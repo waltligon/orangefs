@@ -217,7 +217,7 @@ static PINT_sm_action mgmt_create_root_dir_check_for_request(
     strcpy(s_op->u.mgmt_create_root_dir.credential.issuer+2,
          user_opts->server_alias);
     s_op->u.mgmt_create_root_dir.credential.timeout =
-        PINT_util_get_current_time() + user_opts->security_timeout;
+        PINT_util_get_current_time() + user_opts->credential_timeout;
 
 #ifdef ENABLE_SECURITY_CERT
     /* use CA certificate as cert in credential */

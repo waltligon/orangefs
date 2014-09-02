@@ -21,12 +21,18 @@
     <ClCompile Include="..\..\..\..\src\common\security\cert-util.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\src\common\security\client-capcache.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\src\common\security\security-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\src\common\security\cert-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\src\common\security\client-capcache.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

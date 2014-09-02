@@ -18,6 +18,7 @@
 #include "gossip.h"
 #include "pvfs2-internal.h"
 #include "client-state-machine.h"
+#include "pvfs2-types-debug.h"
 
 /** \file
  *  \ingroup acache
@@ -34,8 +35,13 @@
 #define ACACHE_DEFAULT_TIMEOUT_MSECS 60000 /* 60 seconds */
 
 /* The timeout used for dynamic attributes. */
-/* Currently, the only dynamic attributes are size and size_array.
- * More dynamic attributes could be included in the future. */
+/* Currently, the only dynamic attribute is size.
+ * More dynamic attributes could be included in the future.
+ * Some code exists for size_array, but it has been commented out for now.
+ *     Caching size_array is problematic in that it prevents
+ *     the recursive removal of a directory if the number of
+ *     cached dirents is incorrect. We always need the most
+ *     up-to-date information for this to succeed. */
 #define ACACHE_DEFAULT_DYNAMIC_TIMEOUT_MSECS 10000 /* 10 seconds */
 
 /* data to be stored in a cached entry */
@@ -46,7 +52,9 @@ struct acache_payload
     /**< Time when the dynamic attrs were last updated. */
     struct timeval dynamic_attrs_last_updated;
     PVFS_size size;          /**< cached size */
+#if 0 /* Don't cache size_array. */
     PVFS_size *size_array;   /**< dirent_count of every dirdata handle */
+#endif
 };
 
 static struct PINT_tcache* acache = NULL;
@@ -251,6 +259,7 @@ int PINT_acache_set_info(
  * not. All pointers passed to this function should be valid.
  * @return 0 on success, -PVFS_error on failure
  */
+#if 0 /* Don't cache size_array. */
 int PINT_acache_get_cached_entry(
     PVFS_object_ref refn,  /**< PVFS2 object to look up */
     PVFS_object_attr* attr,/**< attributes of the object */
@@ -258,17 +267,27 @@ int PINT_acache_get_cached_entry(
     PVFS_size* size,       /**< logical size of the object */
     int* size_status,      /**< indicates if the size has expired */
     PVFS_size** size_array, /**< dirent_count of every dirdata handle */
-    int* size_array_status)/**< indicates if the size_array has expired */
-
+    int* size_array_status) /**< indicates if the size_array has expired */
+#endif
+int PINT_acache_get_cached_entry(
+    PVFS_object_ref refn,  /**< PVFS2 object to look up */
+    PVFS_object_attr* attr,/**< attributes of the object */
+    int* attr_status,      /**< indicates if the attributes are expired */
+    PVFS_size* size,       /**< logical size of the object */
+    int* size_status)      /**< indicates if the size has expired */
 {
     struct PINT_tcache_entry* tmp_entry;
     struct acache_payload* tmp_payload;
     int ret = -1;
     struct timeval current_time = { 0, 0};
 
+#if 0 /* Don't cache size_array. */
     if(!attr || !attr_status ||
        !size || !size_status ||
        !size_array || !size_array_status)
+#endif
+    if(!attr || !attr_status ||
+       !size || !size_status)
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG,
                      "%s: Invalid arguments: "
@@ -285,7 +304,9 @@ int PINT_acache_get_cached_entry(
     /* assume everything is timed out for starters */
     *attr_status = -PVFS_ETIME;
     *size_status = -PVFS_ETIME;
+#if 0 /* Don't cache size_array. */
     *size_array_status = -PVFS_ETIME;
+#endif
     attr->mask = 0;
 
     gen_mutex_lock(&acache_mutex);
@@ -314,8 +335,11 @@ int PINT_acache_get_cached_entry(
                    __func__);
         tmp_payload = tmp_entry->payload;
 
+#if 0 /* Don't cache size_array. */
         if((tmp_payload->attr.mask & PVFS_ATTR_DATA_SIZE) ||
            (tmp_payload->attr.mask & PVFS_ATTR_DIR_DIRENT_COUNT))
+#endif
+        if(tmp_payload->attr.mask & PVFS_ATTR_DATA_SIZE)
         {
             int usecs_since_dynamic_attrs_update;
 
@@ -339,14 +363,21 @@ int PINT_acache_get_cached_entry(
                              __func__);
                 /* Strip the cached mask of the PVFS_ATTR_DATA_SIZE bitmask */
                 tmp_payload->attr.mask &= ~(PVFS_ATTR_DATA_SIZE);
+#if 0 /* Don't cache size_array. */
                 /* Strip the cached mask of the PVFS_ATTR_DIR_DIRENT_COUNT */
                 tmp_payload->attr.mask &= ~(PVFS_ATTR_DIR_DIRENT_COUNT);
 
                 /* Should go ahead and free memory here...*/
                 if(tmp_payload->size_array)
                 {
-                    PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&tmp_payload->size_array);
+                    gossip_debug(GOSSIP_ACACHE_DEBUG,
+                                 "%s: about to free: size_array = %p\n",
+                                 __func__,
+                                 (void *) tmp_payload->size_array);
+                    PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(
+                            &tmp_payload->size_array);
                 }
+#endif
             }
             else
             {
@@ -354,8 +385,11 @@ int PINT_acache_get_cached_entry(
                  * dynamic attributes is valid. This behavior might need to
                  * change if we change the required expectations of the acache.
                  */
-                assert((tmp_payload->attr.mask & PVFS_ATTR_DATA_SIZE) ||
-                       (tmp_payload->attr.mask & PVFS_ATTR_DIR_DIRENT_COUNT));
+#if 0 /* Don't cache size_array. */
+                assert((tmp_payload->attr.mask & PVFS_ATTR_DATA_SIZE)
+                      || (tmp_payload->attr.mask & PVFS_ATTR_DIR_DIRENT_COUNT));
+#endif
+                assert(tmp_payload->attr.mask & PVFS_ATTR_DATA_SIZE);
 
                 gossip_debug(GOSSIP_ACACHE_DEBUG,
                              "%s: dynamic attrs are still valid for %d "
@@ -376,18 +410,34 @@ int PINT_acache_get_cached_entry(
                                  __func__,
                                  lld(*size));
                 }
+#if 0
+/* This information needs to be updated each time we create or remove
+   a directory entry. For now just go to the server rather than using
+   the cached value. */
                 if(tmp_payload->attr.mask & PVFS_ATTR_DIR_DIRENT_COUNT)
                 {
-                    /* Set the getattr size_array pointer.
-                     * Any application that uses this pointer should be aware
-                     * that only the acache should destroy this size_array.
-                     * Applications should only read this value or duplicate it
-                     * and do as they want with it.
+                    assert(tmp_payload->attr.objtype == PVFS_TYPE_DIRECTORY);
+
+                    /* NOTE: TODO for v3 
+                     * will eventually use num_servers value integrated with:
+                     *         attr.u.dir
                      */
-                    *size_array = tmp_payload->size_array;
+                    PINT_SM_DATAFILE_SIZE_ARRAY_DUP(
+                            size_array,
+                            tmp_payload->size_array,
+                            tmp_payload->attr.dist_dir_attr.num_servers);
+
+                    gossip_debug(GOSSIP_ACACHE_DEBUG,
+                                 "%s: duplicated <-acache: size_array handle=%llu "
+                                 "size_array=%p num_servers=%d\n",
+                                 __func__,
+                                 llu(tmp_payload->refn.handle),
+                                 (void *) *size_array,
+                                 tmp_payload->attr.dist_dir_attr.num_servers);
+
                     *size_array_status = 0;
-                    /* TODO consider doing some debug output for size_array */
                 }
+#endif
             }
         }
     }
@@ -404,12 +454,11 @@ int PINT_acache_get_cached_entry(
     /* Don't count as a true hit yet. */
     gossip_debug(GOSSIP_ACACHE_DEBUG, 
                  "%s: hit on some attributes: H=%llu, "
-                 "attr_status=%d, size_status=%d, size_array_status=%d\n",
+                 "attr_status=%d, size_status=%d\n",
                  __func__,
                  llu(refn.handle),
                  *attr_status,
-                 *size_status,
-                 *size_array_status);
+                 *size_status);
 
     *attr_status = 0;
     /* return success if we got:
@@ -434,7 +483,8 @@ void PINT_acache_invalidate(
     int tmp_status;
 
     gossip_debug(GOSSIP_ACACHE_DEBUG,
-                 "acache: invalidate(): H=%llu\n",
+                 "%s: H=%llu\n",
+                 __func__,
                  llu(refn.handle));
 
     gen_mutex_lock(&acache_mutex);
@@ -509,13 +559,20 @@ void PINT_acache_invalidate_size(
  *
  * \return 0 on success, -PVFS_error on failure
  */
+#if 0 /* Don't cache size_array. */
 int PINT_acache_update(
     PVFS_object_ref refn,   /**< object to update */
     PVFS_object_attr *attr, /**< attributes to copy into cache */
     PVFS_size* size,        /**< logical file size (NULL if not available) */
     PVFS_size* size_array)  /**< dirent_count of every dirdata handle (NULL if not available) */
+#endif
+int PINT_acache_update(
+    PVFS_object_ref refn,   /**< object to update */
+    PVFS_object_attr *attr, /**< attributes to copy into cache */
+    PVFS_size* size)        /**< logical file size (NULL if not available) */
 {
     struct acache_payload* tmp_payload = NULL;
+    uint32_t save_mask;
     int ret = -1;
 
     gossip_debug(GOSSIP_ACACHE_DEBUG,
@@ -544,7 +601,12 @@ int PINT_acache_update(
     }
 
     tmp_payload->refn = refn;
+    /* copy attrs into payload, excluding capability and size_array */
+    save_mask = attr->mask;
+    /* Don't cache size_array (indicated by PVFS_ATTR_DIR_DIRENT_COUNT). */
+    attr->mask &= ~(PVFS_ATTR_CAPABILITY | PVFS_ATTR_DIR_DIRENT_COUNT);
     ret = PINT_copy_object_attr(&tmp_payload->attr, attr);
+    attr->mask = save_mask;
     if(ret != 0)
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG,
@@ -558,7 +620,10 @@ int PINT_acache_update(
         return -PVFS_ENOMEM;
     }
 
+#if 0 /* Don't cache size_array. */
     if(size || size_array)
+#endif
+    if(size)
     {
         /* For debug output of current time. */
         char parsed_timeval[64] = { 0 };
@@ -593,36 +658,40 @@ int PINT_acache_update(
                      __func__);
     }
 
-    if(size_array)
+#if 0 /* Don't cache size_array. */
+    if(size_array && tmp_payload->attr.objtype == PVFS_TYPE_DIRECTORY &&
+            tmp_payload->attr.mask & PVFS_ATTR_DIR_DIRENT_COUNT)
     {
-        /* getattr should allocate a the size_array it wants to
-         * cache and just pass it to the acache. this way the cache doesn't
-         * have to.
-         * 
-         * Since this instance will be allocated by sys-getattr.sm and the
-         * pointer set in the acache payload. The allocated structure
-         * should be freed at the time the payload size_array is invalidated or
-         * the acache payload itself is destroyed (if it is still present at
-         * that time.) TODO If the acache is disabled, then the caller of the
-         * sys-getattr.sm is responsible for cleaning up. */
-        tmp_payload->size_array = size_array;
+        /* NOTE: TODO for v3 
+         * will eventually use num_servers value integrated with:
+         *         attr.u.dir
+         */
+        PINT_SM_DATAFILE_SIZE_ARRAY_DUP(
+                &tmp_payload->size_array,
+                size_array,
+                tmp_payload->attr.dist_dir_attr.num_servers);
+        gossip_debug(GOSSIP_ACACHE_DEBUG,
+                     "%s: duplicated ->acache: size_array handle=%llu "
+                     "tmp_payload->size_array=%p num_servers=%d\n",
+                     __func__,
+                     llu(tmp_payload->refn.handle),
+                     (void *) tmp_payload->size_array,
+                     tmp_payload->attr.dist_dir_attr.num_servers);
 
         /* No need to mess with the attr bitmask for the same reason listed
          * above for size...
          */
-        gossip_debug(GOSSIP_ACACHE_DEBUG,
-                     "%s: tmp_payload->size_array = %p\n",
-                     __func__,
-                     (void *) tmp_payload->size_array);
-        /* TODO consider better debug output of size_array. */
     }
     else
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG,
-                     "%s: NOTE, size_array is NULL. "
+                     "%s: NOTE, size_array is NULL or "
+                     "objtype is != PVFS_TYPE_DIRECTORY or "
+                     "PVFS_ATTR_DIR_DIRENT_COUNT is not in attr mask. "
                      "No size_array inserted with this acache payload.\n",
                      __func__);
     }
+#endif
 
     gossip_debug(GOSSIP_ACACHE_DEBUG,
                 "%s: copied input payload, mask of copied payload is: %x\n",
@@ -661,7 +730,7 @@ static int PINT_acache_initialize_perf_counter(void)
     acache_pc = PINT_perf_initialize(acache_keys);
     if(!acache_pc)
     {
-        gossip_err("Error: PINT_perf_initialize failure.\n");
+        gossip_err("%s: Error: PINT_perf_initialize failure.\n", __func__);
         return -PVFS_ENOMEM;
     }
 
@@ -737,14 +806,16 @@ static int acache_free_payload(void* payload)
         {
             PINT_free_object_attr(&payload_p->attr);
         }
+#if 0 /* Don't cache size_array. */
         if(payload_p->size_array)
         {
             gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: size_array = %p\n",
+                         "%s: about to free: size_array = %p\n",
                          __func__,
                          (void *) payload_p->size_array);
             PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&payload_p->size_array);
         }
+#endif
         free(payload_p);
     }
     return(0);

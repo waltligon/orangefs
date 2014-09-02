@@ -86,6 +86,7 @@ typedef struct PINT_client_mirror_ctx PINT_client_getattr_mirror_ctx;
 
 /* flag to disable cached lookup during getattr nested sm */
 #define PINT_SM_GETATTR_BYPASS_CACHE 1
+#define PINT_SM_GETATTR_CAPCACHE_HIT 2
 
 typedef struct PINT_sm_getattr_state
 {
@@ -143,14 +144,19 @@ typedef struct PINT_sm_getattr_state
 
 #define PINT_SM_DATAFILE_SIZE_ARRAY_INIT(_array, _count) \
     do { \
-        (*(_array)) = malloc(sizeof(PVFS_size) * (_count)); \
-        memset(*(_array), 0, (sizeof(PVFS_size) * (_count))); \
+        (*(_array)) = calloc((_count), sizeof(PVFS_size)); \
     } while(0)
 
 #define PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(_array) \
     do { \
         free(*(_array)); \
         *(_array) = NULL; \
+    } while(0)
+
+#define PINT_SM_DATAFILE_SIZE_ARRAY_DUP(_dest,_src,_count) \
+    do { \
+        (*(_dest)) = calloc((_count), sizeof(PVFS_size)); \
+        memcpy(*(_dest), _src, sizeof(PVFS_size) * (_count)); \
     } while(0)
 
 /* PINT_client_sm_recv_state_s

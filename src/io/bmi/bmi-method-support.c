@@ -15,6 +15,7 @@
 #include "bmi-method-support.h"
 #include "id-generator.h"
 #include "reference-list.h"
+#include "gossip.h"
 
 
 /*
@@ -134,72 +135,117 @@ void bmi_dealloc_method_addr(bmi_method_addr_p my_method_addr)
  * The function strips all whitespace, commas, and address fields which do
  * not match the key.  
  *
- * Boy, I sure do hate writing code to parse strings...
+ * Adding protocol sub-zones - networks using a given protocol that are
+ * not connected, thus tending to behave like distinct protocols running
+ * the same methods.  string addr is now:
+ *
+ * <protocol>[-<subzone>]://<machine>:<port>
+ *
+ * A subzone can be any string not including a colon.  In this function,
+ * the key will be only the protocol (as it was before) but it will
+ * tolerate the presense of the subzone.
+ *
+ * Phil: Boy, I sure do hate writing code to parse strings...
  * 
- * returns a pointer to the new string on success, NULL on failure.
+ * returns a pointer to the new string containg everything after ://
+ * on success, NULL on failure.
  */
 char *string_key(const char *key,
 		 const char *id_string)
 {
-
-    const char *holder = NULL;
-    const char *end = NULL;
-    char *newkey = NULL;
-    char *retstring = NULL;
-    int keysize = 0;
-    int strsize = 0;
-    int retsize = 0;
+    char *retstr = NULL;
+    char *tmpstr = NULL;
+    int klen = 0;
+    int plen = 0;
+    int rlen = 0;
 
     if ((!id_string) || (!key))
     {
-	return (NULL);
+        /* error */
+	return NULL;
     }
-    keysize = strlen(key);
-    strsize = strlen(id_string);
 
-    /* create a new key of the form <key>:// */
-    if ((newkey = (char *) malloc(keysize + 4)) == NULL)
+    klen = strlen(key);
+
+    while(*id_string && (tmpstr = strstr(id_string, key)))
     {
-	return (NULL);
+        int len, len2;
+
+        /* first verify the key matches the protocol */
+        len = strcspn(tmpstr, "-:");
+        if (len != klen)
+        {
+            /* protocol was not found */
+	    goto keepsearching;
+        }
+        plen = len;
+        
+        /* skip the zone if there is one */
+
+        /* first check for and eat the dash */
+        if (*(tmpstr + plen) == '-')
+        {
+            /* a zone is present */
+            plen++; /* skip over dash */
+            /* make sure zone looks valid */
+            len2 = strcspn(tmpstr + plen, ":-/{}\n\t@$#&*^%! ;,.?");
+            len  = strcspn(tmpstr + plen, ":");
+            if (len != len2)
+            {
+                /* malformed zone string */
+	        goto keepsearching;
+            }
+            plen += len;
+        }
+
+        /* check for colon */
+        if (*(tmpstr + plen) != ':')
+        {
+            /* malformed string */
+	    goto keepsearching;
+        }
+        plen++; /* skip over colon */
+
+        /* eat the slashes */
+        len = strspn(tmpstr + plen, "/");
+        if (len != 2)
+        {
+            /* malformed string */
+	    goto keepsearching;
+        }
+        plen += len;
+
+        /* we found it jump out of the loop */
+        break;  
+
+keepsearching:
+        /* continue searching just past last substr we found */
+        id_string = tmpstr + 1;
+        tmpstr = NULL;
     }
-    strcpy(newkey, key);
-    strcat(newkey, "://");
 
-    holder = id_string;
-
-    holder = strstr(holder, newkey);
-    /* first match */
-    if (holder)
+    if (!tmpstr)
     {
-	end = strpbrk(holder, ", \t\n");
-	if (end == NULL)
-	{
-	    end = id_string + strsize; /* go to the end of the id string (\0) */
-	}
-	/* move holder so it doesn't include the opening key and deliminator */
-	holder = holder + keysize + 3;
+        /* returned NULL so not found */
+        return NULL;
     }
-    else
+
+    /* tmpstr + plen now points just past :// */
+
+    /* find end of string, not including white space */
+    rlen = strcspn(tmpstr + plen, ", \t\n");
+
+    /* malloc the string, copy it in and return it */
+    retstr = (char *)malloc(rlen + 1);
+    if (!retstr)
     {
-	/* no match */
-	free(newkey);
-	return (NULL);
+        /* out of memory */
+        return NULL;
     }
+    memcpy(retstr, tmpstr + plen, rlen);
+    retstr[rlen] = '\0';
 
-    /* figure out how long our substring is */
-    retsize = (end - holder);
-    if ((retstring = (char *) malloc(retsize + 1)) == NULL)
-    {
-	free(newkey);
-	return (NULL);
-    }
-
-    /* copy it out */
-    strncpy(retstring, holder, retsize);
-    retstring[retsize] = '\0';
-
-    free(newkey);
-    return (retstring);
+    return (retstr);
 }
 
 /*

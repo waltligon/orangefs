@@ -35,7 +35,7 @@ static int hash_init_status = 0;                  /* 1 = init, 0 = not init */
 static gen_mutex_t hash_mutex = GEN_MUTEX_INITIALIZER;
 
 
-static int pubkey_compare(void*, struct qhash_head*);
+static int pubkey_compare(const void*, struct qhash_head*);
 static void free_pubkey_entry(void*);
 
 
@@ -169,7 +169,7 @@ EVP_PKEY *SECURITY_lookup_pubkey(char *hash_key)
  *  returns 1 if the IDs match
  *  returns 0 if they do not match or if the structure is invalid
  */
-static int pubkey_compare(void *key, struct qhash_head *link)
+static int pubkey_compare(const void *key, struct qhash_head *link)
 {
     char *hash_key = ((char *)key);
     pubkey_entry_t *temp;

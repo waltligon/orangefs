@@ -28,6 +28,7 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-dist-varstrip.h"
 #include "dist-dir-utils.h"
+#include "client-capcache.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -186,6 +187,8 @@ PVFS_error PVFS_isys_create(
         return -PVFS_ENAMETOOLONG;
     }
 
+#ifndef ENABLE_SECURITY_CERT
+    /* do not use credential values in cert. mode */
     if (attr.owner != credential->userid)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing owner uid %d with %d "
@@ -199,6 +202,7 @@ PVFS_error PVFS_isys_create(
                      "on create\n", attr.group, credential->group_array[0]);
         attr.group = credential->group_array[0];
     }
+#endif
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_CREATE,
@@ -337,7 +341,7 @@ PVFS_error PVFS_sys_create(
         PVFS_perror_gossip("PVFS_isys_create call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "create", &error);
         if (ret)
@@ -345,9 +349,8 @@ PVFS_error PVFS_sys_create(
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -588,6 +591,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(
 static PINT_sm_action create_crdirent_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    PVFS_uid local_uid;
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: crdirent_failure\n");
 
@@ -595,16 +599,30 @@ static PINT_sm_action create_crdirent_failure(
     if(js_p->error_code == -PVFS_EAGAIN)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "create: received -PVFS_EAGAIN, will retry getattr and crdirent.\n");
-
-        /* setup getattr */
+        
+        /* clear attributes */
         PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
         /* clear acache content */
         PINT_acache_invalidate(sm_p->object_ref);
+        /* clear capcache content */
+        local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
 
+        if (local_uid == (PVFS_uid) -1)
+        {
+            local_uid = PINT_util_getuid();
+
+            PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
+                          sizeof(PVFS_uid), &local_uid);
+        }
+
+        PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+
+        /* set up new getattr */
         PINT_SM_GETATTR_STATE_FILL(
                 sm_p->getattr,
                 sm_p->object_ref,
-                PVFS_ATTR_DISTDIR_ATTR,
+                PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|
+                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DISTDIR_ATTR,
                 PVFS_TYPE_DIRECTORY,
                 0);
 
@@ -688,10 +706,15 @@ static PINT_sm_action create_cleanup(
         sm_p->u.create.attr.mask &= (~(PVFS_ATTR_COMMON_MTIME));
         sm_p->u.create.attr.mask &= (~(PVFS_ATTR_COMMON_CTIME));
         sm_p->u.create.attr.mask &= (~(PVFS_ATTR_COMMON_ATIME));
+#if 0 /* Don't cache size_array. */
         ret = PINT_acache_update(metafile_ref,
                                  &sm_p->u.create.attr,
                                  &tmp_size,
                                  NULL);
+#endif
+        ret = PINT_acache_update(metafile_ref,
+                                 &sm_p->u.create.attr,
+                                 &tmp_size);
         if(ret < 0)
         {
             js_p->error_code = ret;
@@ -758,7 +781,7 @@ static PINT_sm_action create_parent_getattr_inspect(
     attr = &sm_p->getattr.attr;
     assert(attr);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "parent owner: %d, group: %d, perms: %d\n",
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "parent owner: %d, group: %d, perms: %o\n",
         (int)attr->owner, (int)attr->group, (int)attr->perms);
 
     /* do we have a setgid bit? */
@@ -770,6 +793,15 @@ static PINT_sm_action create_parent_getattr_inspect(
         sm_p->u.create.attr.group = attr->group;
         /* note that permission checking is left to server even in this case */
     }
+
+#ifdef ENABLE_SECURITY_CERT
+    /* we need to know the correct owner group in cert. mode */
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "adding gid hint: %d\n", 
+                 sm_p->u.create.attr.group);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_OWNER_GID_NAME, sizeof(uint32_t), 
+                  &sm_p->u.create.attr.group);
+#endif
+    
     /* !!! change more later */
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_parent_getattr: [%p] "
         "dirdata_server_count = %d "

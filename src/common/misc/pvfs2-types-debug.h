@@ -65,7 +65,6 @@ static inline void PINT_attrmask_print(int debug, uint32_t attrmask)
     if (attrmask & PVFS_ATTR_DIR_DIRENT_COUNT) gossip_debug(debug, "\tPVFS_ATTR_DIR_DIRENT_COUNT\n");
     if (attrmask & PVFS_ATTR_DIR_HINT) gossip_debug(debug, "\tPVFS_ATTR_DIR_HINT\n");
     if (attrmask & PVFS_ATTR_DISTDIR_ATTR) gossip_debug(debug, "\tPVFS_ATTR_DIR_DISTDIR_ATTR\n");
-    if (attrmask & PVFS_ATTR_SYS_SIZE) gossip_debug(debug, "\tPVFS_ATTR_SYS_SIZE\n");
     if (attrmask & PVFS_ATTR_CAPABILITY) gossip_debug(debug, "\tPVFS_ATTR_CAPABILITY\n");
 }
 

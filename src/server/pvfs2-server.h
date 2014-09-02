@@ -691,7 +691,7 @@ typedef struct PINT_server_op
         struct PINT_server_getconfig_op getconfig;
         struct PINT_server_lookup_op lookup;
         struct PINT_server_crdirent_op crdirent;
-        // struct PINT_server_setattr_op setattr;
+        /* struct PINT_server_setattr_op setattr; */
         struct PINT_server_readdir_op readdir;
         struct PINT_server_remove_op remove;
         struct PINT_server_chdirent_op chdirent;

@@ -316,7 +316,7 @@ directory_test2()
     return 0
 }
 
-# create 100 nested subdirectories
+# create 40 nested subdirectories
 # ls -alR the top-level dir
 # rm -rf the dir
 directory_test3()
@@ -330,21 +330,22 @@ directory_test3()
 
     old_dir=`pwd`
     cd $PVFS2_TESTDIR
-    mkdir $PVFS2_TESTDIR/100
+    mkdir $PVFS2_TESTDIR/40
 
     DATE=`date`
-    echo "$DATE: Creating 100 nested subdirectories"
+    echo "$DATE: Creating 40 nested subdirectories"
 
     # no error checking inside the loop as we're playing
     # a shell trick in there to get the nesting right
-    echo "100" ;
-    for f in `seq 1 100`; do
+    # note: the test dir and the "40" dir count towards the limit
+    echo "40" ;
+    for f in `seq 1 38`; do
         mkdir $_/$f
     done
 
     # now make sure all dirs exist
     NUMDIRS=`find . | grep -c .`
-    if test $NUMDIRS -ne 102 ; then
+    if test $NUMDIRS -ne 40 ; then
         echo ""
         echo "******************************************"
         echo "* FAILED DIRECTORY TEST 3 [stage 1]"
@@ -355,8 +356,8 @@ directory_test3()
     DATE=`date`
     echo "$DATE: Finished"
 
-    CMD="ls -alR $PVFS2_TESTDIR/100"
-    timestamp "Running ls -alR $PVFS2_TESTDIR/100" "$CMD" /dev/null
+    CMD="ls -alR $PVFS2_TESTDIR/40"
+    timestamp "Running ls -alR $PVFS2_TESTDIR/40" "$CMD" /dev/null
 
     cd $old_dir
 
@@ -369,7 +370,7 @@ directory_test3()
     return 0
 }
 
-# create 50 nested subdirectories
+# create 40 nested subdirectories
 # touch 1 file in each of the directories
 # ls -alR the top-level dir
 # rm -rf the dir
@@ -384,21 +385,22 @@ directory_test4()
 
     old_dir=`pwd`
     cd $PVFS2_TESTDIR
-    mkdir $PVFS2_TESTDIR/100
+    mkdir $PVFS2_TESTDIR/40
 
     DATE=`date`
-    echo "$DATE: Creating 50 nested subdirectories"
+    echo "$DATE: Creating 40 nested subdirectories"
 
     # no error checking inside the loop as we're playing
     # a shell trick in there to get the nesting right
-    echo "100" ;
-    for f in `seq 1 50`; do
+    # note: the test dir and the "40" dir count towards the limit
+    echo "40" ;
+    for f in `seq 1 38`; do
         mkdir $_/$f
     done
 
     # now make sure all dirs exist
     NUMDIRS=`find . | grep -c .`
-    if test $NUMDIRS -ne 52 ; then
+    if test $NUMDIRS -ne 40 ; then
         echo ""
         echo "******************************************"
         echo "* FAILED DIRECTORY TEST 4 [stage 1]"
@@ -423,8 +425,8 @@ directory_test4()
     DATE=`date`
     echo "$DATE: Finished"
 
-    CMD="ls -alR $PVFS2_TESTDIR/100"
-    timestamp "Running ls -alR $PVFS2_TESTDIR/100" "$CMD" /dev/null
+    CMD="ls -alR $PVFS2_TESTDIR/40"
+    timestamp "Running ls -alR $PVFS2_TESTDIR/40" "$CMD" /dev/null
 
     cd $old_dir
 
@@ -437,9 +439,14 @@ directory_test4()
     return 0
 }
 
+# *** NOT USED ***
+# the current limit of nested directories is 40; this
+# limit has been tested in directory tests #3 and #4
+# ****************
 # create 256 nested subdirectories
 # ls -alR the top-level dir
 # rm -rf the dir
+
 directory_test5()
 {
     echo ""
@@ -1150,57 +1157,56 @@ fi
 
 if ! test -z "$ENABLE_DIRECTORY_TESTS"; then
 
-    directory_test1
+    directory_test1 || error_exit
 
-    directory_test2
+    directory_test2 || error_exit
 
-    directory_test3
+    directory_test3 || error_exit
 
-    directory_test4
+    directory_test4 || error_exit
 
-    directory_test5
-
+    # directory_test5
 fi
 
 if ! test -z "$ENABLE_IO_TESTS"; then
 
-    io_test1
+    io_test1 || error_exit
 
-    io_test2
+    io_test2 || error_exit
 
 fi
 
 if ! test -z "$ENABLE_EXECUTE_TESTS"; then
 
-    execute_test1
+    execute_test1 || error_exit
 
 fi
 
 if ! test -z "$ENABLE_COMPILE_TESTS"; then
 
-    compile_test1
+    compile_test1 || error_exit
 
-    compile_test2
+    compile_test2 || error_exit
 
 fi
 
 if ! test -z "$ENABLE_PERMISSION_TESTS"; then
 
-    permission_test1
+    permission_test1 || error_exit
 
-    permission_test2
+    permission_test2 || error_exit
 
 fi
 
 if ! test -z "$ENABLE_SYMLINK_TESTS"; then
 
-    symlink_test1
+    symlink_test1 || error_exit
 
 fi
 
 if ! test -z "$ENABLE_RENAME_TESTS"; then
 
-    rename_test1
+    rename_test1 || error_exit
 
 fi
 

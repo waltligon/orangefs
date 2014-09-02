@@ -13,6 +13,7 @@
 #include "pint-sysint-utils.h"
 #include "acache.h"
 #include "ncache.h"
+#include "client-capcache.h"
 #include "gen-locks.h"
 #include "pint-cached-config.h"
 #include "pint-dist-utils.h"
@@ -60,10 +61,7 @@ int PVFS_sys_finalize()
 
     id_gen_safe_finalize();
 
-
-    /* If desired, display acache/ncache perf counters
-     * before they are finalized.
-     */
+    /* If desired, display cache perf counters before they are finalized. */
     perf_counters_to_display = getenv("PVFS2_COUNTERS_AT_FINALIZE");
     if(perf_counters_to_display)
     {
@@ -71,19 +69,27 @@ int PVFS_sys_finalize()
            strstr(perf_counters_to_display, "ncache"))
         {
             gossip_err("%s: DISPLAYING PERF COUNTERS FOR NCACHE:\n%s",
-                       __func__,
-                       PINT_perf_generate_text(PINT_ncache_get_pc(), 4096));
+                __func__,
+                PINT_perf_generate_text(PINT_ncache_get_pc(), 4096));
         }
         if(PINT_acache_get_pc() &&
            strstr(perf_counters_to_display, "acache"))
         {
             gossip_err("%s: DISPLAYING PERF COUNTERS FOR ACACHE:\n%s",
-                       __func__,
-                       PINT_perf_generate_text(PINT_acache_get_pc(), 4096));
+                __func__,
+                PINT_perf_generate_text(PINT_acache_get_pc(), 4096));
         
+        }
+        if(PINT_client_capcache_get_pc() &&
+           strstr(perf_counters_to_display, "capcache"))
+        {
+            gossip_err("%s: DISPLAYING PERF COUNTERS FOR CAPCACHE\n%s",
+                __func__,
+                PINT_perf_generate_text(PINT_client_capcache_get_pc(), 4096));
         }
     }
 
+    PINT_client_capcache_finalize();
     PINT_ncache_finalize();
     PINT_acache_finalize();
     PINT_cached_config_finalize();

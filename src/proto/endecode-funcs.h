@@ -21,6 +21,7 @@ typedef uint64_t u_int64_t;
 /* typeof not available on Windows */
 #define typeof(t)   t
 #endif
+
 #include <assert.h>
 
 /*
@@ -665,23 +666,25 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##t1(pptr, &x->x1); \
     encode_##tn1(pptr, &x->n1); \
     for (i=0; i<x->n1; i++) { int n; n = i; \
-	encode_##ta1(pptr, &(x)->a1[n]); } \
+        encode_##ta1(pptr, &(x)->a1[n]); \
+    } \
     encode_##t2(pptr, &x->x2); \
     encode_##tn2(pptr, &x->n2); \
     for (i=0; i<x->n2; i++) { int n; n = i; \
-	encode_##ta2(pptr, &(x)->a2[n]); } \
+        encode_##ta2(pptr, &(x)->a2[n]); \
+    } \
 } \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t1(pptr, &x->x1); \
     decode_##tn1(pptr, &x->n1); \
     x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
     for (i=0; i<x->n1; i++) \
-	decode_##ta1(pptr, &(x)->a1[i]); \
-    decode_##t1(pptr, &x->x1); \
+        decode_##ta1(pptr, &(x)->a1[i]); \
+    decode_##t2(pptr, &x->x2); \
     decode_##tn2(pptr, &x->n2); \
     x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
     for (i=0; i<x->n2; i++) \
-	decode_##ta2(pptr, &(x)->a2[i]); \
+        decode_##ta2(pptr, &(x)->a2[i]); \
 }
 
 /* 2 fields, then an array */

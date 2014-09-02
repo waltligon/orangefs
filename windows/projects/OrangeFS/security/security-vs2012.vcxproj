@@ -28,10 +28,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\src\common\security\cert-util.c" />
+    <ClCompile Include="..\..\..\..\src\common\security\client-capcache.c" />
     <ClCompile Include="..\..\..\..\src\common\security\security-util.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\src\common\security\cert-util.h" />
+    <ClInclude Include="..\..\..\..\src\common\security\client-capcache.h" />
     <ClInclude Include="..\..\..\..\src\common\security\security-util.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

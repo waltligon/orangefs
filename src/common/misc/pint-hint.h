@@ -30,7 +30,9 @@ enum PINT_hint_type
     PINT_HINT_LAYOUT,
     PINT_HINT_DFILE_COUNT,
     PINT_HINT_SERVERLIST,
-    PINT_HINT_CACHE
+    PINT_HINT_CACHE,
+    PINT_HINT_LOCAL_UID,
+    PINT_HINT_OWNER_GID
 };
 
 typedef struct PVFS_hint_s
@@ -88,6 +90,14 @@ int PVFS_hint_replace_internal(
 #define PINT_HINT_GET_RANK(hints) \
     PINT_hint_get_value_by_type(hints, PINT_HINT_RANK, NULL) ? \
     *(uint32_t *)PINT_hint_get_value_by_type(hints, PINT_HINT_RANK, NULL) : 0
+
+#define PINT_HINT_GET_LOCAL_UID(hints) \
+    PINT_hint_get_value_by_type(hints, PINT_HINT_LOCAL_UID, NULL) ? \
+    *(PVFS_uid *)PINT_hint_get_value_by_type(hints, PINT_HINT_LOCAL_UID, NULL) : -1
+
+#define PINT_HINT_GET_OWNER_GID(hints) \
+    PINT_hint_get_value_by_type(hints, PINT_HINT_OWNER_GID, NULL) ? \
+    *(PVFS_gid *)PINT_hint_get_value_by_type(hints, PINT_HINT_OWNER_GID, NULL) : -1
 
 #endif /* __PINT_HINT_H__ */
 

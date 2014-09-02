@@ -163,7 +163,6 @@ machine pvfs2_pjmp_get_attr_with_prelude_sm
     } 
 }
 
-
 machine pvfs2_pjmp_call_msgpairarray_sm
 {
    state call_msgpairarray

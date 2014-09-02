@@ -138,8 +138,9 @@ extern void  PINT_free(void *mem);
 # ifdef PINT_malloc
 #  undef PINT_malloc
 # endif
-# ifndef PVFS_MALLOC_REDEF_OVERRIDE
-#  define PINT_malloc PINT_malloc_minimum
+#if 0
+-- ifndef PVFS_MALLOC_REDEF_OVERRIDE
+--  define PINT_malloc PINT_malloc_minimum
 # endif
 
 # ifdef PINT_calloc
