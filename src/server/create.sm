@@ -780,32 +780,39 @@ static PINT_sm_action setattr_setobj_attribs(
     }
 
     dspace_a_p->owner = uid;
-    dspace_a_p->group = group_array[0];
+
+    /* for cert mode we use a hint provided by the client */
+    dspace_a_p->group = PINT_HINT_GET_OWNER_GID(s_op->req->hints);
+    if (dspace_a_p->group == PVFS_GID_MAX)
+    {
+        gossip_err("%s: warning: no owner gid hint\n", __func__);
+        dspace_a_p->group = group_array[0];
+    }
 #endif
 
-     gossip_debug(
-         GOSSIP_SERVER_DEBUG,
-         "[STUFFED CREATE]: WRITING attrs: [owner = %d, group = %d\n\t"
-         "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
-         "ctime = %llu | dfile_count = %d | dist_size = %d]\n",
-         dspace_a_p->owner, dspace_a_p->group, dspace_a_p->perms,
-         dspace_a_p->objtype, llu(dspace_a_p->atime),
-         llu(PINT_util_mkversion_time(dspace_a_p->mtime)), llu(dspace_a_p->ctime),
-         (int)dspace_a_p->u.meta.dfile_count,
-         (int)dspace_a_p->u.meta.dist_size);
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG,
+        "[STUFFED CREATE]: WRITING attrs: [owner = %d, group = %d\n\t"
+        "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
+        "ctime = %llu | dfile_count = %d | dist_size = %d]\n",
+        dspace_a_p->owner, dspace_a_p->group, dspace_a_p->perms,
+        dspace_a_p->objtype, llu(dspace_a_p->atime),
+        llu(PINT_util_mkversion_time(dspace_a_p->mtime)), llu(dspace_a_p->ctime),
+        (int)dspace_a_p->u.meta.dfile_count,
+        (int)dspace_a_p->u.meta.dist_size);
 
-     /* translate attrs to storage attr format */
-     ds_attr = &(s_op->ds_attr);
-     PVFS_object_attr_to_ds_attr(dspace_a_p, ds_attr);
+    /* translate attrs to storage attr format */
+    ds_attr = &(s_op->ds_attr);
+    PVFS_object_attr_to_ds_attr(dspace_a_p, ds_attr);
 
-     ret = job_trove_dspace_setattr(
-         s_op->req->u.create.fs_id, s_op->resp.u.create.metafile_handle,
-         ds_attr,
-         TROVE_SYNC,
-         smcb, 0, js_p, &j_id, server_job_context,
-         s_op->req->hints);
+    ret = job_trove_dspace_setattr(
+        s_op->req->u.create.fs_id, s_op->resp.u.create.metafile_handle,
+        ds_attr,
+        TROVE_SYNC,
+        smcb, 0, js_p, &j_id, server_job_context,
+        s_op->req->hints);
 
-     return ret;
+    return ret;
 }
 
 static int setup_resp(

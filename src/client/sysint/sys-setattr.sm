@@ -287,7 +287,10 @@ static PINT_sm_action setattr_cleanup(
     if(sm_p->error_code == 0)
     {
         PINT_CONVERT_ATTR(&attr, &sm_p->u.setattr.sys_attr, 0);
+#if 0 /* Don't cache size_array. */
         PINT_acache_update(sm_p->object_ref, &attr, NULL, NULL);
+#endif
+        PINT_acache_update(sm_p->object_ref, &attr, NULL);
     }
     else
     {

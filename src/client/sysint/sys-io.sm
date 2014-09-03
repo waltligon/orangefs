@@ -3406,10 +3406,15 @@ static int unstuff_comp_fn(void *v_p,
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "Updating attributes after unstuff\n");
 
+#if 0 /* Don't cache size_array. */
         PINT_acache_update(sm_p->object_ref,
                            &resp_p->u.unstuff.attr,
                            NULL,
                            NULL); /* TODO should we try to cache size_array here? */
+#endif
+        PINT_acache_update(sm_p->object_ref,
+                           &resp_p->u.unstuff.attr,
+                           NULL);
 
         /* replace attrs found by getattr */
         /* PINT_copy_object_attr() takes care of releasing old memory */
@@ -3423,10 +3428,15 @@ static int unstuff_comp_fn(void *v_p,
                      "Updating attributes before reading "
                      "beyond stuffing boundary.\n");
 
+#if 0 /* Don't cache size_array. */
         PINT_acache_update(sm_p->object_ref,
                            &resp_p->u.getattr.attr,
                            NULL,
                            NULL); /* TODO should we try to cache size_array here? */
+#endif
+        PINT_acache_update(sm_p->object_ref,
+                           &resp_p->u.getattr.attr,
+                           NULL);
 
         /* replace attrs found by getattr */
         /* PINT_copy_object_attr() takes care of releasing old memory */
