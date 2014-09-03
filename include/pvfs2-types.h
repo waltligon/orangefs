@@ -454,14 +454,17 @@ typedef struct
 #define PVFS_ATTR_SYS_ATIME                 (1 << 3)
 #define PVFS_ATTR_SYS_CTIME                 (1 << 4)
 #define PVFS_ATTR_SYS_MTIME                 (1 << 5)
-#define PVFS_ATTR_SYS_TYPE                  (1 << 6)
-#define PVFS_ATTR_SYS_ATIME_SET             (1 << 7)
-#define PVFS_ATTR_SYS_MTIME_SET             (1 << 8)
+#define PVFS_ATTR_SYS_NTIME                 (1 << 6)
+#define PVFS_ATTR_SYS_TYPE                  (1 << 7)
+#define PVFS_ATTR_SYS_ATIME_SET             (1 << 8)
+#define PVFS_ATTR_SYS_CTIME_SET             (1 << 9)
+#define PVFS_ATTR_SYS_MTIME_SET             (1 << 10)
+#define PVFS_ATTR_SYS_NTIME_SET             (1 << 11)
 #define PVFS_ATTR_SYS_COMMON_ALL \
 (PVFS_ATTR_SYS_UID   | PVFS_ATTR_SYS_GID   | \
  PVFS_ATTR_SYS_PERM  | PVFS_ATTR_SYS_ATIME | \
  PVFS_ATTR_SYS_CTIME | PVFS_ATTR_SYS_MTIME | \
- PVFS_ATTR_SYS_TYPE)
+ PVFS_ATTR_SYS_NTIME | PVFS_ATTR_SYS_TYPE)
 
 #define PVFS_ATTR_SYS_ALL                    \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \

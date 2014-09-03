@@ -228,8 +228,8 @@ do {                                                                   \
         (__dsa)->u.datafile.b_size = (__oa)->u.data.size;              \
         break;                                                         \
     case PVFS_TYPE_DIRECTORY :                                         \
-        (__dsa)->u.dirdata.dirent_count =                              \
-                (__oa)->u.dirdata.dirent_count;                        \
+        (__dsa)->u.directory.dirent_count =                            \
+                (__oa)->u.dir.dirent_count;                            \
         (__dsa)->u.directory.tree_height =                             \
                 (__oa)->u.dir.dist_dir_attr.tree_height;               \
         (__dsa)->u.directory.dirdata_count =                           \
@@ -248,20 +248,20 @@ do {                                                                   \
     case PVFS_TYPE_DIRDATA :                                           \
         (__dsa)->u.dirdata.dirent_count =                              \
                 (__oa)->u.dirdata.dirent_count;                        \
-        (__dsa)->u.directory.tree_height =                             \
-                (__oa)->u.dir.dist_dir_attr.tree_height;               \
-        (__dsa)->u.directory.dirdata_count =                           \
-                (__oa)->u.dir.dist_dir_attr.dirdata_count;             \
-        (__dsa)->u.directory.sid_count =                               \
-                (__oa)->u.dir.dist_dir_attr.sid_count;                 \
-        (__dsa)->u.directory.bitmap_size =                             \
-                (__oa)->u.dir.dist_dir_attr.bitmap_size;               \
-        (__dsa)->u.directory.split_size =                              \
-                (__oa)->u.dir.dist_dir_attr.split_size;                \
-        (__dsa)->u.directory.server_no =                               \
-                (__oa)->u.dir.dist_dir_attr.server_no;                 \
-        (__dsa)->u.directory.branch_level =                            \
-                (__oa)->u.dir.dist_dir_attr.branch_level;              \
+        (__dsa)->u.dirdata.tree_height =                               \
+                (__oa)->u.dirdata.dist_dir_attr.tree_height;           \
+        (__dsa)->u.dirdata.dirdata_count =                             \
+                (__oa)->u.dirdata.dist_dir_attr.dirdata_count;         \
+        (__dsa)->u.dirdata.sid_count =                                 \
+                (__oa)->u.dirdata.dist_dir_attr.sid_count;             \
+        (__dsa)->u.dirdata.bitmap_size =                               \
+                (__oa)->u.dirdata.dist_dir_attr.bitmap_size;           \
+        (__dsa)->u.dirdata.split_size =                                \
+                (__oa)->u.dirdata.dist_dir_attr.split_size;            \
+        (__dsa)->u.dirdata.server_no =                                 \
+                (__oa)->u.dirdata.dist_dir_attr.server_no;             \
+        (__dsa)->u.dirdata.branch_level =                              \
+                (__oa)->u.dirdata.dist_dir_attr.branch_level;          \
         break;                                                         \
     default :                                                          \
         break;                                                         \

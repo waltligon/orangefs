@@ -708,7 +708,8 @@ static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
     ds_attr = &(s_op->u.crdirent.dirdata_ds_attr);
     memset(ds_attr, 0, sizeof(PVFS_ds_attributes));
 
-    dspace_attr->mtime = dspace_attr->ctime = time(NULL);
+    dspace_attr->ctime = time(NULL);
+    dspace_attr->mtime = PINT_util_mktime_version(dspace_attr->ctime);
 
     /* copy and convert format */
     PVFS_ds_attr_from_object_attr(ds_attr, dspace_attr);
