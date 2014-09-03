@@ -60,8 +60,8 @@
              PVFS_ATTR_DIR_ALL     | PVFS_ATTR_DATA_ALL | \
              PVFS_ATTR_SYMLINK_ALL | PVFS_DIRDATA_ALL)
 
-#define PVFS_ATTR_FASTEST            (1 << 25)
-#define PVFS_ATTR_LATEST             (1 << 26)
+#define PVFS_ATTR_FASTEST            (1 << 15)
+#define PVFS_ATTR_LATEST             (1 << 16)
 
 /* latest and fastest refer to atime, mtime, ctime, file size
  * and dirent_count.  Fastest returns the value stored in the
@@ -106,32 +106,32 @@
 
 /* internal attribute masks for metadata objects */
 #define PVFS_ATTR_META_DIST          (1 << 12)
-#define PVFS_ATTR_META_DFILES        (1 << 13)   /* includes sids */
+#define PVFS_ATTR_META_DFILES        (1 << 25)   /* includes sids */
 #define PVFS_ATTR_META_MIRROR_DFILES (0)         /* remove */
 
 #define PVFS_ATTR_META_ALL                             \
         (PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES | \
         PVFS_ATTR_META_MIRROR_DFILES)
 
-#define PVFS_ATTR_META_UNSTUFFED     (1 << 14)
+#define PVFS_ATTR_META_UNSTUFFED     (1 << 13)
 
 
 /* internal attribute masks for datafile objects */
-#define PVFS_ATTR_DATA_SIZE          (1 << 15)   /* replace with latest bit */
+#define PVFS_ATTR_DATA_SIZE          (1 << 20)   /* replace with latest bit */
 
 #define PVFS_ATTR_DATA_ALL \
              PVFS_ATTR_DATA_SIZE
 
 /* internal attribute masks for symlink objects */
-#define PVFS_ATTR_SYMLNK_TARGET      (1 << 16)
+#define PVFS_ATTR_SYMLNK_TARGET      (1 << 24)
 
 #define PVFS_ATTR_SYMLNK_ALL \
              PVFS_ATTR_SYMLNK_TARGET
 
 /* internal attribute masks for directory objects */
-#define PVFS_ATTR_DIR_DIRENT_COUNT   (1 << 17)   /* replace with latest bit */
-#define PVFS_ATTR_DIR_DIRDATA        (1 << 18)   /* includes sids */
-#define PVFS_ATTR_DIR_HINT           (1 << 19)
+#define PVFS_ATTR_DIR_DIRENT_COUNT   (1 << 26)   /* replace with latest bit */
+#define PVFS_ATTR_DIR_DIRDATA        (1 << 14)   /* includes sids */
+#define PVFS_ATTR_DIR_HINT           (1 << 27)
 
 #define PVFS_ATTR_DIR_ALL \
              (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT | \
@@ -144,10 +144,10 @@
 /* internal attribute mask for distributed directory information */
 /* this may be in the meta or dirdata area depending on objtype */
 /* This includes the bitmap and dirdata handles/sids info */
-#define PVFS_ATTR_DISTDIR_ATTR       (1 << 20)    /* remove */
+#define PVFS_ATTR_DISTDIR_ATTR       (1 << 21)    /* remove */
 
 /* internal attribute mask for capability objects */
-#define PVFS_ATTR_CAPABILITY         (1 << 21)
+#define PVFS_ATTR_CAPABILITY         (1 << 30)
 
 /* attributes that do not change once set */
 /* needs to be renamed */
