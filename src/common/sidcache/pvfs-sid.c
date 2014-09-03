@@ -20,11 +20,14 @@
 #include "policyeval.h"
 #include "bmi.h"
 
+/* V3 I think this is obsolete - get rid of it */
+#if 0
 enum {
     PVFS_OBJ_META,
     PVFS_OBJ_DATA,
     PVFS_OBJ_FILE
 };
+#endif
 
 static int PVFS_OBJ_gen(PVFS_object_ref *obj,
                         int obj_count,
@@ -40,7 +43,7 @@ int PVFS_OBJ_gen_meta(PVFS_object_ref *obj,
                       PVFS_fs_id fs_id)
 {
     int ret = 0;
-    ret = PVFS_OBJ_gen(obj, obj_count, fs_id, PVFS_OBJ_META);
+    ret = PVFS_OBJ_gen(obj, obj_count, fs_id, SID_SERVER_META);
     return ret;
 }
 
@@ -53,7 +56,7 @@ int PVFS_OBJ_gen_data(PVFS_object_ref *obj,
                       PVFS_fs_id fs_id)
 {
     int ret = 0;
-    ret = PVFS_OBJ_gen(obj, obj_count, fs_id, PVFS_OBJ_DATA);
+    ret = PVFS_OBJ_gen(obj, obj_count, fs_id, SID_SERVER_DATA);
     return ret;
 }
 
@@ -165,6 +168,82 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
     return ret;
 }
 
+/* These functions count servers of a given type
+ */
+static int PVFS_SID_count_server(int *count, uint32_t stype)
+{
+    int ret = 0;
+    DBT key, val;
+    db_recno_t dbcountp = 0;
+
+    if (!count)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    SID_zero_dbt(&key, &val, NULL);
+
+    gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                 "Counting servers of type %o\n", stype);
+
+    key.data = &stype;
+    key.size = sizeof(uint32_t);
+    key.ulen = sizeof(uint32_t);
+    key.flags = DB_DBT_USERMEM;
+
+    /* val is left empty for DB to fill in */
+   
+    ret = SID_type_cursor->get(SID_type_cursor, /* type index */
+                               &key,            /* key of secondary db  */
+                               &val,            /* no val expected */
+                               DB_SET);         /* get flags */
+    if(ret)
+    {
+        if (ret != DB_NOTFOUND)
+        {
+            gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                         "Error getting type from type cache while counting: "
+                         "%s\n", db_strerror(ret));
+        }
+        return ret;
+    }
+    ret = SID_type_cursor->count(SID_type_cursor, &dbcountp, 0);
+    if(ret)
+    {
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                     "Error counting type from type cache while counting: "
+                     "%s\n", db_strerror(ret));
+        return ret;
+    }
+    *count = dbcountp;
+    return 0;
+}
+
+int PVFS_SID_count_io(PVFS_fs_id fs_id, int *count)
+{
+    return PVFS_SID_count_server(count, SID_SERVER_DATA);
+}
+
+int PVFS_SID_count_meta(PVFS_fs_id fs_id, int *count)
+{
+    return PVFS_SID_count_server(count, SID_SERVER_META);
+}
+
+int PVFS_SID_count_root(PVFS_fs_id fs_id, int *count)
+{
+    return PVFS_SID_count_server(count, SID_SERVER_ROOT);
+}
+
+int PVFS_SID_count_prime(PVFS_fs_id fs_id, int *count)
+{
+    return PVFS_SID_count_server(count, SID_SERVER_PRIME);
+}
+
+int PVFS_SID_count_config(PVFS_fs_id fs_id, int *count)
+{
+    return PVFS_SID_count_server(count, SID_SERVER_CONFIG);
+}
+
 /* These functions find servers of a given type
  */
 static int PVFS_SID_get_server(PVFS_BMI_addr_t *bmi_addr,
@@ -173,40 +252,56 @@ static int PVFS_SID_get_server(PVFS_BMI_addr_t *bmi_addr,
                                uint32_t flag)
 {
     int ret = 0;
-    DBT key, pkey, data;
+    DBT key, val;
+    PVFS_SID sidval;
     SID_cacheval_t *temp_cacheval;
 
-    SID_zero_dbt(&key, &data, NULL);
-    memset(&pkey, 0, sizeof(DBT));
+    SID_zero_dbt(&key, &val, NULL);
+
+    gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                 "Searching for servers of type %o\n", stype);
 
     key.data = &stype;
     key.size = sizeof(uint32_t);
+    key.ulen = sizeof(uint32_t);
+    key.flags = DB_DBT_USERMEM;
+
+    val.data = &sidval;
+    val.size = sizeof(PVFS_SID);
+    val.ulen = sizeof(PVFS_SID);
+    val.flags = DB_DBT_USERMEM;
+
+    /* val is left empty for DB to fill in */
    
-    ret = SID_type_cursor->pget(SID_type_cursor, /* type index */
-                                &key,            /* key of secondary index  */
-                                &pkey,           /* key of primary table */
-                                &data,           /* SID_cacheval_t struct ptr */
-                                flag);           /* get flags */
+    ret = SID_type_cursor->get(SID_type_cursor, /* type index */
+                               &key,            /* key of secondary db  */
+                               &val,            /* no val expected */
+                               flag);           /* get flags */
     if(ret)
     {
         if (ret != DB_NOTFOUND)
         {
             gossip_debug(GOSSIP_SIDCACHE_DEBUG,
-                        "Error getting sid from sid cache : %s\n",
-                        db_strerror(ret));
+                         "Error getting type from type cache while searching:"
+                         "%s\n", db_strerror(ret));
         }
         return(ret);
     }
 
-    /* Unmarshalling the data */
-    SID_cacheval_unpack(&temp_cacheval, &data);
+    /* This allocates memory for temp_cacheval */
+    ret = SID_cache_get(SID_db, &sidval, &temp_cacheval);
+    if(ret)
+    {
+        return(ret);
+    }
+
     if (bmi_addr)
     {
         *bmi_addr = temp_cacheval->bmi_addr;
     }
-    if (sid && (pkey.size >= sizeof(PVFS_SID)))
+    if (sid)
     {
-        *sid = *(PVFS_SID *)(pkey.data);
+        *sid = sidval;
     }
     free(temp_cacheval);
     return(ret);
@@ -244,9 +339,18 @@ static int PVFS_SID_get_server_n(PVFS_BMI_addr_t *bmi_addr,
         return -PVFS_EINVAL;
     }
     ret = PVFS_SID_get_server(bmi_addr, sid, stype, flag);
-    for (i = 0; (i <= *n) && !ret; i++)
+    if (!ret)
     {
-        ret = PVFS_SID_get_server(&bmi_addr[i], &sid[i], stype, DB_NEXT);
+        for (i = 1; i < *n; i++)
+        {
+            PVFS_BMI_addr_t *badr = bmi_addr ? &bmi_addr[i] : NULL;
+            PVFS_SID *sa = sid ? &sid[i] : NULL;
+            ret = PVFS_SID_get_server(badr, sa, stype, DB_NEXT);
+            if (ret)
+            {
+                break;
+            }
+        }
     }
     *n = i;
     return ret;
@@ -281,7 +385,7 @@ int PVFS_SID_get_server_next_n(PVFS_BMI_addr_t *bmi_addr,
  * Simple default policy just picks them in order found in the DB
  */
 int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
-                      PVFS_handle *handle,
+                      PVFS_handle **handle,
                       uint32_t sid_count,
                       PVFS_SID **sid_array,
                       uint32_t datafile_count,
@@ -294,23 +398,27 @@ int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
     int i;
 
     /* generate metadata handle */
-    PVFS_OID_gen(handle);
+    *handle = malloc(sizeof(PVFS_handle));
+    PVFS_OID_gen(*handle);
+
+    /* generate SIDs for metadata object */
+    *sid_array = (PVFS_SID *)malloc(sid_count * sizeof(PVFS_SID));
+    n = sid_count;
+    PVFS_SID_get_server_first_n(NULL, *sid_array, &n, SID_SERVER_META);
+
     /* generate datafile handles */
     *datafile_handles = (PVFS_OID *)malloc(datafile_count * sizeof(PVFS_OID));
     for (i = 0; i < datafile_count; i++)
     {
         PVFS_OID_gen(*datafile_handles);
     }
-    /* generate SIDs for metadata object */
-    *sid_array = (PVFS_SID *)malloc(sid_count * sizeof(PVFS_SID));
-    n = sid_count;
-    PVFS_SID_get_server_first_n(NULL, *sid_array, &n, PVFS_OBJ_META);
+
     /* generate SIDs for datafile objects */
     *datafile_sid_array = (PVFS_SID *)malloc(datafile_count *
                                              datafile_sid_count *
                                              sizeof(PVFS_SID));
     n = datafile_sid_count;
-    PVFS_SID_get_server_next_n(NULL, *datafile_sid_array, &n, PVFS_OBJ_DATA);
+    PVFS_SID_get_server_next_n(NULL, *datafile_sid_array, &n, SID_SERVER_DATA);
     return ret;
 }
 

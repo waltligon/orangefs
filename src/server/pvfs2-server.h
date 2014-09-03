@@ -394,19 +394,23 @@ typedef struct
 
 struct PINT_server_crdirent_op
 {
+#if 0
     PVFS_credential credential;
+#endif
     PVFS_capability capability;
+#if 0
     char *name;
-    PVFS_handle new_handle;
-    PVFS_SID *new_sid;
-    PVFS_handle parent_handle;
-    PVFS_SID *parent_sid;
-    PVFS_fs_id fs_id;
-    PVFS_handle dirent_handle;  /* holds handle of dirdata dspace that
-                                 * we'll write the dirent into */
-    PVFS_SID *dirent_sid;
-    PVFS_size dirent_count;
-    PVFS_size sid_count;
+    PVFS_handle new_handle;     /* handle of new entry */
+    PVFS_SID   *new_sid;        /* sids of new entry */
+    PVFS_handle parent_handle;  /* handle of dir (metadata) */
+    PVFS_SID   *parent_sid;     /* sids of dir (metadata) */
+    PVFS_fs_id  fs_id;
+    PVFS_handle dirdata_handle; /* holds handle of dirdata dspace that */
+                                /* we'll write the dirent into */
+    PVFS_SID   *dirdata_sid;    /* sids of dirdata we write dirent to */
+    PVFS_size   dirent_count;   /* number of dirents in target dirdata */
+    PVFS_size   sid_count;      /* All should be the metadata const */
+#endif
     PVFS_ds_keyval_handle_info keyval_handle_info;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
@@ -415,18 +419,18 @@ struct PINT_server_crdirent_op
     /* index of node to receive directory entries when a split is necessary. */
     int split_node;
 
-    /* Save the old directory attrs in case we have to back out due to an error. */
+    /* Save old directory attrs in case we have to back out due to an error. */
     PVFS_object_attr saved_attr;
 
     /* variables used for sending mgmt_split_dirent request */
-    PVFS_BMI_addr_t svr_addr; /*destination server address*/
-    PVFS_error *split_status; /*status from PVFS_SERV_MGMT_SPLIT_DIRENT*/
-    PINT_dist *dist; /*distribution structure for basic_dist*/
+    PVFS_BMI_addr_t svr_addr; /* destination server address */
+    PVFS_error *split_status; /* status from PVFS_SERV_MGMT_SPLIT_DIRENT */
+    PINT_dist  *dist;         /* distribution structure for basic_dist */
     int read_all_directory_entries;
     int nentries;
     PVFS_handle *entry_handles;
-    PVFS_SID *entry_sid;
-    char **entry_names;
+    PVFS_SID    *entry_sid;
+    char       **entry_names;
     int num_msgs_required;
     split_msg_boundary *msg_boundaries;
     PVFS_ds_keyval *entries_key_a;
@@ -722,7 +726,7 @@ typedef struct PINT_server_op
     int num_pjmp_frames;
 
     /* Used just about everywhere so this is a std place to keep it */
-    uint32_t metasidcnt; /* number of sids per handle for metadata */
+    int32_t metasidcnt; /* number of sids per handle for metadata */
 
     union
     {
@@ -979,6 +983,7 @@ extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_getattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
+extern struct PINT_state_machine_s pvfs2_dirdata_split_sm;
 
 /* exported state machine resource reclamation function */
 int server_post_unexpected_recv(void);

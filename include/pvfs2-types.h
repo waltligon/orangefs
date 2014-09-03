@@ -94,20 +94,26 @@ typedef int64_t PVFS_BMI_addr_t;
 void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x);
 int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x);
 void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x);
+void defree_PVFS_BMI_addr_t(PVFS_BMI_addr_t *x);
 #else
 inline void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x);
 inline int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x);
 inline void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x);
+inline void defree_PVFS_BMI_addr_t(PVFS_BMI_addr_t *x);
 #endif
 
 #define encode_PVFS_error encode_int32_t
 #define decode_PVFS_error decode_int32_t
+#define defree_PVFS_error defree_int32_t
 #define encode_PVFS_offset encode_int64_t
 #define decode_PVFS_offset decode_int64_t
+#define defree_PVFS_offset defree_int64_t
 #define encode_PVFS_size encode_int64_t
 #define decode_PVFS_size decode_int64_t
+#define defree_PVFS_size defree_int64_t
 #define encode_PVFS_id_gen_t encode_int64_t
 #define decode_PVFS_id_gen_t decode_int64_t
+#define defree_PVFS_id_gen_t defree_int64_t
 
 /* Basic types used by communication subsystems. */
 typedef int32_t PVFS_msg_tag_t;
@@ -155,6 +161,7 @@ typedef PVFS_OID PVFS_handle;       /* 128-bit */
 
 #define encode_PVFS_handle encode_PVFS_OID
 #define decode_PVFS_handle decode_PVFS_OID
+#define defree_PVFS_handle defree_PVFS_OID
 
 /** Identifier for a specific PVFS2 file system; administrator
  *  must guarantee that these are unique in the context of all
@@ -166,8 +173,10 @@ typedef int32_t PVFS_ds_flags;
 
 #define encode_PVFS_fs_id encode_int32_t
 #define decode_PVFS_fs_id decode_int32_t
-#define decode_PVFS_ds_position decode_uint64_t
+#define defree_PVFS_fs_id defree_int32_t
 #define encode_PVFS_ds_position encode_uint64_t
+#define decode_PVFS_ds_position decode_uint64_t
+#define defree_PVFS_ds_position defree_uint64_t
 
 /* Basic types used within metadata. */
 typedef uint32_t PVFS_uid;
@@ -179,14 +188,19 @@ typedef uint32_t PVFS_permissions;
 typedef uint64_t PVFS_flags;
 #define encode_PVFS_uid encode_uint32_t
 #define decode_PVFS_uid decode_uint32_t
+#define defree_PVFS_uid defree_uint32_t
 #define encode_PVFS_gid encode_uint32_t
 #define decode_PVFS_gid decode_uint32_t
+#define defree_PVFS_gid defree_uint32_t
 #define encode_PVFS_time encode_int64_t
 #define decode_PVFS_time decode_int64_t
+#define defree_PVFS_time defree_int64_t
 #define encode_PVFS_permissions encode_uint32_t
 #define decode_PVFS_permissions decode_uint32_t
+#define defree_PVFS_permissions defree_uint32_t
 #define encode_PVFS_flags encode_uint64_t
 #define decode_PVFS_flags decode_uint64_t
+#define defree_PVFS_flags defree_uint64_t
 
 /* V3 handle ranges defunct */
 #if 0
@@ -266,9 +280,11 @@ typedef struct PVFS_sys_layout_s
 #ifdef WIN32
 void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x);
 void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
+void defree_PVFS_sys_layout(struct PVFS_sys_layout_s *x);
 #else
 inline void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x);
 inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
+inline void defree_PVFS_sys_layout(struct PVFS_sys_layout_s *x);
 #endif
 
 /* predefined special values for types */
@@ -329,8 +345,9 @@ typedef enum
     PVFS_TYPE_INTERNAL =    (1 << 5)   /* for the server's private use */
 } PVFS_ds_type;
 
-#define decode_PVFS_ds_type decode_enum
 #define encode_PVFS_ds_type encode_enum
+#define decode_PVFS_ds_type decode_enum
+#define defree_PVFS_ds_type defree_enum
 #define PVFS_DS_TYPE_COUNT      7      /* total number of DS types defined in
                                         * the PVFS_ds_type enum */
 
@@ -655,8 +672,10 @@ typedef uint64_t PVFS_dist_dir_hash_type;
 
 #define encode_PVFS_dist_dir_bitmap_basetype encode_uint32_t
 #define decode_PVFS_dist_dir_bitmap_basetype decode_uint32_t
+#define defree_PVFS_dist_dir_bitmap_basetype defree_uint32_t
 #define encode_PVFS_dist_dir_hash_type encode_uint64_t
 #define decode_PVFS_dist_dir_hash_type decode_uint64_t
+#define defree_PVFS_dist_dir_hash_type defree_uint64_t
 
 /** Predefined server parameters that can be manipulated at run-time
  *  through the mgmt interface.
@@ -750,6 +769,15 @@ typedef struct {
  *
  * Errors are made up of a code to indicate the error type and a class
  * that indicates where the error came from.  These are |'d together.
+ */
+
+/* it is not clear what these "perror" variants bring us that the regular
+ * gossip variety do not.  They appear to print error messages on user
+ * errors (like file not found).  As such they should NOT be used, system
+ * software does not print these messages, applications do.  These can be
+ * revived if they are removed from the sysint, server, and library codes.
+ * They can then be used as libc's perror ised used, by the programmer.
+ * WBL 8/14
  */
 int PVFS_strerror_r(int errnum, char *buf, int n);
 void PVFS_perror(const char *text, int retcode);

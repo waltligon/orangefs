@@ -491,13 +491,15 @@ int pvfs2_mkspace(char *data_path,
         attr.uid = getuid();
         attr.gid = getgid();
         attr.mode = 0777;
-	attr.atime = attr.ctime = PINT_util_get_current_time();
-        attr.mtime = PINT_util_mktime_version(attr.ctime);
+	attr.ntime = attr.atime = attr.ctime = PINT_util_get_current_time();
+        attr.mtime = PINT_util_mktime_version(attr.ntime);
+        attr.u.directory.dirent_count = 0;
         attr.u.directory.tree_height = DEFAULT_ROOTDIR_TREE_HEIGHT;
         attr.u.directory.dirdata_count = DEFAULT_ROOTDIR_DIRDATA_COUNT;
         attr.u.directory.sid_count = root_sid_count;
         attr.u.directory.bitmap_size = DEFAULT_ROOTDIR_BITMAP_SIZE;
         attr.u.directory.split_size = DEFAULT_ROOTDIR_SPLIT_SIZE;
+        /* V3 DOES THIS MAKE SENSE? */
         attr.u.directory.server_no = DEFAULT_ROOTDIR_SERVER_NO;
         attr.u.directory.branch_level = DEFAULT_ROOTDIR_BRANCH_LEVEL;
 
@@ -536,7 +538,9 @@ int pvfs2_mkspace(char *data_path,
         memset(&attr, 0, sizeof(TROVE_ds_attributes_s));
         /* fs_id and handle filled in by call */
         attr.type = PVFS_TYPE_DIRDATA;
-        attr.u.dirdata.count = 0;
+	attr.ntime = attr.atime = attr.ctime = PINT_util_get_current_time();
+        attr.mtime = PINT_util_mktime_version(attr.ntime);
+        attr.u.dirdata.dirent_count = 0;
         attr.u.dirdata.tree_height = DEFAULT_ROOTDIR_TREE_HEIGHT;
         attr.u.dirdata.dirdata_count = DEFAULT_ROOTDIR_DIRDATA_COUNT;
         attr.u.dirdata.sid_count = root_sid_count;

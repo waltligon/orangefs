@@ -1084,12 +1084,15 @@ static PINT_sm_action readdirplus_cleanup(struct PINT_smcb *smcb,
                 resp_attr_i->dfile_count = obj_attr_i->u.meta.dfile_count;
                 resp_attr_i->mask |= PVFS_ATTR_SYS_DFILE_COUNT;
             }
+/* V2 remove */
+#if 0
             if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_MIRROR_DFILES)
             {
                 resp_attr_i->mirror_copies_count =
                                     obj_attr_i->u.meta.mirror_copies_count;
                 resp_attr_i->mask |= PVFS_ATTR_SYS_MIRROR_COPIES_COUNT;
             }
+#endif
         }
         else if (resp_attr_i->objtype == PVFS_TYPE_DIRECTORY)
         {

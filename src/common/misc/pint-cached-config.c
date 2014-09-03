@@ -26,6 +26,7 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
+#include "pvfs-sid.h"
 #include "pint-sysint-utils.h"
 #include "bmi.h"
 #include "trove.h"
@@ -1337,12 +1338,12 @@ int PINT_cached_config_map_to_server(PVFS_BMI_addr_t *server_addr,
  */
 int PINT_cached_config_get_num_dfiles(PVFS_fs_id fs_id,
                                       PINT_dist *dist,
-                                      int num_dfiles_requested,
-                                      int *num_dfiles)
+                                      int32_t num_dfiles_requested,
+                                      int32_t *num_dfiles)
 {
     int rc;
-    int num_io_servers;
-    
+    int32_t num_io_servers = 0;
+
     /* If the dfile request is zero, check to see if the config has that
        setting */
     if (0 == num_dfiles_requested)
@@ -1405,85 +1406,56 @@ int PINT_cached_config_get_num_dfiles(PVFS_fs_id fs_id,
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_cached_config_get_num_meta(PVFS_fs_id
-                                    fsid,
-                                    int *num_meta)
+int PINT_cached_config_get_num_meta(PVFS_fs_id fs_id, int32_t *num_meta)
 {
-    int ret = -PVFS_EINVAL;
-    struct qlist_head *hash_link = NULL;
-    struct config_fs_cache_s *cur_config_cache = NULL;
+    int ret = 0;
+    int count;
 
-    if (num_meta)
+    if (!num_meta)
     {
-        hash_link = qhash_search(PINT_fsid_config_cache_table, &(fsid));
-        if (hash_link)
-        {
-            cur_config_cache = qlist_entry(hash_link,
-                                           struct config_fs_cache_s,
-                                           hash_link);
-
-            assert(cur_config_cache);
-            assert(cur_config_cache->fs);
-/* V3 obsolete */
-#if 0
-            assert(cur_config_cache->fs->meta_handle_ranges);
-
-            *num_meta = PINT_llist_count(
-                            cur_config_cache->fs->meta_handle_ranges);
-#endif
-            ret = 0;
-        }
+        return -PVFS_EINVAL;
+    }
+    ret = PVFS_SID_count_meta(fs_id, &count);
+    if (!ret)
+    {
+        *num_meta = count;
     }
     return ret;
 }
 
-/* V3 this function probbly needs a SID query */
+/* V3 this function probably needs a SID query */
 /* PINT_cached_config_get_num_io()
  *
- * discovers the number of io servers available for a given file
- * system
+ * discovers the number of currently known io servers available
+ * for a given file system
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_cached_config_get_num_io(PVFS_fs_id fs_id, int *num_io)
+int PINT_cached_config_get_num_io(PVFS_fs_id fs_id, int32_t *num_io)
 {
-    int ret = -PVFS_EINVAL;
-    struct qlist_head *hash_link = NULL;
-    struct config_fs_cache_s *cur_config_cache = NULL;
+    int ret = 0;
+    int count;
 
-    if (num_io)
+    if (!num_io)
     {
-        hash_link = qhash_search(PINT_fsid_config_cache_table, &(fs_id));
-        if (hash_link)
-        {
-            cur_config_cache = qlist_entry(hash_link,
-                                           struct config_fs_cache_s,
-                                           hash_link);
-
-            assert(cur_config_cache);
-            assert(cur_config_cache->fs);
-/* V3 */
-#if 0
-            assert(cur_config_cache->fs->data_handle_ranges);
-
-            *num_io = PINT_llist_count(
-                            cur_config_cache->fs->data_handle_ranges);
-#endif
-            ret = 0;
-        }
+        return -PVFS_EINVAL;
+    }
+    ret = PVFS_SID_count_io(fs_id, &count);
+    if (!ret)
+    {
+        *num_io = count;
     }
     return ret;
 }
 
 /* PINT_cached_config_get_metadata_sid_count()
  *
- * discovers the number of io servers available for a given file
- * system
+ * discovers the number of sids for a metadata object
  *
  * returns 0 on success, -errno on failure
  */
 int PINT_cached_config_get_metadata_sid_count(PVFS_fs_id fs_id,
-                                              uint32_t *num_sids)
+                                              int32_t *num_sids)
 {
     int ret = -PVFS_EINVAL;
     struct qlist_head *hash_link = NULL;
@@ -1501,6 +1473,37 @@ int PINT_cached_config_get_metadata_sid_count(PVFS_fs_id fs_id,
             assert(cur_config_cache);
             assert(cur_config_cache->fs);
             *num_sids = cur_config_cache->fs->metadata_replication_factor;
+            ret = 0;
+        }
+    }
+    return ret;
+}
+
+/* PINT_cached_config_get_default_dfile_sid_count()
+ *
+ * discovers the default number of sids for a dfile
+ *
+ * returns 0 on success, -errno on failure
+ */
+int PINT_cached_config_get_default_dfile_sid_count(PVFS_fs_id fs_id,
+                                                   int32_t *num_sids)
+{
+    int ret = -PVFS_EINVAL;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+
+    if (num_sids)
+    {
+        hash_link = qhash_search(PINT_fsid_config_cache_table, &(fs_id));
+        if (hash_link)
+        {
+            cur_config_cache = qlist_entry(hash_link,
+                                           struct config_fs_cache_s,
+                                           hash_link);
+
+            assert(cur_config_cache);
+            assert(cur_config_cache->fs);
+            *num_sids = cur_config_cache->fs->default_dfile_replication_factor;
             ret = 0;
         }
     }

@@ -481,7 +481,7 @@ static const configoption_t options[] =
      *
      * As an example:
      *
-     *     Type meta data dirdata
+     *     Type META DATA DIRDATA
      */
     {"Type", ARG_LIST, get_type_list, NULL, CTX_SERVERDEF, NULL},
 
@@ -1606,14 +1606,6 @@ DOTCONF_CB(exit_serverdef_context)
         return "Error: server not added to SID cache\n";
     }
 
-    /* add type reccords to SID cache */
-    ret = SID_update_type(&config_s->new_host->host_sid,
-                          config_s->new_host->server_type);
-    if (ret != 0)
-    {
-        return "Error: server type records not added to SID cache\n";
-    }
-
     /* see if this record refers to this server, and save config
      * info if it does
      */
@@ -1629,6 +1621,14 @@ DOTCONF_CB(exit_serverdef_context)
         config_s->host_sid = config_s->new_host->host_sid;
         config_s->host_id = strdup(config_s->new_host->bmi_address);
         config_s->new_host->server_type |= SID_SERVER_ME;
+    }
+
+    /* add type records to SID cache */
+    ret = SID_update_type(&config_s->new_host->host_sid,
+                          config_s->new_host->server_type);
+    if (ret != 0)
+    {
+        return "Error: server type records not added to SID cache\n";
     }
 
     /* add to config list of aliases */

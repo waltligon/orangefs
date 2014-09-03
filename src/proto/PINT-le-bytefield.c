@@ -340,7 +340,6 @@ static void lebf_initialize(void)
                 /* nothing special */
                 break;
             case PVFS_SERV_MGMT_SPLIT_DIRENT:
-                req.u.mgmt_split_dirent.dist = &tmp_dist;
                 reqsize = extra_size_PVFS_servreq_mgmt_split_dirent;
                 break;
             case PVFS_SERV_MGMT_GET_USER_CERT:
@@ -511,7 +510,46 @@ static int lebf_encode_req(struct PVFS_server_req *req,
 
         /* call standard function defined in headers */
         CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
+#if 1
         CASE(PVFS_SERV_CREATE, create);
+#else
+    case PVFS_SERV_CREATE: {
+    int i;                                                                 
+    encode_PVFS_credential((p), &(&req->u.create)->credential);
+    encode_PVFS_object_attr((p), &(&req->u.create)->attr);
+    encode_PVFS_fs_id((p), &(&req->u.create)->fs_id);
+    encode_uint32_t((p), &(&req->u.create)->sid_count);
+    encode_uint32_t((p), &(&req->u.create)->datafile_count);
+    encode_uint32_t((p), &(&req->u.create)->datafile_sid_count);
+    encode_PVFS_handle((p), &(&req->u.create)->handle);
+    for (i = 0; i < (&req->u.create)->sid_count; i++)
+    {                                                                      
+        encode_PVFS_SID((p), &(&req->u.create)->sid_array[i]);
+    }                                                                      
+    if ((&req->u.create)->parent &&
+        !PVFS_OID_is_null((&req->u.create)->parent))
+    {                                                                      
+        encode_PVFS_handle((p), (&req->u.create)->parent);
+        for (i = 0; i < (&req->u.create)->sid_count; i++)
+        {                                            
+            encode_PVFS_SID((p), &(&req->u.create)->parent_sid_array[i]);
+        }                                                                  
+    }                                                                      
+    else                                                                   
+    {                                                                      
+        encode_PVFS_handle((p), &PVFS_HANDLE_NULL); 
+    }                                                                      
+    for (i = 0; i < (&req->u.create)->datafile_count; i++)
+    {                                                                      
+        encode_PVFS_handle((p), &(&req->u.create)->datafile_handles[i]);
+    }                                                                      
+    for (i = 0; i < ((&req->u.create)->datafile_sid_count *
+                     (&req->u.create)->datafile_count); i++)
+    {                                                                      
+        encode_PVFS_SID((p), &(&req->u.create)->datafile_sid_array[i]);
+    }          
+    } break;
+#endif
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
         CASE(PVFS_SERV_BATCH_CREATE, batch_create);
@@ -1229,12 +1267,14 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     {
                        decode_free(resp->u.getattr.attr.u.meta.dfile_array);
                     }
+#if 0
                     if (resp->u.getattr.attr.mask &
                         PVFS_ATTR_META_MIRROR_DFILES)
                     {
                        decode_free
                         (resp->u.getattr.attr.u.meta.mirror_dfile_array);
                     }
+#endif
                     if (resp->u.getattr.attr.mask & PVFS_ATTR_CAPABILITY)
                     {
                         decode_free(
@@ -1259,12 +1299,14 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     {
                         decode_free(resp->u.unstuff.attr.u.meta.dfile_array);
                     }
+#if 0
                     if (resp->u.unstuff.attr.mask 
                          & PVFS_ATTR_META_MIRROR_DFILES)
                     {
                          decode_free(
                               resp->u.unstuff.attr.u.meta.mirror_dfile_array);
                     }
+#endif
                     break;
 
                 case PVFS_SERV_MGMT_EVENT_MON:
@@ -1313,12 +1355,14 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                                  decode_free(
                                    resp->u.listattr.attr[i].u.meta.dfile_array);
                              }
+#if 0
                              if(resp->u.listattr.attr[i].mask &
                                  PVFS_ATTR_META_MIRROR_DFILES)
                              {
                                  decode_free(
                                        resp->u.listattr.attr[i].u.meta.mirror_dfile_array);
                              }
+#endif
                              if (resp->u.listattr.attr[i].mask & 
                                  PVFS_ATTR_CAPABILITY)
                              {

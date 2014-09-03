@@ -71,8 +71,11 @@ char *PINT_print_op_mask(uint32_t op_mask, char *out_buf)
  */
 void PINT_null_capability(PVFS_capability *cap)
 {
-    memset(cap, 0, sizeof(PVFS_capability));
-    cap->issuer = strdup("");
+    if (cap)
+    {
+        memset(cap, 0, sizeof(PVFS_capability));
+        cap->issuer = strdup("");
+    }
 }
 
 /* PINT_capability_is_null
@@ -84,11 +87,14 @@ void PINT_null_capability(PVFS_capability *cap)
  */
 int PINT_capability_is_null(const PVFS_capability *cap)
 {
-    int ret;
-
-    ret = (!strcmp(cap->issuer, "")) && (cap->op_mask == 0);
-
-    return ret;
+    if (cap)
+    {
+        if (cap->issuer)
+        {
+            return (!strcmp(cap->issuer, "")) && (cap->op_mask == 0);
+        }
+    }
+    return -PVFS_EINVAL;
 }
 
 /* PINT_dup_capability
@@ -139,16 +145,20 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
         return -PVFS_EINVAL;
     }
 
-    /* issuer may be blank, but shouldn't be NULL */
-    assert(src->issuer);
-
     /* first copy by value */
     memcpy(dest, src, sizeof(PVFS_capability));
     dest->issuer = NULL;
     dest->signature = NULL;
     dest->handle_array = NULL;
-
-    dest->issuer = strdup(src->issuer);
+    
+    if (src->issuer)
+    {
+        dest->issuer = strdup(src->issuer);
+    }
+    else
+    {
+        dest->issuer = strdup("");
+    }
     if (!dest->issuer)
     {
         return -PVFS_ENOMEM;
@@ -174,7 +184,8 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
             free(dest->issuer);
             return -PVFS_ENOMEM;
         }
-        memcpy(dest->handle_array, src->handle_array,
+        memcpy(dest->handle_array,
+               src->handle_array,
                src->num_handles * sizeof(PVFS_handle));
     }
 
@@ -192,6 +203,7 @@ void PINT_debug_capability(const PVFS_capability *cap, const char *prefix)
     int i;
 
     assert(cap);
+    assert(cap->issuer);
 
     if (strlen(cap->issuer) == 0)
     {

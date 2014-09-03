@@ -129,8 +129,8 @@ static PINT_sm_action rmdirent_get_dist_dir_attr(
       first we translate the dirdata dspace attributes into a more convenient
       server use-able format.  i.e. a PVFS_object_attr 
     */
-    PVFS_ds_attr_to_object_attr(&s_op->u.rmdirent.dirdata_ds_attr,
-                                &s_op->u.rmdirent.dirdata_attr);
+    PVFS_object_attr_from_ds_attr(&s_op->u.rmdirent.dirdata_attr,
+                                  &s_op->u.rmdirent.dirdata_ds_attr);
     s_op->u.rmdirent.dirdata_attr.mask = PVFS_ATTR_COMMON_ALL;
  
     /* set up key and value structures for reading the dist_dir_attr */
@@ -388,7 +388,7 @@ static PINT_sm_action rmdirent_update_directory_attr(struct PINT_smcb *smcb,
 
     PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
     ds_attr = &(s_op->u.rmdirent.dirdata_ds_attr);
-    PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
+    PVFS_ds_attr_from_object_attr(ds_attr, tmp_attr_ptr);
 
     /* setting dirent_handle dspace */
     ret = job_trove_dspace_setattr(s_op->req->u.rmdirent.fs_id,

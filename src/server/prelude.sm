@@ -280,7 +280,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
      * first we translate the dspace attributes into a more convenient
      * server use-able format.  i.e. a PVFS_object_attr
      */
-    PVFS_ds_attr_to_object_attr(&s_op->ds_attr, &s_op->attr);
+    PVFS_object_attr_from_ds_attr(&s_op->attr, &s_op->ds_attr);
     s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
     s_op->target_object_attr = &s_op->attr;
 

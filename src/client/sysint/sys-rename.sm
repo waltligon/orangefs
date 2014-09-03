@@ -2,7 +2,7 @@
  * (C) 2003 Clemson University and The University of Chicago 
  *
  * Changes by Acxiom Corporation to add extra safety checks via getattr
- * Copyright © Acxiom Corporation, 2005.
+ * Copyright Â© Acxiom Corporation, 2005.
  *
  * See COPYING in top-level directory.
  */
@@ -160,13 +160,13 @@ machine pvfs2_client_rename_sm
     state crdirent_getattr
     {
         jump pvfs2_client_getattr_sm;
-        success => crdirent_getattr_fill_dirent_handle;
+        success => crdirent_getattr_fill_dirdata_handle;
         default => cleanup;
     }
 
-    state crdirent_getattr_fill_dirent_handle
+    state crdirent_getattr_fill_dirdata_handle
     {
-        run rename_crdirent_getattr_fill_dirent_handle;
+        run rename_crdirent_getattr_fill_dirdata_handle;
         default => rename_crdirent_setup_msgpair;
     }
 
@@ -207,13 +207,13 @@ machine pvfs2_client_rename_sm
     state rmdirent_getattr
     {
         jump pvfs2_client_getattr_sm;
-        success => rmdirent_getattr_fill_dirent_handle;
+        success => rmdirent_getattr_fill_dirdata_handle;
         default => cleanup;
     }
 
-    state rmdirent_getattr_fill_dirent_handle
+    state rmdirent_getattr_fill_dirdata_handle
     {
-        run rename_rmdirent_getattr_fill_dirent_handle;
+        run rename_rmdirent_getattr_fill_dirdata_handle;
         default => rename_rmdirent_setup_msgpair;
     }
 
@@ -523,13 +523,16 @@ static int rename_parent_getattr_comp_fn(void *v_p,
     dirdata_index = PINT_find_dist_dir_bucket(hash, 
                                               &attr->u.dir.dist_dir_attr,
                                               attr->u.dir.dist_dir_bitmap);
-    /* stash dirent_handle */
-    sm_p->u.rename.dirent_handle[index] =
+    /* stash dirdata_handle */
+    sm_p->u.rename.dirdata_handle[index] =
                 attr->u.dir.dirdata_handles[dirdata_index];
+    sm_p->u.rename.dirdata_sids[index] =
+                &attr->u.dir.dirdata_sids[dirdata_index *
+                                          attr->u.dir.dist_dir_attr.sid_count];
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
             "rename: selecting dirdata_servers[%d]=%s"
-            " as the dirent_handle for dirent %s.\n",
+            " as the dirdata_handle for dirent %s.\n",
             dirdata_index,
             PVFS_OID_str(&attr->u.dir.dirdata_handles[dirdata_index]),
             sm_p->u.rename.entries[index]);
@@ -591,25 +594,25 @@ static int rename_lookups_comp_fn(void *v_p,
     sm_p->u.rename.refns[index].sid_array = (PVFS_SID *)malloc(
                     resp_p->u.lookup_path.sid_count * sizeof(PVFS_SID));
 
-    /* dirent_handle retrieved already
-    sm_p->u.rename.dirent_handle[index] =
+    /* dirdata_handle retrieved already
+    sm_p->u.rename.dirdata_handle[index] =
         resp_p->u.lookup_path.attr_array[0].dirdata_handles[0];
         */
 
     if (index == 0)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-            "*** Looked up old handle %s, dirent_handle %s\n",
+            "*** Looked up old handle %s, dirdata_handle %s\n",
             PVFS_OID_str(&sm_p->u.rename.refns[index].handle),
-            PVFS_OID_str(&sm_p->u.rename.dirent_handle[index]));
+            PVFS_OID_str(&sm_p->u.rename.dirdata_handle[index]));
     }
     else
     {
         assert(index == 1);
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-            "*** Looked up new handle %s, dirent_handle %s\n",
+            "*** Looked up new handle %s, dirdata_handle %s\n",
             PVFS_OID_str(&sm_p->u.rename.refns[index].handle),
-            PVFS_OID_str(&sm_p->u.rename.dirent_handle[index]));
+            PVFS_OID_str(&sm_p->u.rename.dirdata_handle[index]));
         /*
           flag the fact that we need to do a dirent exchange on the
           existing dirent, rather than creating a new one.  we flag it
@@ -706,12 +709,12 @@ static int rename_chdirent_comp_fn(void *v_p,
       here we have the 'old' dirent handle that we've just replaced
       with the target name; store it for later removal
     */
-    sm_p->u.rename.old_dirent_handle =
+    sm_p->u.rename.old_dirdata_handle =
                  resp_p->u.chdirent.old_dirent_handle;
     /* V3 NEED TO CATCH THE SIDs HERE TOO!!! */
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "got back old dirent handle %s\n",
-                 PVFS_OID_str(&sm_p->u.rename.old_dirent_handle));
+                 PVFS_OID_str(&sm_p->u.rename.old_dirdata_handle));
 
     return 0;
 }
@@ -844,8 +847,8 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
                      "capability\n");
         PINT_copy_capability(&sm_p->u.rename.caps[0],
                              &sm_p->u.rename.caps[1]);
-        sm_p->u.rename.dirent_handle[1] =
-                sm_p->u.rename.dirent_handle[0];
+        sm_p->u.rename.dirdata_handle[1] =
+                sm_p->u.rename.dirdata_handle[0];
 
     }
 
@@ -939,14 +942,15 @@ static PINT_sm_action rename_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     PINT_SERVREQ_CRDIRENT_FILL(msg_p->req,
                                sm_p->u.rename.caps[1],
                                *sm_p->cred_p,
-                               sm_p->u.rename.entries[1],
                                sm_p->u.rename.parent_refns[1].fs_id,
-                               sm_p->u.rename.parent_refns[1].handle,
-                               sm_p->u.rename.dirent_handle[1],
+                               sm_p->u.rename.dirdata_handle[1],
                                sm_p->u.rename.parent_refns[1].sid_count,
-                               sm_p->u.rename.parent_refns[1].sid_array,
+                               sm_p->u.rename.dirdata_sids[1],
+                               sm_p->u.rename.entries[1], /* name */
                                sm_p->u.rename.refns[0].handle,
                                sm_p->u.rename.refns[0].sid_array,
+                               sm_p->u.rename.parent_refns[1].handle,
+                               sm_p->u.rename.parent_refns[1].sid_array,
                                sm_p->hints);
 
     msg_p->msgclass = PVFS_IO_METADATA;
@@ -954,7 +958,7 @@ static PINT_sm_action rename_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
     /* send to dirdata handle */
     msg_p->handle = 
-        sm_p->u.rename.dirent_handle[1];
+        sm_p->u.rename.dirdata_handle[1];
     msg_p->sid_count = sm_p->u.rename.parent_refns[1].sid_count;
     msg_p->sid_index = 0;
     msg_p->sid_array = sm_p->u.rename.parent_refns[1].sid_array;
@@ -1006,7 +1010,7 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].handle,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].sid_count,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].sid_array,
-          sm_p->u.rename.dirent_handle[sm_p->u.rename.rmdirent_index],
+          sm_p->u.rename.dirdata_handle[sm_p->u.rename.rmdirent_index],
           sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index],
           sm_p->hints);
 
@@ -1020,7 +1024,7 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
      * It seems like we don't need this, but suspect it is needed to
      * select which dir bucket the target entry is in
      */
-    /* sm_p->u.rename.dirent_handle[sm_p->u.rename.rmdirent_index]; */
+    /* sm_p->u.rename.dirdata_handle[sm_p->u.rename.rmdirent_index]; */
 
     msg_p->sid_count = sm_p->u.rename.parent_refns[
                             sm_p->u.rename.rmdirent_index].sid_count;
@@ -1152,7 +1156,7 @@ static PINT_sm_action rename_chdirent_setup_msgpair(struct PINT_smcb *smcb,
                                sm_p->u.rename.parent_refns[1].handle,
                                sm_p->u.rename.parent_refns[1].sid_count,
                                sm_p->u.rename.parent_refns[1].sid_array,
-                               sm_p->u.rename.dirent_handle[1],
+                               sm_p->u.rename.dirdata_handle[1],
                                sm_p->u.rename.refns[0].handle,
                                sm_p->u.rename.refns[0].sid_count,
                                sm_p->u.rename.refns[0].sid_array,
@@ -1163,8 +1167,7 @@ static PINT_sm_action rename_chdirent_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
     /* send to dirdata handle */
-    msg_p->handle = 
-        sm_p->u.rename.dirent_handle[1];
+    msg_p->handle = sm_p->u.rename.dirdata_handle[1];
     msg_p->sid_count = sm_p->u.rename.parent_refns[1].sid_count;
     msg_p->sid_index = 0;
     msg_p->sid_array = sm_p->u.rename.parent_refns[1].sid_array;
@@ -1226,7 +1229,7 @@ static PINT_sm_action rename_check_for_remove(struct PINT_smcb *smcb,
     }
 
     /* setup the handle to be removed */
-    sm_p->object_ref.handle = sm_p->u.rename.old_dirent_handle;
+    sm_p->object_ref.handle = sm_p->u.rename.old_dirdata_handle;
     sm_p->object_ref.fs_id = sm_p->u.rename.parent_refns[1].fs_id;
 
     return SM_ACTION_COMPLETE;
@@ -1359,7 +1362,7 @@ static PINT_sm_action rename_crdirent_getattr_setup(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action rename_crdirent_getattr_fill_dirent_handle(
+static PINT_sm_action rename_crdirent_getattr_fill_dirdata_handle(
                                                          struct PINT_smcb *smcb,
                                                          job_status_s *js_p)
 {
@@ -1384,13 +1387,16 @@ static PINT_sm_action rename_crdirent_getattr_fill_dirent_handle(
     dirdata_index = PINT_find_dist_dir_bucket(hash, 
                                               &attr->u.dir.dist_dir_attr,
                                               attr->u.dir.dist_dir_bitmap);
-    /* stash dirent_handle */
-    sm_p->u.rename.dirent_handle[1] =
-                    attr->u.dir.dirdata_handles[dirdata_index];
+    /* stash dirdata_handle */
+    sm_p->u.rename.dirdata_handle[1] =
+            attr->u.dir.dirdata_handles[dirdata_index];
+    sm_p->u.rename.dirdata_sids[1] =
+            &attr->u.dir.dirdata_sids[dirdata_index *
+                                      attr->u.dir.dist_dir_attr.sid_count];
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
             "rename: selecting dirdata_servers[%d]=%s"
-            " as the dirent_handle for dirent %s.\n",
+            " as the dirdata_handle for dirent %s.\n",
             dirdata_index,
             PVFS_OID_str(&attr->u.dir.dirdata_handles[dirdata_index]),
             sm_p->u.rename.entries[1]);
@@ -1470,7 +1476,7 @@ static PINT_sm_action rename_rmdirent_getattr_setup(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action rename_rmdirent_getattr_fill_dirent_handle(
+static PINT_sm_action rename_rmdirent_getattr_fill_dirdata_handle(
                                                    struct PINT_smcb *smcb,
                                                    job_status_s *js_p)
 {
@@ -1496,13 +1502,13 @@ static PINT_sm_action rename_rmdirent_getattr_fill_dirent_handle(
     dirdata_index = PINT_find_dist_dir_bucket(hash, 
                                               &attr->u.dir.dist_dir_attr,
                                               attr->u.dir.dist_dir_bitmap);
-    /* stash dirent_handle */
-    sm_p->u.rename.dirent_handle[sm_p->u.rename.rmdirent_index] =
+    /* stash dirdata_handle */
+    sm_p->u.rename.dirdata_handle[sm_p->u.rename.rmdirent_index] =
                     attr->u.dir.dirdata_handles[dirdata_index];
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
             "rename: selecting dirdata_servers[%d]=%s"
-            " as the dirent_handle for dirent %s.\n",
+            " as the dirdata_handle for dirent %s.\n",
             dirdata_index,
             PVFS_OID_str(&attr->u.dir.dirdata_handles[dirdata_index]),
             sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index]);

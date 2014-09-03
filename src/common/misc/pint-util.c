@@ -4,7 +4,7 @@
  * Changes by Acxiom Corporation to add PINT_check_mode() helper function
  * as a replacement for check_mode() in permission checking, also added
  * PINT_check_group() for supplimental group support 
- * Copyright © Acxiom Corporation, 2005.
+ * Copyright Â© Acxiom Corporation, 2005.
  *
  * See COPYING in top-level directory.
  */
@@ -114,6 +114,314 @@ PVFS_msg_tag_t PINT_util_get_next_tag(void)
     return ret;
 }
 
+/* PINT_copy_object_attr
+ *
+ * This copy function was written in early PVFS days when we made a
+ * habit of moving around partial attributes.  This has proved to be
+ * clumbsy and we now move around complete attributes - with the
+ * following caveates:
+ *
+ * file size, dirent_count, and the 3 times are volatile
+ *
+ * These fields may or may not represent an accurate up-to-the-second
+ * value, and in fact (in V3) getattr supports a flag to get the most
+ * recent value, otherwise it represents the last known value.
+ *
+ * The commented out code is the old model.
+ */
+
+/* PINT_copy_object_attr_var
+ * This copies only the variable length fields of the attribute, the
+ * arrays, strings, etc.
+ */
+
+#define CPYFIELD(x,s) \
+    do { if ((s) > 0 && src->u.x) { \
+        dest->u.x = malloc(s); \
+        memcpy(dest->u.x, src->u.x, s); } \
+    } while (0)
+
+/* this macro is only for OID/SID arrays, we prefer these to be
+ * allocated contiguouosly.  If the src has them packed, we simply copy
+ * the src, otherwise we allocate space for both a copy in two chunks
+ */
+#define PACKSID(o,s,oc,sc) \
+    do { \
+        if (src->u.s == (PVFS_SID *)(src->u.o + src->u.oc)) \
+        { \
+            /* OIDs and SIDs are packed */ \
+            CPYFIELD(o, OSASZ(dest->u.oc, dest->u.sc)); \
+        } \
+        else \
+        { \
+            /* make packed from unpacked */ \
+            dest->u.o = malloc(OSASZ(dest->u.oc, dest->u.sc)); \
+            memcpy(dest->u.o, src->u.o, OASZ(dest->u.oc)); \
+            memcpy(dest->u.o + dest->u.oc, src->u.s, SASZ(dest->u.sc)); \
+        } \
+        dest->u.s = (PVFS_SID *)(dest->u.o + dest->u.oc); \
+    } while (0)
+
+int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
+{
+    switch(dest->objtype)
+    {
+    case PVFS_TYPE_METAFILE:
+        CPYFIELD(meta.dist, dest->u.meta.dist_size);
+        PACKSID(meta.dfile_array,
+                meta.sid_array,
+                meta.dfile_count,
+                meta.sid_count); 
+        break;
+    case PVFS_TYPE_DATAFILE:
+        break;
+    case PVFS_TYPE_DIRECTORY:
+        CPYFIELD(dir.hint.dist_name,
+                 dest->u.dir.hint.dist_name_len);
+        CPYFIELD(dir.hint.dist_params,
+                 dest->u.dir.hint.dist_params_len);
+        CPYFIELD(dir.dist_dir_bitmap,
+                 (dest->u.dir.dist_dir_attr.bitmap_size *
+                        sizeof(PVFS_dist_dir_bitmap_basetype)));
+        PACKSID(dir.dirdata_handles,
+                dir.dirdata_sids,
+                dir.dist_dir_attr.dirdata_count,
+                dir.dist_dir_attr.sid_count); 
+        break;
+    case PVFS_TYPE_DIRDATA:
+        CPYFIELD(dirdata.dist_dir_bitmap,
+                 (dest->u.dirdata.dist_dir_attr.bitmap_size *
+                        sizeof(PVFS_dist_dir_bitmap_basetype)));
+        PACKSID(dirdata.dirdata_handles,
+                dirdata.dirdata_sids,
+                dirdata.dist_dir_attr.dirdata_count,
+                dirdata.dist_dir_attr.sid_count); 
+        break;
+    case PVFS_TYPE_SYMLINK:
+        CPYFIELD(sym.target_path, dest->u.sym.target_path_len);
+        break;
+    default :
+        break;
+    }
+    return 0;
+}
+#undef CPYFIELD
+#undef PACKSID
+
+/* PINT_copy_object_attr_fixed
+ * This copies only the fixed size fields of the attribute, anything
+ * that is not malloc'd as a buffer 
+ */
+
+/* This macro checks to be sure the pointer field argument is not
+ * actually pointing to anything, and frees it if it is
+ */
+#define CLRFIELD(x) \
+    do { if (x) { free(x); (x) = NULL; } \
+    } while (0)
+
+int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
+{
+    int ret = -PVFS_EINVAL;
+
+    if (!dest || !src)
+    {
+        return ret;
+    }
+    dest->objtype = src->objtype;
+    dest->mask  = src->mask;
+    dest->owner = src->owner;
+    dest->group = src->group;
+    dest->perms = src->perms;
+    dest->atime = src->atime;
+    dest->atime = src->mtime;
+    dest->atime = src->ctime;
+
+    switch(dest->objtype)
+    {
+    case PVFS_TYPE_METAFILE:
+        CLRFIELD(dest->u.meta.dist);
+        dest->u.meta.dist_size = src->u.meta.dist_size;
+        CLRFIELD(dest->u.meta.dfile_array);
+        dest->u.meta.dfile_count = src->u.meta.dfile_count;
+        CLRFIELD(dest->u.meta.sid_array);
+        dest->u.meta.sid_count = src->u.meta.sid_count;
+        dest->u.meta.size = src->u.meta.size;
+        dest->u.meta.mirror_mode = src->u.meta.mirror_mode;
+        dest->u.meta.stuffed = src->u.meta.stuffed;
+        dest->u.meta.stuffed_size = src->u.meta.stuffed_size;
+        dest->u.meta.hint.flags = src->u.meta.hint.flags;
+        /**/
+        break;
+    case PVFS_TYPE_DATAFILE:
+        dest->u.data.size = src->u.data.size;
+        break;
+    case PVFS_TYPE_DIRECTORY:
+        dest->u.dir.dirent_count =
+                src->u.dir.dirent_count;
+        /* begin hints */
+        dest->u.dir.hint.dist_name_len =
+                src->u.dir.hint.dist_name_len;
+        CLRFIELD(dest->u.dir.hint.dist_name);
+        dest->u.dir.hint.dist_params_len =
+                src->u.dir.hint.dist_params_len;
+        CLRFIELD(dest->u.dir.hint.dist_params);
+        dest->u.dir.hint.dfile_count =
+                src->u.dir.hint.dfile_count;
+        dest->u.dir.hint.dfile_sid_count =
+                src->u.dir.hint.dfile_sid_count;
+        /* end hints */
+        dest->u.dir.dist_dir_attr.tree_height =
+                src->u.dir.dist_dir_attr.tree_height;
+        dest->u.dir.dist_dir_attr.dirdata_count =
+                src->u.dir.dist_dir_attr.dirdata_count;
+        dest->u.dir.dist_dir_attr.sid_count =
+                src->u.dir.dist_dir_attr.sid_count;
+        dest->u.dir.dist_dir_attr.bitmap_size =
+                src->u.dir.dist_dir_attr.bitmap_size;
+        dest->u.dir.dist_dir_attr.split_size =
+                src->u.dir.dist_dir_attr.split_size;
+        dest->u.dir.dist_dir_attr.server_no =
+                src->u.dir.dist_dir_attr.server_no;
+        dest->u.dir.dist_dir_attr.branch_level =
+                src->u.dir.dist_dir_attr.branch_level;
+        CLRFIELD(dest->u.dir.dist_dir_bitmap);
+        CLRFIELD(dest->u.dir.dirdata_handles);
+        CLRFIELD(dest->u.dir.dirdata_sids);
+        /**/
+        break;
+    case PVFS_TYPE_DIRDATA:
+        dest->u.dirdata.dirent_count =
+                src->u.dirdata.dirent_count;
+        dest->u.dirdata.dist_dir_attr.tree_height =
+                src->u.dirdata.dist_dir_attr.tree_height;
+        dest->u.dirdata.dist_dir_attr.dirdata_count =
+                src->u.dirdata.dist_dir_attr.dirdata_count;
+        dest->u.dirdata.dist_dir_attr.sid_count =
+                src->u.dirdata.dist_dir_attr.sid_count;
+        dest->u.dirdata.dist_dir_attr.bitmap_size =
+                src->u.dirdata.dist_dir_attr.bitmap_size;
+        dest->u.dirdata.dist_dir_attr.split_size =
+                src->u.dirdata.dist_dir_attr.split_size;
+        dest->u.dirdata.dist_dir_attr.server_no =
+                src->u.dirdata.dist_dir_attr.server_no;
+        dest->u.dirdata.dist_dir_attr.branch_level =
+                src->u.dirdata.dist_dir_attr.branch_level;
+        CLRFIELD(dest->u.dirdata.dist_dir_bitmap);
+        CLRFIELD(dest->u.dirdata.dirdata_handles);
+        CLRFIELD(dest->u.dirdata.dirdata_sids);
+        /**/
+        break;
+    case PVFS_TYPE_SYMLINK:
+        dest->u.sym.target_path_len = src->u.sym.target_path_len;
+        CLRFIELD(dest->u.sym.target_path);
+        /**/
+        break;
+    default :
+        break;
+    }
+    return 0;
+}
+#undef CLRFIELD
+
+/* PINT_copy_object_attr
+ * This is the main attrib copy routine, use this most of the time
+ */
+int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
+{
+    int ret = -PVFS_EINVAL;
+    ret = PINT_copy_object_attr_fixed(dest, src);
+    ret = PINT_copy_object_attr_var(dest, src);
+    /* should this be done all of the time */
+    if (PINT_capability_is_null(&src->capability))
+    {
+        PINT_null_capability(&dest->capability);
+    }
+    else
+    {
+        PINT_copy_capability(&src->capability, &dest->capability);
+    }
+    return ret;
+}
+
+/* PINT_free_object_attr
+ * Frees all space associated with an attrib including buffers
+ * do not use if buffers are shared
+ */
+
+#define FREEFIELD(x) do { \
+    if (attr->u.x != NULL) { free(attr->u.x); } \
+} while (0)
+
+/* This macro is only for OID/SID arrays it checks to see if they are
+ * packed (contiguous) and either frees them as one, or as two
+ */
+#define FREEPACK(o,s,oc) do { \
+    if (attr->u.o == NULL || attr->u.s == NULL) \
+    { \
+        if (attr->u.o != NULL) { free(attr->u.o); } \
+        if (attr->u.s != NULL) { free(attr->u.s); } \
+    } \
+    else \
+    { \
+        if (attr->u.s == (PVFS_SID *)(attr->u.o + attr->u.oc)) \
+        { \
+            /* OIDs and SIDs are packed */ \
+            free(attr->u.o); \
+        } \
+        else \
+        { \
+            /* not packed */ \
+            free(attr->u.o); \
+            free(attr->u.s); \
+        } \
+    } \
+} while (0)
+
+void PINT_free_object_attr(PVFS_object_attr *attr)
+{
+    PINT_cleanup_capability(&attr->capability);
+
+    switch(attr->objtype)
+    {
+    case PVFS_TYPE_METAFILE:
+        FREEFIELD(meta.dist);
+        FREEPACK(meta.dfile_array,
+                 meta.sid_array,
+                 meta.dfile_count);
+        break;
+    case PVFS_TYPE_DATAFILE:
+        break;
+    case PVFS_TYPE_DIRECTORY:
+        FREEFIELD(dir.hint.dist_name);
+        FREEFIELD(dir.hint.dist_params);
+        FREEFIELD(dir.dist_dir_bitmap);
+        FREEPACK(dir.dirdata_handles,
+                 dir.dirdata_sids,
+                 dir.dist_dir_attr.dirdata_count);
+        break;
+    case PVFS_TYPE_DIRDATA:
+        FREEFIELD(dirdata.dist_dir_bitmap);
+        FREEPACK(dirdata.dirdata_handles,
+                 dirdata.dirdata_sids,
+                 dirdata.dist_dir_attr.dirdata_count);
+        break;
+    case PVFS_TYPE_SYMLINK:
+        FREEFIELD(sym.target_path);
+        break;
+    default :
+        break;
+    }
+    /* Do not free the main struct */
+    /* free(attr); */
+}
+#undef FREEFIELD
+#undef FREEPACK
+
+/* V3 Add function that calls free_obj_attr then frees the attr itself */
+
+/* V3 Old versions - should be removed */
+#if 0
 int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 {
     int ret = -PVFS_ENOMEM;
@@ -336,6 +644,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 dest->u.meta.dfile_count = src->u.meta.dfile_count;
             }
           /* V3 this should go away eventually */
+#if 0
           if(src->mask & PVFS_ATTR_META_MIRROR_DFILES)
             {
                 PVFS_size df_array_size = src->u.meta.dfile_count         *
@@ -369,6 +678,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 dest->u.meta.mirror_copies_count 
                    = src->u.meta.mirror_copies_count;
             }
+#endif
 
             if(src->mask & PVFS_ATTR_META_DIST)
             {
@@ -454,6 +764,7 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                 }
             }
             /* V3 this should go away eventually */
+#if 0
             if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
             {
                 if (attr->u.meta.mirror_dfile_array)
@@ -462,6 +773,7 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                     attr->u.meta.mirror_dfile_array = NULL;
                 }
             }
+#endif
             if (attr->mask & PVFS_ATTR_META_DIST)
             {
                 if (attr->u.meta.dist)
@@ -515,6 +827,7 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
         }
     }
 }
+#endif
 
 char *PINT_util_get_object_type(int objtype)
 {

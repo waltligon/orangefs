@@ -930,14 +930,15 @@ static PINT_sm_action mgmt_create_root_crdirent_lost_found_setup_msgpair(
                          msg_p->req,
                          s_op->u.mgmt_create_root_dir.capability,
                          s_op->u.mgmt_create_root_dir.credential,
-    /*stored name*/      lost_and_found_string,
                          s_op->target_fs_id,
-    /*metadata handle*/  s_op->u.mgmt_create_root_dir.lost_and_found_handle,
     /*bucket handle*/    s_op->target_handle, 
                          0,    /* V3 sid count of bucket */
                          NULL, /* V3 sid array for target */
+    /*stored name*/      lost_and_found_string,
     /*stored handle*/    s_op->attr.u.dir.dirdata_handles[dirdata_server_index],
                          NULL, /* V3 sid array for stored handle */
+    /*metadata handle*/  s_op->u.mgmt_create_root_dir.lost_and_found_handle,
+                         NULL, /* V3 sid array for metadata */
                          NULL);
 
     msg_p->fs_id = s_op->target_fs_id;

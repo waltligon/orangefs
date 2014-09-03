@@ -457,18 +457,18 @@ struct PINT_client_lookup_sm
 
 struct PINT_client_rename_sm
 {
-    char *entries[2];                /* old/new input entry names */
-    PVFS_object_ref parent_refns[2]; /* old/new input parent refns */
-
-    PVFS_object_ref refns[2];        /* old/new object refns */
+    char *entries[2];                /* old/new entry names */
+    PVFS_object_ref parent_refns[2]; /* old/new parent refns */
+    PVFS_object_ref refns[2];        /* old/new entry object refns */
     PVFS_ds_type types[2];           /* old/new object types */
     PVFS_capability caps[2];         /* old/new capabilities */
-    PVFS_handle dirent_handle[2];    /* old/new dirent handles for parent dirs */
+    PVFS_handle dirdata_handle[2];   /* old/new dirdata handles */
+    PVFS_SID *dirdata_sids[2];       /* old/new dirdata sids */
     int retry_count;
     int stored_error_code;
     int rmdirent_index;
     int target_dirent_exists;
-    PVFS_handle old_dirent_handle;
+    PVFS_handle old_dirdata_handle;
 };
 
 struct PINT_client_mgmt_setparam_list_sm 

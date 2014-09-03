@@ -13,7 +13,7 @@
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
 
-/* converts common fields between sys attr and obj attr structures */
+/* converts common fields from sys attr to obj attr structures */
 #define PINT_CONVERT_ATTR(dest, src, extra_amask)       \
 do{                                                     \
     (dest)->mask = 0;                                   \
@@ -75,6 +75,8 @@ typedef struct PINT_time_marker_s PINT_time_marker;
 
 PVFS_msg_tag_t PINT_util_get_next_tag(void);
 
+int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src);
+int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src);
 int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src);
 void PINT_free_object_attr(PVFS_object_attr *attr);
 void PINT_time_mark(PINT_time_marker* out_marker);

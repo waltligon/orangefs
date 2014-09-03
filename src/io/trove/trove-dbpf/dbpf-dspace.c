@@ -1197,7 +1197,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
         {
             gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
                          "(dir_count=%llu)\n",
-                         llu(ds_attr_p->u.dirdata.count));
+                         llu(ds_attr_p->u.dirdata.dirent_count));
         }
 
         UPDATE_PERF_METADATA_READ();
@@ -1311,7 +1311,7 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
             {
                 gossip_debug(GOSSIP_TROVE_DEBUG,
                              "\tcount = %llu\n",
-                             llu(ds_attr_p[i].u.dirdata.count));
+                             llu(ds_attr_p[i].u.dirdata.dirent_count));
             }
 
             UPDATE_PERF_METADATA_READ();
@@ -1537,7 +1537,7 @@ int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
     {
         gossip_debug(GOSSIP_TROVE_DEBUG,
                      "\tcount = %llu\n",
-                     llu(attr->u.dirdata.count));
+                     llu(attr->u.dirdata.dirent_count));
     }
 
     /* add retrieved ds_attr to dbpf_attr cache here */

@@ -37,6 +37,20 @@ int PVFS_OBJ_gen_data(PVFS_object_ref *obj,
  */
 int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid);
 
+
+/**
+ * Count number of known servers with a given SID type
+ */
+int PVFS_SID_count_io(PVFS_fs_id fs_id, int *count);
+
+int PVFS_SID_count_meta(PVFS_fs_id fs_id, int *count);
+
+int PVFS_SID_count_root(PVFS_fs_id fs_id, int *count);
+
+int PVFS_SID_count_prime(PVFS_fs_id fs_id, int *count);
+
+int PVFS_SID_count_config(PVFS_fs_id fs_id, int *count);
+
 /**
  * Look up a list of SIDs by type and return the matching BMI address
  * _n versions require number of bmi_addr in the provided buffer and
@@ -59,7 +73,7 @@ int PVFS_SID_get_server_next_n(PVFS_BMI_addr_t *bmi_addr,
                                uint32_t stype);
 
 int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
-                      PVFS_handle *handle,
+                      PVFS_handle **handle,
                       uint32_t sid_count,
                       PVFS_SID **sid_array,
                       uint32_t datafile_count,

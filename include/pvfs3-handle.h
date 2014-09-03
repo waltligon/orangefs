@@ -19,11 +19,11 @@
 #define SW(x,y) (((uint32_t)(x))>>(y))
 
 /* size of OID array of size n */
-#define OASZ(n) ((n) * sizeof(PVFS_OID))
+#define OASZ(n) (size_t)((size_t)(n) * sizeof(PVFS_OID))
 /* size of SID array of size m */
-#define SASZ(m) ((m) * sizeof(PVFS_SID))
+#define SASZ(m) (size_t)((size_t)(m) * sizeof(PVFS_SID))
 /* size of OID array of size n with m SIDs per OID */
-#define OSASZ(n,m) ((n) * (OASZ(1) + SASZ(m)))
+#define OSASZ(n,m) (size_t)((size_t)(n) * (OASZ(1) + SASZ((size_t)m)))
 
 /* uuid_t is an unsigned char[16] array and thus passes by reference */
 
@@ -39,6 +39,9 @@ typedef struct {uuid_t u;} PVFS_SID __attribute__ ((__aligned__ (8)));
     memcpy((pbuf), *(pptr), SID_SZ); \
     *(pptr) += SID_SZ; \
 } while (0)
+
+#define defree_PVFS_SID(pbuf) do { \
+} while(0)
     
 /** Unique identifier for an object on a PVFS3 file system  128-bit */
 typedef struct {uuid_t u;} PVFS_OID __attribute__ ((__aligned__ (8)));
@@ -52,6 +55,9 @@ typedef struct {uuid_t u;} PVFS_OID __attribute__ ((__aligned__ (8)));
     memcpy((pbuf), *(pptr), OID_SZ); \
     *(pptr) += OID_SZ; \
 } while (0)
+
+#define defree_PVFS_OID(pbuf) do { \
+} while(0)
 
 /** This union makes it easy to work with an array of mixed OID and SID
  * items - they are the same size and format, but this helps keep the
@@ -167,8 +173,11 @@ static __inline__ uint64_t PVFS_OID_hash64(const PVFS_OID *oid)
            DW(p[12],32) + DW(p[13],40) + DW(p[14],48) + DW(p[15],56);
 }
 
+#if 0
 #define PVFS_OID_encode(d,s) PVFS_OID_cpy(((PVFS_OID *)d),(s))
 #define PVFS_OID_decode(d,s) PVFS_OID_cpy((d),((PVFS_OID *)s))
+#define PVFS_OID_defree(d,s) do { } while (0)
+#endif
 
 /* SID Variant definitions */
 #define PVFS_SID_variant_ncs UUID_VARIANT_NCS    /*0*/
@@ -265,9 +274,11 @@ static __inline__ uint64_t PVFS_SID_hash64(const PVFS_SID *sid)
            DW(p[12],32) + DW(p[13],40) + DW(p[14],48) + DW(p[15],56);
 }
 
+#if 0
 #define PVFS_SID_encode(d,s) PVFS_SID_cpy(((PVFS_SID *)d),(s))
 #define PVFS_SID_decode(d,s) PVFS_SID_cpy((d),((PVFS_SID *)s))
-
+#define PVFS_SID_defree(d,s) do { } while (0)
+#endif
 
 #if 0
 typedef struct          /* 5x 64-bit */

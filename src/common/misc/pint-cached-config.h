@@ -98,23 +98,19 @@ int PINT_cached_config_map_servers(
                 PVFS_handle_extent_array *handle_extent_array);
 #endif
 
-int PINT_cached_config_get_num_dfiles(
-                PVFS_fs_id fsid,
-                PINT_dist *dist,
-                int num_dfiles_requested,
-                int *num_dfiles);
+int PINT_cached_config_get_num_dfiles(PVFS_fs_id fsid,
+                                      PINT_dist *dist,
+                                      int32_t num_dfiles_requested,
+                                      int32_t *num_dfiles);
 
-int PINT_cached_config_get_num_meta(
-                PVFS_fs_id fsid,
-                int *num_meta);
+int PINT_cached_config_get_num_meta(PVFS_fs_id fsid, int32_t *num_meta);
 
-int PINT_cached_config_get_num_io(
-                PVFS_fs_id fsid,
-                int *num_io);
+int PINT_cached_config_get_num_io(PVFS_fs_id fsid, int32_t *num_io);
 
-int PINT_cached_config_get_metadata_sid_count(
-                PVFS_fs_id fsid,
-                uint32_t *num_sid);
+int PINT_cached_config_get_metadata_sid_count(PVFS_fs_id fsid, int32_t *num_sid);
+
+int PINT_cached_config_get_default_dfile_sid_count(PVFS_fs_id fs_id,
+                                                   int32_t *num_sids);
 
 #if 0
 int PINT_cached_config_get_server_name(

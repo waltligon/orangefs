@@ -348,7 +348,7 @@ static PINT_sm_action lookup_verify_object_metadata(
             s_op->u.lookup.seg_nr - 1]);
     }
 
-    PVFS_ds_attr_to_object_attr(ds_attr, a_p);
+    PVFS_object_attr_from_ds_attr(a_p, ds_attr);
     a_p->mask = PVFS_ATTR_COMMON_ALL;
     s_op->target_object_attr = a_p;
 
