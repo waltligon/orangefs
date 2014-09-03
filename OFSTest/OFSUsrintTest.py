@@ -482,8 +482,8 @@ def ltp(testing_node,output=[]):
     #print 'sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=%s:%s/lib %s ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -a %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.db4_lib_dir, testing_node.ofs_installation_location,preload,testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type)
     #rc = testing_node.runSingleCommandAsRoot('PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=%s:%s/lib %s ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp-usrint -f ltp-pvfs-testcases -a %s/zoo.tmp 2>&1 | tee %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.db4_lib_dir,testing_node.ofs_installation_location, preload, testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type),output)
     
-    print 'sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=%s:%s/lib %s ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -a %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.db4_lib_dir, testing_node.ofs_installation_location,testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type)
-    rc = testing_node.runSingleCommandAsRoot('PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=%s:%s/lib %s ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp-usrint -f ltp-pvfs-testcases -a %s/zoo.tmp 2>&1 | tee %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.db4_lib_dir,testing_node.ofs_installation_location, testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type),output)
+    print 'sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=%s:%s/lib ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -a %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.db4_lib_dir, testing_node.ofs_installation_location,testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type)
+    rc = testing_node.runSingleCommandAsRoot('PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=%s:%s/lib ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp-usrint -f ltp-pvfs-testcases -a %s/zoo.tmp 2>&1 | tee %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.db4_lib_dir,testing_node.ofs_installation_location, testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type),output)
 
     # check to see if log file is there
     if testing_node.runSingleCommand("[ -f %s/ltp-pvfs-testcases-%s.log ]"% (testing_node.ofs_installation_location,vfs_type)):
@@ -601,7 +601,7 @@ def tail(testing_node,output=[]):
     
     # Create the file
     testing_node.runSingleCommand('%s bash -c \'echo \\"%s\\" > %s\'' % (preload,test_string,tail_file))
-    testing_node.runSingleCommand('bash -c \'echo \\"%s\\" > %s\'' % (preload,test_string,local_file))
+    testing_node.runSingleCommand('bash -c \'echo \\"%s\\" > %s\'' % (test_string,local_file))
     
     # Create the file
     
