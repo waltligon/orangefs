@@ -463,7 +463,7 @@ int iocommon_create_file(const char *filename,
     PVFS_sys_layout *layout = NULL;
     PVFS_hint hints = NULL;
 
-#ifdef PVFS_USER_ENV_VARS_ENABLED
+#if PVFS_USER_ENV_VARS_ENABLED
     PVFS_hint no_hint_hint; /* We need this if file_creation_param is null. */
 #endif /* PVFS_USER_ENV_VARS_ENABLED */
 
@@ -482,7 +482,7 @@ int iocommon_create_file(const char *filename,
     attr.ctime = attr.atime;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
-#ifdef PVFS_USER_ENV_VARS_ENABLED
+#if PVFS_USER_ENV_VARS_ENABLED
 
     /* env_vars_struct_dump(&env_vars); */
 

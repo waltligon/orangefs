@@ -1,6 +1,6 @@
-/* 
+/*
  * (C) 2013 Clemson University
- *
+ * 
  * See COPYING in top-level directory.
  */
 package org.orangefs.usrint;
@@ -35,7 +35,8 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
     }
 
     @Override
-    public synchronized void close() throws IOException {
+    public synchronized void close()
+            throws IOException {
         if (fd < 0) {
             return;
         }
@@ -49,20 +50,23 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
         channelBuffer = null;
     }
 
-    /* Help cleanup the unreleased file descriptors. Should find a better to do this */
-    protected void finalize() throws Throwable
-    {
-      try {
-        if (orange != null && fd != -1 ) {
-          orange.posix.close(fd);
-          orange = null;
-          fd = -1;
-          pf = null;
-          channelBuffer = null;
+    /*
+     * Help cleanup the unreleased file descriptors. Should find a better to do
+     * this
+     */
+    protected void finalize()
+            throws Throwable {
+        try {
+            if (orange != null && fd != -1) {
+                orange.posix.close(fd);
+                orange = null;
+                fd = -1;
+                pf = null;
+                channelBuffer = null;
+            }
+        } finally {
+            super.finalize();
         }
-      } finally {
-        super.finalize();
-      }
     }
 
     @Override
@@ -71,7 +75,8 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
     }
 
     @Override
-    public synchronized int read(ByteBuffer dst) throws IOException {
+    public synchronized int read(ByteBuffer dst)
+            throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }
@@ -107,8 +112,7 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
                 channelBuffer.limit(channelBufferPosition + dstRemaining);
                 dst.put(channelBuffer);
                 channelBuffer.limit(channelBufferLimit);
-            }
-            else {
+            } else {
                 dst.put(channelBuffer);
             }
         }
@@ -120,54 +124,61 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
         if (initialDstRemaining == 0 || bytesRead > 0) {
             OFSLOG.debug("read: " + bytesRead);
             return bytesRead;
-        }
-        else {
+        } else {
             OFSLOG.debug("no bytes read...EOF");
             return -1;
         }
     }
 
 
-  /* This is reserved method to provide a Zero-Copy between byte array and ByteBuffer */
-  public synchronized int read(byte[] dst, int off, int len) throws IOException {
-    if (fd < 0) {
-      throw new IOException("file descriptor isn't open.");
-    }
-    long ret = 0;
-      /* Attempt to directly read bufferSize bytes from OrangeFS into Byte Buffer. */
-    if (!channelBuffer.hasRemaining() || channelBuffer.limit() == 0) {
-      /* clear buffer then readOFS */
-      channelBuffer.clear();
-      //channelBuffer.flip();
-      ret = orange.posix.read(fd, channelBuffer, len);
-      channelBuffer.position((int) ret);
-      channelBuffer.flip();
+    /*
+     * This is reserved method to provide a Zero-Copy between byte array and
+     * ByteBuffer
+     */
+    public synchronized int read(byte[] dst, int off, int len)
+            throws IOException {
+        if (fd < 0) {
+            throw new IOException("file descriptor isn't open.");
+        }
+        long ret = 0;
+        /*
+         * Attempt to directly read bufferSize bytes from OrangeFS into Byte
+         * Buffer.
+         */
+        if (!channelBuffer.hasRemaining() || channelBuffer.limit() == 0) {
+            /* clear buffer then readOFS */
+            channelBuffer.clear();
+            // channelBuffer.flip();
+            ret = orange.posix.read(fd, channelBuffer, len);
+            channelBuffer.position((int) ret);
+            channelBuffer.flip();
 
-    }
+        }
 
-//    OFSLOG.warn("dst[] size is: " + dst.length);
-//    OFSLOG.warn("off is: " + off);
-//    OFSLOG.warn("length is: " + len);
-//    OFSLOG.warn("bytebuffer capacity: " + channelBuffer.capacity());
-//    OFSLOG.warn("bytebuffer remaining: " + channelBuffer.remaining());
-//    OFSLOG.warn("bytebuffer limit: " + channelBuffer.limit());
-//    OFSLOG.warn("1 bytebuffer position: " + channelBuffer.position());
+        // OFSLOG.warn("dst[] size is: " + dst.length);
+        // OFSLOG.warn("off is: " + off);
+        // OFSLOG.warn("length is: " + len);
+        // OFSLOG.warn("bytebuffer capacity: " + channelBuffer.capacity());
+        // OFSLOG.warn("bytebuffer remaining: " + channelBuffer.remaining());
+        // OFSLOG.warn("bytebuffer limit: " + channelBuffer.limit());
+        // OFSLOG.warn("1 bytebuffer position: " + channelBuffer.position());
 
-    if (ret < 0) {
-      throw new IOException("orange.posix.read failed.");
-    } else if (ret == 0) {
-      return -1;
-    } else {
-      channelBuffer.get(dst, off, len);
-      return (int) ret;
+        if (ret < 0) {
+            throw new IOException("orange.posix.read failed.");
+        } else if (ret == 0) {
+            return -1;
+        } else {
+            channelBuffer.get(dst, off, len);
+            return (int) ret;
+        }
     }
-  }
 
     /*
      * When this method is called, the position should equal 0, and the limit
      * should equal the capacity, via clear().
      */
-    private synchronized void readOFS() throws IOException {
+    private synchronized void readOFS()
+            throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }
@@ -180,7 +191,8 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
         channelBuffer.position((int) ret);
     }
 
-    public synchronized void seek(long pos) throws IOException {
+    public synchronized void seek(long pos)
+            throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }
@@ -188,12 +200,14 @@ public class OrangeFileSystemInputChannel implements ReadableByteChannel {
         channelBuffer.position(0).limit(0);
         long ret = orange.posix.lseek(fd, pos, pf.SEEK_SET);
         if (ret < 0 || ret != pos) {
-            throw new IOException("seek error: pos = " + pos + ", ret = " + ret);
+            throw new IOException("seek error:" + " pos = " + pos + ", ret = "
+                    + ret);
         }
     }
 
     /* Returns current position within the file */
-    public synchronized long tell() throws IOException {
+    public synchronized long tell()
+            throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }

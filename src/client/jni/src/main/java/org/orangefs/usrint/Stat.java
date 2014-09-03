@@ -1,6 +1,6 @@
-/* 
+/*
  * (C) 2011 Clemson University
- *
+ * 
  * See COPYING in top-level directory.
  */
 package org.orangefs.usrint;
@@ -27,8 +27,7 @@ public class Stat {
      * This probably won't get called much since we're depending upon a native
      * method to initialize this object.
      */
-    Stat() {
-    }
+    Stat() {}
 
     /* Generic Object Dump to String */
     @Override
@@ -45,8 +44,7 @@ public class Stat {
                 result.append(field.getName());
                 result.append(": ");
                 result.append(field.get(this));
-            }
-            catch (IllegalAccessException ex) {
+            } catch (IllegalAccessException ex) {
                 System.out.println(ex);
             }
             result.append(newLine);

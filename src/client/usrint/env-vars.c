@@ -1,6 +1,6 @@
 #include "pvfs2-config.h"
 
-#ifdef PVFS_USER_ENV_VARS_ENABLED
+#if PVFS_USER_ENV_VARS_ENABLED
 
 #include <stdlib.h>
 #include <stdio.h>

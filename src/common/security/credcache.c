@@ -15,6 +15,7 @@
 
 #include "credcache.h"
 #include "security-util.h"
+#include "server-config.h"
 #include "pint-util.h"
 #include "murmur3.h"
 #include "gossip.h"
@@ -193,6 +194,8 @@ static void PINT_credcache_debug(const char * prefix,
  */
 int PINT_credcache_init(void)
 {
+    struct server_configuration_s *config = PINT_get_server_config();
+
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Initializing credential cache...\n");
 
     credcache = PINT_seccache_new("Credential", &credcache_methods, 0);
@@ -201,8 +204,8 @@ int PINT_credcache_init(void)
         return -PVFS_ENOMEM;
     }
 
-    /* Set properties */
-    PINT_seccache_set(credcache, SECCACHE_TIMEOUT, CREDCACHE_TIMEOUT);
+    /* Set timeout */
+    PINT_seccache_set(credcache, SECCACHE_TIMEOUT, config->credcache_timeout);
 
     return 0;
 }

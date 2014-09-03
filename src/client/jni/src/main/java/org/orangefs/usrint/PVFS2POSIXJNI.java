@@ -1,6 +1,6 @@
 /*
  * (C) 2011 Clemson University
- *
+ * 
  * See COPYING in top-level directory.
  */
 package org.orangefs.usrint;
@@ -17,22 +17,18 @@ public class PVFS2POSIXJNI {
         String libpvfs2 = "libpvfs2.so";
         try {
             System.load(ldlPath + "/" + libpvfs2);
-        }
-        catch (UnsatisfiedLinkError error) {
+        } catch (UnsatisfiedLinkError error) {
             error.printStackTrace();
             System.err.println("Couldn't load " + libpvfs2);
-            System.err.println("JNI_LIBRARY_PATH = "
-                    + ldlPath);
+            System.err.println("JNI_LIBRARY_PATH = " + ldlPath);
             System.exit(-1);
         }
         try {
             System.load(ldlPath + "/" + libofs);
-        }
-        catch (UnsatisfiedLinkError error) {
+        } catch (UnsatisfiedLinkError error) {
             error.printStackTrace();
             System.err.println("Couldn't load " + libofs);
-            System.err.println("JNI_LIBRARY_PATH = "
-                    + ldlPath);
+            System.err.println("JNI_LIBRARY_PATH = " + ldlPath);
             System.exit(-1);
         }
     }
@@ -99,7 +95,7 @@ public class PVFS2POSIXJNI {
     public native int futimes(int fd, long actime_usec, long modtime_usec);
 
     public native int futimesat(int dirfd, String path, long actime_usec,
-    		long modtime_usec);
+            long modtime_usec);
 
     public native int getdtablesize();
 
@@ -120,7 +116,7 @@ public class PVFS2POSIXJNI {
 
     public native int lremovexattr(String path, String name);
 
-    //@Override
+    // @Override
     public native long lseek(int fd, long offset, long whence);
 
     public native Stat lstat(String path);
@@ -133,13 +129,11 @@ public class PVFS2POSIXJNI {
 
     public native int mknodat(int dirfd, String path, long mode, int dev);
 
-    public native int open(String path, long flags, long mode) throws IOException;
+    public native int open(String path, long flags, long mode)
+            throws IOException;
 
-    public native int openWithHints(String path,
-            long flags,
-						long mode,
-            short replicationFactor,
-						long blockSize);
+    public native int openWithHints(String path, long flags, long mode,
+            short replicationFactor, long blockSize);
 
     public native int openat(int dirfd, String path, long flags, long mode);
 
@@ -191,8 +185,7 @@ public class PVFS2POSIXJNI {
                 result.append(field.getName());
                 result.append(": ");
                 result.append(field.get(this));
-            }
-            catch (IllegalAccessException ex) {
+            } catch (IllegalAccessException ex) {
                 System.out.println(ex);
             }
             result.append(newLine);
@@ -215,6 +208,6 @@ public class PVFS2POSIXJNI {
 
     public native long write(int fd, ByteBuffer buf, long count);
 
-    //public native int getcwd(String path, long mode);
+    // public native int getcwd(String path, long mode);
 
 }

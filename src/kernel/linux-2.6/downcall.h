@@ -32,17 +32,17 @@ typedef struct
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
 } pvfs2_lookup_response_t;
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
 } pvfs2_create_response_t;
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
 } pvfs2_symlink_response_t;
 
 typedef struct
@@ -63,7 +63,7 @@ typedef struct
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
 } pvfs2_mkdir_response_t;
 
 /* duplication of some system interface structures so that I don't have to allocate extra memory */
@@ -71,7 +71,7 @@ struct pvfs2_dirent
 {
     char *d_name;
     int   d_length;
-    PVFS_handle handle;
+    PVFS_khandle khandle;
 };
 
 /* the readdir response is a blank downcall (i.e. all these fields are obtained from the trailer) */
@@ -119,7 +119,7 @@ typedef struct
 {
     PVFS_fs_id fs_id;
     int32_t id;
-    PVFS_handle root_handle;
+    PVFS_khandle root_khandle;
 } pvfs2_fs_mount_response_t;
 
 /* the umount response is a blank downcall */

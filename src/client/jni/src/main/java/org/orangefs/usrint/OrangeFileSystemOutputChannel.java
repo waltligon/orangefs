@@ -27,7 +27,8 @@ public class OrangeFileSystemOutputChannel implements WritableByteChannel {
 
     /* Flush the outChannel and close the file */
     @Override
-    public synchronized void close() throws IOException {
+    public synchronized void close()
+            throws IOException {
         if (fd < 0) {
             return;
         }
@@ -39,37 +40,44 @@ public class OrangeFileSystemOutputChannel implements WritableByteChannel {
         }
     }
 
-    /* Help cleanup unreleased file descriptor. Should find a better to do this */
-    protected void finalize() throws Throwable
-    {
-      try {
-        if (orange != null && fd != -1 ) {
-          flush();
-          orange.posix.close(fd);
-          orange = null;
-          fd = -1;
-          channelBuffer = null;
+    /*
+     * Help cleanup unreleased file descriptor. Should find a better way to do
+     * this.
+     */
+    protected void finalize()
+            throws Throwable {
+        try {
+            if (orange != null && fd != -1) {
+                flush();
+                orange.posix.close(fd);
+                orange = null;
+                fd = -1;
+                channelBuffer = null;
+            }
+        } finally {
+            super.finalize();
         }
-      } finally {
-        super.finalize();
-      }
     }
 
     /* Flush what's left in the channelBuffer to the file system */
-    public synchronized void flush() throws IOException {
+    public synchronized void flush()
+            throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open");
         }
         channelBuffer.flip();
         if (channelBuffer.hasRemaining()) {
-            long ret = orange.posix.write(fd, channelBuffer, channelBuffer
-                    .remaining());
+            long ret =
+                    orange.posix.write(fd, channelBuffer,
+                            channelBuffer.remaining());
             if (ret < 0) {
                 throw new IOException("write error");
             }
-	/* possible bug: if the limit is accidently set to 0, then we are going to get an infinie flush()
-	*/
-        //    channelBuffer.clear();
+            /*
+             * possible bug: if the limit is accidently set to 0, then we are
+             * going to get an infinie flush()
+             */
+            // channelBuffer.clear();
         }
         channelBuffer.clear();
     }
@@ -79,7 +87,8 @@ public class OrangeFileSystemOutputChannel implements WritableByteChannel {
         return fd >= 0;
     }
 
-    public synchronized void seek(long pos) throws IOException {
+    public synchronized void seek(long pos)
+            throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }
@@ -91,7 +100,8 @@ public class OrangeFileSystemOutputChannel implements WritableByteChannel {
         }
     }
 
-    public synchronized long tell() throws IOException {
+    public synchronized long tell()
+            throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }
@@ -110,7 +120,8 @@ public class OrangeFileSystemOutputChannel implements WritableByteChannel {
     }
 
     @Override
-    public synchronized int write(ByteBuffer src) throws IOException {
+    public synchronized int write(ByteBuffer src)
+            throws IOException {
         if (fd < 0) {
             throw new IOException("file descriptor isn't open.");
         }
@@ -139,8 +150,7 @@ public class OrangeFileSystemOutputChannel implements WritableByteChannel {
                 src.limit(srcPosition + channelBufferRemaining);
                 channelBuffer.put(src);
                 src.limit(srcLimit);
-            }
-            else {
+            } else {
                 channelBuffer.put(src);
             }
         }

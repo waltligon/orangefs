@@ -188,10 +188,8 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
  */
 void PINT_debug_capability(const PVFS_capability *cap, const char *prefix)
 {
-    char sig_buf[10], mask_buf[10]; 
+    char sig_buf[16], mask_buf[16];
     int i;
-
-    assert(cap);
 
     if (strlen(cap->issuer) == 0)
     {

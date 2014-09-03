@@ -229,7 +229,8 @@ ifdef LIB_NEEDS_LIBRT
 	DEPLIBS += -lrt
 endif
 DEPLIBS += -lm @LIBS@ @THREAD_LIB@
-ULIBDEPLIBS := -lpvfs2
+ULIBDEPLIBS := -lorangefs -lpvfs2
+OLIBDEPLIBS := -lpvfs2
 # Misc defines
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 RESET_FILE_POS = @RESET_FILE_POS@
@@ -561,6 +562,8 @@ ADMINSRC_SERVER :=
 USERSRC :=
 # LIBSRC is source code for libpvfs2
 LIBSRC :=
+# OLIBSRC is source code for liborangefs
+OLIBSRC :=
 # ULIBSRC is source code for libofs
 ULIBSRC :=
 # UCACHEDSRC is source code for ucached programs
@@ -615,13 +618,11 @@ SERVER := src/server/pvfs2-server
 endif
 
 # LIBRARIES is a list of the pvfs2 client libraries that will be installed
-ifdef TARGET_OS_DARWIN
 LIBRARIES_STATIC := lib/libpvfs2.a
+ifdef TARGET_OS_DARWIN
 LIBRARIES_LIBTOOL := lib/liborangefs.la
 else
-LIBRARIES_STATIC := lib/libpvfs2.a lib/liborangefs.a
-
-LIBRARIES_SHARED := lib/libpvfs2.so lib/liborangefs.so
+LIBRARIES_SHARED := lib/libpvfs2.so
 LIBRARIES_THREADED_STATIC := lib/libpvfs2-threaded.a
 LIBRARIES_THREADED_SHARED := lib/libpvfs2-threaded.so
 endif
@@ -633,11 +634,10 @@ BMILIBRARIES := lib/libbmi.a lib/libbmi.so
 endif
 
 ifeq ($(build_usrint),yes)
+LIBRARIES_STATIC += lib/liborangefs.a
+LIBRARIES_SHARED += lib/liborangefs.so
 LIBRARIES_STATIC += lib/libofs.a lib/liborangefsposix.a
 LIBRARIES_SHARED += lib/libofs.so lib/liborangefsposix.so
-# ifeq ($(build_symbolic),yes)
-# LIBRARIES_SHARED += lib/libofs-s.so
-# endif
 endif
 
 ifneq ($(build_static),yes)
@@ -682,14 +682,20 @@ include $(patsubst %, %/module.mk, $(MODULES))
 
 # LIBOBJS is a list of objects to put in the client lib
 LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
+# OLIBOBJS is a list of objects to put in the ofs lib
+OLIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(OLIBSRC)))
 # ULIBOBJS is a list of objects to put in the ofs lib
 ULIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ULIBSRC)))
 # LIBPICOBJS are the same, but compiled for use in a shared library
 LIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(LIBSRC)))
+# OLIBPICOBJS are the same, but compiled for use in a shared library
+OLIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(OLIBSRC)))
 # ULIBPICOBJS are the same, but compiled for use in a shared library
 ULIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(ULIBSRC)))
 # LIBDEPENDS is a list of dependency files for the client lib
 LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
+# OLIBDEPENDS is a list of dependency files for the client lib
+OLIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(OLIBSRC)))
 # ULIBDEPENDS is a list of dependency files for the client lib
 ULIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
 
@@ -704,18 +710,10 @@ endif
 
 # LIBTHREADEDOBJS is a list of objects to put in the multithreaded client lib
 LIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(LIBSRC)))
-# ULIBTHREADEDOBJS is a list of objects to put in the multithreaded ofs lib
-ULIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(ULIBSRC)))
-
 # LIBTHREADEDPICOBJS are the same, but compiled for use in a shared library
 LIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(LIBSRC)))
-# ULIBTHREADEDPICOBJS are the same, but compiled for use in a shared ofs library
-ULIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(ULIBSRC)))
-
 # LIBTHREADEDDEPENDS is a list of dependency files for the multithreaded client lib
 LIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
-# ULIBTHREADEDDEPENDS is a list of dependency files for the # multithreaded ofs lib
-ULIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
 
 # ADMINOBJS is a list of admin program objects
 ADMINOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC)))
@@ -826,7 +824,8 @@ DEPENDS := $(sort $(LIBDEPENDS) $(ULIBDEPENDS) $(SERVERDEPENDS) \
     $(SERVERBINDEPENDS) $(MISCDEPENDS) $(USERDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) \
     $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS) \
-    $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) )
+    $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) \
+	$(OLIBDEPENDS))
 endif
 
 ####################################################################
@@ -836,7 +835,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools $(VISS) $(KARMA) $(FUSE) 
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools kernapps $(VISS) $(KARMA) $(FUSE) 
 endif
 
 # target for building admin tools
@@ -953,6 +952,18 @@ lib/libpvfs2-threaded.so: $(LIBTHREADEDPICOBJS)
 	$(E)$(INSTALL) -d lib
 	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-threaded.so -o $@ $(LIBTHREADEDPICOBJS) $(DEPLIBS)
 
+# rule for building the orangefs library
+lib/liborangefs.a: $(OLIBOBJS)
+	$(Q) "  RANLIB	$@"
+	$(E)$(INSTALL) -d lib
+	$(E)ar rcs $@ $(OLIBOBJS)
+
+# rule for building the shared ofs library
+lib/liborangefs.so: $(OLIBPICOBJS) lib/libpvfs2.so
+	$(Q) "  LDSO		$@"
+	$(E)$(INSTALL) -d lib
+	$(E)$(LDSHARED) -Wl,-soname,liborangefs.so,-z,interpose,-Bsymbolic -o $@ $(OLIBPICOBJS) $(OLIBDEPLIBS) $(DEPLIBS)
+
 # rule for building the ofs library
 lib/libofs.a: $(ULIBOBJS)
 	$(Q) "  RANLIB	$@"
@@ -960,7 +971,7 @@ lib/libofs.a: $(ULIBOBJS)
 	$(E)ar rcs $@ $(ULIBOBJS)
 
 # rule for building the shared ofs library
-lib/libofs.so: $(ULIBPICOBJS) lib/libpvfs2.so
+lib/libofs.so: $(ULIBPICOBJS) lib/liborangefs.so lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
 	$(E)$(LDSHARED) -Wl,-soname,libofs.so,-z,interpose,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
@@ -974,26 +985,28 @@ lib/libofs.so: $(ULIBPICOBJS) lib/libpvfs2.so
 # endif
 
 # rules for building virtual libraries
-lib/liborangefs.a: lib/libpvfs2.a
-	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborangefs.a
+#lib/liborangefs.a: lib/libpvfs2.a
+#	$(Q) "  VLIB		$@"
+#	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborangefs.a
+#
 
-lib/liborangefs.la: lib/libpvfs2.a
-	$(Q) "  VLIB		$@"
-	$(E)glibtool --mode=link --tag=CC gcc -o lib/libpvfs2.la $^ -lcrypto -lssl -static
-	mv lib/libpvfs2.la $@
+#lib/liborangefs.so: lib/libpvfs2.so
+#	$(Q) "  VLIB		$@"
+#	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborangefs.so
 
-lib/liborangefs.so: lib/libpvfs2.so
+lib/liborangefsposix.a: lib/libofs.a lib/liborangefs.a lib/libpvfs2.a
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborangefs.so
+	$(E)printf "GROUP ( -lofs -lorangefs $(LIBS) )\n" > lib/liborangefsposix.a
 
-lib/liborangefsposix.a: lib/libpvfs2.a
+lib/liborangefsposix.so: lib/libofs.so lib/liborangefs.so lib/libpvfs2.so
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangefsposix.a
+	$(E)printf "GROUP ( -lofs -lorangefs $(LIBS) )\n" > lib/liborangefsposix.so
 
-lib/liborangefsposix.so: lib/libpvfs2.so
-	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangefsposix.so
+# rules for building libtool libraries
+lib/liborangefs.la: lib/liborangefs.a lib/libpvfs2.a
+	$(Q) "  GLT		$@"
+	$(E)glibtool --mode=link --tag=CC gcc -o lib/liborangefs.la $^ -lcrypto -lssl -static
+#	mv lib/libpvfs2.la $@
 
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
@@ -1018,7 +1031,7 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 
 # rule for building development tools and its objects. don't know why db isn't
 # already in libs.
-$(DEVELTOOLS): %: %.o $(LIBRARIES)
+$(DEVELTOOLS): %: %.o
 	$(Q) "  LD 		$@"
 	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBS) -ldb $(call modldflags,$<)
 
@@ -1196,9 +1209,8 @@ clean::
 	$(Q) "  CLEAN"
 	$(E)rm -f $(LIBOBJS) $(LIBTHREADEDOBJS) \
                 $(LIBPICOBJS) $(LIBTHREADEDPICOBJS) \
-                $(ULIBOBJS) $(ULIBTHREADEDOBJS) \
-                $(ULIBPICOBJS) $(ULIBDEPENDS) $(ULIBTHREADEDOBJS) \
-                $(ULIBTHREADEDPICOBJS) $(ULIBTHREADEDDEPENDS) \
+                $(ULIBOBJS) $(OLIBOBJS) $(OLIBDEPENDS) \
+                $(ULIBPICOBJS) $(ULIBDEPENDS) $(OLIBPICOBJS) \
                 $(UCACHEDTOOLS) $(UCACHEDOBJS) \
                 $(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
                 $(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
@@ -1219,7 +1231,7 @@ clean::
 ifdef BUILD_JNI
 clean::
 	$(E)rm -f $(JNIPOSIXHEADER) $(JNISTDIOHEADER)
-	$(E)rm -rf $(JNI_DIR)/target
+	$(E)rm -rf $(JNI_DIR)/target src/client/hadoop/orangefs-hadoop2/target
 
 endif
 
@@ -1251,7 +1263,7 @@ endif
 # some stuff that is cleaned in both distclean and dist targets
 cleaner: clean
 	rm -f tags
-	rm -f src/kernel/linux-2.6/Makefile
+	rm -f src/kernel/linux-2.6/Makefile src/kernel/linux-2.6/modules.order
 	rm -f src/kernel/linux-2.4/Makefile
 	rm -f maint/mpi-depend.sh
 	rm -f examples/pvfs2-server.rc
@@ -1440,6 +1452,7 @@ endif
 
 ifdef BUILD_SERVER
 	install -m 755 $(ADMINTOOLS_SERVER) $(bindir)
+	install -m 755 $(KERNAPPS) $(KERNAPPSTHR) $(sbindir)
     ifeq ($(NPTL_WORKAROUND),)
 	install -m 755 $(SERVER) $(sbindir)
     else

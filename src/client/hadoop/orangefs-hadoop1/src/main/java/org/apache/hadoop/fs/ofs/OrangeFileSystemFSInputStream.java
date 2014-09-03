@@ -1,6 +1,6 @@
-/* 
+/*
  * (C) 2012 Clemson University
- *
+ * 
  * See COPYING in top-level directory.
  */
 package org.apache.hadoop.fs.ofs;
@@ -25,20 +25,23 @@ public class OrangeFileSystemFSInputStream extends OrangeFileSystemInputStream
      * Constructor passes parameters to parent class and initializes statistics
      */
     public OrangeFileSystemFSInputStream(String path, int bufferSize,
-            FileSystem.Statistics statistics) throws IOException {
+            FileSystem.Statistics statistics)
+            throws IOException {
         super(path, bufferSize);
         this.statistics = statistics;
     }
 
     /* *** This method declared abstract in FSInputStream *** */
     @Override
-    public long getPos() throws IOException {
+    public long getPos()
+            throws IOException {
         return super.tell();
     }
 
     /* Override parent class implementation to include FileSystem.Statistics */
     @Override
-    public synchronized int read() throws IOException {
+    public synchronized int read()
+            throws IOException {
         int ret = super.read();
         if (ret != -1 && statistics != null) {
             OFSLOG.debug("<<<<< OrangeFileSystemFSInputStream: int ret = "
@@ -53,7 +56,8 @@ public class OrangeFileSystemFSInputStream extends OrangeFileSystemInputStream
 
     /* Override parent class implementation to include FileSystem.Statistics */
     @Override
-    public synchronized int read(byte[] b) throws IOException {
+    public synchronized int read(byte[] b)
+            throws IOException {
         int ret = super.read(b);
         if (ret > 0 && statistics != null) {
             statistics.incrementBytesRead(ret);
@@ -68,7 +72,8 @@ public class OrangeFileSystemFSInputStream extends OrangeFileSystemInputStream
 
     /* Override parent class implementation to include FileSystem.Statistics */
     @Override
-    public synchronized int read(byte[] b, int off, int len) throws IOException {
+    public synchronized int read(byte[] b, int off, int len)
+            throws IOException {
         int ret = super.read(b, off, len);
         if (ret > 0 && statistics != null) {
             OFSLOG.debug("<<<<< OrangeFileSystemFSInputStream: off ret = "
@@ -94,7 +99,8 @@ public class OrangeFileSystemFSInputStream extends OrangeFileSystemInputStream
 
     /* This method has an implementation in abstract class FSInputStream */
     @Override
-    public void readFully(long position, byte[] buffer) throws IOException {
+    public void readFully(long position, byte[] buffer)
+            throws IOException {
         long oldPos = getPos();
         seek(position);
         int ret = read(buffer);
@@ -119,7 +125,8 @@ public class OrangeFileSystemFSInputStream extends OrangeFileSystemInputStream
 
     /* *** This method declared abstract in FSInputStream *** */
     @Override
-    public synchronized void seek(long pos) throws IOException {
+    public synchronized void seek(long pos)
+            throws IOException {
         super.seek(pos);
     }
 

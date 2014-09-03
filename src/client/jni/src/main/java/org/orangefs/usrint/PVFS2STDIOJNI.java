@@ -1,6 +1,6 @@
 /*
  * (C) 2011 Clemson University
- *
+ * 
  * See COPYING in top-level directory.
  */
 package org.orangefs.usrint;
@@ -16,8 +16,7 @@ public class PVFS2STDIOJNI {
         String libpvfs2 = "libpvfs2.so";
         try {
             System.load(ldlPath + "/" + libpvfs2);
-        }
-        catch (UnsatisfiedLinkError error) {
+        } catch (UnsatisfiedLinkError error) {
             error.printStackTrace();
             System.err.println("Couldn't load " + libpvfs2);
             System.err.println("JNI_LIBRARY_PATH = " + ldlPath);
@@ -25,8 +24,7 @@ public class PVFS2STDIOJNI {
         }
         try {
             System.load(ldlPath + "/" + libofs);
-        }
-        catch (UnsatisfiedLinkError error) {
+        } catch (UnsatisfiedLinkError error) {
             error.printStackTrace();
             System.err.println("Couldn't load " + libofs);
             System.err.println("JNI_LIBRARY_PATH = " + ldlPath);
@@ -187,8 +185,7 @@ public class PVFS2STDIOJNI {
                 result.append(field.getName());
                 result.append(": ");
                 result.append(field.get(this));
-            }
-            catch (IllegalAccessException ex) {
+            } catch (IllegalAccessException ex) {
                 System.out.println(ex);
             }
             result.append(newLine);

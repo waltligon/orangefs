@@ -1,6 +1,6 @@
 /*
  * (C) 2012 Clemson University
- *
+ * 
  * See COPYING in top-level directory.
  */
 package org.orangefs.usrint;
@@ -25,7 +25,8 @@ public class OrangeFileSystemInputStream extends InputStream implements
     private String path;
     private long fileSize;
 
-    public OrangeFileSystemInputStream(String path, int bufferSize) //TODO Add blockSize
+    public OrangeFileSystemInputStream(String path, int bufferSize)
+            // TODO Add blockSize
             throws IOException {
         int fd = -1;
         this.path = path;
@@ -45,7 +46,8 @@ public class OrangeFileSystemInputStream extends InputStream implements
     }
 
     @Override
-    public synchronized int available() throws IOException {
+    public synchronized int available()
+            throws IOException {
         if (inChannel == null) {
             throw new IOException("InputChannel is null.");
         }
@@ -53,7 +55,8 @@ public class OrangeFileSystemInputStream extends InputStream implements
     }
 
     @Override
-    public synchronized void close() throws IOException {
+    public synchronized void close()
+            throws IOException {
         if (inChannel == null) {
             return;
         }
@@ -61,13 +64,13 @@ public class OrangeFileSystemInputStream extends InputStream implements
         inChannel = null;
     }
 
-    public String getPath() throws IOException {
+    public String getPath()
+            throws IOException {
         return path;
     }
 
     @Override
-    public void mark(int readLimit) {
-    }
+    public void mark(int readLimit) {}
 
     @Override
     public boolean markSupported() {
@@ -75,7 +78,8 @@ public class OrangeFileSystemInputStream extends InputStream implements
     }
 
     @Override
-    public synchronized int read() throws IOException {
+    public synchronized int read()
+            throws IOException {
         byte[] b = new byte[1];
         int rc = read(b, 0, 1);
         if (rc == 1) {
@@ -88,12 +92,14 @@ public class OrangeFileSystemInputStream extends InputStream implements
     }
 
     @Override
-    public synchronized int read(byte[] b) throws IOException {
+    public synchronized int read(byte[] b)
+            throws IOException {
         return read(b, 0, b.length);
     }
 
     @Override
-    public synchronized int read(byte[] b, int off, int len) throws IOException {
+    public synchronized int read(byte[] b, int off, int len)
+            throws IOException {
         if (inChannel == null) {
             throw new IOException("InputChannel is null.");
         }
@@ -110,11 +116,13 @@ public class OrangeFileSystemInputStream extends InputStream implements
     }
 
     @Override
-    public void reset() throws IOException {
+    public void reset()
+            throws IOException {
         throw new IOException("No support for marking.");
     }
 
-    public synchronized void seek(long pos) throws IOException {
+    public synchronized void seek(long pos)
+            throws IOException {
         if (inChannel == null) {
             throw new IOException("InputChannel is null.");
         }
@@ -125,12 +133,14 @@ public class OrangeFileSystemInputStream extends InputStream implements
         inChannel.seek(pos);
     }
 
-    public synchronized boolean seekToNewSource(long targetPos) throws IOException {
+    public synchronized boolean seekToNewSource(long targetPos)
+            throws IOException {
         return false;
     }
 
     @Override
-    public synchronized long skip(long n) throws IOException {
+    public synchronized long skip(long n)
+            throws IOException {
         if (n < 0) {
             return 0;
         }
@@ -146,7 +156,8 @@ public class OrangeFileSystemInputStream extends InputStream implements
     }
 
     /* Returns current position within the file */
-    public long tell() throws IOException {
+    public long tell()
+            throws IOException {
         if (inChannel == null) {
             throw new IOException("InputChannel is null.");
         }

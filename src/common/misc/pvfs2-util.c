@@ -15,6 +15,7 @@
 #include <ctype.h>
 #include <assert.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/wait.h>
@@ -186,6 +187,34 @@ int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
 }
 
 #ifdef ENABLE_SECURITY_MODE
+void debug_gencred(char *args[])
+{
+    char **p = args, *str;
+    size_t slen = 0;
+
+    while (*p)
+    {
+        slen += strlen(*p++) + 1;
+    }
+
+    str = calloc(1, slen + 1);
+    if (str == NULL)
+    {
+        return;
+    }
+
+    p = args;
+    while (*p)
+    {
+        strcat(str, *p++);
+        strcat(str, " ");
+    }
+    
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "Executing pvfs2-gencred: %s\n", str);
+
+    free(str);
+}
+
 /* PVFS_util_gen_credential
  * 
  * Generate signed credential object using external app pvfs2-gencred.
@@ -280,6 +309,9 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         }
 #endif
         *ptr++ = NULL;
+
+        debug_gencred(args);
+
         execv(BINDIR"/pvfs2-gencred", args);
 
         _exit(100);
@@ -349,17 +381,17 @@ int PVFS_util_gen_credential(const char *user, const char *group,
                 do
                 {
                     ecnt = read(errordes[0], ebuf+etotal, 
-                                (sizeof(ebuf) - etotal));
+                                (sizeof(ebuf) - etotal));                    
                 } while (ecnt == -1 && errno == EINTR);
                 etotal += ecnt;
             } while (ecnt > 0 && etotal < sizeof(ebuf));
             /* null terminate */
-            ebuf[(etotal < sizeof(ebuf)) ? etotal : sizeof(ebuf)] = '\0';
+            ebuf[(etotal < sizeof(ebuf)) ? etotal : sizeof(ebuf)-1] = '\0';
 
             /* print errors */
             if (etotal > 0)
             {
-                gossip_err("pvfs2_gencred: %s", ebuf);
+                gossip_err("pvfs2_gencred: %s\n", ebuf);
             }
         }
     }
@@ -604,6 +636,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 }
 #endif /* ENABLE_SECURITY_MODE */
 
+#define PINT_REFRESH_CREDENTIAL_TIME    3
 /*
  * This function checks to see if the credential is still valid
  * and is not about to time out - if so then it does nothing,
@@ -614,8 +647,9 @@ int PVFS_util_refresh_credential(PVFS_credential *cred)
 {
     int ret;
 
-    /* if the credential is valid for at least an hour */
-    if (PINT_util_get_current_time() <= cred->timeout - 3600)
+    /* check if the credential is about to expire */
+    if (PINT_util_get_current_time() <= 
+        cred->timeout - PINT_REFRESH_CREDENTIAL_TIME)
     {
         ret = 0;
     }
@@ -2089,7 +2123,6 @@ static int parse_encoding_string(
     for (++cp; isspace(*cp); cp++);        /* optional spaces */
     for (cq = cp; *cq && *cq != ','; cq++);/* find option end */
 
-    *et = -1;
     for (i = 0; i < sizeof(enc_str) / sizeof(enc_str[0]); i++)
     {
         int n = strlen(enc_str[i].name);
@@ -2098,16 +2131,12 @@ static int parse_encoding_string(
         if (!strncmp(enc_str[i].name, cp, n))
         {
             *et = enc_str[i].val;
-            break;
+            return 0;
         }
     }
-    if (*et == -1)
-    {
-        gossip_err("Error: %s: unknown encoding type in tab file.\n",
-                   __func__);
-        return -PVFS_EINVAL;
-    }
-    return 0;
+    gossip_err("Error: %s: unknown encoding type in tab file.\n",
+            __func__);
+    return -PVFS_EINVAL;
 }
 
 /* PINT_release_pvfstab()
@@ -2235,7 +2264,7 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_COMMON_MTIME_SET;
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "attrmask being passed to server: ");
+                 "attrmask being passed to server: \n");
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attrmask);
 
     return attrmask;

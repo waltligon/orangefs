@@ -11,8 +11,10 @@ public class Orange {
     private static class OrangeHolder {
         public static final Orange INSTANCE = new Orange();
     }
+
     @SuppressWarnings("unused")
     private static Orange orange = null;
+
     public static Orange getInstance() {
         return OrangeHolder.INSTANCE;
     }

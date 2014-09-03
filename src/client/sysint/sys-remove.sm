@@ -254,7 +254,7 @@ PVFS_error PVFS_sys_remove(
         PVFS_perror_gossip("PVFS_isys_remove call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "remove", &error);
         if (ret)
@@ -262,9 +262,8 @@ PVFS_error PVFS_sys_remove(
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -330,7 +329,6 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
         msg_p->req,
         sm_p->parent_capability,
         sm_p->parent_ref.fs_id,
-        sm_p->parent_ref.handle,
         sm_p->getattr.attr.dirdata_handles[dirdata_server_index],
         sm_p->u.remove.object_name,
         sm_p->hints);

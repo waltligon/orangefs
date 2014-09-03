@@ -1,6 +1,6 @@
-/* 
+/*
  * (C) 2011 Clemson University
- *
+ * 
  * See COPYING in top-level directory.
  */
 
@@ -32,15 +32,15 @@ public class Statfs {
     }
 
     public long getCapacity() {
-      return f_bsize;
+        return f_bsize;
     }
 
     public long getUsed() {
-      return f_bfree;
+        return f_bfree;
     }
 
     public long getRemaining() {
-      return f_bavail;
+        return f_bavail;
     }
 
     /* Generic Object Dump to String */
@@ -61,8 +61,7 @@ public class Statfs {
                 result.append(field.getName());
                 result.append(": ");
                 result.append(field.get(this));
-            }
-            catch (IllegalAccessException ex) {
+            } catch (IllegalAccessException ex) {
                 System.out.println(ex);
             }
             result.append(newLine);

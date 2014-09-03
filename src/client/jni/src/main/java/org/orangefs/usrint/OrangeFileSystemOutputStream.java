@@ -1,6 +1,6 @@
 /*
  * (C) 2011 Clemson University
- *
+ * 
  * See COPYING in top-level directory.
  */
 package org.orangefs.usrint;
@@ -25,7 +25,8 @@ public class OrangeFileSystemOutputStream extends OutputStream {
 
     /* TODO: comments */
     public OrangeFileSystemOutputStream(String path, int bufferSize,
-            short replication, long blockSize, boolean append) throws IOException {
+            short replication, long blockSize, boolean append)
+            throws IOException {
         int ret = -1;
         /* Initialize Interface and Flags */
         this.orange = Orange.getInstance();
@@ -35,9 +36,10 @@ public class OrangeFileSystemOutputStream extends OutputStream {
          * TODO: replication
          */
         /* Perform open */
-        ret = orange.posix.openWithHints(path, (append ? pf.O_APPEND : pf.O_CREAT)
-                | pf.O_WRONLY, pf.S_IRWXU | pf.S_IRWXG | pf.S_IRWXO,
-                replication, blockSize);
+        ret =
+                orange.posix.openWithHints(path, (append ? pf.O_APPEND
+                        : pf.O_CREAT) | pf.O_WRONLY, pf.S_IRWXU | pf.S_IRWXG
+                        | pf.S_IRWXO, replication, blockSize);
         if (ret < 0) {
             throw new IOException(path + " couldn't be opened. (open)");
         }
@@ -57,7 +59,8 @@ public class OrangeFileSystemOutputStream extends OutputStream {
      * cannot be reopened. The close method of OutputStream does nothing.
      */
     @Override
-    public synchronized void close() throws IOException {
+    public synchronized void close()
+            throws IOException {
         if (outChannel == null) {
             return;
         }
@@ -80,14 +83,16 @@ public class OrangeFileSystemOutputStream extends OutputStream {
      * does nothing.
      */
     @Override
-    public void flush() throws IOException {
+    public void flush()
+            throws IOException {
         if (outChannel == null) {
             throw new IOException("outChannel is null");
         }
         outChannel.flush();
     }
 
-    public String getPath() throws IOException {
+    public String getPath()
+            throws IOException {
         if (outChannel == null) {
             throw new IOException("outChannel is null");
         }
@@ -95,7 +100,8 @@ public class OrangeFileSystemOutputStream extends OutputStream {
     }
 
     /* Returns current position within the file */
-    public long tell() throws IOException {
+    public long tell()
+            throws IOException {
         if (outChannel == null) {
             throw new IOException("outChannel is null.");
         }
@@ -113,7 +119,8 @@ public class OrangeFileSystemOutputStream extends OutputStream {
      * thrown.
      */
     @Override
-    public void write(byte b[], int off, int len) throws IOException {
+    public void write(byte b[], int off, int len)
+            throws IOException {
         if (outChannel == null) {
             throw new IOException("outChannel is null");
         }
@@ -137,7 +144,8 @@ public class OrangeFileSystemOutputStream extends OutputStream {
      * the same effect as the call write(b, 0, b.length).
      */
     @Override
-    public void write(byte[] b) throws IOException {
+    public void write(byte[] b)
+            throws IOException {
         if (outChannel == null) {
             throw new IOException("outChannel is null");
         }
@@ -152,11 +160,12 @@ public class OrangeFileSystemOutputStream extends OutputStream {
      * implementation for this method.
      */
     @Override
-    public void write(int b) throws IOException {
+    public void write(int b)
+            throws IOException {
         if (outChannel == null) {
             throw new IOException("outChannel is null");
         }
-        byte[] byteArray = { (byte) (b & 0x000000ff) };
+        byte[] byteArray = {(byte) (b & 0x000000ff)};
         write(byteArray, 0, 1);
     }
 }

@@ -1,6 +1,6 @@
-/* 
+/*
  * (C) 2011 Clemson University
- *
+ * 
  * See COPYING in top-level directory.
  */
 
@@ -49,8 +49,7 @@ public class Statvfs {
                 result.append(field.getName());
                 result.append(": ");
                 result.append(field.get(this));
-            }
-            catch (IllegalAccessException ex) {
+            } catch (IllegalAccessException ex) {
                 System.out.println(ex);
             }
             result.append(newLine);

@@ -1,6 +1,6 @@
-/* 
+/*
  * (C) 2011 Clemson University
- *
+ * 
  * See COPYING in top-level directory.
  */
 package org.orangefs.usrint;
@@ -12,12 +12,12 @@ public class PVFS2STDIOJNIFlags {
      * Fields set by JNI function fill_PVFS2STDIOJNIFlags. See
      * libPVFS2STDIOJNI.c
      */
-    
+
     /* seek whence */
     public long SEEK_SET;
     public long SEEK_CUR;
     public long SEEK_END;
-    
+
     /* readdir d_type */
     public long DT_BLK;
     public long DT_CHR;
@@ -27,15 +27,14 @@ public class PVFS2STDIOJNIFlags {
     public long DT_REG;
     public long DT_SOCK;
     public long DT_UNKNOWN;
-    
+
     /* setvbuf modes */
     public long _IONBF;
     public long _IOLBF;
     public long _IOFBF;
 
     /* Constructor is irrelevant. Call native method fillPVFS2STDIOJNIFlags */
-    public PVFS2STDIOJNIFlags() {
-    }
+    public PVFS2STDIOJNIFlags() {}
 
     @Override
     public String toString() {
@@ -51,8 +50,7 @@ public class PVFS2STDIOJNIFlags {
                 result.append(field.getName());
                 result.append(": ");
                 result.append(field.get(this));
-            }
-            catch (IllegalAccessException ex) {
+            } catch (IllegalAccessException ex) {
                 System.out.println(ex);
             }
             result.append(newLine);

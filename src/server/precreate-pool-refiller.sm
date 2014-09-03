@@ -22,6 +22,11 @@
 static int batch_create_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 
+enum
+{
+    STATE_RESET = 188
+};
+
 %%
 
 machine pvfs2_precreate_pool_refiller_sm
@@ -57,6 +62,7 @@ machine pvfs2_precreate_pool_refiller_sm
     state msgpair_retry
     {
         run msgpair_retry_fn;
+        STATE_RESET => error_retry;
         default => setup_batch_create;
     }
 
@@ -88,7 +94,7 @@ static PINT_sm_action msgpair_retry_fn(
     job_id_t tmp_id;
 
     /* signal anyone waiting on get_handles() that we are having trouble */
-    return(job_precreate_pool_fill_signal_error(
+    job_precreate_pool_fill_signal_error(
         s_op->u.precreate_pool_refiller.pool_handle,
         s_op->u.precreate_pool_refiller.fsid,
         js_p->error_code,
@@ -96,7 +102,16 @@ static PINT_sm_action msgpair_retry_fn(
         0,
         js_p,
         &tmp_id,
-        server_job_context));
+        server_job_context);
+
+    /* the capability may need to be refreshed */
+    if (s_op->u.precreate_pool_refiller.capability.timeout <=
+        PINT_util_get_current_time())
+    {
+        js_p->error_code = STATE_RESET;
+    }
+
+    return SM_ACTION_COMPLETE;
 }
 
 /* wait_for_threshold_fn()
@@ -238,6 +253,7 @@ static PINT_sm_action setup_fn(
         (char *) malloc(strlen(user_opts->server_alias) + 3);
     if (cap->issuer == NULL)
     {
+        PINT_cleanup_capability(cap);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -247,7 +263,8 @@ static PINT_sm_action setup_fn(
     ret = PINT_sign_capability(cap);
     if (ret < 0)
     {
-        js_p->error_code = -PVFS_EINVAL;
+        PINT_cleanup_capability(cap);
+        js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
         
@@ -255,6 +272,7 @@ static PINT_sm_action setup_fn(
         malloc(user_opts->precreate_batch_size[index] * sizeof(PVFS_handle));
     if(!s_op->u.precreate_pool_refiller.precreate_handle_array)
     {
+        PINT_cleanup_capability(cap);
         js_p->error_code = -PVFS_ENOMEM;
         return(SM_ACTION_COMPLETE);
     }

@@ -1,6 +1,6 @@
-/* 
+/*
  * (C) 2011 Clemson University
- *
+ * 
  * See COPYING in top-level directory.
  */
 package org.orangefs.usrint;
@@ -71,8 +71,7 @@ public class PVFS2POSIXJNIFlags {
     public long W_OK;
 
     /* Constructor is irrelevant. Call native method fillPVFS2POSIXJNIFlags */
-    private PVFS2POSIXJNIFlags() {
-    }
+    private PVFS2POSIXJNIFlags() {}
 
     @Override
     public String toString() {
@@ -88,8 +87,7 @@ public class PVFS2POSIXJNIFlags {
                 result.append(field.getName());
                 result.append(": ");
                 result.append(field.get(this));
-            }
-            catch (IllegalAccessException ex) {
+            } catch (IllegalAccessException ex) {
                 System.out.println(ex);
             }
             result.append(newLine);

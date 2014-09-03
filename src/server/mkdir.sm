@@ -8,7 +8,6 @@
 #include <string.h>
 #include <assert.h>
 
-/* TODO: TEMP */
 #include "pvfs2-config.h"
 #include "server-config.h"
 #include "pvfs2-server.h"
@@ -725,7 +724,7 @@ static inline int PINT_get_object_ref_mkdir(
     *fs_id = req->u.mkdir.fs_id;
     *handle = PVFS_HANDLE_NULL;
     return 0;
-};
+}
 
 static int perm_mkdir(PINT_server_op *s_op)
 {

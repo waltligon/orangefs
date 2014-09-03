@@ -11,8 +11,8 @@ import org.apache.hadoop.fs.DelegateToFileSystem;
  * The OrangeFs implementation of AbstractFileSystem.
  */
 public class OrangeFs extends DelegateToFileSystem {
-  OrangeFs(final URI theUri, final Configuration conf) throws IOException,
-      URISyntaxException {
-    super(theUri, new OrangeFileSystem(), conf, "ofs", true);
-  }
+    OrangeFs(final URI theUri, final Configuration conf)
+            throws IOException, URISyntaxException {
+        super(theUri, new OrangeFileSystem(), conf, "ofs", true);
+    }
 }
