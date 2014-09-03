@@ -94,7 +94,7 @@ if rc == 0:
 if rc == 0:
     rc = test_driver.runTest()
 
-
-test_driver.doPostTest()
+if rc != 0 and test_driver.config.stop_on_failure == False:
+    test_driver.doPostTest()
 
 exit(rc)
