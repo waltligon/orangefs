@@ -1678,11 +1678,11 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##t5(pptr, &x->x5); \
     encode_##t6(pptr, &x->x6); \
     encode_##tn1(pptr, &x->n1); \
-    for (i=0; i<x->n1; i++) \
+    for (i = 0; i < x->n1; i++) \
         encode_##ta1(pptr, &(x)->a1[i]); \
-    for (i=0; i<x->n1; i++) \
+    for (i = 0; i < x->n1; i++) \
         encode_##ta2(pptr, &(x)->a2[i]); \
-    for (i=0; i<x->n1; i++) \
+    for (i = 0; i < x->n1; i++) \
         encode_##ta3(pptr, &(x)->a3[i]); \
 } \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \

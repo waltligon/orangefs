@@ -770,6 +770,15 @@ typedef struct {
  * Errors are made up of a code to indicate the error type and a class
  * that indicates where the error came from.  These are |'d together.
  */
+
+/* it is not clear what these "perror" variants bring us that the regular
+ * gossip variety do not.  They appear to print error messages on user
+ * errors (like file not found).  As such they should NOT be used, system
+ * software does not print these messages, applications do.  These can be
+ * revived if they are removed from the sysint, server, and library codes.
+ * They can then be used as libc's perror ised used, by the programmer.
+ * WBL 8/14
+ */
 int PVFS_strerror_r(int errnum, char *buf, int n);
 void PVFS_perror(const char *text, int retcode);
 void PVFS_perror_gossip(const char* text, int retcode);

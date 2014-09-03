@@ -243,13 +243,21 @@ static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
                                                           NULL);
         // V3 replace with a gossip_debug
         /* TODO: put in more detailed error checking */
-        if (submop->index != task_id - 1 ||
-            error_code < 0 ||
-            (submop->count != mop->count &&
-             js_p->error_code == 0))
+        if (submop->index != task_id - 1)
         {
+            gossip_err("index mismatch from pjmp in MPA\n");
+        }
+        if (error_code < 0)
+        {
+            char buf[1024];
+            PVFS_strerror_r(error_code, buf, 1024);
+            gossip_err("error code (%d) returned from pjmp in MPA: %s\n",
+                       error_code, buf);
             js_p->error_code = error_code;
-            gossip_err("error returning from pjmp in MPA\n");
+        }
+        if ((submop->count != mop->count && js_p->error_code == 0))
+        {
+            gossip_err("count mismatch from pjmp in MPA\n");
         }
         /* everything important in the submops are held elsewhere 
          * free the memory allocated berfore the PJMP 

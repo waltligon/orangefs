@@ -40,6 +40,39 @@
  * implement if we think it is important - WBL
  */
 
+/* New simpler mask system, built on old system */
+
+#define PVFS_ATTR_READ_ALL \
+             PVFS_ATTR_READ_ALL_FASTEST 
+
+#define PVFS_ATTR_READ_ALL_FASTEST \
+            (PVFS_ATTR_COMMON_ALL  | PVFS_ATTR_FASTEST | \
+             PVFS_ATTR_CAPABILITY  | PVFS_ATTR_META_ALL | \
+             PVFS_ATTR_DIR_ALL     | PVFS_ATTR_DATA_ALL | \
+             PVFS_ATTR_SYMLINK_ALL | PVFS_DIRDATA_ALL)
+
+#define PVFS_ATTR_READ_FASTEST \
+            (PVFS_ATTR_COMMON_ALL  | PVFS_ATTR_FASTEST) \
+
+#define PVFS_ATTR_READ_ALL_LATEST \
+            (PVFS_ATTR_COMMON_ALL  | PVFS_ATTR_LATEST | \
+             PVFS_ATTR_CAPABILITY  | PVFS_ATTR_META_ALL | \
+             PVFS_ATTR_DIR_ALL     | PVFS_ATTR_DATA_ALL | \
+             PVFS_ATTR_SYMLINK_ALL | PVFS_DIRDATA_ALL)
+
+#define PVFS_ATTR_FASTEST            (1 << 25)
+#define PVFS_ATTR_LATEST             (1 << 26)
+
+/* latest and fastest refer to atime, mtime, ctime, file size
+ * and dirent_count.  Fastest returns the value stored in the
+ * attributes of the target meta or dir, whereas latest reads
+ * these values from each of the dfile or dirdata objects
+ * referenced by the meta or dir and calculates the global
+ * value and updates the "fastest" version.  Presumably a
+ * scrubber or some such will update these periodically.  User
+ * interfaces can choose to force a "latest" when desired
+ */
+
 /* internal attribute masks, common to all obj types */
 #define PVFS_ATTR_COMMON_UID         (1 << 0)
 #define PVFS_ATTR_COMMON_GID         (1 << 1)
@@ -47,54 +80,77 @@
 #define PVFS_ATTR_COMMON_ATIME       (1 << 3)
 #define PVFS_ATTR_COMMON_CTIME       (1 << 4)
 #define PVFS_ATTR_COMMON_MTIME       (1 << 5)
-#define PVFS_ATTR_COMMON_TYPE        (1 << 6)
-#define PVFS_ATTR_COMMON_ATIME_SET   (1 << 7)
-#define PVFS_ATTR_COMMON_MTIME_SET   (1 << 8)
+#define PVFS_ATTR_COMMON_NTIME       (1 << 6)
+#define PVFS_ATTR_COMMON_TYPE        (1 << 7)
+#define PVFS_ATTR_COMMON_ATIME_SET   (1 << 8)
+#define PVFS_ATTR_COMMON_CTIME_SET   (1 << 9)
+#define PVFS_ATTR_COMMON_MTIME_SET   (1 << 10)
+#define PVFS_ATTR_COMMON_NTIME_SET   (1 << 11)
 
 #define PVFS_ATTR_COMMON_NOTIME                           \
         (PVFS_ATTR_COMMON_UID  | PVFS_ATTR_COMMON_GID   | \
-        PVFS_ATTR_COMMON_PERM  | PVFS_ATTR_COMMON_TYPE)
+         PVFS_ATTR_COMMON_PERM | PVFS_ATTR_COMMON_TYPE)
 
 #define PVFS_ATTR_COMMON_ALL                                \
         (PVFS_ATTR_COMMON_NOTIME | PVFS_ATTR_COMMON_ATIME | \
-         PVFS_ATTR_COMMON_CTIME  | PVFS_ATTR_COMMON_MTIME)
+         PVFS_ATTR_COMMON_CTIME  | PVFS_ATTR_COMMON_MTIME | \
+         PVFS_ATTR_COMMON_NTIME)
+
+#define PVFS_ATTR_NOTIME_SET \
+        ~(PVFS_ATTR_COMMON_ATIME_SET | PVFS_ATTR_COMMON_NTIME_SET | \
+          PVFS_ATTR_COMMON_CTIME_SET | PVFS_ATTR_COMMON_MTIME_SET)
+
+#define PVFS_ATTR_TIME_ALL \
+        (PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_NTIME | \
+         PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_MTIME)
 
 /* internal attribute masks for metadata objects */
-#define PVFS_ATTR_META_DIST          (1 << 10)
-#define PVFS_ATTR_META_DFILES        (1 << 11)
-#define PVFS_ATTR_META_MIRROR_DFILES (1 << 13)
+#define PVFS_ATTR_META_DIST          (1 << 12)
+#define PVFS_ATTR_META_DFILES        (1 << 13)   /* includes sids */
+#define PVFS_ATTR_META_MIRROR_DFILES (0)         /* remove */
 
 #define PVFS_ATTR_META_ALL                             \
         (PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES | \
         PVFS_ATTR_META_MIRROR_DFILES)
 
-#define PVFS_ATTR_META_UNSTUFFED     (1 << 12)
+#define PVFS_ATTR_META_UNSTUFFED     (1 << 14)
 
 
 /* internal attribute masks for datafile objects */
-#define PVFS_ATTR_DATA_SIZE          (1 << 15)
-#define PVFS_ATTR_DATA_ALL   PVFS_ATTR_DATA_SIZE
+#define PVFS_ATTR_DATA_SIZE          (1 << 15)   /* replace with latest bit */
+
+#define PVFS_ATTR_DATA_ALL \
+             PVFS_ATTR_DATA_SIZE
 
 /* internal attribute masks for symlink objects */
-#define PVFS_ATTR_SYMLNK_TARGET      (1 << 18)
-#define PVFS_ATTR_SYMLNK_ALL PVFS_ATTR_SYMLNK_TARGET
+#define PVFS_ATTR_SYMLNK_TARGET      (1 << 16)
+
+#define PVFS_ATTR_SYMLNK_ALL \
+             PVFS_ATTR_SYMLNK_TARGET
 
 /* internal attribute masks for directory objects */
-#define PVFS_ATTR_DIR_DIRENT_COUNT   (1 << 19)
-#define PVFS_ATTR_DIR_HINT           (1 << 20)
+#define PVFS_ATTR_DIR_DIRENT_COUNT   (1 << 17)   /* replace with latest bit */
+#define PVFS_ATTR_DIR_DIRDATA        (1 << 18)   /* includes sids */
+#define PVFS_ATTR_DIR_HINT           (1 << 19)
 
 #define PVFS_ATTR_DIR_ALL \
-        (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT)
+             (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT | \
+              PVFS_ATTR_DIR_DIRDATA | PVFS_ATTR_DISTDIR_ATTR)
+
+#define PVFS_ATTR_DIRDATA_ALL \
+             (PVFS_ATTR_DIR_DIRENT_COUNT | \
+              PVFS_ATTR_DIR_DIRDATA | PVFS_ATTR_DISTDIR_ATTR)
 
 /* internal attribute mask for distributed directory information */
 /* this may be in the meta or dirdata area depending on objtype */
 /* This includes the bitmap and dirdata handles/sids info */
-#define PVFS_ATTR_DISTDIR_ATTR       (1 << 21)
+#define PVFS_ATTR_DISTDIR_ATTR       (1 << 20)    /* remove */
 
 /* internal attribute mask for capability objects */
-#define PVFS_ATTR_CAPABILITY         (1 << 22)
+#define PVFS_ATTR_CAPABILITY         (1 << 21)
 
 /* attributes that do not change once set */
+/* needs to be renamed */
 #define PVFS_STATIC_ATTR_MASK                                   \
         (PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_META_DIST |          \
         PVFS_ATTR_META_DFILES  | PVFS_ATTR_META_MIRROR_DFILES | \

@@ -493,7 +493,7 @@ static PINT_sm_action create_init(struct PINT_smcb *smcb, job_status_s *js_p)
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->parent_ref,
                                (PVFS_ATTR_COMMON_NOTIME |
-                                PVFS_ATTR_DIR_HINT |
+                                PVFS_ATTR_DIR_ALL |
                                 PVFS_ATTR_CAPABILITY), 
                                PVFS_TYPE_DIRECTORY,
                                0);
@@ -827,6 +827,17 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
         sm_p->u.create.attr.mask |= PVFS_ATTR_META_ALL;
     }
 
+    /* This is a file create - ignore any file times passed in
+     * Set them all to now.
+     */
+
+    sm_p->u.create.attr.mask &= PVFS_ATTR_NOTIME_SET;
+    sm_p->u.create.attr.mask |= PVFS_ATTR_TIME_ALL;
+    sm_p->u.create.attr.atime = sm_p->u.create.attr.ctime =
+                sm_p->u.create.attr.ntime = PINT_util_get_current_time();
+    sm_p->u.create.attr.mtime = 
+                PINT_util_mktime_version(sm_p->u.create.attr.ntime);
+
 #if 0
     /* creating one metadata object OID and SIDs */
     ret = PVFS_OBJ_gen_meta(&sm_p->object_ref, 1, sm_p->parent_ref.fs_id);
@@ -853,6 +864,13 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
                             &sm_p->u.create.datafile_handles,
                             sm_p->u.create.datafile_sid_count, /* in */
                             &sm_p->u.create.datafile_sid_array);
+    
+    /* object ref will now refer to newly created metadata object */
+    sm_p->object_ref.handle = *sm_p->u.create.metadata_handle;
+    sm_p->object_ref.fs_id = sm_p->parent_ref.fs_id;
+    sm_p->object_ref.sid_count = sm_p->u.create.metadata_sid_count;
+    sm_p->object_ref.sid_array = sm_p->u.create.metadata_sid_array;
+
     if(ret != 0)
     {
         gossip_err("Failed to generate meta object reference\n");
@@ -903,11 +921,15 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->req.u.create.attr.u.meta.dist = sm_p->u.create.dist;
     msg_p->req.u.create.attr.u.meta.dist_size =
                                     PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
-    msg_p->req.u.create.attr.u.meta.dfile_count  = 0; /* TODO */
-    msg_p->req.u.create.attr.u.meta.sid_count    = 0; /* TODO */
-    msg_p->req.u.create.attr.u.meta.mirror_mode  = 0; /* TODO */
-    msg_p->req.u.create.attr.u.meta.stuffed      = 0; /* TODO */
-    msg_p->req.u.create.attr.u.meta.stuffed_size = 0; /* TODO */
+    /* prevent encoder from trying to encode fields passed elsewhere */
+    msg_p->req.u.create.attr.u.meta.dfile_count  = 0;
+                                    /* sm_p->u.create.datafile_count; */
+    msg_p->req.u.create.attr.u.meta.sid_count    = 0;
+                                    /* sm_p->u.create.datafile_sid_count; */
+    msg_p->req.u.create.attr.u.meta.size         = 0;
+    msg_p->req.u.create.attr.u.meta.mirror_mode  = 0;
+    msg_p->req.u.create.attr.u.meta.stuffed      = 0;
+    msg_p->req.u.create.attr.u.meta.stuffed_size = 0;
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     /* V3 how to handle failure here ?
@@ -972,18 +994,19 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                 sm_p->getattr.attr.capability,
                 *sm_p->cred_p,
                 sm_p->parent_ref.fs_id,
-                sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
+    /* target */sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
                 sm_p->parent_ref.sid_count,
-                &sm_p->getattr.attr.u.dir.dirdata_sids[dirdata_sid_index],
-                sm_p->u.create.object_name,
-                sm_p->object_ref.handle,
-                sm_p->object_ref.sid_array,
-                sm_p->parent_ref.handle,
-                sm_p->parent_ref.sid_array,
+    /* target */&sm_p->getattr.attr.u.dir.dirdata_sids[dirdata_sid_index],
+                sm_p->u.create.object_name,   /* item inserted into dir */
+                sm_p->object_ref.handle,      /* item inserted into dir */
+                sm_p->object_ref.sid_array,   /* item inserted into dir */
+                sm_p->parent_ref.handle,      /* back ptr to dir */
+                sm_p->parent_ref.sid_array,   /* back ptr to dir */
                 sm_p->hints);
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
+    /* next 5 are target data for MPA */
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle =
             sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
@@ -993,6 +1016,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
             &sm_p->getattr.attr.u.dir.dirdata_sids[dirdata_sid_index];
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = create_crdirent_comp_fn;
+    /* not adding an object so no attr needed */
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
@@ -1336,7 +1360,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
             msg_p->msgdir = PVFS_IO_WRITE;
             msg_p->fs_id = sm_p->object_ref.fs_id;
             msg_p->handle = sm_p->u.create.datafile_handles[i];
-            msg_p->sid_count = dfilesids; /* NO, meta sid count */
+            msg_p->sid_count = dfilesids;
             msg_p->sid_index = 0;
             msg_p->sid_array = &sm_p->u.create.metadata_sid_array[
                                                             i * dfilesids];

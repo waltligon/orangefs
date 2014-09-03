@@ -964,7 +964,6 @@ extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_set_attr_work_sm;
 
 /* nested state machines */
-extern struct PINT_state_machine_s pvfs2_dirdata_split_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
@@ -984,6 +983,7 @@ extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_getattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
+extern struct PINT_state_machine_s pvfs2_dirdata_split_sm;
 
 /* exported state machine resource reclamation function */
 int server_post_unexpected_recv(void);

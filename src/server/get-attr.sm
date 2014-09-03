@@ -459,10 +459,12 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             break;
         case PVFS_TYPE_DIRECTORY:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: directory\n");
+
+            /* check for Distdir struct */
             if (s_op->u.getattr.attrmask & PVFS_ATTR_DISTDIR_ATTR)
             {
                 gossip_debug(GOSSIP_GETATTR_DEBUG,
-                             " getattr: dirent_handles needed.\n");
+                             " getattr: distdir_struct needed.\n");
                 assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
                 respattr->mask |= PVFS_ATTR_DISTDIR_ATTR;
                 js_p->error_code = STATE_DIR;
@@ -470,14 +472,48 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             else
             {
                 gossip_debug(GOSSIP_GETATTR_DEBUG,
-                             " getattr: dirent_handles not needed.\n");
+                             " getattr: distdir_struct not needed.\n");
                 js_p->error_code = 0;
                 assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
             }   
-            if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_HINT)
+
+            /* Check for Dirdata handles */
+            if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRDATA)
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                            " getattr: dirdata_handles needed.\n");
+                assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
+                respattr->mask |= PVFS_ATTR_DIR_DIRDATA;
+                js_p->error_code = STATE_DIR;
+            }
+            else
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                            " getattr: dirdata_handles not needed\n");
+                assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
+            }
+
+            /* Check for Dirent Count */
+            if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT)
             {
                 gossip_debug(GOSSIP_GETATTR_DEBUG,
                             " getattr: dfile_count needed.\n");
+                assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
+                respattr->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
+                js_p->error_code = STATE_DIR;
+            }
+            else
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                            " getattr: dfile_count not needed\n");
+                assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
+            }
+
+            /* check fir Dir Hints */
+            if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_HINT)
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                            " getattr: dir hint needed.\n");
                 assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
                 respattr->mask |= PVFS_ATTR_DIR_HINT;
                 js_p->error_code = STATE_DIR;
@@ -485,7 +521,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             else
             {
                 gossip_debug(GOSSIP_GETATTR_DEBUG,
-                            " getattr: dfile_count not needed\n");
+                            " getattr: dir hint not needed\n");
                 assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
             }
             break;
@@ -1498,12 +1534,22 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
 
     respattr->capability.num_handles = 1;
 
+    /* if this is a metadata allocate room for dfile handles */
     if ((respattr->objtype == PVFS_TYPE_METAFILE) &&
         (respattr->mask & PVFS_ATTR_META_DFILES))
     {
         respattr->capability.num_handles += respattr->u.meta.dfile_count;
     }
 
+    /* if this is a directory allocate room for dirdata handles */
+    if ((respattr->objtype == PVFS_TYPE_DIRECTORY) &&
+        (respattr->mask & PVFS_ATTR_DIR_DIRDATA))
+    {
+        respattr->capability.num_handles +=
+                             respattr->u.dir.dist_dir_attr.dirdata_count;
+    }
+
+    /* if there are extra handles allocate them here */
     respattr->capability.handle_array = 
             calloc(respattr->capability.num_handles, sizeof(PVFS_handle));
     if (!respattr->capability.handle_array)
@@ -1513,6 +1559,8 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     }
 
     respattr->capability.handle_array[0] = s_op->u.getattr.handle;
+
+    /* if this is a metadata copy dfile handles into place */
     if ((respattr->objtype == PVFS_TYPE_METAFILE) &&
         (respattr->mask & PVFS_ATTR_META_DFILES))
     {
@@ -1520,6 +1568,17 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
         memcpy((respattr->capability.handle_array + 1),
                respattr->u.meta.dfile_array,
                respattr->u.meta.dfile_count * sizeof(PVFS_handle));
+    }
+
+    /* if this is a directory copy dirdata handles into place */
+    if ((respattr->objtype == PVFS_TYPE_DIRECTORY) &&
+        (respattr->mask & PVFS_ATTR_DIR_DIRDATA))
+    {
+        /* copy datafile handles after the directory handle */
+        memcpy((respattr->capability.handle_array + 1),
+               respattr->u.dir.dirdata_handles,
+               respattr->u.dir.dist_dir_attr.dirdata_count *
+                                             sizeof(PVFS_handle));
     }
 
     /* map credential based on credential certificate */

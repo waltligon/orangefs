@@ -282,8 +282,8 @@ void print_dspace( DBT key, DBT val )
     PVFS_handle *k;
     struct PVFS_ds_attributes_s *v;
 
-    time_t r_ctime, r_mtime, r_atime;
-    char ctimeStr[1024], mtimeStr[1024], atimeStr[1024];
+    time_t r_ctime, r_mtime, r_atime, r_ntime;
+    char ctimeStr[1024], mtimeStr[1024], atimeStr[1024], ntimeStr[1024];
 
     k = (PVFS_handle *)key.data;
     v = val.data;
@@ -291,9 +291,7 @@ void print_dspace( DBT key, DBT val )
     if (v->ctime != 0)
     {
        r_ctime = (time_t) v->ctime;
-
        ctime_r(&r_ctime, ctimeStr);
-
        ctimeStr[strlen(ctimeStr)-1] = '\0';
     }
     else
@@ -303,11 +301,8 @@ void print_dspace( DBT key, DBT val )
 
     if (v->mtime != 0)
     {
-
         r_mtime = (time_t) v->mtime;
-
         ctime_r(&r_mtime, mtimeStr);
-
         mtimeStr[strlen(mtimeStr)-1] = '\0';
     }
     else
@@ -318,14 +313,23 @@ void print_dspace( DBT key, DBT val )
     if (v->atime != 0)
     {
         r_atime = (time_t) v->atime;
-
         ctime_r(&r_atime, atimeStr);
-
         atimeStr[strlen(atimeStr)-1] = '\0';
     }
     else
     {
         strcpy(atimeStr, "");
+    }
+
+    if (v->ntime != 0)
+    {
+        r_ntime = (time_t) v->ntime;
+        ctime_r(&r_ntime, ntimeStr);
+        ntimeStr[strlen(ntimeStr)-1] = '\0';
+    }
+    else
+    {
+        strcpy(ntimeStr, "");
     }
 
     printf("(%s)(%d) -> ", PVFS_OID_str(k), key.size);
@@ -335,16 +339,16 @@ void print_dspace( DBT key, DBT val )
     if (hex)
     {
         printf("(fsid: %d)(handle: %s)(uid: %u)(gid: %u)"
-           "(perm: %u)(ctime: %s)(mtime: %s)(atime: %s)\n",
+           "(perm: %u)(ctime: %s)(mtime: %s)(atime: %s)(ntime: %s)\n",
            v->fs_id, PVFS_OID_str(&v->handle), v->uid, v->gid, v->mode,
-           ctimeStr, mtimeStr, atimeStr);
+           ctimeStr, mtimeStr, atimeStr, ntimeStr);
     }
     else
     {
          printf("(fsid: %d)(handle: %s)(uid: %u)(gid: %u)"
-           "(perm: %u)(ctime: %s)(mtime: %s)(atime: %s)",
+           "(perm: %u)(ctime: %s)(mtime: %s)(atime: %s)(ntime: %s)",
            v->fs_id, PVFS_OID_str(&v->handle), v->uid, v->gid, v->mode,
-           ctimeStr, mtimeStr, atimeStr);
+           ctimeStr, mtimeStr, atimeStr, ntimeStr);
     }
 
     /* union elements */
@@ -359,9 +363,11 @@ void print_dspace( DBT key, DBT val )
             break;
 
         case PVFS_TYPE_DIRECTORY:
-            printf("(tree_height: %d)(dirdata_count: %d)(sid_count: %d)"
+            printf("(dirent_count: %llu)"
+                   "(tree_height: %d)(dirdata_count: %d)(sid_count: %d)"
                    "(bitmap_size: %d)(split_size: %d)(server_no: %d)"
                    "(branch_level: %d) (%d)\n",
+                    llu(v->u.directory.dirent_count),
                     v->u.directory.tree_height,
                     v->u.directory.dirdata_count,
                     v->u.directory.sid_count,
@@ -377,11 +383,11 @@ void print_dspace( DBT key, DBT val )
             break;
 
         case PVFS_TYPE_DIRDATA:
-            printf("(count: %llu)"
+            printf("(dirent_count: %llu)"
                    "(tree_height: %d)(dirdata_count: %d)(sid_count: %d)"
                    "(bitmap_size: %d)(split_size: %d)(server_no: %d)"
                    "(branch_level: %d) (%d)\n",
-                    llu(v->u.dirdata.count),
+                    llu(v->u.dirdata.dirent_count),
                     v->u.dirdata.tree_height,
                     v->u.dirdata.dirdata_count,
                     v->u.dirdata.sid_count,
@@ -428,14 +434,14 @@ void print_keyval( DBT key, DBT val )
             if( strncmp(k->key, "dh", 3) == 0)
             {
                 PVFS_handle *handle = val.data;
-                printf("(dh)(%d) -> ", key.size);
-                int s = 0;
-                while (s < val.size)
+
+                printf("(/dh)(%d) -> ", key.size);
+                while ((char *)handle - (char *)val.data < val.size)
                 {
-                    printf("(%s) ", PVFS_OID_str(handle));
-                    s += sizeof(TROVE_handle);
+                    printf("(%s)", PVFS_OID_str(handle));
+                    handle++;
                 }
-                printf("(%d)\n",val.size);
+                printf(" (%d)\n", val.size);
             }
             /* metafile dist */
             else if( strncmp(k->key, "md", 3) == 0 )

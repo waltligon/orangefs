@@ -105,7 +105,7 @@ struct PVFS_ds_attributes_s
 {
     PVFS_ds_type type;
     PVFS_fs_id fs_id;
-    PVFS_handle handle;
+    PVFS_handle handle;     /* 128 bit */
     PVFS_uid uid;
     PVFS_gid gid;
     PVFS_permissions mode;
@@ -131,9 +131,10 @@ do {                                                    \
     (__dsa)->ctime = time(NULL);                        \
     (__dsa)->atime = time(NULL);                        \
     (__dsa)->mtime = time(NULL);                        \
+    (__dsa)->ntime = time(NULL);                        \
 } while (0)
 
-#define PVFS_ds_attr_to_object_attr(__dsa, __oa)                       \
+#define PVFS_object_attr_from_ds_attr(__oa, __dsa)                     \
 do {                                                                   \
     (__oa)->owner = (__dsa)->uid;                                      \
     (__oa)->group = (__dsa)->gid;                                      \
@@ -201,7 +202,7 @@ do {                                                                   \
     }                                                                  \
 } while(0)
 
-#define PVFS_object_attr_to_ds_attr(__oa, __dsa)                       \
+#define PVFS_ds_attr_from_object_attr(__dsa, __oa)                     \
 do {                                                                   \
     (__dsa)->uid = (__oa)->owner;                                      \
     (__dsa)->gid = (__oa)->group;                                      \
@@ -307,6 +308,14 @@ do {                                                           \
     if ((src)->mask & PVFS_ATTR_COMMON_CTIME)                  \
     {                                                          \
         (dest)->ctime = time(NULL);                            \
+        if ((src)->mask & PVFS_ATTR_COMMON_CTIME_SET)          \
+        {                                                      \
+            (dest)->ctime = (src)->ctime;                      \
+        }                                                      \
+        else                                                   \
+        {                                                      \
+            (dest)->ctime = time(NULL);                        \
+        }                                                      \
     }                                                          \
     if ((src)->mask & PVFS_ATTR_COMMON_TYPE)                   \
     {                                                          \

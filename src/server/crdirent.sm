@@ -45,6 +45,7 @@ machine pvfs2_crdirent_sm
         default => final_response;
     }
 
+    /* these are used to validate the new entry */
     state get_bitmap_and_dirdata_handles
     {
         run crdirent_get_bitmap_and_dirdata_handles;
@@ -73,8 +74,9 @@ machine pvfs2_crdirent_sm
         default => update_dirdata_attr;
     }
 
-    state do_split /* state machine in dirent-split.sm */
+    state do_split
     {
+        /* state machine in dirent-split.sm */
         jump pvfs2_dirdata_split_sm;
         default => update_dirdata_attr;
     }
@@ -171,8 +173,8 @@ static PINT_sm_action crdirent_get_dist_dir_attr(struct PINT_smcb *smcb,
       first we translate the dirdata dspace attributes into a more convenient
       server use-able format.  i.e. a PVFS_object_attr
     */
-    PVFS_ds_attr_to_object_attr(&s_op->u.crdirent.dirdata_ds_attr,
-                                &s_op->u.crdirent.dirdata_attr);
+    PVFS_objecct_attr_from_ds_attr(&s_op->u.crdirent.dirdata_attr,
+                                   &s_op->u.crdirent.dirdata_ds_attr);
     s_op->u.crdirent.dirdata_attr.mask = PVFS_ATTR_COMMON_ALL;
 
     /* set up key and value structures for reading the dist_dir_attr */
@@ -569,51 +571,6 @@ static PINT_sm_action crdirent_write_directory_entry(struct PINT_smcb *smcb,
     return ret;
 }
 
-/*
- * Function: crdirent_update_dirdata_attr
- *
- * Write dirdata metadata to dspace, with updated time stamps and dirent
- * count and anything else modified after the crdirent and split if
- * there is one
- */
-static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
-                                                   job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -1;
-    job_id_t j_id;
-    PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
-    PVFS_object_attr *dspace_attr = NULL;
-    PVFS_ds_attributes *ds_attr = NULL;
-
-    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
-    dspace_attr = &s_op->u.crdirent.dirdata_attr;
-    dspace_attr->mask |= (PVFS_ATTR_COMMON_ATIME |
-                          PVFS_ATTR_COMMON_MTIME |
-                          PVFS_ATTR_COMMON_CTIME);
-
-    PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
-    ds_attr = &(s_op->u.crdirent.dirdata_ds_attr);
-    PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
-
-    /* update timestamps for the dirdata handle. */
-    ret = job_trove_dspace_setattr(s_op->req->u.crdirent.fs_id,
-                                   s_op->req->u.crdirent.dirdata_handle,
-                                   ds_attr,
-                                   TROVE_SYNC,
-                                   smcb,
-                                   0,
-                                   js_p,
-                                   &j_id,
-                                   server_job_context,
-                                   s_op->req->hints);
-
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 " crdirent: update timestamp, type is %d\n ",
-                 ds_attr->type);
-    return ret;
-}
-
 #if 0
 /*
  * Function: crdirent_get_dirent_count
@@ -657,31 +614,34 @@ static PINT_sm_action crdirent_check_for_split(struct PINT_smcb *smcb,
                       s_op->req->u.crdirent.name,
                       PVFS_OID_str(&s_op->req->u.crdirent.new_handle));
 
+    /* dirent count is in attrs */
     if (js_p->error_code != 0)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "retrieval of dirent count failed.\n");
+                     "write of new dirent failed.\n");
         PVFS_perror_gossip("retrieval of dirent count failed",
                            js_p->error_code);
         return SM_ACTION_COMPLETE;
     }
 
+    /* write of dirent succeeded, so increment dirent_count */
+    s_op->attr.u.dirdata.dirent_count++;
+
     gossip_debug(GOSSIP_SERVER_DEBUG, " dirent count = %d "
                  "split_size =%d, branch_level = %d\n",
-                 s_op->u.crdirent.keyval_handle_info.count,
+                 /* s_op->u.crdirent.keyval_handle_info.count, */
+                 s_op->attr.u.dirdata.dirent_count,
                  s_op->attr.u.dirdata.dist_dir_attr.split_size,
                  s_op->attr.u.dirdata.dist_dir_attr.branch_level);
 
-    /* Save the current attrs in case we have to back out due to an error. */
-    PINT_copy_object_attr(&s_op->u.crdirent.saved_attr, &s_op->attr);
-
-    if (s_op->u.crdirent.keyval_handle_info.count >=
+    /* if (s_op->u.crdirent.keyval_handle_info.count >= */
+    if (s_op->attr.u.dirdata.dirent_count >=
         s_op->attr.u.dirdata.dist_dir_attr.split_size)
     {
         /* Determine which node will get split entries. */
         s_op->u.crdirent.split_node = PINT_find_dist_dir_split_node(
-                                           &s_op->attr.u.dirdata.dist_dir_attr,
-                                           s_op->attr.u.dirdata.dist_dir_bitmap);
+                                          &s_op->attr.u.dirdata.dist_dir_attr,
+                                          s_op->attr.u.dirdata.dist_dir_bitmap);
 
         if (s_op->u.crdirent.split_node < 0)
         {
@@ -692,6 +652,11 @@ static PINT_sm_action crdirent_check_for_split(struct PINT_smcb *smcb,
         }
 
         js_p->error_code = SPLIT_REQUIRED;
+
+        /* Save the current attrs in case we have 
+         * to back out due to an error.
+         */
+        PINT_copy_object_attr(&s_op->u.crdirent.saved_attr, &s_op->attr);
 
         gossip_debug(GOSSIP_SERVER_DEBUG,
                      " split to node %d, new branch_level = %d\n",
@@ -711,6 +676,62 @@ static PINT_sm_action crdirent_check_for_split(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_SERVER_DEBUG, "\n");
     }
     return SM_ACTION_COMPLETE;
+}
+
+/*
+ * Function: crdirent_update_dirdata_attr
+ *
+ * Write dirdata metadata to dspace, with updated time stamps and dirent
+ * count and anything else modified after the crdirent and split if
+ * there is one
+ */
+static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
+                                                   job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t j_id;
+    PVFS_object_attr *dspace_attr = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
+
+    /* dirdata attributes are in s_op->attr
+     * Set Ctime and Mtime
+     * If we had a split assume tree_height was updated
+     * If we had a split then in the next state write back the bitmap
+     */
+
+    /* This contains the attrs read from the dirdata object */
+    /* dspace_attr = &s_op->u.crdirent.dirdata_attr; */
+    dspace_attr = &s_op->attr;
+
+    /* This is a buffer for the ds_attrs */
+    ds_attr = &(s_op->u.crdirent.dirdata_ds_attr);
+    memset(ds_attr, 0, sizeof(PVFS_ds_attributes));
+
+    dspace_attr->mtime = dspace_attr->ctime = time(NULL);
+
+    /* copy and convert format */
+    PVFS_ds_attr_from_object_attr(ds_attr, dspace_attr);
+
+    /* dspace setattr simply writes all attr in ds_attr so any
+     * mask effects must be handled before we write
+     */
+    /* update timestamps for the dirdata handle. */
+    ret = job_trove_dspace_setattr(s_op->req->u.crdirent.fs_id,
+                                   s_op->req->u.crdirent.dirdata_handle,
+                                   ds_attr,
+                                   TROVE_SYNC,
+                                   smcb,
+                                   0,
+                                   js_p,
+                                   &j_id,
+                                   server_job_context,
+                                   s_op->req->hints);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 " crdirent: update timestamp, type is %d\n ",
+                 ds_attr->type);
+    return ret;
 }
 
 /*

@@ -760,7 +760,7 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
 
     /* translate attrs to storage attr format */
     ds_attr = (&s_op->ds_attr);
-    PVFS_object_attr_to_ds_attr(a_p, ds_attr);
+    PVFS_ds_attr_from_object_attr(ds_attr, a_p);
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;

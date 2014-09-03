@@ -163,8 +163,8 @@ static PINT_sm_action listattr_setup_getattr(
          */
 
         /* need attrs that the prelude would have read normally */
-        PVFS_ds_attr_to_object_attr(&s_op->u.listattr.ds_attr_a[i],
-                                    &getattr_op->attr);
+        PVFS_object_attr_from_ds_attr(&getattr_op->attr,
+                                      &s_op->u.listattr.ds_attr_a[i]);
         getattr_op->attr.mask = PVFS_ATTR_COMMON_ALL;
         getattr_op->ds_attr = s_op->u.listattr.ds_attr_a[i];
         /* need a valid request structure for some generic features like access

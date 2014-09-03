@@ -34,27 +34,32 @@ machine pvfs2_create_sm
     state create_metafile
     {
         run create_metafile;
+        success => write_keyvals;
+/*
         success => create_local_datafiles;
+*/
         default => setup_final_response;
     }
 
+/*
     state create_local_datafiles
     {
         run create_local_datafiles;
         success => write_keyvals;
         default => remove_metafile_object;
     }
+*/
 
     state write_keyvals
     {
         run write_keyvals;
-        success => setobj_attribs;
+        success => write_metafile_attribs;
         default => remove_local_datafile_handles;
     }
 
-    state setobj_attribs
+    state write_metafile_attribs
     {
-        run setattr_setobj_attribs;
+        run write_metafile_attribs;
         success => setobj_attribs_debug;
         default => remove_keyvals;
     }
@@ -302,6 +307,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
 }
 #endif
 
+#if 0
 static int create_local_datafiles(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -394,7 +400,11 @@ static int create_local_datafiles(struct PINT_smcb *smcb, job_status_s *js_p)
 
     return(ret);
 }
+#endif
 
+/* Write keyval attributes of the metadata object
+ * ADD BACKPOINTER V3
+ */
 static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -462,7 +472,7 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
 /*
  * writes the standard attributes to the metafile object in the dspace
  */
-static PINT_sm_action setattr_setobj_attribs(struct PINT_smcb *smcb,
+static PINT_sm_action write_metafile_attribs(struct PINT_smcb *smcb,
                                              job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -480,6 +490,7 @@ static PINT_sm_action setattr_setobj_attribs(struct PINT_smcb *smcb,
     dspace_a_p = &s_op->attr;
     a_p = &s_op->req->u.create.attr;
 
+#if 0
     /* 
      * Remember that mtime is versioned on disk! so convert it here..
      * It is better to do it here than change the "
@@ -494,6 +505,7 @@ static PINT_sm_action setattr_setobj_attribs(struct PINT_smcb *smcb,
                      "to %llu\n\tmtime is %llu\n",
                      llu(a_p->mtime), llu(orig_mtime));
     }
+#endif
 
     /*
      * we have the attribs stored in the dspace, as well as the
@@ -502,6 +514,18 @@ static PINT_sm_action setattr_setobj_attribs(struct PINT_smcb *smcb,
      * pvfs2-storage.h
      */
     PVFS_object_attr_overwrite_setable(dspace_a_p, a_p);
+
+    /* update fields passed in the request but stored in the dspace
+     * attributes.
+     * for whatever reason we aren't getting the time passed from the
+     * user (client) there is no reason we can't set it here.
+     */
+    dspace_a_p->u.meta.dfile_count = s_op->req->u.create.datafile_count;
+    dspace_a_p->u.meta.sid_count = s_op->req->u.create.sid_count;
+    dspace_a_p->atime =
+            dspace_a_p->ctime =
+                      dspace_a_p->ntime = PINT_util_get_current_time();
+    dspace_a_p->mtime = PINT_util_mktime_version(dspace_a_p->ntime);
 
 #ifdef ENABLE_SECURITY_CERT
     /*                                                              
@@ -539,7 +563,7 @@ static PINT_sm_action setattr_setobj_attribs(struct PINT_smcb *smcb,
 
     /* translate attrs to storage attr format */
     ds_attr = &(s_op->ds_attr);
-    PVFS_object_attr_to_ds_attr(dspace_a_p, ds_attr);
+    PVFS_ds_attr_from_object_attr(ds_attr, dspace_a_p);
 
     ret = job_trove_dspace_setattr(s_op->req->u.create.fs_id,
                                    s_op->req->u.create.handle, /* metafile */
