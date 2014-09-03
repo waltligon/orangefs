@@ -73,6 +73,10 @@ class OFSTestConfig(object):
         # Should the nodes be deleted after testing?
         self.cloud_delete_after_test = False # Web Interface: user
         
+        ## @var stop_on_failure
+        # Stops the test after a failure. Overrides cloud_delete_after_test
+        self.stop_on_failure = False # Web Interface: user
+        
         ## @var cloud_domain
         # Cloud domain
         self.cloud_domain=None # Web Interface: auto
@@ -699,3 +703,6 @@ class OFSTestConfig(object):
         if temp != None:
             self.ofs_tcp_port = temp
                 
+        temp = d.get('stop_on_failure')
+        if temp != None:
+            self.stop_on_failure = temp

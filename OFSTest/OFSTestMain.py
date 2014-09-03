@@ -581,7 +581,11 @@ class OFSTestMain(object):
                 except:
                     print "Unexpected error:", sys.exc_info()[0]
                     traceback.print_exc()
+                    if self.config.stop_on_failure == True:
+                        return -888
                     pass
+                if rc != 0 and self.config.stop_on_failure == True:
+                    return rc
 
         # Run the kmod vfs tests, if required.
         if self.config.run_vfs_tests == True:
@@ -621,7 +625,12 @@ class OFSTestMain(object):
                     except:
                         print "Unexpected error:", sys.exc_info()[0]
                         traceback.print_exc()
+                        if self.config.stop_on_failure == True:
+                            return -888
                         pass
+                    if rc != 0 and self.config.stop_on_failure == True:
+                        return rc
+
 
                 # run the mpi tests, if required.
                 if self.config.run_mpi_tests == True:
@@ -637,15 +646,22 @@ class OFSTestMain(object):
                         except:
                             print "Unexpected error:", sys.exc_info()[0]
                             traceback.print_exc()
+                            if self.config.stop_on_failure == True:
+                                return -888
                             pass
 
-            
+                        if rc != 0 and self.config.stop_on_failure == True:
+                            return rc
+
             # if not, print failure.
             else:
                 self.writeOutputHeader(filename,"VFS Tests (%s) could not run. Mount failed." % mount_type)           
                 # Each test should fail. Use error -999 to indicate mount failure.
                 for callable in OFSVFSTest.tests:
                     self.writeOutput(filename,callable,-999)
+                if self.config.stop_on_failure == True:
+                    return -999
+
         
         # run fuse tests, if required.
         if self.config.run_fuse_tests == True:
@@ -681,7 +697,13 @@ class OFSTestMain(object):
                     except:
                         print "Unexpected error:", sys.exc_info()[0]
                         traceback.print_exc()
+                        if self.config.stop_on_failure == True:
+                            return -888
+
                         pass
+                    if rc != 0 and self.config.stop_on_failure == True:
+                        return rc
+
                 
                 # run the mpi tests, if required.
                 if self.config.run_mpi_tests == True:
@@ -696,7 +718,11 @@ class OFSTestMain(object):
                         except:
                             print "Unexpected error:", sys.exc_info()[0]
                             traceback.print_exc()
+                            if self.config.stop_on_failure == True:
+                                return -888
                             pass
+                        if rc != 0 and self.config.stop_on_failure == True:
+                            return rc
 
         
             else:
@@ -704,7 +730,9 @@ class OFSTestMain(object):
                 # Each test should fail. Use error -999 to indicate mount failure.
                 for callable in OFSVFSTest.tests:
                     self.writeOutput(filename,callable,-999)
-        
+                if self.config.stop_on_failure == True:
+                    return -999
+
 
 
         # run the usrint tests, if required.
@@ -732,7 +760,13 @@ class OFSTestMain(object):
                     except:
                         print "Unexpected error:", sys.exc_info()[0]
                         traceback.print_exc()
+                        if self.config.stop_on_failure == True:
+                            return -888
+
                         pass
+                    if rc != 0 and self.config.stop_on_failure == True:
+                        return rc
+
                 
         # run the mpi tests, if required.
         if self.config.run_mpi_tests == True:
@@ -755,7 +789,12 @@ class OFSTestMain(object):
                 except:
                     print "Unexpected error:", sys.exc_info()[0]
                     traceback.print_exc()
+                    if self.config.stop_on_failure == True:
+                        return -888
                     pass
+                if rc != 0 and self.config.stop_on_failure == True:
+                    return rc
+
 
         # run the hadoop tests, if required.
         if self.config.run_hadoop_tests == True:
@@ -780,7 +819,13 @@ class OFSTestMain(object):
                 except:
                     print "Unexpected error:", sys.exc_info()[0]
                     traceback.print_exc()
+                    if self.config.stop_on_failure == True:
+                        return -888
+                    
                     pass
+                if rc != 0 and self.config.stop_on_failure == True:
+                    return rc
+
 
         # run miscellaneous tests after run.
         if True == True:
@@ -805,7 +850,11 @@ class OFSTestMain(object):
                 except:
                     print "Unexpected error:", sys.exc_info()[0]
                     traceback.print_exc()
+                    if self.config.stop_on_failure == True:
+                        return -888
                     pass
+                if rc != 0 and self.config.stop_on_failure == True:
+                    return rc
         
 
         # Test runfunction group
