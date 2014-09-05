@@ -139,22 +139,25 @@ class OFSTestNetwork(object):
                 self.queue = queue
           
             def run(self):
-                while True:
-                    #grabs host from queue
-                    #print "Queue length is %d" % self.queue.qsize()
-                    node = self.queue.get()
-                    
-            
-                    #runs the selected node function
-                    if len(args) > 0:
-                        rc = node_function(node,*args)
-                    elif len(kwargs) > 0:
-                        rc = node_function(node,**kwargs)
-                    else:
-                        rc = node_function(node)
+                try:
+                    while True:
+                        #grabs host from queue
+                        #print "Queue length is %d" % self.queue.qsize()
+                        node = self.queue.get()
                         
-                    #signals to queue job is done
-                    self.queue.task_done()
+                
+                        #runs the selected node function
+                        if len(args) > 0:
+                            rc = node_function(node,*args)
+                        elif len(kwargs) > 0:
+                            rc = node_function(node,**kwargs)
+                        else:
+                            rc = node_function(node)
+                            
+                        #signals to queue job is done
+                        self.queue.task_done()
+                except:
+                    logging.exception("Thread failed!");
           
           
         start = time.time()
