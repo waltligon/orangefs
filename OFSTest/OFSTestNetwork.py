@@ -397,10 +397,13 @@ class OFSTestNetwork(object):
         time.sleep(180)
         # workaround for strange cuer1 issue where hostname changes on reboot.
         for node in node_list:
+            # node information may have changed during reboot.
+            old_hostname = node.hostname
+            node.currentNodeInformation()
             tmp_hostname = node.runSingleCommandBacktick("hostname")
-            if tmp_hostname != node.hostname:
-                logging.info( "Hostname changed from %s to %s! Resetting to %s" % (node.hostname,tmp_hostname,node.hostname))
-                node.runSingleCommandAsRoot("hostname %s" % node.hostname)
+            if tmp_hostname != old_hostname:
+                logging.info( "Hostname changed from %s to %s! Resetting to %s" % (old_hostname,tmp_hostname,old_hostname))
+                node.runSingleCommandAsRoot("hostname %s" % old_hostname)
                 
     
     ##

@@ -264,8 +264,8 @@ class OFSTestMain(object):
         print "===========================================================" 
         print "Enabling Passwordless SSH access"
         self.ofs_network.enablePasswordlessSSH()
-        print "Enabling Passwordless SSH access for root"
-        self.ofs_network.enablePasswordlessSSH(user="root")
+        #print "Enabling Passwordless SSH access for root"
+        #self.ofs_network.enablePasswordlessSSH(user="root")
 
 
         # Update new cloud nodes and reboot. We don't want to do this with real nodes 
