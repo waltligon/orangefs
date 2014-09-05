@@ -408,7 +408,9 @@ class OFSTestNode(object):
     
     def changeDirectory(self, directory):
         # cd "-" will restore previous directory
-        if directory is not "-": 
+        if directory is not "-":
+            if directory is "~":
+                directory = "/home/%s" % self.current_user 
             self.previous_directory = self.current_directory
             self.current_directory = directory
         else:

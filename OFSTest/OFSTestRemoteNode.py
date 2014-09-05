@@ -422,7 +422,9 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         # This one we activate! 
         if (self.is_cloud):
             print "Allowing root SSH access with user %s's credentials" % self.current_user
-            self.runSingleCommandAsBatch(command="sudo cp -r /home/%s/.ssh /root/ " % self.current_user)
+            self.changeDirectory("~")
+            self.runSingleCommandBacktick(command="ls -l /home/%s/.ssh" % self.current_user)
+            self.runSingleCommandAsBatch(command="sudo /bin/cp -r /home/%s/.ssh /root/ " % self.current_user)
         
         #============================================================================
         #
