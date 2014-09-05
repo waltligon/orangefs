@@ -1104,6 +1104,20 @@ class OFSTestNetwork(object):
 
    
     ##    
+    #   @fn generateOFSCertificates(self,node_list=None,head_node=None):
+    #
+    #    Generate SSH certificates for OrangeFS cert-based security
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network.
+    #    @param head_node Head node of ssh setup
+
+   
+    
+    def generateOFSCertificates(self,node_list=None,head_node=None):
+        return 0
+
+   
+    ##    
     #    @fn generateOFSServerKeys(self,node_list=None,security_node=None)
     #
     #    Generate server SSH keys for OrangeFS security
