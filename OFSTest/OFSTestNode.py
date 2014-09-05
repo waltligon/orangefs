@@ -803,6 +803,7 @@ class OFSTestNode(object):
     
     def updateNode(self):
         logging.debug("Update Node. Distro is " + self.distro)
+           
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             self.runSingleCommandAsRoot("DEBIAN_FRONTEND=noninteractive apt-get -y update")
             self.runSingleCommandAsRoot("DEBIAN_FRONTEND=noninteractive apt-get -y dist-upgrade")
@@ -811,6 +812,8 @@ class OFSTestNode(object):
             self.runSingleCommandAsRoot("zypper --non-interactive update")
             self.runSingleCommandAsRoot("nohup /sbin/reboot &")
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
+            # disable SELINUX
+            self.runSingleCommandAsRoot("bash -c 'echo \\\"SELINUX=Disabled\\\" > /etc/selinux/config'")
             self.runSingleCommandAsRoot("yum install -y perl wget")
             self.runSingleCommandAsRoot("yum update --disableexcludes=main -y")
 
