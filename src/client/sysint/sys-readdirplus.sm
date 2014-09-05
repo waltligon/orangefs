@@ -966,9 +966,6 @@ static PINT_sm_action readdirplus_cleanup(
             }
         }
     }
-    else {
-        gossip_err("readdirplus: response error\n");
-    }
 
     destroy_partition_handles(&sm_p->u.readdirplus.svr_count, 
                        &sm_p->u.readdirplus.server_addresses,
