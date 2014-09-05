@@ -150,8 +150,13 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
             script_file.write(command)
             script_file.write('\n');
 
-
-        script_file.write("exit\n")
+        #error checking: Did command run correctly?
+        script_file.write("RC=$?\n")
+        script_file.write("if [ $RC -ne 0 ]\n")
+        script_file.write("then\n")
+        script_file.write("\texit $RC\n")
+        script_file.write("fi\n")
+        script_file.write("exit 0\n")
         script_file.close()
         
         logging.debug("----- Start generated batchfile: %s -----------------------" % batchfilename)
