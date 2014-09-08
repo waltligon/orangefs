@@ -2261,7 +2261,7 @@ class OFSTestNode(object):
         elif security.lower() == "cert":
             msg = "Configuring certificate based security"
             print msg
-            security_args = '--server-key %s/etc/orangefs-ca-cert-key.pem --ca-file %s/etc/orangefs-ca-cert.pem --ldaphosts \\"ldap://%s\\" --ldapbinddn \\"cn=admin,dc=%s\\" --ldapbindpasswd ldappwd' % (self.ofs_installation_location,self.ofs_installation_location,self.hostname,self.hostname)
+            security_args = '--serverkey %s/etc/orangefs-ca-cert-key.pem --cafile %s/etc/orangefs-ca-cert.pem --ldaphosts \\"ldap://%s\\" --ldapbinddn \\"cn=admin,dc=%s\\" --ldapbindpassword ldappwd' % (self.ofs_installation_location,self.ofs_installation_location,self.hostname,self.hostname)
             logging.info(msg)
             pass
             
