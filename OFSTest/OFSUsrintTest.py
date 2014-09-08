@@ -607,7 +607,7 @@ def tail(testing_node,output=[]):
     
     testing_node.runSingleCommand("tail %s > %s" % (local_file,local_output))
     
-    testing_node.runSingleCommand("%s tail %s > %s" % (preload,tail_file,tail_output))
+    testing_node.runSingleCommand("%s bash -c 'tail %s > %s'" % (preload,tail_file,tail_output))
    
     # now diff it
     rc = testing_node.runSingleCommand("%s diff %s %s" % (preload,local_output,tail_output))
