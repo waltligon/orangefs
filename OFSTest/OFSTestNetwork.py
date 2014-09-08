@@ -669,7 +669,7 @@ class OFSTestNetwork(object):
             destination_list = self.network_nodes;
         self.copyResourceToNodeList(node_function=OFSTestNode.OFSTestNode.copyOFSInstallationToNode,destination_list=destination_list)
 
-       
+
     ##    
     #  @fn copyResourceToNodeList(self,node_function,destination_list=None):
     #
@@ -1116,8 +1116,30 @@ class OFSTestNetwork(object):
 
    
     
-    def generateOFSCertificates(self,node_list=None,head_node=None):
-        return 0
+    def generateOFSCertificates(self,node_list=None,security_node=None):
+        if node_list == None:
+            node_list = self.network_nodes
+        if security_node==None:
+            security_node = node_list[0]
+
+        rc = security_node.setupLDAP()
+        if rc == 0:
+            rc = security_node.createCACert()
+        if rc == 0:
+            rc = security_node.createUserCerts()
+        if rc == 0:
+            rc = security_node.createUserCerts("root")
+        if rc == 0:
+            rc = security_node.createUserCerts("nobody")
+        if rc == 0:
+            rc = security_node.createUserCerts("bin")
+
+        # Should be copied with OFS Installation. 
+        #if rc == 0:
+        #    rc = self.copyCACertsToNodeList()
+        
+        
+        return rc
 
    
     ##    

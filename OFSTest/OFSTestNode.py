@@ -1101,6 +1101,8 @@ class OFSTestNode(object):
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q linux-image",
                 # will fail on Ubuntu 10.04. Run separately to not break anything
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q fuse",
+                # install openldap
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q slapd ldap-utils libldap-2.4-2 libldap2-dev libldap-java libldap-ocaml-dev",
                 #"DEBIAN_FRONTEND=noninteractive apt-get install -yu avahi-autoipd  avahi-dnsconfd  avahi-utils avahi-daemon    avahi-discover  avahi-ui-utils", 
                 "apt-get clean",
     
@@ -2257,8 +2259,9 @@ class OFSTestNode(object):
             logging.info(msg)
             security_args = "--securitykey --serverkey=%s/etc/orangefs-serverkey.pem --keystore=%s/etc/orangefs-keystore" % (self.ofs_installation_location,self.ofs_installation_location)
         elif security.lower() == "cert":
-            msg = "Certificate based security not yet supported by OFSTest."
+            msg = "Configuring certificate based security"
             print msg
+            security_args = '--server-key %s/etc/orangefs-ca-cert-key.pem --ca-file %s/etc/orangefs-ca-cert.pem --ldaphosts \\"ldap://%s\\" --ldapbinddn \\"cn=admin,dc=%s\\" --ldapbindpasswd ldappwd' % (self.ofs_installation_location,self.ofs_installation_location,self.hostname,self.hostname)
             logging.info(msg)
             pass
             
@@ -2642,3 +2645,37 @@ class OFSTestNode(object):
         # grep -r 'prefix = /home/cloud-user/orangefs' /home/cloud-user/stable/Makefile
         return 0
         
+    def setupLDAP(self):
+        self.changeDirectory("%s/examples/certs" % self.ofs_source_location)
+        rc = self.runSingleCommand(command="%s/examples/certs/pvfs2-ldap-create-dir.sh" % self.ofs_source_location)
+        if rc == 0:
+            rc = self.runSingleCommand('%s/examples/certs/pvfs2-ldap-set-pass.sh -w ldappwd \\"cn=root,ou=users,dc=%s' % (self.ofs_source_location,self.hostname))
+        if rc == 0:
+            rc = self.runSingleCommand('for username in \\`cut -d: -f1 /etc/passwd\\`; do %s/examples/certs/pvfs2-ldap-add-user.sh -D \\"cn=admin,dc=%s\\" -w ldappwd \\$username \\"ou=users,dc=%s\\"' % (self.ofs_source_location,self.hostname,self.hostname))
+        return rc
+        
+    def createCACert(self):
+        rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-ca-auto.sh')
+        return rc
+        
+
+    def createUserCerts(self,user=None):
+        if user == None:
+            user = self.current_user
+        rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-req-auto.sh %s %s' % (self.ofs_source_location,user,user))
+        if rc == 0:
+            rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-sign.sh %s' % (self.ofs_source_location,user))
+        if rc == 0:
+            homedir = self.runSingleCommandBacktick('\\`grep ^%s /etc/passwd | cut -d: -f6\\`' % user)
+            self.runSingleCommand('mkdir -p %s' % homedir)
+            self.runSingleCommand('chown %s:%s %s-cert*.pem' % (user,user,user))
+            self.runSingleCommand('chmod 600 %s-cert*.pem' % user)
+            rc = self.runSingleCommand('cp -p %s-cert.pem %s/.pvfs2-cert.pem' % (user,homedir))
+        if rc == 0:
+            rc = self.runSingleCommand('cp -p %s-cert-key.pem %s/.pvfs2-cert-key.pem' % (user,homedir))
+            
+        return rc
+            
+        
+            
+            
