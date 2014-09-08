@@ -1207,6 +1207,8 @@ class OFSTestNode(object):
                 "bash -c 'echo 0 > /selinux/enforce'",
                 
                 "yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-\\`uname -r\\` kernel-headers-\\`uname -r\\` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel openldap openldap-devel openldap-clients gdb nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl wget",
+                "yum -y install openldap openldap-clients openldap-servers openldap-servers-sql compat-openldap",
+                "chown -R ldap:ldap /var/lib/ldap",
                 # install java
                 "yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user,
                 "/sbin/modprobe -v fuse",
@@ -1223,6 +1225,8 @@ class OFSTestNode(object):
                 "service sendmail stop",
                 "service rpcbind start",
                 "service nfs restart",
+                "service slapd start",
+                "chkconfig slapd on"
                 
                 
                 ]
