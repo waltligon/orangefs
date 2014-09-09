@@ -894,7 +894,6 @@ static PINT_sm_action readdirplus_cleanup(
                                  uint32_t num_handles,
                                  PVFS_size *psizes) = NULL;
                              /* compute the file size */
-                             /* TODO: remove assertions */
                              assert(sm_p->u.readdirplus.size_array[i]);
                              logical_file_size = 
                                 sm_p->u.readdirplus.obj_attr_array[i].
@@ -966,9 +965,6 @@ static PINT_sm_action readdirplus_cleanup(
                 }
             }
         }
-    }
-    else {
-        gossip_err("readdirplus: response error\n");
     }
 
     destroy_partition_handles(&sm_p->u.readdirplus.svr_count, 

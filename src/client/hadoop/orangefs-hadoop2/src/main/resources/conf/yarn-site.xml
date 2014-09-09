@@ -73,25 +73,25 @@
 
   <property>
     <name>yarn.nodemanager.resource.cpu-vcores</name>
-    <value>3</value>
-  </property>
-
-  <property>
-    <name>yarn.nodemanager.resource.memory-mb</name>
-    <value>2046</value>
-    <description>
-    	Amount of physical memory, in MB, that can be allocated for containers.
-    </description>
+    <value>1</value>
   </property>
 
   <property>
     <name>yarn.scheduler.minimum-allocation-mb</name>
-    <value>682</value>
+    <value>640</value>
   </property>
 
   <property>
     <name>yarn.scheduler.maximum-allocation-mb</name>
-    <value>2046</value>
+    <value>1920</value>
+  </property>
+
+  <property>
+    <name>yarn.nodemanager.resource.memory-mb</name>
+    <value>1920</value>
+    <description>
+    Amount of physical memory, in MB, that can be allocated for containers.
+    </description>
   </property>
 
   <property>

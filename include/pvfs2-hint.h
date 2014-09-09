@@ -25,6 +25,8 @@
 #define PVFS_HINT_DISTRIBUTION_PV_NAME "pvfs.hint.distribution.pv"
 /* local uid hint for client capcache */
 #define PVFS_HINT_LOCAL_UID_NAME     "pvfs.hint.local_uid"
+/* owner gid for file creation */
+#define PVFS_HINT_OWNER_GID_NAME     "pvfs.hint.owner_gid"
 
 typedef struct PVFS_hint_s *PVFS_hint;
 

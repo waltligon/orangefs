@@ -14,12 +14,21 @@ public class PVFS2POSIXJNI {
     static {
         String ldlPath = System.getenv("JNI_LIBRARY_PATH");
         String libofs = "libofs.so";
+        String liborangefs = "liborangefs.so";
         String libpvfs2 = "libpvfs2.so";
         try {
             System.load(ldlPath + "/" + libpvfs2);
         } catch (UnsatisfiedLinkError error) {
             error.printStackTrace();
             System.err.println("Couldn't load " + libpvfs2);
+            System.err.println("JNI_LIBRARY_PATH = " + ldlPath);
+            System.exit(-1);
+        }
+        try {
+            System.load(ldlPath + "/" + liborangefs);
+        } catch (UnsatisfiedLinkError error) {
+            error.printStackTrace();
+            System.err.println("Couldn't load " + liborangefs);
             System.err.println("JNI_LIBRARY_PATH = " + ldlPath);
             System.exit(-1);
         }

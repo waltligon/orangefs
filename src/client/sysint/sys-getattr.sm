@@ -370,7 +370,6 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
                  __func__,
                  llu(object_ref.handle), object_ref.fs_id);
 
-    /* TODO: debugging */
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: called on behalf of %s\n",
                  __func__, PINT_client_get_name_str(smcb->op));
 
@@ -681,6 +680,11 @@ static PINT_sm_action getattr_client_capcache_lookup(struct PINT_smcb *smcb,
             gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: client capcache miss\n", 
                          __func__);
         }
+        else if (ret == -PVFS_ETIME)
+        {
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: client capcache timeout\n",
+                         __func__);
+        }
         else
         {
             gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: client capcache error "
@@ -775,19 +779,17 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 
     attr = &sm_p->getattr.attr;
 
-    /* TODO: debugging */
     if (attr->mask & PVFS_ATTR_CAPABILITY)
     {
-        PINT_debug_capability(&attr->capability, "getattr received cap:");
+        PINT_debug_capability(&attr->capability, "getattr received");
     }
 
     if (sm_p->getattr.flags & PINT_SM_GETATTR_CAPCACHE_HIT)
     {
         /* add back in capability flag (already stored in attr) */
         attr->mask |= PVFS_ATTR_CAPABILITY;
-        PINT_debug_capability(&attr->capability, "getattr used cached cap:");
+        PINT_debug_capability(&attr->capability, "getattr used cached");
     }
-    /*** TODO ***/
 
     /* if the ref_type mask is set to a non-zero value (!PVFS_TYPE_NONE)
      * a -PVFS_error will be triggered if the

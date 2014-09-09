@@ -187,6 +187,8 @@ PVFS_error PVFS_isys_create(
         return -PVFS_ENAMETOOLONG;
     }
 
+#ifndef ENABLE_SECURITY_CERT
+    /* do not use credential values in cert. mode */
     if (attr.owner != credential->userid)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing owner uid %d with %d "
@@ -200,6 +202,7 @@ PVFS_error PVFS_isys_create(
                      "on create\n", attr.group, credential->group_array[0]);
         attr.group = credential->group_array[0];
     }
+#endif
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_CREATE,
@@ -778,7 +781,7 @@ static PINT_sm_action create_parent_getattr_inspect(
     attr = &sm_p->getattr.attr;
     assert(attr);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "parent owner: %d, group: %d, perms: %d\n",
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "parent owner: %d, group: %d, perms: %o\n",
         (int)attr->owner, (int)attr->group, (int)attr->perms);
 
     /* do we have a setgid bit? */
@@ -790,6 +793,15 @@ static PINT_sm_action create_parent_getattr_inspect(
         sm_p->u.create.attr.group = attr->group;
         /* note that permission checking is left to server even in this case */
     }
+
+#ifdef ENABLE_SECURITY_CERT
+    /* we need to know the correct owner group in cert. mode */
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "adding gid hint: %d\n", 
+                 sm_p->u.create.attr.group);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_OWNER_GID_NAME, sizeof(uint32_t), 
+                  &sm_p->u.create.attr.group);
+#endif
+    
     /* !!! change more later */
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_parent_getattr: [%p] "
         "dirdata_server_count = %d "

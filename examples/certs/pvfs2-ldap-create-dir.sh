@@ -177,11 +177,14 @@ else
 fi
 
 # start slapd
-$slapd
-if [ $? -ne 0 ]; then
-    echo "Error: could not execute slapd... exiting"
-    exit 1
+if [ $slapd ]; then
+    $slapd
+    if [ $? -ne 0 ]; then
+        echo "Error: could not execute slapd... exiting"
+        exit 1
+    fi    
 fi
+
 sleep 2
 
 # create topmost base container

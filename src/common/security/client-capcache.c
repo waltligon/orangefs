@@ -242,8 +242,7 @@ int PINT_client_capcache_get_cached_entry(
         return -PVFS_EINVAL;
     }
 
-    /* TODO: review 
-       return if not enabled */
+    /* return if not enabled */
     if (!client_capcache->enable)
     {
         return -PVFS_ENOENT;
@@ -357,7 +356,7 @@ int PINT_client_capcache_update(
     struct client_capcache_payload *tmp_payload = NULL;
     struct PINT_tcache_entry *tmp_entry;
     struct timeval timev = { 0, 0 }, now = { 0, 0 };
-    unsigned int timeout;
+    unsigned int timeout, timeout_buffer;
 
     if (cap == NULL)
     {
@@ -396,9 +395,13 @@ int PINT_client_capcache_update(
     /* compute timeout */
     if (client_capcache_timeout_flag)
     {
-        /* set entry timeout to current time plus cache timeout */
+        /* set entry timeout to current time plus cache timeout minus buffer 
+           (if timeout is greater than the buffer time) */
         PINT_tcache_get_info(client_capcache, TCACHE_TIMEOUT_MSECS, &timeout);
-        timev.tv_sec = now.tv_sec + (timeout / 1000);
+        timeout_buffer = (timeout / 1000) > CLIENT_CAPCACHE_TIMEOUT_BUFFER ?
+            CLIENT_CAPCACHE_TIMEOUT_BUFFER : 0;
+        timev.tv_sec = now.tv_sec + (timeout / 1000) - timeout_buffer;
+        
         /* do not set timeout past cap timeout */
         if (timev.tv_sec > cap->timeout)
         {

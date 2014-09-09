@@ -37,7 +37,8 @@ static uint16_t PINT_capcache_get_index(void *data,
 static int PINT_capcache_compare(void *data, void *entry);
 static void PINT_capcache_cleanup(void *entry);
 static void PINT_capcache_debug(const char *prefix,
-                                void *data);
+                               void *data);
+int PINT_capcache_remove(seccache_entry_t * entry);
 
 /* method table */
 static seccache_methods_t capcache_methods = {    
@@ -278,7 +279,7 @@ int PINT_capcache_quick_sign(PVFS_capability * cap)
     /* copy capability timeout & signature */
     curr_cap = (PVFS_capability *) curr_entry->data;
     /* check timeout */
-    if (PINT_util_get_current_time() >= curr_cap->timeout)
+    if (PINT_util_get_current_time() > curr_cap->timeout)
     {
         gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: entry timed out\n",
                      __func__);

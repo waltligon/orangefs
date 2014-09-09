@@ -54,55 +54,78 @@
   </property>
 
   <property>
-    <name>mapreduce.map.memory.mb</name>
-    <value>341</value>
-  </property>
-
-  <property>
-    <name>mapreduce.map.java.opts</name>
-    <value>-Xmx272m</value>
-  </property>
-
-  <property>
     <name>mapreduce.reduce.cpu.vcores</name>
     <value>1</value>
   </property>
 
   <property>
+    <name>mapreduce.map.memory.mb</name>
+    <value>640</value>
+  </property>
+
+  <property>
+    <name>mapreduce.map.java.opts</name>
+    <value>-Xmx512m</value>
+  </property>
+
+  <property>
     <name>mapreduce.reduce.memory.mb</name>
-    <value>682</value>
+    <value>1280</value>
   </property>
 
   <property>
     <name>mapreduce.reduce.java.opts</name>
-    <value>-Xmx545m</value>
+    <value>-Xmx1024m</value>
   </property>
 
   <property>
     <name>yarn.app.mapreduce.am.resource.mb</name>
-    <value>341</value>
+    <value>640</value>
   </property>
 
   <property>
     <name>yarn.app.mapreduce.am.command-opts</name>
-    <value>-Xmx272m</value>
+    <value>-Xmx512m</value>
   </property>
 
   <property>
     <name>mapreduce.task.io.sort.mb</name>
-    <value>136</value>
+    <value>256</value>
   </property>
 
   <property>
     <name>mapreduce.input.fileinputformat.split.minsize</name>
     <value>67108864</value>
     <description>
-    Note: To prevent using OFS stripe size (e.g. 2MB) as Hadoop chunck size (e.g. 64MB), this option is still required in some cases. Otherwise, an IO exception could be thrown
-   " java.io.IOException: Split metadata size exceeded 10000000. Aborting job ..." 
+    Note: To prevent using OFS stripe size (e.g. 2MB) as Hadoop chunk size
+    (e.g. 64MB), this option is still required in some cases. Otherwise, an IO
+    exception could be thrown " java.io.IOException: Split metadata size
+    exceeded 10000000. Aborting job ..."
 
-    The minimum size chunk that map input should be split into. Note that some file formats may have minimum split sizes that take priority over this setting
+    The minimum size chunk that map input should be split into. Note that some
+    file formats may have minimum split sizes that take priority over this
+    setting.
     </description>
   </property>
+
+  <property>
+    <name>mapreduce.map.maxattempts</name>
+    <value>1</value>
+    <description>
+    The maximum number of attempts per map task. In other words, framework will
+    try to execute a map task these many number of times before giving up on it.
+    </description>
+  </property>
+
+  <property>
+    <name>mapreduce.reduce.maxattempts</name>
+    <value>1</value>
+    <description>
+    The maximum number of attempts per reduce task. In other words, framework will
+    try to execute a reduce task these many number of times before giving up on it.
+    </description>
+  </property>
+
 
 <!-- You probably want to use compression with OrangeFS. See below. -->
 
