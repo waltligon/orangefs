@@ -240,7 +240,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
             ssh_key_parm = '-i %s' % self.sshLocalKeyFile
 
         
-        command_chunks = ["/usr/bin/ssh %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o BatchMode=yes \"" %  (ssh_key_parm,remote_user,self.ext_ip_address)]
+        command_chunks = ["/usr/bin/ssh %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o BatchMode=yes \" source /etc/profile; " %  (ssh_key_parm,remote_user,self.ext_ip_address)]
 
         # change to proper directory
         command_chunks.append("cd %s; " % self.current_directory)
