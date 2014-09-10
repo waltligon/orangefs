@@ -20,7 +20,7 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <hadoop.version>2.2.0</hadoop.version>
+    <hadoop.version>2.5.0</hadoop.version>
     <orangefs-jni.version>2.9.0</orangefs-jni.version>
     <log4j.version>1.2.17</log4j.version>
     <junit.version>4.9</junit.version>
@@ -32,13 +32,12 @@
       <artifactId>hadoop-common</artifactId>
       <version>${hadoop.version}</version>
     </dependency>
-    <!--
     <dependency>
       <groupId>org.orangefs.usrint</groupId>
       <artifactId>orangefs-jni</artifactId>
       <version>${orangefs-jni.version}</version>
     </dependency>
-    -->
+    <!--
     <dependency>
       <groupId>org.orangefs.usrint</groupId>
       <artifactId>orangefs-jni</artifactId>
@@ -46,6 +45,7 @@
       <scope>system</scope>
       <systemPath>${jni.library.path}/orangefs-jni-${orangefs-jni.version}.jar</systemPath>
     </dependency>
+    -->
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>

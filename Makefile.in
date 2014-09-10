@@ -1038,7 +1038,7 @@ $(DEVELTOOLS): %: %.o
 ifdef BUILD_JNI
 $(OFS_JNI_JAR): $(JNIPOSIXJAVA) $(JNISTDIOJAVA) $(JNISTREAMSCHANNELSJAVA)
 	$(Q) "  MVN		$@"
-	$(E)JAVA_HOME="$(JAVA_HOME)" $(MVN) -DskipTests -Dmaven.test.skip=true -f $(JNI_DIR)/pom.xml clean package
+	$(E)JAVA_HOME="$(JAVA_HOME)" $(MVN) -DskipTests -Dmaven.test.skip=true -f $(JNI_DIR)/pom.xml clean install
 
 # Force the JNI posix .class files to be a dependency of the header file. 
 $(JNIPOSIXHEADER): $(JNI_DIR)/libPVFS2POSIXJNI.c $(OFS_JNI_JAR)
