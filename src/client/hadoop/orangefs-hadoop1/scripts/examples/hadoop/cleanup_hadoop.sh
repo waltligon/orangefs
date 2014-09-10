@@ -3,9 +3,9 @@ set -x
 cd $(dirname $0)
 
 # This script requires two variables to be defined in ./setenv
-# - HADOOP_PREFIX
-# - HADOOP_CONF_DIR
+# - HADOOP_LOG_DIR
+# - HADOOP_LOCAL_DIR
 . setenv
 
-${HADOOP_PREFIX}/bin/hadoop \
-    --config ${HADOOP_CONF_DIR} $@
+# CLEANUP
+rm -rf /tmp/hadoop-$USER

@@ -9,5 +9,5 @@ cd $(dirname $0)
 
 ${HADOOP_PREFIX}/bin/hadoop \
     --config ${HADOOP_CONF_DIR} \
-    jar ${HADOOP_PREFIX}/share/hadoop/mapreduce/hadoop-mapreduce-examples-?.?.?.jar \
-    wordcount $@
+    jar ${HADOOP_PREFIX}/hadoop-examples-1.?.?.jar \
+    teragen 5242880  teragen_data # 500 MB = (5242880 * 100 Bytes)

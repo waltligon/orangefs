@@ -7,9 +7,5 @@ cd $(dirname $0)
 # - HADOOP_CONF_DIR
 . setenv
 
-# -fileSize represents file size in MB
-${HADOOP_PREFIX}/bin/hadoop \
-    --config ${HADOOP_CONF_DIR} \
-    org.apache.hadoop.fs.TestDFSIO \
-        -clean
-
+# STOP
+$HADOOP_PREFIX/bin/stop-mapred.sh

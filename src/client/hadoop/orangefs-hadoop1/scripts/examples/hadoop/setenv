@@ -5,5 +5,5 @@
 # Common Variables sourced by other scripts in this directory
 #HADOOP_PREFIX=
 #HADOOP_CONF_DIR=
-HADOOP_LOG_DIR="/tmp/hadoop-$USER/hadoop2logs"
-HADOOP_LOCAL_DIR="/tmp/hadoop-$USER/hadoop2local"
+HADOOP_LOG_DIR="/tmp/hadoop-$USER/hadoop1logs"
+HADOOP_LOCAL_DIR="/tmp/hadoop-$USER/hadoop1local"
