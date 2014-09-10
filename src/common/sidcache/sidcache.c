@@ -7,15 +7,16 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <ctype.h>
 
 #include "pvfs2-internal.h"
 #include "gossip.h"
 #include "pvfs2-debug.h"
 #include "pvfs3-handle.h"
 #include "sidcache.h"
-#if 0
+#include "pvfs2-server.h"
+#include "server-config.h"
 #include "server-config-mgr.h"
-#endif
 
 /* Length of string representation of PVFS_SID */
 /* #define SID_STR_LEN (37) in sidcache.h */
@@ -31,14 +32,25 @@ static int sids_in_cache = 0;
 
 
 /* Global database variables */
-DB *SID_db;                         /* Primary database (sid cache) */
-DB_ENV *SID_envp;                   /* Env for sid cache and secondary dbs */
+DB *SID_db = NULL;                  /* Primary database (sid cache) */
+DB_ENV *SID_envp = NULL;            /* Env for sid cache and secondary dbs */
 DB *SID_attr_index[SID_NUM_ATTR];   /* Array of secondary databases */
 DBC *SID_attr_cursor[SID_NUM_ATTR]; /* Array of secondary database cursors */
-DB_TXN *SID_txn;                    /* Main transaction variable */
+DB_TXN *SID_txn = NULL;             /* Main transaction variable */
                                     /* (transactions are currently not used */
-                                    /*  with the sid cache) */
+                                    /*     with the sid cache) */
+DB  *SID_type_db = NULL;            /* secondary db for server type */
+DBC *SID_type_cursor = NULL;        /* cursor for server type db */
+DB  *SID_type_index = NULL;         /* index on sid for server type db */
+DBC *SID_index_cursor = NULL;       /* cursor for server type sid index */
 
+/* NOTE: SID_type_db and SID_type_index are plain DB's they are not
+ * secondary indexes at all.  Originally they were going to be but
+ * various restrictions in DB made that not work out.  They can be used
+ * as secondary indices, but it must be done manually, in particular,
+ * records inserted/removed in one should also be inserved/removed in
+ * the other.
+ */
 
 /* <========================= STATIC FUNCTIONS ============================> */
 static int SID_initialize_secondary_dbs(DB *secondary_dbs[]);
@@ -47,6 +59,14 @@ static int SID_cache_parse_header(FILE *inpfile,
                                   int *records_in_file,
                                   int *attrs_in_file,
                                   int **attr_positions);
+static int SID_create_type_table(void);
+static char *SID_type_to_string(const uint32_t typeval);
+static int SID_type_store(PVFS_SID *sid, FILE *outpfile);
+static int SID_cache_update_type(const PVFS_SID *sid_server,
+                                 uint32_t new_type_val);
+static int SID_cache_update_attrs(DB *dbp,
+                                  const PVFS_SID *sid_server,
+                                  int new_attr[]);
 
 /* <====================== INITIALIZATION FUNCTIONS =======================> */
 
@@ -112,6 +132,161 @@ static int SID_initialize_database_cursors(DBC *db_cursors[])
 
     return(ret);
 }
+/* <=========================== HELPER FUNCTIONS =========================> */
+
+/* These are defined in sidcacheval.h */
+
+struct type_conv
+{
+    uint32_t typeval;
+    char *typestring;
+} type_conv_table[] =
+{
+    {SID_SERVER_ROOT        , "ROOT"} ,
+    {SID_SERVER_PRIME       , "PRIME"} ,
+    {SID_SERVER_CONFIG      , "CONFIG"} ,
+    {SID_SERVER_LOCAL       , "LOCAL"} ,
+    {SID_SERVER_META        , "META"} ,
+    {SID_SERVER_DATA        , "DATA"} ,
+    {SID_SERVER_DIRDATA     , "DIRDATA"} ,
+    {SID_SERVER_SECURITY    , "SECURITY"} ,
+    /* these should always be last */
+    {SID_SERVER_ME          , "ME"} ,
+    {SID_SERVER_VALID_TYPES , "ALL"} ,
+    {SID_SERVER_NULL        , "INVALID"}
+};
+/* This must be defined as the size of the longest typestring */
+#define MAX_TYPE_STR 8
+    
+static char *SID_type_to_string(const uint32_t typeval)
+{
+    int i;
+    for (i = 0;
+         type_conv_table[i].typeval != typeval &&
+         type_conv_table[i].typeval != SID_SERVER_NULL;
+         i++);
+    return type_conv_table[i].typestring;
+}
+ 
+/* This function is exported for parsing the config file */
+uint32_t SID_string_to_type(const char *typestring)
+{
+    int i;
+    char *mytype;
+    int len;
+
+    if(!typestring)
+    {
+        return SID_SERVER_NULL;
+    }
+
+    len = strnlen(typestring, MAX_TYPE_STR) + 1;
+
+    if (len > MAX_TYPE_STR + 1)
+    {
+        return SID_SERVER_NULL;
+    }
+
+    mytype = (char *)malloc(len);
+
+    for (i = 0; i < len; i++)
+    {
+        mytype[i] = toupper(typestring[i]);
+    }
+    mytype[len] = 0;
+
+    for (i = 0;
+         strcmp(type_conv_table[i].typestring, mytype) &&
+         type_conv_table[i].typeval != SID_SERVER_NULL;
+         i++);
+
+    free(mytype);
+
+    return type_conv_table[i].typeval;
+}
+
+/* We are expecting a string of the form "someattr=val" where val is an
+ * integer.  If attributes is not careted yet, we create it.  If
+ * something goes wrong we pretty much just return -1 without trying to
+ * diagnose it sinice this is a very limited parse
+ */
+int SID_set_attr(const char *attr_str, int **attributes)
+{
+    int i = 0;;
+    int len = 0;;
+    int eqflag = 0;
+    int atflag = 0;
+    char *myattr = NULL;
+    char *myval = NULL;
+
+    if (!attributes || !attr_str)
+    {
+        return -1;
+    }
+
+    len = strnlen(attr_str, MAX_ATTR_STR);
+
+    if (len > MAX_ATTR_STR)
+    {
+        return -1;
+    }
+
+    myattr = (char *)malloc(len + 1);
+    for (i = 0; i < len; i++)
+    {
+        if (attr_str[i] == '=')
+        {
+            myattr[i] = 0;
+            if (i == len - 1)
+            {
+                /* badly formed string */
+                free(myattr);
+                return -1;
+            }
+            myval = &myattr[i + 1];
+            eqflag = 1;
+        }
+        else
+        {
+            myattr[i] = tolower(attr_str[i]);
+        }
+    }
+    myattr[len] = 0;
+    if (!eqflag)
+    {
+        /* badly formed string */
+        free(myattr);
+        return -1;
+    }
+
+    if (!*attributes)
+    {
+        *attributes = (int *)malloc(SID_NUM_ATTR * sizeof(int));
+        memset(*attributes, -1, SID_NUM_ATTR * sizeof(int));
+        atflag = 1;
+    }
+
+    for (i = 0; i < SID_NUM_ATTR; i++)
+    {
+        if(!strcmp(myattr, SID_attr_map[i]))
+        {
+            /* found the one we want */
+            *attributes[i] = atoi(myval);
+            free(myattr);
+            return 0;
+        }
+    }
+    /* didn't find it, just return */
+
+    if (atflag)
+    {
+        /* we created this but didn't add any data so get rid of it */
+        free(*attributes);
+        *attributes = NULL;
+    }
+    free(myattr);
+    return -1;
+}
 
 /* <====================== SID_cacheval_t FUNCTIONS =======================> */
 
@@ -130,16 +305,18 @@ void SID_cacheval_init(SID_cacheval_t **cacheval)
  * This function marshalls the data for the SID_cacheval_t to store in the 
  * sidcache
 */
-void SID_cacheval_pack(const SID_cacheval_t *cacheval, DBT *data)
+void SID_cacheval_pack(const SID_cacheval_t *cacheval, DBT *val)
 {
-    data->data = (SID_cacheval_t *)cacheval;
-    data->size = (sizeof(int) * SID_NUM_ATTR) +
+    val->data = (SID_cacheval_t *)cacheval;
+    val->size = (sizeof(int) * SID_NUM_ATTR) +
                  sizeof(BMI_addr) +
                  strlen(cacheval->url) +
                  1;
+    val->ulen = val->size;
+    val->flags = DB_DBT_USERMEM;
 }
 
-/* HELPER - LOADS cacheval
+/** HELPER - LOADS cacheval
  *
  * This function creates a SID_cacheval_t struct with the
  * attributes that are passed to
@@ -315,20 +492,137 @@ static int SID_cache_parse_header(FILE *inpfile,
     return(0);
 }
 
+/** SID_type_load
+ * This function reads from a file and locates type identifiers
+ * Each one is added to the type_db
+ * Invalid items or EOL cause the scan to stop
+ */
+#define TYPELINELEN 1024
+static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
+{
+    int ret = 0;
+    DBT type_key;
+    DBT type_val;
+    DBT index_key;
+    DBT index_val;
+    char linebuff[TYPELINELEN];
+    char *lineptr = linebuff;
+    char *saveptr = NULL;
+    char *typeword;
+    PVFS_SID sid_buf;
+    uint32_t type_buf;
+
+    sid_buf = *sid;
+
+    SID_zero_dbt(&type_key, &type_val, NULL);
+    SID_zero_dbt(&index_key, &index_val, NULL);
+
+    type_key.data = &type_buf;
+    type_key.size = sizeof(type_buf);
+    type_key.ulen = sizeof(type_buf);
+    type_key.flags = DB_DBT_USERMEM;
+
+    type_val.data = &sid_buf;
+    type_val.size = sizeof(sid_buf);
+    type_val.ulen = sizeof(sid_buf);
+    type_val.flags = DB_DBT_USERMEM;
+
+    index_key.data = &sid_buf;
+    index_key.size = sizeof(sid_buf);
+    index_key.ulen = sizeof(sid_buf);
+    index_key.flags = DB_DBT_USERMEM;
+
+    index_val.data = &type_buf;
+    index_val.size = sizeof(type_buf);
+    index_val.ulen = sizeof(type_buf);
+    index_val.flags = DB_DBT_USERMEM;
+
+    /* read a line */
+    memset(linebuff, 0, TYPELINELEN);
+    fgets(linebuff, TYPELINELEN, inpfile);
+
+    while(1)
+    {
+        /* read next word */
+        memset(typeword, 0, 50);
+#if 1
+        /* strtok is not reentrant, strtok_r is not standard (gcc
+         * extension) need to add config support to select the right
+         * approach - V3
+         */
+# if 1
+        typeword = strtok_r(lineptr, " \t\n", &saveptr);
+# else
+        typeword = strtok(lineptr, " \t\n");
+# endif
+        if (!typeword)
+        {
+            return 0; /* no more type tokens */
+        }
+        lineptr = NULL; /* subsequent calls from saved string pointer */
+#else
+        /* This is incomplete code using sscanf - has problems that must
+         * be fixed to be usable, namely, the lineptr has to be moved by
+         * the number of chars consumed in the sscanf, which is not
+         * generally possible to determine without lots of effort
+         */
+        ret = sscanf(lineptr, " %49s", typeword);
+        if(ret <= 0)
+        {
+            break; /* scanf error or end of string tokens */
+        }
+        /* move lineptr */
+#endif
+
+        /* a zero return is an invalid typeval */
+        if ((type_buf = SID_string_to_type(typeword)))
+        {
+            /* insert into type database */
+            ret = SID_type_db->put(SID_type_db,
+                                   NULL,
+                                   &type_key,
+                                   &type_val,
+                                   0);
+            if (!ret)
+            {
+                break; /* DB error */
+            }
+            /* insert into type index database */
+            ret = SID_type_index->put(SID_type_index,
+                                      NULL,
+                                      &index_key,
+                                      &index_val,
+                                      0);
+            if (!ret)
+            {
+                break; /* DB error */
+            }
+        }
+        else
+        {
+            ret = -PVFS_EINVAL;
+            break; /* invalid type string */
+        }
+    }
+    return(ret);    
+}
+#undef TYPELINELEN
+
 /** SID_LOAD
  *
- * This function loads the contents an input file into the cache.
+ * This function loads the contents of an input file into the cache.
  * SID records in the file are added to the current contents of the
- * cache.  Duplicates are ...
+ * cache.  Duplicates are rejected with an error, only the first value
+ * is kept.
  *
  * Returns 0 on success, otherwise returns an error code
  * The number of sids in the file is returned through the
  * parameter db_records.
  */
-int SID_cache_load(DB **dbp, FILE *inpfile, int *num_db_records)
+int SID_cache_load(DB *dbp, FILE *inpfile, int *num_db_records)
 {
     int ret = 0;                      /* Function return value */
-    int i = 0, j = 0;                 /* Loop index variables */
+    int i = 0;                        /* Loop index variables */
     int *attr_positions = NULL;
     int attr_pos_index = 0;           /* Index of the attribute from the */
                                       /*   file in the SID_cacheval_t attrs */
@@ -362,42 +656,7 @@ int SID_cache_load(DB **dbp, FILE *inpfile, int *num_db_records)
 
     for(i = 0; i < records_in_file; i++)
     {
-        /* Initializing the temporary attribute array */
-        /* so all index's are currently -1 */
-        memset(sid_attributes, -1, (sizeof(int) * SID_NUM_ATTR));
-
-        /* Getting the attributes from the input file and placing them in the
-         * correct position in the attrs array in the SID_cacheval_t struct 
-         */
-        for(j = 0; j < attrs_in_file; j++)
-        {
-            if(attr_positions[attr_pos_index] != -1)
-            {
-                /*fscanf(inpfile, "%d",
-                         &(current_sid_cacheval.sid_attrs->attrs[
-                                         attr_positions[attr_pos_index]]));*/
-                fscanf(inpfile, "%d",
-                      &(sid_attributes[attr_positions[attr_pos_index]]));
-            }
-            else
-            {
-                fscanf(inpfile, "%d", &throw_away_attr);
-            }
-            attr_pos_index++;
-        }
-        /* Resetting the attribute position index to 0 so the
-         * next SID_cacheval_t will have its attributes in the
-         * correct positions in the attrs array 
-         */
-        attr_pos_index = 0;
-
-        /* Getting the bmi address */
-        fscanf(inpfile, SCANF_lld, &tmp_bmi);
-
-        /* Getting the url */
-        fscanf(inpfile, "%s", tmp_url);
-
-        /* Getting the sid's string representation from the input file */
+        /* Read the sid's string representation from the input file */
         fscanf(inpfile, "%s", tmp_sid_str);
 
         /* convert to binary */
@@ -411,10 +670,43 @@ int SID_cache_load(DB **dbp, FILE *inpfile, int *num_db_records)
             continue;
         }
 
+        /* Read the bmi address */
+        fscanf(inpfile, SCANF_lld, &tmp_bmi);
+
+        /* Read the url */
+        fscanf(inpfile, "%s", tmp_url);
+
+        /* Initializing the temporary attribute array */
+        /* so all index's are currently -1 */
+        memset(sid_attributes, -1, (sizeof(int) * SID_NUM_ATTR));
+
+        /* Read the attributes from the input file and place them in the
+         * correct position in the attrs array in the SID_cacheval_t struct 
+         */
+        for(attr_pos_index = 0;
+            attr_pos_index < attrs_in_file;
+            attr_pos_index++)
+        {
+            if(attr_positions[attr_pos_index] != -1)
+            {
+                fscanf(inpfile,
+                       "%d",
+                       &(sid_attributes[attr_positions[attr_pos_index]]));
+            }
+            else
+            {
+                fscanf(inpfile, "%d", &throw_away_attr);
+            }
+        }
+
+        /* Read the type indicators from the file */
+        SID_type_load(inpfile, &current_sid);
+
         /* This allocates and fills in the cacheval */
         ret = SID_cacheval_alloc(&current_sid_cacheval,
                                  sid_attributes,
-                                 tmp_bmi, tmp_url);
+                                 tmp_bmi,
+                                 tmp_url);
         if(ret)
         {
             /* Presumably out of memory */
@@ -422,10 +714,10 @@ int SID_cache_load(DB **dbp, FILE *inpfile, int *num_db_records)
         }
     
         /* Storing the current sid from the input file into the sid cache */
-        ret = SID_cache_add_server(dbp,
-                                   &current_sid,
-                                   current_sid_cacheval,
-                                   num_db_records);
+        ret = SID_cache_put(dbp,
+                            &current_sid,
+                            current_sid_cacheval,
+                            num_db_records);
         if(ret)
         {
             /* Need to examine error and decide if we should continue or
@@ -446,17 +738,22 @@ int SID_cache_load(DB **dbp, FILE *inpfile, int *num_db_records)
 
 /** SID_ADD
  * 
- * This function stores a sid into the sid_cache
+ * This function stores a sid into the sid_cache.
+ * Pass a pointer to a record counter if we are adding a new record
+ * and we will get an error if there is already a record with the same key.
+ * Otherwise we assume that we are updating a record, though it will
+ * insert silently if the record does not exist.
  *
  * Returns 0 on success, otherwise returns error code
 */
-int SID_cache_add_server(DB **dbp,
-                         const PVFS_SID *sid_server,
-                         const SID_cacheval_t *cacheval,
-                         int *num_db_records)
+int SID_cache_put(DB *dbp,
+                  const PVFS_SID *sid_server,
+                  const SID_cacheval_t *cacheval,
+                  int *num_db_records)
 {
-    int ret = 0;          /* Function return value */
-    DBT key, value;        /* BerekeleyDB k/v pair sid value(SID_cacheval_t) */
+    int ret = 0;        /* Function return value */
+    DBT key, val;       /* BerekeleyDB k/v pair sid value(SID_cacheval_t) */
+    int putflags = 0;
 
     if(PVFS_SID_is_null(sid_server))
     {
@@ -466,23 +763,32 @@ int SID_cache_add_server(DB **dbp,
         return(-1);
     }
 
-    SID_zero_dbt(&key, &value, NULL);
+    SID_zero_dbt(&key, &val, NULL);
 
     key.data = (PVFS_SID *)sid_server;
     key.size = sizeof(PVFS_SID);
+    key.ulen = sizeof(PVFS_SID);
+    key.flags = DB_DBT_USERMEM;
 
     /* Marshalling the data of the SID_cacheval_t struct */
     /* to store it in the primary db */
-    SID_cacheval_pack(cacheval, &value);
+    SID_cacheval_pack(cacheval, &val);
+
+    if (num_db_records != NULL)
+    {
+        /* we are adding a new record 
+         * we should not overwrite an old one
+         */
+        putflags |= DB_NOOVERWRITE;
+    }
 
     /* Placing the data into the database */
-    ret = (*dbp)->put(*dbp,            /* Primary database pointer */
-                      NULL,            /* Transaction pointer */
-                      &key,            /* PVFS_SID */
-                      &value,          /* Data is marshalled SID_cacheval_t */
-                      DB_NOOVERWRITE); /* Do not allow for overwrites because */
-                                       /* this is the primary database */
-    /* with DB_NOOVERWRITE does this return an error on a dup? */
+    ret = (dbp)->put(dbp,           /* Primary database pointer */
+                     NULL,          /* Transaction pointer */
+                     &key,          /* PVFS_SID */
+                     &val,          /* Data is marshalled SID_cacheval_t */
+                     putflags);
+    /* with DB_NOOVERWRITE this returns an error on a dup */
     if(ret)
     {
         gossip_debug(GOSSIP_SIDCACHE_DEBUG,
@@ -512,23 +818,30 @@ int SID_cache_add_server(DB **dbp,
  * Returns 0 on success, otherwise returns an error code
  * Caller is expected to free the cacheval via SID_cacheval_free
  */
-int SID_cache_lookup_server(DB **dbp,
-                            const PVFS_SID *sid_server,
-                            SID_cacheval_t **cacheval)
+int SID_cache_get(DB *dbp,
+                  const PVFS_SID *sid_server,
+                  SID_cacheval_t **cacheval)
 {
     int ret = 0;
-    DBT key, data;
+    DBT key, val;
 
-    SID_zero_dbt(&key, &data, NULL);
+    SID_zero_dbt(&key, &val, NULL);
 
     key.data = (PVFS_SID *)sid_server;
     key.size = sizeof(PVFS_SID);
+    key.ulen = sizeof(PVFS_SID);
+    key.flags = DB_DBT_USERMEM;
+
+    val.flags = DB_DBT_MALLOC;
+
+    /* val is memory managed by db */
+    /* size of val is hard to predict so we let DB malloc it */
    
-    ret = (*dbp)->get(*dbp,  /* Primary database pointer */
-                      NULL,  /* Transaction Handle */
-                      &key,  /* Sid_sid_t sid */
-                      &data, /* Data is marshalled SID_cacheval_t struct */
-                      0);    /* get flags */
+    ret = (dbp)->get(dbp,   /* Primary database pointer */
+                     NULL,  /* Transaction Handle */
+                     &key,  /* Sid_sid_t sid */
+                     &val,  /* Data is marshalled SID_cacheval_t struct */
+                     0);    /* get flags */
     if(ret)
     {
         gossip_debug(GOSSIP_SIDCACHE_DEBUG,
@@ -538,7 +851,15 @@ int SID_cache_lookup_server(DB **dbp,
     }
 
     /* Unmarshalling the data from the database for the SID_cacheval_t struct */
-    SID_cacheval_unpack(cacheval, &data);
+    if (val.data)
+    {
+        SID_cacheval_unpack(cacheval, &val);
+        clean_free(val.data);
+    }
+    else
+    {
+        /* report an error */
+    }
     
     return(ret);
 }
@@ -546,18 +867,18 @@ int SID_cache_lookup_server(DB **dbp,
 /** HELPER - SID_LOOKUP and assign bmi_addr
  *
  * This function searches for a sid in the sid cache, retrieves the struct,
- * malloc's the char * passed in, and copies the bmi URI address of the retrieved
- * struct into that char *.
+ * malloc's the char * passed in, and copies the bmi URI address of the
+ * retrieved struct into that char *.
  *
  * Caller is expected to free the bmi_addr memory
  */
-int SID_cache_lookup_bmi(DB **dbp, const PVFS_SID *search_sid, char **bmi_url)
+int SID_cache_lookup_bmi(DB *dbp, const PVFS_SID *search_sid, char **bmi_url)
 {
     SID_cacheval_t *temp;
     int ret;
 
     /* Retrieve the corresponding value */
-    ret = SID_cache_lookup_server(dbp, search_sid, &temp);
+    ret = SID_cache_get(dbp, search_sid, &temp);
 
     if (ret)
     {
@@ -587,9 +908,10 @@ int SID_cache_lookup_bmi(DB **dbp, const PVFS_SID *search_sid, char **bmi_url)
  *
  * Returns 0 on success, otherwise returns error code
  */
-int SID_cache_update_server(DB **dbp,
+int SID_cache_update_server(DB *dbp,
                             const PVFS_SID *sid_server,
-                            SID_cacheval_t *new_attrs)
+                            SID_cacheval_t *new_attrs,
+                            uint32_t sid_types)
 {
     int ret = 0;                   /* Function return value */
     SID_cacheval_t *current_attrs; /* Temp SID_cacheval_t used to get current 
@@ -604,7 +926,7 @@ int SID_cache_update_server(DB **dbp,
     }
  
     /* Getting the sid from the sid cache */
-    ret = SID_cache_lookup_server(dbp, sid_server, &current_attrs);
+    ret = SID_cache_get(dbp, sid_server, &current_attrs);
     if(ret)
     {
         return(ret);
@@ -612,27 +934,37 @@ int SID_cache_update_server(DB **dbp,
 
     /* Updating the old attributes to the new values */
     SID_cache_copy_attrs(current_attrs, new_attrs->attr);
-        
+
     /* Updating the old bmi address to the new bmi_address */
     SID_cache_copy_bmi(current_attrs, new_attrs->bmi_addr);
    
     /* Updating the old url to the new url */
     SID_cache_copy_url(&current_attrs, new_attrs->url);
 
+/* SHOULD NOT NEED THIS */
+#if 0
     /* Deleting the old record from the sid cache */
     ret = SID_cache_delete_server(dbp, sid_server, NULL);
     if(ret)
     {
         return(ret);
     }
+#endif
     
-    /* Adding the updated SID_cacheval_t struct back to the sid cache */
-    ret = SID_cache_add_server(dbp, sid_server, current_attrs, NULL);
+    /* writing the updated SID_cacheval_t struct back to the sid cache */
+    ret = SID_cache_put(dbp, sid_server, current_attrs, NULL);
     if(ret)
     {
         return(ret);
     }
 
+    /* Update the type db with the type bitfield provided */
+    ret = SID_cache_update_type(sid_server, sid_types);
+    if(ret)
+    {
+        return(ret);
+    }
+        
     /* Freeing the dynamically created bmi address in the SID_cacheval_t
      * struct 
      */
@@ -652,23 +984,23 @@ int SID_cache_update_server(DB **dbp,
  *
  * Returns 0 on success, otherwise returns an error code
  */
-int SID_cache_update_attrs(DB **dbp,
-                           const PVFS_SID *sid_server,
+int SID_cache_update_attrs(DB *dbp,
+                           const PVFS_SID *sid,
                            int new_attr[])
 {
     int ret = 0;
     int i = 0;   /* Loop index variable */
-    SID_cacheval_t *sid_attrs;
+    SID_cacheval_t *sid_data;
 
     /* If sid_server is not passed in as NULL then only the attr's 
      * will be changed for the sid 
      */
-    if(!dbp || !sid_server)
+    if(!dbp || !sid)
     {
         return(-EINVAL);
     }
-    /* Getting the sid from the cache */
-    ret = SID_cache_lookup_server(dbp, sid_server, &sid_attrs);
+    /* Get the sid from the cache */
+    ret = SID_cache_get(dbp, sid, &sid_data);
     if(ret)
     {
         return(ret);
@@ -676,30 +1008,31 @@ int SID_cache_update_attrs(DB **dbp,
         
     for(i = 0; i < SID_NUM_ATTR; i++)
     {
-        /* If the new value is different the original value, then the 
-         * original value is updated to the new attribute value 
-         */
-        if(sid_attrs->attr[i] != new_attr[i])
+        /* a -1 indicates the new_attr does not need an update */
+        if(new_attr[i] != -1)
         {
-            sid_attrs->attr[i] = new_attr[i];
+            sid_data->attr[i] = new_attr[i];
         }
     }
 
+/* SHOULD NOT NEED THIS */
+#if 0
     /* Deleting the old record from the cache */
     ret = SID_cache_delete_server(dbp, sid_server, NULL);
     if(ret)
     {
         return(ret);
     }
+#endif
 
-    ret = SID_cache_add_server(dbp, sid_server, sid_attrs, NULL);
+    ret = SID_cache_put(dbp, sid, sid_data, NULL);
     if(ret)
     {
-        SID_cacheval_free(&sid_attrs);
+        SID_cacheval_free(&sid_data);
         return(ret);
     }
 
-    SID_cacheval_free(&sid_attrs);
+    SID_cacheval_free(&sid_data);
     return(ret);    
 }
 
@@ -720,13 +1053,101 @@ int SID_cache_copy_attrs(SID_cacheval_t *current_attrs,
     return(ret);
 }
 
+/* Add a type to an existing server in the SIDcache
+ * The DB_NODUPDATA flag suppresses an extra error message that would
+ * occur if attempt to put a dup key/val pair (IOW the exact same
+ * record, not just the same key) which could happen here.  We still get
+ * an error code but we can test for that.
+ */
+int SID_cache_update_type(const PVFS_SID *sid_server, uint32_t new_type_val)
+{
+    int ret = 0;
+    DBT type_key;
+    DBT type_val;
+    DBT index_key;
+    DBT index_val;
+    uint32_t mask = 0;
+    PVFS_SID sid_buf;
+    uint32_t type_buf;
+
+    sid_buf = *sid_server;
+
+    SID_zero_dbt(&type_key, &type_val, NULL);
+    SID_zero_dbt(&index_key, &index_val, NULL);
+
+    type_key.data = &type_buf;
+    type_key.size = sizeof(type_buf);
+    type_key.ulen = sizeof(type_buf);
+    type_key.flags = DB_DBT_USERMEM;
+
+    type_val.data = &sid_buf;
+    type_val.size = sizeof(sid_buf);
+    type_val.ulen = sizeof(sid_buf);
+    type_val.flags = DB_DBT_USERMEM;
+
+    index_key.data = &sid_buf;
+    index_key.size = sizeof(sid_buf);
+    index_key.ulen = sizeof(sid_buf);
+    index_key.flags = DB_DBT_USERMEM;
+
+    index_val.data = &type_buf;
+    index_val.size = sizeof(type_buf);
+    index_val.ulen = sizeof(type_buf);
+    index_val.flags = DB_DBT_USERMEM;
+
+    for(mask = 1; mask != 0 && new_type_val != 0; mask <<= 1)
+    {
+        if (new_type_val & mask)
+        {
+            if ((mask & SID_SERVER_VALID_TYPES))
+            {
+                type_buf = mask;
+
+                gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                             "Adding a type record SID %s Type %o\n",
+                             PVFS_SID_str(sid_server), type_buf);
+
+                ret = SID_type_db->put(SID_type_db,
+                                       NULL,
+                                       &type_key,
+                                       &type_val,
+                                       0);
+                /* if KEYEXIST it was just a duplicate - keep going */
+                if (ret && ret != DB_KEYEXIST)
+                {
+                    gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                                 "Error inserting a SID type record:%s\n",
+                                 db_strerror(ret));
+                    break;
+                }
+                ret = SID_type_index->put(SID_type_index,
+                                          NULL,
+                                          &index_key,
+                                          &index_val,
+                                          0);
+                /* if KEYEXIST it was just a duplicate - keep going */
+                if (ret && ret != DB_KEYEXIST)
+                {
+                    gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                                 "Error inserting a SID index record:%s\n",
+                                 db_strerror(ret));
+                    break;
+                }
+            }
+            new_type_val &= ~mask;
+        }
+    }
+ 
+    return(ret);    
+}
+
 /*
  * This function updates the bmi address for a sid in the database if a sid
  * with a matching sid_server parameter is found in the database
  *
  * Returns 0 on success, otherwise returns an error code
  */
-int SID_cache_update_bmi(DB **dbp,
+int SID_cache_update_bmi(DB *dbp,
                          const PVFS_SID *sid_server,
                          BMI_addr new_bmi_addr)
 {
@@ -741,7 +1162,7 @@ int SID_cache_update_bmi(DB **dbp,
         return(-EINVAL);
     }
     /* Getting the sid from the sid cache */
-    ret = SID_cache_lookup_server(dbp, sid_server, &sid_attrs);
+    ret = SID_cache_get(dbp, sid_server, &sid_attrs);
     if(ret)
     {
         return(ret);
@@ -751,14 +1172,17 @@ int SID_cache_update_bmi(DB **dbp,
     {
         sid_attrs->bmi_addr = new_bmi_addr;
 
+/* SHOULD NOT NEED THIS */
+#if 0
         /* Deleting the old record from the sid cache */
         ret = SID_cache_delete_server(dbp, sid_server, NULL);
         if(ret)
         {
             return(ret);
         }
+#endif
 
-        ret = SID_cache_add_server(dbp, sid_server, sid_attrs, NULL);
+        ret = SID_cache_put(dbp, sid_server, sid_attrs, NULL);
         if(ret)
         {
             SID_cacheval_free(&sid_attrs);
@@ -788,7 +1212,7 @@ int SID_cache_copy_bmi(SID_cacheval_t *current_attrs, BMI_addr new_bmi_addr)
  *
  * Returns 0 on success, otherwise returns an error code
  */
-int SID_cache_update_url(DB **dbp, const PVFS_SID *sid_server, char *new_url)
+int SID_cache_update_url(DB *dbp, const PVFS_SID *sid_server, char *new_url)
 {
     int ret = 0;
     int tmp_attrs[SID_NUM_ATTR];
@@ -804,7 +1228,7 @@ int SID_cache_update_url(DB **dbp, const PVFS_SID *sid_server, char *new_url)
     }
 
     /* Getting the sid from the sid cache */
-    ret = SID_cache_lookup_server(dbp, sid_server, &sid_attrs);
+    ret = SID_cache_get(dbp, sid_server, &sid_attrs);
     if(ret)
     {
         return(ret);
@@ -829,15 +1253,18 @@ int SID_cache_update_url(DB **dbp, const PVFS_SID *sid_server, char *new_url)
             return(ret);
         }        
 
+/* SHOULD NOT NEED THIS */
+#if 0
         /* Deleting the old record from the sid cache */
         ret = SID_cache_delete_server(dbp, sid_server, NULL);
         if(ret)
         {
             return(ret);
         }
+#endif
 
-        /* Adding the updated SID_cacheval_t struct back to the sid cache */
-        ret = SID_cache_add_server(dbp, sid_server, sid_attrs, NULL);
+        /* Writing the updated SID_cacheval_t struct back to the sid cache */
+        ret = SID_cache_put(dbp, sid_server, sid_attrs, NULL);
         if(ret)
         {
             SID_cacheval_free(&sid_attrs);
@@ -899,7 +1326,7 @@ int SID_cache_copy_url(SID_cacheval_t **current_attrs, char *new_url)
   *
   * Returns 0 on success, otherwise returns an error code 
   */
-int SID_cache_delete_server(DB **dbp,
+int SID_cache_delete_server(DB *dbp,
                             const PVFS_SID *sid_server,
                             int *db_records)
 {
@@ -914,11 +1341,13 @@ int SID_cache_delete_server(DB **dbp,
      */
     key.data = (PVFS_SID *)sid_server;
     key.size = sizeof(PVFS_SID);
+    key.ulen = sizeof(PVFS_SID);
+    key.flags = DB_DBT_USERMEM;
 
-    ret = (*dbp)->del(*dbp, /* Primary database (sid cache) pointer */
-                      NULL, /* Transaction Handle */
-                      &key, /* SID_cacheval_t key */
-                      0);   /* Delete flag */
+    ret = (dbp)->del(dbp,  /* Primary database (sid cache) pointer */
+                     NULL, /* Transaction Handle */
+                     &key, /* SID_cacheval_t key */
+                     0);   /* Delete flag */
     if(ret)
     {
         gossip_debug(GOSSIP_SIDCACHE_DEBUG,
@@ -933,6 +1362,61 @@ int SID_cache_delete_server(DB **dbp,
     }
 
     return(ret);
+}
+
+/* loop over records matching sid and write type data */
+int SID_type_store(PVFS_SID *sid, FILE *outpfile)
+{
+    int ret = 0;
+    DBT type_sid_key;
+    DBT type_sid_val;
+    char *buff;
+    PVFS_SID kbuf;
+    uint32_t tbuf;
+
+    kbuf = *sid;
+
+    SID_zero_dbt(&type_sid_key, &type_sid_val, NULL);
+
+    type_sid_key.data = &kbuf;
+    type_sid_key.size = sizeof(PVFS_SID);
+    type_sid_key.ulen = sizeof(PVFS_SID);
+    type_sid_key.flags = DB_DBT_USERMEM;
+
+    type_sid_val.data = &tbuf;
+    type_sid_val.size = sizeof(uint32_t);
+    type_sid_val.ulen = sizeof(uint32_t);
+    type_sid_val.flags = DB_DBT_USERMEM;
+
+    ret = SID_index_cursor->get(SID_index_cursor,
+                                &type_sid_key,
+                                &type_sid_val,
+                                DB_SET);
+
+    /* halt on error or DB_NOTFOUND */
+    if (ret == 0)
+    {
+        fprintf(outpfile, "\t\tType ");
+    }
+    while(ret == 0)
+    {
+        /* write type to file */
+        buff = SID_type_to_string(tbuf);
+        fprintf(outpfile, "%s ", buff);
+        /* should have been reset by get */
+        ret = SID_index_cursor->get(SID_index_cursor,
+                                    &type_sid_key,
+                                    &type_sid_val,
+                                    DB_NEXT);
+    }
+
+    fprintf(outpfile, "\n");
+    /* Normal return should be DB_NOTFOUND, 0 is no error */
+    if (ret != 0 && ret != DB_NOTFOUND)
+    {
+        return ret;
+    }
+    return 0;
 }
 
 /** SID_STORE
@@ -951,11 +1435,14 @@ int SID_cache_store(DBC *cursorp,
 {
     int ret = 0;                   /* Function return value */
     int i = 0;                     /* Loop index variable */
-    DBT key, data;          	   /* Database variables */
+    DBT key, val;          	   /* Database variables */
+/* V3 old version */
+#if 0
     char *ATTRS = "ATTRS: ";       /* Tag for the number of attributes on */
                                    /*     the first line of dump file */
     char *SIDS = "SIDS: ";         /* Tag for the number of sids on the */
                                    /*     first line of the dump file */
+#endif
     char tmp_sid_str[SID_STR_LEN]; /* Temporary string to hold the string */
                                    /*     representation of the sids */
     PVFS_SID tmp_sid;              /* Temporary SID to hold contents of */
@@ -964,20 +1451,26 @@ int SID_cache_store(DBC *cursorp,
                                    /*     hold contents of database */
     PVFS_SID sid_buffer;           /* Temporary SID */
     uint32_t db_flags;
+    struct server_configuration_s *config_s = NULL;
 
-    /* Writing the number of attributes in
+    /* First Write SID File Header */
+    fprintf(outpfile, "<ServerDefines>\n");
+
+/* V3 old version */
+#if 0
+    /* Write the number of attributes in
      * the cache to the dump file's first line 
      */
     fprintf(outpfile, "%s", ATTRS);
     fprintf(outpfile, "%d\t", SID_NUM_ATTR);
 
-    /* Writing the number of sids in the cache
+    /* Write the number of sids in the cache
      * to the dump file's first line 
      */
     fprintf(outpfile, "%s", SIDS);
     fprintf(outpfile, "%d\n", db_records);
     
-    /* Writing the string representation of
+    /* Write the string representation of
      * the attributes in the sid cache to
      * the dump file's second line 
      */
@@ -986,42 +1479,93 @@ int SID_cache_store(DBC *cursorp,
        fprintf(outpfile, "%s ", SID_attr_map[i]);
     }
     fprintf(outpfile, "%c", '\n');
+#endif
 
-    /* Initializing the database variables */
-    SID_zero_dbt(&key, &data, NULL);
+    config_s = PINT_server_config_mgr_get_config(PVFS_FS_ID_NULL);
+
+    /* Now Write SID Records */
+
+    /* Initialize the database variables */
+    SID_zero_dbt(&key, &val, NULL);
+
+    /* key will be in a fixed buffer */
+    key.data = &sid_buffer;
+    key.size = sizeof(PVFS_SID);
+    key.ulen = sizeof(PVFS_SID);
+    key.flags = DB_DBT_USERMEM;
+    /* val will be malloc'd and freed */
+    val.flags = DB_DBT_MALLOC;
 
     /* this routine can either output a whole db or a list of SIDs
      */
     if (sid_list)
     {
         db_flags = DB_SET;
-        key.data = &sid_buffer;
-        key.size = sizeof(PVFS_SID);
         SID_pop_query_list(sid_list, &sid_buffer, NULL, NULL, 0);
     }
     else
     {
-        db_flags = DB_NEXT;
+        db_flags = DB_FIRST;
     }
 
-    /* Iterating over the database to get the sids */
-    while(cursorp->get(cursorp, &key, &data, db_flags) == 0)
+    /* Iterate over the database to get the sids */
+    while(cursorp->get(cursorp, &key, &val, db_flags) == 0)
     {
-        SID_cacheval_unpack(&tmp_sid_attrs, &data);
+        char *alias;
+        if (val.data)
+        {
+            SID_cacheval_unpack(&tmp_sid_attrs, &val);
+            clean_free(val.data);
+            val.data = NULL;
+        }
+        else
+        {
+            /* report an error */
+        }
     
         PVFS_SID_cpy(&tmp_sid, (PVFS_SID *)key.data);
         PVFS_SID_bin2str(&tmp_sid, tmp_sid_str);            
 
-        /* Writing the sids and their attributes to the dump file */
-        for(i = 0; i < SID_NUM_ATTR; i++)
-        {
-            fprintf(outpfile, "%d ", tmp_sid_attrs->attr[i]);      
-        }
+        /* this is a sequential search - probably should make hash tbl */
+        alias = PINT_config_get_host_alias_ptr(config_s, tmp_sid_attrs->url);
 
+        fprintf(outpfile,"\t<ServerDef>\n");
+        if (alias)
+        {
+            fprintf(outpfile,"\t\tAlias %s\n", alias);
+        }
+        fprintf(outpfile,"\t\tSID %s\n", tmp_sid_str);
+        fprintf(outpfile,"\t\tAddress %s\n", tmp_sid_attrs->url);
+
+/* V3 old version */
+#if 0
+        /* Write SID and address info */
+        fprintf(outpfile, "%s ", tmp_sid_str);
         fprintf(outpfile, "%lld ", lld(tmp_sid_attrs->bmi_addr));
         fprintf(outpfile, "%s ", tmp_sid_attrs->url);
-        fprintf(outpfile, "%s\n", tmp_sid_str);
- 
+#endif
+
+        /* Write the user attributes to the dump file */
+        fprintf(outpfile,"\t\tAttributes ");
+        for(i = 0; i < SID_NUM_ATTR; i++)
+        {
+            
+            fprintf(outpfile,
+                    "%s=%d ",
+                    SID_attr_map[i],
+                    tmp_sid_attrs->attr[i]);      
+/* V3 old version */
+#if 0
+            fprintf(outpfile, "%d ", tmp_sid_attrs->attr[i]);      
+#endif
+        }
+        fprintf(outpfile,"\n"); /* end of attributes */
+
+        /* Write system attributes for the server */
+        SID_type_store(&tmp_sid, outpfile);
+
+        fprintf(outpfile, "\t</ServerDef>\n");
+
         SID_cacheval_free(&tmp_sid_attrs);
 
         if (sid_list)
@@ -1032,8 +1576,14 @@ int SID_cache_store(DBC *cursorp,
             }
             SID_pop_query_list(sid_list, &sid_buffer, NULL, NULL, 0);
         }
+        else
+        {
+            db_flags = DB_NEXT;
+        }
     }
 
+    /* End of servers to write to file */
+    fprintf(outpfile, "</ServerDefines>\n");
     return(ret);
 }
 
@@ -1196,15 +1746,15 @@ int SID_bulk_insert_into_sid_cache(DB *dbp, DBT *input)
  * This function zeros out the DBT's and should be used before any
  * element is placed into the database
  */
-void SID_zero_dbt(DBT *key, DBT *data, DBT *pkey)
+void SID_zero_dbt(DBT *key, DBT *val, DBT *pkey)
 {
     if(key != NULL)
     {
         memset(key, 0, sizeof(DBT));
     }
-    if(data != NULL)
+    if(val != NULL)
     {
-        memset(data, 0, sizeof(DBT));
+        memset(val, 0, sizeof(DBT));
     }
     if(pkey != NULL)
     {
@@ -1217,7 +1767,7 @@ void SID_zero_dbt(DBT *key, DBT *data, DBT *pkey)
  *
  * Returns 0 on success, otherwise returns an error code.
  */
-int SID_create_open_environment(DB_ENV **envp)
+int SID_create_environment(DB_ENV **envp)
 {
     int ret = 0;
 
@@ -1279,7 +1829,7 @@ int SID_create_open_environment(DB_ENV **envp)
  *
  * Returns 0 on success. Otherwise returns error code.
  */
-int SID_create_open_sid_cache(DB_ENV *envp, DB **dbp)
+int SID_create_sid_cache(DB_ENV *envp, DB **dbp)
 {
     int ret = 0;
 
@@ -1325,7 +1875,7 @@ int SID_create_open_sid_cache(DB_ENV *envp, DB **dbp)
  *
  * Returns 0 on success, otherwise returns an error code
  */
-int SID_create_open_assoc_sec_dbs(
+int SID_create_secondary_dbs(
                         DB_ENV *envp,
                         DB *dbp,
                         DB *secondary_dbs[], 
@@ -1407,13 +1957,230 @@ int SID_create_open_assoc_sec_dbs(
    return(0);
 }
 
+/* get the aggregate SID type for a given SID */
+int SID_get_type(PVFS_SID *sid, uint32_t *typeval)
+{
+    int ret = 0;
+    DBT type_sid_key;
+    DBT type_sid_val;
+    PVFS_SID kbuf;
+    uint32_t vbuf;
+
+    SID_zero_dbt(&type_sid_key, &type_sid_val, NULL);
+
+    type_sid_key.data = &kbuf;
+    type_sid_key.size = sizeof(PVFS_SID);
+    type_sid_key.ulen = sizeof(PVFS_SID);
+    type_sid_key.flags = DB_DBT_USERMEM;
+
+    type_sid_val.data = &vbuf;
+    type_sid_val.size = sizeof(uint32_t);
+    type_sid_val.ulen = sizeof(uint32_t);
+    type_sid_val.flags = DB_DBT_USERMEM;
+
+    /* type_sid_val is filled in by DB */
+
+    ret = SID_index_cursor->get(SID_index_cursor,
+                                &type_sid_key,
+                                &type_sid_val,
+                                DB_SET);
+    /* don't modify typeval unless there is data present */
+    if (ret == 0)
+    {
+        *typeval = 0;
+    }
+    /* halt on error or DB_NOTFOUND */
+    while(ret == 0)
+    {
+        *typeval |= vbuf;
+        ret = SID_index_cursor->get(SID_index_cursor,
+                                       &type_sid_key,
+                                       &type_sid_val,
+                                       DB_NEXT);
+    }
+    if (ret != 0 && ret != DB_NOTFOUND)
+    {
+        return ret;
+    }
+    return 0;
+}
+
+/*-------------------------------------------------------------------
+ * The server type tables map SID to individual types (one bit set in a
+ * field).  There will often be multiple types for a given SID, and many
+ * SIDs with the same type.  We need to be able to look these up by SID,
+ * or by type so we have a main db (SID_type_db) and a secondary index
+ * (SID_type_index) which is associated with the main db.  The main
+ * db cannot be configured with dups, so we will make the key of
+ * these tables type concatenated with SID, which is unique, for the
+ * main db and SID concatenated with type, which is unique, for the
+ * secondary index.  Neither will have anything in the value field.
+ * Using this we can use a partial lookup to either find all types for a
+ * SID, or all SIDs for a type.
+ *
+ * DB won't let us have DUPSORT on a primary table, so we're just going
+ * ot using two plain tables with same data - which means we have to
+ * be caseful when updating.
+ * ------------------------------------------------------------------
+ */
+
+/* Don't need an extractor if we don't associate
+ */
+/* V3 remove this */
+#if 0
+/* Extractor for type database secondard index */
+static int SID_type_sid_extractor(DB *pri,
+                                  const DBT *pkey,
+                                  const DBT *pval,
+                                  DBT *skey)
+{
+    SID_type_index_key *sixbuf;
+    SID_type_db_key *dbbuf;
+
+    sixbuf = (SID_type_index_key *)malloc(sizeof(SID_type_index_key));
+    dbbuf = (SID_type_db_key *)pkey->data;
+
+    sixbuf->sid = dbbuf->sid;
+    sixbuf->typeval = dbbuf->typeval;
+
+    skey->data = sixbuf;
+    skey->size = sizeof(SID_type_index_key);
+    skey->flags = DB_DBT_APPMALLOC;
+    return 0;
+}
+#endif
+
+/* Creates table for storing server types.  There may be multiple types
+ * for each server, but most servers are not all types.  We need to be
+ * able to search for all servers of a given type.  We can't do this
+ * easily with a field in the main table or by using a secondary index
+ * so we record these attributes in this table.
+ */
+static int SID_create_type_table(void)
+{
+    int ret = 0;
+    u_int32_t flags = DB_CREATE;
+
+    /* Create type database */
+    ret = db_create(&SID_type_db, /* Database pointer */
+                    SID_envp,    /* Environment pointer */
+                    0);          /* Create flags (Must be 0 or DB_XA_CREATE) */
+    if(ret)
+    {
+        gossip_err("Error creating type database :  %s\n",
+                   db_strerror(ret));
+        return(ret);
+    }
+
+    /* Set open flags for type database to allow duplicates */
+    ret = SID_type_db->set_flags(SID_type_db, DB_DUPSORT);
+    if(ret)
+    {
+        gossip_err("Error setting duplicate flag for type database : %s\n",
+                   db_strerror(ret));
+        return(ret);
+    }
+
+    /* Open type database */
+    ret = SID_type_db->open(SID_type_db,   /* Database pointer */
+                            NULL,     /* Transaction pointer */
+                            NULL,     /* On disk file that holds database */
+                            NULL,     /* Optional logical database */
+                            DB_HASH,  /* Database access method */
+                            flags,    /* Open flags */
+                            0);       /* File mode. 0 is the default */
+
+    if(ret)
+    {
+        gossip_err("Error opening type database : %s\n",
+                   db_strerror(ret));
+        return(ret);
+    }
+
+    /* Create cursor for type db */
+    ret = SID_type_db->cursor(SID_type_db,      /* Type db pointer */
+                              NULL,             /* TXN id */
+                              &SID_type_cursor, /* Cursor pointer */
+                              0);               /* Cursor opening flags */
+    if(ret)
+    {
+        gossip_err("Error creating cursor :  %s\n", db_strerror(ret));
+        return(ret);
+    }
+
+    /* Now create a secondary index for looking up types by SID */
+    ret = db_create(&SID_type_index, /* SID index pointer */
+                    SID_envp,    /* Environment pointer */
+                    0);          /* Create flags (Must be 0 or DB_XA_CREATE) */
+    if(ret)
+    {
+        gossip_err("Error creating handle for database :  %s\n",
+                   db_strerror(ret));
+        return(ret);
+    }
+
+    /* Set open flags for type SID index to allow duplicates */
+    ret = SID_type_index->set_flags(SID_type_index, DB_DUPSORT);
+    if(ret)
+    {
+        gossip_err("Error setting duplicate flag for type SID index : %s\n",
+                   db_strerror(ret));
+        return(ret);
+    }
+
+    /* Open type SID index database */
+    ret = SID_type_index->open(SID_type_index,   /* Database pointer */
+                            NULL,     /* Transaction pointer */
+                            NULL,     /* On disk file that holds database */
+                            NULL,     /* Optional logical database */
+                            DB_HASH,  /* Database access method */
+                            flags,    /* Open flags */
+                            0);       /* File mode. 0 is the default */
+    if(ret)
+    {
+        gossip_err("Error opening type SID index : %s\n",
+                   db_strerror(ret));
+        return(ret);
+    }
+
+/* cannot use DUPSORT for a primary table, so we are getting away from
+ * an associated or secondary index table - just use a reagular table
+ */
+#if 0
+    /* Associate the type database to the type SID index */
+    ret = SID_type_index->associate(SID_type_db,   /* Type db ptr */
+                         NULL,                     /* TXN id */
+                         SID_type_index,           /* Secondary db ptr */
+                         SID_type_sid_extractor,   /* key extractor func */
+                         0);                       /* Associate flags */
+    if(ret)
+    {
+        gossip_err("Error associating the type SID index %s\n",
+                    db_strerror(ret));
+        return(ret);
+    }
+#endif
+
+    /* Create cursor for type SID index */
+    ret = SID_type_index->cursor(SID_type_index,    /* SID index pointer */
+                              NULL,                 /* TXN id */
+                              &SID_index_cursor,    /* Cursor pointer */
+                              0);                   /* Cursor opening flags */
+    if(ret)
+    {
+        gossip_err("Error creating type SID cursor: %s\n", db_strerror(ret));
+        return(ret);
+    }
+    return(ret);
+}
+
 /* 
  * This function creates and opens the database cursors set to the secondary
  * attribute databases in the database cursor pointers array
  *
  * Returns 0 on success, otherwise returns an error code
  */
-int SID_create_open_dbcs(DB *secondary_dbs[], DBC *db_cursors[])
+int SID_create_dbcs(DB *secondary_dbs[], DBC *db_cursors[])
 {
     int i = 0;                /* Loop index variable */
     int  ret = 0;             /* Function return value */
@@ -1528,6 +2295,25 @@ int SID_close_dbs_env(DB_ENV *envp, DB *dbp, DB *secondary_dbs[])
         return(ret);
     }
 
+    if (SID_type_cursor != NULL)
+    {
+        ret = SID_type_cursor->close(SID_type_cursor);
+    }
+
+    if (SID_type_db != NULL)
+    {
+        ret = SID_type_db->close(SID_type_db, 0);
+    }
+
+    if (SID_index_cursor != NULL)
+    {
+        ret = SID_index_cursor->close(SID_index_cursor);
+    }
+
+    if (SID_type_index != NULL)
+    {
+        ret = SID_type_index->close(SID_type_index, 0);
+    }
 
     /* Checking to make sure the environment handle is open */
     if(envp != NULL)
@@ -1568,31 +2354,38 @@ int SID_initialize(void)
     }
 
     /* create DBD env */
-    ret = SID_create_open_environment(&SID_envp);
+    ret = SID_create_environment(&SID_envp);
     if (ret < 0)
     {
         goto errorout;
     }
 
     /* create main DB */
-    ret = SID_create_open_sid_cache(SID_envp, &SID_db);
+    ret = SID_create_sid_cache(SID_envp, &SID_db);
     if (ret < 0)
     {
         goto errorout;
     }
 
     /* create secondary (attribute index) DBs */
-    ret = SID_create_open_assoc_sec_dbs(SID_envp,
-                                        SID_db,
-                                        SID_attr_index,
-                                        SID_extract_key);
+    ret = SID_create_secondary_dbs(SID_envp,
+                                   SID_db,
+                                   SID_attr_index,
+                                   SID_extract_key);
+    if (ret < 0)
+    {
+        goto errorout;
+    }
+
+    /* create server type table */
+    ret = SID_create_type_table();
     if (ret < 0)
     {
         goto errorout;
     }
 
     /* create cursors */
-    ret = SID_create_open_dbcs(SID_attr_index, SID_attr_cursor);
+    ret = SID_create_dbcs(SID_attr_index, SID_attr_cursor);
     if (ret < 0)
     {
         SID_close_dbs_env(SID_envp, SID_db, SID_attr_index);
@@ -1659,7 +2452,7 @@ int SID_load(const char *path)
     }
 
     /* load cache from file */
-    ret = SID_cache_load(&SID_db, inpfile, &sids_in_cache);
+    ret = SID_cache_load(SID_db, inpfile, &sids_in_cache);
     if (ret < 0)
     {
         /* something failed, close up the database */
@@ -1674,24 +2467,32 @@ errorout:
     return ret;
 }
 
+/* This loads all of the records in the given memory buffer into the
+ * cache.  This is intended for servers to pass groups of SID cache
+ * records around
+ */
 int SID_loadbuffer(const char *buffer, int size)
 {
     int ret = 0;
     FILE *inpfile = NULL;
 
-    /* Opening the file to dump the contents of the database to */
+    /* Opening the buffer as a file to load the contents of the database from */
     inpfile = fmemopen((void *)buffer, size, "r");
     if(!inpfile)
     {
         gossip_err("Error opening dump buffer in SID_loadbuffer function\n");
         return(-1);
     }
-    ret = SID_cache_load(&SID_db, inpfile, &sids_in_cache);
+    /* load buffer into the cache */
+    ret = SID_cache_load(SID_db, inpfile, &sids_in_cache);
     fclose(inpfile);
     return ret;
 }
 
-/* called periodically to save the contents of the SID cache to a file
+/* THis writes the entire contents of the cache into a file specified by
+ * path.
+ *
+ * called periodically to save the contents of the SID cache to a file
  * so we can reload at some future startup and not have to discover
  * everything
  */
@@ -1764,13 +2565,17 @@ errorout:
     return ret;
 }
 
+/* this dumps the contents of the cache corresponding to the
+ * SIDs in list into a memory buffer where it can then be dealt
+ * with
+ */
 int SID_savelist(char *buffer, int size, SID_server_list_t *slist)
 {
     int ret = -1;
     FILE *outpfile = NULL;
     DBC *cursorp = NULL;
 
-    /* Opening the file to dump the contents of the database to */
+    /* Opening the buffer as a file to dump the contents of the database to */
     outpfile = fmemopen(buffer, size, "w");
     if(!outpfile)
     {
@@ -1792,7 +2597,7 @@ int SID_savelist(char *buffer, int size, SID_server_list_t *slist)
         goto errorout;
     }
 
-    /* dump cache to the file */
+    /* dump cache to the buffer */
     ret = SID_cache_store(cursorp, outpfile, size, slist);
 
 errorout:
@@ -1813,9 +2618,14 @@ errorout:
     return ret;
 }
 
-int SID_add(const PVFS_SID *sid, PVFS_BMI_addr_t bmi_addr, const char *url)
+/* Add one entry to the SID cache */
+int SID_add(const PVFS_SID *sid,
+            PVFS_BMI_addr_t bmi_addr,
+            const char *url,
+            int attributes[])
 {
     int ret = 0;
+    int i = 0;
     SID_cacheval_t *cval;
 
     cval = (SID_cacheval_t *)malloc(sizeof(SID_cacheval_t) + strlen(url) + 1);
@@ -1824,18 +2634,49 @@ int SID_add(const PVFS_SID *sid, PVFS_BMI_addr_t bmi_addr, const char *url)
         return -1;
     }
     /* load up the cval */
-    memset(&cval, 0, sizeof(SID_cacheval_t) + strlen(url) + 1);
-    cval->bmi_addr = bmi_addr;
+    memset(cval, 0, sizeof(SID_cacheval_t) + strlen(url) + 1);
     strcpy(cval->url, url);
-    ret = SID_cache_add_server(&SID_db, sid, cval, &sids_in_cache);
+    cval->bmi_addr = bmi_addr;
+    /* if bmi_addr is zero, should register with BMI */
+    if (cval->bmi_addr == 0);
+    {
+        /* enter url into BMI to get BMI addr */
+        ret = BMI_addr_lookup(&cval->bmi_addr, cval->url);
+        if (ret != 0 && ret != -BMI_NOTINITIALIZED)
+        {
+             return ret;
+        }
+    }
+
+    if (attributes)
+    {
+        /* this assumes we are adding a new record so we are not
+         * overwriting existing attribtes
+         */
+        for (i = 0; i < SID_NUM_ATTR; i++)
+        {
+            cval->attr[i] = attributes[i];
+        }
+    }
+
+    /* if a server already exists this should fail and we
+     * just move on to the next one
+     */
+    ret = SID_cache_put(SID_db, sid, cval, &sids_in_cache);
+    if (ret == DB_KEYEXIST)
+    {
+        /* this means server already exists which we ignore */
+        ret = 0; 
+    }
     free(cval);
     return ret;
 }
 
+/* Delete one entry from the SID cache */
 int SID_delete(const PVFS_SID *sid)
 {
     int ret = 0;
-    ret = SID_cache_delete_server(&SID_db, sid, &sids_in_cache);
+    ret = SID_cache_delete_server(SID_db, sid, &sids_in_cache);
     return ret;
 }
 
@@ -1869,6 +2710,20 @@ int SID_finalize(void)
         return ret;
     }
 
+    return ret;
+}
+
+int SID_update_type(const PVFS_SID *sid, int new_server_type)
+{
+    int ret = 0;
+    ret = SID_cache_update_type(sid, new_server_type);
+    return ret;
+}
+
+int SID_update_attributes(const PVFS_SID *sid_server, int new_attr[])
+{   
+    int ret = 0;
+    ret = SID_cache_update_attrs(SID_db, sid_server, new_attr);
     return ret;
 }
 

@@ -41,18 +41,17 @@ typedef struct
 static struct qhash_table *s_fsid_to_config_table = NULL;
 static gen_mutex_t s_server_config_mgr_mutex = GEN_MUTEX_INITIALIZER;
 /*
-  while loading configuration settings for all known file systems
-  (across all configured servers), we keep track of the minimum handle
-  recycle timeout for *any* file system, and expose this value since
-  this is the only place that has access to all of this information.
-*/
+ * while loading configuration settings for all known file systems
+ * (across all configured servers), we keep track of the minimum handle
+ * recycle timeout for *any* file system, and expose this value since
+ * this is the only place that has access to all of this information.
+ */
 static int s_min_handle_recycle_timeout_in_sec = -1;
 
 static int hash_fsid(void *key, int table_size);
 static int hash_fsid_compare(void *key, struct qlist_head *link);
 
-#define SC_MGR_INITIALIZED() \
-(s_fsid_to_config_table)
+#define SC_MGR_INITIALIZED() (s_fsid_to_config_table)
 
 /*
   this is a check that needs to be made each time the
@@ -73,6 +72,7 @@ int PINT_server_config_mgr_initialize(void)
 
     if (s_fsid_to_config_table == NULL)
     {
+        /* table size 17 - not expecting too many fs's */
         s_fsid_to_config_table = qhash_init(hash_fsid_compare, hash_fsid, 17);
         if (s_fsid_to_config_table)
         {
@@ -103,8 +103,8 @@ int PINT_server_config_mgr_finalize(void)
             do
             {
                 hash_link = qhash_search_and_remove_at_index(
-                                                     s_fsid_to_config_table,
-                                                     i);
+                                    s_fsid_to_config_table,
+                                    i);
                 if (hash_link)
                 {
                     config = qlist_entry(hash_link, server_config_t, hash_link);
@@ -129,9 +129,15 @@ int PINT_server_config_mgr_finalize(void)
     return ret;
 }
 
+/* This function processes the server configuration and adds info to the
+ * cached config for fast lookup by the system interface.  The main part
+ * of this is running the file_systems list and adding info on each file
+ * system.  Wipes any existing cached_config before loading.
+ */
 int PINT_server_config_mgr_reload_cached_config_interface(void)
 {
-    int ret = -PVFS_EINVAL, i = 0;
+    int ret = -PVFS_EINVAL;
+    int i = 0;
     server_config_t *config = NULL;
     struct qlist_head *hash_link = NULL;
     PINT_llist *cur = NULL;
@@ -151,11 +157,14 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
             return ret;
         }
 
+/* V3 no longer relevant */
+#if 0
         /*
-          reset the min_handle_recycle_timeout_in_sec since it's going
-          to be re-determined at this point
-        */
+         * reset the min_handle_recycle_timeout_in_sec since it's going
+         * to be re-determined at this point
+         */
         s_min_handle_recycle_timeout_in_sec = -1;
+#endif
 
         for (i = 0; i < s_fsid_to_config_table->table_size; i++)
         {
@@ -173,6 +182,8 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
 
                 cur_fs = PINT_llist_head(cur);
                 assert(cur_fs);
+/* V3 no longer relevant */
+#if 0
                 /* should this be error handling instead? */
                 assert(cur_fs->handle_recycle_timeout_sec.tv_sec > -1);
 
@@ -188,9 +199,8 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
                                  "recycle time to %d seconds\n",
                                  s_min_handle_recycle_timeout_in_sec);
                 }
+#endif
 
-                /* V3 no longer relevant */
-#if 0
                 gossip_debug(GOSSIP_CLIENT_DEBUG,
                              "Reloading handle mappings for fs_id %d\n",
                              cur_fs->coll_id);
@@ -205,7 +215,6 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
                     gen_mutex_unlock(&s_server_config_mgr_mutex);
                     return ret;
                 }
-#endif
             }
         }
         gen_mutex_unlock(&s_server_config_mgr_mutex);
@@ -353,7 +362,16 @@ struct server_configuration_s *__PINT_server_config_mgr_get_config(
         gen_mutex_lock(&s_server_config_mgr_mutex);
         SC_MGR_ASSERT_OK(ret_config);
 
-        hash_link = qhash_search(s_fsid_to_config_table, &fs_id);
+        if (fs_id != PVFS_FS_ID_NULL)
+        {
+            /* find based on fs_id */
+            hash_link = qhash_search(s_fsid_to_config_table, &fs_id);
+        }
+        else
+        {
+            /* grab the first one - we should be on the server */
+            hash_link = qhash_first(s_fsid_to_config_table);
+        }
         if (hash_link)
         {
             config = qlist_entry(hash_link, server_config_t, hash_link);
@@ -410,10 +428,13 @@ void __PINT_server_config_mgr_put_config(struct server_configuration_s *config_s
     }
 }
 
+/* V3 is this even used anywhere */
+#if 0
 int PINT_server_config_mgr_get_abs_min_handle_recycle_time(void)
 {
     return s_min_handle_recycle_timeout_in_sec;
 }
+#endif
 
 static int hash_fsid(void *key, int table_size)
 {

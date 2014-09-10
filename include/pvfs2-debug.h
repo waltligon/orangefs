@@ -88,8 +88,7 @@
  GOSSIP_BMI_DEBUG_GM + GOSSIP_BMI_DEBUG_OFFSETS + GOSSIP_BMI_DEBUG_IB \
  + GOSSIP_BMI_DEBUG_MX + GOSSIP_BMI_DEBUG_PORTALS)
 
-const char *PVFS_debug_get_next_debug_keyword(
-    int position);
+const char *PVFS_debug_get_next_debug_keyword(int position);
 
 #define GOSSIP_SUPER_DEBUG            ((uint64_t)1 << 0)
 #define GOSSIP_INODE_DEBUG            ((uint64_t)1 << 1)

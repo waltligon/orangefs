@@ -26,6 +26,7 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
+#include "pvfs-sid.h"
 #include "pint-sysint-utils.h"
 #include "bmi.h"
 #include "trove.h"
@@ -278,23 +279,21 @@ int PINT_cached_config_reinitialize(struct server_configuration_s *config)
                 break;
             }
 
-            /* V3 */
-#if 0
-            ret = PINT_cached_config_handle_load_mapping(cur_fs);
+            ret = PINT_cached_config_handle_load_mapping(cur_fs, config);
             if (ret)
             {
                 break;
             }
-#endif
             cur = PINT_llist_next(cur);
         }
     }
     return 0;
 }
 
-/* V3 handles are no longer mapped to servers, but this might be relevant */
-#if 0
 /* PINT_cached_config_handle_load_mapping()
+ *
+ * this function now just adds an FS to its hash table for fast lookup
+ * handle mapping is lo longer needed.
  *
  * loads a new mapping of servers to handle into this interface.  This
  * function may be called multiple times in order to add new file
@@ -303,11 +302,13 @@ int PINT_cached_config_reinitialize(struct server_configuration_s *config)
  * returns 0 on success, -errno on failure
  */
 int PINT_cached_config_handle_load_mapping(
-        struct filesystem_configuration_s *fs,
-        struct server_configuration_s *config)
+               struct filesystem_configuration_s *fs,
+                struct server_configuration_s *config)
 {
     struct config_fs_cache_s *cur_config_fs_cache = NULL;
+#if 0
     int ret;
+#endif
 
     if (fs)
     {
@@ -318,7 +319,10 @@ int PINT_cached_config_handle_load_mapping(
 
         cur_config_fs_cache->fs = (struct filesystem_configuration_s *)fs;
 
-        /* V3 obsolete */
+/* V3 partially obsolete  - might like to cache servers but handle
+ * ranges are no more - maybe this translates to SID_cache quesry
+ */
+#if 0
         cur_config_fs_cache->meta_server_cursor =
                         cur_config_fs_cache->fs->meta_handle_ranges;
         cur_config_fs_cache->data_server_cursor =
@@ -348,6 +352,7 @@ int PINT_cached_config_handle_load_mapping(
             gossip_err("Error: failed to load handle lookup table.\n");
             return(ret);
         }
+#endif
 
         qhash_add(PINT_fsid_config_cache_table,
                   &(cur_config_fs_cache->fs->coll_id),
@@ -358,6 +363,7 @@ int PINT_cached_config_handle_load_mapping(
 }
 
 /* V3 no more handle ranges this may be on call path */
+#if 0
 
 static struct host_handle_mapping_s * PINT_cached_config_find_server(
                                                   PINT_llist *handle_ranges,
@@ -459,7 +465,7 @@ int PINT_cached_config_server_local(const PVFS_SID *sid)
 #endif
 
 /* V3 becomes SID cache function */
-
+#if 0
 /* PINT_cached_config_get_next_meta()
  *
  * returns the bmi address of a random server that should be used to
@@ -564,6 +570,7 @@ int PINT_cached_config_get_next_meta(PVFS_fs_id fs_id,
     }
     return ret;
 }
+#endif
 
 /* V3 no more extents - but this may be call path for getting servers
  * */
@@ -624,7 +631,7 @@ static int PINT_cached_config_get_extents(
 #endif
 
 /* V3 becomes SID cache function */
-
+#if 0
 int PINT_cached_config_map_servers(
                                  PVFS_fs_id fs_id,
                                  int *inout_num_datafiles,
@@ -767,7 +774,7 @@ int PINT_cached_config_map_servers(
          * that inout_num_datafiles < num_io_servers but
          * this code should correctly allocate multiple
          * datafiles per server round robin - though that
-         * won't happen with the current caode base 
+         * won't happen with the current code base 
          */
 
         if(num_io_servers < *inout_num_datafiles)
@@ -909,6 +916,7 @@ int PINT_cached_config_map_servers(
     return 0;
 
 }
+#endif
 
 /* THIS APPEARS TO BE SUPERCEDED BY THE PREVIOUS FUNCTION*/
 #if 0
@@ -1330,12 +1338,12 @@ int PINT_cached_config_map_to_server(PVFS_BMI_addr_t *server_addr,
  */
 int PINT_cached_config_get_num_dfiles(PVFS_fs_id fs_id,
                                       PINT_dist *dist,
-                                      int num_dfiles_requested,
-                                      int *num_dfiles)
+                                      int32_t num_dfiles_requested,
+                                      int32_t *num_dfiles)
 {
     int rc;
-    int num_io_servers;
-    
+    int32_t num_io_servers = 0;
+
     /* If the dfile request is zero, check to see if the config has that
        setting */
     if (0 == num_dfiles_requested)
@@ -1398,53 +1406,62 @@ int PINT_cached_config_get_num_dfiles(PVFS_fs_id fs_id,
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_cached_config_get_num_meta(PVFS_fs_id
-                                    fsid,
-                                    int *num_meta)
+int PINT_cached_config_get_num_meta(PVFS_fs_id fs_id, int32_t *num_meta)
 {
-    int ret = -PVFS_EINVAL;
-    struct qlist_head *hash_link = NULL;
-    struct config_fs_cache_s *cur_config_cache = NULL;
+    int ret = 0;
+    int count;
 
-    if (num_meta)
+    if (!num_meta)
     {
-        hash_link = qhash_search(PINT_fsid_config_cache_table, &(fsid));
-        if (hash_link)
-        {
-            cur_config_cache = qlist_entry(hash_link,
-                                           struct config_fs_cache_s,
-                                           hash_link);
-
-            assert(cur_config_cache);
-            assert(cur_config_cache->fs);
-/* V3 obsolete */
-#if 0
-            assert(cur_config_cache->fs->meta_handle_ranges);
-
-            *num_meta = PINT_llist_count(
-                            cur_config_cache->fs->meta_handle_ranges);
-#endif
-            ret = 0;
-        }
+        return -PVFS_EINVAL;
+    }
+    ret = PVFS_SID_count_meta(fs_id, &count);
+    if (!ret)
+    {
+        *num_meta = count;
     }
     return ret;
 }
 
-/* V3 this function probbly needs a SID query */
+/* V3 this function probably needs a SID query */
 /* PINT_cached_config_get_num_io()
  *
- * discovers the number of io servers available for a given file
- * system
+ * discovers the number of currently known io servers available
+ * for a given file system
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_cached_config_get_num_io(PVFS_fs_id fs_id, int *num_io)
+int PINT_cached_config_get_num_io(PVFS_fs_id fs_id, int32_t *num_io)
+{
+    int ret = 0;
+    int count;
+
+    if (!num_io)
+    {
+        return -PVFS_EINVAL;
+    }
+    ret = PVFS_SID_count_io(fs_id, &count);
+    if (!ret)
+    {
+        *num_io = count;
+    }
+    return ret;
+}
+
+/* PINT_cached_config_get_metadata_sid_count()
+ *
+ * discovers the number of sids for a metadata object
+ *
+ * returns 0 on success, -errno on failure
+ */
+int PINT_cached_config_get_metadata_sid_count(PVFS_fs_id fs_id,
+                                              int32_t *num_sids)
 {
     int ret = -PVFS_EINVAL;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
-    if (num_io)
+    if (num_sids)
     {
         hash_link = qhash_search(PINT_fsid_config_cache_table, &(fs_id));
         if (hash_link)
@@ -1455,13 +1472,38 @@ int PINT_cached_config_get_num_io(PVFS_fs_id fs_id, int *num_io)
 
             assert(cur_config_cache);
             assert(cur_config_cache->fs);
-/* V3 */
-#if 0
-            assert(cur_config_cache->fs->data_handle_ranges);
+            *num_sids = cur_config_cache->fs->metadata_replication_factor;
+            ret = 0;
+        }
+    }
+    return ret;
+}
 
-            *num_io = PINT_llist_count(
-                            cur_config_cache->fs->data_handle_ranges);
-#endif
+/* PINT_cached_config_get_default_dfile_sid_count()
+ *
+ * discovers the default number of sids for a dfile
+ *
+ * returns 0 on success, -errno on failure
+ */
+int PINT_cached_config_get_default_dfile_sid_count(PVFS_fs_id fs_id,
+                                                   int32_t *num_sids)
+{
+    int ret = -PVFS_EINVAL;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+
+    if (num_sids)
+    {
+        hash_link = qhash_search(PINT_fsid_config_cache_table, &(fs_id));
+        if (hash_link)
+        {
+            cur_config_cache = qlist_entry(hash_link,
+                                           struct config_fs_cache_s,
+                                           hash_link);
+
+            assert(cur_config_cache);
+            assert(cur_config_cache->fs);
+            *num_sids = cur_config_cache->fs->default_dfile_replication_factor;
             ret = 0;
         }
     }
@@ -1621,10 +1663,15 @@ int PINT_cached_config_get_server_list(PVFS_fs_id fs_id,
                                        const char ***server_names,
                                        int *server_count)
 {
-    int num_io_servers, ret, i;
+    int num_io_servers, ret/*, i*/;
     PVFS_BMI_addr_t *server_addrs;
-    const char **servers;
+    /*const char **servers;*/
 
+    /* This was run on client before sending request
+     * Not clear if total number of IO servers makes sense any more, or
+     * at least finding out that number may not be as simple as looking
+     * in the config - does this kick off a search for more IO servers?
+     */
     /* find the server list from the layout */
     ret = PINT_cached_config_get_num_dfiles(fs_id,
                                             dist,
@@ -1636,6 +1683,11 @@ int PINT_cached_config_get_server_list(PVFS_fs_id fs_id,
         return ret;
     }
 
+    /* This is the protocol limit for how many can be sent in a request.
+     * The limiting factor here is the number sent back to the client
+     * (this is called from the server) after the create.  This limit
+     * needs to take into account SIDs as well
+     */
     if(num_io_servers > PVFS_REQ_LIMIT_DFILE_COUNT)
     {
         num_io_servers = PVFS_REQ_LIMIT_DFILE_COUNT;
@@ -1650,6 +1702,16 @@ int PINT_cached_config_get_server_list(PVFS_fs_id fs_id,
         return -PVFS_ENOMEM;
     }
 
+    /* could (should) this limit have been applied client side?
+     * is layout going to be subsumed by a SIDcache query?
+     */
+    /* V3 WBL This is no longer a viable function call
+     * we have much more complex calls to allocated OIDs and SIDs
+     * and there is no longer a statis list of servers
+     * for now I'm just taking this call out but the whole
+     * function (get_server_list) is going to need a rewrite
+     */
+#if 0
     ret = PINT_cached_config_map_servers(fs_id,
                                          &num_io_servers,
                                          layout,
@@ -1675,8 +1737,9 @@ int PINT_cached_config_get_server_list(PVFS_fs_id fs_id,
     }
     free(server_addrs);
 
-    *server_count = num_io_servers;
     *server_names = servers;
+#endif
+    *server_count = num_io_servers;
 
     return 0;
 }

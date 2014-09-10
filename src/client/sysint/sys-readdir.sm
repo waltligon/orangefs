@@ -277,7 +277,7 @@ static int readdir_msg_comp_fn(void *v_p,
 
     if (resp_p->status != 0)
     {
-	return resp_p->status;
+        return resp_p->status;
     }
 
     /* if it's from the last dirdata of the msg_array */
@@ -365,7 +365,7 @@ static int readdir_msg_comp_fn(void *v_p,
 
     if (resp_p->status != 0)
     {
-	return resp_p->status;
+        return resp_p->status;
     }
 
     /* convert servresp_readdir response to a sysresp_readdir obj */
@@ -502,7 +502,8 @@ static PINT_sm_action readdir_finish_partial_read(
             "readdir: posting dirdata readdir "
             "%s|%s|%d | token is %llu | limit is %d\n",
             PVFS_OID_str(&sm_p->object_ref.handle),
-            PVFS_OID_str(&sm_p->getattr.attr.dirdata_handles[sm_p->readdir_state.dirdata_index]),
+            PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
+                                        sm_p->readdir_state.dirdata_index]),
             sm_p->object_ref.fs_id,
             llu(sm_p->readdir_state.pos_token),
             sm_p->readdir_state.dirent_limit);
@@ -512,7 +513,8 @@ static PINT_sm_action readdir_finish_partial_read(
             sm_p->getattr.attr.capability,
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
-            sm_p->getattr.attr.dirdata_handles[sm_p->readdir_state.dirdata_index],
+            sm_p->getattr.attr.u.dir.dirdata_handles[
+                                       sm_p->readdir_state.dirdata_index],
             sm_p->readdir_state.pos_token,
             sm_p->readdir_state.dirent_limit,
             sm_p->hints);
@@ -521,13 +523,14 @@ static PINT_sm_action readdir_finish_partial_read(
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_READ;
     msg_p->fs_id = sm_p->getattr.object_ref.fs_id;
-    msg_p->handle = sm_p->getattr.attr.dirdata_handles[sm_p->readdir_state.dirdata_index];
+    msg_p->handle = sm_p->getattr.attr.u.dir.dirdata_handles[
+                                      sm_p->readdir_state.dirdata_index];
     msg_p->sid_count = 1;
     msg_p->sid_index = 0;
     msg_p->sid_array =
-           &sm_p->getattr.attr.dirdata_sids[
+           &sm_p->getattr.attr.u.dir.dirdata_sids[
                   sm_p->readdir_state.dirdata_index *
-                        sm_p->getattr.attr.sid_count];
+                        sm_p->getattr.attr.u.dir.dist_dir_attr.sid_count];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = readdir_msg_comp_fn;
 
@@ -573,7 +576,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
         sm_p->readdir.pos_token = PVFS_READDIR_START;
     }
     if( sm_p->readdir.dirdata_index >=
-        sm_p->getattr.attr.dist_dir_attr.num_servers)
+        sm_p->getattr.attr.u.dir.dist_dir_attr.dirdata_count)
     {      
         gossip_debug(GOSSIP_READDIR_DEBUG, "readdir: "
                 "all dirdata servers have been traversed, setting pos and return.\n");
@@ -586,7 +589,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
     assert(sm_p->getattr.size_array);
     gossip_debug(GOSSIP_READDIR_DEBUG, "readdir getattr: "
             "dirent_count of all dirdata handles\n");
-    for(i = 0; i < sm_p->getattr.attr.dist_dir_attr.num_servers; i++)
+    for(i = 0; i < sm_p->getattr.attr.u.dir.dist_dir_attr.dirdata_count; i++)
     {       
         gossip_debug(GOSSIP_READDIR_DEBUG, 
                 "dirent_count[%d]: %llu\n", i,
@@ -602,11 +605,11 @@ static PINT_sm_action readdir_msg_setup_msgpair(
     /* allocate space */
     sm_p->readdir.num_dirdata_needed = 0;
     token_array = malloc( sizeof(PVFS_ds_position) *
-            sm_p->getattr.attr.dist_dir_attr.num_servers);
+            sm_p->getattr.attr.u.dir.dist_dir_attr.dirdata_count);
     tmp_dirent_limit_array = malloc( sizeof(int) *
-            sm_p->getattr.attr.dist_dir_attr.num_servers);
+            sm_p->getattr.attr.u.dir.dist_dir_attr.dirdata_count);
     tmp_dirdata_index_array = malloc( sizeof(int) *
-            sm_p->getattr.attr.dist_dir_attr.num_servers);
+            sm_p->getattr.attr.u.dir.dist_dir_attr.dirdata_count);
     if(!token_array || !tmp_dirent_limit_array || !tmp_dirdata_index_array)
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -616,7 +619,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
     /* fill in request parameters */
     while( (tmp_dirent_limit_needed > 0) &&
            (sm_p->readdir.dirdata_index <
-            sm_p->getattr.attr.dist_dir_attr.num_servers) )
+            sm_p->getattr.attr.u.dir.dist_dir_attr.dirdata_count) )
     {
         int cur_index = sm_p->readdir.dirdata_index;
 
@@ -681,7 +684,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
                 "readdir: posting dirdata readdir[%d]  "
                 "%s|%s(#%d)|%d | token is %llu | limit is %d\n",
                 i, PVFS_OID_str(&sm_p->object_ref.handle),
-                PVFS_OID_str(&sm_p->getattr.attr.dirdata_handles[
+                PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
                                             tmp_dirdata_index_array[i]]),
                 (tmp_dirdata_index_array[i]),
                 sm_p->object_ref.fs_id,
@@ -692,7 +695,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
                                   sm_p->getattr.attr.capability,
                                   sm_p->object_ref.fs_id,
                                   sm_p->object_ref.handle,
-                                  sm_p->getattr.attr.dirdata_handles[
+                                  sm_p->getattr.attr.u.dir.dirdata_handles[
                                                   tmp_dirdata_index_array[i]],
                                   token_array[i],
                                   tmp_dirent_limit_array[i],
@@ -703,7 +706,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
         msg_p->msgdir = PVFS_IO_READ;
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle =
-           sm_p->getattr.attr.dirdata_handles[tmp_dirdata_index_array[i]];
+           sm_p->getattr.attr.u.dir.dirdata_handles[tmp_dirdata_index_array[i]];
         msg_p->sid_count = sm_p->object_ref.sid_count;
         msg_p->sid_index = 0;
         msg_p->sid_array = sm_p->object_ref.sid_array;

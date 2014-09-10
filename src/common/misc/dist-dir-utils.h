@@ -12,9 +12,9 @@
 
 #define PINT_debug_dist_dir_attr(debugmask,dist_dir_attr) \
     do {gossip_debug(debugmask, \
-        "dist_dir_attr: tree_height=%d, num_servers=%d, bitmap_size=%d, "\
+        "dist_dir_attr: tree_height=%d, dirdata_count=%d, bitmap_size=%d, "\
         "split_size=%d, server_no=%d and branch_level=%d\n", \
-        dist_dir_attr.tree_height, dist_dir_attr.num_servers, \
+        dist_dir_attr.tree_height, dist_dir_attr.dirdata_count, \
         dist_dir_attr.bitmap_size, dist_dir_attr.split_size, \
         dist_dir_attr.server_no, dist_dir_attr.branch_level); } while (0)
 
@@ -34,7 +34,7 @@
 #define PINT_debug_dist_dir_handles(debugmask,dist_dir_attr, dist_dir_handles) \
     do { int i; \
         gossip_debug(debugmask, "dist_dir_handles:\n"); \
-        for(i = 0; i < dist_dir_attr.num_servers ; i++) \
+        for(i = 0; i < dist_dir_attr.dirdata_count ; i++) \
         { \
             gossip_debug(debugmask, \
                     "\t\tdirdata server %d: %llu.\n", \
@@ -75,7 +75,8 @@
 int PINT_init_dist_dir_state(
 		PVFS_dist_dir_attr *dist_dir_attr, 
 		PVFS_dist_dir_bitmap *bitmap_ptr,
-		const int num_servers, 
+		const int distdir_count, 
+		const int sid_count, 
 		const int server_no, 
 		int pre_dsg_num_server,
                 const int split_size);
@@ -103,7 +104,8 @@ int PINT_dist_dir_set_serverno(const int server_no,
 #define PINT_dist_dir_attr_copyto(to_attr, from_attr) \
 do { \
 	to_attr.tree_height = from_attr.tree_height; \
-	to_attr.num_servers = from_attr.num_servers; \
+	to_attr.dirdata_count = from_attr.dirdata_count; \
+	to_attr.sid_count = from_attr.sid_count; \
 	to_attr.bitmap_size = from_attr.bitmap_size; \
 	to_attr.split_size = from_attr.split_size; \
 	to_attr.server_no = from_attr.server_no; \

@@ -91,11 +91,16 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   PVFS_sys_attr new_attr;
   uint32_t attrmask;
   /* translate local path into pvfs2 relative path */
-  ret = PVFS_util_resolve(destfile,&cur_fs, pvfs_path, PVFS_NAME_MAX);
+  ret = PVFS_util_resolve(destfile, &cur_fs, pvfs_path, PVFS_NAME_MAX);
   if(ret < 0)
   {
     PVFS_perror("PVFS_util_resolve", ret);
     return -1;
+  }
+  if(strlen(pvfs_path) == 0)
+  {
+      pvfs_path[0] = '/';
+      pvfs_path[1] = 0;
   }
 
   ret = PVFS_util_gen_credential_defaults(&credentials);
@@ -108,72 +113,84 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   /* this if-else statement just pulls apart the pathname into its
    * parts....I think...this should be a function somewhere
    */
-  if (strcmp(pvfs_path,"/") == 0)
+  if (strcmp(pvfs_path, "/") == 0)
   {
-    memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-    ret = PVFS_sys_lookup(cur_fs, pvfs_path,
-                          &credentials, &resp_lookup,
-                          PVFS2_LOOKUP_LINK_FOLLOW, NULL);
-    if (ret < 0)
-    {
-      PVFS_perror("PVFS_sys_lookup", ret);
-      return -1;
-    }
-    parent_ref.handle = resp_lookup.ref.handle;
-    parent_ref.fs_id = resp_lookup.ref.fs_id;
+      memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
+      ret = PVFS_sys_lookup(cur_fs,
+                            pvfs_path,
+                            &credentials,
+                            &resp_lookup,
+                            PVFS2_LOOKUP_LINK_FOLLOW,
+                            NULL);
+      if (ret < 0)
+      {
+          PVFS_perror("PVFS_sys_lookup", ret);
+          return -1;
+      }
   }
   else
   {
-    /* get the absolute path on the pvfs2 file system */
-    if (PINT_remove_base_dir(pvfs_path,str_buf,PVFS_NAME_MAX))
-    {
-      if (pvfs_path[0] != '/')
+      /* get the absolute path on the pvfs2 file system */
+      if (PINT_remove_base_dir(pvfs_path, str_buf, PVFS_NAME_MAX))
       {
-        fprintf(stderr, "Error: poorly formatted path.\n");
+          if (pvfs_path[0] != '/')
+          {
+              fprintf(stderr, "Error: poorly formatted path.\n");
+          }
+          fprintf(stderr, "Error: cannot retrieve entry name for "
+                  "creation on %s\n",pvfs_path);
+          return -1;
       }
-      fprintf(stderr, "Error: cannot retrieve entry name for "
-              "creation on %s\n",pvfs_path);
-      return -1;
-    }
 
-    ret = PINT_lookup_parent(pvfs_path, cur_fs, &credentials, 
-                                  &parent_ref.handle);
-    if(ret < 0)
-    {
-      PVFS_perror("PINT_lookup_parent", ret);
-      return -1;
-    }
-    else
-    {
-      parent_ref.fs_id = cur_fs;
-    }
-  }
-  memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
+      ret = PINT_lookup_parent(pvfs_path,
+                               cur_fs,
+                               &credentials, 
+                               &parent_ref.handle);
+      if(ret < 0)
+      {
+          PVFS_perror("PINT_lookup_parent", ret);
+          return -1;
+      }
+      else
+      {
+          parent_ref.fs_id = cur_fs;
+      }
+      memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 
-  ret = PVFS_sys_ref_lookup(parent_ref.fs_id, str_buf,
-                            parent_ref, &credentials, &resp_lookup,
-                            PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
-  if (ret != 0)
-  {
-    fprintf(stderr, "Target '%s' does not exist!\n", str_buf);
-    return -1;
+      ret = PVFS_sys_ref_lookup(parent_ref.fs_id,
+                                str_buf,
+                                parent_ref,
+                                &credentials,
+                                &resp_lookup,
+                                PVFS2_LOOKUP_LINK_NO_FOLLOW,
+                                NULL);
+      if (ret != 0)
+      {
+          fprintf(stderr, "Target '%s' does not exist!\n", str_buf);
+          return -1;
+      }
   }
-  memset(&resp_getattr,0,sizeof(PVFS_sysresp_getattr));
+
+  memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
   attrmask = (PVFS_ATTR_SYS_ALL_SETABLE);
     
-  ret = PVFS_sys_getattr(resp_lookup.ref,attrmask,&credentials,&resp_getattr, NULL);
+  ret = PVFS_sys_getattr(resp_lookup.ref,
+                         attrmask,
+                         &credentials,
+                         &resp_getattr,
+                         NULL);
   if (ret < 0) 
   {
     PVFS_perror("PVFS_sys_getattr",ret);
     return -1;
   }
   old_attr = resp_getattr.attr;
-  new_attr=old_attr;
+  new_attr = old_attr;
 
   new_attr.perms = perms;
   new_attr.mask = PVFS_ATTR_SYS_PERM;
  
-  ret = PVFS_sys_setattr(resp_lookup.ref,new_attr,&credentials, NULL);
+  ret = PVFS_sys_setattr(resp_lookup.ref, new_attr, &credentials, NULL);
   if (ret < 0) 
   {
     PVFS_perror("PVFS_sys_setattr",ret);

@@ -113,6 +113,9 @@ typedef struct PINT_dist_s {
     (px->methods->decode_lebf) (pptr, px->params); \
     align8(pptr); \
 } while (0)
+#define defree_PINT_dist(x) do { \
+    decode_free(*(x)); \
+} while (0)
 #endif
 
 /* Return a cloned copy of the distribution registered for name*/

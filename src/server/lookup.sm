@@ -15,6 +15,7 @@
 
 #include "pvfs2-config.h"
 #include "server-config.h"
+#include "pint-cached-config.h"
 #include "pvfs2-types.h"
 #include "pvfs2-server.h"
 #include "state-machine.h"
@@ -267,6 +268,15 @@ static PINT_sm_action lookup_read_object_metadata(
 
     assert(s_op->u.lookup.seg_nr <= s_op->u.lookup.seg_ct);
 
+    /* TJS: memcpy each the SIDs taht are in keyval_temp_store
+     * into the resp sid array, making sure to index to the point
+     * in the response sid array that corresponds to our segment number */
+     
+    s_op->resp.u.lookup_path.handle_array[
+                            s_op->u.lookup.seg_nr - 1] =
+            (PVFS_handle) s_op->u.lookup.keyval_temp_store[0].oid;
+    /*s_op->resp.u.lookup_path.sid_*/
+
     /* use the base handle if we haven't looked up a segment yet */
     if (s_op->u.lookup.seg_nr == 0)
     {
@@ -338,7 +348,7 @@ static PINT_sm_action lookup_verify_object_metadata(
             s_op->u.lookup.seg_nr - 1]);
     }
 
-    PVFS_ds_attr_to_object_attr(ds_attr, a_p);
+    PVFS_object_attr_from_ds_attr(a_p, ds_attr);
     a_p->mask = PVFS_ATTR_COMMON_ALL;
     s_op->target_object_attr = a_p;
 
@@ -665,13 +675,21 @@ static PINT_sm_action lookup_read_num_directory_entry_handles(
 
     s_op->key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
-    s_op->val.buffer = &s_op->u.lookup.attr.dist_dir_attr;
-    s_op->val.buffer_sz = sizeof(s_op->u.lookup.attr.dist_dir_attr);
+    s_op->val.buffer = &s_op->u.lookup.attr.u.dir.dist_dir_attr;
+    s_op->val.buffer_sz = sizeof(s_op->u.lookup.attr.u.dir.dist_dir_attr);
 
-    ret = job_trove_keyval_read(
-        s_op->req->u.lookup_path.fs_id, handle, &s_op->key, &s_op->val,
-        0,
-        NULL, smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
+    ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id, 
+                                handle, 
+                                &s_op->key,
+                                &s_op->val,
+                                0,
+                                NULL, 
+                                smcb, 
+                                0, 
+                                js_p, 
+                                &j_id, 
+                                server_job_context, 
+                                s_op->req->hints);
 
     return ret;
 }
@@ -708,13 +726,13 @@ static PINT_sm_action lookup_read_directory_entry_handles(
     if(js_p->error_code == -TROVE_ENOENT)
     {
         gossip_debug(GOSSIP_GETATTR_DEBUG, "lookup: no DIST_DIR_ATTR key present!\n");
-        attr->dist_dir_bitmap = NULL;
-        attr->dirdata_handles = NULL;
+        attr->u.dir.dist_dir_bitmap = NULL;
+        attr->u.dir.dirdata_handles = NULL;
         return SM_ACTION_COMPLETE;
     }
 
-    assert(attr->dist_dir_attr.num_servers > 0 &&
-        attr->dist_dir_attr.bitmap_size > 0);
+    assert(attr->u.dir.dist_dir_attr.dirdata_count > 0 &&
+        attr->u.dir.dist_dir_attr.bitmap_size > 0);
 
     /* use the base handle if we haven't looked up a segment yet */
     if (s_op->u.lookup.seg_nr == 0)
@@ -729,25 +747,34 @@ static PINT_sm_action lookup_read_directory_entry_handles(
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "lookup: get dist-dir-attr for dir meta handle %s "
-            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+            "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
             PVFS_OID_str(&handle),
-            attr->dist_dir_attr.tree_height,
-            attr->dist_dir_attr.num_servers,
-            attr->dist_dir_attr.bitmap_size,
-            attr->dist_dir_attr.split_size,
-            attr->dist_dir_attr.server_no,
-            attr->dist_dir_attr.branch_level);
+            attr->u.dir.dist_dir_attr.tree_height,
+            attr->u.dir.dist_dir_attr.dirdata_count,
+            attr->u.dir.dist_dir_attr.bitmap_size,
+            attr->u.dir.dist_dir_attr.split_size,
+            attr->u.dir.dist_dir_attr.server_no,
+            attr->u.dir.dist_dir_attr.branch_level);
 
     /* allocate space for bitmap and dirdata handles */
-    attr->dist_dir_bitmap =
-            malloc(attr->dist_dir_attr.bitmap_size *
+    attr->u.dir.dist_dir_bitmap =
+            malloc(attr->u.dir.dist_dir_attr.bitmap_size *
                     sizeof(PVFS_dist_dir_bitmap_basetype));
-    attr->dirdata_handles =
-            malloc(attr->dist_dir_attr.num_servers *
-                   sizeof(PVFS_handle));
-    if(!attr->dist_dir_bitmap ||
-            !attr->dirdata_handles)
+
+    attr->u.dir.dirdata_handles =
+            malloc((attr->u.dir.dist_dir_attr.dirdata_count *
+                    sizeof(PVFS_handle)) +
+                   (attr->u.dir.dist_dir_attr.sid_count *
+                    attr->u.dir.dist_dir_attr.dirdata_count *
+                    sizeof(PVFS_handle)));
+
+    attr->u.dir.dirdata_sids = (PVFS_SID *)(attr->u.dir.dirdata_handles + 
+                                (attr->u.dir.dist_dir_attr.dirdata_count *
+                                sizeof(PVFS_handle)));
+    
+    if(!attr->u.dir.dist_dir_bitmap ||
+            !attr->u.dir.dirdata_handles)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
@@ -776,16 +803,19 @@ static PINT_sm_action lookup_read_directory_entry_handles(
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
 
     s_op->val_a[0].buffer_sz =
-            attr->dist_dir_attr.bitmap_size *
+            attr->u.dir.dist_dir_attr.bitmap_size *
             sizeof(PVFS_dist_dir_bitmap_basetype);
-    s_op->val_a[0].buffer = attr->dist_dir_bitmap;
+    s_op->val_a[0].buffer = attr->u.dir.dist_dir_bitmap;
 
     s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
 
-    s_op->val_a[1].buffer = attr->dirdata_handles;
-    s_op->val_a[1].buffer_sz = attr->dist_dir_attr.num_servers *
-                                sizeof(PVFS_handle);
+    s_op->val_a[1].buffer = attr->u.dir.dirdata_handles;
+    s_op->val_a[1].buffer_sz = (attr->u.dir.dist_dir_attr.dirdata_count *
+                                sizeof(PVFS_handle)) +
+                               (attr->u.dir.dist_dir_attr.sid_count *
+                                attr->u.dir.dist_dir_attr.dirdata_count *
+                                sizeof(PVFS_handle));
 
     s_op->error_a = (PVFS_error*)calloc(keyval_count, sizeof(PVFS_error));
     if (s_op->error_a == NULL)
@@ -857,14 +887,14 @@ static PINT_sm_action lookup_read_directory_entry(
     s_op->u.lookup.dirdata_server_index =
                     PINT_find_dist_dir_bucket(
                                     dirdata_hash,
-                                    &s_op->u.lookup.attr.dist_dir_attr,
-                                    s_op->u.lookup.attr.dist_dir_bitmap);
+                                    &s_op->u.lookup.attr.u.dir.dist_dir_attr,
+                                    s_op->u.lookup.attr.u.dir.dist_dir_bitmap);
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "lookup: selecting bucket No.%d from dist_dir_bitmap.\n",
                  s_op->u.lookup.dirdata_server_index);
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "  need to read from dirent handle=%s, segment=%s (len=%d)\n",
-                 PVFS_OID_str(&s_op->u.lookup.attr.dirdata_handles[
+                 PVFS_OID_str(&s_op->u.lookup.attr.u.dir.dirdata_handles[
                                        s_op->u.lookup.dirdata_server_index]),
                  s_op->u.lookup.segp, (int) strlen(s_op->u.lookup.segp));
 
@@ -882,7 +912,7 @@ static PINT_sm_action lookup_read_directory_entry(
 #endif
 
     if (PINT_cached_config_server_local(
-                &s_op->u.lookup.attr.dirdata_sids[
+                &s_op->u.lookup.attr.u.dir.dirdata_sids[
                         s_op->u.lookup.dirdata_sid_index]))
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "lookup: local server !!!\n");
@@ -908,9 +938,27 @@ static PINT_sm_action lookup_read_directory_entry_local(
 
     s_op->key.buffer = s_op->u.lookup.segp;
     s_op->key.buffer_sz = strlen(s_op->u.lookup.segp) + 1;
-    s_op->val.buffer =
-        &s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.seg_nr];
-    s_op->val.buffer_sz = sizeof(PVFS_handle);
+    /*s_op->val.buffer =
+        &s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.seg_nr];*/
+    /* TJS: Read in SID information to temporary location.  Copy back into
+     * response array in next state */
+
+
+    ret = PINT_cached_config_get_metadata_sid_count(
+                                          s_op->req->u.lookup_path.fs_id,
+                                          &(s_op->metasidcnt));
+
+    s_op->u.lookup.keyval_temp_store = (PVFS_ID *)malloc(
+                                                sizeof(PVFS_handle) +
+                                                (sizeof(PVFS_SID) * 
+                                                 s_op->metasidcnt));
+
+
+    
+    s_op->val.buffer = s_op->u.lookup.keyval_temp_store;
+
+    s_op->val.buffer_sz = sizeof(PVFS_handle) + 
+                          (s_op->metasidcnt * sizeof(PVFS_SID));
 
     /*
       NOTE: if this operation fails, seg_nr will indicate one too many
@@ -920,9 +968,10 @@ static PINT_sm_action lookup_read_directory_entry_local(
 
     ret = job_trove_keyval_read(
         s_op->req->u.lookup_path.fs_id,
-        s_op->u.lookup.attr.dirdata_handles[
+        s_op->u.lookup.attr.u.dir.dirdata_handles[
                                           s_op->u.lookup.dirdata_server_index],
-        &s_op->key, &s_op->val,
+        &s_op->key, 
+        &s_op->val,
         TROVE_KEYVAL_DIRECTORY_ENTRY,
         NULL, smcb, 0, js_p, &j_id,
         server_job_context, s_op->req->hints);
@@ -956,14 +1005,14 @@ static PINT_sm_action lookup_read_directory_entry_remote(
             msg_p->req,
             null_cap,
             s_op->req->u.lookup_path.fs_id,
-            s_op->u.lookup.attr.dirdata_handles[
+            s_op->u.lookup.attr.u.dir.dirdata_handles[
                                           s_op->u.lookup.dirdata_server_index],
             s_op->u.lookup.segp,
             NULL);
 
     msg_p->fs_id = s_op->req->u.lookup_path.fs_id;
     msg_p->handle =
-        s_op->u.lookup.attr.dirdata_handles[
+        s_op->u.lookup.attr.u.dir.dirdata_handles[
                                           s_op->u.lookup.dirdata_server_index];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = lookup_get_dirent_comp_fn;

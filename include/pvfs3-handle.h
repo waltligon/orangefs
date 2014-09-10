@@ -18,6 +18,13 @@
 #define DW(x,y) (((uint64_t)(x))>>(y))
 #define SW(x,y) (((uint32_t)(x))>>(y))
 
+/* size of OID array of size n */
+#define OASZ(n) (size_t)((size_t)(n) * sizeof(PVFS_OID))
+/* size of SID array of size m */
+#define SASZ(m) (size_t)((size_t)(m) * sizeof(PVFS_SID))
+/* size of OID array of size n with m SIDs per OID */
+#define OSASZ(n,m) (size_t)((size_t)(n) * (OASZ(1) + SASZ((size_t)m)))
+
 /* uuid_t is an unsigned char[16] array and thus passes by reference */
 
 /** Unique identifier for a server on a PVFS3 file system  128-bit */
@@ -32,6 +39,9 @@ typedef struct {uuid_t u;} PVFS_SID __attribute__ ((__aligned__ (8)));
     memcpy((pbuf), *(pptr), SID_SZ); \
     *(pptr) += SID_SZ; \
 } while (0)
+
+#define defree_PVFS_SID(pbuf) do { \
+} while(0)
     
 /** Unique identifier for an object on a PVFS3 file system  128-bit */
 typedef struct {uuid_t u;} PVFS_OID __attribute__ ((__aligned__ (8)));
@@ -45,6 +55,20 @@ typedef struct {uuid_t u;} PVFS_OID __attribute__ ((__aligned__ (8)));
     memcpy((pbuf), *(pptr), OID_SZ); \
     *(pptr) += OID_SZ; \
 } while (0)
+
+#define defree_PVFS_OID(pbuf) do { \
+} while(0)
+
+/** This union makes it easy to work with an array of mixed OID and SID
+ * items - they are the same size and format, but this helps keep the
+ * compiler happy and makes it clearer what we are doing in some spots.
+ * Mostly this is used when we write such lists to disk
+ */
+typedef union PVFS_ID_u
+{
+    PVFS_OID oid;
+    PVFS_SID sid;
+} PVFS_ID;
 
 #define PVFS_HANDLE_NULL_INIT {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}}
 static const PVFS_OID PVFS_HANDLE_NULL = PVFS_HANDLE_NULL_INIT;
@@ -86,6 +110,13 @@ static __inline__ int PVFS_OID_cmp(const PVFS_OID *oid1, const PVFS_OID *oid2)
 {
     return uuid_compare(oid1->u, oid2->u);
 }
+
+#define PVFS_OID_EQ(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) == 0)
+#define PVFS_OID_NE(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) != 0)
+#define PVFS_OID_GT(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) > 0)
+#define PVFS_OID_GE(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) >= 0)
+#define PVFS_OID_LT(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) < 0)
+#define PVFS_OID_LE(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) <=0)
 
 static __inline__ void PVFS_OID_cpy(PVFS_OID *dst, const PVFS_OID *src)
 {
@@ -142,8 +173,11 @@ static __inline__ uint64_t PVFS_OID_hash64(const PVFS_OID *oid)
            DW(p[12],32) + DW(p[13],40) + DW(p[14],48) + DW(p[15],56);
 }
 
+#if 0
 #define PVFS_OID_encode(d,s) PVFS_OID_cpy(((PVFS_OID *)d),(s))
 #define PVFS_OID_decode(d,s) PVFS_OID_cpy((d),((PVFS_OID *)s))
+#define PVFS_OID_defree(d,s) do { } while (0)
+#endif
 
 /* SID Variant definitions */
 #define PVFS_SID_variant_ncs UUID_VARIANT_NCS    /*0*/
@@ -177,6 +211,13 @@ static __inline__ int PVFS_SID_cmp(const PVFS_SID *sid1, const PVFS_SID *sid2)
 {
     return uuid_compare(sid1->u, sid2->u);
 }
+
+#define PVFS_SID_EQ(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) == 0)
+#define PVFS_SID_NE(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) != 0)
+#define PVFS_SID_GT(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) > 0)
+#define PVFS_SID_GE(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) >= 0)
+#define PVFS_SID_LT(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) < 0)
+#define PVFS_SID_LE(sid1, sid2) (PVFS_SID_cmp((sid1), (sid2)) <=0)
 
 static __inline__ void PVFS_SID_cpy(PVFS_SID *dst, const PVFS_SID *src)
 {
@@ -233,9 +274,11 @@ static __inline__ uint64_t PVFS_SID_hash64(const PVFS_SID *sid)
            DW(p[12],32) + DW(p[13],40) + DW(p[14],48) + DW(p[15],56);
 }
 
+#if 0
 #define PVFS_SID_encode(d,s) PVFS_SID_cpy(((PVFS_SID *)d),(s))
 #define PVFS_SID_decode(d,s) PVFS_SID_cpy((d),((PVFS_SID *)s))
-
+#define PVFS_SID_defree(d,s) do { } while (0)
+#endif
 
 #if 0
 typedef struct          /* 5x 64-bit */

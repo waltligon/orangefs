@@ -38,7 +38,8 @@ static int initializing_sizes = 0;
 /* an array of structs for storing precalculated maximum encoding sizes
  * for each type of server operation 
  */
-static struct {
+static struct
+{
     int req;
     int resp;
 } *max_size_array = NULL;
@@ -67,7 +68,9 @@ static void lebf_initialize(void)
 
     max_size_array = malloc(PVFS_SERV_NUM_OPS * sizeof(*max_size_array));
     if (max_size_array == NULL)
+    {
         return;
+    }
 
     /*
      * Some messages have extra structures, and even indeterminate sizes
@@ -76,7 +79,8 @@ static void lebf_initialize(void)
      */
     memset(&tmp_dist, 0, sizeof(tmp_dist));
     tmp_dist.dist_name = strdup(PVFS_DIST_BASIC_NAME);
-    if (PINT_dist_lookup(&tmp_dist)) {
+    if (PINT_dist_lookup(&tmp_dist))
+    {
         gossip_err("%s: dist %s does not exist?!?\n",
           __func__, tmp_dist.dist_name);
         exit(1);
@@ -93,18 +97,21 @@ static void lebf_initialize(void)
         PVFS_hint_add(&req.hints, name, PVFS_HINT_MAX_LENGTH, val);
     }
 
-    for (op_type=0; op_type<PVFS_SERV_NUM_OPS; op_type++) {
+    for (op_type = 0; op_type < PVFS_SERV_NUM_OPS; op_type++)
+    {
         memset(&req.u, 0, sizeof(req.u));
         memset(&resp.u, 0, sizeof(resp.u));
         req.op = resp.op = op_type;
         reqsize = 0;
         respsize = 0;
         noreq = 0;
-        switch (op_type) {
+        switch (op_type)
+        {
             case PVFS_SERV_INVALID:
             case PVFS_SERV_PERF_UPDATE:
             case PVFS_SERV_PRECREATE_POOL_REFILLER:
             case PVFS_SERV_JOB_TIMER:
+            case PVFS_SERV_GET_CONFIG:
                 /* never used, skip initialization */
                 continue;
             case PVFS_SERV_GETCONFIG:
@@ -333,7 +340,6 @@ static void lebf_initialize(void)
                 /* nothing special */
                 break;
             case PVFS_SERV_MGMT_SPLIT_DIRENT:
-                req.u.mgmt_split_dirent.dist = &tmp_dist;
                 reqsize = extra_size_PVFS_servreq_mgmt_split_dirent;
                 break;
             case PVFS_SERV_MGMT_GET_USER_CERT:
@@ -363,18 +369,26 @@ static void lebf_initialize(void)
         reqsize += extra_size_PVFS_servreq;
 
         if (noreq)
+        {
             reqsize = 0;
+        }
         else
+        {
             reqsize += check_req_size(&req);
+        }
 
         respsize += check_resp_size(&resp);
 
         if (reqsize > init_big_size)
+        {
             gossip_err("%s: op %d reqsize %d exceeded prealloced %d\n",
               __func__, op_type, reqsize, init_big_size);
+        }
         if (respsize > init_big_size)
+        {
             gossip_err("%s: op %d respsize %d exceeded prealloced %d\n",
               __func__, op_type, respsize, init_big_size);
+        }
         max_size_array[op_type].req = reqsize;
         max_size_array[op_type].resp = respsize;
     }
@@ -397,14 +411,17 @@ static void lebf_finalize(void)
  *
  * returns size on success, -errno on failure
  */
-static int lebf_encode_calc_max_size(
-    enum PINT_encode_msg_type input_type,
-    enum PVFS_server_op op_type)
+static int lebf_encode_calc_max_size(enum PINT_encode_msg_type input_type,
+                                     enum PVFS_server_op op_type)
 {
     if(input_type == PINT_ENCODE_REQ)
+    {
         return(max_size_array[op_type].req);
+    }
     else if(input_type == PINT_ENCODE_RESP)
+    {
         return(max_size_array[op_type].resp);
+    }
 
     return -PVFS_EINVAL;
 }
@@ -438,7 +455,8 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
     if (!buf)
     {
         gossip_err("Error: failed to BMI_malloc memory for response.\n");
-        gossip_err("Error: is BMI address %llu still valid?\n", llu(target_msg->dest));
+        gossip_err("Error: is BMI address %llu still valid?\n",
+                   llu(target_msg->dest));
         ret = -PVFS_ENOMEM;
         goto out;
     }
@@ -448,7 +466,8 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
     target_msg->ptr_current = buf;
 
     /* generic header */
-    memcpy(target_msg->ptr_current, le_bytefield_table.generic_header,
+    memcpy(target_msg->ptr_current,
+           le_bytefield_table.generic_header,
            PINT_ENC_GENERIC_HEADER_SIZE);
     target_msg->ptr_current += PINT_ENC_GENERIC_HEADER_SIZE;
 
@@ -462,9 +481,8 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
  *
  * returns 0 on success, -errno on failure
  */
-static int lebf_encode_req(
-    struct PVFS_server_req *req,
-    struct PINT_encoded_msg *target_msg)
+static int lebf_encode_req(struct PVFS_server_req *req,
+                           struct PINT_encoded_msg *target_msg)
 {
     int ret = 0;
     char **p;
@@ -475,7 +493,9 @@ static int lebf_encode_req(
     ret = encode_common(target_msg, max_size_array[req->op].req);
 
     if (ret)
+    {
         goto out;
+    }
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_encode_req\n");
 
     /* every request has these fields */
@@ -485,11 +505,51 @@ static int lebf_encode_req(
 #define CASE(tag,var) \
     case tag: encode_PVFS_servreq_##var(p,&req->u.var); break
 
-    switch (req->op) {
+    switch (req->op)
+    {
 
         /* call standard function defined in headers */
         CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
+#if 1
         CASE(PVFS_SERV_CREATE, create);
+#else
+    case PVFS_SERV_CREATE: {
+    int i;                                                                 
+    encode_PVFS_credential((p), &(&req->u.create)->credential);
+    encode_PVFS_object_attr((p), &(&req->u.create)->attr);
+    encode_PVFS_fs_id((p), &(&req->u.create)->fs_id);
+    encode_uint32_t((p), &(&req->u.create)->sid_count);
+    encode_uint32_t((p), &(&req->u.create)->datafile_count);
+    encode_uint32_t((p), &(&req->u.create)->datafile_sid_count);
+    encode_PVFS_handle((p), &(&req->u.create)->handle);
+    for (i = 0; i < (&req->u.create)->sid_count; i++)
+    {                                                                      
+        encode_PVFS_SID((p), &(&req->u.create)->sid_array[i]);
+    }                                                                      
+    if ((&req->u.create)->parent &&
+        !PVFS_OID_is_null((&req->u.create)->parent))
+    {                                                                      
+        encode_PVFS_handle((p), (&req->u.create)->parent);
+        for (i = 0; i < (&req->u.create)->sid_count; i++)
+        {                                            
+            encode_PVFS_SID((p), &(&req->u.create)->parent_sid_array[i]);
+        }                                                                  
+    }                                                                      
+    else                                                                   
+    {                                                                      
+        encode_PVFS_handle((p), &PVFS_HANDLE_NULL); 
+    }                                                                      
+    for (i = 0; i < (&req->u.create)->datafile_count; i++)
+    {                                                                      
+        encode_PVFS_handle((p), &(&req->u.create)->datafile_handles[i]);
+    }                                                                      
+    for (i = 0; i < ((&req->u.create)->datafile_sid_count *
+                     (&req->u.create)->datafile_count); i++)
+    {                                                                      
+        encode_PVFS_SID((p), &(&req->u.create)->datafile_sid_array[i]);
+    }          
+    } break;
+#endif
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
         CASE(PVFS_SERV_BATCH_CREATE, batch_create);
@@ -544,6 +604,7 @@ static int lebf_encode_req(
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_GET_CONFIG:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
             gossip_err("%s: invalid operation %d\n", __func__, req->op);
             ret = -PVFS_ENOSYS;
@@ -553,19 +614,19 @@ static int lebf_encode_req(
 #undef CASE
 
     /* although much more may have been allocated */
-    target_msg->total_size = target_msg->ptr_current
-      - (char *) target_msg->buffer_list[0];
+    target_msg->total_size = target_msg->ptr_current -
+                             (char *) target_msg->buffer_list[0];
     target_msg->size_list[0] = target_msg->total_size;
 
     if (target_msg->total_size > max_size_array[req->op].req)
     {
         ret = -PVFS_ENOMEM;
         gossip_err("%s: op %d needed %lld bytes but alloced only %d\n",
-          __func__, req->op, lld(target_msg->total_size),
-          max_size_array[req->op].req);
+                   __func__, req->op, lld(target_msg->total_size),
+                   max_size_array[req->op].req);
     }
 
-  out:
+out:
     return ret;
 }
 
@@ -576,16 +637,17 @@ static int lebf_encode_req(
  *
  * returns 0 on success, -errno on failure
  */
-static int lebf_encode_resp(
-    struct PVFS_server_resp *resp,
-    struct PINT_encoded_msg *target_msg)
+static int lebf_encode_resp(struct PVFS_server_resp *resp,
+                            struct PINT_encoded_msg *target_msg)
 {
     int ret;
     char **p;
 
     ret = encode_common(target_msg, max_size_array[resp->op].resp);
     if (ret)
+    {
         goto out;
+    }
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_encode_resp\n");
 
     /* every response has these fields */
@@ -602,7 +664,8 @@ static int lebf_encode_resp(
     {
 
         /* extra encoding rules for particular responses */
-        switch (resp->op) {
+        switch (resp->op)
+        {
 
         /* call standard function defined in headers */
         CASE(PVFS_SERV_GETCONFIG, getconfig);
@@ -662,6 +725,7 @@ static int lebf_encode_resp(
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_GET_CONFIG:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
             gossip_err("%s: invalid operation %d\n", __func__, resp->op);
             ret = -PVFS_ENOSYS;
@@ -672,18 +736,19 @@ static int lebf_encode_resp(
 #undef CASE
 
     /* although much more may have been allocated */
-    target_msg->total_size = target_msg->ptr_current
-      - (char *) target_msg->buffer_list[0];
+    target_msg->total_size = target_msg->ptr_current -
+                             (char *) target_msg->buffer_list[0];
     target_msg->size_list[0] = target_msg->total_size;
 
-    if (target_msg->total_size > max_size_array[resp->op].resp) {
+    if (target_msg->total_size > max_size_array[resp->op].resp)
+    {
         ret = -PVFS_ENOMEM;
         gossip_err("%s: op %d needed %lld bytes but alloced only %d\n",
-          __func__, resp->op, lld(target_msg->total_size),
-          max_size_array[resp->op].resp);
+                   __func__, resp->op, lld(target_msg->total_size),
+                   max_size_array[resp->op].resp);
     }
 
-  out:
+out:
     return ret;
 }
 
@@ -696,11 +761,10 @@ static int lebf_encode_resp(
  *
  * returns 0 on success, -errno on failure
  */
-static int lebf_decode_req(
-    void *input_buffer,
-    int input_size,
-    struct PINT_decoded_msg *target_msg,
-    PVFS_BMI_addr_t target_addr)
+static int lebf_decode_req(void *input_buffer,
+                           int input_size,
+                           struct PINT_decoded_msg *target_msg,
+                           PVFS_BMI_addr_t target_addr)
 {
     int ret = 0;
     char *ptr = input_buffer;
@@ -716,7 +780,8 @@ static int lebf_decode_req(
 #define CASE(tag,var) \
     case tag: decode_PVFS_servreq_##var(p, &req->u.var); break
 
-    switch (req->op) {
+    switch (req->op)
+    {
 
         /* call standard function defined in headers */
         CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
@@ -776,6 +841,7 @@ static int lebf_decode_req(
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_GET_CONFIG:
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
             gossip_lerr("%s: invalid operation %d.\n", __func__, req->op);
@@ -788,7 +854,8 @@ static int lebf_decode_req(
     if (ptr != (char *) input_buffer + input_size)
     {
         gossip_lerr("%s: op %d consumed %ld bytes, but message was %d bytes.\n",
-                    __func__, req->op, (long)(ptr - (char *) input_buffer), input_size);
+                    __func__, req->op, (long)(ptr - (char *) input_buffer),
+                    input_size);
         ret = -PVFS_EPROTO;
     }
 
@@ -802,11 +869,10 @@ static int lebf_decode_req(
  *
  * returns 0 on success, -errno on failure
  */
-static int lebf_decode_resp(
-    void *input_buffer,
-    int input_size,
-    struct PINT_decoded_msg *target_msg,
-    PVFS_BMI_addr_t target_addr)
+static int lebf_decode_resp(void *input_buffer,
+                            int input_size,
+                            struct PINT_decoded_msg *target_msg,
+                            PVFS_BMI_addr_t target_addr)
 {
     int ret = 0;
     char *ptr = input_buffer;
@@ -820,12 +886,15 @@ static int lebf_decode_resp(
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_resp\n");
 
     if (resp->status != 0) 
+    {
         goto out;
+    }
 
 #define CASE(tag,var) \
     case tag: decode_PVFS_servresp_##var(p,&resp->u.var); break
 
-    switch (resp->op) {
+    switch (resp->op)
+    {
 
         /* call standard function defined in headers */
         CASE(PVFS_SERV_GETCONFIG, getconfig);
@@ -885,6 +954,7 @@ static int lebf_decode_resp(
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_GET_CONFIG:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
             gossip_lerr("%s: invalid operation %d.\n", __func__, resp->op);
             ret = -PVFS_EPROTO;
@@ -893,14 +963,15 @@ static int lebf_decode_resp(
 
 #undef CASE
 
-    if (ptr != (char *) input_buffer + input_size) {
+    if (ptr != (char *) input_buffer + input_size)
+    {
         gossip_lerr("%s: op %d consumed %ld bytes, but message was %d bytes.\n",
                     __func__, resp->op, (long)(ptr - (char *) input_buffer),
                     input_size);
         ret = -PVFS_EPROTO;
     }
 
-  out:
+out:
     return(ret);
 }
 
@@ -910,9 +981,8 @@ static int lebf_decode_resp(
  *
  * no return value 
  */
-static void lebf_encode_rel(
-    struct PINT_encoded_msg *msg,
-    enum PINT_encode_msg_type input_type)
+static void lebf_encode_rel(struct PINT_encoded_msg *msg,
+                            enum PINT_encode_msg_type input_type)
 {
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_encode_rel\n");
     /* just a single buffer to free */
@@ -922,8 +992,10 @@ static void lebf_encode_rel(
     }
     else
     {
-        BMI_memfree(msg->dest, msg->buffer_list[0],
-                    msg->alloc_size_list[0], BMI_SEND);
+        BMI_memfree(msg->dest,
+                    msg->buffer_list[0],
+                    msg->alloc_size_list[0],
+                    BMI_SEND);
     }
 }
 
@@ -937,19 +1009,41 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                             enum PINT_encode_msg_type input_type)
 {
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_rel\n");
-    if (input_type == PINT_DECODE_REQ) {
+    if (input_type == PINT_DECODE_REQ)
+    {
         struct PVFS_server_req *req = &msg->stub_dec.req;
+
         decode_free(req->capability.handle_array);
         decode_free(req->capability.signature);
-        switch (req->op) {
+
+        switch (req->op)
+        {
             case PVFS_SERV_CREATE:
                 decode_free(req->u.create.credential.group_array);
                 decode_free(req->u.create.credential.signature);
                 if (req->u.create.attr.mask & PVFS_ATTR_META_DIST)
+                {
                     decode_free(req->u.create.attr.u.meta.dist);
+                }
+                /* V3 remove this:
                 if (req->u.create.layout.server_list.servers)
-                    decode_free(req->u.create.layout.server_list.servers);
+                {
+                    decode_free(req->u.create.layout.server_list.servers); 
+                }
+                if (req->u.create.datafile_handles)
+                {
+                    decode_free(req->u.create.datafile_handles);
+                }
+                */
+                /* all of the OIDs and SIDs arrays are malloced with 1
+                 * call - sid_array points to the buffer
+                 */
+                if (req->u.create.sid_array)
+                {
+                    decode_free(req->u.create.sid_array);
+                }
                 break;
+
             case PVFS_SERV_BATCH_CREATE:
                 /* decode_free(
                     req->u.batch_create.handle_extent_array.extent_array); */
@@ -977,10 +1071,15 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.mkdir.credential.group_array);
                 decode_free(req->u.mkdir.credential.signature);
                 if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DIST)
+                {
                     decode_free(req->u.mkdir.attr.u.meta.dist);
+                }
                 if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DFILES)
+                {
                     decode_free(req->u.mkdir.attr.u.meta.dfile_array);
-                if (req->u.mkdir.attr.mask & PVFS_ATTR_CAPABILITY) {
+                }
+                if (req->u.mkdir.attr.mask & PVFS_ATTR_CAPABILITY)
+                {
                     decode_free(req->u.mkdir.attr.capability.handle_array);
                     decode_free(req->u.mkdir.attr.capability.signature);
                 }
@@ -994,23 +1093,24 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.setattr.credential.group_array);
                 decode_free(req->u.setattr.credential.signature);
                 if (req->u.setattr.attr.mask & PVFS_ATTR_META_DIST)
-                    decode_free(req->u.setattr.attr.u.meta.dist);
-                if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
-                    decode_free(req->u.setattr.attr.u.meta.dfile_array);
-                if (req->u.setattr.attr.mask
-                        & PVFS_ATTR_DISTDIR_ATTR)
                 {
-                    if(req->u.setattr.attr.dist_dir_bitmap)
+                    decode_free(req->u.setattr.attr.u.meta.dist);
+                }
+                if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
+                {
+                    decode_free(req->u.setattr.attr.u.meta.dfile_array);
+                }
+                if (req->u.setattr.attr.mask & PVFS_ATTR_DISTDIR_ATTR)
+                {
+                    if(req->u.setattr.attr.u.dir.dist_dir_bitmap)
                     {
-                        decode_free
-                            (req->u.setattr.attr.dist_dir_bitmap);
-                        req->u.setattr.attr.dist_dir_bitmap = NULL;
+                        decode_free(req->u.setattr.attr.u.dir.dist_dir_bitmap);
+                        req->u.setattr.attr.u.dir.dist_dir_bitmap = NULL;
                     }
-                    if(req->u.setattr.attr.dirdata_handles)
+                    if(req->u.setattr.attr.u.dir.dirdata_handles)
                     {
-                        decode_free
-                            (req->u.setattr.attr.dirdata_handles);
-                        req->u.setattr.attr.dirdata_handles = NULL;
+                        decode_free(req->u.setattr.attr.u.dir.dirdata_handles);
+                        req->u.setattr.attr.u.dir.dirdata_handles = NULL;
                     }
                 }
                 break;
@@ -1039,7 +1139,9 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 
             case PVFS_SERV_LISTATTR:
                 if (req->u.listattr.handles)
+                {
                     decode_free(req->u.listattr.handles);
+                }
                 break;
 
             case PVFS_SERV_GETATTR:
@@ -1103,13 +1205,16 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_PERF_UPDATE:
             case PVFS_SERV_PRECREATE_POOL_REFILLER:
             case PVFS_SERV_JOB_TIMER:
-            case PVFS_SERV_PROTO_ERROR:            
+            case PVFS_SERV_GET_CONFIG:
+            case PVFS_SERV_PROTO_ERROR:
             case PVFS_SERV_NUM_OPS:  /* sentinel */
                 gossip_lerr("%s: invalid request operation %d.\n",
                   __func__, req->op);
                 break;
         }
-    } else if (input_type == PINT_DECODE_RESP) {
+    }
+    else if (input_type == PINT_DECODE_RESP)
+    {
         struct PVFS_server_resp *resp = &msg->stub_dec.resp;
 
         if(resp->status == 0)
@@ -1117,13 +1222,13 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             switch (resp->op)
             {                
                 case PVFS_SERV_LOOKUP_PATH: 
-                    {
-                        struct PVFS_servresp_lookup_path *lookup =
-                            &resp->u.lookup_path;
-                        decode_free(lookup->handle_array);
-                        decode_free(lookup->attr_array);
-                        break;
-                    }
+                {
+                    struct PVFS_servresp_lookup_path *lookup =
+                                 &resp->u.lookup_path;
+                    decode_free(lookup->handle_array);
+                    decode_free(lookup->attr_array);
+                    break;
+                }
                 
                 case PVFS_SERV_READDIR:
                     decode_free(resp->u.readdir.dirent_array);
@@ -1143,48 +1248,65 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 
                 case PVFS_SERV_CREATE:
                     decode_free(resp->u.create.capability.signature);
+                    /* V3 remove this:
                     decode_free(resp->u.create.capability.handle_array);
-                    decode_free(resp->u.create.datafile_handles);
+                    decode_free(resp->u.create.datafile_handles); */
                     break;
 
                 case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
-                    decode_free(resp->u.mgmt_dspace_info_list.dspace_info_array);
+                    decode_free(
+                           resp->u.mgmt_dspace_info_list.dspace_info_array);
                     break;
 
                 case PVFS_SERV_GETATTR:
                     if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DIST)
+                    {
                         decode_free(resp->u.getattr.attr.u.meta.dist);
-                    if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
-                       decode_free(resp->u.getattr.attr.u.meta.dfile_array);
-                    if (resp->u.getattr.attr.mask 
-                         & PVFS_ATTR_META_MIRROR_DFILES)
-                       decode_free
-                        (resp->u.getattr.attr.u.meta.mirror_dfile_array);
-                    if (resp->u.getattr.attr.mask & PVFS_ATTR_CAPABILITY) {
-                        decode_free(resp->u.getattr.attr.capability.handle_array);
-                        decode_free(resp->u.getattr.attr.capability.signature);
                     }
-                    if (resp->u.getattr.attr.mask
-                         & PVFS_ATTR_DISTDIR_ATTR)
+                    if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
+                    {
+                       decode_free(resp->u.getattr.attr.u.meta.dfile_array);
+                    }
+#if 0
+                    if (resp->u.getattr.attr.mask &
+                        PVFS_ATTR_META_MIRROR_DFILES)
                     {
                        decode_free
-                        (resp->u.getattr.attr.dist_dir_bitmap);
+                        (resp->u.getattr.attr.u.meta.mirror_dfile_array);
+                    }
+#endif
+                    if (resp->u.getattr.attr.mask & PVFS_ATTR_CAPABILITY)
+                    {
+                        decode_free(
+                               resp->u.getattr.attr.capability.handle_array);
+                        decode_free(resp->u.getattr.attr.capability.signature);
+                    }
+                    if (resp->u.getattr.attr.mask & PVFS_ATTR_DISTDIR_ATTR)
+                    {
                        decode_free
-                        (resp->u.getattr.attr.dirdata_handles);
+                        (resp->u.getattr.attr.u.dir.dist_dir_bitmap);
+                       decode_free
+                        (resp->u.getattr.attr.u.dir.dirdata_handles);
                     }
                     break;
 
                 case PVFS_SERV_UNSTUFF:
                     if (resp->u.unstuff.attr.mask & PVFS_ATTR_META_DIST)
+                    {
                         decode_free(resp->u.unstuff.attr.u.meta.dist);
+                    }
                     if (resp->u.unstuff.attr.mask & PVFS_ATTR_META_DFILES)
                     {
                         decode_free(resp->u.unstuff.attr.u.meta.dfile_array);
                     }
+#if 0
                     if (resp->u.unstuff.attr.mask 
                          & PVFS_ATTR_META_MIRROR_DFILES)
-                       decode_free
-                        (resp->u.unstuff.attr.u.meta.mirror_dfile_array);
+                    {
+                         decode_free(
+                              resp->u.unstuff.attr.u.meta.mirror_dfile_array);
+                    }
+#endif
                     break;
 
                 case PVFS_SERV_MGMT_EVENT_MON:
@@ -1194,94 +1316,98 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_GETEATTR:
                     /* need a loop here?  WBL */
                     if (resp->u.geteattr.val)
+                    {
                         decode_free(resp->u.geteattr.val);
+                    }
                     break;
                 case PVFS_SERV_ATOMICEATTR:
                     /* need a loop here? */
                     if (resp->u.geteattr.val)
+                    {
                         decode_free(resp->u.geteattr.val);
+                    }
                     break;
                 case PVFS_SERV_LISTEATTR:
                     if (resp->u.listeattr.key)
+                    {
                         decode_free(resp->u.listeattr.key);
+                    }
                     break;
                 case PVFS_SERV_LISTATTR:
-                    {
+                {
                      int i;
                      if (resp->u.listattr.error)
+                     {
                          decode_free(resp->u.listattr.error);
-                     if (resp->u.listattr.attr) {
-                         for (i = 0; i < resp->u.listattr.nhandles; i++) {
-                          if (resp->u.listattr.attr[i].mask &
-                                   PVFS_ATTR_META_DIST)
-                           decode_free(resp->u.listattr.attr[i].u.meta.dist);
-                          if (resp->u.listattr.attr[i].mask &
-                                   PVFS_ATTR_META_DFILES)
-                          {
-                           decode_free(
-                              resp->u.listattr.attr[i].u.meta.dfile_array);
-                          }
-                          if(resp->u.listattr.attr[i].mask &
-                             PVFS_ATTR_META_MIRROR_DFILES)
-                            decode_free(
-                          resp->u.listattr.attr[i].u.meta.mirror_dfile_array);
-                          if (resp->u.listattr.attr[i].mask & 
-                              PVFS_ATTR_CAPABILITY) {
-                           decode_free(
-                             resp->u.listattr.attr[i].capability.handle_array);
-                           decode_free(
-                             resp->u.listattr.attr[i].capability.signature);
-                          }
+                     }
+                     if (resp->u.listattr.attr)
+                     {
+                         for (i = 0; i < resp->u.listattr.nhandles; i++)
+                         {
+                             if (resp->u.listattr.attr[i].mask &
+                                 PVFS_ATTR_META_DIST)
+                             {
+                                 decode_free(resp->u.listattr.attr[i].u.meta.dist);
+                             }
+                             if (resp->u.listattr.attr[i].mask &
+                                 PVFS_ATTR_META_DFILES)
+                             {
+                                 decode_free(
+                                   resp->u.listattr.attr[i].u.meta.dfile_array);
+                             }
+#if 0
+                             if(resp->u.listattr.attr[i].mask &
+                                 PVFS_ATTR_META_MIRROR_DFILES)
+                             {
+                                 decode_free(
+                                       resp->u.listattr.attr[i].u.meta.mirror_dfile_array);
+                             }
+#endif
+                             if (resp->u.listattr.attr[i].mask & 
+                                 PVFS_ATTR_CAPABILITY)
+                             {
+                                 decode_free(
+                                       resp->u.listattr.attr[i].capability.handle_array);
+                                 decode_free(
+                                       resp->u.listattr.attr[i].capability.signature);
+                             }
                          }/*end for*/
                          decode_free(resp->u.listattr.attr);
                      }/*end if attr*/
-                        break;
-                    }/*end case*/
+                     break;
+                }/*end case*/
 
                 case PVFS_SERV_MIRROR:
-                   {
-                      decode_free(resp->u.mirror.bytes_written);
-                      decode_free(resp->u.mirror.write_status_code);
-                      break;
-                   }
+                    decode_free(resp->u.mirror.bytes_written);
+                    decode_free(resp->u.mirror.write_status_code);
+                    break;
 
                 case PVFS_SERV_TREE_REMOVE:
-                   {
-                      decode_free(resp->u.tree_remove.status);
-                      break;
-                   }
+                    decode_free(resp->u.tree_remove.status);
+                    break;
 
                 case PVFS_SERV_TREE_GET_FILE_SIZE:
-                   {
-                      decode_free(resp->u.tree_get_file_size.size);
-                      decode_free(resp->u.tree_get_file_size.error);
-                      break;
-                   }
+                    decode_free(resp->u.tree_get_file_size.size);
+                    decode_free(resp->u.tree_get_file_size.error);
+                    break;
 
                 case PVFS_SERV_TREE_GETATTR:
-                   {
-                      decode_free(resp->u.tree_getattr.attr);
-                      decode_free(resp->u.tree_getattr.error);
-                      break;
-                   }
+                    decode_free(resp->u.tree_getattr.attr);
+                    decode_free(resp->u.tree_getattr.error);
+                    break;
 
                 case PVFS_SERV_MGMT_GET_UID:
-                   {
-                      decode_free(resp->u.mgmt_get_uid.uid_info_array);
-                      break;
-                   }
+                    decode_free(resp->u.mgmt_get_uid.uid_info_array);
+                    break;
 
                 case PVFS_SERV_MGMT_GET_USER_CERT:
-                   { 
-                      decode_free(resp->u.mgmt_get_user_cert.cert.buf);                      
-                      break;
-                   }
+                    decode_free(resp->u.mgmt_get_user_cert.cert.buf); 
+                    break;
 
                 case PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ:
-                   {
-                      decode_free(resp->u.mgmt_get_user_cert_keyreq.public_key.buf);
-                      break;
-                   }
+                    decode_free(
+                           resp->u.mgmt_get_user_cert_keyreq.public_key.buf);
+                    break;
 
                 case PVFS_SERV_GETCONFIG:
                 case PVFS_SERV_REMOVE:
@@ -1310,12 +1436,13 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_MGMT_GET_DIRENT:
                 case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
                 case PVFS_SERV_MGMT_SPLIT_DIRENT:
-                  /*nothing to free */
-                   break;
+                    /*nothing to free */
+                    break;
                 case PVFS_SERV_INVALID:
                 case PVFS_SERV_PERF_UPDATE:
                 case PVFS_SERV_PRECREATE_POOL_REFILLER:
                 case PVFS_SERV_JOB_TIMER:
+                case PVFS_SERV_GET_CONFIG:
                 case PVFS_SERV_NUM_OPS:  /* sentinel */
                     gossip_lerr("%s: invalid response operation %d.\n",
                                 __func__, resp->op);
@@ -1363,7 +1490,8 @@ static void zero_credential(PVFS_credential *cred)
     cred->sig_size = 0;
 }
 
-static PINT_encoding_functions lebf_functions = {
+static PINT_encoding_functions lebf_functions =
+{
     lebf_encode_req,
     lebf_encode_resp,
     lebf_decode_req,
@@ -1373,7 +1501,8 @@ static PINT_encoding_functions lebf_functions = {
     lebf_encode_calc_max_size
 };
 
-PINT_encoding_table_values le_bytefield_table = {
+PINT_encoding_table_values le_bytefield_table =
+{
     &lebf_functions,
     "little endian bytefield",
     lebf_initialize,

@@ -283,7 +283,7 @@ void PINT_encode_release(struct PINT_encoded_msg* input_buffer,
     if (ENCODING_IS_SUPPORTED(input_buffer->enc_type))
     {
         PINT_encoding_table[input_buffer->enc_type]->op->encode_release(
-            input_buffer, input_type);
+                            input_buffer, input_type);
     }
     else
     {
@@ -306,7 +306,7 @@ void PINT_decode_release(struct PINT_decoded_msg* input_buffer,
     if (ENCODING_IS_SUPPORTED(input_buffer->enc_type))
     {
         PINT_encoding_table[input_buffer->enc_type]->op->decode_release(
-            input_buffer, input_type);
+                            input_buffer, input_type);
     }
     else if (input_buffer->enc_type == -1)
     {

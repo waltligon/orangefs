@@ -30,10 +30,13 @@ int PINT_string_next_segment(
     char *pathname,
     char **inout_segp,
     void **opaquep);
+/* V3 */
+#if 0
 int PINT_parse_handle_ranges(
     char *range, 
     PVFS_handle_extent *out_extent,
     int *status);
+#endif
 int PINT_get_next_path(
     char* path,
     char** newpath,

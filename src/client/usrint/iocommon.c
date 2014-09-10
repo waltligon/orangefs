@@ -221,15 +221,6 @@ int iocommon_lookup_absolute(const char *abs_path,
     /* let's try to do the lookup */
 
     errno = 0;
-/* what was this? it was in working ??? */
-#if 0
-    rc = PVFS_sys_lookup(lookup_fs_id,
-                         pvfs_path,
-                         credential,
-                         &resp_lookup,
-                         PVFS2_LOOKUP_LINK_FOLLOW,
-                         NULL);
-#endif
     rc = PVFS_sys_lookup(Ppath->fs_id,
                          Ppath->pvfs_path,
                          credential,
@@ -952,6 +943,8 @@ pvfs_descriptor *iocommon_open(const char *path,
                 /* object was looked up completely */
                 file_ref.fs_id = Ppath->fs_id;
                 file_ref.handle = Ppath->handle;
+                file_ref.sid_count = Ppath->sid_count;
+                file_ref.sid_array = Ppath->sid_array;
                 goto found;
             }
             /* object was partly looked up */
@@ -1007,6 +1000,8 @@ pvfs_descriptor *iocommon_open(const char *path,
                     /* found pvfs file */
                     file_ref.fs_id = Ppath->fs_id;
                     file_ref.handle = Ppath->handle;
+                    file_ref.sid_count = Ppath->sid_count;
+                    file_ref.sid_array = Ppath->sid_array;
                     if (need_to_free)
                     {
                         PVFS_free_path(Ppath);
@@ -1064,6 +1059,8 @@ pvfs_descriptor *iocommon_open(const char *path,
             {
                 file_ref.fs_id = Ppath->fs_id;
                 file_ref.handle = Ppath->handle;
+                file_ref.sid_count = Ppath->sid_count;
+                file_ref.sid_array = Ppath->sid_array;
                 PVFS_free_path(Ppath);
                 free(tmp_path);
                 goto found;
@@ -1125,6 +1122,8 @@ pvfs_descriptor *iocommon_open(const char *path,
             {
                 file_ref.fs_id = Ppath->fs_id;
                 file_ref.handle = Ppath->handle;
+                file_ref.sid_count = Ppath->sid_count;
+                file_ref.sid_array = Ppath->sid_array;
                 PVFS_free_path(Ppath);
                 goto createfile;
             }
@@ -1167,6 +1166,8 @@ pvfs_descriptor *iocommon_open(const char *path,
             {
                 parent_ref.fs_id = Ppath->fs_id;
                 parent_ref.handle = Ppath->handle;
+                parent_ref.sid_count = Ppath->sid_count;
+                parent_ref.sid_array = Ppath->sid_array;
                 PVFS_free_path(Ppath);
                 free(tmp_path);
                 goto createfile;

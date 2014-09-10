@@ -25,7 +25,7 @@
 #define MAX_PVFS_STRERROR_LEN 256
 
 /* static global controls whether pvfs_sys calls print user errors */
-static int pvfs_perror_gossip_silent = 0;
+static int pvfs_perror_gossip_silent = 1;
 
 /* macro defined in include/pvfs2-types.h */
 DECLARE_ERRNO_MAPPING_AND_FN();
@@ -78,6 +78,10 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
  */
 void PVFS_perror(const char *text, int retcode)
 {
+    if (pvfs_perror_gossip_silent)
+    {
+        return;
+    }
     /* TODO: test 
     if (IS_PVFS_NON_ERRNO_ERROR(-retcode))
     {

@@ -100,7 +100,7 @@ machine pvfs2_client_remove_sm
     state rmdirent_retry_or_fail
     {
         run remove_rmdirent_retry_or_fail;
-	RMDIRENT_RETRY => rmdirent_timer;
+        RMDIRENT_RETRY => rmdirent_timer;
         RMDIRENT_RETRY_NEED_GETATTR => rmdirent_getattr_setup;
         default => cleanup;
     }
@@ -374,8 +374,8 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
 
     dirdata_server_index =
         PINT_find_dist_dir_bucket(dirdata_hash,
-            &sm_p->getattr.attr.dist_dir_attr,
-            sm_p->getattr.attr.dist_dir_bitmap);
+            &sm_p->getattr.attr.u.dir.dist_dir_attr,
+            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove: selecting bucket No.%d from dist_dir_bitmap.\n",
             dirdata_server_index);
 
@@ -389,7 +389,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
                  sm_p->parent_ref.handle,
                  sm_p->parent_ref.sid_count,
                  sm_p->parent_ref.sid_array,
-                 sm_p->getattr.attr.dirdata_handles[dirdata_server_index],
+                 sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
                  sm_p->u.remove.object_name,
                  sm_p->hints);
 
@@ -398,7 +398,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
           sm_p->u.remove.object_name,
           PVFS_OID_str(&sm_p->parent_ref.handle),
           sm_p->parent_ref.fs_id,
-          PVFS_OID_str(&sm_p->getattr.attr.dirdata_handles[
+          PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
                                            dirdata_server_index])
           );
 
@@ -407,7 +407,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     /* send to dirdata server */
     msg_p->handle =
-        sm_p->getattr.attr.dirdata_handles[dirdata_server_index];
+        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
     msg_p->sid_count = sm_p->parent_ref.sid_count;
     msg_p->sid_index = 0;
     msg_p->sid_array = sm_p->parent_ref.sid_array;
@@ -418,7 +418,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
     if (ret)
     {
         gossip_err("Failed to map directory server address\n");
-	js_p->error_code = ret;
+        js_p->error_code = ret;
     }
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing RMDIRENT on %s "
@@ -464,6 +464,7 @@ static PINT_sm_action remove_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index;
+    int dirdata_sid_index;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: crdirent_setup_msgpair\n");
@@ -473,19 +474,23 @@ static PINT_sm_action remove_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     
     /* find the hash value and the dist dir bucket */
     dirdata_hash = PINT_encrypt_dirdata(sm_p->u.remove.object_name);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove: encrypt dirent %s into hash value %llu.\n",
-            sm_p->u.remove.object_name,
-            llu(dirdata_hash));
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove: encrypt dirent %s into hash value %llu.\n",
+                 sm_p->u.remove.object_name,
+                 llu(dirdata_hash));
             
     dirdata_server_index =
-        PINT_find_dist_dir_bucket(dirdata_hash,
-            &sm_p->getattr.attr.dist_dir_attr,
-            sm_p->getattr.attr.dist_dir_bitmap);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove: selecting bucket No.%d from dist_dir_bitmap.\n",
-            dirdata_server_index);
+            PINT_find_dist_dir_bucket(dirdata_hash,
+                    &sm_p->getattr.attr.u.dir.dist_dir_attr,
+                    sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    dirdata_sid_index = dirdata_server_index * sm_p->parent_ref.sid_count;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove: selecting bucket No.%d from dist_dir_bitmap.\n",
+                 dirdata_server_index);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove: dirdata_handle: %s\n",
-        PVFS_OID_str(&attr->dirdata_handles[dirdata_server_index]));
+            PVFS_OID_str(&attr->u.dir.dirdata_handles[dirdata_server_index]));
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -494,14 +499,15 @@ static PINT_sm_action remove_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                           msg_p->req,
                           sm_p->parent_capability,
                           *sm_p->cred_p,
-                          sm_p->u.remove.object_name,
                           sm_p->parent_ref.fs_id,
-                          sm_p->parent_ref.handle,
-                          attr->dirdata_handles[dirdata_server_index],
+                          attr->u.dir.dirdata_handles[dirdata_server_index],
                           sm_p->parent_ref.sid_count,
-                          sm_p->parent_ref.sid_array,
+                          &attr->u.dir.dirdata_sids[dirdata_sid_index],
+                          sm_p->u.remove.object_name,
                           sm_p->object_ref.handle,
                           sm_p->object_ref.sid_array,
+                          sm_p->parent_ref.handle,
+                          sm_p->parent_ref.sid_array,
                           sm_p->hints);
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing CRDIRENT of %s (%s,%d) "
@@ -511,18 +517,17 @@ static PINT_sm_action remove_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                  sm_p->object_ref.fs_id,
                  PVFS_OID_str(&sm_p->parent_ref.handle),
                  sm_p->parent_ref.fs_id,
-                 PVFS_OID_str(&attr->dirdata_handles[dirdata_server_index])
+                 PVFS_OID_str(&attr->u.dir.dirdata_handles[dirdata_server_index])
                  );
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     /* send to dirdata server */
-    msg_p->handle =
-        attr->dirdata_handles[dirdata_server_index];
+    msg_p->handle = attr->u.dir.dirdata_handles[dirdata_server_index];
     msg_p->sid_count = sm_p->parent_ref.sid_count;
     msg_p->sid_index = 0;
-    msg_p->sid_array = sm_p->parent_ref.sid_array;
+    msg_p->sid_array = &attr->u.dir.dirdata_sids[dirdata_sid_index];
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = remove_crdirent_comp_fn;
 
@@ -614,7 +619,7 @@ static PINT_sm_action remove_generic_timer(struct PINT_smcb *smcb,
                                    0,
                                    js_p,
                                    &tmp_id,
-	                           pint_client_sm_context);
+                                   pint_client_sm_context);
 
     return ret;
 }
@@ -643,20 +648,20 @@ static PINT_sm_action remove_crdirent_retry_or_fail(struct PINT_smcb *smcb,
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
         (sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit))
     {
-	sm_p->u.remove.retry_count++;
-	js_p->error_code = CRDIRENT_RETRY;
-	return SM_ACTION_COMPLETE;
+        sm_p->u.remove.retry_count++;
+        js_p->error_code = CRDIRENT_RETRY;
+        return SM_ACTION_COMPLETE;
     }
 
     if ((js_p->error_code == -PVFS_EEXIST) &&
         (sm_p->u.remove.retry_count > 0))
     {
-	/* assume everything worked out ok and we got the right
-	 * directory entry back.  there was just a transient network
-	 * problem along the way
-	 */
-	js_p->error_code = 0;
-	return SM_ACTION_COMPLETE;
+        /* assume everything worked out ok and we got the right
+         * directory entry back.  there was just a transient network
+         * problem along the way
+         */
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
     }
 
     sm_p->u.remove.stored_error_code = js_p->error_code;
@@ -694,24 +699,24 @@ static PINT_sm_action remove_rmdirent_retry_or_fail(struct PINT_smcb *smcb,
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
-	(sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit))
+        (sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit))
     {
-	sm_p->u.remove.retry_count++;
-	js_p->error_code = RMDIRENT_RETRY;
-	return SM_ACTION_COMPLETE;
+        sm_p->u.remove.retry_count++;
+        js_p->error_code = RMDIRENT_RETRY;
+        return SM_ACTION_COMPLETE;
     }
 
     if ((js_p->error_code == -PVFS_ENOENT) &&
         (sm_p->u.remove.retry_count > 0))
     {
-	/* this is a tricky error case.  Server reports ENOENT, but
-	 * this is not the first time we attempted the rmdirent.  It
-	 * may be the case that it is reporting ENOENT because one of
-	 * the earlier retries possibly completed.  We will treat this
-	 * as success, but put out an error message.  This could
-	 * strand objects, or remove non-empty directories, for
-	 * example.
-	 */
+        /* this is a tricky error case.  Server reports ENOENT, but
+         * this is not the first time we attempted the rmdirent.  It
+         * may be the case that it is reporting ENOENT because one of
+         * the earlier retries possibly completed.  We will treat this
+         * as success, but put out an error message.  This could
+         * strand objects, or remove non-empty directories, for
+         * example.
+         */
         gossip_err("Warning: Received ENOENT on retry to remove entry %s.\n",
                    sm_p->u.remove.object_name);
 

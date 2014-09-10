@@ -35,6 +35,7 @@
 #include "pvfs2-mirror.h"
 #include "state-machine.h"
 #include "pint-event.h"
+#include "server-config.h"
 
 
 extern job_context_id server_job_context;
@@ -74,13 +75,21 @@ enum PINT_server_req_permissions
     PINT_SERVER_CHECK_CRDIRENT = 5 /* special case for crdirent operations;
                                       needs write and execute */
 };
-
+ 
 /* used to keep a random, but handy, list of keys around */
 typedef struct PINT_server_trove_keys
 {
     char *key;
     int size;
 } PINT_server_trove_keys_s;
+
+/* wrapper object that keeps track of all of the servers where a given OID is stored */
+typedef struct PINT_handle_SID_store_object
+{
+    int32_t count; /* This number should match the associated number of copies set for this OID */
+    PVFS_handle handle;
+    PVFS_SID *sids;
+} PINT_handle_SID_s;
 
 /* This is defined in src/server/pvfs2-server.c
  * These values index this table
@@ -89,15 +98,15 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 /* Reserved keys */
 enum 
 {
-    ROOT_HANDLE_KEY      = 0,
-    DIR_ENT_KEY          = 1,
-    METAFILE_HANDLES_KEY = 2,
-    METAFILE_DIST_KEY    = 3,
-    SYMLINK_TARGET_KEY   = 4,
-    METAFILE_LAYOUT_KEY  = 5,
-    NUM_DFILES_REQ_KEY   = 6,       
-    DIST_DIR_ATTR_KEY    = 7,
-    DIST_DIRDATA_BITMAP_KEY      = 8,
+    ROOT_HANDLE_KEY          = 0,
+    DIR_ENT_KEY              = 1,
+    METAFILE_HANDLES_KEY     = 2,
+    METAFILE_DIST_KEY        = 3,
+    SYMLINK_TARGET_KEY       = 4,
+    METAFILE_LAYOUT_KEY      = 5,
+    NUM_DFILES_REQ_KEY       = 6,       
+    DIST_DIR_ATTR_KEY        = 7,
+    DIST_DIRDATA_BITMAP_KEY  = 8,
     DIST_DIRDATA_HANDLES_KEY = 9
 
 };
@@ -113,14 +122,14 @@ enum
 /* optional; user-settable keys */
 enum 
 {
-    DIST_NAME_KEY        = 0,
-    DIST_PARAMS_KEY      = 1,
-    NUM_DFILES_KEY       = 2,
-    NUM_SPECIAL_KEYS     = 3, /* not an index */
-    METAFILE_HINT_KEY    = 3,
-    MIRROR_COPIES_KEY    = 4,
-    MIRROR_HANDLES_KEY   = 5,
-    MIRROR_STATUS_KEY    = 6,
+    DIST_NAME_KEY          = 0,
+    DIST_PARAMS_KEY        = 1,
+    DEFAULT_NUM_DFILES_KEY = 2,
+    NUM_SPECIAL_KEYS       = 3, /* not an index */
+    METAFILE_HINT_KEY      = 3,
+    MIRROR_COPIES_KEY      = 4,
+    MIRROR_HANDLES_KEY     = 5,
+    MIRROR_STATUS_KEY      = 6,
 };
 
 typedef enum
@@ -147,11 +156,20 @@ typedef enum
     SERVER_PRECREATE_INIT      = (1 << 18),
     SERVER_UID_MGMT_INIT       = (1 << 19), 
     SERVER_SECURITY_INIT       = (1 << 20),
-    SERVER_CAPCACHE_INIT       = (1 << 21),
-    SERVER_CREDCACHE_INIT      = (1 << 22),
-    SERVER_CERTCACHE_INIT      = (1 << 23),
-    SERVER_SID_INIT            = (1 << 24)
+    SERVER_SID_INIT            = (1 << 21),
+    SERVER_FILESYS_INIT        = (1 << 22),
+    SERVER_BMI_CLIENT_INIT     = (1 << 23),
+    SERVER_CAPCACHE_INIT       = (1 << 24),
+    SERVER_CREDCACHE_INIT      = (1 << 25),
+    SERVER_CERTCACHE_INIT      = (1 << 26),
 } PINT_server_status_flag;
+
+/* this combination of flags is used to control pre-init of the server
+ * when reading a remove config file
+ */
+#define SERVER_CLIENT_INIT \
+            SERVER_BMI_CLIENT_INIT | SERVER_TROVE_INIT | SERVER_FILESYS_INIT |\
+            SERVER_FLOW_INIT | SERVER_CACHED_CONFIG_INIT
 
 typedef enum
 {   
@@ -163,13 +181,16 @@ typedef enum
 
 struct PINT_server_create_op
 {
+/* V3 */
+#if 0
     const char **io_servers;
     const char **remote_io_servers;
     int num_io_servers;
-    PVFS_handle* handle_array_local; 
     PVFS_handle* handle_array_remote; 
-    int handle_array_local_count;
     int handle_array_remote_count;
+#endif
+    PVFS_handle* handle_array_local; 
+    int handle_array_local_count;
     PVFS_error saved_error_code;
     int handle_index;
 };
@@ -350,6 +371,8 @@ struct PINT_server_lookup_op
     PVFS_ds_attributes *ds_attr_array;
     PVFS_object_attr attr;
 
+    PVFS_ID *keyval_temp_store;
+
     int dirdata_server_index;
     int dirdata_sid_index;
 };
@@ -359,6 +382,7 @@ struct PINT_server_readdir_op
     uint64_t directory_version;
     PVFS_handle dirent_handle;  /* holds handle of dirdata dspace from
                                    which entries are read */
+    PVFS_ID *keyval_db_entries;
     PVFS_size dirdata_size;
 };
 
@@ -370,37 +394,43 @@ typedef struct
 
 struct PINT_server_crdirent_op
 {
+#if 0
     PVFS_credential credential;
+#endif
     PVFS_capability capability;
+#if 0
     char *name;
-    PVFS_handle new_handle;
-    PVFS_SID *new_sid;
-    PVFS_handle parent_handle;
-    PVFS_SID *parent_sid;
-    PVFS_fs_id fs_id;
-    PVFS_handle dirent_handle;  /* holds handle of dirdata dspace that
-                                 * we'll write the dirent into */
-    PVFS_SID *dirent_sid;
-    PVFS_size dirent_count;
-    PVFS_size sid_count;
+    PVFS_handle new_handle;     /* handle of new entry */
+    PVFS_SID   *new_sid;        /* sids of new entry */
+    PVFS_handle parent_handle;  /* handle of dir (metadata) */
+    PVFS_SID   *parent_sid;     /* sids of dir (metadata) */
+    PVFS_fs_id  fs_id;
+    PVFS_handle dirdata_handle; /* holds handle of dirdata dspace that */
+                                /* we'll write the dirent into */
+    PVFS_SID   *dirdata_sid;    /* sids of dirdata we write dirent to */
+    PVFS_size   dirent_count;   /* number of dirents in target dirdata */
+    PVFS_size   sid_count;      /* All should be the metadata const */
+#endif
     PVFS_ds_keyval_handle_info keyval_handle_info;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
+    PVFS_ID *keyval_temp_store;
 
     /* index of node to receive directory entries when a split is necessary. */
     int split_node;
 
-    /* Save the old directory attrs in case we have to back out due to an error. */
+    /* Save old directory attrs in case we have to back out due to an error. */
     PVFS_object_attr saved_attr;
 
     /* variables used for sending mgmt_split_dirent request */
-    PVFS_BMI_addr_t svr_addr; /*destination server address*/
-    PVFS_error *split_status; /*status from PVFS_SERV_MGMT_SPLIT_DIRENT*/
-    PINT_dist *dist; /*distribution structure for basic_dist*/
+    PVFS_BMI_addr_t svr_addr; /* destination server address */
+    PVFS_error *split_status; /* status from PVFS_SERV_MGMT_SPLIT_DIRENT */
+    PINT_dist  *dist;         /* distribution structure for basic_dist */
     int read_all_directory_entries;
     int nentries;
     PVFS_handle *entry_handles;
-    char **entry_names;
+    PVFS_SID    *entry_sid;
+    char       **entry_names;
     int num_msgs_required;
     split_msg_boundary *msg_boundaries;
     PVFS_ds_keyval *entries_key_a;
@@ -412,6 +442,7 @@ struct PINT_server_rmdirent_op
     PVFS_handle dirdata_handle;
     PVFS_handle entry_handle; /* holds handle of dirdata object,
                                * removed entry */
+    PVFS_SID *sid_array;
     PVFS_size dirent_count;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
@@ -420,8 +451,11 @@ struct PINT_server_rmdirent_op
 struct PINT_server_chdirent_op
 {
     PVFS_handle dirdata_handle;
-    PVFS_handle old_dirent_handle;
-    PVFS_handle new_dirent_handle;
+    PVFS_handle *old_dirent_handle;      /* buffer for old info from dirent */
+    PVFS_SID *old_sid_array;
+    int32_t old_sid_count;
+    
+    int dir_attr_update_required;
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
 };
@@ -462,7 +496,12 @@ struct PINT_server_mgmt_remove_dirent_op
     PVFS_handle dirdata_handle;
 };
 
-/* WBL V# removing precreate */
+struct PINT_server_mgmt_split_dirent_op
+{
+    PVFS_ID *keyval_temp_store;
+};
+
+/* WBL V3 removing precreate */
 #if 0
 struct PINT_server_precreate_pool_refiller_op
 {
@@ -491,7 +530,10 @@ struct PINT_server_batch_remove_op
 
 struct PINT_server_mgmt_get_dirdata_op
 {
-    PVFS_handle dirdata_handle;
+    PVFS_ID *keyval_temp_array;
+
+    PVFS_SID *sid_array;
+    int sid_count;
 };
 
 struct PINT_server_getconfig_op
@@ -599,6 +641,7 @@ struct PINT_server_tree_communicate_op
 struct PINT_server_mgmt_get_dirent_op
 {
     PVFS_handle handle;
+    PVFS_ID *keyval_temp_store;
 };
 
 struct PINT_server_mgmt_create_root_dir_op
@@ -657,13 +700,14 @@ typedef struct PINT_server_op
     PVFS_object_attr attr;
 
     PVFS_BMI_addr_t addr;   /* address of client that contacted us */
-    bmi_msg_tag_t tag; /* operation tag */
+    bmi_msg_tag_t tag;      /* operation tag */
     /* information about unexpected message that initiated this operation */
     struct BMI_unexpected_info unexp_bmi_buff;
 
     /* decoded request and response structures */
     struct PVFS_server_req *req; 
     struct PVFS_server_resp resp; 
+
     /* encoded request and response structures */
     struct PINT_encoded_msg encoded;
     struct PINT_decoded_msg decoded;
@@ -680,6 +724,9 @@ typedef struct PINT_server_op
     enum PINT_server_sched_policy sched_policy;
 
     int num_pjmp_frames;
+
+    /* Used just about everywhere so this is a std place to keep it */
+    int32_t metasidcnt; /* number of sids per handle for metadata */
 
     union
     {
@@ -702,6 +749,7 @@ typedef struct PINT_server_op
         struct PINT_server_truncate_op truncate;
         struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
+        struct PINT_server_mgmt_split_dirent_op mgmt_split_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
 /*
         struct PINT_server_precreate_pool_refiller_op
@@ -935,23 +983,28 @@ extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_getattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
+extern struct PINT_state_machine_s pvfs2_dirdata_split_sm;
 
 /* exported state machine resource reclamation function */
 int server_post_unexpected_recv(void);
 int server_state_machine_start( PINT_smcb *smcb, job_status_s *js_p);
 int server_state_machine_complete(PINT_smcb *smcb);
 int server_state_machine_terminate(PINT_smcb *smcb, job_status_s *js_p);
+int server_state_machine_wait(void);
 
 /* lists of server ops */
 extern struct qlist_head posted_sop_list;
 extern struct qlist_head inprogress_sop_list;
 
 /* starts state machines not associated with an incoming request */
-int server_state_machine_alloc_noreq(
-    enum PVFS_server_op op, struct PINT_smcb ** new_op);
-int server_state_machine_start_noreq(
-    struct PINT_smcb *new_op);
+int server_state_machine_alloc_noreq(enum PVFS_server_op op,
+                                     struct PINT_smcb ** new_op);
+int server_state_machine_start_noreq(struct PINT_smcb *new_op);
 int server_state_machine_complete_noreq(PINT_smcb *smcb);
+int PINT_server_get_config(struct server_configuration_s *config,
+                           struct PVFS_sys_mntent *mntent_p,
+                           const PVFS_credential *credential,
+                           PVFS_hint hints);
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #if 0

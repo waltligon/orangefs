@@ -13,6 +13,9 @@
 #include "str-utils.h"
 #include "src/common/llist/llist.h"
 
+/* V3 REMOVE ME - remove entire file and C code */
+#if 0
+
 PINT_llist *PINT_create_extent_list(char *extent_str);
 
 int PINT_handle_in_extent(PVFS_handle_extent *ext, PVFS_handle handle);
@@ -26,6 +29,7 @@ int PINT_handle_in_extent_list(PINT_llist *extent_list,
 uint64_t PINT_extent_array_count_total(PVFS_handle_extent_array *extent_array);
 
 void PINT_release_extent_list( PINT_llist *extent_list);
+#endif
 
 #endif /* __EXTENT_UTILS_H */
 

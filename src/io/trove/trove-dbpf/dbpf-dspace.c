@@ -93,10 +93,9 @@ static inline void organize_post_op_statistics(
     }
 }
 
-static int dbpf_dspace_create_store_handle(
-    struct dbpf_collection* coll_p,
-    TROVE_ds_type type,
-    TROVE_handle new_handle);
+static int dbpf_dspace_create_store_handle(struct dbpf_collection* coll_p,
+                                           TROVE_ds_type type,
+                                           TROVE_handle new_handle);
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p);
@@ -1198,7 +1197,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
         {
             gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
                          "(dir_count=%llu)\n",
-                         llu(ds_attr_p->u.dirdata.count));
+                         llu(ds_attr_p->u.dirdata.dirent_count));
         }
 
         UPDATE_PERF_METADATA_READ();
@@ -1312,7 +1311,7 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
             {
                 gossip_debug(GOSSIP_TROVE_DEBUG,
                              "\tcount = %llu\n",
-                             llu(ds_attr_p[i].u.dirdata.count));
+                             llu(ds_attr_p[i].u.dirdata.dirent_count));
             }
 
             UPDATE_PERF_METADATA_READ();
@@ -1420,6 +1419,8 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
                      PINT_HINT_GET_OP_ID(hints));
 
    /* initialize op-specific members */
+    ds_attr_p->fs_id = coll_id;
+    ds_attr_p->handle = handle;
     op_p->u.d_setattr.attr_p = ds_attr_p;
     op_p->hints = hints;
 
@@ -1536,7 +1537,7 @@ int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
     {
         gossip_debug(GOSSIP_TROVE_DEBUG,
                      "\tcount = %llu\n",
-                     llu(attr->u.dirdata.count));
+                     llu(attr->u.dirdata.dirent_count));
     }
 
     /* add retrieved ds_attr to dbpf_attr cache here */

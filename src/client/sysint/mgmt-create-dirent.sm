@@ -239,44 +239,53 @@ static PINT_sm_action mgmt_create_dirent_setup_msgpair(struct PINT_smcb *smcb,
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index;
+    int dirdata_sid_index;
 
     js_p->error_code = 0;
 
     /* find the hash value and the dist dir bucket */
     dirdata_hash = PINT_encrypt_dirdata(sm_p->u.mgmt_create_dirent.entry);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, " encrypt dirent %s into hash value %llu.\n",
-            sm_p->u.mgmt_create_dirent.entry,
-            llu(dirdata_hash));
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 " encrypt dirent %s into hash value %llu.\n",
+                 sm_p->u.mgmt_create_dirent.entry,
+                 llu(dirdata_hash));
 
     dirdata_server_index =
-        PINT_find_dist_dir_bucket(dirdata_hash,
-            &sm_p->getattr.attr.dist_dir_attr,
-            sm_p->getattr.attr.dist_dir_bitmap);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, " selecting bucket No.%d from dist_dir_bitmap.\n",
-            dirdata_server_index);
+            PINT_find_dist_dir_bucket(dirdata_hash,
+                    &sm_p->getattr.attr.u.dir.dist_dir_attr,
+                    sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    dirdata_sid_index = dirdata_server_index *
+                        sm_p->getattr.attr.u.dir.dist_dir_attr.sid_count;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 " selecting bucket No.%d from dist_dir_bitmap.\n",
+                 dirdata_server_index);
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                " creating dirent entry %s with "
-                "handle %s under parent %s,%d\n",
-                sm_p->u.mgmt_create_dirent.entry,
-                PVFS_OID_str(&sm_p->u.mgmt_create_dirent.entry_handle),
-                PVFS_OID_str(&sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
+                 " creating dirent entry %s with "
+                 "handle %s under parent %s,%d\n",
+                 sm_p->u.mgmt_create_dirent.entry,
+                 PVFS_OID_str(&sm_p->u.mgmt_create_dirent.entry_handle),
+                 PVFS_OID_str(&sm_p->parent_ref.handle),
+                 sm_p->parent_ref.fs_id);
 
     PINT_SERVREQ_CRDIRENT_FILL(msg_p->req,
                                sm_p->getattr.attr.capability,
                                *sm_p->cred_p,
-                               sm_p->u.mgmt_create_dirent.entry,
                                sm_p->parent_ref.fs_id,
-                               sm_p->parent_ref.handle,
-                               sm_p->getattr.attr.dirdata_handles[
+                               sm_p->getattr.attr.u.dir.dirdata_handles[
                                                         dirdata_server_index],
                                sm_p->parent_ref.sid_count,
-                               sm_p->parent_ref.sid_array,
+                               &sm_p->getattr.attr.u.dir.dirdata_sids[
+                                                        dirdata_sid_index],
+                               sm_p->u.mgmt_create_dirent.entry,
                                sm_p->u.mgmt_create_dirent.entry_handle,
                                sm_p->u.mgmt_create_dirent.sid_array,
+                               sm_p->parent_ref.handle,
+                               sm_p->parent_ref.sid_array,
                                sm_p->hints);
 
     msg_p->msgclass = PVFS_IO_METADATA;
@@ -284,10 +293,11 @@ static PINT_sm_action mgmt_create_dirent_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     /* send to dirdata server */
     msg_p->handle =
-        sm_p->getattr.attr.dirdata_handles[dirdata_server_index];
+             sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
     msg_p->sid_count = sm_p->parent_ref.sid_count;
     msg_p->sid_index = 0;
-    msg_p->sid_array = sm_p->parent_ref.sid_array;
+    msg_p->sid_array = 
+             &sm_p->getattr.attr.u.dir.dirdata_sids[dirdata_sid_index];
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mgmt_create_dirent_comp_fn;
 
@@ -296,7 +306,7 @@ static PINT_sm_action mgmt_create_dirent_setup_msgpair(struct PINT_smcb *smcb,
     if (ret)
     {
         gossip_err("Failed to map server address\n");
-	js_p->error_code = ret;
+        js_p->error_code = ret;
     }
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);

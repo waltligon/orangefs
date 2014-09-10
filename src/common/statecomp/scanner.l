@@ -80,13 +80,14 @@ id          [_a-zA-Z][_0-9a-zA-Z]*
 "\%\%"		{BEGIN(CODE);}
 
 <CODE>"\%\%"	{fprintf(out_file,"#ifndef WIN32\n");
-                 fprintf(out_file,"# %d \"%s\"\n", line, in_file_name);
+                 fprintf(out_file,"# %d \"%s\"\n", line-1, in_file_name);
                  fprintf(out_file,"#endif\n");
                  BEGIN(0);}
 
 <CODE>"machine"    {RETURNVAL(MACHINE);}
 <CODE>"nested" 	   {RETURNVAL(NESTED);}
 <CODE>"state"	   {RETURNVAL(STATE);}
+<CODE>"switch"	   {RETURNVAL(SWITCH);}
 <CODE>"run"	   {RETURNVAL(RUN);}
 <CODE>"pjmp"       {RETURNVAL(PJMP);}
 <CODE>"jump"	   {RETURNVAL(JUMP);}

@@ -12,6 +12,7 @@
 #include <assert.h>
 
 #include "server-config.h"
+#include "pint-cached-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "pvfs2-internal.h"
@@ -85,8 +86,8 @@ static PINT_sm_action readdir_verify_directory_metadata(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action readdir_iterate_on_entries(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action readdir_iterate_on_entries(struct PINT_smcb *smcb,
+                                                 job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -100,7 +101,7 @@ static PINT_sm_action readdir_iterate_on_entries(
     */
     if (s_op->req->u.readdir.dirent_count == 0)
     {
-	js_p->error_code = 0;
+        js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
 
@@ -114,13 +115,32 @@ static PINT_sm_action readdir_iterate_on_entries(
       calculate total memory needed:
       - 2 * dirent_count keyval structures to pass to iterate function
       - dirent_count dirent structures to hold the results
+      - dirent_count * metadata_sid_count SIDs
     */
+
+    /* TJS: make sure this is where we get the config for metadata replication */
+    ret = PINT_cached_config_get_metadata_sid_count(
+                                         s_op->req->u.readdir.fs_id, 
+                                         &(s_op->metasidcnt));
+
+    if (ret)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->resp.u.readdir.sid_count = s_op->metasidcnt *
+                                     s_op->req->u.readdir.dirent_count;
+
+
     kv_array_size = (s_op->req->u.readdir.dirent_count *
                      sizeof(PVFS_ds_keyval));
 
+    s_op->u.readdir.keyval_db_entries = (PVFS_ID *) malloc(
+                    OSASZ(s_op->req->u.readdir.dirent_count, s_op->metasidcnt));
+
     memory_size = (2 * kv_array_size +
-                   s_op->req->u.readdir.dirent_count *
-                   sizeof(PVFS_dirent));
+                   OSASZ(s_op->req->u.readdir.dirent_count,
+                         s_op->resp.u.readdir.sid_count));
 
     memory_buffer = malloc(memory_size);
     if (!memory_buffer)
@@ -138,14 +158,23 @@ static PINT_sm_action readdir_iterate_on_entries(
 
     s_op->resp.u.readdir.dirent_array = (PVFS_dirent *)memory_buffer;
 
+    memory_buffer += s_op->req->u.readdir.dirent_count *
+                     sizeof(PVFS_dirent);
+
+    s_op->resp.u.readdir.sid_array = (PVFS_SID *)memory_buffer;
+
+/* V3 move to func decl */
+    PVFS_ID *buffer_location = s_op->u.readdir.keyval_db_entries;
+
     for (j = 0; j < s_op->req->u.readdir.dirent_count; j++)
     {
-	s_op->key_a[j].buffer =
-                s_op->resp.u.readdir.dirent_array[j].d_name;
-	s_op->key_a[j].buffer_sz = PVFS_NAME_MAX;
-	s_op->val_a[j].buffer =
-                &(s_op->resp.u.readdir.dirent_array[j].handle);
-	s_op->val_a[j].buffer_sz = sizeof(PVFS_handle);
+    	s_op->key_a[j].buffer = s_op->resp.u.readdir.dirent_array[j].d_name;
+    	s_op->key_a[j].buffer_sz = PVFS_NAME_MAX;
+        //TJS: Change this to dump into the keyval_db_entries
+    	s_op->val_a[j].buffer = &(buffer_location);
+    	s_op->val_a[j].buffer_sz = s_op->metasidcnt + 1;
+
+        buffer_location += s_op->metasidcnt + 1;
     }
 
     gossip_debug(
@@ -175,9 +204,10 @@ static PINT_sm_action readdir_iterate_on_entries(
     return ret;
 }
 
-static PINT_sm_action readdir_setup_resp(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action readdir_setup_resp(struct PINT_smcb *smcb,
+                                         job_status_s *js_p)
 {
+    int j, k;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (js_p->error_code == STATE_ENOTDIR)
     {
@@ -187,15 +217,39 @@ static PINT_sm_action readdir_setup_resp(
 	js_p->error_code = -PVFS_EINVAL;
 	return SM_ACTION_COMPLETE;
     }
-    else if(js_p->error_code != 0)
+
+    if(js_p->error_code != 0)
     {
         PVFS_perror_gossip("readdir_setup_resp failed: ", js_p->error_code);
         return SM_ACTION_COMPLETE;
     }
 
+/* V3 move to func decl */
+
+    /* Iterates over entries retrieved from database and copies them
+     * to appropriate locations in response struct
+     */
+    for (j = 0; j < s_op->req->u.readdir.dirent_count; j++)
+    {
+        /* Get the handle from the appropriate entry in the keyval
+         * temporary place holder */
+        s_op->resp.u.readdir.dirent_array[j].handle = 
+                s_op->u.readdir.keyval_db_entries[j * (s_op->metasidcnt + 1)].oid;
+
+        /* Copy SIDs from appropriate index in keval temporary store into
+            response buffer */
+        for(k = 0; k < s_op->metasidcnt; k++){
+            s_op->resp.u.readdir.sid_array[(j * s_op->metasidcnt) + k] =
+                s_op->u.readdir.keyval_db_entries[j * (s_op->metasidcnt + 1) + 1 + k].sid;
+        }
+        
+    }
+
     s_op->resp.u.readdir.directory_version =
-        s_op->u.readdir.directory_version;
+                    s_op->u.readdir.directory_version;
+
     s_op->resp.u.readdir.dirent_count = js_p->count;
+    s_op->resp.u.readdir.sid_count = s_op->metasidcnt;
 
     /*
      * Although, this is not as important to get ls
@@ -208,8 +262,8 @@ static PINT_sm_action readdir_setup_resp(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action readdir_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action readdir_cleanup(struct PINT_smcb *smcb,
+                                      job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (s_op->key_a)
@@ -218,6 +272,10 @@ static PINT_sm_action readdir_cleanup(
         s_op->key_a = NULL;
         s_op->val_a = NULL;
         s_op->resp.u.readdir.dirent_array = NULL;
+    }
+    if(s_op->u.readdir.keyval_db_entries)
+    {
+        free(s_op->u.readdir.keyval_db_entries);
     }
     return(server_state_machine_complete(smcb));
 }
