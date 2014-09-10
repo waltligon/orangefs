@@ -176,6 +176,11 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
         
         self.checkCloudConnection()
         
+        address_dict = self.novaapi.servers.list().addresses
+        print "Address dictionary:"
+        for key, value in address_dict.iteritems() :
+            print key, value
+        
         server_list = [s for s in self.novaapi.servers.list() if s.addresses[self.nova_network_name][0]['addr'] == ip_address]
         
         print "Attempting to delete server at %s" % ip_address
