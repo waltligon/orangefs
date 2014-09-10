@@ -16,7 +16,7 @@ LINE1="log4j.logger.org.apache.hadoop.fs.ofs.OrangeFileSystem=DEBUG"
 LINE2="log4j.logger.org.apache.hadoop.fs.ofs.OrangeFS=DEBUG"
 
 # Variables
-HADOOP_PREFIX=/opt/hadoop-2.4.1
+#HADOOP_PREFIX=
 TMP_DIR="/tmp"
 TARGET_FILE="container-log4j.properties"
 TARGET_JAR_PATH="$(find "${HADOOP_PREFIX}" -iname "hadoop-yarn-server-nodemanager-?.?.?.jar")"

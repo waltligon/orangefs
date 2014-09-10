@@ -3,7 +3,7 @@
 #
 
 # Common Variables sourced by other scripts in this directory
-HADOOP_PREFIX=/opt/hadoop-2.4.1
-HADOOP_CONFIG_DIR=/home/$USER/projects/orangefs/branches/denton.hadoop2.trunk/src/client/hadoop/orangefs-hadoop2/src/main/resources/conf
+#HADOOP_PREFIX=
+#HADOOP_CONFIG_DIR=
 HADOOP_LOG_DIR="/tmp/hadoop-$USER/hadoop2logs"
 HADOOP_LOCAL_DIR="/tmp/hadoop-$USER/hadoop2local"

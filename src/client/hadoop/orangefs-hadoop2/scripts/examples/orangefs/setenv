@@ -1,4 +1,4 @@
-export ORANGEFS_PREFIX="/opt/orangefs-denton.hadoop2.trunk"
+#export ORANGEFS_PREFIX=
 export DB_DIR="/opt/db4"
 export PATH="${ORANGEFS_PREFIX}/bin:${ORANGEFS_PREFIX}/sbin:${PATH}"
 export JNI_LIBRARY_PATH="${ORANGEFS_PREFIX}/lib"
