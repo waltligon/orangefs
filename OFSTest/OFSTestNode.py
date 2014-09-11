@@ -2651,28 +2651,30 @@ class OFSTestNode(object):
         
     def setupLDAP(self):
         self.changeDirectory("%s/examples/certs" % self.ofs_source_location)
+        rc = 0
         rc = self.runSingleCommandAsRoot(command="%s/examples/certs/pvfs2-ldap-create-dir.sh" % self.ofs_source_location)
         if rc != 0:
-            logging.exception("Could not create LDAP directory ")
+            logging.exception("Could not create LDAP directory. rc = %d" % rc)
             exit(rc)
             
         rc = self.runSingleCommand('%s/examples/certs/pvfs2-ldap-set-pass.sh -D \\"cn=admin,dc=%s\\" -w ldappwd \\"cn=root,ou=users,dc=%s\\"' % (self.ofs_source_location,self.hostname,self.hostname))
         if rc != 0:
-            logging.exception("Could not set ldap password ")
+            logging.exception("Could not set ldap password  rc = %d" % rc)
             exit(rc)
 
         
         rc = self.runSingleCommand('for username in \\`cut -d: -f1 /etc/passwd\\`; do %s/examples/certs/pvfs2-ldap-add-user.sh -D \\"cn=admin,dc=%s\\" -w ldappwd \\$username \\"ou=users,dc=%s\\"' % (self.ofs_source_location,self.hostname,self.hostname))
         if rc != 0:
-            logging.exception("Could not create LDAP users")
+            logging.exception("Could not create LDAP users. rc = %d" % rc)
             exit(rc)
 
         return rc
         
     def createCACert(self):
+        rc = 0
         rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-ca-auto.sh')
         if rc != 0:
-            logging.exception("Could not create CA cert")
+            logging.exception("Could not create CA cert.  rc = %d" % rc)
             exit(rc)
 
         return rc
@@ -2683,12 +2685,12 @@ class OFSTestNode(object):
             user = self.current_user
         rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-req-auto.sh %s %s' % (self.ofs_source_location,user,user))
         if rc != 0:
-            logging.exception("Could not create LDAP cert for user %s" % user)
+            logging.exception("Could not create LDAP cert for user %s. rc = %d" % (user,rc))
             exit(rc)
 
         rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-sign.sh %s' % (self.ofs_source_location,user))
         if rc != 0:
-            logging.exception("Could not sign LDAP cert for user %s" % user)
+            logging.exception("Could not sign LDAP cert for user %s. rc = %d" % (user,rc))
             exit(rc)
         
         homedir = self.runSingleCommandBacktick('\\`grep ^%s /etc/passwd | cut -d: -f6\\`' % user)
@@ -2697,7 +2699,7 @@ class OFSTestNode(object):
         self.runSingleCommand('chmod 600 %s-cert*.pem' % user)
         rc = self.runSingleCommand('cp -p %s-cert.pem %s/.pvfs2-cert.pem' % (user,homedir))
         if rc != 0:
-            logging.exception("Could not copy LDAP cert for user %s to %s" % (user,homedir))
+            logging.exception("Could not copy LDAP cert for user %s to %s. rc = %s" % (user,homedir,rc))
             exit(rc)
 
 
