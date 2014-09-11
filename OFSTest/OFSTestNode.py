@@ -2652,14 +2652,29 @@ class OFSTestNode(object):
     def setupLDAP(self):
         self.changeDirectory("%s/examples/certs" % self.ofs_source_location)
         rc = self.runSingleCommandAsRoot(command="%s/examples/certs/pvfs2-ldap-create-dir.sh" % self.ofs_source_location)
-        if rc == 0:
-            rc = self.runSingleCommand('%s/examples/certs/pvfs2-ldap-set-pass.sh -D \\"cn=admin,dc=%s\\" -w ldappwd \\"cn=root,ou=users,dc=%s\\"' % (self.ofs_source_location,self.hostname,self.hostname))
-        if rc == 0:
-            rc = self.runSingleCommand('for username in \\`cut -d: -f1 /etc/passwd\\`; do %s/examples/certs/pvfs2-ldap-add-user.sh -D \\"cn=admin,dc=%s\\" -w ldappwd \\$username \\"ou=users,dc=%s\\"' % (self.ofs_source_location,self.hostname,self.hostname))
+        if rc != 0:
+            logging.exception("Could not create LDAP directory ")
+            exit(rc)
+            
+        rc = self.runSingleCommand('%s/examples/certs/pvfs2-ldap-set-pass.sh -D \\"cn=admin,dc=%s\\" -w ldappwd \\"cn=root,ou=users,dc=%s\\"' % (self.ofs_source_location,self.hostname,self.hostname))
+        if rc != 0:
+            logging.exception("Could not set ldap password ")
+            exit(rc)
+
+        
+        rc = self.runSingleCommand('for username in \\`cut -d: -f1 /etc/passwd\\`; do %s/examples/certs/pvfs2-ldap-add-user.sh -D \\"cn=admin,dc=%s\\" -w ldappwd \\$username \\"ou=users,dc=%s\\"' % (self.ofs_source_location,self.hostname,self.hostname))
+        if rc != 0:
+            logging.exception("Could not create LDAP users")
+            exit(rc)
+
         return rc
         
     def createCACert(self):
         rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-ca-auto.sh')
+        if rc != 0:
+            logging.exception("Could not create CA cert")
+            exit(rc)
+
         return rc
         
 
@@ -2667,17 +2682,31 @@ class OFSTestNode(object):
         if user == None:
             user = self.current_user
         rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-req-auto.sh %s %s' % (self.ofs_source_location,user,user))
-        if rc == 0:
-            rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-sign.sh %s' % (self.ofs_source_location,user))
-        if rc == 0:
-            homedir = self.runSingleCommandBacktick('\\`grep ^%s /etc/passwd | cut -d: -f6\\`' % user)
-            self.runSingleCommand('mkdir -p %s' % homedir)
-            self.runSingleCommand('chown %s:%s %s-cert*.pem' % (user,user,user))
-            self.runSingleCommand('chmod 600 %s-cert*.pem' % user)
-            rc = self.runSingleCommand('cp -p %s-cert.pem %s/.pvfs2-cert.pem' % (user,homedir))
-        if rc == 0:
-            rc = self.runSingleCommand('cp -p %s-cert-key.pem %s/.pvfs2-cert-key.pem' % (user,homedir))
-            
+        if rc != 0:
+            logging.exception("Could not create LDAP cert for user %s" % user)
+            exit(rc)
+
+        rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-sign.sh %s' % (self.ofs_source_location,user))
+        if rc != 0:
+            logging.exception("Could not sign LDAP cert for user %s" % user)
+            exit(rc)
+        
+        homedir = self.runSingleCommandBacktick('\\`grep ^%s /etc/passwd | cut -d: -f6\\`' % user)
+        self.runSingleCommand('mkdir -p %s' % homedir)
+        self.runSingleCommand('chown %s:%s %s-cert*.pem' % (user,user,user))
+        self.runSingleCommand('chmod 600 %s-cert*.pem' % user)
+        rc = self.runSingleCommand('cp -p %s-cert.pem %s/.pvfs2-cert.pem' % (user,homedir))
+        if rc != 0:
+            logging.exception("Could not copy LDAP cert for user %s to %s" % (user,homedir))
+            exit(rc)
+
+
+        rc = self.runSingleCommand('cp -p %s-cert-key.pem %s/.pvfs2-cert-key.pem' % (user,homedir))
+        if rc != 0:
+            logging.exception("Could not copy LDAP cert key for user %s to %s" % (user,homedir))
+            exit(rc)
+
+        
         return rc
             
         
