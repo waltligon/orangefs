@@ -7,17 +7,33 @@
 
   <property>
     <name>fs.default.name</name>
-    <value>ofs://localhost</value>
+    <value>ofs://localhost-orangefs:3334</value>
   </property>
 
   <property>
     <name>fs.ofs.impl</name>
-    <value>org.orangefs.hadoop.fs.ofs.OrangeFileSystem</value>
-    <description>An extension of filesystem for OrangeFS URIs.</description>
+    <value>org.apache.hadoop.fs.ofs.OrangeFileSystem</value>
+    <description>An extension of FileSystem for OrangeFS URIs.</description>
   </property>
 
   <property>
-    <name>fs.ofs.mntLocation</name>
+    <name>hadoop.tmp.dir</name>
+    <value>/tmp/hadoop-${user.name}</value>
+    <description>
+    Notes: user should point the default /tmp directory to a larger local storage. Otherwise, spilled intermediate data could fill all temp space.    
+    
+    A base for other temporary directories.
+    </description>
+  </property>
+
+
+  <property>
+    <name>fs.ofs.systems</name>
+    <value>localhost-orangefs:3334</value>
+  </property>
+
+  <property>
+    <name>fs.ofs.mntLocations</name>
     <value>/mnt/orangefs</value>
     <description>Location of OrangeFS mount point.</description>
   </property>
@@ -27,5 +43,12 @@
    <value>67108864</value>
    <description>64MB OrangeFS I/O Buffer</description>
   </property>
+
+  <property>
+    <name>file.blocksize</name>
+    <value>67108864</value>
+    <descrition>Block size</descrition>
+  </property>
+
 
 </configuration>

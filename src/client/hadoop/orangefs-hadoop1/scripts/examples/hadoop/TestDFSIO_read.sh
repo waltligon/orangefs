@@ -9,12 +9,11 @@ cd $(dirname $0)
 
 # -fileSize represents file size in MB
 ${HADOOP_PREFIX}/bin/hadoop \
-    --config ${HADOOP_CONF_DIR} \
-    org.apache.hadoop.fs.TestDFSIO \
-        -read \
-        -nrFiles 1 \
-        -fileSize 8 \
-        -bufferSize 67108864 # 64MB <--- buffer size in bytes. default is 1000000 bytes
+  --config ${HADOOP_CONF_DIR} \
+  jar ${HADOOP_PREFIX}/hadoop-test-1.?.?.jar TestDFSIO \
+  -read \
+  -nrFiles 1 \
+  -fileSize 8 \
+  -bufferSize 67108864 # 64MB <--- buffer size in bytes. default is 1000000 bytes
 
 #       -bufferSize 4194304 # 4MB has shown good performance in the past <--- buffer size in bytes. default is 1000000 bytes
-

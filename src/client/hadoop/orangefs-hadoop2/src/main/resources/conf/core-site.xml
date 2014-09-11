@@ -19,6 +19,17 @@
 <configuration>
 
   <property>
+    <name>fs.default.name</name>
+    <value>ofs://localhost-orangefs:3334</value>
+  </property>
+
+  <property>
+    <name>fs.ofs.impl</name>
+    <value>org.apache.hadoop.fs.ofs.OrangeFileSystem</value>
+    <description>An extension of FileSystem for OrangeFS URIs.</description>
+  </property>
+
+  <property>
     <name>hadoop.tmp.dir</name>
     <value>/tmp/hadoop-${user.name}</value>
     <description>
@@ -54,29 +65,19 @@
   <property>
     <name>fs.ofs.mntLocations</name>
     <value>/mnt/orangefs</value>
+    <description>Location of OrangeFS mount point.</description>
   </property>
 
   <property>
-    <name>io.file.buffer.size</name>
-    <value>4194304</value>
-    <description>4MB</description>
+   <name>io.file.buffer.size</name>
+   <value>67108864</value>
+   <description>64MB OrangeFS I/O Buffer</description>
   </property>
 
   <property>
     <name>file.blocksize</name>
     <value>67108864</value>
     <descrition>Block size</descrition>
-  </property>
-
-  <property>
-    <name>fs.default.name</name>
-    <value>ofs://localhost-orangefs:3334</value>
-  </property>
-
-  <property>
-    <name>fs.ofs.impl</name>
-    <value>org.apache.hadoop.fs.ofs.OrangeFileSystem</value>
-    <description>An extension of FileSystem for OrangeFS URIs.</description>
   </property>
 
 <!-- You probably want to use compression with OrangeFS. See below. -->

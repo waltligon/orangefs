@@ -11,6 +11,11 @@
   </property>
 
   <property>
+    <name>mapred.child.java.opts</name>
+    <value>-Xmx1024m</value>
+  </property>
+
+  <property>
     <name>mapred.map.tasks.speculative.execution</name>
     <value>false</value>
     <final>true</final>

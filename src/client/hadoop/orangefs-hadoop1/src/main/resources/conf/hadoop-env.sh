@@ -45,7 +45,7 @@ export HADOOP_JOBTRACKER_OPTS="-Dcom.sun.management.jmxremote $HADOOP_JOBTRACKER
 # export HADOOP_SLAVE_SLEEP=0.1
 
 # The directory where pid files are stored. /tmp by default.
-# NOTE: this should be set to a directory that can only be written to by 
+# NOTE: this should be set to a directory that can only be written to by
 #       the users that are going to run the hadoop daemons.  Otherwise there is
 #       the potential for a symlink attack.
 # export HADOOP_PID_DIR=/var/hadoop/pids
@@ -59,6 +59,7 @@ export HADOOP_JOBTRACKER_OPTS="-Dcom.sun.management.jmxremote $HADOOP_JOBTRACKER
 # Customization for OrangeFS/Hadoop plugin:
 #   Note: expects ORANGEFS_PREFIX environment variable to be defined
 export JAVA_HOME="/usr/lib/jvm/java-7-openjdk-amd64"
+export ORANGEFS_PREFIX="/opt/orangefs-denton.hadoop2.trunk"
 export LD_LIBRARY_PATH="$ORANGEFS_PREFIX/lib"
 export JNI_LIBRARY_PATH="$ORANGEFS_PREFIX/lib"
 export HADOOP_CLASSPATH="$JNI_LIBRARY_PATH/orangefs-jni-2.9.0.jar:$JNI_LIBRARY_PATH/orangefs-hadoop1-2.9.0.jar"
