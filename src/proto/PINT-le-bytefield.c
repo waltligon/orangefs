@@ -1161,9 +1161,18 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     break;
                 
                 case PVFS_SERV_CREATE:
-                    decode_free(resp->u.create.metafile_attrs.capability.signature);
-                    decode_free(resp->u.create.metafile_attrs.capability.handle_array);
-                    decode_free(resp->u.create.metafile_attrs.u.meta.dfile_array);
+                    if ( resp->u.create.metafile_attrs.capability.signature )
+                    {
+                       decode_free(resp->u.create.metafile_attrs.capability.signature);
+                    }
+                    if ( resp->u.create.metafile_attrs.capability.handle_array )
+                    {
+                       decode_free(resp->u.create.metafile_attrs.capability.handle_array);
+                    }
+                    if ( resp->u.create.metafile_attrs.u.meta.dfile_array )
+                    {
+                       decode_free(resp->u.create.metafile_attrs.u.meta.dfile_array);
+                    }
                     break;
 
                 case PVFS_SERV_MGMT_DSPACE_INFO_LIST:

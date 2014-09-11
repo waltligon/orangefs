@@ -865,13 +865,13 @@ static int setup_resp(
     gossip_err("                                 .stuffed_size(%d)\n\n",s_op->resp.u.create.metafile_attrs.u.meta.stuffed_size);
 
 
-    if ( s_op->attr.owner )
+    if ( s_op->attr.owner >= 0 )
     {
        s_op->resp.u.create.metafile_attrs.owner = s_op->attr.owner;
        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_COMMON_UID;
     }
 
-    if ( s_op->attr.group )
+    if ( s_op->attr.group >= 0 )
     {
        s_op->resp.u.create.metafile_attrs.group = s_op->attr.group;
        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_COMMON_GID;

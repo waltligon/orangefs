@@ -417,6 +417,10 @@ static int create_comp_fn(void *v_p,
     sm_p->u.create.server_resp.metafile_handle = resp_p->u.create.metafile_handle;
     sm_p->u.create.server_resp.stuffed         = resp_p->u.create.stuffed;
 
+    gossip_err("%s: sm_p->u.create.server_resp.metafile_attrs.u.meta.dfile_array(%p)\n"
+              ,__func__
+              ,sm_p->u.create.server_resp.metafile_attrs.u.meta.dfile_array);
+
     ret = PINT_copy_object_attr(&(sm_p->u.create.server_resp.metafile_attrs),
                                 &(resp_p->u.create.metafile_attrs));
 
@@ -656,7 +660,7 @@ static PINT_sm_action create_cleanup(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_ref metafile_ref;
-    PVFS_size tmp_size = 0;
+    PVFS_size data_size = 0;
     int ret;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: cleanup\n");
@@ -691,6 +695,10 @@ static PINT_sm_action create_cleanup(
             sm_p->u.create.server_resp.metafile_attrs.mask |= PVFS_ATTR_META_DIST;
         }
 
+
+        /* Add PVFS_ATTR_DATA_SIZE to attribute mask; we know that the file size is zero, since we just created it. */
+        sm_p->u.create.server_resp.metafile_attrs.mask |= PVFS_ATTR_DATA_SIZE;
+
         /* we only insert a cache entry if the entire create succeeds,
          * set size to 0 
          */ 
@@ -698,7 +706,7 @@ static PINT_sm_action create_cleanup(
         gossip_err("%s:mask(0x%0x)\n",__func__,sm_p->u.create.server_resp.metafile_attrs.mask);
         ret = PINT_acache_update(metafile_ref,
                                  &sm_p->u.create.server_resp.metafile_attrs,
-                                 &tmp_size);
+                                 &data_size);
         if(ret < 0)
         {
             js_p->error_code = ret;
