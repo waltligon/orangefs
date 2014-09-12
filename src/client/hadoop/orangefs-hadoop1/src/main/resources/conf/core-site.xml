@@ -26,7 +26,6 @@
     </description>
   </property>
 
-
   <property>
     <name>fs.ofs.systems</name>
     <value>localhost-orangefs:3334</value>
@@ -38,11 +37,13 @@
     <description>Location of OrangeFS mount point.</description>
   </property>
 
+<!--
   <property>
-   <name>io.file.buffer.size</name>
-   <value>67108864</value>
-   <description>64MB OrangeFS I/O Buffer</description>
+   <name>fs.ofs.file.buffer.size</name>
+   <value>4194304</value>
+   <description>4MB OrangeFS I/O Buffer</description>
   </property>
+-->
 
   <property>
     <name>file.blocksize</name>
@@ -50,5 +51,17 @@
     <descrition>Block size</descrition>
   </property>
 
+<!-- You probably want to use compression with OrangeFS. See below. -->
+<!--
+  <property>
+    <name>io.compression.codecs</name>
+    <value>
+    org.apache.hadoop.io.compress.GzipCodec,
+    org.apache.hadoop.io.compress.DefaultCodec,
+    org.apache.hadoop.io.compress.BZip2Codec,
+    org.apache.hadoop.io.compress.SnappyCodec
+    </value>
+  </property>
+-->
 
 </configuration>

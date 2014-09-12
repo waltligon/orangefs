@@ -54,7 +54,7 @@ public class HCFSPerformanceIOTests {
      * This is a complex test.  It documents the expected behaviour of the 
      * FileSystem buffering.  
      * 
-     * It assumes that the configuration value of FS is == the {@link OrangeFileSystem} IO_FILE_BUFFER_SIZE.
+     * It assumes that the configuration value of FS is == the {@link OrangeFileSystem} OFS_FILE_BUFFER_SIZE.
      * Then, it starts writing to a stream.  
      */
     @Test
@@ -67,7 +67,7 @@ public class HCFSPerformanceIOTests {
          * we have decide to override, for the sack of "reasonable defaults" out of the box.
          */
         Assert.assertEquals(
-                OrangeFileSystem.IO_FILE_BUFFER_SIZE,
+                OrangeFileSystem.OFS_FILE_BUFFER_SIZE,
                 fs.getConf().getInt("io.file.buffer.size",-1));
         
         FSDataOutputStream os = fs.create(bufferoutpath());
@@ -77,14 +77,14 @@ public class HCFSPerformanceIOTests {
         /**
          * Now, we assert that no data is spilled to disk until we reach the optimal size.
          */
-        while(written < OrangeFileSystem.IO_FILE_BUFFER_SIZE){
+        while(written < OrangeFileSystem.OFS_FILE_BUFFER_SIZE){
             os.write(CONTENT.getBytes());
             written+=CONTENT.getBytes().length;
             Assert.assertTrue("asserting that file not written yet...",fs.getLength(bufferoutpath())==0);
         }
         os.flush();
         
-        Assert.assertTrue("asserting that is now written... ",fs.getLength(bufferoutpath()) >= OrangeFileSystem.IO_FILE_BUFFER_SIZE);
+        Assert.assertTrue("asserting that is now written... ",fs.getLength(bufferoutpath()) >= OrangeFileSystem.OFS_FILE_BUFFER_SIZE);
 
         os.close();
     }

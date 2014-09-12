@@ -1,5 +1,7 @@
 /*
- * (C) 2012 Clemson University. See COPYING in top-level directory.
+ * (C) 2014 Clemson University.
+ *
+ * See COPYING in top-level directory.
  */
 package org.apache.hadoop.fs.ofs;
 
@@ -22,10 +24,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.Progressable;
-import org.orangefs.usrint.Orange;
-import org.orangefs.usrint.OrangeFileSystemOutputStream;
-import org.orangefs.usrint.PVFS2POSIXJNIFlags;
-import org.orangefs.usrint.PVFS2STDIOJNIFlags;
+import org.orangefs.usrint.*;
 import org.orangefs.usrint.Stat;
 
 /*
@@ -43,10 +42,10 @@ public class OrangeFileSystem extends FileSystem {
     private static final Log OFSLOG = LogFactory.getLog(OrangeFileSystem.class);
     private boolean initialized;
 
-    /**
-     * Optimized io.file.buffer.size between OrangeFS and Hadoop stack (4 MB)
+    /*
+     * Optimized bufferSize between OrangeFS and Hadoop stack (4 MB)
      */
-    public static final int IO_FILE_BUFFER_SIZE = 4 * 1024 * 1024;
+    public static final int OFS_FILE_BUFFER_SIZE = 4 * 1024 * 1024;
 
     /*
      * After OrangeFileSystem is constructed, called initialize to set fields.
@@ -90,7 +89,7 @@ public class OrangeFileSystem extends FileSystem {
         FileUtil.copy(this, src, localFS, dst, delSrc, getConf());
     }
 
-    /**
+    /*
      * Opens an FSDataOutputStream at the indicated Path with write-progress
      * reporting.
      */
@@ -120,7 +119,6 @@ public class OrangeFileSystem extends FileSystem {
                 throw new IOException("file: " + fOFS
                         + " exists and overwrite wasn't specified with"
                         + " this creation.");
-
             }
         }
         /* New file */
@@ -144,7 +142,7 @@ public class OrangeFileSystem extends FileSystem {
                      * called mkdir on the parent directory/directories.
                      */
                     if (!exists(fParent)) {
-                        throw new IOException("Failed to create parent "
+                        throw new IOException("Failed to create parent"
                                 + " directory/directories: "
                                 + fParent.toString());
                     }
@@ -222,8 +220,11 @@ public class OrangeFileSystem extends FileSystem {
         FileStatus status;
         Path fOFS = new Path(getOFSPathName(f));
         OFSLOG.debug("Path f = " + f);
-        OFSLOG.debug((recursive) ? "Recursive Delete!" : "Non-recursive"
-                + " Delete");
+        if (recursive) {
+            OFSLOG.debug("Recursive Delete!");
+        } else {
+            OFSLOG.debug("Non-recursive Delete");
+        }
         try {
             status = getFileStatus(f);
         } catch (FileNotFoundException e) {
@@ -258,7 +259,8 @@ public class OrangeFileSystem extends FileSystem {
 
     /* Check if exists. */
     @Override
-    public boolean exists(Path f) {
+    public boolean exists(Path f)
+            throws IOException {
         /* Stat file */
         try {
             @SuppressWarnings("unused")
@@ -276,7 +278,7 @@ public class OrangeFileSystem extends FileSystem {
     /* Return a file status object that represents the path. */
     @Override
     public FileStatus getFileStatus(Path f)
-            throws IOException {
+            throws FileNotFoundException, IOException {
         Stat stats;
         FileStatus fileStatus;
         boolean isdir;
@@ -296,7 +298,11 @@ public class OrangeFileSystem extends FileSystem {
             throw new FileNotFoundException();
         }
         isdir = orange.posix.isDir(stats.st_mode) == 1;
-        OFSLOG.debug("file/directory=" + (isdir ? "directory" : "file"));
+        if (isdir == true) {
+            OFSLOG.debug("file/directory=directory");
+        } else {
+            OFSLOG.debug("file/directory=file");
+        }
         /* Get UGO permissions out of st_mode... */
         intPermission = stats.st_mode & 0777;
         octal = Integer.toOctalString(intPermission);
@@ -351,7 +357,7 @@ public class OrangeFileSystem extends FileSystem {
         String[] split;
         Path[] ret;
         String currentPath = "";
-        OFSLOG.debug("getParentPaths: " + "f = "
+        OFSLOG.debug("getParentPaths:" + " f = "
                 + makeAbsolute(f).toUri().getPath());
         split = makeAbsolute(f).toUri().getPath().split(Path.SEPARATOR);
         /*
@@ -408,7 +414,7 @@ public class OrangeFileSystem extends FileSystem {
             throw new IOException("Incomplete OrangeFS URI, no authority: "
                     + uri);
         }
-
+        setConf(conf);
         int index;
         boolean uriAuthorityMatchFound = false;
         String uriAuthority = uri.getAuthority();
@@ -509,14 +515,21 @@ public class OrangeFileSystem extends FileSystem {
     @Override
     public FileStatus[] listStatus(Path f)
             throws IOException {
+        FileStatus fStatus[] = new FileStatus[1];
         Path fOFS = new Path(getOFSPathName(f));
         OFSLOG.debug("Path f = " + makeAbsolute(f).toString());
-        FileStatus fStatus[] = {getFileStatus(f)};
-        if (!fStatus[0].isDirectory()) {
+        /* Hadoop r2.x.x throws FileNotFoundException when the path does not
+         * exist.
+         */
+        try {
+            fStatus[0] = getFileStatus(f);
+        } catch (IOException e) {
+            return null;
+        }
+        if (!fStatus[0].isDir()) {
             /* Not a directory */
             return fStatus;
         }
-
         ArrayList<String> arrayList =
                 orange.stdio.getEntriesInDir(fOFS.toString());
         if (arrayList == null) {
@@ -547,6 +560,7 @@ public class OrangeFileSystem extends FileSystem {
         return new Path(workingDirectory, path);
     }
 
+    /* Make the given file and all non-existent parents into directories. */
     @Override
     public boolean mkdirs(Path f, FsPermission permission)
             throws IOException {
@@ -581,7 +595,7 @@ public class OrangeFileSystem extends FileSystem {
         OFSLOG.debug("Parent directories: " + Arrays.toString(parents));
 
         if (parents != null) {
-            // Attempt creation of parent directories
+            /* Attempt creation of parent directories */
             for (int i = 0; i < parents.length; i++) {
                 if (exists(parents[i])) {
                     if (!isDir(parents[i])) {
@@ -590,7 +604,7 @@ public class OrangeFileSystem extends FileSystem {
                         return false;
                     }
                 } else {
-                    // Create the missing parent and setPermission.
+                    /* Create the missing parent and setPermission. */
                     statistics.incrementWriteOps(1);
                     ret = orange.posix.mkdir(getOFSPathName(parents[i]), 0700);
                     if (ret == 0) {
@@ -604,7 +618,7 @@ public class OrangeFileSystem extends FileSystem {
                 }
             }
         }
-        // Now create the directory f
+        /* Now create the directory f */
         statistics.incrementWriteOps(1);
         ret = orange.posix.mkdir(getOFSPathName(f), 0700);
         if (ret == 0) {
@@ -615,7 +629,16 @@ public class OrangeFileSystem extends FileSystem {
                     + ", permission = " + permission.toString());
             return false;
         }
+    }
 
+    /* Opens an FSDataInputStream at the indicated Path. */
+    @Override
+    public FSDataInputStream open(Path f)
+            throws IOException {
+        return open(
+                f,
+                getConf().getInt("fs.ofs.file.buffer.size",
+                        OFS_FILE_BUFFER_SIZE));
     }
 
     /* Opens an FSDataInputStream at the indicated Path. */
@@ -623,6 +646,7 @@ public class OrangeFileSystem extends FileSystem {
     public FSDataInputStream open(Path f, int bufferSize)
             throws IOException {
         Path fOFS = new Path(getOFSPathName(f));
+        OFSLOG.debug("open: path=" + f + " bufferSize=" + bufferSize);
         return new FSDataInputStream(new OrangeFileSystemFSInputStream(
                 fOFS.toString(), bufferSize, statistics));
     }

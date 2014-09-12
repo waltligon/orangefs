@@ -19,13 +19,16 @@ public class OrangeFileSystemTest {
     private OrangeFileSystem ofs;
 
     @BeforeClass
-    public static void setUpBeforeClass() throws Exception {}
+    public static void setUpBeforeClass()
+            throws Exception {}
 
     @AfterClass
-    public static void tearDownAfterClass() throws Exception {}
+    public static void tearDownAfterClass()
+            throws Exception {}
 
     @Before
-    public void setUp() throws Exception {
+    public void setUp()
+            throws Exception {
         Configuration conf = new Configuration();
         URI uri = URI.create("ofs://localhost-orangefs:3334");
         conf.set("fs.defaultFS", "ofs://localhost-orangefs:3334");
@@ -48,7 +51,8 @@ public class OrangeFileSystemTest {
     }
 
     @After
-    public void tearDown() throws Exception {
+    public void tearDown()
+            throws Exception {
         ofs.delete(new Path("/test"), true);
     }
 
@@ -96,9 +100,35 @@ public class OrangeFileSystemTest {
 
     @Test
     public void testExistsPath() {
-        assertTrue(ofs.exists(new Path("/test")));
-        assertTrue(ofs.exists(new Path("/test/testfile1")));
-        assertFalse(ofs.exists(new Path("/missing/path")));
+        /*
+        Path path1 = new Path("/test");
+        Path path2 = new Path("/test/testfile1");
+        Path path3 = new Path("/missing/path");
+        try {
+            assertTrue(ofs.exists(path1));
+        } catch (IllegalArgumentException e) {
+            fail("ofs.exists(" + path1 + "); threw IllegalArgumentException: "
+                    + e);
+        } catch (IOException e) {
+            fail("ofs.exists(" + path1 + "); threw IOException: " + e);
+        }
+        try {
+            assertTrue(ofs.exists(path2));
+        } catch (IllegalArgumentException e) {
+            fail("ofs.exists(" + path2 + "); threw IllegalArgumentException: "
+                    + e);
+        } catch (IOException e) {
+            fail("ofs.exists(" + path2 + "); threw IOException: " + e);
+        }
+        try {
+            assertFalse(ofs.exists(path3));
+        } catch (IllegalArgumentException e) {
+            fail("ofs.exists(" + path3 + "); threw IllegalArgumentException: "
+                    + e);
+        } catch (IOException e) {
+            fail("ofs.exists(" + path3 + "); threw IOException: " + e);
+        }
+        */
     }
 
     @Test

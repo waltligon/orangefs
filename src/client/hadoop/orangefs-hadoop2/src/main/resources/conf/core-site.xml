@@ -68,11 +68,13 @@
     <description>Location of OrangeFS mount point.</description>
   </property>
 
+<!--
   <property>
-   <name>io.file.buffer.size</name>
-   <value>67108864</value>
-   <description>64MB OrangeFS I/O Buffer</description>
+   <name>fs.ofs.file.buffer.size</name>
+   <value>4194304</value>
+   <description>4MB OrangeFS I/O Buffer</description>
   </property>
+-->
 
   <property>
     <name>file.blocksize</name>

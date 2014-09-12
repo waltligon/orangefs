@@ -29,12 +29,14 @@ public class OrangeFileSystemFSInputStream extends OrangeFileSystemInputStream
             throws IOException {
         super(path, bufferSize);
         this.statistics = statistics;
+        statistics.incrementReadOps(1);
     }
 
     /* *** This method declared abstract in FSInputStream *** */
     @Override
     public long getPos()
             throws IOException {
+        statistics.incrementReadOps(1);
         return super.tell();
     }
 
@@ -42,6 +44,7 @@ public class OrangeFileSystemFSInputStream extends OrangeFileSystemInputStream
     @Override
     public synchronized int read()
             throws IOException {
+        statistics.incrementReadOps(1);
         int ret = super.read();
         if (ret != -1 && statistics != null) {
             OFSLOG.debug("<<<<< OrangeFileSystemFSInputStream: int ret = "
@@ -58,6 +61,7 @@ public class OrangeFileSystemFSInputStream extends OrangeFileSystemInputStream
     @Override
     public synchronized int read(byte[] b)
             throws IOException {
+        statistics.incrementReadOps(1);
         int ret = super.read(b);
         if (ret > 0 && statistics != null) {
             statistics.incrementBytesRead(ret);
@@ -75,6 +79,7 @@ public class OrangeFileSystemFSInputStream extends OrangeFileSystemInputStream
     public synchronized int read(byte[] b, int off, int len)
             throws IOException {
         int ret = super.read(b, off, len);
+        statistics.incrementReadOps(1);
         if (ret > 0 && statistics != null) {
             OFSLOG.debug("<<<<< OrangeFileSystemFSInputStream: off ret = "
                     + ret + " >>>>>");
@@ -127,6 +132,7 @@ public class OrangeFileSystemFSInputStream extends OrangeFileSystemInputStream
     @Override
     public synchronized void seek(long pos)
             throws IOException {
+        statistics.incrementReadOps(1);
         super.seek(pos);
     }
 

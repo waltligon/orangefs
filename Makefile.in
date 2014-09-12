@@ -1231,7 +1231,9 @@ clean::
 ifdef BUILD_JNI
 clean::
 	$(E)rm -f $(JNIPOSIXHEADER) $(JNISTDIOHEADER)
-	$(E)rm -rf $(JNI_DIR)/target src/client/hadoop/orangefs-hadoop2/target
+	$(E)rm -rf $(JNI_DIR)/target \
+				src/client/hadoop/orangefs-hadoop1/target \
+				src/client/hadoop/orangefs-hadoop2/target
 
 endif
 
