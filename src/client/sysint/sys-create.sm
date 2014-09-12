@@ -417,6 +417,8 @@ static int create_comp_fn(void *v_p,
     sm_p->u.create.server_resp.metafile_handle = resp_p->u.create.metafile_handle;
     sm_p->u.create.server_resp.stuffed         = resp_p->u.create.stuffed;
 
+    gossip_err("%s: resp_p->u.create.metafile_attrs.mask(0x%0x)\n",__func__,resp_p->u.create.metafile_attrs.mask);
+
     gossip_err("%s: sm_p->u.create.server_resp.metafile_attrs.u.meta.dfile_array(%p)\n"
               ,__func__
               ,sm_p->u.create.server_resp.metafile_attrs.u.meta.dfile_array);
