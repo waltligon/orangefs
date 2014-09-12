@@ -2672,7 +2672,7 @@ class OFSTestNode(object):
         
     def createCACert(self):
         rc = 0
-        rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-ca-auto.sh' % self.ofs_storage_location)
+        rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-ca-auto.sh' % self.ofs_source_location)
         if rc != 0:
             logging.exception("Could not create CA cert.  rc = %d" % rc)
             exit(rc)
