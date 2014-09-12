@@ -2657,7 +2657,7 @@ class OFSTestNode(object):
             logging.exception("Could not create LDAP directory. rc = %d" % rc)
             exit(rc)
             
-        rc = self.runSingleCommand('%s/examples/certs/pvfs2-ldap-set-pass.sh -D \\"cn=admin,dc=%s\\" -w ldappwd \\"cn=root,ou=users,dc=%s\\"' % (self.ofs_source_location,self.hostname,self.hostname))
+        rc = self.runSingleCommand('%s/examples/certs/pvfs2-ldap-set-pass.sh -D \\"cn=admin,dc=%s\\" -w ldappwd \\"cn=root,ou=users,dc=%s\\" gotigers' % (self.ofs_source_location,self.hostname,self.hostname))
         if rc != 0:
             logging.exception("Could not set ldap password  rc = %d" % rc)
             exit(rc)
