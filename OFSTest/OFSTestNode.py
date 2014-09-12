@@ -2663,7 +2663,7 @@ class OFSTestNode(object):
             exit(rc)
 
         
-        rc = self.runSingleCommand('for username in \\`cut -d: -f1 /etc/passwd\\`; do %s/examples/certs/pvfs2-ldap-add-user.sh -D \\"cn=admin,dc=%s\\" -w ldappwd \\$username \\"ou=users,dc=%s\\"' % (self.ofs_source_location,self.hostname,self.hostname))
+        rc = self.runSingleCommand('for username in \\`cut -d: -f1 /etc/passwd\\`; do %s/examples/certs/pvfs2-ldap-add-user.sh -D \\"cn=admin,dc=%s\\" -w ldappwd \\$username \\"ou=users,dc=%s\\"; done' % (self.ofs_source_location,self.hostname,self.hostname))
         if rc != 0:
             logging.exception("Could not create LDAP users. rc = %d" % rc)
             exit(rc)
