@@ -2675,6 +2675,8 @@ class OFSTestNode(object):
     def createUserCerts(self,user=None):
         if user == None:
             user = self.current_user
+        
+        self.runSingleCommandAsRoot("rm -f pvfs2-cert.pem pvfs2-cert-key.pem")
         rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-req-auto.sh pvfs2 %s' % (self.ofs_source_location,user))
         if rc != 0:
             logging.exception("Could not create LDAP cert for user %s. rc = %d" % (user,rc))
@@ -2699,7 +2701,7 @@ class OFSTestNode(object):
         if rc != 0:
             logging.exception("Could not move LDAP cert key for user %s to %s" % (user,homedir))
             exit(rc)
-
+        
         
         return rc
             

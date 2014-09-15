@@ -1128,11 +1128,11 @@ class OFSTestNetwork(object):
         if rc == 0:
             rc = security_node.createUserCerts()
         if rc == 0:
-            rc = security_node.createUserCerts("root")
-        if rc == 0:
             rc = security_node.createUserCerts("nobody")
         if rc == 0:
             rc = security_node.createUserCerts("bin")
+        if rc == 0:
+            rc = security_node.createUserCerts("root")
 
         # Should be copied with OFS Installation. 
         #if rc == 0:
