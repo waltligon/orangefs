@@ -2683,27 +2683,27 @@ class OFSTestNode(object):
     def createUserCerts(self,user=None):
         if user == None:
             user = self.current_user
-        rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-req-auto.sh %s %s' % (self.ofs_source_location,user,user))
+        rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-req-auto.sh pvfs2 %s' % (self.ofs_source_location,user))
         if rc != 0:
             logging.exception("Could not create LDAP cert for user %s. rc = %d" % (user,rc))
             exit(rc)
 
-        rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-sign.sh %s' % (self.ofs_source_location,user))
+        rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-sign.sh pvfs2' % (self.ofs_source_location))
         if rc != 0:
             logging.exception("Could not sign LDAP cert for user %s. rc = %d" % (user,rc))
             exit(rc)
         
         homedir = self.runSingleCommandBacktick('\\`grep ^%s /etc/passwd | cut -d: -f6\\`' % user)
         self.runSingleCommand('mkdir -p %s' % homedir)
-        self.runSingleCommand('chown %s:%s %s-cert*.pem' % (user,user,user))
-        self.runSingleCommand('chmod 600 %s-cert*.pem' % user)
-        rc = self.runSingleCommand('cp -p %s-cert.pem %s/.pvfs2-cert.pem' % (user,homedir))
+        self.runSingleCommand('chown %s:%s pvfs2-cert*.pem' % (user,user))
+        self.runSingleCommand('chmod 600 pvfs2-cert*.pem')
+        rc = self.runSingleCommand('cp -p pvfs2-cert.pem %s/.pvfs2-cert.pem' % homedir)
         if rc != 0:
             logging.exception("Could not copy LDAP cert for user %s to %s. rc = %s" % (user,homedir,rc))
             exit(rc)
 
 
-        rc = self.runSingleCommand('cp -p %s-cert-key.pem %s/.pvfs2-cert-key.pem' % (user,homedir))
+        rc = self.runSingleCommand('cp -p pvfs2-cert-key.pem %s/.pvfs2-cert-key.pem' % homedir)
         if rc != 0:
             logging.exception("Could not copy LDAP cert key for user %s to %s" % (user,homedir))
             exit(rc)
