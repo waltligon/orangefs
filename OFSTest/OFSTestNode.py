@@ -1297,93 +1297,85 @@ class OFSTestNode(object):
     # @param self The object pointer
     # @param location Location to install mpich
     #
-
+    def installMPICH(self,install_location=None,build_location=None):
     
-    
 
-    def installMpich2(self,location=None):
-        if location == None:
-            location = "/home/%s/mpich2" % self.current_user
+        if install_location == None:
+            install_location = "/opt/mpi"
         
-        mpich_version = "mpich-3.0.4"
-            
-        url = "http://devorange.clemson.edu/pvfs/%s.tar.gz" % mpich_version
-        # just to make debugging less painful
-        #[ -n "${SKIP_BUILDING_MPICH2}" ] && return 0
-        #[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
-        self.runSingleCommand("mkdir -p "+location)
+        if build_location == None:
+            build_location = install_location
+        
+        
+        
+        self.mpich_version = "mpich-3.0.4"
+        url_base = "http://devorange.clemson.edu/pvfs/"
+        url = url_base+self.mpich_version+".tar.gz"
+
+        #self.openmpi_version = "openmpi-1.8"
+        #url_base = "http://www.open-mpi.org/software/ompi/v1.8/downloads/"
+        #url = url_base+self.openmpi_version+".tar.gz"
+
+        
+        self.runSingleCommand("mkdir -p "+build_location)
         tempdir = self.current_directory
-        self.changeDirectory("/home/%s" % self.current_user)
+        self.changeDirectory(build_location)
         
-        #wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
         rc = self.runSingleCommand("wget --quiet %s" % url)
-        #wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
         if rc != 0:
-            logging.exception("Could not download mpich from %s." % url)
+            logging.exception( "Could not download %s from %s." % (self.mpich_version,url))
             self.changeDirectory(tempdir)
             return rc
 
         output = []
-        self.runSingleCommand("tar xzf %s.tar.gz"% mpich_version)
+        self.runSingleCommand("tar xzf %s.tar.gz"% self.mpich_version)
         
-        self.mpich2_source_location = "/home/%s/%s" % (self.current_user,mpich_version)
-        self.changeDirectory(self.mpich2_source_location)
-        #self.runSingleCommand("ls -l",output)
-        #print output
+        self.openmpi_source_location = "%s/%s" % (build_location,self.mpich_version)
+        self.changeDirectory(self.mpich_source_location)
+
+
+
+        
         
         configure = '''
-        ./configure -q --prefix=%s \
+        ./configure -q --prefix=%s/mpich \
         --enable-romio --with-file-system=pvfs2 \
         --with-pvfs2=%s \
         --enable-g=dbg \
          >mpich2config.log
-        ''' % (location,self.ofs_installation_location)
-        
-        #wd = self.runSingleCommandBacktick("pwd")
-        #print wd
-        #print configure
+        ''' % (install_location,self.ofs_installation_location)
+
         
 
-        msg = "Configuring MPICH"
-        logging.info(msg)
+        logging.info( "Configuring %s" % self.mpich_version)
         rc = self.runSingleCommand(configure,output)
         
         if rc != 0:
-            logging.exception("Configure of MPICH failed. rc=%d" % rc)
-            logging.exception( output)
+            logging.exception( "Configure of %s failed. rc=%d" % (self.mpich_version,rc))
             self.changeDirectory(tempdir)
             return rc
         
-        msg = "Building MPICH"
-        logging.info(msg)
-        rc = self.runSingleCommand("make > mpich2make.log")
+        logging.info( "Making %s" % self.mpich_version)
+        rc = self.runSingleCommand("make 2>&1 | tee mpichmake.log")
         if rc != 0:
-            logging.exception("Make of MPICH failed.")
-            logging.exception( output)
+            logging.exception( "Make of %s failed.")
             self.changeDirectory(tempdir)
             return rc
 
-        logging.info("Installing MPICH")
-        rc = self.runSingleCommand("make install > mpich2install.log")
+        logging.info("Installing %s" % self.mpich_version)
+        rc = self.runSingleCommand("make install 2>&1 | tee mpichinstall.log")
         if rc != 0:
-            logging.exception( "Install of MPICH failed.")
-            logging.exception(output)
+            logging.exception("Install of %s failed." % self.mpich_version)
             self.changeDirectory(tempdir)
             return rc
         
-        logging.info( "Checking MPICH install")
-        rc = self.runSingleCommand("make installcheck > mpich2installcheck.log")
-        if rc != 0:
-            logging.info("Install of MPICH failed.")
-            logging.info( output)
-            self.changeDirectory(tempdir)
-            return rc
+        self.mpich_installation_location = install_location+"/mpich"
         
-        self.mpich2_installation_location = location 
-        # change this!
-        self.romio_runtests_pvfs2 = self.mpich2_source_location+"ompi/mca/io/romio/romio/test/runtests"
+        self.romio_runtests_pvfs2 = self.mpich_source_location+"src/mpi/romio/test/runtests.pvfs2"
+        self.runSingleCommand("chmod a+x "+self.romio_runtests_pvfs2)
         
         return 0
+
     
     ##
     # @fn installOpenMPI(self,install_location=None,build_location=None):
@@ -2693,7 +2685,7 @@ class OFSTestNode(object):
             logging.exception("Could not sign LDAP cert for user %s. rc = %d" % (user,rc))
             exit(rc)
         
-        homedir = self.runSingleCommandBacktick('\\`grep ^%s /etc/passwd | cut -d: -f6\\`' % user)
+        homedir = self.runSingleCommandBacktick('grep ^%s /etc/passwd | cut -d: -f6' % user)
         self.runSingleCommand('mkdir -p %s' % homedir)
         self.runSingleCommand('chown %s:%s pvfs2-cert*.pem' % (user,user))
         self.runSingleCommand('chmod 600 pvfs2-cert*.pem')
