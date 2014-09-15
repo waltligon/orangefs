@@ -2689,15 +2689,15 @@ class OFSTestNode(object):
         self.runSingleCommandAsRoot('mkdir -p %s' % homedir)
         self.runSingleCommandAsRoot('chown %s:%s pvfs2-cert*.pem' % (user,user))
         self.runSingleCommandAsRoot('chmod 600 pvfs2-cert*.pem')
-        rc = self.runSingleCommandAsRoot('cp -p pvfs2-cert.pem %s/.pvfs2-cert.pem' % homedir)
+        rc = self.runSingleCommandAsRoot('mv -f pvfs2-cert.pem %s/.pvfs2-cert.pem' % homedir)
         if rc != 0:
-            logging.exception("Could not copy LDAP cert for user %s to %s. rc = %s" % (user,homedir,rc))
+            logging.exception("Could not move LDAP cert for user %s to %s. rc = %s" % (user,homedir,rc))
             exit(rc)
 
 
-        rc = self.runSingleCommandAsRoot('cp -p pvfs2-cert-key.pem %s/.pvfs2-cert-key.pem' % homedir)
+        rc = self.runSingleCommandAsRoot('mv -f pvfs2-cert-key.pem %s/.pvfs2-cert-key.pem' % homedir)
         if rc != 0:
-            logging.exception("Could not copy LDAP cert key for user %s to %s" % (user,homedir))
+            logging.exception("Could not move LDAP cert key for user %s to %s" % (user,homedir))
             exit(rc)
 
         
