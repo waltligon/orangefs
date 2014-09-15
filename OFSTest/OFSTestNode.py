@@ -2686,16 +2686,16 @@ class OFSTestNode(object):
             exit(rc)
         
         homedir = self.runSingleCommandBacktick('grep ^%s /etc/passwd | cut -d: -f6' % user)
-        self.runSingleCommand('mkdir -p %s' % homedir)
-        self.runSingleCommand('chown %s:%s pvfs2-cert*.pem' % (user,user))
-        self.runSingleCommand('chmod 600 pvfs2-cert*.pem')
-        rc = self.runSingleCommand('cp -p pvfs2-cert.pem %s/.pvfs2-cert.pem' % homedir)
+        self.runSingleCommandAsRoot('mkdir -p %s' % homedir)
+        self.runSingleCommandAsRoot('chown %s:%s pvfs2-cert*.pem' % (user,user))
+        self.runSingleCommandAsRoot('chmod 600 pvfs2-cert*.pem')
+        rc = self.runSingleCommandAsRoot('cp -p pvfs2-cert.pem %s/.pvfs2-cert.pem' % homedir)
         if rc != 0:
             logging.exception("Could not copy LDAP cert for user %s to %s. rc = %s" % (user,homedir,rc))
             exit(rc)
 
 
-        rc = self.runSingleCommand('cp -p pvfs2-cert-key.pem %s/.pvfs2-cert-key.pem' % homedir)
+        rc = self.runSingleCommandAsRoot('cp -p pvfs2-cert-key.pem %s/.pvfs2-cert-key.pem' % homedir)
         if rc != 0:
             logging.exception("Could not copy LDAP cert key for user %s to %s" % (user,homedir))
             exit(rc)
