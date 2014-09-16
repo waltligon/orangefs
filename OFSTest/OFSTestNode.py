@@ -2701,7 +2701,8 @@ class OFSTestNode(object):
         if rc != 0:
             logging.exception("Could not move LDAP cert key for user %s to %s" % (user,homedir))
             exit(rc)
-        
+
+        rc = self.runSingleCommand("cp %s/examples/certs/orangefs-ca*pem %s/etc" % (self.ofs_source_location,self.ofs_installation_location) )
         
         return rc
             
