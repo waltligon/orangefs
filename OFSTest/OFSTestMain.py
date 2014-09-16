@@ -220,7 +220,8 @@ class OFSTestMain(object):
     
     def checkNetwork(self):
         
-        #right now, I will just print out the dictionary of the network and every node:
+        print "TODO: Implement OFSTestMain.checkNetwork()"
+        print "Right now, I will just print out the dictionary of the network and every node:"
         
         return self.ofs_network.printNetwork()
         
@@ -238,7 +239,7 @@ class OFSTestMain(object):
         # First, if we're using Cloud/Openstack, open the connection
         print "===========================================================" 
         print "Connecting to EC2/OpenStack cloud using information from " + self.config.cloud_config
-        print "%s,%s,%s,%s,%s" % (self.config.cloud_config,self.config.cloud_key_name,self.config.ssh_key_filepath,self.config.cloud_type,self.config.nova_password_file)
+        #print "%s,%s,%s,%s,%s" % (self.config.cloud_config,self.config.cloud_key_name,self.config.ssh_key_filepath,self.config.cloud_type,self.config.nova_password_file)
         self.ofs_network.addCloudConnection(self.config.cloud_config,self.config.cloud_key_name,self.config.ssh_key_filepath,self.config.cloud_type,self.config.nova_password_file)
 
 

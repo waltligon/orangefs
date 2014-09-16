@@ -1122,7 +1122,7 @@ class OFSTestNetwork(object):
         if security_node==None:
             security_node = node_list[0]
 
-        rc = self.setupLDAP()
+        rc = security_node.setupLDAP()
         if rc == 0:
             rc = security_node.createCACert()
             # CA Certs should be copied with OrangeFS.
