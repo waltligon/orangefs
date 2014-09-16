@@ -1142,12 +1142,13 @@ class OFSTestNetwork(object):
         
     
     def createUserCerts(self,user=None,node_list=None,security_node=None):
-        if user == None:
-            user = self.current_user
         if node_list == None:
             node_list = self.network_nodes
         if security_node==None:
             security_node = node_list[0]
+        if user == None:
+            user = security_node.current_user
+
             
         rc = security_node.createUserCerts(user);
         if rc == 0:
