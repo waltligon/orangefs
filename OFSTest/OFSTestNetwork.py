@@ -1122,24 +1122,51 @@ class OFSTestNetwork(object):
         if security_node==None:
             security_node = node_list[0]
 
-        rc = security_node.setupLDAP()
+        rc = self.setupLDAP()
         if rc == 0:
             rc = security_node.createCACert()
+            # CA Certs should be copied with OrangeFS.
         if rc == 0:
-            rc = security_node.createUserCerts()
+            rc = self.createUserCerts(node_list=node_list,security_node=security_node)
         if rc == 0:
-            rc = security_node.createUserCerts("nobody")
+            rc = self.createUserCerts(user="nobody",node_list=node_list,security_node=security_node)
         if rc == 0:
-            rc = security_node.createUserCerts("bin")
+            rc = self.createUserCerts(user="bin",node_list=node_list,security_node=security_node)
         if rc == 0:
-            rc = security_node.createUserCerts("root")
+            rc = self.createUserCerts(user="root",node_list=node_list,security_node=security_node)
 
-        # Should be copied with OFS Installation. 
-        #if rc == 0:
-        #    rc = self.copyCACertsToNodeList()
-        
         
         return rc
+
+        
+        
+    
+    def createUserCerts(self,user=None,node_list=None,security_node=None):
+        if user == None:
+            user = self.current_user
+        if node_list == None:
+            node_list = self.network_nodes
+        if security_node==None:
+            security_node = node_list[0]
+            
+        rc = security_node.createUserCerts(user);
+        if rc == 0:
+            self.copyUserCertsToNodeList(user=user,destination_list=node_list) 
+
+    
+    ##    
+    #    @fn copyUserCertsToNodeList(self,destination_list=None):
+    #
+    #    Copy OFS from build node to rest of cluster.
+    #    
+    #    @param self The object pointer
+    #    @param destination_list List of nodes to copy OrangeFS to. OFS should already be at destination_list[0].
+        
+    def copyUserCertsToNodeList(self,destination_list=None):
+        if destination_list == None:
+            destination_list = self.network_nodes;
+        self.copyResourceToNodeList(node_function=OFSTestNode.OFSTestNode.copyUserCertsToNode,destination_list=destination_list)
+
 
    
     ##    

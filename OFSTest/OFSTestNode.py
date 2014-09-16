@@ -2196,6 +2196,34 @@ class OFSTestNode(object):
         destination_node.ofs_fs_name = destination_node.runSingleCommandBacktick("grep Name %s | awk '{print \\$2}'" % destination_node.ofs_conf_file)
         return rc
        
+    
+    ##
+    # @fn copyOFSUserCertsToNode(self,user,destination_node):
+    #
+    # This copies user certs for a given user to the same user account on the destination node
+    # @param self The object pointer
+    # @param user The user for whom the certificates should be copied
+    # @param destination_node OFSTestNode to which the installation is copied.
+
+
+    def copyUserCertsToNode(self,user,destination_node):
+        
+        # Copy the cert.
+        # Copy the cert key.
+        homedir = "/home/"+user
+        
+
+        rc = self.copyToRemoteNode(homedir+"/.pvfs2-cert.pem", destination_node, "/tmp/",True)
+        if rc == 0:
+            rc = destination_node.runSingleCommandAsRoot("mv -f /tmp/.pvfs2-cert.pem %s/" % homedir)
+        if rc == 0:
+            rc = self.copyToRemoteNode(homedir+"/.pvfs2-cert-key.pem", destination_node, "/tmp",True)
+        if rc == 0:
+            rc = destination_node.runSingleCommandAsRoot("mv -f /tmp/.pvfs2-cert-key.pem %s/" % homedir)
+
+
+        return rc
+
 
     ##
     # @fn configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_storage_location="",ofs_conf_file=None,security=None):

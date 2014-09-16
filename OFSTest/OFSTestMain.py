@@ -429,12 +429,7 @@ class OFSTestMain(object):
             return rc
 
 
-        print ""
-        print "==================================================================="
-        print "Copy installation to all nodes"
-        # TODO: Should handle this with exceptions.
-        rc = self.ofs_network.copyOFSToNodeList()
-        
+
 
         if self.config.ofs_security_mode != None:
             if self.config.ofs_security_mode.lower() == "key":
@@ -448,7 +443,13 @@ class OFSTestMain(object):
                 print "==================================================================="
                 print "Generating OrangeFS security certificates"
                 rc = self.ofs_network.generateOFSCertificates()
-            
+
+        print ""
+        print "==================================================================="
+        print "Copy installation to all nodes"
+        # TODO: Should handle this with exceptions.
+        rc = self.ofs_network.copyOFSToNodeList()
+                    
         
         print ""
         print "==================================================================="
