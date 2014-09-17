@@ -688,7 +688,7 @@ class OFSTestNetwork(object):
     #    @param destination_list    list of nodes. Assumption is source is at node[0].
         
 
-    def copyResourceToNodeList(self,node_function,destination_list=None):
+    def copyResourceToNodeList(self,node_function,destination_list=None, *args, **kwargs):
 
         
         if destination_list == None:
@@ -706,7 +706,7 @@ class OFSTestNetwork(object):
         print msg
         logging.info(msg)
         #rc = destination_list[0].copyOFSInstallationToNode(destination_list[list_length/2])
-        rc = node_function(destination_list[0],destination_list[list_length/2])
+        rc = node_function(destination_list[0],destination_list[list_length/2], *args, **kwargs)
         
         
         # TODO: Throw an exception if the copy fails.
@@ -726,7 +726,7 @@ class OFSTestNetwork(object):
                     list = self.queue.get()
                     
                     #print "Copying %r" % list
-                    self.manager.copyResourceToNodeList(node_function=node_function,destination_list=list)
+                    self.manager.copyResourceToNodeList(node_function=node_function,destination_list=list, *args, **kwargs)
                     
                         
                     #signals to queue job is done
@@ -1166,7 +1166,7 @@ class OFSTestNetwork(object):
     def copyUserCertsToNodeList(self,user,destination_list=None):
         if destination_list == None:
             destination_list = self.network_nodes;
-        self.copyResourceToNodeList(node_function=OFSTestNode.OFSTestNode.copyUserCertsToNode,user=user,destination_list=destination_list)
+        self.copyResourceToNodeList(node_function=OFSTestNode.OFSTestNode.copyUserCertsToNode, destination_list=destination_list, user=user )
 
 
    

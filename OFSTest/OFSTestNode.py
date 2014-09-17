@@ -2186,7 +2186,7 @@ class OFSTestNode(object):
 
 
 
-    def copyOFSInstallationToNode(self,destination_node):
+    def copyOFSInstallationToNode(self,destination_node,*args,**kwargs):
         rc = self.copyToRemoteNode(self.ofs_installation_location+"/", destination_node, self.ofs_installation_location, True)
         destination_node.ofs_installation_location = self.ofs_installation_location
         destination_node.ofs_branch =self.ofs_branch
@@ -2202,12 +2202,13 @@ class OFSTestNode(object):
     #
     # This copies user certs for a given user to the same user account on the destination node
     # @param self The object pointer
-    # @param user The user for whom the certificates should be copied
     # @param destination_node OFSTestNode to which the installation is copied.
+    # @param user The user for whom the certificates should be copied
 
 
-    def copyUserCertsToNode(self,user,destination_node):
+    def copyUserCertsToNode(self,destination_node,*args,**kwargs):
         
+        user = kwargs['user']
         # Copy the cert.
         # Copy the cert key.
         homedir = "/home/"+user
