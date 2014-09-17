@@ -1147,7 +1147,10 @@ $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 
 $(USERTOOLS): %: %.o $(LIBRARIES)
 
+# ucached must link with liborangefs
 $(UCACHEDTOOLS): %: %.o $(LIBRARIES)
+	$(Q) "  LD      $@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $< -lorangefs $(LIBS) $(call modldflags,$<)
 
 $(KERNAPPS): %: %.o $(LIBRARIES)
 $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
