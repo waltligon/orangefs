@@ -1163,7 +1163,7 @@ class OFSTestNode(object):
                 # prereqs should be installed as part of the image. Thanx SuseStudio!
                 #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs "nano openssl
                 "zypper --non-interactive install patch libuuid1 uuid-devel gdb",
-                "zypper --non-interactive install openldap openldap-clients openldap-servers openldap-servers-sql compat-openldap",
+                "zypper --non-interactive install openldap2 openldap2-client openldap-servers libldap2_4-2 openldap2-devel",
                 "chown -R ldap:ldap /var/lib/ldap",
                 
     
