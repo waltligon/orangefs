@@ -1163,6 +1163,8 @@ class OFSTestNode(object):
                 # prereqs should be installed as part of the image. Thanx SuseStudio!
                 #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs "nano openssl
                 "zypper --non-interactive install patch libuuid1 uuid-devel gdb",
+                "zypper --non-interactive install openldap openldap-clients openldap-servers openldap-servers-sql compat-openldap",
+                "chown -R ldap:ldap /var/lib/ldap",
                 
     
                 
@@ -1187,6 +1189,8 @@ class OFSTestNode(object):
                 "service rpcbind start",
                 "service nfs restart",
                 "/sbin/rpcbind"
+                "service slapd start",
+                "chkconfig slapd on"
             ]
             for command in install_commands:
                 rc = self.runSingleCommandAsRoot(command, output)

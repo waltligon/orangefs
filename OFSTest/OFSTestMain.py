@@ -430,16 +430,9 @@ class OFSTestMain(object):
             return rc
 
 
-
-
+        # Cert based security must be done before copy. Key based must be done after copy. 
         if self.config.ofs_security_mode != None:
-            if self.config.ofs_security_mode.lower() == "key":
-                print ""
-                print "==================================================================="
-                print "Generating OrangeFS security keys"
-
-                rc = self.ofs_network.generateOFSKeys()
-            elif self.config.ofs_security_mode.lower() == "cert":
+            if self.config.ofs_security_mode.lower() == "cert":
                 print ""
                 print "==================================================================="
                 print "Generating OrangeFS security certificates"
@@ -450,6 +443,16 @@ class OFSTestMain(object):
         print "Copy installation to all nodes"
         # TODO: Should handle this with exceptions.
         rc = self.ofs_network.copyOFSToNodeList()
+
+        if self.config.ofs_security_mode != None:
+            if self.config.ofs_security_mode.lower() == "key":
+                print ""
+                print "==================================================================="
+                print "Generating OrangeFS security keys"
+
+                rc = self.ofs_network.generateOFSKeys()
+
+
                     
         
         print ""
