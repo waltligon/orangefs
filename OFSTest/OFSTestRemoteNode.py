@@ -93,23 +93,26 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
     def getAliasesFromConfigFile(self,config_file_name):
         
         # read the file from the server
-
-        alias = self.runSingleCommandBacktick('cat '+config_file_name+' | grep \"Alias \"')
-        logging.debug("Alias is "+ alias)
-        
-        alias_lines = alias.split('\n')
-        
         aliases = []
-                
-                
-        for line in alias_lines:
-            if "Alias " in line:
-                # split the line into Alias, AliasName, url
-                element = line.split()
-                # What we want is element 1
-                aliases.append(element[1].rstrip())
-                
+        
+        if config_file_name != None:
+
+            alias = self.runSingleCommandBacktick('cat '+config_file_name+' | grep \"Alias \"')
+            logging.debug("Alias is "+ alias)
             
+            alias_lines = alias.split('\n')
+            
+            
+                    
+                    
+            for line in alias_lines:
+                if "Alias " in line:
+                    # split the line into Alias, AliasName, url
+                    element = line.split()
+                    # What we want is element 1
+                    aliases.append(element[1].rstrip())
+                    
+                
         logging.info( "OrangeFS Aliases: ")
         logging.info(aliases)    
         return aliases

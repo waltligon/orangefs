@@ -139,13 +139,13 @@ class OFSTestNetwork(object):
                 self.queue = queue
           
             def run(self):
-                try:
-                    while True:
-                        #grabs host from queue
-                        #print "Queue length is %d" % self.queue.qsize()
-                        node = self.queue.get()
-                        
-                
+                while True:
+                    #grabs host from queue
+                    #print "Queue length is %d" % self.queue.qsize()
+                    node = self.queue.get()
+                    
+                    try:
+    
                         #runs the selected node function
                         if len(args) > 0:
                             rc = node_function(node,*args)
@@ -153,11 +153,11 @@ class OFSTestNetwork(object):
                             rc = node_function(node,**kwargs)
                         else:
                             rc = node_function(node)
-                            
-                        #signals to queue job is done
-                        self.queue.task_done()
-                except:
-                    logging.exception("Thread failed!");
+                    except:
+                        logging.exception("Thread failed!");
+    
+                    #signals to queue job is done
+                    self.queue.task_done()
           
           
         start = time.time()
@@ -724,10 +724,12 @@ class OFSTestNetwork(object):
                     #grabs host from queue
                     #print "Queue length is %d" % self.queue.qsize()
                     list = self.queue.get()
+                    try:
                     
-                    #print "Copying %r" % list
-                    self.manager.copyResourceToNodeList(node_function=node_function,destination_list=list, *args, **kwargs)
-                    
+                        #print "Copying %r" % list
+                        self.manager.copyResourceToNodeList(node_function=node_function,destination_list=list, *args, **kwargs)
+                    except:
+                        logging.exception("Copy failed!")
                         
                     #signals to queue job is done
                     self.queue.task_done()
