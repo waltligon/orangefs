@@ -3,14 +3,15 @@
 
 usage () 
 {
-    echo "USAGE: $0 [-D <admin dn>] [-w <admin password>] <user dn> <password>"
+    echo "USAGE: $0 [-H hosturi] [-D <admin dn>] [-w <admin password>] <user dn> <password>"
+    echo "       hosturi: uri of remote LDAP server (ldap://ldap-server)"
     echo "       admin dn: dn of LDAP administrator"
     echo "       admin password: password of LDAP admin, leave blank for prompt"
     echo "       user dn: user whose password will be changed"
     echo "       password: new password"
 }
 
-while getopts "D:w:" option
+while getopts "D:w:H:" option
 do
     case $option in
     D)
@@ -19,6 +20,8 @@ do
 	w)
 	    adminpw=$OPTARG
         ;;
+    H)	
+    	hosturi=$OPTARG
 	*)
 	    usage
 	    exit 1
@@ -49,13 +52,19 @@ else
     pwdopt="-W"
 fi
 
+# bind option
+if [ $hosturi ]; then
+    hostopt="-H $hosturi"
+fi
+
+
 encpw=`slappasswd -s $password`
 if [ ! $encpw ]; then
     echo "Error: could not encrypt password"
     exit 1
 fi
 
-ldapmodify $bindopt $pwdopt $adminpw -x <<_EOF
+ldapmodify $hostopt $bindopt $pwdopt $adminpw -x <<_EOF
 dn: $userdn
 changetype: modify
 replace: userPassword
