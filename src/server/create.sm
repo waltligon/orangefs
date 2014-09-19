@@ -156,12 +156,6 @@ static int create_metafile(struct PINT_smcb *smcb, job_status_s *js_p)
     PVFS_handle_extent_array meta_handle_ext_array;
     server_configuration_s *config = get_server_config_struct();
 
-
-
-    gossip_err("%s:\n",__func__);
-    gossip_err("s_op->attr.owner(%u)\n",(unsigned int)s_op->attr.owner);
-    gossip_err("          .group(%u)\n",(unsigned int)s_op->attr.group);
-
     /* first state to check in, make sure the attr mask contains the dist bit. 
      * it's required later (not sure if we have to require it) but if we don't
      * have it here, return an EINVAL */
@@ -744,19 +738,16 @@ static PINT_sm_action setattr_setobj_attribs(
     uint32_t num_groups;
 #endif
 
-    gossip_err("%s-dspace attrs:s_op->attr.mask(0x%0x)\n",__func__,s_op->attr.mask);
-    gossip_err("                s_op->attr.objtype(%d)\n",s_op->attr.objtype);
-    gossip_err("%s-req attrs   :s_op->req->u.create.attr.op_mask(0x%0x)\n",__func__
-                                                                          ,s_op->req->u.create.attr.mask);
     dspace_a_p = &s_op->attr;
     a_p = &s_op->req->u.create.attr;
+
 
      /* 
       * Remember that mtime is versioned on disk! so convert it here..
       * It is better to do it here than change the PVFS_object_attr_overwrite_setable
       * macro, since there are many more users of it, I think.
       */
-     if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
+    if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
      {
          PVFS_time orig_mtime = a_p->mtime;
          a_p->mtime = PINT_util_mktime_version(orig_mtime);
@@ -769,7 +760,8 @@ static PINT_sm_action setattr_setobj_attribs(
         we have the attribs stored in the dspace, as well as the
         requested attribs to store.  overwrite the ones that are setable
         and specified by the mask value in the request; macro defined in
-        pvfs2-storage.h
+        pvfs2-storage.h.  NOTE: the following function versions the mtime
+        if PVFS_ATTR_COMMON_MTIME_SET is not set in the attribute mask.
         */
      PVFS_object_attr_overwrite_setable(dspace_a_p, a_p);
 
@@ -815,19 +807,6 @@ static PINT_sm_action setattr_setobj_attribs(
     ds_attr = &(s_op->ds_attr);
     PVFS_object_attr_to_ds_attr(dspace_a_p, ds_attr);
 
-    gossip_err("%s:\n",__func__);
-    gossip_err("   ds_attr->uid(%u)\n",dspace_a_p->owner);
-    gossip_err("          ->gid(%u)\n",dspace_a_p->group);
-    gossip_err("          ->mode(%u)\n",dspace_a_p->perms);
-    gossip_err("          ->ctime(%lu)\n",dspace_a_p->ctime);
-    gossip_err("          ->mtime(%lu)\n",dspace_a_p->mtime);
-    gossip_err("          ->atime(%lu)\n",dspace_a_p->atime);
-    gossip_err("          ->type(%u)\n",dspace_a_p->objtype);
-    gossip_err("          ->dfile_count(%u)\n",dspace_a_p->u.meta.dfile_count);
-    gossip_err("          ->dist_size(%u)\n",dspace_a_p->u.meta.dist_size);
-    gossip_err("          ->mask(0x%0x)\n",dspace_a_p->mask);
-
-
     ret = job_trove_dspace_setattr(
         s_op->req->u.create.fs_id, s_op->resp.u.create.metafile_handle,
         ds_attr,
@@ -842,29 +821,11 @@ static int setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {    
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    //int i;
 
 
     /* NOTE:  Distribution was sent from the client in the original request structure, so there's no need to
      *        to send the same information back.
      */ 
-
-    //gossip_err("%s:BEFORE\n",__func__);
-    //gossip_err("resp.u.create.metafile_handle(%llu)\n",llu(s_op->resp.u.create.metafile_handle));
-    //gossip_err("             .stuffed(%u)\n",s_op->resp.u.create.stuffed);
-    //gossip_err("             .metafile_attrs.owner(%u)\n",(unsigned int)s_op->resp.u.create.metafile_attrs.owner);
-    //gossip_err("                            .group(%u)\n",(unsigned int)s_op->resp.u.create.metafile_attrs.group);
-    //gossip_err("                            .perms(%u)\n",(unsigned int)s_op->resp.u.create.metafile_attrs.perms);
-    //gossip_err("                            .atime(%llu)\n",(long long unsigned int)s_op->resp.u.create.metafile_attrs.atime);
-    //gossip_err("                            .mtime(%llu)\n",(long long unsigned int)s_op->resp.u.create.metafile_attrs.mtime);
-    //gossip_err("                            .ctime(%llu)\n",(long long unsigned int)s_op->resp.u.create.metafile_attrs.ctime);
-    //gossip_err("                            .mask(0x%0x)\n",s_op->resp.u.create.metafile_attrs.mask);
-    //gossip_err("                            .objtype(%d)\n",(int)s_op->resp.u.create.metafile_attrs.objtype);
-    //gossip_err("                            .meta.dist_size(%u)\n",s_op->resp.u.create.metafile_attrs.u.meta.dist_size);
-    //gossip_err("                                 .dfile_count(%u)\n",s_op->resp.u.create.metafile_attrs.u.meta.dfile_count);
-    //gossip_err("                                 .stuffed_size(%d)\n\n",s_op->resp.u.create.metafile_attrs.u.meta.stuffed_size);
-
-
     if ( s_op->attr.owner >= 0 )
     {
        s_op->resp.u.create.metafile_attrs.owner = s_op->attr.owner;
@@ -891,7 +852,11 @@ static int setup_resp(
 
     if ( s_op->attr.mtime )
     {
-       s_op->resp.u.create.metafile_attrs.mtime = s_op->attr.mtime;
+       /* Must "un-version" mtime before sending back to client:  When the mtime is stored in dspace in 
+        * in the setobj_attribs state, the mtime is "versioned", i.e., the time, given in seconds since
+        * the Epoch, is modified using PINT_util_mktime_version().
+        */
+       s_op->resp.u.create.metafile_attrs.mtime = PINT_util_mkversion_time(s_op->attr.mtime);
        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_COMMON_MTIME;
     }
 
@@ -918,25 +883,6 @@ static int setup_resp(
     {
        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_META_UNSTUFFED;
     }
-
-    //gossip_err("%s:AFTER\n",__func__);
-    //gossip_err("resp.u.create.metafile_handle(%llu)\n",llu(s_op->resp.u.create.metafile_handle));
-    //gossip_err("             .stuffed(%u)\n",s_op->resp.u.create.stuffed);
-    //gossip_err("             .metafile_attrs.owner(%u)\n",(unsigned int)s_op->resp.u.create.metafile_attrs.owner);
-    //gossip_err("                            .group(%u)\n",(unsigned int)s_op->resp.u.create.metafile_attrs.group);
-    //gossip_err("                            .perms(%u)\n",(unsigned int)s_op->resp.u.create.metafile_attrs.perms);
-    //gossip_err("                            .atime(%llu)\n",(long long unsigned int)s_op->resp.u.create.metafile_attrs.atime);
-    //gossip_err("                            .mtime(%llu)\n",(long long unsigned int)s_op->resp.u.create.metafile_attrs.mtime);
-    //gossip_err("                            .ctime(%llu)\n",(long long unsigned int)s_op->resp.u.create.metafile_attrs.ctime);
-    //gossip_err("                            .mask(0x%0x)\n",s_op->resp.u.create.metafile_attrs.mask);
-    //gossip_err("                            .objtype(%d)\n",(int)s_op->resp.u.create.metafile_attrs.objtype);
-    //gossip_err("                            .meta.dist_size(%u)\n",s_op->resp.u.create.metafile_attrs.u.meta.dist_size);
-    //gossip_err("                                 .dfile_count(%u)\n",s_op->resp.u.create.metafile_attrs.u.meta.dfile_count);
-    //gossip_err("                                 .stuffed_size(%d)\n",s_op->resp.u.create.metafile_attrs.u.meta.stuffed_size);
-
-    //for (i=0; i<s_op->resp.u.create.metafile_attrs.u.meta.dfile_count; i++)
-    //    gossip_err("dfile[%d]=%llu\n",i,llu(s_op->resp.u.create.metafile_attrs.u.meta.dfile_array[i]));
-
 
     if (js_p->error_code == 0)
     {
