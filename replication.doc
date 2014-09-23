@@ -1,0 +1,196 @@
+Setting System Defaults in the Config File
+
+1.  pvfs2-genconfig PERL script
+	Added defaults for <replication>, which is a subcontext of <Filesystem>
+		ReplicationSwitch off
+		NumberOfReplicas 1
+		LayoutAlgorithm round_robin
+
+	NOTE:  File Stuffing must be turned off when Replication is turned on.
+
+2.  src/common/misc/server-config.h
+	Values from the conf file are stored in struct filesystem_configuration_s.
+		uint32_t        replication_switch
+		PVFS_sys_layout replication_layout
+		uint32_t        replication_number_of_copies
+
+3.  src/common/misc/server_config.c
+	DOTCONF_CB(get_replication_switch) sets fs_conf->replication_switch
+	DOTCONF_CB(get_layout_algorithm) sets fs_conf->replication_layout.algorithm
+	DOTCONF_CB(get_number_of_replicas) sets fs_conf->replication_number_of_copies
+
+	DOTCONF_CB is
+		const char *<function name> (command_t *cmd, context_t *ctx)
+
+
+Creating a File with Replication
+
+1.  src/client/sysint/sys-create.sm
+
+2.  getattr on the parent directory
+	TODO: add replication setting for directory
+	      add replication info being passed from interface
+
+	Replication values are obtained from the config file using:
+		get_replication_from_config( replication_s, PVFS_object_ref *)
+			copy_replication_info_from_config( filesystem_configuration_s *, replication_s *)
+				copy_replication_info( replication_s *src, replication_s *dest)
+					copies from src to dest structures
+					replication_switch, replication_number_of_copies,
+					replication_layout.algorithm, replication_layout.server_list.count
+					if ( server_list.count > 0 ) then
+					   src server_list is copied to dest server_list
+
+3.  setup request for PVFS_SERV_CREATE
+	The request structure has members for replication_number_of_copies and replication_layout.  These
+	values will be zero if replication is off.
+
+	Adds PVFS_ATTR_META_REPLICATION to req->u.create.attr.mask, if replication is on.
+
+	src/proto/pvfs2-req-proto.h contains struct PVFS_servreq_create.
+
+4.  Send request to server
+
+
+NOTE:  Need to add replicated handles to the capability!
+
+5.  src/server/create.sm
+	Create PVFS_TYPE_METAFILE dspace entry, where key is metadata handle and value is TROVE_ds_attributes
+	structure with type set to PVFS_TYPE_METAFILE.
+
+	Add dspace entry to local server cache (dbpf_attr_cache_insert()).
+
+6.  File Stuffing is NOT supported right now when replication is in use. So, allocate primary datafile
+    handles.
+	Calls PINT_cache_config_get_server_list -- gets the list of io-servers for the primary datahandles. Code
+	forces the # of dfiles to NEVER be larger than the # of io servers for Round Robin layout.
+
+7.  Create local datafiles for primary list:
+	Get datahandle range for this host.
+	Call job_trove_dspace_create_list() using the datahandle range for this host.  Creates a PVFS_TYPE_DATAFILE
+		object, key is datahandle from range, value is attrs.
+	Add object to server's attr_cache
+
+8.  Call job_precreate_pool_get_handles() for each remote server to get remote handles.
+
+9.  Store data in the keyval database:
+	key="dh",value=list of datahandles
+	key="md",value=data distribution
+	
+10. Get replication handles
+	Using a round robin layout for now.
+	Get "local" handles using job_trove_dspace_create_list()
+	Get "remote" handles using job_precreate_pool_get_handles()
+
+11. Store replication information as xattrs.
+	Using job_trove_keyval_write_list(), we store:
+		key=user.pvfs2.mirror.handles,     value=list of replica handles
+		key=user.pvfs2.mirror.copies,      value=replication_number_of_copies
+		key=user.pvfs2.mirror.status,      value=all set to zero
+		key=user.pvfs2.mirror.mode,        value=MIRROR_ON_WRITE
+		key=user.pvfs2.mirror.layout_size, value=size
+		key=user.pvfs2.mirror.layout,      value=name of layout
+
+12. Store/update dspace using job_trove_dspace_setattr()
+
+13. Return to client
+	Response includes metafile handle, capability, stuffed indicator, datafile count, total number of replica handles, primary datafile handles,
+	replication datafile handles.
+
+14. Client creates the directory entry (PVFS_SERV_CRDIRENT)
+
+15. Be sure to add the replicated handle to the acache (check to see if this is done).
+
+
+
+
+How the I/O works for a write...
+
+In sys-io.sm
+
+1.  Get attributes for metafile handle including the replication handles, if not already stored in the acache.
+	On metadata server, accessing the keyval database:
+		Get metafile hint:
+			user.pvfs2.meta_hint
+		Get replication xattrs:
+			user.pvfs2.mirror.mode
+			user.pvfs2.mirror.copies
+			user.pvfs2.mirror.handles
+		Get distribution of primary handles:
+			key="md"
+		Get unstuffed marker:
+			key="nd"  NOTE: In the case of replication, "nd" won't exist.
+
+2.  Not supporting small-io right now.  Do this later.  So, we will always start a flow.
+
+3.  Post msgpairs for primary handles and wait for acks.  The PVFS_SERV_IO request is replaced with PVFS_SERV_REPLICATION_PRIME.
+    The request contains the primary handle, the replication handles (only for the primary), and the number of replicas to make.
+
+
+In replicate-prime.sm on the server:
+
+4-1.  Execute the prelude
+
+4-2.  Contact the replica servers:
+	Request is PVFS_SERV_REPLICATE_NEXT. This request is a copy of the PVFS_SERV_REPLICATION_PRIME request with the
+	handle value replaced with the replica handle and the op replaced with PVFS_SERV_REPLICATE_NEXT.  NOTE:  
+	replicate-next.sm is essentially what we originally had as io.sm
+
+In replicate-next.sm:
+
+4-2-1.  Executes the prelude for the replica datahandle
+
+4-2-2.  An ack is sent back to replicate-prime
+
+4-2-3.  A receiving flow is started and waits for data from the primary data server.
+
+
+In replicate-prime.sm:
+
+4-3.  Once an ack is received from each replica server, a bmi-recv is issued for each replica server and waits for a 
+      final ack from its corresponding replica server.  These final acks are sent from each replica server when the
+      PVFS_SERV_REPLICATE_NEXT requests finish.
+
+4-4.  An ack is sent back to the client.
+
+4-5.  A receiving Flow is started and is waiting on data from the client.  At this point, the replica servers are also waiting
+      on data from the primary data server.
+
+
+In sys-io.sm:
+
+5.  The client receives the ack from its primary data servers.
+
+6.  The client starts a flow to each primary data server.  
+
+
+In replicate-prime.sm:
+7-1.  Data is being received from the client.
+
+7-2.  Every flow buffer that is received from the client is also sent to each replica server.
+
+7-3.  As the data is being forwarded to the replica servers, the data is stored locally.
+
+7-4.  This process continues until the I/O request has finished.
+
+
+In replicate-next.sm
+8-1.  The data is received from its primary data server and stored locally.
+
+8-2.  8-1 continues until all of the data is received and stored, then an ack is sent to the primary data server.
+
+8-3.  This request has finished.
+
+
+In replicate-prime.sm
+9-1.  When replicate-prime receives an ack from each of its replica servers, then an ack is sent to the client.
+
+9-2.  This request is now finished.
+
+
+In sys-io.sm
+10.  acks are received from each primary data server.
+
+11.  A response is generated for the client.
+
+12.  This request is now completely over.
