@@ -256,22 +256,16 @@ do {                                                                       \
 
 struct PVFS_servresp_create
 {
-    PVFS_handle metafile_handle;
-    PVFS_capability capability;
-    int32_t stuffed;
-    int32_t datafile_count;
-    PVFS_handle *datafile_handles;
+   PVFS_handle metafile_handle;
+   uint32_t stuffed;
+   PVFS_object_attr metafile_attrs;
 };
-endecode_fields_3a_struct(
-    PVFS_servresp_create,
-    PVFS_handle, metafile_handle,
-    PVFS_capability, capability,
-    int32_t, stuffed,
-    int32_t, datafile_count,
-    PVFS_handle, datafile_handles);
+endecode_fields_3_struct(PVFS_servresp_create,        \
+                         PVFS_handle,metafile_handle, \
+                         uint32_t,stuffed,            \
+                         PVFS_object_attr,metafile_attrs);
 #define extra_size_PVFS_servresp_create \
-    ((PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
-    extra_size_PVFS_capability)
+   (extra_size_PVFS_object_attr)
 
 /* batch_create *********************************************************/
 /* - used to create new multiple metafile and datafile objects */

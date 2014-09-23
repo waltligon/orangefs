@@ -345,8 +345,11 @@ static PINT_sm_action getattr_verify_attribs(
     resp_attr->ctime = s_op->attr.ctime;
     resp_attr->mask = s_op->attr.mask;
     resp_attr->objtype = s_op->attr.objtype;
-    resp_attr->u.meta.dfile_count = s_op->attr.u.meta.dfile_count;
-    resp_attr->u.meta.dist_size = s_op->attr.u.meta.dist_size;
+    if (s_op->attr.objtype == PVFS_TYPE_METAFILE)
+    {
+       resp_attr->u.meta.dfile_count = s_op->attr.u.meta.dfile_count;
+       resp_attr->u.meta.dist_size = s_op->attr.u.meta.dist_size;
+    }
 
 #if 0
     gossip_debug(
