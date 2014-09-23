@@ -159,6 +159,22 @@ class OFSTestConfig(object):
         # Security Mode. Default is None. Options are "Key" and "Cert"
         self.ofs_security_mode = None # Web Interface: user
         
+        ## @var ldap_server_uri
+        # URI for LDAP server used for cert-based security
+        self.ldap_server_uri = None
+        
+        ## @var ldap_admin
+        # cn of LDAP admin, e.g. cn=admin,dc=ldap-server
+        self.ldap_admin = None
+        
+        ## @var ldap_admin_password
+        # Password of LDAP admin
+        self.ldap_admin_password = None
+
+        ## @var ldap_container
+        # LDAP container used for OrangeFS setup.
+        self.ldap_container = None
+        
         ## @var ofs_build_kmod
         # Build the kernel module?
         self.ofs_build_kmod = True # Web Interface: auto

@@ -436,7 +436,7 @@ class OFSTestMain(object):
                 print ""
                 print "==================================================================="
                 print "Generating OrangeFS security certificates"
-                rc = self.ofs_network.generateOFSCertificates()
+                rc = self.ofs_network.generateOFSCertificates(self.config.ldap_server_uri,self.config.ldap_admin,self.config.ldap_admin_password,self.config.ldap_container)
 
         print ""
         print "==================================================================="

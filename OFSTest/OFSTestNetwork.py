@@ -1118,13 +1118,20 @@ class OFSTestNetwork(object):
 
    
     
-    def generateOFSCertificates(self,node_list=None,security_node=None):
+    def generateOFSCertificates(self,ldap_server_uri,ldap_admin,ldap_admin_password,ldap_container,node_list=None,security_node=None,):
         if node_list == None:
             node_list = self.network_nodes
         if security_node==None:
             security_node = node_list[0]
-
-        rc = security_node.setupLDAP()
+        
+        # Do we need to setup ldap? 
+        if ldap_server_uri == None or ldap_admin == None or ldap_admin_password == None or ldap_container == None: 
+            rc = security_node.setupLDAP()
+        else:
+            # if not, use current configuration.
+            security_node.setLDAPConfiguration(ldap_server_uri,ldap_admin,ldap_admin_password,ldap_container)
+            rc = 0
+            
         if rc == 0:
             rc = security_node.createCACert()
             # CA Certs should be copied with OrangeFS.

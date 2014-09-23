@@ -250,6 +250,22 @@ class OFSTestNode(object):
         OFSTestNode.node_number += 1
         self.timestamp = time.strftime('%Y%m%d%H%M%S', time.localtime())
         
+        
+        ## @var ldap_server_uri
+        # URI for LDAP server used for cert-based security
+        self.ldap_server_uri = None
+        
+        ## @var ldap_admin
+        # cn of LDAP admin, e.g. cn=admin,dc=ldap-server
+        self.ldap_admin = None
+        
+        ## @var ldap_admin_password
+        # Password of LDAP admin
+        self.ldap_admin_password = None
+
+        ## @var ldap_container
+        # LDAP container used for OrangeFS setup.
+        self.ldap_container = None
 
     ##
     # 
@@ -2290,7 +2306,7 @@ class OFSTestNode(object):
         elif security.lower() == "cert":
             msg = "Configuring certificate based security"
             print msg
-            security_args = '--serverkey %s/etc/orangefs-ca-cert-key.pem --cafile %s/etc/orangefs-ca-cert.pem --ldaphosts \\"ldap://%s\\" --ldapbinddn \\"cn=admin,dc=%s\\" --ldapbindpassword ldappwd --ldapsearchroot \\"ou=users,dc=%s\\"' % (self.ofs_installation_location,self.ofs_installation_location,self.hostname,self.hostname,self.hostname)
+            security_args = '--serverkey %s/etc/orangefs-ca-cert-key.pem --cafile %s/etc/orangefs-ca-cert.pem --ldaphosts \\"%s\\" --ldapbinddn \\"%s\\" --ldapbindpassword %s --ldapsearchroot \\"ou=users,%s\\"' % (self.ofs_installation_location,self.ofs_installation_location,self.ldap_server_uri,self.ldap_admin,self.ldap_admin_password,self.ldap_container)
             logging.info(msg)
             pass
             
@@ -2673,7 +2689,14 @@ class OFSTestNode(object):
         # grep directory/configure 
         # grep -r 'prefix = /home/cloud-user/orangefs' /home/cloud-user/stable/Makefile
         return 0
+
+    def setLDAPConfig(self,ldap_server_uri,ldap_admin, ldap_admin_password, ldap_container):
+        self.ldap_server_uri = ldap_server_uri
+        self.ldap_admin = ldap_admin
+        self.ldap_admin_password = ldap_admin_password
+        self.ldap_container = ldap_container
         
+                
     def setupLDAP(self):
         self.changeDirectory("%s/examples/certs" % self.ofs_source_location)
         rc = 0
@@ -2681,14 +2704,17 @@ class OFSTestNode(object):
         if rc != 0:
             logging.exception("Could not create LDAP directory. rc = %d" % rc)
             exit(rc)
+        
+        # set LDAP Config to the defaults.
+        self.setLDAPConfig(ldap_server_uri="ldap://%s" % self.hostname,ldap_admin="cn=admin,dc=%s" % self.hostname, ldap_admin_password="ldappwd", ldap_container="dc=%s" % self.hostname)
             
-        rc = self.runSingleCommand('%s/examples/certs/pvfs2-ldap-set-pass.sh -D \\"cn=admin,dc=%s\\" -w ldappwd \\"cn=root,ou=users,dc=%s\\" gotigers' % (self.ofs_source_location,self.hostname,self.hostname))
+        rc = self.runSingleCommand('%s/examples/certs/pvfs2-ldap-set-pass.sh -H %s -D \\"%s\\" -w %s \\"cn=root,ou=users,%s\\" gotigers' % (self.ofs_source_location,self.ldap_server_uri,self.ldap_admin, self.ldap_admin_password,self.ldap_container))
         if rc != 0:
             logging.exception("Could not set ldap password  rc = %d" % rc)
             exit(rc)
 
         
-        rc = self.runSingleCommand('for username in \\`cut -d: -f1 /etc/passwd\\`; do %s/examples/certs/pvfs2-ldap-add-user.sh -D \\"cn=admin,dc=%s\\" -w ldappwd \\$username \\"ou=users,dc=%s\\"; done' % (self.ofs_source_location,self.hostname,self.hostname))
+        rc = self.runSingleCommand('for username in \\`cut -d: -f1 /etc/passwd\\`; do %s/examples/certs/pvfs2-ldap-add-user.sh -H %s -D \\"%s\\" -w %s \\$username \\"ou=users,%s\\"; done' % (self.ofs_source_location,self.ldap_server_uri,self.ldap_admin,self.ldap_admin_password,self.ldap_container))
         if rc != 0:
             logging.exception("Could not create LDAP users. rc = %d" % rc)
             exit(rc)
