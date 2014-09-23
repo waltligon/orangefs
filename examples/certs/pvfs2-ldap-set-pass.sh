@@ -22,9 +22,11 @@ do
         ;;
     H)	
     	hosturi=$OPTARG
-	*)
-	    usage
-	    exit 1
+	;;
+
+    *)
+        usage
+	exit 1
 	;;
     esac
 done
