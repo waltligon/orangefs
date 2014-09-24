@@ -2722,6 +2722,7 @@ class OFSTestNode(object):
         return rc
         
     def createCACert(self):
+        self.changeDirectory("%s/examples/certs" % self.ofs_source_location)
         rc = 0
         rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-ca-auto.sh' % self.ofs_source_location)
         if rc != 0:
@@ -2732,6 +2733,7 @@ class OFSTestNode(object):
         
 
     def createUserCerts(self,user=None):
+        self.changeDirectory("%s/examples/certs" % self.ofs_source_location)
         if user == None:
             user = self.current_user
         
