@@ -1129,7 +1129,7 @@ class OFSTestNetwork(object):
             rc = security_node.setupLDAP()
         else:
             # if not, use current configuration.
-            security_node.setLDAPConfiguration(ldap_server_uri,ldap_admin,ldap_admin_password,ldap_container)
+            security_node.setLDAPConfig(ldap_server_uri,ldap_admin,ldap_admin_password,ldap_container)
             rc = 0
             
         if rc == 0:
