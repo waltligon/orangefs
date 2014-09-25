@@ -420,14 +420,6 @@ class OFSTestMain(object):
                 return rc
 
 
-        print ""
-        print "==================================================================="
-        print "Configure OrangeFS Server"
-        rc = self.ofs_network.configureOFSServer(ofs_fs_name=self.config.ofs_fs_name,pvfs2genconfig_opts=self.config.pvfs2genconfig_opts,security=self.config.ofs_security_mode)
-
-        if rc != 0:
-            print "Could not configure OrangeFS servers. Aborting."
-            return rc
 
 
         # Cert based security must be done before copy. Key based must be done after copy. 
@@ -437,6 +429,15 @@ class OFSTestMain(object):
                 print "==================================================================="
                 print "Generating OrangeFS security certificates"
                 rc = self.ofs_network.generateOFSCertificates(self.config.ldap_server_uri,self.config.ldap_admin,self.config.ldap_admin_password,self.config.ldap_container)
+
+        print ""
+        print "==================================================================="
+        print "Configure OrangeFS Server"
+        rc = self.ofs_network.configureOFSServer(ofs_fs_name=self.config.ofs_fs_name,pvfs2genconfig_opts=self.config.pvfs2genconfig_opts,security=self.config.ofs_security_mode)
+
+        if rc != 0:
+            print "Could not configure OrangeFS servers. Aborting."
+            return rc
 
         print ""
         print "==================================================================="
