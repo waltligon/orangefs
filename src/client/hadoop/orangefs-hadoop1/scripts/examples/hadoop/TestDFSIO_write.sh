@@ -13,7 +13,7 @@ ${HADOOP_PREFIX}/bin/hadoop \
   jar ${HADOOP_PREFIX}/hadoop-test-1.?.?.jar TestDFSIO \
   -write \
   -nrFiles 1 \
-  -fileSize 64 \
+  -fileSize 1024 \
   -bufferSize 67108864 # 64MB <--- buffer size in bytes. default is 1000000 bytes
 
 #       -bufferSize 4194304 # 4MB has shown good performance in the past <--- buffer size in bytes. default is 1000000 bytes
