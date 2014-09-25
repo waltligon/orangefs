@@ -383,6 +383,8 @@ class OFSTestConfig(object):
                     d[key] = True
                 elif val.lower() == "false":
                     d[key] = False
+                elif val.lower() == "none":
+                    d[key] = None
                 else:
                     try:
                         # do we have an int? 
