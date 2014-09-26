@@ -1829,6 +1829,27 @@ static int server_shutdown(
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         security "
                      "module           [ stopped ]\n");
     }
+#ifdef ENABLE_CERTCACHE    
+    if (status & SERVER_CERTCACHE_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting certificate "
+                     "cache           [   ...   ]\n");
+        PINT_certcache_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         certificate "
+                     "cache           [ stopped ]\n");
+    }
+#endif /* ENABLE_CERTCACHE */
+
+#ifdef ENABLE_CREDCACHE
+    if (status & SERVER_CREDCACHE_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting credential "
+                     "cache           [  ...  ]\n");
+        PINT_credcache_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         credential "
+                     "cache           [ stopped ]\n");
+    }
+#endif /* ENABLE_CREDCACHE */
 
 #ifdef ENABLE_CAPCACHE    
     if (status & SERVER_CAPCACHE_INIT)
@@ -1840,17 +1861,6 @@ static int server_shutdown(
                      "cache           [ stopped ]\n");
     }
 #endif /* ENABLE_CAPCACHE */
-
-#ifdef ENABLE_CERTCACHE    
-    if (status & SERVER_CERTCACHE_INIT)
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting certificate "
-                     "cache           [   ...   ]\n");
-        PINT_certcache_finalize();
-        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         certificate "
-                     "cache           [ stopped ]\n");
-    }
-#endif /* ENABLE_CERTCACHE */
 
     if (status & SERVER_ENCODER_INIT)
     {

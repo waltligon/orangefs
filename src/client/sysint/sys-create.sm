@@ -643,10 +643,6 @@ static PINT_sm_action create_cleanup(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: cleanup\n");
 
-    PINT_free_object_attr(&sm_p->u.create.attr);
-
-    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
-
     sm_p->error_code = (sm_p->u.create.stored_error_code ?
                         sm_p->u.create.stored_error_code :
                         js_p->error_code);
@@ -725,6 +721,10 @@ static PINT_sm_action create_cleanup(
         free(sm_p->u.create.dirent_handle);
         sm_p->u.create.dirent_handle = NULL;
     }
+
+    PINT_free_object_attr(&sm_p->u.create.attr);
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 

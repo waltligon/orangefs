@@ -141,10 +141,16 @@ static int PINT_credcache_compare(void *data,
  */
 static void PINT_credcache_cleanup(void *entry)
 {
-    if (entry != NULL && ((seccache_entry_t *)entry)->data != NULL)
+    if (entry != NULL)
     {
-        PINT_cleanup_credential((PVFS_credential *) 
-                                  ((seccache_entry_t *)entry)->data);
+        if (((seccache_entry_t *)entry)->data != NULL)
+        {
+            PINT_cleanup_credential((PVFS_credential *) 
+                                    ((seccache_entry_t *)entry)->data);
+            free(((seccache_entry_t *)entry)->data);
+        }
+        free(entry);
+        entry = NULL;
     }
 }
 
