@@ -8,27 +8,23 @@ USRC := \
     $(JNI_DIR)/libPVFS2POSIXJNI.c \
     $(JNI_DIR)/libPVFS2STDIOJNI.c
 
-JNIPOSIXJAVA := \
+JNIJAVA := \
 	$(ORGDIR)/PVFS2POSIXJNI.java \
 	$(ORGDIR)/PVFS2POSIXJNIFlags.java \
 	$(ORGDIR)/Stat.java \
-	$(ORGDIR)/Statfs.java
-
-# TODO
-#	$(ORGDIR)/Statvfs.java
-
-JNISTDIOJAVA := \
+	$(ORGDIR)/Statfs.java \
 	$(ORGDIR)/PVFS2STDIOJNI.java \
-	$(ORGDIR)/PVFS2STDIOJNIFlags.java
-
-
-JNISTREAMSCHANNELSJAVA := \
+	$(ORGDIR)/PVFS2STDIOJNIFlags.java \
 	$(ORGDIR)/Orange.java \
 	$(ORGDIR)/OrangeFileSystemInputStream.java \
 	$(ORGDIR)/OrangeFileSystemOutputStream.java \
 	$(ORGDIR)/OrangeFileSystemInputChannel.java \
-	$(ORGDIR)/OrangeFileSystemOutputChannel.java
-	
+	$(ORGDIR)/OrangeFileSystemOutputChannel.java \
+	$(ORGDIR)/OrangeFileSystemLayout.java
+
+#	$(ORGDIR)/Statvfs.java
+
+# TODO add test classes to JNIJAVA
 
 # list of all .c files (generated or otherwise) that belong in library
 ULIBSRC += $(USRC)

@@ -142,7 +142,7 @@ public class PVFS2POSIXJNI {
             throws IOException;
 
     public native int openWithHints(String path, long flags, long mode,
-            short replicationFactor, long blockSize);
+            short replicationFactor, long blockSize, int layout);
 
     public native int openat(int dirfd, String path, long flags, long mode);
 

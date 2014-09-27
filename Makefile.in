@@ -596,14 +596,8 @@ MISCSRC :=
 SMCGEN :=
 # DEVELSRC is source for development related tools
 DEVELSRC :=
-
-# JNIPOSIXJAVA represents posix.c related JAVA files
-JNIPOSIXJAVA :=
-# JNISTDIOJAVA represents stdio.c related JAVA files
-JNISTDIOJAVA :=
-# JNISTREAMSCHANNELSJAVA represents Java Streams and Channels built on top of
-#         JNIPOSIXJAVA and JNISTDIOJAVA
-JNISTREAMSCHANNELSJAVA :=
+# JNIJAVA represents OrangeFS JNI Client related JAVA files
+JNIJAVA :=
 
 ################################################################
 # Top level (default) targets
@@ -1036,9 +1030,9 @@ $(DEVELTOOLS): %: %.o
 	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBS) -ldb $(call modldflags,$<)
 
 ifdef BUILD_JNI
-$(OFS_JNI_JAR): $(JNIPOSIXJAVA) $(JNISTDIOJAVA) $(JNISTREAMSCHANNELSJAVA)
+$(OFS_JNI_JAR): $(JNIJAVA)
 	$(Q) "  MVN		$@"
-	$(E)JAVA_HOME="$(JAVA_HOME)" $(MVN) -DskipTests -Dmaven.test.skip=true -f $(JNI_DIR)/pom.xml clean install
+	$(E)JAVA_HOME="$(JAVA_HOME)" $(MVN) -f $(JNI_DIR)/pom.xml clean install
 
 # Force the JNI posix .class files to be a dependency of the header file. 
 $(JNIPOSIXHEADER): $(JNI_DIR)/libPVFS2POSIXJNI.c $(OFS_JNI_JAR)
@@ -1233,8 +1227,7 @@ clean::
 
 ifdef BUILD_JNI
 clean::
-	$(E)rm -f $(JNIPOSIXHEADER) $(JNISTDIOHEADER)
-	$(E)rm -rf $(JNI_DIR)/target \
+	$(E)rm -rf $(JNI_DIR)/target $(JNIPOSIXHEADER) $(JNISTDIOHEADER) \
 				src/client/hadoop/orangefs-hadoop1/target \
 				src/client/hadoop/orangefs-hadoop2/target
 

@@ -25,7 +25,8 @@ public class OrangeFileSystemOutputStream extends OutputStream {
 
     /* TODO: comments */
     public OrangeFileSystemOutputStream(String path, int bufferSize,
-            short replication, long blockSize, boolean append)
+            short replication, long blockSize, boolean append,
+            OrangeFileSystemLayout layout)
             throws IOException {
         int ret = -1;
         /* Initialize Interface and Flags */
@@ -39,7 +40,8 @@ public class OrangeFileSystemOutputStream extends OutputStream {
         ret =
                 orange.posix.openWithHints(path, (append ? pf.O_APPEND
                         : pf.O_CREAT) | pf.O_WRONLY, pf.S_IRWXU | pf.S_IRWXG
-                        | pf.S_IRWXO, replication, blockSize);
+                        | pf.S_IRWXO, replication, blockSize,
+                        layout.getLayout());
         if (ret < 0) {
             throw new IOException(path + " couldn't be opened. (open)");
         }
@@ -49,7 +51,7 @@ public class OrangeFileSystemOutputStream extends OutputStream {
         }
         OFSLOG.debug(path + " opened successfully. fd = " + ret
                 + " , bufferSize = " + bufferSize + " , blockSize = "
-                + blockSize);
+                + blockSize + ", layout = " + layout.toString());
     }
 
     /*

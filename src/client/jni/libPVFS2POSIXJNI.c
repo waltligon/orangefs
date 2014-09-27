@@ -1101,11 +1101,11 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_open(JNIEnv *env, jobject obj,
 JNIEXPORT int JNICALL
 Java_org_orangefs_usrint_PVFS2POSIXJNI_openWithHints(JNIEnv *env, jobject obj,
         jstring path, jlong flags, jlong mode, jshort replicationFactor,
-        jlong blockSize)
+        jlong blockSize, jint layout)
 {
     JNI_PFI();
     PVFS_hint hint = NULL;
-    int layout = PVFS_SYS_LAYOUT_RANDOM;
+    int layout_int = (int) layout;
     char * distribution_name = "simple_stripe";
     char distribution_pv[1024] = { 0 }; /* distribution param:value string */
     int ret = 0;
@@ -1118,10 +1118,11 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_openWithHints(JNIEnv *env, jobject obj,
     if (((int) flags & O_CREAT) == O_CREAT)
     {
         JNI_PRINT("\tO_CREAT detected!\n");
+        JNI_PRINT("\tlayout = %d\n", layout_int);
         PVFS_hint_add(&hint,
                       PVFS_HINT_LAYOUT_NAME,
-                      sizeof(layout),
-                      &layout);
+                      sizeof(layout_int),
+                      &layout_int);
         if(blockSize > 0)
         {
             PVFS_hint_add(&hint,
