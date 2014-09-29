@@ -26,7 +26,6 @@ public class OrangeFileSystemInputStream extends InputStream implements
     private long fileSize;
 
     public OrangeFileSystemInputStream(String path, int bufferSize)
-            // TODO Add blockSize
             throws IOException {
         int fd = -1;
         this.path = path;

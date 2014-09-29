@@ -952,6 +952,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_lseek(JNIEnv *env, jobject obj, int fd,
         jlong offset, jlong whence)
 {
     JNI_PFI();
+    JNI_PRINT("fd = %d, offset = %llu\n", fd, (long long unsigned int) offset);
 
     off_t ret = lseek(fd, (off_t) offset, (int) whence);
     if (ret < 0)
