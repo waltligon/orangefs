@@ -2,7 +2,7 @@
 set -x
 cd $(dirname $0)
 
-# This script requires that two environment variables be defined.
+# This script requires that two environment variables be defined:
 # - HADOOP_PREFIX
 # - HADOOP_CONF_DIR
 
