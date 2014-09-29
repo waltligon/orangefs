@@ -20,8 +20,9 @@
     <name>hadoop.tmp.dir</name>
     <value>/tmp/hadoop-${user.name}</value>
     <description>
-    Notes: user should point the default /tmp directory to a larger local storage. Otherwise, spilled intermediate data could fill all temp space.    
-    
+    Notes: user should point the default /tmp directory to a larger local
+    storage. Otherwise, spilled intermediate data could fill all temp space.
+
     A base for other temporary directories.
     </description>
   </property>
@@ -37,7 +38,7 @@
     <description>Location of OrangeFS mount point.</description>
   </property>
 
-<!--
+<!-- Example showing how to set the OrangeFS I/O buffer size upon file creation
   <property>
    <name>fs.ofs.file.buffer.size</name>
    <value>4194304</value>
@@ -46,10 +47,18 @@
 -->
 
   <property>
-    <name>file.blocksize</name>
-    <value>67108864</value>
-    <descrition>Block size</descrition>
+    <name>fs.ofs.block.size</name>
+    <value>134217728</value>
+    <description>128MB Block size for OrangeFS files.</description>
   </property>
+
+<!-- Example showing how to set the OrangeFS file layout upon file creation
+  <property>
+   <name>fs.ofs.file.layout</name>
+   <value>PVFS_SYS_LAYOUT_ROUND_ROBIN</value>
+   <description>The file layout used by OrangeFS.</description>
+  </property>
+-->
 
 <!-- You probably want to use compression with OrangeFS. See below. -->
 <!--
