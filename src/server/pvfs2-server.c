@@ -1833,10 +1833,10 @@ static int server_shutdown(
     if (status & SERVER_CERTCACHE_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting certificate "
-                     "cache           [   ...   ]\n");
+                     "cache         [   ...   ]\n");
         PINT_certcache_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         certificate "
-                     "cache           [ stopped ]\n");
+                     "cache         [ stopped ]\n");
     }
 #endif /* ENABLE_CERTCACHE */
 
@@ -1844,10 +1844,10 @@ static int server_shutdown(
     if (status & SERVER_CREDCACHE_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting credential "
-                     "cache           [  ...  ]\n");
+                     "cache          [   ...   ]\n");
         PINT_credcache_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         credential "
-                     "cache           [ stopped ]\n");
+                     "cache          [ stopped ]\n");
     }
 #endif /* ENABLE_CREDCACHE */
 
@@ -1855,10 +1855,10 @@ static int server_shutdown(
     if (status & SERVER_CAPCACHE_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting capability "
-                     "cache           [   ...   ]\n");
+                     "cache          [   ...   ]\n");
         PINT_capcache_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         capability "
-                     "cache           [ stopped ]\n");
+                     "cache          [ stopped ]\n");
     }
 #endif /* ENABLE_CAPCACHE */
 
@@ -1892,10 +1892,10 @@ static int server_shutdown(
     if (status & SERVER_UID_MGMT_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting uid management "
-                     "interface     [   ...   ]\n");
+                     "interface  [   ...   ]\n");
         PINT_uid_mgmt_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         uid management "
-                     "interface     [ stopped ]\n");
+                     "interface  [ stopped ]\n");
 
     }
 

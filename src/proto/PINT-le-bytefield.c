@@ -946,10 +946,9 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_rel\n");
     if (input_type == PINT_DECODE_REQ) {
         struct PVFS_server_req *req = &msg->stub_dec.req;
-/*        decode_free(req->capability.handle_array);
+        decode_free(req->capability.handle_array);
         decode_free(req->capability.signature);
-        decode_free(req->capability.issuer); */
-        PINT_cleanup_capability(&req->capability);
+        /* decode_free(req->capability.issuer); */
         switch (req->op) {
             case PVFS_SERV_CREATE:
                 decode_free(req->u.create.credential.group_array);
