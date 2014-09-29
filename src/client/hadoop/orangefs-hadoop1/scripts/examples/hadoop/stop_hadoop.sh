@@ -2,10 +2,9 @@
 set -x
 cd $(dirname $0)
 
-# This script requires two variables to be defined in ./setenv
+# This script requires that two environment variables be defined.
 # - HADOOP_PREFIX
 # - HADOOP_CONF_DIR
-. setenv
 
 # STOP
 $HADOOP_PREFIX/bin/stop-mapred.sh

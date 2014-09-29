@@ -8,4 +8,4 @@ cd $(dirname $0)
 
 # START
 $HADOOP_PREFIX/bin/start-mapred.sh
-#echo "Visit http://localhost:8088"
+echo "Visit http://localhost:50030"
