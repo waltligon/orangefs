@@ -981,7 +981,8 @@ AC_TRY_LINK(
     [
         AC_MSG_RESULT(no)
         LIBS=$OLDLIBS
-        AC_MSG_ERROR([UUID: UUID library not found. Check LD_LIBRARY_PATH.])
+        AC_MSG_ERROR([UUID: -luuid library not found. Check
+        LD_LIBRARY_PATH.  This is part of the util-linux(-ng) package.])
     ]
 )
 
