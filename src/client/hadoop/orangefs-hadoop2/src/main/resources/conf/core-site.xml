@@ -69,7 +69,7 @@
     <description>Location of OrangeFS mount point.</description>
   </property>
 
-<!-- Example showing how to set the OrangeFS I/O buffer size upon file creation
+<!-- Example showing how to set the OrangeFS I/O buffer size upon file append/create/open
   <property>
    <name>fs.ofs.file.buffer.size</name>
    <value>4194304</value>

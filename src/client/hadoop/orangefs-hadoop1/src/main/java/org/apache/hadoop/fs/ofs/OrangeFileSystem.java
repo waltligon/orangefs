@@ -31,6 +31,7 @@ import org.orangefs.usrint.Stat;
  */
 public class OrangeFileSystem extends FileSystem {
     private Orange orange;
+    private int ofsBufferSize;
     private long ofsBlockSize;
     private OrangeFileSystemLayout ofsLayout;
     public PVFS2POSIXJNIFlags pf;
@@ -63,11 +64,12 @@ public class OrangeFileSystem extends FileSystem {
             Progressable progress)
             throws IOException {
         Path fOFS = new Path(getOFSPathName(f));
-        OFSLOG.debug("append parameters: {\n\tPath f= " + fOFS
-                + "\n\tint bufferSize= " + bufferSize);
+        OFSLOG.debug("append parameters: {\n\tPath f= " + fOFS);
+        OFSLOG.debug("override bufferSize: old = " + bufferSize + ", new = "
+                + ofsBufferSize);
         OrangeFileSystemOutputStream ofsOutputStream =
-                new OrangeFileSystemOutputStream(fOFS.toString(), bufferSize,
-                        (short) 0, 0L, true, ofsLayout);
+                new OrangeFileSystemOutputStream(fOFS.toString(),
+                        ofsBufferSize, (short) 0, 0L, true, ofsLayout);
         return new FSDataOutputStream(ofsOutputStream, statistics);
     }
 
@@ -103,17 +105,19 @@ public class OrangeFileSystem extends FileSystem {
         FSDataOutputStream fsdos;
         fOFS = new Path(getOFSPathName(f));
         /*
-         * Force override blockSize for OrangeFS files at creation.
+         * Force override blockSize and bufferSize for OrangeFS files at
+         * creation.
          */
         OFSLOG.debug("override blockSize: old = " + blockSize + ", new = "
                 + ofsBlockSize);
-        blockSize = ofsBlockSize;
+        OFSLOG.debug("override bufferSize: old = " + bufferSize + ", new = "
+                + ofsBufferSize);
         OFSLOG.debug("create parameters: {\n\tPath f= " + f.toString()
                 + "\n\tFsPermission permission= " + permission.toString()
                 + "\n\tboolean overwrite= " + overwrite
-                + "\n\tint bufferSize= " + bufferSize
+                + "\n\tint ofsBufferSize= " + ofsBufferSize
                 + "\n\tshort replication= " + replication
-                + "\n\tlong blockSize= " + blockSize);
+                + "\n\tlong ofsBlockSize= " + ofsBlockSize);
         /* Does this file exist */
         if (exists(f)) {
             /* Delete existing file */
@@ -157,8 +161,8 @@ public class OrangeFileSystem extends FileSystem {
         }
         fsdos =
                 new FSDataOutputStream(new OrangeFileSystemOutputStream(
-                        fOFS.toString(), bufferSize, replication, blockSize,
-                        false, ofsLayout), statistics);
+                        fOFS.toString(), ofsBufferSize, replication,
+                        ofsBlockSize, false, ofsLayout), statistics);
         /* Set the desired permission. */
         setPermission(f, permission);
         return fsdos;
@@ -375,6 +379,10 @@ public class OrangeFileSystem extends FileSystem {
                     + uri);
         }
         setConf(conf);
+
+        ofsBufferSize =
+                conf.getInt("fs.ofs.file.buffer.size",
+                        DEFAULT_OFS_FILE_BUFFER_SIZE);
 
         ofsBlockSize =
                 conf.getLong("fs.ofs.block.size", DEFAULT_OFS_FILE_BLOCK_SIZE);
@@ -595,22 +603,14 @@ public class OrangeFileSystem extends FileSystem {
 
     /* Opens an FSDataInputStream at the indicated Path. */
     @Override
-    public FSDataInputStream open(Path f)
-            throws IOException {
-        return open(
-                f,
-                getConf().getInt("fs.ofs.file.buffer.size",
-                        DEFAULT_OFS_FILE_BUFFER_SIZE));
-    }
-
-    /* Opens an FSDataInputStream at the indicated Path. */
-    @Override
     public FSDataInputStream open(Path f, int bufferSize)
             throws IOException {
         Path fOFS = new Path(getOFSPathName(f));
-        OFSLOG.debug("open: path=" + f + " bufferSize=" + bufferSize);
+        OFSLOG.debug("open: path=" + f);
+        OFSLOG.debug("override bufferSize: old = " + bufferSize + ", new = "
+                + ofsBufferSize);
         return new FSDataInputStream(new OrangeFileSystemFSInputStream(
-                fOFS.toString(), bufferSize, statistics));
+                fOFS.toString(), ofsBufferSize, statistics));
     }
 
     /* Renames Path src to Path dst. */

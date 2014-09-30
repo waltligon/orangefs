@@ -18,7 +18,6 @@ ${HADOOP_PREFIX}/bin/hadoop \
 #
 #  -Dfs.ofs.file.buffer.size=67108864
 #
-# This instructs the OrangeFS / Hadoop plugin to use the specified buffer.size
-# rather than the plugin default. This is different than TestDFSIO -write in
-# that the bufferSize flag isn't used in TestDFSIO -read, so in order to
-# customize buffer size the above flag must be used.
+# This instructs the OrangeFS / Hadoop plugin to use the specified buffer size
+# rather than the parameter passed via the API.
+
