@@ -663,7 +663,7 @@ def simultaneous_ls(testing_node,output=[]):
     # Copy file from installation location/bin to mount point
     testing_node.runSingleCommand("cp /bin/ls %s/simultaneous_ls" % testing_node.ofs_mount_point,output)
     
-    pvfs2_ls = "%s/simultaneous_ls/ls -al %s/simultaneous_ls" % testing_node.ofs_mount_point
+    pvfs2_ls = "%s/simultaneous_ls/ls -al %s/simultaneous_ls" % (testing_node.ofs_mount_point,testing_node.ofs_mount_point)
     
     rc = testing_node.runSingleCommand("eval %s & %s" % (pvfs2_ls,pvfs2_ls),output)
     return rc
