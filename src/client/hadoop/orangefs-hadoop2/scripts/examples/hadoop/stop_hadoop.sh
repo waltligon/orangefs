@@ -11,5 +11,5 @@ $HADOOP_PREFIX/sbin/yarn-daemon.sh --config ${HADOOP_CONF_DIR} stop resourcemana
 for slave in $(cat $HADOOP_CONF_DIR/slaves); do
   ssh $slave "$HADOOP_PREFIX/sbin/yarn-daemon.sh --config ${HADOOP_CONF_DIR} stop nodemanager"
   ssh $slave "$HADOOP_PREFIX/sbin/yarn-daemon.sh --config ${HADOOP_CONF_DIR} stop proxyserver"
-#  ssh $slave "$HADOOP_PREFIX/sbin/mr-jobhistory-daemon.sh --config ${HADOOP_CONF_DIR} stop historyserver"
+  ssh $slave "$HADOOP_PREFIX/sbin/mr-jobhistory-daemon.sh --config ${HADOOP_CONF_DIR} stop historyserver"
 done

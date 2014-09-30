@@ -25,7 +25,7 @@
 
   <property>
     <name>yarn.app.mapreduce.am.staging-dir</name>
-    <value>ofs://localhost-orangefs:3334/job-staging-yarn</value>
+    <value>ofs://localhost-orangefs:3334/tmp/hadoop-yarn/staging</value>
   </property>
 
   <property>
@@ -41,6 +41,16 @@
   <property>
     <name>mapred.system.dir</name>
     <value>ofs://localhost-orangefs:3334/mapred/system</value>
+  </property>
+
+  <property>
+    <name>mapreduce.jobhistory.done-dir</name>
+    <value>ofs://localhost-orangefs:3334/job-history/done</value>
+  </property>
+  
+  <property>
+    <name>mapreduce.jobhistory.intermediate-done-dir</name>
+    <value>ofs://localhost-orangefs:3334/job-history/intermediate-done</value>
   </property>
 
   <property>

@@ -11,6 +11,6 @@ $HADOOP_PREFIX/sbin/yarn-daemon.sh --config ${HADOOP_CONF_DIR} start resourceman
 for slave in $(cat $HADOOP_CONF_DIR/slaves); do
     ssh $slave "$HADOOP_PREFIX/sbin/yarn-daemon.sh --config ${HADOOP_CONF_DIR} start nodemanager"
     ssh $slave "$HADOOP_PREFIX/sbin/yarn-daemon.sh --config ${HADOOP_CONF_DIR} start proxyserver"
-#    ssh $slave "$HADOOP_PREFIX/sbin/mr-jobhistory-daemon.sh --config ${HADOOP_CONF_DIR} start historyserver"
+    ssh $slave "$HADOOP_PREFIX/sbin/mr-jobhistory-daemon.sh --config ${HADOOP_CONF_DIR} start historyserver"
 done
 echo "Visit http://localhost:8088"
