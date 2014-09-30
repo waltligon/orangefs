@@ -135,11 +135,9 @@ def TestDFSIO_write(testing_node,output=[]):
 
 def terasort_full(testing_node,output=[]):
     
-    memsize = testing_node.runSingleCommandBacktick("cat /proc/meminfo | grep MemTotal | awk '{print \\$2}'")
-    try:
-        gensize = memsize / 200
-    except:
-        gensize = 10000000
+
+    # generate 500M of data. Not much, but good enough to kick the tires.
+    gensize = 5000000
      
     rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s/hadoop*examples*.jar  teragen %d /user/%s/terasort5-input" % (testing_node.hadoop_location,testing_node.hadoop_location,gensize,testing_node.current_user),output)
     if rc != 0:
