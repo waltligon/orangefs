@@ -636,6 +636,20 @@ def usrint_cp(testing_node,output=[]):
     rc = testing_node.runSingleCommand("%s cmp %s/bin/pvfs2-cp %s/pvfs2-cp" % (preload,testing_node.ofs_installation_location,testing_node.ofs_installation_location),output)
     return rc
 
+def simultaneous_ls(testing_node,output=[]):
+
+    preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
+    # Compare original in the bin directory to what was copied back
+    testing_node.runSingleCommand("%s mkdir -p %s/simultaneous_ls" % (preload,testing_node.ofs_mount_point), output)
+    testing_node.changeDirectory("%s/simultaneous_ls" % testing_node.ofs_mount_point)
+    # Copy file from installation location/bin to mount point
+    testing_node.runSingleCommand("%s cp /bin/ls %s/simultaneous_ls" % (preload,testing_node.ofs_mount_point),output)
+    
+    pvfs2_ls = "%s %s/simultaneous_ls/ls -al %s/simultaneous_ls" % (preload,testing_node.ofs_mount_point)
+    
+    rc = testing_node.runSingleCommand("%s eval %s & %s" % (preload,pvfs2_ls,pvfs2_ls),output)
+    return rc
+
 tests = [ 
 append,
 append2,
@@ -650,5 +664,6 @@ usrint_cp,
 shelltest,
 ltp,
 bonnie,
-dbench
+dbench,
+simultaneous_ls
  ]
