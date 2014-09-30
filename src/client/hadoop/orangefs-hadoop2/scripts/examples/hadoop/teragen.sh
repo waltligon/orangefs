@@ -2,12 +2,19 @@
 set -x
 cd $(dirname $0)
 
-# This script requires two variables to be defined in ./setenv
+# This script requires that two variables be defined:
 # - HADOOP_PREFIX
 # - HADOOP_CONF_DIR
-. setenv
 
 ${HADOOP_PREFIX}/bin/hadoop \
     --config ${HADOOP_CONF_DIR} \
     jar ${HADOOP_PREFIX}/share/hadoop/mapreduce/hadoop-mapreduce-examples-?.?.?.jar \
-    teragen 5242880  teragen_data # 500 MB = (5242880 * 100 Bytes)
+    teragen \
+    10000000 teragen_data
+
+# You may want to increase the number of reduce tasks by specifying for instance:
+#
+# -D mapreduce.job.maps=10 \
+#
+# The default is 1.
+

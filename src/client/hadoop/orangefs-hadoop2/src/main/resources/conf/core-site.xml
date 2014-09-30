@@ -83,7 +83,6 @@
   </property>
 
 <!-- You probably want to use compression with OrangeFS. See below. -->
-
 <!--
   <property>
     <name>io.compression.codecs</name>
