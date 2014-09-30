@@ -126,15 +126,13 @@
     </description>
   </property>
 
-
 <!-- You probably want to use compression with OrangeFS. See below. -->
-
 <!--
   <property>
     <name>mapreduce.map.output.compress</name>
     <value>true</value>
     <description>
-    Notes: Compute nodes on HPC typically use a single hard drive as local storage device, which could be a potential bottleneck when getting a large intermediate data sets (spilled records, mapper output and so on). So we recommend user to active the compression for this phase.  
+    Notes: Compute nodes on HPC typically use a single hard drive as local storage device, which could be a potential bottleneck when getting a large intermediate data sets (spilled records, mapper output and so on). So we recommend user to active the compression for this phase.
 
     Should the outputs of the maps be compressed before being sent across the network. Uses SequenceFile compression
     </description>
@@ -151,12 +149,7 @@
   </property>
 -->
 
-</configuration>
-
-
-
 <!-- other optional configurations
-
   <property>
     <name>mapred.child.java.opts</name>
     <value>-Djava.net.preferIPv4Stack=true -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5006</value>
@@ -173,6 +166,6 @@
   </property>
 
   </property>
-
-
 -->
+
+</configuration>
