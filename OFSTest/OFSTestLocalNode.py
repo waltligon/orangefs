@@ -111,10 +111,12 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
             script_file.write('\n');
         
         #error checking: Did command run correctly?
-        #script_file.write("if [ $? -ne 0 ]\n")
-        #script_file.write("then\n")
-        #script_file.write("\texit 1\n")
-        #script_file.write("fi\n")
+        script_file.write("RC=$?\n")
+        script_file.write("if [ $RC -ne 0 ]\n")
+        script_file.write("then\n")
+        script_file.write("\texit $RC\n")
+        script_file.write("fi\n")
+        script_file.write("exit 0\n")
         
         script_file.close()
         
@@ -232,7 +234,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
             rflag = "-a "
         else:
             rflag = ""
-        
+          
         ssh_key_parm = ''
         try:
             if self.getRemoteKeyFile(destination_node.ext_ip_address) is not None:

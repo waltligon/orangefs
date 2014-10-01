@@ -220,7 +220,8 @@ class OFSTestMain(object):
     
     def checkNetwork(self):
         
-        #right now, I will just print out the dictionary of the network and every node:
+        print "TODO: Implement OFSTestMain.checkNetwork()"
+        print "Right now, I will just print out the dictionary of the network and every node:"
         
         return self.ofs_network.printNetwork()
         
@@ -238,7 +239,7 @@ class OFSTestMain(object):
         # First, if we're using Cloud/Openstack, open the connection
         print "===========================================================" 
         print "Connecting to EC2/OpenStack cloud using information from " + self.config.cloud_config
-        print "%s,%s,%s,%s,%s" % (self.config.cloud_config,self.config.cloud_key_name,self.config.ssh_key_filepath,self.config.cloud_type,self.config.nova_password_file)
+        #print "%s,%s,%s,%s,%s" % (self.config.cloud_config,self.config.cloud_key_name,self.config.ssh_key_filepath,self.config.cloud_type,self.config.nova_password_file)
         self.ofs_network.addCloudConnection(self.config.cloud_config,self.config.cloud_key_name,self.config.ssh_key_filepath,self.config.cloud_type,self.config.nova_password_file)
 
 
@@ -280,6 +281,19 @@ class OFSTestMain(object):
         print "==================================================================="
         print "Installing Required Software"
         self.ofs_network.installRequiredSoftware()
+        
+        # Install software required to compile and run OFS and all tests.
+        print ""
+        print "==================================================================="
+        print "Installing Berkeley DB 4.8"
+        self.ofs_network.installDB4()
+        
+        
+                # Install software required to compile and run OFS and all tests.
+        print ""
+        print "==================================================================="
+        print "Installing Hadoop"
+        self.ofs_network.installHadoop()
 
 
     ##
@@ -308,6 +322,7 @@ class OFSTestMain(object):
 
             # Add the node to the virtual cluster.
             self.ofs_network.addRemoteNode(ip_address=self.config.node_ip_addresses[i],username=self.config.node_usernames[i],key=self.config.ssh_key_filepath,is_cloud=self.config.using_cloud,ext_ip_address=ext_ip_address)
+
 
 
     ##
@@ -339,6 +354,20 @@ class OFSTestMain(object):
             node.runSingleCommand("mount -t nfs")
 
         '''    
+
+        # DB4 and hadoop are required to build OrangeFS. Make sure they are installed in the proper location.
+        print ""
+        print "==================================================================="
+        print "Installing Berkeley DB 4.8"
+        self.ofs_network.installDB4()
+        
+        if self.config.install_hadoop == True or self.config.run_hadoop_tests == True:
+            print ""
+            print "==================================================================="
+            print "Installing Hadoop"
+            self.ofs_network.installHadoop()
+
+
 
         print ""
         print "==================================================================="
@@ -391,6 +420,16 @@ class OFSTestMain(object):
                 return rc
 
 
+
+
+        # Cert based security must be done before copy. Key based must be done after copy. 
+        if self.config.ofs_security_mode != None:
+            if self.config.ofs_security_mode.lower() == "cert":
+                print ""
+                print "==================================================================="
+                print "Generating OrangeFS security certificates"
+                rc = self.ofs_network.generateOFSCertificates(self.config.ldap_server_uri,self.config.ldap_admin,self.config.ldap_admin_password,self.config.ldap_container)
+
         print ""
         print "==================================================================="
         print "Configure OrangeFS Server"
@@ -400,13 +439,11 @@ class OFSTestMain(object):
             print "Could not configure OrangeFS servers. Aborting."
             return rc
 
-
         print ""
         print "==================================================================="
         print "Copy installation to all nodes"
         # TODO: Should handle this with exceptions.
         rc = self.ofs_network.copyOFSToNodeList()
-        
 
         if self.config.ofs_security_mode != None:
             if self.config.ofs_security_mode.lower() == "key":
@@ -415,7 +452,9 @@ class OFSTestMain(object):
                 print "Generating OrangeFS security keys"
 
                 rc = self.ofs_network.generateOFSKeys()
-            
+
+
+                    
         
         print ""
         print "==================================================================="
@@ -460,7 +499,6 @@ class OFSTestMain(object):
             # Check to see if Torque is installed correctly
             self.ofs_network.checkTorque()
             '''
-
         if self.config.install_hadoop == True or self.config.run_hadoop_tests == True:
             print ""
             print "==================================================================="
@@ -554,7 +592,11 @@ class OFSTestMain(object):
                 except:
                     print "Unexpected error:", sys.exc_info()[0]
                     traceback.print_exc()
+                    if self.config.stop_on_failure == True:
+                        return -888
                     pass
+                if rc != 0 and self.config.stop_on_failure == True:
+                    return rc
 
         # Run the kmod vfs tests, if required.
         if self.config.run_vfs_tests == True:
@@ -594,7 +636,12 @@ class OFSTestMain(object):
                     except:
                         print "Unexpected error:", sys.exc_info()[0]
                         traceback.print_exc()
+                        if self.config.stop_on_failure == True:
+                            return -888
                         pass
+                    if rc != 0 and self.config.stop_on_failure == True:
+                        return rc
+
 
                 # run the mpi tests, if required.
                 if self.config.run_mpi_tests == True:
@@ -610,15 +657,22 @@ class OFSTestMain(object):
                         except:
                             print "Unexpected error:", sys.exc_info()[0]
                             traceback.print_exc()
+                            if self.config.stop_on_failure == True:
+                                return -888
                             pass
 
-            
+                        if rc != 0 and self.config.stop_on_failure == True:
+                            return rc
+
             # if not, print failure.
             else:
                 self.writeOutputHeader(filename,"VFS Tests (%s) could not run. Mount failed." % mount_type)           
                 # Each test should fail. Use error -999 to indicate mount failure.
                 for callable in OFSVFSTest.tests:
                     self.writeOutput(filename,callable,-999)
+                if self.config.stop_on_failure == True:
+                    return -999
+
         
         # run fuse tests, if required.
         if self.config.run_fuse_tests == True:
@@ -654,7 +708,13 @@ class OFSTestMain(object):
                     except:
                         print "Unexpected error:", sys.exc_info()[0]
                         traceback.print_exc()
+                        if self.config.stop_on_failure == True:
+                            return -888
+
                         pass
+                    if rc != 0 and self.config.stop_on_failure == True:
+                        return rc
+
                 
                 # run the mpi tests, if required.
                 if self.config.run_mpi_tests == True:
@@ -669,7 +729,11 @@ class OFSTestMain(object):
                         except:
                             print "Unexpected error:", sys.exc_info()[0]
                             traceback.print_exc()
+                            if self.config.stop_on_failure == True:
+                                return -888
                             pass
+                        if rc != 0 and self.config.stop_on_failure == True:
+                            return rc
 
         
             else:
@@ -677,7 +741,9 @@ class OFSTestMain(object):
                 # Each test should fail. Use error -999 to indicate mount failure.
                 for callable in OFSVFSTest.tests:
                     self.writeOutput(filename,callable,-999)
-        
+                if self.config.stop_on_failure == True:
+                    return -999
+
 
 
         # run the usrint tests, if required.
@@ -705,7 +771,13 @@ class OFSTestMain(object):
                     except:
                         print "Unexpected error:", sys.exc_info()[0]
                         traceback.print_exc()
+                        if self.config.stop_on_failure == True:
+                            return -888
+
                         pass
+                    if rc != 0 and self.config.stop_on_failure == True:
+                        return rc
+
                 
         # run the mpi tests, if required.
         if self.config.run_mpi_tests == True:
@@ -728,7 +800,12 @@ class OFSTestMain(object):
                 except:
                     print "Unexpected error:", sys.exc_info()[0]
                     traceback.print_exc()
+                    if self.config.stop_on_failure == True:
+                        return -888
                     pass
+                if rc != 0 and self.config.stop_on_failure == True:
+                    return rc
+
 
         # run the hadoop tests, if required.
         if self.config.run_hadoop_tests == True:
@@ -753,7 +830,13 @@ class OFSTestMain(object):
                 except:
                     print "Unexpected error:", sys.exc_info()[0]
                     traceback.print_exc()
+                    if self.config.stop_on_failure == True:
+                        return -888
+                    
                     pass
+                if rc != 0 and self.config.stop_on_failure == True:
+                    return rc
+
 
         # run miscellaneous tests after run.
         if True == True:
@@ -778,7 +861,11 @@ class OFSTestMain(object):
                 except:
                     print "Unexpected error:", sys.exc_info()[0]
                     traceback.print_exc()
+                    if self.config.stop_on_failure == True:
+                        return -888
                     pass
+                if rc != 0 and self.config.stop_on_failure == True:
+                    return rc
         
 
         # Test runfunction group

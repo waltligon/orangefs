@@ -435,7 +435,8 @@ def ltp(testing_node,output=[]):
     
     
     
-    if testing_node.runSingleCommand("[ -f %s/runltp ]" % LTP_PREFIX):
+    #if testing_node.runSingleCommand("[ -f %s/runltp ]" % LTP_PREFIX):
+    if True:
         testing_node.runSingleCommand("rm -rf ltp-" + LTP_ARCHIVE_VERSION + "*",output)
         rc = testing_node.runSingleCommand("wget --no-check-certificate --output-document=%s %s/%s" % (LTP_ARCHIVE,LTP_URL,LTP_ARCHIVE),output)
         if rc != 0:
@@ -456,7 +457,7 @@ def ltp(testing_node,output=[]):
             return rc
         
         rc = testing_node.runSingleCommand("make autotools")
-        rc = testing_node.runSingleCommand("CFLAGS='-g -O0' ./configure --prefix=%s" % LTP_PREFIX,output)
+        rc = testing_node.runSingleCommand("export CFLAGS='-g -O0'; export LDFLAGS='-L %s/lib -lorangefsposix' ; ./configure --prefix=%s" % (testing_node.ofs_installation_location,LTP_PREFIX))
         #if rc != 0:
         #    return rc
 
@@ -472,14 +473,17 @@ def ltp(testing_node,output=[]):
     preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
     testing_node.runSingleCommand("cp %s/test/automated/usrint-tests.d/ltp-pvfs-testcases runtest/" % testing_node.ofs_source_location)
     testing_node.runSingleCommand("cp %s/test/automated/usrint-tests.d/ltp-pvfs-testcases %s/runtest/" % (testing_node.ofs_source_location,LTP_PREFIX))
-    testing_node.runSingleCommand("%s mkdir -p %s/ltp-tmp-usrint" % (preload,testing_node.ofs_source_location))
+    testing_node.runSingleCommand("%s mkdir -p %s/ltp-tmp-usrint" % (preload,testing_node.ofs_mount_point))
     testing_node.runSingleCommand("%s chmod 777 %s/ltp-tmp-usrint" % (preload,testing_node.ofs_mount_point))
     testing_node.runSingleCommand("umask 0")
     
     testing_node.changeDirectory(LTP_PREFIX)
-    
+
     print 'sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=%s:%s/lib %s ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -a %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.db4_lib_dir, testing_node.ofs_installation_location,preload,testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type)
     rc = testing_node.runSingleCommandAsRoot('PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=%s:%s/lib %s ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp-usrint -f ltp-pvfs-testcases -a %s/zoo.tmp 2>&1 | tee %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.db4_lib_dir,testing_node.ofs_installation_location, preload, testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type),output)
+    
+    #print 'sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=%s:%s/lib ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -a %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.db4_lib_dir, testing_node.ofs_installation_location,testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type)
+    #rc = testing_node.runSingleCommandAsRoot('PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=%s:%s/lib ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp-usrint -f ltp-pvfs-testcases -a %s/zoo.tmp 2>&1 | tee %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.db4_lib_dir,testing_node.ofs_installation_location, testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type),output)
 
     # check to see if log file is there
     if testing_node.runSingleCommand("[ -f %s/ltp-pvfs-testcases-%s.log ]"% (testing_node.ofs_installation_location,vfs_type)):
@@ -597,13 +601,13 @@ def tail(testing_node,output=[]):
     
     # Create the file
     testing_node.runSingleCommand('%s bash -c \'echo \\"%s\\" > %s\'' % (preload,test_string,tail_file))
-    testing_node.runSingleCommand('bash -c \'echo \\"%s\\" > %s\'' % (preload,test_string,local_file))
+    testing_node.runSingleCommand('bash -c \'echo \\"%s\\" > %s\'' % (test_string,local_file))
     
     # Create the file
     
     testing_node.runSingleCommand("tail %s > %s" % (local_file,local_output))
     
-    testing_node.runSingleCommand("%s tail %s > %s" % (preload,tail_file,tail_output))
+    testing_node.runSingleCommand("%s bash -c 'tail %s > %s'" % (preload,tail_file,tail_output))
    
     # now diff it
     rc = testing_node.runSingleCommand("%s diff %s %s" % (preload,local_output,tail_output))
@@ -632,6 +636,20 @@ def usrint_cp(testing_node,output=[]):
     rc = testing_node.runSingleCommand("%s cmp %s/bin/pvfs2-cp %s/pvfs2-cp" % (preload,testing_node.ofs_installation_location,testing_node.ofs_installation_location),output)
     return rc
 
+def simultaneous_ls(testing_node,output=[]):
+
+    preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
+    # Compare original in the bin directory to what was copied back
+    testing_node.runSingleCommand("%s mkdir -p %s/simultaneous_ls" % (preload,testing_node.ofs_mount_point), output)
+    testing_node.changeDirectory("%s/simultaneous_ls" % testing_node.ofs_mount_point)
+    # Copy file from installation location/bin to mount point
+    testing_node.runSingleCommand("%s cp /bin/ls %s/simultaneous_ls" % (preload,testing_node.ofs_mount_point),output)
+    
+    pvfs2_ls = "%s/simultaneous_ls/ls -al %s/simultaneous_ls" % (testing_node.ofs_mount_point,testing_node.ofs_mount_point)
+    
+    rc = testing_node.runSingleCommand("%s eval %s & %s" % (preload,pvfs2_ls,pvfs2_ls),output)
+    return rc
+
 tests = [ 
 append,
 append2,
@@ -646,5 +664,6 @@ usrint_cp,
 shelltest,
 ltp,
 bonnie,
-dbench
+dbench,
+simultaneous_ls
  ]

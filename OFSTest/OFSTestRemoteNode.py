@@ -93,23 +93,26 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
     def getAliasesFromConfigFile(self,config_file_name):
         
         # read the file from the server
-
-        alias = self.runSingleCommandBacktick('cat '+config_file_name+' | grep \"Alias \"')
-        logging.debug("Alias is "+ alias)
-        
-        alias_lines = alias.split('\n')
-        
         aliases = []
-                
-                
-        for line in alias_lines:
-            if "Alias " in line:
-                # split the line into Alias, AliasName, url
-                element = line.split()
-                # What we want is element 1
-                aliases.append(element[1].rstrip())
-                
+        
+        if config_file_name != None:
+
+            alias = self.runSingleCommandBacktick('cat '+config_file_name+' | grep \"Alias \"')
+            logging.debug("Alias is "+ alias)
             
+            alias_lines = alias.split('\n')
+            
+            
+                    
+                    
+            for line in alias_lines:
+                if "Alias " in line:
+                    # split the line into Alias, AliasName, url
+                    element = line.split()
+                    # What we want is element 1
+                    aliases.append(element[1].rstrip())
+                    
+                
         logging.info( "OrangeFS Aliases: ")
         logging.info(aliases)    
         return aliases
@@ -150,8 +153,13 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
             script_file.write(command)
             script_file.write('\n');
 
-
-        script_file.write("exit\n")
+        #error checking: Did command run correctly?
+        script_file.write("RC=$?\n")
+        script_file.write("if [ $RC -ne 0 ]\n")
+        script_file.write("then\n")
+        script_file.write("\texit $RC\n")
+        script_file.write("fi\n")
+        script_file.write("exit 0\n")
         script_file.close()
         
         logging.debug("----- Start generated batchfile: %s -----------------------" % batchfilename)
@@ -235,7 +243,7 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
             ssh_key_parm = '-i %s' % self.sshLocalKeyFile
 
         
-        command_chunks = ["/usr/bin/ssh %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o BatchMode=yes \"" %  (ssh_key_parm,remote_user,self.ext_ip_address)]
+        command_chunks = ["/usr/bin/ssh %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o BatchMode=yes \" source /etc/profile; " %  (ssh_key_parm,remote_user,self.ext_ip_address)]
 
         # change to proper directory
         command_chunks.append("cd %s; " % self.current_directory)
@@ -417,7 +425,9 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         # This one we activate! 
         if (self.is_cloud):
             print "Allowing root SSH access with user %s's credentials" % self.current_user
-            self.runSingleCommandAsBatch(command="sudo cp -r /home/%s/.ssh /root/ " % self.current_user)
+            self.changeDirectory("~")
+            self.runSingleCommandBacktick(command="ls -l /home/%s/.ssh" % self.current_user)
+            self.runSingleCommandAsBatch(command="sudo /bin/cp -r /home/%s/.ssh /root/ " % self.current_user)
         
         #============================================================================
         #

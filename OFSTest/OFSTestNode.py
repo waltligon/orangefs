@@ -250,6 +250,22 @@ class OFSTestNode(object):
         OFSTestNode.node_number += 1
         self.timestamp = time.strftime('%Y%m%d%H%M%S', time.localtime())
         
+        
+        ## @var ldap_server_uri
+        # URI for LDAP server used for cert-based security
+        self.ldap_server_uri = None
+        
+        ## @var ldap_admin
+        # cn of LDAP admin, e.g. cn=admin,dc=ldap-server
+        self.ldap_admin = None
+        
+        ## @var ldap_admin_password
+        # Password of LDAP admin
+        self.ldap_admin_password = None
+
+        ## @var ldap_container
+        # LDAP container used for OrangeFS setup.
+        self.ldap_container = None
 
     ##
     # 
@@ -408,7 +424,9 @@ class OFSTestNode(object):
     
     def changeDirectory(self, directory):
         # cd "-" will restore previous directory
-        if directory is not "-": 
+        if directory is not "-":
+            if directory is "~":
+                directory = "/home/%s" % self.current_user 
             self.previous_directory = self.current_directory
             self.current_directory = directory
         else:
@@ -539,7 +557,7 @@ class OFSTestNode(object):
     # @param output Output list
     
     def runSingleCommandAsRoot(self,command,output=[],debug=False):
-        self.runSingleCommand(command,output,"root",debug)
+        return self.runSingleCommand(command,output,"root",debug)
      
     ##
     # @fn runSingleCommandBacktick(self,command,output=[],remote_user=None):
@@ -803,6 +821,7 @@ class OFSTestNode(object):
     
     def updateNode(self):
         logging.debug("Update Node. Distro is " + self.distro)
+           
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             self.runSingleCommandAsRoot("DEBIAN_FRONTEND=noninteractive apt-get -y update")
             self.runSingleCommandAsRoot("DEBIAN_FRONTEND=noninteractive apt-get -y dist-upgrade")
@@ -811,8 +830,12 @@ class OFSTestNode(object):
             self.runSingleCommandAsRoot("zypper --non-interactive update")
             self.runSingleCommandAsRoot("nohup /sbin/reboot &")
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
+            # disable SELINUX
+            self.runSingleCommandAsRoot("bash -c 'echo \\\"SELINUX=Disabled\\\" > /etc/selinux/config'")
+            self.runSingleCommandAsRoot("yum install -y perl wget")
             self.runSingleCommandAsRoot("yum update --disableexcludes=main -y")
 
+            
             # Uninstall the old kernel
             # Must escape double quotes and backquotes for command to run correctly on remote machine.
             # Otherwise shell will interpret them for local machine and commands won't work.
@@ -1077,6 +1100,8 @@ class OFSTestNode(object):
     def installRequiredSoftware(self):
         output = []
         
+        self.changeDirectory("/home/"+self.current_user)
+        
         if "ubuntu" in self.distro.lower() or "mint" in self.distro.lower() or "debian" in self.distro.lower():
             
             print "Installing required software for Debian based system %s" % self.distro
@@ -1092,6 +1117,8 @@ class OFSTestNode(object):
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q linux-image",
                 # will fail on Ubuntu 10.04. Run separately to not break anything
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q fuse",
+                # install openldap
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q slapd ldap-utils libldap-2.4-2 libldap2-dev libldap-java libldap-ocaml-dev",
                 #"DEBIAN_FRONTEND=noninteractive apt-get install -yu avahi-autoipd  avahi-dnsconfd  avahi-utils avahi-daemon    avahi-discover  avahi-ui-utils", 
                 "apt-get clean",
     
@@ -1141,6 +1168,7 @@ class OFSTestNode(object):
             
                         # download Java 6
             print "Installing required software for SuSE based system %s" % self.distro
+        
             rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
             if rc != 0:
                 logging.exception(output)
@@ -1151,6 +1179,8 @@ class OFSTestNode(object):
                 # prereqs should be installed as part of the image. Thanx SuseStudio!
                 #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs "nano openssl
                 "zypper --non-interactive install patch libuuid1 uuid-devel gdb",
+                "zypper --non-interactive install openldap2 openldap2-client openldap-servers libldap2_4-2 openldap2-devel",
+                "chown -R ldap:ldap /var/lib/ldap",
                 
     
                 
@@ -1175,6 +1205,8 @@ class OFSTestNode(object):
                 "service rpcbind start",
                 "service nfs restart",
                 "/sbin/rpcbind"
+                "service slapd start",
+                "chkconfig slapd on"
             ]
             for command in install_commands:
                 rc = self.runSingleCommandAsRoot(command, output)
@@ -1186,7 +1218,7 @@ class OFSTestNode(object):
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             print "Installing required software for Red Hat based system %s" % self.distro
             # download Java 6
-            rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
+            rc = self.runSingleCommand("wget http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
             if rc != 0:
                 logging.exception(output)
                 return rc
@@ -1194,7 +1226,9 @@ class OFSTestNode(object):
             install_commands = [
                 "bash -c 'echo 0 > /selinux/enforce'",
                 
-                "yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-\\`uname -r\\` kernel-headers-\\`uname -r\\` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel openldap openldap-devel openldap-clients gdb nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl ",
+                "yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-\\`uname -r\\` kernel-headers-\\`uname -r\\` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel openldap openldap-devel openldap-clients gdb nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl wget",
+                "yum -y install openldap openldap-clients openldap-servers openldap-servers-sql compat-openldap",
+                "chown -R ldap:ldap /var/lib/ldap",
                 # install java
                 "yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user,
                 "/sbin/modprobe -v fuse",
@@ -1211,6 +1245,8 @@ class OFSTestNode(object):
                 "service sendmail stop",
                 "service rpcbind start",
                 "service nfs restart",
+                "service slapd start",
+                "chkconfig slapd on"
                 
                 
                 ]
@@ -1229,7 +1265,10 @@ class OFSTestNode(object):
             self.jdk6_location = "/usr/java/default"
         else:
             print "Unknown system %s" % self.distro
+        
+    
 
+    def installDB4(self):
         # db4 is built from scratch for all systems to have a consistant version.
         batch_commands = '''
         
@@ -1253,16 +1292,20 @@ class OFSTestNode(object):
         self.db4_lib_dir = self.db4_dir+"/lib"
         self.addBatchCommand(batch_commands)
         self.runAllBatchCommands()
-        
-        # Install Hadoop. 
-        output = []
-        self.changeDirectory("/opt")
-        # Download from a helluva open source mirror.
-        self.runSingleCommand("wget --quiet  http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
-        self.runSingleCommand("tar -zxf %s.tar.gz" % self.hadoop_version)
-        
         # Add DB4 to the library path.
         self.setEnvironmentVariable("LD_LIBRARY_PATH","%s:$LD_LIBRARY_PATH" % self.db4_lib_dir)
+
+        
+    def installHadoop(self):
+        # Install Hadoop. 
+        rc = self.runSingleCommand("[ -d /opt/%s ]" % self.hadoop_version)
+        if rc != 0:
+            output = []
+            self.changeDirectory("/opt")
+            
+            self.runSingleCommand("wget http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
+            self.runSingleCommand("tar -zxf %s.tar.gz" % self.hadoop_version)
+        
 
 
 
@@ -1274,93 +1317,85 @@ class OFSTestNode(object):
     # @param self The object pointer
     # @param location Location to install mpich
     #
-
+    def installMPICH(self,install_location=None,build_location=None):
     
-    
 
-    def installMpich2(self,location=None):
-        if location == None:
-            location = "/home/%s/mpich2" % self.current_user
+        if install_location == None:
+            install_location = "/opt/mpi"
         
-        mpich_version = "mpich-3.0.4"
-            
-        url = "http://devorange.clemson.edu/pvfs/%s.tar.gz" % mpich_version
-        # just to make debugging less painful
-        #[ -n "${SKIP_BUILDING_MPICH2}" ] && return 0
-        #[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
-        self.runSingleCommand("mkdir -p "+location)
+        if build_location == None:
+            build_location = install_location
+        
+        
+        
+        self.mpich_version = "mpich-3.0.4"
+        url_base = "http://devorange.clemson.edu/pvfs/"
+        url = url_base+self.mpich_version+".tar.gz"
+
+        #self.openmpi_version = "openmpi-1.8"
+        #url_base = "http://www.open-mpi.org/software/ompi/v1.8/downloads/"
+        #url = url_base+self.openmpi_version+".tar.gz"
+
+        
+        self.runSingleCommand("mkdir -p "+build_location)
         tempdir = self.current_directory
-        self.changeDirectory("/home/%s" % self.current_user)
+        self.changeDirectory(build_location)
         
-        #wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.5/mpich2-1.5.tar.gz
         rc = self.runSingleCommand("wget --quiet %s" % url)
-        #wget --passive-ftp --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
         if rc != 0:
-            logging.exception("Could not download mpich from %s." % url)
+            logging.exception( "Could not download %s from %s." % (self.mpich_version,url))
             self.changeDirectory(tempdir)
             return rc
 
         output = []
-        self.runSingleCommand("tar xzf %s.tar.gz"% mpich_version)
+        self.runSingleCommand("tar xzf %s.tar.gz"% self.mpich_version)
         
-        self.mpich2_source_location = "/home/%s/%s" % (self.current_user,mpich_version)
-        self.changeDirectory(self.mpich2_source_location)
-        #self.runSingleCommand("ls -l",output)
-        #print output
+        self.openmpi_source_location = "%s/%s" % (build_location,self.mpich_version)
+        self.changeDirectory(self.mpich_source_location)
+
+
+
+        
         
         configure = '''
-        ./configure -q --prefix=%s \
+        ./configure -q --prefix=%s/mpich \
         --enable-romio --with-file-system=pvfs2 \
         --with-pvfs2=%s \
         --enable-g=dbg \
          >mpich2config.log
-        ''' % (location,self.ofs_installation_location)
-        
-        #wd = self.runSingleCommandBacktick("pwd")
-        #print wd
-        #print configure
+        ''' % (install_location,self.ofs_installation_location)
+
         
 
-        msg = "Configuring MPICH"
-        logging.info(msg)
+        logging.info( "Configuring %s" % self.mpich_version)
         rc = self.runSingleCommand(configure,output)
         
         if rc != 0:
-            logging.exception("Configure of MPICH failed. rc=%d" % rc)
-            logging.exception( output)
+            logging.exception( "Configure of %s failed. rc=%d" % (self.mpich_version,rc))
             self.changeDirectory(tempdir)
             return rc
         
-        msg = "Building MPICH"
-        logging.info(msg)
-        rc = self.runSingleCommand("make > mpich2make.log")
+        logging.info( "Making %s" % self.mpich_version)
+        rc = self.runSingleCommand("make 2>&1 | tee mpichmake.log")
         if rc != 0:
-            logging.exception("Make of MPICH failed.")
-            logging.exception( output)
+            logging.exception( "Make of %s failed.")
             self.changeDirectory(tempdir)
             return rc
 
-        logging.info("Installing MPICH")
-        rc = self.runSingleCommand("make install > mpich2install.log")
+        logging.info("Installing %s" % self.mpich_version)
+        rc = self.runSingleCommand("make install 2>&1 | tee mpichinstall.log")
         if rc != 0:
-            logging.exception( "Install of MPICH failed.")
-            logging.exception(output)
+            logging.exception("Install of %s failed." % self.mpich_version)
             self.changeDirectory(tempdir)
             return rc
         
-        logging.info( "Checking MPICH install")
-        rc = self.runSingleCommand("make installcheck > mpich2installcheck.log")
-        if rc != 0:
-            logging.info("Install of MPICH failed.")
-            logging.info( output)
-            self.changeDirectory(tempdir)
-            return rc
+        self.mpich_installation_location = install_location+"/mpich"
         
-        self.mpich2_installation_location = location 
-        # change this!
-        self.romio_runtests_pvfs2 = self.mpich2_source_location+"ompi/mca/io/romio/romio/test/runtests"
+        self.romio_runtests_pvfs2 = self.mpich_source_location+"src/mpi/romio/test/runtests.pvfs2"
+        self.runSingleCommand("chmod a+x "+self.romio_runtests_pvfs2)
         
         return 0
+
     
     ##
     # @fn installOpenMPI(self,install_location=None,build_location=None):
@@ -2171,7 +2206,7 @@ class OFSTestNode(object):
 
 
 
-    def copyOFSInstallationToNode(self,destination_node):
+    def copyOFSInstallationToNode(self,destination_node,*args,**kwargs):
         rc = self.copyToRemoteNode(self.ofs_installation_location+"/", destination_node, self.ofs_installation_location, True)
         destination_node.ofs_installation_location = self.ofs_installation_location
         destination_node.ofs_branch =self.ofs_branch
@@ -2181,6 +2216,35 @@ class OFSTestNode(object):
         destination_node.ofs_fs_name = destination_node.runSingleCommandBacktick("grep Name %s | awk '{print \\$2}'" % destination_node.ofs_conf_file)
         return rc
        
+    
+    ##
+    # @fn copyOFSUserCertsToNode(self,user,destination_node):
+    #
+    # This copies user certs for a given user to the same user account on the destination node
+    # @param self The object pointer
+    # @param destination_node OFSTestNode to which the installation is copied.
+    # @param user The user for whom the certificates should be copied
+
+
+    def copyUserCertsToNode(self,destination_node,*args,**kwargs):
+        
+        user = kwargs['user']
+        # Copy the cert.
+        # Copy the cert key.
+        homedir = "/home/"+user
+        
+
+        rc = self.copyToRemoteNode(homedir+"/.pvfs2-cert.pem", destination_node, "/tmp/",True)
+        if rc == 0:
+            rc = destination_node.runSingleCommandAsRoot("mv -f /tmp/.pvfs2-cert.pem %s/" % homedir)
+        if rc == 0:
+            rc = self.copyToRemoteNode(homedir+"/.pvfs2-cert-key.pem", destination_node, "/tmp",True)
+        if rc == 0:
+            rc = destination_node.runSingleCommandAsRoot("mv -f /tmp/.pvfs2-cert-key.pem %s/" % homedir)
+
+
+        return rc
+
 
     ##
     # @fn configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_storage_location="",ofs_conf_file=None,security=None):
@@ -2240,8 +2304,9 @@ class OFSTestNode(object):
             logging.info(msg)
             security_args = "--securitykey --serverkey=%s/etc/orangefs-serverkey.pem --keystore=%s/etc/orangefs-keystore" % (self.ofs_installation_location,self.ofs_installation_location)
         elif security.lower() == "cert":
-            msg = "Certificate based security not yet supported by OFSTest."
+            msg = "Configuring certificate based security"
             print msg
+            security_args = '--serverkey %s/etc/orangefs-ca-cert-key.pem --cafile %s/etc/orangefs-ca-cert.pem --ldaphosts \\"%s\\" --ldapbinddn \\"%s\\" --ldapbindpassword %s --ldapsearchroot \\"ou=users,%s\\"' % (self.ofs_installation_location,self.ofs_installation_location,self.ldap_server_uri,self.ldap_admin,self.ldap_admin_password,self.ldap_container)
             logging.info(msg)
             pass
             
@@ -2624,4 +2689,84 @@ class OFSTestNode(object):
         # grep directory/configure 
         # grep -r 'prefix = /home/cloud-user/orangefs' /home/cloud-user/stable/Makefile
         return 0
+
+    def setLDAPConfig(self,ldap_server_uri,ldap_admin, ldap_admin_password, ldap_container):
+        self.ldap_server_uri = ldap_server_uri
+        self.ldap_admin = ldap_admin
+        self.ldap_admin_password = ldap_admin_password
+        self.ldap_container = ldap_container
         
+                
+    def setupLDAP(self):
+        self.changeDirectory("%s/examples/certs" % self.ofs_source_location)
+        rc = 0
+        rc = self.runSingleCommandAsRoot(command="%s/examples/certs/pvfs2-ldap-create-dir.sh" % self.ofs_source_location)
+        if rc != 0:
+            logging.exception("Could not create LDAP directory. rc = %d" % rc)
+            exit(rc)
+        
+        # set LDAP Config to the defaults.
+        self.setLDAPConfig(ldap_server_uri="ldap://%s" % self.hostname,ldap_admin="cn=admin,dc=%s" % self.hostname, ldap_admin_password="ldappwd", ldap_container="dc=%s" % self.hostname)
+            
+        rc = self.runSingleCommand('%s/examples/certs/pvfs2-ldap-set-pass.sh -H %s -D \\"%s\\" -w %s \\"cn=root,ou=users,%s\\" gotigers' % (self.ofs_source_location,self.ldap_server_uri,self.ldap_admin, self.ldap_admin_password,self.ldap_container))
+        if rc != 0:
+            logging.exception("Could not set ldap password  rc = %d" % rc)
+            exit(rc)
+
+        
+        rc = self.runSingleCommand('for username in \\`cut -d: -f1 /etc/passwd\\`; do %s/examples/certs/pvfs2-ldap-add-user.sh -H %s -D \\"%s\\" -w %s \\$username \\"ou=users,%s\\"; done' % (self.ofs_source_location,self.ldap_server_uri,self.ldap_admin,self.ldap_admin_password,self.ldap_container))
+        if rc != 0:
+            logging.exception("Could not create LDAP users. rc = %d" % rc)
+            exit(rc)
+
+        return rc
+        
+    def createCACert(self):
+        self.changeDirectory("%s/examples/certs" % self.ofs_source_location)
+        rc = 0
+        rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-ca-auto.sh' % self.ofs_source_location)
+        if rc != 0:
+            logging.exception("Could not create CA cert.  rc = %d" % rc)
+            exit(rc)
+
+        return rc
+        
+
+    def createUserCerts(self,user=None):
+        self.changeDirectory("%s/examples/certs" % self.ofs_source_location)
+        if user == None:
+            user = self.current_user
+        
+        self.runSingleCommandAsRoot("rm -f pvfs2-cert.pem pvfs2-cert-key.pem pvfs2-cert-req.pem")
+        rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-req-auto.sh pvfs2 %s' % (self.ofs_source_location,user))
+        if rc != 0:
+            logging.exception("Could not create LDAP cert for user %s. rc = %d" % (user,rc))
+            exit(rc)
+
+        rc = self.runSingleCommand('%s/examples/certs/pvfs2-cert-sign.sh pvfs2' % (self.ofs_source_location))
+        if rc != 0:
+            logging.exception("Could not sign LDAP cert for user %s. rc = %d" % (user,rc))
+            exit(rc)
+        
+        homedir = self.runSingleCommandBacktick('grep ^%s /etc/passwd | cut -d: -f6' % user)
+        self.runSingleCommandAsRoot('mkdir -p %s' % homedir)
+        self.runSingleCommandAsRoot('chown %s:%s pvfs2-cert*.pem' % (user,user))
+        self.runSingleCommandAsRoot('chmod 600 pvfs2-cert*.pem')
+        rc = self.runSingleCommandAsRoot('mv -f pvfs2-cert.pem %s/.pvfs2-cert.pem' % homedir)
+        if rc != 0:
+            logging.exception("Could not move LDAP cert for user %s to %s. rc = %s" % (user,homedir,rc))
+            exit(rc)
+
+
+        rc = self.runSingleCommandAsRoot('mv -f pvfs2-cert-key.pem %s/.pvfs2-cert-key.pem' % homedir)
+        if rc != 0:
+            logging.exception("Could not move LDAP cert key for user %s to %s" % (user,homedir))
+            exit(rc)
+
+        rc = self.runSingleCommand("cp %s/examples/certs/orangefs-ca*pem %s/etc" % (self.ofs_source_location,self.ofs_installation_location) )
+        
+        return rc
+            
+        
+            
+            

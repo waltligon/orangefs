@@ -655,6 +655,19 @@ def vfs_cp(testing_node,output=[]):
     rc = testing_node.runSingleCommand("cmp %s/bin/pvfs2-cp %s/pvfs2-cp" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location),output)
     return rc
 
+def simultaneous_ls(testing_node,output=[]):
+
+    # Compare original in the bin directory to what was copied back
+    testing_node.runSingleCommand("mkdir -p %s/simultaneous_ls" % testing_node.ofs_mount_point, output)
+    testing_node.changeDirectory("%s/simultaneous_ls" % testing_node.ofs_mount_point)
+    # Copy file from installation location/bin to mount point
+    testing_node.runSingleCommand("cp /bin/ls %s/simultaneous_ls" % testing_node.ofs_mount_point,output)
+    
+    pvfs2_ls = "%s/simultaneous_ls/ls -al %s/simultaneous_ls" % (testing_node.ofs_mount_point,testing_node.ofs_mount_point)
+    
+    rc = testing_node.runSingleCommand("eval %s & %s" % (pvfs2_ls,pvfs2_ls),output)
+    return rc
+
 tests = [ 
 #ltp,
 append,
@@ -671,5 +684,6 @@ tail,
 vfs_cp,
 bonnie,
 dbench,
-ltp
+ltp,
+simultaneous_ls
  ]

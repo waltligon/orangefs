@@ -144,15 +144,18 @@ class OFSTestNetwork(object):
                     #print "Queue length is %d" % self.queue.qsize()
                     node = self.queue.get()
                     
-            
-                    #runs the selected node function
-                    if len(args) > 0:
-                        rc = node_function(node,*args)
-                    elif len(kwargs) > 0:
-                        rc = node_function(node,**kwargs)
-                    else:
-                        rc = node_function(node)
-                        
+                    try:
+    
+                        #runs the selected node function
+                        if len(args) > 0:
+                            rc = node_function(node,*args)
+                        elif len(kwargs) > 0:
+                            rc = node_function(node,**kwargs)
+                        else:
+                            rc = node_function(node)
+                    except:
+                        logging.exception("Thread failed!");
+    
                     #signals to queue job is done
                     self.queue.task_done()
           
@@ -394,10 +397,13 @@ class OFSTestNetwork(object):
         time.sleep(180)
         # workaround for strange cuer1 issue where hostname changes on reboot.
         for node in node_list:
+            # node information may have changed during reboot.
+            old_hostname = node.hostname
+            node.currentNodeInformation()
             tmp_hostname = node.runSingleCommandBacktick("hostname")
-            if tmp_hostname != node.hostname:
-                logging.info( "Hostname changed from %s to %s! Resetting to %s" % (node.hostname,tmp_hostname,node.hostname))
-                node.runSingleCommandAsRoot("hostname %s" % node.hostname)
+            if tmp_hostname != old_hostname:
+                logging.info( "Hostname changed from %s to %s! Resetting to %s" % (old_hostname,tmp_hostname,old_hostname))
+                node.runSingleCommandAsRoot("hostname %s" % old_hostname)
                 
     
     ##
@@ -414,6 +420,37 @@ class OFSTestNetwork(object):
         if node_list == None:
             node_list = self.network_nodes
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.installRequiredSoftware)
+        
+        
+    ##
+    # @fn installDB4(self,node_list=None):
+    #
+    # This installs the required software on all the nodes
+    #
+    #    @param self The object pointer
+    #    @param node_list List of nodes to update
+                    
+        
+    
+    def installDB4(self,node_list=None):
+        if node_list == None:
+            node_list = self.network_nodes
+        self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.installDB4)
+
+    ##
+    # @fn installHadoop(self,node_list=None):
+    #
+    # This installs the required software on all the nodes
+    #
+    #    @param self The object pointer
+    #    @param node_list List of nodes to update
+                    
+        
+    
+    def installHadoop(self,node_list=None):
+        if node_list == None:
+            node_list = self.network_nodes
+        self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.installHadoop)
     
     ##
     # @fn buildOFSFromSource(
@@ -632,7 +669,7 @@ class OFSTestNetwork(object):
             destination_list = self.network_nodes;
         self.copyResourceToNodeList(node_function=OFSTestNode.OFSTestNode.copyOFSInstallationToNode,destination_list=destination_list)
 
-       
+
     ##    
     #  @fn copyResourceToNodeList(self,node_function,destination_list=None):
     #
@@ -651,7 +688,7 @@ class OFSTestNetwork(object):
     #    @param destination_list    list of nodes. Assumption is source is at node[0].
         
 
-    def copyResourceToNodeList(self,node_function,destination_list=None):
+    def copyResourceToNodeList(self,node_function,destination_list=None, *args, **kwargs):
 
         
         if destination_list == None:
@@ -669,7 +706,7 @@ class OFSTestNetwork(object):
         print msg
         logging.info(msg)
         #rc = destination_list[0].copyOFSInstallationToNode(destination_list[list_length/2])
-        rc = node_function(destination_list[0],destination_list[list_length/2])
+        rc = node_function(destination_list[0],destination_list[list_length/2], *args, **kwargs)
         
         
         # TODO: Throw an exception if the copy fails.
@@ -687,10 +724,12 @@ class OFSTestNetwork(object):
                     #grabs host from queue
                     #print "Queue length is %d" % self.queue.qsize()
                     list = self.queue.get()
+                    try:
                     
-                    #print "Copying %r" % list
-                    self.manager.copyResourceToNodeList(node_function=node_function,destination_list=list)
-                    
+                        #print "Copying %r" % list
+                        self.manager.copyResourceToNodeList(node_function=node_function,destination_list=list, *args, **kwargs)
+                    except:
+                        logging.exception("Copy failed!")
                         
                     #signals to queue job is done
                     self.queue.task_done()
@@ -1067,6 +1106,77 @@ class OFSTestNetwork(object):
         if rc != 0:
             return rc
         return 0
+
+   
+    ##    
+    #   @fn generateOFSCertificates(self,node_list=None,head_node=None):
+    #
+    #    Generate SSH certificates for OrangeFS cert-based security
+    #    @param self The object pointer
+    #    @param node_list List of nodes in network.
+    #    @param head_node Head node of ssh setup
+
+   
+    
+    def generateOFSCertificates(self,ldap_server_uri,ldap_admin,ldap_admin_password,ldap_container,node_list=None,security_node=None,):
+        if node_list == None:
+            node_list = self.network_nodes
+        if security_node==None:
+            security_node = node_list[0]
+        
+        # Do we need to setup ldap? 
+        if ldap_server_uri == None or ldap_admin == None or ldap_admin_password == None or ldap_container == None: 
+            rc = security_node.setupLDAP()
+        else:
+            # if not, use current configuration.
+            security_node.setLDAPConfig(ldap_server_uri,ldap_admin,ldap_admin_password,ldap_container)
+            rc = 0
+            
+        if rc == 0:
+            rc = security_node.createCACert()
+            # CA Certs should be copied with OrangeFS.
+        if rc == 0:
+            rc = self.createUserCerts(node_list=node_list,security_node=security_node)
+        if rc == 0:
+            rc = self.createUserCerts(user="nobody",node_list=node_list,security_node=security_node)
+        if rc == 0:
+            rc = self.createUserCerts(user="bin",node_list=node_list,security_node=security_node)
+        if rc == 0:
+            rc = self.createUserCerts(user="root",node_list=node_list,security_node=security_node)
+
+        
+        return rc
+
+        
+        
+    
+    def createUserCerts(self,user=None,node_list=None,security_node=None):
+        if node_list == None:
+            node_list = self.network_nodes
+        if security_node==None:
+            security_node = node_list[0]
+        if user == None:
+            user = security_node.current_user
+
+            
+        rc = security_node.createUserCerts(user);
+        if rc == 0:
+            self.copyUserCertsToNodeList(user=user,destination_list=node_list) 
+
+    
+    ##    
+    #    @fn copyUserCertsToNodeList(self,destination_list=None):
+    #
+    #    Copy OFS from build node to rest of cluster.
+    #    
+    #    @param self The object pointer
+    #    @param destination_list List of nodes to copy OrangeFS to. OFS should already be at destination_list[0].
+        
+    def copyUserCertsToNodeList(self,user,destination_list=None):
+        if destination_list == None:
+            destination_list = self.network_nodes;
+        self.copyResourceToNodeList(node_function=OFSTestNode.OFSTestNode.copyUserCertsToNode, destination_list=destination_list, user=user )
+
 
    
     ##    
