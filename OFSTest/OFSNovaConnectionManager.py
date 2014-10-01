@@ -199,6 +199,7 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
             return 1
             
             
+            
     ##
     #
     # @fn createNewCloudInstances(self,number_nodes,image_name,flavor_name): 
