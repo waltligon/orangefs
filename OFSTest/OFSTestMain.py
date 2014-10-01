@@ -19,13 +19,9 @@
 #   initNetwork()   builds the OFSTestNetwork virtual cluster based on the
 #                   config values.
 #
-#   checkNetwork()  verify that the OFSTestNetwork has all the information to setup OrangeFS
-#
 #   printConfig()   Prints the dictionary of self.config. For debugging.
 #
 #   setupOFS()      Builds the OFSTestNetwork as specified by the config.
-#
-#   checkOFS()      Verify the OrangeFS installation is complete and system has all information needed to run OrangeFS tests.
 #
 #   runTest()       Runs the tests for OrangeFS as specified by the config.
 #
@@ -117,8 +113,6 @@ class OFSTestMain(object):
             output.write("%s........................................PASS.\n" % function.__name__)
         output.close()
     
-
-    
     ##
     # @fn initNetwork(self)
     #
@@ -128,31 +122,55 @@ class OFSTestMain(object):
     
     def initNetwork(self):
 
-    # if the configuration says that we need to create new Cloud nodes, 
-        # do it.
-        if self.config.number_new_cloud_nodes > 0:
-            self.setupNewCloudCluster()
         # If config.node_ip_addresses > 0, then we are dealing with existing 
         # nodes. Add them to the virtual cluster.
-        elif len(self.config.node_ip_addresses) > 0:
-            self.setupExistingCluster()
+        if len(self.config.node_ip_addresses) > 0:
+
+            print "===========================================================" 
+            print "Adding %d Existing Nodes to OFS cluster" % len(self.config.node_ip_addresses)
+
+            for i in range(len(self.config.node_ip_addresses)):
+                
+                # For each node, check to see if test program is accessing
+                # through external address. If so, set the external address.
+
+                if len(self.config.node_ext_ip_addresses) > 0:
+                    ext_ip_address = self.config.node_ext_ip_addresses[i]
+                else:
+                    # if not, underlying functionality will use one IP for both.
+                    ext_ip_address = None
+
+                # Add the node to the virtual cluster.
+                self.ofs_network.addRemoteNode(ip_address=self.config.node_ip_addresses[i],username=self.config.node_usernames[i],key=self.config.ssh_key_filepath,is_cloud=self.config.using_cloud,ext_ip_address=ext_ip_address)
         
-        else:
-            print "Cannot create test cluster. %d new cloud nodes and %d existing nodes specified" % (self.config.number_new_cloud_nodes,len(self.config.node_ip_addresses))
-        
+        # Upload the access key to all the nodes in the cluster.
+        print "===========================================================" 
+        print "Distributing SSH keys"
+        self.ofs_network.uploadKeys()
+
+        # Sometimes virtual networking doesn't do a good job of letting the
+        # hosts find each other. This method sets standard hostnames and 
+        # updates the /etc/hosts file ofeach virtual node so that everyone 
+        # can find everyone else.
+        print "===========================================================" 
+        print "Verifying hostname resolution"
+        self.ofs_network.updateEtcHosts()
+
+        # MPI and Hadoop testing require passwordless SSH access.
+        print "===========================================================" 
+        print "Enabling Passwordless SSH access"
+        self.ofs_network.enablePasswordlessSSH()
+        #print "Enabling Passwordless SSH access for root"
+        #self.ofs_network.enablePasswordlessSSH(user="root")
         
         # TODO: Make this smart enough to return success or failure.
-        
-        return self.checkNetwork()
-        
-        
+        return 0
         
 
     ##
     # @fn checkOFS(self)
     #
-    # checks to see if OrangeFS is setup on the cluster.
-    # Assumes that all work has been done to setup OrangeFS 
+    # checks to see if OrangeFS is setup on the cluster. 
     #
     # @param self The object pointer
     #
@@ -162,18 +180,23 @@ class OFSTestMain(object):
     
     def checkOFS(self):
         
+        # if we need to create new Cloud nodes, then OFS not setup
+        if self.config.number_new_cloud_nodes > 0:        
+            return 1;
         
+        # initialize the network
+        rc = self.initNetwork();
+        if rc != 0:
+            return rc
+       
     
         # TODO: Make this smart enough to detect if the installation is running
-        print "Looking for existing OrangeFS installation"
         rc = self.ofs_network.findExistingOFSInstallation()
         if rc != 0:
-            print "Existing OrangeFS installation not found."
             return rc
 
         # OK, now that OrangeFS installation has been found, set the
         # appropriate varaibles in the OFSTestNetwork virtual cluster.
-        print "Existing OrangeFS installation found. Detecting settings"
         self.ofs_network.networkOFSSettings(
             ofs_installation_location = self.config.install_prefix,
             db4_prefix=self.config.db4_prefix,
@@ -205,111 +228,7 @@ class OFSTestMain(object):
 
         '''
         return 0
-
-    ##
-    # @fn checkOFS(self)
-    #
-    # checks to see if network has been properly setup 
-    #
-    # @param self The object pointer
-    #
-    # @return 0 network setup
-    # @return Not 0 network not setup
-
-
-    
-    def checkNetwork(self):
         
-        #right now, I will just print out the dictionary of the network and every node:
-        
-        return self.ofs_network.printNetwork()
-        
-        
-    ##
-    # @fn setupNewCloudCluster(self):      
-    #
-    #    Builds the OFSTestNetwork as specified by the config.
-    #
-    # @param self The object pointer
-        
-    def setupNewCloudCluster(self):
-    
-
-        # First, if we're using Cloud/Openstack, open the connection
-        print "===========================================================" 
-        print "Connecting to EC2/OpenStack cloud using information from " + self.config.cloud_config
-        print "%s,%s,%s,%s,%s" % (self.config.cloud_config,self.config.cloud_key_name,self.config.ssh_key_filepath,self.config.cloud_type,self.config.nova_password_file)
-        self.ofs_network.addCloudConnection(self.config.cloud_config,self.config.cloud_key_name,self.config.ssh_key_filepath,self.config.cloud_type,self.config.nova_password_file)
-
-
-        print "===========================================================" 
-        print "Creating %d new EC2/OpenStack cloud nodes" % self.config.number_new_cloud_nodes
-        self.ofs_network.createNewCloudNodes(self.config.number_new_cloud_nodes,self.config.cloud_image,self.config.cloud_machine,self.config.cloud_associate_ip,self.config.cloud_domain,self.config.cloud_subnet,self.config.instance_suffix)
-    
-                
-        # Upload the access key to all the nodes in the cluster.
-        print "===========================================================" 
-        print "Distributing SSH keys"
-        self.ofs_network.uploadKeys()
-
-        # Sometimes virtual networking doesn't do a good job of letting the
-        # hosts find each other. This method sets standard hostnames and 
-        # updates the /etc/hosts file of each virtual node so that everyone 
-        # can find everyone else.
-        print "===========================================================" 
-        print "Verifying hostname resolution"
-        self.ofs_network.updateEtcHosts()
-
-        # MPI and Hadoop testing require passwordless SSH access.
-        print "===========================================================" 
-        print "Enabling Passwordless SSH access"
-        self.ofs_network.enablePasswordlessSSH()
-        #print "Enabling Passwordless SSH access for root"
-        #self.ofs_network.enablePasswordlessSSH(user="root")
-
-
-        # Update new cloud nodes and reboot. We don't want to do this with real nodes 
-        # because we don't want to step on the admin's toes.
-        print ""
-        print "==================================================================="
-        print "Updating New Nodes (This may take awhile...)"
-        self.ofs_network.updateCloudNodes()
-        
-        # Install software required to compile and run OFS and all tests.
-        print ""
-        print "==================================================================="
-        print "Installing Required Software"
-        self.ofs_network.installRequiredSoftware()
-
-
-    ##
-    # @fn setupExistingCluster(self):      
-    #
-    #    Builds the OFSTestNetwork as specified by the config.
-    #    Assumes that nodes have been updated, all software has been installed and that network access is working. 
-    #
-    # @param self The object pointer
-        
-    def setupExistingCluster(self):
-
-        print "===========================================================" 
-        print "Adding %d Existing Nodes to OFS cluster" % len(self.config.node_ip_addresses)
-
-        for i in range(len(self.config.node_ip_addresses)):
-            
-            # For each node, check to see if test program is accessing
-            # through external address. If so, set the external address.
-
-            if len(self.config.node_ext_ip_addresses) > 0:
-                ext_ip_address = self.config.node_ext_ip_addresses[i]
-            else:
-                # if not, underlying functionality will use one IP for both.
-                ext_ip_address = None
-
-            # Add the node to the virtual cluster.
-            self.ofs_network.addRemoteNode(ip_address=self.config.node_ip_addresses[i],username=self.config.node_usernames[i],key=self.config.ssh_key_filepath,is_cloud=self.config.using_cloud,ext_ip_address=ext_ip_address)
-
-
     ##
     # @fn setupOFS(self):      
     #
@@ -318,6 +237,39 @@ class OFSTestMain(object):
     # @param self The object pointer
         
     def setupOFS(self):
+        
+    
+        if self.config.using_cloud == True:
+            # First, if we're using Cloud/Openstack, open the connection
+            print "===========================================================" 
+            print "Connecting to EC2/OpenStack cloud using information from " + self.config.cloud_config
+            print "%s,%s,%s,%s,%s" % (self.config.cloud_config,self.config.cloud_key_name,self.config.ssh_key_filepath,self.config.cloud_type,self.config.nova_password_file)
+            self.ofs_network.addCloudConnection(self.config.cloud_config,self.config.cloud_key_name,self.config.ssh_key_filepath,self.config.cloud_type,self.config.nova_password_file)
+    
+            # if the configuration says that we need to create new Cloud nodes, 
+            # do it.
+            if self.config.number_new_cloud_nodes > 0:
+                print "===========================================================" 
+                print "Creating %d new EC2/OpenStack cloud nodes" % self.config.number_new_cloud_nodes
+                self.ofs_network.createNewCloudNodes(self.config.number_new_cloud_nodes,self.config.cloud_image,self.config.cloud_machine,self.config.cloud_associate_ip,self.config.cloud_domain,self.config.cloud_subnet,self.config.instance_suffix)
+            
+        # Setup the virtual cluster.
+        self.initNetwork()
+    
+        if self.config.using_cloud == True:
+            # Update new cloud nodes and reboot. We don't want to do this with real nodes 
+            # because we don't want to step on the admin's toes.
+            print ""
+            print "==================================================================="
+            print "Updating New Nodes (This may take awhile...)"
+            self.ofs_network.updateCloudNodes()
+            
+        # Install software required to compile and run OFS and all tests.
+        print ""
+        print "==================================================================="
+        print "Installing Required Software"
+        self.ofs_network.installRequiredSoftware()
+
 
         '''
         # If you're using any NFS mounts, could put them here.
@@ -427,7 +379,7 @@ class OFSTestMain(object):
             print ""
             print "==================================================================="
             print "Start OFS Client"
-            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode,disable_acache=self.config.ofs_disable_acache)
+            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode)
    
 
 
@@ -467,7 +419,7 @@ class OFSTestMain(object):
             print "Setup Hadoop"
             self.ofs_network.setupHadoop()
         
-        return self.checkNetwork()
+        return 0
 
     ##
     #
@@ -538,7 +490,7 @@ class OFSTestMain(object):
             import OFSSysintTest
             
             # Start the OrangeFS Client on the head node
-            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode,disable_acache=self.config.ofs_disable_acache)
+            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode)
         
             # print section header in output file.
             self.writeOutputHeader(filename,"Sysint Tests")
@@ -566,7 +518,7 @@ class OFSTestMain(object):
             mount_type = "kmod"
             # Start the OrangeFS Client on the head node
 
-            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode,disable_acache=self.config.ofs_disable_acache)
+            rc = self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode)
 
 
             # OrangeFS must be mounted to run kmod tests.
@@ -836,7 +788,7 @@ class OFSTestMain(object):
         self.ofs_network.stopOFSClientAllNodes()
         self.ofs_network.stopOFSServers()
         self.ofs_network.startOFSServers()
-        self.ofs_network.startOFSClientAllNodes(security=self.config.ofs_security_mode,disable_acache=self.config.ofs_disable_acache) 
+        self.ofs_network.startOFSClientAllNodes(security=self.config.security_mode) 
         self.ofs_network.mountOFSFilesystemAllNodes()
     
     def doPostTest(self):

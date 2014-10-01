@@ -233,14 +233,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         else:
             rflag = ""
           
-        ssh_key_parm = ''
-        try:
-            if self.getRemoteKeyFile(destination_node.ext_ip_address) is not None:
-                ssh_key_parm = '-i %s' % self.getRemoteKeyFile(destination_node.ext_ip_address)
-        except:
-            pass
-          
-        rsync_command = "rsync %s -e \\\"ssh %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\" %s %s@%s:%s" % (rflag,ssh_key_parm,source,destination_node.current_user,destination_node.ext_ip_address,destination)
+        rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\" %s %s@%s:%s" % (rflag,self.getRemoteKeyFile(destination_node.ext_ip_address),source,destination_node.current_user,destination_node.ext_ip_address,destination)
         
         output = []
         rc = self.runSingleCommand(rsync_command,output)
@@ -272,14 +265,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
         else:
             rflag = ""
           
-        ssh_key_parm = ''
-        try:
-            if self.getRemoteKeyFile(source_node.ext_ip_address) is not None:
-                ssh_key_parm = '-i %s' % self.getRemoteKeyFile(source_node.ext_ip_address)
-        except:
-            pass
-        
-        rsync_command = "rsync %s -e \\\"ssh %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\"  %s@%s:%s %s" % (rflag,ssh_key_parm,source_node.current_user,source_node.ext_ip_address,source,destination)
+        rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\"  %s@%s:%s %s" % (rflag,self.getRemoteKeyFile(source_node.ext_ip_address),source_node.current_user,source_node.ext_ip_address,source,destination)
         
         output = []
         rc = self.runSingleCommand(rsync_command,output)

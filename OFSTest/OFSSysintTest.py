@@ -55,8 +55,8 @@ def cp(testing_node,output=[]):
         #print "copy_test_pvt: Diff %s " % (result)
         return rc
         
-    test_source = testing_node.ofs_source_location + "/configure.ac"
-    test_destination = testing_node.ofs_mount_point + "/configure.ac"
+    test_source = testing_node.ofs_source_location + "/configure.in"
+    test_destination = testing_node.ofs_mount_point + "/configure.in"
     test_local = testing_node.ofs_source_location + "/config"
     
     test_args = [ "",'-s 128','-s $((1024*1024))', '-n 1', '-n 4', '-b 128', '-b $((1024*1024))' ]
