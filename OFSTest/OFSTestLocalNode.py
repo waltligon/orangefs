@@ -232,7 +232,7 @@ class OFSTestLocalNode(OFSTestNode.OFSTestNode):
             rflag = "-a "
         else:
             rflag = ""
-        
+          
         ssh_key_parm = ''
         try:
             if self.getRemoteKeyFile(destination_node.ext_ip_address) is not None:
