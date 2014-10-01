@@ -1117,6 +1117,7 @@ class OFSTestNode(object):
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q linux-image",
                 # will fail on Ubuntu 10.04. Run separately to not break anything
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q fuse",
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q maven",
                 # install openldap
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q slapd ldap-utils libldap-2.4-2 libldap2-dev libldap-java libldap-ocaml-dev",
                 #"DEBIAN_FRONTEND=noninteractive apt-get install -yu avahi-autoipd  avahi-dnsconfd  avahi-utils avahi-daemon    avahi-discover  avahi-ui-utils", 
@@ -1226,7 +1227,7 @@ class OFSTestNode(object):
             install_commands = [
                 "bash -c 'echo 0 > /selinux/enforce'",
                 
-                "yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-\\`uname -r\\` kernel-headers-\\`uname -r\\` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel openldap openldap-devel openldap-clients gdb nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl wget",
+                "yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-\\`uname -r\\` kernel-headers-\\`uname -r\\` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel openldap openldap-devel openldap-clients gdb nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl wget maven",
                 "yum -y install openldap openldap-clients openldap-servers openldap-servers-sql compat-openldap",
                 "chown -R ldap:ldap /var/lib/ldap",
                 # install java
