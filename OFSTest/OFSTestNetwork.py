@@ -18,9 +18,6 @@ import os
 import OFSTestNode
 import OFSTestLocalNode 
 import OFSTestRemoteNode 
-import OFSCloudConnectionManager
-import OFSEC2ConnectionManager
-import OFSNovaConnectionManager
 import Queue
 import threading
 import time
@@ -192,6 +189,10 @@ class OFSTestNetwork(object):
     
     
     def addCloudConnection(self,cloud_config_file,key_name,key_location,cloud_type="EC2",nova_password_file=None):
+        
+        import OFSCloudConnectionManager
+        import OFSEC2ConnectionManager
+        import OFSNovaConnectionManager
         #This function initializes the cloud connection
         self.cloud_type = cloud_type
         if (cloud_type == 'EC2'):
@@ -518,7 +519,8 @@ class OFSTestNetwork(object):
         
             resource_type = "BUILDNODE"
             resource_location = download_location+dir_list
-        rc = build_node.copyOFSSource(resource_type,resource_location,download_location+dir_list,svn_options)
+            
+        rc = build_node.copyOFSSource(resource_type=resource_type,resource=resource_location,dest_dir=download_location+dir_list,options=svn_options)
         
         if rc != 0:
             return rc
@@ -751,11 +753,11 @@ class OFSTestNetwork(object):
     #    @param node_list List of nodes in network.
      
 
-    def startOFSClientAllNodes(self,security=None,node_list=None):
+    def startOFSClientAllNodes(self,security=None,node_list=None,disable_acache=False):
         if node_list == None:
             node_list = self.network_nodes
         for node in node_list:
-            self.startOFSClient(node,security)
+            self.startOFSClient(client_node=node,security=security,disable_acache=disable_acache)
    
     ##    
     #    @fn startOFSClient(self,client_node=None,security=None):
@@ -768,14 +770,14 @@ class OFSTestNetwork(object):
     #    @param node_list List of nodes in network.
 
             
-    def startOFSClient(self,client_node=None,security=None,node_list=None):
+    def startOFSClient(self,client_node=None,security=None,node_list=None,disable_acache=False):
         if node_list == None:
             node_list = self.network_nodes
         if client_node == None:
             client_node = node_list[0]
         client_node.installKernelModule()
         #client_node.runSingleCommand('/sbin/lsmod | grep pvfs')
-        client_node.startOFSClient(security=security)
+        client_node.startOFSClient(security=security,disable_acache=disable_acache)
 
 
         time.sleep(10)
@@ -1547,4 +1549,19 @@ class OFSTestNetwork(object):
             master_node.runSingleCommand("%s/bin/hadoop dfs -mkdir /user/%s" % (master_node.hadoop_location,master_node.current_user))
             
         return rc
+    
+    def printNetwork(self):
+        
+        print "==========================================================================="
+        print "Virtual Cluster: Network-wide settings"
+        pprint(self.__dict__)
+        for node in self.network_nodes:
+            print "------------------------------------------------------------------------"
+            print "Node settings for %s" %  node.ip_address
+            pprint(node.__dict__)
+        
+        print "==========================================================================="
+        
+        return 0
+        
         

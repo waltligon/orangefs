@@ -478,8 +478,8 @@ def ltp(testing_node,output=[]):
     
     testing_node.changeDirectory(LTP_PREFIX)
     
-    print 'sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib %s ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -a %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location,preload, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type)
-    rc = testing_node.runSingleCommandAsRoot('PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=/opt/db4/lib:%s/lib %s ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp-usrint -f ltp-pvfs-testcases -a %s/zoo.tmp 2>&1 | tee %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_installation_location, preload,vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type),output)
+    print 'sudo PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=%s:%s/lib %s ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp -f ltp-pvfs-testcases -a %s/zoo.tmp >& %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.db4_lib_dir, testing_node.ofs_installation_location,preload,testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type)
+    rc = testing_node.runSingleCommandAsRoot('PVFS2TAB_FILE=%s/etc/orangefstab LD_LIBRARY_PATH=%s:%s/lib %s ./runltp -p -l %s/ltp-pvfs-testcases-%s.log -d %s/ltp-tmp-usrint -f ltp-pvfs-testcases -a %s/zoo.tmp 2>&1 | tee %s/ltp-pvfs-testcases-%s.output' % (testing_node.ofs_installation_location,testing_node.db4_lib_dir,testing_node.ofs_installation_location, preload, testing_node.ofs_installation_location, vfs_type, testing_node.ofs_mount_point,testing_node.ofs_extra_tests_location,testing_node.ofs_installation_location,vfs_type),output)
 
     # check to see if log file is there
     if testing_node.runSingleCommand("[ -f %s/ltp-pvfs-testcases-%s.log ]"% (testing_node.ofs_installation_location,vfs_type)):
@@ -581,18 +581,32 @@ def symlink_usrint(testing_node,output=[]):
     
 def tail(testing_node,output=[]):
     
-    tail_test = testing_node.ofs_mount_point +"/tail_test"
-    local_reference = testing_node.ofs_installation_location + "/tail_ref"
+    preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
+    
+   
+    tail_file = testing_node.ofs_mount_point +"/tail_file"
+    tail_output = testing_node.ofs_mount_point +"/tail_output_usrint"
+    local_file = testing_node.ofs_installation_location + "/tail_file"
+    local_output = testing_node.ofs_installation_location + "/tail_output_usrint"
     
     test_string = ""
     for i in range(25):
         test_string = "%s line%d\n" % (test_string,i)
     
-    preload = "LD_PRELOAD=%s/lib/libofs.so:%s/lib/libpvfs2.so " % (testing_node.ofs_installation_location,testing_node.ofs_installation_location)
-    testing_node.runSingleCommand('%s bash -c \'echo "%s" > %s\'' % (preload,test_string,tail_test))
+    rc = 0
+    
+    # Create the file
+    testing_node.runSingleCommand('%s bash -c \'echo \\"%s\\" > %s\'' % (preload,test_string,tail_file))
+    testing_node.runSingleCommand('bash -c \'echo \\"%s\\" > %s\'' % (preload,test_string,local_file))
+    
+    # Create the file
+    
+    testing_node.runSingleCommand("tail %s > %s" % (local_file,local_output))
+    
+    testing_node.runSingleCommand("%s tail %s > %s" % (preload,tail_file,tail_output))
    
     # now diff it
-    rc = testing_node.runSingleCommand("%s diff %s %s" % (preload,tail_test,local_reference),output)
+    rc = testing_node.runSingleCommand("%s diff %s %s" % (preload,local_output,tail_output))
     return rc
 
 ##
@@ -619,7 +633,6 @@ def usrint_cp(testing_node,output=[]):
     return rc
 
 tests = [ 
-ltp,
 append,
 append2,
 fdtree,
@@ -631,6 +644,7 @@ symlink_usrint,
 tail,
 usrint_cp,
 shelltest,
-dbench,
-bonnie
+ltp,
+bonnie,
+dbench
  ]

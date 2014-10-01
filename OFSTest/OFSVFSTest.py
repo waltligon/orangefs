@@ -603,18 +603,26 @@ def symlink_vfs(testing_node,output=[]):
     
 def tail(testing_node,output=[]):
     
-    tail_test = testing_node.ofs_mount_point +"/tail_test"
-    local_reference = testing_node.ofs_installation_location + "/tail_ref"
+    
+    tail_file = testing_node.ofs_mount_point +"/tail_file"
+    tail_output = testing_node.ofs_mount_point +"/tail_output_vfs"
+    local_file = testing_node.ofs_installation_location + "/tail_file"
+    local_output = testing_node.ofs_installation_location + "/tail_output_vfs"
     
     test_string = ""
     for i in range(25):
         test_string = "%s line%d\n" % (test_string,i)
     
-    # Create the file
-    testing_node.runSingleCommand("%s > %s" % (test_string,tail_test))
+    rc = 0
+    
+    testing_node.runSingleCommand('bash -c \'echo \\"%s\\" > %s\'' % (test_string,tail_file))
+    testing_node.runSingleCommand('bash -c \'echo \\"%s\\" > %s\'' % (test_string,local_file))
    
-    rc = testing_node.runSingleCommand("tail "+tail_test,output)
+    testing_node.runSingleCommand("tail %s > %s" % (local_file,local_output))
     # OK should do more here
+    testing_node.runSingleCommand("tail %s > %s" % (tail_file,tail_output))
+    # now diff it
+    rc = testing_node.runSingleCommand("diff %s %s" % (local_output, tail_output))
     return rc
 
 ##

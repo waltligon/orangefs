@@ -51,10 +51,16 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         self.is_cloud = is_cloud
         self.sshLocalKeyFile = key
         self.localnode = local_node
-        self.ssh_command = "/usr/bin/ssh -i %s %s@%s" % (self.sshLocalKeyFile,self.current_user,self.ext_ip_address)
+        ssh_key_parm = ''
+        if self.sshLocalKeyFile is not None:
+            ssh_key_parm = '-i %s' % self.sshLocalKeyFile
+            
+        self.ssh_command = "/usr/bin/ssh %s %s@%s" % (ssh_key_parm,self.current_user,self.ext_ip_address)
         
         super(OFSTestRemoteNode,self).currentNodeInformation()
-        self.getKeyFileFromLocal(local_node)
+        
+        if self.sshLocalKeyFile is not None:
+            self.getKeyFileFromLocal(local_node)
         
         
         msg = "SSH: "+self.ssh_command
@@ -154,9 +160,13 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
             logging.debug(line)
         script_file.close()
         logging.debug("---- End generated batchfile: %s -------------------------" % batchfilename)            
+        
+        ssh_key_parm = ''
+        if self.sshLocalKeyFile is not None:
+            ssh_key_parm = '-i %s' % self.sshLocalKeyFile
 
 
-        command_line = "/usr/bin/ssh -i %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"bash -s\" < %s" % (self.sshLocalKeyFile,self.current_user,self.ext_ip_address,batchfilename)
+        command_line = "/usr/bin/ssh %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no \"bash -s\" < %s" % (ssh_key_parm,self.current_user,self.ext_ip_address,batchfilename)
         
         logging.debug("Command:" + command_line)
         p = subprocess.Popen(command_line,shell=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=-1)
@@ -220,8 +230,12 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
             
         
         #start with the ssh command and open quote
+        ssh_key_parm = ''
+        if self.sshLocalKeyFile is not None:
+            ssh_key_parm = '-i %s' % self.sshLocalKeyFile
+
         
-        command_chunks = ["/usr/bin/ssh -i %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o BatchMode=yes \"" %  (self.sshLocalKeyFile,remote_user,self.ext_ip_address)]
+        command_chunks = ["/usr/bin/ssh %s %s@%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o BatchMode=yes \"" %  (ssh_key_parm,remote_user,self.ext_ip_address)]
 
         # change to proper directory
         command_chunks.append("cd %s; " % self.current_directory)
@@ -265,8 +279,16 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
             rflag = "-a"
         else:
             rflag = ""
-          
-        rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\" %s %s@%s:%s" % (rflag,self.getRemoteKeyFile(destination_node.ext_ip_address),source,destination_node.current_user,destination_node.ip_address,destination)
+        
+        ssh_key_parm = ''
+        try:
+            if self.getRemoteKeyFile(destination_node.ext_ip_address) is not None:
+                ssh_key_parm = '-i %s' % self.getRemoteKeyFile(destination_node.ext_ip_address)
+        except:
+            pass
+        
+
+        rsync_command = "rsync %s -e \\\"ssh %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\" %s %s@%s:%s" % (rflag,ssh_key_parm,source,destination_node.current_user,destination_node.ip_address,destination)
         #print rsync_command
         output = []
         rc = self.runSingleCommand(rsync_command,output)
@@ -299,8 +321,15 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
             rflag = "-a"
         else:
             rflag = ""
+        
+        ssh_key_parm = ''
+        try:
+            if self.getRemoteKeyFile(source_node.ext_ip_address) is not None:
+                ssh_key_parm = '-i %s' % self.getRemoteKeyFile(source_node.ext_ip_address)
+        except:
+            pass
           
-        rsync_command = "rsync %s -e \\\"ssh -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\"  %s@%s:%s %s" % (rflag,self.getRemoteKeyFile(source_node.ext_ip_address),source_node.current_user,source_node.ip_address,source,destination)
+        rsync_command = "rsync %s -e \\\"ssh %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\\\"  %s@%s:%s %s" % (rflag,ssh_key_parm,source_node.current_user,source_node.ip_address,source,destination)
         
         output = []
         rc = self.runSingleCommand(rsync_command,output)
@@ -386,8 +415,9 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         
     def allowRootSshAccess(self):
         # This one we activate! 
-        print "Allowing root SSH access with user %s's credentials" % self.current_user
-        self.runSingleCommandAsBatch(command="sudo cp -r /home/%s/.ssh /root/ " % self.current_user)
+        if (self.is_cloud):
+            print "Allowing root SSH access with user %s's credentials" % self.current_user
+            self.runSingleCommandAsBatch(command="sudo cp -r /home/%s/.ssh /root/ " % self.current_user)
         
         #============================================================================
         #
