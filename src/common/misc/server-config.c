@@ -1229,6 +1229,7 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
     config_s = config_obj;
     memset(config_s, 0, sizeof(struct server_configuration_s));
 
+    /* set server alias -- will be NULL on the client */
     if (server_alias_name)
     {
         config_s->server_alias = strdup(server_alias_name);
@@ -1238,7 +1239,6 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
         gossip_err("Server alias not provided for server config\n");
         return 1;
     }
-    config_s->server_alias = server_alias_name;
 
     /* set some global defaults for optional parameters */
     config_s->logstamp_type = GOSSIP_LOGSTAMP_DEFAULT;
@@ -3864,6 +3864,12 @@ void PINT_config_release(struct server_configuration_s *config_s)
         {
             free(config_s->db_cache_type);
             config_s->db_cache_type = NULL;
+        }
+
+        if (config_s->server_alias)
+        {
+            free(config_s->server_alias);
+            config_s->server_alias = NULL;
         }
 
         free(config_s->keystore_path);

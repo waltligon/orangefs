@@ -585,7 +585,7 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
     struct PINT_server_op *getattr_op = NULL;
     struct PVFS_server_req *req = NULL;
     PVFS_object_attr *attr_p = NULL;
-    PVFS_capability null_cap;
+    PVFS_capability capability;
     int location = 0;
 
     attr_p = &s_op->attr;
@@ -593,10 +593,10 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
         attr_p->dirdata_handles[0], s_op->req->u.remove.fs_id,
         location, req, LOCAL_OPERATION);
 
-    PINT_null_capability(&null_cap);
+    PINT_null_capability(&capability);
 
     PINT_SERVREQ_TREE_GETATTR_FILL(*req,
-        null_cap,
+        capability,
         s_op->req->u.remove.credential,
         s_op->req->u.remove.fs_id,
         0,
@@ -605,6 +605,8 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
         PVFS_ATTR_DIR_DIRENT_COUNT, /* only interested in dirent_count */
         0,
         s_op->req->hints);
+
+    PINT_cleanup_capability(&capability);
 
     return SM_ACTION_COMPLETE;
 }
@@ -639,6 +641,9 @@ static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
         }
     }
     js_p->error_code = 0;
+
+    /* free getattr_op (allocated as subordinate frame) */
+    PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(getattr_op);
 
     attr_p = &s_op->attr;
     assert(attr_p);
@@ -694,6 +699,10 @@ static PINT_sm_action remove_dirdata_handles_check_remove_success(
             return SM_ACTION_COMPLETE;
         }
     }
+
+    /* free remove_op (allocated as subordinate frame) */
+    PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(remove_op);
+
     return SM_ACTION_COMPLETE;
 }
 

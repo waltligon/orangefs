@@ -271,6 +271,8 @@ static PINT_sm_action get_user_cert_public_key_setup_msgpair(
         msg_p->svr_addr = sm_p->u.mgmt_get_user_cert.addr_array[i];
     }
 
+    PINT_cleanup_capability(&capability);
+
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
 
     return SM_ACTION_COMPLETE;
@@ -478,6 +480,8 @@ static PINT_sm_action get_user_cert_req_setup_msgpair(
         sm_p->u.mgmt_get_user_cert.enc_key_size,
         sm_p->u.mgmt_get_user_cert.enc_key,
         sm_p->u.mgmt_get_user_cert.exp);
+
+    PINT_cleanup_capability(&capability);
 
     msg_p->fs_id = sm_p->u.mgmt_get_user_cert.fs_id;
     msg_p->handle = PVFS_HANDLE_NULL;

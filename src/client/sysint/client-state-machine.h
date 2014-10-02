@@ -195,16 +195,14 @@ struct PINT_client_create_sm
     PINT_dist *dist;
     PVFS_sys_layout layout;
 
-    PVFS_handle metafile_handle;
-    int datafile_count;
-    PVFS_handle *datafile_handles;
-    int stuffed;
     PVFS_object_attr store_attr;
 
     int dirent_file_count;
     PVFS_handle *dirent_handle;
 
     PVFS_handle handles[2];
+
+    struct PVFS_servresp_create server_resp; /* data returned from the server request */
 };
 
 struct PINT_client_mkdir_sm
