@@ -27,10 +27,11 @@
 
 /* Forward declarations of non-native functions */
 static char *combine(char* s1, char* s2, char* dest);
-static int fill_dirent(JNIEnv *env, struct dirent *ptr, jobject *inst);
 static int get_comb_len(char* s1, char* s2);
 static int get_groupname_by_gid(gid_t gid, char *groupname);
 static int get_username_by_uid(uid_t uid, char *username);
+static int get_gid_by_groupname(gid_t *gid, char *groupname);
+static int get_uid_by_username(uid_t *uid, char *username);
 static inline int is_dot_dir(char * dirent_name);
 static inline int is_lostfound_dir(char * dirent_name);
 /* TODO: relocate recursive delete related functions so other utilities can
@@ -47,49 +48,6 @@ static char *combine(char* s1, char* s2, char* dest)
     strcat(dest, s1);
     strcat(dest, "/");
     return strcat(dest, s2);
-}
-
-/* Convert allocated struct DIR to an instance of our Dirent Class */
-static int fill_dirent(JNIEnv *env, struct dirent *ptr, jobject *inst)
-{
-    int num_fields = 5;
-    char *field_names[] =
-    {
-        "d_ino", "d_off", "d_reclen", "d_type", "d_name" };
-    char *field_types[] =
-    {
-        "J", "J", "I", "Ljava/lang/String;", "Ljava/lang/String;" };
-    jfieldID fids[num_fields];
-    char *cls_name = "org/orangefs/usrint/Dirent";
-    jclass cls = (*env)->FindClass(env, cls_name);
-    if (!cls)
-    {
-        JNI_ERROR("invalid class: %s\n", cls_name);
-        return -1;
-    }
-    int fid_index = 0;
-    for (; fid_index < num_fields; fid_index++)
-    {
-        fids[fid_index] = (*env)->GetFieldID(env, cls, field_names[fid_index],
-                field_types[fid_index]);
-        if (!fids[fid_index])
-        {
-            JNI_ERROR("invalid field requested: %s\n", field_names[fid_index]);
-            return -1;
-        }
-    }
-    *inst = (*env)->AllocObject(env, cls);
-
-    /* Load object with data from structure using
-     * constructor or set methods.
-     */
-    (*env)->SetLongField(env, *inst, fids[0], ptr->d_ino);
-    (*env)->SetLongField(env, *inst, fids[1], ptr->d_off);
-    (*env)->SetIntField(env, *inst, fids[2], ptr->d_reclen);
-    (*env)->SetCharField(env, *inst, fids[3], (char) ptr->d_type);
-    jstring d_name_string = (*env)->NewStringUTF(env, ptr->d_name);
-    (*env)->SetObjectField(env, *inst, fids[4], d_name_string);
-    return 0;
 }
 
 /** Return the length of the resulting string assuming s1 and s2 will be
@@ -123,6 +81,64 @@ static int get_username_by_uid(uid_t uid, char *username)
         return -1;
     }
     strcpy(username, pwdp->pw_name);
+    return 0;
+}
+
+static int get_gid_by_groupname(gid_t *gid, char *groupname)
+{
+    JNI_PFI();
+    struct group *groupp = NULL;
+
+    /* Check for NULL ptr */
+    if (!gid)
+    {
+    	JNI_ERROR("gid is NULL!\n");
+    	return -1;
+    }
+
+    /* Get "struct group" using groupname */
+    groupp = getgrnam(groupname);
+    if (groupp == NULL )
+    {
+        JNI_PERROR();
+        return -1;
+    }
+
+    /* set value referenced by gid pointer equal to
+     * gr_gid of "struct group" */
+    *gid = groupp->gr_gid;
+    JNI_PRINT("gid of groupname(%s) = %d\n", groupname, (int) *gid);
+
+    /* Return 0 on success */
+    return 0;
+}
+
+static int get_uid_by_username(uid_t *uid, char *username)
+{
+    JNI_PFI();
+    struct passwd *pwdp = NULL;
+
+    /* Check for NULL ptr */
+    if(!uid)
+    {
+    	JNI_ERROR("uid is NULL!\n");
+    	return -1;
+    }
+
+    /* Get "struct passwd" using username */
+    pwdp = getpwnam(username);
+    if (pwdp == NULL )
+    {
+        JNI_PERROR();
+        return -1;
+    }
+
+    /* set value referenced by uid pointer equal to
+     * pw_uid of "struct passwd" */
+    *uid = pwdp->pw_uid;
+    JNI_PRINT("uid of username(%s) = %d\n", username, (int) *uid);
+
+    /* Return 0 on success */
     return 0;
 }
 
@@ -383,29 +399,18 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fdopen(JNIEnv *env, jobject obj, jint fd,
 }
 
 /* fdopendir */
-JNIEXPORT jobject JNICALL
+JNIEXPORT jlong JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_fdopendir(JNIEnv *env, jobject obj,
         jint fd)
 {
     JNI_PFI();
-    JNI_PRINT("fd = %d\n", (int) fd);
-    struct dirent *dir;
-    jobject dir_obj = (jobject) 0;
-    dir = (struct dirent *) fdopendir((int) fd);
+    DIR *dir = fdopendir(fd);
     if (dir == NULL )
     {
         JNI_PERROR();
-        return dir_obj;
+        return (jlong) NULL;
     }
-    if (fill_dirent(env, dir, &dir_obj) != 0)
-    {
-        JNI_ERROR("fill_dirent failed");
-    }
-    if(dir)
-    {
-        free(dir);
-    }
-    return dir_obj;
+    return (jlong) dir;
 }
 
 /* feof */
@@ -877,6 +882,10 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fseek(JNIEnv *env, jobject obj,
         jlong stream, jlong offset, jlong whence)
 {
     JNI_PFI();
+    JNI_PRINT("stream = %llu\noffset = %llu\nwhence = %llu\n",
+              (long long unsigned int) stream,
+              (long long unsigned int) offset,
+              (long long unsigned int) whence);
     jint ret = (jint) fseek((FILE *) stream, (long) offset, (int) whence);
     if (ret != 0)
     {
@@ -1181,39 +1190,78 @@ error_out:
     return objArrayList;
 }
 
-JNIEXPORT jobjectArray JNICALL
-Java_org_orangefs_usrint_PVFS2STDIOJNI_getUsernameGroupname(JNIEnv *env,
-        jobject obj, jint uid, jint gid)
+JNIEXPORT jstring JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_getGroupname(JNIEnv *env,
+        jobject obj, jint gid)
 {
     JNI_PFI();
     int ret = 0;
-    jobjectArray obj_ret = (jobjectArray) (jobject) 0;
-    char username[MAX_USERNAME_LENGTH + 1];
     char groupname[MAX_GROUPNAME_LENGTH + 1];
-
-    ret = get_username_by_uid(uid, username);
-    if (ret != 0)
-    {
-        return obj_ret;
-    }
-    JNI_PRINT("uid, username = <%u, %s>\n", uid, username);
 
     ret = get_groupname_by_gid(gid, groupname);
     if (ret != 0)
     {
-        return obj_ret;
+        return NULL_JOBJECT;
     }
     JNI_PRINT("gid, groupname = <%u, %s>\n", gid, groupname);
+    return (*env)->NewStringUTF(env, groupname);
+}
 
-    obj_ret = (*env)->NewObjectArray(env, (jsize) 2,
-            (*env)->FindClass(env, "java/lang/String"),
-            (*env)->NewStringUTF(env, ""));
+JNIEXPORT jstring JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_getUsername(JNIEnv *env,
+        jobject obj, jint uid)
+{
+    JNI_PFI();
+    int ret = 0;
+    char username[MAX_USERNAME_LENGTH + 1];
 
-    (*env)->SetObjectArrayElement(env, obj_ret, 0,
-            (*env)->NewStringUTF(env, username));
-    (*env)->SetObjectArrayElement(env, obj_ret, 1,
-            (*env)->NewStringUTF(env, groupname));
-    return obj_ret;
+    ret = get_username_by_uid(uid, username);
+    if (ret != 0)
+    {
+        return NULL_JOBJECT;
+    }
+    JNI_PRINT("uid, username = <%u, %s>\n", uid, username);
+    return (*env)->NewStringUTF(env, username);
+}
+
+JNIEXPORT jint JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_getGid(JNIEnv *env,
+        jobject obj, jstring groupname)
+{
+    JNI_PFI();
+    int ret = 0;
+    char cgroupname[MAX_GROUPNAME_LENGTH + 1];
+    int cgroupname_len = (*env)->GetStringLength(env, groupname);
+    (*env)->GetStringUTFRegion(env, groupname, 0, cgroupname_len, cgroupname);
+
+    gid_t gid;
+    ret = get_gid_by_groupname(&gid, cgroupname);
+    if (ret != 0)
+    {
+        return (jint) -1;
+    }
+    JNI_PRINT("gid, groupname = <%u, %s>\n", gid, cgroupname);
+    return (jint) gid;
+}
+
+JNIEXPORT jint JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_getUid(JNIEnv *env,
+        jobject obj, jstring username)
+{
+    JNI_PFI();
+    int ret = 0;
+    char cusername[MAX_USERNAME_LENGTH + 1];
+    int cusername_len = (*env)->GetStringLength(env, username);
+    (*env)->GetStringUTFRegion(env, username, 0, cusername_len, cusername);
+
+    uid_t uid;
+    ret = get_uid_by_username(&uid, cusername);
+    if (ret != 0)
+    {
+        return (jint) -1;
+    }
+    JNI_PRINT("uid, username = <%u, %s>\n", uid, cusername);
+    return (jint) 0;
 }
 
 /* getw */
@@ -1270,32 +1318,23 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_mkstemp(JNIEnv *env, jobject obj,
 }
 
 /* opendir */
-JNIEXPORT jobject JNICALL
+JNIEXPORT jlong JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_opendir(JNIEnv *env, jobject obj,
         jstring name)
 {
     JNI_PFI();
-    struct dirent *dir;
-    jobject dir_obj = (jobject) 0;
+    DIR *dir;
     char cname[PVFS_NAME_MAX];
     int cname_len = (*env)->GetStringLength(env, name);
     (*env)->GetStringUTFRegion(env, name, 0, cname_len, cname);
     JNI_PRINT("name = %s\n", cname);
-    dir = (struct dirent *) opendir(cname);
+    dir = opendir(cname);
     if (dir == NULL )
     {
         JNI_PERROR();
-        return dir_obj;
+        return (jlong) NULL;
     }
-    if (fill_dirent(env, dir, &dir_obj) != 0)
-    {
-        JNI_ERROR("fill_dirent failed");
-    }
-    if(dir)
-    {
-        free(dir);
-    }
-    return dir_obj;
+    return (jlong) dir;
 }
 
 /* putc */

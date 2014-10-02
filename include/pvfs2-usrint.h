@@ -48,6 +48,7 @@
 #include <sys/statvfs.h>
 #include <sys/time.h>
 #include <sys/vfs.h>
+#include <sys/uio.h>
 
 /* define open flags unique to PVFS here */
 #define O_HINTS     02000000  /* PVFS hints are present */

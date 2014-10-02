@@ -9,7 +9,8 @@ OSRC := \
 	$(DIR)/iocommon.c \
 	$(DIR)/request.c \
 	$(DIR)/ucache.c \
-	$(DIR)/posix-pvfs.c 
+	$(DIR)/posix-pvfs.c  \
+	$(DIR)/env-vars.c
 
 #   these routines don't need pvfs implementation and will
 #   probably be removed

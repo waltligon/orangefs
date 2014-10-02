@@ -1203,6 +1203,23 @@ main() {void *p = dlsym(RTLD_DEFAULT,"sym");}
     LIBS="$LIBS -ldl"
 ])
 
+dnl Method to enable user environment variable support
+BUILD_USER_ENV_VARS=
+AC_ARG_ENABLE(user-env-vars,
+[  --enable-user-env-vars         Enables usrint environment variable support.],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_USER_ENV_VARS_ENABLED, 1,
+      [Should we enable user environment variables.])
+   BUILD_USER_ENV_VARS=1
+else
+   AC_DEFINE(PVFS_USER_ENV_VARS_ENABLED, 0,
+      [Should we enable user environment variables.])
+fi
+AC_SUBST(BUILD_USER_ENV_VARS)],
+[AC_DEFINE(PVFS_USER_ENV_VARS_ENABLED, 0,
+    [Should we enable user environment variables.])
+AC_SUBST(BUILD_USER_ENV_VARS)])
+
 dnl Method to enable user interface data cache
 BUILD_UCACHE=
 AC_ARG_ENABLE(ucache,
@@ -1250,6 +1267,12 @@ AC_ARG_ENABLE(
             if test "x$JAVA_HOME" = "x"; then
                 AC_MSG_ERROR(--enable-jni must be used in conjunction with --with-jdk=jdk_path.)
             fi
+
+            AC_CHECK_PROG(HAVE_MAVEN, mvn, yes, no)
+            if test $HAVE_MAVEN = "no"; then
+                AC_MSG_ERROR("maven (mvn) required in PATH to complete JNI client build")
+            fi
+
             AC_DEFINE(PVFS_JNI_ENABLE, 1,
                 [Should we enable PVFS Client JNI.])
             BUILD_JNI=1
@@ -1263,50 +1286,6 @@ AC_ARG_ENABLE(
     ]
 )
 AC_SUBST(BUILD_JNI)
-
-HADOOP_PREFIX=
-AC_ARG_WITH(
-    hadoop,
-    [  --with-hadoop=<path>    Enables support for OrangeFS extensions of Hadoop classes.],
-    [
-        HADOOP_PREFIX=$withval;
-        corepath=`ls $withval/hadoop-core*`
-        AC_CHECK_FILE($corepath,
-            [],
-            [
-                AC_MSG_ERROR(could not locate $withval/hadoop-core-*.jar at the path given with --with-hadoop.)
-            ]
-        )
-    ],
-    [   with_hadoop=no]
-)
-AC_SUBST(HADOOP_PREFIX)
-
-dnl Method to enable OrangeFS extensions to Hadoop classes.
-BUILD_HADOOP=
-AC_ARG_ENABLE(
-    hadoop,
-    [  --enable-hadoop         Enables OrangeFS extenions of Hadoop classes. Requires --enable-jni --with-jdk and --with-hadoop.],
-    [   if test "x$enableval" = "xyes" ; then
-            if test "x$HADOOP_PREFIX" = "x"; then
-                AC_MSG_ERROR(--enable-hadoop must be used in conjunction with --with-hadoop=path.)
-            fi
-            if test "$BUILD_JNI" != "1"; then
-                AC_MSG_ERROR(--enable-hadoop must be used in conjunction with --enable-jni.)
-            fi
-            AC_DEFINE(PVFS_HADOOP_ENABLE, 1,
-                [Should we enable OrangeFS extensions of Hadoop classes.])
-            BUILD_HADOOP=1
-        else
-            AC_DEFINE(PVFS_HADOOP_ENABLE, 0,
-                [Should we enable OrangeFS extensions of Hadoop classes.])
-        fi
-    ],
-    [   AC_DEFINE(PVFS_HADOOP_ENABLE, 0,
-            [Should we enable OrangeFS extensions of Hadoop classes.])
-    ]
-)
-AC_SUBST(BUILD_HADOOP)
 
 dnl See if we have includes needed for acls
 BUILD_ACL_INTERFACE=
@@ -1845,6 +1824,7 @@ src/common/events/module.mk
 src/common/mgmt/module.mk
 src/common/security/module.mk
 src/common/hash/module.mk
+src/common/token-utils/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
@@ -2016,6 +1996,12 @@ else
    AC_MSG_RESULT([PVFS2 symbolic libraries will be built            :  no])
 fi
 
+if test "x$BUILD_USER_ENV_VARS" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 user environment variables enabled          : yes])
+else
+   AC_MSG_RESULT([PVFS2 user environment variables enabled          :  no])
+fi
+
 if test "x$BUILD_UCACHE" = "x1" ; then
    AC_MSG_RESULT([PVFS2 user interface library cache enabled        : yes])
 else
@@ -2032,12 +2018,6 @@ if test "x$BUILD_JNI" = "x1" ; then
    AC_MSG_RESULT([PVFS2 client JNI enabled                          : yes])
 else
    AC_MSG_RESULT([PVFS2 client JNI enabled                          :  no])
-fi
-
-if test "x$BUILD_HADOOP" = "x1" ; then
-   AC_MSG_RESULT([OrangeFS/Hadoop libraries enabled                 : yes])
-else
-   AC_MSG_RESULT([OrangeFS/Hadoop libraries enabled                 :  no])
 fi
 
 else
