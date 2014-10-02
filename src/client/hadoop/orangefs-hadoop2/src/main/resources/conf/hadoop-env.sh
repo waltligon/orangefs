@@ -35,7 +35,7 @@ export MALLOC_ARENA_MAX=4
 export HADOOP_CONF_DIR=${HADOOP_CONF_DIR:-"/etc/hadoop"}
 
 #Custom Additions for OrangeFS
-export ORANGEFS_PREFIX=/opt/orangefs-denton.hadoop2.trunk
+export ORANGEFS_PREFIX=/opt/orangefs-trunk
 export LD_LIBRARY_PATH=$ORANGEFS_PREFIX/lib
 export JNI_LIBRARY_PATH=$ORANGEFS_PREFIX/lib
 export PVFS2TAB_FILE=/tmp/orangefs_hadoop_storage/pvfs2tab
