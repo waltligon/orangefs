@@ -229,6 +229,8 @@ static int flush_datafile_setup_msgpairarray(
         }
     }
 
+    PINT_cleanup_capability(&capability);
+
     ret = PINT_serv_msgpairarray_resolve_addrs(&sm_p->msgarray_op);
     if (ret)
     {

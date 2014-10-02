@@ -672,6 +672,9 @@ static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
         msg_p->comp_fn = server_fetch_config_comp_fn;
         msg_p->svr_addr = sm_p->fetch_config.addr_array[i];
     }
+
+    PINT_cleanup_capability(&capability);
+
     /* don't complain so much about servers we can't reach yet */
     sm_p->msgarray_op.params.quiet_flag = 1; 
 

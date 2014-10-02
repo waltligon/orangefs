@@ -326,6 +326,7 @@ int PINT_security_cache_ca_cert(void)
     ret = PINT_certcache_insert(pcert, 0, 1, group_array);
 
     PINT_cleanup_cert(pcert);
+    free(pcert);
 
     return ret;
 }

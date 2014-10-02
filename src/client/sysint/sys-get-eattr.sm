@@ -192,6 +192,8 @@ static PINT_sm_action get_eattr_setup_msgpair(
         sm_p->u.geteattr.size_array,
         sm_p->hints);
 
+    PINT_cleanup_capability(&capability);
+
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;

@@ -5,13 +5,48 @@
  */
 
 /* for POSIX strerror_r */
+/* Save _XOPEN_SOURCE */
+#ifdef _XOPEN_SOURCE
+#if _XOPEN_SOURCE < 600
+#define _SAVE_XOPEN_SOURCE _XOPEN_SOURCE
+#undef _XOPEN_SOURCE
 #define _XOPEN_SOURCE 600
+#endif
+#else
+#define _XOPEN_SOURCE 600
+#endif
+
+#ifdef _GNU_SOURCE
+#define _SAVE_GNU_SOURCE _GNU_SOURCE
 #undef _GNU_SOURCE
+#endif
+
+#ifdef __USE_GNU
+#define _SAVE__USE_GNU __USE_GNU
+#undef __USE_GNU
+#endif
+
+#include <string.h>
+
+/* Restore macros */
+#ifdef _SAVE__USE_GNU
+#undef __USE_GNU
+#define __USE_GNU _SAVE__USE_GNU
+#endif
+
+#ifdef _SAVE_GNU_SOURCE
+#undef _GNU_SOURCE
+#define _GNU_SOURCE _SAVE_GNU_SOURCE
+#endif
+
+#ifdef _SAVE_XOPEN_SOURCE
+#undef _XOPEN_SOURCE
+#define _XOPEN_SOURCE _SAVE_XOPEN_SOURCE
+#endif
 
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "pvfs2-internal.h"
 #include "pvfs2-util.h"

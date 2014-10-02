@@ -1357,7 +1357,7 @@ AC_ARG_WITH(efence,
        if test "x$withval" != "xyes" ; then
               LDFLAGS="${LDFLAGS} -L$withval"
        fi
-       AC_CHECK_LIB(efence,malloc)
+       AC_CHECK_LIB(efence,malloc,,,-lpthread)
 )
 
 dnl Use compiled-in valgrind annotations?  Give the header path if

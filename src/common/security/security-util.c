@@ -236,7 +236,7 @@ void PINT_cleanup_capability(PVFS_capability *cap)
         {
             free(cap->signature);
         }
-        if (cap->issuer)
+        if (cap->issuer && (cap->issuer != PVFS2_BLANK_ISSUER))
         {
             free(cap->issuer);
         }

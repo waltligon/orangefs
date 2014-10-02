@@ -160,10 +160,16 @@ static int PINT_capcache_compare(void * data,
  */
 static void PINT_capcache_cleanup(void *entry)
 {
-    if (entry != NULL && ((seccache_entry_t *) entry)->data != NULL)
+    if (entry != NULL)
     {
-        PINT_cleanup_capability((PVFS_capability *) 
-                                 ((seccache_entry_t *)entry)->data);
+        if (((seccache_entry_t *) entry)->data != NULL)
+        {
+            PINT_cleanup_capability((PVFS_capability *) 
+                                    ((seccache_entry_t *)entry)->data);
+            free(((seccache_entry_t *)entry)->data);
+        }
+        free(entry);
+        entry = NULL;
     }
 }
 

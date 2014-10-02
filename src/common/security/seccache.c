@@ -35,12 +35,14 @@
 #define LOCK_LOCK_NULL(__lock) __LOCK_LOCK(__lock, NULL)
 
 /* note: log a warning but do not exit calling function */
-#define LOCK_UNLOCK(__lock) do { \
-                                if (lock_unlock((__lock)) != 0) \
-                                { \
-                                    gossip_err("Warning: could not unlock cache lock\n"); \
-                                } \
-                            } while (0)
+#define LOCK_UNLOCK(__lock) \
+ do { \
+     if (lock_unlock((__lock)) != 0) \
+     { \
+         gossip_err("%s: warning: could not unlock cache lock\n", \
+                    __func__); \
+     } \
+ } while (0)
 
 
 /*** internal functions ***/
@@ -197,8 +199,6 @@ static int PINT_seccache_rm_expired_entries(seccache_t *cache,
             cache->methods.debug("*** Removing", rem_entry->data);
 
             cache->methods.cleanup(rem_entry);
-
-            free(rem_entry);
 
             cache->stats.removed++;
             cache->stats.entry_count--;
@@ -658,9 +658,9 @@ int PINT_seccache_remove(seccache_t *cache,
         gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: %s cache - removed entry %p @ "
                      "index %u\n", __func__, cache->desc, rem_entry, index);
 
+        /* frees the data and entry */
         cache->methods.cleanup(rem_entry);
 
-        free(rem_entry);
         cache->stats.removed++;
         cache->stats.entry_count--;
     }

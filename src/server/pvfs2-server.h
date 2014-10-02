@@ -530,6 +530,8 @@ struct PINT_server_mkdir_op
     PVFS_fs_id fs_id;
     PVFS_handle_extent_array handle_extent_array;
     PVFS_size init_dirdata_size;
+    PVFS_capability *saved_capability;
+    PVFS_object_attr *saved_attr;
 
     /* dist-dir-struct
      * not in resp, only return meta handle
@@ -738,6 +740,12 @@ typedef struct PINT_server_op
         memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op)); \
         PINT_serv_init_msgarray_params(__s_op, __fs_id); \
       } \
+    } while (0)
+
+#define PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(__s_op) \
+    do { \
+        PINT_cleanup_capability(&__s_op->req->capability); \
+        free(__s_op); \
     } while (0)
 
 /* state machine permission function */

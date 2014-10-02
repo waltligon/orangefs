@@ -1410,7 +1410,8 @@ static PINT_sm_action crdirent_find_split_entries(
         {
             PINT_sm_msgpair_state *msg_p = &(msgarray_op->msgarray[i]);
 
-            PINT_SERVREQ_MGMT_SPLIT_DIRENT_FILL(msg_p->req, s_op->u.crdirent.capability,
+            PINT_SERVREQ_MGMT_SPLIT_DIRENT_FILL(msg_p->req, 
+                     s_op->u.crdirent.capability,
                      s_op->req->u.crdirent.fs_id,
                      s_op->attr.dirdata_handles[s_op->u.crdirent.split_node],
                      s_op->u.crdirent.dist,
@@ -1586,7 +1587,8 @@ static PINT_sm_action crdirent_split_remove_entries(
             PINT_sm_msgpair_state *msg_p = &(msgarray_op->msgarray[i]);
 
             /* Capability was initialized earlier. */
-            PINT_SERVREQ_MGMT_SPLIT_DIRENT_FILL(msg_p->req, s_op->u.crdirent.capability,
+            PINT_SERVREQ_MGMT_SPLIT_DIRENT_FILL(msg_p->req,
+                     s_op->u.crdirent.capability,
                      s_op->req->u.crdirent.fs_id,
                      s_op->attr.dirdata_handles[s_op->u.crdirent.split_node],
                      s_op->u.crdirent.dist,
