@@ -1179,7 +1179,7 @@ class OFSTestNode(object):
                 "/sbin/SuSEfirewall2 off",
                 # prereqs should be installed as part of the image. Thanx SuseStudio!
                 #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs "nano openssl
-                "zypper --non-interactive install patch libuuid1 uuid-devel gdb maven",
+                "zypper --non-interactive install patch libuuid1 uuid-devel gdb maven java-1.7.0-openjdk java-1.7.0-openjdk-devel",
                 "zypper --non-interactive install openldap2 openldap2-client openldap-servers libldap2_4-2 openldap2-devel",
                 "chown -R ldap:ldap /var/lib/ldap",
                 
@@ -1190,7 +1190,7 @@ class OFSTestNode(object):
                 "ln -s /lib/modules/\\`uname -r\\`/build/Module.symvers /lib/modules/\\`uname -r\\`/source",
                 "if [ ! -f /lib/modules/\\`uname -r\\`/build/include/linux/version.h ] then; ln -s include/generated/uapi/version.h /lib/modules/\\`uname -r\\`/build/include/linux/version.h; fi",
             
-                "yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user,
+                #"yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user,
                 "/sbin/modprobe -v fuse",
                 "chmod a+x /bin/fusermount",
                 "chmod a+r /etc/fuse.conf",
@@ -1231,7 +1231,7 @@ class OFSTestNode(object):
                 "yum -y install openldap openldap-clients openldap-servers openldap-servers-sql compat-openldap",
                 "chown -R ldap:ldap /var/lib/ldap",
                 # install java
-                "yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user,
+                #"yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user,
                 "/sbin/modprobe -v fuse",
                 "chmod a+x /bin/fusermount",
                 "chmod a+r /etc/fuse.conf",
