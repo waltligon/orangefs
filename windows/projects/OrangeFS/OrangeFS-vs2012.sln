@@ -300,11 +300,12 @@ Global
 		{334A80F7-0F06-4C17-9A32-975C4ABA30AA}.MemLeaks|Win32.ActiveCfg = Debug|Win32
 		{334A80F7-0F06-4C17-9A32-975C4ABA30AA}.MemLeaks|x64.ActiveCfg = Debug|Win32
 		{334A80F7-0F06-4C17-9A32-975C4ABA30AA}.Release|Win32.ActiveCfg = Release|Win32
-		{334A80F7-0F06-4C17-9A32-975C4ABA30AA}.Release|x64.ActiveCfg = Release|Win32
+		{334A80F7-0F06-4C17-9A32-975C4ABA30AA}.Release|x64.ActiveCfg = Release|x64
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Debug|Win32.ActiveCfg = Debug|Win32
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Debug|Win32.Build.0 = Debug|Win32
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Debug|x64.ActiveCfg = Debug|x64
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Debug|x64.Build.0 = Debug|x64
+		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Debug|x64.Deploy.0 = Debug|x64
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.MemLeaks|Win32.ActiveCfg = Release|Win32
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.MemLeaks|Win32.Build.0 = Release|Win32
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.MemLeaks|x64.ActiveCfg = Release|Win32
@@ -312,6 +313,7 @@ Global
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Release|Win32.Build.0 = Release|Win32
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Release|x64.ActiveCfg = Release|x64
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Release|x64.Build.0 = Release|x64
+		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Release|x64.Deploy.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

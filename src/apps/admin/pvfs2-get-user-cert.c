@@ -1,5 +1,5 @@
 /*
- * (C) 2013 Clemson University and Omnibond Systems LLC
+ * (C) 2013-2014 Clemson University and Omnibond Systems LLC
  *
  * See COPYING in top-level directory.
  *
@@ -14,6 +14,7 @@
 #else
 #include <Windows.h>
 #include <lmcons.h>
+#include <UserEnv.h>
 #endif
 #include <stdlib.h>
 #include <stdio.h>
@@ -44,6 +45,13 @@ struct options {
 #define EAT_WS(str)    while (*str && (*str == ' ' || \
                               *str == '\t')) \
                            str++
+
+#ifdef WIN32
+#define DEFAULT_KEYFILE          "\\orangefs-cert-key.pem"
+#define DEFAULT_KEYFILE_LEN      22
+#define DEFAULT_CERTFILE         "\\orangefs-cert.pem"
+#define DEFAULT_CERTFILE_LEN     18
+#endif
 
 struct user_info {
 #ifndef WIN32
@@ -273,14 +281,52 @@ int get_file_paths(const struct user_info *user_info,
 
     fclose(f);
 
-    if (strlen(conf_keypath) == 0)
+    if (strlen(conf_keypath) == 0 || strlen(conf_certpath) == 0)
     {
-        /* TODO: default--use profile dir? */
-    }
+        /* default--use profile dir for files */
+        HANDLE h_token = INVALID_HANDLE_VALUE;
+        char profile_dir[MAX_PATH];
+        DWORD size = MAX_PATH;
 
-    if (strlen(conf_certpath) == 0)
-    {
-        /* TODO: default? */
+        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &h_token))
+        {
+            fprintf(stderr, "OpenProcessToken error: %d\n", GetLastError());
+            return -PVFS_EINVAL;
+        }
+
+        if (!GetUserProfileDirectory(h_token, profile_dir, &size))
+        {
+            fprintf(stderr, "GetUserProfileDirectory error: %d\n", GetLastError());
+            CloseHandle(h_token);
+            return -PVFS_EINVAL;
+        }
+
+        CloseHandle(h_token);
+        
+        if (strlen(conf_keypath) == 0)
+        {
+            if (strlen(profile_dir) + DEFAULT_KEYFILE_LEN + 1 > MAX_PATH)
+            {
+                fprintf(stderr, "Profile directory path is too long\n");
+                return -PVFS_ENAMETOOLONG; /* TODO */
+            }
+
+            strcpy(conf_keypath, profile_dir);
+            strcat(conf_keypath, DEFAULT_KEYFILE);
+        }
+
+        if (strlen(conf_certpath) == 0)
+        {
+            if (strlen(profile_dir) + DEFAULT_CERTFILE_LEN + 1 > MAX_PATH)
+            {
+                fprintf(stderr, "Profile directory path is too long\n");
+                return -PVFS_ENAMETOOLONG; /* TODO */
+            }
+
+            strcpy(conf_certpath, profile_dir);
+            strcat(conf_certpath, DEFAULT_CERTFILE);
+        }
+
     }
 
     /* get security paths */
