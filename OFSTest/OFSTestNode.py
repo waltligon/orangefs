@@ -1110,7 +1110,7 @@ class OFSTestNode(object):
                 " bash -c 'echo 0 > /selinux/enforce'",
                 "DEBIAN_FRONTEND=noninteractive apt-get update", 
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
-                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-\\`uname -r\\` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime gdb maven", 
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-\\`uname -r\\` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime gdb maven openjdk-7-jdk openjdk-7-jre openjdk-7-jre-lib", 
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q libfuse2 fuse-utils libfuse-dev",
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q autofs nfs-kernel-server rpcbind nfs-common nfs-kernel-server", 
                 # needed for Ubuntu 10.04
@@ -1151,7 +1151,7 @@ class OFSTestNode(object):
                 "apt-get update ",
                 "bash -c 'echo debconf shared/accepted-oracle-license-v1-1 select true | debconf-set-selections'",
                 "bash -c 'echo debconf shared/accepted-oracle-license-v1-1 seen true | debconf-set-selections'",
-                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q oracle-java6-installer "
+                #"DEBIAN_FRONTEND=noninteractive apt-get install -y -q oracle-java6-installer "
             ]
             
             
@@ -1162,7 +1162,7 @@ class OFSTestNode(object):
 
             
             # ubuntu installs java to a different location than RHEL and SuSE 
-            self.jdk6_location = "/usr/lib/jvm/java-6-oracle"
+            self.jdk6_location = "/usr/lib/jvm/java-7-openjdk-amd64"
             
             
         elif "suse" in self.distro.lower():
@@ -1170,7 +1170,7 @@ class OFSTestNode(object):
                         # download Java 6
             print "Installing required software for SuSE based system %s" % self.distro
         
-            rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
+            #rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
             if rc != 0:
                 logging.exception(output)
                 return rc
@@ -1227,7 +1227,7 @@ class OFSTestNode(object):
             install_commands = [
                 "bash -c 'echo 0 > /selinux/enforce'",
                 
-                "yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-\\`uname -r\\` kernel-headers-\\`uname -r\\` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel openldap openldap-devel openldap-clients gdb nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl wget maven",
+                "yum -y install gcc gcc-c++ gcc-gfortran openssl fuse flex bison openssl-devel kernel-devel-\\`uname -r\\` kernel-headers-\\`uname -r\\` perl make subversion automake autoconf zip fuse fuse-devel fuse-libs wget patch bzip2 libuuid libuuid-devel uuid uuid-devel openldap openldap-devel openldap-clients gdb nfs-utils nfs-utils-lib nfs-kernel nfs-utils-clients rpcbind libtool libtool-ltdl wget maven java-1.7.0-openjdk java-1.7.0-openjdk-devel",
                 "yum -y install openldap openldap-clients openldap-servers openldap-servers-sql compat-openldap",
                 "chown -R ldap:ldap /var/lib/ldap",
                 # install java
