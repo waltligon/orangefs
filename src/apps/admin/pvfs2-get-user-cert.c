@@ -333,8 +333,7 @@ int get_file_paths(const struct user_info *user_info,
     ret = PINT_get_security_path(conf_keypath, user_info->userid, 
         keypath, MAX_PATH);
     if (ret != 0)
-    {
-        /* TODO: use pvfs_perror? */
+    {        
         fprintf(stderr, "Could not process path: %s (%d)\n", conf_keypath,
             ret);
         return ret;
@@ -343,8 +342,7 @@ int get_file_paths(const struct user_info *user_info,
     ret = PINT_get_security_path(conf_certpath, user_info->userid, 
         certpath, MAX_PATH);
     if (ret != 0)
-    {
-        /* TODO: use pvfs_perror? */
+    {        
         fprintf(stderr, "Could not process path: %s (%d)\n", conf_keypath,
             ret);
         return ret;
@@ -390,29 +388,20 @@ int get_user_info(struct user_info *user_info)
  *
  * Write user cert and private key to disk.
  */
-int store_cert_and_key(PVFS_certificate *cert, PVFS_security_key *key)
+int store_cert_and_key(struct user_info *user_info, PVFS_certificate *cert, PVFS_security_key *key)
 {
     X509 *xcert = NULL;
     RSA *rsa_privkey;
     PVFS_key_data keybuf;
     EVP_PKEY *privkey;
     char keypath[MAX_PATH], certpath[MAX_PATH];
-    struct user_info user_info;
     int ret;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: storing user cert and key\n", 
                  __func__);
 
-    /* retrieve user information struct */
-    ret = get_user_info(&user_info);
-    if (ret != 0)
-    {
-        gossip_err("Error: could not retrieve user info: %d\n", ret);
-        return ret;
-    }
-
     /* get paths */
-    ret = get_file_paths(&user_info, keypath, certpath);
+    ret = get_file_paths(user_info, keypath, certpath);
     if (ret != 0)
     {
         fprintf(stderr, "Could not get key/certificate file path (%d)\n", ret);
@@ -655,19 +644,19 @@ int main(int argc, char **argv)
         scanf("%[^\r\n]%*c", userid);
 
         /* use default */
-        if (strlen(userid) == 0)
+        if (strlen(userid) != 0)
         {
-            strcpy(userid, user_info.userid);
+            strcpy(user_info.userid, userid);
         }
     }
 
-    if (strlen(userid) == 0)
+    if (strlen(user_info.userid) == 0)
     {
         fprintf(stderr, "No username specified... exiting\n");
         goto exit_main;
     }
 
-    printf("Using username %s...\n", userid);
+    printf("Using username %s...\n", user_info.userid);
 
     /* prompt for password */
     EVP_read_pw_string(pwd, USERID_PWD_LIMIT, "Enter file system password: ", 0);
@@ -790,11 +779,11 @@ int main(int argc, char **argv)
 
     /* send get-user-cert request */
     ret = PVFS_mgmt_get_user_cert(tab->mntent_array[fs_num].fs_id,
-                                  userid, pwd, (uint32_t) addr_count,
+                                  user_info.userid, pwd, (uint32_t) addr_count,
                                   addr_array, &cert, &privkey, options.exp);
     if (ret == 0)
     {
-        ret = store_cert_and_key(&cert, &privkey);
+        ret = store_cert_and_key(&user_info, &cert, &privkey);
     }
     else
     {
