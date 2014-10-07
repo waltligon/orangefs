@@ -34,8 +34,10 @@
 #include "security-util.h"
 
 struct options {
-    char *userid;
+    char *fs_userid;
     uint32_t exp;
+    char *keypath;
+    char *certpath;
 };
 
 #ifndef MAX_PATH
@@ -50,11 +52,13 @@ struct options {
                            str++
 
 #ifdef WIN32
-#define DEFAULT_KEYFILE          "\\orangefs-cert-key.pem"
-#define DEFAULT_KEYFILE_LEN      22
-#define DEFAULT_CERTFILE         "\\orangefs-cert.pem"
-#define DEFAULT_CERTFILE_LEN     18
+#define DEFAULT_KEYFILE          "orangefs-cert-key.pem"
+#define DEFAULT_KEYFILE_LEN      21
+#define DEFAULT_CERTFILE         "orangefs-cert.pem"
+#define DEFAULT_CERTFILE_LEN     17
 #endif
+
+int get_current_userid(char *userid, int buflen);
 
 void sec_error(const char *msg, int err)
 {
@@ -152,12 +156,60 @@ static FILE *open_config_file(void)
 }
 #endif /* WIN32 */
 
+/* return path with filename appended to current user's profile directory */
+int get_default_path(const char *filename,
+                     char *path)
+{
+#ifndef WIN32
+#else
+    HANDLE h_token = INVALID_HANDLE_VALUE;
+    char profile_dir[MAX_PATH];
+    DWORD size = MAX_PATH;    
+#endif /* WIN32 */
+
+    if (filename == NULL || path == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+#ifndef WIN32
+#else
+
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &h_token))
+    {
+        fprintf(stderr, "OpenProcessToken error: %d\n", GetLastError());
+        return -PVFS_EINVAL;
+    }
+
+    if (!GetUserProfileDirectory(h_token, profile_dir, &size))
+    {
+        fprintf(stderr, "GetUserProfileDirectory error: %d\n", GetLastError());
+        CloseHandle(h_token);
+        return -PVFS_EINVAL;
+    }
+
+    CloseHandle(h_token);
+        
+    if (strlen(profile_dir) + strlen(filename) + 2 > MAX_PATH)
+    {
+        fprintf(stderr, "Profile directory path is too long\n");
+        return -PVFS_ENAMETOOLONG; /* TODO */
+    }
+
+    strcpy(path, profile_dir);
+    strcat(path, "\\");
+    strcat(path, filename);
+#endif /* WIN32 */
+
+    return 0;
+}
+
 /* get_file_paths()
  *
  * Utility function to get private key and certificate paths.
  * keypath and certpath should be size MAX_PATH.
  */
-int get_file_paths(const char *userid,
+int get_file_paths(struct options *options,
                    char *keypath,
                    char *certpath)
 {
@@ -166,7 +218,16 @@ int get_file_paths(const char *userid,
     const char def_certfile[] = "/.pvfs2-cert.pem";
     char *envvar;
     struct passwd *passwd;
+#else
+    FILE *f;
+    char line[STR_BUF_LEN], *pline, keyword[STR_BUF_LEN],
+        args[STR_BUF_LEN], conf_keypath[MAX_PATH], conf_certpath[MAX_PATH],
+        local_userid[USERID_PWD_LIMIT];
+    int i, ret;
+    DWORD size = MAX_PATH;
+#endif /* WIN32 */
 
+#ifndef WIN32
     keypath[0] = certpath[0] = '\0';
 
     envvar = getenv("PVFS2KEY_FILE");
@@ -182,6 +243,8 @@ int get_file_paths(const char *userid,
         strncpy(certpath, envvar, MAX_PATH);
         certpath[MAX_PATH-1] = '\0';
     }
+
+    /* TODO! */
 
     passwd = getpwnam(userid);
     if (passwd == NULL && 
@@ -222,56 +285,26 @@ int get_file_paths(const char *userid,
         }
     }
 #else
-    FILE *f;
-    char *envvar, line[STR_BUF_LEN], *pline, keyword[STR_BUF_LEN],
-        args[STR_BUF_LEN], conf_keypath[MAX_PATH], conf_certpath[MAX_PATH],
-        profiles_dir[MAX_PATH];
-    int i, ret;
-    DWORD size = MAX_PATH;
-
+    /* if specified as options, copy */
     keypath[0] = certpath[0] = '\0';
-    conf_keypath[0] = conf_certpath[0] = '\0';
-
-    envvar = getenv("ORANGEFS_KEY_FILE");
-    if (envvar == NULL)
+    if (options->keypath != NULL)
     {
-        envvar = getenv("PVFS2KEY_FILE");
+        strncpy(keypath, options->keypath, MAX_PATH);
     }
-    if (envvar != NULL)
+    if (options->certpath != NULL)
     {
-        strncpy(conf_keypath, envvar, MAX_PATH);
-        conf_keypath[MAX_PATH-1] = '\0';
+        strncpy(certpath, options->certpath, MAX_PATH);
     }
 
-    envvar = getenv("ORANGEFS_CERT_FILE");
-    if (envvar == NULL)
+    /* we're done if both paths defined */
+    if (strlen(keypath) > 0 && strlen(certpath) > 0)
     {
-        envvar = getenv("PVFS2CERT_FILE");
-    }    
-    if (envvar != NULL)
-    {
-        strncpy(conf_certpath, envvar, MAX_PATH);
-        conf_certpath[MAX_PATH-1] = '\0';
-    }
-
-    /* neither or both env. vars must be used */
-    if (strlen(conf_keypath) > 0 && strlen(conf_certpath) > 0)
-    {
-        /* use specified files */
-        strcpy(keypath, conf_keypath);
-        strcpy(certpath, conf_certpath);
-
         return 0;
     }
-    else if ((strlen(conf_keypath) > 0 && strlen(conf_certpath) == 0) ||
-             (strlen(conf_keypath) == 0 && strlen(conf_certpath) > 0))
-    {
-        fprintf(stderr, "Error: environment variable error - only cert. path "
-            "or key path specified; must specify both.\n");
-        return -PVFS_EINVAL;
-    }
 
-    /* no env. vars -- try OrangeFS configuration file */
+    /* otherwise use OrangeFS configuration file (usually 
+       C:\OrangeFS\Client\orangefs.cfg) */
+    conf_keypath[0] = conf_certpath[0] = '\0';
     f = open_config_file();
     while (f && !feof(f))
     {
@@ -334,70 +367,73 @@ int get_file_paths(const char *userid,
         fclose(f);
     }
 
-    /* neither or both paths must be defined */
-    if (strlen(conf_keypath) > 0 && strlen(conf_certpath) > 0)
+    /* keypath needs definition */
+    if (strlen(keypath) == 0)
     {
-        /* get security paths - this replaces %ORANGEFS_USER% strings in 
-           the paths with the userid */
+        if (strlen(conf_keypath) > 0)
+        {
+            /* get security paths - this replaces %USERNAME% strings in 
+               the paths with the *LOCAL* userid */
+            ret = get_current_userid(local_userid, USERID_PWD_LIMIT);
+            if (ret != 0)
+            {
+                fprintf(stderr, "Error: cannot retrieve current user\n");
+                return -PVFS_EINVAL;
+            } 
 
-        ret = PINT_get_security_path(conf_keypath, userid, 
-            keypath, MAX_PATH);
-        if (ret != 0)
-        {        
-            fprintf(stderr, "Error: could not process path: %s (%d)\n",
-                conf_keypath, ret);
-            return ret;
+            ret = PINT_get_security_path(conf_keypath, local_userid, 
+                keypath, MAX_PATH);
+            if (ret != 0)
+            {        
+               fprintf(stderr, "Error: could not process path: %s (%d)\n",
+                   conf_keypath, ret);
+               return ret;
+            }
         }
-
-        ret = PINT_get_security_path(conf_certpath, userid,
-            certpath, MAX_PATH);
-        if (ret != 0)
-        {        
-            fprintf(stderr, "Error: Could not process path: %s (%d)\n", conf_certpath,
-                ret);
-            return ret;
+        else
+        {
+            /* use executing user's profile directory */
+            ret = get_default_path(DEFAULT_KEYFILE, keypath);
+            if (ret != 0)
+            {
+                return ret;
+            }
         }
-
-        return 0;
     }
-    else if ((strlen(conf_keypath) > 0 && strlen(conf_certpath) == 0) ||
-             (strlen(conf_keypath) == 0 && strlen(conf_certpath) > 0))
+
+    /* certpath needs definition */
+    if (strlen(certpath) == 0)
     {
-        fprintf(stderr, "Error: only key-file or cert-file specified in "
-            "config file - must specify both.\n");
-        return -PVFS_EINVAL;
-    }
+        if (strlen(conf_certpath) > 0)
+        {
+            /* get security paths - this replaces %USERNAME% strings in 
+               the paths with the *LOCAL* userid */
+            ret = get_current_userid(local_userid, USERID_PWD_LIMIT);
+            if (ret != 0)
+            {
+                fprintf(stderr, "Error: cannot retrieve current user\n");
+                return -PVFS_EINVAL;
+            } 
 
-    if (!GetProfilesDirectory(profiles_dir, &size))
-    {
-        fprintf(stderr, "Error: GetProfilesDirectory returned %d\n", GetLastError());
-        return -PVFS_EINVAL;
-    }
-
-    if (strlen(profiles_dir) + strlen(userid) + 
-        DEFAULT_KEYFILE_LEN + 2 > MAX_PATH)
-    {
-        fprintf(stderr, "Error: profile directory path is too long\n");
-        return -PVFS_ENAMETOOLONG; /* TODO */
-    }
-
-    strcpy(conf_keypath, profiles_dir);
-    strcat(conf_keypath, "\\");
-    strcat(conf_keypath, userid);
-    strcat(conf_keypath, DEFAULT_KEYFILE);
-
-    if (strlen(profiles_dir) + strlen(userid) + 
-        DEFAULT_CERTFILE_LEN + 2 > MAX_PATH)
-    {
-        fprintf(stderr, "Error: profile directory path is too long\n");
-        return -PVFS_ENAMETOOLONG; /* TODO */
-    }
-
-    strcpy(conf_certpath, profiles_dir);
-    strcat(conf_certpath, "\\");
-    strcat(conf_certpath, userid);
-    strcat(conf_certpath, DEFAULT_CERTFILE);
-    
+            ret = PINT_get_security_path(conf_certpath, local_userid, 
+                certpath, MAX_PATH);
+            if (ret != 0)
+            {        
+               fprintf(stderr, "Error: could not process path: %s (%d)\n",
+                   conf_certpath, ret);
+               return ret;
+            }
+        }
+        else
+        {
+            /* use executing user's profile directory */
+            ret = get_default_path(DEFAULT_CERTFILE, certpath);
+            if (ret != 0)
+            {
+                return ret;
+            }
+        }
+    }    
 #endif /* WIN32 */
     
     return 0;
@@ -417,6 +453,7 @@ int get_current_userid(char *userid, int buflen)
     }
 
     strncpy(userid, passwd->pw_name, buflen);
+    userid[buflen-1] = '\0';
 #else
     if (!GetUserName(userid, (LPDWORD) &buflen))
     {
@@ -431,7 +468,9 @@ int get_current_userid(char *userid, int buflen)
  *
  * Write user cert and private key to disk.
  */
-int store_cert_and_key(char *userid, PVFS_certificate *cert, PVFS_security_key *key)
+int store_cert_and_key(struct options *options,
+                       PVFS_certificate *cert,
+                       PVFS_security_key *key)
 {
     X509 *xcert = NULL;
     RSA *rsa_privkey;
@@ -443,8 +482,8 @@ int store_cert_and_key(char *userid, PVFS_certificate *cert, PVFS_security_key *
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: storing user cert and key\n", 
                  __func__);
 
-    /* get paths */
-    ret = get_file_paths(userid, keypath, certpath);
+    /* get paths for key and cert. files */
+    ret = get_file_paths(options, keypath, certpath);
     if (ret != 0)
     {
         fprintf(stderr, "Error: Could not get key/certificate file path (%d)\n", ret);
@@ -547,28 +586,100 @@ int store_cert_and_key(char *userid, PVFS_certificate *cert, PVFS_security_key *
     return ret;
 }
 
+/* get_option_value - return value from long or short option
+   Returns NULL on error. If not NULL, strdup the returned value -
+   do not operate on the returned pointer. */
+char *get_option_value(int argc, char **argv, int *argi)
+{
+    char *popt;
+
+    if (argv == NULL || *argi >= argc)
+    {
+        return NULL;
+    }
+
+    popt = argv[*argi];
+
+    /* long option in "--opt=val" form */
+    if (!strncmp(popt, "--", 2))
+    {
+        (*argi)++;
+        return (strchr(popt, '=') != NULL) ? strchr(popt, '=') + 1 : NULL;
+    }
+    else 
+    {
+        /* short option in "-opt val" form */        
+        if (*argi+1 >= argc)
+        {
+            return NULL;
+        }
+        else
+        {
+            (*argi) += 2;
+            return argv[*argi-1];
+        }
+    }
+
+    /* unreachable */
+    return NULL;
+}
+
 int parse_args(int argc, char **argv, struct options *options)
 {
     int argi;
+    char *optval = NULL;
 
     if (options == NULL || argv == NULL)
     {
         return -1;
     }
 
-    options->userid = NULL;
+    options->fs_userid = NULL;
 
-    for (argi = 1; argi < argc; argi++)
+    argi = 1;
+    while (argi < argc)
     {
-        if (!strcmp(argv[argi], "-h") || !(strcmp(argv[argi], "--help")))
+        if (!strcmp(argv[argi], "-h") || !strcmp(argv[argi], "--help"))
         {
             return 1;
         }
-        if (!strcmp(argv[argi], "-d"))
+        else if (!strcmp(argv[argi], "-k") ||
+                 !strncmp(argv[argi], "--keyfile=", 10))
         {
-            options->exp = strtol(argv[++argi], NULL, 10);
+            optval = get_option_value(argc, argv, &argi);
+            if (optval == NULL)
+            {
+                fprintf(stderr, "Error: bad option %s\n", argv[argi]);
+                return -1;
+            }
+            options->keypath = strdup(optval);
+        }
+        else if (!strcmp(argv[argi], "-c") ||
+                 !strncmp(argv[argi], "--certfile=", 11))
+        {
+            optval = get_option_value(argc, argv, &argi);
+            if (optval == NULL)
+            {
+                fprintf(stderr, "Error: bad option %s\n", argv[argi]);
+                return -1;
+            }
+            options->certpath = strdup(optval);
+        }
+        else if (!strcmp(argv[argi], "-x") ||
+                 !strncmp(argv[argi], "--expiration=", 12))
+        {
+            optval = get_option_value(argc, argv, &argi);
+            if (optval == NULL)
+            {
+                fprintf(stderr, "Error: bad option %s\n", argv[argi]);
+                return -1;
+            }
+            options->exp = strtol(optval, NULL, 10);
             if (errno == ERANGE)
+            {
+                fprintf(stderr, "Error bad option %s\n", optval);
                 return 1;
+            }
         }
         else if (argv[argi][0] == '-')
         {
@@ -577,7 +688,8 @@ int parse_args(int argc, char **argv, struct options *options)
         }
         else
         {
-            options->userid = argv[argi];
+            options->fs_userid = argv[argi];
+            break;
         }
     }
 
@@ -639,7 +751,7 @@ int get_tab_file(char *tabfile)
 int main(int argc, char **argv)
 {
     struct options options;
-    char userid[USERID_PWD_LIMIT], input_userid[USERID_PWD_LIMIT], pwd[USERID_PWD_LIMIT], 
+    char fs_userid[USERID_PWD_LIMIT], input_userid[USERID_PWD_LIMIT], pwd[USERID_PWD_LIMIT], 
         input[8];
     const PVFS_util_tab* tab;
     int ret, valid, quit, fs_num, init_flag = 0, addr_count;
@@ -652,12 +764,17 @@ int main(int argc, char **argv)
     char tabfile[MAX_PATH];
 #endif
 
+    memset(&options, 0, sizeof(options));
+
     if (parse_args(argc, argv, &options) != 0)
     {
-        fprintf(stderr, "USAGE: %s [-h|--help] [-d expiration time] [username]\n", argv[0]);
-        fprintf(stderr, "   Requests certificate and private key from OrangeFS file system.\n"
-                        "   Expiration time is in minutes.\n"
-                        "   Files are stored in user's home directory.\n");
+        fprintf(stderr, "USAGE: %s [-h|--help] [options...] [username]\n", argv[0]);
+        fprintf(stderr, "   Requests certificate and private key from OrangeFS file system\n"
+            "   Options:\n"
+            "       -c {val}|--certfile={val} - full path for storage of certificate file\n"
+            "       -k {val}|--keyfile={val} - full path for storage of cert. key file\n"
+            "       -x {val}|--expiration={val} - expiration time (in minutes; default set on server)\n"
+            "   By default, files are stored in executing user's home directory.\n");
         return 1;
     }    
 
@@ -666,15 +783,15 @@ int main(int argc, char **argv)
     OpenSSL_add_all_algorithms();
 
     /* prompt for userid if necessary */
-    if (options.userid != NULL)
+    if (options.fs_userid != NULL)
     {
-        strncpy(userid, options.userid, USERID_PWD_LIMIT);
-        userid[USERID_PWD_LIMIT-1] = '\0';
+        strncpy(fs_userid, options.fs_userid, USERID_PWD_LIMIT);
+        fs_userid[USERID_PWD_LIMIT-1] = '\0';
     }
     else
     {
         /* get current userid as default */
-        ret = get_current_userid(userid, USERID_PWD_LIMIT);
+        ret = get_current_userid(fs_userid, USERID_PWD_LIMIT);
         if (ret != 0)
         {
             gossip_err("Error: could not retrieve current user: %d\n", 
@@ -683,23 +800,23 @@ int main(int argc, char **argv)
         }
 
         input_userid[0] = '\0';
-        printf("Enter username [%s]: ", userid);
+        printf("Enter username [%s]: ", fs_userid);
         scanf("%[^\r\n]%*c", input_userid);
 
         /* override default */
         if (strlen(input_userid) != 0)
         {
-            strcpy(userid, input_userid);
+            strcpy(fs_userid, input_userid);
         }
     }
 
-    if (strlen(userid) == 0)
+    if (strlen(fs_userid) == 0)
     {
         fprintf(stderr, "Error: No username specified... exiting\n");
         goto exit_main;
     }
 
-    printf("Using username %s...\n", userid);
+    printf("Using username %s...\n", fs_userid);
 
     /* prompt for password */
     EVP_read_pw_string(pwd, USERID_PWD_LIMIT, "Enter file system password: ", 0);
@@ -822,11 +939,11 @@ int main(int argc, char **argv)
 
     /* send get-user-cert request */
     ret = PVFS_mgmt_get_user_cert(tab->mntent_array[fs_num].fs_id,
-                                  userid, pwd, (uint32_t) addr_count,
+                                  fs_userid, pwd, (uint32_t) addr_count,
                                   addr_array, &cert, &privkey, options.exp);
     if (ret == 0)
     {
-        ret = store_cert_and_key(userid, &cert, &privkey);
+        ret = store_cert_and_key(&options, &cert, &privkey);
     }
     else
     {

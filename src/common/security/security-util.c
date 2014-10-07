@@ -463,7 +463,7 @@ void PINT_cleanup_credential(PVFS_credential *cred)
 
 #ifdef WIN32
 
-#define ORANGEFS_USER_VAR_LEN    15
+#define USERNAME_VAR_LEN    10
 
 /* copy string segment */
 #define COPY_STR_SEG(pin, pout, ind, start, end) \
@@ -472,7 +472,7 @@ void PINT_cleanup_credential(PVFS_credential *cred)
                     
 /* PINT_get_security_path
  *
- * (Windows only) Replace %ORANGEFS_USER% with userid 
+ * (Windows only) Replace %USERNAME% with userid 
  */
 int PINT_get_security_path(const char *inpath, 
                            const char *userid, 
@@ -496,8 +496,8 @@ int PINT_get_security_path(const char *inpath,
 
     /* find %ORANGEFS_USER% tokens */
     for (i = 0, pseg = uppath; 
-        (pvar = strstr(pseg, "%ORANGEFS_USER%")) && i < 16;
-        pseg += (pvar - pseg) + ORANGEFS_USER_VAR_LEN)
+        (pvar = strstr(pseg, "%USERNAME%")) && i < 16;
+        pseg += (pvar - pseg) + USERNAME_VAR_LEN)
     {
         tstart[i++] = pvar - uppath;
     }
@@ -505,7 +505,7 @@ int PINT_get_security_path(const char *inpath,
     nvars = i;
 
     /* check output length */
-    if (strlen(inpath) - (nvars * ORANGEFS_USER_VAR_LEN) + 
+    if (strlen(inpath) - (nvars * USERNAME_VAR_LEN) + 
         (nvars * strlen(userid)) + 1 > outlen)
     {
         free(uppath);
@@ -524,7 +524,7 @@ int PINT_get_security_path(const char *inpath,
     /* replace each token */
     for (i = 0, sstart = 0, outpath[0] = '\0', pout = outpath;
         i < nvars; 
-        sstart += tstart[i] + ORANGEFS_USER_VAR_LEN, i++)
+        sstart += tstart[i] + USERNAME_VAR_LEN, i++)
     {
         /* append segment prior to token i */
         COPY_STR_SEG(inpath, pout, ind, sstart, tstart[i]);
@@ -536,7 +536,7 @@ int PINT_get_security_path(const char *inpath,
         if (i+1 == nvars)
         {
             /* copy remainder of string */
-            COPY_STR_SEG(inpath, pout, ind, tstart[i] + ORANGEFS_USER_VAR_LEN, 
+            COPY_STR_SEG(inpath, pout, ind, tstart[i] + USERNAME_VAR_LEN, 
                 strlen(inpath));
         }        
     }
