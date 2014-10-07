@@ -2058,11 +2058,14 @@ class OFSTestNode(object):
             return rc
         
         if self.build_kmod == True:
-            self.runSingleCommand("make kmod_install kmod_prefix=%s" % self.ofs_installation_location,output)
+            rc = self.runSingleCommand("make kmod_install kmod_prefix=%s" % self.ofs_installation_location,output)
             if rc != 0:
                 logging.exception("Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location))
                 
-
+        if self.enable_hadoop == True:
+            rc = self.runSingleCommand("ORANGEFS_PREFIX=%s %s/src/client/hadoop/orangefs-hadoop1/build-and-install.sh" %(self.ofs_installation_location,self.ofs_source_location))
+            if rc != 0:
+                logging.exception("Could not build and install hadoop1 libraries" )
         
         return rc
 
