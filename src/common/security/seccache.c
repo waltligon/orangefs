@@ -77,8 +77,13 @@ static void PINT_seccache_print_stats(seccache_t *cache)
 
 static int lock_init(seccache_lock_t *lock)
 {
-    *lock = (seccache_lock_t) GEN_SHARED_MUTEX_INITIALIZER_NP;
-
+    int ret;
+    /* *lock = (seccache_lock_t) GEN_SHARED_MUTEX_INITIALIZER_NP; */
+    ret = gen_shared_mutex_init(lock);
+    if(ret != 0)
+    {
+        return -1;
+    }
     return 0;
 }
 

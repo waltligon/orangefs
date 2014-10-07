@@ -1,0 +1,82 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<!-- Put site-specific property overrides in this file. -->
+
+<configuration>
+
+  <property>
+    <name>fs.default.name</name>
+    <value>ofs://localhost-orangefs:3334</value>
+  </property>
+
+  <property>
+    <name>fs.ofs.impl</name>
+    <value>org.apache.hadoop.fs.ofs.OrangeFileSystem</value>
+    <description>An extension of FileSystem for OrangeFS URIs.</description>
+  </property>
+
+  <property>
+    <name>hadoop.tmp.dir</name>
+    <value>/tmp/hadoop-${user.name}</value>
+    <description>
+    Notes: user should point the default /tmp directory to a larger local
+    storage. Otherwise, spilled intermediate data could fill all temp space.
+
+    A base for other temporary directories.
+    </description>
+  </property>
+
+  <property>
+    <name>fs.ofs.systems</name>
+    <value>localhost-orangefs:3334</value>
+  </property>
+
+  <property>
+    <name>fs.ofs.mntLocations</name>
+    <value>/mnt/orangefs</value>
+    <description>Location of OrangeFS mount point.</description>
+  </property>
+
+<!-- Example showing how to set the OrangeFS I/O buffer size upon file append/create/open
+  <property>
+   <name>fs.ofs.file.buffer.size</name>
+   <value>4194304</value>
+   <description>
+   4MB OrangeFS I/O Buffer. The default for OrangeFS is 4MB.
+   </description>
+  </property>
+-->
+
+<!-- Example showing how to set the OrangeFS file block size upon file creation
+  <property>
+    <name>fs.ofs.block.size</name>
+    <value>134217728</value>
+    <description>
+    128MB Block size for OrangeFS files. The default is 64 MB.
+    </description>
+  </property>
+-->
+
+<!-- Example showing how to set the OrangeFS file layout upon file creation
+  <property>
+   <name>fs.ofs.file.layout</name>
+   <value>PVFS_SYS_LAYOUT_ROUND_ROBIN</value>
+   <description>The file layout used by OrangeFS.</description>
+  </property>
+-->
+
+<!-- You probably want to use compression with OrangeFS. See below. -->
+<!--
+  <property>
+    <name>io.compression.codecs</name>
+    <value>
+    org.apache.hadoop.io.compress.GzipCodec,
+    org.apache.hadoop.io.compress.DefaultCodec,
+    org.apache.hadoop.io.compress.BZip2Codec,
+    org.apache.hadoop.io.compress.SnappyCodec
+    </value>
+  </property>
+-->
+
+</configuration>

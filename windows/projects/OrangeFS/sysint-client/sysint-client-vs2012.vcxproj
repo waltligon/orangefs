@@ -107,7 +107,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\client\usrint;..\..\..\..\src\common\misc;..\..\..\..\src\common\security;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\client\usrint;..\..\..\..\src\common\misc;..\..\..\..\src\common\token-utils;..\..\..\..\src\common\security;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\openssl\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4047;4133;4018</DisableSpecificWarnings>
     </ClCompile>
@@ -124,7 +124,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\client\usrint;..\..\..\..\src\common\misc;..\..\..\..\src\common\security;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\client\usrint;..\..\..\..\src\common\misc;..\..\..\..\src\common\token-utils;..\..\..\..\src\common\security;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\openssl\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4047;4133;4018</DisableSpecificWarnings>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
@@ -142,7 +142,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\client\usrint;..\..\..\..\src\common\misc;..\..\..\..\src\common\security;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\client\usrint;..\..\..\..\src\common\misc;..\..\..\..\src\common\token-utils;..\..\..\..\src\common\security;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\openssl\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4047;4133;4018</DisableSpecificWarnings>
     </ClCompile>
@@ -159,7 +159,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\client\usrint;..\..\..\..\src\common\misc;..\..\..\..\src\common\security;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\client\usrint;..\..\..\..\src\common\misc;..\..\..\..\src\common\token-utils;..\..\..\..\src\common\security;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\openssl\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4047;4133;4018</DisableSpecificWarnings>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
@@ -179,7 +179,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\client\usrint;..\..\..\..\src\common\misc;..\..\..\..\src\common\security;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\client\usrint;..\..\..\..\src\common\misc;..\..\..\..\src\common\token-utils;..\..\..\..\src\common\security;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\openssl\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_MBCS;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4047;4133;4018</DisableSpecificWarnings>
     </ClCompile>
@@ -200,7 +200,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\client\usrint;..\..\..\..\src\common\misc;..\..\..\..\src\common\security;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\client\usrint;..\..\..\..\src\common\misc;..\..\..\..\src\common\token-utils;..\..\..\..\src\common\security;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\openssl\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_MBCS;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4047;4133;4018</DisableSpecificWarnings>
     </ClCompile>
@@ -268,6 +268,7 @@
     <ClCompile Include="..\..\..\..\src\client\sysint\sys-statfs.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\sys-symlink.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\sys-truncate.c" />
+    <ClCompile Include="..\..\..\..\src\common\token-utils\token-utils.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\src\client\sysint\acache.h" />
@@ -275,6 +276,7 @@
     <ClInclude Include="..\..\..\..\src\client\sysint\ncache.h" />
     <ClInclude Include="..\..\..\..\src\client\sysint\pint-sysint-utils.h" />
     <ClInclude Include="..\..\..\..\src\client\sysint\rcache.h" />
+    <ClInclude Include="..\..\..\..\src\common\token-utils\token-utils.h" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\..\..\src\client\sysint\client-job-timer.sm">

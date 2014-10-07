@@ -887,6 +887,10 @@ static int init_usrint_internal(void)
     /*       BEGIN INITIALIZATION         */
     /**************************************/
 
+#if PVFS_USER_ENV_VARS_ENABLED
+    env_vars_struct_initialize(&env_vars);
+#endif /* USER_ENVIRONMENT_VARIABLES */
+
     /* this allows system calls to be run */
     /* init_glibc_malloc(); */
     load_glibc();
