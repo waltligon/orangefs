@@ -447,7 +447,8 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
             ret = get_ldap_credential(user_name, credential);
         }
         else if (goptions->user_mode == USER_MODE_SERVER)
-        {
+        {            
+            /* TODO - key mode */
             ret = get_user_cert_credential(htoken, user_name, credential, &expires);
         }
 

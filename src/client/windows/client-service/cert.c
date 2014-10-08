@@ -568,6 +568,7 @@ int get_user_cert_credential(HANDLE huser,
             /* default: profile_dir\orangefs-cert-key.pem */
             ret = get_profile_dir(huser, cert_file);
         }
+
         if (ret == 0)
         {
             if (strlen(cert_file) + 20 > MAX_PATH)

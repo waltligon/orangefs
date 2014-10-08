@@ -38,6 +38,9 @@ struct options {
     uint32_t exp;
     char *keypath;
     char *certpath;
+#ifdef WIN32
+    int system_flag;
+#endif
 };
 
 #ifndef MAX_PATH
@@ -97,7 +100,9 @@ static DWORD get_module_dir(char *module_dir)
     /* get exe path */
     if (!GetModuleFileName(NULL, module_dir, MAX_PATH))
     {
-        return GetLastError();
+        fprintf(stderr, "Error: GetModuleFileName returned %d\n",
+            GetLastError());
+        return -PVFS_EINVAL;
     }
 
     /* remove exe file name */
@@ -161,6 +166,7 @@ int get_default_path(const char *filename,
                      char *path)
 {
 #ifndef WIN32
+    /* TODO */
 #else
     HANDLE h_token = INVALID_HANDLE_VALUE;
     char profile_dir[MAX_PATH];
@@ -173,6 +179,7 @@ int get_default_path(const char *filename,
     }
 
 #ifndef WIN32
+    /* TODO */
 #else
 
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &h_token))
@@ -287,6 +294,26 @@ int get_file_paths(struct options *options,
 #else
     /* if specified as options, copy */
     keypath[0] = certpath[0] = '\0';
+
+    if (options->system_flag)
+    {
+        /* return paths for SYSTEM user, to be stored in the module dir */
+        if ((ret = get_module_dir(keypath)) != 0)
+        {
+            /* error already reported */
+            return ret;
+        }
+        strcpy(certpath, keypath);
+
+        strcat(keypath, "\\");
+        strcat(keypath, DEFAULT_KEYFILE);
+
+        strcat(certpath, "\\");
+        strcat(certpath, DEFAULT_CERTFILE);
+
+        return 0;
+    }
+
     if (options->keypath != NULL)
     {
         strncpy(keypath, options->keypath, MAX_PATH);
@@ -665,6 +692,14 @@ int parse_args(int argc, char **argv, struct options *options)
             }
             options->certpath = strdup(optval);
         }
+#ifdef WIN32
+        else if (!strcmp(argv[argi], "-s") ||
+                 !strcmp(argv[argi], "--system"))
+        {
+            options->system_flag = 1;
+            argi++;
+        }
+#endif
         else if (!strcmp(argv[argi], "-x") ||
                  !strncmp(argv[argi], "--expiration=", 12))
         {
@@ -773,7 +808,11 @@ int main(int argc, char **argv)
             "   Options:\n"
             "       -c {val}|--certfile={val} - full path for storage of certificate file\n"
             "       -k {val}|--keyfile={val} - full path for storage of cert. key file\n"
-            "       -x {val}|--expiration={val} - expiration time (in minutes; default set on server)\n"
+#ifdef WIN32
+            "       -s|--system - generate files for the SYSTEM user\n"
+#endif
+            "       -x {val}|--expiration={val} - expiration time (in days; default\n"
+            "                                     set on server)\n"
             "   By default, files are stored in executing user's home directory.\n");
         return 1;
     }    

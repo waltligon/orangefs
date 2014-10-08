@@ -494,11 +494,15 @@ static PINT_sm_action get_user_cert_gen_cert(
     /* set expiration */
     X509_gmtime_adj(X509_get_notBefore(xcert), 0);
     if (s_op->req->u.mgmt_get_user_cert.exp != 0)
+    {
         X509_gmtime_adj(X509_get_notAfter(xcert),
-                        (long) s_op->req->u.mgmt_get_user_cert.exp * 60);
+            (long) s_op->req->u.mgmt_get_user_cert.exp * 24 * 60 * 60);
+    }
     else
+    {
         X509_gmtime_adj(X509_get_notAfter(xcert), 
-                        (long) config->user_cert_exp * 24 * 60 * 60);
+            (long) config->user_cert_exp * 24 * 60 * 60);
+    }
 
     /* set public key */
     X509_set_pubkey(xcert, keypair);

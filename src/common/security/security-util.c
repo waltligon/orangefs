@@ -494,7 +494,7 @@ int PINT_get_security_path(const char *inpath,
     
     _strupr(uppath);
 
-    /* find %ORANGEFS_USER% tokens */
+    /* find %USERNAME% tokens */
     for (i = 0, pseg = uppath; 
         (pvar = strstr(pseg, "%USERNAME%")) && i < 16;
         pseg += (pvar - pseg) + USERNAME_VAR_LEN)
