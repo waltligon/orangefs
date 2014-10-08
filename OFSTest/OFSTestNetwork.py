@@ -1635,7 +1635,7 @@ class OFSTestNetwork(object):
             node.runSingleCommand("echo 'export HADOOP_CLASSPATH=\$JNI_LIBRARY_PATH/orangefs-hadoop1*.jar:\$JNI_LIBRARY_PATH/ofs-jni-*.jar' >> %s/conf/hadoop-env.sh" % node.hadoop_location)
             # copy templates to node
             #master_node.copyToRemoteNode(source="%s/test/automated/hadoop-tests.d/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
-            master_node.copyToRemoteNode(source="%s/src/client/hadoop/orangefs-hadoop1/resources/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
+            master_node.copyToRemoteNode(source="%s/src/client/hadoop/orangefs-hadoop1/src/main/resources/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
             
             # update mapred-site.xml
             node.runSingleCommand("sed -i s/localhost/%s/ %s/conf/mapred-site.xml" % (master_node.hostname,node.hadoop_location))
