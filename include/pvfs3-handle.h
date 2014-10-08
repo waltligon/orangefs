@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include <uuid/uuid.h>
+#include <string.h>
 
 #define OID_SZ 16
 #define OID_STR_SZ 36

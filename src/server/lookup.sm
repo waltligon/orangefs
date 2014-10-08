@@ -185,6 +185,14 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
 
+
+    gossip_err("%s:REQUEST:path(%s) fs_id(%d) parent handle(%s) attrmask(0x%0x)\n"
+              ,__func__
+              ,s_op->req->u.lookup_path.path
+              ,s_op->req->u.lookup_path.fs_id
+              ,PVFS_OID_str(&s_op->req->u.lookup_path.handle)
+              ,s_op->req->u.lookup_path.attrmask);
+
     /* fill in the lookup portion of the PINT_server_op */
     s_op->u.lookup.segp = NULL;
     s_op->u.lookup.seg_nr = 0;
@@ -195,7 +203,7 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  " STARTING LOOKUP REQUEST "
-                 "(path:%s)(fs_id:%d)(handle:%s)(attrmask:%u)"
+                 "(path:%s)(fs_id:%d)(handle:%s)(attrmask:0x%0x)"
                  "(# of segments:%u)\n",
                  s_op->req->u.lookup_path.path,
                  s_op->req->u.lookup_path.fs_id,
@@ -271,11 +279,6 @@ static PINT_sm_action lookup_read_object_metadata(
     /* TJS: memcpy each the SIDs taht are in keyval_temp_store
      * into the resp sid array, making sure to index to the point
      * in the response sid array that corresponds to our segment number */
-     
-    s_op->resp.u.lookup_path.handle_array[
-                            s_op->u.lookup.seg_nr - 1] =
-            (PVFS_handle) s_op->u.lookup.keyval_temp_store[0].oid;
-    /*s_op->resp.u.lookup_path.sid_*/
 
     /* use the base handle if we haven't looked up a segment yet */
     if (s_op->u.lookup.seg_nr == 0)
@@ -289,6 +292,9 @@ static PINT_sm_action lookup_read_object_metadata(
                                         s_op->u.lookup.seg_nr - 1];
         ds_attr = &(s_op->u.lookup.ds_attr_array[
                                         s_op->u.lookup.seg_nr - 1]);
+        s_op->resp.u.lookup_path.handle_array[
+                                        s_op->u.lookup.seg_nr - 1] =
+               (PVFS_handle) s_op->u.lookup.keyval_temp_store[0].oid;
     }
 
     /* update our successful handle read count */
@@ -658,13 +664,48 @@ static PINT_sm_action lookup_read_num_directory_entry_handles(
     PVFS_handle handle = PVFS_HANDLE_NULL;
     job_id_t j_id;
 
-    /* use the base handle if we haven't looked up a segment yet */
+
+    gossip_err("%s:s_op->attrs:\n"
+               "%s:s_op->attrs.objtype(%d)\n"
+               "%s:           .u.dir.dirent_count(%d)\n"
+               "%s:                 .dist_dir_attr.tree_height(%d)\n"
+               "%s:                               .dirdata_count(%d)\n"
+               "%s:                               .sid_count(%d)\n"
+               "%s:                               .bitmap_size(%d)\n"
+               "%s:                               .split_size(%d)\n"
+               "%s:                               .server_no(%d)\n"
+               "%s:                               .branch_level(%d)\n"
+               "%s:                 .dist_dir_bitmap(%p)\n"
+               "%s:                 .dirdata_handles(%p)\n"
+               "%s:                 .dirdata_sids(%p)\n"
+               ,__func__
+               ,__func__,s_op->attr.objtype
+               ,__func__,(int)s_op->attr.u.dir.dirent_count
+               ,__func__,s_op->attr.u.dir.dist_dir_attr.tree_height
+               ,__func__,s_op->attr.u.dir.dist_dir_attr.dirdata_count
+               ,__func__,s_op->attr.u.dir.dist_dir_attr.sid_count
+               ,__func__,s_op->attr.u.dir.dist_dir_attr.bitmap_size
+               ,__func__,s_op->attr.u.dir.dist_dir_attr.split_size
+               ,__func__,s_op->attr.u.dir.dist_dir_attr.server_no
+               ,__func__,s_op->attr.u.dir.dist_dir_attr.branch_level
+               ,__func__,s_op->attr.u.dir.dist_dir_bitmap
+               ,__func__,s_op->attr.u.dir.dirdata_handles
+               ,__func__,s_op->attr.u.dir.dirdata_sids);
+
+    /* use the base handle if we haven't looked up a segment yet. In this
+     * case, the dist_dir_attr values are already provided by the prelude
+     * and are stored in s_op->attr.  No need to do another lookup.
+     */
     if (s_op->u.lookup.seg_nr == 0)
     {
         handle = s_op->req->u.lookup_path.handle;
+        /* copy dist_dir_attr data from s_op->attr to s_op->u.lookup.attr.u.dir.dist_dir_attr */
+        s_op->u.lookup.attr = s_op->attr;
+        return SM_ACTION_COMPLETE;
     }
     else
     {
+        /* we have to get data from dspace */
         handle = s_op->resp.u.lookup_path.handle_array[
                         s_op->u.lookup.seg_nr-1];
     }
@@ -762,23 +803,26 @@ static PINT_sm_action lookup_read_directory_entry_handles(
             malloc(attr->u.dir.dist_dir_attr.bitmap_size *
                     sizeof(PVFS_dist_dir_bitmap_basetype));
 
-    attr->u.dir.dirdata_handles =
-            malloc((attr->u.dir.dist_dir_attr.dirdata_count *
-                    sizeof(PVFS_handle)) +
-                   (attr->u.dir.dist_dir_attr.sid_count *
-                    attr->u.dir.dist_dir_attr.dirdata_count *
-                    sizeof(PVFS_handle)));
+    attr->u.dir.dirdata_handles = malloc(OSASZ(attr->u.dir.dist_dir_attr.dirdata_count,
+                                               attr->u.dir.dist_dir_attr.sid_count));
 
-    attr->u.dir.dirdata_sids = (PVFS_SID *)(attr->u.dir.dirdata_handles + 
-                                (attr->u.dir.dist_dir_attr.dirdata_count *
-                                sizeof(PVFS_handle)));
-    
     if(!attr->u.dir.dist_dir_bitmap ||
             !attr->u.dir.dirdata_handles)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+
+    /* Beginning of sids is immediately following the dirdata handles */
+    attr->u.dir.dirdata_sids = (PVFS_SID *)&attr->u.dir.dirdata_handles[attr->u.dir.dist_dir_attr.dirdata_count];
+
+    gossip_err("%s: dirdata_handles(%p):sizeof(%ld)  dirdata_sids(%p):sizeof(%ld)\n"
+              ,__func__
+              ,attr->u.dir.dirdata_handles
+              ,sizeof(PVFS_handle)
+              ,attr->u.dir.dirdata_sids
+              ,sizeof(PVFS_SID));
+    
 
     /* total 2 keyvals, DIST_DIRDATA_BITMAP, DIST_DIRDATA_HANDLES */
     keyval_count = 2;
@@ -857,11 +901,6 @@ static PINT_sm_action lookup_read_directory_entry(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_dist_dir_hash_type dirdata_hash;
-    /* V3 */
-#if 0
-    server_configuration_t *config = get_server_config_struct();
-    char dirdata_server_name[1024];
-#endif
 
     /* find the segment that we should look up in the directory */
     ret = PINT_string_next_segment(s_op->req->u.lookup_path.path,
@@ -873,7 +912,6 @@ static PINT_sm_action lookup_read_directory_entry(
         gossip_err("PINT_string_next_segment failed: path: %s\n",
                    s_op->req->u.lookup_path.path);
     }
-    assert(ret == 0);
 
     /* Need to see if directory entry is on this server. If not prepare
        to send a request to the server where it is located. */
@@ -898,18 +936,18 @@ static PINT_sm_action lookup_read_directory_entry(
                                        s_op->u.lookup.dirdata_server_index]),
                  s_op->u.lookup.segp, (int) strlen(s_op->u.lookup.segp));
 
-    /* find the server name of the dirdata handle */
-    /* V3 we now compare each SID against the local SID to decide this */
-#if 0
-    PINT_cached_config_get_server_name(
-            dirdata_server_name,
-            1024,
-            s_op->u.lookup.attr.dirdata_handles[
-                                s_op->u.lookup.dirdata_server_index],
-            s_op->req->u.lookup_path.fs_id);
+    gossip_err("%s:dirdata_sids[%d]=%s(%p)\n"
+               ,__func__
+               ,s_op->u.lookup.dirdata_sid_index
+               ,PVFS_SID_str(&s_op->u.lookup.attr.u.dir.dirdata_sids[s_op->u.lookup.dirdata_sid_index])
+               ,&s_op->u.lookup.attr.u.dir.dirdata_sids[0]);
 
-    if ( !strcmp(dirdata_server_name, config->host_id) )
-#endif
+    gossip_err("%s:dirdata_handles[0]=%s(%p) dirdata_handles[1]=%s(%p)\n"
+              ,__func__
+              ,PVFS_OID_str(&s_op->u.lookup.attr.u.dir.dirdata_handles[0])
+              ,&s_op->u.lookup.attr.u.dir.dirdata_handles[0]
+              ,PVFS_OID_str(&s_op->u.lookup.attr.u.dir.dirdata_handles[1])
+              ,&s_op->u.lookup.attr.u.dir.dirdata_handles[1]);
 
     if (PINT_cached_config_server_local(
                 &s_op->u.lookup.attr.u.dir.dirdata_sids[
