@@ -1632,15 +1632,17 @@ class OFSTestNetwork(object):
             node.runSingleCommand("echo 'export JAVA_HOME=%s' >> %s/conf/hadoop-env.sh" % (node.jdk6_location,node.hadoop_location))
             node.runSingleCommand("echo 'export LD_LIBRARY_PATH=%s/lib' >> %s/conf/hadoop-env.sh" % (node.ofs_installation_location,node.hadoop_location))
             node.runSingleCommand("echo 'export JNI_LIBRARY_PATH=%s/lib' >> %s/conf/hadoop-env.sh" % (node.ofs_installation_location,node.hadoop_location))
-            node.runSingleCommand("echo 'export HADOOP_CLASSPATH=\$JNI_LIBRARY_PATH/ofs_hadoop.jar:\$JNI_LIBRARY_PATH/ofs_jni.jar' >> %s/conf/hadoop-env.sh" % node.hadoop_location)
+            node.runSingleCommand("echo 'export HADOOP_CLASSPATH=\$JNI_LIBRARY_PATH/orangefs-hadoop1*.jar:\$JNI_LIBRARY_PATH/ofs-jni-*.jar' >> %s/conf/hadoop-env.sh" % node.hadoop_location)
             # copy templates to node
-            master_node.copyToRemoteNode(source="%s/test/automated/hadoop-tests.d/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
+            #master_node.copyToRemoteNode(source="%s/test/automated/hadoop-tests.d/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
+            master_node.copyToRemoteNode(source="%s/src/main/resources/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
             
             # update mapred-site.xml
-            node.runSingleCommand("sed -i s/__NODE001__/%s/ %s/conf/mapred-site.xml" % (master_node.hostname,node.hadoop_location))
+            node.runSingleCommand("sed -i s/localhost/%s/ %s/conf/mapred-site.xml" % (master_node.hostname,node.hadoop_location))
             
             # update core-site.xml
-            node.runSingleCommand("sed -i s,__MNT_LOCATION__,%s, %s/conf/core-site.xml" % (node.ofs_mount_point,node.hadoop_location))
+            node.runSingleCommand("sed -i s,/mnt/orangefs,%s, %s/conf/core-site.xml" % (node.ofs_mount_point,node.hadoop_location))
+            node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%s,g %s/conf/core-site.xml" % (node.hostname,node.ofs_port,node.hadoop_location))
 
             # point slave node to master
             node.runSingleCommand("echo '%s' > %s/conf/masters" % (master_node.hostname,node.hadoop_location))
