@@ -131,6 +131,8 @@ public class PVFS2POSIXJNI {
     public native Stat lstat(String path);
 
     public native int mkdir(String path, long mode);
+    
+    public native int mkdirTolerateExisting(String path, long mode);
 
     public native int mkdirat(int dirfd, String path, long mode);
 
