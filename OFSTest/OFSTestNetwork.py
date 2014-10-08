@@ -1635,7 +1635,7 @@ class OFSTestNetwork(object):
             node.runSingleCommand("echo 'export JAVA_HOME=%s' >> %s/conf/hadoop-env.sh" % (node.jdk6_location,node.hadoop_location))
             node.runSingleCommand("echo 'export LD_LIBRARY_PATH=%s/lib' >> %s/conf/hadoop-env.sh" % (node.ofs_installation_location,node.hadoop_location))
             node.runSingleCommand("echo 'export JNI_LIBRARY_PATH=%s/lib' >> %s/conf/hadoop-env.sh" % (node.ofs_installation_location,node.hadoop_location))
-            node.runSingleCommand("echo 'export HADOOP_CLASSPATH=\$JNI_LIBRARY_PATH/orangefs-hadoop1*.jar:\$JNI_LIBRARY_PATH/ofs-jni-*.jar' >> %s/conf/hadoop-env.sh" % node.hadoop_location)
+            node.runSingleCommand("echo 'export HADOOP_CLASSPATH=\$JNI_LIBRARY_PATH/orangefs-hadoop1-2.9.0.jar:\$JNI_LIBRARY_PATH/ofs-jni-2.9.0.jar' >> %s/conf/hadoop-env.sh" % node.hadoop_location)
             
             
             # update mapred-site.xml
