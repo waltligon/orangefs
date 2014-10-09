@@ -241,7 +241,7 @@ class OFSTestNode(object):
         
         ## @var jdk6_location
         # Location of Oracle JDK 6
-        self.jdk6_location = "/usr/java/default"
+        self.jdk6_location = "/usr/lib/jvm/java"
         
         
         
@@ -1214,7 +1214,7 @@ class OFSTestNode(object):
     
             
             # RPM installs to default location
-            self.jdk6_location = "/usr/java/default"
+            self.jdk6_location = "/usr/lib/jvm/java"
             
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             print "Installing required software for Red Hat based system %s" % self.distro
@@ -1263,7 +1263,7 @@ class OFSTestNode(object):
 
             
             # RPM installs to default location
-            self.jdk6_location = "/usr/java/default"
+            self.jdk6_location = "/usr/lib/jvm/java"
         else:
             print "Unknown system %s" % self.distro
         
