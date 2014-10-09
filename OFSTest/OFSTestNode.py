@@ -2065,7 +2065,7 @@ class OFSTestNode(object):
                 logging.exception("Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location))
                 
         if self.enable_hadoop == True:
-            rc = self.runSingleCommand("ORANGEFS_PREFIX=%s %s/src/client/hadoop/orangefs-hadoop1/build-and-install.sh" %(self.ofs_installation_location,self.ofs_source_location))
+            rc = self.runSingleCommandAsBatch("ORANGEFS_PREFIX=%s %s/src/client/hadoop/orangefs-hadoop1/build-and-install.sh" %(self.ofs_installation_location,self.ofs_source_location))
             if rc != 0:
                 logging.exception("Could not build and install hadoop1 libraries" )
         
