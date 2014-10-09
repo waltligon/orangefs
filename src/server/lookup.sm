@@ -288,14 +288,13 @@ static PINT_sm_action lookup_read_object_metadata(
     }
     else
     {
-        handle = s_op->resp.u.lookup_path.handle_array[
-                                        s_op->u.lookup.seg_nr - 1];
+        handle = s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.seg_nr - 1] 
+               = (PVFS_handle)s_op->u.lookup.keyval_temp_store[0].oid;
         ds_attr = &(s_op->u.lookup.ds_attr_array[
                                         s_op->u.lookup.seg_nr - 1]);
-        s_op->resp.u.lookup_path.handle_array[
-                                        s_op->u.lookup.seg_nr - 1] =
-               (PVFS_handle) s_op->u.lookup.keyval_temp_store[0].oid;
     }
+
+    gossip_err("%s:handle(%s)\n",__func__,PVFS_OID_str(&handle));
 
     /* update our successful handle read count */
     s_op->u.lookup.handle_ct++;
@@ -942,10 +941,12 @@ static PINT_sm_action lookup_read_directory_entry(
                ,PVFS_SID_str(&s_op->u.lookup.attr.u.dir.dirdata_sids[s_op->u.lookup.dirdata_sid_index])
                ,&s_op->u.lookup.attr.u.dir.dirdata_sids[0]);
 
-    gossip_err("%s:dirdata_handles[0]=%s(%p) dirdata_handles[1]=%s(%p)\n"
+    gossip_err("%s:dirdata_handles[0]=%s(%p)\n"
               ,__func__
               ,PVFS_OID_str(&s_op->u.lookup.attr.u.dir.dirdata_handles[0])
-              ,&s_op->u.lookup.attr.u.dir.dirdata_handles[0]
+              ,&s_op->u.lookup.attr.u.dir.dirdata_handles[0]);
+    gossip_err("%s:dirdata_handles[1]=%s(%p)\n"
+              ,__func__
               ,PVFS_OID_str(&s_op->u.lookup.attr.u.dir.dirdata_handles[1])
               ,&s_op->u.lookup.attr.u.dir.dirdata_handles[1]);
 
@@ -976,15 +977,16 @@ static PINT_sm_action lookup_read_directory_entry_local(
 
     s_op->key.buffer = s_op->u.lookup.segp;
     s_op->key.buffer_sz = strlen(s_op->u.lookup.segp) + 1;
-    /*s_op->val.buffer =
-        &s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.seg_nr];*/
+
+    gossip_err("%s:s_op->u.lookup.segp(%s)\n",__func__,s_op->u.lookup.segp);
+
+
     /* TJS: Read in SID information to temporary location.  Copy back into
      * response array in next state */
-
-
     ret = PINT_cached_config_get_metadata_sid_count(
                                           s_op->req->u.lookup_path.fs_id,
                                           &(s_op->metasidcnt));
+    gossip_err("%s:s_op->metasidcnt(%d)\n",__func__,s_op->metasidcnt);
 
     s_op->u.lookup.keyval_temp_store = (PVFS_ID *)malloc(
                                                 sizeof(PVFS_handle) +
@@ -1149,6 +1151,23 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
             s_op, GOSSIP_ACCESS_DEBUG, "path: %s, lookup failed\n", 
             s_op->req->u.lookup_path.path);
     }
+
+    gossip_err("%s\n"
+               "s_op->resp.u.lookup_path.handle_count(%u)\n"
+               "                        .attr_count(%u)\n"
+               "                        .sid_count(%u)\n"
+               "                        .handle_array(%s)\n"
+               "                        .attr_array(%p)\n"
+               "                        .sid_array(%p)\n"
+               ,__func__
+               ,s_op->resp.u.lookup_path.handle_count
+               ,s_op->resp.u.lookup_path.attr_count
+               ,s_op->resp.u.lookup_path.sid_count
+               ,PVFS_OID_str(&s_op->resp.u.lookup_path.handle_array[0])
+               ,s_op->resp.u.lookup_path.attr_array
+               ,s_op->resp.u.lookup_path.sid_array);
+
+
 
     return SM_ACTION_COMPLETE;
 }
