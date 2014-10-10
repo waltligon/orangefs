@@ -1176,10 +1176,7 @@ class OFSTestNode(object):
                         # download Java 6
             print "Installing required software for SuSE based system %s" % self.distro
         
-            #rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
-            if rc != 0:
-                logging.exception(output)
-                return rc
+
             install_commands = [
                 "bash -c 'echo 0 > /selinux/enforce'",
                 "/sbin/SuSEfirewall2 off",
@@ -1230,12 +1227,6 @@ class OFSTestNode(object):
             
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             print "Installing required software for Red Hat based system %s" % self.distro
-            # download Java 6
-            rc = self.runSingleCommand("wget http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
-            if rc != 0:
-                logging.exception(output)
-                return rc
-            
             install_commands = [
                 "bash -c 'echo 0 > /selinux/enforce'",
                 
