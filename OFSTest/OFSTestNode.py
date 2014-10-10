@@ -1145,6 +1145,9 @@ class OFSTestNode(object):
                 "service sendmail stop",
                 "service rpcbind restart",
                 "service nfs-kernel-server restart",
+                "mkdir -p /home/bin",
+                "mkdir -p /home/nobody",
+                
 
                 # install Sun Java6 for hadoop via webupd8
                 "add-apt-repository ppa:webupd8team/java < /dev/null",
@@ -1207,7 +1210,10 @@ class OFSTestNode(object):
                 "service nfs restart",
                 "/sbin/rpcbind"
                 "service slapd start",
-                "chkconfig slapd on"
+                "chkconfig slapd on",
+                "mkdir -p /home/bin",
+                "mkdir -p /home/nobody",
+
             ]
             for command in install_commands:
                 rc = self.runSingleCommandAsRoot(command, output)
@@ -1247,7 +1253,10 @@ class OFSTestNode(object):
                 "service rpcbind start",
                 "service nfs restart",
                 "service slapd start",
-                "chkconfig slapd on"
+                "chkconfig slapd on",
+                "mkdir -p /home/bin",
+                "mkdir -p /home/nobody",
+
                 
                 
                 ]
