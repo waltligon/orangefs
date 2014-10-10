@@ -1135,13 +1135,10 @@ class OFSTestNetwork(object):
         if rc == 0:
             rc = security_node.createCACert()
             # CA Certs should be copied with OrangeFS.
-        if rc == 0:
+        
             rc = self.createUserCerts(node_list=node_list,security_node=security_node)
-        if rc == 0:
             rc = self.createUserCerts(user="nobody",node_list=node_list,security_node=security_node)
-        if rc == 0:
             rc = self.createUserCerts(user="bin",node_list=node_list,security_node=security_node)
-        if rc == 0:
             rc = self.createUserCerts(user="root",node_list=node_list,security_node=security_node)
 
         
