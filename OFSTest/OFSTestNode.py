@@ -1147,6 +1147,9 @@ class OFSTestNode(object):
                 "service nfs-kernel-server restart",
                 "mkdir -p /home/bin",
                 "mkdir -p /home/nobody",
+                "chown nobody:nobody /home/nobody",
+                "chown bin:bin /home/bin"
+
                 
 
                 # install Sun Java6 for hadoop via webupd8
@@ -1213,6 +1216,9 @@ class OFSTestNode(object):
                 "chkconfig slapd on",
                 "mkdir -p /home/bin",
                 "mkdir -p /home/nobody",
+                "chown nobody:nobody /home/nobody",
+                "chown bin:bin /home/bin"
+
 
             ]
             for command in install_commands:
@@ -1255,7 +1261,10 @@ class OFSTestNode(object):
                 "service slapd start",
                 "chkconfig slapd on",
                 "mkdir -p /home/bin",
+
                 "mkdir -p /home/nobody",
+                "chown nobody:nobody /home/nobody",
+                "chown bin:bin /home/bin"
 
                 
                 
