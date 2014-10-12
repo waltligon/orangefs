@@ -45,16 +45,16 @@ int main(int argc, char **argv)
     user_opts = parse_args(argc, argv);
     if(!user_opts)
     {
-	fprintf(stderr, "Error: failed to parse command line arguments.\n");
-	return(-1);
+        fprintf(stderr, "Error: failed to parse command line arguments.\n");
+        return(-1);
     }
 
     /* Initialize the pvfs2 server */
     ret = PVFS_util_init_defaults();
     if(ret < 0)
     {
-	PVFS_perror("PVFS_util_init_defaults", ret);
-	return -1;
+        PVFS_perror("PVFS_util_init_defaults", ret);
+        return -1;
     }
 
     /* Remove each specified file */
@@ -193,7 +193,7 @@ static struct options* parse_args(int argc, char **argv)
     tmp_opts = (struct options *)malloc(sizeof(struct options));
     if(!tmp_opts)
     {
-	return NULL;
+        return NULL;
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
@@ -203,21 +203,21 @@ static struct options* parse_args(int argc, char **argv)
 
     while((one_opt = getopt(argc, argv, flags)) != EOF)
     {
-	switch(one_opt)
+        switch(one_opt)
         {
-	    case('f'):
-		fprintf(stderr, "Error: force option not supported.\n");
-		free(tmp_opts);
-		return NULL;
-	    case('r'):
-		fprintf(stderr, "Error: recursive option not "
+            case('f'):
+                fprintf(stderr, "Error: force option not supported.\n");
+                free(tmp_opts);
+                return NULL;
+            case('r'):
+                fprintf(stderr, "Error: recursive option not "
                         "supported.\n");
-		free(tmp_opts);
-		return NULL;
-	    case('?'):
-		usage(argc, argv);
-		exit(EXIT_FAILURE);
-	}
+                free(tmp_opts);
+                return NULL;
+            case('?'):
+                usage(argc, argv);
+                exit(EXIT_FAILURE);
+        }
     }
 
     if (optind < argc)
@@ -234,8 +234,8 @@ static struct options* parse_args(int argc, char **argv)
     }
     else
     {
-	usage(argc, argv);
-	exit(EXIT_FAILURE);
+        usage(argc, argv);
+        exit(EXIT_FAILURE);
     }
     return tmp_opts;
 }
