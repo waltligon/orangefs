@@ -80,9 +80,9 @@ AC_DEFUN([AX_UUID],
     dnl This section sesarches standard paths
 
         dnl first search for include file 
-        for incdir in /usr/include /usr/local/include
+        for lidir in /usr/include /usr/local/include
         do
-            for path in `find $incdir -name uuid.h`
+            for path in `find $lidir -name uuid.h`
             do
                 dnl see if the include file is pointed to by the path
                 tmppath=`dirname $path`
@@ -120,9 +120,9 @@ AC_DEFUN([AX_UUID],
 
         UUID_LIB="-luuid"
         LIBS="$oldlibs $UUID_LIB"
-        for libdir in $LIBPATH
+        for ludir in $LIBPATH
         do
-            for path in `find $libdir ! -perm -555 -prune -o -name libuuid.so -print`
+            for path in `find $ludir ! -perm -555 -prune -o -name libuuid.so -print`
             do
                 dnl see if the lib file is pointed to by the path
                 LDFLAGS="-L`dirname $path` $oldldflags"
