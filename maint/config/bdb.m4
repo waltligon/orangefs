@@ -14,34 +14,34 @@ AC_DEFUN([AX_BERKELEY_DB],
     lib=notfound
 
     if test "x$dbpath" != "x" ; then
-	oldcflags=$CFLAGS
-	for dbheader in db4 db3 notfound; do
-		AC_COMPILE_IFELSE(
-			[AC_LANG_SOURCE([[#include "$dbpath/include/$dbheader/db.h"]])],
-			[DB_CFLAGS="-I$dbpath/include/$dbheader/"
-			 break])
-	done
+    oldcflags=$CFLAGS
+    for dbheader in db4 db3 notfound; do
+        AC_COMPILE_IFELSE(
+            [AC_LANG_SOURCE([[#include "$dbpath/include/$dbheader/db.h"]])],
+            [DB_CFLAGS="-I$dbpath/include/$dbheader/"
+             break])
+    done
 
-	if test "x$dbheader" = "xnotfound"; then
-		AC_COMPILE_IFELSE(
-			[AC_LANG_SOURCE([[#include "$dbpath/include/db.h"]])],
-			[DB_CFLAGS="-I$dbpath/include/"],
-			[AC_MSG_FAILURE(
-				Invalid libdb path specified. No db.h found.)])
-	fi
+    if test "x$dbheader" = "xnotfound"; then
+        AC_COMPILE_IFELSE(
+            [AC_LANG_SOURCE([[#include "$dbpath/include/db.h"]])],
+            [DB_CFLAGS="-I$dbpath/include/"],
+            [AC_MSG_FAILURE(
+                Invalid libdb path specified. No db.h found.)])
+    fi
 
         DB_LDFLAGS="-L${dbpath}/lib"
-	LDFLAGS="$DB_LDFLAGS ${LDFLAGS}"
+    LDFLAGS="$DB_LDFLAGS ${LDFLAGS}"
 
-	LIBS="${oldlibs} -ldb -lpthread"
-	DB_LIB="-ldb"
-	CFLAGS="$DB_CFLAGS $oldcflags"
-	AC_TRY_LINK(
-		[#include <db.h>],
-		[DB *dbp; db_create(&dbp, NULL, 0);],
-		lib=db)
-	CFLAGS=$oldcflags
-	
+    LIBS="${oldlibs} -ldb -lpthread"
+    DB_LIB="-ldb"
+    CFLAGS="$DB_CFLAGS $oldcflags"
+    AC_TRY_LINK(
+        [#include <db.h>],
+        [DB *dbp; db_create(&dbp, NULL, 0);],
+        lib=db)
+    CFLAGS=$oldcflags
+    
     else
         dnl Typically a distro's db-devel package (or whatever
         dnl they might call it) includes /usr/include/db.h. 
@@ -114,9 +114,10 @@ AC_DEFUN([AX_BERKELEY_DB],
     if test "x$lib" = "xnotfound" ; then
            AC_MSG_ERROR(could not find DB libraries)
     else
-           AC_MSG_RESULT($lib)
+           dnl AC_MSG_RESULT($lib)
+           AC_MSG_RESULT(yes)
     fi
-    AC_SUBST(DB_CFLAGS)	
+    AC_SUBST(DB_CFLAGS)    
     AC_SUBST(DB_LIB)
     
     dnl See if we have a new enough version of Berkeley DB; needed for
