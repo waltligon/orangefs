@@ -217,7 +217,7 @@ int PINT_X509_to_cert(const X509 *xcert,
         BIO_free(bio_mem);
         return ENOMEM;
     }
-    (*cert)->buf = malloc(cert_size);
+    (*cert)->buf = (PVFS_cert_data) malloc(cert_size);
     if ((*cert)->buf == NULL)
     {
         free(*cert);

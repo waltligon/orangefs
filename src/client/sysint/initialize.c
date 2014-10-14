@@ -43,6 +43,11 @@ PINT_event_id PINT_client_sys_event_id;
 
 int pint_client_pid;
 
+/* set to one when init is done */
+#ifdef WIN32
+int pvfs_sys_init_flag = 0;
+#endif 
+
 typedef enum
 {
     CLIENT_NO_INIT           =       0,
@@ -79,7 +84,9 @@ typedef enum
  */
 int PVFS_sys_initialize(uint64_t default_debug_mask)
 {
+#ifndef WIN32
     static int pvfs_sys_init_flag = 0; /* set to one when init is done */
+#endif
     static int pvfs_sys_init_in_progress = 0;
     static gen_mutex_t init_mutex = GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
 
@@ -176,7 +183,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     }
     client_status_flag |= CLIENT_SECURITY_INIT;
     
-    /* initlialize the protocol encoder */
+    /* initialize the protocol encoder */
     ret = PINT_encode_initialize();
     if (ret < 0)
     {
@@ -390,6 +397,10 @@ error_exit:
     PINT_smcb_free(smcb);
 
 local_exit:
+
+#ifdef WIN32
+    pvfs_sys_init_in_progress = 0;
+#endif
 
     gen_mutex_unlock(&init_mutex);
 

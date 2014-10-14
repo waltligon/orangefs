@@ -584,9 +584,9 @@ static PINT_sm_action create_crdirent_setup_msgpair(
 static PINT_sm_action create_crdirent_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    PVFS_uid local_uid;
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: crdirent_failure\n");
-    PVFS_uid local_uid;
 
     /* if need to retry. clear the error_code and setup getattr. */
     if(js_p->error_code == -PVFS_EAGAIN)

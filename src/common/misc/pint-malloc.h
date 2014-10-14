@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef WIN32
+/* pint-malloc.c is not used on Windows */
 struct glibc_malloc_ops_s
 {
     void *(*malloc)(size_t size);
@@ -39,6 +41,10 @@ extern char *PINT_strndup(const char *str, size_t size);
 extern void  PINT_free(void *mem);
 
 #include "pint-clean-malloc.h"
+#else
+# define PVFS_MALLOC_REDEF 0
+# define PVFS_MALLOC_REDEF_OVERRIDE 1
+#endif
 
 /* Defaults if not defined in pvfs2-config.h */
 

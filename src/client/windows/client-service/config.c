@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2011 Clemson University and Omnibond LLC
+ * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -14,6 +14,9 @@
 #include <string.h>
 #include <ctype.h>
 
+#include <openssl/err.h>
+#include <openssl/pem.h>
+
 #include "pvfs2-types.h"
 #include "security-util.h"
 
@@ -23,6 +26,8 @@
 #include "cred.h"
 
 extern struct qhash_table user_cache;
+
+QLIST_HEAD(user_list);
 
 #define LDAP_SCOPE_ONELEVEL    0x01
 #define LDAP_SCOPE_SUBTREE     0x02
@@ -186,14 +191,22 @@ static KEYWORD_CB(user_mode)
     {
         options->user_mode = USER_MODE_LIST;
     }
+    else if (!stricmp(args, "certificate"))
+    {
+        options->user_mode = USER_MODE_CERT;
+    }
     else if (!stricmp(args, "ldap"))
     {
         options->user_mode = USER_MODE_LDAP;
     }
+    else if (!stricmp(args, "server"))
+    {
+        options->user_mode = USER_MODE_SERVER;
+    }
     else
     {
         _snprintf(error_msg, ERROR_MSG_LEN, "%s option: must be \"list\" "
-            "or \"ldap\"", keyword);
+            "\"certificate\", \"ldap\" or \"server\"", keyword);
         return KEYWORD_ERR_INVALID_ARGS;
     }
 
@@ -203,10 +216,20 @@ static KEYWORD_CB(user_mode)
 static KEYWORD_CB(user)
 {
     char *token, *p;
-    char user_name[256];
-    char uid[16], gid[16];
+    char user_name[STR_BUF_LEN];
+    char uidbuf[16], gidbuf[16];
+    PVFS_uid uid;
+    PVFS_gid gid;
     int i, ret = 0;
-    PVFS_credential credential;
+    PCONFIG_USER_ENTRY user_entry;
+    
+
+    if (options->user_mode != USER_MODE_LIST)
+    {
+        _snprintf(error_msg, ERROR_MSG_LEN, "%s option: must be in list mode", 
+            keyword);
+        return KEYWORD_ERR_UNEXPECTED;
+    }
 
     /* tokenize arguments */
     token = strtok(args, " \t");
@@ -214,19 +237,19 @@ static KEYWORD_CB(user)
     if (token)
     {
         /* copy user name */
-        strncpy(user_name, token, 256);
+        strncpy(user_name, token, STR_BUF_LEN);
 
         token = strtok(NULL, " \t");
         if (token)
         {
-            uid[0] = gid[0] = '\0';
+            uidbuf[0] = gidbuf[0] = '\0';
             i = 0;
             p = token;
             while (*p && *p != ':' && i < 15)
             {
                 if (isdigit(*p))
                 {
-                    uid[i++] = *p++;
+                    uidbuf[i++] = *p++;
                 }
                 else 
                 {
@@ -234,7 +257,7 @@ static KEYWORD_CB(user)
                     break;
                 }
             }
-            uid[i] = '\0';
+            uidbuf[i] = '\0';
             if (ret == 0)
             {
                 if (*p == ':')
@@ -244,7 +267,7 @@ static KEYWORD_CB(user)
                 {
                     if (isdigit(*p))
                     {
-                        gid[i++] = *p++;
+                        gidbuf[i++] = *p++;
                     }
                     else 
                     {
@@ -252,7 +275,7 @@ static KEYWORD_CB(user)
                         break;
                     }
                 }
-                gid[i] = '\0';
+                gidbuf[i] = '\0';
             }
         }
         else
@@ -266,19 +289,35 @@ static KEYWORD_CB(user)
     }
 
     if (ret == 0)
-        ret = !(strlen(uid) > 0 && strlen(gid) > 0);
+        ret = !(strlen(uidbuf) > 0 && strlen(gidbuf) > 0);
 
     if (ret == 0)
     {
-        /* add user to cache with no expiration */
-        /* TODO: updated security */
-        init_credential(&credential);
-        credential.userid = atoi(uid);
-        credential_add_group(&credential, atoi(gid));
-        
-        add_cache_user(user_name, &credential, NULL);
+        /* get numeric uid/gid, checking for error */
+        uid = atoi(uidbuf);
+        if (uid == 0 && strcmp(uidbuf, "0"))
+        {
+            return -1;
+        }
+        gid = atoi(gidbuf);
+        if (gid == 0 && strcmp(gidbuf, "0"))
+        {
+            return -1;
+        }
 
-        PINT_cleanup_credential(&credential);
+        /* set up user entry for list */
+        user_entry = (PCONFIG_USER_ENTRY) malloc(sizeof(CONFIG_USER_ENTRY));
+        if (user_entry != NULL)
+        {
+            strncpy(user_entry->user_name, user_name, STR_BUF_LEN);
+            user_entry->user_name[STR_BUF_LEN-1] = '\0';
+
+            user_entry->uid = uid;
+            user_entry->gid = gid;
+        }
+
+        /* insert entry */
+        qlist_add_tail(&user_entry->link, &user_list);
     }
 
     return ret;
@@ -320,7 +359,7 @@ static KEYWORD_CB(debug)
         /* optional debug mask */
         if (strlen(args) > 0) 
         {
-            strncpy(options->debug_mask, args, 256);
+            strncpy(options->debug_mask, args, STR_BUF_LEN);
             options->debug_mask[255] = '\0';
         }
         else
@@ -352,9 +391,9 @@ static KEYWORD_CB(security_mode)
 {
     KEYWORD_ARGS_CHECK();
 
-    if (!stricmp(args, "none"))
+    if (!stricmp(args, "default"))
     {
-        options->security_mode = SECURITY_MODE_NONE;
+        options->security_mode = SECURITY_MODE_DEFAULT;
     }
     else if (!stricmp(args, "key"))
     {
@@ -366,7 +405,7 @@ static KEYWORD_CB(security_mode)
     }
     else
     {
-        _snprintf(error_msg, ERROR_MSG_LEN, "%s option: must be \"none\","
+        _snprintf(error_msg, ERROR_MSG_LEN, "%s option: must be \"default\","
             "\"key\" or \"certificate\"", keyword);
         return KEYWORD_ERR_INVALID_ARGS;
     }
@@ -376,10 +415,33 @@ static KEYWORD_CB(security_mode)
 
 static KEYWORD_CB(key_file)
 {
+    FILE *f;
+    char errbuf[256];
+
     KEYWORD_ARGS_CHECK();
 
     strncpy(options->key_file, args, MAX_PATH-2);
     options->key_file[MAX_PATH-2] = '\0';
+
+    /* cache private key in key mode */
+    if (options->security_mode == SECURITY_MODE_KEY)
+    {
+        f = fopen(options->key_file, "r");
+        if (f == NULL)
+        {
+            strerror_s(errbuf, sizeof(errbuf), errno);
+            _snprintf(error_msg, ERROR_MSG_LEN, "%s option: could not open file "
+                "%s: %s (%d)", keyword, options->key_file, errbuf, errno);
+            return KEYWORD_ERR_INVALID_ARGS;
+        }
+    
+        options->private_key = PEM_read_PrivateKey(f, NULL, NULL, NULL);
+        if (options->private_key == NULL) {
+            report_error("Error loading private key: ", -PVFS_ESECURITY);
+        }
+
+        fclose(f);
+    }
 
     return 0;
 }
@@ -409,37 +471,15 @@ static KEYWORD_CB(cert_security)
 {
     KEYWORD_ARGS_CHECK();
 
-    if (!stricmp(keyword, "cert-mode"))
-    {
-        if (!stricmp(args, "proxy"))
-        {
-            options->cert_mode = CERT_MODE_PROXY;
-        }
-        else if (!stricmp(args, "user")) 
-        {
-            options->cert_mode = CERT_MODE_USER;
-        }
-        else
-        {
-            _snprintf(error_msg, ERROR_MSG_LEN, "%s option: must be \"proxy\""
-                " or \"user\"", keyword);
-            return KEYWORD_ERR_INVALID_ARGS;
-        }
-    }
-    else if (!stricmp(keyword, "ca-file") || !stricmp(keyword, "ca-path"))
+    if (!stricmp(keyword, "ca-file") || !stricmp(keyword, "ca-path"))
     {
         strncpy(options->ca_file, args, MAX_PATH-2);
         options->ca_file[MAX_PATH-2] = '\0';
     }
-    else if (!stricmp(keyword, "cert-dir-prefix"))
+    else if (!stricmp(keyword, "cert-dir-prefix") || !stricmp(keyword, "cert-file"))
     {
         strncpy(options->cert_dir_prefix, args, MAX_PATH-2);
         options->cert_dir_prefix[MAX_PATH-2] = '\0';
-    }
-    else if (!stricmp(keyword, "cert-file"))
-    {
-        strncpy(options->cert_file, args, MAX_PATH-2);
-        options->cert_file[MAX_PATH-2] = '\0';
     }
 
     return 0;
@@ -447,13 +487,13 @@ static KEYWORD_CB(cert_security)
 
 static KEYWORD_CB(ldap)
 {
-    char temp[256], *token;
+    char temp[STR_BUF_LEN], *token;
     int ret;
 
     if (!stricmp(keyword, "ldap-host"))
     {
         /* parse string of form ldap[s]://host[:port] */      
-        strncpy(temp, args, 256);
+        strncpy(temp, args, STR_BUF_LEN);
         token = strtok(temp, ":/");
         if (token != NULL)
         {
@@ -494,7 +534,7 @@ static KEYWORD_CB(ldap)
     else if (!stricmp(keyword, "ldap-bind-dn"))
     {
         /* the dn of the user used to bind to the ldap host */
-        strncpy(options->ldap.bind_dn, args, 256);
+        strncpy(options->ldap.bind_dn, args, STR_BUF_LEN);
         options->ldap.bind_dn[255] = '\0';
 
         ret = strlen(args) > 0 ? 0 : -1;
@@ -511,7 +551,7 @@ static KEYWORD_CB(ldap)
     else if (!stricmp(keyword, "ldap-search-root"))
     {
         /* dn of the object from which to start the search */
-        strncpy(options->ldap.search_root, args, 256);
+        strncpy(options->ldap.search_root, args, STR_BUF_LEN);
         options->ldap.search_root[255] = '\0';
 
         ret = strlen(args) > 0 ? 0 : -1;
@@ -573,252 +613,6 @@ keyword_ldap_cb_exit:
 
     return ret;
 }
-
-#if 0
-
-/* parse line in format: <[domain\]user name> <uid>:<gid> */
-static int parse_user()
-{
-    char *token, *p;
-    char user_name[256];
-    char uid[16], gid[16];
-    int i, ret = 0;
-    PVFS_credential credential;
-
-    /* assume current string being parsed */
-    token = strtok(NULL, " \t");
-
-    if (token)
-    {
-        /* copy user name */
-        strncpy(user_name, token, 256);
-
-        token = strtok(NULL, " \t");
-        if (token)
-        {
-            uid[0] = gid[0] = '\0';
-            i = 0;
-            p = token;
-            while (*p && *p != ':' && i < 15)
-            {
-                if (isdigit(*p))
-                {
-                    uid[i++] = *p++;
-                }
-                else 
-                {
-                    ret = -1;
-                    break;
-                }
-            }
-            uid[i] = '\0';
-            if (ret == 0)
-            {
-                if (*p == ':')
-                    p++;
-                i = 0;
-                while(*p && i < 15)
-                {
-                    if (isdigit(*p))
-                    {
-                        gid[i++] = *p++;
-                    }
-                    else 
-                    {
-                        ret = -1;
-                        break;
-                    }
-                }
-                gid[i] = '\0';
-            }
-        }
-        else
-        {
-            ret = -1;
-        }
-    }
-    else
-    {
-        ret = -1;
-    }
-
-    if (ret == 0)
-        ret = !(strlen(uid) > 0 && strlen(gid) > 0);
-
-    if (ret == 0)
-    {
-        /* add user to cache with no expiration */
-        init_credential(&credential);
-        credential.userid = atoi(uid);
-        credential_add_group(&credential, atoi(gid));
-        
-        add_cache_user(user_name, &credential, NULL);
-
-        PINT_cleanup_credential(&credential);
-    }
-
-    return ret;
-}
-
-static int parse_ldap_option(PORANGEFS_OPTIONS options,
-                      char *line,
-                      char *option,
-                      char *error_msg,
-                      unsigned int error_msg_len)
-{
-    char *p, temp[256], *token;
-    int ret = -1;
-
-    error_msg[0] = '\0';
-
-    if (options->user_mode != USER_MODE_LDAP)
-    {
-        strncpy(error_msg, "Configuration file (fatal): "
-            "Specify \"user-mode ldap\" before other ldap options", 
-            error_msg_len);
-        goto parse_ldap_option_exit;
-    }
-
-    if (!stricmp(option, "ldap-host"))
-    {
-        /* parse string of form ldap[s]://host[:port] */
-        p = line + strlen(option);
-        EAT_WS(p);
-       
-        strncpy(temp, p, 256);
-        token = strtok(temp, ":/");
-        if (token != NULL)        
-            if (!stricmp(token, "ldap"))
-                options->ldap.secure = 0;
-            else if (!stricmp(token, "ldaps"))
-                options->ldap.secure = 1;
-            else
-                goto parse_ldap_option_exit;        
-        else 
-            goto parse_ldap_option_exit;
-        
-        token = strtok(NULL, ":/");
-        if (token != NULL && strlen(token) > 0)
-            strcpy(options->ldap.host, token);
-        else
-            goto parse_ldap_option_exit;
-
-        token = strtok(NULL, ":");
-        if (token != NULL && strlen(token) > 0)
-            options->ldap.port = atoi(token);
-
-        ret = 0;
-    }
-    else if (!stricmp(option, "ldap-bind-dn"))
-    {
-        /* the dn of the user used to bind to the ldap host */
-        p = line + strlen(option);
-        EAT_WS(p);
-
-        strncpy(options->ldap.bind_dn, p, 256);
-        options->ldap.bind_dn[255] = '\0';
-
-        ret = strlen(p) > 0 ? 0 : -1;
-    }
-    else if (!stricmp(option, "ldap-bind-password"))
-    {
-        /* the password of the binding user */
-        p = line + strlen(option);
-        EAT_WS(p);
-
-        strncpy(options->ldap.bind_password, p, 32);
-        options->ldap.bind_password[31] = '\0';
-
-        ret = strlen(p) > 0 ? 0 : -1;
-    }
-    else if (!stricmp(option, "ldap-search-root"))
-    {
-        /* dn of the object from which to start the search */
-        p = line + strlen(option);
-        EAT_WS(p);
-
-        strncpy(options->ldap.search_root, p, 256);
-        options->ldap.search_root[255] = '\0';
-
-        ret = strlen(p) > 0 ? 0 : -1;
-    }
-    else if (!stricmp(option, "ldap-search-scope"))
-    {
-        /* scope of search: onelevel or subtree */
-        p = line + strlen(option);
-        EAT_WS(p);
-
-        strncpy(temp, p, 32);
-        temp[31] = '\0';
-
-        if (!stricmp(temp, "onelevel"))
-            options->ldap.search_scope = LDAP_SCOPE_ONELEVEL;
-        else if (!stricmp(temp, "subtree"))
-            options->ldap.search_scope = LDAP_SCOPE_SUBTREE;
-        else
-        {
-            strncpy(error_msg, "Configuration file (fatal): "
-                "ldap-search-scope must be onelevel or subtree", error_msg_len);
-            goto parse_ldap_option_exit;
-        }
-
-        ret = 0;
-    }
-    else if (!stricmp(option, "ldap-search-class"))
-    {
-        p = line + strlen(option);
-        EAT_WS(p);
-
-        strncpy(options->ldap.search_class, p, 32);
-        options->ldap.search_class[31] = '\0';
-
-        ret = strlen(p) > 0 ? 0 : -1;
-    }
-    else if (!stricmp(option, "ldap-naming-attr"))
-    {
-        p = line + strlen(option);
-        EAT_WS(p);
-
-        strncpy(options->ldap.naming_attr, p, 32);
-        options->ldap.naming_attr[31] = '\0';
-
-        ret = strlen(p) > 0 ? 0 : -1;
-    }
-    else if (!stricmp(option, "ldap-uid-attr"))
-    {
-        p = line + strlen(option);
-        EAT_WS(p);
-
-        strncpy(options->ldap.uid_attr, p, 32);
-        options->ldap.uid_attr[31] = '\0';
-
-        ret = strlen(p) > 0 ? 0 : -1;
-    }
-    else if (!stricmp(option, "ldap-gid-attr"))
-    {
-        p = line + strlen(option);
-        EAT_WS(p);
-
-        strncpy(options->ldap.gid_attr, p, 32);
-        options->ldap.gid_attr[31] = '\0';
-
-        ret = strlen(p) > 0 ? 0 : -1;
-    }
-    else
-    {
-        _snprintf(error_msg, error_msg_len, "Configuration file (fatal): "
-            "Unknown option %s", option);
-    }
-
-parse_ldap_option_exit:
-
-    if (ret != 0 && strlen(error_msg) == 0)
-        _snprintf(error_msg, error_msg_len, "Configuration file (fatal): "
-            "Could not parse option %s", option);
-
-    return ret;
-}
-#endif   /* #if 0 */
 
 /* pick the first available drive, starting with E: 
    drive must be able to store two chars (e.g. "F:") */
@@ -893,7 +687,7 @@ int get_config(PORANGEFS_OPTIONS options,
 {
     FILE *config_file;
     PCONFIG_KEYWORD_DEF keyword_def;
-    char line[256], copy[256], *keyword, *pargs, args[256];
+    char line[STR_BUF_LEN], *pline, keyword[STR_BUF_LEN], args[STR_BUF_LEN];
     int ret = 0, i, debug_file_flag = FALSE;
 
     config_file = open_config_file(error_msg, error_msg_len);
@@ -903,34 +697,46 @@ int get_config(PORANGEFS_OPTIONS options,
 
     set_defaults(options);
 
+    /* initialize user list */
+    /*INIT_QLIST_HEAD(&user_list);*/
+
     /* parse options from the file */
     while (!feof(config_file))
     {
         line[0] = '\0';
-        fgets(line, 256, config_file);
+        fgets(line, sizeof(line), config_file);
+        line[sizeof(line)-1] = '\0';
 
         /* remove \n */        
         if (strlen(line) > 0 && line[strlen(line)-1] == '\n')
             line[strlen(line)-1] = '\0';
         
         /* check line -- # used for comments */
-        if (strlen(line) > 0 && line[0] != '#')
+        if (strlen(line) > 0)
         {
-            /* make a copy */
-            strncpy(copy, line, 256);
-            /* parse line */
-            keyword = strtok(copy, " \t");
-            if (keyword == NULL)
+            /* skip whitespace and comments */
+            pline = line;
+            EAT_WS(pline);
+            if (!(*pline) || *pline == '#')
                 continue;
 
-            /* set arguments */
-            memset(args, 0, 256);
-            pargs = strtok(NULL, " \t");
-            if (pargs != NULL)
+            /* get keyword */
+            i = 0;
+            while (*pline && (*pline != ' ' || *pline == '\t') &&
+                (i < sizeof(keyword)-1))
             {
-                strncpy(args, pargs, 256);
-                args[255] = '\0';
+                keyword[i++] = *pline++;
             }
+            keyword[i] = '\0';
+
+            /* get arguments */
+            EAT_WS(pline);
+            i = 0;
+            while (*pline && (i < sizeof(args)-1))
+            {
+                args[i++] = *pline++;
+            }
+            args[i] = '\0';
             
             memset(error_msg, 0, error_msg_len);
 
@@ -962,203 +768,27 @@ int get_config(PORANGEFS_OPTIONS options,
 
     } /* feof */
 
-/* TODO: remove */
-#if 0
-        if (!stricmp(token, "mount"))
-        {
-                /* copy the remaining portion of the line 
-                   as the mount point */
-                token = strtok(NULL, " \t");
-                strncpy(options->mount_point, token, MAX_PATH);
-            }
-            else if (!stricmp(token, "threads"))
-            {
-                token = strtok(NULL, " \t");
-                options->threads = atoi(token);
-            }
-            else if (!stricmp(token, "user-mode"))
-            {
-                token = strtok(NULL, " \t");
-                if (token == NULL)
-                {
-                    _snprintf(error_msg, error_msg_len, 
-                        "Configuration file (fatal): "
-                        "user-mode option must be list, certificate, "
-                        "or ldap");
-                    ret = -1;
-                    goto get_config_exit;
-                }
-                if (!stricmp(token, "list"))
-                {
-                    options->user_mode = USER_MODE_LIST;
-                }
-                else if (!stricmp(token, "certificate"))
-                {
-                    options->user_mode = USER_MODE_CERT;
-                }
-                else if (!stricmp(token, "ldap"))
-                {
-                    options->user_mode = USER_MODE_LDAP;
-                }
-                else
-                {
-                    _snprintf(error_msg, error_msg_len,
-                        "Configuration file (fatal): "
-                        "user-mode option must be list, certificate, "
-                        "or ldap");
-                    ret = -1;
-                    goto get_config_exit;
-                }
-            }
-            else if (!stricmp(token, "user")) 
-            {
-                if (options->user_mode == USER_MODE_NONE)
-                {
-                    _snprintf(error_msg, error_msg_len, 
-                        "Configuration file (fatal): "
-                        "user option: specify 'user-mode list' above user "
-                        "option");
-                    ret = -1;
-                    goto get_config_exit;
-                }
-                else if (options->user_mode != USER_MODE_LIST)
-                {
-                    _snprintf(error_msg, error_msg_len, 
-                        "Configuration file (fatal): "
-                        "user option: not legal with current user mode");
-                    ret = -1;
-                    goto get_config_exit;
-                }
-
-                if (parse_user() != 0)
-                {
-                    _snprintf(error_msg, error_msg_len, 
-                        "Configuration file (fatal): "
-                        "user option: parse error");
-                    ret = -1;
-                    goto get_config_exit;
-                }
-            }            
-            else if (!stricmp(token, "cert-dir-prefix"))
-            {
-                p = line + strlen(token);
-                EAT_WS(p);
-                if (strlen(p) > 0)
-                {
-                    strncpy(options->cert_dir_prefix, p, MAX_PATH-2);
-                    options->cert_dir_prefix[MAX_PATH-2] = '\0';
-                    if (options->cert_dir_prefix[strlen(options->cert_dir_prefix)-1] != '\\')
-                        strcat(options->cert_dir_prefix, "\\");
-                }
-                else
-                {
-                    _snprintf(error_msg, error_msg_len, 
-                        "Configuration file (fatal): "
-                        "cert-dir-prefix option: parse error");
-                    ret = -1;
-                    goto get_config_exit;
-                }
-            }
-            else if (!stricmp(token, "ca-path"))
-            {
-                p = line + strlen(token);
-                EAT_WS(p);
-                if (strlen(p) > 0)
-                {
-                    strncpy(options->ca_path, p, MAX_PATH-2);
-                    options->ca_path[MAX_PATH-2] = '\0';
-                }
-                else
-                {
-                    _snprintf(error_msg, error_msg_len, 
-                        "Configuration file (fatal): "
-                        "ca-path option: parse error\n");
-                    ret = -1;
-                    goto get_config_exit;
-                }
-            }
-            else if (!stricmp(token, "new-file-perms") ||
-                     !stricmp(token, "new-dir-perms"))
-            {
-                p = line + strlen(token);
-                EAT_WS(p);
-                /* get mask in octal format */
-                mask = strtol(p, &endptr, 8);
-                if (!mask || *endptr != '\0')
-                {
-                    _snprintf(error_msg, error_msg_len,
-                        "Configuration file (fatal): "
-                        "%s option: parse error - value must be "
-                        "nonzero octal integer\n", token);
-                    ret = -1;
-                    goto get_config_exit;
-                }
-                if (!stricmp(token, "new-file-perms"))
-                {
-                    options->new_file_perms = (unsigned int) mask;
-                }
-                else
-                {
-                    options->new_dir_perms = (unsigned int) mask;
-                }
-            }
-            else if (!stricmp(token, "debug"))
-            {
-                options->debug = TRUE;
-                /* rest of line gives optional debug mask */
-                p = line + strlen(token);
-                EAT_WS(p);
-                if (strlen(p) > 0)
-                {
-                    strncpy(options->debug_mask, p, 256);
-                    options->debug_mask[255] = '\0';
-                }
-                else
-                {
-                    /* just debug Windows client */
-                    strcpy(options->debug_mask, "win_client");
-                }
-            }
-            else if (!stricmp(token, "debug-stderr"))
-            {
-                options->debug_stderr = options->debug = TRUE;
-            }
-            else if (!stricmp(token, "debug-file"))
-            {
-                debug_file_flag = TRUE;
-                /* path to debug file */
-                p = line + strlen(token);
-                EAT_WS(p);
-                if (strlen(p) > 0)
-                {
-                    strncpy(options->debug_file, p, MAX_PATH-2);
-                    options->debug_file[MAX_PATH-2] = '\0';
-                }
-            }
-            else if (!strnicmp(token, "ldap", 4))
-            {
-                ret = parse_ldap_option(options, line, token, error_msg, 
-                    error_msg_len);
-                if (ret != 0)
-                    goto get_config_exit;
-            }
-            else
-            {
-                _snprintf(error_msg, error_msg_len, 
-                    "Configuration file (fatal): "
-                    "Unknown option %s", token);
-                ret = -1;
-                goto get_config_exit;
-            }
-        }
+    if (options->user_mode == USER_MODE_NONE && 
+        options->security_mode == SECURITY_MODE_CERT)
+    {
+        options->user_mode = USER_MODE_SERVER;
     }
-#endif /* #if 0 */
 
     if (options->user_mode == USER_MODE_NONE)
     {
         _snprintf(error_msg, error_msg_len, 
             "Configuration file (fatal): "
-            "Must specify user-mode (list or ldap)");
+            "Must specify user-mode (list, certificate, ldap or server)");
+        ret = -1;
+        goto get_config_exit;
+    }
+
+    if (options->security_mode == SECURITY_MODE_CERT &&
+        options->user_mode != USER_MODE_SERVER)
+    {
+        _snprintf(error_msg, error_msg_len,
+            "Configuration file (fatal): "
+            "User-mode must be server if security-mode is certificate");
         ret = -1;
         goto get_config_exit;
     }
@@ -1189,6 +819,68 @@ int get_config(PORANGEFS_OPTIONS options,
 get_config_exit:
 
     close_config_file(config_file);
+
+    return ret;
+}
+
+/* add users from list to cache 
+ * NOTE: goptions must have been initialized
+ */
+int add_users(PORANGEFS_OPTIONS options,
+              char *error_msg,
+              unsigned int error_msg_len)
+{
+    int ret = 0, add_flag = 0;
+    struct qlist_head *iterator = NULL, *scratch = NULL;
+    PCONFIG_USER_ENTRY user_entry;
+    PVFS_credential cred;
+
+    if (options->user_mode == USER_MODE_LIST)
+    {
+        /* add users from list to cache */
+        qlist_for_each_safe(iterator, scratch, &user_list)
+        {
+            user_entry = qlist_entry(iterator, CONFIG_USER_ENTRY, link);
+            if (user_entry == NULL)
+            {
+                _snprintf(error_msg, error_msg_len, "Initialization (fatal): "
+                    "internal error");
+                ret = -1;
+                break;
+            }
+
+            /* create credential */
+            ret = init_credential(user_entry->uid, &user_entry->gid, 1, NULL, NULL, &cred);
+            if (ret != 0)
+            {
+                _snprintf(error_msg, error_msg_len, "Initialization (fatal): "
+                    "could not init credential for %s", user_entry->user_name);
+                break;
+            }
+
+            /* add user to cache with no expiration */
+            ret = add_cache_user(user_entry->user_name, &cred, NULL);
+            if (ret != 0)
+            {
+                _snprintf(error_msg, error_msg_len, "Initialization (fatal): "
+                    "could not add %s to cache", user_entry->user_name);
+                break;
+            }
+
+            add_flag = 1;
+
+            /* free list entry and credential fields */
+            free(user_entry);
+
+            PINT_cleanup_credential(&cred);
+        }
+    }
+
+    if (options->user_mode == USER_MODE_LIST && ret == 0 && add_flag == 0)
+    {
+        _snprintf(error_msg, error_msg_len, "Initialization (fatal): no users");
+        ret = -1;
+    }
 
     return ret;
 }

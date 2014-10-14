@@ -16,7 +16,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <usrint.h>
-#include <posix-pvfs.h>
+#include <recursive-remove.h>
+#include <str-utils.h>
 #include "org_orangefs_usrint_PVFS2STDIOJNI.h"
 
 /* TODO: relocate these maybe to pvfs2-types.h? */
@@ -26,37 +27,10 @@
 #define MAX_GROUPNAME_LENGTH 32
 
 /* Forward declarations of non-native functions */
-static char *combine(char* s1, char* s2, char* dest);
-static int get_comb_len(char* s1, char* s2);
 static int get_groupname_by_gid(gid_t gid, char *groupname);
 static int get_username_by_uid(uid_t uid, char *username);
 static int get_gid_by_groupname(gid_t *gid, char *groupname);
 static int get_uid_by_username(uid_t *uid, char *username);
-static inline int is_dot_dir(char * dirent_name);
-static inline int is_lostfound_dir(char * dirent_name);
-/* TODO: relocate recursive delete related functions so other utilities can
- * make use of them. */
-static int recursive_delete(char *dir);
-static int remove_files_in_dir(char *dir, DIR* dirp);
-
-/** Combine the two strings with a forward slash between.
- * Don't forget to memset the string!!! The resulting string is stored in dest.
- * Ensure dest is large enough to contain the resulting string.
- */
-static char *combine(char* s1, char* s2, char* dest)
-{
-    strcat(dest, s1);
-    strcat(dest, "/");
-    return strcat(dest, s2);
-}
-
-/** Return the length of the resulting string assuming s1 and s2 will be
- * combined with a separating slash and null terminating byte.
- */
-static int get_comb_len(char* s1, char* s2)
-{
-    return (int) (strlen(s1) + strlen(s2) + 2);
-}
 
 static int get_groupname_by_gid(gid_t gid, char *groupname)
 {
@@ -139,165 +113,6 @@ static int get_uid_by_username(uid_t *uid, char *username)
     JNI_PRINT("uid of username(%s) = %d\n", username, (int) *uid);
 
     /* Return 0 on success */
-    return 0;
-}
-
-/* Returns non-zero (true) if the supplied directory entry name corresponds
- * to the dot directories: {".", ".."}. Otherwise, returns 0;
- */
-static inline int is_dot_dir(char * dirent_name)
-{
-    return (int) ((strcmp(dirent_name, ".") == 0)
-            || (strcmp(dirent_name, "..") == 0));
-}
-
-/* Returns non-zero(true) if the supplied directory entry name corresponds to
- * the OrangeFS specific directory called "lost+found". */
-static inline int is_lostfound_dir(char * dirent_name)
-{
-    return (int) (strcmp(dirent_name, "lost+found") == 0);
-}
-
-/* Recursively delete the path specified by dir. */
-static int recursive_delete(char *dir)
-{
-    JNI_PFI();
-    JNI_PRINT("dir=%s\n", dir);
-    int ret = -1;
-    DIR * dirp = NULL;
-    struct dirent * direntp = NULL;
-
-    /* Open the directory specified by dir */
-    errno = 0;
-    dirp = opendir(dir);
-    if (!dirp)
-    {
-        JNI_PERROR();
-        return -1;
-    }
-
-    /* Remove all files in the current directory */
-    if (remove_files_in_dir(dir, dirp) != 0)
-    {
-        JNI_ERROR("remove_files_in_dir failed on directory: %s\n", dir);
-        return -1;
-    }
-
-    /* Rewind directory stream and call recursive delete on the directories
-     * in this directory.
-     */
-    rewinddir(dirp);
-    JNI_PRINT("rewinddir succeeded!\n");
-    while(1)
-    {
-        JNI_PRINT("calling readdir on dirp=%p\n", (void *) dirp);
-        errno = 0;
-        if((direntp = readdir(dirp)) == NULL)
-        {
-            if(errno != 0)
-            {
-                JNI_PERROR();
-                return -1;
-            }
-            break;
-        }
-        if(is_dot_dir(direntp->d_name) || is_lostfound_dir(direntp->d_name))
-        {
-            continue;
-        }
-        size_t abs_path_len = get_comb_len(dir, direntp->d_name);
-        char abs_path[abs_path_len];
-        memset((void *) abs_path, 0, abs_path_len);
-        combine(dir, direntp->d_name, abs_path);
-        /* Determine if this entry is a file or directory. */
-        struct stat buf;
-        JNI_PRINT("calling pvfs_stat_mask on file: %s\n", abs_path);
-        errno = 0;
-        ret = pvfs_stat_mask(abs_path, &buf, PVFS_ATTR_SYS_TYPE);
-        if(ret < 0)
-        {
-            JNI_PERROR();
-            return ret;
-        }
-        if(S_ISDIR(buf.st_mode))
-        {
-            ret = recursive_delete(abs_path);
-            if(ret < 0)
-            {
-                JNI_ERROR("recursive_delete failed on path:%s\n", abs_path);
-                return -1;
-            }
-        }
-    }
-
-    /* Close current directory before we attempt removal */
-    errno = 0;
-    if (closedir(dirp) != 0)
-    {
-        JNI_PERROR();
-        return -1;
-    }
-    errno = 0;
-    if (rmdir(dir) != 0)
-    {
-        JNI_PERROR();
-        return -1;
-    }
-    return 0;
-}
-
-/* Remove all files discovered in the open directory pointed to by dirp. */
-static int remove_files_in_dir(char *dir, DIR* dirp)
-{
-    int ret = -1;
-    struct dirent* direntp = NULL;
-    JNI_PFI();
-    /* Rewind this directory stream back to the beginning. */
-    JNI_PRINT("rewinding dirp = %p\n", dirp);
-    rewinddir(dirp);
-    JNI_PRINT("rewinddir succeeded!\n");
-    /* Loop over directory contents */
-    while(1)
-    {
-        errno = 0;
-        if((direntp = readdir(dirp)) == NULL)
-        {
-            if(errno != 0)
-            {
-                JNI_PERROR();
-                return -1;
-            }
-            break;
-        }
-        JNI_PRINT("direntp->d_name = %s\n", direntp->d_name);
-        size_t abs_path_len = get_comb_len(dir, direntp->d_name);
-        char abs_path[abs_path_len];
-        memset((void *) abs_path, 0, abs_path_len);
-        combine(dir, direntp->d_name, abs_path);
-        /* Determine if this entry is a file or directory. */
-        struct stat buf;
-        errno = 0;
-        ret = pvfs_stat_mask(abs_path, &buf, PVFS_ATTR_SYS_TYPE);
-        if(ret < 0)
-        {
-            JNI_PERROR();
-            return ret;
-        }
-        /* Skip directories. */
-        if(S_ISDIR(buf.st_mode))
-        {
-            continue;
-        }
-        /* Unlink file. */
-        JNI_PRINT("Unlinking file=%s\n", abs_path);
-        errno = 0;
-        ret = unlink(abs_path);
-        if (ret == -1)
-        {
-            JNI_PERROR();
-            return ret;
-        }
-    }
     return 0;
 }
 
@@ -1146,8 +961,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_getEntriesInDir(JNIEnv *env, jobject obj,
         direntp = readdir(dirp);
         if (direntp)
         {
-            if (is_dot_dir(direntp->d_name) ||
-                    is_lostfound_dir(direntp->d_name))
+            if (PINT_is_dot_dir(direntp->d_name))
             {
                 continue;
             }
@@ -1458,9 +1272,9 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_readdir(JNIEnv *env, jobject obj,
     return direntp;
 }
 
-/* recursive_delete */
+/* recursiveDeleteDir */
 JNIEXPORT jint JNICALL
-Java_org_orangefs_usrint_PVFS2STDIOJNI_recursiveDelete(JNIEnv *env, jobject obj,
+Java_org_orangefs_usrint_PVFS2STDIOJNI_recursiveDeleteDir(JNIEnv *env, jobject obj,
         jstring path)
 {
     JNI_PFI();
@@ -1468,10 +1282,10 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_recursiveDelete(JNIEnv *env, jobject obj,
     char cpath[PVFS_NAME_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-    ret = recursive_delete(cpath);
+    ret = recursive_delete_dir(cpath);
     if (ret == -1)
     {
-        JNI_ERROR("recursiveDelete error\n");
+        JNI_ERROR("recursiveDeleteDir error\n");
     }
     return ret;
 }

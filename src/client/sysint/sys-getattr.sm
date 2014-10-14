@@ -897,11 +897,12 @@ static int getattr_object_getattr_comp_fn(void *v_p,
             }
             return 0;
         case PVFS_TYPE_DIRECTORY:
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: objtype = DIRECTORY\n", __func__);
+        {            
             uint32_t dirent_file_count_i;
             int tmp_i;
             unsigned char *c;
+
+            gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: objtype = DIRECTORY\n", __func__);
 
             /* dirent_count will be collected later */
             gossip_debug(GOSSIP_CLIENT_DEBUG,
