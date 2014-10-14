@@ -324,7 +324,7 @@ static void lebf_initialize(void)
                 respsize = extra_size_PVFS_servresp_mgmt_get_uid;
                 break;
             case PVFS_SERV_TREE_SETATTR:
-                req.u.tree_setattr.num_servers = 0;
+                req.u.tree_setattr.handle_count = 0;
                 req.u.tree_setattr.handle_array = NULL;
                 reqsize = extra_size_PVFS_servreq_tree_setattr;
                 break;

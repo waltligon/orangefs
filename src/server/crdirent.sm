@@ -23,7 +23,14 @@
 #include "security-util.h"
 #include "pint-uid-map.h"
 
-int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i);
+static int split_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int i);
+static int tree_setattr_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int index);
 
 enum
 {
@@ -1138,6 +1145,7 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
             s_op->req->u.crdirent.fs_id,
             PVFS_TYPE_DIRDATA,
             s_op->attr,
+            0,
             num_remote_dirdata_handles,
             remote_dirdata_handles,
             NULL);
@@ -1145,7 +1153,7 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
         msg_p->fs_id = s_op->req->u.crdirent.fs_id;
         msg_p->handle = remote_dirdata_handles[0];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-        msg_p->comp_fn = NULL;
+        msg_p->comp_fn = tree_setattr_comp_fn;
 
         ret = PINT_cached_config_map_to_server(
             &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
@@ -1164,6 +1172,19 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
         js_p->error_code = 0;
     }
     return SM_ACTION_COMPLETE;
+}
+
+static int tree_setattr_comp_fn(void *v_p,
+                                struct PVFS_server_resp *resp_p,
+                                int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = &mop->msgpair;;
+
+    assert(msg_p->req.op == PVFS_SERV_TREE_SETATTR);
+    PINT_free_object_attr(&(msg_p->req).u.tree_setattr.attr);
+    return 0;
 }
 
 static PINT_sm_action crdirent_retrieve_dir_entries(
@@ -1236,7 +1257,7 @@ static PINT_sm_action crdirent_retrieve_dir_entries(
     return ret;
 }
 
-int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
+static int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
 {
     /* This function executes AFTER each msgpair has completed and is under the
     * control of msgpairarray.sm.  Here, we will capture the response from the

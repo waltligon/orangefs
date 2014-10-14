@@ -63,6 +63,10 @@
  * would be no dirdata dspace.
  */
 
+static int tree_setattr_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int index);
 #if 0
 static int remove_get_dirent_count_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -758,6 +762,8 @@ static PINT_sm_action remove_rebuild_dirdata_handle_local(
         server_job_context, 
         s_op->req->hints);
 
+    free(extent_array.extent_array);
+
     return(ret);
 }
 
@@ -922,6 +928,7 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(struct 
         s_op->req->u.remove.fs_id,
         PVFS_TYPE_DIRDATA,
         attr,
+        0,
         s_op->attr.dist_dir_attr.num_servers,
         s_op->attr.dirdata_handles,
         s_op->req->hints);
@@ -929,7 +936,7 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(struct 
     msg_p->fs_id = s_op->req->u.remove.fs_id;
     msg_p->handle = s_op->attr.dirdata_handles[0];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = NULL;
+    msg_p->comp_fn = tree_setattr_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
@@ -946,6 +953,18 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(struct 
     return SM_ACTION_COMPLETE;
 }
 
+static int tree_setattr_comp_fn(void *v_p,
+                                struct PVFS_server_resp *resp_p,
+                                int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = &mop->msgpair;;
+
+    assert(msg_p->req.op == PVFS_SERV_TREE_SETATTR);
+    PINT_free_object_attr(&(msg_p->req).u.tree_setattr.attr);
+    return 0;
+}
 
 static PINT_sm_action remove_rebuild_done(struct PINT_smcb *smcb, job_status_s *js_p)
 {

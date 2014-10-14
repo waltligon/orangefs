@@ -564,6 +564,7 @@ static PINT_sm_action msgpairarray_completion_fn(
              */
             msg_p->op_status = resp_p->status;
         }
+gossip_err("%s: resp_p address = %llu\n", __func__, llu(resp_p));
 
         /* NOTE: we call the function associated with each message,
          *       not just the one from the first array element.  so
