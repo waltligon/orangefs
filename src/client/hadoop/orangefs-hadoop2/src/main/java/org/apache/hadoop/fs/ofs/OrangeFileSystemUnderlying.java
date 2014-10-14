@@ -168,7 +168,7 @@ public class OrangeFileSystemUnderlying extends FileSystem {
             OFSLOG.debug("Path f =" + f
                     + " is a directory and recursive is true."
                     + " Recursively deleting directory.");
-            ret = orange.stdio.recursiveDelete(fOFS.toString()) == 0;
+            ret = orange.stdio.recursiveDeleteDir(fOFS.toString()) == 0;
         } else {
             OFSLOG.debug("Path f =" + f
                     + " exists and is a regular file. unlinking.");
@@ -559,12 +559,15 @@ public class OrangeFileSystemUnderlying extends FileSystem {
                 } else {
                     /* Create the missing parent and setPermission. */
                     statistics.incrementWriteOps(1);
-                    ret = orange.posix.mkdir(getOFSPathName(parents[i]), 0700);
+                    ret =
+                            orange.posix.mkdirTolerateExisting(
+                                    getOFSPathName(parents[i]), 0700);
                     if (ret == 0) {
                         setPermission(parents[i], permission);
                     } else {
-                        OFSLOG.error("mkdir failed on parent directory = "
-                                + parents[i] + ", permission = "
+                        OFSLOG.error("mkdirTolerateExisting failed on parent directory = "
+                                + parents[i]
+                                + ", permission = "
                                 + permission.toString());
                         return false;
                     }
@@ -573,13 +576,14 @@ public class OrangeFileSystemUnderlying extends FileSystem {
         }
         /* Now create the directory f */
         statistics.incrementWriteOps(1);
-        ret = orange.posix.mkdir(getOFSPathName(f), 0700);
+        ret = orange.posix.mkdirTolerateExisting(getOFSPathName(f), 0700);
         if (ret == 0) {
             setPermission(f, permission);
             return true;
         } else {
-            OFSLOG.error("mkdir failed on path f =" + makeAbsolute(f)
-                    + ", permission = " + permission.toString());
+            OFSLOG.error("mkdirTolerateExisting failed on path f ="
+                    + makeAbsolute(f) + ", permission = "
+                    + permission.toString());
             return false;
         }
     }

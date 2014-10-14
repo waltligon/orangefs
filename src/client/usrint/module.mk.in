@@ -23,7 +23,8 @@ USRC := \
 	$(DIR)/overunder.c \
 	$(DIR)/fts.c \
 	$(DIR)/glob.c \
-	$(DIR)/error.c
+	$(DIR)/error.c \
+        $(DIR)/recursive-remove.c
 
 #   these routines do no need to use the pvfs descriptor
 #   and will probably be removed

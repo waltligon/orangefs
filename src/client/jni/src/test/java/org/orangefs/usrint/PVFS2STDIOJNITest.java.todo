@@ -634,13 +634,13 @@ public class PVFS2STDIOJNITest
 
 	// C side implementation
 	@Test
-	public final void testRecursiveDelete() 
+	public final void testRecursiveDeleteDir() 
 	{
 		// Delete content inside this directory first
 		// then attempt deletion of this directory
 		fd = posix.creat("/mnt/orangefs/stdio_dir/test_file", posix.f.S_IRWXU);
 		assertTrue(fd > 0);
-		int ret = stdio.recursiveDelete("/mnt/orangefs/stdio_dir");
+		int ret = stdio.recursiveDeleteDir("/mnt/orangefs/stdio_dir");
 		assertTrue(ret != -1);
 	}
 

@@ -136,6 +136,33 @@
     </description>
   </property>
 
+  <property>
+    <name>mapreduce.map.speculative</name>
+    <value>false</value>
+    <description>
+    If true, then multiple instances of some map tasks may be executed in
+    parallel. DO NOT set this to true when OrangeFS is used.
+    </description>
+  </property>
+
+  <property>
+    <name>mapreduce.reduce.speculative</name>
+    <value>false</value>
+    <description>
+    If true, then multiple instances of some reduce tasks may be executed in
+    parallel. DO NOT set this to true when OrangeFS is used.
+    </description>
+  </property>
+
+  <property>
+    <name>mapreduce.job.reduce.slowstart.completedmaps</name>
+    <value>0.95</value>
+    <description>
+    Fraction of the number of maps in the job which should be complete before
+    reduces are scheduled for the job.
+    </description>
+  </property>
+
 <!-- You probably want to use compression with OrangeFS. See below. -->
 <!--
   <property>

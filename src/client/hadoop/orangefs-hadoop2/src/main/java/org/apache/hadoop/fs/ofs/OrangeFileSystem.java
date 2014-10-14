@@ -145,19 +145,8 @@ public class OrangeFileSystem extends FileSystem {
                 OFSLOG.debug("missing fParent = " + fParent);
                 /* Create missing parent dirs with default dir permissions */
                 if (!mkdirs(fParent)) {
-                    OFSLOG.debug("mkdir on fParent failed = " + fParent);
-                    /*
-                     * mkdirs could fail if another task creates the parent
-                     * directory after we checked to see if the parent exists.
-                     * So, check if the parent exists again to make sure mkdirs
-                     * didn't fail because another task already successfully
-                     * called mkdir on the parent directory/directories.
-                     */
-                    if (!exists(fParent)) {
-                        throw new IOException("Failed to create parent"
-                                + " directory/directories: "
-                                + fParent.toString());
-                    }
+                    throw new IOException("Failed to create parent"
+                            + " directory/directories: " + fParent.toString());
                 }
             }
         }
@@ -211,8 +200,7 @@ public class OrangeFileSystem extends FileSystem {
         /* New file */
         else {
             /*
-             * Check if parent directory exists.. if it doesn't call mkdirs on
-             * it.
+             * Check if parent directory exists.
              */
             fParent = f.getParent();
             OFSLOG.debug("fParent = " + fParent);
@@ -264,7 +252,7 @@ public class OrangeFileSystem extends FileSystem {
             OFSLOG.debug("Path f =" + f
                     + " is a directory and recursive is true."
                     + " Recursively deleting directory.");
-            ret = orange.stdio.recursiveDelete(fOFS.toString()) == 0;
+            ret = orange.stdio.recursiveDeleteDir(fOFS.toString()) == 0;
         } else {
             OFSLOG.debug("Path f =" + f
                     + " exists and is a regular file. unlinking.");
@@ -637,12 +625,15 @@ public class OrangeFileSystem extends FileSystem {
                 } else {
                     /* Create the missing parent and setPermission. */
                     statistics.incrementWriteOps(1);
-                    ret = orange.posix.mkdir(getOFSPathName(parents[i]), 0700);
+                    ret =
+                            orange.posix.mkdirTolerateExisting(
+                                    getOFSPathName(parents[i]), 0700);
                     if (ret == 0) {
                         setPermission(parents[i], permission);
                     } else {
-                        OFSLOG.error("mkdir failed on parent directory = "
-                                + parents[i] + ", permission = "
+                        OFSLOG.error("mkdirTolerateExisting failed on parent directory = "
+                                + parents[i]
+                                + ", permission = "
                                 + permission.toString());
                         return false;
                     }
@@ -651,13 +642,14 @@ public class OrangeFileSystem extends FileSystem {
         }
         /* Now create the directory f */
         statistics.incrementWriteOps(1);
-        ret = orange.posix.mkdir(getOFSPathName(f), 0700);
+        ret = orange.posix.mkdirTolerateExisting(getOFSPathName(f), 0700);
         if (ret == 0) {
             setPermission(f, permission);
             return true;
         } else {
-            OFSLOG.error("mkdir failed on path f =" + makeAbsolute(f)
-                    + ", permission = " + permission.toString());
+            OFSLOG.error("mkdirTolerateExisting failed on path f ="
+                    + makeAbsolute(f) + ", permission = "
+                    + permission.toString());
             return false;
         }
     }

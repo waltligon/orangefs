@@ -10,6 +10,15 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 
+inline short PINT_merged_path_len(
+    char* s1,
+    char* s2);
+int PINT_merge_paths(
+    char* s1,
+    char* s2,
+    char* dest);
+inline int PINT_is_dot_dir(
+    char * dirent_name);
 void PINT_string_rm_extra_slashes(
     char *s);
 void PINT_string_rm_extra_slashes_rts(

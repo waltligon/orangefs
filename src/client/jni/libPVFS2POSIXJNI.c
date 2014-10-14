@@ -1009,6 +1009,42 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_mkdir(JNIEnv *env, jobject obj,
     return ret;
 }
 
+/* mkdirTolerateExisting */
+JNIEXPORT jint JNICALL
+Java_org_orangefs_usrint_PVFS2POSIXJNI_mkdirTolerateExisting(JNIEnv *env,
+        jobject obj, jstring path, jlong mode)
+{
+    JNI_PFI();
+    int ret = -1;
+    int hold_errno = 0;
+    int cpath_len = (*env)->GetStringLength(env, path);
+    char cpath[cpath_len + 1];
+    (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
+    JNI_PRINT("cpath = %s\n", cpath);
+    ret = mkdir(cpath, (mode_t) mode);
+    JNI_PRINT("mkdir returned %d\n", ret);
+    if (ret < 0)
+    {
+        hold_errno = errno;
+        /* The sole purpose of this native method is return 0 when the path
+         * already exists as a directory. */
+        struct stat s;
+        /* Verify the path is a directory */
+        if(stat(cpath, &s) == 0)
+        {
+            if( s.st_mode & S_IFDIR )
+            {
+                /* cpath is an existing directory! */
+                return 0;
+            }
+        }
+        errno = hold_errno;
+        JNI_PERROR();
+        ret = -1;
+    }
+    return ret;
+}
+
 /* mkdirat */
 JNIEXPORT jint JNICALL
 Java_org_orangefs_usrint_PVFS2POSIXJNI_mkdirat(JNIEnv *env, jobject obj,
@@ -1389,7 +1425,9 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_stat(JNIEnv *env, jobject obj,
     ret = stat(cpath, &stats);
     if (ret != 0)
     {
+#ifdef ENABLE_JNI_PRINT
         JNI_PERROR();
+#endif
         return (jobject) 0;
     }
     jobject stat_obj;

@@ -1,63 +1,55 @@
-#ifndef LIBPVFS2JNI_COMMON_H
-#define LIBPVFS2JNI_COMMON_H
+/*
+ * (C) 2014 Clemson University
+ *
+ * See COPYING in top-level directory.
+ */
 
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
+#ifndef RECURSIVE_REMOVE_H
+#define RECURSIVE_REMOVE_H
 
-#ifdef _FORTIFY_SOURCE
-# undef _FORTIFY_SOURCE
-# define _FORTIFY_SOURCE 0
-#endif
-
-#include <errno.h>
+#include <dirent.h>
 #include <stdio.h>
-
-#define JNI_INITIAL_ARRAY_LIST_SIZE 1024
-#define NULL_JOBJECT ((jobject) NULL)
+#include <errno.h>
 
 /* ------------------ Uncomment to turn on debug info. ----------------------*/
-//#define ENABLE_JNI_PFI
-//#define ENABLE_JNI_PRINT
-#define ENABLE_JNI_ERROR
-#define ENABLE_JNI_PERROR
+//#define ENABLE_RR_PFI
+//#define ENABLE_RR_PRINT
+#define ENABLE_RR_ERROR
+#define ENABLE_RR_PERROR
 /* --------------------------------------------------------------------------*/
 
-#ifdef ENABLE_JNI_PFI
- #define JNI_PFI()                                                             \
+#ifdef ENABLE_RR_PFI
+ #define RR_PFI()                                                              \
      do                                                                        \
      {                                                                         \
          printf("function called: {%s}\n", __PRETTY_FUNCTION__);               \
-         fflush(stdout);                                                       \
      } while(0)
 #else
- #define JNI_PFI() do {} while(0)
+ #define RR_PFI() do {} while(0)
 #endif
 
-#ifdef ENABLE_JNI_PRINT
- #define JNI_PRINT(...)                                                        \
+#ifdef ENABLE_RR_PRINT
+ #define RR_PRINT(...)                                                         \
      do                                                                        \
      {                                                                         \
          fprintf(stdout, __VA_ARGS__);                                         \
-         fflush(stdout);                                                       \
      } while(0)
 #else
- #define JNI_PRINT(...) do {} while(0)
+ #define RR_PRINT(...) do {} while(0)
 #endif
 
-#ifdef ENABLE_JNI_ERROR
-#define JNI_ERROR(...)                                                         \
+#ifdef ENABLE_RR_ERROR
+#define RR_ERROR(...)                                                          \
      do                                                                        \
      {                                                                         \
          fprintf(stderr, __VA_ARGS__);                                         \
-         fflush(stderr);                                                       \
      } while(0)
 #else
- #define JNI_ERROR(...) do {} while(0)
+ #define RR_ERROR(...) do {} while(0)
 #endif
 
-#ifdef ENABLE_JNI_PERROR
-#define JNI_PERROR()                                                           \
+#ifdef ENABLE_RR_PERROR
+#define RR_PERROR(message)                                                     \
     do                                                                         \
     {                                                                          \
         if(errno != 0)                                                         \
@@ -65,12 +57,14 @@
             fprintf(stderr, "errno= %d\t"                                      \
                     "Error detected on line %d in function %s\n\t",            \
                     errno, __LINE__, __PRETTY_FUNCTION__);                     \
-            perror("");                                                        \
-            fflush(stderr);                                                    \
+            perror(message);                                                   \
         }                                                                      \
     } while(0)
 #else
- #define JNI_PERROR() do {} while(0)
+ #define RR_PERROR(message) do {} while(0)
 #endif
 
-#endif /* #ifndef LIBPVFS2JNI_COMMON_H */
+int recursive_delete_dir(char *dir);
+int remove_files_in_dir(char *dir, DIR* dirp);
+
+#endif
