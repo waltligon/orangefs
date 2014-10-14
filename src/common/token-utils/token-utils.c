@@ -12,6 +12,10 @@
 #include <stdlib.h>
 #endif
 
+#ifdef WIN32
+#define strtok_r(s, d, v)    strtok_s(s, d, v)
+#endif
+
 /* In-place tokenizer: Nice because it uses no malloc/free/etc...just strncpy.
  * It's up to the user to provide the character arrays this function uses.
  * ===========================================================================*/

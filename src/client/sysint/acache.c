@@ -6,7 +6,9 @@
 
 #include <assert.h>
 #include <string.h>
+#ifndef WIN32
 #include <err.h>
+#endif
 
 #include "pvfs2-attr.h"
 #include "acache.h"
@@ -339,12 +341,14 @@ int PINT_acache_get_cached_entry(
 #endif
         if(tmp_payload->attr.mask & PVFS_ATTR_DATA_SIZE)
         {
+            int usecs_since_dynamic_attrs_update;
+
             /* Get the time of day and store as milliseconds */
             PINT_util_get_current_timeval(&current_time);
             /* Get the difference in the current time and the time the dynamic
              * attrs were last refreshed.
              */
-            int usecs_since_dynamic_attrs_update = PINT_util_get_timeval_diff(
+            usecs_since_dynamic_attrs_update = PINT_util_get_timeval_diff(
                 &tmp_payload->dynamic_attrs_last_updated, &current_time);
             gossip_debug(GOSSIP_ACACHE_DEBUG,
                          "%s: usecs_since_dynamic_attrs_update = %d\n",
