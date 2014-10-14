@@ -168,7 +168,7 @@ public class OrangeFileSystemUnderlying extends FileSystem {
             OFSLOG.debug("Path f =" + f
                     + " is a directory and recursive is true."
                     + " Recursively deleting directory.");
-            ret = orange.stdio.recursiveDelete(fOFS.toString()) == 0;
+            ret = orange.stdio.recursiveDeleteDir(fOFS.toString()) == 0;
         } else {
             OFSLOG.debug("Path f =" + f
                     + " exists and is a regular file. unlinking.");

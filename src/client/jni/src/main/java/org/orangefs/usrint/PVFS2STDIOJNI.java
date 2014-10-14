@@ -161,7 +161,7 @@ public class PVFS2STDIOJNI {
 
     public native long readdir(long dirp);
 
-    public native int recursiveDelete(String path);
+    public native int recursiveDeleteDir(String path);
 
     public native int remove(String path);
 

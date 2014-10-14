@@ -558,7 +558,7 @@ ADMINSRC :=
 # ADMINSRC_SERVER special version of ADMINSRC for tools that need server 
 # library
 ADMINSRC_SERVER :=
-# usRSRC is source code for userland programs
+# USERSRC is source code for userland programs
 USERSRC :=
 # LIBSRC is source code for libpvfs2
 LIBSRC :=
@@ -1140,6 +1140,8 @@ $(ADMINTOOLS): %: %.o $(LIBRARIES)
 $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 
 $(USERTOOLS): %: %.o $(LIBRARIES)
+	$(Q) "  LD      $@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $< -lofs -lorangefs $(LIBS) $(call modldflags,$<)
 
 # ucached must link with liborangefs
 $(UCACHEDTOOLS): %: %.o $(LIBRARIES)
