@@ -2074,9 +2074,13 @@ class OFSTestNode(object):
                 logging.exception("Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location))
                 
         if self.enable_hadoop == True:
-            rc = self.runSingleCommand("ORANGEFS_PREFIX=%s %s/src/client/hadoop/orangefs-hadoop1/build-and-install.sh" %(self.ofs_installation_location,self.ofs_source_location))
+            self.changeDirectory("%s/src/client/hadoop/orangefs-hadoop1")
+            rc = self.runSingleCommand("mvn -Dmaven.complier.target=1.6 -Dmaven.compiler.source=1.6 -DskipTests clean package")
             if rc != 0:
                 logging.exception("Could not build and install hadoop1 libraries" )
+            else:
+                self.runSingleCommand('cp target/orangefs-hadoop1-?.?.?.jar "%s/lib"' % self.ofs_installation_location)
+            self.restoreDirectory()
         
         return rc
 
