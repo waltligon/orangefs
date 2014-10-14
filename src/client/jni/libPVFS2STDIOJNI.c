@@ -961,10 +961,6 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_getEntriesInDir(JNIEnv *env, jobject obj,
         direntp = readdir(dirp);
         if (direntp)
         {
-#if 0
-            if (is_dot_dir(direntp->d_name) ||
-                    is_lostfound_dir(direntp->d_name))
-#endif
             if (PINT_is_dot_dir(direntp->d_name))
             {
                 continue;

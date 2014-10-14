@@ -1425,7 +1425,9 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_stat(JNIEnv *env, jobject obj,
     ret = stat(cpath, &stats);
     if (ret != 0)
     {
+#ifdef ENABLE_JNI_PRINT
         JNI_PERROR();
+#endif
         return (jobject) 0;
     }
     jobject stat_obj;
