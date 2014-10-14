@@ -128,7 +128,7 @@ int main(int argc, char **argv)
  *
  * parses command line arguments
  *
- * returns pointer to options structure on success, NULL on failure
+ * Returns 0 on success and exits with EXIT_FAILURE on failure.
  */
 static int parse_args(int argc, char **argv, struct options *user_opts_p)
 {
