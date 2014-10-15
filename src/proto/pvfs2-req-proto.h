@@ -505,8 +505,9 @@ struct PVFS_servresp_tree_setattr
     uint32_t handle_count;
     int32_t *status;
 };
-endecode_fields_1a_struct(
+endecode_fields_2a_struct(
     PVFS_servresp_tree_setattr,
+    skip4,,
     uint32_t, caller_handle_index,
     uint32_t, handle_count,
     int32_t, status);

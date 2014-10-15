@@ -233,7 +233,6 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
     struct PVFS_server_req *req = NULL;
     PVFS_capability capability;
 
-gossip_err("tree_communicate_partition_handles: s_op = %llu, s_op->op = %d\n", llu(s_op), s_op->op);
     s_op->u.tree_communicate.handle_array_local = calloc(
         num_data_files, sizeof(*s_op->u.tree_communicate.handle_array_local));
     s_op->u.tree_communicate.handle_array_remote = calloc(
@@ -301,7 +300,6 @@ gossip_err("tree_communicate_partition_handles: s_op = %llu, s_op->op = %d\n", l
             case PVFS_SERV_TREE_SETATTR:
             {
                 PVFS_sys_attr dummy_sys_attr;
-gossip_err("%s: frame for local operation = %llu\n", __func__, llu(tree_communicate_s_op));
                 
                 memset(&dummy_sys_attr, 0, sizeof(PVFS_sys_attr));
                 
@@ -483,7 +481,6 @@ gossip_err("%s: frame for local operation = %llu\n", __func__, llu(tree_communic
             {
                 case PVFS_SERV_TREE_SETATTR:
                 {
-gossip_err("%s: frame for remote operation = %llu\n", __func__, llu(tree_communicate_s_op));
                     PINT_SERVREQ_TREE_SETATTR_FILL(
                         msg_p->req,
                         s_op->req->capability,
@@ -496,9 +493,6 @@ gossip_err("%s: frame for remote operation = %llu\n", __func__, llu(tree_communi
                         &s_op->u.tree_communicate.handle_array_remote[i*num_files_per_server],
                         s_op->req->hints);
                     msg_p->comp_fn = tree_setattr_comp_fn;
-//assert(s_op->resp.u.tree_setattr.caller_handle_index < 2);
-gossip_err("partition_handles: resp = %llu, caller_handle_index = %d, TREE_SETATTR_FILL caller_handle_index = %d\n", llu(&s_op->resp), s_op->resp.u.tree_setattr.caller_handle_index, i*num_files_per_server);
-assert( (i * num_files_per_server) < 2);
 
                     msg_p->retry_flag = PVFS_MSGPAIR_RETRY; 
                     break;
@@ -633,10 +627,6 @@ assert(s_op->req->u.tree_setattr.caller_handle_index < 2);
     s_op->resp.u.tree_setattr.handle_count =
             s_op->req->u.tree_setattr.handle_count;
 
-gossip_err("in tree_setattr_setup: s_op = %llu\n", llu(s_op));
-gossip_err("in tree_setattr_setup: s_op->resp = %llu\n", llu(&(s_op->resp)));
-gossip_err("in tree_setattr_setup: handle_count = %d\n", s_op->resp.u.tree_setattr.handle_count);
-gossip_err("in tree_setattr_setup: caller_handle_index = %d\n", s_op->resp.u.tree_setattr.caller_handle_index);
     gossip_debug(GOSSIP_SERVER_DEBUG,"%s: frame:%p \ttree.caller_handle_index:%u\n"
                                      "\t\ttree.handle_count:%d "
                                      "\ttree.op:%d\n"
@@ -656,7 +646,6 @@ gossip_err("in tree_setattr_setup: caller_handle_index = %d\n", s_op->resp.u.tre
         return SM_ACTION_COMPLETE;
     }
 
-gossip_err("in tree_setattr_setup: status array allocated: %llu\n", llu(s_op->resp.u.tree_setattr.status));
 
     return (tree_communicate_partition_handles(smcb, js_p, s_op->req->u.tree_setattr.handle_count,
         s_op->req->u.tree_setattr.fs_id, PVFS_SERV_TREE_SETATTR,
@@ -677,10 +666,6 @@ static int tree_setattr_comp_fn(void *v_p,
     int i;
     uint32_t status_array_index=0;
 
-gossip_err("tree_setattr_comp_fn: s_op = %llu, s_op->op = %d\n", llu(s_op), s_op->op);
-gossip_err("tree_setattr_comp_fn: index = %d, op_resp = %llu, caller_handle_index = %d\n", index, llu(op_resp), op_resp->u.tree_setattr.caller_handle_index);
-gossip_err("tree_setattr_comp_fn: resp_p = %llu, resp_p->op = %d, handle_count = %d, caller_handle_index = %d\n", llu(resp_p), resp_p->op, resp_p->u.tree_setattr.handle_count, resp_p->u.tree_setattr.caller_handle_index);
-assert(resp_p->u.tree_setattr.caller_handle_index < 2);
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "tree_setattr_comp_fn[%d], caller_handle_index = %u\n",
                  index, resp_p->u.tree_setattr.caller_handle_index);
@@ -708,10 +693,13 @@ assert(resp_p->u.tree_setattr.caller_handle_index < 2);
                                         ,__func__
                                         ,i
                                         ,m_tree->status[i]);
+//if (resp_p->u.tree_setattr.caller_handle_index < 2)
+//{
         status_array_index = s_op->u.tree_communicate.remote_join_size[ i +
                               resp_p->u.tree_setattr.caller_handle_index];
 
         op_tree->status[status_array_index] = m_tree->status[i];
+//}
     }
 
     return 0;
@@ -791,7 +779,7 @@ assert(tree_req->caller_handle_index < 2);
                               ,index
                               ,s_op->resp.u.tree_setattr.status[index]);
                  }/*end for*/
-                 PINT_free_object_attr(&tree_req->attr);
+/*temp                 PINT_free_object_attr(&tree_req->attr); */
               }/*end for*/
             }/*end if non-zero error-code*/
 
@@ -807,12 +795,11 @@ assert(tree_req->caller_handle_index < 2);
             gossip_debug(GOSSIP_SERVER_DEBUG,"%s:handle_index:%d\n"
                                             ,__func__
                                            ,old_frame->local_index);
-gossip_err("%s:handle_index:%d\n" ,__func__ ,old_frame->local_index);
             status_array_index = s_op->u.tree_communicate.local_join_size[
                                      old_frame->local_index];
             s_op->resp.u.tree_setattr.status[status_array_index] = error_code;
 
-            PINT_free_object_attr(&old_frame->req->u.setattr.attr);
+/*temp            PINT_free_object_attr(&old_frame->req->u.setattr.attr); */
             PINT_cleanup_capability(&old_frame->req->capability);
         }
         free(old_frame);
@@ -838,7 +825,6 @@ gossip_err("%s:handle_index:%d\n" ,__func__ ,old_frame->local_index);
                                     ,__func__
                                     ,s_tree->caller_handle_index
                                     ,s_tree->handle_count);
-//gossip_err("%s: resp->caller_handle_index:%u, resp->handle_count:%d\n" ,__func__ ,s_tree->caller_handle_index ,s_tree->handle_count);
 
     /*deallocate resources*/
     if (s_op->u.tree_communicate.handle_array_local)
@@ -855,28 +841,20 @@ gossip_err("%s:handle_index:%d\n" ,__func__ ,old_frame->local_index);
     s_op->u.tree_communicate.remote_join_size    = NULL;
 
     js_p->error_code = 0;
-gossip_err("tree_setattr_work_cleanup: s_op = %llu\n", llu(s_op));
-gossip_err("finishing tree_setattr_work_cleanup: s_op->resp = %llu\n", llu(&s_op->resp));
-gossip_err("finishing tree_setattr_work_cleanup: handle_count = %d\n", s_op->resp.u.tree_setattr.handle_count);
-gossip_err("finishing tree_setattr_work_cleanup: caller_handle_index = %d\n", s_op->resp.u.tree_setattr.caller_handle_index);
-gossip_err("finishing tree_setattr_work_cleanup: status array = %llu\n", llu(s_op->resp.u.tree_setattr.status));
     return SM_ACTION_COMPLETE;
 }
 
 static int tree_setattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PVFS_servresp_tree_setattr *s_tree = &(s_op->resp.u.tree_setattr);
+//    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+//    struct PVFS_servresp_tree_setattr *s_tree = &(s_op->resp.u.tree_setattr);
 
-gossip_err("tree_setattr_cleanup: s_op = %llu, s_op->op = %d\n", llu(s_op), s_op->op);
-gossip_err("finishing tree_setattr_cleanup: s_op->resp = %llu\n", llu(&s_op->resp));
-gossip_err("finishing tree_setattr_cleanup: handle_count = %d\n", s_op->resp.u.tree_setattr.handle_count);
-gossip_err("finishing tree_setattr_cleanup: caller_handle_index = %d\n", s_op->resp.u.tree_setattr.caller_handle_index);
-gossip_err("finishing tree_setattr_cleanup: status array = %llu\n", llu(s_op->resp.u.tree_setattr.status));
     /*cleanup response structure*/
+#if 0 //temp
     if (s_tree->status)
        free(s_tree->status);
+#endif
 
     return(server_state_machine_complete(smcb));
 }
@@ -984,7 +962,6 @@ static int tree_remove_work_cleanup(struct PINT_smcb *smcb,
     PINT_sm_msgpair_state *tree_msgarray = NULL;
     PINT_sm_msgarray_op *tree_msgop = NULL;
 
-gossip_err("entering tree_remove_work_cleanup\n");
     assert(s_op->req->op == PVFS_SERV_TREE_REMOVE);
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "%s: num_pjmp_frames = %d\n"
@@ -1109,13 +1086,14 @@ gossip_err("entering tree_remove_work_cleanup\n");
 static int tree_remove_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PVFS_servresp_tree_remove *s_tree = &(s_op->resp.u.tree_remove);
+//    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+//    struct PVFS_servresp_tree_remove *s_tree = &(s_op->resp.u.tree_remove);
 
-gossip_err("entering tree_remove_cleanup\n");
     /*cleanup response structure*/
+#if 0 //temp
     if (s_tree->status)
        free(s_tree->status);
+#endif
 
     return(server_state_machine_complete(smcb));
 }
@@ -1241,7 +1219,6 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
     struct PINT_server_tree_communicate_op *s_tree_comm = &(s_op->u.tree_communicate); 
 
 
-gossip_err("entering tree_get_file_size_work_cleanup\n");
     assert(s_op->req->op == PVFS_SERV_TREE_GET_FILE_SIZE);
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "%s: num_pjmp_frames = %d\n"
@@ -1370,15 +1347,16 @@ gossip_err("entering tree_get_file_size_work_cleanup\n");
 static int tree_get_file_size_cleanup(struct PINT_smcb *smcb,
                                       job_status_s *js_p)
 {
-   PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-   struct PVFS_servresp_tree_get_file_size *s_tree = &(s_op->resp.u.tree_get_file_size);
+//   PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+//   struct PVFS_servresp_tree_get_file_size *s_tree = &(s_op->resp.u.tree_get_file_size);
  
-gossip_err("entering tree_get_file_size_cleanup\n");
    /*cleanup response structure*/
+#if 0 //temp
    if (s_tree->size)
       free(s_tree->size);
    if (s_tree->error)
       free(s_tree->error);
+#endif
     
    return(server_state_machine_complete(smcb));
 }
@@ -1501,7 +1479,6 @@ static int tree_getattr_work_cleanup(struct PINT_smcb *smcb,
     PINT_sm_msgarray_op *tree_msgop = NULL;
     struct PINT_server_tree_communicate_op *s_tree_comm = &(s_op->u.tree_communicate);
 
-gossip_err("entering tree_getattr_work_cleanup\n");
     assert(s_op->req->op == PVFS_SERV_TREE_GETATTR);
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "%s: num_pjmp_frames = %d\n"
@@ -1623,12 +1600,12 @@ gossip_err("entering tree_getattr_work_cleanup\n");
 static int tree_getattr_cleanup(struct PINT_smcb *smcb,
                                 job_status_s *js_p)
 {
-   PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-   struct PVFS_servresp_tree_getattr *s_tree = &(s_op->resp.u.tree_getattr);
-   int i;
+//   PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+//   struct PVFS_servresp_tree_getattr *s_tree = &(s_op->resp.u.tree_getattr);
+//   int i;
 
-gossip_err("entering tree_getattr_cleanup\n");
    /*cleanup response structure*/
+#if 0 //temp
    if (s_tree->attr)
    {
       for (i = 0; i < s_op->req->u.tree_getattr.handle_count; i++) {
@@ -1640,6 +1617,7 @@ gossip_err("entering tree_getattr_cleanup\n");
    {
       free(s_tree->error);
    }
+#endif
 
    return(server_state_machine_complete(smcb));
 }

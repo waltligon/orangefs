@@ -324,9 +324,13 @@ static void lebf_initialize(void)
                 respsize = extra_size_PVFS_servresp_mgmt_get_uid;
                 break;
             case PVFS_SERV_TREE_SETATTR:
+                zero_credential(&req.u.tree_setattr.credential);
                 req.u.tree_setattr.handle_count = 0;
                 req.u.tree_setattr.handle_array = NULL;
+                resp.u.tree_setattr.handle_count = 0;
+                resp.u.tree_setattr.status = NULL;
                 reqsize = extra_size_PVFS_servreq_tree_setattr;
+                respsize = extra_size_PVFS_servresp_tree_setattr;
                 break;
             case PVFS_SERV_MGMT_GET_DIRENT:
                 req.u.mgmt_get_dirent.entry = tmp_name;
@@ -639,6 +643,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
         CASE(PVFS_SERV_TREE_REMOVE, tree_remove);
         CASE(PVFS_SERV_TREE_GETATTR, tree_getattr);
+        CASE(PVFS_SERV_TREE_SETATTR, tree_setattr);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
 #ifdef ENABLE_SECURITY_CERT
@@ -649,7 +654,6 @@ static int lebf_encode_resp(
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
-        case PVFS_SERV_TREE_SETATTR:
         case PVFS_SERV_SETATTR:
         case PVFS_SERV_SETEATTR:
         case PVFS_SERV_DELEATTR:
@@ -862,6 +866,7 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
         CASE(PVFS_SERV_TREE_REMOVE, tree_remove);
         CASE(PVFS_SERV_TREE_GETATTR, tree_getattr);
+        CASE(PVFS_SERV_TREE_SETATTR, tree_setattr);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
 #ifdef ENABLE_SECURITY_CERT
@@ -872,7 +877,6 @@ static int lebf_decode_resp(
         case PVFS_SERV_BATCH_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
-        case PVFS_SERV_TREE_SETATTR:
         case PVFS_SERV_SETATTR:
         case PVFS_SERV_SETEATTR:
         case PVFS_SERV_DELEATTR:
@@ -1331,6 +1335,12 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                       break;
                    }
 
+                case PVFS_SERV_TREE_SETATTR:
+                   {
+                      decode_free(resp->u.tree_setattr.status);
+                      break;
+                   }
+
                 case PVFS_SERV_MGMT_GET_UID:
                    {
                       decode_free(resp->u.mgmt_get_uid.uid_info_array);
@@ -1372,7 +1382,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_PROTO_ERROR:
                 case PVFS_SERV_BATCH_REMOVE:
                 case PVFS_SERV_IMM_COPIES:
-                case PVFS_SERV_TREE_SETATTR:
                 case PVFS_SERV_MGMT_GET_DIRENT:
                 case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
                 case PVFS_SERV_MGMT_SPLIT_DIRENT:
