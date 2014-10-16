@@ -763,11 +763,13 @@ int pvfs2_remove(
 
     memset(&args,        0, sizeof(args));
 
-	snprintf(cmd, sizeof(cmd), "%spvfs2-rm -r -f", pvfsEXELocation);
+	snprintf(cmd, sizeof(cmd), "%spvfs2-rm", pvfsEXELocation);
 
 	*ptr++ = cmd;
 	//*ptr++ = (char*)filename;
 
+	*ptr++ = "-r";
+	*ptr++ = "-f";
 	/* Use strtok to support multiple directories */
 	/* TODO: Make this smart enough to recognize escaped and quoted spaces */
 	token = strtok((char*)filename,WHITE_SPACE);
@@ -783,7 +785,7 @@ int pvfs2_remove(
 	}
 	else
 	{
-		printf("\nRUNNING->%s %s ", cmd, filename);
+		printf("\nRUNNING->%s -r -f %s ", cmd, filename);
 	}
 
 	ret = run_external_command(cmd,args);
