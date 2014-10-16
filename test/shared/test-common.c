@@ -763,7 +763,7 @@ int pvfs2_remove(
 
     memset(&args,        0, sizeof(args));
 
-	snprintf(cmd, sizeof(cmd), "%spvfs2-rm", pvfsEXELocation);
+	snprintf(cmd, sizeof(cmd), "%spvfs2-rm -r -f", pvfsEXELocation);
 
 	*ptr++ = cmd;
 	//*ptr++ = (char*)filename;
