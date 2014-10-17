@@ -69,6 +69,7 @@ class OFSTestNetwork(object):
         
         if ip_address != "":
             if ip_address == self.local_master.ip_address:
+                genconfig_str="%s/bin/pvfs2-genconfig %s/etc/orangefs.c
                 return self.local_master
             else:
                 return next((i for i in self.network_nodes if i.ip_address == ip_address), None) 
@@ -1627,6 +1628,7 @@ class OFSTestNetwork(object):
             
             # copy templates to node
             #master_node.copyToRemoteNode(source="%s/test/automated/hadoop-tests.d/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
+            
             master_node.copyToRemoteNode(source="%s/src/client/hadoop/orangefs-hadoop1/src/main/resources/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
 #              setup hadoop-env.sh
 #             node.runSingleCommand("echo 'export JAVA_HOME=%s' >> %s/conf/hadoop-env.sh" % (node.jdk6_location,node.hadoop_location))
@@ -1634,8 +1636,9 @@ class OFSTestNetwork(object):
 #             node.runSingleCommand("echo 'export JNI_LIBRARY_PATH=%s/lib' >> %s/conf/hadoop-env.sh" % (node.ofs_installation_location,node.hadoop_location))
 #             node.runSingleCommand("echo 'export HADOOP_CLASSPATH=\$JNI_LIBRARY_PATH/orangefs-hadoop1-2.9.0.jar:\$JNI_LIBRARY_PATH/ofs-jni-2.9.0.jar' >> %s/conf/hadoop-env.sh" % node.hadoop_location)
             
+            node.runSindleCommand('sed -i s,/usr/lib/jvm/java-7-openjdk-amd64,%s,g %s/conf/hadoop-env.sh' % (node.jdk6_location,node.hadoop_location ))
             # update mapred-site.xml
-            node.runSingleCommand("sed -i s,/opt/orangefs-trunk,%s, %s/conf/hadoop-env.sh" % (node.ofs_installation_location,node.hadoop_location ))
+            node.runSingleCommand('sed -i s,/opt/orangefs-trunk,%s,g %s/conf/hadoop-env.sh' % (node.ofs_installation_location,node.hadoop_location ))
             
             # update mapred-site.xml
             node.runSingleCommand("sed -i s/localhost/%s/ %s/conf/mapred-site.xml" % (master_node.hostname,node.hadoop_location))
