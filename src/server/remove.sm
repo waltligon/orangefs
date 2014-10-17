@@ -634,6 +634,8 @@ static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
     if (error_code != 0)
     {
         js_p->error_code = error_code;
+        tree_getattr_free(getattr_op);
+        PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(getattr_op);
         return SM_ACTION_COMPLETE;
     }
     for (i = 0; i < attr_p->dist_dir_attr.num_servers; i++)
@@ -641,12 +643,16 @@ static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
         if (getattr_op->resp.u.tree_getattr.attr[i].u.dir.dirent_count > 0)
         {
             js_p->error_code = -PVFS_ENOTEMPTY;
+            tree_getattr_free(getattr_op);
+            PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(getattr_op);
             return SM_ACTION_COMPLETE;
         }
     }
     js_p->error_code = 0;
 
-    /* free getattr_op (allocated as subordinate frame) */
+    /* perform cleanup routine and free getattr_op (allocated as
+      subordinate frame) */
+    tree_getattr_free(getattr_op);
     PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(getattr_op);
 
     attr_p = &s_op->attr;

@@ -620,7 +620,6 @@ static PINT_sm_action tree_setattr_setup(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     assert(s_op->req->op == PVFS_SERV_TREE_SETATTR);
-assert(s_op->req->u.tree_setattr.caller_handle_index < 2);
 
     s_op->resp.u.tree_setattr.caller_handle_index =
             s_op->req->u.tree_setattr.caller_handle_index;
@@ -693,13 +692,10 @@ static int tree_setattr_comp_fn(void *v_p,
                                         ,__func__
                                         ,i
                                         ,m_tree->status[i]);
-//if (resp_p->u.tree_setattr.caller_handle_index < 2)
-//{
         status_array_index = s_op->u.tree_communicate.remote_join_size[ i +
                               resp_p->u.tree_setattr.caller_handle_index];
 
         op_tree->status[status_array_index] = m_tree->status[i];
-//}
     }
 
     return 0;
@@ -718,7 +714,6 @@ static int tree_setattr_work_cleanup(struct PINT_smcb *smcb,
     PINT_sm_msgpair_state *tree_msgarray = NULL;
     PINT_sm_msgarray_op *tree_msgop = NULL;
 
-//gossip_err("entering tree_setattr_work_cleanup, caller_handle_index = %llu\n", llu(s_tree->caller_handle_index));
     assert(s_op->req->op == PVFS_SERV_TREE_SETATTR);
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "%s: num_pjmp_frames = %d\n"
@@ -768,7 +763,6 @@ static int tree_setattr_work_cleanup(struct PINT_smcb *smcb,
                  uint32_t index = 0;
                  for (k=0; k < tree_req->handle_count; k++)
                  {
-assert(tree_req->caller_handle_index < 2);
                     index = tree_req->caller_handle_index
                             + k
                             + s_op->u.tree_communicate.handle_array_local_count;
@@ -779,7 +773,7 @@ assert(tree_req->caller_handle_index < 2);
                               ,index
                               ,s_op->resp.u.tree_setattr.status[index]);
                  }/*end for*/
-/*temp                 PINT_free_object_attr(&tree_req->attr); */
+                 PINT_free_object_attr(&tree_req->attr);
               }/*end for*/
             }/*end if non-zero error-code*/
 
@@ -799,7 +793,7 @@ assert(tree_req->caller_handle_index < 2);
                                      old_frame->local_index];
             s_op->resp.u.tree_setattr.status[status_array_index] = error_code;
 
-/*temp            PINT_free_object_attr(&old_frame->req->u.setattr.attr); */
+            PINT_free_object_attr(&old_frame->req->u.setattr.attr);
             PINT_cleanup_capability(&old_frame->req->capability);
         }
         free(old_frame);
@@ -847,14 +841,12 @@ assert(tree_req->caller_handle_index < 2);
 static int tree_setattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-//    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-//    struct PVFS_servresp_tree_setattr *s_tree = &(s_op->resp.u.tree_setattr);
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PVFS_servresp_tree_setattr *s_tree = &(s_op->resp.u.tree_setattr);
 
     /*cleanup response structure*/
-#if 0 //temp
     if (s_tree->status)
        free(s_tree->status);
-#endif
 
     return(server_state_machine_complete(smcb));
 }
@@ -1086,14 +1078,12 @@ static int tree_remove_work_cleanup(struct PINT_smcb *smcb,
 static int tree_remove_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-//    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-//    struct PVFS_servresp_tree_remove *s_tree = &(s_op->resp.u.tree_remove);
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PVFS_servresp_tree_remove *s_tree = &(s_op->resp.u.tree_remove);
 
     /*cleanup response structure*/
-#if 0 //temp
     if (s_tree->status)
        free(s_tree->status);
-#endif
 
     return(server_state_machine_complete(smcb));
 }
@@ -1347,16 +1337,14 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
 static int tree_get_file_size_cleanup(struct PINT_smcb *smcb,
                                       job_status_s *js_p)
 {
-//   PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-//   struct PVFS_servresp_tree_get_file_size *s_tree = &(s_op->resp.u.tree_get_file_size);
+   PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   struct PVFS_servresp_tree_get_file_size *s_tree = &(s_op->resp.u.tree_get_file_size);
  
    /*cleanup response structure*/
-#if 0 //temp
    if (s_tree->size)
       free(s_tree->size);
    if (s_tree->error)
       free(s_tree->error);
-#endif
     
    return(server_state_machine_complete(smcb));
 }
@@ -1597,15 +1585,12 @@ static int tree_getattr_work_cleanup(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }/*end tree_getattr_work_cleanup*/
 
-static int tree_getattr_cleanup(struct PINT_smcb *smcb,
-                                job_status_s *js_p)
+void tree_getattr_free(PINT_server_op *s_op)
 {
-//   PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-//   struct PVFS_servresp_tree_getattr *s_tree = &(s_op->resp.u.tree_getattr);
-//   int i;
+   struct PVFS_servresp_tree_getattr *s_tree = &(s_op->resp.u.tree_getattr);
+   int i;
 
    /*cleanup response structure*/
-#if 0 //temp
    if (s_tree->attr)
    {
       for (i = 0; i < s_op->req->u.tree_getattr.handle_count; i++) {
@@ -1617,8 +1602,14 @@ static int tree_getattr_cleanup(struct PINT_smcb *smcb,
    {
       free(s_tree->error);
    }
-#endif
+}
 
+static int tree_getattr_cleanup(struct PINT_smcb *smcb,
+                                job_status_s *js_p)
+{
+   PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+   tree_getattr_free(s_op);
    return(server_state_machine_complete(smcb));
 }
 
