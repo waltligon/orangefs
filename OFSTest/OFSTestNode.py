@@ -1229,7 +1229,7 @@ class OFSTestNode(object):
     
             
             # RPM installs to default location
-            self.jdk6_location = "/usr/lib/jvm/java"
+            self.jdk6_location = "/usr/lib64/jvm/java"
             
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             print "Installing required software for Red Hat based system %s" % self.distro
