@@ -773,10 +773,15 @@ static int tree_setattr_work_cleanup(struct PINT_smcb *smcb,
                               ,index
                               ,s_op->resp.u.tree_setattr.status[index]);
                  }/*end for*/
-                 PINT_free_object_attr(&tree_req->attr);
               }/*end for*/
             }/*end if non-zero error-code*/
 
+            /* Free resources used in the request. */
+            for (j=0; j < tree_msgop->count; j++)
+            {
+               tree_req = &(tree_msgarray[j].req.u.tree_setattr);
+               PINT_free_object_attr(&tree_req->attr);
+            }/*end for*/
            PINT_msgpairarray_destroy(&old_frame->msgarray_op);
 
         }
@@ -1075,15 +1080,21 @@ static int tree_remove_work_cleanup(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }/*end tree_remove_work_cleanup*/
  
-static int tree_remove_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+void tree_remove_free(PINT_server_op *s_op)
 {
-    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PVFS_servresp_tree_remove *s_tree = &(s_op->resp.u.tree_remove);
 
     /*cleanup response structure*/
     if (s_tree->status)
        free(s_tree->status);
+}
+
+static int tree_remove_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    tree_remove_free(s_op);
 
     return(server_state_machine_complete(smcb));
 }

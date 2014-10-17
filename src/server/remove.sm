@@ -706,11 +706,14 @@ static PINT_sm_action remove_dirdata_handles_check_remove_success(
         if (remove_op->resp.u.tree_remove.status != 0)
         {
             js_p->error_code = error_code;
+            tree_remove_free(remove_op);
+            PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(remove_op);
             return SM_ACTION_COMPLETE;
         }
     }
 
     /* free remove_op (allocated as subordinate frame) */
+    tree_remove_free(remove_op);
     PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(remove_op);
 
     return SM_ACTION_COMPLETE;
