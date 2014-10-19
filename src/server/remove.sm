@@ -63,17 +63,6 @@
  * would be no dirdata dspace.
  */
 
-static int tree_setattr_comp_fn(
-        void *v_p,
-        struct PVFS_server_resp *resp_p,
-        int index);
-#if 0
-static int remove_get_dirent_count_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index);
-static int remove_remove_dirdata_handles_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index);
-#endif
-
 enum
 {
     STATE_TYPE_DIRECTORY = 1,
@@ -945,7 +934,7 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(struct 
     msg_p->fs_id = s_op->req->u.remove.fs_id;
     msg_p->handle = s_op->attr.dirdata_handles[0];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = tree_setattr_comp_fn;
+    msg_p->comp_fn = NULL;
 
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
@@ -960,19 +949,6 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(struct 
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
-}
-
-static int tree_setattr_comp_fn(void *v_p,
-                                struct PVFS_server_resp *resp_p,
-                                int index)
-{
-    PINT_smcb *smcb = v_p;
-    PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_sm_msgpair_state *msg_p = &mop->msgpair;;
-
-    assert(msg_p->req.op == PVFS_SERV_TREE_SETATTR);
-    PINT_free_object_attr(&(msg_p->req).u.tree_setattr.attr);
-    return 0;
 }
 
 static PINT_sm_action remove_rebuild_done(struct PINT_smcb *smcb, job_status_s *js_p)
