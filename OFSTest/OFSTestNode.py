@@ -1224,6 +1224,15 @@ class OFSTestNode(object):
 
 
             ]
+            
+            if "opensuse" in self.distro.lower():    
+                install_commands.append("cd /opt; wget http://apache.mesi.com.ar/maven/maven-3/3.2.3/binaries/apache-maven-3.2.3-bin.tar.gz")
+                install_commands.append("cd /opt; tar xf apache-maven-3.2.3-bin.tar.gz")
+                install_commands.append("ln -s /opt/apache-maven-3.2.3/bin/mvn /usr/bin/mvn")
+                self.setEnvironmentVariable("M2_HOME", "/opt/apache-maven-3.2.3")
+                self.setEnvironmentVariable("M2", "/opt/apache-maven-3.2.3/bin")
+            
+            
             for command in install_commands:
                 rc = self.runSingleCommandAsRoot(command, output)
     
