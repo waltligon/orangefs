@@ -1267,6 +1267,11 @@ class OFSTestNode(object):
                 
                 ]
             
+            # install maven in RHEL 6
+            if "6." in self.distro:
+                install_commands.append("wget ftp://ftp.pbone.net/mirror/ftp.sourceforge.net/pub/sourceforge/s/sr/sroycoderhelrpm/RPMS/noarch/apache-maven-3.0.3-1.el6.sroycode.noarch.rpm")
+                install_commands.append("rpm -i ./apache-maven-3.0.3-1.el6.sroycode.noarch.rpm")
+            
 
         
             for command in install_commands:
