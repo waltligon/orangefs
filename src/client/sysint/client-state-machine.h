@@ -216,7 +216,6 @@ struct PINT_client_mkdir_sm
     int retry_count;
     int stored_error_code;
     PVFS_handle metafile_handle;
-    PINT_sm_getattr_state metafile_getattr;
 
     /* keep first */
     PINT_dist *dist;
