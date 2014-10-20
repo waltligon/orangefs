@@ -122,6 +122,7 @@ static PINT_sm_action final_response_send_resp(struct PINT_smcb *smcb,
         gossip_lerr("Error: req_sched_release() failure; continuing...\n");
     }
 
+
     ret = PINT_encode(&s_op->resp,
                       PINT_ENCODE_RESP,
                       &(s_op->encoded),

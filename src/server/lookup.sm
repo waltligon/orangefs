@@ -38,12 +38,13 @@ static int lookup_get_dirent_comp_fn(
 
 enum 
 {
-    STATE_ENOTDIR = 22,
-    STATE_NOMORESEGS = 23,
-    LOOKUP_CHECK_DIR_ACLS = 24,
-    LOOKUP_CHECK_PERMS = 25,
-    LOCAL_DIRENT = 26,
-    REMOTE_DIRENT = 27
+    LOOKUP_LOCAL_METAFILE_KEYVALS = 21,
+    STATE_ENOTDIR                 = 22,
+    STATE_NOMORESEGS              = 23,
+    LOOKUP_CHECK_DIR_ACLS         = 24,
+    LOOKUP_CHECK_PERMS            = 25,
+    LOCAL_DIRENT                  = 26,
+    REMOTE_DIRENT                 = 27
 };
 
 %%
@@ -75,8 +76,28 @@ machine pvfs2_lookup_sm
     {
         run lookup_verify_object_metadata;
         LOOKUP_CHECK_PERMS => check_perms;
+        LOOKUP_LOCAL_METAFILE_KEYVALS => setup_to_read_local_metafile_keyvals;
         success => read_num_directory_entry_handles;
         default => setup_resp;
+    }
+
+    state setup_to_read_local_metafile_keyvals
+    {
+       run lookup_setup_getattr_request;
+       success => initiate_getattr_request;
+       default => setup_resp;
+    }
+
+    state initiate_getattr_request
+    {
+       jump pvfs2_get_attr_work_sm;
+       default => verify_getattr_results;
+    }
+
+    state verify_getattr_results
+    {
+       run lookup_verify_getattr_results;
+       default => setup_resp;
     }
 
     state check_perms
@@ -288,13 +309,15 @@ static PINT_sm_action lookup_read_object_metadata(
     }
     else
     {
-        handle = s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.seg_nr - 1] 
-               = (PVFS_handle)s_op->u.lookup.keyval_temp_store[0].oid;
-        ds_attr = &(s_op->u.lookup.ds_attr_array[
-                                        s_op->u.lookup.seg_nr - 1]);
+        handle  = s_op->resp.u.lookup_path.handle_array[ s_op->u.lookup.seg_nr - 1 ] 
+                = (PVFS_handle)s_op->u.lookup.keyval_temp_store[0].oid;
+        ds_attr = &(s_op->u.lookup.ds_attr_array[ s_op->u.lookup.seg_nr - 1 ]);
+        gossip_err("%s:sid for metadata object(%s)\n"
+                  ,__func__
+                  ,PVFS_SID_str(&s_op->u.lookup.keyval_temp_store[1].sid));
     }
 
-    gossip_err("%s:handle(%s)\n",__func__,PVFS_OID_str(&handle));
+    gossip_err("%s:oid for metadata object(%s)\n",__func__,PVFS_OID_str(&handle));
 
     /* update our successful handle read count */
     s_op->u.lookup.handle_ct++;
@@ -373,9 +396,9 @@ static PINT_sm_action lookup_verify_object_metadata(
     if (a_p->objtype == PVFS_TYPE_METAFILE)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "  object is a metafile; "
-                     "halting lookup and sending response\n");
+                     "gathering attributes.....\n");
 
-        js_p->error_code = STATE_ENOTDIR;
+        js_p->error_code = LOOKUP_LOCAL_METAFILE_KEYVALS;
         return SM_ACTION_COMPLETE;
     }
 
@@ -415,6 +438,79 @@ static PINT_sm_action lookup_verify_object_metadata(
 
     return SM_ACTION_COMPLETE;
 }
+
+
+
+
+
+/*
+ * Function: lookup_setup_getattr_request
+ *
+ * Synopsis: The object we are now processing is a metafile and we know that its
+ * keyval entries are on the local server as well.  So, lets setup a getattr request
+ * that will return as many keyval attributes as possible.
+ *
+ */
+static PINT_sm_action lookup_setup_getattr_request(
+        struct PINT_smcb *smcb,
+        job_status_s *js_p)
+{
+   int ret;
+   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   struct PINT_server_op *getattr_op;
+
+   js_p->error_code = 0;
+
+   getattr_op = calloc(1,sizeof(*getattr_op));
+   if ( !getattr_op )
+   {
+      js_p->error_code = -PVFS_ENOMEM;
+      return SM_ACTION_COMPLETE;
+   }
+   
+   getattr_op->attr = s_op->attr;
+
+   getattr_op->req = s_op->req;
+
+   getattr_op->u.getattr.fs_id      = s_op->req->u.lookup_path.fs_id;
+   getattr_op->u.getattr.handle     = s_op->resp.u.lookup_path.handle_array[ s_op->u.lookup.seg_nr - 1 ];
+   getattr_op->u.getattr.attrmask   = PVFS_ATTR_META_DIST          |
+                                      PVFS_ATTR_META_DFILES        |
+                                      PVFS_ATTR_META_MIRROR_DFILES |
+                                      PVFS_ATTR_CAPABILITY;
+   getattr_op->u.getattr.credential = s_op->req->u.lookup_path.credential;
+
+   ret = PINT_sm_push_frame(smcb, 0, getattr_op);
+   if ( ret < 0 )
+   {
+      js_p->error_code = ret;
+   }
+
+   return SM_ACTION_COMPLETE;
+}/*end lookup_setup_getattr_request*/
+
+
+
+/*
+ * Function: lookup_verify_getattr_results
+ *
+ * Synopsis: This getattr request is returning keyval entries for a metafile object.
+ * Check the results and update local variables as necessary.
+ *
+ */
+static PINT_sm_action lookup_verify_getattr_results(
+        struct PINT_smcb *smcb,
+        job_status_s *js_p)
+{
+   int ret;
+   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+
+   return ret;
+}/*end lookup_verify_getattr_results*/
+
+
+
 
 /*                                                              
  * Function: lookup_check_perms
@@ -695,9 +791,11 @@ static PINT_sm_action lookup_read_num_directory_entry_handles(
      * case, the dist_dir_attr values are already provided by the prelude
      * and are stored in s_op->attr.  No need to do another lookup.
      */
+
+    gossip_err("%s:s_op->u.lookup.seg_nr(%d)\n",__func__,s_op->u.lookup.seg_nr);
+
     if (s_op->u.lookup.seg_nr == 0)
     {
-        handle = s_op->req->u.lookup_path.handle;
         /* copy dist_dir_attr data from s_op->attr to s_op->u.lookup.attr.u.dir.dist_dir_attr */
         s_op->u.lookup.attr = s_op->attr;
         return SM_ACTION_COMPLETE;
@@ -1167,6 +1265,37 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
                ,s_op->resp.u.lookup_path.attr_array
                ,s_op->resp.u.lookup_path.sid_array);
 
+
+   gossip_err("%s\n"
+              "s_op->resp.u.lookup_path.attr_array[0].objtype(%d)\n"
+              "                                      .mask(0x%0x)\n"
+              "                                      .owner(%d)\n"
+              "                                      .group(%d)\n"
+              "                                      .perms(%o)\n"
+              "                                      .atime(%d)\n"
+              "                                      .mtime(%d)\n"
+              "                                      .ctime(%d)\n"
+              "                                      .ntime(%d)\n"
+              "                                      .capability(%p)\n"
+              "                                      .u.meta.dist(%p)\n"
+              "                                             .dfile_array(%p)\n"
+              "                                             .sid_array(%p)\n"
+              "                                             .size(%d)\n"
+              ,__func__
+              ,s_op->resp.u.lookup_path.attr_array[0].objtype
+              ,s_op->resp.u.lookup_path.attr_array[0].mask
+              ,s_op->resp.u.lookup_path.attr_array[0].owner
+              ,s_op->resp.u.lookup_path.attr_array[0].group
+              ,s_op->resp.u.lookup_path.attr_array[0].perms
+              ,(int)s_op->resp.u.lookup_path.attr_array[0].atime
+              ,(int)s_op->resp.u.lookup_path.attr_array[0].mtime
+              ,(int)s_op->resp.u.lookup_path.attr_array[0].ctime
+              ,(int)s_op->resp.u.lookup_path.attr_array[0].ntime
+              ,&s_op->resp.u.lookup_path.attr_array[0].capability
+              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.dist
+              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.dfile_array
+              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.sid_array
+              ,(int)s_op->resp.u.lookup_path.attr_array[0].u.meta.size);
 
 
     return SM_ACTION_COMPLETE;
