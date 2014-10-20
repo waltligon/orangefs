@@ -1269,8 +1269,11 @@ class OFSTestNode(object):
             
             # install maven in RHEL 6
             if "6." in self.distro:
-                install_commands.append("wget ftp://ftp.pbone.net/mirror/ftp.sourceforge.net/pub/sourceforge/s/sr/sroycoderhelrpm/RPMS/noarch/apache-maven-3.0.3-1.el6.sroycode.noarch.rpm")
-                install_commands.append("rpm -i ./apache-maven-3.0.3-1.el6.sroycode.noarch.rpm")
+                install_commands.append("cd /opt; wget http://apache.mesi.com.ar/maven/maven-3/3.2.3/binaries/apache-maven-3.2.3-bin.tar.gz")
+                install_commands.append("cd /opt; tar xf apache-maven-3.2.3-bin.tar.gz")
+                install_commands.append("ln -s /opt/apache-maven-3.2.3/bin/mvn /usr/bin/mvn")
+                self.setEnvironmentVariable("M2_HOME", "/opt/apache-maven-3.2.3")
+                self.setEnvironmentVariable("M2", "/opt/apache-maven-3.2.3/bin")
             
 
         
