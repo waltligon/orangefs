@@ -237,58 +237,73 @@ int get_file_paths(struct options *options,
 #ifndef WIN32
     keypath[0] = certpath[0] = '\0';
 
-    envvar = getenv("PVFS2KEY_FILE");
-    if (envvar != NULL)
+    if (options->keypath != NULL)
     {
-        strncpy(keypath, envvar, MAX_PATH);
-        keypath[MAX_PATH-1] = '\0';
+        strncpy(keypath, options->keypath, MAX_PATH);
     }
-
-    envvar = getenv("PVFS2CERT_FILE");
-    if (envvar != NULL)
+    else
     {
-        strncpy(certpath, envvar, MAX_PATH);
-        certpath[MAX_PATH-1] = '\0';
-    }
-
-    /* TODO! */
-
-    passwd = getpwnam(userid);
-    if (passwd == NULL && 
-        (strlen(keypath) == 0 || strlen(certpath) == 0))
-    {
-        fprintf(stderr, "Error: Could not retrieve passwd info for %s\n", 
-                userid);
-        return -PVFS_ENOENT;
-    }
-
-    if (strlen(keypath) == 0)
-    {    
-        /* construct certificate private key file path */
-        strncpy(keypath, passwd->pw_dir, MAX_PATH);
-        keypath[MAX_PATH-1] = '\0';
-        if ((strlen(keypath) + strlen(def_keyfile)) < (MAX_PATH - 1))
+        envvar = getenv("PVFS2KEY_FILE");
+        if (envvar != NULL)
         {
-            strcat(keypath, def_keyfile);
-        }
-        else
-        {
-            return -PVFS_EOVERFLOW;
+            strncpy(keypath, envvar, MAX_PATH);
+            keypath[MAX_PATH-1] = '\0';
         }
     }
 
-    if (strlen(certpath) == 0) 
+    if (options->certpath != NULL)
     {
-        /* construct certificate file path */
-        strncpy(certpath, passwd->pw_dir, MAX_PATH);
-        certpath[MAX_PATH-1] = '\0';
-        if ((strlen(certpath) + strlen(def_certfile)) < (MAX_PATH - 1))
+        strncpy(certpath, options->certpath, MAX_PATH);
+    }
+    else
+    {
+        envvar = getenv("PVFS2CERT_FILE");
+        if (envvar != NULL)
         {
-            strcat(certpath, def_certfile);
+            strncpy(certpath, envvar, MAX_PATH);
+            certpath[MAX_PATH-1] = '\0';
         }
-        else
+    }
+
+    if (strlen(keypath) == 0 || strlen(certpath) == 0)
+    {
+        /* store file(s) in current user's home directory */
+        passwd = getpwuid(getuid());
+        if (passwd == NULL)
         {
-            return -PVFS_EOVERFLOW;
+            fprintf(stderr, "Error: Could not retrieve passwd info for "
+                    "current user\n");
+            return -PVFS_ENOENT;
+        }
+
+        if (strlen(keypath) == 0)
+        {    
+            /* construct certificate private key file path */
+            strncpy(keypath, passwd->pw_dir, MAX_PATH);
+            keypath[MAX_PATH-1] = '\0';
+            if ((strlen(keypath) + strlen(def_keyfile)) < (MAX_PATH - 1))
+            {
+                strcat(keypath, def_keyfile);
+            }
+            else
+            {
+                return -PVFS_EOVERFLOW;
+            }
+        }
+    
+        if (strlen(certpath) == 0) 
+        {
+            /* construct certificate file path */
+            strncpy(certpath, passwd->pw_dir, MAX_PATH);
+            certpath[MAX_PATH-1] = '\0';
+            if ((strlen(certpath) + strlen(def_certfile)) < (MAX_PATH - 1))
+            {
+                strcat(certpath, def_certfile);
+            }
+            else
+            {
+                return -PVFS_EOVERFLOW;
+            }
         }
     }
 #else

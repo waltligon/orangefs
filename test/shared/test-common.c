@@ -768,6 +768,8 @@ int pvfs2_remove(
 	*ptr++ = cmd;
 	//*ptr++ = (char*)filename;
 
+	*ptr++ = "-r";
+	*ptr++ = "-f";
 	/* Use strtok to support multiple directories */
 	/* TODO: Make this smart enough to recognize escaped and quoted spaces */
 	token = strtok((char*)filename,WHITE_SPACE);
@@ -783,7 +785,7 @@ int pvfs2_remove(
 	}
 	else
 	{
-		printf("\nRUNNING->%s %s ", cmd, filename);
+		printf("\nRUNNING->%s -r -f %s ", cmd, filename);
 	}
 
 	ret = run_external_command(cmd,args);

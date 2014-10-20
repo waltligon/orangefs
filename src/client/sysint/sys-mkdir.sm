@@ -514,6 +514,7 @@ static PINT_sm_action mkdir_crdirent_failure(
         gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: received -PVFS_EAGAIN, will retry getattr and crdirent.\n");
 
         /* clear attributes */
+gossip_err("%s: PINT_SM_GETATTR_STATE_CLEAR, attr = %llu, mask = %d\n", __func__, llu(&sm_p->getattr.attr), sm_p->getattr.attr.mask);
         PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
         /* clear acache content */
         PINT_acache_invalidate(sm_p->object_ref);
@@ -624,6 +625,7 @@ static PINT_sm_action mkdir_cleanup(
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->u.mkdir.metafile_getattr);
     
+gossip_err("%s: PINT_SM_GETATTR_STATE_CLEAR, attr = %llu, mask = %d\n", __func__, llu(&sm_p->getattr.attr), sm_p->getattr.attr.mask);
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     sm_p->error_code = (sm_p->u.mkdir.stored_error_code ?

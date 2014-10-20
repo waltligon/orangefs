@@ -5,8 +5,8 @@ JNI_JAVA_DIR := src/client/jni/src/main/java
 ORGDIR := $(JNI_JAVA_DIR)/org/orangefs/usrint
 
 USRC := \
-    $(JNI_DIR)/libPVFS2POSIXJNI.c \
-    $(JNI_DIR)/libPVFS2STDIOJNI.c
+	$(JNI_DIR)/libPVFS2POSIXJNI.c \
+	$(JNI_DIR)/libPVFS2STDIOJNI.c
 
 JNIJAVA := \
 	$(ORGDIR)/PVFS2POSIXJNI.java \
