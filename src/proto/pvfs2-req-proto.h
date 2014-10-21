@@ -459,16 +459,18 @@ struct PVFS_servreq_tree_setattr
     PVFS_credential credential;
     PVFS_ds_type objtype;
     PVFS_object_attr attr;      /* new attributes */
-    uint32_t num_servers;       /* # of servers to send setattr msg */
+    uint32_t caller_handle_index;
+    uint32_t handle_count;      /* # of servers to send setattr msg */
     PVFS_handle *handle_array;  /* handles indicating where to send msgs */
 };
-endecode_fields_4a_struct(
+endecode_fields_5a_struct(
     PVFS_servreq_tree_setattr,
     PVFS_fs_id, fs_id,
     PVFS_credential, credential,
     PVFS_ds_type, objtype,
     PVFS_object_attr, attr,
-    uint32_t, num_servers,
+    uint32_t, caller_handle_index,
+    uint32_t, handle_count,
     PVFS_handle, handle_array);
 #define extra_size_PVFS_servreq_tree_setattr \
   (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle) + extra_size_PVFS_object_attr)
@@ -479,7 +481,8 @@ endecode_fields_4a_struct(
                                  __fsid,                            \
                                  __objtype,                         \
                                  __attr,                            \
-                                 __num_servers,                     \
+                                 __caller_handle_index,             \
+                                 __handle_count,                    \
                                  __handle_array,                    \
                                  __hints)                           \
 do {                                                                \
@@ -491,9 +494,25 @@ do {                                                                \
     (__req).u.tree_setattr.fs_id = (__fsid);                        \
     (__req).u.tree_setattr.objtype = (__objtype);                   \
     PINT_copy_object_attr(&(__req).u.tree_setattr.attr, &(__attr)); \
-    (__req).u.tree_setattr.num_servers = (__num_servers);           \
+    (__req).u.tree_setattr.caller_handle_index = (__caller_handle_index);           \
+    (__req).u.tree_setattr.handle_count = (__handle_count);         \
     (__req).u.tree_setattr.handle_array = (__handle_array);         \
 } while (0)
+
+struct PVFS_servresp_tree_setattr
+{
+    uint32_t caller_handle_index;
+    uint32_t handle_count;
+    int32_t *status;
+};
+endecode_fields_2a_struct(
+    PVFS_servresp_tree_setattr,
+    skip4,,
+    uint32_t, caller_handle_index,
+    uint32_t, handle_count,
+    int32_t, status);
+#define extra_size_PVFS_servresp_tree_setattr \
+    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(int32_t))
 
 struct PVFS_servreq_tree_remove
 {
@@ -2622,10 +2641,11 @@ struct PVFS_server_resp
         struct PVFS_servresp_listeattr listeattr;
         struct PVFS_servresp_small_io small_io;
         struct PVFS_servresp_listattr listattr;
+        struct PVFS_servresp_tree_remove tree_remove;
         struct PVFS_servresp_tree_get_file_size tree_get_file_size;
         struct PVFS_servresp_tree_getattr tree_getattr;
-        struct PVFS_servresp_tree_remove tree_remove;
         struct PVFS_servresp_mgmt_get_uid mgmt_get_uid;
+        struct PVFS_servresp_tree_setattr tree_setattr;
         struct PVFS_servresp_mgmt_get_dirent mgmt_get_dirent;
 #ifdef ENABLE_SECURITY_CERT
         struct PVFS_servresp_mgmt_get_user_cert mgmt_get_user_cert;
