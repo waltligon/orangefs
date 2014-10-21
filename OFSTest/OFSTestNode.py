@@ -241,7 +241,7 @@ class OFSTestNode(object):
         
         ## @var jdk6_location
         # Location of Oracle JDK 6
-        self.jdk6_location = "/usr/java/default"
+        self.jdk6_location = "/usr/lib/jvm/java"
         
         
         
@@ -1145,6 +1145,12 @@ class OFSTestNode(object):
                 "service sendmail stop",
                 "service rpcbind restart",
                 "service nfs-kernel-server restart",
+                "mkdir -p /home/bin",
+                "mkdir -p /home/nobody",
+                "chown nobody:nobody /home/nobody",
+                "chown bin:bin /home/bin"
+
+                
 
                 # install Sun Java6 for hadoop via webupd8
                 "add-apt-repository ppa:webupd8team/java < /dev/null",
@@ -1169,11 +1175,14 @@ class OFSTestNode(object):
             
                         # download Java 6
             print "Installing required software for SuSE based system %s" % self.distro
+            
         
             #rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
+            
             if rc != 0:
                 logging.exception(output)
                 return rc
+            
             install_commands = [
                 "bash -c 'echo 0 > /selinux/enforce'",
                 "/sbin/SuSEfirewall2 off",
@@ -1207,23 +1216,32 @@ class OFSTestNode(object):
                 "service nfs restart",
                 "/sbin/rpcbind"
                 "service slapd start",
-                "chkconfig slapd on"
+                "chkconfig slapd on",
+                "mkdir -p /home/bin",
+                "mkdir -p /home/nobody",
+                "chown nobody:nobody /home/nobody",
+                "chown bin:bin /home/bin"
+
+
             ]
+            
+            if "opensuse" in self.distro.lower():    
+                install_commands.append("cd /opt; wget http://apache.mesi.com.ar/maven/maven-3/3.2.3/binaries/apache-maven-3.2.3-bin.tar.gz")
+                install_commands.append("cd /opt; tar xf apache-maven-3.2.3-bin.tar.gz")
+                install_commands.append("ln -s /opt/apache-maven-3.2.3/bin/mvn /usr/bin/mvn")
+                self.setEnvironmentVariable("M2_HOME", "/opt/apache-maven-3.2.3")
+                self.setEnvironmentVariable("M2", "/opt/apache-maven-3.2.3/bin")
+            
+            
             for command in install_commands:
                 rc = self.runSingleCommandAsRoot(command, output)
     
             
             # RPM installs to default location
-            self.jdk6_location = "/usr/java/default"
+            self.jdk6_location = "/usr/lib64/jvm/java"
             
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             print "Installing required software for Red Hat based system %s" % self.distro
-            # download Java 6
-            rc = self.runSingleCommand("wget http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
-            if rc != 0:
-                logging.exception(output)
-                return rc
-            
             install_commands = [
                 "bash -c 'echo 0 > /selinux/enforce'",
                 
@@ -1247,10 +1265,24 @@ class OFSTestNode(object):
                 "service rpcbind start",
                 "service nfs restart",
                 "service slapd start",
-                "chkconfig slapd on"
+                "chkconfig slapd on",
+                "mkdir -p /home/bin",
+
+                "mkdir -p /home/nobody",
+                "chown nobody:nobody /home/nobody",
+                "chown bin:bin /home/bin"
+
                 
                 
                 ]
+            
+            # install maven in RHEL 6
+            if "6." in self.distro:
+                install_commands.append("cd /opt; wget http://apache.mesi.com.ar/maven/maven-3/3.2.3/binaries/apache-maven-3.2.3-bin.tar.gz")
+                install_commands.append("cd /opt; tar xf apache-maven-3.2.3-bin.tar.gz")
+                install_commands.append("ln -s /opt/apache-maven-3.2.3/bin/mvn /usr/bin/mvn")
+                self.setEnvironmentVariable("M2_HOME", "/opt/apache-maven-3.2.3")
+                self.setEnvironmentVariable("M2", "/opt/apache-maven-3.2.3/bin")
             
 
         
@@ -1263,7 +1295,7 @@ class OFSTestNode(object):
 
             
             # RPM installs to default location
-            self.jdk6_location = "/usr/java/default"
+            self.jdk6_location = "/usr/lib/jvm/java"
         else:
             print "Unknown system %s" % self.distro
         
@@ -1844,6 +1876,8 @@ class OFSTestNode(object):
         # Save build_kmod for later.
         self.build_kmod = build_kmod
         
+        self.enable_hadoop = enable_hadoop
+        
         # Change directory to source location.
         self.changeDirectory(self.ofs_source_location)
         
@@ -2058,11 +2092,18 @@ class OFSTestNode(object):
             return rc
         
         if self.build_kmod == True:
-            self.runSingleCommand("make kmod_install kmod_prefix=%s" % self.ofs_installation_location,output)
+            rc = self.runSingleCommand("make kmod_install kmod_prefix=%s" % self.ofs_installation_location,output)
             if rc != 0:
                 logging.exception("Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location))
                 
-
+        if self.enable_hadoop == True:
+            self.changeDirectory("%s/src/client/hadoop/orangefs-hadoop1" % self.ofs_source_location)
+            rc = self.runSingleCommand("mvn -Dmaven.compiler.target=1.6 -Dmaven.compiler.source=1.6 -DskipTests clean package")
+            if rc != 0:
+                logging.exception("Could not build and install hadoop1 libraries" )
+            else:
+                self.runSingleCommand('cp target/orangefs-hadoop1-?.?.?.jar "%s/lib"' % self.ofs_installation_location)
+            self.restoreDirectory()
         
         return rc
 
