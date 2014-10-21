@@ -421,11 +421,13 @@ void print_keyval( DBT key, DBT val )
         case DBPF_DIRECTORY_ENTRY_TYPE:
         {
             PVFS_handle *handle = val.data;
-            printf("(%s)(%d) -> (%s) (%d)\n",
-                   k->key,
-                   key.size,
-                   PVFS_OID_str(handle),
-                   val.size);
+            printf("(%s)(%d) -> ", k->key, key.size);
+            while ((char *)handle - (char *)val.data < val.size)
+            {
+                printf("(%s)", PVFS_OID_str(handle));
+                handle++;
+            }
+            printf(" (%d)\n", val.size);
         }
             break;
 

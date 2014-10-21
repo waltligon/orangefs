@@ -305,6 +305,18 @@ do {                                                           \
             (dest)->mtime = PINT_util_mktime_version(time(NULL)); \
         }                                                      \
     }                                                          \
+    if ((src)->mask & PVFS_ATTR_COMMON_NTIME)                  \
+    {                                                          \
+        (dest)->ntime = time(NULL);                            \
+        if ((src)->mask & PVFS_ATTR_COMMON_NTIME_SET)          \
+        {                                                      \
+            (dest)->ntime = (src)->ntime;                      \
+        }                                                      \
+        else                                                   \
+        {                                                      \
+            (dest)->ntime = time(NULL);                        \
+        }                                                      \
+    }                                                          \
     if ((src)->mask & PVFS_ATTR_COMMON_CTIME)                  \
     {                                                          \
         (dest)->ctime = time(NULL);                            \

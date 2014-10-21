@@ -45,6 +45,7 @@ struct PVFS_sys_attr_s
     PVFS_time atime;
     PVFS_time mtime;
     PVFS_time ctime;
+    PVFS_time ntime;
     PVFS_size size;
     PVFS2_ALIGN_VAR(char *, link_target);/**< NOTE: caller must free if valid */
     PVFS2_ALIGN_VAR(int32_t, dfile_count);

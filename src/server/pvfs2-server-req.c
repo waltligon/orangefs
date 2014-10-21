@@ -202,6 +202,31 @@ int PINT_server_req_get_credential(struct PVFS_server_req *req,
     return ret;
 }
 
+int PINT_server_req_get_ctrl(struct PVFS_server_req *req,
+                             struct PINT_server_req_ctrl *req_ctrl)
+{
+    CHECK_OP(req->op);
+
+    if (!req_ctrl)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    if (!PINT_server_req_table[req->op].params->get_ctrl)
+    {
+        /* request SM does not define a get_ctrl function */
+        req_ctrl->handles = NULL;
+        req_ctrl->count = 0;
+        req_ctrl->sids = NULL;
+        req_ctrl->sid_count = 0;
+        return 0;
+    }
+    else
+    {
+        return PINT_server_req_table[req->op].params->get_ctrl(req, req_ctrl);
+    }
+}
+
 /*
  * PINT_map_server_op_to_string()
  *
