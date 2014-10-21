@@ -18,51 +18,51 @@
 typedef struct PINT_dist_methods_s
 {
     /* Returns the physical storage offset for a logical file offset */
-    PVFS_offset (*logical_to_physical_offset)(void* params,
-                                              PINT_request_file_data* rf_data,
+    PVFS_offset (*logical_to_physical_offset)(void *params,
+                                              PINT_request_file_data *rf_data,
                                               PVFS_offset logical_offset);
     
     /* Returns the logical file offset for a given physical storage offset */
-    PVFS_offset (*physical_to_logical_offset)(void* params,
-                                              PINT_request_file_data* rf_data,
+    PVFS_offset (*physical_to_logical_offset)(void *params,
+                                              PINT_request_file_data *rf_data,
                                               PVFS_offset physical_offset);
 
     /* Returns the next physical offset for the file on server_nr given an
      * arbitraty logical offset (i.e. an offset anywhere in the file) */
-    PVFS_offset (*next_mapped_offset)(void* params,
-                                      PINT_request_file_data* rf_data,
+    PVFS_offset (*next_mapped_offset)(void *params,
+                                      PINT_request_file_data *rf_data,
                                       PVFS_offset logical_offset);
 
     /* Returns the contiguous length of file data starting at physical_offset*/
-    PVFS_size (*contiguous_length)(void* params,
-                                   PINT_request_file_data* rf_data,
+    PVFS_size (*contiguous_length)(void *params,
+                                   PINT_request_file_data *rf_data,
                                    PVFS_offset physical_offset);
 
     /* Returns the logical file size */
-    PVFS_size (*logical_file_size)(void* params,
+    PVFS_size (*logical_file_size)(void *params,
                                    uint32_t num_handles,
                                    PVFS_size *psizes);
 
     /* Returns the number of data file objects to use for a file */
-    int (*get_num_dfiles)(void* params,
+    int (*get_num_dfiles)(void *params,
                           uint32_t num_servers_available,
                           uint32_t num_dfiles_requested);
 
     /* Sets the parameter designated by name to the given value */
-    int (*set_param)(const char* dist_name, void* params,
-                     const char* param_name, void* value);
+    int (*set_param)(const char *dist_name, void *params,
+                     const char *param_name, void *value);
 
     /* Retrieves a blocksize value suitable to report in stat() */
-    PVFS_size (*get_blksize)(void* params, int dfile_count);
+    PVFS_size (*get_blksize)(void *params, int dfile_count);
 
     /* Stores parameters in lebf memory at pptr */
-    void (*encode_lebf)(char **pptr, void* params);
+    void (*encode_lebf)(char **pptr, void *params);
     
     /* Restores parameters in lebf memory at pptr */
-    void (*decode_lebf)(char **pptr, void* params);
+    void (*decode_lebf)(char **pptr, void *params);
 
     /* Called when the distribution is registered */
-    void (*registration_init)(void* params);
+    void (*registration_init)(void *params);
 
     /* Called when the distribution is unregisterd */
     void (*unregister)(void);
@@ -71,21 +71,31 @@ typedef struct PINT_dist_methods_s
 } PINT_dist_methods;
 
 /* Internal representation of a PVFS2 Distribution */
-typedef struct PINT_dist_s {
-	char * dist_name;
+typedef struct PINT_dist_s PINT_dist;
+
+/* Given a distribution with only the dist_name filled in, the remaining
+ * distribution parameters are copied from the registered distribution for
+ * that name */
+int PINT_dist_lookup(PINT_dist *dist);
+
+struct PINT_dist_s {
+	char *dist_name;
 	int32_t name_size;
 	int32_t param_size; 
-        void * params;
-	PINT_dist_methods * methods;
-} PINT_dist;
-
+        void *params;
+	PINT_dist_methods *methods;
+};
 
 /* Macros to encode/decode distributions for sending requests */
-#define PINT_DIST_PACK_SIZE(d) \
- (roundup8(sizeof(*(d))) + roundup8((d)->name_size) + roundup8((d)->param_size))
+#define PINT_DIST_PACK_SIZE(d) (roundup8(sizeof(*(d))) + \
+                                roundup8((d)->name_size) + \
+                                roundup8((d)->param_size))
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
-#define encode_PINT_dist(pptr,x) do { PINT_dist *px = *(x); \
+
+#if 0
+#define encode_PINT_dist(pptr,x)  \
+do { PINT_dist *px = *(x); \
     encode_string(pptr, &px->dist_name); \
     if (!px->methods) { \
 	gossip_err("%s: encode_PINT_dist: methods is null\n", __func__); \
@@ -94,7 +104,32 @@ typedef struct PINT_dist_s {
     (px->methods->encode_lebf) (pptr, px->params); \
     align8(pptr); \
 } while (0)
-#define decode_PINT_dist(pptr,x) do { PINT_dist tmp_dist; PINT_dist *px; \
+#endif
+
+/* If we convert req endecode macros to inlines add const support */
+
+static inline void encode_PINT_dist(char **pptr, PINT_dist **x)
+{
+    if (*x == NULL || (*x)->dist_name[0] == '\0') /* no name, no dist */
+    {
+        **pptr = '\0';
+        *pptr += 8;  /* align to 8 */
+        return;
+    }
+    encode_string(pptr, (const char **)&(*x)->dist_name); 
+    if (!(*x)->methods)
+    { 
+	gossip_err("%s: encode_PINT_dist: methods is null\n", __func__); 
+	exit(1); 
+    } 
+    ((*x)->methods->encode_lebf) (pptr, (*x)->params); 
+    align8(pptr); 
+}
+
+#if 0
+#define decode_PINT_dist(pptr,x) \
+do { PINT_dist tmp_dist; \
+     PINT_dist *px; \
     decode_string(pptr, &tmp_dist.dist_name); \
     tmp_dist.params = 0; \
     tmp_dist.methods = 0; \
@@ -113,6 +148,40 @@ typedef struct PINT_dist_s {
     (px->methods->decode_lebf) (pptr, px->params); \
     align8(pptr); \
 } while (0)
+#endif
+
+static inline void  decode_PINT_dist(char **pptr, PINT_dist **x) 
+{
+    PINT_dist tmp_dist; 
+    decode_string(pptr, &tmp_dist.dist_name); 
+    if (tmp_dist.dist_name[0] == 0)
+    {
+        *x = NULL;
+        *pptr += 8;  /* align to 8 */
+        return;
+    }
+    tmp_dist.params = 0; 
+    tmp_dist.methods = 0; 
+    /* bizzare lookup function fills in most fields */ 
+    PINT_dist_lookup(&tmp_dist); 
+    if (!tmp_dist.methods)
+    { 
+	gossip_err("%s: decode_PINT_dist: methods is null\n", __func__); 
+	exit(1); 
+    } 
+    /* later routines assume dist is a big contiguous thing, do so */ 
+    *x = decode_malloc(PINT_DIST_PACK_SIZE(&tmp_dist)); 
+    memcpy(*x, &tmp_dist, sizeof(PINT_dist)); 
+
+    (*x)->dist_name = (char *)(*x) + roundup8(sizeof(PINT_dist)); 
+    memcpy((*x)->dist_name, tmp_dist.dist_name, tmp_dist.name_size); 
+
+    (*x)->params = (void *)((*x)->dist_name + roundup8((*x)->name_size)); 
+    ((*x)->methods->decode_lebf) (pptr, (*x)->params); 
+
+    align8(pptr); 
+}
+
 #define defree_PINT_dist(x) do { \
     decode_free(*(x)); \
 } while (0)
@@ -133,11 +202,6 @@ int PINT_dist_getparams(void *buf, const PINT_dist *dist);
 
 /* Memcpys the the distribution params from buf into dist */
 int PINT_dist_setparams(PINT_dist *dist, const void *buf);
-
-/* Given a distribution with only the dist_name filled in, the remaining
- * distribution parameters are copied from the registered distribution for
- * that name */
-int PINT_dist_lookup(PINT_dist *dist);
 
 /* pack dist struct for storage */
 void PINT_dist_encode(void *buffer, PINT_dist *dist);

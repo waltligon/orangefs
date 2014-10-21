@@ -2434,6 +2434,10 @@ static int server_purge_unexpected_recv_machines(void)
     return 0;
 }
 
+/* V3 Not used any more - we do all of this in various states of
+ * unexpected
+ */
+#if 0
 /* server_state_machine_start()
  *
  * initializes fields in the s_op structure and begins execution of
@@ -2532,6 +2536,7 @@ int server_state_machine_start(PINT_smcb *smcb, job_status_s *js_p)
 
     return PINT_state_machine_invoke(smcb, js_p);
 }
+#endif
 
 /* server_state_machine_alloc_noreq()
  * 

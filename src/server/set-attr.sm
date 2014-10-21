@@ -569,6 +569,13 @@ static PINT_sm_action setattr_setobj_attribs(struct PINT_smcb *smcb,
                       llu(a_p->mtime), llu(orig_mtime));
      }
 
+     /*
+      * Probably any time attributes are set we should update ctime
+      * Clients should be able to send in specific values for the 4
+      * times to be explicitly set, and we should handle that.  Need
+      * to work out details of that for the mask an so on - WBL
+      */
+
     /* if the object is a symbolic link, check to make sure that the request
      * is not attempting to change the permissions 
      */
