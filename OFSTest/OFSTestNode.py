@@ -1177,18 +1177,18 @@ class OFSTestNode(object):
             print "Installing required software for SuSE based system %s" % self.distro
             
         
-            #rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
-            
-            if rc != 0:
-                logging.exception(output)
-                return rc
+#             rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
+#             
+#             if rc != 0:
+#                 logging.exception(output)
+#                 return rc
             
             install_commands = [
                 "bash -c 'echo 0 > /selinux/enforce'",
                 "/sbin/SuSEfirewall2 off",
                 # prereqs should be installed as part of the image. Thanx SuseStudio!
                 #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs "nano openssl
-                "zypper --non-interactive install patch libuuid1 uuid-devel gdb maven java-1.7.0-openjdk java-1.7.0-openjdk-devel",
+#                 "zypper --non-interactive install patch libuuid1 uuid-devel gdb maven java-1.7.0-openjdk java-1.7.0-openjdk-devel",
                 "zypper --non-interactive install openldap2 openldap2-client openldap-servers libldap2_4-2 openldap2-devel",
                 "chown -R ldap:ldap /var/lib/ldap",
                 
