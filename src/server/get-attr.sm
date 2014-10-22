@@ -366,10 +366,10 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
         GOSSIP_GETATTR_DEBUG,
         "+  _DSPACE_ retrieved attrs: [owner = %d, group = %d\n\t"
         "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
-        "ctime = %llu, dfile_count = %d, dist_size = %d]\n",
+        "ctime = %llu, ntime = %llu, dfile_count = %d, dist_size = %d]\n",
         respattr->owner, respattr->group, respattr->perms,
         respattr->objtype, llu(respattr->atime),
-        llu(respattr->mtime), llu(respattr->ctime),
+        llu(respattr->mtime), llu(respattr->ctime),llu(respattr->ntime),
         (int)respattr->u.meta.dfile_count,
         (int)respattr->u.meta.dist_size);
 

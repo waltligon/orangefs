@@ -234,8 +234,9 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
     dest->group = src->group;
     dest->perms = src->perms;
     dest->atime = src->atime;
-    dest->atime = src->mtime;
-    dest->atime = src->ctime;
+    dest->mtime = src->mtime;
+    dest->ctime = src->ctime;
+    dest->ntime = src->ntime;
 
     switch(dest->objtype)
     {
