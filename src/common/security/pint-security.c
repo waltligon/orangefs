@@ -411,12 +411,20 @@ int PINT_sign_capability(PVFS_capability *cap)
 {
     const struct server_configuration_s *config;
     EVP_MD_CTX mdctx;
-    char buf[256];
     const EVP_MD *md = NULL;
 #if 0
     char mdstr[2*SHA_DIGEST_LENGTH+1];
 #endif
     int ret;
+
+    if (cap == NULL || cap->issuer == NULL || cap->signature == NULL ||
+        (cap->num_handles != 0 && cap->handle_array == NULL))
+    {
+        /* log parameter error */
+        PINT_security_error(__func__, -1);
+
+        return -1;
+    }
 
     config = PINT_get_server_config();
 
@@ -440,8 +448,7 @@ int PINT_sign_capability(PVFS_capability *cap)
     ret = EVP_SignInit_ex(&mdctx, md, NULL);
     if (!ret)
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing capability: "
-                     "%s\n", ERR_error_string(ERR_get_error(), buf));
+        PINT_security_error(__func__, -PVFS_ESECURITY);
         EVP_MD_CTX_cleanup(&mdctx);
         return -1;
     }
@@ -462,8 +469,8 @@ int PINT_sign_capability(PVFS_capability *cap)
 
     if (!ret)
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing capability: "
-                     "%s\n", ERR_error_string(ERR_get_error(), buf));
+        PINT_security_error(__func__, -PVFS_ESECURITY);
+
         EVP_MD_CTX_cleanup(&mdctx);
         return -1;
     }
@@ -473,8 +480,8 @@ int PINT_sign_capability(PVFS_capability *cap)
                         security_privkey);
     if (!ret)
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing capability: "
-                     "%s\n", ERR_error_string(ERR_get_error(), buf));
+        PINT_security_error(__func__, -PVFS_ESECURITY);
+
         EVP_MD_CTX_cleanup(&mdctx);
         return -1;
     }
@@ -549,8 +556,12 @@ int PINT_verify_capability(const PVFS_capability *cap)
     EVP_PKEY *pubkey;
     int ret;
     
-    if (!cap)
+    if (cap == NULL || cap->issuer == NULL || cap->signature == NULL ||
+        (cap->num_handles != 0 && cap->handle_array == NULL))
     {
+        /* log parameter error */
+        PINT_security_error(__func__, -1);
+
         return 0;
     }
 
@@ -714,13 +725,20 @@ int PINT_sign_credential(PVFS_credential *cred)
 {
     const struct server_configuration_s *config;
     EVP_MD_CTX mdctx;
-    char buf[256];
     const EVP_MD *md = NULL;
 #if 0
     char mdstr[2*SHA_DIGEST_LENGTH+1];
 #endif
     int ret;
-        
+
+    if (cred == NULL || (cred->num_groups != 0 && cred->group_array == NULL))
+    {
+        /* log parameter error */
+        PINT_security_error(__func__, -1);
+
+        return -1;
+    }
+
     config = PINT_get_server_config();
     
     cred->issuer = (char *) malloc(strlen(config->server_alias) + 3);
@@ -785,9 +803,7 @@ int PINT_sign_credential(PVFS_credential *cred)
     EVP_MD_CTX_cleanup(&mdctx);
     if (!ret)
     {
-        ERR_error_string_n(ERR_get_error(), buf, 256);
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing credential: "
-             "%s\n", buf);
+        PINT_security_error(__func__, -PVFS_ESECURITY);
         return -1;
     }
 
@@ -822,9 +838,12 @@ int PINT_verify_credential(const PVFS_credential *cred)
     int certcache_hit;
 #endif
 
-    if (!cred)
+    if (cred == NULL || (cred->sig_size != 0 && cred->signature == NULL) ||
+        (cred->num_groups != 0 && cred->group_array == NULL))
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Null credential\n");
+        /* log parameter error */
+        PINT_security_error(__func__, -1);
+
         return 0;
     }
 
@@ -941,7 +960,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
 
     if (ret != 1)
     {
-        PINT_security_error("Credential verify", -PVFS_ESECURITY);
+        PINT_security_error(__func__, -PVFS_ESECURITY);
     }
 
     EVP_MD_CTX_cleanup(&mdctx);
