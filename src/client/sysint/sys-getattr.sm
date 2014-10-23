@@ -778,7 +778,6 @@ static int getattr_object_getattr_comp_fn(void *v_p,
      */
     PINT_copy_object_attr(&sm_p->getattr.attr,
                           &resp_p->u.getattr.attr);
-//gossip_err("%s: PINT_copy_object_attr, attr = %llu, mask = %d\n", __func__, llu(&sm_p->getattr.attr), sm_p->getattr.attr.mask);
 
     attr = &sm_p->getattr.attr;
 
@@ -2065,7 +2064,6 @@ static PINT_sm_action getattr_set_sys_response(
                0, sizeof(PVFS_sysresp_getattr));
     }
 
-//gossip_err("%s: PINT_SM_GETATTR_STATE_CLEAR\n", __func__);
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     PINT_SET_OP_COMPLETE;
