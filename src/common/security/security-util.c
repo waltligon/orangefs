@@ -240,11 +240,8 @@ void PINT_cleanup_capability(PVFS_capability *cap)
         {
             free(cap->issuer);
         }
-        
-        cap->handle_array = NULL;
-        cap->signature = NULL;
-        cap->sig_size = 0;
-        cap->issuer = NULL;
+
+        memset(cap, 0, sizeof(PVFS_capability));
     }
 }
 
