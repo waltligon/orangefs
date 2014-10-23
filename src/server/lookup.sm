@@ -205,6 +205,7 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
+    int ret;
 
 
     gossip_err("%s:REQUEST:path(%s) fs_id(%d) parent handle(%s) attrmask(0x%0x)\n"
@@ -232,6 +233,12 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
        /* get the filesystem value representing the number of sids per metadata object. */
        ret = PINT_cached_config_get_metadata_sid_count(s_op->req->u.lookup_path.fs_id,
                                                        &(s_op->metasidcnt));
+       if (ret)
+       {
+          gossip_err("%s:Error retrieving the metadata sid count from the config file.\n",__func__);
+          js_p->error_code = ret;
+          return SM_ACTION_COMPLETE;
+       }
     }
 
     gossip_err("%s: metasidcnt(%d)\n",__func__,s_op->metasidcnt);
@@ -282,7 +289,7 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
      */  
     ptr = malloc(s_op->u.lookup.seg_ct *
                  (sizeof(PVFS_handle) + sizeof(PVFS_object_attr) 
-                                      + (sizeof(PVFS_sid)*s_op->metasidcnt)));
+                                      + (sizeof(PVFS_SID)*s_op->metasidcnt)));
     if (!ptr)
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -293,7 +300,7 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
     ptr += (s_op->u.lookup.seg_ct * sizeof(PVFS_handle));
 
     s_op->resp.u.lookup_path.attr_array = (PVFS_object_attr *)ptr;
-    ptr += (s_op->lookup.seg_ct * sizeof(PVFS_object_attr));
+    ptr += (s_op->u.lookup.seg_ct * sizeof(PVFS_object_attr));
 
     s_op->resp.u.lookup_path.sid_array = (PVFS_SID *)ptr;
 
@@ -327,6 +334,7 @@ static PINT_sm_action lookup_read_object_metadata(
     job_id_t j_id;
     PVFS_handle handle = PVFS_HANDLE_NULL;
     PVFS_ds_attributes *ds_attr = NULL;
+    int i,j;
 
     assert(s_op->u.lookup.seg_nr <= s_op->u.lookup.seg_ct);
 
@@ -339,7 +347,7 @@ static PINT_sm_action lookup_read_object_metadata(
     {
         handle = s_op->req->u.lookup_path.handle;
         //ds_attr = &(s_op->u.lookup.ds_attr_array[0]);
-        s_op->u.lookup.ds_attr_array[0] = &s_op->ds_attr;
+        s_op->u.lookup.ds_attr_array[0] = s_op->ds_attr;
     }
     else
     {
@@ -363,11 +371,30 @@ static PINT_sm_action lookup_read_object_metadata(
     if (s_op->u.lookup.seg_nr == 0)
     {
        /* don't need to retrieve dspace attributes, since we are working with the
-        * handle given by the request.
+        * handle given by the request, in which case, the prelude has already done
+        * the work.
         */
        js_p->error_code = 0;
        return SM_ACTION_COMPLETE;
     }
+
+    /* Does the handle's dspace entry reside locally or remotely?  If remotely,
+     * then we are done.
+     */
+    for (i=0,j=1; i<s_op->metasidcnt; i++,j++)
+    {
+        if ( PINT_cached_config_server_local( &(s_op->u.lookup.keyval_temp_store[j].sid) ) )
+        {
+           break;
+        }
+    }
+    if ( i == s_op->metasidcnt )
+    {
+       /* None of the sids represent the local server */
+       js_p->error_code = STATE_NOMORESEGS;
+       return SM_ACTION_COMPLETE;
+    }
+
 
     /* get the dspace attributes/metadata */
     ret = job_trove_dspace_getattr(s_op->req->u.lookup_path.fs_id,
@@ -418,10 +445,9 @@ static PINT_sm_action lookup_verify_object_metadata(
         ds_attr = &(s_op->u.lookup.ds_attr_array[
             s_op->u.lookup.seg_nr - 1]);
         PVFS_object_attr_from_ds_attr(a_p, ds_attr);
+        a_p->mask = PVFS_ATTR_COMMON_ALL;
     }
 
-    //PVFS_object_attr_from_ds_attr(a_p, ds_attr);
-    a_p->mask = PVFS_ATTR_COMMON_ALL;
     s_op->target_object_attr = a_p;
 
     /* update our successful attr read count */
@@ -436,14 +462,11 @@ static PINT_sm_action lookup_verify_object_metadata(
         "perms = %o, type = %d)\n", a_p->owner, a_p->group,
         a_p->perms, a_p->objtype);
 
-    /* if we hit a metafile, we are done */
+    /* if we hit a metafile, then lookup its keyval attributes */
     if (a_p->objtype == PVFS_TYPE_METAFILE)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "  object is a metafile; "
-                     "gathering attributes.....\n");
-
-
-
+                     "gathering keyval attributes.....\n");
 
         js_p->error_code = LOOKUP_LOCAL_METAFILE_KEYVALS;
         return SM_ACTION_COMPLETE;
@@ -586,7 +609,8 @@ static PINT_sm_action lookup_verify_getattr_results(
    struct PINT_server_op *s_op;
    int task_id;
    int remaining;
-   PVFS_object_attr resp_attr;
+   int ret;
+   PVFS_object_attr *resp_attr;
 
    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
 
@@ -599,7 +623,7 @@ static PINT_sm_action lookup_verify_getattr_results(
 
    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-   resp_attr = getattr_op->resp.u.getattr.attr;
+   resp_attr = &(getattr_op->resp.u.getattr.attr);
 
    gossip_err("%s\n"
               "resp_attr.objtype(%d)\n"
@@ -617,28 +641,34 @@ static PINT_sm_action lookup_verify_getattr_results(
               "         .sid_array(%p) sid_count(%d)\n"
               "         .size(%d)\n"
               ,__func__
-              ,resp_attr.objtype
-              ,resp_attr.mask
-              ,resp_attr.owner
-              ,resp_attr.group
-              ,resp_attr.perms
-              ,(int)resp_attr.atime
-              ,(int)resp_attr.mtime
-              ,(int)resp_attr.ctime
-              ,(int)resp_attr.ntime
-              ,llu(resp_attr.capability.fsid)
-              ,resp_attr.capability.issuer
-              ,resp_attr.u.meta.dist
-              ,resp_attr.u.meta.dfile_array
-              ,resp_attr.u.meta.dfile_count
-              ,PVFS_OID_str(&resp_attr.u.meta.dfile_array[0])
-              ,resp_attr.u.meta.sid_array
-              ,resp_attr.u.meta.sid_count
-              ,(int)resp_attr.u.meta.size);
+              ,resp_attr->objtype
+              ,resp_attr->mask
+              ,resp_attr->owner
+              ,resp_attr->group
+              ,resp_attr->perms
+              ,(int)resp_attr->atime
+              ,(int)resp_attr->mtime
+              ,(int)resp_attr->ctime
+              ,(int)resp_attr->ntime
+              ,llu(resp_attr->capability.fsid)
+              ,resp_attr->capability.issuer
+              ,resp_attr->u.meta.dist
+              ,resp_attr->u.meta.dfile_array
+              ,resp_attr->u.meta.dfile_count
+              ,PVFS_OID_str(&resp_attr->u.meta.dfile_array[0])
+              ,resp_attr->u.meta.sid_array
+              ,resp_attr->u.meta.sid_count
+              ,(int)resp_attr->u.meta.size);
 
-   gossip_err("resp_attr.sid_array[0]:(%s)\n",PVFS_SID_str(&resp_attr.u.meta.sid_array[0]));
+   gossip_err("resp_attr.sid_array[0]:(%s)\n",PVFS_SID_str(&resp_attr->u.meta.sid_array[0]));
    
-
+   ret = PINT_copy_object_attr( &s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.seg_nr - 1],resp_attr );
+   if (ret)
+   {
+      gossip_err("%s:Error copying metafile attributes from getattr to lookup(%d)\n",__func__,ret);
+      js_p->error_code = ret;
+      goto out;
+   }
 
 out:
    free(getattr_op);
@@ -1163,6 +1193,8 @@ static PINT_sm_action lookup_read_directory_entry(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_dist_dir_hash_type dirdata_hash;
+    int last_dirdata_sid_index=0;
+    int i;
 
     /* find the segment that we should look up in the directory */
     ret = PINT_string_next_segment(s_op->req->u.lookup_path.path,
@@ -1191,11 +1223,12 @@ static PINT_sm_action lookup_read_directory_entry(
                                     s_op->u.lookup.attr.u.dir.dist_dir_bitmap);
 
     /* thus, the dirdata handle is s_op->u.lookup.attr.u.dir.dirdata_handles[dirdata_server_index]
-     * and the sids associated with that dirdata handle is 
+     * and the sids associated with that dirdata handle are
      * s_op->u.lookup.attr.u.dir.dirdata_sids[dirdata_server_index * metasidcnt]...
      *                                       [(dirdata_server_index * metasidcnt) +
      *                                        (metasidcnt - 1)]
      */
+    s_op->u.lookup.dirdata_sid_index = (s_op->u.lookup.dirdata_server_index * s_op->metasidcnt);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "lookup: selecting bucket No.%d from dist_dir_bitmap.\n",
@@ -1221,18 +1254,29 @@ static PINT_sm_action lookup_read_directory_entry(
               ,PVFS_OID_str(&s_op->u.lookup.attr.u.dir.dirdata_handles[1])
               ,&s_op->u.lookup.attr.u.dir.dirdata_handles[1]);
 
-    if (PINT_cached_config_server_local(
-                &s_op->u.lookup.attr.u.dir.dirdata_sids[
-                        s_op->u.lookup.dirdata_sid_index]))
+    /* We must check each sid to see if any one of them is local.  If not,
+     * then we can just use the first one in the list.
+     */
+    last_dirdata_sid_index = s_op->u.lookup.dirdata_sid_index + s_op->metasidcnt;
+    for (i=s_op->u.lookup.dirdata_sid_index; i<last_dirdata_sid_index; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "lookup: local server !!!\n");
-        js_p->error_code = LOCAL_DIRENT;
+        if (PINT_cached_config_server_local(&s_op->u.lookup.attr.u.dir.dirdata_sids[i]))
+        {
+           gossip_debug(GOSSIP_SERVER_DEBUG, "lookup: local server !!!\n");
+           js_p->error_code = LOCAL_DIRENT;
+           break;
+        }
     }
-    else
-    {
+
+    if ( i == last_dirdata_sid_index )
+    {   /* in the case of a remote server, we will just use the first one in the
+         * sid list for this dirdata handle, which is already known via dirdata_sid_index. 
+         * msgpair will handle using the others in the event that a server can't be reached.
+         */
         gossip_debug(GOSSIP_SERVER_DEBUG, "lookup: remote server !!!\n");
         js_p->error_code = REMOTE_DIRENT;
     }
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -1360,6 +1404,8 @@ static int lookup_get_dirent_comp_fn(void *v_p,
     {
         s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.seg_nr-1] =
                  resp_p->u.mgmt_get_dirent.handle;
+
+        /*becky: copy sids from response to lookup area */
 
         gossip_debug(GOSSIP_SERVER_DEBUG,
                      "  lookup_get_dirent_comp_fn: got dirent handle %s\n",
