@@ -206,6 +206,10 @@ class OFSTestConfig(object):
         ## @var install_hadoop
         # Enable OrangeFS hadoop support
         self.install_hadoop = False # Web Interface: auto
+        
+        ## @var install_hadoop
+        # Enable OrangeFS hadoop support
+        self.hadoop_version = "hadoop-1.2.1" # Web Interface: select
 
         ## @var configure_opts
         # Additional options for configure
@@ -598,6 +602,10 @@ class OFSTestConfig(object):
         temp = d.get('install_hadoop')
         if temp != None:
             self.install_hadoop = temp
+            
+        temp = d.get('hadoop_version')
+        if temp != None:
+            self.hadoop_version = temp    
             
                 # --enable-fuse
         temp = d.get('install_fuse')

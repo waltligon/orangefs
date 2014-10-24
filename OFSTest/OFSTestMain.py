@@ -365,7 +365,7 @@ class OFSTestMain(object):
             print ""
             print "==================================================================="
             print "Installing Hadoop"
-            self.ofs_network.installHadoop()
+            self.ofs_network.installHadoop(hadoop_version=self.config.hadoop_version)
 
 
 

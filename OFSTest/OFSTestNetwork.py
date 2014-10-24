@@ -447,9 +447,12 @@ class OFSTestNetwork(object):
                     
         
     
-    def installHadoop(self,node_list=None):
+    def installHadoop(self,hadoop_version="hadoop-1.2.1",node_list=None):
         if node_list == None:
             node_list = self.network_nodes
+        for node in node_list:
+            node.hadoop_version=hadoop_version
+            
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.installHadoop)
     
     ##
@@ -1627,8 +1630,10 @@ class OFSTestNetwork(object):
             
             # copy templates to node
             #master_node.copyToRemoteNode(source="%s/test/automated/hadoop-tests.d/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
-            
-            master_node.copyToRemoteNode(source="%s/src/client/hadoop/orangefs-hadoop1/src/main/resources/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
+            if master_node.hadoop_version == "hadoop-1.2.1":
+                master_node.copyToRemoteNode(source="%s/src/client/hadoop/orangefs-hadoop1/src/main/resources/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
+            else:
+                master_node.copyToRemoteNode(source="%s/src/client/hadoop/orangefs-hadoop2/src/main/resources/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
 #              setup hadoop-env.sh
 #             node.runSingleCommand("echo 'export JAVA_HOME=%s' >> %s/conf/hadoop-env.sh" % (node.jdk6_location,node.hadoop_location))
 #             node.runSingleCommand("echo 'export LD_LIBRARY_PATH=%s/lib' >> %s/conf/hadoop-env.sh" % (node.ofs_installation_location,node.hadoop_location))
