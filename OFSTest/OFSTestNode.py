@@ -1157,7 +1157,7 @@ class OFSTestNode(object):
                 "apt-get update ",
                 "bash -c 'echo debconf shared/accepted-oracle-license-v1-1 select true | debconf-set-selections'",
                 "bash -c 'echo debconf shared/accepted-oracle-license-v1-1 seen true | debconf-set-selections'",
-                #"DEBIAN_FRONTEND=noninteractive apt-get install -y -q oracle-java6-installer "
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q oracle-java7-installer "
             ]
             
             
@@ -1168,8 +1168,8 @@ class OFSTestNode(object):
 
             
             # ubuntu installs java to a different location than RHEL and SuSE 
-            self.jdk6_location = "/usr/lib/jvm/java-7-openjdk-amd64"
-            
+            #self.jdk6_location = "/usr/lib/jvm/java-7-openjdk-amd64"
+            self.jdk6_location = "/usr/lib/jvm/java-7-oracle"
             
         elif "suse" in self.distro.lower():
             
@@ -1177,18 +1177,13 @@ class OFSTestNode(object):
             print "Installing required software for SuSE based system %s" % self.distro
             
         
-            rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
-            
-            if rc != 0:
-                logging.exception(output)
-                return rc
             
             install_commands = [
                 "bash -c 'echo 0 > /selinux/enforce'",
                 "/sbin/SuSEfirewall2 off",
                 # prereqs should be installed as part of the image. Thanx SuseStudio!
                 #zypper --non-interactive install gcc gcc-c++ flex bison libopenssl-devel kernel-source kernel-syms kernel-devel perl make subversion automake autoconf zip fuse fuse-devel fuse-libs "nano openssl
-                "zypper --non-interactive install patch libuuid1 uuid-devel gdb maven java-1.7.0-openjdk java-1.7.0-openjdk-devel",
+#                 "zypper --non-interactive install patch libuuid1 uuid-devel gdb maven java-1.7.0-openjdk java-1.7.0-openjdk-devel",
                 "zypper --non-interactive install openldap2 openldap2-client openldap-servers libldap2_4-2 openldap2-devel",
                 "chown -R ldap:ldap /var/lib/ldap",
                 
@@ -1199,7 +1194,6 @@ class OFSTestNode(object):
                 "ln -s /lib/modules/\\`uname -r\\`/build/Module.symvers /lib/modules/\\`uname -r\\`/source",
                 "if [ ! -f /lib/modules/\\`uname -r\\`/build/include/linux/version.h ] then; ln -s include/generated/uapi/version.h /lib/modules/\\`uname -r\\`/build/include/linux/version.h; fi",
             
-                "yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user,
                 "/sbin/modprobe -v fuse",
                 "chmod a+x /bin/fusermount",
                 "chmod a+r /etc/fuse.conf",
@@ -1225,21 +1219,29 @@ class OFSTestNode(object):
 
             ]
             
-            if "opensuse" in self.distro.lower():    
+            if "opensuse" in self.distro.lower():
+                rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-7u71-linux-x64.rpm",output)
+             
+                if rc != 0:
+                    logging.exception(output)
+                    return rc
+                #install_commands.append("yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user)
+                install_commands.append("rpm -i /home/%s/jdk-7u71-linux-x64.rpm" % self.current_user)
                 install_commands.append("cd /opt; wget http://apache.mesi.com.ar/maven/maven-3/3.2.3/binaries/apache-maven-3.2.3-bin.tar.gz")
                 install_commands.append("cd /opt; tar xf apache-maven-3.2.3-bin.tar.gz")
                 install_commands.append("ln -s /opt/apache-maven-3.2.3/bin/mvn /usr/bin/mvn")
                 self.setEnvironmentVariable("M2_HOME", "/opt/apache-maven-3.2.3")
                 self.setEnvironmentVariable("M2", "/opt/apache-maven-3.2.3/bin")
-            
+                self.jdk6_location = "/usr/java/default"
+            else:
+                #SLES uses IBM Java
+                self.jdk6_location = "/usr/lib64/jvm/java"
             
             for command in install_commands:
                 rc = self.runSingleCommandAsRoot(command, output)
     
             
-            # RPM installs to default location
-            self.jdk6_location = "/usr/lib64/jvm/java"
-            
+                        
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             print "Installing required software for Red Hat based system %s" % self.distro
             install_commands = [
@@ -1276,9 +1278,18 @@ class OFSTestNode(object):
                 
                 ]
             
+            #install Sun Java 7
+            rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-7u71-linux-x64.rpm",output)
+             
+            if rc != 0:
+                logging.exception(output)
+                return rc
+            #install_commands.append("yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user)
+            install_commands.append("rpm -i /home/%s/jdk-7u71-linux-x64.rpm" % self.current_user)
+            
             # install maven in RHEL 6
             if "6." in self.distro:
-                install_commands.append("cd /opt; wget http://apache.mesi.com.ar/maven/maven-3/3.2.3/binaries/apache-maven-3.2.3-bin.tar.gz")
+                install_commands.append("cd /opt; wget --quiet http://apache.mesi.com.ar/maven/maven-3/3.2.3/binaries/apache-maven-3.2.3-bin.tar.gz")
                 install_commands.append("cd /opt; tar xf apache-maven-3.2.3-bin.tar.gz")
                 install_commands.append("ln -s /opt/apache-maven-3.2.3/bin/mvn /usr/bin/mvn")
                 self.setEnvironmentVariable("M2_HOME", "/opt/apache-maven-3.2.3")
@@ -1308,7 +1319,7 @@ class OFSTestNode(object):
         if [ ! -d %s ]
         then
             cd ~
-            wget -q http://devorange.clemson.edu/pvfs/db-4.8.30.tar.gz
+            wget --quiet http://devorange.clemson.edu/pvfs/db-4.8.30.tar.gz
             tar zxf db-4.8.30.tar.gz &> /dev/null
             cd db-4.8.30/build_unix
             echo "Configuring Berkeley DB 4.8.30..."
@@ -1336,7 +1347,7 @@ class OFSTestNode(object):
             output = []
             self.changeDirectory("/opt")
             
-            self.runSingleCommand("wget http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
+            self.runSingleCommand("wget --quiet http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
             self.runSingleCommand("tar -zxf %s.tar.gz" % self.hadoop_version)
         
 
