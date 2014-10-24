@@ -68,7 +68,7 @@ machine pvfs2_lookup_sm
     state read_object_metadata
     {
         run lookup_read_object_metadata;
-        success => verify_object_metadata;
+        /*success => verify_object_metadata;*/
         default => setup_resp;
     }
 
@@ -145,7 +145,7 @@ machine pvfs2_lookup_sm
     state read_directory_entry_local
     {
         run lookup_read_directory_entry_local;
-        success => read_object_metadata;
+        success => read_object_metadata; 
         default => setup_resp;
     }
 
@@ -334,26 +334,40 @@ static PINT_sm_action lookup_read_object_metadata(
     job_id_t j_id;
     PVFS_handle handle = PVFS_HANDLE_NULL;
     PVFS_ds_attributes *ds_attr = NULL;
-    int i,j;
+    int i,j,start_index,end_index;
 
     assert(s_op->u.lookup.seg_nr <= s_op->u.lookup.seg_ct);
 
-    /* TJS: memcpy each the SIDs taht are in keyval_temp_store
-     * into the resp sid array, making sure to index to the point
-     * in the response sid array that corresponds to our segment number */
-
-    /* use the base handle if we haven't looked up a segment yet */
+    /* use the handle given with the request if we haven't looked up a segment yet */
+    /* this handle is the parent directory for the first segment.                  */
     if (s_op->u.lookup.seg_nr == 0)
     {
         handle = s_op->req->u.lookup_path.handle;
-        //ds_attr = &(s_op->u.lookup.ds_attr_array[0]);
-        s_op->u.lookup.ds_attr_array[0] = s_op->ds_attr;
     }
     else
     {
-        handle  = s_op->resp.u.lookup_path.handle_array[ s_op->u.lookup.seg_nr - 1 ] 
-                = (PVFS_handle)s_op->u.lookup.keyval_temp_store[0].oid;
+        /* In this case, a dirent object was found in the keyval db associated with a 
+         * dirdata handle.
+         */
+
+        /* prepare local variables */
+        handle  = (PVFS_handle)s_op->u.lookup.keyval_temp_store[0].oid;
         ds_attr = &(s_op->u.lookup.ds_attr_array[ s_op->u.lookup.seg_nr - 1 ]);
+
+        /* store dirent object in the response structure */
+        s_op->resp.u.lookup_path.handle_array[ s_op->u.lookup.seg_nr - 1 ] = handle; 
+
+        start_index = ((s_op->u.lookup.seg_nr - 1) * (s_op->metasidcnt));
+        end_index   = start_index + s_op->metasidcnt;
+        for (i=start_index,j=1; i<end_index; i++,j++)
+        {
+            s_op->resp.u.lookup_path.sid_array[i] = s_op->u.lookup.keyval_temp_store[j].sid;
+            s_op->resp.u.lookup_path.sid_count++;
+        }
+
+        /* update our successful handle read count */
+        s_op->u.lookup.handle_ct++;
+
         gossip_err("%s:sid for metadata object(%s)\n"
                   ,__func__
                   ,PVFS_SID_str(&s_op->u.lookup.keyval_temp_store[1].sid));
@@ -361,8 +375,6 @@ static PINT_sm_action lookup_read_object_metadata(
 
     gossip_err("%s:oid for metadata object(%s)\n",__func__,PVFS_OID_str(&handle));
 
-    /* update our successful handle read count */
-    s_op->u.lookup.handle_ct++;
 
     /* Copy the fsid and handle to the s_op structure for the acl check */
     s_op->target_handle = handle;
@@ -381,16 +393,16 @@ static PINT_sm_action lookup_read_object_metadata(
     /* Does the handle's dspace entry reside locally or remotely?  If remotely,
      * then we are done.
      */
-    for (i=0,j=1; i<s_op->metasidcnt; i++,j++)
+    for (i=start_index,j=1; i<end_index; i++,j++)
     {
         if ( PINT_cached_config_server_local( &(s_op->u.lookup.keyval_temp_store[j].sid) ) )
         {
            break;
         }
     }
-    if ( i == s_op->metasidcnt )
+    if ( i == end_index )
     {
-       /* None of the sids represent the local server */
+       /* None of the sids identifies the local server */
        js_p->error_code = STATE_NOMORESEGS;
        return SM_ACTION_COMPLETE;
     }
@@ -436,7 +448,7 @@ static PINT_sm_action lookup_verify_object_metadata(
     if (s_op->u.lookup.seg_nr == 0)
     {
         a_p = &s_op->attr;
-        ds_attr = &(s_op->u.lookup.ds_attr_array[0]);
+        ds_attr = &s_op->ds_attr;
     }
     else
     {
@@ -446,12 +458,12 @@ static PINT_sm_action lookup_verify_object_metadata(
             s_op->u.lookup.seg_nr - 1]);
         PVFS_object_attr_from_ds_attr(a_p, ds_attr);
         a_p->mask = PVFS_ATTR_COMMON_ALL;
+        /* update our successful attr read count */
+        s_op->u.lookup.attr_ct++;
     }
 
     s_op->target_object_attr = a_p;
 
-    /* update our successful attr read count */
-    s_op->u.lookup.attr_ct++;
 
     assert(((a_p->objtype == PVFS_TYPE_DIRECTORY) ||
             (a_p->objtype == PVFS_TYPE_METAFILE)  ||
@@ -466,7 +478,7 @@ static PINT_sm_action lookup_verify_object_metadata(
     if (a_p->objtype == PVFS_TYPE_METAFILE)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "  object is a metafile; "
-                     "gathering keyval attributes.....\n");
+                     "gathering keyval attributes from local server.....\n");
 
         js_p->error_code = LOOKUP_LOCAL_METAFILE_KEYVALS;
         return SM_ACTION_COMPLETE;
@@ -1420,14 +1432,13 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /*
-      NOTE: we may have handle_count N with attr_count N-1 in the case
-      that another meta-server needs to continue with the path (attr)
-      lookup.  otherwise, we're returning N handles with N attrs.
-
-      # actually completed are one less than the respective counts
+      NOTE: we may have handle_count N and sid_count N*metasidcnt
+      with attr_count N-1 in the case that another meta-server needs to 
+      continue with the path (attr) lookup.  otherwise, we're returning 
+      N handles, N*metasidcnt, and  N attrs.
     */
-    s_op->resp.u.lookup_path.handle_count = s_op->u.lookup.handle_ct - 1;
-    s_op->resp.u.lookup_path.attr_count = s_op->u.lookup.attr_ct - 1;
+    s_op->resp.u.lookup_path.handle_count = s_op->u.lookup.handle_ct;
+    s_op->resp.u.lookup_path.attr_count   = s_op->u.lookup.attr_ct;
 
     if (s_op->resp.u.lookup_path.handle_count ||
         s_op->resp.u.lookup_path.attr_count)
@@ -1457,7 +1468,7 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
                           "path: %s, handle: %s\n", 
                           s_op->req->u.lookup_path.path, 
                           PVFS_OID_str(&s_op->resp.u.lookup_path.handle_array[
-                                   s_op->resp.u.lookup_path.handle_count-1]));
+                                   s_op->resp.u.lookup_path.handle_count]));
     }
     else
     {
@@ -1466,6 +1477,9 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
             s_op->req->u.lookup_path.path);
     }
 
+
+if (js_p->error_code == 0)
+{
     gossip_err("%s\n"
                "s_op->resp.u.lookup_path.handle_count(%u)\n"
                "                        .attr_count(%u)\n"
@@ -1480,6 +1494,7 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
                ,PVFS_OID_str(&s_op->resp.u.lookup_path.handle_array[0])
                ,s_op->resp.u.lookup_path.attr_array
                ,s_op->resp.u.lookup_path.sid_array);
+   gossip_err("sid_array[0]:(%s)\n",PVFS_SID_str(&s_op->resp.u.lookup_path.sid_array[0]));
 
 
    gossip_err("%s\n"
@@ -1494,9 +1509,13 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
               "                                      .ntime(%d)\n"
               "                                      .capability(%p)\n"
               "                                      .u.meta.dist(%p)\n"
-              "                                             .dfile_array(%p)\n"
-              "                                             .sid_array(%p)\n"
+              "                                             .dfile_array(%p) .dfile_count(%u)\n"
+              "                                             .sid_array(%p) .sid_count(%u)\n"
               "                                             .size(%d)\n"
+              "                                             .mirror_mode(%d)\n"
+              "                                             .stuffed(%d)\n"
+              "                                             .stuffed_size(%d)\n"
+              "                                             .hint(0x%08x)\n"
               ,__func__
               ,s_op->resp.u.lookup_path.attr_array[0].objtype
               ,s_op->resp.u.lookup_path.attr_array[0].mask
@@ -1510,9 +1529,18 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
               ,&s_op->resp.u.lookup_path.attr_array[0].capability
               ,s_op->resp.u.lookup_path.attr_array[0].u.meta.dist
               ,s_op->resp.u.lookup_path.attr_array[0].u.meta.dfile_array
+              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.dfile_count
               ,s_op->resp.u.lookup_path.attr_array[0].u.meta.sid_array
-              ,(int)s_op->resp.u.lookup_path.attr_array[0].u.meta.size);
+              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.sid_count
+              ,(int)s_op->resp.u.lookup_path.attr_array[0].u.meta.size
+              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.mirror_mode
+              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.stuffed
+              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.stuffed_size
+              ,(unsigned int)(s_op->resp.u.lookup_path.attr_array[0].u.meta.hint.flags));
 
+    gossip_err("dfile(0):(%s)\n",PVFS_OID_str(&s_op->resp.u.lookup_path.attr_array[0].u.meta.dfile_array[0]));
+    gossip_err("sid(0)  :(%s)\n",PVFS_SID_str(&s_op->resp.u.lookup_path.attr_array[0].u.meta.sid_array[0]));
+}
 
     return SM_ACTION_COMPLETE;
 }
