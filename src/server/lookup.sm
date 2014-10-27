@@ -68,7 +68,7 @@ machine pvfs2_lookup_sm
     state read_object_metadata
     {
         run lookup_read_object_metadata;
-        /*success => verify_object_metadata;*/
+        success => verify_object_metadata;
         default => setup_resp;
     }
 
@@ -338,26 +338,32 @@ static PINT_sm_action lookup_read_object_metadata(
 
     assert(s_op->u.lookup.seg_nr <= s_op->u.lookup.seg_ct);
 
-    /* use the handle given with the request if we haven't looked up a segment yet */
-    /* this handle is the parent directory for the first segment.                  */
     if (s_op->u.lookup.seg_nr == 0)
     {
-        handle = s_op->req->u.lookup_path.handle;
+       /* don't need to retrieve dspace attributes or lookup permissions, since we 
+        * are working with the handle given by the request, in which case, the 
+        * prelude has already done the work.
+        */
+       js_p->error_code = 0;
+       return SM_ACTION_COMPLETE;
     }
     else
     {
         /* In this case, a dirent object was found in the keyval db associated with a 
-         * dirdata handle.
+         * dirdata handle.  So, we are now working with the next object.
          */
+
+        s_op->u.lookup.seg_nr++;
+        s_op->u.lookup.array_index = s_op->u.lookup.seg_nr - 1;
 
         /* prepare local variables */
         handle  = (PVFS_handle)s_op->u.lookup.keyval_temp_store[0].oid;
-        ds_attr = &(s_op->u.lookup.ds_attr_array[ s_op->u.lookup.seg_nr - 1 ]);
+        ds_attr = &(s_op->u.lookup.ds_attr_array[ s_op->u.lookup.array_index ]);
 
         /* store dirent object in the response structure */
-        s_op->resp.u.lookup_path.handle_array[ s_op->u.lookup.seg_nr - 1 ] = handle; 
+        s_op->resp.u.lookup_path.handle_array[ s_op->u.lookup.array_index ] = handle; 
 
-        start_index = ((s_op->u.lookup.seg_nr - 1) * (s_op->metasidcnt));
+        start_index = ((s_op->u.lookup.array_index) * (s_op->metasidcnt));
         end_index   = start_index + s_op->metasidcnt;
         for (i=start_index,j=1; i<end_index; i++,j++)
         {
@@ -376,19 +382,6 @@ static PINT_sm_action lookup_read_object_metadata(
     gossip_err("%s:oid for metadata object(%s)\n",__func__,PVFS_OID_str(&handle));
 
 
-    /* Copy the fsid and handle to the s_op structure for the acl check */
-    s_op->target_handle = handle;
-    s_op->target_fs_id = s_op->req->u.lookup_path.fs_id;
-
-    if (s_op->u.lookup.seg_nr == 0)
-    {
-       /* don't need to retrieve dspace attributes, since we are working with the
-        * handle given by the request, in which case, the prelude has already done
-        * the work.
-        */
-       js_p->error_code = 0;
-       return SM_ACTION_COMPLETE;
-    }
 
     /* Does the handle's dspace entry reside locally or remotely?  If remotely,
      * then we are done.
@@ -407,8 +400,11 @@ static PINT_sm_action lookup_read_object_metadata(
        return SM_ACTION_COMPLETE;
     }
 
+    /* Copy the fsid and handle to the s_op structure for the acl check */
+    s_op->target_handle = handle;
+    s_op->target_fs_id = s_op->req->u.lookup_path.fs_id;
 
-    /* get the dspace attributes/metadata */
+    /* get the dspace attributes for this object (could be a directory or a metafile) */
     ret = job_trove_dspace_getattr(s_op->req->u.lookup_path.fs_id,
                                    handle,
                                    smcb,
@@ -447,15 +443,16 @@ static PINT_sm_action lookup_verify_object_metadata(
 
     if (s_op->u.lookup.seg_nr == 0)
     {
-        a_p = &s_op->attr;
-        ds_attr = &s_op->ds_attr;
+        /* we are using the parent handle given by the request, so permission
+         * checks were already done in the prelude.
+         */
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
     }
     else
     {
-        a_p = &s_op->resp.u.lookup_path.attr_array[
-            s_op->u.lookup.seg_nr - 1];
-        ds_attr = &(s_op->u.lookup.ds_attr_array[
-            s_op->u.lookup.seg_nr - 1]);
+        a_p     = &s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ];
+        ds_attr = &(s_op->u.lookup.ds_attr_array[ s_op->u.lookup.array_index ]);
         PVFS_object_attr_from_ds_attr(a_p, ds_attr);
         a_p->mask = PVFS_ATTR_COMMON_ALL;
         /* update our successful attr read count */
@@ -551,7 +548,7 @@ static PINT_sm_action lookup_setup_getattr_request(
    }
    
    gossip_err("%s\n"
-              "s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].objtype(%d)\n"
+              "s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index].objtype(%d)\n"
               "         .mask(0x%0x)\n"
               "         .owner(%d)\n"
               "         .group(%d)\n"
@@ -566,29 +563,29 @@ static PINT_sm_action lookup_setup_getattr_request(
               "         .sid_array(%p)\n"
               "         .size(%d)\n"
               ,__func__
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].objtype
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].mask
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].owner
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].group
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].perms
-              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].atime
-              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].mtime
-              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].ctime
-              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].ntime
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].capability.issuer
-              ,llu(s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].capability.fsid)
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].u.meta.dist
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].u.meta.dfile_array
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].u.meta.sid_array
-              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ].u.meta.size);
+              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].objtype
+              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].mask
+              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].owner
+              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].group
+              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].perms
+              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].atime
+              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].mtime
+              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].ctime
+              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].ntime
+              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].capability.issuer
+              ,llu(s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].capability.fsid)
+              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].u.meta.dist
+              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].u.meta.dfile_array
+              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].u.meta.sid_array
+              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].u.meta.size);
 
 
-   getattr_op->attr = s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.seg_nr - 1 ];
+   getattr_op->attr = s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ];
 
    getattr_op->req = s_op->req;
 
    getattr_op->u.getattr.fs_id      = s_op->req->u.lookup_path.fs_id;
-   getattr_op->u.getattr.handle     = s_op->resp.u.lookup_path.handle_array[ s_op->u.lookup.seg_nr - 1 ];
+   getattr_op->u.getattr.handle     = s_op->resp.u.lookup_path.handle_array[ s_op->u.lookup.array_index ];
    getattr_op->u.getattr.attrmask   = PVFS_ATTR_META_DIST          |
                                       PVFS_ATTR_META_DFILES        |
                                       PVFS_ATTR_META_MIRROR_DFILES |
@@ -598,7 +595,10 @@ static PINT_sm_action lookup_setup_getattr_request(
    ret = PINT_sm_push_frame(smcb, 0, getattr_op);
    if ( ret < 0 )
    {
+      gossip_err("%s:Error pushing getattr frame onto lookup stack:ret(%d)\n",__func__,ret);
+      free(getattr_op);
       js_p->error_code = ret;
+      return SM_ACTION_COMPLETE;
    }
 
    return SM_ACTION_COMPLETE;
@@ -674,10 +674,10 @@ static PINT_sm_action lookup_verify_getattr_results(
 
    gossip_err("resp_attr.sid_array[0]:(%s)\n",PVFS_SID_str(&resp_attr->u.meta.sid_array[0]));
    
-   ret = PINT_copy_object_attr( &s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.seg_nr - 1],resp_attr );
+   ret = PINT_copy_object_attr( &s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.array_index],resp_attr );
    if (ret)
    {
-      gossip_err("%s:Error copying metafile attributes from getattr to lookup(%d)\n",__func__,ret);
+      gossip_err("%s:Error copying metafile attributes from getattr to lookup:ret(%d)\n",__func__,ret);
       js_p->error_code = ret;
       goto out;
    }
@@ -971,6 +971,7 @@ static PINT_sm_action lookup_read_num_directory_entry_handles(
      */
 
     gossip_err("%s:s_op->u.lookup.seg_nr(%d)\n",__func__,s_op->u.lookup.seg_nr);
+    gossip_err("%s:s_op->u.lookup.array_index(%d)\n",__func__,s_op->u.lookup.array_index);
 
     if (s_op->u.lookup.seg_nr == 0)
     {
@@ -980,34 +981,11 @@ static PINT_sm_action lookup_read_num_directory_entry_handles(
     }
     else
     {
-        /* we have to get data from dspace */
-        handle = s_op->resp.u.lookup_path.handle_array[
-                        s_op->u.lookup.seg_nr-1];
+        s_op->u.lookup.attr = s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ];
+        return SM_ACTION_COMPLETE;
     }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "  reading distributed directory attributes from handle %s\n",
-                 PVFS_OID_str(&handle));
 
-    s_op->key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
-    s_op->val.buffer = &s_op->u.lookup.attr.u.dir.dist_dir_attr;
-    s_op->val.buffer_sz = sizeof(s_op->u.lookup.attr.u.dir.dist_dir_attr);
-
-    ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id, 
-                                handle, 
-                                &s_op->key,
-                                &s_op->val,
-                                0,
-                                NULL, 
-                                smcb, 
-                                0, 
-                                js_p, 
-                                &j_id, 
-                                server_job_context, 
-                                s_op->req->hints);
-
-    return ret;
 }
 
 /*
@@ -1026,7 +1004,7 @@ static PINT_sm_action lookup_read_num_directory_entry_handles(
  *
  * Posts the keyval read to trove.
  */
-static PINT_sm_action lookup_read_directory_entry_handles(
+static PINT_sm_action lookup_read_dirdata_from_keyval(
         struct PINT_smcb *smcb,
         job_status_s *js_p)
 {
@@ -1037,15 +1015,17 @@ static PINT_sm_action lookup_read_directory_entry_handles(
     PVFS_object_attr *attr;
     int keyval_count;
 
+    if (s_op->u.lookup.seg_nr == 0)
+    {
+        /* copy dist_dir_attr data from s_op->attr to s_op->u.lookup.attr.u.dir.dist_dir_attr */
+        s_op->u.lookup.attr = s_op->attr;
+    }
+    else
+    {
+        s_op->u.lookup.attr = s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ];
+    }
     attr = &s_op->u.lookup.attr;
 
-    if(js_p->error_code == -TROVE_ENOENT)
-    {
-        gossip_debug(GOSSIP_GETATTR_DEBUG, "lookup: no DIST_DIR_ATTR key present!\n");
-        attr->u.dir.dist_dir_bitmap = NULL;
-        attr->u.dir.dirdata_handles = NULL;
-        return SM_ACTION_COMPLETE;
-    }
 
     assert(attr->u.dir.dist_dir_attr.dirdata_count > 0 &&
         attr->u.dir.dist_dir_attr.bitmap_size > 0);
@@ -1057,8 +1037,7 @@ static PINT_sm_action lookup_read_directory_entry_handles(
     }
     else
     {
-        handle = s_op->resp.u.lookup_path.handle_array[
-                    s_op->u.lookup.seg_nr-1];
+        handle = s_op->resp.u.lookup_path.handle_array[ s_op->u.lookup.array_index ];
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
@@ -1089,7 +1068,7 @@ static PINT_sm_action lookup_read_directory_entry_handles(
     }
 
     /* Beginning of sids is immediately following the dirdata handles */
-    attr->u.dir.dirdata_sids = (PVFS_SID *)&attr->u.dir.dirdata_handles[attr->u.dir.dist_dir_attr.dirdata_count];
+    attr->u.dir.dirdata_sids = (PVFS_SID *)&attr->u.dir.dirdata_handles[ attr->u.dir.dist_dir_attr.dirdata_count ];
 
     gossip_err("%s: dirdata_handles(%p):sizeof(%ld)  dirdata_sids(%p):sizeof(%ld)\n"
               ,__func__
@@ -1143,6 +1122,7 @@ static PINT_sm_action lookup_read_directory_entry_handles(
     }
 
     js_p->error_code = 0;
+
     ret = job_trove_keyval_read_list(
                     s_op->req->u.lookup_path.fs_id,
                     handle,
@@ -1190,7 +1170,7 @@ error_out:
     }
 
     return SM_ACTION_COMPLETE;
-}/* end lookup_read_directory_entry_handles */
+}/* end lookup_read_dirdata_from_keyval */
 
 /*
  * Function: lookup_read_directory_entry
@@ -1198,7 +1178,7 @@ error_out:
  * Synopsis: Given a handle for a dspace holding directory entries,
  * look up the current segment and obtain its handle.
  */
-static PINT_sm_action lookup_read_directory_entry(
+static PINT_sm_action lookup_compute_location_of_directory_entry(
         struct PINT_smcb *smcb,
         job_status_s *js_p)
 {
@@ -1215,19 +1195,21 @@ static PINT_sm_action lookup_read_directory_entry(
 
     if (ret != 0)
     {
-        gossip_err("PINT_string_next_segment failed: path: %s\n",
+        gossip_err("%s:PINT_string_next_segment failed: path: %s\n",__func__,
                    s_op->req->u.lookup_path.path);
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
     }
 
-    /* Need to see if directory entry is on this server. If not prepare
-       to send a request to the server where it is located. */
 
-    /* find the hash value and the dist dir bucket */
+    /* find the hash value for that segment */
     dirdata_hash = PINT_encrypt_dirdata(s_op->u.lookup.segp);
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "lookup: encrypt dirent %s into hash value %llu.\n",
                  s_op->u.lookup.segp, llu(dirdata_hash));
 
+
+    /* determine which dirdata handle hosts that segment */
     s_op->u.lookup.dirdata_server_index =
                     PINT_find_dist_dir_bucket(
                                     dirdata_hash,
@@ -1266,8 +1248,9 @@ static PINT_sm_action lookup_read_directory_entry(
               ,PVFS_OID_str(&s_op->u.lookup.attr.u.dir.dirdata_handles[1])
               ,&s_op->u.lookup.attr.u.dir.dirdata_handles[1]);
 
-    /* We must check each sid to see if any one of them is local.  If not,
-     * then we can just use the first one in the list.
+    /* For that dirdata handle, do any of its sids identify the local machine? 
+     * If not, then we start with the first one in the list.  MSGPAIR will access 
+     * the other sids, if the first one fails.
      */
     last_dirdata_sid_index = s_op->u.lookup.dirdata_sid_index + s_op->metasidcnt;
     for (i=s_op->u.lookup.dirdata_sid_index; i<last_dirdata_sid_index; i++)
@@ -1281,16 +1264,13 @@ static PINT_sm_action lookup_read_directory_entry(
     }
 
     if ( i == last_dirdata_sid_index )
-    {   /* in the case of a remote server, we will just use the first one in the
-         * sid list for this dirdata handle, which is already known via dirdata_sid_index. 
-         * msgpair will handle using the others in the event that a server can't be reached.
-         */
+    {   
         gossip_debug(GOSSIP_SERVER_DEBUG, "lookup: remote server !!!\n");
         js_p->error_code = REMOTE_DIRENT;
     }
 
     return SM_ACTION_COMPLETE;
-}
+}/* lookup_compute_location_of_directory_entry */
 
 static PINT_sm_action lookup_read_directory_entry_local(
         struct PINT_smcb *smcb,
