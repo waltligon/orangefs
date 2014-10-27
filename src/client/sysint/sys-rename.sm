@@ -368,6 +368,7 @@ PVFS_error PVFS_isys_rename(
     sm_p->u.rename.rmdirent_index = 0;
     sm_p->u.rename.target_dirent_exists = 0;
     sm_p->u.rename.stored_error_code = 0;
+    sm_p->u.rename.retry_count = 0;
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &old_parent_ref.handle);
 
@@ -1348,8 +1349,11 @@ static PINT_sm_action rename_rmdirent_retry_or_fail(
 
 
     /* try again if we get a -PVFS_EAGAIN failure. */
-    if (js_p->error_code == -PVFS_EAGAIN) 
+    if (js_p->error_code == -PVFS_EAGAIN &&
+        sm_p->u.rename.retry_count < sm_p->msgarray_op.params.retry_limit) 
     {
+        sm_p->u.rename.retry_count++;
+
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                 "rename_rmdirent: received -PVFS_EAGAIN, wrong dirdata server, "
                 "will do getattr and retry rmdirent!\n");

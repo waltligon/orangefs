@@ -250,12 +250,14 @@ struct PINT_client_setattr_sm
 struct PINT_client_mgmt_remove_dirent_sm
 {
     char *entry;
+    int retry_count;
 };
 
 struct PINT_client_mgmt_create_dirent_sm
 {
     char *entry;
     PVFS_handle entry_handle;
+    int retry_count;
 };
 
 struct PINT_client_mgmt_get_dirdata_handle_sm

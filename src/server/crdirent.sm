@@ -955,6 +955,9 @@ static PINT_sm_action crdirent_update_dirdata_attrs(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr_p = NULL;
     int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = &s_op->msgarray_op.msgpair;
+
+    PINT_free_object_attr(&msg_p->req.u.setattr.attr);
 
     js_p->error_code = 0;
     attr_p = &s_op->attr;
@@ -1170,6 +1173,10 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
     else
     {
         js_p->error_code = 0;
+    }
+    if (remote_dirdata_handles)
+    {
+        free(remote_dirdata_handles);
     }
     return SM_ACTION_COMPLETE;
 }

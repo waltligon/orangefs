@@ -36,7 +36,7 @@ int fadvise64(int, off64_t, off64_t, int);
 /*
  * open_internal wrapper
  */
-int open_internal(const char *path, int flags, va_list ap)
+static int open_internal(const char *path, int flags, va_list ap)
 {
     int rc = 0;
     mode_t mode = 0;
@@ -130,7 +130,7 @@ int open64(const char *path, int flags, ...)
     return fd;
 }
 
-int openat_internal(int dirfd, const char *path, int flags, va_list ap)
+static int openat_internal(int dirfd, const char *path, int flags, va_list ap)
 {
     int fd; 
     int mode = 0;

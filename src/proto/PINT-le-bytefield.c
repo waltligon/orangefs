@@ -341,6 +341,9 @@ static void lebf_initialize(void)
                 break;
             case PVFS_SERV_MGMT_SPLIT_DIRENT:
                 req.u.mgmt_split_dirent.dist = &tmp_dist;
+                req.u.mgmt_split_dirent.nentries = 0;
+                req.u.mgmt_split_dirent.entry_handles = NULL;
+                req.u.mgmt_split_dirent.entry_names = NULL;
                 reqsize = extra_size_PVFS_servreq_mgmt_split_dirent;
                 break;
 #ifdef ENABLE_SECURITY_CERT
@@ -1133,6 +1136,12 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 #endif
                 break;
 
+            case PVFS_SERV_MGMT_SPLIT_DIRENT:
+                decode_free(req->u.mgmt_split_dirent.dist);
+                decode_free(req->u.mgmt_split_dirent.entry_handles);
+                decode_free(req->u.mgmt_split_dirent.entry_names);
+                break;
+
             case PVFS_SERV_GETCONFIG:
             case PVFS_SERV_MGMT_REMOVE_OBJECT:
             case PVFS_SERV_MGMT_REMOVE_DIRENT:
@@ -1150,7 +1159,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_MGMT_EVENT_MON:
             case PVFS_SERV_MGMT_GET_UID:
             case PVFS_SERV_MGMT_GET_DIRENT:
-            case PVFS_SERV_MGMT_SPLIT_DIRENT:
             case PVFS_SERV_DELEATTR:
             case PVFS_SERV_LISTEATTR:
             case PVFS_SERV_BATCH_REMOVE:

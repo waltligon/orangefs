@@ -218,6 +218,7 @@ PVFS_error PVFS_isys_mkdir(
     PVFS_util_copy_sys_attr(&sm_p->u.mkdir.sys_attr, &attr);
     sm_p->u.mkdir.mkdir_resp = resp;
     sm_p->u.mkdir.stored_error_code = 0;
+    sm_p->u.mkdir.retry_count = 0;
     sm_p->object_ref = parent_ref;
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &parent_ref.handle);
@@ -496,9 +497,13 @@ static PINT_sm_action mkdir_crdirent_failure(
     PVFS_uid local_uid;
 
     /* if need to retry. clear the error_code and setup getattr. */
-    if(js_p->error_code == -PVFS_EAGAIN)
+    if(js_p->error_code == -PVFS_EAGAIN &&
+       sm_p->u.mkdir.retry_count < sm_p->msgarray_op.params.retry_limit)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: received -PVFS_EAGAIN, will retry getattr and crdirent.\n");
+        sm_p->u.mkdir.retry_count++;
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: received -PVFS_EAGAIN, will retry getattr and crdirent (attempt number %d).\n",
+                     sm_p->u.mkdir.retry_count);
 
         /* clear attributes */
 gossip_err("%s: PINT_SM_GETATTR_STATE_CLEAR, attr = %llu, mask = %d\n", __func__, llu(&sm_p->getattr.attr), sm_p->getattr.attr.mask);

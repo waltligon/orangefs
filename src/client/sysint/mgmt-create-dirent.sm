@@ -119,6 +119,7 @@ PVFS_error PVFS_imgmt_create_dirent(
     sm_p->parent_ref = parent_ref;
     sm_p->u.mgmt_create_dirent.entry = entry;
     sm_p->u.mgmt_create_dirent.entry_handle = entry_handle;
+    sm_p->u.mgmt_create_dirent.retry_count = 0;
     PVFS_hint_copy(hints, &sm_p->hints);
 
     gossip_debug(
@@ -285,11 +286,15 @@ static PINT_sm_action mgmt_create_dirent_retry_or_fail(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     
     /* if need to retry. clear the error_code and setup getattr. */
-    if(js_p->error_code == -PVFS_EAGAIN)
+    if(js_p->error_code == -PVFS_EAGAIN &&
+       sm_p->u.mgmt_create_dirent.retry_count < sm_p->msgarray_op.params.retry_limit)
     {
+        sm_p->u.mgmt_create_dirent.retry_count++;
+
         gossip_debug(GOSSIP_CLIENT_DEBUG,
            "mgmt-create-dirent: received -PVFS_EAGAIN,"
-           " will retry getattr and mgmt-create-dirent.\n");
+           " will retry getattr and mgmt-create-dirent (attempt number %d).\n",
+           sm_p->u.mgmt_create_dirent.retry_count);
  
         /* setup getattr */
         PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
