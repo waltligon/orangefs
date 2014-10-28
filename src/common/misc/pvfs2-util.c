@@ -284,8 +284,15 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         if (user)
         {
             *ptr++ = "-u";
-            *ptr++ = (char*)user;
+            *ptr++ = (char *) user;
         }
+
+        if (group)
+        {
+            *ptr++ = "-g";
+            *ptr++ = (char *) group;
+        }
+
         if (timeout != 0 && 
             timeout != PVFS2_DEFAULT_CREDENTIAL_TIMEOUT)
         {
@@ -293,16 +300,17 @@ int PVFS_util_gen_credential(const char *user, const char *group,
            *ptr++ = "-t";
            *ptr++ = timearg;
         }
+
         if (keypath)
         {
             *ptr++ = "-k";
-            *ptr++ = (char*)keypath;
+            *ptr++ = (char *) keypath;
         }
 #ifdef ENABLE_SECURITY_CERT
         if (certpath)
         {
             *ptr++ = "-c";
-            *ptr++ = (char*)certpath;
+            *ptr++ = (char *) certpath;
         }
 #endif
         *ptr++ = NULL;
@@ -391,7 +399,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
                 char *line, *saveptr;
 
                 line = strtok_r(ebuf, "\n", &saveptr);
-                while (line != NULL)
+                while (line != NULL && strlen(line) > 0)
                 {
                     gossip_err("%s\n", line);
                     line = strtok_r(NULL, "\n", &saveptr);

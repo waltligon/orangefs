@@ -1137,6 +1137,9 @@ endif # BUILD_JNI
 
 # all applications depend on the pvfs2 library
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
+	$(Q) "  LD		$@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS) $(call modldflags,$<)
+
 $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 
 $(USERTOOLS): %: %.o $(LIBRARIES)
