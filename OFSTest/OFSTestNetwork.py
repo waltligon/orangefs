@@ -1656,8 +1656,12 @@ class OFSTestNetwork(object):
             
             # notify master of new slave
             master_node.runSingleCommand("echo '%s' >> %s/conf/slaves" % (node.hostname,master_node.hadoop_location))
+        
+        if master_node.hadoop_version == "hadoop-1.2.1":    
+            master_node.runSingleCommand("%s/bin/start-mapred.sh" % master_node.hadoop_location)
+        else:
+            master_node.runSingleCommand("%s/src/client/hadoop/orangefs-hadoop2/scripts/examples/hadoop/start_hadoop.sh" % master_node.ofs_source_location)
             
-        master_node.runSingleCommand("%s/bin/start-mapred.sh" % master_node.hadoop_location)
         time.sleep(20)
         # hadoop dfs -ls is our "ping" for hadoop. 
         rc = master_node.runSingleCommand("%s/bin/hadoop dfs -ls /" % master_node.hadoop_location)
