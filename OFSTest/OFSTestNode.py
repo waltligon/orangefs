@@ -1954,7 +1954,7 @@ class OFSTestNode(object):
             configure_opts = configure_opts+" --disable-opt"
 
         if enable_hadoop == True:
-            configure_opts =  configure_opts + " --with-jdk=%s --enable-hadoop --with-hadoop=%s --enable-jni " % (self.jdk6_location,self.hadoop_location)
+            configure_opts =  configure_opts + " --with-jdk=%s --enable-jni " % (self.jdk6_location,self.hadoop_location)
             enable_shared = True
 
 
@@ -2108,13 +2108,23 @@ class OFSTestNode(object):
                 logging.exception("Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location))
                 
         if self.enable_hadoop == True:
-            self.changeDirectory("%s/src/client/hadoop/orangefs-hadoop1" % self.ofs_source_location)
-            rc = self.runSingleCommand("mvn -Dmaven.compiler.target=1.6 -Dmaven.compiler.source=1.6 -DskipTests clean package")
-            if rc != 0:
-                logging.exception("Could not build and install hadoop1 libraries" )
+            if self.hadoop_version == 'hadoop-1.2.1':
+                self.changeDirectory("%s/src/client/hadoop/orangefs-hadoop1" % self.ofs_source_location)
+                rc = self.runSingleCommand("mvn -Dmaven.compiler.target=1.6 -Dmaven.compiler.source=1.6 -DskipTests clean package")
+                if rc != 0:
+                    logging.exception("Could not build and install hadoop1 libraries" )
+                else:
+                    self.runSingleCommand('cp target/orangefs-hadoop1-?.?.?.jar "%s/lib"' % self.ofs_installation_location)
+                self.restoreDirectory()
             else:
-                self.runSingleCommand('cp target/orangefs-hadoop1-?.?.?.jar "%s/lib"' % self.ofs_installation_location)
-            self.restoreDirectory()
+                self.changeDirectory("%s/src/client/hadoop/orangefs-hadoop2" % self.ofs_source_location)
+                rc = self.runSingleCommand("mvn -Dmaven.compiler.target=1.7 -Dmaven.compiler.source=1.7 -DskipTests clean package")
+                if rc != 0:
+                    logging.exception("Could not build and install hadoop2 libraries" )
+                else:
+                    self.runSingleCommand('cp target/orangefs-hadoop2-?.?.?.jar "%s/lib"' % self.ofs_installation_location)
+                self.restoreDirectory()
+
         
         return rc
 
