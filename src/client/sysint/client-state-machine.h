@@ -857,14 +857,14 @@ void PINT_mgmt_release(PVFS_mgmt_op_id op_id);
 do {                                                          \
     if (user_cred_p == NULL)                                  \
     {                                                         \
-        gossip_lerr("Invalid user credentials! (nil)\n");     \
+        gossip_err("Invalid user credentials! (nil)\n");      \
         free(sm_p);                                           \
-        return -PVFS_EINVAL;                                  \
+        return -PVFS_EACCES;                                  \
     }                                                         \
     sm_p_cred_p = PINT_dup_credential(user_cred_p);           \
     if (!sm_p_cred_p)                                         \
     {                                                         \
-        gossip_lerr("Failed to copy user credentials\n");     \
+        gossip_err("Failed to copy user credentials\n");      \
         free(sm_p);                                           \
         return -PVFS_ENOMEM;                                  \
     }                                                         \
