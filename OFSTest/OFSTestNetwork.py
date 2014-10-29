@@ -1645,12 +1645,12 @@ class OFSTestNetwork(object):
             node.runSingleCommand('sed -i s,/opt/orangefs-trunk,%s,g %s/conf/hadoop-env.sh' % (node.ofs_installation_location,node.hadoop_location ))
             
             # update mapred-site.xml
+            node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%s,g %s/conf/core-site.xml" % (node.hostname,node.ofs_tcp_port,node.hadoop_location))
             node.runSingleCommand("sed -i s/localhost/%s/ %s/conf/mapred-site.xml" % (master_node.hostname,node.hadoop_location))
             
             # update core-site.xml
             node.runSingleCommand("sed -i s,/mnt/orangefs,%s, %s/conf/core-site.xml" % (node.ofs_mount_point,node.hadoop_location))
-            node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%s,g %s/conf/core-site.xml" % (node.hostname,node.ofs_tcp_port,node.hadoop_location))
-
+            
             # point slave node to master
             node.runSingleCommand("echo '%s' > %s/conf/masters" % (master_node.hostname,node.hadoop_location))
             
