@@ -1344,6 +1344,7 @@ class OFSTestNode(object):
         # Install Hadoop. 
         self.hadoop_location = "/opt/"+self.hadoop_version
         rc = self.runSingleCommand("[ -d %s ]" % self.hadoop_location)
+        self.setEnvironmentVariable("JAVA_HOME",self.jdk6_location)
         if rc != 0:
             output = []
             self.changeDirectory("/opt")
