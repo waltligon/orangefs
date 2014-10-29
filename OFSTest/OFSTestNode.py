@@ -1342,7 +1342,8 @@ class OFSTestNode(object):
         
     def installHadoop(self):
         # Install Hadoop. 
-        rc = self.runSingleCommand("[ -d /opt/%s ]" % self.hadoop_version)
+        self.hadoop_location = "/opt/"+self.hadoop_version
+        rc = self.runSingleCommand("[ -d %s ]" % self.hadoop_location)
         if rc != 0:
             output = []
             self.changeDirectory("/opt")
