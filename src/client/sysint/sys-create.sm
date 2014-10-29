@@ -188,15 +188,19 @@ PVFS_error PVFS_isys_create(
     }
 
 #ifndef ENABLE_SECURITY_CERT
-    /* do not use credential values in cert. mode */
-    if (attr.owner != credential->userid)
+    /* if owner/group differ from credential values, and credential is 
+       not for root, create with owner/group equal to credential values
+       (in cert. mode the credential fields aren't used) */
+    if (attr.owner != credential->userid &&
+        credential->userid != 0)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing owner uid %d with %d "
                      "on create\n", attr.owner, credential->userid);
         attr.owner = credential->userid;
     }
 
-    if (attr.group != credential->group_array[0])
+    if (attr.group != credential->group_array[0] && 
+        credential->group_array[0] != 0)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing group gid %d with %d "
                      "on create\n", attr.group, credential->group_array[0]);
