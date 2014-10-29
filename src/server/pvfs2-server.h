@@ -375,6 +375,8 @@ struct PINT_server_lookup_op
 
     int dirdata_server_index;
     int dirdata_sid_index;
+
+    int array_index;
 };
 
 struct PINT_server_readdir_op
