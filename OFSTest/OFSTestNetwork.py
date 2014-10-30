@@ -1652,6 +1652,8 @@ class OFSTestNetwork(object):
             node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%s,g %s/conf/mapred-site.xml" % (node.hostname,node.ofs_tcp_port,node.hadoop_location))
             node.runSingleCommand("sed -i s/localhost/%s/ %s/conf/mapred-site.xml" % (master_node.hostname,node.hadoop_location))
             
+            node.runSingleCommand("sed -i s/localhost/%s/ %s/conf/yarn-site.xml" % (master_node.hostname,node.hadoop_location))
+            
             
             # point slave node to master
             node.runSingleCommand("echo '%s' > %s/conf/masters" % (master_node.hostname,node.hadoop_location))
