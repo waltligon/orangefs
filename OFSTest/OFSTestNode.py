@@ -454,6 +454,7 @@ class OFSTestNode(object):
     
     def setEnvironmentVariable(self,variable,value):
         self.current_environment[variable] = value
+        self.saveEnvironment()
     
     ##
     # @fn unsetEnvironmentVariable(self,variable):
@@ -462,7 +463,13 @@ class OFSTestNode(object):
     # @param variable Variable name
     
     def unsetEnvironmentVariable(self,variable):
-        del self.current_environment[variable] 
+        del self.current_environment[variable]
+        self.saveEnvironment()
+    
+    def saveEnvironment(self):
+        # Writes to /etc/profile.d/orangefs.sh
+        # Implement in subclass.
+        pass
     
     ## 
     # @fn setEnvironment(self, setenv): 
