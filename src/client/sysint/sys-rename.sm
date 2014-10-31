@@ -1158,6 +1158,9 @@ static PINT_sm_action rename_check_for_remove(
     {
         PINT_copy_capability(&sm_p->u.rename.caps[1],
                              &sm_p->parent_capability);
+        PVFS_hint_replace(&sm_p->hints, PVFS_HINT_HANDLE_NAME,
+                          sizeof(PVFS_handle),
+                          &sm_p->u.rename.parent_refns[1].handle);
         js_p->error_code = RENAME_REMOVE_REQUIRED;
     }
 
