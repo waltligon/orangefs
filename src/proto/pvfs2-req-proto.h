@@ -1254,7 +1254,8 @@ struct PVFS_servresp_lookup_path
 
     uint32_t handle_count; /* # of handles returned */
     uint32_t attr_count;   /* # of attributes returned */
-    uint32_t sid_count;    /* total # of sids returned */
+    uint32_t sid_count;    /* # of sids per object * the number of objects
+                            * metasidcnt * handle_count */
 };
 endecode_fields_1a1a1a_struct(
     PVFS_servresp_lookup_path,

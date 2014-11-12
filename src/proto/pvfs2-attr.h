@@ -219,7 +219,7 @@ do {                                                                    \
     {                                                                   \
         encode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);          \
     }                                                                   \
-    for (sid_i = 0; sid_i < (x)->sid_count; sid_i++)                    \
+    for (sid_i = 0; sid_i < (x)->dfile_count * (x)->sid_count; sid_i++) \
     {                                                                   \
         encode_PVFS_SID(pptr, &(x)->sid_array[sid_i]);                  \
     }                                                                   \
@@ -241,13 +241,13 @@ do {                                                                    \
     decode_uint32_t(pptr, &(x)->sid_count);                             \
     decode_skip4(pptr,);                                                \
     (x)->dfile_array = decode_malloc(                                   \
-                       OSASZ((x)->dfile_count, (x)->sid_array));        \
+                       OSASZ((x)->dfile_count, (x)->sid_count));        \
     (x)->sid_array = (PVFS_SID *)&((x)->dfile_array[(x)->dfile_count]); \
     for (dfiles_i = 0; dfiles_i < (x)->dfile_count; dfiles_i++)         \
     {                                                                   \
 	decode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);          \
     }                                                                   \
-    for (sid_i = 0; sid_i < (x)->sid_count; sid_i++)                    \
+    for (sid_i = 0; sid_i < (x)->dfile_count * (x)->sid_count; sid_i++) \
     {                                                                   \
 	decode_PVFS_SID(pptr, &(x)->sid_array[sid_i]);                  \
     }                                                                   \
