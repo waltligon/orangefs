@@ -12,77 +12,171 @@
 
 #include "pvfs2-server.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-debug.h"
 #include "quicklist.h"
+#include "server-config.h"
+#include "id-generator.h"
+#include "sid.h"
+
+#define PFI()                                                                \
+    do                                                                       \
+    {                                                                        \
+        gossip_debug(GOSSIP_SERVER_DEBUG,                                    \
+                     "function called: {%s}\n", __PRETTY_FUNCTION__);        \
+        fflush(stdout);                                                      \
+    } while(0)
+
+/* TODO are these enum values okay? */
+enum {
+    LOCAL_OPERATION = 2,
+    REMOTE_OPERATION = 3,
+    OP_CANCELLED = 4
+};
 
 %%
+
+nested machine pvfs2_unexpected_local_sm
+{
+    state unexp_local_pre
+    {
+        run unexp_local_pre;
+        default => unexp_local_start;
+    }
+
+    state unexp_local_start
+    {
+        switch;
+        default => unexp_local_post;
+    }
+
+    state unexp_local_post
+    {
+        run unexp_local_post;
+        default => terminate;
+    }
+}
+
+nested machine pvfs2_unexpected_remote_sm
+{
+    state unexp_remote_pre
+    {
+        run unexp_remote_pre;
+        default => unexp_remote_send;
+    }
+
+    state unexp_remote_send
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => unexp_remote_post;
+    }
+
+    state unexp_remote_post
+    {
+        run unexp_remote_post;
+        default => terminate;
+    }
+}
 
 machine pvfs2_unexpected_sm
 {
-	state post_unexpected
-	{
-		run unexpected_post;
-		default => map_request;
-	}
+    state unexpected_post
+    {
+        run unexpected_post;
+        default => unexpected_replace;
+    }
 
-	state map_request
-	{
-		run unexpected_map;
-		default => terminate;
-	}
+    state unexpected_replace
+    {
+        run unexpected_replace;
+        OP_CANCELLED => unexpected_terminate;
+        default => unexpected_pjmp;
+    }
+
+    state unexpected_pjmp
+    {
+        pjmp unexpected_pjmp_setup
+        {
+            LOCAL_OPERATION => pvfs2_unexpected_local_sm;
+            REMOTE_OPERATION => pvfs2_unexpected_remote_sm;
+        }
+        default => unexpected_pjmp_cleanup;
+    }
+
+    state unexpected_pjmp_cleanup
+    {
+        run unexpected_pjmp_cleanup;
+        default => unexpected_terminate;
+    }
+
+    state unexpected_terminate
+    {
+        run unexpected_terminate;
+        default => terminate;
+    }
 }
 
 %%
+
+/* ---------------------- STATE ACTIONS ------------------------ */
 
 /* unexpected_post()
  *
  * Post an unexpected receive
  */
-static PINT_sm_action unexpected_post(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action unexpected_post(struct PINT_smcb *smcb,
+                                      job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    struct PINT_server_op *s_op =
-            (struct PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PFI();
 
     /*
-       TODO: Consider the optimization of enabling immediate
-       completion in this part of the code (see the mailing list
-       thread from Feb. 2003 on pvfs2-internal).
-                                                                                
-       note: unexp_bmi_buff is really a struct that describes an
-       unexpected message (it is an output parameter).
+     * TODO: Consider the optimization of enabling immediate
+     * completion in this part of the code (see the mailing list
+     * thread from Feb. 2003 on pvfs2-internal).
+     *
+     * note: unexp_bmi_buff is really a struct that describes an
+     * unexpected message (it is an output parameter).
      */
-    ret = job_bmi_unexp(&s_op->unexp_bmi_buff, smcb, 0,
-                        js_p, &s_op->unexp_id, JOB_NO_IMMED_COMPLETE,
+    ret = job_bmi_unexp(&s_op->unexp_bmi_buff,
+                        smcb,
+                        0,
+                        js_p,
+                        &s_op->unexp_id,
+                        JOB_NO_IMMED_COMPLETE,
                         server_job_context);
+
     if(ret == SM_ACTION_COMPLETE)
     {
         PVFS_perror_gossip("Error: job_bmi_unexp failure", ret);
         return SM_ACTION_TERMINATE;
     }
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "DEFERRING!\n");
     return SM_ACTION_DEFERRED;
 }
 
-/* unexpected_map()
+/* unexpected_replace()
  *
- * Change the state machine OP to that of the received request
- * This instance will continue execution in another state machine
- * Set up another unexpected receive
+ * Starts a replacement unexpected request
  */
-static PINT_sm_action unexpected_map(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action unexpected_replace(struct PINT_smcb *smcb,
+                                         job_status_s *js_p)
 {
-    int ret = 0;
-    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    PFI();
+
+    /* If op was cancelled, print WARNING */
+    if (s_op->op_cancelled)
+    {
+        gossip_ldebug(GOSSIP_SERVER_DEBUG,
+                      "INFO: op_cancelled, terminating sm!\n");
+        js_p->error_code = OP_CANCELLED;
+        return SM_ACTION_COMPLETE;
+    }
 
     /* Remove s_op from posted_sop_list */
     qlist_del(&s_op->next);
-    /* If op was cancelled, kill the SM */
-    if (s_op->op_cancelled)
-    {
-        return SM_ACTION_TERMINATE;
-    }
-    /* Else move it to the inprogress_sop_list */
-    qlist_add_tail(&s_op->next, &inprogress_sop_list);
 
     /* start replacement unexpected recv */
     ret = server_post_unexpected_recv();
@@ -93,26 +187,269 @@ static PINT_sm_action unexpected_map(struct PINT_smcb *smcb, job_status_s *js_p)
          * put something here to make it exit for the
          * moment.  -Phil
          */
-        PVFS_perror_gossip("pvfs2_unexpected_sm.unexpected_map: "
+        PVFS_perror_gossip("pvfs2_unexpected_sm.unexpected_replace: "
                            "server_post_unexpected_recv() returned an error: ",
                            ret);
     }
-
-    /* restart as new request state machine */
-    memset(js_p, 0, sizeof(job_status_s));
-    ret = server_state_machine_start(smcb, js_p);
-    if (ret < 0)
-    {
-        PVFS_perror_gossip("Error: server_state_machine_start", ret);
-        /* TODO: tell BMI to drop this address? */
-        /* set return code to let this SM end
-         */
-        ret = SM_ACTION_TERMINATE;
-    }
-
-    return ret;
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
+                                            job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *local_op_frame = NULL;
+    struct PINT_sm_msgarray_op *remote_op_frame = NULL;
+    struct server_configuration_s *server_config_p = NULL;
+    struct PINT_server_req_ctrl req_ctrl;
+    int ret = -PVFS_EINVAL;
+    int remote_op_cnt = 0;
+    int remote_op = 0;
+
+    PFI();
+
+    server_config_p = get_server_config_struct();
+    gossip_ldebug(GOSSIP_SERVER_DEBUG,
+                  "server_config_p->host_index = %d\n",
+                  server_config_p->host_index);
+
+    /* If op was cancelled, kill the SM */
+    if (s_op->op_cancelled)
+    {
+        return SM_ACTION_TERMINATE;
+    }
+
+    /* Decode request */
+    ret = PINT_decode(s_op->unexp_bmi_buff.buffer,
+                      PINT_DECODE_REQ,
+                      &s_op->decoded,
+                      s_op->unexp_bmi_buff.addr,
+                      s_op->unexp_bmi_buff.size);
+
+    if (ret == -PVFS_EPROTONOSUPPORT)
+    {
+        /* we have a protocol mismatch of some sort; try to trigger a
+         * response that gives a helpful error on client side even
+         * though we can't interpret what the client was asking for
+         */
+        //ret = PINT_smcb_set_op(smcb, PVFS_SERV_PROTO_ERROR);
+        
+        /* for now return an error */
+        PVFS_perror_gossip("Error: PINT_decode failure", ret);
+        return ret;
+    }
+    else if (ret != 0)
+    {
+        PVFS_perror_gossip("Error: PINT_decode failure", ret);
+        return ret;
+    }
+
+    s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
+    smcb->op = s_op->req->op;
+    s_op->op = s_op->req->op;
+
+    PVFS_hint_add(&s_op->req->hints,
+                  PVFS_HINT_SERVER_ID_NAME,
+                  sizeof(uint32_t),
+                  &server_config_p->host_index);
+
+    PVFS_hint_add(&s_op->req->hints,
+                  PVFS_HINT_OP_ID_NAME,
+                  sizeof(uint32_t),
+                  &s_op->req->op);
+
+    memset(&req_ctrl, 0, sizeof(struct PINT_server_req_ctrl));
+    remote_op_cnt = PINT_server_req_get_ctrl(s_op->req, &req_ctrl);
+
+    /* Record how many frames should be popped
+     * during cleanup. +1 for the local op 
+     */
+    s_op->num_pjmp_frames = 1 + remote_op_cnt;
+
+    /* Setup 1 local op */
+    local_op_frame = (struct PINT_server_op *)
+                             calloc(1, sizeof(struct PINT_server_op));
+    if (!local_op_frame)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    /* this is the original request so we copy the frame from the
+     * original and push it onto the framestack
+     */
+    memcpy(local_op_frame, s_op, sizeof(struct PINT_server_op));
+    ret = PINT_sm_push_frame(smcb, LOCAL_OPERATION, local_op_frame);
+    if(ret < 0)
+    {
+        gossip_lerr("unexpected_pjmp_setup failed to push frame for "
+                    "local_op!\n");
+    }
+
+    if (s_op->req->ctrl.mode == PVFS_REQ_REPLICATE)
+    {
+        /* The local op nolonger cares about this field, and the other
+         * remote ops all need the same value.  Possibly TREE or other
+         * protocls will do things differently
+         */
+        s_op->req->ctrl.type = PVFS_REQ_SECONDARY;
+
+        /* malloc for each remote_op SM a msg_op and push to frame stack */
+        for(remote_op = 0; remote_op < remote_op_cnt; remote_op++)
+        {
+            PINT_sm_msgpair_state *msg_p;
+            remote_op_frame = (struct PINT_sm_msgarray_op *)
+                                 calloc(1, sizeof(struct PINT_sm_msgarray_op));
+            if (!remote_op_frame)
+            {
+                return -PVFS_ENOMEM;
+            }
+
+            PINT_msgpair_init(remote_op_frame);
+            msg_p = &remote_op_frame->msgpair;
+            memcpy(&msg_p->req, s_op->req, sizeof(struct PVFS_server_req));
+            msg_p->msgclass = PVFS_IO_METADATA;
+            msg_p->msgdir = PVFS_IO_WRITE;
+            msg_p->fs_id = req_ctrl.fs_id;
+            /* assuming normal case one handle for now */
+            msg_p->handle = *req_ctrl.handles;
+            msg_p->sid_count = req_ctrl.sid_count;
+            msg_p->sid_index = 0;
+            msg_p->sid_array = &req_ctrl.sids[remote_op];
+            msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+            msg_p->comp_fn = NULL;
+
+            ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+            if (ret)
+            {
+                gossip_err("Failed to map meta server address\n");
+                js_p->error_code = ret;
+            }
+
+            ret = PINT_sm_push_frame(smcb, REMOTE_OPERATION, remote_op_frame);
+            if(ret < 0)
+            {
+                gossip_lerr("unexpected_pjmp_setup failed to push frame for "
+                            "remote_op %d!\n", remote_op);
+            }
+        }
+    }
+    /* for now other modes are ignored, treated as single op */
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *popped_op = (struct PINT_server_op *) NULL;
+    int task_id;
+    PVFS_error tmp_err = 0;
+    int remaining = 0;
+    int popped_count = 0;
+    PFI();
+
+    gossip_ldebug(GOSSIP_SERVER_DEBUG,
+                  "s_op->num_pjmp_frames = %d\n",
+                  s_op->num_pjmp_frames);
+
+    for (popped_count = 0;
+         popped_count < s_op->num_pjmp_frames;
+         popped_count++)
+    {
+        popped_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, &remaining);
+        gossip_ldebug(GOSSIP_SERVER_DEBUG,
+                      "popping frame\n"
+                      "\ttask_id = %d\n"
+                      "\ttmp_err = %d\n"
+                      "\tremaining = %d\n",
+                      task_id, tmp_err, remaining);
+
+        /* check for return codes and errors */
+        /* comm failures need to be recorded at least */
+
+        free(popped_op);
+    }
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action unexpected_terminate(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PFI();
+    return SM_ACTION_TERMINATE;
+}
+
+/* ---------------------- PJMP STATE ACTIONS ------------------------ */
+
+static PINT_sm_action unexp_remote_pre(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
+{
+    PFI();
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action unexp_remote_post(struct PINT_smcb *smcb,
+                                         job_status_s *js_p)
+{
+    PFI();
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action unexp_local_pre(struct PINT_smcb *smcb,
+                                      job_status_s *js_p)
+{
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_id_gen_t tmp_id;
+    PFI();
+
+#if 0
+    qlist_del(&s_op->next);
+#endif
+
+    qlist_add_tail(&s_op->next, &inprogress_sop_list);
+
+    /* set timestamp on the beginning of this state machine */
+    id_gen_fast_register(&tmp_id, s_op);
+
+    if(s_op->req)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "client:%d, reqid:%d, rank:%d\n",
+                     PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
+                     PINT_HINT_GET_REQUEST_ID(s_op->req->hints),
+                     PINT_HINT_GET_RANK(s_op->req->hints));
+        PINT_EVENT_START(PINT_sm_event_id, server_controlling_pid,
+                         NULL, &s_op->event_id,
+                         PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
+                         PINT_HINT_GET_REQUEST_ID(s_op->req->hints),
+                         PINT_HINT_GET_RANK(s_op->req->hints),
+                         PINT_HINT_GET_HANDLE(s_op->req->hints),
+                         s_op->req->op);
+        s_op->resp.op = s_op->req->op;
+    }
+
+    s_op->addr = s_op->unexp_bmi_buff.addr;
+    s_op->tag  = s_op->unexp_bmi_buff.tag;
+
+    /* the smcb->op and s_op->op are already set to the request 
+     * next state is the switch that calls the proper state machine
+     */
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action unexp_local_post(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
+{
+    PFI();
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
 
 /*
  * Local variables:
@@ -123,4 +460,3 @@ static PINT_sm_action unexpected_map(struct PINT_smcb *smcb, job_status_s *js_p)
  *
  * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */
-

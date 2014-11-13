@@ -387,9 +387,10 @@ void print_stats(const PVFS_object_ref * ref,
                  const char            * pszRelativeName,
                  const PVFS_sys_attr   * attr)
 {
-   char a_time[100] = "", 
-        m_time[100] = "",  
-        c_time[100] = "";
+   char a_time[100] = ""; 
+   char m_time[100] = "";  
+   char c_time[100] = "";
+   char n_time[100] = "";
    struct passwd * user;
    struct group  * group;
 
@@ -476,6 +477,13 @@ void print_stats(const PVFS_object_ref * ref,
       sprintf(c_time, "%s", ctime((const time_t *)&c_tmp));
       c_time[strlen(c_time)-1] = 0;
       fprintf(stdout, "  ctime         : %llu (%s)\n", llu(attr->ctime), c_time);
+   }
+   if(attr->mask & PVFS_ATTR_SYS_NTIME)
+   {
+      time_t n_tmp = attr->ntime;
+      sprintf(n_time, "%s", ctime((const time_t *)&n_tmp));
+      n_time[strlen(n_time)-1] = 0;
+      fprintf(stdout, "  ntime         : %llu (%s)\n", llu(attr->ntime), n_time);
    }
    
    /* dfile_count is only valid for a file. For a given file, it tells how many

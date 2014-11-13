@@ -260,7 +260,7 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
     if (!smcb)
     {
         gossip_err("SM next called on invald smcb\n");
-        return -1;
+        return SM_ACTION_TERMINATE;
     }
     if(PINT_smcb_cancelled(smcb))
     {
@@ -347,7 +347,7 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
             {
                 if (!PINT_state_machine_locate(smcb))
                 {
-                    return -1;
+                    return SM_ACTION_TERMINATE;
                 }
             }
         }
@@ -984,7 +984,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
         PINT_smcb_alloc(&new_sm,
                         smcb->op,
                         0,
-                        NULL,
+                        smcb->op_get_state_machine,
                         child_sm_frame_terminate,
                         smcb->context);
 

@@ -1903,6 +1903,7 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
     sysresp->attr.atime = attr->atime;
     sysresp->attr.mtime = attr->mtime;
     sysresp->attr.ctime = attr->ctime;
+    sysresp->attr.ntime = attr->ntime;
     /* this is done below - WBL */
     /*sysresp->attr.mask  = PVFS_util_object_to_sys_attr_mask(attr->mask);*/
     sysresp->attr.mask  = 0;
