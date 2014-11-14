@@ -2251,6 +2251,10 @@ uint32_t PVFS_util_sys_to_object_attr_mask(uint32_t sys_attrmask)
     {
         attrmask |= PVFS_ATTR_COMMON_MTIME;
     }
+    if(sys_attrmask & PVFS_ATTR_SYS_NTIME)
+    {
+       attrmask |= PVFS_ATTR_COMMON_NTIME;
+    }
     if(sys_attrmask & PVFS_ATTR_SYS_TYPE)
     {
         attrmask |= PVFS_ATTR_COMMON_TYPE;
@@ -2298,6 +2302,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(uint32_t obj_mask)
     if (obj_mask & PVFS_ATTR_COMMON_MTIME)
     {
         sys_mask |= PVFS_ATTR_SYS_MTIME;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_NTIME)
+    {
+        sys_mask |= PVFS_ATTR_SYS_NTIME;
     }
     if (obj_mask & PVFS_ATTR_COMMON_TYPE)
     {

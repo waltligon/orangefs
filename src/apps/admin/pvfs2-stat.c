@@ -235,7 +235,15 @@ static int do_stat(const char             * pszFile,
       return -1;
    }
 
+   if (opts->nVerbose)
+   {
+      fprintf(stderr, "PVFS_sys_lookup call on (%s)\n",pszRelativeFile);
+   }
+
    ref = lk_response.ref;
+
+
+   printf("attrmask(0x%08x)\n",PVFS_ATTR_SYS_ALL_NOHINT);
    
    ret = PVFS_sys_getattr(ref, 
                           PVFS_ATTR_SYS_ALL_NOHINT,
@@ -248,6 +256,10 @@ static int do_stat(const char             * pszFile,
       PVFS_perror("PVFS_sys_getattr", ret);
       return -1;
    }
+
+
+   printf("getattr_response.attr.mask(0x%08x) blksize(%ld)\n",getattr_response.attr.mask
+                                                             ,getattr_response.attr.blksize);
 
    /* Display the attributes for the file */
    print_stats(&ref,
@@ -389,7 +401,8 @@ void print_stats(const PVFS_object_ref * ref,
 {
    char a_time[100] = "", 
         m_time[100] = "",  
-        c_time[100] = "";
+        c_time[100] = "",
+        n_time[100] = "";
    struct passwd * user;
    struct group  * group;
 
@@ -398,7 +411,7 @@ void print_stats(const PVFS_object_ref * ref,
    fprintf(stdout, "  Relative Name : %s\n",  pszRelativeName);
    fprintf(stdout, "  fs ID         : %d\n",  ref->fs_id);
    fprintf(stdout, "  Handle        : %s\n",  PVFS_OID_str(&ref->handle));
-   fprintf(stdout, "  Mask          : %o\n",  attr->mask);
+   fprintf(stdout, "  Mask          : %x\n",  attr->mask);
    if(attr->mask & PVFS_ATTR_SYS_PERM)
    {
       fprintf(stdout, "  Permissions   : %o\n",  attr->perms);
@@ -436,11 +449,32 @@ void print_stats(const PVFS_object_ref * ref,
       {
          fprintf(stdout, "  Size          : 4096\n");
       }
-      else
+      else 
       {
          fprintf(stdout, "  Size          : %lld\n",      lld(attr->size));
       }
 
+   }
+   else
+   {  /* a size wasn't returned by getattr */
+      switch (attr->objtype)
+      {
+         case PVFS_TYPE_DIRECTORY:
+         {
+            fprintf(stdout, "  Size          : 4096\n");
+            break;
+         }
+         case PVFS_TYPE_METAFILE:
+         {
+            fprintf(stdout, "  Size          : none (datafiles not yet created)\n");
+            break;
+         }
+         default:
+         {
+            fprintf(stdout, "  Size          : none\n");
+            break;
+         }
+      }/*end switch*/
    }
    if(attr->mask & PVFS_ATTR_SYS_UID)
    {
@@ -476,6 +510,13 @@ void print_stats(const PVFS_object_ref * ref,
       sprintf(c_time, "%s", ctime((const time_t *)&c_tmp));
       c_time[strlen(c_time)-1] = 0;
       fprintf(stdout, "  ctime         : %llu (%s)\n", llu(attr->ctime), c_time);
+   }
+   if(attr->mask & PVFS_ATTR_SYS_NTIME)
+   {
+      time_t n_tmp = attr->ntime;
+      sprintf(n_time, "%s", ctime((const time_t *)&n_tmp));
+      n_time[strlen(n_time)-1] = 0;
+      fprintf(stdout, "  ntime         : %llu (%s)\n", llu(attr->ntime), n_time);
    }
    
    /* dfile_count is only valid for a file. For a given file, it tells how many

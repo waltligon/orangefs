@@ -419,10 +419,13 @@ static int initialize_context(struct PINT_client_lookup_sm *lookup_sm,
         for (i = 0; i < cur_seg_index; i++)
         {
             assert(ctx->segments[i].seg_name);
-            gossip_debug(GOSSIP_LOOKUP_DEBUG, "/%s", 
-                         ctx->segments[i].seg_name);
+            if ( i == (cur_seg_index - 1) )
+            {
+               gossip_debug(GOSSIP_LOOKUP_DEBUG, "/%s\n",ctx->segments[i].seg_name);
+               continue;
+            }
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, "/%s",ctx->segments[i].seg_name);
         }
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "\n");
     }
 #endif
 

@@ -1841,7 +1841,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                  s_op->resp.status, js_p->error_code);
 
 #if 0
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "returning attrmask ");
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "returning attrmask\n");
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG,
                         s_op->resp.u.getattr.attr.mask);
 #endif

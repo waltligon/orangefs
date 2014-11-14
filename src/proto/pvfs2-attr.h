@@ -511,6 +511,7 @@ static inline void encode_PVFS_object_attr(char **pptr,
     encode_PVFS_time(pptr, &(x)->atime); 
     encode_PVFS_time(pptr, &(x)->mtime); 
     encode_PVFS_time(pptr, &(x)->ctime); 
+    encode_PVFS_time(pptr, &(x)->ntime);
     encode_PVFS_capability(pptr, &(x)->capability); 
     switch ((x)->objtype) 
     { 
@@ -546,6 +547,7 @@ static inline void decode_PVFS_object_attr(char **pptr, PVFS_object_attr *x)
     decode_PVFS_time(pptr, &(x)->atime); 
     decode_PVFS_time(pptr, &(x)->mtime); 
     decode_PVFS_time(pptr, &(x)->ctime); 
+    decode_PVFS_time(pptr, &(x)->ntime);
     decode_PVFS_capability(pptr, &(x)->capability); 
     switch ((x)->objtype) 
     { 

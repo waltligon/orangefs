@@ -335,6 +335,9 @@ static int getattr_object_getattr_comp_fn(void *v_p,
      * then we can make a copy of the retrieved attribute for later
      * caching.
      */
+    gossip_err("%s:resp_p->u.getattr.attr.mask(0x%08x) ntime(%lld)\n",__func__
+                                                    ,resp_p->u.getattr.attr.mask
+                                                    ,llu(resp_p->u.getattr.attr.ntime));
     PINT_copy_object_attr(&sm_p->getattr.attr,
                           &resp_p->u.getattr.attr);
 
@@ -921,6 +924,8 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     assert(PVFS_OID_cmp(&object_ref.handle, &PVFS_HANDLE_NULL));
     assert(object_ref.sid_count > 0);
     assert(object_ref.sid_array != NULL);
+
+    gossip_err("%s:sm_p->getattr.req_attrmask(0x%08x)\n",__func__,sm_p->getattr.req_attrmask);
 
     /* setup the msgpair to do a getattr operation */
     PINT_SERVREQ_GETATTR_FILL(msg_p->req,
@@ -1803,6 +1808,9 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
     attr = &sm_p->getattr.attr;
     assert(attr);
     
+    gossip_err("%s:sm_p->getattr.attr.mask(0x%08x\n)",__func__,sm_p->getattr.attr.mask);
+
+
     /* If we get to this state action, 
      * the getattr state machine was invoked, so
      * we can assume that one of the PVFS_[i]sys_getattr functions
@@ -1838,7 +1846,7 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
         /* Copy if there are any special object specific flags */
         sysresp->attr.flags = attr->u.meta.hint.flags;
         /* special case for when users ask for dfile count */
-        if (sm_p->getattr.req_attrmask & PVFS_ATTR_META_DFILES)
+        if (attr->mask & PVFS_ATTR_META_DFILES)
         {
             sysresp->attr.dfile_count = attr->u.meta.dfile_count;
         }
@@ -1897,24 +1905,31 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
     }
 
     /* copy outgoing sys_attr fields from returned object_attr */
-    sysresp->attr.owner = attr->owner;
-    sysresp->attr.group = attr->group;
-    sysresp->attr.perms = attr->perms;
-    sysresp->attr.atime = attr->atime;
-    sysresp->attr.mtime = attr->mtime;
-    sysresp->attr.ctime = attr->ctime;
-    /* this is done below - WBL */
-    /*sysresp->attr.mask  = PVFS_util_object_to_sys_attr_mask(attr->mask);*/
+    sysresp->attr.owner   = attr->owner;
+    sysresp->attr.group   = attr->group;
+    sysresp->attr.perms   = attr->perms;
+    sysresp->attr.atime   = attr->atime;
+    sysresp->attr.mtime   = attr->mtime;
+    sysresp->attr.ctime   = attr->ctime;
+    sysresp->attr.ntime   = attr->ntime;
+    sysresp->attr.objtype = attr->objtype;
+
+    gossip_err("%s:attr->ntime(%llu)\n",__func__,llu(attr->ntime));
+
     sysresp->attr.mask  = 0;
     sysresp->attr.size  = 0;
-    sysresp->attr.objtype = attr->objtype;
 
     if (js_p->error_code == 0)
     {
+
+        gossip_err("%s:attr->mask(0x%08x)\n",__func__,attr->mask);
         /* convert outgoing attribute mask based on what we got */
         sysresp->attr.mask = PVFS_util_object_to_sys_attr_mask(attr->mask);
 
-        if (sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
+
+        gossip_err("%s:sysresp->attr.mask(0x%08x)\n",__func__,sysresp->attr.mask);
+
+        if (attr->mask & PVFS_ATTR_DATA_SIZE)
         {
             if( attr->objtype == PVFS_TYPE_DATAFILE )
             {
@@ -1924,6 +1939,8 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
             {
                 sysresp->attr.size = sm_p->getattr.size;
             }
+
+            gossip_err("%s:sm_p->getattr.size(%d)\n",__func__,(int)sm_p->getattr.size);
 
             sysresp->attr.mask |= PVFS_ATTR_SYS_SIZE;
         }
@@ -1937,20 +1954,29 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
                                                   attr->u.meta.dfile_count);
             sysresp->attr.mask |= PVFS_ATTR_SYS_BLKSIZE;
         }
+        else
+        {
+            /* we can't return the blocksize */
+            /* unfortunately, PVFS_util_object_to_sys_attr_mask adds PVFS_ATTR_SYS_BLKSIZE to
+             * the mask by checking only for the meta distribution and not both the meta
+             * distribution and dfile count.  So, we have to remove it.
+             */
+            sysresp->attr.mask &= (~PVFS_ATTR_SYS_BLKSIZE);
+        }
 
         /* if this is a symlink, add the link target */
-        if (sm_p->getattr.req_attrmask & PVFS_ATTR_SYMLNK_TARGET)
+        if (attr->mask & PVFS_ATTR_SYMLNK_TARGET)
         {
             sysresp->attr.mask |= PVFS_ATTR_SYS_LNK_TARGET;
         }
 
-        if(sm_p->getattr.req_attrmask & PVFS_ATTR_DIR_DIRENT_COUNT)
+        if(attr->mask & PVFS_ATTR_DIR_DIRENT_COUNT)
         {
             sysresp->attr.dirent_count = attr->u.dir.dirent_count;
             sysresp->attr.mask |= PVFS_ATTR_SYS_DIRENT_COUNT;
         }
 
-        if (sm_p->getattr.req_attrmask & PVFS_ATTR_DISTDIR_ATTR)
+        if (attr->mask & PVFS_ATTR_DISTDIR_ATTR)
         {
             sysresp->attr.distr_dir_servers_max =
                                 attr->u.dir.dist_dir_attr.dirdata_count;
