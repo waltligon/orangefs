@@ -119,6 +119,7 @@ static DOTCONF_CB(get_db_cache_type);
 static DOTCONF_CB(get_param);
 static DOTCONF_CB(get_value);
 static DOTCONF_CB(get_default_num_dfiles);
+static DOTCONF_CB(get_default_dfile_replication);
 static DOTCONF_CB(get_immediate_completion);
 static DOTCONF_CB(get_server_job_bmi_timeout);
 static DOTCONF_CB(get_server_job_flow_timeout);
@@ -1086,6 +1087,13 @@ static const configoption_t options[] =
      * and it determines whether to use that value or not.
      */
     {"DefaultNumDFiles", ARG_INT, get_default_num_dfiles, NULL,
+        CTX_FILESYSTEM, "0"},
+
+    /* This option specifies the default number of datafiles to use
+     * when a new file is created.  The value is passed to the distribution
+     * and it determines whether to use that value or not.
+     */
+    {"DefaultDFileReplication", ARG_INT, get_default_dfile_replication, NULL,
         CTX_FILESYSTEM, "0"},
 
     {"ImmediateCompletion", ARG_STR, get_immediate_completion, NULL,
@@ -3263,7 +3271,24 @@ DOTCONF_CB(get_default_num_dfiles)
     fs_conf->default_num_dfiles = (int)cmd->data.value;
     if(fs_conf->default_num_dfiles < 0)
     {
-        return("Error DefaultNumDFiles must be positive.\n");
+        return("Error DefaultNumDFiles must be non-negative.\n");
+    }
+    return NULL;
+}
+
+DOTCONF_CB(get_default_dfile_replication)
+{
+    struct server_configuration_s *config_s = 
+            (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    fs_conf = (struct filesystem_configuration_s *)
+            PINT_llist_head(config_s->file_systems);
+
+    fs_conf->default_dfile_replication_factor = (int)cmd->data.value;
+    if(fs_conf->default_dfile_replication_factor < 0)
+    {
+        return("Error DefaultDFileReplication must be non-negative.\n");
     }
     return NULL;
 }
