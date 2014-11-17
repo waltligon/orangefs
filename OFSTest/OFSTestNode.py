@@ -568,7 +568,7 @@ class OFSTestNode(object):
     # @param output Output list
     
     def runSingleCommandAsRoot(self,command,output=[],debug=False):
-        return self.runSingleCommand(command,output,"root",debug)
+        return self.runSingleCommand(command=command,output=output,remote_user="root",debug=debug)
      
     ##
     # @fn runSingleCommandBacktick(self,command,output=[],remote_user=None):
