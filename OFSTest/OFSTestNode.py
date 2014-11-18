@@ -1356,12 +1356,15 @@ class OFSTestNode(object):
         self.hadoop_location = "/opt/"+self.hadoop_version
         rc = self.runSingleCommand("[ -d %s ]" % self.hadoop_location)
         self.setEnvironmentVariable("JAVA_HOME",self.jdk6_location)
+        self.setEnvironmentVariable("HADOOP_PREFIX", self.hadoop_location)
         if self.hadoop_version == "hadoop-1.2.1":
             self.hadoop_examples_location = self.hadoop_location+"/hadoop*examples*.jar"
             self.hadoop_test_location = self.hadoop_location+"/hadoop*test*.jar"
+            self.setEnvironmentVariable("HADOOP_CONF_DIR", self.hadoop_location+"/conf")    
         else:
             self.hadoop_examples_location = self.hadoop_location+"/share/hadoop/mapreduce/hadoop*examples*.jar"
             self.hadoop_test_location = self.hadoop_location+"/share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-*-tests.jar"
+            self.setEnvironmentVariable("HADOOP_CONF_DIR", self.hadoop_location+"/etc/hadoop")
         if rc != 0:
             output = []
             self.changeDirectory("/opt")

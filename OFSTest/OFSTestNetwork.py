@@ -1648,18 +1648,20 @@ class OFSTestNetwork(object):
             node.runSingleCommand('sed -i s,/opt/orangefs-trunk,%s,g %s/hadoop-env.sh' % (node.ofs_installation_location,hadoop_conf ))
             
             # update core-site.xml
-            node.runSingleCommand("sed -i s,/mnt/orangefs,%s, %s/core-site.xml" % (node.ofs_mount_point,node.hadoop_location))
+            node.runSingleCommand("sed -i s,/mnt/orangefs,%s,g %s/core-site.xml" % (node.ofs_mount_point,hadoop_conf))
             node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%s,g %s/core-site.xml" % (node.hostname,node.ofs_tcp_port,hadoop_conf))
             
             # update mapred-site.xml
             node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%s,g %s/mapred-site.xml" % (node.hostname,node.ofs_tcp_port,hadoop_conf))
-            node.runSingleCommand("sed -i s/localhost/%s/ %s/mapred-site.xml" % (master_node.hostname,hadoop_conf))
+            node.runSingleCommand("sed -i s/localhost/%s/g %s/mapred-site.xml" % (master_node.hostname,hadoop_conf))
             
-            node.runSingleCommand("sed -i s/localhost/%s/ %s/conf/yarn-site.xml" % (master_node.hostname,node.hadoop_location))
-            node.runSingleCommand("sed -i s/yarn.nodemanager.hostname/commentout.yarn.nodemanager.hostname/ %s/conf/yarn-site.xml" % (node.hadoop_location))
+            node.runSingleCommand("sed -i s/localhost/%s/g %s/yarn-site.xml" % (master_node.hostname,hadoop_conf))
+            node.runSingleCommand("sed -i s/yarn.nodemanager.hostname/commentout.yarn.nodemanager.hostname/ %s/yarn-site.xml" % hadoop_conf)
             
             # point slave node to master
             node.runSingleCommand("echo '%s' > %s/masters" % (master_node.hostname,hadoop_conf))
+            
+            
             
             # notify master of new slave
             master_node.runSingleCommand("echo '%s' >> %s/slaves" % (node.hostname,hadoop_conf))
