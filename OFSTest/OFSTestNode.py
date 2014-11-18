@@ -1361,7 +1361,7 @@ class OFSTestNode(object):
             self.hadoop_test_location = self.hadoop_location+"/hadoop*test*.jar"
         else:
             self.hadoop_examples_location = self.hadoop_location+"/share/hadoop/mapreduce/hadoop*examples*.jar"
-            self.hadoop_test_location = self.hadoop_location+"/share/hadoop/hdfs/hadoop*test*.jar"
+            self.hadoop_test_location = self.hadoop_location+"/share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-*-tests.jar"
         if rc != 0:
             output = []
             self.changeDirectory("/opt")
