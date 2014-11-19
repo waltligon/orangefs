@@ -1678,7 +1678,7 @@ class OFSTestNetwork(object):
             print "Hadoop setup failed. See logs for more information."
         else:
             print "Hadoop setup successfully"
-            master_node.runSingleCommand("%s/bin/hadoop dfs -mkdir /user/%s" % (master_node.hadoop_location,master_node.current_user))
+            master_node.runSingleCommand("%s/bin/hadoop dfs -mkdir -p /user/%s" % (master_node.hadoop_location,master_node.current_user))
             
         return rc
     
