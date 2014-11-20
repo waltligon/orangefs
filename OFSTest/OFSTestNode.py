@@ -1483,13 +1483,14 @@ class OFSTestNode(object):
             build_location = install_location
         
         
-#         self.openmpi_version = "openmpi-1.6.5"
-#         url_base = "http://devorange.clemson.edu/pvfs/"
-#         url = url_base+self.openmpi_version+"-omnibond-2.tar.gz"
-
+        #self.openmpi_version = "openmpi-1.6.5"
         self.openmpi_version = "openmpi-1.8.3"
-        url_base = "http://www.open-mpi.org/software/ompi/v1.8/downloads/"
-        url = url_base+self.openmpi_version+".tar.gz"
+        url_base = "http://devorange.clemson.edu/pvfs/"
+        url = url_base+self.openmpi_version+"-omnibond-2.tar.gz"
+
+        
+#         url_base = "http://www.open-mpi.org/software/ompi/v1.8/downloads/"
+#         url = url_base+self.openmpi_version+".tar.gz"
 
         patch_name = "openmpi.patch"
         patch_url = url_base+patch_name
@@ -1505,8 +1506,8 @@ class OFSTestNode(object):
             return rc
 
         output = []
-        self.runSingleCommand("tar xzf %s.tar.gz"% self.openmpi_version)
-        #self.runSingleCommand("tar xzf %s-omnibond-2.tar.gz"% self.openmpi_version)
+        #self.runSingleCommand("tar xzf %s.tar.gz"% self.openmpi_version)
+        self.runSingleCommand("tar xzf %s-omnibond.tar.gz"% self.openmpi_version)
         
         self.openmpi_source_location = "%s/%s" % (build_location,self.openmpi_version)
         self.changeDirectory(self.openmpi_source_location)
