@@ -1486,7 +1486,7 @@ class OFSTestNode(object):
         #self.openmpi_version = "openmpi-1.6.5"
         self.openmpi_version = "openmpi-1.8.3"
         url_base = "http://devorange.clemson.edu/pvfs/"
-        url = url_base+self.openmpi_version+"-omnibond-2.tar.gz"
+        url = url_base+self.openmpi_version+"-omnibond.tar.gz"
 
         
 #         url_base = "http://www.open-mpi.org/software/ompi/v1.8/downloads/"
