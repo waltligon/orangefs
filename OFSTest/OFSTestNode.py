@@ -1943,7 +1943,7 @@ class OFSTestNode(object):
             configure_opts = configure_opts+" --disable-opt"
 
         if enable_hadoop == True:
-            configure_opts =  configure_opts + " --with-jdk=%s --enable-hadoop --with-hadoop=%s --enable-jni " % (self.jdk6_location,self.hadoop_location)
+            configure_opts =  configure_opts + " --with-jdk=%s --enable-jni " % (self.jdk6_location)
             enable_shared = True
 
 
