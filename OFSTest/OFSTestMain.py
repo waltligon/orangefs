@@ -282,18 +282,18 @@ class OFSTestMain(object):
         print "Installing Required Software"
         self.ofs_network.installRequiredSoftware()
         
-        # Install software required to compile and run OFS and all tests.
-        print ""
-        print "==================================================================="
-        print "Installing Berkeley DB 4.8"
-        self.ofs_network.installDB4()
-        
-        
-                # Install software required to compile and run OFS and all tests.
-        print ""
-        print "==================================================================="
-        print "Installing Hadoop"
-        self.ofs_network.installHadoop()
+#         # Install software required to compile and run OFS and all tests.
+#         print ""
+#         print "==================================================================="
+#         print "Installing Berkeley DB 4.8"
+#         self.ofs_network.installDB4()
+#         
+#         
+#                 # Install software required to compile and run OFS and all tests.
+#         print ""
+#         print "==================================================================="
+#         print "Installing Hadoop"
+#         self.ofs_network.installHadoop()
 
 
     ##
@@ -365,7 +365,7 @@ class OFSTestMain(object):
             print ""
             print "==================================================================="
             print "Installing Hadoop"
-            self.ofs_network.installHadoop()
+            self.ofs_network.installHadoop(hadoop_version=self.config.hadoop_version)
 
 
 

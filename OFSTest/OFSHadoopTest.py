@@ -50,7 +50,7 @@ def wordcount(testing_node,output=[]):
 
     testing_node.runSingleCommand("mkdir -p /home/%s/gutenberg" % testing_node.current_user)    
     testing_node.changeDirectory("/home/%s/gutenberg" % testing_node.current_user)    
-    testing_node.runSingleCommand("%s/bin/hadoop dfs -mkdir /user/%s/gutenberg" % (testing_node.hadoop_location,testing_node.current_user))
+    testing_node.runSingleCommand("%s/bin/hadoop dfs -mkdir -p /user/%s/gutenberg" % (testing_node.hadoop_location,testing_node.current_user))
     
     # get the gutenberg files
     testing_node.runSingleCommand("wget http://www.gutenberg.org/cache/epub/5000/pg5000.txt")
@@ -59,7 +59,7 @@ def wordcount(testing_node,output=[]):
     
     testing_node.runSingleCommand("%s/bin/hadoop dfs -copyFromLocal /home/%s/gutenberg/* /user/%s/gutenberg" % (testing_node.hadoop_location,testing_node.current_user,testing_node.current_user))
     
-    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s/hadoop*examples*.jar  wordcount /user/%s/gutenberg /user/%s/gutenberg-output" % (testing_node.hadoop_location,testing_node.hadoop_location,testing_node.current_user,testing_node.current_user),output)
+    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s  wordcount /user/%s/gutenberg /user/%s/gutenberg-output" % (testing_node.hadoop_location,testing_node.hadoop_examples_location,testing_node.current_user,testing_node.current_user),output)
     # TODO: Compare acutal results with expected.
     return rc
 
@@ -79,7 +79,7 @@ def wordcount(testing_node,output=[]):
 
 def TestDFSIO_clean(testing_node,output=[]):
 
-    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s/hadoop*test*.jar  TestDFSIO -clean" % (testing_node.hadoop_location,testing_node.hadoop_location),output)
+    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s  TestDFSIO -clean" % (testing_node.hadoop_location,testing_node.hadoop_test_location),output)
     return rc
 
 ##
@@ -97,7 +97,7 @@ def TestDFSIO_clean(testing_node,output=[]):
 
 def TestDFSIO_read(testing_node,output=[]):
 
-    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s/hadoop*test*.jar  TestDFSIO -read -nrFiles 10 -fileSize 100" % (testing_node.hadoop_location,testing_node.hadoop_location),output)
+    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s  TestDFSIO -read -nrFiles 10 -fileSize 100" % (testing_node.hadoop_location,testing_node.hadoop_test_location),output)
     return rc
 
 
@@ -115,7 +115,7 @@ def TestDFSIO_read(testing_node,output=[]):
 
 def TestDFSIO_write(testing_node,output=[]):
 
-    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s/hadoop*test*.jar  TestDFSIO -write -nrFiles 10 -fileSize 100" % (testing_node.hadoop_location,testing_node.hadoop_location),output)
+    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s  TestDFSIO -write -nrFiles 10 -fileSize 100" % (testing_node.hadoop_location,testing_node.hadoop_test_location),output)
     return rc
 
 ##
@@ -139,13 +139,13 @@ def terasort_full(testing_node,output=[]):
     # generate 500M of data. Not much, but good enough to kick the tires.
     gensize = 5000000
      
-    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s/hadoop*examples*.jar  teragen %d /user/%s/terasort5-input" % (testing_node.hadoop_location,testing_node.hadoop_location,gensize,testing_node.current_user),output)
+    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s  teragen %d /user/%s/terasort5-input" % (testing_node.hadoop_location,testing_node.hadoop_examples_location,gensize,testing_node.current_user),output)
     if rc != 0:
         return rc    
-    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s/hadoop*examples*.jar  terasort /user/%s/terasort5-input /user/%s/terasort5-output" % (testing_node.hadoop_location,testing_node.hadoop_location,testing_node.current_user,testing_node.current_user),output)
+    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s  terasort /user/%s/terasort5-input /user/%s/terasort5-output" % (testing_node.hadoop_location,testing_node.hadoop_examples_location,testing_node.current_user,testing_node.current_user),output)
     if rc != 0:
         return rc    
-    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s/hadoop*examples*.jar  teravalidate /user/%s/terasort5-output /user/%s/terasort5-validate" % (testing_node.hadoop_location,testing_node.hadoop_location,testing_node.current_user,testing_node.current_user),output)
+    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s  teravalidate /user/%s/terasort5-output /user/%s/terasort5-validate" % (testing_node.hadoop_location,testing_node.hadoop_examples_location,testing_node.current_user,testing_node.current_user),output)
 
     return rc      
 ##
@@ -192,7 +192,7 @@ def terasort_full(testing_node,output=[]):
     
 def mrbench(testing_node,output=[]):
 
-    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s/hadoop*test*.jar  mrbench -numRuns 50" % (testing_node.hadoop_location,testing_node.hadoop_location),output)
+    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s  mrbench -numRuns 50" % (testing_node.hadoop_location,testing_node.hadoop_test_location),output)
     return rc
 
 

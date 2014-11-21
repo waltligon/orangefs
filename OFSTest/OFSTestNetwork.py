@@ -447,9 +447,12 @@ class OFSTestNetwork(object):
                     
         
     
-    def installHadoop(self,node_list=None):
+    def installHadoop(self,hadoop_version="hadoop-1.2.1",node_list=None):
         if node_list == None:
             node_list = self.network_nodes
+        for node in node_list:
+            node.hadoop_version=hadoop_version
+            
         self.runSimultaneousCommands(node_list=node_list,node_function=OFSTestNode.OFSTestNode.installHadoop)
     
     ##
@@ -1625,34 +1628,49 @@ class OFSTestNetwork(object):
 
         for node in hadoop_nodes:
             
+            
             # copy templates to node
             #master_node.copyToRemoteNode(source="%s/test/automated/hadoop-tests.d/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
-            
-            master_node.copyToRemoteNode(source="%s/src/client/hadoop/orangefs-hadoop1/src/main/resources/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/conf/" % node.hadoop_location,recursive=True)
+            if master_node.hadoop_version == "hadoop-1.2.1":
+                hadoop_conf=node.hadoop_location+"/conf"
+                master_node.copyToRemoteNode(source="%s/src/client/hadoop/orangefs-hadoop1/src/main/resources/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/" % (hadoop_conf),recursive=True)
+            else:
+                hadoop_conf=node.hadoop_location+"/etc/hadoop"
+                master_node.copyToRemoteNode(source="%s/src/client/hadoop/orangefs-hadoop2/src/main/resources/conf/" % master_node.ofs_source_location,destination_node=node,destination="%s/" % (hadoop_conf),recursive=True)
 #              setup hadoop-env.sh
 #             node.runSingleCommand("echo 'export JAVA_HOME=%s' >> %s/conf/hadoop-env.sh" % (node.jdk6_location,node.hadoop_location))
 #             node.runSingleCommand("echo 'export LD_LIBRARY_PATH=%s/lib' >> %s/conf/hadoop-env.sh" % (node.ofs_installation_location,node.hadoop_location))
 #             node.runSingleCommand("echo 'export JNI_LIBRARY_PATH=%s/lib' >> %s/conf/hadoop-env.sh" % (node.ofs_installation_location,node.hadoop_location))
 #             node.runSingleCommand("echo 'export HADOOP_CLASSPATH=\$JNI_LIBRARY_PATH/orangefs-hadoop1-2.9.0.jar:\$JNI_LIBRARY_PATH/ofs-jni-2.9.0.jar' >> %s/conf/hadoop-env.sh" % node.hadoop_location)
             
-            node.runSingleCommand('sed -i s,/usr/lib/jvm/java-7-openjdk-amd64,%s,g %s/conf/hadoop-env.sh' % (node.jdk6_location,node.hadoop_location ))
-            # update mapred-site.xml
-            node.runSingleCommand('sed -i s,/opt/orangefs-trunk,%s,g %s/conf/hadoop-env.sh' % (node.ofs_installation_location,node.hadoop_location ))
+            node.runSingleCommand('sed -i s,/usr/lib/jvm/java-7-openjdk-amd64,%s,g %s/hadoop-env.sh' % (node.jdk6_location,hadoop_conf ))
             
-            # update mapred-site.xml
-            node.runSingleCommand("sed -i s/localhost/%s/ %s/conf/mapred-site.xml" % (master_node.hostname,node.hadoop_location))
+            node.runSingleCommand('sed -i s,/opt/orangefs-trunk,%s,g %s/hadoop-env.sh' % (node.ofs_installation_location,hadoop_conf ))
             
             # update core-site.xml
-            node.runSingleCommand("sed -i s,/mnt/orangefs,%s, %s/conf/core-site.xml" % (node.ofs_mount_point,node.hadoop_location))
-            node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%s,g %s/conf/core-site.xml" % (node.hostname,node.ofs_tcp_port,node.hadoop_location))
-
+            node.runSingleCommand("sed -i s,/mnt/orangefs,%s,g %s/core-site.xml" % (node.ofs_mount_point,hadoop_conf))
+            node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%s,g %s/core-site.xml" % (node.hostname,node.ofs_tcp_port,hadoop_conf))
+            
+            # update mapred-site.xml
+            node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%s,g %s/mapred-site.xml" % (node.hostname,node.ofs_tcp_port,hadoop_conf))
+            node.runSingleCommand("sed -i s/localhost/%s/g %s/mapred-site.xml" % (master_node.hostname,hadoop_conf))
+            
+            node.runSingleCommand("sed -i s/localhost/%s/g %s/yarn-site.xml" % (master_node.hostname,hadoop_conf))
+            node.runSingleCommand("sed -i s/yarn.nodemanager.hostname/commentout.yarn.nodemanager.hostname/ %s/yarn-site.xml" % hadoop_conf)
+            
             # point slave node to master
-            node.runSingleCommand("echo '%s' > %s/conf/masters" % (master_node.hostname,node.hadoop_location))
+            node.runSingleCommand("echo '%s' > %s/masters" % (master_node.hostname,hadoop_conf))
+            
+            
             
             # notify master of new slave
-            master_node.runSingleCommand("echo '%s' >> %s/conf/slaves" % (node.hostname,master_node.hadoop_location))
+            master_node.runSingleCommand("echo '%s' >> %s/slaves" % (node.hostname,hadoop_conf))
+        
+        if master_node.hadoop_version == "hadoop-1.2.1":    
+            master_node.runSingleCommand("%s/bin/start-mapred.sh" % master_node.hadoop_location)
+        else:
+            master_node.runSingleCommand("%s/src/client/hadoop/orangefs-hadoop2/scripts/examples/hadoop/start_hadoop.sh" % master_node.ofs_source_location)
             
-        master_node.runSingleCommand("%s/bin/start-mapred.sh" % master_node.hadoop_location)
         time.sleep(20)
         # hadoop dfs -ls is our "ping" for hadoop. 
         rc = master_node.runSingleCommand("%s/bin/hadoop dfs -ls /" % master_node.hadoop_location)
@@ -1660,7 +1678,7 @@ class OFSTestNetwork(object):
             print "Hadoop setup failed. See logs for more information."
         else:
             print "Hadoop setup successfully"
-            master_node.runSingleCommand("%s/bin/hadoop dfs -mkdir /user/%s" % (master_node.hadoop_location,master_node.current_user))
+            master_node.runSingleCommand("%s/bin/hadoop dfs -mkdir -p /user/%s" % (master_node.hadoop_location,master_node.current_user))
             
         return rc
     

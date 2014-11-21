@@ -194,6 +194,12 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         return p.returncode
         
 
+    def saveEnvironment(self):
+        self.runSingleCommandAsRoot("rm -f /etc/profile.d/orangefs.sh /etc/profile.d/orangefs.csh")
+        for variable in self.current_environment:
+            self.runSingleCommandAsRoot("bash -c 'echo export %s=%s >> /etc/profile.d/orangefs.sh'" % (variable,self.current_environment[variable]))
+            self.runSingleCommandAsRoot("bash -c 'echo setenv %s %s >> /etc/profile.d/orangefs.csh'" % (variable,self.current_environment[variable]))
+
     ##       
     # @fn prepareCommandLine(self,command,outfile="",append_out=False,errfile="",append_err=False,remote_user=None):
     #
@@ -248,8 +254,8 @@ class OFSTestRemoteNode(OFSTestNode.OFSTestNode):
         # change to proper directory
         command_chunks.append("cd %s; " % self.current_directory)
         #now append each variable followed by a space
-        for variable in self.current_environment:
-            command_chunks.append("export %s=%s; " % (variable,self.current_environment[variable]))
+        #for variable in self.current_environment:
+        #    command_chunks.append("export %s=%s; " % (variable,self.current_environment[variable]))
         #now append the command
         command_chunks.append(command)
                 
