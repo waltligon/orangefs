@@ -993,8 +993,6 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
     }
 
 
-    gossip_err("%s:calling PINT_serv_decode_resp...\n",__func__);
-
     /* this decodes what should be a successful response */
     /* this could either be the recv ack or the write ack */
     /* this is an IO read, do we do this here? was it not done before? */
@@ -1059,8 +1057,6 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
     if (msg_p->comp_fn != NULL)
     {
         PVFS_error err_stat;
-
-        gossip_err("%s:calling msg_p->comp_fn\n",__func__);
 
         gossip_debug(GOSSIP_MIRROR_DEBUG,"\texecuting msg_p->comp_fn..\n");
         /* If we call the completion function, store the result on
@@ -1780,7 +1776,6 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
                       decoded_resp_p, /* holds data on decoded resp */
                       *svr_addr_p,
                       actual_resp_sz);
-    gossip_err("%s:Return from PINT_decode...\n",__func__);
     if (ret > -1)
     {
         *resp_out_pp = (struct PVFS_server_resp *)decoded_resp_p->buffer;

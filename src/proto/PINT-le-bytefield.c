@@ -893,8 +893,6 @@ static int lebf_decode_resp(void *input_buffer,
 #define CASE(tag,var) \
     case tag: decode_PVFS_servresp_##var(p,&resp->u.var); break
 
-    gossip_err("%s:Calling decode_PVFS_servresp_lookup_path\n",__func__);
-
     switch (resp->op)
     {
 
@@ -974,8 +972,6 @@ static int lebf_decode_resp(void *input_buffer,
     }
 
 out:
-
-    gossip_err("%s:returning from lebf_decode_resp...\n",__func__);
 
     return(ret);
 }
