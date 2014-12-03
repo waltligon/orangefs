@@ -257,7 +257,7 @@ do {                                                                    \
 #define defree_PVFS_metafile_attr(x) \
 do { \
     defree_PINT_dist(&(x)->dist); \
-    decode_free(&(x)->dfile_array); \
+    decode_free((x)->dfile_array); \
 } while(0)
 
 #endif
