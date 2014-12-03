@@ -239,6 +239,10 @@ class OFSTestNode(object):
         # Location of hadoop installation
         self.hadoop_location = "/opt/"+self.hadoop_version
         
+        
+        self.hadoop_examples_location = self.hadoop_location+"/hadoop*examples*.jar"
+        self.hadoop_test_location = self.hadoop_location+"/hadoop*test*.jar"
+        
         ## @var jdk6_location
         # Location of Oracle JDK 6
         self.jdk6_location = "/usr/lib/jvm/java"
@@ -450,6 +454,7 @@ class OFSTestNode(object):
     
     def setEnvironmentVariable(self,variable,value):
         self.current_environment[variable] = value
+        self.saveEnvironment()
     
     ##
     # @fn unsetEnvironmentVariable(self,variable):
@@ -458,7 +463,13 @@ class OFSTestNode(object):
     # @param variable Variable name
     
     def unsetEnvironmentVariable(self,variable):
-        del self.current_environment[variable] 
+        del self.current_environment[variable]
+        self.saveEnvironment()
+    
+    def saveEnvironment(self):
+        # Writes to /etc/profile.d/orangefs.sh
+        # Implement in subclass.
+        pass
     
     ## 
     # @fn setEnvironment(self, setenv): 
@@ -557,7 +568,7 @@ class OFSTestNode(object):
     # @param output Output list
     
     def runSingleCommandAsRoot(self,command,output=[],debug=False):
-        return self.runSingleCommand(command,output,"root",debug)
+        return self.runSingleCommand(command=command,output=output,remote_user="root",debug=debug)
      
     ##
     # @fn runSingleCommandBacktick(self,command,output=[],remote_user=None):
@@ -1110,7 +1121,7 @@ class OFSTestNode(object):
                 " bash -c 'echo 0 > /selinux/enforce'",
                 "DEBIAN_FRONTEND=noninteractive apt-get update", 
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
-                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-\\`uname -r\\` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime gdb maven openjdk-7-jdk openjdk-7-jre openjdk-7-jre-lib", 
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-\\`uname -r\\` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime gdb maven", # openjdk-7-jdk openjdk-7-jre openjdk-7-jre-lib", 
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q libfuse2 fuse-utils libfuse-dev",
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q autofs nfs-kernel-server rpcbind nfs-common nfs-kernel-server", 
                 # needed for Ubuntu 10.04
@@ -1148,7 +1159,7 @@ class OFSTestNode(object):
                 "mkdir -p /home/bin",
                 "mkdir -p /home/nobody",
                 "chown nobody:nobody /home/nobody",
-                "chown bin:bin /home/bin"
+                "chown bin:bin /home/bin",
 
                 
 
@@ -1157,7 +1168,7 @@ class OFSTestNode(object):
                 "apt-get update ",
                 "bash -c 'echo debconf shared/accepted-oracle-license-v1-1 select true | debconf-set-selections'",
                 "bash -c 'echo debconf shared/accepted-oracle-license-v1-1 seen true | debconf-set-selections'",
-                #"DEBIAN_FRONTEND=noninteractive apt-get install -y -q oracle-java6-installer "
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q oracle-java7-installer "
             ]
             
             
@@ -1168,8 +1179,8 @@ class OFSTestNode(object):
 
             
             # ubuntu installs java to a different location than RHEL and SuSE 
-            self.jdk6_location = "/usr/lib/jvm/java-7-openjdk-amd64"
-            
+            #self.jdk6_location = "/usr/lib/jvm/java-7-openjdk-amd64"
+            self.jdk6_location = "/usr/lib/jvm/java-7-oracle"
             
         elif "suse" in self.distro.lower():
             
@@ -1177,11 +1188,6 @@ class OFSTestNode(object):
             print "Installing required software for SuSE based system %s" % self.distro
             
         
-#             rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-6u45-linux-x64-rpm.bin",output)
-#             
-#             if rc != 0:
-#                 logging.exception(output)
-#                 return rc
             
             install_commands = [
                 "bash -c 'echo 0 > /selinux/enforce'",
@@ -1199,7 +1205,6 @@ class OFSTestNode(object):
                 "ln -s /lib/modules/\\`uname -r\\`/build/Module.symvers /lib/modules/\\`uname -r\\`/source",
                 "if [ ! -f /lib/modules/\\`uname -r\\`/build/include/linux/version.h ] then; ln -s include/generated/uapi/version.h /lib/modules/\\`uname -r\\`/build/include/linux/version.h; fi",
             
-                #"yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user,
                 "/sbin/modprobe -v fuse",
                 "chmod a+x /bin/fusermount",
                 "chmod a+r /etc/fuse.conf",
@@ -1225,21 +1230,29 @@ class OFSTestNode(object):
 
             ]
             
-            if "opensuse" in self.distro.lower():    
+            if "opensuse" in self.distro.lower():
+                rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-7u71-linux-x64.rpm",output)
+             
+                if rc != 0:
+                    logging.exception(output)
+                    return rc
+                #install_commands.append("yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user)
+                install_commands.append("rpm -i /home/%s/jdk-7u71-linux-x64.rpm" % self.current_user)
                 install_commands.append("cd /opt; wget http://apache.mesi.com.ar/maven/maven-3/3.2.3/binaries/apache-maven-3.2.3-bin.tar.gz")
                 install_commands.append("cd /opt; tar xf apache-maven-3.2.3-bin.tar.gz")
                 install_commands.append("ln -s /opt/apache-maven-3.2.3/bin/mvn /usr/bin/mvn")
                 self.setEnvironmentVariable("M2_HOME", "/opt/apache-maven-3.2.3")
                 self.setEnvironmentVariable("M2", "/opt/apache-maven-3.2.3/bin")
-            
+                self.jdk6_location = "/usr/java/default"
+            else:
+                #SLES uses IBM Java
+                self.jdk6_location = "/usr/lib64/jvm/java"
             
             for command in install_commands:
                 rc = self.runSingleCommandAsRoot(command, output)
     
             
-            # RPM installs to default location
-            self.jdk6_location = "/usr/lib64/jvm/java"
-            
+                        
         elif "centos" in self.distro.lower() or "scientific linux" in self.distro.lower() or "red hat" in self.distro.lower() or "fedora" in self.distro.lower():
             print "Installing required software for Red Hat based system %s" % self.distro
             install_commands = [
@@ -1276,9 +1289,18 @@ class OFSTestNode(object):
                 
                 ]
             
+            #install Sun Java 7
+            rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-7u71-linux-x64.rpm",output)
+             
+            if rc != 0:
+                logging.exception(output)
+                return rc
+            #install_commands.append("yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user)
+            install_commands.append("rpm -i /home/%s/jdk-7u71-linux-x64.rpm" % self.current_user)
+            
             # install maven in RHEL 6
             if "6." in self.distro:
-                install_commands.append("cd /opt; wget http://apache.mesi.com.ar/maven/maven-3/3.2.3/binaries/apache-maven-3.2.3-bin.tar.gz")
+                install_commands.append("cd /opt; wget --quiet http://apache.mesi.com.ar/maven/maven-3/3.2.3/binaries/apache-maven-3.2.3-bin.tar.gz")
                 install_commands.append("cd /opt; tar xf apache-maven-3.2.3-bin.tar.gz")
                 install_commands.append("ln -s /opt/apache-maven-3.2.3/bin/mvn /usr/bin/mvn")
                 self.setEnvironmentVariable("M2_HOME", "/opt/apache-maven-3.2.3")
@@ -1308,7 +1330,7 @@ class OFSTestNode(object):
         if [ ! -d %s ]
         then
             cd ~
-            wget -q http://devorange.clemson.edu/pvfs/db-4.8.30.tar.gz
+            wget --quiet http://devorange.clemson.edu/pvfs/db-4.8.30.tar.gz
             tar zxf db-4.8.30.tar.gz &> /dev/null
             cd db-4.8.30/build_unix
             echo "Configuring Berkeley DB 4.8.30..."
@@ -1331,12 +1353,23 @@ class OFSTestNode(object):
         
     def installHadoop(self):
         # Install Hadoop. 
-        rc = self.runSingleCommand("[ -d /opt/%s ]" % self.hadoop_version)
+        self.hadoop_location = "/opt/"+self.hadoop_version
+        rc = self.runSingleCommand("[ -d %s ]" % self.hadoop_location)
+        self.setEnvironmentVariable("JAVA_HOME",self.jdk6_location)
+        self.setEnvironmentVariable("HADOOP_PREFIX", self.hadoop_location)
+        if self.hadoop_version == "hadoop-1.2.1":
+            self.hadoop_examples_location = self.hadoop_location+"/hadoop*examples*.jar"
+            self.hadoop_test_location = self.hadoop_location+"/hadoop*test*.jar"
+            self.setEnvironmentVariable("HADOOP_CONF_DIR", self.hadoop_location+"/conf")    
+        else:
+            self.hadoop_examples_location = self.hadoop_location+"/share/hadoop/mapreduce/hadoop*examples*.jar"
+            self.hadoop_test_location = self.hadoop_location+"/share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-*-tests.jar"
+            self.setEnvironmentVariable("HADOOP_CONF_DIR", self.hadoop_location+"/etc/hadoop")
         if rc != 0:
             output = []
             self.changeDirectory("/opt")
             
-            self.runSingleCommand("wget http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
+            self.runSingleCommand("wget --quiet http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
             self.runSingleCommand("tar -zxf %s.tar.gz" % self.hadoop_version)
         
 
@@ -1450,13 +1483,14 @@ class OFSTestNode(object):
             build_location = install_location
         
         
-        self.openmpi_version = "openmpi-1.6.5"
+        #self.openmpi_version = "openmpi-1.6.5"
+        self.openmpi_version = "openmpi-1.8.3"
         url_base = "http://devorange.clemson.edu/pvfs/"
-        url = url_base+self.openmpi_version+"-omnibond-2.tar.gz"
+        url = url_base+self.openmpi_version+"-omnibond.tar.gz"
 
-        #self.openmpi_version = "openmpi-1.8"
-        #url_base = "http://www.open-mpi.org/software/ompi/v1.8/downloads/"
-        #url = url_base+self.openmpi_version+".tar.gz"
+        
+#         url_base = "http://www.open-mpi.org/software/ompi/v1.8/downloads/"
+#         url = url_base+self.openmpi_version+".tar.gz"
 
         patch_name = "openmpi.patch"
         patch_url = url_base+patch_name
@@ -1472,8 +1506,8 @@ class OFSTestNode(object):
             return rc
 
         output = []
-        self.runSingleCommand("tar xzf %s.tar.gz"% self.openmpi_version)
-        self.runSingleCommand("tar xzf %s-omnibond-2.tar.gz"% self.openmpi_version)
+        #self.runSingleCommand("tar xzf %s.tar.gz"% self.openmpi_version)
+        self.runSingleCommand("tar xzf %s-omnibond.tar.gz"% self.openmpi_version)
         
         self.openmpi_source_location = "%s/%s" % (build_location,self.openmpi_version)
         self.changeDirectory(self.openmpi_source_location)
@@ -1943,7 +1977,7 @@ class OFSTestNode(object):
             configure_opts = configure_opts+" --disable-opt"
 
         if enable_hadoop == True:
-            configure_opts =  configure_opts + " --with-jdk=%s --enable-jni " % (self.jdk6_location)
+            configure_opts =  configure_opts + " --with-jdk=%s --enable-jni " % self.jdk6_location
             enable_shared = True
 
 
@@ -2097,13 +2131,23 @@ class OFSTestNode(object):
                 logging.exception("Could not install OrangeFS from %s to %s" % (self.ofs_source_location,self.ofs_installation_location))
                 
         if self.enable_hadoop == True:
-            self.changeDirectory("%s/src/client/hadoop/orangefs-hadoop1" % self.ofs_source_location)
-            rc = self.runSingleCommand("mvn -Dmaven.compiler.target=1.6 -Dmaven.compiler.source=1.6 -DskipTests clean package")
-            if rc != 0:
-                logging.exception("Could not build and install hadoop1 libraries" )
+            if self.hadoop_version == 'hadoop-1.2.1':
+                self.changeDirectory("%s/src/client/hadoop/orangefs-hadoop1" % self.ofs_source_location)
+                rc = self.runSingleCommand("mvn -Dmaven.compiler.target=1.6 -Dmaven.compiler.source=1.6 -DskipTests clean package")
+                if rc != 0:
+                    logging.exception("Could not build and install hadoop1 libraries" )
+                else:
+                    self.runSingleCommand('cp target/orangefs-hadoop1-?.?.?.jar "%s/lib"' % self.ofs_installation_location)
+                self.restoreDirectory()
             else:
-                self.runSingleCommand('cp target/orangefs-hadoop1-?.?.?.jar "%s/lib"' % self.ofs_installation_location)
-            self.restoreDirectory()
+                self.changeDirectory("%s/src/client/hadoop/orangefs-hadoop2" % self.ofs_source_location)
+                rc = self.runSingleCommand("mvn -Dmaven.compiler.target=1.7 -Dmaven.compiler.source=1.7 -DskipTests clean package")
+                if rc != 0:
+                    logging.exception("Could not build and install hadoop2 libraries" )
+                else:
+                    self.runSingleCommand('cp target/orangefs-hadoop2-?.?.?.jar "%s/lib"' % self.ofs_installation_location)
+                self.restoreDirectory()
+
         
         return rc
 
