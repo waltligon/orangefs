@@ -53,6 +53,15 @@ do{                                                     \
     if ((src)->mask & PVFS_ATTR_SYS_CTIME)              \
     {                                                   \
         (dest)->mask |= PVFS_ATTR_COMMON_CTIME;         \
+        if ((src)->mask & PVFS_ATTR_SYS_CTIME_SET)      \
+        {                                               \
+            (dest)->ctime = (src)->ctime;               \
+            (dest)->mask |= PVFS_ATTR_COMMON_CTIME_SET; \
+        }                                               \
+    }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_NTIME)              \
+    {                                                   \
+        (dest)->mask |= PVFS_ATTR_COMMON_NTIME;         \
     }                                                   \
     if ((src)->mask & PVFS_ATTR_SYS_TYPE)               \
     {                                                   \

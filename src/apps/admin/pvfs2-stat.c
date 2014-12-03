@@ -399,10 +399,10 @@ void print_stats(const PVFS_object_ref * ref,
                  const char            * pszRelativeName,
                  const PVFS_sys_attr   * attr)
 {
-   char a_time[100] = "", 
-        m_time[100] = "",  
-        c_time[100] = "",
-        n_time[100] = "";
+   char a_time[100] = ""; 
+   char m_time[100] = "";  
+   char c_time[100] = "";
+   char n_time[100] = "";
    struct passwd * user;
    struct group  * group;
 

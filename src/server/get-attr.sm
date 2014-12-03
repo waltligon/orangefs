@@ -374,16 +374,16 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
         (int)respattr->u.meta.dist_size);
 
     /*
-      weed out the attr mask of the response based on what the client
-      request asked for.  also, check if we need to retrieve more
-      information before returning the response to the client (by
-      guiding the state machine to get it).
-
-      we can safely do this now that we have the type of the object
-      (read in from the dspace, not stored in the respattr), and we
-      have the original client request attr mask
-      (s_op->u.getattr.attrmask).
-    */
+     * weed out the attr mask of the response based on what the client
+     * request asked for.  also, check if we need to retrieve more
+     * information before returning the response to the client (by
+     * guiding the state machine to get it).
+     *
+     * we can safely do this now that we have the type of the object
+     * (read in from the dspace, not stored in the respattr), and we
+     * have the original client request attr mask
+     * (s_op->u.getattr.attrmask).
+     */
     switch(respattr->objtype)
     {
         case PVFS_TYPE_METAFILE:
@@ -443,12 +443,12 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
         case PVFS_TYPE_DATAFILE:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: datafile\n");
             /*
-              note: the prelude already retrieved the size for us, so
-              there's no special action that needs to be taken if we have
-              a datafile here (other than adjusting our mask to include
-              the data information and copying the retrieved size from the
-              ds_attribute the prelude used)
-            */
+             * note: the prelude already retrieved the size for us, so
+             * there's no special action that needs to be taken if we have
+             * a datafile here (other than adjusting our mask to include
+             * the data information and copying the retrieved size from the
+             * ds_attribute the prelude used)
+             */
             //respattr->u.data.size = s_op->ds_attr.u.datafile.b_size;
             respattr->mask |= PVFS_ATTR_DATA_ALL;
 

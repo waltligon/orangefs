@@ -724,7 +724,10 @@ typedef struct PINT_server_op
 
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
-
+    
+    /* used in a pjmp to remember how many frames we pushed but be
+     * careful about nesting
+     */
     int num_pjmp_frames;
 
     /* Used just about everywhere so this is a std place to keep it */
@@ -848,6 +851,19 @@ enum PINT_server_req_access_type PINT_server_req_readonly(
 enum PINT_server_req_access_type PINT_server_req_modify(
                                     struct PVFS_server_req *req);
 
+/* This struct is used when the unexpected SM needs to get req specific
+ * control info from the different SMs via the get_ctrl method defined
+ * below in PVFS_server_req_params
+ */
+struct PINT_server_req_ctrl
+{
+    PVFS_fs_id fs_id;
+    PVFS_OID *handles;
+    int count;
+    PVFS_SID *sids;
+    int sid_count;
+};
+
 struct PINT_server_req_params
 {
     const char* string_name;
@@ -878,15 +894,19 @@ struct PINT_server_req_params
     /* A callback implemented by the request to return the object reference
      * from the server request structure.
      */
-    int (*get_object_ref)(
-        struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
+    int (*get_object_ref)(struct PVFS_server_req *req,
+                          PVFS_fs_id *fs_id,
+                          PVFS_handle *handle);
 
     /* A callback implemented by the request to return the credential from
      * the server request structure. If the server request does not contain
      * a credential this field should be set to NULL.
      */
-    int (*get_credential)(
-        struct PVFS_server_req *req, PVFS_credential **cred);
+    int (*get_credential)(struct PVFS_server_req *req,
+                          PVFS_credential **cred);
+
+    int (*get_ctrl)(struct PVFS_server_req *req,
+                    struct PINT_server_req_ctrl *req_ctrl);
 
     /* The state machine that performs the request */
     struct PINT_state_machine_s *state_machine;
@@ -905,17 +925,29 @@ extern struct PINT_server_req_entry PINT_server_req_table[];
 /* This declareation is in src/common/misc/server-config.h */
 /* struct server_configuration_s *get_server_config_struct(void); */
 
-int PINT_server_req_get_object_ref(
-    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
-int PINT_server_req_get_credential(
-    struct PVFS_server_req *req, PVFS_credential **cred);
+int PINT_server_req_get_object_ref(struct PVFS_server_req *req,
+                                   PVFS_fs_id *fs_id,
+                                   PVFS_handle *handle);
 
+int PINT_server_req_get_credential(struct PVFS_server_req *req,
+                                   PVFS_credential **cred);
+
+int PINT_server_req_get_ctrl(struct PVFS_server_req *req,
+                             struct PINT_server_req_ctrl *ctrl);
+
+/* This hideous bit of code declares a function that takes a
+ * pointer to a PVFS_server_req and returns pointer to another
+ * function that itself returns
+ * an int and takes a PVFS_server_op as an argument
+ */
 PINT_server_req_perm_fun
-PINT_server_req_get_perm_fun(struct PVFS_server_req *req);
+        PINT_server_req_get_perm_fun(struct PVFS_server_req *req);
+
 enum PINT_server_req_access_type
-PINT_server_req_get_access_type(struct PVFS_server_req *req);
+        PINT_server_req_get_access_type(struct PVFS_server_req *req);
+
 enum PINT_server_sched_policy
-PINT_server_req_get_sched_policy(struct PVFS_server_req *req);
+        PINT_server_req_get_sched_policy(struct PVFS_server_req *req);
 
 const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
 

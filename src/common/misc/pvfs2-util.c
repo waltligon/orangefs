@@ -2208,12 +2208,10 @@ uint32_t PVFS_util_sys_to_object_attr_mask(uint32_t sys_attrmask)
     {
         attrmask |= PVFS_ATTR_DIR_HINT;
     }
-
     if (sys_attrmask & PVFS_ATTR_SYS_DISTDIR_ATTR)
     {
         attrmask |= PVFS_ATTR_DISTDIR_ATTR;
     }
-
     if (sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
     {
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
@@ -2253,7 +2251,7 @@ uint32_t PVFS_util_sys_to_object_attr_mask(uint32_t sys_attrmask)
     }
     if(sys_attrmask & PVFS_ATTR_SYS_NTIME)
     {
-       attrmask |= PVFS_ATTR_COMMON_NTIME;
+        attrmask |= PVFS_ATTR_COMMON_NTIME;
     }
     if(sys_attrmask & PVFS_ATTR_SYS_TYPE)
     {
@@ -2266,6 +2264,10 @@ uint32_t PVFS_util_sys_to_object_attr_mask(uint32_t sys_attrmask)
     if(sys_attrmask & PVFS_ATTR_SYS_MTIME_SET)
     {
         attrmask |= PVFS_ATTR_COMMON_MTIME_SET;
+    }
+    if(sys_attrmask & PVFS_ATTR_SYS_CTIME_SET)
+    {
+        attrmask |= PVFS_ATTR_COMMON_CTIME_SET;
     }
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
@@ -2346,6 +2348,14 @@ uint32_t PVFS_util_object_to_sys_attr_mask(uint32_t obj_mask)
     if (obj_mask & PVFS_ATTR_DISTDIR_ATTR)
     {
         sys_mask |= PVFS_ATTR_SYS_DISTDIR_ATTR;
+    }
+    if(obj_mask & PVFS_ATTR_COMMON_MTIME_SET)
+    {
+        sys_mask |= PVFS_ATTR_SYS_MTIME_SET;
+    }
+    if(obj_mask & PVFS_ATTR_COMMON_CTIME_SET)
+    {
+        sys_mask |= PVFS_ATTR_SYS_CTIME_SET;
     }
 
     /* NOTE: the PVFS_ATTR_META_UNSTUFFED is intentionally not exposed

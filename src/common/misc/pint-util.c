@@ -203,6 +203,7 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
     default :
         break;
     }
+    dest->mask = src->mask;
     return 0;
 }
 #undef CPYFIELD
@@ -321,6 +322,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
     default :
         break;
     }
+    dest->mask = src->mask;
     return 0;
 }
 #undef CLRFIELD
@@ -333,7 +335,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
     int ret = -PVFS_EINVAL;
     ret = PINT_copy_object_attr_fixed(dest, src);
     ret = PINT_copy_object_attr_var(dest, src);
-    /* should this be done all of the time */
+    /* should this be done all of the time ? */
     if (PINT_capability_is_null(&src->capability))
     {
         PINT_null_capability(&dest->capability);
@@ -452,6 +454,10 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
         if (src->mask & PVFS_ATTR_COMMON_MTIME)
         {
             dest->mtime = src->mtime;
+        }
+        if (src->mask & PVFS_ATTR_COMMON_NTIME)
+        {
+            dest->ntime = src->ntime;
         }
         if (src->mask & PVFS_ATTR_COMMON_TYPE)
         {
