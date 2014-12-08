@@ -181,7 +181,7 @@ static PINT_sm_action setup_batch_create_fn(
     int index = 0;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "setting up msgpair to get precreated "
-                 "handles from %s, of type %u, and put store them in %llu.\n",
+                 "handles from %s, of type %u, and store them in %llu.\n",
                 s_op->u.precreate_pool_refiller.host,
                 s_op->u.precreate_pool_refiller.type,
                 llu(s_op->u.precreate_pool_refiller.pool_handle));
@@ -234,7 +234,7 @@ static PINT_sm_action setup_fn(
     PVFS_capability *cap = &s_op->u.precreate_pool_refiller.capability;
     int index = 0;
     int ret;
-  
+
     PVFS_ds_type_to_int( s_op->u.precreate_pool_refiller.type, &index);
 
     ret = PINT_init_capability(cap);
@@ -292,10 +292,6 @@ static PINT_sm_action error_fn(
     job_id_t tmp_id;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    gossip_err("Error: precreate_pool_refiller for %s encountered error.\n",
-        s_op->u.precreate_pool_refiller.host);
-    gossip_err("Error: sleeping for 30 seconds before retrying.\n");
-        
     if(s_op->u.precreate_pool_refiller.precreate_handle_array)
     {
         free(s_op->u.precreate_pool_refiller.precreate_handle_array);
@@ -303,6 +299,21 @@ static PINT_sm_action error_fn(
 
     PINT_cleanup_capability(&s_op->u.precreate_pool_refiller.capability);
 
+    if (js_p->error_code == STATE_RESET)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Getting new capability for "
+                     "precreate pool refiller for %s\n",
+                     s_op->u.precreate_pool_refiller.host);
+
+        js_p->error_code = 0;
+
+        return SM_ACTION_COMPLETE;
+    }
+
+    gossip_err("Error: precreate_pool_refiller for %s encountered error.\n",
+        s_op->u.precreate_pool_refiller.host);
+    gossip_err("Error: sleeping for 30 seconds before retrying.\n");
+        
     return(job_req_sched_post_timer(
         (30*1000),
         smcb,

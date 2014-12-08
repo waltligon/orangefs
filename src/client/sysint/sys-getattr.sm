@@ -730,7 +730,9 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
                               object_ref.handle,
                               sm_p->getattr.req_attrmask,
                               sm_p->hints);
-    
+
+    PINT_cleanup_capability(&capability);
+
     msg_p->fs_id = object_ref.fs_id;
     msg_p->handle = object_ref.handle;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
@@ -895,11 +897,12 @@ static int getattr_object_getattr_comp_fn(void *v_p,
             }
             return 0;
         case PVFS_TYPE_DIRECTORY:
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: objtype = DIRECTORY\n", __func__);
+        {            
             uint32_t dirent_file_count_i;
             int tmp_i;
             unsigned char *c;
+
+            gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: objtype = DIRECTORY\n", __func__);
 
             /* dirent_count will be collected later */
             gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -1128,6 +1131,8 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
                                          handles,
                                          (mirror_retry ? 1 : 0),
                                          sm_p->hints);
+
+    PINT_cleanup_capability(&capability);
 
     msg_p->fs_id = sm_p->getattr.object_ref.fs_id;
     msg_p->handle = handles[0];
@@ -1555,7 +1560,7 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
             attr->dirdata_handles[cur_index],
             PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_COUNT, /* only interested in timestamp and dirent_count */
             sm_p->hints);
-        
+
         /* fill in msgpair structure components */
         msg_p->fs_id = sm_p->getattr.object_ref.fs_id;
         msg_p->handle = attr->dirdata_handles[cur_index];
@@ -1572,6 +1577,8 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
             break;
         }
     }
+
+    PINT_cleanup_capability(&capability);
     
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;

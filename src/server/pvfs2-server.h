@@ -530,6 +530,8 @@ struct PINT_server_mkdir_op
     PVFS_fs_id fs_id;
     PVFS_handle_extent_array handle_extent_array;
     PVFS_size init_dirdata_size;
+    PVFS_capability *saved_capability;
+    PVFS_object_attr *saved_attr;
 
     /* dist-dir-struct
      * not in resp, only return meta handle
@@ -740,6 +742,12 @@ typedef struct PINT_server_op
       } \
     } while (0)
 
+#define PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(__s_op) \
+    do { \
+        PINT_cleanup_capability(&__s_op->req->capability); \
+        free(__s_op); \
+    } while (0)
+
 /* state machine permission function */
 typedef int (*PINT_server_req_perm_fun)(PINT_server_op *s_op);
 
@@ -897,6 +905,9 @@ extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_getattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
+
+extern void tree_getattr_free(PINT_server_op *s_op);
+extern void tree_remove_free(PINT_server_op *s_op);
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

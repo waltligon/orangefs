@@ -9,6 +9,7 @@
  *
  *  PVFS2 user interface routines - low level calls to system interface
  */
+
 #define USRINT_SOURCE 1
 #include "usrint.h"
 #include "posix-ops.h"
@@ -439,7 +440,6 @@ static int iocommon_parse_serverlist(char *serverlist,
     free(server_array);
     return 0;
 }
-    
 
 /**
  * Create a file via the PVFS system interface
@@ -463,6 +463,10 @@ int iocommon_create_file(const char *filename,
     PVFS_sys_layout *layout = NULL;
     PVFS_hint hints = NULL;
 
+#if PVFS_USER_ENV_VARS_ENABLED
+    PVFS_hint no_hint_hint; /* We need this if file_creation_param is null. */
+#endif /* PVFS_USER_ENV_VARS_ENABLED */
+
     gossip_debug(GOSSIP_USRINT_DEBUG,
                  "iocommon_create_file: called with %s\n", filename);
 
@@ -478,6 +482,18 @@ int iocommon_create_file(const char *filename,
     attr.ctime = attr.atime;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
+#if PVFS_USER_ENV_VARS_ENABLED
+
+    /* env_vars_struct_dump(&env_vars); */
+
+    if(env_vars.env_var_present && !file_creation_param)
+    {
+        /* TODO */
+        printf("env_var_present && no hint detected!\n");
+    }
+#endif /* PVFS_USER_ENV_VARS_ENABLED */
+    /* ====================================================================== */
+
     if (file_creation_param) /* these are hints */
     {
         int length;
@@ -488,8 +504,29 @@ int iocommon_create_file(const char *filename,
                                             &length);
         if (value)
         {
+#if 0
+            printf("HINT DETECTED:\n"
+                   "\tPINT_HINT_DISTRIBUTION -> value = %s\n", (char *) value);
+#endif
             dist = PVFS_sys_dist_lookup((char *)value);
-            if (!dist) /* distribution not found */
+            if (dist)
+            {
+                value = PINT_hint_get_value_by_type(file_creation_param,
+                                                    PINT_HINT_DISTRIBUTION_PV,
+                                                    &length);
+                /* This should come in as a string here and get tokenized into 
+                 * potentially multiple param:value pairs delimited by a '+'.*/
+                if(value)
+                {
+#if 0
+                    printf("\tPINT_HINT_DISTRIBUTION_PV -> value = %s\n",
+                           (char *) value);
+#endif
+                    /* Uses inplace iterator */
+                    PVFS_dist_pv_pairs_extract_and_add(value, (void *) dist);
+                }
+            }
+            else /* distribution not found */
             {
                 rc = EINVAL;
                 goto errorout;
@@ -1042,12 +1079,12 @@ pvfs_descriptor *iocommon_open(const char *path,
              */
             char *tmp_path;
             int dlen = strlen(pdir->s->dpath);
-            int plen = strlen(directory);
+            int plen = strlen(path);
             int mlen = dlen + plen + 2;
             tmp_path = (char *)malloc(mlen);
             strncpy(tmp_path, pdir->s->dpath, dlen + 1);
             strncat(tmp_path, "/", 1);
-            strncat(tmp_path, directory, plen);
+            strncat(tmp_path, path, plen);
             Ppath = PVFS_new_path(tmp_path);
 
             rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);

@@ -765,8 +765,8 @@ int PINT_cached_config_map_servers(
          */
         random_array = (int *)malloc(*inout_num_datafiles * sizeof(int));
         server_array = (int *)malloc(num_io_servers * sizeof(int));
-        memset(random_array, 0, (*inout_num_datafiles)*sizeof(*addr_array));
-        memset(server_array, 0, (num_io_servers)*sizeof(*addr_array));
+        memset(random_array, 0, (*inout_num_datafiles) * sizeof(int));
+        memset(server_array, 0, (num_io_servers) * sizeof(int));
 
         /* generate list of unique random numbers from 0 to */
         /* inout_num_datafiles - 1 */

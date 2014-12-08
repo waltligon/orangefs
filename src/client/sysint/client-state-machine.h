@@ -195,16 +195,14 @@ struct PINT_client_create_sm
     PINT_dist *dist;
     PVFS_sys_layout layout;
 
-    PVFS_handle metafile_handle;
-    int datafile_count;
-    PVFS_handle *datafile_handles;
-    int stuffed;
     PVFS_object_attr store_attr;
 
     int dirent_file_count;
     PVFS_handle *dirent_handle;
 
     PVFS_handle handles[2];
+
+    struct PVFS_servresp_create server_resp; /* data returned from the server request */
 };
 
 struct PINT_client_mkdir_sm
@@ -218,7 +216,6 @@ struct PINT_client_mkdir_sm
     int retry_count;
     int stored_error_code;
     PVFS_handle metafile_handle;
-    PINT_sm_getattr_state metafile_getattr;
 
     /* keep first */
     PINT_dist *dist;
@@ -253,12 +250,14 @@ struct PINT_client_setattr_sm
 struct PINT_client_mgmt_remove_dirent_sm
 {
     char *entry;
+    int retry_count;
 };
 
 struct PINT_client_mgmt_create_dirent_sm
 {
     char *entry;
     PVFS_handle entry_handle;
+    int retry_count;
 };
 
 struct PINT_client_mgmt_get_dirdata_handle_sm
@@ -858,14 +857,14 @@ void PINT_mgmt_release(PVFS_mgmt_op_id op_id);
 do {                                                          \
     if (user_cred_p == NULL)                                  \
     {                                                         \
-        gossip_lerr("Invalid user credentials! (nil)\n");     \
+        gossip_err("Invalid user credentials! (nil)\n");      \
         free(sm_p);                                           \
-        return -PVFS_EINVAL;                                  \
+        return -PVFS_EACCES;                                  \
     }                                                         \
     sm_p_cred_p = PINT_dup_credential(user_cred_p);           \
     if (!sm_p_cred_p)                                         \
     {                                                         \
-        gossip_lerr("Failed to copy user credentials\n");     \
+        gossip_err("Failed to copy user credentials\n");      \
         free(sm_p);                                           \
         return -PVFS_ENOMEM;                                  \
     }                                                         \

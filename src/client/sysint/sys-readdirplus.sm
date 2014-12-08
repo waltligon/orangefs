@@ -532,6 +532,9 @@ static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(struct PINT_smcb *sm
         msg_p->comp_fn = readdirplus_fetch_attrs_comp_fn;
         msg_p->svr_addr = sm_p->u.readdirplus.server_addresses[i];
      }
+
+     PINT_cleanup_capability(&capability);
+
      /* immediate return. next state jumps to msgpairarray machine */
      js_p->error_code = 0;
      PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
@@ -965,9 +968,6 @@ static PINT_sm_action readdirplus_cleanup(
                 }
             }
         }
-    }
-    else {
-        gossip_err("readdirplus: response error\n");
     }
 
     destroy_partition_handles(&sm_p->u.readdirplus.svr_count, 

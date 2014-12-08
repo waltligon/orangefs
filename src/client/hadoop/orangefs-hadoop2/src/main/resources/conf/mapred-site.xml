@@ -1,0 +1,208 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<!--
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License. See accompanying LICENSE file.
+-->
+
+<!-- Put site-specific property overrides in this file. -->
+
+<configuration>
+
+  <property>
+    <name>mapreduce.framework.name</name>
+    <value>yarn</value>
+  </property>
+
+  <property>
+    <name>yarn.app.mapreduce.am.staging-dir</name>
+    <value>ofs://localhost-orangefs:3334/tmp/hadoop-yarn/staging</value>
+  </property>
+
+  <property>
+    <name>mapred.healthChecker.script.path</name>
+    <value>ofs://localhost-orangefs:3334/mapred/jobstatus</value>
+  </property>
+
+  <property>
+    <name>mapred.job.tracker.history.completed.location</name>
+    <value>ofs://localhost-orangefs:3334/mapred/history/done</value>
+  </property>
+
+  <property>
+    <name>mapred.system.dir</name>
+    <value>ofs://localhost-orangefs:3334/mapred/system</value>
+  </property>
+
+  <property>
+    <name>mapreduce.jobhistory.done-dir</name>
+    <value>ofs://localhost-orangefs:3334/job-history/done</value>
+  </property>
+  
+  <property>
+    <name>mapreduce.jobhistory.intermediate-done-dir</name>
+    <value>ofs://localhost-orangefs:3334/job-history/intermediate-done</value>
+  </property>
+
+  <property>
+    <name>mapreduce.jobtracker.staging.root.dir</name>
+    <value>ofs://localhost-orangefs:3334/user</value>
+  </property>
+
+  <property>
+    <name>mapreduce.map.cpu.vcores</name>
+    <value>1</value>
+  </property>
+
+  <property>
+    <name>mapreduce.reduce.cpu.vcores</name>
+    <value>1</value>
+  </property>
+
+  <property>
+    <name>mapreduce.map.memory.mb</name>
+    <value>640</value>
+  </property>
+
+  <property>
+    <name>mapreduce.map.java.opts</name>
+    <value>-Xmx512m</value>
+  </property>
+
+  <property>
+    <name>mapreduce.reduce.memory.mb</name>
+    <value>1280</value>
+  </property>
+
+  <property>
+    <name>mapreduce.reduce.java.opts</name>
+    <value>-Xmx1024m</value>
+  </property>
+
+  <property>
+    <name>yarn.app.mapreduce.am.resource.mb</name>
+    <value>640</value>
+  </property>
+
+  <property>
+    <name>yarn.app.mapreduce.am.command-opts</name>
+    <value>-Xmx512m</value>
+  </property>
+
+  <property>
+    <name>mapreduce.task.io.sort.mb</name>
+    <value>256</value>
+  </property>
+
+  <property>
+    <name>mapreduce.input.fileinputformat.split.minsize</name>
+    <value>67108864</value>
+    <description>
+    Note: To prevent using OFS stripe size (e.g. 2MB) as Hadoop chunk size
+    (e.g. 64MB), this option is still required in some cases. Otherwise, an IO
+    exception could be thrown " java.io.IOException: Split metadata size
+    exceeded 10000000. Aborting job ..."
+
+    The minimum size chunk that map input should be split into. Note that some
+    file formats may have minimum split sizes that take priority over this
+    setting.
+    </description>
+  </property>
+
+  <property>
+    <name>mapreduce.map.maxattempts</name>
+    <value>1</value>
+    <description>
+    The maximum number of attempts per map task. In other words, framework will
+    try to execute a map task these many number of times before giving up on it.
+    </description>
+  </property>
+
+  <property>
+    <name>mapreduce.reduce.maxattempts</name>
+    <value>1</value>
+    <description>
+    The maximum number of attempts per reduce task. In other words, framework will
+    try to execute a reduce task these many number of times before giving up on it.
+    </description>
+  </property>
+
+  <property>
+    <name>mapreduce.map.speculative</name>
+    <value>false</value>
+    <description>
+    If true, then multiple instances of some map tasks may be executed in
+    parallel. DO NOT set this to true when OrangeFS is used.
+    </description>
+  </property>
+
+  <property>
+    <name>mapreduce.reduce.speculative</name>
+    <value>false</value>
+    <description>
+    If true, then multiple instances of some reduce tasks may be executed in
+    parallel. DO NOT set this to true when OrangeFS is used.
+    </description>
+  </property>
+
+  <property>
+    <name>mapreduce.job.reduce.slowstart.completedmaps</name>
+    <value>0.95</value>
+    <description>
+    Fraction of the number of maps in the job which should be complete before
+    reduces are scheduled for the job.
+    </description>
+  </property>
+
+<!-- You probably want to use compression with OrangeFS. See below. -->
+<!--
+  <property>
+    <name>mapreduce.map.output.compress</name>
+    <value>true</value>
+    <description>
+    Notes: Compute nodes on HPC typically use a single hard drive as local storage device, which could be a potential bottleneck when getting a large intermediate data sets (spilled records, mapper output and so on). So we recommend user to active the compression for this phase.
+
+    Should the outputs of the maps be compressed before being sent across the network. Uses SequenceFile compression
+    </description>
+  </property>
+
+  <property>
+    <name>mapreduce.map.output.compress.codec</name>
+    <value>org.apache.hadoop.io.compress.GzipCodec</value>
+    <description>
+    Notes: if use SnappyCodec, then installation of libsnappy is required.
+
+    If the map outputs are compressed, how should they be compressed?
+    </description>
+  </property>
+-->
+
+<!-- other optional configurations
+  <property>
+    <name>mapred.child.java.opts</name>
+    <value>-Djava.net.preferIPv4Stack=true -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5006</value>
+  </property>
+
+  <property>
+    <name>mapreduce.task.io.sort.factor</name>
+    <value>100</value>
+  </property>
+
+  <property>
+    <name>mapreduce.reduce.shuffle.parallelcopies</name>
+    <value>2</value>
+  </property>
+
+  </property>
+-->
+
+</configuration>

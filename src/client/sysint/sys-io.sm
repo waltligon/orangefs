@@ -2142,6 +2142,8 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
                                          decoded_resp,
                                          &cur_ctx->msg.svr_addr,
                                          cur_ctx->msg.max_resp_sz);
+
+        /* TODO: free msg capability? */
         cur_ctx->msg.encoded_resp_p = NULL;
     }
     return ret;
@@ -2514,6 +2516,8 @@ static inline int io_process_context_recv(PINT_client_sm *sm_p,
                                            cur_ctx->msg.max_resp_sz);
     memset(&cur_ctx->msg.encoded_req,0,sizeof(cur_ctx->msg.encoded_req));
     cur_ctx->msg.encoded_resp_p = NULL;
+
+    /* TODO: free msg capability? */
 
     if (ret)
     {

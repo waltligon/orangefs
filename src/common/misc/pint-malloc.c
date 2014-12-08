@@ -557,7 +557,7 @@ void PINT_free(void *mem)
 #if PVFS_MALLOC_MAGIC
     if (extra->magic != PVFS_MALLOC_MAGIC_NUM)
     {
-        gossip_err("PINT_free: free fails magic number test\n");
+        gossip_lerr("PINT_free: free fails magic number test\n");
         return;
     }
 #endif

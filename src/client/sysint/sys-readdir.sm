@@ -667,22 +667,13 @@ static PINT_sm_action readdir_cleanup(
 
     }
 
-    if (!sm_p->getattr.keep_size_array && sm_p->getattr.size_array)
+    if (sm_p->getattr.keep_size_array && sm_p->getattr.size_array)
     {
         gossip_debug(GOSSIP_READDIR_DEBUG,
                      "%s: about to free: getattr->size_array = %p\n",
                      __func__,
                      (void *) sm_p->getattr.size_array);
         PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->getattr.size_array);
-    }
-
-    /* TODO this is debug only. */
-    if(sm_p->getattr.keep_size_array && sm_p->getattr.size_array)
-    {
-        gossip_debug(GOSSIP_READDIR_DEBUG,
-                     "%s: keeping: getattr->size_array = %p\n",
-                     __func__,
-                     (void *) sm_p->getattr.size_array);  
     }
 
     /* cleanup tree request */

@@ -297,7 +297,7 @@ static int write_device_response(
 do {                                                                         \
     void *buffer_list[MAX_LIST_SIZE];                                        \
     int size_list[MAX_LIST_SIZE];                                            \
-    int list_size = 0, total_size = 0;                                       \
+    int list_size = 0, total_size = 0, ret;                                  \
                                                                              \
     log_operation_timing(vfs_request);                                       \
     buffer_list[0] = &vfs_request->out_downcall;                             \

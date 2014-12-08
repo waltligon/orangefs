@@ -204,6 +204,8 @@ static PINT_sm_action mgmt_statfs_list_setup_msgpair(
 	msg_p->svr_addr = sm_p->u.statfs_list.addr_array[i];
     }
 
+    PINT_cleanup_capability(&capability);
+
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
