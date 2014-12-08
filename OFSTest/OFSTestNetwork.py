@@ -1649,7 +1649,8 @@ class OFSTestNetwork(object):
             
             # update core-site.xml
             node.runSingleCommand("sed -i s,/mnt/orangefs,%s,g %s/core-site.xml" % (node.ofs_mount_point,hadoop_conf))
-            node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%s,g %s/core-site.xml" % (node.hostname,node.ofs_tcp_port,hadoop_conf))
+            # Core site points to the OrangeFS on the master node
+            node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%s,g %s/core-site.xml" % (master_node.hostname,master_node.ofs_tcp_port,hadoop_conf))
             
             # update mapred-site.xml
             node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%s,g %s/mapred-site.xml" % (node.hostname,node.ofs_tcp_port,hadoop_conf))
