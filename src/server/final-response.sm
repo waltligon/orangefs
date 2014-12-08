@@ -13,6 +13,7 @@
 #include "pvfs2-attr.h"
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
+#include "pint-util.h"
 
 /* final-response state machine:
  * This is used as a nested state machine to perform two primary tasks:
@@ -189,11 +190,20 @@ gossip_err("%s\n"
               ,s_op->resp.u.lookup_path.attr_array[0].u.meta.stuffed_size
               ,(unsigned int)(s_op->resp.u.lookup_path.attr_array[0].u.meta.hint.flags));
 
-    gossip_err("dfile(0):(%s)\n",PVFS_OID_str(&s_op->resp.u.lookup_path.attr_array[0].u.meta.dfile_array[0]));
-    gossip_err("sid(0)  :(%s)\n",PVFS_SID_str(&s_op->resp.u.lookup_path.attr_array[0].u.meta.sid_array[0]));
-
-
+       gossip_err("dfile(0):(%s)\n",PVFS_OID_str(&s_op->resp.u.lookup_path.attr_array[0].u.meta.dfile_array[0]));
+       gossip_err("sid(0)  :(%s)\n",PVFS_SID_str(&s_op->resp.u.lookup_path.attr_array[0].u.meta.sid_array[0]));
               
+    }
+
+    if ( s_op->resp.op == PVFS_SERV_GETATTR ) 
+    {
+        gossip_err("%s\n"
+                   " s_op->resp.u.getattr.attr.objtype(%s)\n"
+                   " s_op->resp.u.getattr.attr.u.dir.dirent_count(%d)\n"
+                   ,__func__
+                   ,PINT_util_get_object_type(s_op->resp.u.getattr.attr.objtype)
+                   ,(int)s_op->resp.u.getattr.attr.u.dir.dirent_count
+                  );
     }
 
 

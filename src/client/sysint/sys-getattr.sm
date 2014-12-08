@@ -335,9 +335,10 @@ static int getattr_object_getattr_comp_fn(void *v_p,
      * then we can make a copy of the retrieved attribute for later
      * caching.
      */
-    gossip_err("%s:resp_p->u.getattr.attr.mask(0x%08x) ntime(%lld)\n",__func__
-                                                    ,resp_p->u.getattr.attr.mask
-                                                    ,llu(resp_p->u.getattr.attr.ntime));
+    gossip_err("%s:resp_p->u.getattr.attr.mask(0x%08x) ntime(%lld) dirent_count(%d)\n",__func__
+                                            ,resp_p->u.getattr.attr.mask
+                                            ,llu(resp_p->u.getattr.attr.ntime)
+                                            ,(int)resp_p->u.getattr.attr.u.dir.dirent_count);
     PINT_copy_object_attr(&sm_p->getattr.attr,
                           &resp_p->u.getattr.attr);
 
@@ -1547,6 +1548,8 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
                      PVFS_OID_str(&attr->u.dir.dirdata_handles[cur_index]),
                      sm_p->getattr.object_ref.fs_id);
             
+
+
         PINT_SERVREQ_GETATTR_FILL(
                     msg_p->req,
                     capability,
@@ -1557,6 +1560,15 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
                     PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_COUNT,
                     sm_p->hints);
         
+        gossip_err("%s\n"
+                   "  msg_p->req.op : %d\n"
+                   "            .u.getattr.handle   : %s\n"
+                   "                      .attrmask : 0x%08x\n"
+                  ,__func__
+                  ,msg_p->req.op
+                  ,PVFS_OID_str(&(msg_p->req.u.getattr.handle))
+                  ,msg_p->req.u.getattr.attrmask
+                  );
         /* fill in msgpair structure components */
         msg_p->msgclass = PVFS_IO_METADATA;
         msg_p->msgdir = PVFS_IO_READ;
@@ -1809,6 +1821,10 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
     assert(attr);
     
     gossip_err("%s:sm_p->getattr.attr.mask(0x%08x\n)",__func__,sm_p->getattr.attr.mask);
+    gossip_err("%s:sm_p->getattr.attr.u.dir.dirent_count(%d)\n"
+              ,__func__
+              ,(int)sm_p->getattr.attr.u.dir.dirent_count);
+                                                               
 
 
     /* If we get to this state action, 
@@ -1817,6 +1833,9 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
      * was called, and the response field must be filled in for the
      * user.
      */
+    gossip_err("%s:sm_p->u.getattr.getattr_resp_p->attr.dirent_count(%d)\n"
+              ,__func__
+              ,(int)sm_p->u.getattr.getattr_resp_p->attr.dirent_count);
 
     sysresp = sm_p->u.getattr.getattr_resp_p;
     

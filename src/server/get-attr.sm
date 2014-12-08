@@ -364,9 +364,10 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
 
     gossip_debug(
         GOSSIP_GETATTR_DEBUG,
-        "+  _DSPACE_ retrieved attrs: [owner = %d, group = %d\n\t"
+        "+  _DSPACE_ retrieved attrs: [mask = 0x%08x, owner = %d, group = %d\n\t"
         "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
         "ctime = %llu, ntime = %llu, dfile_count = %d, dist_size = %d]\n",
+        respattr->mask,
         respattr->owner, respattr->group, respattr->perms,
         respattr->objtype, llu(respattr->atime),
         llu(respattr->mtime), llu(respattr->ctime),llu(respattr->ntime),
@@ -533,7 +534,17 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                              " getattr: dirent_count needed.\n");
                 assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
                 respattr->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
-                js_p->error_code = STATE_DIRDATA;
+         
+                /* to prevent encoding of the bitmap, handles, and sids 
+                 * when all we want is the dirent-count. NOTE: (1)By default,
+                 * prelude retrieves these values for PVFS_TYPE_DIRDATA.
+                 * (2)The most up-to-date value for dirent-count is kept
+                 * in the PVFS_TYPE_DIRDATA dspace record.
+                 */
+                respattr->u.dirdata.dist_dir_attr.bitmap_size  =0;
+                respattr->u.dirdata.dist_dir_attr.dirdata_count=0;
+                respattr->u.dirdata.dist_dir_attr.sid_count    =0;
+                js_p->error_code = 0;
             }   
             else
             {
@@ -1706,11 +1717,12 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "-  retrieved attrs: [owner = %d, group = %d\n\t"
                  "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
-                 "ctime = %llu, dist_size = %d]\n",
+                 "ctime = %llu, dist_size = %d, dirent_count = %d]\n",
                  respattr->owner, respattr->group, respattr->perms,
                  respattr->objtype, llu(respattr->atime),
                  llu(respattr->mtime), llu(respattr->ctime),
-                 (int)respattr->u.meta.dist_size);
+                 (int)respattr->u.meta.dist_size,
+                 (int)respattr->u.dir.dirent_count);
 
     if (respattr->objtype == PVFS_TYPE_METAFILE)
     {
@@ -1840,7 +1852,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                  PINT_util_get_object_type(respattr->objtype),
                  s_op->resp.status, js_p->error_code);
 
-#if 0
+#if 1
     gossip_debug(GOSSIP_GETATTR_DEBUG, "returning attrmask\n");
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG,
                         s_op->resp.u.getattr.attr.mask);
@@ -1894,6 +1906,18 @@ static PINT_sm_action getattr_setup_op(struct PINT_smcb *smcb,
     s_op->u.getattr.attrmask = s_op->req->u.getattr.attrmask;
     s_op->u.getattr.mirror_dfile_status_array = NULL;
     s_op->u.getattr.credential = s_op->req->u.getattr.credential;
+
+    gossip_err("%s:\n"
+               "  s_op->u.getattr.handle : %s\n"
+               "                 .fs_id  : %d\n"
+               "                 .attrmask : 0x%08x\n"
+              ,__func__
+              ,PVFS_OID_str(&(s_op->u.getattr.handle))
+              ,s_op->u.getattr.fs_id
+              ,s_op->u.getattr.attrmask
+              );
+
+    gossip_err("%s: s_op->attr.mask(0x%08x)\n",__func__,s_op->attr.mask);
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
@@ -2140,6 +2164,7 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
          js_p->error_code = STATE_DIR_HINT;
          return SM_ACTION_COMPLETE;
     }
+
 
     /* get dirent_count of incoming dirdata handle. */
     ret = job_trove_keyval_get_handle_info(s_op->u.getattr.fs_id,

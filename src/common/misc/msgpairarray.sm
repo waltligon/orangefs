@@ -247,7 +247,7 @@ static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
         {
             gossip_err("index mismatch from pjmp in MPA\n");
         }
-        if (error_code < 0)
+        if (error_code != 0)
         {
             char buf[1024];
             PVFS_strerror_r(error_code, buf, 1024);
@@ -1064,6 +1064,8 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
          * (failure) value in js_p->error_code if we see one.
          */
         err_stat = msg_p->comp_fn(smcb, resp_p, mop->index);
+
+        gossip_err("%s:err_stat(%d) msg_p->op_status(%d)\n",__func__,err_stat,msg_p->op_status);
         if (msg_p->op_status == 0)
         {
             js_p->error_code = msg_p->op_status = err_stat;
