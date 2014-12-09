@@ -1513,7 +1513,9 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
     }
 
 
-    /* find out active dirdata handles */
+    /* find out active dirdata handles. (active refers to dirdata handles
+     * having directory entries) 
+     */
     tmp_index = 0;
     for(i = 0; i < attr->u.dir.dist_dir_attr.dirdata_count; i++)
     {
@@ -1649,6 +1651,10 @@ static int getattr_dirdata_getattr_comp_fn(void *v_p,
     /* update timestamp and dirent_count */
     sm_p->getattr.size_array[cur_index] = resp_attr_p->u.dir.dirent_count;
     attr_p->u.dir.dirent_count += resp_attr_p->u.dir.dirent_count;
+
+    gossip_err("%s:index(%d) dirent_count(%d)\n",__func__
+                                                ,index
+                                                ,(int)attr_p->u.dir.dirent_count);
 
     if(attr_p->atime < resp_attr_p->atime)
     {   

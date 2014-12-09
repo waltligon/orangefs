@@ -80,9 +80,7 @@ nested machine pvfs2_get_attr_work_sm
         run getattr_verify_attribs;
         STATE_SYMLINK => read_symlink_target;
         STATE_METAFILE => read_metafile_hint;
-        /* STATE_DIR => get_dist_dir_attr; */
         STATE_DIR => get_bitmap_and_dirdata_handles;
-        STATE_DIRDATA => get_dirent_count;
         default => check_if_capability_required;
     }
 
@@ -441,6 +439,8 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             }
             js_p->error_code = STATE_METAFILE;
             break;
+
+
         case PVFS_TYPE_DATAFILE:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: datafile\n");
             /*
@@ -458,6 +458,8 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                          PVFS_OID_str(&s_op->u.getattr.handle),
                          lld(respattr->u.data.size));
             break;
+
+
         case PVFS_TYPE_DIRECTORY:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: directory\n");
 
@@ -494,11 +496,17 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                 assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
             }
 
+#if 0  
+  /* Becky:  removing check for dirent_count.  ASSUMPTION:for a directory type, at most, we
+   * return the bitmap and dirdata handles from keyval db along with data from the 
+   * PVFS_TYPE_DIRECTORY dspace record.  dirent_count is only retrieved when we
+   * are processing a PVFS_TYPE_DIRDATA dspace record.
+   */
             /* Check for Dirent Count */
             if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT)
             {
                 gossip_debug(GOSSIP_GETATTR_DEBUG,
-                            " getattr: dfile_count needed.\n");
+                            " getattr: dirent_count needed.\n");
                 assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
                 respattr->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
                 js_p->error_code = STATE_DIR;
@@ -506,9 +514,11 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             else
             {
                 gossip_debug(GOSSIP_GETATTR_DEBUG,
-                            " getattr: dfile_count not needed\n");
+                            " getattr: dirent_count not needed\n");
                 assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
             }
+
+#endif
 
             /* check fir Dir Hints */
             if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_HINT)
@@ -526,6 +536,8 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                 assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
             }
             break;
+
+
         case PVFS_TYPE_DIRDATA:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: dirdata\n");
             if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT)
@@ -536,10 +548,11 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                 respattr->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
          
                 /* to prevent encoding of the bitmap, handles, and sids 
-                 * when all we want is the dirent-count. NOTE: (1)By default,
-                 * prelude retrieves these values for PVFS_TYPE_DIRDATA.
-                 * (2)The most up-to-date value for dirent-count is kept
-                 * in the PVFS_TYPE_DIRDATA dspace record.
+                 * when all we want is the dirent-count. NOTE: (1)By 
+                 * default, prelude retrieves these values for 
+                 * PVFS_TYPE_DIRDATA handles. (2)The most up-to-date 
+                 * value for dirent-count is kept in the PVFS_TYPE_DIRDATA 
+                 * dspace record.
                  */
                 respattr->u.dirdata.dist_dir_attr.bitmap_size  =0;
                 respattr->u.dirdata.dist_dir_attr.dirdata_count=0;
@@ -561,6 +574,8 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
 */
             break;
+
+
         case PVFS_TYPE_SYMLINK:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: symlink\n");
             gossip_debug(
@@ -573,10 +588,14 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             */
             js_p->error_code = STATE_SYMLINK;
             break;
+
+
         case PVFS_TYPE_INTERNAL:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: symlink\n");
             /* nothing interesting to add; this is meaningless to a client */
             break;
+
+
         default:
             /* if we don't understand the object type, then it probably indicates
              * a bug or some data corruption.  All trove objects should have a
@@ -588,7 +607,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                 PVFS_OID_str(&s_op->u.getattr.handle));
             js_p->error_code = -PVFS_ENXIO;
             break;
-    }
+    }/*end switch on object type */
 
     return SM_ACTION_COMPLETE;
 }
