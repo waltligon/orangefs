@@ -1628,3 +1628,12 @@ struct PINT_server_req_params pvfs2_tree_getattr_params =
     .state_machine = &pvfs2_tree_getattr_sm
 };
 
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
