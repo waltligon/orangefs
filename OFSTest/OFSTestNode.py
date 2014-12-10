@@ -1241,12 +1241,16 @@ class OFSTestNode(object):
                 install_commands.append("cd /opt; wget http://apache.mesi.com.ar/maven/maven-3/3.2.3/binaries/apache-maven-3.2.3-bin.tar.gz")
                 install_commands.append("cd /opt; tar xf apache-maven-3.2.3-bin.tar.gz")
                 install_commands.append("ln -s /opt/apache-maven-3.2.3/bin/mvn /usr/bin/mvn")
+                install_commands.append("ln -s /opt/apache-maven-3.2.3/bin/mvn /usr/bin/mvn")
+                
                 self.setEnvironmentVariable("M2_HOME", "/opt/apache-maven-3.2.3")
                 self.setEnvironmentVariable("M2", "/opt/apache-maven-3.2.3/bin")
                 self.jdk6_location = "/usr/java/default"
             else:
                 #SLES uses IBM Java
+                install_commands.append("ln -s /usr/lib64/jvm/java-1.7.?-ibm-1.7.? /usr/lib64/jvm/java")
                 self.jdk6_location = "/usr/lib64/jvm/java"
+                
             
             for command in install_commands:
                 rc = self.runSingleCommandAsRoot(command, output)
