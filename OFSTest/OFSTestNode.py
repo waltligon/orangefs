@@ -1329,28 +1329,23 @@ class OFSTestNode(object):
 
     def installDB4(self):
         # db4 is built from scratch for all systems to have a consistant version.
-        batch_commands = '''
         
-        if [ ! -d %s ]
-        then
-            cd ~
-            wget --quiet http://devorange.clemson.edu/pvfs/db-4.8.30.tar.gz
-            tar zxf db-4.8.30.tar.gz &> /dev/null
-            cd db-4.8.30/build_unix
-            echo "Configuring Berkeley DB 4.8.30..."
-            ../dist/configure --prefix=%s &> db4conf.out
-            echo "Building Berkeley DB 4.8.30..."
-            make &> db4make.out
-            echo "Installing Berkeley DB 4.8.30 to %s..."
-            make install &> db4install.out
-        fi
         
 
-        exit
-        ''' % (self.db4_dir,self.db4_dir,self.db4_dir) 
+        self.changeDirectory("/home/%s" % self.current_user)
+        self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/db-4.8.30.tar.gz")
+        self.runSingleCommand("tar zxf db-4.8.30.tar.gz")
+        self.changeDirectory("/home/%s/db-4.8.30/build_unix" % self.current_user)
+        
+        print "Configuring Berkeley DB 4.8.30..."
+        self.runSingleCommand("../dist/configure --prefix=%s" % self.db4_dir)
+        print "Building Berkeley DB 4.8.30..."
+        self.runSingleCommand("make")
+        print "Installing Berkeley DB 4.8.30 to %s..."
+        self.runSingleCommand("make install")
+
         self.db4_lib_dir = self.db4_dir+"/lib"
-        self.addBatchCommand(batch_commands)
-        self.runAllBatchCommands()
+   
         # Add DB4 to the library path.
         self.setEnvironmentVariable("LD_LIBRARY_PATH","%s:$LD_LIBRARY_PATH" % self.db4_lib_dir)
 
