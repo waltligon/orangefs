@@ -1245,13 +1245,17 @@ struct PVFS_servresp_lookup_path
 {
     /* array of handles for each successfully resolved path segment */
     PVFS_handle *handle_array;            
+
     /* array of attributes for each path segment (when available) */
     PVFS_object_attr *attr_array;
+
     /* array of sids for all objects */
     PVFS_SID *sid_array;
+
     uint32_t handle_count; /* # of handles returned */
     uint32_t attr_count;   /* # of attributes returned */
-    uint32_t sid_count;    /* # of sids returned */
+    uint32_t sid_count;    /* # of sids per object * the number of objects
+                            * metasidcnt * handle_count */
 };
 endecode_fields_1a1a1a_struct(
     PVFS_servresp_lookup_path,

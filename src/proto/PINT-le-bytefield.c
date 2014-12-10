@@ -972,6 +972,7 @@ static int lebf_decode_resp(void *input_buffer,
     }
 
 out:
+
     return(ret);
 }
 
@@ -1223,10 +1224,24 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             {                
                 case PVFS_SERV_LOOKUP_PATH: 
                 {
-                    struct PVFS_servresp_lookup_path *lookup =
-                                 &resp->u.lookup_path;
-                    decode_free(lookup->handle_array);
-                    decode_free(lookup->attr_array);
+                    struct PVFS_servresp_lookup_path *lookup = &resp->u.lookup_path;
+                    int i;
+                    if ( lookup->handle_count > 0 && lookup->handle_array )
+                    {
+                     decode_free(lookup->handle_array);
+                    }
+                    if ( lookup->sid_count > 0 && lookup->sid_array )
+                    {
+                       decode_free(lookup->sid_array);
+                    }
+                    if ( lookup->attr_count > 0 && lookup->attr_array )
+                    {
+                       for (i=0; i<lookup->attr_count; i++)
+                       {
+                           defree_PVFS_object_attr(&lookup->attr_array[i]);
+                       }
+                       decode_free(lookup->attr_array);
+                    }
                     break;
                 }
                 

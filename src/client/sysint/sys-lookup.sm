@@ -411,7 +411,7 @@ static int initialize_context(struct PINT_client_lookup_sm *lookup_sm,
 
     free(orig_pathname);
 
-#if 0
+#if 1
     /* DEBUGGING ONLY */
     {
         int i = 0;
@@ -419,10 +419,13 @@ static int initialize_context(struct PINT_client_lookup_sm *lookup_sm,
         for (i = 0; i < cur_seg_index; i++)
         {
             assert(ctx->segments[i].seg_name);
-            gossip_debug(GOSSIP_LOOKUP_DEBUG, "/%s", 
-                         ctx->segments[i].seg_name);
+            if ( i == (cur_seg_index - 1) )
+            {
+               gossip_debug(GOSSIP_LOOKUP_DEBUG, "/%s\n",ctx->segments[i].seg_name);
+               continue;
+            }
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, "/%s",ctx->segments[i].seg_name);
         }
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "\n");
     }
 #endif
 
@@ -717,14 +720,14 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
 {
     int i = 0;
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb->parent_smcb, PINT_MSGPAIR_PARENT_SM);
     PINT_client_lookup_sm_segment *cur_seg = NULL;
-    int current_seg_index = sm_p->u.lookup.contexts[
-                               sm_p->u.lookup.current_context].current_segment;
+    int current_seg_index = sm_p->u.lookup.contexts[ sm_p->u.lookup.current_context ].current_segment;
     PVFS_object_ref last_resolved_refn;
     struct server_configuration_s *server_config = NULL;
     struct filesystem_configuration_s* cur_fs = NULL;
     int metasidcnt;
+    char oid1[OID_STR_SZ+1]={0}, oid2[OID_STR_SZ+1]={0};
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup_segment_lookup_comp_fn\n");
 
@@ -735,6 +738,7 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
         return resp_p->status;
     }
 
+    /* we are assuming here that we were able to resolve at least one segment */
     assert(resp_p->u.lookup_path.handle_count);
 
     gossip_debug(GOSSIP_LOOKUP_DEBUG, "- Resolved %d segments\n",
@@ -773,28 +777,25 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
             cur_seg->seg_starting_refn = last_resolved_refn;
         }
 
-        last_resolved_refn.fs_id = cur_seg->seg_starting_refn.fs_id;
+        memset(&last_resolved_refn,0,sizeof(last_resolved_refn));
+        last_resolved_refn.fs_id  = cur_seg->seg_starting_refn.fs_id;
         last_resolved_refn.handle = resp_p->u.lookup_path.handle_array[i];
-        /* 
-         * There are metasidcnt sids for each meta object returned
-         * All objects returned are meta object except possibly the
-         * last object.  Thus there are num objects * metasidcnt plus
-         * some number more sids (sids for non-meta objects are
-         * variable).  Then condition handles the known meta objects
-         * Else condition handle the last object
+
+
+        /* In the response structure, the sid_count is (the number of handles * the metasidcnt).
+         * So, each handle has metasidcnt sids.  If that handle happens to be a metafile object,
+         * then the sid_count and sids for its datafile handles are stored in the attr_array and
+         * are NOT included in the higher-level sid count.
          */
-        if (i < resp_p->u.lookup_path.handle_count - 1)
+        last_resolved_refn.sid_count = metasidcnt;
+        last_resolved_refn.sid_array = calloc(metasidcnt,sizeof(*last_resolved_refn.sid_array));
+        if ( !last_resolved_refn.sid_array )
         {
-            last_resolved_refn.sid_count = metasidcnt;
+           gossip_err("%s:Unable to allocate memory for sid_array\n",__func__);
+           return -PVFS_ENOMEM;
         }
-        else
-        {
-            last_resolved_refn.sid_count =
-                    resp_p->u.lookup_path.sid_count - 
-                    ((resp_p->u.lookup_path.handle_count - 1) * metasidcnt);
-        }
-        last_resolved_refn.sid_array = 
-                    &resp_p->u.lookup_path.sid_array[i * metasidcnt];
+        memcpy(last_resolved_refn.sid_array,&(resp_p->u.lookup_path.sid_array[i * metasidcnt])
+                                            ,metasidcnt * sizeof(*last_resolved_refn.sid_array));
 
         cur_seg->seg_resolved_refn = last_resolved_refn;
 
@@ -804,25 +805,28 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
          */
         if (i < resp_p->u.lookup_path.attr_count)
         {
+            /* add update to acache here or when msgpairarray returns */
             PINT_free_object_attr(&(cur_seg->seg_attr));
             PINT_copy_object_attr(&(cur_seg->seg_attr),
                                   &(resp_p->u.lookup_path.attr_array[i]));
         }
+
         
-        gossip_debug(GOSSIP_NCACHE_DEBUG, "*** ncache update on %s target "
+        memcpy(oid1,PVFS_OID_str(&last_resolved_refn.handle),OID_STR_SZ); 
+        memcpy(oid2,PVFS_OID_str(&cur_seg->seg_starting_refn.handle),OID_STR_SZ); 
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, "*** ncache update on %s target "
                      "(%s|%d) parent (%s|%d)\n",
                      cur_seg->seg_name,
-                     PVFS_OID_str(&last_resolved_refn.handle),
+                     oid1,
                      last_resolved_refn.fs_id,
-                     PVFS_OID_str(&cur_seg->seg_starting_refn.handle),
+                     oid2,
                      cur_seg->seg_starting_refn.fs_id);
 
         PINT_ncache_update((const char*) cur_seg->seg_name,
                            (const PVFS_object_ref*) &(last_resolved_refn),
-                           (const PVFS_object_ref*) 
-                               &(cur_seg->seg_starting_refn));
-    }
-    assert(i == resp_p->u.lookup_path.handle_count);
+                           (const PVFS_object_ref*) &(cur_seg->seg_starting_refn));
+    }/*end for*/
+
 
     /*
      * if we've updated all of the segments that we could, advance
@@ -930,10 +934,8 @@ static PINT_sm_action lookup_segment_setup_parent_getattr(
     return SM_ACTION_COMPLETE;
 }
    
-/*
- * This is called if the ncache lookup failed.  It builds the msgpair
- * so that the next state can jump into xfer msgpair.
- */
+
+
 static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
                                                    job_status_s *js_p)
 {
@@ -993,6 +995,10 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->sid_array = cur_seg->seg_starting_refn.sid_array;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = lookup_segment_lookup_comp_fn;
+
+    gossip_err("%s:msg_p->sid_count(%d)  sid_array(%p)\n",__func__,msg_p->sid_count,msg_p->sid_array);
+    gossip_err("%s:msg_p->sid_array[0]=(%s)\n",__func__,PVFS_SID_str(&msg_p->sid_array[0]));
+
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)

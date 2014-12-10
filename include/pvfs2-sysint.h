@@ -60,6 +60,7 @@ struct PVFS_sys_attr_s
     PVFS_flags flags;
     uint32_t mask;
     PVFS_size blksize;
+    uint32_t stuffed;
 };
 typedef struct PVFS_sys_attr_s PVFS_sys_attr;
 

@@ -24,6 +24,7 @@ static inline void PINT_attrmask_print(int debug, uint32_t attrmask)
     if (attrmask & PVFS_ATTR_COMMON_ATIME) gossip_debug(debug, "\tPVFS_ATTR_COMMON_ATIME\n");
     if (attrmask & PVFS_ATTR_COMMON_CTIME) gossip_debug(debug, "\tPVFS_ATTR_COMMON_CTIME\n");
     if (attrmask & PVFS_ATTR_COMMON_MTIME) gossip_debug(debug, "\tPVFS_ATTR_COMMON_MTIME\n");
+    if (attrmask & PVFS_ATTR_COMMON_NTIME) gossip_debug(debug, "\tPVFS_ATTR_COMMON_NTIME\n");
     if (attrmask & PVFS_ATTR_COMMON_TYPE) gossip_debug(debug, "\tPVFS_ATTR_COMMON_TYPE\n");
     if (attrmask & PVFS_ATTR_META_DIST) gossip_debug(debug, "\tPVFS_ATTR_META_DIST\n");
     if (attrmask & PVFS_ATTR_META_DFILES) gossip_debug(debug, "\tPVFS_ATTR_META_DFILES\n");

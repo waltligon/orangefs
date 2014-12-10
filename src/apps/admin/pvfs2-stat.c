@@ -235,8 +235,26 @@ static int do_stat(const char             * pszFile,
       return -1;
    }
 
+   if (opts->nVerbose)
+   {
+      fprintf(stderr, "PVFS_sys_lookup call on (%s)\n",pszRelativeFile);
+   }
+
    ref = lk_response.ref;
+
+
+   printf("attrmask(0x%08x)\n",PVFS_ATTR_SYS_ALL_NOHINT);
    
+
+   printf("%s:PVFS_object_ref sent into PVFS_sys_getattr\n"
+          "      handle(%s)\n"
+          "       fs_id(%d)\n"
+          "   sid_count(%d)\n"
+         ,__func__
+         ,PVFS_OID_str(&ref.handle)
+         ,ref.fs_id
+         ,ref.sid_count);
+
    ret = PVFS_sys_getattr(ref, 
                           PVFS_ATTR_SYS_ALL_NOHINT,
                           credentials, 
@@ -248,6 +266,10 @@ static int do_stat(const char             * pszFile,
       PVFS_perror("PVFS_sys_getattr", ret);
       return -1;
    }
+
+
+   printf("getattr_response.attr.mask(0x%08x) blksize(%ld)\n",getattr_response.attr.mask
+                                                             ,getattr_response.attr.blksize);
 
    /* Display the attributes for the file */
    print_stats(&ref,
@@ -399,7 +421,7 @@ void print_stats(const PVFS_object_ref * ref,
    fprintf(stdout, "  Relative Name : %s\n",  pszRelativeName);
    fprintf(stdout, "  fs ID         : %d\n",  ref->fs_id);
    fprintf(stdout, "  Handle        : %s\n",  PVFS_OID_str(&ref->handle));
-   fprintf(stdout, "  Mask          : %o\n",  attr->mask);
+   fprintf(stdout, "  Mask          : %x\n",  attr->mask);
    if(attr->mask & PVFS_ATTR_SYS_PERM)
    {
       fprintf(stdout, "  Permissions   : %o\n",  attr->perms);
@@ -437,11 +459,32 @@ void print_stats(const PVFS_object_ref * ref,
       {
          fprintf(stdout, "  Size          : 4096\n");
       }
-      else
+      else 
       {
          fprintf(stdout, "  Size          : %lld\n",      lld(attr->size));
       }
 
+   }
+   else
+   {  /* a size wasn't returned by getattr */
+      switch (attr->objtype)
+      {
+         case PVFS_TYPE_DIRECTORY:
+         {
+            fprintf(stdout, "  Size          : 4096\n");
+            break;
+         }
+         case PVFS_TYPE_METAFILE:
+         {
+            fprintf(stdout, "  Size          : none (datafiles not yet created)\n");
+            break;
+         }
+         default:
+         {
+            fprintf(stdout, "  Size          : none\n");
+            break;
+         }
+      }/*end switch*/
    }
    if(attr->mask & PVFS_ATTR_SYS_UID)
    {

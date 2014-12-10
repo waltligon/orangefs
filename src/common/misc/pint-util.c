@@ -135,9 +135,9 @@ PVFS_msg_tag_t PINT_util_get_next_tag(void)
  * arrays, strings, etc.
  */
 
-#define CPYFIELD(x,s) \
-    do { if ((s) > 0 && src->u.x) { \
-        dest->u.x = malloc(s); \
+#define CPYFIELD(x,s)                     \
+    do { if ((s) > 0 && src->u.x) {       \
+        dest->u.x = malloc(s);            \
         memcpy(dest->u.x, src->u.x, s); } \
     } while (0)
 
@@ -145,21 +145,21 @@ PVFS_msg_tag_t PINT_util_get_next_tag(void)
  * allocated contiguouosly.  If the src has them packed, we simply copy
  * the src, otherwise we allocate space for both a copy in two chunks
  */
-#define PACKSID(o,s,oc,sc) \
-    do { \
-        if (src->u.s == (PVFS_SID *)(src->u.o + src->u.oc)) \
-        { \
-            /* OIDs and SIDs are packed */ \
-            CPYFIELD(o, OSASZ(dest->u.oc, dest->u.sc)); \
-        } \
-        else \
-        { \
-            /* make packed from unpacked */ \
-            dest->u.o = malloc(OSASZ(dest->u.oc, dest->u.sc)); \
-            memcpy(dest->u.o, src->u.o, OASZ(dest->u.oc)); \
-            memcpy(dest->u.o + dest->u.oc, src->u.s, SASZ(dest->u.sc)); \
-        } \
-        dest->u.s = (PVFS_SID *)(dest->u.o + dest->u.oc); \
+#define PACKSID(o,s,oc,sc)                                                 \
+    do {                                                                   \
+        if (src->u.s == (PVFS_SID *)(src->u.o + src->u.oc))                \
+        {                                                                  \
+            /* OIDs and SIDs are packed */                                 \
+            CPYFIELD(o, OSASZ(dest->u.oc, dest->u.sc));                    \
+        }                                                                  \
+        else                                                               \
+        {                                                                  \
+            /* make packed from unpacked */                                \
+            dest->u.o = malloc(OSASZ(dest->u.oc, dest->u.sc));             \
+            memcpy(dest->u.o, src->u.o, OASZ(dest->u.oc));                 \
+            memcpy(dest->u.o + dest->u.oc, src->u.s, SASZ(dest->u.sc));    \
+        }                                                                  \
+        dest->u.s = (PVFS_SID *)(dest->u.o + dest->u.oc);                  \
     } while (0)
 
 int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
