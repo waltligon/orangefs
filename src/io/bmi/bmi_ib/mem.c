@@ -135,28 +135,22 @@ memcache_memalloc(void *md, bmi_size_t len, int eager_limit)
 
     /* search in size cache first */
 #if ENABLE_MEMCACHE
-    if (len > eager_limit) 
-    {
-        memcache_entry_t *c;
-        gen_mutex_lock(&memcache_device->mutex);
-        qlist_for_each_entry(c, &memcache_device->free_chunk_list, list) 
-        {
-            if (c->len == len) 
-            {
-                debug(4, "%s: recycle free chunk, buf %p", __func__, c->buf);
-                qlist_del(&c->list);
-                qlist_add_tail(&c->list, &memcache_device->list);
-                ++c->count;
-                if (c->count == 1) 
-                {
-                    memcache_device->mem_register(c);
-                }
-                buf = c->buf;
-                gen_mutex_unlock(&memcache_device->mutex);
-                goto out;
-            }
-        }
-        gen_mutex_unlock(&memcache_device->mutex);
+    if (len > eager_limit) {
+	memcache_entry_t *c;
+	gen_mutex_lock(&memcache_device->mutex);
+	qlist_for_each_entry(c, &memcache_device->free_chunk_list, list) {
+	    if (c->len == len) {
+		debug(4, "%s: recycle free chunk, buf %p", __func__, c->buf);
+		qlist_del(&c->list);
+		qlist_add_tail(&c->list, &memcache_device->list);
+		++c->count;
+		if (c->count == 1) memcache_device->mem_register(c);
+		buf = c->buf;
+		gen_mutex_unlock(&memcache_device->mutex);
+		goto out;
+	    }
+	}
+	gen_mutex_unlock(&memcache_device->mutex);
     }
 #endif
 
@@ -164,44 +158,36 @@ memcache_memalloc(void *md, bmi_size_t len, int eager_limit)
 
 #if ENABLE_MEMCACHE
     if (bmi_ib_unlikely(!buf))
-    goto out;
-    if (len > eager_limit) 
-    {
-        memcache_entry_t *c;
+	goto out;
+    if (len > eager_limit) {
+	memcache_entry_t *c;
 
-        gen_mutex_lock(&memcache_device->mutex);
-        /* could be recycled buffer */
-        c = memcache_lookup_cover(memcache_device, buf, len);
-        if (c) 
-        {
-            ++c->count;
-            if (c->count == 1) memcache_device->mem_register(c);
-            debug(4, "%s: reuse reg, buf %p, count %d", __func__, c->buf,
-                  c->count);
-        } 
-        else 
-        {
-            c = memcache_add(memcache_device, buf, len);
-            if (bmi_ib_unlikely(!c)) 
-            {
-                free(buf);
-                buf = NULL;
-            } 
-            else 
-            {
-                int ret = memcache_device->mem_register(c);
-                if (ret) 
-                {
-                    memcache_del(memcache_device, c);
-                    free(buf);
-                    buf = NULL;
-                }
-                debug(4, "%s: new reg, buf %p", __func__, c->buf);
-            }
-        }
-        gen_mutex_unlock(&memcache_device->mutex);
+	gen_mutex_lock(&memcache_device->mutex);
+	/* could be recycled buffer */
+	c = memcache_lookup_cover(memcache_device, buf, len);
+	if (c) {
+	    ++c->count;
+	    if (c->count == 1) memcache_device->mem_register(c);
+	    debug(4, "%s: reuse reg, buf %p, count %d", __func__, c->buf,
+	          c->count);
+	} else {
+	    c = memcache_add(memcache_device, buf, len);
+	    if (bmi_ib_unlikely(!c)) {
+		free(buf);
+		buf = NULL;
+	    } else {
+		int ret = memcache_device->mem_register(c);
+		if (ret) {
+		    memcache_del(memcache_device, c);
+		    free(buf);
+		    buf = NULL;
+		}
+		debug(4, "%s: new reg, buf %p", __func__, c->buf);
+	    }
+	}
+	gen_mutex_unlock(&memcache_device->mutex);
     }
-    out:
+  out:
 #endif  /* ENABLE_MEMCACHE */
     return buf;
 }
@@ -216,22 +202,18 @@ memcache_memfree(void *md, void *buf, bmi_size_t len)
     gen_mutex_lock(&memcache_device->mutex);
     /* okay if not found, just not cached; perhaps an eager-size buffer */
     c = memcache_lookup_exact(memcache_device, buf, len);
-    if (c) 
-    {
-        debug(4, "%s: cache free buf %p len %lld", __func__, c->buf,
-              lld(c->len));
-        bmi_ib_assert(c->count == 1, "%s: buf %p len %lld count %d, expected 1",
-                  __func__, c->buf, lld(c->len), c->count);
-        /* cache it */
-        --c->count;
-        if (c->count == 0) 
-        {
-            memcache_device->mem_deregister(c);
-        }
-        qlist_del(&c->list);
-        qlist_add(&c->list, &memcache_device->free_chunk_list);
-        gen_mutex_unlock(&memcache_device->mutex);
-        return 0;
+    if (c) {
+	debug(4, "%s: cache free buf %p len %lld", __func__, c->buf,
+	      lld(c->len));
+	bmi_ib_assert(c->count == 1, "%s: buf %p len %lld count %d, expected 1",
+		      __func__, c->buf, lld(c->len), c->count);
+	/* cache it */
+	--c->count;
+	if (c->count == 0) memcache_device->mem_deregister(c);
+	qlist_del(&c->list);
+	qlist_add(&c->list, &memcache_device->free_chunk_list);
+	gen_mutex_unlock(&memcache_device->mutex);
+	return 0;
     }
     gen_mutex_unlock(&memcache_device->mutex);
 #endif
@@ -250,55 +232,44 @@ memcache_register(void *md, ib_buflist_t *buflist)
     memcache_device_t *memcache_device = md;
 
     buflist->memcache = bmi_ib_malloc(buflist->num *
-                      sizeof(*buflist->memcache));
+				      sizeof(*buflist->memcache));
     gen_mutex_lock(&memcache_device->mutex);
-    for (i=0; i<buflist->num; i++) 
-    {
+    for (i=0; i<buflist->num; i++) {
 #if ENABLE_MEMCACHE
-        memcache_entry_t *c;
-        c = memcache_lookup_cover(memcache_device, buflist->buf.send[i],
-                                  buflist->len[i]);
-        if (c) 
-        {
-            ++c->count;
-            if (c->count == 1) 
-            {
-                memcache_device->mem_register(c);
-            }
-            debug(2, "%s: hit [%d] %p len %lld (via %p len %lld) refcnt now %d",
-              __func__, i, buflist->buf.send[i], lld(buflist->len[i]), c->buf,
-              lld(c->len), c->count);
-        } 
-        else 
-        {
-            debug(2, "%s: miss [%d] %p len %lld", __func__, i,
-              buflist->buf.send[i], lld(buflist->len[i]));
-            c = memcache_add(memcache_device, buflist->buf.recv[i],
-                             buflist->len[i]);
-            /* XXX: replace error with return values, let caller deal */
-            if (!c) 
-            {
-                error("%s: no memory for cache entry", __func__);
-            }
-            ret = memcache_device->mem_register(c);
-            if (ret) 
-            {
-                memcache_del(memcache_device, c);
-                error("%s: could not register memory", __func__);
-            }
-        }
-        buflist->memcache[i] = c;
+	memcache_entry_t *c;
+	c = memcache_lookup_cover(memcache_device, buflist->buf.send[i],
+	                          buflist->len[i]);
+	if (c) {
+	    ++c->count;
+	    if (c->count == 1) memcache_device->mem_register(c);
+	    debug(2, "%s: hit [%d] %p len %lld (via %p len %lld) refcnt now %d",
+	      __func__, i, buflist->buf.send[i], lld(buflist->len[i]), c->buf,
+	      lld(c->len), c->count);
+	} else {
+	    debug(2, "%s: miss [%d] %p len %lld", __func__, i,
+	      buflist->buf.send[i], lld(buflist->len[i]));
+	    c = memcache_add(memcache_device, buflist->buf.recv[i],
+	                     buflist->len[i]);
+	    /* XXX: replace error with return values, let caller deal */
+	    if (!c)
+		error("%s: no memory for cache entry", __func__);
+	    ret = memcache_device->mem_register(c);
+	    if (ret) {
+		memcache_del(memcache_device, c);
+		error("%s: could not register memory", __func__);
+	    }
+	}
+	buflist->memcache[i] = c;
 #else
-        memcache_entry_t *cp = bmi_ib_malloc(sizeof(*cp));
-        cp->buf = buflist->buf.recv[i];
-        cp->len = buflist->len[i];
-        ret = memcache_device->mem_register(cp);
-        if (ret) 
-        {
-            free(cp);
-            error("%s: could not register memory", __func__);
-        }
-        buflist->memcache[i] = cp;
+	memcache_entry_t *cp = bmi_ib_malloc(sizeof(*cp));
+	cp->buf = buflist->buf.recv[i];
+	cp->len = buflist->len[i];
+	ret = memcache_device->mem_register(cp);
+	if (ret) {
+	    free(cp);
+	    error("%s: could not register memory", __func__);
+	}
+	buflist->memcache[i] = cp;
 #endif
     }
     gen_mutex_unlock(&memcache_device->mutex);
@@ -319,27 +290,20 @@ void memcache_preregister(void *md, const void *buf, bmi_size_t len,
     return ; // Can not do this any more.
     gen_mutex_lock(&memcache_device->mutex);
     c = memcache_lookup_cover(memcache_device, buf, len);
-    if (c) 
-    {
-        debug(2, "%s: hit %p len %lld (via %p len %lld) refcnt now %d",
-          __func__, buf, lld(len), c->buf, lld(c->len), c->count);
-    } 
-    else 
-    {
-        int ret;
+    if (c) {
+	debug(2, "%s: hit %p len %lld (via %p len %lld) refcnt now %d",
+	      __func__, buf, lld(len), c->buf, lld(c->len), c->count);
+    } else {
+	int ret;
 
-        debug(2, "%s: miss %p len %lld", __func__, buf, lld(len));
-        c = memcache_add(memcache_device, (void *)(uintptr_t) buf, len);
-        if (!c)
-        {
-            error("%s: no memory for cache entry", __func__);
-        }
-        ret = memcache_device->mem_register(c);
-        c->count = 0;  /* drop ref */
-        if (ret)
-        {    
-            memcache_del(memcache_device, c);
-        }
+	debug(2, "%s: miss %p len %lld", __func__, buf, lld(len));
+	c = memcache_add(memcache_device, (void *)(uintptr_t) buf, len);
+	if (!c)
+	    error("%s: no memory for cache entry", __func__);
+	ret = memcache_device->mem_register(c);
+	c->count = 0;  /* drop ref */
+	if (ret)
+		memcache_del(memcache_device, c);
     }
     gen_mutex_unlock(&memcache_device->mutex);
 #endif
@@ -352,23 +316,19 @@ memcache_deregister(void *md, ib_buflist_t *buflist)
     memcache_device_t *memcache_device = md;
 
     gen_mutex_lock(&memcache_device->mutex);
-    for (i=0; i<buflist->num; i++) 
-    {
+    for (i=0; i<buflist->num; i++) {
 #if ENABLE_MEMCACHE
-        memcache_entry_t *c = buflist->memcache[i];
-        --c->count;
-        if (c->count == 0) 
-        {
-            memcache_device->mem_deregister(c);
-        }
-        debug(2,
-           "%s: dec refcount [%d] %p len %lld (via %p len %lld) refcnt now %d",
-           __func__, i, buflist->buf.send[i], lld(buflist->len[i]),
-           c->buf, lld(c->len), c->count);
-        /* let garbage collection do ib_mem_deregister(c) for refcnt==0 */
+	memcache_entry_t *c = buflist->memcache[i];
+	--c->count;
+	if (c->count == 0) memcache_device->mem_deregister(c);
+	debug(2,
+	   "%s: dec refcount [%d] %p len %lld (via %p len %lld) refcnt now %d",
+	   __func__, i, buflist->buf.send[i], lld(buflist->len[i]),
+	   c->buf, lld(c->len), c->count);
+	/* let garbage collection do ib_mem_deregister(c) for refcnt==0 */
 #else
-        memcache_device->mem_deregister(buflist->memcache[i]);
-        free(buflist->memcache[i]);
+	memcache_device->mem_deregister(buflist->memcache[i]);
+	free(buflist->memcache[i]);
 #endif
     }
     free(buflist->memcache);
@@ -401,24 +361,16 @@ void memcache_shutdown(void *md)
     memcache_entry_t *c, *cn;
 
     gen_mutex_lock(&memcache_device->mutex);
-    qlist_for_each_entry_safe(c, cn, &memcache_device->list, list) 
-    {
-        if (c->count > 0) 
-        {
-            memcache_device->mem_deregister(c);
-        }
-        qlist_del(&c->list);
-        free(c);
+    qlist_for_each_entry_safe(c, cn, &memcache_device->list, list) {
+        if (c->count > 0) memcache_device->mem_deregister(c);
+	qlist_del(&c->list);
+	free(c);
     }
-    qlist_for_each_entry_safe(c, cn, &memcache_device->free_chunk_list, list) 
-    {
-        if (c->count > 0) 
-        {
-            memcache_device->mem_deregister(c);
-        }
-        qlist_del(&c->list);
-        free(c->buf);
-        free(c);
+    qlist_for_each_entry_safe(c, cn, &memcache_device->free_chunk_list, list) {
+        if (c->count > 0) memcache_device->mem_deregister(c);
+	qlist_del(&c->list);
+	free(c->buf);
+	free(c);
     }
     gen_mutex_unlock(&memcache_device->mutex);
     free(memcache_device);
@@ -434,21 +386,17 @@ void memcache_cache_flush(void *md)
     memcache_entry_t *c, *cn;
 
     debug(4, "%s", __func__);
-    qlist_for_each_entry_safe(c, cn, &memcache_device->list, list) 
-    {
+    qlist_for_each_entry_safe(c, cn, &memcache_device->list, list) {
         debug(4, "%s: list c->count %x c->buf %p", __func__, c->count, c->buf);
-        if (c->count == 0) 
-        {
+        if (c->count == 0) {
             qlist_del(&c->list);
             free(c);
         }
     }
-    qlist_for_each_entry_safe(c, cn, &memcache_device->free_chunk_list, list) 
-    {
+    qlist_for_each_entry_safe(c, cn, &memcache_device->free_chunk_list, list) {
         debug(4, "%s: free list c->count %x c->buf %p", __func__,
-          c->count, c->buf);
-        if (c->count == 0) 
-        {
+	      c->count, c->buf);
+        if (c->count == 0) {
             qlist_del(&c->list);
             free(c->buf);
             free(c);
