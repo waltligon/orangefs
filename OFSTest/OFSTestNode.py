@@ -1341,7 +1341,7 @@ class OFSTestNode(object):
         self.runSingleCommand("../dist/configure --prefix=%s" % self.db4_dir)
         print "Building Berkeley DB 4.8.30..."
         self.runSingleCommand("make")
-        print "Installing Berkeley DB 4.8.30 to %s..."
+        print "Installing Berkeley DB 4.8.30 to %s..." % self.db4_dir
         self.runSingleCommand("make install")
 
         self.db4_lib_dir = self.db4_dir+"/lib"
