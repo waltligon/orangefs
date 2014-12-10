@@ -112,6 +112,15 @@ int PINT_cached_config_get_metadata_sid_count(PVFS_fs_id fsid, int32_t *num_sid)
 int PINT_cached_config_get_default_dfile_sid_count(PVFS_fs_id fs_id,
                                                    int32_t *num_sids);
 
+int PINT_cached_config_get_default_distr_dir_params(
+                           PVFS_fs_id fs_id,
+                           int32_t distr_dir_servers_initial_requested,
+                           int32_t *distr_dir_servers_initial,
+                           int32_t distr_dir_servers_max_requested,
+                           int32_t *distr_dir_servers_max,
+                           int32_t distr_dir_split_size_requested,
+                           int32_t *distr_dir_split_size);
+
 #if 0
 int PINT_cached_config_get_server_name(
                 char *server_name,

@@ -1510,6 +1510,112 @@ int PINT_cached_config_get_default_dfile_sid_count(PVFS_fs_id fs_id,
     return ret;
 }
 
+/* PINT_cached_config_get_default_distr_dir_params()
+ *  *
+ *   * Discovers the default numbers for initial dirdata servers, max
+ *    * dirdata servers, and split size.
+ *     * Clients may pass in values as a hint. If no hint is given, the
+ *      * server configuration is checked to find a hint there.
+ *       *
+ *        * returns 0 on success, -errno on failure
+ *         */
+int PINT_cached_config_get_default_distr_dir_params(PVFS_fs_id fs_id,
+                                                    int32_t distr_dir_servers_initial_requested,
+                                                    int32_t *distr_dir_servers_initial,
+                                                    int32_t distr_dir_servers_max_requested,
+                                                    int32_t *distr_dir_servers_max,
+                                                    int32_t distr_dir_split_size_requested,
+                                                    int32_t *distr_dir_split_size)
+{
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+    int rc;
+    int32_t num_meta_servers = 0;
+
+    /* Locate the filesystem configuration for this fs id */
+    hash_link = qhash_search(PINT_fsid_config_cache_table, &(fs_id));
+    if (! hash_link)
+    {
+        gossip_err("Error: Could not find configuration info.");
+        return(-PVFS_EINVAL);
+    }
+    cur_config_cache = qlist_entry(hash_link,
+                                   struct config_fs_cache_s,
+                                   hash_link);
+    assert(cur_config_cache);
+    assert(cur_config_cache->fs);
+
+    if (0 == distr_dir_servers_initial_requested)
+    {
+        *distr_dir_servers_initial =
+            cur_config_cache->fs->default_distr_dir_servers_initial;
+    }
+    else
+    {
+        *distr_dir_servers_initial = distr_dir_servers_initial_requested;
+    }
+
+    if (0 == distr_dir_servers_max_requested)
+    {
+        *distr_dir_servers_max =
+            cur_config_cache->fs->default_distr_dir_servers_max;
+    }
+    else
+    {
+        *distr_dir_servers_max = distr_dir_servers_max_requested;
+    }
+
+    if (0 == distr_dir_split_size_requested)
+    {
+        *distr_dir_split_size =
+            cur_config_cache->fs->default_distr_dir_split_size;
+    }
+    else
+    {
+        *distr_dir_split_size = distr_dir_split_size_requested;
+    }
+
+    /* Determine the number of metadata servers available */
+    rc = PINT_cached_config_get_num_meta(fs_id, &num_meta_servers);
+    if(rc < 0)
+    {
+        return(rc);
+    }
+
+    if (*distr_dir_servers_initial > num_meta_servers)
+    {
+        gossip_err("%s: Requested more initial dirdata servers(%d) than "
+                   "meta servers(%d) currently defined in the system. Capping "
+                   "initial number of dirdata servers to the number of meta servers.\n"
+                   ,__func__
+                   ,*distr_dir_servers_initial
+                   ,num_meta_servers);
+        *distr_dir_servers_initial = num_meta_servers;
+    }
+
+    if (*distr_dir_servers_max > num_meta_servers)
+    {
+        gossip_err("%s: Requested more maximum dirdata servers(%d) than "
+                   "meta servers(%d) currently defined in the system. Capping "
+                   "maximum number of dirdata servers to the number of meta servers.\n"
+                   ,__func__
+                   ,*distr_dir_servers_max
+                   ,num_meta_servers);
+        *distr_dir_servers_max = num_meta_servers;
+    }
+
+    if (*distr_dir_servers_initial > *distr_dir_servers_max)
+    {
+        gossip_err("Error: Number of initial dirdata servers (%d) cannot "
+                   "exceed max number of dirdata servers (%d).\n",
+                   *distr_dir_servers_initial, *distr_dir_servers_max);
+        return(-PVFS_EINVAL);
+    }
+
+    return 0;
+
+}
+
 /* V3 this won't make sense */
 #if 0
 /* PINT_cached_config_get_server_handle_count()

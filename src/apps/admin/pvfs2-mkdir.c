@@ -319,8 +319,7 @@ static int make_directory(PVFS_credential      * credentials,
         }
     }
     
-    parent_ref.handle = resp_lookup.ref.handle;
-    parent_ref.fs_id  = resp_lookup.ref.fs_id;
+    memcpy(&parent_ref, &resp_lookup.ref, sizeof(resp_lookup.ref));
 
     /* Clear out any info from previous calls */
     memset(&resp_mkdir, 0, sizeof(PVFS_sysresp_mkdir));

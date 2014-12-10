@@ -1280,8 +1280,13 @@ struct PVFS_servreq_mkdir
 {
     PVFS_fs_id fs_id;             /* file system */
     PVFS_handle handle;           /* object being created */
+    int32_t sid_count;            /* for object being created */
+    PVFS_SID *sid_array;          /* sids for object being created */
     PVFS_handle parent;           /* back pointer */
     PVFS_SID parent_sid;          /* back pointer primary sid */
+    PVFS_handle *dirdata_handles; /* array of dirdata handles */
+    int32_t dirdata_sid_count;    /* # of sids per dirdata handle */
+    PVFS_SID *dirdata_sid_array;  /* sids for dirdata handles */
     PVFS_object_attr attr;        /* initial attributes */
     PVFS_credential credential;   /* user credential */
 
