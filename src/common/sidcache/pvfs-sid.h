@@ -80,6 +80,15 @@ int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
                       PVFS_handle **datafile_handles,
                       uint32_t datafile_sid_count,
                       PVFS_SID **datafile_sid_array);
+
+int PVFS_OBJ_gen_dir(PVFS_fs_id fs_id,
+                     PVFS_handle **handle,
+                     uint32_t sid_count,
+                     PVFS_SID **sid_array,
+                     uint32_t dirdata_count,
+                     PVFS_handle **dirdata_handles,
+                     uint32_t dirdata_sid_count,
+                     PVFS_SID **dirdata_sid_array);
 #endif
 
 /*

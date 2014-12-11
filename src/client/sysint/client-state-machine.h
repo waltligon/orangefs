@@ -226,8 +226,17 @@ struct PINT_client_mkdir_sm
 
     int retry_count;
     int stored_error_code;
-    PVFS_handle metafile_handle; /* V3 remove this field */
-    PINT_sm_getattr_state metafile_getattr;
+
+    PVFS_handle metadata_handle;
+    int metadata_sid_count;
+    PVFS_SID *metadata_sid_array;
+
+    int dirdata_count;
+    PVFS_handle *dirdata_handles;
+    int dirdata_sid_count;
+    PVFS_SID *dirdata_sid_array;
+
+    PINT_sm_getattr_state metadata_getattr;
 
     /* keep first */
     PINT_dist *dist;

@@ -406,7 +406,7 @@ int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
     n = sid_count;
     PVFS_SID_get_server_first_n(NULL, *sid_array, &n, SID_SERVER_META);
 
-    /* generate datafile handles */
+    /* generate dirdata handles */
     *datafile_handles = (PVFS_OID *)malloc(datafile_count * sizeof(PVFS_OID));
     for (i = 0; i < datafile_count; i++)
     {
@@ -422,6 +422,46 @@ int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
     return ret;
 }
 
+/**
+ * Simple default policy just picks them in order found in the DB
+ */
+int PVFS_OBJ_gen_dir(PVFS_fs_id fs_id,
+                     PVFS_handle **handle,
+                     uint32_t sid_count,
+                     PVFS_SID **sid_array,
+                     uint32_t dirdata_count,
+                     PVFS_handle **dirdata_handles,
+                     uint32_t dirdata_sid_count,
+                     PVFS_SID **dirdata_sid_array)
+{
+    int ret = 0;
+    int n;
+    int i;
+
+    /* generate metadata handle */
+    *handle = malloc(sizeof(PVFS_handle));
+    PVFS_OID_gen(*handle);
+
+    /* generate SIDs for metadata object */
+    *sid_array = (PVFS_SID *)malloc(sid_count * sizeof(PVFS_SID));
+    n = sid_count;
+    PVFS_SID_get_server_first_n(NULL, *sid_array, &n, SID_SERVER_META);
+
+    /* generate dirdata handles */
+    *dirdata_handles = (PVFS_OID *)malloc(dirdata_count * sizeof(PVFS_OID));
+    for (i = 0; i < dirdata_count; i++)
+    {
+        PVFS_OID_gen(*dirdata_handles);
+    }
+
+    /* generate SIDs for dirdata objects */
+    *dirdata_sid_array = (PVFS_SID *)malloc(dirdata_count *
+                                             dirdata_sid_count *
+                                             sizeof(PVFS_SID));
+    n = dirdata_sid_count;
+    PVFS_SID_get_server_next_n(NULL, *dirdata_sid_array, &n, SID_SERVER_META);
+    return ret;
+}
 /*
  * Local variables:
  *  c-indent-level: 4
