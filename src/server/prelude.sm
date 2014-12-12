@@ -264,6 +264,10 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     INIT_PROFILER(profiler);
     START_PROFILER(profiler);
 
+
+/* add code to allow creation of dspace record for a datafile if op is
+ * getattr.  return code to indicate that record was created.
+ */
     if(js_p->error_code < 0 && s_op->req->op == PVFS_SERV_IO)
     {
         /* we failed to find the dpsace record and this is an IO op

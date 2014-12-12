@@ -162,8 +162,8 @@ nested machine pvfs2_tree_get_file_size_work_sm
     {
         pjmp tree_get_file_size_setup
         {
-            REMOTE_OPERATION => pvfs2_pjmp_call_msgpairarray_sm;
-            LOCAL_OPERATION => pvfs2_pjmp_get_attr_with_prelude_sm;
+            REMOTE_OPERATION => pvfs2_msgpairarray_sm;
+            LOCAL_OPERATION => pvfs2_get_attr_with_prelude_sm;
         }
         default => tree_get_file_size_work_cleanup;
     }
@@ -231,7 +231,7 @@ static PINT_sm_action tree_communicate_partition_handles(
     struct PVFS_server_req *this_req = s_op->req;
     int num_partitions, num_files_per_server;
     int i,j;
-    struct server_configuration_t *config = get_server_config_struct();
+    struct server_configuration_s *config = get_server_config_struct();
     int ret = -PVFS_EINVAL;
     struct PVFS_server_req *req = NULL;
     PVFS_capability null_cap;
@@ -288,6 +288,8 @@ static PINT_sm_action tree_communicate_partition_handles(
 
                s_op->u.tree_communicate.handle_array_local[s_op->u.tree_communicate.handle_array_local_count] = handle_array[i];
 
+
+               //What is this used for?
                s_op->u.tree_communicate.local_join_size[s_op->u.tree_communicate.handle_array_local_count] = i;
 
                s_op->u.tree_communicate.handle_array_local_count++;
@@ -305,6 +307,7 @@ static PINT_sm_action tree_communicate_partition_handles(
 
             s_op->u.tree_communicate.handle_array_remote[s_op->u.tree_communicate.handle_array_remote_count] = handle_array[i];
 
+            //What is this used for?
             s_op->u.tree_communicate.remote_join_size[s_op->u.tree_communicate.handle_array_remote_count] = i;
 
             s_op->u.tree_communicate.handle_array_remote_count++;
@@ -328,7 +331,7 @@ static PINT_sm_action tree_communicate_partition_handles(
                                tree_communicate_s_op, /* new frame */
                                config->host_sid,
                                fs_id,
-                               LOCAL_OPERATION, 
+                               js_p->error_code,
                                req,                  /* req in new frame */
                                LOCAL_OPERATION);
 
@@ -474,9 +477,9 @@ static PINT_sm_action tree_communicate_partition_handles(
         PINT_CREATE_SUBORDINATE_SERVER_FRAME(
                 smcb,
                 tree_communicate_s_op,
-                s_op->u.tree_communicate.handle_array_remote[0],
+                PVFS_SID_NULL,  /* bc this is a remote operation, we don't need a real sid, just a place holder */
                 fs_id,
-                REMOTE_OPERATION,
+                js_p->error_code,
                 req,
                 REMOTE_OPERATION);
 
@@ -952,6 +955,9 @@ static int tree_remove_work_cleanup(
     return SM_ACTION_COMPLETE;
 }/*end tree_remove_work_cleanup*/
  
+
+
+
 static int tree_remove_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -963,6 +969,9 @@ static int tree_remove_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 
     return(server_state_machine_complete(smcb));
 }
+
+
+
  
 static PINT_sm_action tree_get_file_size_setup(struct PINT_smcb *smcb,
                                                job_status_s *js_p)

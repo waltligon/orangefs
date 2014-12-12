@@ -608,9 +608,13 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
     int location = 0;
 
     attr_p = &s_op->attr;
-    PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, getattr_op,
-        attr_p->u.dir.dirdata_handles[0], s_op->req->u.remove.fs_id,
-        location, req, LOCAL_OPERATION);
+    PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb
+                                        ,getattr_op
+                                        ,attr_p->u.dir.dirdata_sids[0] /* FIXME? */
+                                        ,s_op->req->u.remove.fs_id
+                                        ,location
+                                        ,req
+                                        ,LOCAL_OPERATION);
 
     PINT_null_capability(&null_cap);
 
@@ -673,7 +677,8 @@ static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
 
     PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb,
                                          remove_op,
-                                         attr_p->u.dir.dirdata_handles[0],
+                                         attr_p->u.dir.dirdata_sids[0], /* FIXME? */
+                                         //attr_p->u.dir.dirdata_handles[0],
                                          s_op->req->u.remove.fs_id,
                                          location, req, LOCAL_OPERATION);
 
