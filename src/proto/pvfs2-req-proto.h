@@ -96,10 +96,8 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_SPLIT_DIRENT = 47,
     PVFS_SERV_ATOMICEATTR = 48,
     PVFS_SERV_TREE_GETATTR = 49,
-#ifdef ENABLE_SECURITY_CERT
     PVFS_SERV_MGMT_GET_USER_CERT = 50,
     PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 51,
-#endif
 
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
@@ -2416,7 +2414,6 @@ do {                                                                         \
     (__req).u.mgmt_split_dirent.entry_names   = (__entry_names);             \
 } while (0)
 
-#ifdef ENABLE_SECURITY_CERT
 /* get_user_cert ******************************************************/
 /* - retrieve user certificate/key from server given user id/password */
 
@@ -2527,8 +2524,6 @@ endecode_fields_1_struct(
 #define extra_size_PVFS_servresp_mgmt_get_user_cert_keyreq \
     PVFS_REQ_LIMIT_SECURITY_KEY
 
-#endif /* ENABLE_SECURITY_CERT */
-
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
@@ -2581,10 +2576,8 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_get_dirent mgmt_get_dirent;
         struct PVFS_servreq_mgmt_create_root_dir mgmt_create_root_dir;
         struct PVFS_servreq_mgmt_split_dirent mgmt_split_dirent;
-#ifdef ENABLE_SECURITY_CERT
         struct PVFS_servreq_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servreq_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
-#endif
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -2647,10 +2640,8 @@ struct PVFS_server_resp
         struct PVFS_servresp_mgmt_get_uid mgmt_get_uid;
         struct PVFS_servresp_tree_setattr tree_setattr;
         struct PVFS_servresp_mgmt_get_dirent mgmt_get_dirent;
-#ifdef ENABLE_SECURITY_CERT
         struct PVFS_servresp_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servresp_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
-#endif
     } u;
 };
 endecode_fields_2_struct(

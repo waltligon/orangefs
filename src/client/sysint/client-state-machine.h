@@ -821,9 +821,7 @@ enum
     PVFS_MGMT_GET_DIRDATA_HANDLE   = 80,
     PVFS_MGMT_GET_UID_LIST         = 81, 
     PVFS_MGMT_GET_DIRDATA_ARRAY    = 82,
-#ifdef ENABLE_SECURITY_CERT
     PVFS_MGMT_GET_USER_CERT        = 83,
-#endif
     PVFS_SERVER_GET_CONFIG         = 200,
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
@@ -832,11 +830,7 @@ enum
 
 #define PVFS_OP_SYS_MAXVALID  22
 #define PVFS_OP_SYS_MAXVAL 69
-#ifdef ENABLE_SECURITY_CERT
 #define PVFS_OP_MGMT_MAXVALID 84
-#else
-#define PVFS_OP_MGMT_MAXVALID 83
-#endif
 #define PVFS_OP_MGMT_MAXVAL 199
 
 int PINT_client_io_cancel(job_id_t id);
