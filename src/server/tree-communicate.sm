@@ -395,7 +395,7 @@ static PINT_sm_action tree_communicate_partition_handles(
                          this_req->u.tree_get_file_size.credential,
                          fs_id,
                          s_op->u.tree_communicate.handle_array_local[i],
-                         PVFS_ATTR_DATA_SIZE,
+                         PVFS_ATTR_DATA_ALL,
                          s_op->req->hints);
 
                 /* this identifies which "local" subordinate frame is being populated.

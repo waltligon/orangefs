@@ -258,6 +258,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     PVFS_credential *cred = NULL;
     int create_object = 0;
     int ret = -PVFS_EINVAL, capcache_hit = 0, credcache_hit = 0;
+    PVFS_error error_code = 0;
     DECLARE_PROFILER(profiler);
 
     /* Profile validate operation */
@@ -265,19 +266,26 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     START_PROFILER(profiler);
 
 
-/* add code to allow creation of dspace record for a datafile if op is
- * getattr.  return code to indicate that record was created.
- */
-    if(js_p->error_code < 0 && s_op->req->op == PVFS_SERV_IO)
+    /* Get the errno value to use for comparison */
+    error_code = PVFS_get_errno_mapping(js_p->error_code);
+
+
+    /* RAL:  Need to re-visit this logic.  Should we always create the DATAFILE
+     *       dspace record, regardless of operation?
+     */ 
+    if (error_code == ENOENT && (s_op->req->op == PVFS_SERV_IO || 
+                                 s_op->req->op == PVFS_SERV_GETATTR))
     {
-        /* we failed to find the dpsace record and this is an IO op
-         * fake one and we will add it later if validation works out
+        /* we failed to find the dpsace record.  fake one and we will 
+         * add it later if validation works out.
          */
         s_op->ds_attr.type = PVFS_TYPE_DATAFILE;
         s_op->ds_attr.fs_id = s_op->target_fs_id;
         s_op->ds_attr.handle = s_op->target_handle;
         s_op->ds_attr.u.datafile.b_size = 0;
         create_object = 1;
+        js_p->error_code = 0;
+        gossip_err("%s: Need to create dspace entry...\n",__func__);
     }
 
     /*
@@ -285,8 +293,19 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
      * server use-able format.  i.e. a PVFS_object_attr
      */
     PVFS_object_attr_from_ds_attr(&s_op->attr, &s_op->ds_attr);
-    s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
+
+    if ( create_object )
+    {
+       s_op->attr.mask = PVFS_ATTR_DATA_ALL;
+    }
+    else
+    {
+       s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
+    }
+
     s_op->target_object_attr = &s_op->attr;
+
+
 
     if (s_op->prelude_mask & PRELUDE_PERM_CHECK_DONE)
     {
@@ -473,8 +492,8 @@ complete:
 
     FINISH_PROFILER("pv2", profiler, 1);
      
-    /* if an IO and everything has checked out so far except the
-     * dspace record is missing then create the dspace record
+    /* if everything has checked out so far except the
+     * dspace record is missing, then create the dspace record
      */
     if (js_p->error_code == 0 && create_object == 1)
     {
@@ -494,12 +513,16 @@ static PINT_sm_action prelude_create_object_if_allowed(struct PINT_smcb *smcb,
     int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
 
+
+    /* RAL:  revisit the operations allowed to create a DATAFILE dspace record
+     */ 
     switch (s_op->req->op)
     {
     case PVFS_SERV_IO :
+    case PVFS_SERV_GETATTR :
         /* setup and post dspace create job */
-        ret = job_trove_dspace_create(s_op->req->u.io.fs_id,
-                                      s_op->req->u.io.handle,
+        ret = job_trove_dspace_create(s_op->target_fs_id,
+                                      s_op->target_handle,
                                       PVFS_TYPE_DATAFILE,
                                       NULL, /* hint */
                                       0,    /* flags */
@@ -509,6 +532,17 @@ static PINT_sm_action prelude_create_object_if_allowed(struct PINT_smcb *smcb,
                                       &tmp_id,
                                       server_job_context,
                                       s_op->req->hints);
+        //ret = job_trove_dspace_create(s_op->req->u.io.fs_id,
+        //                              s_op->req->u.io.handle,
+        //                              PVFS_TYPE_DATAFILE,
+        //                              NULL, /* hint */
+        //                              0,    /* flags */
+        //                              smcb, /* user_ptr */
+        //                              0,    /* status_user_tag */
+        //                              js_p,
+        //                              &tmp_id,
+        //                              server_job_context,
+        //                              s_op->req->hints);
         return SM_ACTION_DEFERRED;
     default :
         break;
@@ -524,13 +558,26 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
+    time_t current_time;
 
+    /* RAL:  revisit if operation type is necessary */
     switch (s_op->req->op)
     {
     case PVFS_SERV_IO :
-        /* setup and post dspace setattr job */
-        ret = job_trove_dspace_setattr(s_op->req->u.io.fs_id,
-                                       s_op->req->u.io.handle,
+    case PVFS_SERV_GETATTR :
+        /* initialize the time members */
+        current_time = time(NULL);
+        s_op->ds_attr.atime = current_time;
+
+        /* RAL:  Do we want to continue this versioning stuff? */
+        s_op->ds_attr.mtime = PINT_util_mktime_version(current_time);
+
+        s_op->ds_attr.ctime = current_time;
+        s_op->ds_attr.ntime = current_time;
+
+        /* post dspace setattr job */
+        ret = job_trove_dspace_setattr(s_op->target_fs_id,
+                                       s_op->target_handle,
                                        &(s_op->ds_attr),
                                        TROVE_SYNC, /* flags */
                                        smcb,       /* user_ptr */
@@ -539,6 +586,16 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
                                        &tmp_id,
                                        server_job_context,
                                        s_op->req->hints);
+        //ret = job_trove_dspace_setattr(s_op->req->u.io.fs_id,
+        //                               s_op->req->u.io.handle,
+        //                               &(s_op->ds_attr),
+        //                               TROVE_SYNC, /* flags */
+        //                               smcb,       /* user_ptr */
+        //                               0,          /* status_user_tag */
+        //                               js_p,
+        //                               &tmp_id,
+        //                               server_job_context,
+        //                               s_op->req->hints);
         return SM_ACTION_DEFERRED;
     default :
         break;
