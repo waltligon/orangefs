@@ -1510,13 +1510,16 @@ dnl
 dnl check for open O_DIRECT
 AC_MSG_CHECKING([for open O_DIRECT])
 AC_TRY_COMPILE([
+    #define _GNU_SOURCE
     #include <fcntl.h>
+    #include <sys/types.h>
+    #include <sys/stat.h>
     ], [
-    open("somefile", O_DIRECT);
-    ], [],
-    AC_MSG_RESULT(no),
-    AC_MSG_RESULT(yes),
-    AC_DEFINE(HAVE_OPEN_O_DIRECT, 1, Define if system defines O_DIRECT fcntl)
+    open("somefile", O_RDONLY | O_DIRECT);
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_OPEN_O_DIRECT, 1, Define if system defines O_DIRECT fcntl),
+    AC_MSG_RESULT(no)
 )
 
 dnl
