@@ -1922,6 +1922,7 @@ static PINT_sm_action getattr_setup_op(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     memset(&s_op->resp.u.getattr.attr, 0, sizeof(PVFS_object_attr));
+    s_op->resp.op = s_op->req->op;
 
     gossip_err("%s: s_op->req->u.getattr.attrmask(0x%08x)\n",__func__
                                                             ,s_op->req->u.getattr.attrmask);

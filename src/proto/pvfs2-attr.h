@@ -120,7 +120,7 @@
 #define PVFS_ATTR_DATA_SIZE          (1 << 20)   /* replace with latest bit */
 
 #define PVFS_ATTR_DATA_ALL \
-                (PVFS_ATTR_DATA_SIZE | PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_MTIME \
+                (PVFS_ATTR_DATA_SIZE | PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_MTIME | \
               PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_NTIME | PVFS_ATTR_COMMON_TYPE)
 
 /* internal attribute masks for symlink objects */
