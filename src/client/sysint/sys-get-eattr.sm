@@ -1,5 +1,5 @@
-/*
- * (C) 2003 Clemson University and The University of Chicago
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
  */
@@ -127,7 +127,7 @@ PVFS_error PVFS_sys_geteattr_list(
         PVFS_perror_gossip("PVFS_isys_geteattr call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "geteattr", &error);
         if (ret)
@@ -135,9 +135,8 @@ PVFS_error PVFS_sys_geteattr_list(
              PVFS_perror_gossip("PVFS_sys_wait call", ret);
              error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -192,6 +191,8 @@ static PINT_sm_action get_eattr_setup_msgpair(
         sm_p->u.geteattr.key_array,
         sm_p->u.geteattr.size_array,
         sm_p->hints);
+
+    PINT_cleanup_capability(&capability);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
@@ -260,20 +261,12 @@ static int get_eattr_comp_fn(
     if ((sm_p->msgarray_op.msgarray[i].op_status == 0) ||
         (sm_p->msgarray_op.msgarray[i].op_status == -PVFS_ERANGE))
     {
-        int32_t k, maxk;
-        if (resp_p->u.geteattr.nkey > sm_p->u.geteattr.nkey)
+        int k, mink;
+        mink = sm_p->u.geteattr.nkey;
+        if (resp_p->u.geteattr.nkey < mink)
         {
-            maxk = resp_p->u.geteattr.nkey;
-            gossip_err("Successful call returned more values than requested\n");
-        }
-        else if (resp_p->u.geteattr.nkey < sm_p->u.geteattr.nkey)
-        {
-            maxk = sm_p->u.geteattr.nkey;
+            mink = resp_p->u.geteattr.nkey;
             gossip_err("Successful call returned fewer values than requested\n");
-        }
-        else
-        {
-            maxk = sm_p->u.geteattr.nkey;
         }
         if (!resp_p->u.geteattr.val)
         {
@@ -282,72 +275,52 @@ static int get_eattr_comp_fn(
         }
         gossip_debug(GOSSIP_GETEATTR_DEBUG,"returned %d values\n",
                 sm_p->u.geteattr.nkey);
-        for (k = 0; k < maxk; k++)
+        for (k = 0; k < sm_p->u.geteattr.nkey; k++)
         {
-            /* Print debugging if we will not overflow. */
-            if (k < resp_p->u.geteattr.nkey)
+            gossip_debug(GOSSIP_GETEATTR_DEBUG,"resp_read_sz = %d\n",
+                    resp_p->u.geteattr.val[k].read_sz);
+            gossip_debug(GOSSIP_GETEATTR_DEBUG,"resp_buff_sz = %d\n",
+                    resp_p->u.geteattr.val[k].buffer_sz);
+            gossip_debug(GOSSIP_GETEATTR_DEBUG,"sm_buff_sz = %d\n",
+                    sm_p->u.geteattr.resp_p->val_array[k].buffer_sz);
+            gossip_debug(GOSSIP_GETEATTR_DEBUG,"resp_buff_ = %s\n",
+                    (char *)resp_p->u.geteattr.val[k].buffer);
+            /* out the actual read_sz in its place */
+            sm_p->u.geteattr.resp_p->val_array[k].read_sz =
+                    resp_p->u.geteattr.val[k].buffer_sz;
+            sm_p->u.geteattr.resp_p->err_array[k] =
+                    resp_p->u.geteattr.err[k];
+            /* check for too big a return message */
+            if(resp_p->u.geteattr.err[k] == 0)
             {
-                gossip_debug(GOSSIP_GETEATTR_DEBUG,"resp_read_sz = %d\n",
-                        resp_p->u.geteattr.val[k].read_sz);
-                gossip_debug(GOSSIP_GETEATTR_DEBUG,"resp_buff_sz = %d\n",
-                        resp_p->u.geteattr.val[k].buffer_sz);
-                gossip_debug(GOSSIP_GETEATTR_DEBUG,"resp_buff_ = %s\n",
-                        (char *)resp_p->u.geteattr.val[k].buffer);
-            }
-            if (k < sm_p->u.geteattr.nkey)
-            {
-                gossip_debug(GOSSIP_GETEATTR_DEBUG,"sm_buff_sz = %d\n",
-                        sm_p->u.geteattr.resp_p->val_array[k].buffer_sz);
-            }
-            /* Copy result into caller's buffer if possible. */
-            if (k < resp_p->u.geteattr.nkey && k < sm_p->u.geteattr.nkey)
-            {
-                /* out the actual read_sz in its place */
-                sm_p->u.geteattr.resp_p->val_array[k].read_sz =
-                        resp_p->u.geteattr.val[k].buffer_sz;
-                sm_p->u.geteattr.resp_p->err_array[k] =
-                        resp_p->u.geteattr.err[k];
-                /* check for too big a return message */
-                if(resp_p->u.geteattr.err[k] == 0)
+                if (sm_p->u.geteattr.resp_p->val_array[k].read_sz <=
+                        sm_p->u.geteattr.resp_p->val_array[k].buffer_sz)
                 {
-                    if (sm_p->u.geteattr.resp_p->val_array[k].read_sz <=
-                            sm_p->u.geteattr.resp_p->val_array[k].buffer_sz)
-                    {
-                        gossip_debug(GOSSIP_GETEATTR_DEBUG,"copying\n");
-                        memcpy(sm_p->u.geteattr.resp_p->val_array[k].buffer,
-                                resp_p->u.geteattr.val[k].buffer,
-                                sm_p->u.geteattr.resp_p->val_array[k].read_sz);
-                    }
-                    else /* oops, error! returned too much data */
-                    {
-                        gossip_debug(GOSSIP_GETEATTR_DEBUG,
-                                "clearing on error\n");
-                        memset(sm_p->u.geteattr.resp_p->val_array[k].buffer, 0,
-                               sm_p->u.geteattr.resp_p->val_array[k].buffer_sz);
-                        /* record an error, but keep going */
-                        ret = -PVFS_EMSGSIZE;
-                    }
-
-                    /* seems ok - decode the eattrs we know about */
-                    decode_ret = PINT_eattr_decode(
-                        &sm_p->u.geteattr.key_array[k],
-                        &sm_p->u.geteattr.resp_p->val_array[k]);
-                    if(decode_ret != 0)
-                    {
-                        gossip_debug(GOSSIP_GETATTR_DEBUG,
-                                "failed decode of eattr: %s\n",
-                                (char *)sm_p->u.geteattr.key_array[k].buffer);
-                        return decode_ret;
-                    }
+                    gossip_debug(GOSSIP_GETEATTR_DEBUG,"copying\n");
+                    memcpy(sm_p->u.geteattr.resp_p->val_array[k].buffer,
+                            resp_p->u.geteattr.val[k].buffer,
+                            sm_p->u.geteattr.resp_p->val_array[k].read_sz);
                 }
-            }
-            else if (k < sm_p->u.geteattr.nkey)
-            {
-                /* Clear extra entries at end of caller's buffer. */
-                memset(sm_p->u.geteattr.key_array[k].buffer, 0,
-                        sm_p->u.geteattr.key_array[k].buffer_sz);
-                memset(sm_p->u.geteattr.resp_p->val_array[k].buffer, 0,
-                        sm_p->u.geteattr.resp_p->val_array[k].buffer_sz);
+                else /* oops, error! returned too much data */
+                {
+                    gossip_debug(GOSSIP_GETEATTR_DEBUG,"clearing on error\n");
+                    memset(sm_p->u.geteattr.resp_p->val_array[k].buffer,0,
+                            sm_p->u.geteattr.resp_p->val_array[k].buffer_sz);
+                    /* record an error, but keep going */
+                    ret = -PVFS_EMSGSIZE;
+                }
+
+                /* seems ok - decode the eattrs we know about */
+                decode_ret = PINT_eattr_decode(
+                    &sm_p->u.geteattr.key_array[k],
+                    &sm_p->u.geteattr.resp_p->val_array[k]);
+                if(decode_ret != 0)
+                {
+                    gossip_debug(GOSSIP_GETATTR_DEBUG, 
+                                 "failed decode of eattr: %s\n",
+                                 (char *)sm_p->u.geteattr.key_array[k].buffer);
+                    return decode_ret;
+                }
             }
         }
     }

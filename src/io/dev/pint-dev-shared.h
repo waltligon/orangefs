@@ -52,21 +52,6 @@
 /* Sane maximum values for these parameters (128 MB) */
 #define PVFS2_BUFMAP_MAX_TOTAL_SIZE      (128ULL * (1024 * 1024))
 
-/* log to base 2 when we know that number is a power of 2 */
-static inline int LOG2(int number)
-{
-    int count = 0;
-    if (number == 0 || (number & (number - 1))) 
-    {
-        return -1;
-    }
-    while (number >>= 1)
-    {
-        count++;
-    }
-    return count;
-}
-
 #define PVFS2_READDIR_DEFAULT_DESC_COUNT  5
 #define PVFS2_READDIR_DEFAULT_DESC_SIZE  (128 * 1024)
 #define PVFS2_READDIR_DEFAULT_DESC_SHIFT 17
@@ -108,13 +93,15 @@ struct PVFS_dev_map_desc
 #define DEV_MAX_NR              0x7
 
 /* supported ioctls, codes are with respect to user-space */
-#define PVFS_DEV_GET_MAGIC        _IOW(PVFS_DEV_MAGIC , DEV_GET_MAGIC, int32_t)
-#define PVFS_DEV_GET_MAX_UPSIZE   _IOW(PVFS_DEV_MAGIC , DEV_GET_MAX_UPSIZE, int32_t)
-#define PVFS_DEV_GET_MAX_DOWNSIZE _IOW(PVFS_DEV_MAGIC , DEV_GET_MAX_DOWNSIZE, int32_t)
-#define PVFS_DEV_MAP              _IO(PVFS_DEV_MAGIC , DEV_MAP)
-#define PVFS_DEV_REMOUNT_ALL      _IO(PVFS_DEV_MAGIC , DEV_REMOUNT_ALL)
-#define PVFS_DEV_DEBUG            _IOR(PVFS_DEV_MAGIC, DEV_DEBUG, int32_t)
-#define PVFS_DEV_MAXNR            DEV_MAX_NR
+enum {
+PVFS_DEV_GET_MAGIC          = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAGIC, int32_t),
+PVFS_DEV_GET_MAX_UPSIZE     = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAX_UPSIZE, int32_t),
+PVFS_DEV_GET_MAX_DOWNSIZE   = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAX_DOWNSIZE, int32_t),
+PVFS_DEV_MAP                =  _IO(PVFS_DEV_MAGIC , DEV_MAP),
+PVFS_DEV_REMOUNT_ALL        =  _IO(PVFS_DEV_MAGIC , DEV_REMOUNT_ALL),
+PVFS_DEV_DEBUG              =  _IOR(PVFS_DEV_MAGIC, DEV_DEBUG, int32_t),
+PVFS_DEV_MAXNR              =  DEV_MAX_NR,
+};
 
 #endif  /* WITH_LINUX_KMOD */
 

@@ -183,6 +183,7 @@ static PVFS_offset next_mapped_offset(void* params,
         logical_offset - (ui_stripe_nr * ui_stripe_size);
 
     /* get Strips number */
+    ii = 0;
     for(ii = 0; ii < ui_count; ii++)
     {
         if ((ui_offset_in_stripe >= strips[ii].offset) &&

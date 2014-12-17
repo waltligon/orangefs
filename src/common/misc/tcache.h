@@ -181,7 +181,7 @@ int PINT_tcache_delete(
     struct PINT_tcache* tcache,
     struct PINT_tcache_entry* entry);
 
-void PINT_tcache_refresh_entry(
+int PINT_tcache_refresh_entry(
     struct PINT_tcache* tcache,
     struct PINT_tcache_entry* entry);
 

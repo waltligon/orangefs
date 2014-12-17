@@ -39,6 +39,9 @@
     <ClCompile Include="..\..\..\..\src\client\windows\client-service\cred.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\windows\client-service\io-cache.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\include\windows\memleaks.h">
@@ -66,6 +69,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\src\client\windows\client-service\cred.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\src\client\windows\client-service\io-cache.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

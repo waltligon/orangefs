@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <pvfs2.h>
 
-#define PVFS_PATH_MAGIC (0xfafbfcfdfefff000ull)
+#define PVFS_PATH_MAGIC (0xfafbfcfdfefff000)
 #define PVFS_PATH_QUALIFIED (0x001)
 #define PVFS_PATH_EXPANDED (0x002)
 #define PVFS_PATH_RESOLVED (0x004)
@@ -25,7 +25,7 @@
 #define PVFS_PATH_ERROR (0x800)
 
 #define VALID_PATH_MAGIC(p) \
-            (((p)->magic & 0xffffffffffffff00ull) == PVFS_PATH_MAGIC)
+            (((p)->magic & 0xffffffffffffff00) == PVFS_PATH_MAGIC)
 
 #define PATH_QUALIFIED(p) ((p)->magic & PVFS_PATH_QUALIFIED)
 #define SET_QUALIFIED(p) do{(p)->magic |= PVFS_PATH_QUALIFIED;}while(0)

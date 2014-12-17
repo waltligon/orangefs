@@ -9,6 +9,8 @@
 #include "pvfs2-internal.h"
 #include "pint-distribution.h"
 #include "pvfs2-sysint.h"
+#include "token-utils.h"
+#include "pint-hint.h"
 
 /** Return the distribution associated with the given identifier, or null
  *  if none exists.
@@ -96,6 +98,110 @@ PVFS_error PVFS_sys_dist_setparam(
         }
     }
     return rc;
+}
+
+PVFS_error PVFS_dist_pv_pairs_extract_and_add(const char * pv_pairs,
+                                      void * dist)
+{
+    PVFS_error rc = -PVFS_EINVAL;
+    unsigned int count = 0;
+    char copy[PLUS_ONE(PVFS_HINT_PARAM_VAL_PAIRS_MAX_STRLEN)] = {0};
+    rc = iterate_tokens_inplace(pv_pairs,
+                                  PVFS_HINT_PARAM_VAL_PAIRS_SEP,
+                                  copy,
+                                  PVFS_HINT_PARAM_VAL_PAIRS_MAX_STRLEN,
+                                  PVFS_HINT_PARAM_VAL_PAIRS_MAX,
+                                  &count,
+                                  &PVFS_dist_pv_pair_split,
+                                  dist,
+                                  NULL,
+                                  NULL);
+    if(rc != 0)
+    {
+        rc = -PVFS_EINVAL;
+        gossip_err("Error: There was a problem parsing your distribution "
+                   "parameter/value pairs: %s\n",
+                   pv_pairs);
+    }
+    return rc;
+}
+
+PVFS_error PVFS_dist_pv_pair_split(const char * pv_pair, void *dist)
+{
+    PVFS_error rc = -PVFS_EINVAL;
+    PVFS_sys_dist *dist_p = 0;
+    unsigned int count = 0;
+    char copy[PLUS_ONE(PVFS_HINT_PARAM_VAL_PAIR_MAX_STRLEN)] = {0};
+    char copy_out_param_name[PLUS_ONE(PVFS_HINT_MAX_NAME_LENGTH)] = {0};
+    char copy_out_param_value[PLUS_ONE(PVFS_HINT_MAX_LENGTH)] = {0};
+    char * copy_out[] = {copy_out_param_name, copy_out_param_value};
+    unsigned int copy_out_token_lengths[] = {PVFS_HINT_MAX_NAME_LENGTH,
+                                             PVFS_HINT_MAX_LENGTH};
+
+    if(dist)
+    {
+        dist_p = (PVFS_sys_dist *) dist;
+    }
+
+    rc = iterate_tokens_inplace(pv_pair,
+                           PVFS_HINT_PARAM_VAL_SEP,
+                           copy,
+                           PVFS_HINT_PARAM_VAL_PAIR_MAX_STRLEN,
+                           2,
+                           &count,
+                           NULL,
+                           NULL,
+                           copy_out,
+                           copy_out_token_lengths
+                          );
+    if(rc != 0)
+    {
+        gossip_err("Error: There was a problem parsing your supplied "
+                   "distribution parameter/value pair: %s\n",
+                    pv_pair);
+        return -PVFS_EINVAL;
+    }
+
+    if(count == 2)
+    {
+#if 0
+        printf("dist param name: %s\n"
+               "dist param value: %s\n",
+               copy_out_param_name,
+               copy_out_param_value);
+#endif 
+
+        /* TODO This is currently hard-coded to look for strip_size ONLY rather
+         *  than a better approach at the moment."
+         * We should check the expected p:v pair based on the distribution
+         *  name. */
+        if(strcmp(copy_out_param_name, "strip_size") == 0)
+        {
+            long long int strip_size = strtoll(copy_out_param_value,
+                                               NULL,
+                                               10);
+#if 0
+            printf("lld representation of strip_size=%lld\n",
+                   strip_size);
+#endif
+            rc = PVFS_sys_dist_setparam(dist_p,
+                                   "strip_size",
+                                   &strip_size);
+            if(rc != 0)
+            {
+                gossip_err("Error: There was a problem setting the parsed "
+                           "distribution parameter value in the dist "
+                           "structure:\n"
+                           "\tparameter_name=%s\n"
+                           "\tparameter_value=%s\n",
+                           copy_out_param_name,
+                           copy_out_param_value);
+                return -PVFS_EINVAL;
+            }
+        }
+        return 0;
+    }
+    return -PVFS_EINVAL;
 }
 
 /*

@@ -261,23 +261,13 @@ static PINT_sm_action mgmt_split_dirent_release(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0;
-//    job_id_t i;
 
     if (s_op->val_a)
         free(s_op->val_a);
     if (s_op->key_a)
         free(s_op->key_a);
- 
-#if 0
-    /*
-      tell the scheduler that we are done with this operation (if it
-      was scheduled in the first place)
-    */
-    ret = job_req_sched_release(
-        s_op->scheduled_id, smcb, 0, js_p, &i, server_job_context);
-#endif
-    return ret;
+
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -302,13 +292,13 @@ static PINT_sm_action mgmt_split_dirent_cleanup(
 }
 
 
-static inline int PINT_get_object_ref_mgmt_split_dirent(
+static int PINT_get_object_ref_mgmt_split_dirent(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
     *fs_id = req->u.mgmt_split_dirent.fs_id;
     *handle = req->u.mgmt_split_dirent.dest_dirent_handle;
     return 0;
-}
+};
 
 static int perm_mgmt_split_dirent(PINT_server_op *s_op)
 {

@@ -20,6 +20,36 @@
 #include "str-utils.h"
 #include "pvfs-path.h"
 
+/* PINT_merge_paths()
+ * 
+ * s1 (an absolute path), a single '/' character, and s2 ( a relative path) are all appended to dest.
+ * 
+ * Note: this implementation is based on the fact that PVFS_PATH_MAX is 4096 excluding the null terminating byte.
+ * 
+ * Returns 0 on success, -1 on failure.
+ */
+int PINT_merge_paths(char* s1, char* s2, char* dest)
+{
+    if(!s1 || !s2 || !dest)
+    {
+        fprintf(stderr, "One of the supplied arguments to "
+                   "pvfs_merge_paths is NULL!");
+        return -1;
+    }
+    if(PINT_merged_path_len(s1, s2) > (PVFS_PATH_MAX + 1))
+    {
+        fprintf(stderr, "pvfs_merge_paths asked to merge strings that would result "
+                   "in a path length greather than PVFS_PATH_MAX!");
+        return -1;
+    }
+    
+    memset(dest, 0, PVFS_PATH_MAX + 1);
+    strcat(dest, s1);
+    strcat(dest, "/");
+    strcat(dest, s2);
+    return 0;
+}
+
 /* PINT_string_rm_extra_slashes()
  * 
  * Remove extra slashes from the string pointed to by 's'.

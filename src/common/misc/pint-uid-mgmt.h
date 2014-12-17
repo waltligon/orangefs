@@ -25,12 +25,12 @@ typedef struct
 endecode_fields_2_struct(
         timeval,
         uint64_t, tv_sec,
-        uint32_t, tv_usec)
+        uint32_t, tv_usec);
 endecode_fields_3(
         PVFS_uid_info_s,
         PVFS_uid, uid,
         uint64_t, count,
-        timeval, tv)
+        timeval, tv);
 
 /* our uid management structure */
 typedef struct

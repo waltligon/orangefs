@@ -118,7 +118,7 @@ static PINT_sm_action mgmt_get_dirdata_handle_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
-PINT_GET_OBJECT_REF_DEFINE(mgmt_get_dirdata_handle)
+PINT_GET_OBJECT_REF_DEFINE(mgmt_get_dirdata_handle);
 
 static int perm_mgmt_get_dirdata_handle(PINT_server_op *s_op)
 {

@@ -837,8 +837,7 @@ PINT_Request *PINT_do_request_commit(PINT_Request *region, PINT_Request *node,
 	if(node == NULL)
 		return NULL;
   
-	gossip_debug(GOSSIP_REQUEST_DEBUG,"%s: commit node %p\n", __func__,
-            (void *)node);
+	gossip_debug(GOSSIP_REQUEST_DEBUG,"%s: commit node %p\n", __func__, node);
 
 	/* catches any previously packed structures */
 	if (node->committed == -1)
@@ -959,7 +958,7 @@ void PINT_dump_packed_request(PINT_Request *req)
 void PINT_dump_request(PINT_Request *req)
 {
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"**********************\n");
-	gossip_debug(GOSSIP_REQUEST_DEBUG,"address:\t%p\n",(void *)req);
+	gossip_debug(GOSSIP_REQUEST_DEBUG,"address:\t%p\n",req);
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"offset:\t\t%d\n",(int)req->offset);
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"num_ereqs:\t%d\n",(int)req->num_ereqs);
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"num_blocks:\t%d\n",(int)req->num_blocks);
@@ -972,8 +971,8 @@ void PINT_dump_request(PINT_Request *req)
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"num_nest:\t%d\n",(int)req->num_nested_req);
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"commit:\t\t%d\n",(int)req->committed);
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"refcount:\t\t%d\n",(int)req->refcount);
-	gossip_debug(GOSSIP_REQUEST_DEBUG,"ereq:\t\t%p\n",(void *)req->ereq);
-	gossip_debug(GOSSIP_REQUEST_DEBUG,"sreq:\t\t%p\n",(void *)req->sreq);
+	gossip_debug(GOSSIP_REQUEST_DEBUG,"ereq:\t\t%p\n",req->ereq);
+	gossip_debug(GOSSIP_REQUEST_DEBUG,"sreq:\t\t%p\n",req->sreq);
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"**********************\n");
 }
 

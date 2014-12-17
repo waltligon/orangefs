@@ -1,0 +1,108 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<!-- Put site-specific property overrides in this file. -->
+
+<configuration>
+
+  <property>
+    <name>mapred.job.tracker</name>
+    <value>localhost:8021</value>
+  </property>
+
+  <property>
+    <name>mapred.child.java.opts</name>
+    <value>-Xmx400m</value>
+    <description>
+    Java opts for the task tracker child processes.
+    </description>
+  </property>
+
+  <property>
+    <name>mapred.map.tasks</name>
+    <value>2</value>
+    <final>false</final>
+  </property>
+
+  <property>
+    <name>mapred.reduce.tasks</name>
+    <value>1</value>
+    <final>false</final>
+  </property>
+
+  <property>
+    <name>mapred.tasktracker.map.tasks.maximum</name>
+    <value>2</value>
+    <final>false</final>
+  </property>
+
+  <property>
+    <name>mapred.tasktracker.reduce.tasks.maximum</name>
+    <value>1</value>
+    <final>false</final>
+  </property>
+
+  <property>
+    <name>mapred.job.reuse.jvm.num.tasks</name>
+    <value>-1</value>
+  </property>
+
+<!-- TODO: You should configure this!
+  <property>
+    <name>mapred.local.dir</name>
+    <value>/pvfs/data/mapred/local</value>
+    <description>
+    The local directory where MapReduce stores intermediate data files. May be
+    a comma-separated list of directories on different devices in order to
+    spread disk i/o. Directories that do not exist are ignored.
+    </description>
+  </property>
+-->
+
+  <property>
+    <name>mapred.system.dir</name>
+    <value>/mapred/system</value>
+    <description>
+    The directory where MapReduce stores control files.
+    </description>
+  </property>
+
+  <property>
+    <name>mapreduce.jobtracker.staging.root.dir</name>
+    <value>/user</value>
+    <description>
+    The root of the staging area for users' job files. In practice, this should
+    be the directory where users' home directories are located (usually /user).
+    </description>
+  </property>
+
+  <property>
+    <name>mapred.temp.dir</name>
+    <value>/mapred/temp</value>
+    <description>
+    A shared directory for temporary files.
+    </description>
+  </property>
+
+  <property>
+    <name>mapred.map.tasks.speculative.execution</name>
+    <value>false</value>
+    <final>true</final>
+  </property>
+
+  <property>
+    <name>mapred.reduce.tasks.speculative.execution</name>
+    <value>false</value>
+    <final>true</final>
+  </property>
+
+  <property>
+    <name>mapred.reduce.slowstart.completed.maps</name>
+    <value>0.95</value>
+    <description>
+    Fraction of the number of maps in the job which should be complete before
+    reduces are scheduled for the job.
+    </description>
+  </property>
+
+</configuration>

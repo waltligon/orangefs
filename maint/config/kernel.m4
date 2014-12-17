@@ -2804,6 +2804,33 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	)
         CFLAGS=$tmp_cflags
 
+
+        dnl in 3.11 and up, a d_count() function is provided that returns the value
+        dnl of d_lockref.count.  In SLES 11-SP3, the new structure is being used (struct lockref d_lockref)
+        dnl but the function d_count() is not in their version of Linux (3.0.101-0.35-default), instead
+        dnl there is a #define d_count d_lockref.count.
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+        AC_MSG_CHECKING(for function d_count)
+        AC_TRY_COMPILE([
+                #define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
+                #include <linux/fs.h>
+                #include <linux/dcache.h>
+                struct dentry d;
+                unsigned int x;
+        ],
+        [
+                x = d_count(d);
+        ],
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(HAVE_D_COUNT_FUNCTION, 1, [define if d_count() is provided]),
+        AC_MSG_RESULT(no)
+        )
+        CFLAGS=$tmp_cflags 
+
         dnl permission function pointer in the inode_operations struct now
         dnl takes three params with the third being an unsigned int (circa
         dnl 2.6.38

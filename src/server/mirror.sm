@@ -399,6 +399,8 @@ static PINT_sm_action setup_write_request(struct PINT_smcb *smcb,
                              NULL );
     }/*end for*/
 
+    PINT_cleanup_capability(&capability);
+
     PINT_sm_push_frame(smcb,0,msgarray_op);
   
     return SM_ACTION_COMPLETE;
@@ -854,10 +856,10 @@ static PINT_sm_action check_results( struct PINT_smcb *smcb,
                                             "\t\t\tresp : %p\n",
                                             reqmir_p->fs_id,
                                             (void *)jobs[i].encoded_resp_p,
-                                            (void *)&decoded_resp,
+                                            &decoded_resp,
                                             (long int)jobs[i].svr_addr,
                                             (int)jobs[i].recv_status.actual_size,
-                                           (void *)resp);
+                                           resp);
           ret = PINT_serv_decode_resp( reqmir_p->fs_id,
                                        jobs[i].encoded_resp_p,
                                        &decoded_resp,
@@ -1020,14 +1022,14 @@ int write_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
 } /* end msgpair completion function mirror_comp_fn */
 
 /* set handle and fs-id ... required by the state machine processor */
-static inline int PINT_get_object_ref_mirror( struct PVFS_server_req *req,
+static int PINT_get_object_ref_mirror( struct PVFS_server_req *req,
                                               PVFS_fs_id *fs_id,
                                               PVFS_handle *handle )
 {
     *fs_id  = req->u.mirror.fs_id;
     *handle = req->u.mirror.src_handle;
     return 0;
-}
+};
 
 static int perm_mirror(PINT_server_op *s_op)
 {

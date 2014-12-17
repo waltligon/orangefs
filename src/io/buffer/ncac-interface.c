@@ -2,11 +2,9 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#include "quicklist.h"
+#include "ncac-interface.h"
 #include "pvfs2-internal.h"
 #include "internal.h"
-
-#include "ncac-interface.h"
 
 /* cache_read_post()
  *
@@ -184,7 +182,7 @@ int cache_write_post(cache_write_desc_t *desc,
 /* sync request submit */
 int cache_sync_post(cache_sync_desc_t *desc,
                     cache_request_t *request,
-            void *user_ptr)
+		    void *user_ptr)
 {
 
      fprintf(stderr, "not implemented yet\n");
@@ -221,9 +219,9 @@ int cache_req_test(cache_request_t *request,
     }
 
     if ( request->status == NCAC_BUFFER_COMPLETE || request->status == NCAC_COMPLETE )
-        *flag = 1;
+		*flag = 1;
     else 
-        *flag = 0;
+		*flag = 0;
 
     return 0;
 }

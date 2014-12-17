@@ -88,9 +88,9 @@ BUILD_PORTALS = @BUILD_PORTALS@
 BUILD_ZOID = @BUILD_ZOID@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
+BUILD_USER_ENV_VARS = @BUILD_USER_ENV_VARS@
 BUILD_UCACHE = @BUILD_UCACHE@
 BUILD_JNI = @BUILD_JNI@
-BUILD_HADOOP = @BUILD_HADOOP@
 BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
@@ -187,7 +187,8 @@ INCLUDES := \
     src/proto \
     src/common/mgmt \
 	src/common/hash \
-	src/common/llist
+	src/common/llist \
+	src/common/token-utils
 GENINCLUDES := \
 	include
 endif
@@ -201,12 +202,10 @@ CC = @CC@
 LD = @CC@
 BUILD_CC = @BUILD_CC@
 BUILD_LD = @BUILD_CC@
-BUILD_CFLAGS = -std=c99 -pedantic \
-        -I$(srcdir)/src/common/misc -I$(srcdir) @BUILD_CFLAGS@
+BUILD_CFLAGS = -I$(srcdir)/src/common/misc -I$(srcdir) @BUILD_CFLAGS@
 BUILD_LDFLAGS = @BUILD_LDFLAGS@
 # make sure the srcdir include gets included first
-CFLAGS = -std=c99 -pedantic \
-        -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
+CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
 LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += @LDFLAGS@
 SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
@@ -272,7 +271,7 @@ CFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
 CFLAGS += @OPENSSL_CPPFLAGS@
 
 # always want these gcc flags
-GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes
+GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes -std=c99
 
 ifneq (,$(STRICT_CFLAGS))
     GCC_CFLAGS += -Wcast-align -Wbad-function-cast
@@ -535,38 +534,15 @@ endif
 ifdef BUILD_JNI
 JAVA_HOME := @JAVA_HOME@
 CFLAGS += -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux
-JAVAC := $(JAVA_HOME)/bin/javac -J-Xmx256m
 JAVAH := $(JAVA_HOME)/bin/javah -J-Xmx256m
-JAR := $(JAVA_HOME)/bin/jar -J-Xmx256m
+MVN := `which mvn`
 JNI_DIR := $(srcdir)/src/client/jni
-ORGDIR := $(JNI_DIR)/org/orangefs/usrint
+JNI_JAVA_DIR := $(srcdir)/src/client/jni/src/main/java
+ORGDIR := $(JNI_JAVA_DIR)/org/orangefs/usrint
 ORGDOT := org.orangefs.usrint
-COMMONS_LOGGING_JAR := `ls $(JNI_DIR)/lib/commons-logging-api-*.jar`
-OFS_JNI_JAR := $(JNI_DIR)/lib/ofs_jni.jar
+OFS_JNI_JAR := $(JNI_DIR)/target/orangefs-jni-$(SO_FULLVER).jar
 JNIPOSIXHEADER := $(JNI_DIR)/org_orangefs_usrint_PVFS2POSIXJNI.h
 JNISTDIOHEADER := $(JNI_DIR)/org_orangefs_usrint_PVFS2STDIOJNI.h
-endif
-
-#################################################################
-# Hadoop Layer Variables
-#
-# NOTES:
-# This installation process will change after OrangeFS related Hadoop code is 
-#         commited to the Apache Hadoop Project.
-#
-#
-#
-#
-ifdef BUILD_HADOOP
-# Directory Containing PVFS2/Hadoop related .java files
-HADOOP_ORGDIR := $(JNI_DIR)/org/orangefs/hadoop/fs/ofs
-# Path to Hadoop Directory containing hadoop-core-*.jar
-HADOOP_PREFIX := @HADOOP_PREFIX@
-# Path to Hadoop's core Jar
-HADOOP_CORE_JAR := `ls $(HADOOP_PREFIX)/hadoop-core-*.jar`
-# Path to our temp PVFS jar file 
-#         (eventually will be a part of hadoop-core-*.jar)
-OFS_HADOOP_JAR := $(JNI_DIR)/lib/ofs_hadoop.jar
 endif
 
 #################################################################
@@ -582,7 +558,7 @@ ADMINSRC :=
 # ADMINSRC_SERVER special version of ADMINSRC for tools that need server 
 # library
 ADMINSRC_SERVER :=
-# usRSRC is source code for userland programs
+# USERSRC is source code for userland programs
 USERSRC :=
 # LIBSRC is source code for libpvfs2
 LIBSRC :=
@@ -620,16 +596,8 @@ MISCSRC :=
 SMCGEN :=
 # DEVELSRC is source for development related tools
 DEVELSRC :=
-# JNIPOSIXJAVA represents posix.c related JAVA files
-JNIPOSIXJAVA :=
-# JNISTDIOJAVA represents stdio.c related JAVA files
-JNISTDIOJAVA :=
-# JNISTREAMSCHANNELSJAVA represents Java Streams and Channels built on top of
-#         JNIPOSIXJAVA and JNISTDIOJAVA
-JNISTREAMSCHANNELSJAVA :=
-# HADOOPJAVA represents OrangeFS/Hadoop related Java files
-# TODO: commit src to Apache Hadoop
-HADOOPJAVA :=
+# JNIJAVA represents OrangeFS JNI Client related JAVA files
+JNIJAVA :=
 
 ################################################################
 # Top level (default) targets
@@ -839,16 +807,6 @@ DEVELOBJS := $(patsubst %.c,%.o, $(filter %.c,$(DEVELSRC)))
 DEVELTOOLS := $(patsubst %.c,%, $(filter %.c, $(DEVELSRC)))
 # DEVELDEPENDS is a list of dependency files for development programs
 DEVELDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(DEVELSRC)))
-
-# JNIPOSIXCLS is a list of posix.c related JNI compiled classes
-JNIPOSIXCLS := $(patsubst %.java,%.class, $(filter %.java, $(JNIPOSIXJAVA)))
-# JNISTDIOCLS is a list of stdio.c related JNI compiled classes
-JNISTDIOCLS := $(patsubst %.java,%.class, $(filter %.java, $(JNISTDIOJAVA)))
-# JNISTREAMSCHANNELSCLS is a list of compiled classes representing Java
-#         Input and Ouput Streams and Channels.
-JNISTREAMSCHANNELSCLS := $(patsubst %.java,%.class, $(filter %.java, $(JNISTREAMSCHANNELSJAVA)))
-# HADOOPCLS is a list of compiled classes representing PVFS2/Hadoop related classes.
-HADOOPCLS := $(patsubst %.java,%.class, $(filter %.java, $(HADOOPJAVA)))
 
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
@@ -1071,52 +1029,28 @@ $(DEVELTOOLS): %: %.o
 	$(Q) "  LD 		$@"
 	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBS) -ldb $(call modldflags,$<)
 
-ifdef BUILD_HADOOP
-$(HADOOPCLS): $(HADOOPJAVA) $(OFS_JNI_JAR)
-	$(Q) "  JAVAC		$(HADOOPCLS)"
-	$(E)$(JAVAC) -cp "$(COMMONS_LOGGING_JAR):$(HADOOP_CORE_JAR):$(OFS_JNI_JAR):$(JNI_DIR)" $(HADOOPJAVA)
-
-$(OFS_HADOOP_JAR): $(HADOOPCLS)
-	$(Q) "  JAR		$@"
-	$(E)$(JAR) cf $@ -C src/client/jni org/orangefs/hadoop/fs/ofs
-endif # BUILD_HADOOP
-
 ifdef BUILD_JNI
-$(JNISTREAMSCHANNELSCLS): $(JNISTREAMSCHANNELSJAVA)
-	$(Q) "  JAVAC		$(JNISTREAMSCHANNELSCLS)"
-	$(E)$(JAVAC) -cp "$(COMMONS_LOGGING_JAR):$(JNI_DIR)" $(JNISTREAMSCHANNELSJAVA)
-	
-$(OFS_JNI_JAR): $(JNIPOSIXCLS) $(JNISTDIOCLS) $(JNISTREAMSCHANNELSCLS)
-	$(Q) "  JAR		$@"
-	$(E)$(JAR) cf $@ -C src/client/jni org/orangefs/usrint
-
-$(JNIPOSIXCLS): $(JNIPOSIXJAVA)
-	$(Q) "  JAVAC		$(JNIPOSIXCLS)"
-	$(E)$(JAVAC) -cp $(JNI_DIR) $(JNIPOSIXJAVA)
+$(OFS_JNI_JAR): $(JNIJAVA)
+	$(Q) "  MVN		$@"
+	$(E)JAVA_HOME="$(JAVA_HOME)" $(MVN) -f $(JNI_DIR)/pom.xml clean install
 
 # Force the JNI posix .class files to be a dependency of the header file. 
-$(JNIPOSIXHEADER): $(JNI_DIR)/libPVFS2POSIXJNI.c $(JNIPOSIXCLS)
+$(JNIPOSIXHEADER): $(JNI_DIR)/libPVFS2POSIXJNI.c $(OFS_JNI_JAR)
 	$(Q) "  JAVAH		$@"
-	$(E)$(JAVAH) -classpath $(JNI_DIR) -d $(JNI_DIR) $(ORGDOT).PVFS2POSIXJNI
+	$(E)$(JAVAH) -classpath $(JNI_JAVA_DIR) -d $(JNI_DIR) $(ORGDOT).PVFS2POSIXJNI
 
 # Force the required javah generated header file to be a dependency of the 
-# dependency file. $(OFS_HADOOP_JAR) is considered a dependency only when 
-#         BUILD_HADOOP is defined.
-$(JNI_DIR)/libPVFS2POSIXJNI.d: $(JNIPOSIXHEADER) $(OFS_JNI_JAR) $(OFS_HADOOP_JAR)
-
-$(JNISTDIOCLS): $(JNISTDIOJAVA)
-	$(Q) "  JAVAC		$(JNISTDIOCLS)"
-	$(E)$(JAVAC) -cp "$(COMMONS_LOGGING_JAR):$(JNI_DIR)" $(JNISTDIOJAVA)
+# dependency file. 
+$(JNI_DIR)/libPVFS2POSIXJNI.d: $(JNIPOSIXHEADER) $(OFS_JNI_JAR)
 
 # Force the JNI stdio .class files to be a dependency of the header file.
-$(JNISTDIOHEADER): $(JNI_DIR)/libPVFS2STDIOJNI.c $(JNISTDIOCLS)
+$(JNISTDIOHEADER): $(JNI_DIR)/libPVFS2STDIOJNI.c $(OFS_JNI_JAR)
 	$(Q) "  JAVAH		$@"
-	$(E)$(JAVAH) -classpath $(JNI_DIR) -d $(JNI_DIR) $(ORGDOT).PVFS2STDIOJNI
+	$(E)$(JAVAH) -classpath $(JNI_JAVA_DIR) -d $(JNI_DIR) $(ORGDOT).PVFS2STDIOJNI
 
 # Force the required javah generated header file to be a dependency of the 
-# dependency file. $(OFS_HADOOP_JAR) is considered a dependency only when 
-#         BUILD_HADOOP is defined.
-$(JNI_DIR)/libPVFS2STDIOJNI.d: $(JNISTDIOHEADER) $(OFS_JNI_JAR) $(OFS_HADOOP_JAR)
+# dependency file.
+$(JNI_DIR)/libPVFS2STDIOJNI.d: $(JNISTDIOHEADER) $(OFS_JNI_JAR)
 endif # BUILD_JNI
 
 # default rule for building executables from object files
@@ -1203,11 +1137,19 @@ endif # BUILD_JNI
 
 # all applications depend on the pvfs2 library
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
+	$(Q) "  LD		$@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS) $(call modldflags,$<)
+
 $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 
 $(USERTOOLS): %: %.o $(LIBRARIES)
+	$(Q) "  LD		$@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $< -lofs -lorangefs $(LIBS) $(call modldflags,$<)
 
+# ucached must link with liborangefs
 $(UCACHEDTOOLS): %: %.o $(LIBRARIES)
+	$(Q) "  LD      $@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $< -lorangefs $(LIBS) $(call modldflags,$<)
 
 $(KERNAPPS): %: %.o $(LIBRARIES)
 $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
@@ -1288,16 +1230,12 @@ clean::
                 src/apps/karma/karma src/apps/fuse/pvfs2fuse \
                 src/server/simple.conf examples/fs.conf
 
-ifdef BUILD_HADOOP
-clean ::
-	$(E)rm -f $(HADOOPCLS) $(OFS_HADOOP_JAR)
-endif
-
 ifdef BUILD_JNI
 clean::
-	$(E)rm -f $(JNIPOSIXHEADER) $(JNISTDIOHEADER) \
-				$(ORGDIR)/*.class \
-    			$(OFS_JNI_JAR)
+	$(E)rm -rf $(JNI_DIR)/target $(JNIPOSIXHEADER) $(JNISTDIOHEADER) \
+				src/client/hadoop/orangefs-hadoop1/target \
+				src/client/hadoop/orangefs-hadoop2/target
+
 endif
 
 ifndef DIST_RELEASE
@@ -1328,7 +1266,7 @@ endif
 # some stuff that is cleaned in both distclean and dist targets
 cleaner: clean
 	rm -f tags
-	rm -f src/kernel/linux-2.6/Makefile
+	rm -f src/kernel/linux-2.6/Makefile src/kernel/linux-2.6/modules.order
 	rm -f src/kernel/linux-2.4/Makefile
 	rm -f maint/mpi-depend.sh
 	rm -f examples/pvfs2-server.rc
@@ -1511,13 +1449,8 @@ endif
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-start-all $(sbindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-stop-all $(sbindir)
 
-ifdef BUILD_HADOOP
-	install -m 755 $(OFS_HADOOP_JAR) $(libdir)
-endif
-
 ifdef BUILD_JNI
-	install -m 755 $(OFS_JNI_JAR) $(libdir)
-	install -m 755 $(COMMONS_LOGGING_JAR) $(libdir)
+	install -m 644 $(OFS_JNI_JAR) $(libdir)
 endif
 
 ifdef BUILD_SERVER

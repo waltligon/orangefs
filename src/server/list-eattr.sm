@@ -267,7 +267,7 @@ static PINT_sm_action listeattr_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
-PINT_GET_OBJECT_REF_DEFINE(listeattr)
+PINT_GET_OBJECT_REF_DEFINE(listeattr);
 
 static int perm_listeattr(PINT_server_op *s_op)
 {

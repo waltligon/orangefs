@@ -317,176 +317,176 @@ void load_glibc(void)
     }
     memset((void *)&glibc_ops, 0, sizeof(glibc_ops));
     /* first set */
-    *(void **)(&glibc_ops.snprintf) = dlsym(libc_handle, "snprintf");
-    *(void **)(&glibc_ops.open) = dlsym(libc_handle, "open");
-    *(void **)(&glibc_ops.open64) = dlsym(libc_handle, "open64");
-    *(void **)(&glibc_ops.openat) = dlsym(libc_handle, "openat");
-    *(void **)(&glibc_ops.openat64) = dlsym(libc_handle, "openat64");
-    *(void **)(&glibc_ops.creat) = dlsym(libc_handle, "creat");
-    *(void **)(&glibc_ops.creat64) = dlsym(libc_handle, "creat64");
-    *(void **)(&glibc_ops.unlink) = dlsym(libc_handle, "unlink");
-    *(void **)(&glibc_ops.unlinkat) = dlsym(libc_handle, "unlinkat");
-    *(void **)(&glibc_ops.rename) = dlsym(libc_handle, "rename");
-    *(void **)(&glibc_ops.renameat) = dlsym(libc_handle, "renameat");
-    *(void **)(&glibc_ops.read) = dlsym(libc_handle, "read");
-    *(void **)(&glibc_ops.pread) = dlsym(libc_handle, "pread");
-    *(void **)(&glibc_ops.readv) = dlsym(libc_handle, "readv");
-    *(void **)(&glibc_ops.pread64) = dlsym(libc_handle, "pread64");
-    *(void **)(&glibc_ops.write) = dlsym(libc_handle, "write");
-    *(void **)(&glibc_ops.pwrite) = dlsym(libc_handle, "pwrite");
-    *(void **)(&glibc_ops.writev) = dlsym(libc_handle, "writev");
-    *(void **)(&glibc_ops.pwrite64) = dlsym(libc_handle, "pwrite64");
-    *(void **)(&glibc_ops.lseek) = dlsym(libc_handle, "lseek");
-    *(void **)(&glibc_ops.lseek64) = dlsym(libc_handle, "lseek64");
-    *(void **)(&glibc_ops.perror) = dlsym(libc_handle, "perror");
-    *(void **)(&glibc_ops.truncate) = dlsym(libc_handle, "truncate");
-    *(void **)(&glibc_ops.truncate64) = dlsym(libc_handle, "truncate64");
-    *(void **)(&glibc_ops.ftruncate) = dlsym(libc_handle, "ftruncate");
-    *(void **)(&glibc_ops.ftruncate64) = dlsym(libc_handle, "ftruncate64");
-    *(void **)(&glibc_ops.fallocate) = dlsym(libc_handle, "posix_fallocate");
-    *(void **)(&glibc_ops.close) = dlsym(libc_handle, "close");
+    glibc_ops.snprintf = dlsym(libc_handle, "snprintf");
+    glibc_ops.open = dlsym(libc_handle, "open");
+    glibc_ops.open64 = dlsym(libc_handle, "open64");
+    glibc_ops.openat = dlsym(libc_handle, "openat");
+    glibc_ops.openat64 = dlsym(libc_handle, "openat64");
+    glibc_ops.creat = dlsym(libc_handle, "creat");
+    glibc_ops.creat64 = dlsym(libc_handle, "creat64");
+    glibc_ops.unlink = dlsym(libc_handle, "unlink");
+    glibc_ops.unlinkat = dlsym(libc_handle, "unlinkat");
+    glibc_ops.rename = dlsym(libc_handle, "rename");
+    glibc_ops.renameat = dlsym(libc_handle, "renameat");
+    glibc_ops.read = dlsym(libc_handle, "read");
+    glibc_ops.pread = dlsym(libc_handle, "pread");
+    glibc_ops.readv = dlsym(libc_handle, "readv");
+    glibc_ops.pread64 = dlsym(libc_handle, "pread64");
+    glibc_ops.write = dlsym(libc_handle, "write");
+    glibc_ops.pwrite = dlsym(libc_handle, "pwrite");
+    glibc_ops.writev = dlsym(libc_handle, "writev");
+    glibc_ops.pwrite64 = dlsym(libc_handle, "pwrite64");
+    glibc_ops.lseek = dlsym(libc_handle, "lseek");
+    glibc_ops.lseek64 = dlsym(libc_handle, "lseek64");
+    glibc_ops.perror = dlsym(libc_handle, "perror");
+    glibc_ops.truncate = dlsym(libc_handle, "truncate");
+    glibc_ops.truncate64 = dlsym(libc_handle, "truncate64");
+    glibc_ops.ftruncate = dlsym(libc_handle, "ftruncate");
+    glibc_ops.ftruncate64 = dlsym(libc_handle, "ftruncate64");
+    glibc_ops.fallocate = dlsym(libc_handle, "posix_fallocate");
+    glibc_ops.close = dlsym(libc_handle, "close");
     /* stats */
     glibc_ops.stat = my_glibc_stat;
-    *(void **)(&glibc_redirect.stat) = dlsym(libc_handle, "__xstat");
+    glibc_redirect.stat = dlsym(libc_handle, "__xstat");
     glibc_ops.stat64 = my_glibc_stat64;
-    *(void **)(&glibc_redirect.stat64) = dlsym(libc_handle, "__xstat64");
+    glibc_redirect.stat64 = dlsym(libc_handle, "__xstat64");
     glibc_ops.fstat = my_glibc_fstat;
-    *(void **)(&glibc_redirect.fstat) = dlsym(libc_handle, "__fxstat");
+    glibc_redirect.fstat = dlsym(libc_handle, "__fxstat");
     glibc_ops.fstat64 = my_glibc_fstat64;
-    *(void **)(&glibc_redirect.fstat64) = dlsym(libc_handle, "__fxstat64");
+    glibc_redirect.fstat64 = dlsym(libc_handle, "__fxstat64");
     glibc_ops.fstatat = my_glibc_fstatat;
-    *(void **)(&glibc_redirect.fstatat) = dlsym(libc_handle, "__fxstatat");
+    glibc_redirect.fstatat = dlsym(libc_handle, "__fxstatat");
     glibc_ops.fstatat64 = my_glibc_fstatat64;
-    *(void **)(&glibc_redirect.fstatat64) = dlsym(libc_handle, "__fxstatat64");
+    glibc_redirect.fstatat64 = dlsym(libc_handle, "__fxstatat64");
     glibc_ops.lstat = my_glibc_lstat;
-    *(void **)(&glibc_redirect.lstat) = dlsym(libc_handle, "__lxstat");
+    glibc_redirect.lstat = dlsym(libc_handle, "__lxstat");
     glibc_ops.lstat64 = my_glibc_lstat64;
-    *(void **)(&glibc_redirect.lstat64) = dlsym(libc_handle, "__lxstat64");
+    glibc_redirect.lstat64 = dlsym(libc_handle, "__lxstat64");
     /* times dups chowns mks */
-    *(void **)(&glibc_ops.futimesat) = dlsym(libc_handle, "futimesat");
-    *(void **)(&glibc_ops.utimes) = dlsym(libc_handle, "utimes");
-    *(void **)(&glibc_ops.utime) = dlsym(libc_handle, "utime");
-    *(void **)(&glibc_ops.futimes) = dlsym(libc_handle, "futimes");
-    *(void **)(&glibc_ops.dup) = dlsym(libc_handle, "dup");
-    *(void **)(&glibc_ops.dup2) = dlsym(libc_handle, "dup2");
-    *(void **)(&glibc_ops.dup3) = dlsym(libc_handle, "dup3");
-    *(void **)(&glibc_ops.chown) = dlsym(libc_handle, "chown");
-    *(void **)(&glibc_ops.fchown) = dlsym(libc_handle, "fchown");
-    *(void **)(&glibc_ops.fchownat) = dlsym(libc_handle, "fchownat");
-    *(void **)(&glibc_ops.lchown) = dlsym(libc_handle, "lchown");
-    *(void **)(&glibc_ops.chmod) = dlsym(libc_handle, "chmod");
-    *(void **)(&glibc_ops.fchmod) = dlsym(libc_handle, "fchmod");
-    *(void **)(&glibc_ops.fchmodat) = dlsym(libc_handle, "fchmodat");
-    *(void **)(&glibc_ops.mkdir) = dlsym(libc_handle, "mkdir");
-    *(void **)(&glibc_ops.mkdirat) = dlsym(libc_handle, "mkdirat");
-    *(void **)(&glibc_ops.rmdir) = dlsym(libc_handle, "rmdir");
-    *(void **)(&glibc_ops.readlink) = dlsym(libc_handle, "readlink");
-    *(void **)(&glibc_ops.readlinkat) = dlsym(libc_handle, "readlinkat");
-    *(void **)(&glibc_ops.symlink) = dlsym(libc_handle, "symlink");
-    *(void **)(&glibc_ops.symlinkat) = dlsym(libc_handle, "symlinkat");
-    *(void **)(&glibc_ops.link) = dlsym(libc_handle, "link");
-    *(void **)(&glibc_ops.linkat) = dlsym(libc_handle, "linkat");
+    glibc_ops.futimesat = dlsym(libc_handle, "futimesat");
+    glibc_ops.utimes = dlsym(libc_handle, "utimes");
+    glibc_ops.utime = dlsym(libc_handle, "utime");
+    glibc_ops.futimes = dlsym(libc_handle, "futimes");
+    glibc_ops.dup = dlsym(libc_handle, "dup");
+    glibc_ops.dup2 = dlsym(libc_handle, "dup2");
+    glibc_ops.dup3 = dlsym(libc_handle, "dup3");
+    glibc_ops.chown = dlsym(libc_handle, "chown");
+    glibc_ops.fchown = dlsym(libc_handle, "fchown");
+    glibc_ops.fchownat = dlsym(libc_handle, "fchownat");
+    glibc_ops.lchown = dlsym(libc_handle, "lchown");
+    glibc_ops.chmod = dlsym(libc_handle, "chmod");
+    glibc_ops.fchmod = dlsym(libc_handle, "fchmod");
+    glibc_ops.fchmodat = dlsym(libc_handle, "fchmodat");
+    glibc_ops.mkdir = dlsym(libc_handle, "mkdir");
+    glibc_ops.mkdirat = dlsym(libc_handle, "mkdirat");
+    glibc_ops.rmdir = dlsym(libc_handle, "rmdir");
+    glibc_ops.readlink = dlsym(libc_handle, "readlink");
+    glibc_ops.readlinkat = dlsym(libc_handle, "readlinkat");
+    glibc_ops.symlink = dlsym(libc_handle, "symlink");
+    glibc_ops.symlinkat = dlsym(libc_handle, "symlinkat");
+    glibc_ops.link = dlsym(libc_handle, "link");
+    glibc_ops.linkat = dlsym(libc_handle, "linkat");
     /* readdirs and misc */
     glibc_ops.readdir = my_glibc_readdir;
     glibc_ops.getdents = my_glibc_getdents;
     glibc_ops.getdents64 = my_glibc_getdents64;
-    *(void **)(&glibc_ops.access) = dlsym(libc_handle, "access");
-    *(void **)(&glibc_ops.faccessat) = dlsym(libc_handle, "faccessat");
-    *(void **)(&glibc_ops.flock) = dlsym(libc_handle, "flock");
-    *(void **)(&glibc_ops.fcntl) = dlsym(libc_handle, "fcntl");
-    *(void **)(&glibc_ops.sync) = dlsym(libc_handle, "sync");
-    *(void **)(&glibc_ops.fsync) = dlsym(libc_handle, "fsync");
-    *(void **)(&glibc_ops.fdatasync) = dlsym(libc_handle, "fdatasync");
+    glibc_ops.access = dlsym(libc_handle, "access");
+    glibc_ops.faccessat = dlsym(libc_handle, "faccessat");
+    glibc_ops.flock = dlsym(libc_handle, "flock");
+    glibc_ops.fcntl = dlsym(libc_handle, "fcntl");
+    glibc_ops.sync = dlsym(libc_handle, "sync");
+    glibc_ops.fsync = dlsym(libc_handle, "fsync");
+    glibc_ops.fdatasync = dlsym(libc_handle, "fdatasync");
     glibc_ops.fadvise = my_glibc_fadvise;
     glibc_ops.fadvise64 = my_glibc_fadvise64;
-    *(void **)(&glibc_ops.statfs) = dlsym(libc_handle, "statfs");
-    *(void **)(&glibc_ops.statfs64) = dlsym(libc_handle, "statfs64");
-    *(void **)(&glibc_ops.fstatfs) = dlsym(libc_handle, "fstatfs");
-    *(void **)(&glibc_ops.fstatfs64) = dlsym(libc_handle, "fstatfs64");
-    *(void **)(&glibc_ops.statvfs) = dlsym(libc_handle, "statvfs");
-    *(void **)(&glibc_ops.fstatvfs) = dlsym(libc_handle, "fstatvfs");
+    glibc_ops.statfs = dlsym(libc_handle, "statfs");
+    glibc_ops.statfs64 = dlsym(libc_handle, "statfs64");
+    glibc_ops.fstatfs = dlsym(libc_handle, "fstatfs");
+    glibc_ops.fstatfs64 = dlsym(libc_handle, "fstatfs64");
+    glibc_ops.statvfs = dlsym(libc_handle, "statvfs");
+    glibc_ops.fstatvfs = dlsym(libc_handle, "fstatvfs");
     glibc_ops.mknod = my_glibc_mknod;
-    *(void **)(&glibc_redirect.mknod) = dlsym(libc_handle, "__xmknod");
+    glibc_redirect.mknod = dlsym(libc_handle, "__xmknod");
     glibc_ops.mknodat = my_glibc_mknodat;
-    *(void **)(&glibc_redirect.mknodat) = dlsym(libc_handle, "__xmknodat");
-    *(void **)(&glibc_ops.sendfile) = dlsym(libc_handle, "sendfile");
-    *(void **)(&glibc_ops.sendfile64) = dlsym(libc_handle, "sendfile64");
+    glibc_redirect.mknodat = dlsym(libc_handle, "__xmknodat");
+    glibc_ops.sendfile = dlsym(libc_handle, "sendfile");
+    glibc_ops.sendfile64 = dlsym(libc_handle, "sendfile64");
 #ifdef HAVE_ATTR_XATTR_H
-    *(void **)(&glibc_ops.setxattr) = dlsym(libc_handle, "setxattr");
-    *(void **)(&glibc_ops.lsetxattr) = dlsym(libc_handle, "lsetxattr");
-    *(void **)(&glibc_ops.fsetxattr) = dlsym(libc_handle, "fsetxattr");
-    *(void **)(&glibc_ops.getxattr) = dlsym(libc_handle, "getxattr");
-    *(void **)(&glibc_ops.lgetxattr) = dlsym(libc_handle, "lgetxattr");
-    *(void **)(&glibc_ops.fgetxattr) = dlsym(libc_handle, "fgetxattr");
-    *(void **)(&glibc_ops.listxattr) = dlsym(libc_handle, "listxattr");
-    *(void **)(&glibc_ops.llistxattr) = dlsym(libc_handle, "llistxattr");
-    *(void **)(&glibc_ops.flistxattr) = dlsym(libc_handle, "flistxattr");
-    *(void **)(&glibc_ops.removexattr) = dlsym(libc_handle, "removexattr");
-    *(void **)(&glibc_ops.lremovexattr) = dlsym(libc_handle, "lremovexattr");
-    *(void **)(&glibc_ops.fremovexattr) = dlsym(libc_handle, "fremovexattr");
+    glibc_ops.setxattr = dlsym(libc_handle, "setxattr");
+    glibc_ops.lsetxattr = dlsym(libc_handle, "lsetxattr");
+    glibc_ops.fsetxattr = dlsym(libc_handle, "fsetxattr");
+    glibc_ops.getxattr = dlsym(libc_handle, "getxattr");
+    glibc_ops.lgetxattr = dlsym(libc_handle, "lgetxattr");
+    glibc_ops.fgetxattr = dlsym(libc_handle, "fgetxattr");
+    glibc_ops.listxattr = dlsym(libc_handle, "listxattr");
+    glibc_ops.llistxattr = dlsym(libc_handle, "llistxattr");
+    glibc_ops.flistxattr = dlsym(libc_handle, "flistxattr");
+    glibc_ops.removexattr = dlsym(libc_handle, "removexattr");
+    glibc_ops.lremovexattr = dlsym(libc_handle, "lremovexattr");
+    glibc_ops.fremovexattr = dlsym(libc_handle, "fremovexattr");
 #endif
-    *(void **)(&glibc_ops.socket) = dlsym(libc_handle, "socket");
-    *(void **)(&glibc_ops.accept) = dlsym(libc_handle, "accept");
-    *(void **)(&glibc_ops.bind) = dlsym(libc_handle, "bind");
-    *(void **)(&glibc_ops.connect) = dlsym(libc_handle, "connect");
-    *(void **)(&glibc_ops.getpeername) = dlsym(libc_handle, "getpeername");
-    *(void **)(&glibc_ops.getsockname) = dlsym(libc_handle, "getsockname");
-    *(void **)(&glibc_ops.getsockopt) = dlsym(libc_handle, "getsockopt");
-    *(void **)(&glibc_ops.setsockopt) = dlsym(libc_handle, "setsockopt");
-    *(void **)(&glibc_ops.ioctl) = dlsym(libc_handle, "ioctl");
-    *(void **)(&glibc_ops.listen) = dlsym(libc_handle, "listen");
-    *(void **)(&glibc_ops.recv) = dlsym(libc_handle, "recv");
-    *(void **)(&glibc_ops.recvfrom) = dlsym(libc_handle, "recvfrom");
-    *(void **)(&glibc_ops.recvmsg) = dlsym(libc_handle, "recvmsg");
-    *(void **)(&glibc_ops.send) = dlsym(libc_handle, "send");
-    *(void **)(&glibc_ops.sendto) = dlsym(libc_handle, "sendto");
-    *(void **)(&glibc_ops.sendmsg) = dlsym(libc_handle, "sendmsg");
-    *(void **)(&glibc_ops.shutdown) = dlsym(libc_handle, "shutdown");
-    *(void **)(&glibc_ops.socketpair) = dlsym(libc_handle, "socketpair");
-    *(void **)(&glibc_ops.pipe) = dlsym(libc_handle, "pipe");
-    *(void **)(&glibc_ops.umask) = dlsym(libc_handle, "umask");
-    *(void **)(&glibc_ops.getumask) = dlsym(libc_handle, "getumask");
-    *(void **)(&glibc_ops.getdtablesize) = dlsym(libc_handle, "getdtablesize");
-    *(void **)(&glibc_ops.mmap) = dlsym(libc_handle, "mmap");
-    *(void **)(&glibc_ops.munmap) = dlsym(libc_handle, "munmap");
-    *(void **)(&glibc_ops.msync) = dlsym(libc_handle, "msync");
+    glibc_ops.socket = dlsym(libc_handle, "socket");
+    glibc_ops.accept = dlsym(libc_handle, "accept");
+    glibc_ops.bind = dlsym(libc_handle, "bind");
+    glibc_ops.connect = dlsym(libc_handle, "connect");
+    glibc_ops.getpeername = dlsym(libc_handle, "getpeername");
+    glibc_ops.getsockname = dlsym(libc_handle, "getsockname");
+    glibc_ops.getsockopt = dlsym(libc_handle, "getsockopt");
+    glibc_ops.setsockopt = dlsym(libc_handle, "setsockopt");
+    glibc_ops.ioctl = dlsym(libc_handle, "ioctl");
+    glibc_ops.listen = dlsym(libc_handle, "listen");
+    glibc_ops.recv = dlsym(libc_handle, "recv");
+    glibc_ops.recvfrom = dlsym(libc_handle, "recvfrom");
+    glibc_ops.recvmsg = dlsym(libc_handle, "recvmsg");
+    glibc_ops.send = dlsym(libc_handle, "send");
+    glibc_ops.sendto = dlsym(libc_handle, "sendto");
+    glibc_ops.sendmsg = dlsym(libc_handle, "sendmsg");
+    glibc_ops.shutdown = dlsym(libc_handle, "shutdown");
+    glibc_ops.socketpair = dlsym(libc_handle, "socketpair");
+    glibc_ops.pipe = dlsym(libc_handle, "pipe");
+    glibc_ops.umask = dlsym(libc_handle, "umask");
+    glibc_ops.getumask = dlsym(libc_handle, "getumask");
+    glibc_ops.getdtablesize = dlsym(libc_handle, "getdtablesize");
+    glibc_ops.mmap = dlsym(libc_handle, "mmap");
+    glibc_ops.munmap = dlsym(libc_handle, "munmap");
+    glibc_ops.msync = dlsym(libc_handle, "msync");
 #if 0
     /* might need these some day */
-    *(void **)(&glibc_ops.acl_delete_def_file) = dlsym(libc_handle, "acl_delete_def_file");
-    *(void **)(&glibc_ops.acl_get_fd) = dlsym(libc_handle, "acl_get_fd");
-    *(void **)(&glibc_ops.acl_get_file) = dlsym(libc_handle, "acl_get_file");
-    *(void **)(&glibc_ops.acl_set_fd) = dlsym(libc_handle, "acl_set_fd");
-    *(void **)(&glibc_ops.acl_set_file) = dlsym(libc_handle, "acl_set_file");
+    glibc_ops.acl_delete_def_file = dlsym(libc_handle, "acl_delete_def_file");
+    glibc_ops.acl_get_fd = dlsym(libc_handle, "acl_get_fd");
+    glibc_ops.acl_get_file = dlsym(libc_handle, "acl_get_file");
+    glibc_ops.acl_set_fd = dlsym(libc_handle, "acl_set_fd");
+    glibc_ops.acl_set_file = dlsym(libc_handle, "acl_set_file");
 #endif
-    *(void **)(&glibc_ops.getfscreatecon) = dlsym(libc_handle, "getfscreatecon");
-    *(void **)(&glibc_ops.getfilecon) = dlsym(libc_handle, "getfilecon");
-    *(void **)(&glibc_ops.lgetfilecon) = dlsym(libc_handle, "lgetfilecon");
-    *(void **)(&glibc_ops.fgetfilecon) = dlsym(libc_handle, "fgetfilecon");
-    *(void **)(&glibc_ops.setfscreatecon) = dlsym(libc_handle, "setfscreatecon");
-    *(void **)(&glibc_ops.setfilecon) = dlsym(libc_handle, "setfilecon");
-    *(void **)(&glibc_ops.lsetfilecon) = dlsym(libc_handle, "lsetfilecon");
-    *(void **)(&glibc_ops.fsetfilecon) = dlsym(libc_handle, "fsetfilecon");
+    glibc_ops.getfscreatecon = dlsym(libc_handle, "getfscreatecon");
+    glibc_ops.getfilecon = dlsym(libc_handle, "getfilecon");
+    glibc_ops.lgetfilecon = dlsym(libc_handle, "lgetfilecon");
+    glibc_ops.fgetfilecon = dlsym(libc_handle, "fgetfilecon");
+    glibc_ops.setfscreatecon = dlsym(libc_handle, "setfscreatecon");
+    glibc_ops.setfilecon = dlsym(libc_handle, "setfilecon");
+    glibc_ops.lsetfilecon = dlsym(libc_handle, "lsetfilecon");
+    glibc_ops.fsetfilecon = dlsym(libc_handle, "fsetfilecon");
 
     /* PVFS does not implement socket ops */
-    *(void **)(&pvfs_ops.socket) = dlsym(libc_handle, "socket");
-    *(void **)(&pvfs_ops.accept) = dlsym(libc_handle, "accept");
-    *(void **)(&pvfs_ops.bind) = dlsym(libc_handle, "bind");
-    *(void **)(&pvfs_ops.connect) = dlsym(libc_handle, "connect");
-    *(void **)(&pvfs_ops.getpeername) = dlsym(libc_handle, "getpeername");
-    *(void **)(&pvfs_ops.getsockname) = dlsym(libc_handle, "getsockname");
-    *(void **)(&pvfs_ops.getsockopt) = dlsym(libc_handle, "getsockopt");
-    *(void **)(&pvfs_ops.setsockopt) = dlsym(libc_handle, "setsockopt");
-    *(void **)(&pvfs_ops.ioctl) = dlsym(libc_handle, "ioctl");
-    *(void **)(&pvfs_ops.listen) = dlsym(libc_handle, "listen");
-    *(void **)(&pvfs_ops.recv) = dlsym(libc_handle, "recv");
-    *(void **)(&pvfs_ops.recvfrom) = dlsym(libc_handle, "recvfrom");
-    *(void **)(&pvfs_ops.recvmsg) = dlsym(libc_handle, "recvmsg");
-    *(void **)(&pvfs_ops.send) = dlsym(libc_handle, "send");
-    *(void **)(&pvfs_ops.sendto) = dlsym(libc_handle, "sendto");
-    *(void **)(&pvfs_ops.sendmsg) = dlsym(libc_handle, "sendmsg");
-    *(void **)(&pvfs_ops.shutdown) = dlsym(libc_handle, "shutdown");
-    *(void **)(&pvfs_ops.socketpair) = dlsym(libc_handle, "socketpair");
-    *(void **)(&pvfs_ops.pipe) = dlsym(libc_handle, "pipe");
+    pvfs_ops.socket = dlsym(libc_handle, "socket");
+    pvfs_ops.accept = dlsym(libc_handle, "accept");
+    pvfs_ops.bind = dlsym(libc_handle, "bind");
+    pvfs_ops.connect = dlsym(libc_handle, "connect");
+    pvfs_ops.getpeername = dlsym(libc_handle, "getpeername");
+    pvfs_ops.getsockname = dlsym(libc_handle, "getsockname");
+    pvfs_ops.getsockopt = dlsym(libc_handle, "getsockopt");
+    pvfs_ops.setsockopt = dlsym(libc_handle, "setsockopt");
+    pvfs_ops.ioctl = dlsym(libc_handle, "ioctl");
+    pvfs_ops.listen = dlsym(libc_handle, "listen");
+    pvfs_ops.recv = dlsym(libc_handle, "recv");
+    pvfs_ops.recvfrom = dlsym(libc_handle, "recvfrom");
+    pvfs_ops.recvmsg = dlsym(libc_handle, "recvmsg");
+    pvfs_ops.send = dlsym(libc_handle, "send");
+    pvfs_ops.sendto = dlsym(libc_handle, "sendto");
+    pvfs_ops.sendmsg = dlsym(libc_handle, "sendmsg");
+    pvfs_ops.shutdown = dlsym(libc_handle, "shutdown");
+    pvfs_ops.socketpair = dlsym(libc_handle, "socketpair");
+    pvfs_ops.pipe = dlsym(libc_handle, "pipe");
 
     /* should have been previously opened */
     /* this decrements the reference count */
@@ -858,8 +858,7 @@ static int init_usrint_internal(void)
     int rc = 0;
     int i;
 
-    /* The recursive mutex */
-    static gen_mutex_t rec_mutex;
+    static gen_mutex_t mutex = GEN_RECURSIVE_MUTEX_INITIALIZER; 
 
     /* only one initialize happens */
     if(pvfs_lib_init_flag)
@@ -871,13 +870,13 @@ static int init_usrint_internal(void)
     errno_in = errno;
 
     /* make sure no double inits */
-    gen_mutex_lock(&rec_mutex);
+    gen_mutex_lock(&mutex);
     if(pvfs_lib_init_flag || pvfs_initializing_flag)
     {
-        gen_mutex_unlock(&rec_mutex);
+        gen_mutex_unlock(&mutex);
         /* make sure errors in here don't carry out */
         errno = errno_in;
-        return -1;
+        return 1;
     }
 
     /* set this to prevent pvfs_sys_init from running recursively (indirect) */
@@ -887,11 +886,9 @@ static int init_usrint_internal(void)
     /*       BEGIN INITIALIZATION         */
     /**************************************/
 
-    if (gen_posix_recursive_mutex_init(&rec_mutex) < 0)
-    {
-        gossip_err("init_usrint_internal: could not init recursive mutex\n");
-        return -1;
-    }
+#if PVFS_USER_ENV_VARS_ENABLED
+    env_vars_struct_initialize(&env_vars);
+#endif /* USER_ENVIRONMENT_VARIABLES */
 
     /* this allows system calls to be run */
     /* init_glibc_malloc(); */
@@ -1183,7 +1180,7 @@ static int init_usrint_internal(void)
 
     pvfs_lib_init_flag = 1;
     pvfs_initializing_flag = 0;
-    gen_mutex_unlock(&rec_mutex);
+    gen_mutex_unlock(&mutex);
     /* make sure errors in here don't carry out */
     errno = errno_in;
     return 0;

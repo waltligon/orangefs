@@ -30,7 +30,7 @@
 /*
  * gettimeofday
  */
-static int gettimeofday(struct timeval *tv, struct timezone *tz)
+static inline int gettimeofday(struct timeval *tv, struct timezone *tz)
 {
     struct _timeb timebuffer;
     errno_t ret;

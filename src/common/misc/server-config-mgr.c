@@ -222,7 +222,7 @@ int PINT_server_config_mgr_add_config(struct server_configuration_s *config_s,
     *free_config_flag = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_server_config_mgr_add_"
-                 "config: adding config %p\n", (void *)config_s);
+                 "config: adding config %p\n", config_s);
 
     if (SC_MGR_INITIALIZED() && config_s)
     {
@@ -262,7 +262,7 @@ int PINT_server_config_mgr_add_config(struct server_configuration_s *config_s,
         qhash_add(s_fsid_to_config_table, &fs_id, &config->hash_link);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG, "\tmapped fs_id %d => "
-                     "config %p\n", fs_id, (void *)config_s);
+                     "config %p\n", fs_id, config_s);
 
         gen_mutex_unlock(&s_server_config_mgr_mutex);
 
@@ -311,7 +311,7 @@ int PINT_server_config_mgr_remove_config(PVFS_fs_id fs_id)
             {
                 gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: "
                              "Removed config object %p with fs_id %d\n",
-                             __func__, (void *)config, fs_id);
+                             __func__, config, fs_id);
                 qhash_del(&config->hash_link);
 
                 /*
@@ -328,7 +328,7 @@ int PINT_server_config_mgr_remove_config(PVFS_fs_id fs_id)
             {
                 gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: "
                              "Config object %p with fs_id %d still in use.\n",
-                             __func__, (void *)config, fs_id);
+                             __func__, config, fs_id);
             }
 
             ret = 0;

@@ -29,6 +29,7 @@
 #include "job.h"
 #include "acache.h"
 #include "ncache.h"
+#include "client-capcache.h"
 #include "tcache.h"
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
@@ -89,6 +90,8 @@ typedef struct
     int ncache_timeout;
     int ccache_timeout;
     int ccache_timeout_set;
+    int capcache_timeout;
+    int capcache_timeout_set;
     char* logfile;
     char* logtype;
     unsigned int acache_hard_limit;
@@ -109,6 +112,12 @@ typedef struct
     int ccache_soft_limit_set;
     unsigned int ccache_reclaim_percentage;
     int ccache_reclaim_percentage_set;
+    unsigned int capcache_hard_limit;
+    int capcache_hard_limit_set;
+    unsigned int capcache_soft_limit;
+    int capcache_soft_limit_set;
+    unsigned int capcache_reclaim_percentage;
+    int capcache_reclaim_percentage_set;
     unsigned int perf_time_interval_secs;
     unsigned int perf_history_size;
     char* gossip_mask;
@@ -230,8 +239,6 @@ static int s_client_signal = 0;
 static struct PVFS_dev_map_desc s_io_desc[NUM_MAP_DESC];
 static struct PINT_dev_params s_desc_params[NUM_MAP_DESC];
 
-static struct PINT_perf_counter* acache_pc = NULL;
-static struct PINT_perf_counter* ncache_pc = NULL;
 /* static char hostname[100]; */
 
 /* used only for deleting all allocated vfs_request objects */
@@ -257,8 +264,9 @@ static int set_acache_parameters(options_t* s_opts);
 static void set_device_parameters(options_t *s_opts);
 static void reset_ncache_timeout(void);
 static int set_ncache_parameters(options_t* s_opts);
+static int set_capcache_parameters(options_t* s_opts);
 static void finalize_perf_items(int n, ... );
-inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req);
+static void fill_hints(PVFS_hint *hints, vfs_request_t *req);
 
 static PVFS_credential *lookup_credential(
     PVFS_uid uid,
@@ -289,7 +297,7 @@ static int write_device_response(
 do {                                                                         \
     void *buffer_list[MAX_LIST_SIZE];                                        \
     int size_list[MAX_LIST_SIZE];                                            \
-    int list_size = 0, total_size = 0;                                       \
+    int list_size = 0, total_size = 0, ret;                                  \
                                                                              \
     log_operation_timing(vfs_request);                                       \
     buffer_list[0] = &vfs_request->out_downcall;                             \
@@ -332,16 +340,16 @@ static void pvfs2_khandle_from_handle(PVFS_handle *handle,
 
   memset(khandle,0,16);
 
-  ihandle.ino = *handle;
+  ihandle.u.ino = *handle;
 
-  khandle->u[0] = ihandle.u[0];
-  khandle->u[1] = ihandle.u[1];
-  khandle->u[2] = ihandle.u[2];
-  khandle->u[3] = ihandle.u[3];
-  khandle->u[12] = ihandle.u[4];
-  khandle->u[13] = ihandle.u[5];
-  khandle->u[14] = ihandle.u[6];
-  khandle->u[15] = ihandle.u[7];
+  khandle->u.u[0] = ihandle.u.u[0];
+  khandle->u.u[1] = ihandle.u.u[1];
+  khandle->u.u[2] = ihandle.u.u[2];
+  khandle->u.u[3] = ihandle.u.u[3];
+  khandle->u.u[12] = ihandle.u.u[4];
+  khandle->u.u[13] = ihandle.u.u[5];
+  khandle->u.u[14] = ihandle.u.u[6];
+  khandle->u.u[15] = ihandle.u.u[7];
 }
 
 static void client_segfault_handler(int signum, siginfo_t *info, void *secret)
@@ -450,7 +458,7 @@ static PVFS_error cancel_op_in_progress(PVFS_id_gen_t tag)
         assert(vfs_request->in_upcall.type == PVFS2_VFS_OP_FILE_IO);
 
         gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "cancelling I/O req %p "
-                     "from tag %lld\n", (void *)vfs_request, lld(tag));
+                     "from tag %lld\n", vfs_request, lld(tag));
 
         ret = PINT_client_io_cancel(vfs_request->op_id);
         if (ret < 0)
@@ -565,7 +573,7 @@ static void *exec_remount(void *ptr)
     return NULL;
 }
 
-static inline void log_operation_timing(vfs_request_t *vfs_request)
+static void log_operation_timing(vfs_request_t *vfs_request)
 {
 #ifdef CLIENT_CORE_OP_TIMING
     double wtime = 0.0f, utime = 0.0f, stime = 0.0f;
@@ -579,7 +587,7 @@ static inline void log_operation_timing(vfs_request_t *vfs_request)
         GOSSIP_CLIENTCORE_TIMING_DEBUG, "%s complete (vfs_request "
         "%p)\n\twtime = %f, utime=%f, stime=%f (seconds)\n",
         get_vfs_op_name_str(vfs_request->in_upcall.type),
-        (void *)vfs_request, wtime, utime, stime);
+        vfs_request, wtime, utime, stime);
 #else
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "%s complete (vfs_request %p)\n",
@@ -1491,7 +1499,7 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
 }
 
 
-static inline int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
+static int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
         pvfs2_upcall_t *in_upcall, int mount) 
 {
     char *ptr = NULL, *ptrcomma = NULL;
@@ -1692,8 +1700,8 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
     switch(vfs_request->in_upcall.req.perf_count.type)
     {
         case PVFS2_PERF_COUNT_REQUEST_ACACHE:
-            tmp_str = PINT_perf_generate_text(acache_pc,
-                PERF_COUNT_BUF_SIZE);
+            tmp_str = PINT_perf_generate_text(PINT_acache_get_pc(),
+                                              PERF_COUNT_BUF_SIZE);
             if(!tmp_str)
             {
                 vfs_request->out_downcall.status = -PVFS_EINVAL;
@@ -1708,7 +1716,7 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             break;
 
         case PVFS2_PERF_COUNT_REQUEST_NCACHE:
-            tmp_str = PINT_perf_generate_text(ncache_pc,
+            tmp_str = PINT_perf_generate_text(PINT_ncache_get_pc(),
                 PERF_COUNT_BUF_SIZE);
             if(!tmp_str)
             {
@@ -1723,6 +1731,22 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             }
             break;
 
+        case PVFS2_PERF_COUNT_REQUEST_CAPCACHE:
+            tmp_str = PINT_perf_generate_text(PINT_client_capcache_get_pc(),
+                PERF_COUNT_BUF_SIZE);
+            if(!tmp_str)
+            {
+                vfs_request->out_downcall.status = -PVFS_EINVAL;
+            }
+            else
+            {
+                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                    tmp_str, PERF_COUNT_BUF_SIZE);
+                free(tmp_str);
+                vfs_request->out_downcall.status = 0;
+            }
+            break;
+           
         default:
             /* unsupported request, didn't match anything in case statement */
             vfs_request->out_downcall.status = -PVFS_ENOSYS;
@@ -1734,9 +1758,10 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
     return 0;
 }
 
-#define ACACHE 0
-#define NCACHE 1
-#define CCACHE 2
+#define ACACHE   0
+#define NCACHE   1
+#define CCACHE   2
+#define CAPCACHE 3
 static PVFS_error service_param_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -1804,6 +1829,22 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             tmp_param = TCACHE_RECLAIM_PERCENTAGE;
             tmp_subsystem = CCACHE;
             break;
+        case PVFS2_PARAM_REQUEST_OP_CAPCACHE_TIMEOUT_SECS:
+            tmp_param = TCACHE_TIMEOUT_MSECS;
+            tmp_subsystem = CAPCACHE;
+            break;
+        case PVFS2_PARAM_REQUEST_OP_CAPCACHE_HARD_LIMIT:
+            tmp_param = TCACHE_HARD_LIMIT;
+            tmp_subsystem = CAPCACHE;
+            break;
+        case PVFS2_PARAM_REQUEST_OP_CAPCACHE_SOFT_LIMIT:
+            tmp_param = TCACHE_SOFT_LIMIT;
+            tmp_subsystem = CAPCACHE;
+            break;
+        case PVFS2_PARAM_REQUEST_OP_CAPCACHE_RECLAIM_PERCENTAGE:
+            tmp_param = TCACHE_RECLAIM_PERCENTAGE;
+            tmp_subsystem = CAPCACHE;
+            break;
         /* These next few case statements return without falling through */
         case PVFS2_PARAM_REQUEST_OP_CLIENT_DEBUG:
             gossip_debug(GOSSIP_PROC_DEBUG,"Got request to SET the client debug mask...\n");
@@ -1838,17 +1879,23 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             if(vfs_request->in_upcall.req.param.type ==
                 PVFS2_PARAM_REQUEST_GET)
             {
-                ret = PINT_perf_get_info(
-                    acache_pc, PINT_PERF_HISTORY_SIZE, &tmp_perf_val);
+                ret = PINT_perf_get_info(PINT_acache_get_pc(),
+                                         PINT_PERF_HISTORY_SIZE,
+                                         &tmp_perf_val);
                 vfs_request->out_downcall.resp.param.value = tmp_perf_val;
             }
             else
             {
                 tmp_perf_val = vfs_request->in_upcall.req.param.value;
-                ret = PINT_perf_set_info(
-                    acache_pc, PINT_PERF_HISTORY_SIZE, tmp_perf_val);
-                ret = PINT_perf_set_info(
-                    ncache_pc, PINT_PERF_HISTORY_SIZE, tmp_perf_val);
+                ret = PINT_perf_set_info(PINT_acache_get_pc(),
+                                         PINT_PERF_HISTORY_SIZE,
+                                         tmp_perf_val);
+                ret = PINT_perf_set_info(PINT_ncache_get_pc(),
+                                         PINT_PERF_HISTORY_SIZE,
+                                         tmp_perf_val);
+                ret = PINT_perf_set_info(PINT_client_capcache_get_pc(),
+                                         PINT_PERF_HISTORY_SIZE,
+                                         tmp_perf_val);
             }    
             vfs_request->out_downcall.status = ret;
             return(0);
@@ -1857,8 +1904,9 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             if(vfs_request->in_upcall.req.param.type ==
                 PVFS2_PARAM_REQUEST_SET)
             {
-                PINT_perf_reset(acache_pc);
-                PINT_perf_reset(ncache_pc);
+                PINT_perf_reset(PINT_acache_get_pc());
+                PINT_perf_reset(PINT_ncache_get_pc());
+                PINT_perf_reset(PINT_client_capcache_get_pc());
             }    
             vfs_request->out_downcall.resp.param.value = 0;
             vfs_request->out_downcall.status = 0;
@@ -1873,7 +1921,7 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
         return 0;
     }
 
-    /* get or set acache/ncache parameters */
+    /* get or set cache parameters */
     if(vfs_request->in_upcall.req.param.type ==
         PVFS2_PARAM_REQUEST_GET)
     {
@@ -1887,7 +1935,7 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             vfs_request->out_downcall.status =
                 PINT_ncache_get_info(tmp_param, &val);
         }
-        else /* CCACHE */
+        else if (tmp_subsystem == CCACHE)
         {
             vfs_request->out_downcall.status = 
                 PINT_tcache_get_info(credential_cache, tmp_param, &val);
@@ -1897,6 +1945,17 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                 val /= 1000;
             }
         }
+        else /* CAPCACHE */
+        {
+            vfs_request->out_downcall.status = 
+                PINT_client_capcache_get_info(tmp_param, &val);
+            if (vfs_request->in_upcall.req.param.op == 
+                PVFS2_PARAM_REQUEST_OP_CAPCACHE_TIMEOUT_SECS)
+            {
+                val /= 1000;
+            }
+        }
+
         vfs_request->out_downcall.resp.param.value = val;
     }
     else
@@ -1913,7 +1972,7 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             vfs_request->out_downcall.status = 
                 PINT_ncache_set_info(tmp_param, val);
         }
-        else /* CCACHE */
+        else if (tmp_subsystem == CCACHE)
         {
             if (vfs_request->in_upcall.req.param.op == 
                 PVFS2_PARAM_REQUEST_OP_CCACHE_TIMEOUT_SECS)
@@ -1923,12 +1982,23 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             vfs_request->out_downcall.status = 
                 PINT_tcache_set_info(credential_cache, tmp_param, val);
         }
+        else /* CAPCACHE */
+        {
+            if (vfs_request->in_upcall.req.param.op == 
+                PVFS2_PARAM_REQUEST_OP_CAPCACHE_TIMEOUT_SECS)
+            {
+                val *= 1000;
+            }
+            vfs_request->out_downcall.status =
+                PINT_client_capcache_set_info(tmp_param, val);
+        }
     }
     return 0;
 }
 #undef ACACHE 
 #undef NCACHE 
 #undef CCACHE
+#undef CAPCACHE
 
 static PVFS_error post_statfs_request(vfs_request_t *vfs_request)
 {
@@ -2188,7 +2258,7 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
     }
 #endif /* USE_MMAP_RA_CACHE */
 
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "posted %s: off %ld size %ld tag: %lld\n",
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "posted %s: off %ld size %ld tag: %Ld\n",
             vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ ? "read" : "write",
             (unsigned long) vfs_request->in_upcall.req.io.offset,
             (unsigned long) vfs_request->in_upcall.req.io.count,
@@ -2326,7 +2396,8 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
     /* trailer is interpreted as struct read_write_x */
     if (vfs_request->in_upcall.trailer_size % sizeof(struct read_write_x) != 0)
     {
-        gossip_err("post_iox_request: trailer size (%lld) is not a multiple of read_write_x structure (%ld)\n",
+        gossip_err("post_iox_request: trailer size (%Ld) "
+                   "is not a multiple of read_write_x structure (%ld)\n",
             lld(vfs_request->in_upcall.trailer_size),
             (long) sizeof(struct read_write_x));
         goto out;
@@ -2645,8 +2716,9 @@ PVFS_error write_device_response(
     int outcount = 0;
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, 
-                 "%s: writing device response.  tag: %llu\n",
-                 __func__, llu(tag));
+                 "%s: writing device response. tag: %llu, "
+                 "error code: %d\n",
+                 __func__, llu(tag), jstat->error_code);
 
     if (buffer_list && size_list && list_size &&
         total_size && (list_size < MAX_LIST_SIZE))
@@ -2700,12 +2772,12 @@ static long encode_dirents(pvfs2_readdir_response_t *ptr, PVFS_sysresp_readdir *
     {
         enc_string(pptr, &readdir->dirent_array[i].d_name);
         /* format the handle as a khandle */
-        s.ino = readdir->dirent_array[i].handle; 
-        *(unsigned int *) *pptr = s.slice[0];
+        s.u.ino = readdir->dirent_array[i].handle; 
+        *(unsigned int *) *pptr = s.u.slice[0];
         *pptr += 4;
 	memset((void *)*pptr,0,8);
         *pptr += 8;
-        *(unsigned int *) *pptr = s.slice[1];
+        *(unsigned int *) *pptr = s.u.slice[1];
         *pptr += 4;
     }
     return ((unsigned long) *pptr - (unsigned long) ptr);
@@ -2829,7 +2901,7 @@ err:
    this method has the ability to overwrite/scrub the error code
    passed down to the vfs
 */
-static inline void package_downcall_members(
+static void package_downcall_members(
     vfs_request_t *vfs_request, int *error_code)
 {
     int ret = -PVFS_EINVAL;
@@ -2837,6 +2909,10 @@ static inline void package_downcall_members(
     assert(error_code);
     PVFS_object_ref refn1;
     PVFS_object_ref refn2;
+
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s enter: op %s error code: %d\n",
+                 __func__, get_vfs_op_name_str(vfs_request->in_upcall.type),
+                 *error_code);
 
     switch(vfs_request->in_upcall.type)
     {
@@ -3224,7 +3300,7 @@ static inline void package_downcall_members(
 
                 vfs_request->out_downcall.resp.io.amt_complete =
                     (size_t)vfs_request->response.io.total_completed;
-                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "completed I/O on tag %lld\n", lld(vfs_request->info.tag));
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "completed I/O on tag %Ld\n", lld(vfs_request->info.tag));
 #endif
             }
 #ifdef USE_MMAP_RA_CACHE
@@ -3398,9 +3474,13 @@ static inline void package_downcall_members(
     vfs_request->out_downcall.status = *error_code;
     vfs_request->out_downcall.type = vfs_request->in_upcall.type;
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s exit: op %s error code: %d\n",
+                 __func__, get_vfs_op_name_str(vfs_request->out_downcall.type),
+                 vfs_request->out_downcall.status);
+
 }
 
-static inline PVFS_error repost_unexp_vfs_request(
+static PVFS_error repost_unexp_vfs_request(
     vfs_request_t *vfs_request, char *completion_handle_desc)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -3423,13 +3503,13 @@ static inline PVFS_error repost_unexp_vfs_request(
     else
     {
         gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "[-] reposted unexp "
-                     "req [%p] due to %s\n", (void *)vfs_request,
+                     "req [%p] due to %s\n", vfs_request,
                      completion_handle_desc);
     }
     return ret;
 }
 
-static inline PVFS_error handle_unexp_vfs_request(
+static PVFS_error handle_unexp_vfs_request(
     vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -3479,7 +3559,7 @@ static inline PVFS_error handle_unexp_vfs_request(
     }
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-                 "[*] handling new unexp vfs_request %p\n", (void *)vfs_request);
+                 "[*] handling new unexp vfs_request %p\n", vfs_request);
 
     /*
       make sure the operation is not currently in progress.  if it is,
@@ -3750,7 +3830,7 @@ static PVFS_error process_vfs_requests(void)
             if (vfs_request->num_ops == 1 &&
                     vfs_request->op_id != op_id_array[i])
             {
-                gossip_err("op_id %lld != completed op id %lld\n",
+                gossip_err("op_id %Ld != completed op id %Ld\n",
                         lld(vfs_request->op_id), lld(op_id_array[i]));
                 continue;
             }
@@ -3764,7 +3844,7 @@ static PVFS_error process_vfs_requests(void)
                 }
                 if (j == vfs_request->num_ops)
                 {
-                    gossip_err("completed op id (%lld) is weird\n",
+                    gossip_err("completed op id (%Ld) is weird\n",
                             lld(op_id_array[i]));
                     continue;
                 }
@@ -3783,7 +3863,7 @@ static PVFS_error process_vfs_requests(void)
                 */
                 gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
                              " returned unexp vfs_request %p, tag: %llu\n",
-                             (void *)vfs_request,
+                             vfs_request,
                              llu(vfs_request->info.tag));
                 ret = handle_unexp_vfs_request(vfs_request);
                 assert(ret == 0);
@@ -3807,7 +3887,7 @@ static PVFS_error process_vfs_requests(void)
 
             gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
                          " returned completed vfs_request %p\n",
-                         (void *)vfs_request);
+                         vfs_request);
             /*
                if this is not a dev unexp msg, it's a non-blocking
                sysint operation that has just completed
@@ -3931,11 +4011,13 @@ int main(int argc, char **argv)
     PINT_smcb *acache_smcb = NULL;
     PINT_client_sm *ncache_timer_sm_p = NULL;
     PINT_smcb *ncache_smcb = NULL;
+    PINT_client_sm *capcache_timer_sm_p = NULL;
+    PINT_smcb *capcache_smcb = NULL;
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
     struct sigaction segv_action;
 
-    segv_action.sa_sigaction = client_segfault_handler;
+    segv_action.sa_sigaction = (void *)client_segfault_handler;
     sigemptyset (&segv_action.sa_mask);
     segv_action.sa_flags = SA_RESTART | SA_SIGINFO | SA_ONESHOT;
     sigaction (SIGSEGV, &segv_action, NULL);
@@ -4074,6 +4156,13 @@ int main(int argc, char **argv)
         PVFS_perror("set_ncache_parameters", ret);
         return(ret);
     }
+    ret = set_capcache_parameters(&s_opts);
+    if(ret < 0)
+    {
+        PVFS_perror("set_capcache_parameters", ret);
+        return(ret);
+    }
+
     set_device_parameters(&s_opts);
 
     if(s_opts.events)
@@ -4081,40 +4170,65 @@ int main(int argc, char **argv)
         PINT_event_enable(s_opts.events);
     }
 
-    /* start performance counters for acache */
-    acache_pc = PINT_perf_initialize(acache_keys);
-    if(!acache_pc)
+    if(PINT_acache_get_pc())
     {
-        gossip_err("Error: PINT_perf_initialize failure.\n");
+        ret = PINT_perf_set_info(PINT_acache_get_pc(),
+                                 PINT_PERF_HISTORY_SIZE,
+                                 s_opts.perf_history_size);
+        if(ret < 0)
+        {
+            gossip_err("%s: acache PINT_perf_set_info (history_size).\n",
+                       __func__);
+            finalize_perf_items(0);
+            return(ret);
+        }
+    }
+    else
+    {
+        gossip_err("%s: PINT_acache_get_pc() returned NULL.\n",
+                   __func__);
         return(-PVFS_ENOMEM);
     }
-    ret = PINT_perf_set_info(acache_pc, PINT_PERF_HISTORY_SIZE,
-        s_opts.perf_history_size);
-    if(ret < 0)
-    {
-        gossip_err("Error: PINT_perf_set_info (history_size).\n");
-        finalize_perf_items( 0 );
-        return(ret);
-    }
-    PINT_acache_enable_perf_counter(acache_pc);
 
-    /* start performance counters for ncache */
-    ncache_pc = PINT_perf_initialize(ncache_keys);
-    if(!ncache_pc)
+    if(PINT_ncache_get_pc())
     {
-        gossip_err("Error: PINT_perf_initialize failure.\n");
-        finalize_perf_items( 0 );
+        ret = PINT_perf_set_info(PINT_ncache_get_pc(),
+                                 PINT_PERF_HISTORY_SIZE,
+                                 s_opts.perf_history_size);
+        if(ret < 0)
+        {
+            gossip_err("%s: ncache PINT_perf_set_info (history_size).\n",
+                       __func__);
+            finalize_perf_items(0);
+            return(ret);
+        }
+    }
+    else
+    {
+        gossip_err("%s: PINT_ncache_get_pc() returned NULL.\n",
+                   __func__);
         return(-PVFS_ENOMEM);
     }
-    ret = PINT_perf_set_info(ncache_pc, PINT_PERF_HISTORY_SIZE,
-        s_opts.perf_history_size);
-    if(ret < 0)
+
+    if(PINT_client_capcache_get_pc())
     {
-        gossip_err("Error: PINT_perf_set_info (history_size).\n");
-        finalize_perf_items( 0 );
-        return(ret);
+        ret = PINT_perf_set_info(PINT_client_capcache_get_pc(),
+                                 PINT_PERF_HISTORY_SIZE,
+                                 s_opts.perf_history_size);
+        if(ret < 0)
+        {
+            gossip_err("%s: client_capcache PINT_perf_set_info (history_size).\n",
+                       __func__);
+            finalize_perf_items(0);
+            return(ret);
+        }
     }
-    PINT_ncache_enable_perf_counter(ncache_pc);
+    else
+    {
+        gossip_err("%s: PINT_client_capcache_get_pc() returned NULL.\n",
+                   __func__);
+        return(-PVFS_ENOMEM);
+    }
 
     /* start a timer to roll over performance counters (acache) */
     PINT_smcb_alloc(&acache_smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
@@ -4124,18 +4238,18 @@ int main(int argc, char **argv)
             s_client_dev_context);
     if (!acache_smcb)
     {
-        finalize_perf_items( 0 );
+        finalize_perf_items(0);
         return(-PVFS_ENOMEM);
     }
     acache_timer_sm_p = PINT_sm_frame(acache_smcb, PINT_FRAME_CURRENT);
     acache_timer_sm_p->u.perf_count_timer.interval_secs = 
         &s_opts.perf_time_interval_secs;
-    acache_timer_sm_p->u.perf_count_timer.pc = acache_pc;
+    acache_timer_sm_p->u.perf_count_timer.pc = PINT_acache_get_pc();
     ret = PINT_client_state_machine_post(acache_smcb, NULL, NULL);
     if (ret < 0)
     {
         gossip_lerr("Error posting acache timer.\n");
-        finalize_perf_items( 1, acache_smcb );
+        finalize_perf_items(1, acache_smcb);
         return(ret);
     }
 
@@ -4146,35 +4260,58 @@ int main(int argc, char **argv)
             s_client_dev_context);
     if (!ncache_smcb)
     {
-        finalize_perf_items( 1, acache_smcb);
+        finalize_perf_items(1, acache_smcb);
         return(-PVFS_ENOMEM);
     }
     ncache_timer_sm_p = PINT_sm_frame(ncache_smcb, PINT_FRAME_CURRENT);
     ncache_timer_sm_p->u.perf_count_timer.interval_secs = 
         &s_opts.perf_time_interval_secs;
-    ncache_timer_sm_p->u.perf_count_timer.pc = ncache_pc;
+    ncache_timer_sm_p->u.perf_count_timer.pc = PINT_ncache_get_pc();
     ret = PINT_client_state_machine_post(ncache_smcb, NULL, NULL);
     if (ret < 0)
     {
         gossip_lerr("Error posting ncache timer.\n");
-        finalize_perf_items( 2, acache_smcb, ncache_smcb );
+        finalize_perf_items(2, acache_smcb, ncache_smcb);
         return(ret);
     }
+
+    PINT_smcb_alloc(&capcache_smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
+            sizeof(struct PINT_client_sm),
+            client_op_state_get_machine,
+            client_state_machine_terminate,
+            s_client_dev_context);
+    if (!capcache_smcb)
+    {
+        finalize_perf_items( 1, acache_smcb);
+        return(-PVFS_ENOMEM);
+    }
+    capcache_timer_sm_p = PINT_sm_frame(capcache_smcb, PINT_FRAME_CURRENT);
+    capcache_timer_sm_p->u.perf_count_timer.interval_secs = 
+        &s_opts.perf_time_interval_secs;
+    capcache_timer_sm_p->u.perf_count_timer.pc = PINT_client_capcache_get_pc();
+    ret = PINT_client_state_machine_post(capcache_smcb, NULL, NULL);
+    if (ret < 0)
+    {
+        gossip_lerr("Error posting capcache timer.\n");
+        finalize_perf_items( 2, acache_smcb, capcache_smcb );
+        return(ret);
+    }
+
 
     ret = initialize_ops_in_progress_table();
     if (ret)
     {
-	PVFS_perror("initialize_ops_in_progress_table", ret);
-        finalize_perf_items( 2, acache_smcb, ncache_smcb );
+        PVFS_perror("initialize_ops_in_progress_table", ret);
+        finalize_perf_items(2, acache_smcb, ncache_smcb);
         return ret;
     }   
 
     ret = PINT_dev_initialize("/dev/pvfs2-req", 0);
     if (ret < 0)
     {
-	PVFS_perror("PINT_dev_initialize", ret);
-        finalize_perf_items( 2, acache_smcb, ncache_smcb );
-	return -PVFS_EDEVINIT;
+        PVFS_perror("PINT_dev_initialize", ret);
+        finalize_perf_items(2, acache_smcb, ncache_smcb);
+        return -PVFS_EDEVINIT;
     }
 
     /* setup a mapped region for I/O transfers */
@@ -4182,17 +4319,17 @@ int main(int argc, char **argv)
     ret = PINT_dev_get_mapped_regions(NUM_MAP_DESC, s_io_desc, s_desc_params);
     if (ret < 0)
     {
-	PVFS_perror("PINT_dev_get_mapped_region", ret);
-        finalize_perf_items( 2, acache_smcb, ncache_smcb );
-	return ret;
+        PVFS_perror("PINT_dev_get_mapped_region", ret);
+        finalize_perf_items(2, acache_smcb, ncache_smcb);
+        return ret;
     }
 
     ret = job_open_context(&s_client_dev_context);
     if (ret < 0)
     {
-	PVFS_perror("device job_open_context failed", ret);
-        finalize_perf_items( 2, acache_smcb, ncache_smcb );
-	return ret;
+        PVFS_perror("device job_open_context failed", ret);
+        finalize_perf_items(2, acache_smcb, ncache_smcb);
+        return ret;
     }
 
     /*
@@ -4203,8 +4340,8 @@ int main(int argc, char **argv)
 
     if (pthread_create(&remount_thread, NULL, exec_remount, NULL))
     {
-	gossip_err("Cannot create remount thread!");
-        finalize_perf_items( 2, acache_smcb, ncache_smcb );
+        gossip_err("Cannot create remount thread!");
+        finalize_perf_items(2, acache_smcb, ncache_smcb);
         return -1;
     }
 
@@ -4246,8 +4383,6 @@ int main(int argc, char **argv)
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "calling PVFS_sys_finalize()\n");
 
-    finalize_perf_items( 2, acache_smcb, ncache_smcb );
-
     gossip_err("pvfs2-client-core shutting down.\n");
     if (PVFS_sys_finalize())
     {
@@ -4285,11 +4420,16 @@ static void print_help(char *progname)
     printf("--ncache-soft-limit=LIMIT     ncache soft limit\n");
     printf("--ncache-hard-limit=LIMIT     ncache hard limit\n");
     printf("--ncache-reclaim-percentage=LIMIT ncache reclaim percentage\n");
-    printf("-c S, --ccache-timeout=S   credential cache timeout in seconds "
+    printf("-c S, --ccache-timeout=S      credential cache timeout in seconds "
            "(default is %ds)\n", PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
     printf("--ccache-soft-limit=LIMIT     credential cache soft limit\n");
     printf("--ccache-hard-limit=LIMIT     credential cache hard limit\n");
     printf("--ccache-reclaim-percentage=LIMIT credential cache reclaim percentage\n");
+    printf("-b S, --capcache-timeout=S    capability cache timeout in seconds "
+           "(default is %ds)\n", PVFS2_DEFAULT_CAPABILITY_TIMEOUT);
+    printf("--capcache-soft-limit=LIMIT   capability cache soft limit\n");
+    printf("--capcache-hard-limit=LIMIT   capability cache hard limit\n");
+    printf("--capcache-reclaim-percentage=LIMIT capability cache reclaim percentage\n");
     printf("--perf-time-interval-secs=SECONDS length of perf counter intervals\n");
     printf("--perf-history-size=VALUE     number of perf counter intervals to maintain\n");
     printf("--logfile=VALUE               override the default log file\n");
@@ -4315,6 +4455,8 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"ncache-reclaim-percentage",1,0,0},
         {"ccache-timeout",1,0,0},
         {"ccache-reclaim-percentage",1,0,0},
+        {"capcache-timeout",1,0,0},
+        {"capcache-reclaim-percentage",1,0,0},
         {"perf-time-interval-secs",1,0,0},
         {"perf-history-size",1,0,0},
         {"gossip-mask",1,0,0},
@@ -4324,6 +4466,8 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"ncache-soft-limit",1,0,0},
         {"ccache-hard-limit",1,0,0},
         {"ccache-soft-limit",1,0,0},
+        {"capcache-hard-limit",1,0,0},
+        {"capcache-soft-limit",1,0,0},
         {"desc-count",1,0,0},
         {"desc-size",1,0,0},
         {"logfile",1,0,0},
@@ -4339,7 +4483,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
     opts->perf_time_interval_secs = PERF_DEFAULT_UPDATE_INTERVAL / 1000;
     opts->perf_history_size = PERF_DEFAULT_HISTORY_SIZE;
 
-    while((ret = getopt_long(argc, argv, "ha:n:c:L:",
+    while((ret = getopt_long(argc, argv, "ha:n:c:L:b:",
                              long_opts, &option_index)) != -1)
     {
         switch(ret)
@@ -4362,6 +4506,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("ccache-timeout", cur_option) == 0)
                 {
                     goto do_ccache;
+                }
+                else if (strcmp("capcache-timeout", cur_option) == 0)
+                {
+                    goto do_capcache;
                 }
                 else if (strcmp("desc-count", cur_option) == 0) 
                 {
@@ -4517,6 +4665,39 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     }
                     opts->ccache_reclaim_percentage_set = 1;
                 }
+                else if (strcmp("capcache-hard-limit", cur_option) == 0)
+                {
+                    ret = sscanf(optarg, "%u", &opts->capcache_hard_limit);
+                    if (ret != 1)
+                    {
+                        gossip_err(
+                            "Error: invalid capcache-hard-limit value.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    opts->capcache_hard_limit_set = 1;
+                }
+                else if (strcmp("capcache-soft-limit", cur_option) == 0)
+                {
+                    ret = sscanf(optarg, "%u", &opts->capcache_soft_limit);
+                    if(ret != 1)
+                    {
+                        gossip_err(
+                            "Error: invalid capcache-soft-limit value.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    opts->capcache_soft_limit_set = 1;
+                }
+                else if (strcmp("capcache-reclaim-percentage", cur_option) == 0)
+                {
+                    ret = sscanf(optarg, "%u", &opts->capcache_reclaim_percentage);
+                    if(ret != 1)
+                    {
+                        gossip_err(
+                            "Error: invalid capcache-reclaim-percentage value.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    opts->capcache_reclaim_percentage_set = 1;
+                }
                 else if (strcmp("perf-time-interval-secs", cur_option) == 0)
                 {
                     ret = sscanf(optarg, "%u",
@@ -4598,6 +4779,18 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     opts->ccache_timeout = 0;
                 }                
                 break;
+            case 'b':
+          do_capcache:
+              opts->capcache_timeout = atoi(optarg);
+              opts->capcache_timeout_set = 1;
+              if (opts->capcache_timeout < 0)
+              {
+                  gossip_err("Invalid ccache timeout value of %d s,"
+                             "disabling the ccache.\n",
+                             opts->capcache_timeout);
+                  opts->capcache_timeout = 0;
+              }                
+              break;
             default:
                 gossip_err("Unrecognized option.  "
                         "Try --help for information.\n");
@@ -4646,6 +4839,9 @@ static void reset_acache_timeout(void)
 
             PINT_acache_finalize();
             PINT_acache_initialize();
+            PINT_perf_set_info(PINT_acache_get_pc(),
+                               PINT_PERF_HISTORY_SIZE,
+                               s_opts.perf_history_size);
             s_opts.acache_timeout = max_acache_timeout_ms;
             set_acache_parameters(&s_opts);
         }
@@ -4700,33 +4896,41 @@ static void reset_ncache_timeout(void)
     }
 }
 
-static void finalize_perf_items(int n, ... )
+static void finalize_perf_items(int n, ...)
 {
+    gossip_err("%s: n = %d\n", __func__, n);
+    gossip_backtrace();
 
-    int i=0;
+    int i = 0;
     PINT_smcb *smcb;
     va_list v_args;
 
     va_start(v_args, n);
-    for( i=0; i < n; i++ )
+    for(i = 0; i < n; i++)
     {
         smcb = va_arg(v_args, PINT_smcb *);
-        if( smcb )
+        if(smcb)
         {
-            PINT_client_state_machine_release( smcb );
+            PINT_client_state_machine_release(smcb);
         }
     }
-    va_end( v_args );
+    va_end(v_args);
 
-    if( acache_pc != NULL )
+    if(PINT_acache_get_pc() != NULL)
     {
-        PINT_perf_finalize( acache_pc );
+        PINT_perf_finalize(PINT_acache_get_pc());
     }
 
-    if( ncache_pc != NULL )
+    if(PINT_ncache_get_pc() != NULL)
     {
-        PINT_perf_finalize( ncache_pc );
+        PINT_perf_finalize(PINT_ncache_get_pc());
     }
+
+    if(PINT_client_capcache_get_pc() != NULL )
+    {
+        PINT_perf_finalize(PINT_client_capcache_get_pc());
+    }
+
     return;
 }
 
@@ -4892,6 +5096,66 @@ static int set_ccache_parameters(options_t *s_opts)
     return(0);
 }
 
+static int set_capcache_parameters(options_t *s_opts)
+{
+    int ret = -1;
+    unsigned int timeout;
+
+    /* pass along credential cache settings if they were 
+       specified on command line */
+    if(s_opts->capcache_reclaim_percentage_set)
+    {
+        ret = PINT_client_capcache_set_info(TCACHE_RECLAIM_PERCENTAGE, 
+            s_opts->capcache_reclaim_percentage);
+        if(ret < 0)
+        {
+            PVFS_perror_gossip("set_capcache_parameters: PINT_tcache_set_info "
+                "(reclaim-percentage)", ret);
+            return(ret);
+        }
+    }
+    if(s_opts->capcache_hard_limit_set)
+    {
+        ret = PINT_client_capcache_set_info(TCACHE_HARD_LIMIT, 
+            s_opts->capcache_hard_limit);
+        if(ret < 0)
+        {
+            PVFS_perror_gossip("set_capcache_parameters: PINT_tcache_set_info "
+                "(hard-limit)", ret);
+            return(ret);
+        }
+    }
+    if(s_opts->capcache_soft_limit_set)
+    {
+        ret = PINT_client_capcache_set_info(TCACHE_SOFT_LIMIT, 
+            s_opts->capcache_soft_limit);
+        if(ret < 0)
+        {
+            PVFS_perror_gossip("set_capcache_parameters: PINT_tcache_set_info "
+                "(soft-limit)", ret);
+            return(ret);
+        }
+    }
+    if (s_opts->capcache_timeout_set)
+    {
+        timeout = s_opts->capcache_timeout * 1000;
+    }
+    else
+    {
+        timeout = PVFS2_DEFAULT_CAPABILITY_TIMEOUT * 1000;
+    }    
+    ret = PINT_client_capcache_set_info(TCACHE_TIMEOUT_MSECS, 
+         timeout);
+    if(ret < 0)
+    {
+        PVFS_perror_gossip("set_capcache_parameters: PINT_tcache_set_info "
+            "(timeout-msecs)", ret);
+        return(ret);
+    }
+
+    return(0);
+}
+
 static int set_acache_parameters(options_t* s_opts)
 {
     int ret = -1;
@@ -5012,12 +5276,17 @@ static void set_device_parameters(options_t *s_opts)
 
 static int get_mac(void);
 
-inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req)
+static void fill_hints(PVFS_hint *hints, vfs_request_t *req)
 {
     int32_t mac;
 
     *hints = NULL;
-    if(!s_opts.events) return;
+
+    /* add uid hint for client capcache functionality */
+    PVFS_hint_add(hints, PVFS_HINT_LOCAL_UID_NAME, sizeof(PVFS_uid),
+                  &req->in_upcall.uid);
+
+    if (!s_opts.events) return;
 
     mac = get_mac();
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "mac: %d\n", mac);

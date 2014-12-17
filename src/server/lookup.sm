@@ -9,6 +9,9 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
 
 #include "pvfs2-config.h"
 #include "server-config.h"
@@ -896,7 +899,7 @@ static PINT_sm_action lookup_read_directory_entry_remote(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
     int ret;
-    PVFS_capability null_cap;
+    PVFS_capability capability;
 
     gossip_debug(GOSSIP_LOOKUP_DEBUG, "lookup state: read_directory_entry_remote\n");
 
@@ -910,15 +913,17 @@ static PINT_sm_action lookup_read_directory_entry_remote(
     msg_p = &s_op->msgarray_op.msgpair;
     PINT_serv_init_msgarray_params(s_op, s_op->req->u.lookup_path.fs_id);
 
-    PINT_null_capability(&null_cap);
+    PINT_null_capability(&capability);
 
     PINT_SERVREQ_MGMT_GET_DIRENT_FILL(
         msg_p->req,
-        null_cap,
+        capability,
         s_op->req->u.lookup_path.fs_id,
         s_op->u.lookup.attr.dirdata_handles[s_op->u.lookup.dirdata_server_index],
         s_op->u.lookup.segp,
         NULL);
+
+    PINT_cleanup_capability(&capability);
 
     msg_p->fs_id = s_op->req->u.lookup_path.fs_id;
     msg_p->handle =
@@ -1082,8 +1087,8 @@ static int perm_lookup(PINT_server_op *s_op)
 
     return ret;
 }
-PINT_GET_CREDENTIAL_DEFINE(lookup_path)
-PINT_GET_OBJECT_REF_DEFINE(lookup_path)
+PINT_GET_CREDENTIAL_DEFINE(lookup_path);
+PINT_GET_OBJECT_REF_DEFINE(lookup_path);
 
 struct PINT_server_req_params pvfs2_lookup_params = 
 {

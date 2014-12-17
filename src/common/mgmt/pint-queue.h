@@ -120,7 +120,21 @@ int PINT_queue_add_trigger(PINT_queue_id queue,
                            PINT_queue_trigger_destroy destroy,
                            void *user_ptr);
 
-int PINT_queue_count(PINT_queue_id queue_id);
+static inline int PINT_queue_count(PINT_queue_id qid)
+{
+    struct PINT_queue_s *queue;
+    int count;
+    queue = id_gen_fast_lookup(qid);
+    if(!queue)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    gen_mutex_lock(&queue->mutex);
+    count = queue->count;
+    gen_mutex_unlock(&queue->mutex);
+    return count;
+}
 
 int PINT_queue_push(PINT_queue_id queue_id, PINT_queue_entry_t *entry);
 

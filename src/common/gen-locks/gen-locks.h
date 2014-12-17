@@ -72,6 +72,11 @@ typedef pthread_mutex_t gen_mutex_t;
 typedef pthread_t       gen_thread_t;
 typedef pthread_cond_t  gen_cond_t;
 #define GEN_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
+#ifdef __DARWIN__
+#define GEN_RECURSIVE_MUTEX_INITIALIZER_NP PTHREAD_RECURSIVE_MUTEX_INITIALIZER
+#else
+#define GEN_RECURSIVE_MUTEX_INITIALIZER PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+#endif
 #define GEN_COND_INITIALIZER PTHREAD_COND_INITIALIZER
 
 #define gen_mutex_lock(m) gen_posix_mutex_lock(m)

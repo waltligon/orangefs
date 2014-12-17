@@ -36,7 +36,7 @@ int PINT_uid_mgmt_initialize()
     if (uid_lru_list)
     {
         qlist_for_each_entry_safe(rover, tmp, uid_lru_list, lru_link,
-                PINT_uid_mgmt_s, PINT_uid_mgmt_s)
+            PINT_uid_mgmt_s, PINT_uid_mgmt_s)
         {
             free(rover);
         }
@@ -97,7 +97,7 @@ void PINT_uid_mgmt_finalize()
     if (uid_lru_list)
     {
         qlist_for_each_entry_safe(rover, tmp, uid_lru_list, lru_link,
-                PINT_uid_mgmt_s, PINT_uid_mgmt_s)
+            PINT_uid_mgmt_s, PINT_uid_mgmt_s)
         {
             free(rover);
         }

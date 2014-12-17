@@ -288,6 +288,7 @@ extern int fremovexattr(int fd, const char *name);
 #include "pvfs2-types.h"
 #include "pvfs2-req-proto.h"
 #include "gen-locks.h"
+#include "env-vars.h"
 
 /* Just in case this is not defined - sizeof blocks reported in stat */
 #ifndef S_BLKSIZE
@@ -388,7 +389,7 @@ extern int dup3(int oldfd, int newfd, int flags);
 # define GOSSIP_USRINT_DEBUG stderr
 # define gossip_debug fprintf
 #else
-# define gossip_debug(_m, ...)
+# define gossip_debug(__m, __f, ...)
 #endif /* USRINT_DEBUG */
 
 #define PVFS_STDIO_DEBUG 0

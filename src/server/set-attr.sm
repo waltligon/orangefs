@@ -28,6 +28,11 @@ enum
     STATE_DIRECTORY = 10
 };
 
+static int tree_setattr_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int index);
+
 %%
 
 nested machine pvfs2_set_dirdata_attr_work_sm
@@ -178,7 +183,6 @@ static PINT_sm_action setattr_verify_attribs(
                  a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
     /* debug request attrs */
-    gossip_debug(GOSSIP_SETATTR_DEBUG, "  attrs read from request:\n\t");
     if (req_a_p->mask & PVFS_ATTR_COMMON_UID)
     {
         if (req_a_p->owner == PVFS_UID_MAX)
@@ -211,10 +215,10 @@ static PINT_sm_action setattr_verify_attribs(
     {
         strcpy(gstr, "(none)");
     }
-    gossip_debug(GOSSIP_SETATTR_DEBUG, "[owner = %s, group = %s, "
-                 "perms = %o, type = %d]\n", ostr, gstr, 
-                 (req_a_p->mask & PVFS_ATTR_COMMON_PERM) ? req_a_p->perms : -1,
-                 (req_a_p->mask & PVFS_ATTR_COMMON_TYPE) ? req_a_p->objtype : -1);
+    gossip_debug(GOSSIP_SETATTR_DEBUG, "  attrs read from request:\n\t"
+        "[owner = %s, group = %s, perms = %o, type = %d]\n", ostr, gstr, 
+        (req_a_p->mask & PVFS_ATTR_COMMON_PERM) ? req_a_p->perms : -1,
+        (req_a_p->mask & PVFS_ATTR_COMMON_TYPE) ? req_a_p->objtype : -1);
 
     /*
       here we're enforcing that no one can change the type of the
@@ -488,7 +492,7 @@ static PINT_sm_action setattr_setobj_attribs(
         gossip_debug(GOSSIP_SETATTR_DEBUG, " request has dfile_count of "
                      "%d | dspace has %d\n",
                      s_op->req->u.setattr.attr.u.meta.dfile_count,
-                     s_op->attr.u.meta.dfile_count);
+                     a_p->u.meta.dfile_count);
 
         gossip_debug(GOSSIP_SETATTR_DEBUG, " writing count of %d to "
                      "disk\n", dspace_a_p->u.meta.dfile_count);
@@ -515,7 +519,7 @@ static PINT_sm_action setattr_setobj_attribs(
         if (dspace_a_p->perms != 0 && ((a_p->mask & PVFS_ATTR_COMMON_PERM) && (dspace_a_p->perms != a_p->perms)))
         {
             gossip_debug(GOSSIP_SETATTR_DEBUG, "Cannot change perms of symlink: Permission denied\n");
-            js_p->error_code = -PVFS_EPERM;
+            js_p->error_code = -PVFS_EACCES;
             return SM_ACTION_COMPLETE;
         }
     }
@@ -536,11 +540,10 @@ static PINT_sm_action setattr_setobj_attribs(
         "handle = %llu | S = %p | mask = %d]\n",
         dspace_a_p->owner, dspace_a_p->group, dspace_a_p->perms,
         dspace_a_p->objtype, llu(dspace_a_p->atime),
-        llu(PINT_util_mkversion_time(dspace_a_p->mtime)),
-        llu(dspace_a_p->ctime),
+        llu(PINT_util_mkversion_time(dspace_a_p->mtime)), llu(dspace_a_p->ctime),
         (int)dspace_a_p->u.meta.dfile_count,
         (int)dspace_a_p->u.meta.dist_size,
-        llu(s_op->req->u.setattr.handle), (void *)s_op, a_p->mask);
+        llu(s_op->req->u.setattr.handle), s_op, a_p->mask);
 
     /* translate attrs to storage attr format */
     ds_attr = &(s_op->ds_attr);
@@ -805,6 +808,7 @@ static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(struct PINT_smcb
         s_op->req->u.setattr.fs_id,
         PVFS_TYPE_DIRDATA,
         attr,
+        0,
         s_op->attr.dist_dir_attr.num_servers,
         s_op->attr.dirdata_handles,
         NULL);
@@ -812,7 +816,7 @@ static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(struct PINT_smcb
     msg_p->fs_id = s_op->req->u.setattr.fs_id;
     msg_p->handle = s_op->attr.dirdata_handles[0];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = NULL;
+    msg_p->comp_fn = tree_setattr_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
@@ -828,6 +832,18 @@ static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(struct PINT_smcb
     return SM_ACTION_COMPLETE;
 }
 
+static int tree_setattr_comp_fn(void *v_p,
+                                struct PVFS_server_resp *resp_p,
+                                int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = &mop->msgpair;;
+
+    assert(msg_p->req.op == PVFS_SERV_TREE_SETATTR);
+    PINT_free_object_attr(&(msg_p->req).u.tree_setattr.attr);
+    return 0;
+}
 
 static PINT_sm_action setattr_set_dirdata_attr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -999,7 +1015,7 @@ static int perm_setattr(PINT_server_op *s_op)
                 gossip_debug((GOSSIP_SETATTR_DEBUG|GOSSIP_SECURITY_DEBUG), 
                              "%s: no permissions to set attr 0x%x\n", __func__, 
                              perm_table[i][PERM_TABLE_ATTR]);
-                return -PVFS_EPERM;
+                return -PVFS_EACCES;
             }
         }
     }
@@ -1066,8 +1082,8 @@ static int perm_setattr(PINT_server_op *s_op)
     return 0;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(setattr)
-PINT_GET_CREDENTIAL_DEFINE(setattr)
+PINT_GET_OBJECT_REF_DEFINE(setattr);
+PINT_GET_CREDENTIAL_DEFINE(setattr);
 
 struct PINT_server_req_params pvfs2_set_attr_params =
 {

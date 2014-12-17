@@ -51,6 +51,16 @@ typedef struct
     char link_target[PVFS2_NAME_LEN];
 } pvfs2_getattr_response_t;
 
+/* the setattr response is a blank downcall */
+typedef struct
+{
+} pvfs2_setattr_response_t;
+
+/* the remove response is a blank downcall */
+typedef struct
+{
+} pvfs2_remove_response_t;
+
 typedef struct
 {
     PVFS_object_kref refn;
@@ -86,6 +96,11 @@ typedef struct
     PVFS_sys_attr *attr_array;
 } pvfs2_readdirplus_response_t;
 
+/* the rename response is a blank downcall */
+typedef struct
+{
+} pvfs2_rename_response_t;
+
 typedef struct
 {
     int64_t block_size;
@@ -95,12 +110,22 @@ typedef struct
     int64_t files_avail;
 } pvfs2_statfs_response_t;
 
+/* the truncate response is a blank downcall */
+typedef struct
+{
+} pvfs2_truncate_response_t;
+
 typedef struct
 {
     PVFS_fs_id fs_id;
     int32_t id;
     PVFS_khandle root_khandle;
 } pvfs2_fs_mount_response_t;
+
+/* the umount response is a blank downcall */
+typedef struct
+{
+} pvfs2_fs_umount_response_t;
 
 /* the getxattr response is the attribute value */
 
@@ -109,6 +134,11 @@ typedef struct {
     int32_t __pad1;
     char val[PVFS_MAX_XATTR_VALUELEN];
 } pvfs2_getxattr_response_t;
+
+/* the setxattr response is a blank downcall */
+
+typedef struct {
+} pvfs2_setxattr_response_t;
 
 /* the listxattr response is an array of attribute names */
 
@@ -121,6 +151,21 @@ typedef struct {
     int32_t  __pad2;
     int32_t  lengths[PVFS_MAX_XATTR_LISTLEN];
 } pvfs2_listxattr_response_t;
+/* the removexattr response is a blank downcall */
+
+typedef struct {
+} pvfs2_removexattr_response_t;
+
+
+/* the cancel response is a blank downcall */
+typedef struct
+{
+} pvfs2_cancel_response_t;
+
+/* the fsync response is a blank downcall */
+typedef struct
+{
+} pvfs2_fsync_response_t;
 
 typedef struct
 {

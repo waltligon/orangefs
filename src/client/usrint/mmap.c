@@ -103,7 +103,7 @@ int pvfs_munmap(void *start, size_t length)
         return -1;
     }
     qlist_for_each_entry_safe(mapl, temp, &maplist, link,
-            struct pvfs_mmap_s, struct pvfs_mmap_s)
+        struct pvfs_mmap_s, struct pvfs_mmap_s)
     {
         /* assuming we must unmap something that was mapped */
         /* and not just part of it */
@@ -148,7 +148,7 @@ int pvfs_msync(void *start, size_t length, int flags)
         return -1;
     }
     qlist_for_each_entry_safe(mapl, temp, &maplist, link,
-            struct pvfs_mmap_s, struct pvfs_mmap_s)
+        struct pvfs_mmap_s, struct pvfs_mmap_s)
     {
         if ((u_char *)mapl->mst <= (u_char *)start &&
             (u_char *)mapl->mst + mapl->mlen >= (u_char *)start + length)

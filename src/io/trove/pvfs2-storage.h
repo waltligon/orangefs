@@ -21,7 +21,28 @@ enum PVFS_coll_getinfo_options_e
 };
 typedef enum PVFS_coll_getinfo_options_e PVFS_coll_getinfo_options;
 
+struct PVFS_vtag_s
+{
+    /* undefined */
+#ifdef WIN32
+    int field;
+#endif
+};
 typedef struct PVFS_vtag_s PVFS_vtag;
+/* key/value descriptor definition moved to include/pvfs2-types.h */
+#if 0
+/* key/value descriptors */
+struct PVFS_ds_keyval_s
+{
+    void *buffer;
+    /* size of memory region pointed to by buffer */
+    int32_t buffer_sz;
+    /* size of data read into buffer (only valid after a read) */
+    int32_t read_sz;
+};
+
+typedef struct PVFS_ds_keyval_s PVFS_ds_keyval;
+#endif
 
 struct PVFS_ds_metadata_attr_s
 {

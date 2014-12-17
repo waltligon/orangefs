@@ -8,7 +8,6 @@
 #include <string.h>
 #include <assert.h>
 
-/* TODO: TEMP */
 #include "pvfs2-config.h"
 #include "server-config.h"
 #include "pvfs2-server.h"
@@ -21,6 +20,11 @@
 #include "pvfs2-dist-basic.h"
 #include "dist-dir-utils.h"
 #include "pint-uid-map.h"
+
+static int tree_setattr_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int index);
 
 %%
 
@@ -512,14 +516,19 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(struct 
         s_op->u.mkdir.fs_id,
         PVFS_TYPE_DIRDATA,
         attr,
+        0,
         s_op->attr.dist_dir_attr.num_servers,
         s_op->attr.dirdata_handles,
         NULL);
 
+    /* save objects so they can be freed */
+    s_op->u.mkdir.saved_attr = &msg_p->req.u.mkdir.attr;
+    s_op->u.mkdir.saved_capability = &msg_p->req.capability;
+
     msg_p->fs_id = s_op->u.mkdir.fs_id;
     msg_p->handle = s_op->attr.dirdata_handles[0];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = NULL;
+    msg_p->comp_fn = tree_setattr_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
@@ -535,6 +544,19 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(struct 
     return SM_ACTION_COMPLETE;
 }
 
+static int tree_setattr_comp_fn(void *v_p,
+                                struct PVFS_server_resp *resp_p,
+                                int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = &mop->msgpair;;
+
+    assert(msg_p->req.op == PVFS_SERV_TREE_SETATTR);
+    PINT_free_object_attr(&(msg_p->req).u.tree_setattr.attr);
+    return 0;
+}
+
 static PINT_sm_action mkdir_write_keyval_to_meta_handle(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -545,6 +567,10 @@ static PINT_sm_action mkdir_write_keyval_to_meta_handle(
 
     /* total 3 keyvals, PVFS_DIST_DIR_ATTR, PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES */
     int keyval_count = 3;
+
+    /* free saved capability */
+    PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
+    s_op->u.mkdir.saved_capability = NULL;
 
     /* !!!! this is to set meta handle keyval,
      * use dist_dir_attr in s_op->attr 
@@ -612,6 +638,10 @@ static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     s_op->resp.u.mkdir.handle = 0;
+
+    /* clean up objects */
+    PINT_free_object_attr(s_op->u.mkdir.saved_attr);
+    PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
 
     if (js_p->error_code > -1)
     {
@@ -719,7 +749,7 @@ static PINT_sm_action mkdir_prep_sm(
     return SM_ACTION_COMPLETE;
 }
 
-static inline int PINT_get_object_ref_mkdir(
+static int PINT_get_object_ref_mkdir(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
     *fs_id = req->u.mkdir.fs_id;
@@ -743,7 +773,7 @@ static int perm_mkdir(PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_CREDENTIAL_DEFINE(mkdir)
+PINT_GET_CREDENTIAL_DEFINE(mkdir);
 
 struct PINT_server_req_params pvfs2_mkdir_params =
 {

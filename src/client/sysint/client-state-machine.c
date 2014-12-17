@@ -127,78 +127,78 @@ static PVFS_error completion_list_retrieve_any_completed(
    int limit,                   /* in  */
    int *out_count)              /* what exactly is this supposed to return */
 {
-    int i = 0, new_list_index = 0;
-    PINT_smcb *smcb = NULL;
-    PINT_smcb *tmp_completion_list[MAX_RETURNED_JOBS] = {NULL};
-    PINT_client_sm *sm_p;
-  
-    assert(op_id_array);
-    assert(error_code_array);
-    assert(out_count);
-  
-    memset(tmp_completion_list, 0,
-           (MAX_RETURNED_JOBS * sizeof(PINT_smcb *)));
-  
-    gen_mutex_lock(&s_completion_list_mutex);
-    for(i = 0; i < s_completion_list_index; i++)
-    {
-        if (s_completion_list[i] == NULL)
-        {
-            continue;
-        }
-  
-        smcb = s_completion_list[i];
-        assert(smcb);
-  
-        if (i < limit)
-        {
-            sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-            op_id_array[i] = sm_p->sys_op_id;
-            error_code_array[i] = sm_p->error_code;
-  
-            if (user_ptr_array)
-            {
-                /* if this smcb has been set cancelled and is a PVFS_SYS_IO
-                  * state machine then stick the user_ptr of the base frame
-                  * in to the user_ptr_array instead of the standard sm_p 
-                  * user_ptr. This prevents segfaults back in 
-                  * process_vfs_requests which expects the pointer to be a 
-                  * vfs_request.
-                  */
-                if( smcb->op_cancelled && smcb->op == PVFS_SYS_IO )
-                {
-                    PINT_client_sm *sm_base_p = PINT_sm_frame(smcb,
-                                                 (-(smcb->frame_count -1)));
-                    assert(sm_base_p);
-                    gossip_debug(GOSSIP_CANCEL_DEBUG,
-                            "%s: assignment of PVFS_SYS_IO user_ptr from "
-                            "sm_base_p(%p), user_ptr(%p)\n", __func__,
-                            (void *)sm_base_p, (void *)sm_base_p->user_ptr);
-                    user_ptr_array[i] = sm_base_p->user_ptr;
-                }
-                else
-                {
-                    user_ptr_array[i] = (void *)sm_p->user_ptr;
-                }
-            }
-            s_completion_list[i] = NULL;
-  
-            PINT_sys_release(sm_p->sys_op_id);
-        }
-        else
-        {
-            tmp_completion_list[new_list_index++] = smcb;
-        }
-    }
-    *out_count = PVFS_util_min(i, limit);
-  
-    /* clean up and adjust the list and it's book keeping */
-    s_completion_list_index = new_list_index;
-    memcpy(s_completion_list, tmp_completion_list,
-           (MAX_RETURNED_JOBS * sizeof(struct PINT_smcb *)));
-    
-    gen_mutex_unlock(&s_completion_list_mutex);
-    return 0;
+   int i = 0, new_list_index = 0;
+   PINT_smcb *smcb = NULL;
+   PINT_smcb *tmp_completion_list[MAX_RETURNED_JOBS] = {NULL};
+   PINT_client_sm *sm_p;
+ 
+   assert(op_id_array);
+   assert(error_code_array);
+   assert(out_count);
+ 
+   memset(tmp_completion_list, 0,
+          (MAX_RETURNED_JOBS * sizeof(PINT_smcb *)));
+ 
+   gen_mutex_lock(&s_completion_list_mutex);
+   for(i = 0; i < s_completion_list_index; i++)
+   {
+       if (s_completion_list[i] == NULL)
+       {
+           continue;
+       }
+ 
+       smcb = s_completion_list[i];
+       assert(smcb);
+ 
+       if (i < limit)
+       {
+           sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+           op_id_array[i] = sm_p->sys_op_id;
+           error_code_array[i] = sm_p->error_code;
+ 
+           if (user_ptr_array)
+           {
+               /* if this smcb has been set cancelled and is a PVFS_SYS_IO
+                 * state machine then stick the user_ptr of the base frame
+                 * in to the user_ptr_array instead of the standard sm_p 
+                 * user_ptr. This prevents segfaults back in 
+                 * process_vfs_requests which expects the pointer to be a 
+                 * vfs_request.
+                 */
+               if( smcb->op_cancelled && smcb->op == PVFS_SYS_IO )
+               {
+                   PINT_client_sm *sm_base_p = PINT_sm_frame(smcb,
+                                                (-(smcb->frame_count -1)));
+                   assert(sm_base_p);
+                   gossip_debug(GOSSIP_CANCEL_DEBUG, "%s: assignment of "
+                                "PVFS_SYS_IO user_ptr from sm_base_p(%p), "
+                                "user_ptr(%p)\n", __func__, sm_base_p,
+                                sm_base_p->user_ptr);
+                   user_ptr_array[i] = sm_base_p->user_ptr;
+               }
+               else
+               {
+                   user_ptr_array[i] = (void *)sm_p->user_ptr;
+               }
+           }
+           s_completion_list[i] = NULL;
+ 
+           PINT_sys_release(sm_p->sys_op_id);
+       }
+       else
+       {
+           tmp_completion_list[new_list_index++] = smcb;
+       }
+   }
+   *out_count = PVFS_util_min(i, limit);
+ 
+   /* clean up and adjust the list and it's book keeping */
+   s_completion_list_index = new_list_index;
+   memcpy(s_completion_list, tmp_completion_list,
+          (MAX_RETURNED_JOBS * sizeof(struct PINT_smcb *)));
+   
+   gen_mutex_unlock(&s_completion_list_mutex);
+   return 0;
 }
 
 /*  Moves finished jobs from the finished list if they are found in the in/out parameter op_id_array.
@@ -271,10 +271,10 @@ static PVFS_error completion_list_retrieve_some_completed(
                     PINT_client_sm *sm_base_p = PINT_sm_frame(smcb,
                                                  (-(smcb->frame_count -1)));
                     assert(sm_base_p);
-                    gossip_debug(GOSSIP_CANCEL_DEBUG,
-                            "%s: assignment of PVFS_SYS_IO user_ptr from "
-                            "sm_base_p(%p), user_ptr(%p)\n", __func__,
-                            (void *)sm_base_p, (void *)sm_base_p->user_ptr);
+                    gossip_debug(GOSSIP_CANCEL_DEBUG, "%s: assignment of "
+                                 "PVFS_SYS_IO user_ptr from sm_base_p(%p), "
+                                 "user_ptr(%p)\n", __func__, sm_base_p, 
+                                 sm_base_p->user_ptr);
                     user_ptr_array[out_op_count] = sm_base_p->user_ptr;
                 }
                 else
@@ -334,11 +334,31 @@ static int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
 
     gossip_debug(
         GOSSIP_IO_DEBUG, "(%p) cancelled_io_jobs_are_pending: %d "
-        "remaining (op %s)\n", (void *)sm_base_p,
+        "remaining (op %s)\n", sm_base_p,
         sm_base_p->u.io.total_cancellations_remaining,
         (PINT_smcb_complete(smcb) ? "complete" : "NOT complete"));
 
     return (sm_base_p->u.io.total_cancellations_remaining != 0);
+}
+
+/* exposed wrappers around the id-generator code */
+static int PINT_id_gen_safe_register(
+    PVFS_sys_op_id *new_id,
+    void *item)
+{
+    return id_gen_safe_register(new_id, item);
+}
+
+static void *PINT_id_gen_safe_lookup(
+    PVFS_sys_op_id id)
+{
+    return id_gen_safe_lookup(id);
+}
+
+static int PINT_id_gen_safe_unregister(
+    PVFS_sys_op_id id)
+{
+    return id_gen_safe_unregister(id);
 }
 
 /* this array must be ordered to match the enum in client-state-machine.h */ 
@@ -381,9 +401,11 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
     {&pvfs2_client_mgmt_create_dirent_sm},
     {&pvfs2_client_mgmt_get_dirdata_handle_sm},
     {&pvfs2_client_mgmt_get_uid_list_sm},
-    {&pvfs2_client_mgmt_get_dirdata_array_sm}
+    {&pvfs2_client_mgmt_get_dirdata_array_sm},
 #ifdef ENABLE_SECURITY_CERT
-    ,{&pvfs2_client_mgmt_get_user_cert_sm}
+    {&pvfs2_client_mgmt_get_user_cert_sm}
+#else
+    {NULL}
 #endif
 };
 
@@ -451,7 +473,7 @@ int client_state_machine_terminate(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-            "client_state_machine_terminate smcb %p\n", (void *)smcb);
+                 "client_state_machine_terminate smcb %p\n",smcb);
 
     if (!((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
             (PINT_smcb_cancelled(smcb)) &&
@@ -459,25 +481,22 @@ int client_state_machine_terminate(
         !PINT_smcb_immediate_completion(smcb))
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "client_state_machine_terminate smcb %p completing\n",
-                (void *)smcb);
+                 "client_state_machine_terminate smcb %p completing\n",smcb);
 
-        PINT_EVENT_END(PINT_client_sys_event_id, pint_client_pid, NULL,
-                sm_p->event_id, 0);
+        PINT_EVENT_END(PINT_client_sys_event_id, pint_client_pid, NULL, sm_p->event_id, 0);
 
         PVFS_hint_free(sm_p->hints);
         sm_p->hints = NULL;
 
         gossip_debug(GOSSIP_CLIENT_DEBUG, 
-                "add smcb %p to completion list\n", (void *)smcb);
+                "add smcb %p to completion list\n", smcb);
         ret = add_sm_to_completion_list(smcb);
         assert(ret == 0);
     }
     else
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "client_state_machine_terminate smcb %p waiting for cancelled "
-                "jobs\n", (void *)smcb);
+                 "client_state_machine_terminate smcb %p waiting for cancelled jobs\n",smcb);
     }
     return SM_ACTION_TERMINATE;
 }
@@ -542,7 +561,7 @@ PVFS_error PINT_client_state_machine_post(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_client_state_machine_post smcb %p, op: %s\n",
-                 (void *)smcb, PINT_client_get_name_str(smcb->op));
+                 smcb, PINT_client_get_name_str(smcb->op));
 
     CLIENT_SM_ASSERT_INITIALIZED();
 
@@ -606,7 +625,7 @@ PVFS_error PINT_client_state_machine_post(
     {
         assert(sm_ret == SM_ACTION_DEFERRED);
 
-        id_gen_safe_register(&sm_p->sys_op_id, (void *)smcb);
+        PINT_id_gen_safe_register(&sm_p->sys_op_id, (void *)smcb);
         if (op_id)
         {
             *op_id = sm_p->sys_op_id;
@@ -635,7 +654,7 @@ PVFS_error PINT_client_state_machine_release(PINT_smcb * smcb)
 
     PINT_smcb_set_complete(smcb);
 
-    id_gen_safe_unregister(sm_p->sys_op_id);
+    PINT_id_gen_safe_unregister(sm_p->sys_op_id);
 
     /* free the internal hint list */
     PVFS_hint_free(sm_p->hints);
@@ -661,7 +680,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     gossip_debug(GOSSIP_CANCEL_DEBUG,
             "PINT_client_io_cancel id %lld\n",lld(id));
 
-    smcb = id_gen_safe_lookup(id);
+    smcb = PINT_id_gen_safe_lookup(id);
     if (!smcb)
     {
 	/* if we can't find it, it may have already completed */
@@ -785,7 +804,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
         }
     }
     gossip_debug(GOSSIP_CANCEL_DEBUG, "(%p) Total cancellations "
-                 "remaining: %d\n", (void *)sm_base_p,
+                 "remaining: %d\n", sm_base_p,
                  sm_base_p->u.io.total_cancellations_remaining);
     return ret;
 }
@@ -822,7 +841,7 @@ PVFS_error PINT_client_state_machine_test(
         return ret;
     }
 
-    smcb = id_gen_safe_lookup(op_id);
+    smcb = PINT_id_gen_safe_lookup(op_id);
     if (!smcb)
     {
         gen_mutex_unlock(&test_mutex);
@@ -860,9 +879,13 @@ PVFS_error PINT_client_state_machine_test(
 
         if (!PINT_smcb_complete(tmp_smcb))
         {
-            /* There used to be a test for errors here but the code did
-             * nothing no matter what the result. */
-            PINT_state_machine_continue(tmp_smcb, &job_status_array[i]);
+            ret = PINT_state_machine_continue(tmp_smcb, &job_status_array[i]);
+
+            if (ret != SM_ACTION_DEFERRED &&
+                    ret != SM_ACTION_TERMINATE); /* ret == 0 */
+            {
+                continue;
+            }
         }
     }
 
@@ -1080,7 +1103,7 @@ PVFS_error PINT_client_wait_internal(PVFS_sys_op_id op_id,
 
     if (in_op_str && out_error && in_class_str)
     {
-        smcb = id_gen_safe_lookup(op_id);
+        smcb = PINT_id_gen_safe_lookup(op_id);
         assert(smcb);
 
         do
@@ -1119,12 +1142,12 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
     PINT_smcb *smcb; 
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: id %lld\n", __func__, lld(op_id));
-    smcb = id_gen_safe_lookup(op_id);
+    smcb = PINT_id_gen_safe_lookup(op_id);
     if (smcb == NULL) 
     {
         return;
     }
-    id_gen_safe_unregister(op_id);
+    PINT_id_gen_safe_unregister(op_id);
     PINT_sys_release_smcb(smcb);
 
     return;
@@ -1221,9 +1244,7 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_MGMT_GET_UID_LIST, "PVFS_MGMT_GET_UID_LIST" },
         { PVFS_MGMT_GET_DIRDATA_ARRAY,
           "PVFS_MGMT_GET_DIRDATA_ARRAY" },
-#ifdef ENABLE_SECURITY_CERT
         { PVFS_MGMT_GET_USER_CERT, "PVFS_MGMT_GET_USER_CERT" },
-#endif
         { PVFS_SYS_GETEATTR, "PVFS_SYS_GETEATTR" },
         { PVFS_SYS_SETEATTR, "PVFS_SYS_SETEATTR" },
         { PVFS_SYS_ATOMICEATTR, "PVFS_SYS_ATOMICEATTR" },

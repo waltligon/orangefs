@@ -530,6 +530,8 @@ struct PINT_server_mkdir_op
     PVFS_fs_id fs_id;
     PVFS_handle_extent_array handle_extent_array;
     PVFS_size init_dirdata_size;
+    PVFS_capability *saved_capability;
+    PVFS_object_attr *saved_attr;
 
     /* dist-dir-struct
      * not in resp, only return meta handle
@@ -691,7 +693,7 @@ typedef struct PINT_server_op
         struct PINT_server_getconfig_op getconfig;
         struct PINT_server_lookup_op lookup;
         struct PINT_server_crdirent_op crdirent;
-        // struct PINT_server_setattr_op setattr;
+        /* struct PINT_server_setattr_op setattr; */
         struct PINT_server_readdir_op readdir;
         struct PINT_server_remove_op remove;
         struct PINT_server_chdirent_op chdirent;
@@ -740,6 +742,12 @@ typedef struct PINT_server_op
       } \
     } while (0)
 
+#define PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(__s_op) \
+    do { \
+        PINT_cleanup_capability(&__s_op->req->capability); \
+        free(__s_op); \
+    } while (0)
+
 /* state machine permission function */
 typedef int (*PINT_server_req_perm_fun)(PINT_server_op *s_op);
 
@@ -756,7 +764,7 @@ static inline int PINT_get_object_ref_##req_name(                        \
 static inline int PINT_get_credential_##req_name(        \
     struct PVFS_server_req *req, PVFS_credential **cred) \
 {                                                        \
-    *cred = &req->u.req_name.credential;                  \
+    *cred = &req->u.req_name.credential;                 \
     return 0;                                            \
 }
 
@@ -838,10 +846,19 @@ const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
  * no return value
  */
 #ifdef GOSSIP_DISABLE_DEBUG
-#define PINT_ACCESS_DEBUG(_s_op, _mask, ...) do {} while (0)
+#ifdef WIN32
+#define PINT_ACCESS_DEBUG(__s_op, __mask, format, ...) do {} while (0)
 #else
-#define PINT_ACCESS_DEBUG(_s_op, _mask, ...)                     \
-    PINT_server_access_debug(_s_op, _mask, __VA_ARGS__)
+#define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...) do {} while (0)
+#endif
+#else
+#ifdef WIN32
+#define PINT_ACCESS_DEBUG(__s_op, __mask, format, ...)                     \
+    PINT_server_access_debug(__s_op, __mask, format, __VA_ARGS__)
+#else
+#define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...)                     \
+    PINT_server_access_debug(__s_op, __mask, format, ##f)
+#endif
 #endif
 
 #ifndef GOSSIP_DISABLE_DEBUG
@@ -888,6 +905,9 @@ extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_getattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
+
+extern void tree_getattr_free(PINT_server_op *s_op);
+extern void tree_remove_free(PINT_server_op *s_op);
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

@@ -9,6 +9,7 @@
  *
  *  PVFS2 user interface routines - low level calls to system interface
  */
+
 #define USRINT_SOURCE 1
 #include "usrint.h"
 #include "posix-ops.h"
@@ -22,8 +23,9 @@
 #include <errno.h>
 #include <pint-cached-config.h>
 
-static int iocommon_parse_serverlist(char *serverlist, PVFS_sys_layout *layout,
-        PVFS_fs_id fsid);
+static int iocommon_parse_serverlist(char *serverlist,
+                                     struct PVFS_sys_server_list *slist,
+                                     PVFS_fs_id fsid);
 
 /** this is a global analog of errno for pvfs specific
  *  errors errno is set to EIO and this is set to the
@@ -375,15 +377,17 @@ errorout:
  * Parses a simple string to find the number and select of servers
  * for the LIST layout method
  */
-static int iocommon_parse_serverlist(char *serverlist, PVFS_sys_layout *layout,
-        PVFS_fs_id fsid)
+static int iocommon_parse_serverlist(char *serverlist,
+                                     struct PVFS_sys_server_list *slist,
+                                     PVFS_fs_id fsid)
 {
     PVFS_BMI_addr_t *server_array;
-    int count, i;
+    int count;
     char *tok, *save_ptr;
+    int i;
 
-    /* expects layout->servers to be NULL */
-    if (!layout || layout->servers)
+    /* expects slist->servers to be NULL */
+    if (!slist || slist->servers)
     {
         errno = EINVAL;
         return -1;
@@ -394,24 +398,25 @@ static int iocommon_parse_serverlist(char *serverlist, PVFS_sys_layout *layout,
         errno = EINVAL;
         return -1;
     }
-    layout->count = atoi(tok);
+    slist->count = atoi(tok);
     PINT_cached_config_count_servers(fsid, PINT_SERVER_TYPE_IO, &count);
-    if (layout->count < 1 || layout->count > count)
+    if (slist->count < 1 || slist->count > count)
     {
         errno = EINVAL;
         return -1;
     }
-    layout->servers = malloc(sizeof(PVFS_BMI_addr_t) * layout->count);
-    if (!layout->servers)
+    slist->servers = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t) *
+                                                slist->count);
+    if (!slist->servers)
     {
         errno = ENOMEM;
         return -1;
     }
-    server_array = malloc(sizeof(PVFS_BMI_addr_t)*count);
+    server_array = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t)*count);
     if (!server_array)
     {
-        free(layout->servers);
-        layout->servers = NULL;
+        free(slist->servers);
+        slist->servers = NULL;
         errno = ENOMEM;
         return -1;
     }
@@ -419,23 +424,22 @@ static int iocommon_parse_serverlist(char *serverlist, PVFS_sys_layout *layout,
                                         PINT_SERVER_TYPE_IO,
                                         server_array,
                                         &count);
-    for (i = 0; i < layout->count; i++)
+    for (i = 0; i < slist->count; i++)
     {
         tok = strtok_r(NULL, ":", &save_ptr);
         if (!tok || atoi(tok) < 0 || atoi(tok) >= count)
         {
-            free(layout->servers);
-            layout->servers = NULL;
+            free(slist->servers);
+            slist->servers = NULL;
             free(server_array);
             errno = EINVAL;
             return -1;
         }
-        layout->servers[i] = server_array[atoi(tok)];
+        slist->servers[i] = server_array[atoi(tok)];
     }
     free(server_array);
     return 0;
 }
-    
 
 /**
  * Create a file via the PVFS system interface
@@ -459,6 +463,10 @@ int iocommon_create_file(const char *filename,
     PVFS_sys_layout *layout = NULL;
     PVFS_hint hints = NULL;
 
+#if PVFS_USER_ENV_VARS_ENABLED
+    PVFS_hint no_hint_hint; /* We need this if file_creation_param is null. */
+#endif /* PVFS_USER_ENV_VARS_ENABLED */
+
     gossip_debug(GOSSIP_USRINT_DEBUG,
                  "iocommon_create_file: called with %s\n", filename);
 
@@ -474,6 +482,18 @@ int iocommon_create_file(const char *filename,
     attr.ctime = attr.atime;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
+#if PVFS_USER_ENV_VARS_ENABLED
+
+    /* env_vars_struct_dump(&env_vars); */
+
+    if(env_vars.env_var_present && !file_creation_param)
+    {
+        /* TODO */
+        printf("env_var_present && no hint detected!\n");
+    }
+#endif /* PVFS_USER_ENV_VARS_ENABLED */
+    /* ====================================================================== */
+
     if (file_creation_param) /* these are hints */
     {
         int length;
@@ -484,8 +504,29 @@ int iocommon_create_file(const char *filename,
                                             &length);
         if (value)
         {
+#if 0
+            printf("HINT DETECTED:\n"
+                   "\tPINT_HINT_DISTRIBUTION -> value = %s\n", (char *) value);
+#endif
             dist = PVFS_sys_dist_lookup((char *)value);
-            if (!dist) /* distribution not found */
+            if (dist)
+            {
+                value = PINT_hint_get_value_by_type(file_creation_param,
+                                                    PINT_HINT_DISTRIBUTION_PV,
+                                                    &length);
+                /* This should come in as a string here and get tokenized into 
+                 * potentially multiple param:value pairs delimited by a '+'.*/
+                if(value)
+                {
+#if 0
+                    printf("\tPINT_HINT_DISTRIBUTION_PV -> value = %s\n",
+                           (char *) value);
+#endif
+                    /* Uses inplace iterator */
+                    PVFS_dist_pv_pairs_extract_and_add(value, (void *) dist);
+                }
+            }
+            else /* distribution not found */
             {
                 rc = EINVAL;
                 goto errorout;
@@ -508,8 +549,8 @@ int iocommon_create_file(const char *filename,
         {
             layout = (PVFS_sys_layout *)malloc(sizeof(PVFS_sys_layout));
             layout->algorithm = *(int *)value;
-            layout->count = 0;
-            layout->servers = NULL;
+            layout->server_list.count = 0;
+            layout->server_list.servers = NULL;
         }
         /* check for server list */
         value = PINT_hint_get_value_by_type(file_creation_param,
@@ -523,9 +564,10 @@ int iocommon_create_file(const char *filename,
                 rc = EINVAL;
                 goto errorout;
             }
-            layout->count = 0;
-            layout->servers = NULL;
-            rc = iocommon_parse_serverlist(value, layout, parent_ref.fs_id);
+            layout->server_list.count = 0;
+            layout->server_list.servers = NULL;
+            rc = iocommon_parse_serverlist(value, &layout->server_list,
+                                           parent_ref.fs_id);
             if (rc < 0)
             {
                 return rc;
@@ -1037,12 +1079,12 @@ pvfs_descriptor *iocommon_open(const char *path,
              */
             char *tmp_path;
             int dlen = strlen(pdir->s->dpath);
-            int plen = strlen(directory);
+            int plen = strlen(path);
             int mlen = dlen + plen + 2;
             tmp_path = (char *)malloc(mlen);
             strncpy(tmp_path, pdir->s->dpath, dlen + 1);
             strncat(tmp_path, "/", 1);
-            strncat(tmp_path, directory, plen);
+            strncat(tmp_path, path, plen);
             Ppath = PVFS_new_path(tmp_path);
 
             rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);

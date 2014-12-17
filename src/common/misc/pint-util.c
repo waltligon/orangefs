@@ -120,23 +120,23 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
     if (dest && src)
     {
-	if (src->mask & PVFS_ATTR_COMMON_UID)
+        if (src->mask & PVFS_ATTR_COMMON_UID)
         {
             dest->owner = src->owner;
         }
-	if (src->mask & PVFS_ATTR_COMMON_GID)
+        if (src->mask & PVFS_ATTR_COMMON_GID)
         {
             dest->group = src->group;
         }
-	if (src->mask & PVFS_ATTR_COMMON_PERM)
+        if (src->mask & PVFS_ATTR_COMMON_PERM)
         {
             dest->perms = src->perms;
         }
-	if (src->mask & PVFS_ATTR_COMMON_ATIME)
+        if (src->mask & PVFS_ATTR_COMMON_ATIME)
         {
             dest->atime = src->atime;
         }
-	if (src->mask & PVFS_ATTR_COMMON_CTIME)
+        if (src->mask & PVFS_ATTR_COMMON_CTIME)
         {
             dest->ctime = src->ctime;
         }
@@ -144,7 +144,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
         {
             dest->mtime = src->mtime;
         }
-	if (src->mask & PVFS_ATTR_COMMON_TYPE)
+        if (src->mask & PVFS_ATTR_COMMON_TYPE)
         {
             dest->objtype = src->objtype;
         }
@@ -276,7 +276,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             dest->u.data.size = src->u.data.size;
         }
 
-	if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
+        if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
             (src->objtype == PVFS_TYPE_METAFILE))
         {      
             if(src->mask & PVFS_ATTR_META_DFILES)
@@ -382,7 +382,8 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             }
         }
 
-	dest->mask = src->mask;
+        dest->mask = src->mask;
+
         ret = 0;
     }
     return ret;
@@ -398,17 +399,15 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
             {
                 free(attr->capability.signature);
             }            
-            attr->capability.signature = NULL;
             if (attr->capability.handle_array)
             {
                 free(attr->capability.handle_array);
             }            
-            attr->capability.handle_array = NULL;
             if (attr->capability.issuer)
             {
                 free(attr->capability.issuer);
             }
-            attr->capability.issuer = NULL;
+            memset(&attr->capability, 0, sizeof(PVFS_capability));
         }
         if (attr->mask & PVFS_ATTR_META_DFILES)
         {
@@ -605,6 +604,26 @@ struct timespec PINT_util_get_abs_timespec(int microsecs)
     return tv;
 }
 
+PVFS_uid PINT_util_getuid(void)
+{
+#ifdef WIN32
+    /* TODO! */
+    return (PVFS_uid) 999;
+#else
+    return (PVFS_uid) getuid();
+#endif
+}
+
+PVFS_gid PINT_util_getgid(void)
+{
+#ifdef WIN32
+    /* TODO! */
+    return (PVFS_gid) 999;
+#else
+    return (PVFS_gid) getgid();
+#endif
+}
+
 /*                                                              
  * Output hex representation of arbitrary data.
  * The output buffer must have size for count * 2 bytes + 1 (zero-byte).
@@ -629,6 +648,82 @@ char *PINT_util_bytes2str(unsigned char *bytes, char *output, size_t count)
 
     return output;    
 
+}
+
+void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x)
+{
+    const char *addr_str;
+
+    addr_str = BMI_addr_rev_lookup(*x);
+    encode_string(pptr, &addr_str);
+}
+
+/* determines how much protocol space a BMI_addr_t encoding will consume */
+int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x)
+{
+    const char *addr_str;
+    addr_str = BMI_addr_rev_lookup(*x);
+    return(encode_string_size_check(&addr_str));
+}
+void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x)
+{
+    char *addr_string;
+    decode_string(pptr, &addr_string);
+    BMI_addr_lookup(x, addr_string);
+}
+
+void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
+{
+    int tmp_size;
+    int i;
+
+    /* figure out how big this encoding will be first */
+
+    tmp_size = 16; /* enumeration and list count */
+    for(i=0 ; i<x->server_list.count; i++)
+    {
+        /* room for each server encoding */
+        tmp_size += encode_PVFS_BMI_addr_t_size_check(&(x)->server_list.servers[i]);
+    }
+
+    if(tmp_size > PVFS_REQ_LIMIT_LAYOUT)
+    {
+        /* don't try to encode everything.  Just set pptr too high so that
+         * we hit error condition in encode function
+         */
+        gossip_err("Error: layout too large to encode in request protocol.\n");
+        *(pptr) += extra_size_PVFS_servreq_create + 1;
+        return;
+    }
+
+    /* otherwise we are in business */
+    encode_enum(pptr, &x->algorithm);
+    encode_skip4(pptr, NULL);
+    encode_int32_t(pptr, &x->server_list.count);
+    encode_skip4(pptr, NULL);
+    for(i=0 ; i<x->server_list.count; i++)
+    {
+        encode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
+    }
+}
+
+void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x)
+{
+    int i;
+
+    decode_enum(pptr, &x->algorithm);
+    decode_skip4(pptr, NULL);
+    decode_int32_t(pptr, &x->server_list.count);
+    decode_skip4(pptr, NULL);
+    if(x->server_list.count)
+    {
+        x->server_list.servers = malloc(x->server_list.count*sizeof(*(x->server_list.servers)));
+        assert(x->server_list.servers);
+    }
+    for(i=0 ; i<x->server_list.count; i++)
+    {
+        decode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
+    }
 }
 
 char *PINT_util_guess_alias(void)

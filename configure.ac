@@ -54,6 +54,8 @@ AC_CHECK_HEADER([features.h],
         [AC_DEFINE(HAVE_FEATURES_H, 1, Define if features.h exists)])
 AC_CHECK_HEADER([fstab.h],
         [AC_DEFINE(HAVE_FSTAB_H, 1, Define if fstab.h exists)])
+AC_CHECK_HEADER([malloc.h],
+        [AC_DEFINE(HAVE_MALLOC_H, 1, Define if malloc.h exists)])
 AC_CHECK_HEADER([memory.h],
         [AC_DEFINE(HAVE_MEMORY_H, 1, Define if memory.h exists)])
 AC_CHECK_HEADER([mntent.h],
@@ -89,6 +91,8 @@ AC_CHECK_HEADER([dlfcn.h],
 
 AC_CHECK_HEADER([linux/types.h],
         [AC_DEFINE(HAVE_LINUX_TYPES_H, 1, Define if linux/types.h exists)])
+AC_CHECK_HEADER([linux/malloc.h],
+        [AC_DEFINE(HAVE_LINUX_MALLOC_H, 1, Define if linux/malloc.h exists)])
 
 AC_CHECK_HEADER([selinux/selinux.h],
         [AC_DEFINE(HAVE_SELINUX_H, 1, Define if selinux/selinux.h exists)])
@@ -122,9 +126,6 @@ AC_CHECK_HEADER([arpa/inet.h],
         [AC_DEFINE(HAVE_ARPA_INET_H, 1, Define if arpa/inet.h exists)])
 AC_CHECK_HEADER([attr/xattr.h],
         [AC_DEFINE(HAVE_ATTR_XATTR_H, 1, Define if attr/xattr.h exists)])
-
-AC_CHECK_HEADER([byteswap.h],
-		[AC_DEFINE(HAVE_BYTESWAP_H, 1, Define if byteswap.h exists)])
 
 AC_CHECK_SIZEOF([long int])
 
@@ -264,6 +265,9 @@ AC_SUBST(BUILD_SERVER)
 dnl locate OpenSSL libraries
 AX_OPENSSL
 
+dnl check to see if the "fast" getgrouplist function is available
+AX_GETGROUPLIST
+
 dnl check for key-based security
 AC_ARG_ENABLE(security-key,
 [  --enable-security-key   Enables key-based security],
@@ -290,7 +294,7 @@ fi],
 )
 AC_SUBST(ENABLE_SECURITY_CERT)
 
-dnl check for Capability Cache
+dnl check for capability cache
 AC_ARG_ENABLE(capcache,
 [  --disable-capcache      Disables server capability cache],
 [if test "x$enableval" = "xyes" ; then
@@ -299,16 +303,14 @@ AC_ARG_ENABLE(capcache,
 else
     ENABLE_CAPCACHE=
 fi],
-[if test "x$ENABLE_SECURITY_KEY" = "x1" -o "x$ENABLE_SECURITY_CERT" = "x1"; then
-    ENABLE_CAPCACHE=1
-    AC_DEFINE(ENABLE_CAPCACHE, 1, Define if capability cache is enabled)
-else
-    ENABLE_CAPCACHE=
-fi]
+[ENABLE_CAPCACHE=1
+ AC_DEFINE(ENABLE_CAPCACHE, 1, Define if capability cache is enabled)]
 )
 AC_SUBST(ENABLE_CAPCACHE)
 
-dnl check for Credential Cache
+
+
+dnl check for credential cache
 AC_ARG_ENABLE(credcache,
 [  --disable-credcache     Disables server credential cache],
 [if test "x$enableval" = "xyes" ; then
@@ -326,7 +328,7 @@ fi]
 )
 AC_SUBST(ENABLE_CREDCACHE)
 
-dnl check for Certificate Cache
+dnl check for certificate cache
 AC_ARG_ENABLE(certcache,
 [  --disable-certcache     Disables server certificate cache],
 [if test "x$enableval" = "xyes" ; then
@@ -354,17 +356,12 @@ if test \( "x$ENABLE_SECURITY_KEY" = "x1" -o "x$ENABLE_SECURITY_CERT" = "x1" \) 
     AC_MSG_ERROR([OpenSSL required for robust security (use --with-ssl)])
 fi
 
-dnl Capability cache only valid in security modes
-if test "x$ENABLE_CAPCACHE" = "x1" -a "x$ENABLE_SECURITY_KEY" = "x" -a "x$ENABLE_SECURITY_CERT" = "x"; then
-    AC_MSG_ERROR([capability cache can only be used in key- or certificate-based security mode])
-fi
-
-dnl Credential cache only valid in security modes
+dnl credential cache only valid in security modes
 if test "x$ENABLE_CREDCACHE" = "x1" -a "x$ENABLE_SECURITY_KEY" = "x" -a "x$ENABLE_SECURITY_CERT" = "x"; then
     AC_MSG_ERROR([credential cache can only be used in key- or certificate-based security mode])
 fi
 
-dnl Certificate cache only valid in certificate-based security mode
+dnl certificate cache only valid in certificate-based security mode
 if test "x$ENABLE_CERTCACHE" = "x1" -a "x$ENABLE_SECURITY_CERT" = "x"; then
     AC_MSG_ERROR([certificate cache can only be used in certificate-based security mode])
 fi
@@ -1206,6 +1203,23 @@ main() {void *p = dlsym(RTLD_DEFAULT,"sym");}
     LIBS="$LIBS -ldl"
 ])
 
+dnl Method to enable user environment variable support
+BUILD_USER_ENV_VARS=
+AC_ARG_ENABLE(user-env-vars,
+[  --enable-user-env-vars         Enables usrint environment variable support.],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_USER_ENV_VARS_ENABLED, 1,
+      [Should we enable user environment variables.])
+   BUILD_USER_ENV_VARS=1
+else
+   AC_DEFINE(PVFS_USER_ENV_VARS_ENABLED, 0,
+      [Should we enable user environment variables.])
+fi
+AC_SUBST(BUILD_USER_ENV_VARS)],
+[AC_DEFINE(PVFS_USER_ENV_VARS_ENABLED, 0,
+    [Should we enable user environment variables.])
+AC_SUBST(BUILD_USER_ENV_VARS)])
+
 dnl Method to enable user interface data cache
 BUILD_UCACHE=
 AC_ARG_ENABLE(ucache,
@@ -1253,6 +1267,12 @@ AC_ARG_ENABLE(
             if test "x$JAVA_HOME" = "x"; then
                 AC_MSG_ERROR(--enable-jni must be used in conjunction with --with-jdk=jdk_path.)
             fi
+
+            AC_CHECK_PROG(HAVE_MAVEN, mvn, yes, no)
+            if test $HAVE_MAVEN = "no"; then
+                AC_MSG_ERROR("maven (mvn) required in PATH to complete JNI client build")
+            fi
+
             AC_DEFINE(PVFS_JNI_ENABLE, 1,
                 [Should we enable PVFS Client JNI.])
             BUILD_JNI=1
@@ -1266,50 +1286,6 @@ AC_ARG_ENABLE(
     ]
 )
 AC_SUBST(BUILD_JNI)
-
-HADOOP_PREFIX=
-AC_ARG_WITH(
-    hadoop,
-    [  --with-hadoop=<path>    Enables support for OrangeFS extensions of Hadoop classes.],
-    [
-        HADOOP_PREFIX=$withval;
-        corepath=`ls $withval/hadoop-core*`
-        AC_CHECK_FILE($corepath,
-            [],
-            [
-                AC_MSG_ERROR(could not locate $withval/hadoop-core-*.jar at the path given with --with-hadoop.)
-            ]
-        )
-    ],
-    [   with_hadoop=no]
-)
-AC_SUBST(HADOOP_PREFIX)
-
-dnl Method to enable OrangeFS extensions to Hadoop classes.
-BUILD_HADOOP=
-AC_ARG_ENABLE(
-    hadoop,
-    [  --enable-hadoop         Enables OrangeFS extenions of Hadoop classes. Requires --enable-jni --with-jdk and --with-hadoop.],
-    [   if test "x$enableval" = "xyes" ; then
-            if test "x$HADOOP_PREFIX" = "x"; then
-                AC_MSG_ERROR(--enable-hadoop must be used in conjunction with --with-hadoop=path.)
-            fi
-            if test "$BUILD_JNI" != "1"; then
-                AC_MSG_ERROR(--enable-hadoop must be used in conjunction with --enable-jni.)
-            fi
-            AC_DEFINE(PVFS_HADOOP_ENABLE, 1,
-                [Should we enable OrangeFS extensions of Hadoop classes.])
-            BUILD_HADOOP=1
-        else
-            AC_DEFINE(PVFS_HADOOP_ENABLE, 0,
-                [Should we enable OrangeFS extensions of Hadoop classes.])
-        fi
-    ],
-    [   AC_DEFINE(PVFS_HADOOP_ENABLE, 0,
-            [Should we enable OrangeFS extensions of Hadoop classes.])
-    ]
-)
-AC_SUBST(BUILD_HADOOP)
 
 dnl See if we have includes needed for acls
 BUILD_ACL_INTERFACE=
@@ -1381,7 +1357,7 @@ AC_ARG_WITH(efence,
        if test "x$withval" != "xyes" ; then
               LDFLAGS="${LDFLAGS} -L$withval"
        fi
-       AC_CHECK_LIB(efence,malloc)
+       AC_CHECK_LIB(efence,malloc,,,-lpthread)
 )
 
 dnl Use compiled-in valgrind annotations?  Give the header path if
@@ -1452,13 +1428,29 @@ case "$host_os" in
 esac
 
 dnl check for gethostbyname function
-AC_CHECK_FUNCS([gethostbyname])
+AC_MSG_CHECKING(for gethostbyname)
+oldcflags="$CFLAGS"
+CFLAGS="$USR_CFLAGS"
+AC_TRY_COMPILE([
+#include <netdb.h>
+], [
+gethostbyname("localhost");
+],
+AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_GETHOSTBYNAME, 1, Define if gethostbyname function exists),
+AC_MSG_RESULT(no)
+WARN_ABOUT_HOSTNAMES="yes")
 
-dnl check for gethostbyaddr function
-AC_CHECK_FUNCS([gethostbyaddr])
-
-dnl check for memalign function
-AC_CHECK_FUNCS([memalign])
+AC_MSG_CHECKING(for gethostbyaddr)
+AC_TRY_COMPILE([
+#include <netdb.h>
+], [
+struct sockaddr_in peer;
+gethostbyaddr((void *)&peer.sin_addr.s_addr, sizeof(struct in_addr), AF_INET);
+],
+AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_GETHOSTBYADDR, 1, Define if gethostbyaddr function exists),
+AC_MSG_RESULT(no)  )
 
 CFLAGS="$oldcflags"
 
@@ -1518,13 +1510,16 @@ dnl
 dnl check for open O_DIRECT
 AC_MSG_CHECKING([for open O_DIRECT])
 AC_TRY_COMPILE([
+    #define _GNU_SOURCE
     #include <fcntl.h>
+    #include <sys/types.h>
+    #include <sys/stat.h>
     ], [
-    open("somefile", O_DIRECT);
-    ], [],
-    AC_MSG_RESULT(no),
-    AC_MSG_RESULT(yes),
-    AC_DEFINE(HAVE_OPEN_O_DIRECT, 1, Define if system defines O_DIRECT fcntl)
+    open("somefile", O_RDONLY | O_DIRECT);
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_OPEN_O_DIRECT, 1, Define if system defines O_DIRECT fcntl),
+    AC_MSG_RESULT(no)
 )
 
 dnl
@@ -1727,6 +1722,47 @@ fi
 ],
 )
 
+dnl in our src/io/bmi/bmi-byteswap.h we check to see if __bswap_64
+dnl is defined, and if not, we define it. We probably haven't
+dnl had to use our define for a long time, __bswap_64 has been
+dnl defined in some glibc package (wherever /usr/include/bits/byteswap.h
+dnl comes from) for a long time. We could probably get rid of our
+dnl check in bmi-byteswap.h: even as far back as Red Hat 7.3 where
+dnl /usr/include/bits/byteswap.h came from glibc-devel-2.2.5.34, __bswap_64
+dnl would be defined for anyone using gcc > 2.0.
+dnl
+dnl Anyhow, more recently (for example: when /usr/include/bits/byteswap.h
+dnl comes from glibc-headers-2.17-11.fc19.x86_64), dnl __bswap_64 is
+dnl an inline function in most situations. This causes our define of
+dnl __bswap_64 to kick in (since __bswap_64 is NOT defined) and this
+dnl is a problem - our stinky old define overrides the inline function.
+dnl This test sets a define if __bswap_64 is a function. We can use
+dnl this define in src/io/bmi/bmi-byteswap.h to avoid defining __bswap_64
+dnl if it is an inline function. This way, we can leave the test in 
+dnl src/io/bmi/bmi-byteswap.h in case there's anyone out there who
+dnl still needs it.
+AC_MSG_CHECKING([for __bswap_64 is a function])
+AC_TRY_COMPILE(
+    [
+      #include <byteswap.h>
+      #include <bits/types.h>
+    ],
+    [
+      __uint64_t x;
+      #ifndef  __bswap_64
+        __bswap_64(x);
+      #else
+         __bswap_64_is_not_a_function(not a function);
+      #endif
+    ],
+    [
+      AC_MSG_RESULT(yes)
+      AC_DEFINE(BSWAP_64_IS_A_FUNC, 1, Define if __bswap_64 is a function)
+    ]
+    ,
+    AC_MSG_RESULT(no)
+)
+
 dnl gets has been officially removed in ISO C11
 dnl     - /usr/include/stdio.h
 dnl     - glibc-headers-2.17-11.fc19.x86_64
@@ -1791,6 +1827,7 @@ src/common/events/module.mk
 src/common/mgmt/module.mk
 src/common/security/module.mk
 src/common/hash/module.mk
+src/common/token-utils/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
@@ -1962,6 +1999,12 @@ else
    AC_MSG_RESULT([PVFS2 symbolic libraries will be built            :  no])
 fi
 
+if test "x$BUILD_USER_ENV_VARS" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 user environment variables enabled          : yes])
+else
+   AC_MSG_RESULT([PVFS2 user environment variables enabled          :  no])
+fi
+
 if test "x$BUILD_UCACHE" = "x1" ; then
    AC_MSG_RESULT([PVFS2 user interface library cache enabled        : yes])
 else
@@ -1978,12 +2021,6 @@ if test "x$BUILD_JNI" = "x1" ; then
    AC_MSG_RESULT([PVFS2 client JNI enabled                          : yes])
 else
    AC_MSG_RESULT([PVFS2 client JNI enabled                          :  no])
-fi
-
-if test "x$BUILD_HADOOP" = "x1" ; then
-   AC_MSG_RESULT([OrangeFS/Hadoop libraries enabled                 : yes])
-else
-   AC_MSG_RESULT([OrangeFS/Hadoop libraries enabled                 :  no])
 fi
 
 else

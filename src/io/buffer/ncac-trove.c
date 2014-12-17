@@ -1,40 +1,31 @@
 
 /* this file contains functions used by the cache to access Trove */
 
-#include <stdio.h>
-
-#include "quicklist.h"
 #include "internal.h"
 #include "trove.h"
 #include "aiovec.h"
+#include "ncac-trove.h"
 #include "state.h"
 #include "pvfs2-internal.h"
 
-#include "ncac-trove.h"
-
-static inline void  offset_shorten( int s_cnt, 
-                      PVFS_offset *stream_offset_array,
-                      PVFS_size *stream_size_array,
-                      int m_cnt, 
-                      char **mem_offset_array,
-                      PVFS_size *mem_size_array,
-                      int *new_s_cnt, int *new_m_cnt);
-
+static void offset_shorten(int s_cnt, PVFS_offset *stream_offset_array,
+    PVFS_size *stream_size_array, int m_cnt, char **mem_offset_array,
+    PVFS_size *mem_size_array, int *new_s_cnt, int *new_m_cnt); 
 
 int NCAC_aio_read_ext( PVFS_fs_id coll_id, PVFS_handle handle, 
-               PVFS_context_id context, struct aiovec *aiovec, 
-               int *ioreq)
+		       PVFS_context_id context, struct aiovec *aiovec, 
+		       int *ioreq)
 {
     char **mem_offset_array;
     PVFS_size *mem_size_array;
-    PVFS_size off;
+	PVFS_size off;
     int m_cnt;
     PVFS_offset *stream_offset_array;
     PVFS_size *stream_size_array;
     void *user_ptr_array[1] = { (char *) 13 };
 
     TROVE_op_id op_id;
-    TROVE_size output_size;
+	TROVE_size output_size;
 
     int s_cnt;
     int ret;
@@ -44,8 +35,8 @@ int NCAC_aio_read_ext( PVFS_fs_id coll_id, PVFS_handle handle,
     m_cnt = s_cnt = aiovec_count(aiovec);
 
     if ( !m_cnt ) {
-        *ioreq = INVAL_IOREQ;
-        return -1;
+		*ioreq = INVAL_IOREQ;
+		return -1;
     }
 
     mem_offset_array = aiovec->mem_offset_array;
@@ -60,52 +51,47 @@ int NCAC_aio_read_ext( PVFS_fs_id coll_id, PVFS_handle handle,
 
     for (i=0; i< m_cnt; i++ ) {
         DPRINT( "off:%lld, size=%lld, buff:%p, size=%lld\n", 
-                stream_offset_array[i], stream_size_array[i],
-                 mem_offset_array[i], mem_size_array[i] );
+				stream_offset_array[i], stream_size_array[i],
+				 mem_offset_array[i], mem_size_array[i] );
     }
 
 
-    /* adjust the offset and length to the I/O unit.
-     * In the current implementation, we read/write over the whole extent. 
-     * At the same time, shorten the iovec list if possible. 
-     */
+	/* adjust the offset and length to the I/O unit.
+	 * In the current implementation, we read/write over the whole extent. 
+	 * At the same time, shorten the iovec list if possible. 
+	 */
 
 
     for (i=0; i< m_cnt; i++ ) {
-        if ( stream_size_array[i] % NCAC_dev.extsize ) {
-            stream_size_array[i] = NCAC_dev.extsize;
-            mem_size_array[i]    = NCAC_dev.extsize;
+		if ( stream_size_array[i] % NCAC_dev.extsize ) {
+			stream_size_array[i] = NCAC_dev.extsize;
+			mem_size_array[i]    = NCAC_dev.extsize;
 
-            off = stream_offset_array[i] & (NCAC_dev.extsize -1) ;
+			off = stream_offset_array[i] & (NCAC_dev.extsize -1) ;
 
-            stream_offset_array[i] -= off;
-            mem_offset_array[i] -= off;
-        }
+			stream_offset_array[i] -= off;
+			mem_offset_array[i] -= off;
+		}
 
         DPRINT( "off:%lld, size=%lld, buff:%p, size=%lld\n", 
-                stream_offset_array[i], stream_size_array[i],
-                 mem_offset_array[i], mem_size_array[i] );
+				stream_offset_array[i], stream_size_array[i],
+				 mem_offset_array[i], mem_size_array[i] );
 
     }
 
-    offset_shorten( s_cnt, 
-                    stream_offset_array,
-                    stream_size_array,
-                    m_cnt, 
-                    mem_offset_array,
-                    mem_size_array,
-                    &s_cnt, &m_cnt);
+    offset_shorten(s_cnt, stream_offset_array, stream_size_array, m_cnt,
+        mem_offset_array, mem_size_array, &s_cnt, &m_cnt);
 
     DPRINT("--------------after offset_shorten: s_cnt=%d\n", s_cnt);
     for (i=0; i< s_cnt; i++ ) {
         DPRINT( "off:%lld, size=%lld\n", 
-                stream_offset_array[i], stream_size_array[i] );
+				stream_offset_array[i], stream_size_array[i] );
     }
 
     DPRINT("--------------after offset_shorten: m_cnt=%d\n", m_cnt);
     for (i=0; i< m_cnt; i++ ) {
         DPRINT( "buff:%p, size=%lld\n", 
-                mem_offset_array[i], mem_size_array[i] );
+			    mem_offset_array[i], mem_size_array[i] );
     }
 
     ret = trove_bstream_write_list(coll_id,
@@ -136,20 +122,20 @@ int NCAC_aio_read_ext( PVFS_fs_id coll_id, PVFS_handle handle,
 }
 
 int NCAC_aio_write( PVFS_fs_id coll_id, 
-                    PVFS_handle handle,
-                    PVFS_context_id context,
-                     int cnt,
+					PVFS_handle handle,
+					PVFS_context_id context,
+				 	int cnt,
                     PVFS_offset *stream_offset_array, 
-                    PVFS_size *stream_size_array,
-                    char **mem_offset_array,  
-                    PVFS_size *mem_size_array, 
-                    int *ioreq) 
+					PVFS_size *stream_size_array,
+            		char **mem_offset_array,  
+					PVFS_size *mem_size_array, 
+					int *ioreq) 
 {
-    int m_cnt, s_cnt;
-    PVFS_size off;
+	int m_cnt, s_cnt;
+	PVFS_size off;
     void *user_ptr_array[1] = { (char *) 13 };
     TROVE_op_id op_id;
-    TROVE_size output_size;
+	TROVE_size output_size;
     int ret;
     int i;
 
@@ -158,48 +144,43 @@ int NCAC_aio_write( PVFS_fs_id coll_id,
     m_cnt = s_cnt = cnt;
 
 
-    /* adjust the offset and length to the I/O unit.
-     * In the current implementation, we read/write over the whole extent. 
-     * At the same time, shorten the iovec list if possible. 
-     */
+	/* adjust the offset and length to the I/O unit.
+	 * In the current implementation, we read/write over the whole extent. 
+	 * At the same time, shorten the iovec list if possible. 
+	 */
 
     for (i=0; i< m_cnt; i++ ) {
-        if ( stream_size_array[i] % NCAC_dev.extsize ) {
-            stream_size_array[i] = NCAC_dev.extsize;
-            mem_size_array[i]    = NCAC_dev.extsize;
+		if ( stream_size_array[i] % NCAC_dev.extsize ) {
+			stream_size_array[i] = NCAC_dev.extsize;
+			mem_size_array[i]    = NCAC_dev.extsize;
 
-            off = stream_offset_array[i] & (NCAC_dev.extsize -1) ;
+			off = stream_offset_array[i] & (NCAC_dev.extsize -1) ;
 
-            stream_offset_array[i] -= off;
-            mem_offset_array[i] -= off;
-        }
+			stream_offset_array[i] -= off;
+			mem_offset_array[i] -= off;
+		}
 
         DPRINT( "off:%lld, size=%lld, buff:%p, size=%lld\n", 
-                stream_offset_array[i], stream_size_array[i],
-                 mem_offset_array[i], mem_size_array[i] );
+				stream_offset_array[i], stream_size_array[i],
+				 mem_offset_array[i], mem_size_array[i] );
 
     }
 
-    offset_shorten( s_cnt, 
-                    stream_offset_array,
-                    stream_size_array,
-                    m_cnt, 
-                    mem_offset_array,
-                    mem_size_array,
-                    &s_cnt, &m_cnt);
+    offset_shorten(s_cnt, stream_offset_array, stream_size_array, m_cnt,
+        mem_offset_array, mem_size_array, &s_cnt, &m_cnt);
 
 
 #ifdef DEBUG
     fprintf(stderr, "--------------after offset_shorten: s_cnt=%d\n", s_cnt);
     for (i=0; i< s_cnt; i++ ) {
         fprintf(stderr, "off:%lld, size=%lld\n", 
-                stream_offset_array[i], stream_size_array[i] );
+				stream_offset_array[i], stream_size_array[i] );
     }
 
     fprintf(stderr, "--------------after offset_shorten: m_cnt=%d\n", m_cnt);
     for (i=0; i< m_cnt; i++ ) {
         fprintf(stderr, "buff:%p, size=%lld\n", 
-                mem_offset_array[i], mem_size_array[i] );
+			    mem_offset_array[i], mem_size_array[i] );
     }
 #endif
 
@@ -235,17 +216,17 @@ int NCAC_aio_write( PVFS_fs_id coll_id,
  * parameters can be used to do finer read.
  */
 int do_read_for_rmw(PVFS_fs_id coll_id, PVFS_handle handle, 
-                    PVFS_context_id context, struct extent *extent, 
-                    PVFS_offset pos, char * off, int size, int *ioreq)
+					PVFS_context_id context, struct extent *extent, 
+					PVFS_offset pos, char * off, int size, int *ioreq)
 {
-    char * buf;
-    TROVE_size inout_size;
+	char * buf;
+	TROVE_size inout_size;
     TROVE_op_id op_id;
-    
-    int ret;
+	
+	int ret;
 
-    buf = extent->addr;
-    inout_size = NCAC_dev.extsize;
+	buf = extent->addr;
+	inout_size = NCAC_dev.extsize;
 
     DPRINT("do_read_for_rmw; pos=%lld, buf=%p, size=%lld\n", pos, buf, inout_size);
     ret = trove_bstream_read_at(coll_id, handle,
@@ -281,9 +262,9 @@ int NCAC_check_ioreq(struct extent *extent)
     op_id = extent->ioreq;
 
     if ( op_id == INVAL_IOREQ ) {
-        NCAC_error("invalid trove io req id");    
-        return -1;
-    }
+		NCAC_error("invalid trove io req id");	
+		return -1;
+	}
 
     coll_id = extent->mapping->coll_id;
     context_id = extent->mapping->context_id;
@@ -293,7 +274,7 @@ int NCAC_check_ioreq(struct extent *extent)
     ret = trove_dspace_test(coll_id, op_id, context_id, &count, NULL, NULL, &state, TROVE_DEFAULT_TEST_TIMEOUT);
 
     if ( ret > 0 ) {
-        fprintf(stderr, "++++++++++++NCAC_check_ioreq: finished %lld\n", lld(op_id));
+    	fprintf(stderr, "++++++++++++NCAC_check_ioreq: finished %lld\n", lld(op_id));
         extent->ioreq = INVAL_IOREQ;
     }
 
@@ -305,13 +286,9 @@ int NCAC_check_ioreq(struct extent *extent)
  * Reduce <file offset, len> and <mem offset, len>  pairs in-place.  
  */
 
-static inline void  offset_shorten( int s_cnt, 
-                      PVFS_offset *stream_offset_array,
-                      PVFS_size *stream_size_array,
-                      int m_cnt, 
-                      char **mem_offset_array,
-                      PVFS_size *mem_size_array,
-                      int *new_s_cnt, int *new_m_cnt)
+static void offset_shorten(int s_cnt, PVFS_offset *stream_offset_array,
+    PVFS_size *stream_size_array, int m_cnt, char **mem_offset_array,
+    PVFS_size *mem_size_array, int *new_s_cnt, int *new_m_cnt)
 {
 
     int i = 0;

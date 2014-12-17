@@ -6,6 +6,8 @@
 
 /* TCP/IP implementation of a BMI method */
 
+#define BMI_TCP_ZONE 1
+
 #include "pvfs2-internal.h"
 
 #include <errno.h>
@@ -58,17 +60,24 @@ static int sc_test_busy = 0;
 int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
 		       int method_id,
 		       int init_flags);
+
 int BMI_tcp_finalize(void);
+
 int BMI_tcp_set_info(int option,
 		     void *inout_parameter);
+
 int BMI_tcp_get_info(int option,
 		     void *inout_parameter);
+
 void *BMI_tcp_memalloc(bmi_size_t size,
 		       enum bmi_op_type send_recv);
+
 int BMI_tcp_memfree(void *buffer,
 		    bmi_size_t size,
 		    enum bmi_op_type send_recv);
+
 int BMI_tcp_unexpected_free(void *buffer);
+
 int BMI_tcp_post_send(bmi_op_id_t * id,
 		      bmi_method_addr_p dest,
 		      const void *buffer,
@@ -78,6 +87,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
 		      void *user_ptr,
 		      bmi_context_id context_id,
                       PVFS_hint hints);
+
 int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 				bmi_method_addr_p dest,
 				const void *buffer,
@@ -87,6 +97,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 				void *user_ptr,
 				bmi_context_id context_id,
                                 PVFS_hint hints);
+
 int BMI_tcp_post_recv(bmi_op_id_t * id,
 		      bmi_method_addr_p src,
 		      void *buffer,
@@ -97,6 +108,7 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
 		      void *user_ptr,
 		      bmi_context_id context_id,
                       PVFS_hint hints);
+
 int BMI_tcp_test(bmi_op_id_t id,
 		 int *outcount,
 		 bmi_error_code_t * error_code,
@@ -104,6 +116,7 @@ int BMI_tcp_test(bmi_op_id_t id,
 		 void **user_ptr,
 		 int max_idle_time_ms,
 		 bmi_context_id context_id);
+
 int BMI_tcp_testsome(int incount,
 		     bmi_op_id_t * id_array,
 		     int *outcount,
@@ -113,10 +126,12 @@ int BMI_tcp_testsome(int incount,
 		     void **user_ptr_array,
 		     int max_idle_time_ms,
 		     bmi_context_id context_id);
+
 int BMI_tcp_testunexpected(int incount,
 			   int *outcount,
 			   struct bmi_method_unexpected_info *info,
 			   int max_idle_time_ms);
+
 int BMI_tcp_testcontext(int incount,
 		     bmi_op_id_t * out_id_array,
 		     int *outcount,
@@ -125,9 +140,13 @@ int BMI_tcp_testcontext(int incount,
 		     void **user_ptr_array,
 		     int max_idle_time_ms,
 		     bmi_context_id context_id);
+
 bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string);
+
 const char* BMI_tcp_addr_rev_lookup_unexpected(bmi_method_addr_p map);
+
 int BMI_tcp_query_addr_range(bmi_method_addr_p, const char *, int);
+
 int BMI_tcp_post_send_list(bmi_op_id_t * id,
 			   bmi_method_addr_p dest,
 			   const void *const *buffer_list,
@@ -139,6 +158,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
 			   void *user_ptr,
 			   bmi_context_id context_id,
                            PVFS_hint hints);
+
 int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 			   bmi_method_addr_p src,
 			   void *const *buffer_list,
@@ -151,6 +171,7 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 			   void *user_ptr,
 			   bmi_context_id context_id,
                            PVFS_hint hints);
+
 int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     bmi_method_addr_p dest,
 				     const void *const *buffer_list,
@@ -162,8 +183,11 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     void *user_ptr,
 				     bmi_context_id context_id,
                                      PVFS_hint hints);
+
 int BMI_tcp_open_context(bmi_context_id context_id);
+
 void BMI_tcp_close_context(bmi_context_id context_id);
+
 int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id);
 
 char BMI_tcp_method_name[] = "bmi_tcp";
@@ -240,8 +264,11 @@ static struct iovec stat_io_vector[BMI_TCP_IOV_COUNT+1];
 
 /* internal utility functions */
 static int tcp_server_init(void);
+
 static void dealloc_tcp_method_addr(bmi_method_addr_p map);
+
 static int tcp_sock_init(bmi_method_addr_p my_method_addr);
+
 static int enqueue_operation(op_list_p target_list,
 			     enum bmi_op_type send_recv,
 			     bmi_method_addr_p map,
@@ -258,20 +285,33 @@ static int enqueue_operation(op_list_p target_list,
 			     bmi_size_t expected_size,
 			     bmi_context_id context_id,
                              int32_t event_id);
+
 static int tcp_cleanse_addr(bmi_method_addr_p map, int error_code);
+
 static int tcp_shutdown_addr(bmi_method_addr_p map);
+
 static int tcp_do_work(int max_idle_time);
+
 static int tcp_do_work_error(bmi_method_addr_p map);
+
 static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag);
+
 static int tcp_do_work_send(bmi_method_addr_p map, int* stall_flag);
+
 static int work_on_recv_op(method_op_p my_method_op,
 			   int *stall_flag);
+
 static int work_on_send_op(method_op_p my_method_op,
 			   int *blocked_flag, int* stall_flag);
+
 static int tcp_accept_init(int *socket, char** peer);
+
 static method_op_p alloc_tcp_method_op(void);
+
 static void dealloc_tcp_method_op(method_op_p old_op);
+
 static int handle_new_connection(bmi_method_addr_p map);
+
 static int tcp_post_send_generic(bmi_op_id_t * id,
                                  bmi_method_addr_p dest,
                                  const void *const *buffer_list,
@@ -282,6 +322,7 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
                                  void *user_ptr,
                                  bmi_context_id context_id,
                                  PVFS_hint hints);
+
 static int tcp_post_recv_generic(bmi_op_id_t * id,
                                  bmi_method_addr_p src,
                                  void *const *buffer_list,
@@ -294,10 +335,17 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
                                  void *user_ptr,
                                  bmi_context_id context_id,
                                  PVFS_hint hints);
-static int payload_progress(int s, void *const *buffer_list, const bmi_size_t* 
-    size_list, int list_count, bmi_size_t total_size, int* list_index, 
-    bmi_size_t* current_index_complete, enum bmi_op_type send_recv, 
-    char* enc_hdr, bmi_size_t* env_amt_complete);
+
+static int payload_progress(int s,
+                            void *const *buffer_list,
+                            const bmi_size_t* size_list,
+                            int list_count,
+                            bmi_size_t total_size,
+                            int* list_index,
+                            bmi_size_t* current_index_complete,
+                            enum bmi_op_type send_recv,
+                            char* enc_hdr,
+                            bmi_size_t* env_amt_complete);
 
 #if defined(USE_TRUSTED) && defined(__PVFS2_CLIENT__)
 static int tcp_enable_trusted(struct tcp_addr *tcp_addr_data);
@@ -340,6 +388,7 @@ const struct bmi_method_ops bmi_tcp_ops = {
 static struct
 {
     int method_flags;
+    int connect_test;
     int method_id;
     bmi_method_addr_p listen_addr;
 } tcp_method_params;
@@ -405,6 +454,14 @@ enum
  */
 static int forceful_cancel_mode = 0;
 
+#ifdef BMI_TCP_ZONE
+/* hangs on to the zone when connecting to config server
+ * for later checking against server addresses
+ */
+static char *tcp_zone = NULL;
+static int tcp_zone_len = 0;
+#endif
+
 /*
   Socket buffer sizes, currently these default values will be used 
   for the clients... (TODO)
@@ -439,7 +496,7 @@ int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
     struct tcp_addr *tcp_addr_data = NULL;
     int i = 0;
 
-    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "Initializing TCP/IP module.\n");
+    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Initializing TCP/IP module.\n");
 
     /* check args */
     if ((init_flags & BMI_INIT_SERVER) && !listen_addr)
@@ -453,6 +510,7 @@ int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
     /* zero out our parameter structure and fill it in */
     memset(&tcp_method_params, 0, sizeof(tcp_method_params));
     tcp_method_params.method_id = method_id;
+    tcp_method_params.connect_test = 1;
     tcp_method_params.method_flags = init_flags;
 
     if (init_flags & BMI_INIT_SERVER)
@@ -529,7 +587,7 @@ int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
         "%d", &bmi_tcp_recv_event_id);
 
     gen_mutex_unlock(&interface_mutex);
-    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
+    gossip_debug(GOSSIP_BMI_DEBUG_TCP,
                   "TCP/IP module successfully initialized.\n");
     return (0);
 
@@ -591,11 +649,13 @@ int BMI_tcp_finalize(void)
     /* NOTE: we are trusting the calling BMI layer to deallocate 
      * all of the method addresses (this will close any open sockets)
      */
-    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "TCP/IP module finalized.\n");
+    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "TCP/IP module finalized.\n");
     gen_mutex_unlock(&interface_mutex);
     return (0);
 }
 
+/* temp def for now */
+#define TCP_DEFAULT_CONNECT_TRYS 50
 
 /*
  * BMI_tcp_method_addr_lookup()
@@ -609,58 +669,184 @@ bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
 {
     char *tcp_string = NULL;
     char *delim = NULL;
+#ifdef BMI_TCP_ZONE
+    char *zone = NULL;
+    int zone_len = 0;
+#endif
     char *hostname = NULL;
     bmi_method_addr_p new_addr = NULL;
     struct tcp_addr *tcp_addr_data = NULL;
     int ret = -1;
 
-    tcp_string = string_key("tcp", id_string);
-    if (!tcp_string)
+    /* Loop over available tcp addresses in id_string to find
+     * the right one
+     */
+    while(id_string)
     {
-	/* the string doesn't even have our info */
-	return (NULL);
-    }
+        tcp_string = string_key("tcp", id_string);
+        if (!tcp_string)
+        {
+	    /* the string doesn't even have our info */
+	    return (NULL);
+        }
 
-    /* start breaking up the method information */
-    /* for normal tcp, it is simply hostname:port */
-    if ((delim = index(tcp_string, ':')) == NULL)
+        gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Method matched\n");
+
+        /* looks ok, so let's build the method addr structure */
+        new_addr = alloc_tcp_method_addr();
+        if (!new_addr)
+        {
+            goto errorout;
+        }
+        tcp_addr_data = new_addr->method_data;
+
+#ifdef BMI_TCP_ZONE
+        /* check for network zone */
+        if ( ((delim = strpbrk(id_string, "-:/")) == NULL) ||
+            (*delim != '-') )
+        {
+            /* no zone found so carry on */
+            zone = NULL;
+        }
+        else
+        {
+            char *delim2;
+
+            if ( ((delim2 = strpbrk(delim, ":/")) == NULL) ||
+                 (*delim2 != ':') )
+            {
+                /* incorrect string format */
+                goto errorout;
+            }
+            zone_len = delim2 - delim;
+            zone = (char *)malloc(zone_len + 1);
+            strncpy(zone, delim, zone_len);
+            zone[zone_len + 1] = '\0';
+        }
+#endif
+
+        /* start breaking up the method information */
+        /* for normal tcp, it is simply hostname:port */
+        if ((delim = index(tcp_string, ':')) == NULL)
+        {
+	    gossip_lerr("Error: malformed tcp address.\n");
+            goto errorout;
+        }
+
+        ret = sscanf((delim + 1), "%d", &(tcp_addr_data->port));
+        if (ret != 1)
+        {
+	    gossip_lerr("Error: malformed tcp address.\n");
+            goto errorout;
+        }
+
+        hostname = (char *) malloc((delim - tcp_string + 1));
+        if (!hostname)
+        {
+            goto errorout;
+        }
+        strncpy(hostname, tcp_string, (delim - tcp_string));
+        hostname[delim - tcp_string] = '\0';
+
+        tcp_addr_data->hostname = hostname;
+
+#ifdef BMI_TCP_ZONE
+        if (tcp_method_params.method_flags & BMI_INIT_SERVER)
+        {
+            tcp_addr_data->zone = zone;
+        }
+        else if (tcp_method_params.connect_test)
+        {
+            /* make sure we can actually talk to this addresss */
+            int connect_cnt = TCP_DEFAULT_CONNECT_TRYS;
+
+            do
+            {
+                if (connect_cnt-- <= 0)
+                {
+                    /* failure - never responded */
+                    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "connect timed out\n");
+                    goto errorout;
+                }
+                ret = tcp_sock_init(new_addr);
+                if (ret < 0)
+                {
+                    /* error - connect returned a tcp error */
+                    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "tcp_sock_init returned error\n");
+                    goto errorout;
+                }
+                gossip_debug(GOSSIP_BMI_DEBUG_TCP, "connect test started\n");
+            } while (tcp_addr_data->not_connected);
+
+            /* save the successful zone info */
+            gossip_debug(GOSSIP_BMI_DEBUG_TCP, "connect test successful for zone %s\n", zone);
+            tcp_method_params.connect_test = 0;
+            tcp_addr_data->zone = zone;
+            tcp_zone = zone;
+            tcp_zone_len = zone_len;
+
+            /* we could drop the connection here if we wanted to */
+        }
+        else  /* client && !connect_test */
+        {
+            /* zone passed in must match saved zone if there is one */
+            if (tcp_zone)
+            {
+                 gossip_debug(GOSSIP_BMI_DEBUG_TCP, "testing for zone match %s %s\n", zone, tcp_zone);
+                if ((tcp_zone_len != zone_len) ||
+                    (strncmp(tcp_zone, zone, tcp_zone_len)))
+                {
+                    /* does not match zone */
+                    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "does not match\n");
+                    goto errorout;
+                }
+                gossip_debug(GOSSIP_BMI_DEBUG_TCP, "zone match\n");
+                /* zone matches ... */
+            }
+            /* or no zone set so we assume any zone is OK */
+        } /* else */
+#endif
+
+        /* we have success */
+        break;
+
+errorout:
+
+        /* frees hostname and zone if they are present */
+        if (new_addr)
+        {
+	    dealloc_tcp_method_addr(new_addr);
+            new_addr = NULL;
+        }
+        if (tcp_string)
+        {
+            free(tcp_string);
+            tcp_string = NULL;
+        }
+
+        hostname = NULL;
+        zone = NULL;
+        zone_len = 0;
+        delim = NULL;
+
+        /* this might skip several non-tcp addrs */
+        /* it mimics what is done at the top of the loop */
+        id_string = strstr(id_string, "tcp");
+        id_string = index(id_string, ',');
+        /* at the top of the loop we'll look for more tcp addrs */
+        if (id_string)
+        {
+            /* found a comma, there are more addresses in the string */
+            id_string++; /* skip the comma */
+        }
+
+    } /* while loop */
+
+    /* either success or not found (new_addr == NULL) */
+    if (tcp_string)
     {
-	gossip_lerr("Error: malformed tcp address.\n");
-	free(tcp_string);
-	return (NULL);
+        free(tcp_string);
     }
-
-    /* looks ok, so let's build the method addr structure */
-    new_addr = alloc_tcp_method_addr();
-    if (!new_addr)
-    {
-	free(tcp_string);
-	return (NULL);
-    }
-    tcp_addr_data = new_addr->method_data;
-
-    ret = sscanf((delim + 1), "%d", &(tcp_addr_data->port));
-    if (ret != 1)
-    {
-	gossip_lerr("Error: malformed tcp address.\n");
-	dealloc_tcp_method_addr(new_addr);
-	free(tcp_string);
-	return (NULL);
-    }
-
-    hostname = (char *) malloc((delim - tcp_string + 1));
-    if (!hostname)
-    {
-	dealloc_tcp_method_addr(new_addr);
-	free(tcp_string);
-	return (NULL);
-    }
-    strncpy(hostname, tcp_string, (delim - tcp_string));
-    hostname[delim - tcp_string] = '\0';
-
-    tcp_addr_data->hostname = hostname;
-
-    free(tcp_string);
     return (new_addr);
 }
 
@@ -1926,7 +2112,7 @@ void tcp_forget_addr(bmi_method_addr_p map,
         bmi_method_addr_forget_callback(bmi_addr);
     }
     return;
-}
+};
 
 /******************************************************************
  * Internal support functions
@@ -1959,6 +2145,8 @@ static void dealloc_tcp_method_addr(bmi_method_addr_p map)
 
     if (tcp_addr_data->hostname)
 	free(tcp_addr_data->hostname);
+    if (tcp_addr_data->zone)
+	free(tcp_addr_data->zone);
     if (tcp_addr_data->peer)
         free(tcp_addr_data->peer);
 
@@ -2158,7 +2346,7 @@ static int tcp_sock_init(bmi_method_addr_p my_method_addr)
 	    if ((ret < 0) || (poll_conn.revents & POLLERR))
 	    {
 		tmp_errno = errno;
-		gossip_lerr("Error: poll: %s\n", strerror(tmp_errno));
+		//gossip_lerr("Error: poll: %s\n", strerror(tmp_errno));
 		return (bmi_tcp_errno_to_pvfs(-tmp_errno));
 	    }
 	    if (poll_conn.revents & POLLOUT)

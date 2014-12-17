@@ -26,6 +26,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "client-capcache.h"
 
 #define IO_MAX_SEGMENT_NUM 50 
 #define IO_ATTR_MASKS (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|\
@@ -47,28 +48,29 @@ enum
     IO_MIRRORING,
     IO_NO_MIRRORING,
     IO_FATAL_ERROR,
+    IO_RENEW_CAPABILITY,
 };
 
 /* Helper functions local to sys-io.sm. */
 
-static inline int io_complete_context_send_or_recv(
+static int io_complete_context_send_or_recv(
     PINT_smcb *smcb, job_status_s *js_p);
 
-static inline int io_decode_ack_response(
+static int io_decode_ack_response(
     PINT_client_io_ctx *cur_ctx,
     struct PINT_decoded_msg *decoded_resp,
     struct PVFS_server_resp **resp);
 
-static inline int io_post_flow(
+static int io_post_flow(
     PINT_smcb *smcb, PINT_client_io_ctx *cur_ctx);
 
-static inline int io_post_write_ack_recv(
+static int io_post_write_ack_recv(
     PINT_smcb *smcb, PINT_client_io_ctx * cur_ctx);
 
-static inline int io_process_context_recv(
+static int io_process_context_recv(
     PINT_client_sm *sm_p, job_status_s *js_p, PINT_client_io_ctx **out_ctx);
 
-static inline int io_check_context_status(
+static int io_check_context_status(
     PINT_client_io_ctx *cur_ctx, int io_type,
     PVFS_size *total_size);
 
@@ -239,7 +241,21 @@ machine pvfs2_client_io_sm
         run io_datafile_complete_operations;
         IO_DATAFILE_TRANSFERS_COMPLETE => io_analyze_results;
         IO_RETRY => io_datafile_post_msgpairs_retry;
+        IO_RENEW_CAPABILITY => io_renew_capability;
         default => io_datafile_complete_operations;
+    }
+
+    state io_renew_capability
+    {
+        run io_init;
+        default => io_renew_getattr;
+    }
+
+    state io_renew_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => io_datafile_setup_msgpairs;
+        default => io_cleanup;
     }
 
     state io_analyze_results
@@ -414,7 +430,7 @@ PVFS_error PVFS_sys_io(PVFS_object_ref ref,
         PVFS_perror_gossip("PVFS_isys_io call", ret);
         error = ret;
     }
-    else 
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "io", &error);
         if (ret)
@@ -424,7 +440,6 @@ PVFS_error PVFS_sys_io(PVFS_object_ref ref,
         }
         PINT_sys_release(op_id);
     } 
-
     return error;
 }
 
@@ -436,11 +451,13 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_init\n", (void *)sm_p);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_init\n", sm_p);
 
     assert((js_p->error_code == 0) ||
-           (js_p->error_code == IO_RETRY));
+           (js_p->error_code == IO_RETRY) ||
+           (js_p->error_code == IO_RENEW_CAPABILITY));
 
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->object_ref,
                                IO_ATTR_MASKS, 
@@ -448,9 +465,9 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
                                0);
        
     if (js_p->error_code == IO_RETRY ||
-        (js_p->error_code == IO_RETRY_NODELAY))
+        (js_p->error_code == IO_RETRY_NODELAY) ||
+        (js_p->error_code == IO_RENEW_CAPABILITY))
     {
-        js_p->error_code = 0;
 
         io_datafile_index_array_destroy(sm_p);
         io_contexts_destroy(sm_p);
@@ -461,13 +478,20 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
             return SM_ACTION_COMPLETE;
         }
 
+        if (js_p->error_code == IO_RENEW_CAPABILITY)
+        {
+            gossip_debug(GOSSIP_IO_DEBUG, "  sys-io renewing capability.\n");
+            js_p->error_code = 0;
+            return SM_ACTION_COMPLETE;
+        }
         if(js_p->error_code == IO_RETRY_NODELAY)
         {
             gossip_debug(GOSSIP_IO_DEBUG, "  sys-io retrying without delay.\n");
             js_p->error_code = 0;
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
         gossip_debug(GOSSIP_IO_DEBUG, "  sys-io retrying with delay.\n");
+        js_p->error_code = 0;
         return job_req_sched_post_timer(sm_p->msgarray_op.params.retry_delay,
                                         smcb,
                                         0,
@@ -579,7 +603,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
     int sio_count;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
-                 "io_datafile_setup_msgpairs\n", (void *)sm_p);
+                 "io_datafile_setup_msgpairs\n", sm_p);
 
     if (PINT_smcb_cancelled(smcb))
     {
@@ -782,6 +806,9 @@ static PINT_sm_action io_datafile_post_msgpairs(struct PINT_smcb *smcb,
     {
         PINT_client_io_ctx *cur_ctx = &sm_p->u.io.contexts[i];
         PINT_sm_msgpair_state *msg = &cur_ctx->msg;
+
+        /* reset op_status */
+        msg->op_status = 0;
 
         /* do not do this one again in retry case */
         if (cur_ctx->msg_recv_has_been_posted &&
@@ -1282,7 +1309,7 @@ static PINT_sm_action io_datafile_complete_operations(struct PINT_smcb *smcb,
     struct server_configuration_s *server_config = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io_datafile_complete_operations "
-                 "(tag %lu)\n", (void *)sm_p, status_user_tag);
+                 "(tag %lu)\n", sm_p, status_user_tag);
 
     assert(sm_p->u.io.msgpair_completion_count > -1);
     assert(sm_p->u.io.flow_completion_count > -1);
@@ -1435,7 +1462,7 @@ static PINT_sm_action io_datafile_complete_operations(struct PINT_smcb *smcb,
         }
 
         gossip_debug(GOSSIP_IO_DEBUG, "  matched completed flow for "
-                     "context %p%s\n", (void *)cur_ctx,
+                     "context %p%s\n", cur_ctx,
                      ((cur_ctx->write_ack_in_progress ?
                       " and reset write_recv timeout" : "")));
 
@@ -1497,7 +1524,7 @@ static PINT_sm_action io_datafile_complete_operations(struct PINT_smcb *smcb,
         cur_ctx->write_ack.recv_status = *js_p;
 
         gossip_debug(GOSSIP_IO_DEBUG, "  matched completed ack for "
-                     "context %p\n", (void *)cur_ctx);
+                     "context %p\n", cur_ctx);
 
         cur_ctx->write_ack_in_progress = 0;
         sm_p->u.io.write_ack_completion_count--;
@@ -1577,7 +1604,14 @@ check_next_step:
     {
         gossip_debug(GOSSIP_IO_DEBUG,
           "*** %s: some msgpairs to repost\n", __func__);
-        js_p->error_code = IO_RETRY;
+        if (js_p->error_code == -PVFS_EAGAIN)
+        {
+            js_p->error_code = IO_RENEW_CAPABILITY;
+        }
+        else
+        {
+            js_p->error_code = IO_RETRY;
+        }
     }
     else
     {
@@ -1597,7 +1631,7 @@ static PINT_sm_action io_analyze_results(struct PINT_smcb *smcb,
     PVFS_object_attr *attr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
-                 "io_analyze_results\n", (void *)sm_p);
+                 "io_analyze_results\n", sm_p);
 
     attr = &sm_p->getattr.attr;
 
@@ -1649,7 +1683,7 @@ static PINT_sm_action io_analyze_results(struct PINT_smcb *smcb,
                     else
                     {
                         gossip_debug(GOSSIP_IO_DEBUG, 
-                            "io_check_context_status found error: %d", ret);
+                            "io_check_context_status found error: %d\n", ret);
                     }
                     break;
                 }
@@ -1951,6 +1985,9 @@ static PINT_sm_action io_analyze_size_results(
 
     eor = filereq_ub_offset + sm_p->u.io.file_req_offset;
 
+    /* TODO why is sm_p->getattr.size_array used here instead of:
+     * sm_p->u.io.dfile_size_array?
+     */
     eof = attr->u.meta.dist->methods->
                                 logical_file_size(attr->u.meta.dist->params,
                                                   attr->u.meta.dfile_count,
@@ -2012,17 +2049,20 @@ static PINT_sm_action io_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_cleanup\n",
-            (void *)sm_p);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_cleanup\n", sm_p);
 
     io_contexts_destroy(sm_p);
 
     io_datafile_index_array_destroy(sm_p);
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr); 
-    
+
     if(sm_p->u.io.dfile_size_array)
     {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "%s: about to free: sm_p->u.io.dfile_size_array = %p\n",
+                     __func__,
+                     (void *) sm_p->getattr.size_array);
         PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->u.io.dfile_size_array);
     }
 
@@ -2048,13 +2088,13 @@ static PINT_sm_action io_cleanup(
     return SM_ACTION_TERMINATE;
 }
 
-static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
+static int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
                                          struct PINT_decoded_msg *decoded_resp,
                                          struct PVFS_server_resp **resp)
 {
     int ret = -PVFS_EINVAL;
 
-    gossip_debug(GOSSIP_IO_DEBUG, "- io_process_context_recv called\n");
+    gossip_debug(GOSSIP_IO_DEBUG, "%s called\n", __func__);
 
     assert(cur_ctx && decoded_resp && resp);
 
@@ -2079,18 +2119,18 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
         gossip_debug(GOSSIP_IO_DEBUG, "  error %d with status %d related "
                      "to response from context %p; not submitting flow.\n",
                      cur_ctx->msg.recv_status.error_code,
-                     cur_ctx->msg.op_status, (void *)cur_ctx);
+                     cur_ctx->msg.op_status, cur_ctx);
 
         if (cur_ctx->msg.recv_status.error_code)
         {
             PVFS_perror_gossip(
-                    "io_process_context_recv (recv_status.error_code)",
+                    "io_decode_ack_response (recv_status.error_code)",
                     cur_ctx->msg.recv_status.error_code);
             ret = cur_ctx->msg.recv_status.error_code;
         }
         else if (cur_ctx->msg.op_status)
         {
-            PVFS_perror_gossip("io_process_context_recv (op_status)",
+            PVFS_perror_gossip("io_decode_ack_response (op_status)",
                                cur_ctx->msg.op_status);
             gossip_err("server: %s\n"
                       , BMI_addr_rev_lookup(cur_ctx->msg.svr_addr));
@@ -2102,7 +2142,8 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
                                          decoded_resp,
                                          &cur_ctx->msg.svr_addr,
                                          cur_ctx->msg.max_resp_sz);
-        memset(&cur_ctx->msg.encoded_req,0,sizeof(cur_ctx->msg.encoded_req));
+
+        /* TODO: free msg capability? */
         cur_ctx->msg.encoded_resp_p = NULL;
     }
     return ret;
@@ -2113,7 +2154,7 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
  * at present), or not until the ack from the request is received (as
  * in the case of reads).
  */
-static inline int io_post_flow(PINT_smcb *smcb,
+static int io_post_flow(PINT_smcb *smcb,
                                PINT_client_io_ctx *cur_ctx)
 {
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -2147,7 +2188,7 @@ static inline int io_post_flow(PINT_smcb *smcb,
 
         binfo.buffer = sm_p->u.io.buffer;
         binfo.len = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
-        binfo.rw = (enum BMI_io_type)sm_p->u.io.io_type;
+        binfo.rw = sm_p->u.io.io_type;
         BMI_set_info(cur_ctx->msg.svr_addr, BMI_OPTIMISTIC_BUFFER_REG, &binfo);
     }
 
@@ -2242,7 +2283,7 @@ static inline int io_post_flow(PINT_smcb *smcb,
         }
 
         gossip_debug(GOSSIP_IO_DEBUG, "  immediate flow failure for "
-                     "context %p, error code: %d\n", (void *)cur_ctx,
+                     "context %p, error code: %d\n", cur_ctx,
                      cur_ctx->flow_desc.error_code);
         gossip_debug(GOSSIP_IO_DEBUG, "  posting job_null() to propigate.\n");
 
@@ -2261,7 +2302,7 @@ static inline int io_post_flow(PINT_smcb *smcb,
     else
     {
         gossip_debug(GOSSIP_IO_DEBUG, "  posted flow for "
-                     "context %p\n", (void *)cur_ctx);
+                     "context %p\n", cur_ctx);
     }
 
     cur_ctx->flow_has_been_posted = 1;
@@ -2271,7 +2312,7 @@ static inline int io_post_flow(PINT_smcb *smcb,
     return 0;
 }
 
-static inline int io_post_write_ack_recv(PINT_smcb *smcb,
+static int io_post_write_ack_recv(PINT_smcb *smcb,
                                          PINT_client_io_ctx * cur_ctx)
 {
     PINT_client_sm * sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -2279,7 +2320,7 @@ static inline int io_post_write_ack_recv(PINT_smcb *smcb,
     unsigned long status_user_tag;
 
     gossip_debug(GOSSIP_IO_DEBUG, "  preposting write "
-                 "ack for context %p.\n", (void *)cur_ctx);
+                 "ack for context %p.\n", cur_ctx);
 
     cur_ctx->write_ack.max_resp_sz = PINT_encode_calc_max_size(
                                                 PINT_ENCODE_RESP,
@@ -2341,7 +2382,7 @@ static inline int io_post_write_ack_recv(PINT_smcb *smcb,
   returns 0 on send completion; IO_RECV_COMPLETED on recv completion,
   and -PVFS_error on failure
 */
-static inline int io_complete_context_send_or_recv(PINT_smcb *smcb,
+static int io_complete_context_send_or_recv(PINT_smcb *smcb,
                                                    job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL, index = 0;
@@ -2413,7 +2454,7 @@ static inline int io_complete_context_send_or_recv(PINT_smcb *smcb,
  * in response to the I/O request.  This is called for each I/O context
  * i.e. each specific server response for each datafile.
  */
-static inline int io_process_context_recv(PINT_client_sm *sm_p,
+static int io_process_context_recv(PINT_client_sm *sm_p,
                                           job_status_s *js_p, 
                                           PINT_client_io_ctx **out_ctx)
 {
@@ -2457,7 +2498,7 @@ static inline int io_process_context_recv(PINT_client_sm *sm_p,
     {
         {
             char buf[1024];
-            PVFS_strerror_r(js_p->error_code, buf, sizeof(buf));
+            PVFS_strerror_r(ret, buf, sizeof(buf));
             buf[sizeof(buf)-1] = '\0';
             gossip_debug(GOSSIP_IO_DEBUG, "%s: failed: %s\n", __func__, buf);
         }
@@ -2476,6 +2517,8 @@ static inline int io_process_context_recv(PINT_client_sm *sm_p,
     memset(&cur_ctx->msg.encoded_req,0,sizeof(cur_ctx->msg.encoded_req));
     cur_ctx->msg.encoded_resp_p = NULL;
 
+    /* TODO: free msg capability? */
+
     if (ret)
     {
         PVFS_perror_gossip("PINT_serv_free_msgpair_resources "
@@ -2486,7 +2529,7 @@ static inline int io_process_context_recv(PINT_client_sm *sm_p,
     return ret;
 }
 
-static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
+static int io_check_context_status(PINT_client_io_ctx *cur_ctx,
                                           int io_type,
                                           PVFS_size *total_size)
 {
@@ -2499,18 +2542,26 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
     if (cur_ctx->msg.send_status.error_code)
     {
         gossip_debug(GOSSIP_IO_DEBUG,
-                "  error (%d) in msgpair send for context %p\n",
-                cur_ctx->msg.send_status.error_code,
-                (void *)cur_ctx);
+                     "  error (%d) in msgpair send for context %p\n",
+                     cur_ctx->msg.send_status.error_code,
+                     cur_ctx);
         ret = cur_ctx->msg.send_status.error_code;
     }
     else if (cur_ctx->msg.recv_status.error_code)
     {
         gossip_debug(GOSSIP_IO_DEBUG,
-                "  error (%d) in msgpair recv for context %p\n",
-                cur_ctx->msg.recv_status.error_code,
-                (void *)cur_ctx);
+                     "  error (%d) in msgpair recv for context %p\n",
+                     cur_ctx->msg.recv_status.error_code,
+                     cur_ctx);
         ret = cur_ctx->msg.recv_status.error_code;
+    }
+    else if (cur_ctx->msg.op_status)
+    {
+        gossip_debug(GOSSIP_IO_DEBUG,
+                     "  error (%d) in op_status for context %p\n",
+                     cur_ctx->msg.op_status,
+                     cur_ctx);
+        ret = cur_ctx->msg.op_status;
     }
     else if (io_type == PVFS_IO_WRITE)
     {
@@ -2520,9 +2571,8 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
         if (cur_ctx->write_ack.recv_status.error_code)
         {
             gossip_debug(GOSSIP_IO_DEBUG,
-                    "  error (%d) in final ack for context %p\n",
-                    cur_ctx->write_ack.recv_status.error_code,
-                    (void *)cur_ctx);
+                         "  error (%d) in final ack for context %p\n",
+                         cur_ctx->write_ack.recv_status.error_code, cur_ctx);
 
             assert(cur_ctx->write_ack_has_been_posted);
             ret = cur_ctx->write_ack.recv_status.error_code;
@@ -2536,17 +2586,17 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
               have to decode it first
             */
             ret = PINT_serv_decode_resp(cur_ctx->msg.fs_id,
-                    cur_ctx->write_ack.encoded_resp_p,
-                    &decoded_resp,
-                    &cur_ctx->msg.svr_addr,
-                    cur_ctx->write_ack.recv_status.actual_size,
-                    &resp);
+                                    cur_ctx->write_ack.encoded_resp_p,
+                                    &decoded_resp,
+                                    &cur_ctx->msg.svr_addr,
+                                    cur_ctx->write_ack.recv_status.actual_size,
+                                    &resp);
             if (ret == 0)
             {
                 gossip_debug(GOSSIP_IO_DEBUG,
-                        "  %lld bytes written to context %p\n",
-                        lld(resp->u.write_completion.total_completed),
-                        (void *)cur_ctx);
+                             "  %lld bytes written to context %p\n",
+                             lld(resp->u.write_completion.total_completed),
+                             cur_ctx);
 
                 *total_size += resp->u.write_completion.total_completed;
                 
@@ -2562,15 +2612,15 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
 
             PINT_flow_reset(&cur_ctx->flow_desc);
             BMI_memfree(cur_ctx->msg.svr_addr,
-                    cur_ctx->write_ack.encoded_resp_p,
-                    cur_ctx->write_ack.max_resp_sz,
-                    BMI_RECV);
+                        cur_ctx->write_ack.encoded_resp_p,
+                        cur_ctx->write_ack.max_resp_sz,
+                        BMI_RECV);
         }
         else if (cur_ctx->flow_status.error_code)
         {
             gossip_debug(GOSSIP_IO_DEBUG,
-                    "  error (%d) in flow for context %p\n",
-                    cur_ctx->flow_status.error_code, (void *)cur_ctx);
+                         "  error (%d) in flow for context %p\n",
+                         cur_ctx->flow_status.error_code, cur_ctx);
             PINT_flow_reset(&cur_ctx->flow_desc);
             ret = cur_ctx->flow_status.error_code;
         }
@@ -2578,16 +2628,15 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
     else if (cur_ctx->flow_status.error_code)
     {
         gossip_debug(GOSSIP_IO_DEBUG,
-                "  error (%d) in flow for context %p\n",
-                cur_ctx->flow_status.error_code, (void *)cur_ctx);
+                     "  error (%d) in flow for context %p\n",
+                     cur_ctx->flow_status.error_code, cur_ctx);
         PINT_flow_reset(&cur_ctx->flow_desc);
         ret = cur_ctx->flow_status.error_code;
     }
     else if (io_type == PVFS_IO_READ)
     {
         gossip_debug(GOSSIP_IO_DEBUG, "  %lld bytes read from context %p\n",
-                lld(cur_ctx->flow_desc.total_transferred),
-                (void *)cur_ctx);
+                     lld(cur_ctx->flow_desc.total_transferred), cur_ctx);
 
         /* size for reads are reported in the flow */
         *total_size += cur_ctx->flow_desc.total_transferred;
@@ -3203,7 +3252,8 @@ static int io_contexts_init(PINT_client_sm *sm_p,
         msg->comp_fn = NULL;
 
         ret = PINT_cached_config_map_to_server(&msg->svr_addr,
-                msg->handle, msg->fs_id);
+                                               msg->handle,
+                                               msg->fs_id);
         if(ret)
         {
             gossip_err("Failed to map meta server address\n");
@@ -3212,7 +3262,7 @@ static int io_contexts_init(PINT_client_sm *sm_p,
         }
         
         gossip_debug(GOSSIP_IO_DEBUG, "initializing context[%d] %p\n",
-                i, (void *)cur_ctx);
+                     i, cur_ctx);
 
         cur_ctx->index = i;
         cur_ctx->server_nr = sm_p->u.io.datafile_index_array[i];
@@ -3336,6 +3386,8 @@ static int unstuff_comp_fn(void *v_p,
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int local_uid, ret;
+    PVFS_capability *cap = NULL;
 
     gossip_debug(GOSSIP_IO_DEBUG,
 		"unstuff/getattr completion fn: unstuff_comp_fn\n");
@@ -3356,6 +3408,14 @@ static int unstuff_comp_fn(void *v_p,
     
     if(resp_p->op == PVFS_SERV_UNSTUFF)
     {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Updating attributes after unstuff\n");
+
+#if 0 /* Don't cache size_array. */
+        PINT_acache_update(sm_p->object_ref,
+                           &resp_p->u.unstuff.attr,
+                           NULL,
+                           NULL); /* TODO should we try to cache size_array here? */
+#endif
         PINT_acache_update(sm_p->object_ref,
                            &resp_p->u.unstuff.attr,
                            NULL);
@@ -3363,6 +3423,8 @@ static int unstuff_comp_fn(void *v_p,
         /* replace attrs found by getattr */
         /* PINT_copy_object_attr() takes care of releasing old memory */
         PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.unstuff.attr);
+
+        cap = &resp_p->u.unstuff.attr.capability;
     }
     else 
     {
@@ -3370,11 +3432,34 @@ static int unstuff_comp_fn(void *v_p,
                      "Updating attributes before reading "
                      "beyond stuffing boundary.\n");
 
-        PINT_acache_update(sm_p->object_ref, &resp_p->u.getattr.attr, NULL);
+#if 0 /* Don't cache size_array. */
+        PINT_acache_update(sm_p->object_ref,
+                           &resp_p->u.getattr.attr,
+                           NULL,
+                           NULL); /* TODO should we try to cache size_array here? */
+#endif
+        PINT_acache_update(sm_p->object_ref,
+                           &resp_p->u.getattr.attr,
+                           NULL);
 
         /* replace attrs found by getattr */
         /* PINT_copy_object_attr() takes care of releasing old memory */
         PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.getattr.attr);
+
+        cap = &resp_p->u.getattr.attr.capability;
+    }
+
+    /* update client capcache with returned cap */
+    local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+    if (local_uid == (PVFS_uid) -1) {
+        local_uid = PINT_util_getuid();
+    }
+    PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+    ret = PINT_client_capcache_update(sm_p->object_ref, local_uid, cap);
+    if (ret < 0)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: capcache update returned "
+                     "%d\n", __func__, ret);
     }
 
     return(0);

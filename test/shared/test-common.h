@@ -79,7 +79,7 @@ int destroy_pvfs2tab_file(const char* pvfs2tab_name);
    fprintf(stderr, "----------------------------------------\n"); \
    fprintf(stderr, format);                                       \
    fprintf(stderr, "\n");                                         \
-   fprintf(stderr, "Function : %s\n", __func__);                  \
+   fprintf(stderr, "Function : %s\n", __FUNCTION__);              \
    fprintf(stderr, "File     : %s\n", __FILE__);                  \
    fprintf(stderr, "Line     : %d\n", __LINE__);                  \
    fprintf(stderr, "----------------------------------------\n");

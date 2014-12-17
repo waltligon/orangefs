@@ -2,6 +2,9 @@
 #include "benchmark-utils.h"
 #include "pvfs2-internal.h"
 #include <stdlib.h>
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
 #include <string.h>
 #include <stdio.h>
 #include <math.h>

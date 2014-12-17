@@ -30,6 +30,7 @@
 /* permission to remove multiple objects */
 #define PINT_CAP_BATCH_REMOVE (1 << 8)
 
+#ifdef WIN32
 #define PINT_SECURITY_CHECK(rc, label, format, ...) \
     do { \
         if ((rc) != 0) \
@@ -69,12 +70,61 @@
             return -PVFS_ESECURITY; \
         } \
     } while (0)
+#else
+#define PINT_SECURITY_CHECK(rc, label, format, f...) \
+    do { \
+        if ((rc) != 0) \
+        { \
+            gossip_err("%s: " format, __func__, ##f); \
+            PINT_security_error(__func__, (rc)); \
+            goto label; \
+        } \
+    } while (0)
 
+#define PINT_SECURITY_CHECK_RET(rc, format, f...) \
+    do { \
+        if ((rc) != 0) \
+        { \
+            gossip_err("%s: " format, __func__, ##f); \
+            PINT_security_error(__func__, (rc)); \
+            return (rc); \
+        } \
+    } while (0)
+
+#define PINT_SECURITY_CHECK_NULL(ptr, label, format, f...) \
+    do { \
+        if ((ptr) == NULL) \
+        { \
+            gossip_err("%s: " format, __func__, ##f); \
+            PINT_security_error(__func__, -PVFS_ESECURITY); \
+            goto label; \
+        } \
+    } while (0)
+
+#define PINT_SECURITY_CHECK_NULL_RET(ptr, format, f...) \
+    do { \
+        if ((ptr) == NULL) \
+        { \
+            gossip_err("%s: " format, __func__, ##f); \
+            PINT_security_error(__func__, -PVFS_ESECURITY); \
+            return -PVFS_ESECURITY; \
+        } \
+    } while (0)
+#endif
+
+#ifdef WIN32
 #define PINT_SECURITY_ERROR(rc, format, ...) \
     do { \
         gossip_err("%s: " format, __func__, __VA_ARGS__); \
         PINT_security_error(__func__, (rc)); \
     } while (0)
+#else
+#define PINT_SECURITY_ERROR(rc, format, f...) \
+    do { \
+        gossip_err("%s: " format, __func__, ##f); \
+        PINT_security_error(__func__, (rc)); \
+    } while (0)
+#endif
 
 int PINT_security_initialize(void);
 int PINT_security_finalize(void);

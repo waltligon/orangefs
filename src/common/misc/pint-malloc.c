@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <dlfcn.h>
 
-#ifdef HAVE_MEMALIGN
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
 #endif
 
@@ -24,7 +24,7 @@
 #if 0
 #define memdebug fprintf
 #else
-static inline void memdebug(FILE *stream, char *format, ...)
+static void memdebug(FILE *stream, char *format, ...)
 {
     /* this is just a dummy function to eat varargs */
     return;
@@ -66,10 +66,9 @@ void *clean_valloc(size_t size)
 }
 
 void *clean_memalign(size_t alignment, size_t size)
+
 {
-#ifdef HAVE_MEMALIGN
-    return memalign(alignment, size);
-#else
+#ifdef __DARWIN__
     void *ptr;
     int rc;
     rc = posix_memalign(&ptr, alignment, size);
@@ -81,6 +80,8 @@ void *clean_memalign(size_t alignment, size_t size)
     {
         return NULL;
     }
+#else
+    return memalign(alignment, size);
 #endif
 }
 
@@ -101,7 +102,7 @@ char *clean_strndup(const char *str, size_t n)
 
 void clean_free(void *ptr)
 {
-    free(ptr);
+    return free(ptr);
 }
 
 /* These need to be after the clean functions which should call whatever
@@ -115,12 +116,6 @@ void clean_free(void *ptr)
 #include "pint-malloc.h"
 #include "gen-locks.h"
 #include "gossip.h"
-
-#if PVFS2_SIZEOF_VOIDP == 64
-    typedef uint64_t ptrint_t;
-#else
-    typedef uint32_t ptrint_t;
-#endif
 
 /* we don't want any crazy redefs below
  * want to call real malloc, free, etc.
@@ -213,7 +208,7 @@ static struct glibc_malloc_ops_s glibc_malloc_ops = {
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
 
-static inline void *my_glibc_malloc(size_t size)
+static void *my_glibc_malloc(size_t size)
 {
     if (glibc_malloc_ops.malloc)
     {
@@ -233,7 +228,7 @@ static inline void *my_glibc_malloc(size_t size)
     }
 }
 
-static inline void *my_glibc_realloc(void *mem, size_t size)
+static void *my_glibc_realloc(void *mem, size_t size)
 {
     if (glibc_malloc_ops.realloc)
     {
@@ -253,44 +248,22 @@ static inline void *my_glibc_realloc(void *mem, size_t size)
     }
 }
 
-static inline void my_glibc_free(void *mem)
+static void my_glibc_free(void *mem)
 {
     if (glibc_malloc_ops.free)
     {
-        glibc_malloc_ops.free(mem);
+        return glibc_malloc_ops.free(mem);
     }
     else
     {
         init_glibc_malloc();
         if (glibc_malloc_ops.free)
         {
-            glibc_malloc_ops.free(mem);
+            return glibc_malloc_ops.free(mem);
         }
         else
         {
-            free(mem);
-        }
-    }
-}
-
-static inline int my_glibc_posix_memalign(void **mem,
-                                          size_t alignment,
-                                          size_t size)
-{
-    if (glibc_malloc_ops.posix_memalign)
-    {
-        return glibc_malloc_ops.posix_memalign(mem, alignment, size);
-    }
-    else
-    {
-        init_glibc_malloc();
-        if (glibc_malloc_ops.posix_memalign)
-        {
-            return glibc_malloc_ops.posix_memalign(mem, alignment, size);
-        }
-        else
-        {
-            return posix_memalign(mem, alignment, size);
+            return free(mem);
         }
     }
 }
@@ -310,10 +283,10 @@ void *PINT_malloc_minimum(size_t size)
 typedef struct extra_s
 {
     void     *mem;
+    size_t   size;
 #if PVFS_MALLOC_MAGIC
     uint32_t magic;
 #endif
-    size_t   size;
 #if PVFS_MALLOC_CHECK_ALIGN
     size_t   align;
 #endif
@@ -351,28 +324,14 @@ void *PINT_malloc(size_t size)
 #endif
 
     memdebug(stderr, "call to MALLOC size %d addr %p returning %p \n",
-             (int)size, mem, (void *)((ptrint_t)mem + EXTRA_SIZE));
+             (int)size, mem, (void *)((unsigned char *)mem + EXTRA_SIZE));
 
-    return (void *)((ptrint_t)mem + EXTRA_SIZE);
+    return (void *)((unsigned char *)mem + EXTRA_SIZE);
 }
 
 void *PINT_calloc(size_t nmemb, size_t size)
 {
-    size_t total;
-    void *p;
-    total = nmemb*size;
-    /* Check for overflow. */
-    if (total < nmemb || total < size)
-    {
-        return NULL;
-    }
-    p = PINT_malloc(total);
-    if (p == NULL)
-    {
-        return p;
-    }
-    memset(p, 0, total);
-    return p;
+    return PINT_malloc(nmemb * size);
 }
 
 int PINT_posix_memalign(void **mem, size_t alignment, size_t size)
@@ -406,11 +365,12 @@ int PINT_posix_memalign(void **mem, size_t alignment, size_t size)
 #if PVFS_MALLOC_ZERO
     memset(mem_orig, 0, sizeplus);
 #endif
-    aligned = (void *)(((ptrint_t)mem_orig + EXTRA_SIZE + alignplus - 1) &
-                       (~alignplus + 1));
+    aligned = (void *)(
+        (size_t)((unsigned char *)mem_orig + EXTRA_SIZE + alignplus - 1) &
+        (~alignplus + 1));
     *mem = aligned;
 
-    extra = (extra_t *)((ptrint_t)aligned - EXTRA_SIZE);
+    extra = (extra_t *)((unsigned char *)aligned - EXTRA_SIZE);
 #if !PVFS_MALLOC_ZERO
     memset(extra, 0, EXTRA_SIZE);
 #endif
@@ -465,7 +425,7 @@ void *PINT_realloc(void *mem, size_t size)
     void *ptr = NULL;
     size_t newsize = 0;
     extra_t *extra = NULL;
-    ptrint_t region_offset;
+    ptrdiff_t region_offset;
 
     if (mem == NULL)
     {
@@ -478,7 +438,7 @@ void *PINT_realloc(void *mem, size_t size)
         return NULL;
     }
 
-    extra = (void *)((ptrint_t)mem - EXTRA_SIZE);
+    extra = (void *)((unsigned char *)mem - EXTRA_SIZE);
 #if PVFS_MALLOC_MAGIC
     if (extra->magic != PVFS_MALLOC_MAGIC_NUM)
     {
@@ -488,7 +448,7 @@ void *PINT_realloc(void *mem, size_t size)
         return NULL;
     }
 #endif
-    region_offset = (ptrint_t)mem - (ptrint_t)extra->mem;
+    region_offset = (unsigned char *)mem - (unsigned char *)extra->mem;
     newsize = region_offset + size;
     /* glibc realloc will keep our extra structures in place */
     ptr =  my_glibc_realloc(extra->mem, newsize);
@@ -496,14 +456,14 @@ void *PINT_realloc(void *mem, size_t size)
     {
         return NULL;
     }
-    extra = (extra_t *)(((ptrint_t)ptr + region_offset) - EXTRA_SIZE);
+    extra = (extra_t *)(((unsigned char *)ptr + region_offset) - EXTRA_SIZE);
     extra->mem = ptr;
     extra->size = newsize;
 
     memdebug(stderr, "call to REALLOC size %d addr %p newaddr %p returned %p\n",
-             (int)size, mem, ptr, (void *)((ptrint_t)ptr + region_offset));
+        (int)size, mem, ptr, (void *)((unsigned char *)ptr + region_offset));
 
-    return (void *)((ptrint_t)ptr + region_offset);
+    return (void *)((unsigned char *)ptr + region_offset);
 }
 
 char *PINT_strdup(const char *str)
@@ -557,7 +517,7 @@ void PINT_free(void *mem)
         return;
     }
 
-    extra = (void *)((ptrint_t)mem - EXTRA_SIZE);
+    extra = (void *)((unsigned char *)mem - EXTRA_SIZE);
     orig_mem = extra->mem;
 
     memdebug(stderr, "call to FREE addr %p real addr %p", mem, orig_mem);
@@ -570,7 +530,7 @@ void PINT_free(void *mem)
 #if PVFS_MALLOC_MAGIC
     if (extra->magic != PVFS_MALLOC_MAGIC_NUM)
     {
-        gossip_err("PINT_free: free fails magic number test\n");
+        gossip_lerr("PINT_free: free fails magic number test\n");
         return;
     }
 #endif
@@ -590,7 +550,7 @@ void init_glibc_malloc(void)
 {
     static int init_flag = 0;
     static int recurse_flag = 0;
-    static gen_mutex_t init_mutex;
+    static gen_mutex_t init_mutex = GEN_MUTEX_INITIALIZER;
     void *libc_handle;
 
     /* prevent multiple threads from running this */
@@ -609,28 +569,21 @@ void init_glibc_malloc(void)
     recurse_flag = 1;
     memdebug(stderr, "init_glibc_malloc running\n");
 
-    if (gen_posix_recursive_mutex_init(&init_mutex) < 0)
-    {
-        gossip_err("init_glibc_malloc: could not init recursive mutex\n");
-        abort();
-    }
-
     libc_handle = dlopen("libc.so.6", RTLD_LAZY|RTLD_GLOBAL);
     if (!libc_handle)
     {
         libc_handle = RTLD_DEFAULT;
     }
     /* this structure defined in common/misc/pint-malloc.h */
-    *(void **)(&glibc_malloc_ops.malloc) = dlsym(libc_handle, "malloc");
-    *(void **)(&glibc_malloc_ops.calloc) = dlsym(libc_handle, "calloc");
-    *(void **)(&glibc_malloc_ops.posix_memalign) = dlsym(libc_handle,
-            "posix_memalign");
-    *(void **)(&glibc_malloc_ops.memalign) = dlsym(libc_handle, "memalign");
-    *(void **)(&glibc_malloc_ops.valloc) = dlsym(libc_handle, "valloc");
-    *(void **)(&glibc_malloc_ops.realloc) = dlsym(libc_handle, "realloc");
-    *(void **)(&glibc_malloc_ops.strdup) = dlsym(libc_handle, "strdup");
-    *(void **)(&glibc_malloc_ops.strndup) = dlsym(libc_handle, "strndup");
-    *(void **)(&glibc_malloc_ops.free) = dlsym(libc_handle, "free");
+    glibc_malloc_ops.malloc = dlsym(libc_handle, "malloc");
+    glibc_malloc_ops.calloc = dlsym(libc_handle, "calloc");
+    glibc_malloc_ops.posix_memalign = dlsym(libc_handle, "posix_memalign");
+    glibc_malloc_ops.memalign = dlsym(libc_handle, "memalign");
+    glibc_malloc_ops.valloc = dlsym(libc_handle, "valloc");
+    glibc_malloc_ops.realloc = dlsym(libc_handle, "realloc");
+    glibc_malloc_ops.strdup = dlsym(libc_handle, "strdup");
+    glibc_malloc_ops.strndup = dlsym(libc_handle, "strndup");
+    glibc_malloc_ops.free = dlsym(libc_handle, "free");
     if (libc_handle != RTLD_DEFAULT) /* was NEXT but I think that was wrong */
     {
         dlclose(libc_handle);

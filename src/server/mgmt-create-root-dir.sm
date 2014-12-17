@@ -50,6 +50,9 @@ static int delete_lost_and_found_handle_comp_fn(
         void *v_p,
         struct PVFS_server_resp *resp_p,
         int index);
+static int tree_setattr_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
+
 
 %%
 
@@ -217,7 +220,7 @@ static PINT_sm_action mgmt_create_root_dir_check_for_request(
     strcpy(s_op->u.mgmt_create_root_dir.credential.issuer+2,
          user_opts->server_alias);
     s_op->u.mgmt_create_root_dir.credential.timeout =
-        PINT_util_get_current_time() + user_opts->security_timeout;
+        PINT_util_get_current_time() + user_opts->credential_timeout;
 
 #ifdef ENABLE_SECURITY_CERT
     /* use CA certificate as cert in credential */
@@ -304,6 +307,8 @@ static PINT_sm_action mgmt_create_root_dir_create_dist_dir_struct(
             100);
 
     assert(ret == 0);
+    /* Need to set mask so we will free dist dir attrs when cleaning up. */
+    attr->mask |= PVFS_ATTR_DISTDIR_ATTR;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
             "mgmt-create-root-dir: Init dist-dir-attr for dir meta handle %llu "
@@ -444,6 +449,8 @@ static PINT_sm_action mgmt_create_root_dir_create_local_dirdata_dspace(
         server_job_context, 
         NULL);
 
+    free(extent_array.extent_array);
+
     return(ret);
 }
 
@@ -542,6 +549,7 @@ static PINT_sm_action mgmt_create_root_dir_remote_dirdata_attr_and_keyval_setup_
         s_op->target_fs_id,
         PVFS_TYPE_DIRDATA,
         attr,
+        0,
         s_op->attr.dist_dir_attr.num_servers,
         s_op->attr.dirdata_handles,
         NULL);
@@ -549,7 +557,7 @@ static PINT_sm_action mgmt_create_root_dir_remote_dirdata_attr_and_keyval_setup_
     msg_p->fs_id = s_op->target_fs_id;
     msg_p->handle = s_op->attr.dirdata_handles[0];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = NULL;
+    msg_p->comp_fn = tree_setattr_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
@@ -557,12 +565,26 @@ static PINT_sm_action mgmt_create_root_dir_remote_dirdata_attr_and_keyval_setup_
     if (ret)
     {
         gossip_err("Failed to map dirdata server address\n");
+        PINT_free_object_attr(&(msg_p->req).u.tree_setattr.attr);
         js_p->error_code = ret;
     }
 
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
+}
+
+static int tree_setattr_comp_fn(void *v_p,
+                                struct PVFS_server_resp *resp_p,
+                                int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = &mop->msgpair;;
+
+    assert(msg_p->req.op == PVFS_SERV_TREE_SETATTR);
+    PINT_free_object_attr(&(msg_p->req).u.tree_setattr.attr);
+    return 0;
 }
 
 static PINT_sm_action mgmt_create_root_dir_write_keyval_to_meta_handle(
@@ -764,7 +786,8 @@ static PINT_sm_action mgmt_create_root_dir_crdirent_lost_and_found_setup_msgpair
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index;
-    const struct server_configuration_s *config;
+    int num_handles;
+    PVFS_handle *handle_array = NULL;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "mgmt-create-root-dir state: crdirent_lost_and_found_setup_msgpair\n");
@@ -785,32 +808,36 @@ static PINT_sm_action mgmt_create_root_dir_crdirent_lost_and_found_setup_msgpair
             dirdata_server_index);
 
     /* Update capability to send with request. */
-    s_op->u.mgmt_create_root_dir.capability.num_handles =
-        s_op->attr.dist_dir_attr.num_servers + 1;
-    s_op->u.mgmt_create_root_dir.capability.handle_array =
-        malloc(s_op->u.mgmt_create_root_dir.capability.num_handles *
-               sizeof(PVFS_handle));
-    s_op->u.mgmt_create_root_dir.capability.handle_array[0] = s_op->target_handle;
-    memcpy((s_op->u.mgmt_create_root_dir.capability.handle_array + 1),
-           s_op->attr.dirdata_handles,
-           s_op->attr.dist_dir_attr.num_servers* sizeof(PVFS_handle));
+    /* first, free the one we have already been using */
+    PINT_cleanup_capability(&s_op->u.mgmt_create_root_dir.capability);
 
-    config = PINT_get_server_config();
-    s_op->u.mgmt_create_root_dir.capability.issuer = 
-        (char *) malloc(strlen(config->server_alias) + 3);
-    if (s_op->u.mgmt_create_root_dir.capability.issuer == NULL)
+    /* create new handle array with target handle and dirdata handles */
+    num_handles = s_op->attr.dist_dir_attr.num_servers + 1;
+    handle_array = (PVFS_handle *) malloc(num_handles * sizeof(PVFS_handle));
+    if (handle_array == NULL)
     {
+        gossip_err("mgmt-create-root-dir: out of memory in %s\n", __func__);
         js_p->error_code = -PVFS_ENOMEM;
+
         return SM_ACTION_COMPLETE;
     }
-    strcpy(s_op->u.mgmt_create_root_dir.capability.issuer, "S:");
-    strcat(s_op->u.mgmt_create_root_dir.capability.issuer, config->server_alias);
+    handle_array[0] = s_op->target_handle;
+    memcpy((handle_array + 1),
+           s_op->attr.dirdata_handles,
+           s_op->attr.dist_dir_attr.num_servers * sizeof(PVFS_handle));
 
-    /* Need to re-sign the capability since we added a target handle. */
-    ret = PINT_sign_capability(&s_op->u.mgmt_create_root_dir.capability);
-    if (ret < 0)
+    /* create new capability -- note that handle_array will be freed by 
+       PINT_cleanup_capability when the SM completes */
+    ret = PINT_server_to_server_capability(&s_op->u.mgmt_create_root_dir.capability, 
+                                           s_op->target_fs_id,
+                                           num_handles,
+                                           handle_array);
+    if (ret != 0)
     {
-        js_p->error_code = -PVFS_EINVAL;
+        gossip_err("mgmt-create-root-dir: unable to retrieve server-to-server "
+                   "capability in %s\n", __func__);
+        js_p->error_code = -PVFS_EACCES;
+
         return SM_ACTION_COMPLETE;
     }
 
@@ -952,6 +979,15 @@ static PINT_sm_action mgmt_create_root_dir_cleanup_noreq( struct PINT_smcb *smcb
 
     assert(s_op);
 
+    if (js_p->error_code != 0)
+    {
+        char errstr[256];
+        PVFS_strerror_r(js_p->error_code, errstr, sizeof(errstr));
+        gossip_err("Warning: unable to create root dir due to error: %s\n", 
+                   errstr);
+        gossip_err("         Your FS may be in an inconsistent state\n");
+    }
+
     if(s_op->key_a)
     {
         free(s_op->key_a);
@@ -981,7 +1017,7 @@ static PINT_sm_action mgmt_create_root_dir_cleanup_noreq( struct PINT_smcb *smcb
 }
 
 
-PINT_GET_OBJECT_REF_DEFINE(mgmt_create_root_dir)
+PINT_GET_OBJECT_REF_DEFINE(mgmt_create_root_dir);
 
 static int perm_mgmt_create_root_dir(PINT_server_op *s_op)
 {

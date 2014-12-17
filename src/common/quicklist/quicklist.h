@@ -21,10 +21,6 @@
 
 #include <stdlib.h>
 
-#ifdef WIN32
-#include "wincommon.h"
-#endif
-
 struct qlist_head {
     struct qlist_head *next, *prev;
 };
@@ -194,7 +190,6 @@ static __inline__ void qlist_splice(struct qlist_head *qlist, struct qlist_head 
  * @pos:	the type * to use as a loop counter.
  * @head:	the head for your list.
  * @member:	the name of the list_struct within the struct.
- * @type:       the type of pos
  */
 #define qlist_for_each_entry(pos, head, member, type)        \
     for (pos = qlist_entry((head)->next, type, member);	     \
@@ -206,8 +201,6 @@ static __inline__ void qlist_splice(struct qlist_head *qlist, struct qlist_head 
  * @n:		another type * to use as temporary storage
  * @head:	the head for your list.
  * @member:	the name of the list_struct within the struct.
- * @pos_type:   the type of the head for your list.
- * @n_type:     the type of the name of the list_struct within the struct.
  */
 #define qlist_for_each_entry_safe(pos, n, head, member, pos_type, n_type) \
     for (pos = qlist_entry((head)->next, pos_type, member),	\

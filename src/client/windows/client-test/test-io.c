@@ -17,6 +17,8 @@
 #include "timer.h"
 #include "thread.h"
 
+#define BUF_MAX_SIZE    1024*1024   /* 1 MB */
+
 void io_file_cleanup(char *file_name)
 {
     _unlink(file_name);
@@ -25,25 +27,40 @@ void io_file_cleanup(char *file_name)
 int io_file_int(char *file_name, char *mode, char *buffer, size_t size)
 {
     FILE *f;
-    int real_size, code = 0;
-    size_t total = 0;
+    int code = 0, imode;
+    size_t real_size, total = 0, buf_size;
 
     f = fopen(file_name, mode);
     if (!f)
         return errno;
 
+    /* compute buf_size */
+    buf_size = (size > BUF_MAX_SIZE) ? BUF_MAX_SIZE : size;
+
+    /* set mode */
+    imode = !strcmp(mode, "rb") ? 0 : 1;
+
     while ((total < size) && !feof(f))
     {
-        if (!strcmp(mode, "rb"))
-            real_size = fread(&(buffer[total]), 1, size - total, f);
+        if (imode == 0) /* "rb" */
+        {
+            real_size = fread(buffer, 1, buf_size, f);
+        }
         else /* "wb" or "ab" */
-            real_size = fwrite(&(buffer[total]), 1, size - total, f);        
+        {
+            real_size = fwrite(buffer, 1, buf_size, f);
+        }
+
         if (real_size == 0)
         {
             code = errno;
             break;
         }
         total += real_size;
+
+        /* debugging 
+        printf("%s %u: %u\n", (imode == 0) ? "read" : "write", size, total);
+        */
     }
 
     fclose(f);
@@ -51,14 +68,21 @@ int io_file_int(char *file_name, char *mode, char *buffer, size_t size)
     return code;
 }
 
+
+#define NUM_SIZES    5
+
 int io_file(global_options *options, int fatal)
 {
     char *file_name, *buffer = NULL, *copy = NULL;
     int i, j, code, code_flag;
-    size_t sizes[] = {4*1024, 100*1024, 1024*1024};
-    char *perftests[] = {"io_file_write_4kb", "io_file_read_4kb", "io_file_write_100kb", 
-                        "io_file_read_100kb", "io_file_write_1mb", "io_file_read_1mb"};
-    char *subtests[] = {"4kb", "100kb", "1mb"};
+    size_t sizes[] = {4*1024, 100*1024, 1024*1024, 100*1024*1024, 1024*1024*1024};
+    size_t buf_size;
+    char *perftests[] = {"io_file_write_4kb", "io_file_read_4kb", 
+                         "io_file_write_100kb", "io_file_read_100kb", 
+                         "io_file_write_1mb", "io_file_read_1mb",
+                         "io_file_write_100mb", "io_file_read_100mb",
+                         "io_file_write_1gb", "io_file_read_1gb"};
+    char *subtests[] = {"4kb", "100kb", "1mb", "100mb", "1gb"};
 #ifdef WIN32
     unsigned __int64 start;
 #else
@@ -66,15 +90,18 @@ int io_file(global_options *options, int fatal)
 #endif
     double elapsed;
     
-    for (i = 0; i < 3; i++)
+    for (i = 0; i < NUM_SIZES; i++)
     {
         code_flag = 0;
 
+        /* compute buffer size */
+        buf_size = (sizes[i] > BUF_MAX_SIZE) ? BUF_MAX_SIZE : sizes[i];
+
         /* allocate buffer */
-        buffer = (char *) malloc(sizes[i]);
+        buffer = (char *) malloc(buf_size);
 
         /* fill buffer */
-        for (j = 0; (unsigned) j < sizes[i]; j++)
+        for (j = 0; (unsigned) j < buf_size; j++)
             buffer[j] = (char) j % 256;
 
         file_name = randfile(options->root_dir);
@@ -101,8 +128,8 @@ int io_file(global_options *options, int fatal)
                     "%3.3fs");
 
         /* copy the buffer */
-        copy = (char *) malloc(sizes[i]);
-        memcpy(copy, buffer, sizes[i]);
+        copy = (char *) malloc(buf_size);
+        memcpy(copy, buffer, buf_size);
 
 #ifdef WIN32
         start = timer_start();
@@ -127,7 +154,7 @@ int io_file(global_options *options, int fatal)
                     "%3.3fs");
 
         /* compare buffers */
-        code = memcmp(copy, buffer, sizes[i]);
+        code = memcmp(copy, buffer, buf_size);
         code_flag = 1;
 
         report_result(options,

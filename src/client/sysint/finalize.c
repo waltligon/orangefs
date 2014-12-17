@@ -5,12 +5,15 @@
  */
 
 /* System Interface Finalize Implementation */
-#include <stdlib.h>
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
 
 #include "pvfs2-internal.h"
 #include "pint-sysint-utils.h"
 #include "acache.h"
 #include "ncache.h"
+#include "client-capcache.h"
 #include "gen-locks.h"
 #include "pint-cached-config.h"
 #include "pint-dist-utils.h"
@@ -27,6 +30,10 @@ extern job_context_id pint_client_sm_context;
 
 extern PINT_smcb *g_smcb;
 
+#ifdef WIN32
+extern int pvfs_sys_init_flag;
+#endif
+
 /* PVFS_finalize
  *
  * shuts down the PVFS system interface
@@ -38,6 +45,7 @@ int PVFS_sys_finalize()
 {
     static int finiflag = 0;
     static gen_mutex_t finimutex = GEN_MUTEX_INITIALIZER;
+    char * perf_counters_to_display = NULL;
 
     /* first time runs, other wait until completed then exit */
     if (finiflag)
@@ -53,6 +61,35 @@ int PVFS_sys_finalize()
 
     id_gen_safe_finalize();
 
+    /* If desired, display cache perf counters before they are finalized. */
+    perf_counters_to_display = getenv("PVFS2_COUNTERS_AT_FINALIZE");
+    if(perf_counters_to_display)
+    {
+        if(PINT_ncache_get_pc() &&
+           strstr(perf_counters_to_display, "ncache"))
+        {
+            gossip_err("%s: DISPLAYING PERF COUNTERS FOR NCACHE:\n%s",
+                __func__,
+                PINT_perf_generate_text(PINT_ncache_get_pc(), 4096));
+        }
+        if(PINT_acache_get_pc() &&
+           strstr(perf_counters_to_display, "acache"))
+        {
+            gossip_err("%s: DISPLAYING PERF COUNTERS FOR ACACHE:\n%s",
+                __func__,
+                PINT_perf_generate_text(PINT_acache_get_pc(), 4096));
+        
+        }
+        if(PINT_client_capcache_get_pc() &&
+           strstr(perf_counters_to_display, "capcache"))
+        {
+            gossip_err("%s: DISPLAYING PERF COUNTERS FOR CAPCACHE\n%s",
+                __func__,
+                PINT_perf_generate_text(PINT_client_capcache_get_pc(), 4096));
+        }
+    }
+
+    PINT_client_capcache_finalize();
     PINT_ncache_finalize();
     PINT_acache_finalize();
     PINT_cached_config_finalize();
@@ -88,7 +125,12 @@ int PVFS_sys_finalize()
 
     PINT_client_state_machine_release(g_smcb);
 
+#ifdef WIN32
+    pvfs_sys_init_flag = 0;
+#endif
+
     finiflag = 1;
+    
     gen_mutex_unlock(&finimutex);
     return 0;
 }

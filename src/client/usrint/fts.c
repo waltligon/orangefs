@@ -75,12 +75,6 @@ static u_short	 fts_stat (FTS *, FTSENT *, int) internal_function;
 static int      fts_safe_changedir (FTS *, FTSENT *, int, const char *)
      internal_function;
 
-#ifndef MAX
-#define MAX(a, b)	({ __typeof__ (a) _a = (a); \
-			   __typeof__ (b) _b = (b); \
-			   _a > _b ? _a : _b; })
-#endif
-
 #define	ISDOT(a)	(a[0] == '.' && (!a[1] || (a[1] == '.' && !a[2])))
 
 #define CLR(opt)	(sp->fts_options &= ~(opt))
@@ -131,7 +125,9 @@ fts_open(argv, options, compar)
 #define MAXPATHLEN 1024
 #endif
 	size_t maxarglen = fts_maxarglen(argv);
-	if (fts_palloc(sp, MAX(maxarglen, MAXPATHLEN)))
+	if (MAXPATHLEN > maxarglen)
+		maxarglen = MAXPATHLEN;
+	if (fts_palloc(sp, maxarglen))
 		goto mem1;
 
 	/* Allocate/initialize root's parent. */

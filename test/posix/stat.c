@@ -120,7 +120,7 @@ struct files {
 	struct qlist_head 					level; 
 };
 
-static inline struct files* clone_filp(struct files *filp)
+static struct files* clone_filp(struct files *filp)
 {
 	struct files *new_filp = (struct files *)calloc(1, sizeof(struct files));
 	if (new_filp) {
@@ -167,7 +167,7 @@ static int path_init(const char *path)
 	return 0;
 }
 
-static inline void format_size_string(
+static void format_size_string(
     char *src_str, int num_spaces_total, char **out_str_p,
     int right_justified, int hard_limit)
 {

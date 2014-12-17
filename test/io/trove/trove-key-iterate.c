@@ -27,7 +27,7 @@ char path_to_file[PATH_SIZE];
 #define KEYVAL_ARRAY_LEN 10
 int parse_args(int argc, char **argv);
 
-static inline int file_lookup(
+static int file_lookup(
     TROVE_coll_id coll_id,
     /*TROVE_context_id context_id, FIXME: Hacked for now...uses 0*/
     char *path,
