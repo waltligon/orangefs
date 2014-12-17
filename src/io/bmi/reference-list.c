@@ -16,7 +16,6 @@
 #include <string.h>
 #include <assert.h>
 
-#include "pvfs2-internal.h"
 #include "reference-list.h"
 #include "gossip.h"
 #include "id-generator.h"
@@ -29,7 +28,7 @@ static struct qhash_table* str_table = NULL;
  * Visible functions
  */
 
-static int ref_list_compare_key_entry(const void* key, struct qhash_head* link);
+static int ref_list_compare_key_entry(void* key, struct qhash_head* link);
 
 /*
  * ref_list_new()
@@ -132,7 +131,7 @@ ref_st_p ref_list_search_str(ref_list_p rlp,
 
     struct qhash_head* tmp_link;
 
-    tmp_link = qhash_search(str_table, idstring);
+    tmp_link = qhash_search(str_table, (char*)idstring);
     if(!tmp_link)
     {
         return(NULL);
@@ -254,9 +253,9 @@ void dealloc_ref_st(ref_st_p deadref)
     free(deadref);
 }
 
-static int ref_list_compare_key_entry(const void* key, struct qhash_head* link)
+static int ref_list_compare_key_entry(void* key, struct qhash_head* link)
 {
-    const char* key_string = key;
+    char* key_string = (char*)key;
     ref_st_p tmp_entry = NULL;
 
     tmp_entry = qhash_entry(link, ref_st, hash_link);
