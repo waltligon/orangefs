@@ -553,8 +553,11 @@ class OFSTestNode(object):
             output.append(i)
 
         logging.debug("RC: %r" % p.returncode)
-        logging.debug("STDOUT: %s" % output[1] )
-        logging.debug("STDERR: %s" % output[2] )
+	try:
+	        logging.debug("STDOUT: %s" % output[1] )
+        	logging.debug("STDERR: %s" % output[2] )
+	except:
+		pass
         
         return p.returncode
     
@@ -2469,6 +2472,7 @@ class OFSTestNode(object):
 
         # for all the aliases in the file
         for alias in self.alias_list:
+            logging.info("looking for alias for hostname " + self.hostname)
             # if the alias is for THIS host
             if self.hostname in alias:
                 
