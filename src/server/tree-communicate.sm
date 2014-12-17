@@ -236,6 +236,8 @@ static PINT_sm_action tree_communicate_partition_handles(
     struct PVFS_server_req *req = NULL;
     PVFS_capability null_cap;
 
+    gossip_err("%s:s_op->num_pjmp_frames(%d)\n",__func__,s_op->num_pjmp_frames);
+
     gossip_err("%s:sid_count(%d) sid_array[0]=(%s)\n"
               ,__func__
               ,(int)s_op->req->u.tree_get_file_size.sid_count
@@ -263,6 +265,12 @@ static PINT_sm_action tree_communicate_partition_handles(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+
+    /* RAL:  Something is wrong.  I shouldn't have to initialize num_pjmp_frames bc it should already be
+     * zeroed out when the smcb is created.  Need to investigate.
+     */
+    s_op->num_pjmp_frames = 0;
+    gossip_err("%s: num_pjmp_frames(%d)\n",__func__,s_op->num_pjmp_frames);
 
     /* Separate the handles into local and remote. */
     for (i = 0; i < num_data_files; i++)
@@ -315,8 +323,8 @@ static PINT_sm_action tree_communicate_partition_handles(
     }/*end for each datafile*/
 
 
-    /* For each local handle, setup a state machine frame, a required precursor to pjmps in the next state.  (pjmps execute multiple
-     * requests simultaneously.)
+    /* For each local handle, setup a state machine frame, a required precursor to pjmps in the next state.  
+     * (pjmps execute multiple requests simultaneously.)
      */
     if (s_op->u.tree_communicate.handle_array_local_count > 0)
     {
@@ -404,6 +412,8 @@ static PINT_sm_action tree_communicate_partition_handles(
                  * so we can't rely on a value in u.tree_communicate here.
                  */
                 tree_communicate_s_op->local_index = i;
+
+                gossip_err("%s line %d: s_op->num_pjmp_frames(%d)\n",__FILE__,__LINE__,s_op->num_pjmp_frames);
 
                 break;
 
@@ -663,6 +673,10 @@ static PINT_sm_action tree_communicate_partition_handles(
             }
         } /* end for */
     } /* end if remote */
+
+
+    gossip_err("%s: num_pjmp_frames(%d)\n",__func__,s_op->num_pjmp_frames);
+
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
@@ -981,6 +995,8 @@ static PINT_sm_action tree_get_file_size_setup(struct PINT_smcb *smcb,
 
     assert(s_op->req->op == PVFS_SERV_TREE_GET_FILE_SIZE);
 
+    gossip_err("%s:s_op->num_pjmp_frames(%d)\n",__func__,s_op->num_pjmp_frames);
+
     gossip_debug(GOSSIP_SERVER_DEBUG,"%s:req->retry_msgpair_at_leaf:%s\n"
                 ,__func__
                 ,(req->u.tree_get_file_size.retry_msgpair_at_leaf ? "YES" : "NO"));
@@ -1186,7 +1202,7 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb, job_status_s 
                          error_code;
         }
         free(old_frame);
-    }/*end for*/
+    }/*end for each frame*/
 
     for (i = 0; i < s_tree->handle_count; i++)
     {
