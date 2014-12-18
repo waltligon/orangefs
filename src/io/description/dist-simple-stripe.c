@@ -200,6 +200,11 @@ static PVFS_size get_blksize(void* params, int dfile_count)
 {
     PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
     /* report the strip size as the block size */
+
+    gossip_err("%s: dparam->strip_size(%d) dfile_count(%d)\n",__func__
+                                                             ,(int)dparam->strip_size
+                                                             ,dfile_count);
+
     return(dparam->strip_size * dfile_count);
 }
 

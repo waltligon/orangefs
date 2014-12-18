@@ -628,6 +628,7 @@ struct PINT_server_unstuff_op
 
 struct PINT_server_tree_communicate_op
 {
+    int num_pjmp_frames;
     int num_partitions;
     PVFS_handle* handle_array_local; 
     PVFS_handle* handle_array_remote; 

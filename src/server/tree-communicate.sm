@@ -236,7 +236,7 @@ static PINT_sm_action tree_communicate_partition_handles(
     struct PVFS_server_req *req = NULL;
     PVFS_capability null_cap;
 
-    gossip_err("%s:s_op->num_pjmp_frames(%d)\n",__func__,s_op->num_pjmp_frames);
+    gossip_err("%s:s_op->u.tree_communicate.num_pjmp_frames(%d)\n",__func__,s_op->u.tree_communicate.num_pjmp_frames);
 
     gossip_err("%s:sid_count(%d) sid_array[0]=(%s)\n"
               ,__func__
@@ -265,12 +265,6 @@ static PINT_sm_action tree_communicate_partition_handles(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-
-    /* RAL:  Something is wrong.  I shouldn't have to initialize num_pjmp_frames bc it should already be
-     * zeroed out when the smcb is created.  Need to investigate.
-     */
-    s_op->num_pjmp_frames = 0;
-    gossip_err("%s: num_pjmp_frames(%d)\n",__func__,s_op->num_pjmp_frames);
 
     /* Separate the handles into local and remote. */
     for (i = 0; i < num_data_files; i++)
@@ -331,7 +325,7 @@ static PINT_sm_action tree_communicate_partition_handles(
         for (i = 0; i < s_op->u.tree_communicate.handle_array_local_count; i++)
         {
             /* Create a stack frame for the local operation. */
-            s_op->num_pjmp_frames++;
+            s_op->u.tree_communicate.num_pjmp_frames++;
             js_p->error_code = LOCAL_OPERATION;
 
             PINT_CREATE_SUBORDINATE_SERVER_FRAME(
@@ -413,8 +407,6 @@ static PINT_sm_action tree_communicate_partition_handles(
                  */
                 tree_communicate_s_op->local_index = i;
 
-                gossip_err("%s line %d: s_op->num_pjmp_frames(%d)\n",__FILE__,__LINE__,s_op->num_pjmp_frames);
-
                 break;
 
             case PVFS_SERV_TREE_GETATTR:
@@ -481,7 +473,7 @@ static PINT_sm_action tree_communicate_partition_handles(
 
         /* We need to send tree-based messages to other servers */
         js_p->error_code = REMOTE_OPERATION;
-        s_op->num_pjmp_frames++;
+        s_op->u.tree_communicate.num_pjmp_frames++;
 
         /* Prepare the stack for pjmp. */
         PINT_CREATE_SUBORDINATE_SERVER_FRAME(
@@ -675,9 +667,6 @@ static PINT_sm_action tree_communicate_partition_handles(
     } /* end if remote */
 
 
-    gossip_err("%s: num_pjmp_frames(%d)\n",__func__,s_op->num_pjmp_frames);
-
-
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -707,7 +696,7 @@ static int tree_setattr_work_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 
     assert(s_op->req->op == PVFS_SERV_TREE_SETATTR);
     /* for each state machine spawned, pop a frame */
-    for (i = 0; i < s_op->num_pjmp_frames; i++)
+    for (i = 0; i < s_op->u.tree_communicate.num_pjmp_frames; i++)
     {
         old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
         if (task_id == REMOTE_OPERATION)
@@ -848,11 +837,11 @@ static int tree_remove_work_cleanup(
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "%s: num_pjmp_frames = %d\n"
                 ,__func__
-                ,s_op->num_pjmp_frames);
+                ,s_op->u.tree_communicate.num_pjmp_frames);
 
 
     /* for each state machine spawned, pop a frame */
-    for (i = 0; i < s_op->num_pjmp_frames; i++)
+    for (i = 0; i < s_op->u.tree_communicate.num_pjmp_frames; i++)
     {
         old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
         if (old_frame)
@@ -995,7 +984,7 @@ static PINT_sm_action tree_get_file_size_setup(struct PINT_smcb *smcb,
 
     assert(s_op->req->op == PVFS_SERV_TREE_GET_FILE_SIZE);
 
-    gossip_err("%s:s_op->num_pjmp_frames(%d)\n",__func__,s_op->num_pjmp_frames);
+    gossip_err("%s:s_op->num_pjmp_frames(%d)\n",__func__,s_op->u.tree_communicate.num_pjmp_frames);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,"%s:req->retry_msgpair_at_leaf:%s\n"
                 ,__func__
@@ -1123,10 +1112,10 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb, job_status_s 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "%s: num_pjmp_frames = %d\n"
                 ,__func__
-                ,s_op->num_pjmp_frames);
+                ,s_op->u.tree_communicate.num_pjmp_frames);
 
     /* for each state machine spawned, pop a frame */
-    for (i = 0; i < s_op->num_pjmp_frames; i++)
+    for (i = 0; i < s_op->u.tree_communicate.num_pjmp_frames; i++)
     {
         old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
         if (old_frame)
@@ -1399,10 +1388,10 @@ static int tree_getattr_work_cleanup(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "%s: num_pjmp_frames = %d\n"
                 ,__func__
-                ,s_op->num_pjmp_frames);
+                ,s_op->u.tree_communicate.num_pjmp_frames);
 
     /* for each state machine spawned, pop a frame */
-    for (i = 0; i < s_op->num_pjmp_frames; i++)
+    for (i = 0; i < s_op->u.tree_communicate.num_pjmp_frames; i++)
     {
         old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
         if (old_frame)

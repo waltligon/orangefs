@@ -606,29 +606,37 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
          * individual handle, then we must invalidate the size array
          * and return an error code.
          */
-        for (i = 0; i < resp_p->u.tree_get_file_size.handle_count; i++)
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG
-                         ,"%s: error[%d]:%d\tsize[%d]:%d\n"
-                         ,__func__
-                         ,i
-                         ,(int)resp_p->u.tree_get_file_size.error[i]
-                         ,i
-                         ,(int)resp_p->u.tree_get_file_size.size[i]);
+   gossip_debug(GOSSIP_GETATTR_DEBUG,"%s:handle_count(%u)\n",__func__
+                                                            ,resp_p->u.tree_get_file_size.handle_count);
 
-            if (resp_p->u.tree_get_file_size.error[i] != 0)
-            {
-                gossip_debug(GOSSIP_GETATTR_DEBUG
-                             ,"%s: error[%d] is %d\n"
-                             ,__func__
-                             ,i
-                             ,resp_p->u.tree_get_file_size.error[i]);
-                memset(getattr->size_array, 0, sizeof(*getattr->size_array));
-                return (resp_p->u.tree_get_file_size.error[i]);
-            }
+   getattr->size = 0;
+   for (i = 0; i < resp_p->u.tree_get_file_size.handle_count; i++)
+   {
+       gossip_debug(GOSSIP_GETATTR_DEBUG
+                    ,"%s: error[%d]:%d\tsize[%d]:%d\n"
+                    ,__func__
+                    ,i
+                    ,(int)resp_p->u.tree_get_file_size.error[i]
+                    ,i
+                    ,(int)resp_p->u.tree_get_file_size.size[i]);
 
-            getattr->size_array[i] = resp_p->u.tree_get_file_size.size[i];
-        } /* end for */
+       if (resp_p->u.tree_get_file_size.error[i] != 0)
+       {
+           gossip_debug(GOSSIP_GETATTR_DEBUG
+                        ,"%s: error[%d] is %d\n"
+                        ,__func__
+                        ,i
+                        ,resp_p->u.tree_get_file_size.error[i]);
+           memset(getattr->size_array, 0, sizeof(*getattr->size_array));
+           getattr->size = 0;
+           return (resp_p->u.tree_get_file_size.error[i]);
+       }
+
+       getattr->size_array[i] = resp_p->u.tree_get_file_size.size[i];
+       getattr->size += getattr->size_array[i];
+   } /* end for */
+
+   getattr->attr.mask |= PVFS_ATTR_DATA_SIZE;
 
 #if 0
     } /* end if */
@@ -1843,6 +1851,10 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
      * the PVFS_sys_attr object.  The caller of PVFS_[i]sys_getattr
      * must free it.
      */
+
+    gossip_err("%s: sm_p->getattr.attr.objtype(%d) mask(0x%08x)\n",__func__,(int)sm_p->getattr.attr.objtype
+                                                                           ,sm_p->getattr.attr.mask);
+
     if(attr->objtype == PVFS_TYPE_SYMLINK &&
        attr->mask & PVFS_ATTR_SYMLNK_TARGET)
     {
@@ -1943,6 +1955,11 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
 
         if (attr->mask & PVFS_ATTR_DATA_SIZE)
         {
+            gossip_err("%s: sm_p->getattr.attr.objtype(%d) sm_p->getattr.size(%d)\n"
+                      ,__func__
+                      ,(int)sm_p->getattr.attr.objtype
+                      ,(int)sm_p->getattr.size);
+
             if( attr->objtype == PVFS_TYPE_DATAFILE )
             {
                 sysresp->attr.size = attr->u.data.size;
@@ -1959,6 +1976,9 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
             (attr->mask & PVFS_ATTR_META_DFILES))
         {
             /* we have enough information to set a block size */
+            gossip_err("%s: sm_p->getattr.attr->u.meta.dfile_count(%d) params(%p)\n",__func__
+                                                                      ,sm_p->getattr.attr.u.meta.dfile_count
+                                                                      ,sm_p->getattr.attr.u.meta.dist->params);
             sysresp->attr.blksize = attr->u.meta.dist->methods->get_blksize(
                                                   attr->u.meta.dist->params,
                                                   attr->u.meta.dfile_count);
@@ -2000,6 +2020,8 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
                0,
                sizeof(PVFS_sysresp_getattr));
     }
+
+    gossip_err("%s: sysresp->attr.mask(0x%08x)\n",__func__,sysresp->attr.mask);
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
