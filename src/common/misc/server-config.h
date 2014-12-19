@@ -153,7 +153,7 @@ typedef struct distribution_param_config_s
 /* Config struct to hold overloaded distribution defaults */
 typedef struct distribution_config_s
 {
-    char* name;
+    char *name;
     PINT_llist *param_list;
 
 } distribution_config_t;
@@ -173,6 +173,7 @@ typedef struct server_configuration_s
     char *fs_config_filename;       /* the fs.conf file name            */
     size_t fs_config_buflen;        /* the fs.conf file length          */
     char *fs_config_buf;            /* the fs.conf file contents        */
+
     int  initial_unexpected_requests;
     int  server_job_bmi_timeout;    /* job timeout values in seconds    */
     int  server_job_flow_timeout;
@@ -188,7 +189,9 @@ typedef struct server_configuration_s
     uint32_t *precreate_low_threshold; /* threshold for each ds type */
 #endif
 
-/* V3 ECQ - unneeded? */
+/* V3 ECQ - unneeded?
+   Is this the same as int32_t distr_dir_servers_initial which is at bottom?
+ */
 #if 0
     uint32_t init_num_dirdata_handles; /* initial number of dirdata handles */
                                        /*    when creating a new directory */

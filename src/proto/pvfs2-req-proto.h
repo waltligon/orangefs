@@ -35,11 +35,12 @@
 
 #define PVFS2_PROTO_VERSION ((PVFS2_PROTO_MAJOR*1000)+(PVFS2_PROTO_MINOR))
 
-/* we set the maximum possible size of a small I/O packed message as 64K.  This
- * is an upper limit that is used to allocate the request and response encoded
- * buffers, and is independent of the max unexpected message size of the specific
- * BMI module.  All max unexpected message sizes for BMI modules have to be less
- * than this value
+/* We set the maximum possible size of a small I/O packed message as 64K.
+ * This is an upper limit that is used to allocate the request and response
+ * encoded buffers, and is independent of the max unexpected message size
+ * of the specific BMI module. 
+ * All max unexpected message sizes for BMI modules have to be less
+ * than this value.
  */
 #define PINT_SMALL_IO_MAXSIZE (16*1024)
 
@@ -426,7 +427,7 @@ do {                                                                       \
     int mask;                                                              \
     memset(&(__req), 0, sizeof(__req));                                    \
     (__req).op = PVFS_SERV_CREATE;                                         \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;                                \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                                \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                                  \
     (__req).hints = (__hints);                                             \
     (__req).capability = (__cap);                                          \
@@ -498,7 +499,7 @@ endecode_fields_4a_struct(
 do {                                                        \
     memset(&(__req), 0, sizeof(__req));                     \
     (__req).op = PVFS_SERV_BATCH_CREATE;                    \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;                 \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                 \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                   \
     (__req).hints = (__hints);                              \
     (__req).capability = (__cap);                           \
@@ -550,7 +551,7 @@ endecode_fields_3a_struct(
 do {                                            \
     memset(&(__req), 0, sizeof(__req));         \
     (__req).op = PVFS_SERV_REMOVE;              \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;     \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;     \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;       \
     (__req).capability = (__cap);               \
     (__req).u.remove.credential = (__cred);     \
@@ -586,7 +587,7 @@ endecode_fields_1a_struct(
 do {                                                 \
     memset(&(__req), 0, sizeof(__req));              \
     (__req).op = PVFS_SERV_BATCH_REMOVE;             \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;          \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;          \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;            \
     (__req).capability = (__cap);                    \
     (__req).u.batch_remove.fs_id = (__fsid);         \
@@ -621,7 +622,7 @@ endecode_fields_2a_struct(
 do {                                                        \
     memset(&(__req), 0, sizeof(__req));                     \
     (__req).op = PVFS_SERV_MGMT_REMOVE_OBJECT;              \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;                 \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                 \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                   \
     (__req).hints = (__hints);                              \
     (__req).capability = (__cap);                           \
@@ -667,7 +668,7 @@ endecode_fields_4a_struct(
 do {                                                        \
     memset(&(__req), 0, sizeof(__req));                     \
     (__req).op = PVFS_SERV_MGMT_REMOVE_DIRENT;              \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;                 \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                 \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                   \
     (__req).capability = (__cap);                           \
     (__req).hints = (__hints);                              \
@@ -1115,7 +1116,7 @@ endecode_fields_5a_struct(
 do {                                               \
     memset(&(__req), 0, sizeof(__req));            \
     (__req).op = PVFS_SERV_UNSTUFF;                \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;        \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;        \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;          \
     (__req).capability = (__cap);                  \
     (__req).u.unstuff.credential = (__cred);       \
@@ -1324,7 +1325,7 @@ endecode_fields_10_struct(
 do {                                                       \
     memset(&(__req), 0, sizeof(__req));                    \
     (__req).op = PVFS_SERV_MKDIR;                          \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;                \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                  \
     (__req).capability = (__cap);                          \
     (__req).u.mkdir.credential = (__cred);                 \
@@ -1406,7 +1407,7 @@ endecode_fields_6aaa_struct(
 do {                                                              \
     memset(&(__req), 0, sizeof(__req));                           \
     (__req).op = PVFS_SERV_CRDIRENT;                              \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;                       \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                       \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                         \
     (__req).capability = (__cap);                                 \
     (__req).u.crdirent.credential = (__cred);                     \
@@ -1461,7 +1462,7 @@ endecode_fields_4a_struct(
 do {                                                     \
     memset(&(__req), 0, sizeof(__req));                  \
     (__req).op = PVFS_SERV_RMDIRENT;                     \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;              \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;              \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                \
     (__req).capability = (__cap);                        \
     (__req).hints = (__hints);                           \
@@ -1536,7 +1537,7 @@ endecode_fields_5a1a_struct(
 do {                                                                 \
     memset(&(__req), 0, sizeof(__req));                              \
     (__req).op = PVFS_SERV_CHDIRENT;                                 \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;                          \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                          \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                            \
     (__req).capability = (__cap);                                    \
     (__req).hints = (__hints);                                       \
@@ -1802,7 +1803,7 @@ endecode_fields_5a_struct(
 do {                                             \
     memset(&(__req), 0, sizeof(__req));          \
     (__req).op = PVFS_SERV_TRUNCATE;             \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;      \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;      \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;        \
     (__req).capability = (__cap);                \
     (__req).hints = (__hints);                   \
@@ -2534,7 +2535,7 @@ endecode_fields_2a1aa_struct(
 do {                                              \
     memset(&(__req), 0, sizeof(__req));           \
     (__req).op = PVFS_SERV_SETEATTR;              \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;       \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;       \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;         \
     (__req).capability = (__cap);                 \
     (__req).hints = (__hints);                    \
@@ -2593,7 +2594,7 @@ endecode_fields_4aaa_struct(
 do {                                              \
     memset(&(__req), 0, sizeof(__req));           \
     (__req).op = PVFS_SERV_ATOMICEATTR;           \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;       \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;       \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;         \
     (__req).capability = (__cap);                 \
     (__req).hints = (__hints);                    \
@@ -2658,7 +2659,7 @@ endecode_fields_4a_struct(
 do {                                                      \
     memset(&(__req), 0, sizeof(__req));                   \
     (__req).op = PVFS_SERV_DELEATTR;                      \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;               \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;               \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                 \
     (__req).capability = (__cap);                         \
     (__req).hints = (__hints);                            \
@@ -2838,7 +2839,7 @@ endecode_fields_2_struct(
 do {                                                       \
     memset(&(__req), 0, sizeof(__req));                    \
     (__req).op = PVFS_SERV_MGMT_CREATE_ROOT_DIR;           \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;                \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                  \
     (__req).capability = (__cap);                          \
     (__req).hints = (__hints);                             \
@@ -2951,7 +2952,7 @@ endecode_fields_5aa_struct(
 do {                                                                          \
     memset(&(__req), 0, sizeof(__req));                                       \
     (__req).op = PVFS_SERV_MGMT_SPLIT_DIRENT;                                 \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;                                   \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                                   \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                                     \
     (__req).capability = (__cap);                                             \
     (__req).hints       = (__hints);                                          \

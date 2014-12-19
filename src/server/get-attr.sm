@@ -80,10 +80,10 @@ nested machine pvfs2_get_attr_work_sm
         run getattr_verify_attribs;
         STATE_SYMLINK => read_symlink_target;
         STATE_METAFILE => read_metafile_hint;
-        /* STATE_DIR => get_dist_dir_attr; */
         STATE_DIR => get_bitmap_and_dirdata_handles;
-        STATE_DIRDATA => get_dirent_count;
-        default => check_if_capability_required;
+        default => setup_resp;
+        /* STATE_DIR => get_dist_dir_attr; */
+        /* STATE_DIRDATA => get_dirent_count; */
     }
 
 /* SYMLINK */
@@ -105,13 +105,16 @@ nested machine pvfs2_get_attr_work_sm
     state interpret_metafile_hint
     {
         run getattr_interpret_metafile_hint;
+        /*
         STATE_METAFILE => read_metafile_datafile_handles_if_required;
         default => check_if_capability_required;
+        */
+        default => read_datafile_handles;
     }
 
-    state read_metafile_datafile_handles_if_required
+    state read_datafile_handles
     {
-        run getattr_read_metafile_datafile_handles_if_required;
+        run getattr_read_datafile_handles;
         success => datafile_handles_safety_check;
         default => check_if_capability_required;
     }
@@ -119,11 +122,11 @@ nested machine pvfs2_get_attr_work_sm
     state datafile_handles_safety_check
     {
         run getattr_datafile_handles_safety_check;
-        success => read_metafile_distribution_if_required;
+        default => read_metafile_distribution;
         /*
          success => read_mirrored_copies_count_if_required; 
+         default => check_if_capability_required;
          */
-        default => check_if_capability_required;
     }
 
     /* V3 should not need these states any more */
@@ -151,19 +154,19 @@ nested machine pvfs2_get_attr_work_sm
     */
     /* V3 End of old states */
 
-    state read_metafile_distribution_if_required
+    state read_metafile_distribution
     {
-        run getattr_read_metafile_distribution_if_required;
+        run getattr_read_metafile_distribution;
         default => interpret_metafile_distribution;
     }
 
     state interpret_metafile_distribution
     {
         run interpret_metafile_distribution;
-        success => detect_stuffed;
         default => check_if_capability_required;
     }
 
+/*
     state detect_stuffed
     {
         run getattr_detect_stuffed;
@@ -182,6 +185,7 @@ nested machine pvfs2_get_attr_work_sm
         run getattr_interpret_stuffed_size;
         default => check_if_capability_required;
     }
+*/
 
 /* DIRECTORY */
 
@@ -218,7 +222,7 @@ nested machine pvfs2_get_attr_work_sm
     }
 
 /* DIRDATA */
-
+/*
     state get_dirent_count
     {
         run getattr_get_dirent_count;
@@ -231,6 +235,7 @@ nested machine pvfs2_get_attr_work_sm
         run getattr_interpret_dirent_count;
         default => check_if_capability_required;
     }
+*/
 
 /* PERMISSIONS */
 
@@ -392,6 +397,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                          "  Req handle %s refers to a metafile\n",
                          PVFS_OID_str(&s_op->u.getattr.handle));
 
+    #if 0
             //respattr->u.meta.dfile_count = s_op->attr.u.meta.dfile_count;
             //respattr->u.meta.dist_size = s_op->attr.u.meta.dist_size;
             if (s_op->u.getattr.attrmask & PVFS_ATTR_META_DFILES)
@@ -438,6 +444,8 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                                                  "mirrored handles.\n");
                respattr->mask &= ~(PVFS_ATTR_META_MIRROR_DFILES);
             }
+    #endif
+            respattr->mask = PVFS_ATTR_META_ALL;
             js_p->error_code = STATE_METAFILE;
             break;
         case PVFS_TYPE_DATAFILE:
@@ -450,16 +458,20 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
              * ds_attribute the prelude used)
              */
             //respattr->u.data.size = s_op->ds_attr.u.datafile.b_size;
-            respattr->mask |= PVFS_ATTR_DATA_ALL;
+            //respattr->mask |= PVFS_ATTR_DATA_ALL;
 
             gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %s refers to "
                          "a datafile (size = %lld).\n",
                          PVFS_OID_str(&s_op->u.getattr.handle),
                          lld(respattr->u.data.size));
+
+            respattr->mask = PVFS_ATTR_DATA_ALL;
+            js_p->error_code = 0;
             break;
         case PVFS_TYPE_DIRECTORY:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: directory\n");
 
+#if 0
             /* check for Distdir struct */
             if (s_op->u.getattr.attrmask & PVFS_ATTR_DISTDIR_ATTR)
             {
@@ -524,8 +536,12 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                             " getattr: dir hint not needed\n");
                 assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
             }
+#endif
+            respattr->mask = PVFS_ATTR_DIR_ALL;
+            js_p->error_code = STATE_DIR;
             break;
         case PVFS_TYPE_DIRDATA:
+#if 0
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: dirdata\n");
             if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT)
             {
@@ -549,6 +565,9 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                 PVFS_OID_str(&s_op->u.getattr.handle));
             assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
 */
+#endif
+            respattr->mask = PVFS_ATTR_DIRDATA_ALL;
+            js_p->error_code = 0;
             break;
         case PVFS_TYPE_SYMLINK:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: symlink\n");
@@ -560,6 +579,8 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
               we'll definitely have to fetch the symlink target in this
               case, as the prelude will never retrieve it for us
             */
+
+            respattr->mask = PVFS_ATTR_SYMLNK_ALL;
             js_p->error_code = STATE_SYMLINK;
             break;
         case PVFS_TYPE_INTERNAL:
@@ -589,20 +610,6 @@ static PINT_sm_action getattr_read_symlink_target(struct PINT_smcb *smcb,
     int ret;
     job_id_t i;
     PVFS_object_attr *respattr = &(s_op->resp.u.getattr.attr);
-
-    /* if we don't need to fill in the symlink target, skip it */
-    if (!(s_op->u.getattr.attrmask & PVFS_ATTR_SYMLNK_TARGET))
-    {
-        gossip_debug(GOSSIP_GETATTR_DEBUG, "skipping symlink target read\n");
-        js_p->error_code = 0;
-        return SM_ACTION_COMPLETE;
-    }
-    
-    /*
-     * optimistically add mask value to indicate the symlink target is
-     * filled (error_code is checked in next state)
-     */
-    respattr->mask |= PVFS_ATTR_SYMLNK_TARGET;
 
     respattr->u.sym.target_path_len = PVFS_NAME_MAX;
     respattr->u.sym.target_path = malloc(respattr->u.sym.target_path_len);
@@ -658,25 +665,14 @@ static PINT_sm_action getattr_interpret_metafile_hint(PINT_smcb *smcb,
             memcpy(&(meta->hint), s_op->val.buffer, sizeof(meta->hint));
         }
 
-        if ((respattr->mask & PVFS_ATTR_META_DFILES) ||
-            (respattr->mask & PVFS_ATTR_META_DIST)   ||
-            (respattr->mask & PVFS_ATTR_META_MIRROR_DFILES))
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG, " * client wants extra "
-                         "meta info, about to retrieve it now\n");
-            js_p->error_code = STATE_METAFILE;
+        gossip_debug(GOSSIP_GETATTR_DEBUG, " * client wants extra "
+                     "meta info, about to retrieve it now\n");
+        js_p->error_code = STATE_METAFILE;
 
-            if ( (respattr->mask  & PVFS_ATTR_META_MIRROR_DFILES) && 
-                !(meta->hint.flags & PVFS_MIRROR_FL) ) 
-            {
-                respattr->mask &= ~(PVFS_ATTR_META_MIRROR_DFILES);
-            }
-        }
-        else
+        if ( (respattr->mask  & PVFS_ATTR_META_MIRROR_DFILES) && 
+            !(meta->hint.flags & PVFS_MIRROR_FL) ) 
         {
-            gossip_debug(GOSSIP_GETATTR_DEBUG, " * client doesn't want "
-                         "extra meta info, preparing response now\n");
-            js_p->error_code = 0;
+            respattr->mask &= ~(PVFS_ATTR_META_MIRROR_DFILES);
         }
     }
     else
@@ -746,9 +742,8 @@ static PINT_sm_action getattr_read_metafile_hint(struct PINT_smcb *smcb,
 }
 
 /* V3 rename ... _read_datafile_handles_ ... */
-static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
-        struct PINT_smcb *smcb,
-        job_status_s *js_p)
+static PINT_sm_action getattr_read_datafile_handles(struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -761,13 +756,6 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
     assert(s_op->attr.objtype == PVFS_TYPE_METAFILE);
 
     js_p->error_code = 0;
-
-    /* if we don't need to fill in the dfiles, skip them */
-    if (!(s_op->u.getattr.attrmask & PVFS_ATTR_META_DFILES))
-    {
-        gossip_debug(GOSSIP_GETATTR_DEBUG, "skipping data handle read\n");
-        return SM_ACTION_COMPLETE;
-    }
 
     dfile_count = respattr->u.meta.dfile_count;
     sid_count = respattr->u.meta.sid_count;
@@ -809,9 +797,6 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
 
     s_op->key.buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
-
-    /* add mask value to indicate the data file array is filled */
-    respattr->mask |= PVFS_ATTR_META_DFILES;
 
     respattr->u.meta.dfile_array = malloc(OSASZ(dfile_count, sid_count));
 
@@ -1225,10 +1210,7 @@ error_exit:
 }/*end getattr_mirrored_handles_safety_check*/
 #endif
 
-
-
-
-static PINT_sm_action getattr_read_metafile_distribution_if_required(
+static PINT_sm_action getattr_read_metafile_distribution(
         struct PINT_smcb *smcb,
         job_status_s *js_p)
 {
@@ -1239,14 +1221,6 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
     assert(s_op->attr.objtype == PVFS_TYPE_METAFILE);
 
     js_p->error_code = 0;
-
-    /* if we don't need to fill in the distribution, skip it */
-    if (!(s_op->u.getattr.attrmask & PVFS_ATTR_META_DIST))
-    {
-        gossip_debug(GOSSIP_GETATTR_DEBUG, "skipping data handle "
-                     "distribution read\n");
-        return SM_ACTION_COMPLETE;
-    }
 
     free_keyval_buffers(s_op);
 
@@ -1269,9 +1243,6 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
     }
     assert(s_op->resp.u.getattr.attr.u.meta.dist_size > 0);
 
-    /* add mask value to indicate the distribution is filled */
-    s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_DIST;
-
     s_op->val.buffer_sz = s_op->resp.u.getattr.attr.u.meta.dist_size; 
     s_op->val.buffer = malloc(s_op->val.buffer_sz);
     if (!s_op->val.buffer)
@@ -1293,6 +1264,7 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
     return ret;
 }
 
+#if 0
 static PINT_sm_action getattr_read_stuffed_size(struct PINT_smcb *smcb,
                                                 job_status_s *js_p)
 {
@@ -1353,7 +1325,7 @@ static PINT_sm_action getattr_interpret_stuffed_size(struct PINT_smcb *smcb,
      */
     return SM_ACTION_COMPLETE;
 }
-
+#endif
 
 /* interpret_metafile_distribution()
  *
@@ -1535,15 +1507,13 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     respattr->capability.num_handles = 1;
 
     /* if this is a metadata allocate room for dfile handles */
-    if ((respattr->objtype == PVFS_TYPE_METAFILE) &&
-        (respattr->mask & PVFS_ATTR_META_DFILES))
+    if (respattr->objtype == PVFS_TYPE_METAFILE)
     {
         respattr->capability.num_handles += respattr->u.meta.dfile_count;
     }
 
     /* if this is a directory allocate room for dirdata handles */
-    if ((respattr->objtype == PVFS_TYPE_DIRECTORY) &&
-        (respattr->mask & PVFS_ATTR_DIR_DIRDATA))
+    if (respattr->objtype == PVFS_TYPE_DIRECTORY)
     {
         respattr->capability.num_handles +=
                              respattr->u.dir.dist_dir_attr.dirdata_count;
@@ -1552,6 +1522,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     /* if there are extra handles allocate them here */
     respattr->capability.handle_array = 
             calloc(respattr->capability.num_handles, sizeof(PVFS_handle));
+
     if (!respattr->capability.handle_array)
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -1561,8 +1532,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     respattr->capability.handle_array[0] = s_op->u.getattr.handle;
 
     /* if this is a metadata copy dfile handles into place */
-    if ((respattr->objtype == PVFS_TYPE_METAFILE) &&
-        (respattr->mask & PVFS_ATTR_META_DFILES))
+    if (respattr->objtype == PVFS_TYPE_METAFILE)
     {
         /* copy datafile handles after the metafile handle */
         memcpy((respattr->capability.handle_array + 1),
@@ -1571,8 +1541,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     }
 
     /* if this is a directory copy dirdata handles into place */
-    if ((respattr->objtype == PVFS_TYPE_DIRECTORY) &&
-        (respattr->mask & PVFS_ATTR_DIR_DIRDATA))
+    if (respattr->objtype == PVFS_TYPE_DIRECTORY)
     {
         /* copy datafile handles after the directory handle */
         memcpy((respattr->capability.handle_array + 1),
@@ -1712,18 +1681,16 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                  llu(respattr->mtime), llu(respattr->ctime),
                  (int)respattr->u.meta.dist_size);
 
-    if (respattr->objtype == PVFS_TYPE_METAFILE)
+    switch (respattr->objtype)
     {
-        if (respattr->mask & PVFS_ATTR_META_DFILES)
+    case PVFS_TYPE_METAFILE :
+        if (respattr->u.meta.dfile_count)
         {
-            if (respattr->u.meta.dfile_count)
-            {
-                assert(respattr->u.meta.dfile_array);
-            }
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         "  also returning %d datafile handles\n",
-                         respattr->u.meta.dfile_count);
+            assert(respattr->u.meta.dfile_array);
         }
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     "  also returning %d datafile handles\n",
+                     respattr->u.meta.dfile_count);
 /* V3 remove */
 #if 0
         if (respattr->mask & PVFS_ATTR_META_MIRROR_DFILES)
@@ -1735,24 +1702,25 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                        ,respattr->u.meta.mirror_copies_count);
         }
 #endif
-        if (respattr->mask & PVFS_ATTR_META_DIST)
-        {
-            /* we have already gathered the dist field in an earlier state */
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         "  also returning dist size of %d\n",
-                         respattr->u.meta.dist_size);
-        }
-    }
-    else if ((respattr->objtype == PVFS_TYPE_DATAFILE) &&
-             (respattr->mask & PVFS_ATTR_DATA_SIZE))
-    {
+        /* we have already gathered the dist field in an earlier state */
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     "  also returning dist size of %d\n",
+                     respattr->u.meta.dist_size);
+        break;
+    case PVFS_TYPE_DIRDATA :
+        respattr->u.dirdata.dist_dir_attr.bitmap_size = 0;
+        respattr->u.dirdata.dist_dir_attr.dirdata_count = 0;
+        respattr->u.dirdata.dist_dir_attr.sid_count = 0;
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     "  also returning dirent count of %lld\n",
+                     lld(respattr->u.dirdata.dirent_count));
+        break;
+    case PVFS_TYPE_DATAFILE :
         gossip_debug(GOSSIP_GETATTR_DEBUG,
                      "  also returning data size of %lld\n",
                      lld(respattr->u.data.size));
-    }
-    else if ((respattr->objtype == PVFS_TYPE_SYMLINK) &&
-             (respattr->mask & PVFS_ATTR_SYMLNK_TARGET))
-    {
+        break;
+    case PVFS_TYPE_SYMLINK :
         if (js_p->error_code == 0)
         {
             assert(respattr->u.sym.target_path);
@@ -1781,9 +1749,8 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
             js_p->error_code = -PVFS_EINVAL;
             return SM_ACTION_COMPLETE;
         }
-    }
-    else if ((respattr->objtype == PVFS_TYPE_DIRECTORY) &&
-            (respattr->mask & PVFS_ATTR_DIR_HINT))
+        break;
+    case PVFS_TYPE_DIRECTORY :
     {
         uint32_t dirent_file_count_i;
         int bcount;
@@ -1805,6 +1772,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
         /* gossip bitmap */
         gossip_debug(GOSSIP_GETATTR_DEBUG,
                      " server returning dist_dir_bitmap as:\n");
+
         for(bcount = respattr->u.dir.dist_dir_attr.bitmap_size - 1;
             bcount >= 0 ;
             bcount--)
@@ -1814,6 +1782,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                          " i=%d : %02x %02x %02x %02x\n",
                          bcount, c[3], c[2], c[1], c[0]);
         }
+
         gossip_debug(GOSSIP_GETATTR_DEBUG, "\n");
 
         for (dirent_file_count_i = 0;
@@ -1826,6 +1795,10 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                          PVFS_OID_str(&respattr->u.dir.dirdata_handles[
                                                  dirent_file_count_i]));
         }
+    }
+    break;
+    default :
+    break;
     }
 
     if (respattr->mask & PVFS_ATTR_CAPABILITY)
@@ -1905,8 +1878,7 @@ static PINT_sm_action getattr_datafile_handles_safety_check(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    if((js_p->error_code == 0) &&
-        (s_op->u.getattr.attrmask & PVFS_ATTR_META_DFILES))
+    if(js_p->error_code == 0)
     {
         /* successfully read datafile key; make sure we got something valid */
         if(s_op->val.read_sz != s_op->val.buffer_sz)
@@ -2085,6 +2057,7 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
     return ret;
 }
         
+#if 0
 static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
                                                job_status_s *js_p)
 {
@@ -2179,6 +2152,7 @@ static PINT_sm_action getattr_interpret_dirent_count(struct PINT_smcb *smcb,
 
     return SM_ACTION_COMPLETE;
 }
+#endif
 
 static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
@@ -2200,44 +2174,33 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
 
     attr_p = &s_op->resp.u.getattr.attr;
 
-    if (s_op->u.getattr.attrmask & PVFS_ATTR_DISTDIR_ATTR)
+    /* gossip bitmap */
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                 "getattr: dist_dir_bitmap as:\n");
+
+    for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
     {
-        /* gossip bitmap */
+        c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
         gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     "getattr: dist_dir_bitmap as:\n");
+                     " i=%d : %02x %02x %02x %02x\n",
+                     i, c[3], c[2], c[1], c[0]);
+    }
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "\n");
 
-        for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
-        {
-            c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         " i=%d : %02x %02x %02x %02x\n",
-                         i, c[3], c[2], c[1], c[0]);
-        }
-        gossip_debug(GOSSIP_GETATTR_DEBUG, "\n");
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                 "\t getattr: dirdata handles array of directory %s.\n",
+                 PVFS_OID_str(&s_op->u.getattr.handle));
 
+    for(i = 0; i < attr_p->u.dir.dist_dir_attr.dirdata_count; i++)
+    {
         gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     "\t getattr: dirdata handles array of directory %s.\n",
-                     PVFS_OID_str(&s_op->u.getattr.handle));
-
-        for(i = 0; i < attr_p->u.dir.dist_dir_attr.dirdata_count; i++)
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         "\t\tdirdata server %d: %s.\n",
-                         i, PVFS_OID_str(&attr_p->u.dir.dirdata_handles[i]));
-        }
+                     "\t\tdirdata server %d: %s.\n",
+                     i, PVFS_OID_str(&attr_p->u.dir.dirdata_handles[i]));
     }
 
     /* NOTE: memory allocations are released in the getattr_cleanup()
      * function 
      */
-   
-    if (!(s_op->u.getattr.attrmask & PVFS_ATTR_DIR_HINT))
-    {
-        /* the caller didn't really want the dir hints; skip */
-        js_p->error_code = STATE_DONE;
-        return SM_ACTION_COMPLETE;
-    }
-
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  trying to getxattr of %s,%s,%s "
                  "of dir handle (coll_id = %d, handle = %s\n",
@@ -2450,6 +2413,7 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+#if 0
 /* getattr_detect_stuffed()
  *
  * determine if a file is stuffed or not
@@ -2483,6 +2447,7 @@ static PINT_sm_action getattr_detect_stuffed(struct PINT_smcb *smcb,
                                  server_job_context,
                                  s_op->req->hints));
 }
+#endif
 
 static void free_keyval_buffers(struct PINT_server_op *s_op)
 {

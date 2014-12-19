@@ -254,6 +254,14 @@ PVFS_error PVFS_isys_create(char *object_name,
                             fs_config->metadata_replication_factor;
     sm_p->u.create.datafile_sid_count =
                             fs_config->default_dfile_replication_factor;
+    if (sm_p->u.create.metadata_sid_count <= 0)
+    {
+        sm_p->u.create.metadata_sid_count = 1;
+    }
+    if (sm_p->u.create.datafile_sid_count <= 0)
+    {
+        sm_p->u.create.datafile_sid_count = 1;
+    }
 
     /* copy layout to sm struct */
     if(layout)
@@ -705,11 +713,15 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
     }
 
     /* Replication for metadata is always set in the configuration for
-     * the file system as it is not user setable, so al we have to go is
+     * the file system as it is not user setable, so all we have to do is
      * grab it, but we will check and make sure it is reasonable and
      * default to 1 if not.
      * TODO There should be a reasonable max also, not implemented yet.
      */
+    /*
+     * We did this in PVFS2_sys_create it is already in place
+     */
+#if 0
     PINT_cached_config_get_metadata_sid_count(
                                 sm_p->parent_ref.fs_id, 
                                 &sm_p->u.create.metadata_sid_count);
@@ -717,6 +729,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
     {
         sm_p->u.create.metadata_sid_count = 1;
     }
+#endif
 
     /* Determining the number of dfiles.
      * priority for determining user's preference for number of data files:
@@ -773,7 +786,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
 
     /*
      * Set up default replication for dfiles. Again, can be set by
-     * a directory hint, the configuration and has a final default
+     * a directory hint, the configuration, or has a final default
      * of 1 (no replication).
      * TODO There should be a reasonable max also, not implemented yet.
      */
@@ -842,12 +855,6 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
 #if 0
     /* creating one metadata object OID and SIDs */
     ret = PVFS_OBJ_gen_meta(&sm_p->object_ref, 1, sm_p->parent_ref.fs_id);
-    if(ret != 0)
-    {
-        gossip_err("Failed to generate meta object reference\n");
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
 #endif
 
     /* Allocate OIDs and SIDs for a file.
@@ -865,19 +872,18 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
                             &sm_p->u.create.datafile_handles,
                             sm_p->u.create.datafile_sid_count, /* in */
                             &sm_p->u.create.datafile_sid_array);
+    if(ret != 0)
+    {
+        gossip_err("Failed to generate new file OID/SID\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
     
     /* object ref will now refer to newly created metadata object */
     sm_p->object_ref.handle = *sm_p->u.create.metadata_handle;
     sm_p->object_ref.fs_id = sm_p->parent_ref.fs_id;
     sm_p->object_ref.sid_count = sm_p->u.create.metadata_sid_count;
     sm_p->object_ref.sid_array = sm_p->u.create.metadata_sid_array;
-
-    if(ret != 0)
-    {
-        gossip_err("Failed to generate meta object reference\n");
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -1226,57 +1232,53 @@ static PINT_dist *get_default_distribution(PVFS_fs_id fs_id)
 
     /* If a default dist is specified in the config, use that
        else just create a simple_stripe distribution */
-    if (NULL != server_config &&
-        NULL != server_config->default_dist_config.name)
-    {
-        dist = PINT_dist_create(server_config->default_dist_config.name);
-        
-        if (dist)
-        {
-            PINT_llist_p iter = server_config->default_dist_config.param_list;
-
-            /* Set supplied the distribution parameters */
-            while (iter)
-            {
-                int rc;
-                distribution_param_config_t *param = PINT_llist_head(iter);
-
-                /* If we are at the list end, break
-                   else, set the distribution parameter to the given value */
-                if (NULL == param)
-                {
-                    break;
-                }
-                else
-                {
-                    rc = dist->methods->set_param(dist->dist_name,
-                                                  dist->params,
-                                                  param->name,
-                                                  &param->value);
-
-                    if (0 != rc)
-                    {
-                        gossip_err("Error setting distribution parameter\n"
-                                   "  dist: %s\n"
-                                   "  param name: %s\n"
-                                   "  param value: %lld\n",
-                                   dist->dist_name, param->name,
-                                   lld(param->value));
-                    }
-                }
-                iter = PINT_llist_next(iter);
-            }                
-        }
-        else
-        {
-            gossip_err("Error creating default distribution: %s\n",
-                       server_config->default_dist_config.name);
-        }
-    }
-    else
+    if (server_config == NULL ||
+        server_config->default_dist_config.name == NULL )
     {
         dist = PINT_dist_create(PVFS_DIST_SIMPLE_STRIPE_NAME);
+        goto getdist_exit;
     }
+    
+    dist = PINT_dist_create(server_config->default_dist_config.name);
+    
+    if (!dist)
+    {
+        gossip_err("Error creating default distribution: %s\n",
+                   server_config->default_dist_config.name);
+        goto getdist_exit;
+    }
+    PINT_llist_p iter = server_config->default_dist_config.param_list;
+
+    /* Set supplied the distribution parameters */
+    while (iter)
+    {
+        int rc;
+        distribution_param_config_t *param = PINT_llist_head(iter);
+
+        /* If we are at the list end, break
+           else, set the distribution parameter to the given value */
+        if (param == NULL)
+        {
+            break;
+        }
+        rc = dist->methods->set_param(dist->dist_name,
+                                      dist->params,
+                                      param->name,
+                                      &param->value);
+
+        if (rc != 0)
+        {
+            gossip_err("Error setting distribution parameter\n"
+                       "  dist: %s\n"
+                       "  param name: %s\n"
+                       "  param value: %lld\n",
+                       dist->dist_name, param->name,
+                       lld(param->value));
+        }
+        iter = PINT_llist_next(iter);
+    }                
+
+getdist_exit:
 
     /* Release the server config mutex */
     PINT_put_server_config_struct(server_config);

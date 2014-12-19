@@ -111,7 +111,7 @@
 
 #define PVFS_ATTR_META_ALL                             \
         (PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES | \
-        PVFS_ATTR_META_MIRROR_DFILES)
+        PVFS_ATTR_META_MIRROR_DFILES | PVFS_ATTR_COMMON_ALL)
 
 #define PVFS_ATTR_META_UNSTUFFED     (1 << 13)
 
@@ -120,13 +120,13 @@
 #define PVFS_ATTR_DATA_SIZE          (1 << 20)   /* replace with latest bit */
 
 #define PVFS_ATTR_DATA_ALL \
-             PVFS_ATTR_DATA_SIZE
+             (PVFS_ATTR_DATA_SIZE | PVFS_ATTR_TIME_ALL)
 
 /* internal attribute masks for symlink objects */
 #define PVFS_ATTR_SYMLNK_TARGET      (1 << 24)
 
 #define PVFS_ATTR_SYMLNK_ALL \
-             PVFS_ATTR_SYMLNK_TARGET
+             (PVFS_ATTR_SYMLNK_TARGET | PVFS_ATTR_COMMON_ALL)
 
 /* internal attribute masks for directory objects */
 #define PVFS_ATTR_DIR_DIRENT_COUNT   (1 << 26)   /* replace with latest bit */
@@ -135,11 +135,11 @@
 
 #define PVFS_ATTR_DIR_ALL \
              (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT | \
-              PVFS_ATTR_DIR_DIRDATA | PVFS_ATTR_DISTDIR_ATTR)
+              PVFS_ATTR_DIR_DIRDATA | PVFS_ATTR_DISTDIR_ATTR | \
+              PVFS_ATTR_COMMON_ALL)
 
 #define PVFS_ATTR_DIRDATA_ALL \
-             (PVFS_ATTR_DIR_DIRENT_COUNT | \
-              PVFS_ATTR_DIR_DIRDATA | PVFS_ATTR_DISTDIR_ATTR)
+             (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_TIME_ALL)
 
 /* internal attribute mask for distributed directory information */
 /* this may be in the meta or dirdata area depending on objtype */

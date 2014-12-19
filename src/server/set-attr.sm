@@ -1154,6 +1154,21 @@ static int perm_setattr(PINT_server_op *s_op)
     return ret;
 }
 
+static int setattr_get_ctrl(struct PVFS_server_req *req,
+                            struct PINT_server_req_ctrl *ctrl)
+{
+    /* this sets up a standard replication */
+    /* generates a request to each of sid_count SIDs */
+    /* all with the same UID */
+    ctrl->fs_id = req->u.setattr.fs_id;
+    ctrl->handles = &req->u.setattr.handle;
+    ctrl->count = 1;
+    ctrl->sids = &req->u.setattr.sid_array[1];
+    ctrl->sid_count = req->u.setattr.sid_count - 1;
+    /* return number of new remote messages */
+    return ctrl->sid_count;
+}
+
 PINT_GET_OBJECT_REF_DEFINE(setattr);
 PINT_GET_CREDENTIAL_DEFINE(setattr);
 
@@ -1165,6 +1180,7 @@ struct PINT_server_req_params pvfs2_set_attr_params =
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_setattr,
     .get_credential = PINT_get_credential_setattr,
+    .get_ctrl = setattr_get_ctrl,
     .state_machine = &pvfs2_set_attr_sm
 };
 

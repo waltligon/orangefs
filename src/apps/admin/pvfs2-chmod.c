@@ -174,6 +174,7 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
   attrmask = (PVFS_ATTR_SYS_ALL_SETABLE);
     
+#if 0
   ret = PVFS_sys_getattr(resp_lookup.ref,
                          attrmask,
                          &credentials,
@@ -186,6 +187,9 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   }
   old_attr = resp_getattr.attr;
   new_attr = old_attr;
+#else
+printf("About to call setattr\n");
+#endif
 
   new_attr.perms = perms;
   new_attr.mask = PVFS_ATTR_SYS_PERM;

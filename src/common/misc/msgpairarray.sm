@@ -241,7 +241,7 @@ static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
                                                           &task_id,
                                                           &error_code,
                                                           NULL);
-        // V3 replace with a gossip_debug
+        /* V3 replace with a gossip_debug */
         /* TODO: put in more detailed error checking */
         if (submop->index != task_id - 1)
         {
@@ -253,12 +253,16 @@ static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
             PVFS_strerror_r(error_code, buf, 1024);
             gossip_err("error code (%d) returned from pjmp in MPA: %s\n",
                        error_code, buf);
-            js_p->error_code = error_code;
         }
         if ((submop->count != mop->count && js_p->error_code == 0))
         {
             gossip_err("count mismatch from pjmp in MPA\n");
         }
+
+        /* What if there more multiple return codes? */
+        /* send all return codes to caller */
+        js_p->error_code = error_code;
+
         /* everything important in the submops are held elsewhere 
          * free the memory allocated berfore the PJMP 
          */
