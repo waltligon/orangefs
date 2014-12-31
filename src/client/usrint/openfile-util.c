@@ -1177,6 +1177,8 @@ static int init_usrint_internal(void)
    }
 #endif
 
+    /* env_vars_struct_dump(&env_vars); */
+
     init_debug("finished with initialization\n");
 
     pvfs_lib_init_flag = 1;
