@@ -91,12 +91,15 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_GET_UID = 43,
     PVFS_SERV_TREE_SETATTR = 44,
     PVFS_SERV_MGMT_GET_DIRENT = 45,
+/* V3 no longer needed - subsequent requests renumbered */
+#if 0
     PVFS_SERV_MGMT_CREATE_ROOT_DIR = 46,
-    PVFS_SERV_MGMT_SPLIT_DIRENT = 47,
-    PVFS_SERV_ATOMICEATTR = 48,
-    PVFS_SERV_GET_CONFIG = 49,
-    PVFS_SERV_TREE_GETATTR = 50,
-    PVFS_SERV_MGMT_GET_USER_CERT = 51,
+#endif
+    PVFS_SERV_MGMT_SPLIT_DIRENT = 46,
+    PVFS_SERV_ATOMICEATTR = 47,
+    PVFS_SERV_GET_CONFIG = 48,
+    PVFS_SERV_TREE_GETATTR = 49,
+    PVFS_SERV_MGMT_GET_USER_CERT = 50,
     PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 52,
 
     /* leave this entry last */
@@ -1293,20 +1296,6 @@ struct PVFS_servreq_mkdir
     int32_t dirdata_sid_count;    /* # of sids per dirdata handle */
     PVFS_SID *dirdata_sid_array;  /* sids for dirdata handles */
 };
-#if 0
-endecode_fields_10_struct(
-    PVFS_servreq_mkdir,
-    PVFS_fs_id, fs_id,
-    PVFS_handle, handle,
-    PVFS_handle, parent,
-    PVFS_SID, parent_sid,
-    PVFS_object_attr, attr,
-    PVFS_credential, credential,
-    int32_t, distr_dir_servers_initial,
-    int32_t, distr_dir_servers_max,
-    int32_t, distr_dir_split_size,
-    PVFS_sys_layout, layout);
-#endif 
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 static inline void encode_PVFS_servreq_mkdir(char **pptr,
@@ -1315,32 +1304,32 @@ static inline void encode_PVFS_servreq_mkdir(char **pptr,
     int i;
 
     encode_PVFS_credential((pptr), &(x)->credential);
-    encode_PVFS_object_attr((pptr), &(x)->attr);                        
-    encode_PVFS_fs_id((pptr), &(x)->fs_id);                             
-    encode_uint32_t((pptr), &(x)->sid_count);                           
+    encode_PVFS_object_attr((pptr), &(x)->attr);
+    encode_PVFS_fs_id((pptr), &(x)->fs_id);
+    encode_uint32_t((pptr), &(x)->sid_count);
     encode_uint32_t((pptr), &(x)->dirdata_count);                      
     encode_uint32_t((pptr), &(x)->dirdata_sid_count);                  
-    encode_PVFS_handle((pptr), &(x)->handle);                           
-    for (i = 0; i < (x)->sid_count; i++)                                
-    {                                                                   
-        encode_PVFS_SID((pptr), &(x)->sid_array[i]);                    
-    }                                                                   
-    if ((x)->parent && !PVFS_OID_is_null((x)->parent))                  
-    {                                                                   
-        encode_PVFS_handle((pptr), (x)->parent);                        
-        for (i = 0; i < (x)->sid_count; i++)                            
-        {                                                               
-            encode_PVFS_SID((pptr), &(x)->parent_sid_array[i]);         
-        }                                                               
-    }                                                                   
-    else                                                                
-    {                                                                   
-        encode_PVFS_handle((pptr), &PVFS_HANDLE_NULL);                  
-    }   
-    for (i = 0; i < (x)->dirdata_count; i++)                           
-    {                                                                   
-        encode_PVFS_handle((pptr), &(x)->dirdata_handles[i]);          
-    }                                                                   
+    encode_PVFS_handle((pptr), &(x)->handle);
+    for (i = 0; i < (x)->sid_count; i++)
+    {
+        encode_PVFS_SID((pptr), &(x)->sid_array[i]);
+    }
+    if ((x)->parent && !PVFS_OID_is_null((x)->parent))
+    {
+        encode_PVFS_handle((pptr), (x)->parent);
+        for (i = 0; i < (x)->sid_count; i++)
+        {
+            encode_PVFS_SID((pptr), &(x)->parent_sid_array[i]);
+        }
+    }
+    else
+    {
+        encode_PVFS_handle((pptr), &PVFS_HANDLE_NULL);
+    }
+    for (i = 0; i < (x)->dirdata_count; i++)
+    {
+        encode_PVFS_handle((pptr), &(x)->dirdata_handles[i]);
+    }
     for (i = 0; i < ((x)->dirdata_sid_count * (x)->dirdata_count); i++)
     {
         encode_PVFS_SID((pptr), &(x)->dirdata_sid_array[i]);
@@ -1357,7 +1346,6 @@ static inline void decode_PVFS_servreq_mkdir(char **pptr,
     decode_uint32_t((pptr), &(x)->sid_count);
     decode_uint32_t((pptr), &(x)->dirdata_count);
     decode_uint32_t((pptr), &(x)->dirdata_sid_count);
-
     (x)->sid_array = decode_malloc(
                   SASZ((x)->sid_count) +
                   OSASZ(1,(x)->sid_count) +
@@ -1444,7 +1432,7 @@ do {                                                       \
     (__req).u.mkdir.dirdata_sid_array = (__dirdata_sid_array); \
     (__attr).objtype = PVFS_TYPE_DIRECTORY;                \
     (__attr).mask   |= PVFS_ATTR_SYS_TYPE;                 \
-    PINT_copy_object_attr(&(__req).u.mkdir.attr, &(__attr));\
+    PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);\
 } while (0)
 
 struct PVFS_servresp_mkdir
@@ -2919,6 +2907,8 @@ endecode_fields_2a_struct(
 #define extra_size_PVFS_servresp_mgmt_get_dirent \
                 (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID))
 
+/* V3 no longer needed */
+#if 0
 /* mgmt_create_root_dir ************************************************/
 /* - used to create root directory at very first startup time, only called noreq */
 struct PVFS_servreq_mgmt_create_root_dir
@@ -2946,7 +2936,7 @@ do {                                                       \
     (__req).u.mgmt_create_root_dir.fs_id = (__fsid);       \
     (__req).u.mgmt_create_root_dir.handle = (__handle);    \
 } while (0)
-
+#endif
 
 /* mgmt_split_dirent ************************************************/
 /* - used to send directory entries to another server for storing */
@@ -3229,7 +3219,10 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_get_uid mgmt_get_uid;
         struct PVFS_servreq_tree_setattr tree_setattr;
         struct PVFS_servreq_mgmt_get_dirent mgmt_get_dirent;
+/* V3 - no longer needed */
+#if 0
         struct PVFS_servreq_mgmt_create_root_dir mgmt_create_root_dir;
+#endif
         struct PVFS_servreq_mgmt_split_dirent mgmt_split_dirent;
         struct PVFS_servreq_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servreq_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;

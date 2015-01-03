@@ -66,6 +66,7 @@ enum
     SKIP_NEXT_STATE  = 13,
     STATE_CAPABILITY = 14,
     STATE_DIRDATA    = 15,
+    STATE_DATA_SIZE  = 16,
 };
 
 static void free_nested_getattr_data(struct PINT_server_op *s_op);
@@ -81,6 +82,7 @@ nested machine pvfs2_get_attr_work_sm
         STATE_SYMLINK => read_symlink_target;
         STATE_METAFILE => read_metafile_hint;
         STATE_DIR => get_bitmap_and_dirdata_handles;
+        STATE_DATA_SIZE => setup_resp;
         default => check_if_capability_required;
     }
 
@@ -451,12 +453,13 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
              * ds_attribute the prelude used)
              */
             //respattr->u.data.size = s_op->ds_attr.u.datafile.b_size;
-            respattr->mask |= PVFS_ATTR_DATA_ALL;
+            //respattr->mask |= PVFS_ATTR_DATA_ALL;
 
             gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %s refers to "
                          "a datafile (size = %lld).\n",
                          PVFS_OID_str(&s_op->u.getattr.handle),
                          lld(respattr->u.data.size));
+            js_p->error_code = STATE_DATA_SIZE;
             break;
 
 
@@ -1775,7 +1778,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
         }
     }
     else if ((respattr->objtype == PVFS_TYPE_DATAFILE) &&
-             (respattr->mask & PVFS_ATTR_DATA_SIZE))
+             (respattr->mask & PVFS_ATTR_DATA_ALL))
     {
         gossip_debug(GOSSIP_GETATTR_DEBUG,
                      "  also returning data size of %lld\n",
@@ -1919,12 +1922,16 @@ static PINT_sm_action getattr_setup_op(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     memset(&s_op->resp.u.getattr.attr, 0, sizeof(PVFS_object_attr));
+    s_op->resp.op = s_op->req->op;
 
-    s_op->u.getattr.handle = s_op->req->u.getattr.handle;
-    s_op->u.getattr.fs_id = s_op->req->u.getattr.fs_id;
-    s_op->u.getattr.attrmask = s_op->req->u.getattr.attrmask;
+    gossip_err("%s: s_op->req->u.getattr.attrmask(0x%08x)\n",__func__
+                                                            ,s_op->req->u.getattr.attrmask);
+
+    s_op->u.getattr.handle                    = s_op->req->u.getattr.handle;
+    s_op->u.getattr.fs_id                     = s_op->req->u.getattr.fs_id;
+    s_op->u.getattr.attrmask                  = s_op->req->u.getattr.attrmask;
     s_op->u.getattr.mirror_dfile_status_array = NULL;
-    s_op->u.getattr.credential = s_op->req->u.getattr.credential;
+    s_op->u.getattr.credential                = s_op->req->u.getattr.credential;
 
     gossip_err("%s:\n"
                "  s_op->u.getattr.handle : %s\n"

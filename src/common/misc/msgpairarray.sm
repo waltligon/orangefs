@@ -249,11 +249,14 @@ static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
         }
         if (error_code != 0)
         {
-            char buf[1024];
-            PVFS_strerror_r(error_code, buf, 1024);
-            gossip_err("error code (%d) returned from pjmp in MPA: %s\n",
-                       error_code, buf);
             js_p->error_code = error_code;
+            if ( error_code < 0 )
+            {
+               char buf[1024];
+               PVFS_strerror_r(error_code, buf, 1024);
+               gossip_err("error code (%d) returned from pjmp in MPA: %s\n",
+                          error_code, buf);
+            }
         }
         if ((submop->count != mop->count && js_p->error_code == 0))
         {
@@ -1065,7 +1068,6 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
          */
         err_stat = msg_p->comp_fn(smcb, resp_p, mop->index);
 
-        gossip_err("%s:err_stat(%d) msg_p->op_status(%d)\n",__func__,err_stat,msg_p->op_status);
         if (msg_p->op_status == 0)
         {
             js_p->error_code = msg_p->op_status = err_stat;

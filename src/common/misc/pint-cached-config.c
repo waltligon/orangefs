@@ -1511,14 +1511,14 @@ int PINT_cached_config_get_default_dfile_sid_count(PVFS_fs_id fs_id,
 }
 
 /* PINT_cached_config_get_default_distr_dir_params()
- *  *
- *   * Discovers the default numbers for initial dirdata servers, max
- *    * dirdata servers, and split size.
- *     * Clients may pass in values as a hint. If no hint is given, the
- *      * server configuration is checked to find a hint there.
- *       *
- *        * returns 0 on success, -errno on failure
- *         */
+ *
+ * Discovers the default numbers for initial dirdata servers, max
+ * dirdata servers, and split size.
+ * Clients may pass in values as a hint. If no hint is given, the
+ * server configuration is checked to find a hint there.
+ *
+ * returns 0 on success, -errno on failure
+ */
 int PINT_cached_config_get_default_distr_dir_params(PVFS_fs_id fs_id,
                                                     int32_t distr_dir_servers_initial_requested,
                                                     int32_t *distr_dir_servers_initial,
@@ -1574,6 +1574,10 @@ int PINT_cached_config_get_default_distr_dir_params(PVFS_fs_id fs_id,
     {
         *distr_dir_split_size = distr_dir_split_size_requested;
     }
+    if (*distr_dir_split_size < 1)
+    {
+        *distr_dir_split_size = 5;
+    }
 
     /* Determine the number of metadata servers available */
     rc = PINT_cached_config_get_num_meta(fs_id, &num_meta_servers);
@@ -1582,6 +1586,10 @@ int PINT_cached_config_get_default_distr_dir_params(PVFS_fs_id fs_id,
         return(rc);
     }
 
+    if (*distr_dir_servers_initial < 1)
+    {
+        *distr_dir_servers_initial = 1;
+    }
     if (*distr_dir_servers_initial > num_meta_servers)
     {
         gossip_err("%s: Requested more initial dirdata servers(%d) than "
@@ -1593,6 +1601,10 @@ int PINT_cached_config_get_default_distr_dir_params(PVFS_fs_id fs_id,
         *distr_dir_servers_initial = num_meta_servers;
     }
 
+    if (*distr_dir_servers_max < *distr_dir_servers_initial)
+    {
+        *distr_dir_servers_max = *distr_dir_servers_initial;
+    }
     if (*distr_dir_servers_max > num_meta_servers)
     {
         gossip_err("%s: Requested more maximum dirdata servers(%d) than "

@@ -336,9 +336,12 @@ static void lebf_initialize(void)
                 req.u.mgmt_get_dirent.entry = tmp_name;
                 reqsize = extra_size_PVFS_servreq_mgmt_get_dirent;
                 break;
+/* V3 - no longer needed */
+#if 0
             case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
                 /* nothing special */
                 break;
+#endif
             case PVFS_SERV_MGMT_SPLIT_DIRENT:
                 reqsize = extra_size_PVFS_servreq_mgmt_split_dirent;
                 break;
@@ -587,7 +590,10 @@ static int lebf_encode_req(struct PVFS_server_req *req,
         CASE(PVFS_SERV_LISTATTR,  listattr);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
+/* V3 - no longer needed */
+#if 0
         CASE(PVFS_SERV_MGMT_CREATE_ROOT_DIR, mgmt_create_root_dir);
+#endif
         CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
@@ -716,7 +722,10 @@ static int lebf_encode_resp(struct PVFS_server_resp *resp,
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_IMM_COPIES:
         case PVFS_SERV_MGMT_SETPARAM:
+/* V3 - no longer needed */
+#if 0
         case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
+#endif
         case PVFS_SERV_MGMT_SPLIT_DIRENT:
             /* nothing else */
             break;
@@ -823,7 +832,10 @@ static int lebf_decode_req(void *input_buffer,
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
+/* V3 - no longer needed */
+#if 0
         CASE(PVFS_SERV_MGMT_CREATE_ROOT_DIR, mgmt_create_root_dir);
+#endif
         CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
@@ -945,7 +957,10 @@ static int lebf_decode_resp(void *input_buffer,
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_IMM_COPIES:
         case PVFS_SERV_MGMT_SETPARAM:
+/* V3 - no longer needed */
+#if 0
         case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
+#endif
         case PVFS_SERV_MGMT_SPLIT_DIRENT:
             /* nothing else */
             break;
@@ -1196,7 +1211,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_LISTEATTR:
             case PVFS_SERV_BATCH_REMOVE:
             case PVFS_SERV_IMM_COPIES:
+/* V3 - no longer needed */
+#if 0
             case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
+#endif
             case PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ:
             case PVFS_SERV_MGMT_GET_USER_CERT:
               /*nothing to free*/
@@ -1449,7 +1467,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_IMM_COPIES:
                 case PVFS_SERV_TREE_SETATTR:
                 case PVFS_SERV_MGMT_GET_DIRENT:
+/* V3 - no longer needed */
+#if 0
                 case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
+#endif
                 case PVFS_SERV_MGMT_SPLIT_DIRENT:
                     /*nothing to free */
                     break;

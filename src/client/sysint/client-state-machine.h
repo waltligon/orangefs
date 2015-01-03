@@ -227,7 +227,7 @@ struct PINT_client_mkdir_sm
     int retry_count;
     int stored_error_code;
 
-    PVFS_handle metadata_handle;
+    PVFS_handle *metadata_handle;
     int metadata_sid_count;
     PVFS_SID *metadata_sid_array;
 
@@ -241,9 +241,9 @@ struct PINT_client_mkdir_sm
     /* keep first */
     PINT_dist *dist;
     PVFS_sys_layout layout;
-    int distr_dir_servers_initial;
-    int distr_dir_servers_max;
-    int distr_dir_split_size;
+//    int distr_dir_servers_initial;
+//    int distr_dir_servers_max;
+//    int distr_dir_split_size;
 };
 
 struct PINT_client_symlink_sm

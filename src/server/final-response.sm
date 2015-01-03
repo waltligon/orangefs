@@ -124,6 +124,7 @@ static PINT_sm_action final_response_send_resp(struct PINT_smcb *smcb,
     }
 
 
+    gossip_err("%s:s_op->resp.op(%d)\n",__func__,s_op->resp.op);
     gossip_err("%s:s_op->resp.op(%s)\n",__func__,PINT_map_server_op_to_string(s_op->resp.op));
     gossip_err("%s:s_op->resp.status(%d)\n",__func__,s_op->resp.status);
 
@@ -206,6 +207,7 @@ gossip_err("%s\n"
                   );
     }
 
+    gossip_err("%s:encoding type = %d\n",__func__,(int)s_op->decoded.enc_type);
 
     ret = PINT_encode(&s_op->resp,
                       PINT_ENCODE_RESP,

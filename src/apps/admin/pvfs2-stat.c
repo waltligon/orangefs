@@ -89,7 +89,7 @@ int main(int argc, char **argv)
       return(-1);
    }
    
-    /* Allocate enough space to hold file system id for each directory */
+   /* Allocate enough space to hold file system id for each directory */
    pfs_id = (PVFS_fs_id *)calloc(user_opts.nNumFiles, sizeof(PVFS_fs_id));
    
    if(pfs_id == NULL)
@@ -97,7 +97,7 @@ int main(int argc, char **argv)
       fprintf(stderr, "Unable to allocate memory\n");
       return(-1);
    }
-   
+
    
    for(i = 0; i < user_opts.nNumFiles; i++)
    {
@@ -129,6 +129,11 @@ int main(int argc, char **argv)
          fprintf(stderr, "Error: could not find file system for %s\n", 
                  user_opts.pszFiles[i]);
          return(-1);
+      }
+      
+      if ( strlen(ppszPvfsPath[i]) == 0 )
+      {
+         memcpy(ppszPvfsPath[i],"/",strlen("/"));
       }
    }
 
