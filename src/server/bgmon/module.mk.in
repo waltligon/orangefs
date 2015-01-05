@@ -1,0 +1,7 @@
+BUILD_SERVER = @BUILD_SERVER@
+DIR := src/server/bgmon
+
+ifdef BUILD_SERVER
+	BGMONSRC += \
+		$(DIR)/bgmon.c
+endif

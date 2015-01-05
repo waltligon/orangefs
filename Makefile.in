@@ -65,6 +65,7 @@ mandir = $(DESTDIR)@mandir@
 sbindir = $(DESTDIR)@sbindir@
 bindir = $(DESTDIR)@bindir@
 libdir = $(DESTDIR)@libdir@
+libexecdir = $(DESTDIR)@libexecdir@
 sysconfdir = $(DESTDIR)@sysconfdir@
 
 VPATH = $(srcdir)
@@ -265,7 +266,8 @@ CFLAGS += $(patsubst %,-I$(builddir)/%,$(GENINCLUDES))
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
 
   # make bindir and sysconfdir available to source files
-CFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
+CFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"' \
+    -DLIBEXECDIR='"$(libexecdir)"'
 
   # OpenSLL support
 CFLAGS += @OPENSSL_CPPFLAGS@
@@ -576,6 +578,8 @@ LIBBMISRC :=
 endif
 # SERVERBINSRC is source files that don't get added to the server library but must be added to the server binary
 SERVERBINSRC :=
+# BGMONSRC is source code for the parallel background process monitor
+BGMONSRC :=
 # DOCSRC is source code for documentation
 DOCSRC :=
 # VISSRC is the source code for visualization tools
@@ -609,6 +613,7 @@ ifdef BUILD_SERVER
 SERVER_STUB := src/server/pvfs2-server-stub
 # SERVER is the pvfs2 server
 SERVER := src/server/pvfs2-server
+BGMON := src/server/pvfs2-bgmon
 endif
 
 # LIBRARIES is a list of the pvfs2 client libraries that will be installed
@@ -741,6 +746,12 @@ ifdef BUILD_SERVER
     # SERVERBINOBJS is a list of objects not in SERVEROBJS to put into the server
     SERVERBINOBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERBINSRC)))
     SERVERBINDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERBINSRC)))
+    # BGMONOBJS is a list of objects to put into the parallel background
+    # process monitor
+    BGMONOBJS := $(patsubst %.c,%.o, $(filter %.c,$(BGMONSRC)))
+    # BGMONDEPENDS is a list of dependency files for the paralle background
+    # process monitor
+    BGMONDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(BGMONSRC)))
 endif
 
 # MISCOBJS is a list of misc. objects not in the above categories
@@ -815,7 +826,7 @@ ifdef BUILD_BMI_ONLY
 DEPENDS := $(sort $(LIBBMIDEPENDS))
 else
 DEPENDS := $(sort $(LIBDEPENDS) $(ULIBDEPENDS) $(SERVERDEPENDS) \
-    $(SERVERBINDEPENDS) $(MISCDEPENDS) $(USERDEPENDS) \
+    $(SERVERBINDEPENDS) $(BGMONDEPENDS) $(MISCDEPENDS) $(USERDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) \
     $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS) \
     $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) \
@@ -829,7 +840,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools kernapps $(VISS) $(KARMA) $(FUSE) 
+all:: $(SERVER) $(BGMON) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools kernapps $(VISS) $(KARMA) $(FUSE) 
 endif
 
 # target for building admin tools
@@ -892,6 +903,10 @@ modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
 $(SERVER): $(SERVERBINOBJS) lib/libpvfs2-server.a 
 	$(Q) "  LD		$@"
 	$(E)$(LD) $^ -o $@ $(SERVER_LDFLAGS) $(SERVERLIBS)
+
+$(BGMON): $(BGMONOBJS) $(LIBRARIES)
+	$(Q) "  LD		$@"
+	$(E)$(LD) $(BGMONOBJS) -o $@ $(LDFLAGS) $(LIBS) $(call modldflags,$<)
 
 # special rules for admin tool objects which also require server components
 $(ADMINOBJS_SERVER): %.o: %.c
@@ -1214,9 +1229,9 @@ clean::
                 $(ULIBOBJS) $(OLIBOBJS) $(OLIBDEPENDS) \
                 $(ULIBPICOBJS) $(ULIBDEPENDS) $(OLIBPICOBJS) \
                 $(UCACHEDTOOLS) $(UCACHEDOBJS) \
-                $(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
+                $(SERVEROBJS) $(SERVERBINOBJS) $(BGMONOBJS) $(MISCOBJS) \
                 $(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
-                $(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
+                $(BGMON) $(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
                 $(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
                 $(USERTOOLS) $(USEROBJS) $(DEVELTOOLS) $(DEVELOBJS) \
                 $(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
@@ -1462,6 +1477,7 @@ ifdef BUILD_SERVER
 	install -m 755 $(srcdir)/$(SERVER_STUB) $(sbindir)/pvfs2-server
 	install -m 755 $(SERVER) $(sbindir)/pvfs2-server.bin
     endif
+	install -m 755 $(BGMON) $(sbindir)
 	rm -f $(bindir)/.pvfs2-genconfig-* &> /dev/null
     ifdef ENABLE_SECURITY_KEY
 	touch $(bindir)/.pvfs2-genconfig-key
