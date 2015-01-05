@@ -1,0 +1,7 @@
+BUILD_SERVER = @BUILD_SERVER@
+DIR := src/client/bgproc
+
+ifdef BUILD_SERVER
+	BGPROCSRC += \
+		$(DIR)/pvfs2-example.c
+endif

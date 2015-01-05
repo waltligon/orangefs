@@ -580,6 +580,8 @@ endif
 SERVERBINSRC :=
 # BGMONSRC is source code for the parallel background process monitor
 BGMONSRC :=
+# BGPROCSRC is source code for the parallel background processes
+BGPROCSRC :=
 # DOCSRC is source code for documentation
 DOCSRC :=
 # VISSRC is the source code for visualization tools
@@ -728,6 +730,15 @@ USERTOOLS := $(patsubst %.c,%, $(filter %.c, $(USERSRC)))
 # USERDEPENDS is a list of dependency files for user programs
 USERDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(USERSRC)))
 
+# BGPROCOBJS is a list of objects to put into the parallel background
+# processes
+BGPROCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(BGPROCSRC)))
+# BGPROCS is a list of parallel background processes
+BGPROCS := $(patsubst %.c,%, $(filter %.c, $(BGPROCSRC)))
+# BGPROCDEPENDS is a list of dependency files for the parallel background
+# processes
+BGPROCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(BGPROCSRC)))
+
 # UCACHEDOBJS is a list of ucached program objects
 UCACHEDOBJS := $(patsubst %.c,%.o, $(filter %.c,$(UCACHEDSRC)))
 # UCACHEDTOOLS is a list of ucached program executables
@@ -840,7 +851,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(BGMON) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools kernapps $(VISS) $(KARMA) $(FUSE) 
+all:: $(SERVER) $(BGMON) $(KARMA) $(LIBRARIES) admintools usertools bgprocs ucachedtools kernapps $(VISS) $(KARMA) $(FUSE) 
 endif
 
 # target for building admin tools
@@ -848,6 +859,9 @@ admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
 
 #target for building user tools
 usertools: $(USERTOOLS)
+
+#target for building parallel background processes
+bgprocs: $(BGPROCS)
 
 # target for building ucached tools
 ucachedtools: $(UCACHEDTOOLS)
@@ -1233,10 +1247,10 @@ clean::
                 $(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
                 $(BGMON) $(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
                 $(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
-                $(USERTOOLS) $(USEROBJS) $(DEVELTOOLS) $(DEVELOBJS) \
-                $(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
-                $(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
-                $(VISMISCDEPENDS) $(KARMAOBJS) \
+                $(USERTOOLS) $(USEROBJS) $(BGPROCS) $(BGPROCOBJS) \
+		$(DEVELTOOLS) $(DEVELOBJS) $(KERNAPPOBJS) \
+		$(KERNAPPS) $(KERNAPPSTHR) $(VISS) $(VISMISCOBJS) \
+		$(VISOBJS) $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMAOBJS) \
                 $(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) \
                 $(BMILIBRARIES) $(FUSEOBJS) \
                 $(VISMISCDEPENDS) $(KARMAOBJS) \
@@ -1478,6 +1492,8 @@ ifdef BUILD_SERVER
 	install -m 755 $(SERVER) $(sbindir)/pvfs2-server.bin
     endif
 	install -m 755 $(BGMON) $(sbindir)
+	install -d $(libexecdir)
+	install -m 755 $(BGPROCS) $(libexecdir)
 	rm -f $(bindir)/.pvfs2-genconfig-* &> /dev/null
     ifdef ENABLE_SECURITY_KEY
 	touch $(bindir)/.pvfs2-genconfig-key

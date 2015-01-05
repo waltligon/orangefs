@@ -1851,6 +1851,7 @@ src/server/request-scheduler/module.mk
 src/client/jni/module.mk
 src/client/sysint/module.mk
 src/client/usrint/module.mk
+src/client/bgproc/module.mk
 src/kernel/linux-2.6/Makefile
 src/kernel/linux-2.4/Makefile
 doc/module.mk
