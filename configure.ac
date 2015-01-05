@@ -294,7 +294,7 @@ fi],
 )
 AC_SUBST(ENABLE_SECURITY_CERT)
 
-dnl check for Capability Cache
+dnl check for capability cache
 AC_ARG_ENABLE(capcache,
 [  --disable-capcache      Disables server capability cache],
 [if test "x$enableval" = "xyes" ; then
@@ -303,16 +303,14 @@ AC_ARG_ENABLE(capcache,
 else
     ENABLE_CAPCACHE=
 fi],
-[if test "x$ENABLE_SECURITY_KEY" = "x1" -o "x$ENABLE_SECURITY_CERT" = "x1"; then
-    ENABLE_CAPCACHE=1
-    AC_DEFINE(ENABLE_CAPCACHE, 1, Define if capability cache is enabled)
-else
-    ENABLE_CAPCACHE=
-fi]
+[ENABLE_CAPCACHE=1
+ AC_DEFINE(ENABLE_CAPCACHE, 1, Define if capability cache is enabled)]
 )
 AC_SUBST(ENABLE_CAPCACHE)
 
-dnl check for Credential Cache
+
+
+dnl check for credential cache
 AC_ARG_ENABLE(credcache,
 [  --disable-credcache     Disables server credential cache],
 [if test "x$enableval" = "xyes" ; then
@@ -330,7 +328,7 @@ fi]
 )
 AC_SUBST(ENABLE_CREDCACHE)
 
-dnl check for Certificate Cache
+dnl check for certificate cache
 AC_ARG_ENABLE(certcache,
 [  --disable-certcache     Disables server certificate cache],
 [if test "x$enableval" = "xyes" ; then
@@ -358,17 +356,12 @@ if test \( "x$ENABLE_SECURITY_KEY" = "x1" -o "x$ENABLE_SECURITY_CERT" = "x1" \) 
     AC_MSG_ERROR([OpenSSL required for robust security (use --with-ssl)])
 fi
 
-dnl Capability cache only valid in security modes
-if test "x$ENABLE_CAPCACHE" = "x1" -a "x$ENABLE_SECURITY_KEY" = "x" -a "x$ENABLE_SECURITY_CERT" = "x"; then
-    AC_MSG_ERROR([capability cache can only be used in key- or certificate-based security mode])
-fi
-
-dnl Credential cache only valid in security modes
+dnl credential cache only valid in security modes
 if test "x$ENABLE_CREDCACHE" = "x1" -a "x$ENABLE_SECURITY_KEY" = "x" -a "x$ENABLE_SECURITY_CERT" = "x"; then
     AC_MSG_ERROR([credential cache can only be used in key- or certificate-based security mode])
 fi
 
-dnl Certificate cache only valid in certificate-based security mode
+dnl certificate cache only valid in certificate-based security mode
 if test "x$ENABLE_CERTCACHE" = "x1" -a "x$ENABLE_SECURITY_CERT" = "x"; then
     AC_MSG_ERROR([certificate cache can only be used in certificate-based security mode])
 fi
@@ -1210,6 +1203,23 @@ main() {void *p = dlsym(RTLD_DEFAULT,"sym");}
     LIBS="$LIBS -ldl"
 ])
 
+dnl Method to enable user environment variable support
+BUILD_USER_ENV_VARS=
+AC_ARG_ENABLE(user-env-vars,
+[  --enable-user-env-vars         Enables usrint environment variable support.],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_USER_ENV_VARS_ENABLED, 1,
+      [Should we enable user environment variables.])
+   BUILD_USER_ENV_VARS=1
+else
+   AC_DEFINE(PVFS_USER_ENV_VARS_ENABLED, 0,
+      [Should we enable user environment variables.])
+fi
+AC_SUBST(BUILD_USER_ENV_VARS)],
+[AC_DEFINE(PVFS_USER_ENV_VARS_ENABLED, 0,
+    [Should we enable user environment variables.])
+AC_SUBST(BUILD_USER_ENV_VARS)])
+
 dnl Method to enable user interface data cache
 BUILD_UCACHE=
 AC_ARG_ENABLE(ucache,
@@ -1257,6 +1267,12 @@ AC_ARG_ENABLE(
             if test "x$JAVA_HOME" = "x"; then
                 AC_MSG_ERROR(--enable-jni must be used in conjunction with --with-jdk=jdk_path.)
             fi
+
+            AC_CHECK_PROG(HAVE_MAVEN, mvn, yes, no)
+            if test $HAVE_MAVEN = "no"; then
+                AC_MSG_ERROR("maven (mvn) required in PATH to complete JNI client build")
+            fi
+
             AC_DEFINE(PVFS_JNI_ENABLE, 1,
                 [Should we enable PVFS Client JNI.])
             BUILD_JNI=1
@@ -1270,50 +1286,6 @@ AC_ARG_ENABLE(
     ]
 )
 AC_SUBST(BUILD_JNI)
-
-HADOOP_PREFIX=
-AC_ARG_WITH(
-    hadoop,
-    [  --with-hadoop=<path>    Enables support for OrangeFS extensions of Hadoop classes.],
-    [
-        HADOOP_PREFIX=$withval;
-        corepath=`ls $withval/hadoop-core*`
-        AC_CHECK_FILE($corepath,
-            [],
-            [
-                AC_MSG_ERROR(could not locate $withval/hadoop-core-*.jar at the path given with --with-hadoop.)
-            ]
-        )
-    ],
-    [   with_hadoop=no]
-)
-AC_SUBST(HADOOP_PREFIX)
-
-dnl Method to enable OrangeFS extensions to Hadoop classes.
-BUILD_HADOOP=
-AC_ARG_ENABLE(
-    hadoop,
-    [  --enable-hadoop         Enables OrangeFS extenions of Hadoop classes. Requires --enable-jni --with-jdk and --with-hadoop.],
-    [   if test "x$enableval" = "xyes" ; then
-            if test "x$HADOOP_PREFIX" = "x"; then
-                AC_MSG_ERROR(--enable-hadoop must be used in conjunction with --with-hadoop=path.)
-            fi
-            if test "$BUILD_JNI" != "1"; then
-                AC_MSG_ERROR(--enable-hadoop must be used in conjunction with --enable-jni.)
-            fi
-            AC_DEFINE(PVFS_HADOOP_ENABLE, 1,
-                [Should we enable OrangeFS extensions of Hadoop classes.])
-            BUILD_HADOOP=1
-        else
-            AC_DEFINE(PVFS_HADOOP_ENABLE, 0,
-                [Should we enable OrangeFS extensions of Hadoop classes.])
-        fi
-    ],
-    [   AC_DEFINE(PVFS_HADOOP_ENABLE, 0,
-            [Should we enable OrangeFS extensions of Hadoop classes.])
-    ]
-)
-AC_SUBST(BUILD_HADOOP)
 
 dnl See if we have includes needed for acls
 BUILD_ACL_INTERFACE=
@@ -1385,7 +1357,7 @@ AC_ARG_WITH(efence,
        if test "x$withval" != "xyes" ; then
               LDFLAGS="${LDFLAGS} -L$withval"
        fi
-       AC_CHECK_LIB(efence,malloc)
+       AC_CHECK_LIB(efence,malloc,,,-lpthread)
 )
 
 dnl Use compiled-in valgrind annotations?  Give the header path if
@@ -1538,13 +1510,16 @@ dnl
 dnl check for open O_DIRECT
 AC_MSG_CHECKING([for open O_DIRECT])
 AC_TRY_COMPILE([
+    #define _GNU_SOURCE
     #include <fcntl.h>
+    #include <sys/types.h>
+    #include <sys/stat.h>
     ], [
-    open("somefile", O_DIRECT);
-    ], [],
-    AC_MSG_RESULT(no),
-    AC_MSG_RESULT(yes),
-    AC_DEFINE(HAVE_OPEN_O_DIRECT, 1, Define if system defines O_DIRECT fcntl)
+    open("somefile", O_RDONLY | O_DIRECT);
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_OPEN_O_DIRECT, 1, Define if system defines O_DIRECT fcntl),
+    AC_MSG_RESULT(no)
 )
 
 dnl
@@ -1747,46 +1722,6 @@ fi
 ],
 )
 
-dnl Do we have strerror_r?
-AC_MSG_CHECKING([for strerror_r])
-AC_TRY_COMPILE(
-    [
-	  #include <string.h>
-    ],
-    [
-      int errnum, buflen;
-      char *buf;
-      strerror_r(errnum, buf, buflen);
-    ],
-    [
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_STRERROR_R, 1, Define if have strerror_r)
-      AC_DEFINE(HAVE_DECL_STRERROR_R, 1, Define if have strerror_r)
-    ]
-    ,
-    AC_MSG_RESULT(no)
-)
-
-dnl Which form of strerror?
-AC_MSG_CHECKING([for GNU-style strerror_r])
-AC_TRY_COMPILE(
-    [
-	  #include <string.h>
-    ],
-    [
-      int errnum, buflen;
-      char *buf, *ret;
-      ret = strerror_r(errnum, buf, buflen);
-    ],
-    [
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE_GNU_STRERROR_R, 1, Define if strerror_r is GNU-specific)
-      AC_DEFINE(STRERROR_R_CHAR_P, 1, Define if strerror_r return char ptr)
-    ]
-    ,
-    AC_MSG_RESULT(no)
-)
-
 dnl in our src/io/bmi/bmi-byteswap.h we check to see if __bswap_64
 dnl is defined, and if not, we define it. We probably haven't
 dnl had to use our define for a long time, __bswap_64 has been
@@ -1876,8 +1811,6 @@ src/apps/fuse/module.mk
 src/apps/ucache/module.mk
 src/apps/kernel/linux/module.mk
 src/apps/user/module.mk
-src/bgproc/apps/module.mk
-src/bgproc/lib/module.mk
 src/io/trove/module.mk
 src/io/trove/trove-handle-mgmt/module.mk
 src/io/trove/trove-dbpf/module.mk
@@ -1894,6 +1827,7 @@ src/common/events/module.mk
 src/common/mgmt/module.mk
 src/common/security/module.mk
 src/common/hash/module.mk
+src/common/token-utils/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
@@ -2065,6 +1999,12 @@ else
    AC_MSG_RESULT([PVFS2 symbolic libraries will be built            :  no])
 fi
 
+if test "x$BUILD_USER_ENV_VARS" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 user environment variables enabled          : yes])
+else
+   AC_MSG_RESULT([PVFS2 user environment variables enabled          :  no])
+fi
+
 if test "x$BUILD_UCACHE" = "x1" ; then
    AC_MSG_RESULT([PVFS2 user interface library cache enabled        : yes])
 else
@@ -2081,12 +2021,6 @@ if test "x$BUILD_JNI" = "x1" ; then
    AC_MSG_RESULT([PVFS2 client JNI enabled                          : yes])
 else
    AC_MSG_RESULT([PVFS2 client JNI enabled                          :  no])
-fi
-
-if test "x$BUILD_HADOOP" = "x1" ; then
-   AC_MSG_RESULT([OrangeFS/Hadoop libraries enabled                 : yes])
-else
-   AC_MSG_RESULT([OrangeFS/Hadoop libraries enabled                 :  no])
 fi
 
 else

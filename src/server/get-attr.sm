@@ -4,7 +4,7 @@
  * See COPYING in top-level directory.
  *
  * Changes by Acxiom Corporation to add dirent_count field to attributes
- * Copyright © Acxiom Corporation, 2005.
+ * Copyright Â© Acxiom Corporation, 2005.
  */
 
 /* pvfs2_get_attr_sm
@@ -35,6 +35,10 @@
 #include "pint-uid-map.h"
 #include "check.h"
 #include "capcache.h"
+
+#if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
+#define ENABLE_SECURITY_MODE
+#endif
 
 static uint64_t UINT64_HIGH = 0xffffffffffffffffULL;
 
@@ -341,8 +345,11 @@ static PINT_sm_action getattr_verify_attribs(
     resp_attr->ctime = s_op->attr.ctime;
     resp_attr->mask = s_op->attr.mask;
     resp_attr->objtype = s_op->attr.objtype;
-    resp_attr->u.meta.dfile_count = s_op->attr.u.meta.dfile_count;
-    resp_attr->u.meta.dist_size = s_op->attr.u.meta.dist_size;
+    if (s_op->attr.objtype == PVFS_TYPE_METAFILE)
+    {
+       resp_attr->u.meta.dfile_count = s_op->attr.u.meta.dfile_count;
+       resp_attr->u.meta.dist_size = s_op->attr.u.meta.dist_size;
+    }
 
 #if 0
     gossip_debug(
@@ -509,7 +516,7 @@ static PINT_sm_action getattr_verify_attribs(
             js_p->error_code = STATE_SYMLINK;
             break;
         case PVFS_TYPE_INTERNAL:
-            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: symlink\n");
+            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: internal\n");
             /* nothing interesting to add; this is meaningless to a client */
             break;
         default:
@@ -522,6 +529,7 @@ static PINT_sm_action getattr_verify_attribs(
                 "handle %llu.\n", 
                 llu(s_op->u.getattr.handle));
             js_p->error_code = -PVFS_ENXIO;
+js_p->error_code = -PVFS_ENOENT;
             break;
     }
 
@@ -1201,7 +1209,7 @@ static PINT_sm_action getattr_read_stuffed_size(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t job_id;
 
-    if(js_p->error_code == -TROVE_ENOENT)
+    if (js_p->error_code == -TROVE_ENOENT)
     {
         gossip_debug(
             GOSSIP_GETATTR_DEBUG, "Getattr detected non-stuffed file.\n");
@@ -1212,7 +1220,7 @@ static PINT_sm_action getattr_read_stuffed_size(
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
-    if(js_p->error_code)
+    if (js_p->error_code)
     {
         /* any other error code here is just a normal error case */
         /* preserve error code and catch next error transition */
@@ -1245,7 +1253,7 @@ static PINT_sm_action getattr_interpret_stuffed_size(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_metafile_attr *meta    = &(s_op->resp.u.getattr.attr.u.meta);
 
-    if(js_p->error_code == 0)
+    if (js_p->error_code == 0)
     {
         meta->stuffed_size = s_op->ds_attr.u.datafile.b_size;
     }
@@ -1267,15 +1275,15 @@ static PINT_sm_action interpret_metafile_distribution(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
     
-    if(js_p->error_code < 0)
+    if (js_p->error_code < 0)
     {
         return SM_ACTION_COMPLETE;
     }
 
-    if(s_op->u.getattr.attrmask & PVFS_ATTR_META_DIST)
+    if (s_op->u.getattr.attrmask & PVFS_ATTR_META_DIST)
     {
         /* successfully read dist key; make sure we got something valid */
-        if(s_op->val.read_sz != s_op->val.buffer_sz)
+        if (s_op->val.read_sz != s_op->val.buffer_sz)
         {
             gossip_err("Error: %s key found val size: %d when expecting val size: %d\n",
                 Trove_Common_Keys[METAFILE_DIST_KEY].key,
@@ -1294,7 +1302,7 @@ static PINT_sm_action interpret_metafile_distribution(
         assert(s_op->val.buffer);
         PINT_dist_decode(&resp_attr->u.meta.dist, s_op->val.buffer);
 
-        if(resp_attr->u.meta.dist == 0) {
+        if (resp_attr->u.meta.dist == 0) {
             gossip_err("Found dist of 0 for handle %llu,%d\n",
                     llu(s_op->u.getattr.handle), s_op->u.getattr.fs_id);
             PVFS_perror("Metafile getattr_setup_resp",js_p->error_code);
@@ -1439,6 +1447,13 @@ static PINT_sm_action getattr_create_capability(
         resp_attr->capability.num_handles += resp_attr->u.meta.dfile_count;
     }
 
+    if ((resp_attr->objtype == PVFS_TYPE_DIRECTORY) &&
+        (resp_attr->mask & PVFS_ATTR_DISTDIR_ATTR))
+    {
+        resp_attr->capability.num_handles +=
+            resp_attr->dist_dir_attr.num_servers;
+    }
+
     resp_attr->capability.handle_array = 
         calloc(resp_attr->capability.num_handles, sizeof(PVFS_handle));
     if (!resp_attr->capability.handle_array)
@@ -1457,6 +1472,15 @@ static PINT_sm_action getattr_create_capability(
                resp_attr->u.meta.dfile_count * sizeof(PVFS_handle));
     }
 
+    if ((resp_attr->objtype == PVFS_TYPE_DIRECTORY) &&
+        (resp_attr->mask & PVFS_ATTR_DISTDIR_ATTR))
+    {
+        /* copy dirdata handles after the metafile handle */
+        memcpy((resp_attr->capability.handle_array + 1),
+               resp_attr->dirdata_handles,
+               resp_attr->dist_dir_attr.num_servers * sizeof(PVFS_handle));
+    }
+
     /* map credential based on credential certificate */
     ret = PINT_map_credential(&s_op->u.getattr.credential, &uid, &num_groups,
                               group_array);
@@ -1467,7 +1491,7 @@ static PINT_sm_action getattr_create_capability(
         return SM_ACTION_COMPLETE;
     }
 
-#ifdef ENABLE_SECURITY_CERT
+#ifdef ENABLE_SECURITY_MODE
     /* no capabilities for unsigned credential; some operations
        still allowed */
     if (!IS_UNSIGNED_CRED(&s_op->u.getattr.credential))
@@ -1487,7 +1511,7 @@ static PINT_sm_action getattr_create_capability(
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
-#ifdef ENABLE_SECURITY_CERT
+#ifdef ENABLE_SECURITY_MODE
     } /* if */
 #endif
     
@@ -1504,7 +1528,7 @@ static PINT_sm_action getattr_create_capability(
     strcpy(resp_attr->capability.issuer, "S:");
     strcat(resp_attr->capability.issuer, config->server_alias);
 
-#ifdef ENABLE_CAPCACHE
+#if defined(ENABLE_CAPCACHE) && defined(ENABLE_SECURITY_MODE)
     /* if capability fields match cached capability, use
        signature from that capability */
     ret = PINT_capcache_quick_sign(&resp_attr->capability);
@@ -1543,10 +1567,10 @@ static PINT_sm_action getattr_create_capability(
     if (insert_flag)
     {
         ret = PINT_capcache_insert(&resp_attr->capability);
-        if(ret < 0)
+        if (ret < 0)
         {
             /* issue a warning */
-            gossip_err("Warning: could not cache capability\n");            
+            gossip_err("Warning: could not cache capability\n");
         }
     }
 #endif /* ENABLE_CAPCACHE */
@@ -1563,7 +1587,7 @@ static PINT_sm_action getattr_setup_resp(
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "  getattr_setup_resp: error_code = %d\n",
                  js_p->error_code);
-    if(js_p->error_code > 0)
+    if (js_p->error_code > 0)
     {
         /* if we reach this state with a positive error code it means that
          * nothing is wrong; we just used one of the explicit STATE_*
@@ -1571,7 +1595,7 @@ static PINT_sm_action getattr_setup_resp(
          */
         js_p->error_code = 0;
     }
-    if(js_p->error_code < 0)
+    if (js_p->error_code < 0)
     {
         free_nested_getattr_data(s_op);
         return SM_ACTION_COMPLETE;
@@ -1772,11 +1796,11 @@ static PINT_sm_action getattr_datafile_handles_safety_check(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    if((js_p->error_code == 0) &&
+    if ((js_p->error_code == 0) &&
         (s_op->u.getattr.attrmask & PVFS_ATTR_META_DFILES))
     {
         /* successfully read datafile key; make sure we got something valid */
-        if(s_op->val.read_sz != s_op->val.buffer_sz)
+        if (s_op->val.read_sz != s_op->val.buffer_sz)
         {
             gossip_err("Error: %s key found val size: %d when "
                        "expecting val size: %d\n",
@@ -1848,7 +1872,7 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
 
     attr = &s_op->resp.u.getattr.attr;
 
-    if(js_p->error_code == -TROVE_ENOENT)
+    if (js_p->error_code == -TROVE_ENOENT)
     {
         gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr: no DIST_DIR_ATTR key present!!\n");
         attr->dist_dir_bitmap = NULL;
@@ -1878,7 +1902,7 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
     attr->dirdata_handles =
         malloc(attr->dist_dir_attr.num_servers *
                 sizeof(PVFS_handle));
-    if(!attr->dist_dir_bitmap ||
+    if (!attr->dist_dir_bitmap ||
             !attr->dirdata_handles)
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -1898,7 +1922,7 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
     s_op->key_a = calloc(s_op->keyval_count, sizeof(PVFS_ds_keyval));
     s_op->val_a = calloc(s_op->keyval_count, sizeof(PVFS_ds_keyval));
     s_op->error_a = calloc(s_op->keyval_count, sizeof(PVFS_error));
-    if(! s_op->key_a || ! s_op->val_a || ! s_op->error_a)
+    if (! s_op->key_a || ! s_op->val_a || ! s_op->error_a)
     {
         gossip_lerr("Cannot allocate memory for key/val/error.\n");
         js_p->error_code = -PVFS_ENOMEM;
@@ -1947,7 +1971,7 @@ static PINT_sm_action getattr_get_dirent_count(
     int i;
     unsigned char *c;
 
-    if(js_p->error_code == -TROVE_ENOENT)
+    if (js_p->error_code == -TROVE_ENOENT)
     {
         gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr: no DIST_DIR_ATTR key present, not getting dirent_count! \n");
         return SM_ACTION_COMPLETE;
@@ -2042,7 +2066,7 @@ static PINT_sm_action getattr_get_dir_hint(
     unsigned char *c;
 
     /* wrapping up get_bitmap_and_dirdata_handles */
-    if(js_p->error_code == -TROVE_ENOENT)
+    if (js_p->error_code == -TROVE_ENOENT)
     {
         gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr: no DIST_DIR_ATTR key present, not getting DIR_HINTS! \n");
         return SM_ACTION_COMPLETE;
@@ -2135,7 +2159,7 @@ static PINT_sm_action getattr_get_dir_hint(
     }
     s_op->error_a = (PVFS_error*)calloc(NUM_SPECIAL_KEYS,
         sizeof(PVFS_error));
-    if(s_op->error_a == NULL)
+    if (s_op->error_a == NULL)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
@@ -2151,7 +2175,7 @@ static PINT_sm_action getattr_get_dir_hint(
         if (i == NUM_DFILES_KEY)
         {
             s_op->val_a[i].buffer = (char *) calloc(1, 16);
-            if(s_op->val_a[i].buffer == NULL)
+            if (s_op->val_a[i].buffer == NULL)
             {
                 js_p->error_code = -PVFS_ENOMEM;
                 return SM_ACTION_COMPLETE;
@@ -2187,7 +2211,7 @@ static PINT_sm_action getattr_interpret_dir_hint(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    if(js_p->error_code != 0 && js_p->error_code != -TROVE_ENOENT)
+    if (js_p->error_code != 0 && js_p->error_code != -TROVE_ENOENT)
     {
         /* if we failed to get any of the keys, and the error code is due to
          * something other than the keys simply not being present, then
@@ -2251,7 +2275,7 @@ static PINT_sm_action getattr_interpret_dir_hint(
                 dfile_count = 0;
             }
         }
-        if(s_op->val_a[NUM_DFILES_KEY].buffer)
+        if (s_op->val_a[NUM_DFILES_KEY].buffer)
         {
             free(s_op->val_a[NUM_DFILES_KEY].buffer);
             s_op->val_a[NUM_DFILES_KEY].buffer = NULL;
@@ -2333,17 +2357,17 @@ static void free_keyval_buffers(struct PINT_server_op *s_op)
     memset(&(s_op->val),0,sizeof(s_op->val));
     memset(&(s_op->key),0,sizeof(s_op->key));
 
-    if(s_op->val_a)
+    if (s_op->val_a)
     {
         free(s_op->val_a);
         s_op->val_a = NULL;
     }
-    if(s_op->key_a)
+    if (s_op->key_a)
     {
         free(s_op->key_a);
         s_op->key_a = NULL;
     }
-    if(s_op->error_a)
+    if (s_op->error_a)
     {
         free(s_op->error_a);
         s_op->error_a = NULL;

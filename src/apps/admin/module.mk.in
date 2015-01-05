@@ -8,7 +8,6 @@ ADMINSRC := \
 	$(DIR)/pvfs2-set-sync.c \
 	$(DIR)/pvfs2-ls.c \
 	$(DIR)/pvfs2-ping.c \
-	$(DIR)/pvfs2-rm.c \
 	$(DIR)/pvfs2-stat.c \
 	$(DIR)/pvfs2-statfs.c \
 	$(DIR)/pvfs2-perf-mon-example.c \
@@ -28,15 +27,15 @@ ADMINSRC := \
 	$(DIR)/pvfs2-ln.c \
 	$(DIR)/pvfs2-perror.c \
 	$(DIR)/pvfs2-check-server.c \
-	$(DIR)/pvfs2-drop-caches.c \
-	$(DIR)/pvfs2-bgproc.c
+	$(DIR)/pvfs2-drop-caches.c
 #       Not currently supported
 #	$(DIR)/pvfs2-get-uid.c
 
 ifdef ENABLE_SECURITY_KEY
 	ADMINSRC += $(DIR)/pvfs2-gencred.c
 else ifdef ENABLE_SECURITY_CERT
-	ADMINSRC += $(DIR)/pvfs2-gencred.c $(DIR)/pvfs2-get-user-cert.c
+	ADMINSRC += $(DIR)/pvfs2-gencred.c \
+	            $(DIR)/pvfs2-get-user-cert.c
 endif
 
 ADMINSRC_SERVER := \

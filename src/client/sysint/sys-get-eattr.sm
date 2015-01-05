@@ -127,7 +127,7 @@ PVFS_error PVFS_sys_geteattr_list(
         PVFS_perror_gossip("PVFS_isys_geteattr call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "geteattr", &error);
         if (ret)
@@ -135,9 +135,8 @@ PVFS_error PVFS_sys_geteattr_list(
              PVFS_perror_gossip("PVFS_sys_wait call", ret);
              error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -192,6 +191,8 @@ static PINT_sm_action get_eattr_setup_msgpair(
         sm_p->u.geteattr.key_array,
         sm_p->u.geteattr.size_array,
         sm_p->hints);
+
+    PINT_cleanup_capability(&capability);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;

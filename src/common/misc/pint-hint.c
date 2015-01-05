@@ -114,6 +114,27 @@ static const struct PINT_hint_info hint_types[] = {
      decode_func_uint32_t,
      sizeof(uint32_t)},
 
+    {PINT_HINT_LOCAL_UID,
+     0,
+     PVFS_HINT_LOCAL_UID_NAME,
+     encode_func_uint32_t,
+     decode_func_uint32_t,
+     sizeof(uint32_t)},
+
+    {PINT_HINT_OWNER_GID,
+     PINT_HINT_TRANSFER,
+     PVFS_HINT_OWNER_GID_NAME,
+     encode_func_uint32_t,
+     decode_func_uint32_t,
+     sizeof(uint32_t)},
+
+    {PINT_HINT_DISTRIBUTION_PV,
+     0,
+     PVFS_HINT_DISTRIBUTION_PV_NAME,
+     encode_func_uint32_t,
+     decode_func_uint32_t,
+     sizeof(uint32_t)},
+
     {0}
 };
 

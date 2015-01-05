@@ -179,6 +179,8 @@ static PINT_sm_action mgmt_get_uid_list_setup_msgpair(
 	msg_p->svr_addr = sm_p->u.get_uid_list.addr_array[i];
     }
 
+    PINT_cleanup_capability(&capability);
+
     /* immediate return: next state jumps to msgpairarray machine */
     js_p->error_code = 0;
 

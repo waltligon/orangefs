@@ -23,7 +23,14 @@
 #include "security-util.h"
 #include "pint-uid-map.h"
 
-int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i);
+static int split_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int i);
+static int tree_setattr_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int index);
 
 enum
 {
@@ -33,6 +40,7 @@ enum
     SPLIT_REQUIRED,
     NO_SPLIT_REQUIRED,
     SPLIT_FATAL_ERROR,
+    NOTIFY_DIRDATA,
     LOCAL_METAHANDLE,
     REMOTE_METAHANDLE,
     REMOVE_ENTRIES_REQUIRED
@@ -200,7 +208,8 @@ machine pvfs2_crdirent_sm
     state notify_dirdata_servers_setup
     {
         run crdirent_notify_dirdata_servers_setup;
-        success => notify_dirdata_servers_xfer;
+        NOTIFY_DIRDATA => notify_dirdata_servers_xfer;
+        success => remove_local_copies;
         default => backout_dirdata_attrs;
     }
 
@@ -208,6 +217,7 @@ machine pvfs2_crdirent_sm
     {
         jump pvfs2_msgpairarray_sm;
         success => remove_local_copies;
+        default => backout_dirdata_attrs;
     }
 
     state backout_dirdata_attrs
@@ -945,6 +955,9 @@ static PINT_sm_action crdirent_update_dirdata_attrs(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr_p = NULL;
     int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = &s_op->msgarray_op.msgpair;
+
+    PINT_free_object_attr(&msg_p->req.u.setattr.attr);
 
     js_p->error_code = 0;
     attr_p = &s_op->attr;
@@ -990,7 +1003,7 @@ static PINT_sm_action crdirent_send_server_attrs(
         *attr_p,
         PVFS_ATTR_DISTDIR_ATTR,
         s_op->req->hints);
-
+    PINT_copy_object_attr(&(msg_p->req).u.setattr.attr, &(*attr_p));
 
     msg_p->fs_id = s_op->req->u.crdirent.fs_id;
     msg_p->handle = handle;
@@ -1122,38 +1135,63 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
         }
     }
 
-    PINT_msgpair_init(&s_op->msgarray_op);
-    msg_p = &s_op->msgarray_op.msgpair;
-    PINT_serv_init_msgarray_params(s_op, s_op->req->u.setattr.fs_id);
-
-    PINT_SERVREQ_TREE_SETATTR_FILL(
-        msg_p->req,
-        s_op->u.crdirent.capability,
-        s_op->req->u.crdirent.credential,
-        s_op->req->u.crdirent.fs_id,
-        PVFS_TYPE_DIRDATA,
-        s_op->attr,
-        num_remote_dirdata_handles,
-        remote_dirdata_handles,
-        NULL);
-
-    msg_p->fs_id = s_op->req->u.crdirent.fs_id;
-    msg_p->handle = remote_dirdata_handles[0];
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = NULL;
-
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-
-    if (ret)
+    if (num_remote_dirdata_handles > 0)
     {
-        gossip_err("Failed to map dirdata server address\n");
-        js_p->error_code = ret;
-    }
+        PINT_msgpair_init(&s_op->msgarray_op);
+        msg_p = &s_op->msgarray_op.msgpair;
+        PINT_serv_init_msgarray_params(s_op, s_op->req->u.setattr.fs_id);
 
-    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
-    js_p->error_code = 0;
+        PINT_SERVREQ_TREE_SETATTR_FILL(
+            msg_p->req,
+            s_op->u.crdirent.capability,
+            s_op->req->u.crdirent.credential,
+            s_op->req->u.crdirent.fs_id,
+            PVFS_TYPE_DIRDATA,
+            s_op->attr,
+            0,
+            num_remote_dirdata_handles,
+            remote_dirdata_handles,
+            NULL);
+
+        msg_p->fs_id = s_op->req->u.crdirent.fs_id;
+        msg_p->handle = remote_dirdata_handles[0];
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = tree_setattr_comp_fn;
+
+        ret = PINT_cached_config_map_to_server(
+            &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+        if (ret)
+        {
+            gossip_err("Failed to map dirdata server address\n");
+            js_p->error_code = ret;
+        }
+
+        PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+        js_p->error_code = NOTIFY_DIRDATA;
+    }
+    else
+    {
+        js_p->error_code = 0;
+    }
+    if (remote_dirdata_handles)
+    {
+        free(remote_dirdata_handles);
+    }
     return SM_ACTION_COMPLETE;
+}
+
+static int tree_setattr_comp_fn(void *v_p,
+                                struct PVFS_server_resp *resp_p,
+                                int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = &mop->msgpair;;
+
+    assert(msg_p->req.op == PVFS_SERV_TREE_SETATTR);
+    PINT_free_object_attr(&(msg_p->req).u.tree_setattr.attr);
+    return 0;
 }
 
 static PINT_sm_action crdirent_retrieve_dir_entries(
@@ -1226,7 +1264,7 @@ static PINT_sm_action crdirent_retrieve_dir_entries(
     return ret;
 }
 
-int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
+static int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
 {
     /* This function executes AFTER each msgpair has completed and is under the
     * control of msgpairarray.sm.  Here, we will capture the response from the
@@ -1400,7 +1438,8 @@ static PINT_sm_action crdirent_find_split_entries(
         {
             PINT_sm_msgpair_state *msg_p = &(msgarray_op->msgarray[i]);
 
-            PINT_SERVREQ_MGMT_SPLIT_DIRENT_FILL(msg_p->req, s_op->u.crdirent.capability,
+            PINT_SERVREQ_MGMT_SPLIT_DIRENT_FILL(msg_p->req, 
+                     s_op->u.crdirent.capability,
                      s_op->req->u.crdirent.fs_id,
                      s_op->attr.dirdata_handles[s_op->u.crdirent.split_node],
                      s_op->u.crdirent.dist,
@@ -1576,7 +1615,8 @@ static PINT_sm_action crdirent_split_remove_entries(
             PINT_sm_msgpair_state *msg_p = &(msgarray_op->msgarray[i]);
 
             /* Capability was initialized earlier. */
-            PINT_SERVREQ_MGMT_SPLIT_DIRENT_FILL(msg_p->req, s_op->u.crdirent.capability,
+            PINT_SERVREQ_MGMT_SPLIT_DIRENT_FILL(msg_p->req,
+                     s_op->u.crdirent.capability,
                      s_op->req->u.crdirent.fs_id,
                      s_op->attr.dirdata_handles[s_op->u.crdirent.split_node],
                      s_op->u.crdirent.dist,
@@ -1735,7 +1775,15 @@ static int perm_crdirent(PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(crdirent);
+static inline int PINT_get_object_ref_crdirent(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    *fs_id = req->u.crdirent.fs_id;
+    *handle = req->u.crdirent.dirent_handle;
+    return 0;
+}
+
+
 
 struct PINT_server_req_params pvfs2_crdirent_params =
 {

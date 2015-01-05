@@ -12,7 +12,11 @@
 /* #undef BERKDB_ERROR_REPORTING */
 
 /* Define if robust security is enabled */
-/* #undef ENABLE_SECURITY */
+/* The Windows Client supports both key- and cert-based modes,
+   however for compilation purposes we use ENABLE_SECURITY_CERT. */
+ 
+#define ENABLE_SECURITY 1
+#define ENABLE_SECURITY_CERT 1
 
 /* Define if profiling enabled */
 /* #undef ENABLE_PROFILING */

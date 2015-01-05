@@ -28,8 +28,8 @@ int PVFS_proc_mask_to_eventlog(uint64_t mask, char *debug_string);
 extern char kernel_debug_string[];
 
 /* prototypes */
-static int hash_func(void *key, int table_size);
-static int hash_compare(void *key, struct qhash_head *link);
+static int hash_func(const void *key, int table_size);
+static int hash_compare(const void *key, struct qhash_head *link);
 
 /*************************************
  * global variables declared here
@@ -344,18 +344,19 @@ static void __exit pvfs2_exit(void)
 }
 
 /* simply return an index valid for the table_size */
-static int hash_func(void *key, int table_size)
+static int hash_func(const void *key, int table_size)
 {
-    uint64_t ret, *tag = (uint64_t *) key;
+    uint64_t ret;
+    const uint64_t *tag = (const uint64_t *) key;
 
     ret = *tag % ((unsigned int) table_size);
 
     return (int) ret;
 }
 
-static int hash_compare(void *key, struct qhash_head *link)
+static int hash_compare(const void *key, struct qhash_head *link)
 {
-    uint64_t *real_tag = (uint64_t *)key;
+    const uint64_t *real_tag = (const uint64_t *)key;
     pvfs2_kernel_op_t *op = qhash_entry(
         link, pvfs2_kernel_op_t, list);
 

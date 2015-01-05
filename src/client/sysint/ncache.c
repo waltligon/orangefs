@@ -22,7 +22,7 @@
   
 /* compile time defaults */
 enum {
-NCACHE_DEFAULT_TIMEOUT_MSECS  =  3000,
+NCACHE_DEFAULT_TIMEOUT_MSECS  =  60000,  /* 60 seconds */
 NCACHE_DEFAULT_SOFT_LIMIT     =  5120,
 NCACHE_DEFAULT_HARD_LIMIT     = 10240,
 NCACHE_DEFAULT_RECLAIM_PERCENTAGE = 25,
@@ -61,35 +61,13 @@ struct ncache_key
   
 static struct PINT_tcache* ncache = NULL;
 static gen_mutex_t ncache_mutex = GEN_MUTEX_INITIALIZER;
-  
-static int ncache_compare_key_entry(void* key, struct qhash_head* link);
-static int ncache_hash_key(void* key, int table_size);
-static int ncache_free_payload(void* payload);
 static struct PINT_perf_counter* ncache_pc = NULL;
 
-/**
- * Enables perf counter instrumentation of the ncache
- */
-void PINT_ncache_enable_perf_counter(
-    struct PINT_perf_counter* pc)     /**< perf counter instance to use */
-{
-    gen_mutex_lock(&ncache_mutex);
-
-    ncache_pc = pc;
-    assert(ncache_pc);
-
-    /* set initial values */
-    PINT_perf_count(ncache_pc, PERF_NCACHE_SOFT_LIMIT,
-        ncache->soft_limit, PINT_PERF_SET);
-    PINT_perf_count(ncache_pc, PERF_NCACHE_HARD_LIMIT,
-        ncache->hard_limit, PINT_PERF_SET);
-    PINT_perf_count(ncache_pc, PERF_NCACHE_ENABLED,
-        ncache->enable, PINT_PERF_SET);
-
-    gen_mutex_unlock(&ncache_mutex);
-
-    return;
-}
+static int PINT_ncache_initialize_perf_counter(void);
+static int ncache_compare_key_entry(const void* key, struct qhash_head* link);
+static int ncache_hash_key(const void* key, int table_size);
+static int ncache_free_payload(void* payload);
+static int set_tcache_defaults(struct PINT_tcache* instance);
 
 /**
  * Initializes the ncache 
@@ -114,43 +92,42 @@ int PINT_ncache_initialize(void)
         return(-PVFS_ENOMEM);
     }
   
-    /* fill in defaults that are specific to ncache */
     ncache_timeout_str = getenv("PVFS2_NCACHE_TIMEOUT");
-    if (ncache_timeout_str != NULL) 
-        ncache_timeout_msecs = (unsigned int)strtoul(ncache_timeout_str,NULL,0);
+    if (ncache_timeout_str != NULL)
+    {
+        ncache_timeout_msecs = (unsigned int) strtoul(
+                ncache_timeout_str,NULL,0);
+    }
     else
+    {
         ncache_timeout_msecs = NCACHE_DEFAULT_TIMEOUT_MSECS;
+    }
 
-    ret = PINT_tcache_set_info(ncache, TCACHE_TIMEOUT_MSECS,
+    ret = PINT_tcache_set_info(ncache,
+                               TCACHE_TIMEOUT_MSECS,
                                ncache_timeout_msecs);
-                
     if(ret < 0)
     {
         PINT_tcache_finalize(ncache);
         gen_mutex_unlock(&ncache_mutex);
         return(ret);
     }
-    ret = PINT_tcache_set_info(ncache, TCACHE_HARD_LIMIT, 
-                               NCACHE_DEFAULT_HARD_LIMIT);
+
+    ret = set_tcache_defaults(ncache);
     if(ret < 0)
     {
         PINT_tcache_finalize(ncache);
         gen_mutex_unlock(&ncache_mutex);
         return(ret);
     }
-    ret = PINT_tcache_set_info(ncache, TCACHE_SOFT_LIMIT, 
-                               NCACHE_DEFAULT_SOFT_LIMIT);
-    if(ret < 0)
+
+    /* initialize the perf counter for ncache */
+    ret = PINT_ncache_initialize_perf_counter();
+    if (ret < 0)
     {
-        PINT_tcache_finalize(ncache);
-        gen_mutex_unlock(&ncache_mutex);
-        return(ret);
-    }
-    ret = PINT_tcache_set_info(ncache, TCACHE_RECLAIM_PERCENTAGE,
-                               NCACHE_DEFAULT_RECLAIM_PERCENTAGE);
-    if(ret < 0)
-    {
-        PINT_tcache_finalize(ncache);
+        gossip_err("%s: Error initializing"
+                    "name cache performance counter\n",
+                    __func__);
         gen_mutex_unlock(&ncache_mutex);
         return(ret);
     }
@@ -207,14 +184,22 @@ int PINT_ncache_set_info(
     ret = PINT_tcache_set_info(ncache, option, arg);
 
     /* record any resulting parameter changes */
-    PINT_perf_count(ncache_pc, PERF_NCACHE_SOFT_LIMIT,
-        ncache->soft_limit, PINT_PERF_SET);
-    PINT_perf_count(ncache_pc, PERF_NCACHE_HARD_LIMIT,
-        ncache->hard_limit, PINT_PERF_SET);
-    PINT_perf_count(ncache_pc, PERF_NCACHE_ENABLED,
-        ncache->enable, PINT_PERF_SET);
-    PINT_perf_count(ncache_pc, PERF_NCACHE_NUM_ENTRIES,
-        ncache->num_entries, PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_SOFT_LIMIT,
+                    ncache->soft_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_HARD_LIMIT,
+                    ncache->hard_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_ENABLED,
+                    ncache->enable,
+                    PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_NUM_ENTRIES,
+                    ncache->num_entries,
+                    PINT_PERF_SET);
 
     gen_mutex_unlock(&ncache_mutex);
 
@@ -252,7 +237,10 @@ int PINT_ncache_get_cached_entry(
     {
         gossip_debug(GOSSIP_NCACHE_DEBUG, 
             "ncache: miss: name=[%s]\n", entry_key.entry_name);
-        PINT_perf_count(ncache_pc, PERF_NCACHE_MISSES, 1, PINT_PERF_ADD);
+        PINT_perf_count(ncache_pc,
+                        PERF_NCACHE_MISSES,
+                        1,
+                        PINT_PERF_ADD);
         gen_mutex_unlock(&ncache_mutex);
         /* Return -PVFS_ENOENT if the entry has expired */
         if(status != 0)
@@ -317,12 +305,16 @@ void PINT_ncache_invalidate(
     if(ret == 0)
     {
         PINT_tcache_delete(ncache, tmp_entry);
-        PINT_perf_count(ncache_pc, PERF_NCACHE_DELETIONS, 1,
+        PINT_perf_count(ncache_pc,
+                        PERF_NCACHE_DELETIONS,
+                        1,
                         PINT_PERF_ADD);
     }
 
-    PINT_perf_count(ncache_pc, PERF_NCACHE_NUM_ENTRIES,
-                    ncache->num_entries, PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_NUM_ENTRIES,
+                    ncache->num_entries,
+                    PINT_PERF_SET);
 
     gen_mutex_unlock(&ncache_mutex);
     return;
@@ -422,8 +414,10 @@ int PINT_ncache_update(
             /* since only one item was purged, we count this as one item being
              * replaced rather than as a purge and an insert
              */
-            PINT_perf_count(ncache_pc, PERF_NCACHE_REPLACEMENTS,purged,
-                PINT_PERF_ADD);
+            PINT_perf_count(ncache_pc,
+                            PERF_NCACHE_REPLACEMENTS,
+                            purged,
+                            PINT_PERF_ADD);
         }
         else
         {
@@ -431,13 +425,17 @@ int PINT_ncache_update(
             /* if we didn't purge anything, then the "purged" variable will
              * be zero and this counter call won't do anything.
              */
-            PINT_perf_count(ncache_pc, PERF_NCACHE_PURGES, purged,
-                PINT_PERF_ADD);
+            PINT_perf_count(ncache_pc,
+                            PERF_NCACHE_PURGES,
+                            purged,
+                            PINT_PERF_ADD);
         }
     }
     
-    PINT_perf_count(ncache_pc, PERF_NCACHE_NUM_ENTRIES,
-        ncache->num_entries, PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_NUM_ENTRIES,
+                    ncache->num_entries,
+                    PINT_PERF_SET);
 
     gen_mutex_unlock(&ncache_mutex);
   
@@ -450,6 +448,47 @@ int PINT_ncache_update(
     gossip_debug(GOSSIP_NCACHE_DEBUG, "ncache: update(): return=%d\n", ret);
     return(ret);
 }
+
+/**
+ * Returns the perf counter associated with this ncache instance.
+ */
+struct PINT_perf_counter* PINT_ncache_get_pc(void)
+{
+    return ncache_pc;
+}
+
+/**
+ * Enables perf counter instrumentation of the ncache.
+ *
+ * Should only be called by PINT_ncache_initialize; therefore, no need to deal
+ * with the ncache mutex here.
+ *
+ * \returns 0 on success, -PVFS_error on failure
+ */
+static int PINT_ncache_initialize_perf_counter(void)
+{
+    ncache_pc = PINT_perf_initialize(ncache_keys);
+    if(!ncache_pc)
+    {
+        gossip_err("Error: PINT_perf_initialize failure.\n");
+        return -PVFS_ENOMEM;
+    }
+
+    /* set initial values */
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_SOFT_LIMIT,
+                    ncache->soft_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_HARD_LIMIT,
+                    ncache->hard_limit,
+                    PINT_PERF_SET);
+    PINT_perf_count(ncache_pc,
+                    PERF_NCACHE_ENABLED,
+                    ncache->enable,
+                    PINT_PERF_SET);
+    return 0;
+}
   
 /* ncache_compare_key_entry()
  *
@@ -458,9 +497,9 @@ int PINT_ncache_update(
  *
  * returns 1 on match, 0 otherwise
  */
-static int ncache_compare_key_entry(void* key, struct qhash_head* link)
+static int ncache_compare_key_entry(const void* key, struct qhash_head* link)
 {
-    struct ncache_key* real_key = (struct ncache_key*)key;
+    const struct ncache_key* real_key = (const struct ncache_key*)key;
     struct ncache_payload* tmp_payload = NULL;
     struct PINT_tcache_entry* tmp_entry = NULL;
   
@@ -497,9 +536,9 @@ static int ncache_compare_key_entry(void* key, struct qhash_head* link)
  *
  * returns hash index 
  */
-static int ncache_hash_key(void* key, int table_size)
+static int ncache_hash_key(const void* key, int table_size)
 {
-    struct ncache_key* real_key = (struct ncache_key*) key;
+    const struct ncache_key* real_key = (const struct ncache_key*) key;
     int tmp_ret = 0;
     unsigned int sum = 0, i = 0;
 
@@ -525,6 +564,37 @@ static int ncache_free_payload(void* payload)
   
     free(tmp_payload->entry_name);
     free(tmp_payload);
+    return(0);
+}
+
+static int set_tcache_defaults(struct PINT_tcache* instance)
+{
+    int ret;
+
+    ret = PINT_tcache_set_info(instance,
+                               TCACHE_HARD_LIMIT,
+                               NCACHE_DEFAULT_HARD_LIMIT);
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    ret = PINT_tcache_set_info(instance,
+                               TCACHE_SOFT_LIMIT,
+                               NCACHE_DEFAULT_SOFT_LIMIT);
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    ret = PINT_tcache_set_info(instance,
+                               TCACHE_RECLAIM_PERCENTAGE,
+                               NCACHE_DEFAULT_RECLAIM_PERCENTAGE);
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
     return(0);
 }
   

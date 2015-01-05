@@ -118,6 +118,7 @@ PVFS_error PVFS_imgmt_remove_dirent(
     PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->parent_ref = parent_ref;
     sm_p->u.mgmt_remove_dirent.entry = entry;
+    sm_p->u.mgmt_remove_dirent.retry_count = 0;
     PVFS_hint_copy(hints, &sm_p->hints);
 
     gossip_debug(
@@ -217,7 +218,6 @@ static PINT_sm_action mgmt_remove_dirent_setup_msgpair(
         msg_p->req,
         sm_p->getattr.attr.capability,
         sm_p->parent_ref.fs_id,
-        sm_p->parent_ref.handle,
         sm_p->getattr.attr.dirdata_handles[dirdata_server_index],
         sm_p->u.mgmt_remove_dirent.entry,
         sm_p->hints);
@@ -276,9 +276,13 @@ static PINT_sm_action mgmt_remove_dirent_retry_or_fail(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* if need to retry. clear the error_code and setup getattr. */
-    if(js_p->error_code == -PVFS_EAGAIN)
+    if(js_p->error_code == -PVFS_EAGAIN &&
+        sm_p->u.mgmt_remove_dirent.retry_count < sm_p->msgarray_op.params.retry_limit)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt-remove-dirent: received -PVFS_EAGAIN, will retry getattr and mgmt-remove-dirent.\n");
+        sm_p->u.mgmt_remove_dirent.retry_count++;
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt-remove-dirent: received -PVFS_EAGAIN, will retry getattr and mgmt-remove-dirent (attempt number %d).\n",
+                     sm_p->u.mgmt_remove_dirent.retry_count);
         
         /* setup getattr */
         PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);

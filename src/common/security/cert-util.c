@@ -14,6 +14,7 @@
 
 #include <openssl/pem.h>
 
+#include "pvfs2-internal.h"
 #include "cert-util.h"
 
 #define KEY_TYPE_PUBLIC  0
@@ -216,9 +217,11 @@ int PINT_X509_to_cert(const X509 *xcert,
         BIO_free(bio_mem);
         return ENOMEM;
     }
-    (*cert)->buf = malloc(cert_size);
+    (*cert)->buf = (PVFS_cert_data) malloc(cert_size);
     if ((*cert)->buf == NULL)
     {
+        free(*cert);
+        *cert = NULL;
         BIO_free(bio_mem);
         return ENOMEM;
     }
@@ -230,6 +233,7 @@ int PINT_X509_to_cert(const X509 *xcert,
     {
         free((*cert)->buf);
         free(*cert);
+        *cert = NULL;
         BIO_free(bio_mem);
         return -PVFS_ESECURITY;
     }

@@ -13,7 +13,6 @@
 
 #include <string.h>
 #include <sys/stat.h>
-#include <pwd.h>
 #include <stdio.h>
 #include <assert.h>
 
@@ -28,6 +27,7 @@
 #include "pvfs2-internal.h"
 #include "gossip.h"
 #include "cert-util.h"
+
 
 #define PVFS_USER_CERT_KEY_SIZE    1024
 
@@ -271,6 +271,8 @@ static PINT_sm_action get_user_cert_public_key_setup_msgpair(
         msg_p->svr_addr = sm_p->u.mgmt_get_user_cert.addr_array[i];
     }
 
+    PINT_cleanup_capability(&capability);
+
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
 
     return SM_ACTION_COMPLETE;
@@ -280,15 +282,15 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_key_data keybuf, pkeybuf;
+    PVFS_key_data tmp_pubkey_buf, tmp_privkey_buf, pkeybuf;
     RSA *rsa_pubkey, *rsa_privkey;
     unsigned char pwddata[PVFS_REQ_LIMIT_USERID_PWD], *penc_key;
-    int flen, bufrem, maxflen, elen;
+    int flen, tmp_privkey_len, bufrem, maxflen, elen;
     EVP_PKEY *keypair;
 
     /* load public key from data received from the server */
-    keybuf = sm_p->u.mgmt_get_user_cert.public_key.buf;
-    rsa_pubkey = d2i_RSAPublicKey(NULL, (const unsigned char **) &keybuf,
+    tmp_pubkey_buf = sm_p->u.mgmt_get_user_cert.public_key.buf;
+    rsa_pubkey = d2i_RSAPublicKey(NULL, (const unsigned char **) &tmp_pubkey_buf,
                      sm_p->u.mgmt_get_user_cert.public_key.buf_size);
 
     if (rsa_pubkey == NULL)
@@ -337,6 +339,8 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
     {
         GET_USER_CERT_ERR("could not encrypt password", -PVFS_ESECURITY);
         js_p->error_code = -PVFS_ESECURITY;
+        RSA_free(rsa_pubkey);
+        return SM_ACTION_COMPLETE;
     }
 
     /*** generate user private key ***/
@@ -367,10 +371,10 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
     }
 
     /* copy key to buffer */
-    keybuf = NULL;
-    bufrem = sm_p->u.mgmt_get_user_cert.privkey->buf_size = 
-        i2d_RSAPrivateKey(rsa_privkey, &keybuf);
-    if (bufrem <= 0)
+    tmp_privkey_buf = NULL;
+    tmp_privkey_len = sm_p->u.mgmt_get_user_cert.privkey->buf_size = 
+        i2d_RSAPrivateKey(rsa_privkey, &tmp_privkey_buf);
+    if (tmp_privkey_len <= 0)
     {
         GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: could not "
                           "write user private key to buffer", -PVFS_ESECURITY);
@@ -381,6 +385,7 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
     }
 
     /* encrypt key... requires multiple blocks */
+    bufrem = tmp_privkey_len;
     maxflen = RSA_size(rsa_pubkey) - 12;
     sm_p->u.mgmt_get_user_cert.enc_key_size = 
         ((bufrem / maxflen) + 1) * (maxflen + 12);
@@ -391,7 +396,7 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
         GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: could not "
                           "allocate encrypted key buffer", -PVFS_ENOMEM);
         js_p->error_code = -PVFS_ENOMEM;
-        OPENSSL_free(keybuf);
+        OPENSSL_free(tmp_privkey_buf);
         RSA_free(rsa_privkey);
         RSA_free(rsa_pubkey);
 
@@ -399,7 +404,7 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
     }
 
     penc_key = sm_p->u.mgmt_get_user_cert.enc_key;
-    pkeybuf = keybuf;
+    pkeybuf = tmp_privkey_buf;
     while (bufrem > 0)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: encrypting key: bufrem = %d\n",
@@ -413,7 +418,8 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
         {
             GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: error "
                               "encrypting private key", -PVFS_ESECURITY);
-            OPENSSL_free(keybuf);
+            js_p->error_code = -PVFS_ESECURITY;
+            OPENSSL_free(tmp_privkey_buf);
             RSA_free(rsa_privkey);
             RSA_free(rsa_pubkey);
 
@@ -425,8 +431,21 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
     }
 
     /* copy key to be returned to caller */
-    sm_p->u.mgmt_get_user_cert.privkey->buf = keybuf;
+    sm_p->u.mgmt_get_user_cert.privkey->buf =
+        (PVFS_key_data) malloc(tmp_privkey_len);
+    if (sm_p->u.mgmt_get_user_cert.privkey->buf != NULL)
+    {
+        memcpy(sm_p->u.mgmt_get_user_cert.privkey->buf, tmp_privkey_buf,
+               tmp_privkey_len);
+    }
+    else
+    {
+        GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: could not "
+                          "allocate private key buffer", -PVFS_ENOMEM);
+        js_p->error_code = -PVFS_ENOMEM;
+    }
 
+    OPENSSL_free(tmp_privkey_buf);
     RSA_free(rsa_privkey);
 
     return SM_ACTION_COMPLETE;
@@ -461,6 +480,8 @@ static PINT_sm_action get_user_cert_req_setup_msgpair(
         sm_p->u.mgmt_get_user_cert.enc_key_size,
         sm_p->u.mgmt_get_user_cert.enc_key,
         sm_p->u.mgmt_get_user_cert.exp);
+
+    PINT_cleanup_capability(&capability);
 
     msg_p->fs_id = sm_p->u.mgmt_get_user_cert.fs_id;
     msg_p->handle = PVFS_HANDLE_NULL;

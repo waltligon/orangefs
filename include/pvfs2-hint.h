@@ -17,11 +17,16 @@
 #define PVFS_HINT_RANK_NAME       "pvfs.hint.rank"
 #define PVFS_HINT_SERVER_ID_NAME  "pvfs.hint.server_id"
 /* these are file creation parameters */
-#define PVFS_HINT_DISTRIBUTION_NAME  "pvfs.hint.disribution"
-#define PVFS_HINT_DFILE_COUNT_NAME   "pvfs.hint.dfile_count"
-#define PVFS_HINT_LAYOUT_NAME        "pvfs.hint.layout"
-#define PVFS_HINT_SERVERLIST_NAME    "pvfs.hint.serverlist"
-#define PVFS_HINT_CACHE_NAME         "pvfs.hint.cache"
+#define PVFS_HINT_DISTRIBUTION_NAME    "pvfs.hint.distribution"
+#define PVFS_HINT_DFILE_COUNT_NAME     "pvfs.hint.dfile_count"
+#define PVFS_HINT_LAYOUT_NAME          "pvfs.hint.layout"
+#define PVFS_HINT_SERVERLIST_NAME      "pvfs.hint.serverlist"
+#define PVFS_HINT_CACHE_NAME           "pvfs.hint.cache"
+#define PVFS_HINT_DISTRIBUTION_PV_NAME "pvfs.hint.distribution.pv"
+/* local uid hint for client capcache */
+#define PVFS_HINT_LOCAL_UID_NAME     "pvfs.hint.local_uid"
+/* owner gid for file creation */
+#define PVFS_HINT_OWNER_GID_NAME     "pvfs.hint.owner_gid"
 
 typedef struct PVFS_hint_s *PVFS_hint;
 
