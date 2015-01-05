@@ -1,0 +1,127 @@
+/*
+ * Copyright 2014 Omnibond Systems, L.L.C.
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include "pvfs2-server.h"
+#include "pvfs2-internal.h"
+
+#include "bgmon/bgmon.h"
+
+#include <assert.h>
+#include <unistd.h>
+
+extern int bgproc_pipes[2];
+
+%%
+
+machine pvfs2_mgmt_bgproc_start_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        default => do_work;
+    }
+    state do_work
+    {
+        run mgmt_bgproc_start_do_work;
+        default => final_response;
+    }
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => terminate;
+    }
+}
+
+%%
+
+static PINT_sm_action mgmt_bgproc_start_do_work(struct PINT_smcb *smcb,
+                                                job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    unsigned char *buf;
+    size_t namelen, i;
+    uint16_t type;
+    int cancel;
+
+    namelen = strlen(s_op->req->u.mgmt_bgproc_start.name);
+    buf = malloc(2+namelen);
+    if (buf == NULL)
+    {
+        goto fail;
+    }
+    buf[0] = (namelen << 8) & 0xff;
+    buf[1] = namelen & 0xff;
+    memcpy(buf+2, s_op->req->u.mgmt_bgproc_start.name, namelen);
+
+    i = 0;
+    while (i < 2+namelen) {
+        size_t r;
+        r = write(bgproc_pipes[1], buf+i, 2+namelen-i);
+        if (r == -1) {
+            if (i == 0) {
+                goto fail;
+            } else {
+                /* XXX: Half a request has been written. What is a
+                 * reasonable thing to do here? */
+                assert(0);
+            }
+        }
+        i += r;
+    }
+
+    i += 0;
+    while (1) {
+        size_t r;
+        if (i == sizeof buf) {
+            /* XXX: The response is too big. Keep reading, then die. */
+            cancel = 1;
+            i = 0;
+        }
+        r = read(bgproc_pipes[0], buf+i, sizeof buf-i);
+        if (r == -1) {
+            if (i == 0) {
+                goto fail;
+            } else {
+                /* XXX: Half a request has been read. What is a
+                 * reasonable thing to do here? */
+                assert(0);
+            }
+        } else if (r == 0) {
+            break;
+        }
+        i += r;
+    }
+    if (cancel) {
+        goto fail;
+    }
+
+    /* The response is too small; it cannot be start. */
+    if (i < 4) {
+        goto fail;
+    }
+
+    type = (buf[0] << 8) | buf[1];
+    if (type == TYPE_START) {
+        s_op->resp.u.mgmt_bgproc_start.status = 1;
+        s_op->resp.u.mgmt_bgproc_start.id = (buf[2] << 8) | buf[3];
+    } else {
+        /* invalid type or error */
+        goto fail;
+    }
+
+    free(buf);
+    return SM_ACTION_COMPLETE;
+fail:
+    free(buf);
+    s_op->resp.u.mgmt_bgproc_start.status = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+struct PINT_server_req_params pvfs2_mgmt_bgproc_start_params =
+{
+    .string_name = "mgmt_bgproc_start",
+    .state_machine = &pvfs2_mgmt_bgproc_start_sm
+};

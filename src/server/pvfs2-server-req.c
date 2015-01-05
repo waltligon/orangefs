@@ -65,6 +65,9 @@ extern struct PINT_server_req_params pvfs2_tree_getattr_params;
 extern struct PINT_server_req_params pvfs2_get_user_cert_params;
 extern struct PINT_server_req_params pvfs2_get_user_cert_keyreq_params;
 #endif
+extern struct PINT_server_req_params pvfs2_mgmt_bgproc_list;
+extern struct PINT_server_req_params pvfs2_mgmt_bgproc_start;
+extern struct PINT_server_req_params pvfs2_mgmt_bgproc_kill;
 
 /* table of incoming request types and associated parameters */
 struct PINT_server_req_entry PINT_server_req_table[] =
