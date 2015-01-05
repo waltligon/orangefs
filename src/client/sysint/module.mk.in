@@ -53,7 +53,10 @@ CLIENT_SMCGEN := \
 	$(DIR)/mgmt-create-dirent.c \
 	$(DIR)/mgmt-get-dirdata-handle.c \
         $(DIR)/mgmt-get-uid-list.c \
-	$(DIR)/mgmt-get-dirdata-array.c
+	$(DIR)/mgmt-get-dirdata-array.c \
+	$(DIR)/mgmt-bgproc-list.c \
+	$(DIR)/mgmt-bgproc-start.c \
+	$(DIR)/mgmt-bgproc-kill.c
 
 ifdef ENABLE_SECURITY_CERT
 	CLIENT_SMCGEN += $(DIR)/mgmt-get-user-cert.c

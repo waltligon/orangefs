@@ -474,6 +474,54 @@ PVFS_error PVFS_mgmt_get_user_cert(
     uint32_t exp);
 #endif /* ENABLE_SECURITY_CERT */
 
+PVFS_error PVFS_imgmt_bgproc_list(
+    PVFS_fs_id fs_id,
+    PVFS_BMI_addr_t addr,
+    unsigned long *entries,
+    unsigned long *ids,
+    char **names,
+    PVFS_mgmt_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_mgmt_bgproc_list(
+    PVFS_fs_id fs_id,
+    PVFS_BMI_addr_t addr,
+    unsigned long *entries,
+    unsigned long *ids,
+    char **names);
+
+PVFS_error PVFS_imgmt_bgproc_start(
+    PVFS_fs_id fs_id,
+    int server_count,
+    PVFS_BMI_addr_t *addr_array,
+    unsigned long *statuses,
+    unsigned long *ids,
+    char *name,
+    PVFS_mgmt_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_mgmt_bgproc_start(
+    PVFS_fs_id fs_id,
+    int server_count,
+    PVFS_BMI_addr_t *addr_array,
+    unsigned long *statuses,
+    unsigned long *ids,
+    char *name);
+
+PVFS_error PVFS_imgmt_bgproc_kill(
+    PVFS_fs_id fs_id,
+    PVFS_BMI_addr_t addr,
+    unsigned long id,
+    unsigned long *status,
+    PVFS_mgmt_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_mgmt_bgproc_kill(
+    PVFS_fs_id fs_id,
+    PVFS_BMI_addr_t addr,
+    unsigned long id,
+    unsigned long *status);
+
 #endif /* __PVFS2_MGMT_H */
 
 /* @} */

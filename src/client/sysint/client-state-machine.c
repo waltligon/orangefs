@@ -383,10 +383,13 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
     {&pvfs2_client_mgmt_get_uid_list_sm},
     {&pvfs2_client_mgmt_get_dirdata_array_sm},
 #ifdef ENABLE_SECURITY_CERT
-    {&pvfs2_client_mgmt_get_user_cert_sm}
+    {&pvfs2_client_mgmt_get_user_cert_sm},
 #else
-    {NULL}
+    {NULL},
 #endif
+    {&pvfs2_client_mgmt_bgproc_list_sm},
+    {&pvfs2_client_mgmt_bgproc_start_sm},
+    {&pvfs2_client_mgmt_bgproc_kill_sm}
 };
 
 
@@ -1235,6 +1238,9 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_DEV_UNEXPECTED, "PVFS_DEV_UNEXPECTED" },
         { PVFS_SYS_FS_ADD, "PVFS_SYS_FS_ADD" },
         { PVFS_SYS_STATFS, "PVFS_SYS_STATFS" },
+        { PVFS_MGMT_BGPROC_LIST, "PVFS_MGMT_GET_UID_LIST" },
+        { PVFS_MGMT_BGPROC_START, "PVFS_MGMT_GET_UID_START" },
+        { PVFS_MGMT_BGPROC_KILL, "PVFS_MGMT_GET_UID_KILL" },
         { 0, "UNKNOWN" }
     };
 
