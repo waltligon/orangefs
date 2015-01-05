@@ -21,6 +21,7 @@ typedef uint64_t u_int64_t;
 /* typeof not available on Windows */
 #define typeof(t)   t
 #endif
+
 #include <assert.h>
 
 /*
@@ -58,6 +59,24 @@ typedef uint64_t u_int64_t;
 #define decode_uint32_t(pptr,x) do { \
     *(x) = bmitoh32(*(u_int32_t*) *(pptr)); \
     *(pptr) += 4; \
+} while (0)
+
+#define encode_PVFS_signature(pptr,x) encode_char(pptr,x)
+#define decode_PVFS_signature(pptr,x) decode_char(pptr,x)
+
+#define encode_PVFS_cert_data(pptr,x) encode_char(pptr,x)
+#define decode_PVFS_cert_data(pptr,x) decode_char(pptr,x)
+
+#define encode_PVFS_key_data(pptr,x) encode_char(pptr,x)
+#define decode_PVFS_key_data(pptr,x) decode_char(pptr,x)
+
+#define encode_char(pptr,x) do { \
+    *(char *) *(pptr) = *(x); \
+    *(pptr) += 1; \
+} while (0)
+#define decode_char(pptr,x) do { \
+    *(x) = *(char *) *(pptr); \
+    *(pptr) += 1; \
 } while (0)
 
 #define encode_int32_t(pptr,x) do { \
@@ -647,23 +666,25 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##t1(pptr, &x->x1); \
     encode_##tn1(pptr, &x->n1); \
     for (i=0; i<x->n1; i++) { int n; n = i; \
-	encode_##ta1(pptr, &(x)->a1[n]); } \
+        encode_##ta1(pptr, &(x)->a1[n]); \
+    } \
     encode_##t2(pptr, &x->x2); \
     encode_##tn2(pptr, &x->n2); \
     for (i=0; i<x->n2; i++) { int n; n = i; \
-	encode_##ta2(pptr, &(x)->a2[n]); } \
+        encode_##ta2(pptr, &(x)->a2[n]); \
+    } \
 } \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t1(pptr, &x->x1); \
     decode_##tn1(pptr, &x->n1); \
     x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
     for (i=0; i<x->n1; i++) \
-	decode_##ta1(pptr, &(x)->a1[i]); \
-    decode_##t1(pptr, &x->x1); \
+        decode_##ta1(pptr, &(x)->a1[i]); \
+    decode_##t2(pptr, &x->x2); \
     decode_##tn2(pptr, &x->n2); \
     x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
     for (i=0; i<x->n2; i++) \
-	decode_##ta2(pptr, &(x)->a2[i]); \
+        decode_##ta2(pptr, &(x)->a2[i]); \
 }
 
 /* 2 fields, then an array */
@@ -759,6 +780,38 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
 	decode_##ta2(pptr, &(x)->a2[i]); \
 }
 
+/* special case where we have three arrays of the same size after 4 
+fields */
+#define endecode_fields_4aaa_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, tn1, n1, ta1, a1, ta2, a2, ta3, a3) \
+static inline void encode_##name(char **pptr, const struct name *x) { int i; \
+     encode_##t1(pptr, &x->x1); \
+     encode_##t2(pptr, &x->x2); \
+     encode_##t3(pptr, &x->x3); \
+     encode_##t4(pptr, &x->x4); \
+     encode_##tn1(pptr, &x->n1); \
+     for (i=0; i<x->n1; i++) \
+     encode_##ta1(pptr, &(x)->a1[i]); \
+     for (i=0; i<x->n1; i++) \
+     encode_##ta2(pptr, &(x)->a2[i]); \
+     for (i=0; i<x->n1; i++) \
+     encode_##ta3(pptr, &(x)->a3[i]); \
+} \
+static inline void decode_##name(char **pptr, struct name *x) { int i; \
+     decode_##t1(pptr, &x->x1); \
+     decode_##t2(pptr, &x->x2); \
+     decode_##t3(pptr, &x->x3); \
+     decode_##t4(pptr, &x->x4); \
+     decode_##tn1(pptr, &x->n1); \
+     x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
+     for (i=0; i<x->n1; i++) \
+     decode_##ta1(pptr, &(x)->a1[i]); \
+     x->a2 = decode_malloc(x->n1 * sizeof(*x->a2)); \
+     for (i=0; i<x->n1; i++) \
+     decode_##ta2(pptr, &(x)->a2[i]); \
+     x->a3 = decode_malloc(x->n1 * sizeof(*x->a3)); \
+     for (i=0; i<x->n1; i++) \
+     decode_##ta3(pptr, &(x)->a3[i]); \
+}
 
 /* 4 fields, then an array */
 #define endecode_fields_4a_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, tn1,n1,ta1,a1) \
@@ -851,9 +904,131 @@ static inline void decode_##name(char **pptr, struct name *x)                 \
         default: assert(0);                                                   \
     }                                                                         \
 };
+/* 3 fields, then an array, then 2 fields, then an array */
+#define endecode_fields_3a2a_struct(name, t1, x1, t2, x2, t3, x3, tn1, n1, ta1, a1, t4, x4, t5, x5, tn2, n2, ta2, a2) \
+static inline void encode_##name(char **pptr, const struct name *x) { int i; \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##tn1(pptr, &x->n1); \
+    if (x->n1 > 0) \
+        for (i=0; i<x->n1; i++) \
+            encode_##ta1(pptr, &(x)->a1[i]); \
+    align8(pptr); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##t5(pptr, &x->x5); \
+    encode_##tn2(pptr, &x->n2); \
+    if (x->n2 > 0) \
+        for (i=0; i<x->n2; i++) \
+            encode_##ta2(pptr, &(x)->a2[i]); \
+    align8(pptr); \
+} \
+static inline void decode_##name(char **pptr, struct name *x) { int i; \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##tn1(pptr, &x->n1); \
+    if (x->n1 > 0) \
+    { \
+        x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
+        for (i=0; i<x->n1; i++) \
+            decode_##ta1(pptr, &(x)->a1[i]); \
+    } \
+    else \
+        x->a1 = NULL; \
+    align8(pptr); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##t5(pptr, &x->x5); \
+    decode_##tn2(pptr, &x->n2); \
+    if (x->n2 > 0) \
+    { \
+        x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
+        for (i=0; i<x->n2; i++) \
+            decode_##ta2(pptr, &(x)->a2[i]); \
+    } \
+    else \
+        x->a2 = NULL; \
+    align8(pptr); \
+}
 
-#ifdef WIN32
-#endif
+#define endecode_fields_3a2a1_struct(name, t1, x1, t2, x2, t3, x3, tn1, n1, ta1, a1, t4, x4, t5, x5, tn2, n2, ta2, a2, t6, x6) \
+static inline void encode_##name(char **pptr, const struct name *x) { int i; \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##tn1(pptr, &x->n1); \
+    if (x->n1 > 0) \
+        for (i=0; i<x->n1; i++) \
+            encode_##ta1(pptr, &(x)->a1[i]); \
+    align8(pptr); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##t5(pptr, &x->x5); \
+    encode_##tn2(pptr, &x->n2); \
+    if (x->n2 > 0) \
+        for (i=0; i<x->n2; i++) \
+            encode_##ta2(pptr, &(x)->a2[i]); \
+    align8(pptr); \
+    encode_##t6(pptr, &x->x6); \
+    align8(pptr); \
+} \
+static inline void decode_##name(char **pptr, struct name *x) { int i; \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##tn1(pptr, &x->n1); \
+    if (x->n1 > 0) \
+    { \
+        x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
+        for (i=0; i<x->n1; i++) \
+            decode_##ta1(pptr, &(x)->a1[i]); \
+    } \
+    else \
+        x->a1 = NULL; \
+    align8(pptr); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##t5(pptr, &x->x5); \
+    decode_##tn2(pptr, &x->n2); \
+    if (x->n2 > 0) \
+    { \
+        x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
+        for (i=0; i<x->n2; i++) \
+            decode_##ta2(pptr, &(x)->a2[i]); \
+    } \
+    else \
+        x->a2 = NULL; \
+    align8(pptr); \
+    decode_##t6(pptr, &x->x6); \
+    align8(pptr); \
+}
+
+/* special case where we have two arrays of the same size after 4 fields */
+#define endecode_fields_5aa_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, tn1, n1, ta1, a1, ta2, a2) \
+static inline void encode_##name(char **pptr, const struct name *x) { int i; \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##t5(pptr, &x->x5); \
+    encode_##tn1(pptr, &x->n1); \
+    for (i=0; i<x->n1; i++) \
+        encode_##ta1(pptr, &(x)->a1[i]); \
+    for (i=0; i<x->n1; i++) \
+        encode_##ta2(pptr, &(x)->a2[i]); \
+} \
+static inline void decode_##name(char **pptr, struct name *x) { int i; \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##t5(pptr, &x->x5); \
+    decode_##tn1(pptr, &x->n1); \
+    x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
+    for (i=0; i<x->n1; i++) \
+        decode_##ta1(pptr, &(x)->a1[i]); \
+    x->a2 = decode_malloc(x->n1 * sizeof(*x->a2)); \
+    for (i=0; i<x->n1; i++) \
+        decode_##ta2(pptr, &(x)->a2[i]); \
+}
 
 #endif  /* __SRC_PROTO_ENDECODE_FUNCS_H */
 
