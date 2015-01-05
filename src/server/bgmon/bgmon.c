@@ -90,6 +90,10 @@ static int reap(void);
 static sigset_t chldset;
 static int got_sigchld;
 
+/*
+ * Generate a handle for a new process. Warning: the handles are capped at 2^16,
+ * at which point no more will be generated.
+ */
 static int proc_num(unsigned short *r)
 {
     static unsigned short num;
@@ -105,6 +109,9 @@ static int proc_num(unsigned short *r)
     }
 }
 
+/*
+ * Send response buffer.
+ */
 static int respond(unsigned char *buf, size_t sz)
 {
     ssize_t i = 0, r;
@@ -123,6 +130,9 @@ static int respond(unsigned char *buf, size_t sz)
     return 0;
 }
 
+/*
+ * Send error response.
+ */
 static int respond_err(int error)
 {
     unsigned char buf[6];
@@ -135,6 +145,9 @@ static int respond_err(int error)
     return respond(buf, sizeof buf);
 }
 
+/*
+ * Send list response.
+ */
 static int respond_list(void)
 {
     size_t nump = 0, sz = 6, i = 6;
@@ -142,6 +155,7 @@ static int respond_list(void)
     struct process *p;
     int r;
 
+    /* Calculate necessary buffer size. */
     LIST_FOREACH(p, &processes, entries)
     {
         nump++;
@@ -149,6 +163,7 @@ static int respond_list(void)
         sz += strlen(p->name);
     }
 
+    /* Allocate and fill the buffer. */
     buf = malloc(sz);
     if (buf == NULL)
     {
@@ -178,12 +193,17 @@ static int respond_list(void)
     return r;
 }
 
+/*
+ * Send start response.
+ */
 static int respond_start(const char *str)
 {
+    /* Static buffer. buf[4] and buf[5] will contain the process number. */
     unsigned char buf[6] = {0, 6, 0, TYPE_START};
     struct process *p;
     pid_t pid;
 
+    /* Allocate and fill a struct process. pid is not yet filled. */
     p = malloc(sizeof *p);
     if (p == NULL)
     {
@@ -210,6 +230,7 @@ static int respond_start(const char *str)
     }
     else if (pid == 0)
     {
+        /* Become a parallel background process. */
         char path[FILENAME_MAX];
         char *args[2];
         int r;
@@ -227,6 +248,7 @@ static int respond_start(const char *str)
     }
     else
     {
+        /* Finish up and respond. */
         p->pid = pid;
         LIST_INSERT_HEAD(&processes, p, entries);
         buf[4] = (p->num >> 8) & 0xff;
@@ -235,6 +257,10 @@ static int respond_start(const char *str)
     }
 }
 
+/*
+ * Send a kill response. The process is removed from the list by reap after
+ * receipt of a SIGCHLD signal.
+ */
 static int respond_kill(unsigned short num)
 {
     unsigned char buf[4] = {0, 4, 0, TYPE_KILL};
@@ -253,6 +279,9 @@ static int respond_kill(unsigned short num)
     return respond(buf, sizeof buf);
 }
 
+/*
+ * Dispatch an incoming request.
+ */
 static int process(const unsigned char *buf, size_t sz)
 {
     int type;
@@ -304,6 +333,9 @@ error:
     return respond_err(ERR_NOMEM);
 }
 
+/*
+ * Set a flag indicating that there are processes to reap.
+ */
 static void child(int signal)
 {
     got_sigchld = 1;
@@ -314,6 +346,9 @@ static void child(int signal)
     }
 }
 
+/*
+ * Reap and remove from the list any processes which have died.
+ */
 static int reap(void)
 {
     struct process *p;
@@ -357,12 +392,15 @@ int main(void)
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "Parallel background process monitor starting.\n");
 
+    /* Generate a signal set, so the signal catcher can use it without handling
+     * a possible error. */ 
     if (sigemptyset(&chldset) == -1 || sigaddset(&chldset, SIGCHLD) == -1)
     {
         gossip_lerr("could not setup signal set: %s\n", strerror(errno));
         return EXIT_FAILURE;
     }
 
+    /* Setup the SIGCHLD handler. */
     sa.sa_handler = child;
     if (sigemptyset(&sa.sa_mask) == -1)
     {
@@ -376,6 +414,10 @@ int main(void)
         return EXIT_FAILURE;
     }
 
+    /* Read incoming requests. The idea is to keep a pointer (req, reqsz) into
+     * the buffer (buf, bufsz) and dispatch the request once the entire request
+     * is read. Special handling is needed for requests which are too large for
+     * the buffer (which should not be sent to the program). */
 top:
     while (1)
     {
@@ -415,6 +457,8 @@ top:
                     }
                     else
                     {
+                        /* Dispatch a request. Reap if necessary and make sure
+                         * SIGCHLD is blocked while processing the request. */
                         if (got_sigchld)
                         {
                             reap();
