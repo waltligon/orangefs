@@ -266,8 +266,8 @@ CFLAGS += $(patsubst %,-I$(builddir)/%,$(GENINCLUDES))
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
 
   # make bindir and sysconfdir available to source files
-CFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"' \
-    -DLIBEXECDIR='"$(libexecdir)"'
+CFLAGS += -DBINDIR='"$(bindir)"' -DSBINDIR='"$(sbindir)"' \
+    -DSYSCONFDIR='"$(sysconfdir)"' -DLIBEXECDIR='"$(libexecdir)"'
 
   # OpenSLL support
 CFLAGS += @OPENSSL_CPPFLAGS@

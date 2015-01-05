@@ -61,6 +61,7 @@ endif
 
 	# c files that should be added to server library
 	SERVERSRC += \
+                $(DIR)/bgproc-pipe.c \
 		$(SERVER_SMCGEN)
 
 	# server only file

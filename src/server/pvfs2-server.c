@@ -60,6 +60,8 @@
 #include "certcache.h"
 #endif
 
+#include "bgproc-pipe.h"
+
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
 #endif
@@ -185,7 +187,6 @@ static int precreate_pool_count(
     PVFS_fs_id fsid, PVFS_handle pool_handle, int* count);
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
-
 
 struct server_configuration_s *PINT_get_server_config(void)
 {
@@ -577,6 +578,14 @@ static int server_initialize(
     {
         gossip_err("Error: Could not start server; aborting.\n");
         return ret;
+    }
+
+    /* initialize the background process monitor */
+    ret = bgproc_startup();       
+    if (ret < 0)                   
+    {
+        gossip_err("Error: Cannot create background process monitor; aborting.\n");
+        return ret;           
     }
 
     /* initialize the security module */
