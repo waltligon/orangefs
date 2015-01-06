@@ -1276,6 +1276,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_GETATTR:
                     if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DIST)
                     {
+                        gossip_err("%s:resp->u.getattr.attr.u.meta.dist(%p)\n",__func__
+                                                                              ,resp->u.getattr.attr.u.meta.dist);
                         decode_free(resp->u.getattr.attr.u.meta.dist);
                     }
                     if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
