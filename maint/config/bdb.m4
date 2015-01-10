@@ -30,7 +30,9 @@ AC_DEFUN([AX_BERKELEY_DB],
 				Invalid libdb path specified. No db.h found.)])
 	fi
 
-        DB_LDFLAGS="-L${dbpath}/lib"
+	DB_DIR="${dbpath}"
+	AC_SUBST(DB_DIR)
+	DB_LDFLAGS="-L$DB_DIR/lib"
 	LDFLAGS="$DB_LDFLAGS ${LDFLAGS}"
 
 	LIBS="${oldlibs} -ldb -lpthread"
