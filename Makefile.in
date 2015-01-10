@@ -206,10 +206,12 @@ BUILD_CFLAGS = -I$(srcdir)/src/common/misc -I$(srcdir) @BUILD_CFLAGS@
 BUILD_LDFLAGS = @BUILD_LDFLAGS@
 # make sure the srcdir include gets included first
 CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
-LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
+LDFLAGS = -Wl,--hash-style=both -L@BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += @LDFLAGS@
-SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
-SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@ @LDAP_LDFLAGS@
+SERVER_LDFLAGS = -Wl,--hash-style=both -L@BUILD_ABSOLUTE_TOP@/lib
+SERVER_LDFLAGS += @SERVER_LDFLAGS@ -Wl,-rpath,'$$ORIGIN/../lib' @OPENSSL_LDFLAGS@ @LDAP_LDFLAGS@
+DB_DIR=@DB_DIR@
+LIBSSL_DIR=@LIBSSL_DIR@
 DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
 PICFLAGS = -fPIC
@@ -376,7 +378,8 @@ SERVERCFLAGS += @OPENSSL_CPPFLAGS@
 # LDAP support
 SERVERCFLAGS += @LDAP_CPPFLAGS@
 
-SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ @OPENSSL_LIB@ -lm @LDAP_LIB@
+#SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ @OPENSSL_LIB@ -lm @LDAP_LIB@
+SERVERLIBS = -lpvfs2-server @DB_LIB@ @OPENSSL_LIB@ @LIBS@ -lm @LDAP_LIB@
 
 ifdef NEEDS_LIBRT 
 	SERVERLIBS += -lrt
@@ -891,7 +894,7 @@ modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
 # rule for building the pvfs2 server
 $(SERVER): $(SERVERBINOBJS) lib/libpvfs2-server.a 
 	$(Q) "  LD		$@"
-	$(E)$(LD) $^ -o $@ $(SERVER_LDFLAGS) $(SERVERLIBS)
+	$(LD) $(SERVER_LDFLAGS) $^ -o $@ $(SERVERLIBS)
 
 # special rules for admin tool objects which also require server components
 $(ADMINOBJS_SERVER): %.o: %.c
@@ -901,7 +904,7 @@ $(ADMINOBJS_SERVER): %.o: %.c
 # special rules for admin tools which also require server components
 $(ADMINTOOLS_SERVER): %: %.o
 	$(Q) "  LD		$@"
-	$(E)$(LD) $< $(LDFLAGS) $(SERVER_LDFLAGS) $(SERVERLIBS) -o $@
+	$(LD) $(LDFLAGS) $(SERVER_LDFLAGS) $< -o $@ $(SERVERLIBS)
 
 # special rules for devel tool objects which also require db components
 $(DEVELOBJS): %.o: %.c
@@ -1138,7 +1141,7 @@ endif # BUILD_JNI
 # all applications depend on the pvfs2 library
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
 	$(Q) "  LD		$@"
-	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS) $(call modldflags,$<)
+	$(LD) $(LDFLAGS) $< -o $@ $(LIBS) $(call modldflags,$<)
 
 $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 
@@ -1473,6 +1476,11 @@ ifdef BUILD_SERVER
 	touch $(bindir)/.pvfs2-genconfig-cert
     endif
 endif
+	# Install non-LSB dependencies of OrangeFS along with the rest of the OrangeFS libs
+	install -m 644 $(DB_DIR)/lib/libdb-4.8.so $(libdir)
+    ifdef LIBSSL_DIR
+	install -m 644 $(LIBSSL_DIR)/libcrypto.so.1.0.0 $(libdir)
+    endif
 	# create etc dir under install dir
 	install -d $(sysconfdir)
 endif
