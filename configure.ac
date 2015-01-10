@@ -1258,26 +1258,6 @@ AC_ARG_WITH(
 )
 AC_SUBST(JAVA_HOME)
 
-dnl Method to set LIBSSL_DIR if it hasn't already been set using --with-libssl-dir
-LIBSSL_DIR=
-AC_ARG_WITH(
-    libssl-dir,
-    [  --with-libssl-dir=<path>       Enable specification of the parent directory the libcrypto.1.0.0.so library that you wish to include with installation.],
-    [
-        dnl Check for libcrypto
-        AC_CHECK_FILE($withval/libcrypto.so.1.0.0,
-            [
-                LIBSSL_DIR=$withval
-            ],
-            [
-                AC_MSG_ERROR(could not locate libcrypto.so.1.0.0 at the path given with --with-libssl-dir.)
-            ]
-        )
-    ],
-    [   with_jdk=no]
-)
-AC_SUBST(LIBSSL_DIR)
-
 dnl Method to enable JNI prefixed stdio and posix calls
 BUILD_JNI=
 AC_ARG_ENABLE(
