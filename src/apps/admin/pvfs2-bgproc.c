@@ -168,6 +168,7 @@ main(int argc, char **argv)
 	int mode = 0, ret;
 	unsigned long id;
 	PVFS_fs_id fs_id;
+	size_t i;
 	char ch;
 
 	/* Parse command line. */
@@ -227,7 +228,51 @@ main(int argc, char **argv)
 
 	aa = get_addr_array(fs_id, addrs);
 
-	
-
+	switch (mode) {
+	case MODE_KILL:
+		{unsigned long status;
+		for (i = 0; i < aa->count; i++) {
+			ret = PVFS_mgmt_bgproc_kill(fs_id, aa->addrs[i], id,
+			    &status);
+			if (ret < 0)
+				errp(1, ret, "PVFS_mgmt_bgproc_kill");
+			printf("%lu %lu\n", (unsigned long)i,
+			    (unsigned long)status);
+		}
+		break;}
+	case MODE_LIST:
+		{unsigned long entries, *ids;
+		char *names;
+		ids = calloc(aa->count, sizeof *ids);
+		if (!ids)
+			err(1, "malloc");
+		names = calloc(aa->count, sizeof *names);
+		if (!names)
+			err(1, "malloc");
+		for (i = 0; i < aa->count; i++) {
+			ret = PVFS_mgmt_bgproc_list(fs_id, aa->addrs[i],
+			    &entries, ids, &names);
+			if (ret < 0)
+				errp(1, ret, "PVFS_mgmt_bgproc_list");
+			printf("%lu\n", (unsigned long)i);
+		}
+		break;}
+	case MODE_START:
+		{unsigned long *statuses, *ids;
+		statuses = calloc(aa->count, sizeof *statuses);
+		if (!statuses)
+			err(1, "malloc");
+		ids = calloc(aa->count, sizeof *ids);
+		if (!ids)
+			err(1, "malloc");
+		ret = PVFS_mgmt_bgproc_start(fs_id, aa->count, aa->addrs,
+		    statuses, ids, name);
+		if (ret < 0)
+			errp(1, ret, "PVFS_mgmt_bgproc_kill");
+		for (i = 0; i < aa->count; i++)
+			printf("%lu %lu %lu\n", (unsigned long)i,
+			    (unsigned long)statuses[i], (unsigned long)ids[i]);
+		break;}
+	}
 	return 0;
 }
