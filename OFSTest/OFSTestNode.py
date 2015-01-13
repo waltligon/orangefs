@@ -1332,7 +1332,11 @@ class OFSTestNode(object):
 
     def installDB4(self):
         # db4 is built from scratch for all systems to have a consistant version.
-        
+        self.db4_lib_dir = self.db4_dir+"/lib"
+        rc = self.runSingleCommand("[ -f %s/libdb.so ]" % self.db4_lib_dir)
+        if rc == 0: 
+            print "Found %s/libdb.so" % self.db4_lib_dir
+            return
         
 
         self.changeDirectory("/home/%s" % self.current_user)
@@ -1347,7 +1351,7 @@ class OFSTestNode(object):
         print "Installing Berkeley DB 4.8.30 to %s..." % self.db4_dir
         self.runSingleCommand("make install")
 
-        self.db4_lib_dir = self.db4_dir+"/lib"
+        
    
         # Add DB4 to the library path.
         self.setEnvironmentVariable("LD_LIBRARY_PATH","%s:$LD_LIBRARY_PATH" % self.db4_lib_dir)
