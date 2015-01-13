@@ -32,10 +32,6 @@
 #define INT32_MAX (2147483647)
 #endif
 
-#ifndef UINT32_MAX
-#define UINT32_MAX (4294967295U)
-#endif
-
 #ifndef NAME_MAX
 #define NAME_MAX 255
 #endif
@@ -163,9 +159,7 @@ typedef int32_t PVFS_ds_flags;
 
 /* Basic types used within metadata. */
 typedef uint32_t PVFS_uid;
-#define PVFS_UID_MAX UINT32_MAX
 typedef uint32_t PVFS_gid;
-#define PVFS_GID_MAX UINT32_MAX
 typedef uint64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
 typedef uint64_t PVFS_flags;
@@ -413,14 +407,12 @@ typedef struct
 
 /* attribute masks used by system interface callers */
 #define PVFS_ATTR_SYS_SIZE                  (1 << 20)
-#define PVFS_ATTR_SYS_DISTDIR_ATTR          (1 << 21)
 #define PVFS_ATTR_SYS_LNK_TARGET            (1 << 24)
 #define PVFS_ATTR_SYS_DFILE_COUNT           (1 << 25)
 #define PVFS_ATTR_SYS_DIRENT_COUNT          (1 << 26)
 #define PVFS_ATTR_SYS_DIR_HINT              (1 << 27)
 #define PVFS_ATTR_SYS_BLKSIZE               (1 << 28)
 #define PVFS_ATTR_SYS_MIRROR_COPIES_COUNT   (1 << 29)
-#define PVFS_ATTR_SYS_CAPABILITY            (1 << 30)
 #define PVFS_ATTR_SYS_UID                   (1 << 0)
 #define PVFS_ATTR_SYS_GID                   (1 << 1)
 #define PVFS_ATTR_SYS_PERM                  (1 << 2)
@@ -440,19 +432,16 @@ typedef struct
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
  PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
- PVFS_ATTR_SYS_DISTDIR_ATTR | \
  PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_NOHINT                \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
  PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
- PVFS_ATTR_SYS_DISTDIR_ATTR | \
  PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
  PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT | \
  PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
- PVFS_ATTR_SYS_DISTDIR_ATTR | \
  PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_SETABLE \
 (PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
@@ -493,10 +482,9 @@ endecode_fields_12(
     uint64_t, handles_available_count,
     uint64_t, handles_total_count);
 
-/*
- * object reference (uniquely refers to a single file, directory, or
- * symlink).
- */
+/** object reference (uniquely refers to a single file, directory, or
+    symlink).
+*/
 typedef struct
 {
     PVFS_handle handle;
@@ -504,37 +492,19 @@ typedef struct
     int32_t    __pad1;
 } PVFS_object_ref;
 
-/* kernel compatibility version of a PVFS_handle */
-typedef struct {
-   union {
-     unsigned char u[16];
-     unsigned int slice[4];
-   };
-} PVFS_khandle __attribute__ (( __aligned__ (8)));
-
-
-/*
- * kernel version of an object ref.
- */
+/** Credentials (stubbed for future authentication methods). */
 typedef struct
 {
-  PVFS_khandle khandle;
-  int32_t fs_id;
-  int32_t __pad1;
-} PVFS_object_kref;
-
-/*
- * The kernel module will put the appropriate bytes of the khandle
- * into ihash.u and perceive them as an inode number through ihash.ino.
- * The slices are handy in encode and decode dirents...
- */
-struct ihash {
-  union {
-    unsigned char u[8];
-    uint64_t ino;
-    unsigned int slice[2];
-  };
-};
+#ifdef WIN32
+    /* TODO - store username string? */
+#endif
+    PVFS_uid uid;
+    PVFS_gid gid;
+} PVFS_credentials;
+endecode_fields_2(
+    PVFS_credentials,
+    PVFS_uid, uid,
+    PVFS_gid, gid);
 
 /* max length of BMI style URI's for identifying servers */
 #define PVFS_MAX_SERVER_ADDR_LEN 256
@@ -543,6 +513,7 @@ struct ihash {
 /* max len of individual path element */
 #define PVFS_SEGMENT_MAX         PVFS_NAME_MAX
 /* max len of an entire path */
+/* note protocol only handles a segment, not a path */
 #define PVFS_PATH_MAX            4096
 
 /* max extended attribute name len as imposed by the VFS and exploited for the
@@ -579,38 +550,6 @@ endecode_fields_2(
     PVFS_dirent,
     here_string, d_name,
     PVFS_handle, handle);
-
-/* Distributed directory attributes struct
- * will be stored in keyval space under DIST_DIR_ATTR
- */
-typedef struct {
-        /* global info */
-        int32_t tree_height; /* ceil(log2(num_servers)) */
-        int32_t num_servers; /* total number of servers */
-        int32_t bitmap_size; /* number of PVFS_dist_dir_bitmap_basetype stored under the key DIST_DIR_BITMAP */
-        int32_t split_size; /* maximum number of entries before a split */
-
-        /* local info */
-        int32_t server_no; /* 0 to num_servers-1, indicates which server is running this code */
-        int32_t branch_level; /* level of branching on this server */
-} PVFS_dist_dir_attr;
-endecode_fields_6(
-    PVFS_dist_dir_attr,
-    int32_t, tree_height,
-    int32_t, num_servers,
-    int32_t, bitmap_size,
-    int32_t, split_size,
-    int32_t, server_no,
-    int32_t, branch_level);
-
-typedef uint32_t PVFS_dist_dir_bitmap_basetype;
-typedef uint32_t *PVFS_dist_dir_bitmap;
-typedef uint64_t PVFS_dist_dir_hash_type;
-
-#define encode_PVFS_dist_dir_bitmap_basetype encode_uint32_t
-#define decode_PVFS_dist_dir_bitmap_basetype decode_uint32_t
-#define encode_PVFS_dist_dir_hash_type encode_uint64_t
-#define decode_PVFS_dist_dir_hash_type decode_uint64_t
 
 /** Predefined server parameters that can be manipulated at run-time
  *  through the mgmt interface.
@@ -657,33 +596,15 @@ enum PVFS_server_mode
     PVFS_SERVER_ADMIN_MODE = 2        /* administrative mode */
 };
 
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-/* OLD PVFS ACL Format - a null terminated array of these */
+/* PVFS2 ACL structures */
 typedef struct {
     int32_t  p_tag;
     uint32_t p_perm;
     uint32_t p_id;
 } pvfs2_acl_entry;
-#else
-/* PVFS2 ACL structures - Matches Linux ACL EA structures */
-/* matches POSIX ACL-XATTR format */
-typedef struct {
-    int16_t  p_tag;
-    uint16_t p_perm;
-    uint32_t p_id;
-} pvfs2_acl_entry;
-
-typedef struct {
-    uint32_t p_version;
-    pvfs2_acl_entry p_entries[0];
-} pvfs2_acl_header;
-#endif
 
 /* These defines match that of the POSIX defines */
 #define PVFS2_ACL_UNDEFINED_ID   (-1)
-#define PVFS2_ACL_VERSION      0x0002
-#define PVFS2_ACL_ACCESS       "system.posix_acl_access"
-#define PVFS2_ACL_DEFAULT      "system.posix_acl_default"
 
 /* p_tag entry in struct posix_acl_entry */
 #define PVFS2_ACL_USER_OBJ    (0x01)
@@ -804,7 +725,7 @@ PVFS_error PVFS_errno_to_error(int err);
 #define PVFS_EALREADY        E(57) /* Operation already in progress */
 #define PVFS_EACCES          E(58) /* Access not allowed */
 #define PVFS_ECONNRESET      E(59) /* Connection reset by peer */
-#define PVFS_ERANGE          E(60) /* Math out of range, or buf too small */
+#define PVFS_ERANGE          E(60) /* Math out of range or buf too small */
 
 /***************** non-errno/pvfs2 specific error codes *****************/
 #define PVFS_ECANCEL    (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
@@ -815,7 +736,6 @@ PVFS_error PVFS_errno_to_error(int err);
 #define PVFS_ENORECVR   (6|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ETRYAGAIN  (7|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ENOTPVFS   (8|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
-#define PVFS_ESECURITY  (9|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERRNO ERROR CODES!
  *
@@ -824,7 +744,7 @@ PVFS_error PVFS_errno_to_error(int err);
  * UNIX ERRNO VALUE IN THE MACROS BELOW (USED IN
  * src/common/misc/errno-mapping.c and the kernel module)
  */
-#define PVFS_ERRNO_MAX          61
+#define PVFS_ERRNO_MAX          60
 
 /*
  * If system headers do not define these, assign them, with arbitrary
@@ -925,7 +845,6 @@ PVFS_error PINT_errno_mapping[PVFS_ERRNO_MAX + 1] = { \
     EALREADY,                                         \
     EACCES,                                           \
     ECONNRESET,   /* 59 */                            \
-    ERANGE,                                           \
     0         /* PVFS_ERRNO_MAX */                    \
 };                                                    \
 const char *PINT_non_errno_strerror_mapping[] = {     \
@@ -938,7 +857,6 @@ const char *PINT_non_errno_strerror_mapping[] = {     \
     "Unknown server error",                           \
     "Host name lookup failure",                       \
     "Path contains non-PVFS elements",                \
-    "Security error",                                 \
 };                                                    \
 PVFS_error PINT_non_errno_mapping[] = {               \
     0,     /* leave this one empty */                 \
@@ -950,7 +868,6 @@ PVFS_error PINT_non_errno_mapping[] = {               \
     PVFS_ENORECVR,  /* 6 */                           \
     PVFS_ETRYAGAIN, /* 7 */                           \
     PVFS_ENOTPVFS,  /* 8 */                           \
-    PVFS_ESECURITY, /* 9 */                           \
 }
 
 /*
@@ -984,20 +901,20 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error)        \
         PVFS_ERROR_CODE(((positive ? error :               \
                              abs(error))) & ~mask)];       \
     }                                                      \
-    return ret;                                            \
+    return ret;                        			   \
 }                                                          \
 PVFS_error PVFS_errno_to_error(int err)                    \
 {                                                          \
     PVFS_error e = 0;                                      \
-                                                           \
+    \
     for(; e < PVFS_ERRNO_MAX; ++e)                         \
     {                                                      \
         if(PINT_errno_mapping[e] == err)                   \
         {                                                  \
-            return e | PVFS_ERROR_BIT;                     \
+            return e;                                      \
         }                                                  \
     }                                                      \
-    return err;                                            \
+    return 0;                                              \
 }                                                          \
 DECLARE_ERRNO_MAPPING()
 #define PVFS_ERROR_TO_ERRNO(__error) PVFS_get_errno_mapping(__error)
@@ -1043,185 +960,36 @@ enum PVFS_io_type
  */
 #define PVFS_MGMT_RESERVED 1
 
-/* Note: in a C file which uses profiling, include pvfs2-config.h before
- * pvfs2-types.h so ENABLE_PROFILING is declared.
- */
-#ifdef ENABLE_PROFILING
 /*
  * Structure and macros for timing things for profile-like output.
  *
  */
 struct profiler
 {
-    struct timeval start;
-    struct timeval finish;
-    double save_timing;
+    struct  timeval  start;
+    struct  timeval  finish;
+    uint64_t  save_timing;
 };
 
-#define DECLARE_PROFILER(prof_struct) \
-    struct profiler prof_struct
-
-#define DECLARE_PROFILER_EXTERN(prof_struct) \
-    extern struct profiler prof_struct
-
-#define INIT_PROFILER(prof_struct) \
-    do { \
-        prof_struct.save_timing = 0; \
-    } while (0)
+#define INIT_PROFILER(prof_struct) prof_struct.cumulative_diff = 0;
 
 #define START_PROFILER(prof_struct) \
-    do { \
-        gettimeofday(&prof_struct.start, NULL); \
-    } while (0)
+    gettimeofday(&prof_struct.start, NULL);
 
 #define FINISH_PROFILER(label, prof_struct, print_timing) \
-    do { \
-        double t_start, t_finish; \
-        gettimeofday(&prof_struct.finish, NULL); \
-        t_start = prof_struct.start.tv_sec + \
-                  (prof_struct.start.tv_usec / 1000000.0); \
-        t_finish = prof_struct.finish.tv_sec + \
-                   (prof_struct.finish.tv_usec / 1000000.0); \
-        prof_struct.save_timing = t_finish - t_start; \
-        if (print_timing) { \
-            gossip_err("PROFILING %s: %0.6f\n", label, prof_struct.save_timing); \
-        } \
-    } while (0)
+{ \
+    double t_start, t_finish; \
+    gettimeofday(&prof_struct.finish, NULL); \
+    t_start = prof_struct.start.tv_sec + (prof_struct.start.tv_usec/1000000.0); \
+    t_finish = prof_struct.finish.tv_sec + (prof_struct.finish.tv_usec/1000000.0); \
+    prof_struct.save_timing = t_finish - t_start * 1000000.0; \
+    if (print_timing) { \
+      gossip_err("PROFILING %s: %f\n", label, t_finish - t_start); \
+    } \
+}
 
 #define PRINT_PROFILER(label, prof_struct) \
-    do { \
-        gossip_err("PROFILING %s: %0.6f\n", label, prof_struct.save_timing); \
-    } while (0)
-
-#else /* ENABLE_PROFILING */
-
-#define DECLARE_PROFILER(prof_struct)
-
-#define DECLARE_PROFILER_EXTERN(prof_struct)
-
-#define INIT_PROFILER(prof_struct)
-
-#define START_PROFILER(prof_struct)
-
-#define FINISH_PROFILER(label, prof_struct, print_timing)
-
-#define PRINT_PROFILER(label, prof_struct)
-
-#endif /* ENABLE_PROFILING */
-/*
- * New types for robust security implementation.
- */
-#define PVFS2_DEFAULT_CREDENTIAL_TIMEOUT (3600)   /* 1 hour */
-#define PVFS2_DEFAULT_CAPABILITY_TIMEOUT (600)
-#define PVFS2_DEFAULT_CREDENTIAL_KEYPATH SYSCONFDIR "/pvfs2-clientkey.pem"
-#define PVFS2_DEFAULT_CREDENTIAL_SERVICE_USERS SYSCONFDIR \
-        "/orangefs-service-users"
-#define PVFS2_SECURITY_TIMEOUT_MIN   5
-#define PVFS2_SECURITY_TIMEOUT_MAX   (10*365*24*60*60)   /* ten years */
-
-extern const char PVFS2_BLANK_ISSUER[];
-
-typedef unsigned char *PVFS_cert_data;
-
-/* PVFS_certificate simply stores a buffer with the buffer size.
-   The buffer can be converted to an OpenSSL X509 struct for use. */
-typedef struct PVFS_certificate PVFS_certificate;
-struct PVFS_certificate
-{
-    uint32_t buf_size;
-    PVFS_cert_data buf;
-};
-endecode_fields_1a_struct (
-    PVFS_certificate,
-    skip4,,
-    uint32_t, buf_size,
-    PVFS_cert_data, buf);
-#define extra_size_PVFS_certificate PVFS_REQ_LIMIT_CERT
-
-/* Buffer and structure for certificate private key */
-typedef unsigned char *PVFS_key_data;
-
-typedef struct PVFS_security_key PVFS_security_key;
-struct PVFS_security_key
-{
-    uint32_t buf_size;
-    PVFS_key_data buf;
-};
-endecode_fields_1a_struct (
-    PVFS_security_key,
-    skip4,,
-    uint32_t, buf_size,
-    PVFS_key_data, buf);
-#define extra_size_PVFS_security_key PVFS_REQ_LIMIT_KEY
-
-typedef unsigned char *PVFS_signature;
-
-/* A capability defines permissions for a set of handles. */
-typedef struct PVFS_capability PVFS_capability;
-struct PVFS_capability
-{
-    char *issuer;              /* alias of the issuing server */
-    PVFS_fs_id fsid;           /* fsid for which this capability is valid */
-    uint32_t sig_size;         /* length of the signature in bytes */
-    PVFS_signature signature;  /* digital signature */
-    PVFS_time timeout;         /* seconds after epoch to time out */
-    uint32_t op_mask;          /* allowed operations mask */
-    uint32_t num_handles;      /* number of elements in the handle array */
-    PVFS_handle *handle_array; /* handles in this capability */
-};
-endecode_fields_3a2a_struct (
-    PVFS_capability,
-    string, issuer,
-    PVFS_fs_id, fsid,
-    skip4,,
-    uint32_t, sig_size,
-    PVFS_signature, signature,
-    PVFS_time, timeout,
-    uint32_t, op_mask,
-    uint32_t, num_handles,
-    PVFS_handle, handle_array);
-#define extra_size_PVFS_capability (PVFS_REQ_LIMIT_HANDLES_COUNT * \
-                                    sizeof(PVFS_handle)          + \
-                                    PVFS_REQ_LIMIT_ISSUER        + \
-                                    PVFS_REQ_LIMIT_SIGNATURE)
-
-/* A credential identifies a user and is signed by the client/user 
-   private key. */
-typedef struct PVFS_credential PVFS_credential;
-struct PVFS_credential 
-{
-    PVFS_uid userid;           /* user id */
-    uint32_t num_groups;       /* length of group_array */
-    PVFS_gid *group_array;     /* groups for which the user is a member */
-    char *issuer;              /* alias of the issuing server */
-    PVFS_time timeout;         /* seconds after epoch to time out */
-    uint32_t sig_size;         /* length of the signature in bytes */
-    PVFS_signature signature;  /* digital signature */
-    PVFS_certificate certificate; /* user certificate buffer */
-};
-endecode_fields_3a2a1_struct (
-    PVFS_credential,
-    skip4,,
-    skip4,,
-    PVFS_uid, userid,
-    uint32_t, num_groups,
-    PVFS_gid, group_array,
-    string, issuer,
-    PVFS_time, timeout,
-    uint32_t, sig_size,
-    PVFS_signature, signature,
-    PVFS_certificate, certificate);
-#define extra_size_PVFS_credential (PVFS_REQ_LIMIT_GROUPS    * \
-                                    sizeof(PVFS_gid)         + \
-                                    PVFS_REQ_LIMIT_ISSUER    + \
-                                    PVFS_REQ_LIMIT_SIGNATURE + \
-                                    extra_size_PVFS_certificate)
-
-/* 
- * NOTE: for backwards compatibility only. 
- * For all new code use PVFS_credential.
- */
-typedef PVFS_credential PVFS_credentials;
+      gossip_err("PROFILING %s: %f\n", label, prof_struct.save_timing / 1000000.0);
 
 
 #endif /* __PVFS2_TYPES_H */
