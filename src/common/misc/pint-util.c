@@ -167,7 +167,16 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
     switch(dest->objtype)
     {
     case PVFS_TYPE_METAFILE:
-        CPYFIELD(meta.dist, dest->u.meta.dist_size);
+        if (dest->u.meta.dist)
+        {
+            PINT_dist_free(dest->u.meta.dist);
+        }
+        dest->u.meta.dist = PINT_dist_copy(src->u.meta.dist);
+        if (dest->u.meta.dist == NULL)
+        {
+            return -PVFS_ENOMEM;
+        }
+        dest->u.meta.dist_size = src->u.meta.dist_size;
         PACKSID(meta.dfile_array,
                 meta.sid_array,
                 meta.dfile_count,
