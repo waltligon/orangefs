@@ -218,7 +218,7 @@ nested machine pvfs2_get_attr_work_sm
     }
 
 /* DIRDATA */
-
+/*
     state get_dirent_count
     {
         run getattr_get_dirent_count;
@@ -231,6 +231,8 @@ nested machine pvfs2_get_attr_work_sm
         run getattr_interpret_dirent_count;
         default => check_if_capability_required;
     }
+*/
+
 
 /* PERMISSIONS */
 
@@ -2134,6 +2136,8 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
 
     return ret;
 }
+
+#if 0
         
 static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
                                                job_status_s *js_p)
@@ -2230,6 +2234,8 @@ static PINT_sm_action getattr_interpret_dirent_count(struct PINT_smcb *smcb,
 
     return SM_ACTION_COMPLETE;
 }
+
+#endif
 
 static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
                                            job_status_s *js_p)

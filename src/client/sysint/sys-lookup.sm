@@ -996,10 +996,6 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = lookup_segment_lookup_comp_fn;
 
-    gossip_err("%s:msg_p->sid_count(%d)  sid_array(%p)\n",__func__,msg_p->sid_count,msg_p->sid_array);
-    gossip_err("%s:msg_p->sid_array[0]=(%s)\n",__func__,PVFS_SID_str(&msg_p->sid_array[0]));
-
-
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {

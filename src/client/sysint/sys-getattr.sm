@@ -325,16 +325,10 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "getattr_object_getattr_comp_fn called\n");
 
-    gossip_err("%s: frame from parent is %p\n",__func__,sm_p);
-
     if (resp_p->status != 0)
     {
         return resp_p->status;
     }
-
-    gossip_err("%s: resp_p->u.getattr.attr.mask(0x%08x) objtype(%d)\n",__func__
-                                                          ,resp_p->u.getattr.attr.mask
-                                                          ,(int)resp_p->u.getattr.attr.objtype);
 
     /*
      * If we've reached the callback for the getattr msgpair tranfer,
@@ -390,24 +384,6 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                  */
                 assert(attr->mask & PVFS_ATTR_META_DIST);
                 assert(attr->u.meta.dist && (attr->u.meta.dist_size > 0));
-                gossip_err("%s: dist_name(%s) param_size(%d)\n",__func__,attr->u.meta.dist->dist_name
-                                                                        ,attr->u.meta.dist->param_size);
-                gossip_err("%s: param is %s\n",__func__
-                                              ,(attr->u.meta.dist->methods->params_string(attr->u.meta.dist->params)));
-
-                gossip_err("%s\n"
-                           "  dist size      (%d)\n"
-                           "  dist_name(%p)  (%s)\n"
-                           "  name_size(%p)  (%d)\n"
-                           "  param_size(%p) (%d)\n"
-                           "  params(%p)     (%s)\n"
-                           ,__func__
-                           ,attr->u.meta.dist_size
-                           ,attr->u.meta.dist->dist_name  ,attr->u.meta.dist->dist_name
-                           ,&attr->u.meta.dist->name_size ,attr->u.meta.dist->name_size
-                           ,&attr->u.meta.dist->param_size,attr->u.meta.dist->param_size
-                           ,attr->u.meta.dist->params,attr->u.meta.dist->methods->params_string(attr->u.meta.dist->params));
-
             }
 /* V3 remove */
 #if 0
@@ -963,8 +939,6 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
                               sm_p->getattr.req_attrmask,
                               sm_p->hints);
 
-    gossip_err("%s: sm_p->getattr.req_attrmask(0x%08x)\n",__func__,sm_p->getattr.req_attrmask);
-    
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_READ;
     msg_p->fs_id = object_ref.fs_id;
@@ -1029,7 +1003,6 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     PVFS_handle *handles;
 #endif
 
-    gossip_err("%s: current frame is %p\n",__func__,sm_p);
     PVFS_capability capability;
 
     gossip_debug(GOSSIP_MIRROR_DEBUG,
@@ -1048,18 +1021,6 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     attr = &sm_p->getattr.attr;
     assert(attr);
 
-                gossip_err("%s\n"
-                           "  dist_name(%p)  (%s)\n"
-                           "  name_size(%p)  (%d)\n"
-                           "  param_size(%p) (%d)\n"
-                           "  params(%p)     (%s)\n"
-                           ,__func__
-                           ,attr->u.meta.dist->dist_name  ,attr->u.meta.dist->dist_name
-                           ,&attr->u.meta.dist->name_size ,attr->u.meta.dist->name_size
-                           ,&attr->u.meta.dist->param_size,attr->u.meta.dist->param_size
-                           ,attr->u.meta.dist->params,attr->u.meta.dist->methods->params_string(attr->u.meta.dist->params));
-
-    gossip_err("%s: current frame is %p\n",__func__,sm_p);
 
     /* Note: permission not required for tree_get_file_size op */
     PINT_null_capability(&capability);
@@ -1893,9 +1854,6 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
      * must free it.
      */
 
-    gossip_err("%s: sm_p->getattr.attr.objtype(%d) mask(0x%08x)\n",__func__,(int)sm_p->getattr.attr.objtype
-                                                                           ,sm_p->getattr.attr.mask);
-
     if(attr->objtype == PVFS_TYPE_SYMLINK &&
        attr->mask & PVFS_ATTR_SYMLNK_TARGET)
     {
@@ -1996,11 +1954,6 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
 
         if (attr->mask & PVFS_ATTR_DATA_SIZE)
         {
-            gossip_err("%s: sm_p->getattr.attr.objtype(%d) sm_p->getattr.size(%d)\n"
-                      ,__func__
-                      ,(int)sm_p->getattr.attr.objtype
-                      ,(int)sm_p->getattr.size);
-
             if( attr->objtype == PVFS_TYPE_DATAFILE )
             {
                 sysresp->attr.size = attr->u.data.size;
@@ -2017,11 +1970,6 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
             (attr->mask & PVFS_ATTR_META_DFILES))
         {
             /* we have enough information to set a block size */
-            gossip_err("%s: sm_p->getattr.attr->u.meta.dfile_count(%d) params(%p)\n",__func__
-                                                                      ,attr->u.meta.dfile_count
-                                                                      ,attr->u.meta.dist->params);
-            gossip_err("%s: param is %s\n",__func__
-                                          ,(attr->u.meta.dist->methods->params_string(attr->u.meta.dist->params)));
             sysresp->attr.blksize = attr->u.meta.dist->methods->get_blksize(
                                                   attr->u.meta.dist->params,
                                                   attr->u.meta.dfile_count);
@@ -2063,8 +2011,6 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
                0,
                sizeof(PVFS_sysresp_getattr));
     }
-
-    gossip_err("%s: sysresp->attr.mask(0x%08x)\n",__func__,sysresp->attr.mask);
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 

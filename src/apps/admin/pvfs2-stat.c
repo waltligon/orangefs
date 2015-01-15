@@ -247,19 +247,6 @@ static int do_stat(const char             * pszFile,
 
    ref = lk_response.ref;
 
-
-   printf("attrmask(0x%08x)\n",PVFS_ATTR_SYS_ALL_NOHINT);
-   
-
-   printf("%s:PVFS_object_ref sent into PVFS_sys_getattr\n"
-          "      handle(%s)\n"
-          "       fs_id(%d)\n"
-          "   sid_count(%d)\n"
-         ,__func__
-         ,PVFS_OID_str(&ref.handle)
-         ,ref.fs_id
-         ,ref.sid_count);
-
    ret = PVFS_sys_getattr(ref, 
                           PVFS_ATTR_SYS_ALL_NOHINT,
                           credentials, 
@@ -272,9 +259,6 @@ static int do_stat(const char             * pszFile,
       return -1;
    }
 
-
-   printf("getattr_response.attr.mask(0x%08x) blksize(%ld)\n",getattr_response.attr.mask
-                                                             ,getattr_response.attr.blksize);
 
    /* Display the attributes for the file */
    print_stats(&ref,

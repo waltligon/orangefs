@@ -177,7 +177,6 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
             return -PVFS_ENOMEM;
         }
         dest->u.meta.dist_size = src->u.meta.dist_size;
-        //CPYFIELD(meta.dist, dest->u.meta.dist_size);
         PACKSID(meta.dfile_array,
                 meta.sid_array,
                 meta.dfile_count,
