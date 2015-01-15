@@ -342,8 +342,6 @@ static PINT_sm_action lookup_read_object_metadata(
     s_op->u.lookup.seg_nr++;
     s_op->u.lookup.array_index = s_op->u.lookup.seg_nr - 1;
 
-    gossip_err("%s:array_index:(%d)\n",__func__,s_op->u.lookup.array_index);
-
     /* From the dirdata directory entry, we have a handle representing a
      * dspace object.  We don't know, yet, if this object is a metafile or
      * another directory until we retrieve it.  
@@ -361,12 +359,6 @@ static PINT_sm_action lookup_read_object_metadata(
         s_op->resp.u.lookup_path.sid_array[i] = s_op->u.lookup.keyval_temp_store[j].sid;
         s_op->resp.u.lookup_path.sid_count++;
     }
-
-    gossip_err("%s:sid for metadata object(%s)\n"
-              ,__func__
-              ,PVFS_SID_str(&s_op->u.lookup.keyval_temp_store[1].sid));
-
-    gossip_err("%s:oid for metadata object(%s)\n",__func__,PVFS_OID_str(&handle));
 
     /* Does the handle's dspace entry reside locally or remotely?  If remotely,
      * then we are done.
@@ -531,39 +523,6 @@ static PINT_sm_action lookup_setup_getattr_request(
       return SM_ACTION_COMPLETE;
    }
    
-   gossip_err("%s\n"
-              "s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index].objtype(%d)\n"
-              "         .mask(0x%0x)\n"
-              "         .owner(%d)\n"
-              "         .group(%d)\n"
-              "         .perms(%o)\n"
-              "         .atime(%d)\n"
-              "         .mtime(%d)\n"
-              "         .ctime(%d)\n"
-              "         .ntime(%d)\n"
-              "         .capability.issuer(%s) fs_id(%llu)\n"
-              "         .dist(%p)\n"
-              "         .dfile_array(%p)\n"
-              "         .sid_array(%p)\n"
-              "         .size(%d)\n"
-              ,__func__
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].objtype
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].mask
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].owner
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].group
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].perms
-              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].atime
-              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].mtime
-              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].ctime
-              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].ntime
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].capability.issuer
-              ,llu(s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].capability.fsid)
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].u.meta.dist
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].u.meta.dfile_array
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].u.meta.sid_array
-              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].u.meta.size);
-
-
    getattr_op->attr = s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ];
 
    getattr_op->req = s_op->req;
@@ -610,8 +569,6 @@ static PINT_sm_action lookup_verify_getattr_results(
 
    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
 
-   gossip_err("%s: js_p->error_code=%d\n",__func__,js_p->error_code);
-
    if ( js_p->error_code )
    {
       goto out;
@@ -621,45 +578,6 @@ static PINT_sm_action lookup_verify_getattr_results(
 
    resp_attr = &(getattr_op->resp.u.getattr.attr);
 
-   gossip_err("%s\n"
-              "resp_attr.objtype(%d)\n"
-              "         .mask(0x%0x)\n"
-              "         .owner(%d)\n"
-              "         .group(%d)\n"
-              "         .perms(%o)\n"
-              "         .atime(%d)\n"
-              "         .mtime(%d)\n"
-              "         .ctime(%d)\n"
-              "         .ntime(%d)\n"
-              "         .capability.fsid(%llu) issuer(%s)\n"
-              "         .dist(%p)\n"
-              "         .dfile_array(%p) dfile_count(%d) dfile_array[0](%s)\n"
-              "         .sid_array(%p) sid_count(%d)\n"
-              "         .size(%d)\n"
-              ,__func__
-              ,resp_attr->objtype
-              ,resp_attr->mask
-              ,resp_attr->owner
-              ,resp_attr->group
-              ,resp_attr->perms
-              ,(int)resp_attr->atime
-              ,(int)resp_attr->mtime
-              ,(int)resp_attr->ctime
-              ,(int)resp_attr->ntime
-              ,llu(resp_attr->capability.fsid)
-              ,resp_attr->capability.issuer
-              ,resp_attr->u.meta.dist
-              ,resp_attr->u.meta.dfile_array
-              ,resp_attr->u.meta.dfile_count
-              ,PVFS_OID_str(&resp_attr->u.meta.dfile_array[0])
-              ,resp_attr->u.meta.sid_array
-              ,resp_attr->u.meta.sid_count
-              ,(int)resp_attr->u.meta.size);
-
-   gossip_err("resp_attr.sid_array[0]:(%s)\n",PVFS_SID_str(&resp_attr->u.meta.sid_array[0]));
-
-   gossip_err("array_index:(%d)\n",s_op->u.lookup.array_index);
-   
    ret = PINT_copy_object_attr( &s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.array_index],resp_attr );
    if (ret)
    {
@@ -1376,74 +1294,6 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
             s_op->req->u.lookup_path.path);
     }
 
-
-if (js_p->error_code == 0)
-{
-    gossip_err("%s\n"
-               "s_op->resp.op(%d)\n"
-               "s_op->resp.status(%d)\n"
-               "s_op->resp.u.lookup_path.handle_count(%u)\n"
-               "                        .attr_count(%u)\n"
-               "                        .sid_count(%u)\n"
-               "                        .handle_array(%s)\n"
-               "                        .attr_array(%p)\n"
-               "                        .sid_array(%p)\n"
-               ,__func__
-               ,(int)s_op->resp.op
-               ,s_op->resp.status
-               ,s_op->resp.u.lookup_path.handle_count
-               ,s_op->resp.u.lookup_path.attr_count
-               ,s_op->resp.u.lookup_path.sid_count
-               ,PVFS_OID_str(&s_op->resp.u.lookup_path.handle_array[0])
-               ,s_op->resp.u.lookup_path.attr_array
-               ,s_op->resp.u.lookup_path.sid_array);
-   gossip_err("sid_array[0]:(%s)\n",PVFS_SID_str(&s_op->resp.u.lookup_path.sid_array[0]));
-
-
-   gossip_err("%s\n"
-              "s_op->resp.u.lookup_path.attr_array[0].objtype(%d)\n"
-              "                                      .mask(0x%0x)\n"
-              "                                      .owner(%d)\n"
-              "                                      .group(%d)\n"
-              "                                      .perms(%o)\n"
-              "                                      .atime(%d)\n"
-              "                                      .mtime(%d)\n"
-              "                                      .ctime(%d)\n"
-              "                                      .ntime(%d)\n"
-              "                                      .capability(%p)\n"
-              "                                      .u.meta.dist(%p)\n"
-              "                                             .dfile_array(%p) .dfile_count(%u)\n"
-              "                                             .sid_array(%p) .sid_count(%u)\n"
-              "                                             .size(%d)\n"
-              "                                             .mirror_mode(%d)\n"
-              "                                             .stuffed(%d)\n"
-              "                                             .stuffed_size(%d)\n"
-              "                                             .hint(0x%08x)\n"
-              ,__func__
-              ,s_op->resp.u.lookup_path.attr_array[0].objtype
-              ,s_op->resp.u.lookup_path.attr_array[0].mask
-              ,s_op->resp.u.lookup_path.attr_array[0].owner
-              ,s_op->resp.u.lookup_path.attr_array[0].group
-              ,s_op->resp.u.lookup_path.attr_array[0].perms
-              ,(int)s_op->resp.u.lookup_path.attr_array[0].atime
-              ,(int)s_op->resp.u.lookup_path.attr_array[0].mtime
-              ,(int)s_op->resp.u.lookup_path.attr_array[0].ctime
-              ,(int)s_op->resp.u.lookup_path.attr_array[0].ntime
-              ,&s_op->resp.u.lookup_path.attr_array[0].capability
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.dist
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.dfile_array
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.dfile_count
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.sid_array
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.sid_count
-              ,(int)s_op->resp.u.lookup_path.attr_array[0].u.meta.size
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.mirror_mode
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.stuffed
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.stuffed_size
-              ,(unsigned int)(s_op->resp.u.lookup_path.attr_array[0].u.meta.hint.flags));
-
-    gossip_err("dfile(0):(%s)\n",PVFS_OID_str(&s_op->resp.u.lookup_path.attr_array[0].u.meta.dfile_array[0]));
-    gossip_err("sid(0)  :(%s)\n",PVFS_SID_str(&s_op->resp.u.lookup_path.attr_array[0].u.meta.sid_array[0]));
-} /* end if */
 
     return SM_ACTION_COMPLETE;
 }

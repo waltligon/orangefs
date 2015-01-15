@@ -236,14 +236,6 @@ static PINT_sm_action tree_communicate_partition_handles(
     struct PVFS_server_req *req = NULL;
     PVFS_capability null_cap;
 
-    gossip_err("%s:s_op->u.tree_communicate.num_pjmp_frames(%d)\n",__func__,s_op->u.tree_communicate.num_pjmp_frames);
-
-    gossip_err("%s:sid_count(%d) sid_array[0]=(%s)\n"
-              ,__func__
-              ,(int)s_op->req->u.tree_get_file_size.sid_count
-              ,PVFS_SID_str(&s_op->req->u.tree_get_file_size.sid_array[0])
-              );
-
     s_op->u.tree_communicate.handle_array_local = calloc(
                         num_data_files,
                         sizeof(*s_op->u.tree_communicate.handle_array_local));
@@ -983,8 +975,6 @@ static PINT_sm_action tree_get_file_size_setup(struct PINT_smcb *smcb,
     struct PVFS_server_req *req = s_op->req;
 
     assert(s_op->req->op == PVFS_SERV_TREE_GET_FILE_SIZE);
-
-    gossip_err("%s:s_op->num_pjmp_frames(%d)\n",__func__,s_op->u.tree_communicate.num_pjmp_frames);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,"%s:req->retry_msgpair_at_leaf:%s\n"
                 ,__func__
