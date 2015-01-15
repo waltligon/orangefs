@@ -390,7 +390,7 @@ static PINT_sm_action rmdirent_update_directory_attr(struct PINT_smcb *smcb,
     ds_attr = &(s_op->u.rmdirent.dirdata_ds_attr);
     PVFS_ds_attr_from_object_attr(ds_attr, tmp_attr_ptr);
 
-    /* setting dirent_handle dspace */
+    /* setting dspace */
     ret = job_trove_dspace_setattr(s_op->req->u.rmdirent.fs_id,
                                    s_op->req->u.rmdirent.dirent_handle,
                                    ds_attr,

@@ -12,6 +12,7 @@
 
 #ifndef _CAPCACHE_H
 #define _CAPCACHE_H
+
 #include <stdio.h>
 #include <stdint.h>
 #include <time.h>
@@ -21,7 +22,7 @@
 /* capcache property defaults */
 /* Default timeout of capability-cache entry in seconds */
 #ifndef CAPCACHE_TIMEOUT
-#define CAPCACHE_TIMEOUT        10
+#define CAPCACHE_TIMEOUT       10
 #endif
 
 /* Externally Visible Capability Cache API */
@@ -36,6 +37,6 @@ int PINT_capcache_insert(PVFS_capability *cap);
 int PINT_capcache_quick_sign(PVFS_capability *cap);
 
 /* End of Externally Visible Capability Cache API */
-
 #endif /* _CAPCACHE_H */
+
 #endif /* ENABLE_CAPCACHE */

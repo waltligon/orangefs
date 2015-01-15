@@ -313,6 +313,7 @@ static PINT_sm_action mgmt_create_dirent_setup_msgpair(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+/* V3 remove state - retry to MPA */
 static PINT_sm_action mgmt_create_dirent_retry_or_fail(struct PINT_smcb *smcb,
                                                        job_status_s *js_p)
 {       
@@ -321,9 +322,16 @@ static PINT_sm_action mgmt_create_dirent_retry_or_fail(struct PINT_smcb *smcb,
     /* if need to retry. clear the error_code and setup getattr. */
     if(js_p->error_code == -PVFS_EAGAIN)
     {
+/* V3
+ * && sm_p->u.mgmt_create_dirent.retry_count < sm_p->msgarray_op.params.retry_limit)
+    {
+        sm_p->u.mgmt_create_dirent.retry_count++;
+
         gossip_debug(GOSSIP_CLIENT_DEBUG,
            "mgmt-create-dirent: received -PVFS_EAGAIN,"
-           " will retry getattr and mgmt-create-dirent.\n");
+           " will retry getattr and mgmt-create-dirent (attempt number %d).\n",
+           sm_p->u.mgmt_create_dirent.retry_count);
+*/
  
         /* setup getattr */
         PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);

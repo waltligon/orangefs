@@ -55,7 +55,7 @@ struct pvfs2_param_extra
 */
 #if defined(HAVE_PROC_HANDLER_FILE_ARG)
 static int pvfs2_proc_debug_mask_handler(
-    ctl_table       *ctl,
+    struct ctl_table       *ctl,
     int             write,
     struct file     *filp,
     void            *buffer,
@@ -63,14 +63,14 @@ static int pvfs2_proc_debug_mask_handler(
     loff_t          *ppos)
 #elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
 static int pvfs2_proc_debug_mask_handler(
-    ctl_table       *ctl,
+    struct ctl_table       *ctl,
     int             write,
     void            *buffer,
     size_t          *lenp,
     loff_t          *ppos)
 #else
 static int pvfs2_proc_debug_mask_handler(
-    ctl_table       *ctl,
+    struct ctl_table       *ctl,
     int             write,
     struct file     *filp,
     void            *buffer,
@@ -165,7 +165,7 @@ static int pvfs2_proc_debug_mask_handler(
  */
 #if defined(HAVE_PROC_HANDLER_FILE_ARG)
 static int pvfs2_param_proc_handler(
-    ctl_table       *ctl,
+    struct ctl_table       *ctl,
     int             write,
     struct file     *filp,
     void            *buffer,
@@ -173,14 +173,14 @@ static int pvfs2_param_proc_handler(
     loff_t          *ppos)
 #elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
 static int pvfs2_param_proc_handler(
-    ctl_table       *ctl,
+    struct ctl_table       *ctl,
     int             write,
     void            *buffer,
     size_t          *lenp,
     loff_t          *ppos)
 #else
 static int pvfs2_param_proc_handler(
-    ctl_table       *ctl,
+    struct ctl_table       *ctl,
     int             write,
     struct file     *filp,
     void            *buffer,
@@ -191,7 +191,7 @@ static int pvfs2_param_proc_handler(
     struct pvfs2_param_extra* extra = ctl->extra1;
     int val = 0;
     int ret = 0;
-    ctl_table tmp_ctl = *ctl;
+    struct ctl_table tmp_ctl = *ctl;
 
     /* override fields in control structure for call to generic proc handler */
     tmp_ctl.data = &val;
@@ -256,7 +256,7 @@ static int pvfs2_param_proc_handler(
 
 #if defined(HAVE_PROC_HANDLER_FILE_ARG)
 static int pvfs2_pc_proc_handler(
-    ctl_table       *ctl,
+    struct ctl_table       *ctl,
     int             write,
     struct file     *filp,
     void            *buffer,
@@ -264,14 +264,14 @@ static int pvfs2_pc_proc_handler(
     loff_t          *ppos)
 #elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
 static int pvfs2_pc_proc_handler(
-    ctl_table       *ctl,
+    struct ctl_table       *ctl,
     int             write,
     void            *buffer,
     size_t          *lenp,
     loff_t          *ppos)
 #else
 static int pvfs2_pc_proc_handler(
-    ctl_table       *ctl,
+    struct ctl_table       *ctl,
     int             write,
     struct file     *filp,
     void            *buffer,
@@ -372,26 +372,6 @@ static struct pvfs2_param_extra acache_rec_extra = {
     .min = 0,
     .max = 100,
 };
-static struct pvfs2_param_extra static_acache_timeout_extra = {
-    .op = PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_TIMEOUT_MSECS,
-    .min = 0,
-    .max = INT_MAX,
-};
-static struct pvfs2_param_extra static_acache_hard_extra = {
-    .op = PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_HARD_LIMIT,
-    .min = 0,
-    .max = INT_MAX,
-};
-static struct pvfs2_param_extra static_acache_soft_extra = {
-    .op = PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_SOFT_LIMIT,
-    .min = 0,
-    .max = INT_MAX,
-};
-static struct pvfs2_param_extra static_acache_rec_extra = {
-    .op = PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_RECLAIM_PERCENTAGE,
-    .min = 0,
-    .max = 100,
-};
 static struct pvfs2_param_extra ncache_timeout_extra = {
     .op = PVFS2_PARAM_REQUEST_OP_NCACHE_TIMEOUT_MSECS,
     .min = 0,
@@ -429,6 +409,26 @@ static struct pvfs2_param_extra ccache_soft_extra = {
 };
 static struct pvfs2_param_extra ccache_rec_extra = {
     .op = PVFS2_PARAM_REQUEST_OP_CCACHE_RECLAIM_PERCENTAGE,
+    .min = 0,
+    .max = 100,
+};
+static struct pvfs2_param_extra capcache_timeout_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_CAPCACHE_TIMEOUT_SECS,
+    .min = 0,
+    .max = INT_MAX,
+};
+static struct pvfs2_param_extra capcache_hard_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_CAPCACHE_HARD_LIMIT,
+    .min = 0,
+    .max = INT_MAX,
+};
+static struct pvfs2_param_extra capcache_soft_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_CAPCACHE_SOFT_LIMIT,
+    .min = 0,
+    .max = INT_MAX,
+};
+static struct pvfs2_param_extra capcache_rec_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_CAPCACHE_RECLAIM_PERCENTAGE,
     .min = 0,
     .max = 100,
 };
@@ -475,7 +475,7 @@ static int min_slot_timeout_secs[] = {0}, max_slot_timeout_secs[] = {INT_MAX};
 #define CTL_STRATEGY(strat)     
 #endif /* HAVE_CTL_STRATEGY */
 
-static ctl_table pvfs2_acache_table[] = {
+static struct ctl_table pvfs2_acache_table[] = {
     /* controls acache timeout */
     {
         CTL_NAME(1)
@@ -514,47 +514,8 @@ static ctl_table pvfs2_acache_table[] = {
     },
     { CTL_NAME(CTL_NONE) }
 };
-static ctl_table pvfs2_static_acache_table[] = {
-    /* controls static acache timeout */
-    {
-        CTL_NAME(1)
-        .procname = "timeout-msecs",
-        .maxlen = sizeof(int),
-        .mode = 0644,
-        .proc_handler = &pvfs2_param_proc_handler,
-        .extra1 = &static_acache_timeout_extra
-    },
-    /* controls static acache hard limit */
-    {
-        CTL_NAME(2)
-        .procname = "hard-limit",
-        .maxlen = sizeof(int),
-        .mode = 0644,
-        .proc_handler = &pvfs2_param_proc_handler,
-        .extra1 = &static_acache_hard_extra
-    },
-    /* controls static acache soft limit */
-    {
-        CTL_NAME(3)
-        .procname = "soft-limit",
-        .maxlen = sizeof(int),
-        .mode = 0644,
-        .proc_handler = &pvfs2_param_proc_handler,
-        .extra1 = &static_acache_soft_extra
-    },
-    /* controls static acache reclaim percentage */
-    {
-        CTL_NAME(4)
-        .procname = "reclaim-percentage",
-        .maxlen = sizeof(int),
-        .mode = 0644,
-        .proc_handler = &pvfs2_param_proc_handler,
-        .extra1 = &static_acache_rec_extra,
-    },
-    { CTL_NAME(CTL_NONE) }
-};
 
-static ctl_table pvfs2_ncache_table[] = {
+static struct ctl_table pvfs2_ncache_table[] = {
     /* controls ncache timeout */
     {
         CTL_NAME(1)
@@ -594,7 +555,7 @@ static ctl_table pvfs2_ncache_table[] = {
     { CTL_NAME(CTL_NONE) }
 };
 
-static ctl_table pvfs2_ccache_table[] = {
+static struct ctl_table pvfs2_ccache_table[] = {
     /* controls credential cache timeout */
     {
         CTL_NAME(1)
@@ -634,10 +595,50 @@ static ctl_table pvfs2_ccache_table[] = {
     { CTL_NAME(CTL_NONE) }
 };
 
+static struct ctl_table pvfs2_capcache_table[] = {
+    /* controls capcache timeout */
+    {
+        CTL_NAME(1)
+        .procname = "timeout-secs",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &capcache_timeout_extra
+    },
+    /* controls capability cache hard limit */
+    {
+        CTL_NAME(2)
+        .procname = "hard-limit",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &capcache_hard_extra
+    },
+    /* controls capability cache soft limit */
+    {
+        CTL_NAME(3)
+        .procname = "soft-limit",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &capcache_soft_extra
+    },
+    /* controls capability cache reclaim percentage */
+    {
+        CTL_NAME(4)
+        .procname = "reclaim-percentage",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &capcache_rec_extra
+    },
+    { CTL_NAME(CTL_NONE) }
+};
+
 static int acache_perf_count = PVFS2_PERF_COUNT_REQUEST_ACACHE;
-static int static_acache_perf_count = PVFS2_PERF_COUNT_REQUEST_STATIC_ACACHE;
 static int ncache_perf_count = PVFS2_PERF_COUNT_REQUEST_NCACHE;
-static ctl_table pvfs2_pc_table[] = {
+static int capcache_perf_count = PVFS2_PERF_COUNT_REQUEST_CAPCACHE;
+static struct ctl_table pvfs2_pc_table[] = {
     {
         CTL_NAME(1)
         .procname = "acache",
@@ -647,14 +648,6 @@ static ctl_table pvfs2_pc_table[] = {
         .extra1 = &acache_perf_count,
     },
     {
-        CTL_NAME(1)
-        .procname = "static-acache",
-        .maxlen = 4096,
-        .mode = 0444,
-        .proc_handler = pvfs2_pc_proc_handler,
-        .extra1 = &static_acache_perf_count,
-    },
-    {
         CTL_NAME(2)
         .procname = "ncache",
         .maxlen = 4096,
@@ -662,12 +655,20 @@ static ctl_table pvfs2_pc_table[] = {
         .proc_handler = pvfs2_pc_proc_handler,
         .extra1 = &ncache_perf_count
     },
+    {
+        CTL_NAME(3)
+        .procname = "capcache",
+        .maxlen = 4096,
+        .mode = 0444,
+        .proc_handler = pvfs2_pc_proc_handler,
+        .extra1 = &capcache_perf_count
+    },
     { CTL_NAME(CTL_NONE) }
 };
 
 pvfs2_stats g_pvfs2_stats;
 
-static ctl_table pvfs2_stats_table[] = {
+static struct ctl_table pvfs2_stats_table[] = {
     /* shows number of hits in cache */
     {
         CTL_NAME(1)
@@ -705,7 +706,7 @@ static ctl_table pvfs2_stats_table[] = {
 
 
 
-static ctl_table pvfs2_table[] = {
+static struct ctl_table pvfs2_table[] = {
     /* outputs the available debugging keywords */
     {
         CTL_NAME(14)
@@ -792,14 +793,6 @@ static ctl_table pvfs2_table[] = {
         .mode = 0555,
         .child = pvfs2_acache_table
     },
-    /* subdir for static acache control */
-    {
-        CTL_NAME(9)
-        .procname = "static-acache",
-        .maxlen = 0,
-        .mode = 0555,
-        .child = pvfs2_static_acache_table
-    },
     {
         CTL_NAME(10)
         .procname = "perf-counters",
@@ -831,9 +824,17 @@ static ctl_table pvfs2_table[] = {
         .mode = 0555,
         .child = pvfs2_stats_table
     },
+    /* subdir for capability cache control */
+    {
+        CTL_NAME(14)
+        .procname = "capcache",
+        .maxlen = 0,
+        .mode = 0555,
+        .child = pvfs2_capcache_table
+    },
     { CTL_NAME(CTL_NONE) }
 };
-static ctl_table fs_table[] = {
+static struct ctl_table fs_table[] = {
     {
         CTL_NAME(13)
         .procname = "pvfs2",

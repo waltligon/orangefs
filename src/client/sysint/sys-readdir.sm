@@ -245,7 +245,7 @@ PVFS_error PVFS_sys_readdir(PVFS_object_ref ref,
         PVFS_perror_gossip("PVFS_isys_readdir call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "readdir", &error);
         if (ret)
@@ -253,9 +253,8 @@ PVFS_error PVFS_sys_readdir(PVFS_object_ref ref,
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -458,7 +457,7 @@ static PINT_sm_action readdir_init(struct PINT_smcb *smcb,
                                                    PVFS_ATTR_DISTDIR_ATTR,
                                PVFS_TYPE_DIRECTORY,
                                0);
-    
+
     /* keep dirent_count of all dirdata server in
        sm_p->getattr.size_array */
     sm_p->getattr.keep_size_array = 1;
@@ -796,18 +795,17 @@ static PINT_sm_action readdir_cleanup(struct PINT_smcb *smcb,
 
     }
 
-    /* deliberately free sm_p->getattr.size_array */
     if (sm_p->getattr.keep_size_array && sm_p->getattr.size_array)
     {
-        gossip_debug(GOSSIP_READDIR_DEBUG, 
-                "readdir_cleanup: freeing sm_p->getattr.size_array. \n");
-        free(sm_p->getattr.size_array);
-        sm_p->getattr.size_array = NULL;
+        gossip_debug(GOSSIP_READDIR_DEBUG,
+                     "%s: about to free: getattr->size_array = %p\n",
+                     __func__,
+                     (void *) sm_p->getattr.size_array);
+        PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->getattr.size_array);
     }
 
     /* cleanup tree request */
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
-
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     if(js_p->error_code != 0)

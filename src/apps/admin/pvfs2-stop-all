@@ -1,0 +1,100 @@
+#!/bin/bash
+# (C) 2013 Clemson University and The University of Chicago.
+#  See COPYING in top-level directory.
+
+# Purpose: Stop all PVFS2 Servers based on contents of config file.
+
+cd `dirname $0`
+
+help()
+{
+    SP=40
+    printf "%s\n" "Usage: pvfs2-stop-all -c <config_file_path> [OPTION]"
+    printf "%-${SP}s%s\n" "  -c, --conf <config_file_path>" "PVFS configuration file path"
+
+    printf "%-${SP}s%s\n" "  -e, --exclusions <exclusions_string>" "String of space separated expressions: "
+    printf "%-${SP}s%s\n" "" "    Addresses on the 'Alias' lines of the config file will be "
+    printf "%-${SP}s%s\n" "" "    excluded from the server list if any part of the "
+    printf "%-${SP}s%s\n" "" "    address matches any of the expressions."
+
+    printf "%-${SP}s%s\n" "  -h, --help" "Show help information"
+    printf "%-${SP}s%s\n" "  -o, --options <options_string>" "String of options passed to ssh"
+    printf "%-${SP}s%s\n" "" "    ex: -o \"-t headnode ssh\""
+}
+
+# optionally set by options
+PVFS_CONF_FILE=             #Ex: '/opt/orangefs/orangefs.conf'
+EXCLUSIONS=                   #Ex: 'ib0 myri0'
+SSH_OPTIONS=                #Ex: '-t another_host ssh'
+
+# Execute getopt
+ARGS=`getopt -o "c:e:ho:" -l "conf:,exclusions:,help,options:" -n "$0" -- "$@"`
+
+# Check if getopt returned an error b/c of bad arguments
+if [ $? -ne 0 ]; then
+    exit 1
+fi
+
+# Handle whitespace
+eval set -- "$ARGS"
+
+# Check for Required Options
+CONF_SET=0
+
+# Iterate over options
+while [ $# -ne 0 ]; do
+    case "$1" in
+        -c|--conf)
+        if [ -n "$2" ]; then
+            PVFS_CONF_FILE=$2
+            CONF_SET=1
+        fi
+        shift 2;;
+
+        -e|--exclusions)
+        EXCLUSIONS=$2
+        shift 2;;
+
+        -h|--help)
+        help
+        exit 0
+        shift 2;;
+
+        -o|--options)
+        if [ -n "$2" ]; then
+            SSH_OPTIONS=$2
+        fi
+        shift 2;;
+
+        --)
+        shift
+    esac
+done
+
+if [ $CONF_SET -eq 0 ]; then
+    help
+    exit 1
+fi
+
+# Store Server List in SERVERS variable
+SERVERS=`cat $PVFS_CONF_FILE | grep "Alias " | tr ' ,' '\n' | grep ":" | cut -d ':' -f2 | sed 's/\///g'`
+
+# Exclude hostnames from config file that match a certain expression
+if [ ${#EXCLUSIONS} -gt 0 ]; then
+    for EXCLUSION in $EXCLUSIONS; do
+        SERVERS=`echo $SERVERS | tr ' ' '\n' | grep -v "$EXCLUSION"`
+    done
+fi
+
+SPACING=$[`echo "$SERVERS" | wc -L`+4]
+
+# Stop Servers
+for SERVER in $SERVERS; do
+    OUTPUT=`ssh $SSH_OPTIONS $SERVER killall pvfs2-server 2>&1`
+    if [ `echo $OUTPUT | wc -m` -eq 1 ]; then
+        printf "%-${SPACING}s%s\n" "$SERVER:" "pvfs2-server killed"
+    else
+        printf "%-${SPACING}s%s\n" "$SERVER:" "$OUTPUT"
+    fi
+done
+

@@ -76,7 +76,9 @@ static void get_cert_subject(const PVFS_certificate *cert,
 {
     X509 *xcert = NULL;
     X509_NAME *xsubject;
-    
+
+    subject[0] = '\0';
+
     if (PINT_cert_to_X509(cert, &xcert) != 0)
     {
         return;
@@ -85,11 +87,14 @@ static void get_cert_subject(const PVFS_certificate *cert,
     xsubject = X509_get_subject_name(xcert);
     if (xsubject == NULL)
     {
+        X509_free(xcert);
         return;
     }
 
     X509_NAME_oneline(xsubject, subject, CERTCACHE_SUBJECT_SIZE);
     subject[CERTCACHE_SUBJECT_SIZE-1] = '\0';
+
+    X509_free(xcert);
 }
 
 /* get_expiration 
@@ -247,10 +252,16 @@ static void PINT_certcache_cleanup_data(certcache_data_t *certdata)
  */
 static void PINT_certcache_cleanup(void *entry)
 {
-    if (entry != NULL && ((seccache_entry_t *) entry)->data != NULL)
+    if (entry != NULL)
     {
-        PINT_certcache_cleanup_data((certcache_data_t *) 
-                                    ((seccache_entry_t *) entry)->data);
+        if (((seccache_entry_t *) entry)->data != NULL)
+        {
+            PINT_certcache_cleanup_data((certcache_data_t *) 
+                                        ((seccache_entry_t *) entry)->data);
+            ((seccache_entry_t *)entry)->data = NULL;
+        }
+        free(entry);
+        entry = NULL;
     }
 }
 
@@ -274,9 +285,7 @@ static void PINT_certcache_debug(const char *prefix,
  */
 int PINT_certcache_init(void)
 {
-    struct server_configuration_s *config;
-
-    config = get_server_config_struct();
+    struct server_configuration_s *config = PINT_get_server_config();
 
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Initializing certificate cache...\n");
 
@@ -286,8 +295,8 @@ int PINT_certcache_init(void)
         return -PVFS_ENOMEM;
     }
 
-    /* Set properties */
-    PINT_seccache_set(certcache, SECCACHE_TIMEOUT, config->security_timeout);
+    /* Set timeout */
+    PINT_seccache_set(certcache, SECCACHE_TIMEOUT, config->certcache_timeout);
 
     return 0;
 }

@@ -1,0 +1,8 @@
+#export ORANGEFS_PREFIX=
+export DB_DIR="/opt/db4"
+export PATH="${ORANGEFS_PREFIX}/bin:${ORANGEFS_PREFIX}/sbin:${PATH}"
+export JNI_LIBRARY_PATH="${ORANGEFS_PREFIX}/lib"
+export LD_LIBRARY_PATH="${ORANGEFS_PREFIX}/lib:${DB_DIR}/lib"
+ORANGEFS_STORAGE_DIR="/tmp/orangefs_hadoop_storage"
+export PVFS2TAB_FILE=../../../src/main/resources/conf/pvfs2tab
+ORANGEFS_CONF_FILE=../../../src/main/resources/conf/orangefs-server.conf

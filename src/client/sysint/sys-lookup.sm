@@ -608,7 +608,7 @@ PVFS_error PVFS_sys_ref_lookup(PVFS_fs_id fs_id,
                                int32_t follow_link,
                                PVFS_hint hints)
 {
-    PVFS_error ret, error;
+    PVFS_error ret, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_ref_lookup entered\n");
@@ -622,29 +622,22 @@ PVFS_error PVFS_sys_ref_lookup(PVFS_fs_id fs_id,
                                &op_id, 
                                hints, 
                                resp);
-
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_ref_lookup call", ret);
-        return ret;
+        error = ret;
     }
-
-    if (op_id != -1)
+    else if (!ret && op_id != -1)
     {
-        /* did not complete immediately, so we wait */
         ret = PVFS_sys_wait(op_id, "lookup", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
-        }
-        if (error)
-        {
-            ret = error;
+            error = ret;
         }
         PINT_sys_release(op_id);
     }
-
-    return ret;
+    return error;
 }
 
 /** Dereference a path string relative to the root directory.
@@ -968,8 +961,13 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    /* ensure a capability exists for the parent directory */
-    assert(sm_p->getattr.attr.mask & PVFS_ATTR_CAPABILITY); 
+    /* ensure a capability exists for the parent directory */    
+    if (!(sm_p->getattr.attr.mask & PVFS_ATTR_CAPABILITY))
+    {
+        gossip_err("%s: missing cap\n", __func__);
+        js_p->error_code = -PVFS_EACCES;
+        return SM_ACTION_COMPLETE;
+    }
 
     PINT_SERVREQ_LOOKUP_PATH_FILL(msg_p->req,
                                   sm_p->getattr.attr.capability,
@@ -1053,7 +1051,6 @@ static PINT_sm_action lookup_segment_verify_attr_present(
         gossip_debug(GOSSIP_LOOKUP_DEBUG, " -- NO attrs for %s\n",
                      cur_seg->seg_name);
 
-        /* nlmills: TODO: get capability too? */
         PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
         PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,  
                                    cur_seg->seg_resolved_refn,

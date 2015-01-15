@@ -1,7 +1,7 @@
 # (C) 2012 Clemson University
 # See COPYING in top-level directory.
 ===============================================================================
-Documentation - OrangeFS JNI and Hadoop Extensions
+Brief Documentation - OrangeFS JNI and Hadoop Client
 
   Exposing OrangeFS Direct Client User Interface Calls to Java Developers 
   through JNI.
@@ -9,28 +9,21 @@ Documentation - OrangeFS JNI and Hadoop Extensions
 ===============================================================================
 Step 1: 
 
-  JNI Only Instructions:
+  JNI Instructions:
 
-    ./configure --prefix=/opt/orangefs --enable-shared --enable-symbolic \
+    ./configure --prefix=/opt/orangefs --enable-shared \
             --enable-jni --with-jdk=<path_to_jdk>
     make
     sudo make install
-    make jni
-    sudo make jni_install
 
-  JNI and Hadoop Instructions:
-
-    ./configure --prefix=/opt/orangefs --enable-shared --enable-symbolic \
-            --enable-jni --with-jdk=<path_to_jdk> \
-            --enable-hadoop --with-hadoop=<path_to_hadoop>
-    make
-    sudo make install
+  For comprehensive documentation on using Hadoop with OrangeFS, please see:
+    http://www.omnibond.com/orangefs/docs/v_2_8_8/index.htm#Hadoop_Client.htm
 
 ===============================================================================
 Step 2:
 
   *Note: The environment variable LD_LIBRARY_PATH and JNI_LIBRARY_PATH should 
-    contain the path of your JNI libraries. 
+    contain the path of your JNI libraries and other required library paths. 
 
   ex:     
     export LD_LIBRARY_PATH=/opt/orangefs/lib
@@ -56,7 +49,7 @@ Step 3:
         }
     }
 
-  example of building Main.java:
+  example of building and running Main.java:
 
-    javac -cp ".:$LD_LIBRARY_PATH/ofs_jni.jar" Main.java
-    java -cp ".:$LD_LIBRARY_PATH/ofs_jni.jar" Main
+    javac -cp ".:/opt/orangefs/lib/orangefs-jni-2.9.0.jar" Main.java
+    java -cp ".:/opt/orangefs/lib/orangefs-jni-2.9.0.jar" Main

@@ -27,6 +27,7 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "sid.h"
+#include "client-capcache.h"
 
 #define IO_MAX_SEGMENT_NUM 50 
 #define IO_ATTR_MASKS (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|\
@@ -48,6 +49,7 @@ enum
     IO_MIRRORING,
     IO_NO_MIRRORING,
     IO_FATAL_ERROR,
+    IO_RENEW_CAPABILITY,
 };
 
 /* Helper functions local to sys-io.sm. */
@@ -213,7 +215,7 @@ machine pvfs2_client_io_sm
         jump pvfs2_msgpairarray_sm;
         IO_RETRY => io_datafile_setup_msgpairs;
         IO_FATAL_ERROR => io_cleanup;
-        default => io_analyze_results;
+        default => io_renew_capability;
     }
 /*
     state io_datafile_post_msgpairs_retry
@@ -243,9 +245,23 @@ machine pvfs2_client_io_sm
         run io_datafile_complete_operations;
         IO_DATAFILE_TRANSFERS_COMPLETE => io_analyze_results;
         IO_RETRY => io_datafile_post_msgpairs_retry;
+        IO_RENEW_CAPABILITY => io_renew_capability;
         default => io_datafile_complete_operations;
     }
 */
+    state io_renew_capability
+    {
+        run io_init;
+        default => io_renew_getattr;
+    }
+
+    state io_renew_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => io_datafile_setup_msgpairs;
+        default => io_analyze_results;
+    }
+
     state io_analyze_results
     {
         run io_analyze_results;
@@ -417,7 +433,7 @@ PVFS_error PVFS_sys_io(PVFS_object_ref ref,
         PVFS_perror_gossip("PVFS_isys_io call", ret);
         error = ret;
     }
-    else 
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "io", &error);
         if (ret)
@@ -427,7 +443,6 @@ PVFS_error PVFS_sys_io(PVFS_object_ref ref,
         }
         PINT_sys_release(op_id);
     } 
-
     return error;
 }
 
@@ -675,8 +690,10 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_init\n", sm_p);
 
     assert((js_p->error_code == 0) ||
-           (js_p->error_code == IO_RETRY));
+           (js_p->error_code == IO_RETRY) ||
+           (js_p->error_code == IO_RENEW_CAPABILITY));
 
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->object_ref,
                                IO_ATTR_MASKS, 
@@ -684,9 +701,9 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
                                0);
        
     if (js_p->error_code == IO_RETRY ||
-        (js_p->error_code == IO_RETRY_NODELAY))
+        (js_p->error_code == IO_RETRY_NODELAY) ||
+        (js_p->error_code == IO_RENEW_CAPABILITY))
     {
-        js_p->error_code = 0;
 
         /* V3 This should be done before retry not here */
         io_datafile_index_array_destroy(sm_p);
@@ -698,13 +715,20 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
             return SM_ACTION_COMPLETE;
         }
 
+        if (js_p->error_code == IO_RENEW_CAPABILITY)
+        {
+            gossip_debug(GOSSIP_IO_DEBUG, "  sys-io renewing capability.\n");
+            js_p->error_code = 0;
+            return SM_ACTION_COMPLETE;
+        }
         if(js_p->error_code == IO_RETRY_NODELAY)
         {
             gossip_debug(GOSSIP_IO_DEBUG, "  sys-io retrying without delay.\n");
             js_p->error_code = 0;
-            return 1;
+            return SM_ACTION_COMPLETE;
         }
         gossip_debug(GOSSIP_IO_DEBUG, "  sys-io retrying with delay.\n");
+        js_p->error_code = 0;
         return job_req_sched_post_timer(sm_p->msgarray_op.params.retry_delay,
                                         smcb,
                                         0,
@@ -1167,6 +1191,9 @@ static PINT_sm_action io_datafile_post_msgpairs(struct PINT_smcb *smcb,
     {
         PINT_client_io_ctx *cur_ctx = &sm_p->u.io.contexts[i];
         PINT_sm_msgpair_state *msg = &cur_ctx->msg;
+
+        /* reset op_status */
+        msg->op_status = 0;
 
         /* do not do this one again in retry case */
         if (cur_ctx->msg_recv_has_been_posted &&
@@ -1970,7 +1997,14 @@ check_next_step:
     {
         gossip_debug(GOSSIP_IO_DEBUG,
           "*** %s: some msgpairs to repost\n", __func__);
-        js_p->error_code = IO_RETRY;
+        if (js_p->error_code == -PVFS_EAGAIN)
+        {
+            js_p->error_code = IO_RENEW_CAPABILITY;
+        }
+        else
+        {
+            js_p->error_code = IO_RETRY;
+        }
     }
     else
     {
@@ -2413,9 +2447,13 @@ static PINT_sm_action io_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     io_datafile_index_array_destroy(sm_p);
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr); 
-    
+
     if(sm_p->u.io.dfile_size_array)
     {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "%s: about to free: sm_p->u.io.dfile_size_array = %p\n",
+                     __func__,
+                     (void *) sm_p->getattr.size_array);
         PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->u.io.dfile_size_array);
     }
 
@@ -2451,7 +2489,7 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
 {
     int ret = -PVFS_EINVAL;
 
-    gossip_debug(GOSSIP_IO_DEBUG, "- io_process_context_recv called\n");
+    gossip_debug(GOSSIP_IO_DEBUG, "%s called\n", __func__);
 
     assert(cur_ctx && decoded_resp && resp);
 
@@ -2481,13 +2519,13 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
         if (cur_ctx->msg.recv_status.error_code)
         {
             PVFS_perror_gossip(
-                    "io_process_context_recv (recv_status.error_code)",
+                    "io_decode_ack_response (recv_status.error_code)",
                     cur_ctx->msg.recv_status.error_code);
             ret = cur_ctx->msg.recv_status.error_code;
         }
         else if (cur_ctx->msg.op_status)
         {
-            PVFS_perror_gossip("io_process_context_recv (op_status)",
+            PVFS_perror_gossip("io_decode_ack_response (op_status)",
                                cur_ctx->msg.op_status);
             gossip_err("server: %s\n"
                       , BMI_addr_rev_lookup(cur_ctx->msg.svr_addr));
@@ -2501,7 +2539,7 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
                                          cur_ctx->msg.max_resp_sz);
             
         memset(&cur_ctx->msg.encoded_req,0,sizeof(cur_ctx->msg.encoded_req));
-        cur_ctx->msg.encoded_resp_p = NULL;
+        /* TODO: free msg capability? */
     }
     return ret;
 }
@@ -2854,7 +2892,7 @@ static inline int io_process_context_recv(PINT_client_sm *sm_p,
     {
         {
             char buf[1024];
-            PVFS_strerror_r(js_p->error_code, buf, sizeof(buf));
+            PVFS_strerror_r(ret, buf, sizeof(buf));
             buf[sizeof(buf)-1] = '\0';
             gossip_debug(GOSSIP_IO_DEBUG, "%s: failed: %s\n", __func__, buf);
         }
@@ -2873,6 +2911,8 @@ static inline int io_process_context_recv(PINT_client_sm *sm_p,
 
     memset(&cur_ctx->msg.encoded_req, 0, sizeof(cur_ctx->msg.encoded_req));
     cur_ctx->msg.encoded_resp_p = NULL;
+
+    /* TODO: free msg capability? */
 
     if (ret)
     {
@@ -2898,16 +2938,24 @@ static inline int io_check_message_status(PINT_sm_msgpair_state *msg_p,
     if (msg_p->send_status.error_code)
     {
         gossip_debug(GOSSIP_IO_DEBUG,
-                     "  error (%d) in msgpair send for context %p\n",
+                     "  error (%d) in msgpair send for message %p\n",
                      msg_p->send_status.error_code, msg_p);
         ret = msg_p->send_status.error_code;
     }
     else if (msg_p->recv_status.error_code)
     {
         gossip_debug(GOSSIP_IO_DEBUG,
-                     "  error (%d) in msgpair recv for context %p\n",
+                     "  error (%d) in msgpair recv for message %p\n",
                      msg_p->recv_status.error_code, msg_p);
         ret = msg_p->recv_status.error_code;
+    }
+    else if (msg_p->op_status)
+    {
+        gossip_debug(GOSSIP_IO_DEBUG,
+                     "  error (%d) in op_status for message %p\n",
+                     msg_p->op_status,
+                     msg_p);
+        ret = msg_p->op_status;
     }
     else if (io_type == PVFS_IO_WRITE)
     {

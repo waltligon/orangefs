@@ -270,10 +270,10 @@ static __keyword_mask_t s_kmod_keyword_mask_map[] =
 };
 
 static const int num_kmod_keyword_mask_map = (int)           \
-(sizeof(s_kmod_keyword_mask_map) / sizeof(__keyword_mask_t));
+        (sizeof(s_kmod_keyword_mask_map) / sizeof(__keyword_mask_t));
 
 static const int num_keyword_mask_map = (int)           \
-(sizeof(s_keyword_mask_map) / sizeof(__keyword_mask_t));
+        (sizeof(s_keyword_mask_map) / sizeof(__keyword_mask_t));
 
 #endif /* __PVFS2_DEBUG_H */
 

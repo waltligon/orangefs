@@ -1112,12 +1112,27 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
                                            &decoded_resp,
                                            &msg_p->svr_addr,
                                            msg_p->max_resp_sz);
+
+    /* cleanup capability
+     * Maybe should be part of serv_free_msgpair_resources - V3
+     */
+    PINT_cleanup_capability(&msg_p->req.capability);
+
     if (ret)
     {
         PVFS_perror_gossip("Failed to free msgpair resources", ret);
         js_p->error_code = ret;
         return SM_ACTION_TERMINATE;
     }
+
+ /* Old code - but why don't we ever set complete to 1?
+  * This may be something we need to do, or may be obsolete - V3
+  */
+    /*
+     * mark that this msgpair has been completed and should not be
+     * retried in the case of possible future retries
+     */
+     msg_p->complete = 1;
 
     if (msg_p->op_action == PVFS_MPA_RETRY)
     {
@@ -1290,8 +1305,8 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
                                            &msg_p->svr_addr,
                                            msg_p->max_resp_sz);
 
-    memset(&msg_p->encoded_req, 0, sizeof(msg_p->encoded_req));
     msg_p->encoded_resp_p = NULL;
+    PINT_cleanup_capability(&msg_p->req.capability);
 
     if (ret)
     {
@@ -1358,8 +1373,15 @@ static inline int io_decode_message_recv(PINT_sm_msgpair_state *msg_p,
                                          &msg_p->svr_addr,
                                          msg_p->max_resp_sz);
             
-        memset(&msg_p->encoded_req, 0, sizeof(msg_p->encoded_req));
         msg_p->encoded_resp_p = NULL;
+        PINT_cleanup_capability(&msg_p->req.capability);
+
+        if (ret)
+        {
+            PVFS_perror_gossip("PINT_serv_free_msgpair_resources "
+                               "failed", ret);
+            return ret;
+        }
     }
     return ret;
 }

@@ -29,6 +29,7 @@
 #include "ncache.h"
 #include "sid.h"
 #include "dist-dir-utils.h"
+#include "client-capcache.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -424,7 +425,7 @@ PVFS_error PVFS_sys_rename(char *old_entry,
         PVFS_perror_gossip("PVFS_isys_rename call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "rename", &error);
         if (ret)
@@ -432,9 +433,8 @@ PVFS_error PVFS_sys_rename(char *old_entry,
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -820,6 +820,8 @@ static PINT_sm_action rename_parent_getattr_setup_msgpair_array(
             break;
         }
     }
+
+    PINT_cleanup_capability(&capability);
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
@@ -1225,6 +1227,9 @@ static PINT_sm_action rename_check_for_remove(struct PINT_smcb *smcb,
     {
         PINT_copy_capability(&sm_p->u.rename.caps[1],
                              &sm_p->parent_capability);
+        PVFS_hint_replace(&sm_p->hints, PVFS_HINT_HANDLE_NAME,
+                          sizeof(PVFS_handle),
+                          &sm_p->u.rename.parent_refns[1].handle);
         js_p->error_code = RENAME_REMOVE_REQUIRED;
     }
 
@@ -1304,6 +1309,8 @@ static PINT_sm_action rename_crdirent_retry_or_fail(struct PINT_smcb *smcb,
     /* try again if we get a -PVFS_EAGAIN failure. */
     if (js_p->error_code == -PVFS_EAGAIN) 
     {
+        PVFS_uid local_uid;
+
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                 "rename_crdirent: received -PVFS_EAGAIN, wrong dirdata server, "
                 "will do getattr and retry crdirent!\n");
@@ -1312,7 +1319,22 @@ static PINT_sm_action rename_crdirent_retry_or_fail(struct PINT_smcb *smcb,
         PINT_acache_invalidate(sm_p->u.rename.parent_refns[1]);
         js_p->error_code = RENAME_CRDIRENT_RETRY_NEED_GETATTR;
 
-        return  SM_ACTION_COMPLETE;
+        /* clear capcache content */
+        local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+
+        if (local_uid == (PVFS_uid) -1)
+        {
+            local_uid = PINT_util_getuid();
+
+            PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
+                          sizeof(PVFS_uid), &local_uid);
+        }
+
+        PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+
+        js_p->error_code = RENAME_CRDIRENT_RETRY_NEED_GETATTR;
+
+        return SM_ACTION_COMPLETE;
     }
 
     /* try again (up to a point) if we get a comm. failure. */
@@ -1355,7 +1377,7 @@ static PINT_sm_action rename_crdirent_getattr_setup(struct PINT_smcb *smcb,
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->u.rename.parent_refns[1],
-        PVFS_ATTR_DISTDIR_ATTR,
+        PVFS_ATTR_CAPABILITY|PVFS_ATTR_DISTDIR_ATTR,
         PVFS_TYPE_DIRECTORY,
         0);
 
@@ -1411,8 +1433,11 @@ static PINT_sm_action rename_rmdirent_retry_or_fail(struct PINT_smcb *smcb,
 
 
     /* try again if we get a -PVFS_EAGAIN failure. */
-    if (js_p->error_code == -PVFS_EAGAIN) 
+    if (js_p->error_code == -PVFS_EAGAIN &&
+        sm_p->u.rename.retry_count < sm_p->msgarray_op.params.retry_limit) 
     {
+        sm_p->u.rename.retry_count++;
+
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                 "rename_rmdirent: received -PVFS_EAGAIN, wrong dirdata server, "
                 "will do getattr and retry rmdirent!\n");
@@ -1469,7 +1494,7 @@ static PINT_sm_action rename_rmdirent_getattr_setup(struct PINT_smcb *smcb,
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index],
-        PVFS_ATTR_DISTDIR_ATTR,
+        PVFS_ATTR_CAPABILITY|PVFS_ATTR_DISTDIR_ATTR,
         PVFS_TYPE_DIRECTORY,
         0);
 

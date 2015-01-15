@@ -113,10 +113,10 @@ static __inline__ int PVFS_OID_cmp(const PVFS_OID *oid1, const PVFS_OID *oid2)
 
 #define PVFS_OID_EQ(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) == 0)
 #define PVFS_OID_NE(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) != 0)
-#define PVFS_OID_GT(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) > 0)
+#define PVFS_OID_GT(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) >  0)
 #define PVFS_OID_GE(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) >= 0)
-#define PVFS_OID_LT(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) < 0)
-#define PVFS_OID_LE(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) <=0)
+#define PVFS_OID_LT(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) <  0)
+#define PVFS_OID_LE(oid1, oid2) (PVFS_OID_cmp((oid1), (oid2)) <= 0)
 
 static __inline__ void PVFS_OID_cpy(PVFS_OID *dst, const PVFS_OID *src)
 {

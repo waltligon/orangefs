@@ -1006,7 +1006,6 @@ static int server_initialize_subsystems(
             init_flags |= TROVE_DB_CACHE_MMAP;
         }
 
-
         /* Fire up TROVE */
         ret = trove_initialize(server_config.trove_method, 
                                trove_coll_to_method_callback,
@@ -1997,28 +1996,38 @@ static int server_shutdown(PINT_server_status_flag status,
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         security "
                      "module           [ stopped ]\n");
     }
+#ifdef ENABLE_CERTCACHE    
+    if (status & SERVER_CERTCACHE_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting certificate "
+                     "cache         [   ...   ]\n");
+        PINT_certcache_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         certificate "
+                     "cache         [ stopped ]\n");
+    }
+#endif /* ENABLE_CERTCACHE */
+
+#ifdef ENABLE_CREDCACHE
+    if (status & SERVER_CREDCACHE_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting credential "
+                     "cache          [   ...   ]\n");
+        PINT_credcache_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         credential "
+                     "cache          [ stopped ]\n");
+    }
+#endif /* ENABLE_CREDCACHE */
 
 #ifdef ENABLE_CAPCACHE    
     if (status & SERVER_CAPCACHE_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting capability "
-                     "cache           [   ...   ]\n");
+                     "cache          [   ...   ]\n");
         PINT_capcache_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         capability "
-                     "cache           [ stopped ]\n");
+                     "cache          [ stopped ]\n");
     }
 #endif /* ENABLE_CAPCACHE */
-
-#ifdef ENABLE_CERTCACHE    
-    if (status & SERVER_CERTCACHE_INIT)
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting certificate "
-                     "cache           [   ...   ]\n");
-        PINT_certcache_finalize();
-        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         certificate "
-                     "cache           [ stopped ]\n");
-    }
-#endif /* ENABLE_CERTCACHE */
 
     if (status & SERVER_ENCODER_INIT)
     {
@@ -2050,10 +2059,10 @@ static int server_shutdown(PINT_server_status_flag status,
     if (status & SERVER_UID_MGMT_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting uid management "
-                     "interface     [   ...   ]\n");
+                     "interface  [   ...   ]\n");
         PINT_uid_mgmt_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         uid management "
-                     "interface     [ stopped ]\n");
+                     "interface  [ stopped ]\n");
 
     }
 
@@ -2091,7 +2100,7 @@ static void server_sig_handler(int sig)
     {
         if (sig != SIGSEGV)
         {
-            gossip_err("\nPVFS2 server got signal %d "
+            gossip_err("PVFS2 server got signal %d "
                        "(server_status_flag: %d)\n",
                        sig, (int)server_status_flag);
         }
@@ -2299,12 +2308,6 @@ static int server_parse_cmd_line_args(int argc, char **argv)
             gossip_err("Failure copying configuration file path\n");
             goto parse_cmd_line_args_failure;
         }
-    }
-
-    if( fs_conf == NULL )
-    {
-        gossip_err("Failure copying configuration file path\n");
-        goto parse_cmd_line_args_failure;
     }
 
     if(argc - total_arguments > 2)

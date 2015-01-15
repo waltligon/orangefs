@@ -549,6 +549,14 @@ PVFS_error PVFS_sys_dist_setparam(
     const char *param,
     void *value);
 
+PVFS_error PVFS_dist_pv_pairs_extract_and_add(
+    const char * pv_pairs,
+    void * dist);
+
+PVFS_error PVFS_dist_pv_pair_split(
+    const char * pv_pair,
+    void *dist);
+
 PVFS_error PVFS_isys_geteattr(
     PVFS_object_ref ref,
     const PVFS_credential *credential,

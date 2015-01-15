@@ -16,7 +16,7 @@ static hash_table_t *uid_hash_table = NULL;
 
 static gen_mutex_t uid_mgmt_mutex = GEN_MUTEX_INITIALIZER;
 
-static int uid_hash_compare_keys(void* key, list_head_t *link);
+static int uid_hash_compare_keys(const void* key, list_head_t *link);
 
 /* PINT_uid_mgmt_initialize()
  *
@@ -166,9 +166,9 @@ int PINT_add_user_to_uid_mgmt(PVFS_uid userID)
  *
  * Compare will return true if hash entry has same uid as a given key.
  */
-static int uid_hash_compare_keys(void* key, list_head_t *link)
+static int uid_hash_compare_keys(const void* key, list_head_t *link)
 {
-    PVFS_uid uid = *(PVFS_uid *)key;
+    PVFS_uid uid = *(const PVFS_uid *)key;
     PINT_uid_mgmt_s *tmp_entry = NULL;
 
     tmp_entry = qhash_entry(link, PINT_uid_mgmt_s, hash_link);

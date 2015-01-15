@@ -121,7 +121,6 @@ PVFS_error PVFS_imgmt_remove_dirent(PVFS_object_ref parent_ref,
 
     sm_p->parent_ref = parent_ref;
     sm_p->u.mgmt_remove_dirent.entry = entry;
-
     PVFS_hint_copy(hints, &sm_p->hints);
 
     gossip_debug(
@@ -288,6 +287,9 @@ static PINT_sm_action mgmt_remove_dirent_setup_msgpair(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+/* retry should be dealt with in MPA so it is done them all of the time
+ * so this state should probably just go away - V3
+ */
 static PINT_sm_action mgmt_remove_dirent_retry_or_fail(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {           
@@ -296,7 +298,17 @@ static PINT_sm_action mgmt_remove_dirent_retry_or_fail(
     /* if need to retry. clear the error_code and setup getattr. */
     if(js_p->error_code == -PVFS_EAGAIN)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt-remove-dirent: received -PVFS_EAGAIN, will retry getattr and mgmt-remove-dirent.\n");
+/* V3 remove
+        && sm_p->u.mgmt_remove_dirent.retry_count < sm_p->msgarray_op.params.retry_limit)
+    {
+        sm_p->u.mgmt_remove_dirent.retry_count++;
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "mgmt-remove-dirent: received -PVFS_EAGAIN, "
+                     "will retry getattr and mgmt-remove-dirent "
+                     "(attempt number %d).\n",
+                     sm_p->u.mgmt_remove_dirent.retry_count);
+*/
         
         /* setup getattr */
         PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);

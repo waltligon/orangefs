@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2011 Clemson University and Omnibond LLC
+ * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -37,13 +37,13 @@ int split_path(char *fs_path,
     int ret;
 
     /* get base dir */
-    ret = PINT_get_base_dir(fs_path, base_dir, base_dir_len);
+    ret = PINT_get_base_dir(fs_path, base_dir, (int) base_dir_len);
 
     if (ret != 0)
         return ret;
 
     /* get entry name */
-    ret = PINT_remove_base_dir(fs_path, entry_name, entry_name_len);
+    ret = PINT_remove_base_dir(fs_path, entry_name, (int) entry_name_len);
 
     return ret;
 }
@@ -53,7 +53,7 @@ int fs_initialize(const char *tabfile,
                   char *error_msg,
                   size_t error_msg_len)
 {
-    int ret, i, found_one = 0;
+    int ret;
     char errbuf[256];
 
     /* read tab file */
@@ -70,26 +70,22 @@ int fs_initialize(const char *tabfile,
     if (ret < 0)
     {
         PVFS_strerror_r(ret, errbuf, 256);
-        _snprintf(error_msg, error_msg_len, "PVFS_sys_initialize: %s", errbuf);
+        _snprintf(error_msg, error_msg_len, "fs_initialize: PVFS_sys_initialize "
+            "returned '%s' (%d)", errbuf, ret);
         return ret;
     }
     
     /* initialize file systems */
-    for (i = 0; i < tab->mntent_count; i++)
+    ret = PVFS_sys_fs_add(&tab->mntent_array[0]);
+    if (ret != 0)
     {
-        ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
-        if (ret == 0)
-            found_one = 1;
-    }
-
-    if (!found_one)
-    {
-        _snprintf(error_msg, error_msg_len, "fs_initialize: could not initialize any "
-            "file systems from %s", tab->tabfile_name);
+        _snprintf(error_msg, error_msg_len, "fs_initialize: could not initialize "
+            "file system from %s.\n\nCheck whether file system is running and "
+            "network route from client to server", tab->tabfile_name);
 
         PINT_release_pvfstab();
         PVFS_sys_finalize();
-        return -1;
+        return ret;
     }
 
     return 0;
@@ -106,22 +102,12 @@ int fs_resolve_path(const char *local_path,
                     char *fs_path,
                     size_t fs_path_max)
 {
-    /* struct PVFS_sys_mntent *mntent; */
-    /* char *trans_path, *full_path; */
     char *inptr, *outptr;
-    /* PVFS_fs_id fs_id; */
     size_t count;
 
     if (local_path == NULL || fs_path == NULL ||
         fs_path_max == 0)
         return -1;
-
-    /*
-    trans_path = (char *) malloc(strlen(local_path) + 1);
-    if (trans_path == NULL)
-    {
-        return -1;   /* TODO */
-    /* } */
 
     /* remove drive: if necessary */
     if (strlen(local_path) >= 2 && local_path[1] == ':')
@@ -140,35 +126,6 @@ int fs_resolve_path(const char *local_path,
             *outptr = *inptr;
     }
     *outptr = '\0';
-
-#if 0
-    mntent = fs_get_mntent(0);
-    
-    full_path = (char *) malloc(strlen(trans_path) + 
-                                strlen(mntent->mnt_dir) + 2);
-    if (full_path == NULL)
-    {
-        free(trans_path);
-        return -1;
-    }
-    
-    /* prepend mount directory to path */
-    strcpy(full_path, mntent->mnt_dir);
-    /* append path */
-    if (full_path[strlen(full_path)-1] != '/')
-        strcat(full_path, "/");
-    if (trans_path[0] == '/')
-        strcat(full_path, trans_path+1);
-    else
-        strcat(full_path, trans_path);
-    /* strncpy(fs_path, full_path, fs_path_max); */
-
-    /* resolve the path against PVFS */
-    ret = PVFS_util_resolve(full_path, &fs_id, fs_path, fs_path_max);
-
-    free(full_path);
-    free(trans_path);
-#endif 
 
     return 0;
 }
@@ -689,6 +646,7 @@ fs_mkdir_exit:
     return ret;
 }
 
+/* NOTE: deprecated... use fs_io2 */
 int fs_io(enum PVFS_io_type io_type,
           char *fs_path,
           void *buffer,
@@ -698,9 +656,9 @@ int fs_io(enum PVFS_io_type io_type,
           PVFS_credential *credential)
 {
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
-    PVFS_sysresp_lookup resp_lookup;
-    PVFS_object_ref object_ref;
+    PVFS_sysresp_lookup resp_lookup;    
     PVFS_Request file_req, mem_req;
+    PVFS_object_ref object_ref;
     PVFS_sysresp_io resp_io;
     int ret;
 
@@ -721,7 +679,7 @@ int fs_io(enum PVFS_io_type io_type,
     /* get memory buffer */
     file_req = PVFS_BYTE;
 
-    ret = PVFS_Request_contiguous(buffer_len, PVFS_BYTE, &(mem_req));
+    ret = PVFS_Request_contiguous((int32_t) buffer_len, PVFS_BYTE, &(mem_req));
     if (ret != 0)
         goto fs_io_exit;
 
@@ -736,6 +694,36 @@ int fs_io(enum PVFS_io_type io_type,
     PVFS_Request_free(&mem_req);
 
 fs_io_exit:
+
+    return ret;
+}
+
+/* new IO function designed for IO cache */
+int fs_io2(enum PVFS_io_type io_type,
+           PVFS_object_ref object_ref,
+           void *buffer,
+           size_t buffer_len,
+           uint64_t offset,
+           PVFS_size *op_len,
+           PVFS_credential *credential,
+           PVFS_Request req)
+{
+    PVFS_Request file_req;    
+    PVFS_sysresp_io resp_io;
+    int ret;
+
+    if (buffer == NULL || credential == NULL || req == NULL)
+        return -PVFS_EINVAL;
+
+    file_req = PVFS_BYTE;
+    
+    ret = PVFS_sys_io(object_ref, file_req, offset, buffer, req, credential, 
+        &resp_io, io_type, NULL);
+
+    if (ret == 0 && op_len != NULL)
+    {
+        *op_len = resp_io.total_completed;
+    }
 
     return ret;
 }
@@ -809,11 +797,12 @@ int fs_find_files(char *fs_path,
             if (resp_readdirplus.stat_err_array[i] == 0)
             {
                 memcpy(&attr_array[i], &resp_readdirplus.attr_array[i], sizeof(PVFS_sys_attr));
-                /* TODO: DEBUG */
+                /* DEBUG
                 if (resp_readdirplus.attr_array[i].link_target)
                 {
                     DbgPrint("    %s link: %s\n", filename_array[i], resp_readdirplus.attr_array[i].link_target);                    
                 }
+                */
             }
             else
             {
@@ -914,7 +903,6 @@ char *fs_get_name(int fs_num)
 
 int fs_finalize()
 {
-    /* TODO */
     PVFS_sys_finalize();
 
     return 0;
