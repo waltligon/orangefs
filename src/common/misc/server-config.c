@@ -1981,6 +1981,8 @@ DOTCONF_CB(get_client_retry_limit)
     struct server_configuration_s *config_s = 
              (struct server_configuration_s *)cmd->context;
     config_s->client_retry_limit = cmd->data.value;
+gossip_debug(GOSSIP_SERVER_DEBUG, "client_retry_limit = %d\n",
+                     config_s->client_retry_limit);
     return NULL;
 }
 
@@ -2740,6 +2742,9 @@ DOTCONF_CB(get_attr_cache_size)
     assert(fs_conf);
 
     fs_conf->attr_cache_size = (int)cmd->data.value;
+gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "attr_cache_size = %d\n", 
+                     fs_conf->attr_cache_size);
     return NULL;
 }
 
@@ -3764,8 +3769,18 @@ DOTCONF_CB(distr_dir_servers_initial)
 {
     struct server_configuration_s *config_s =
         (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
 
-    config_s->distr_dir_servers_initial = cmd->data.value;
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    fs_conf->default_distr_dir_servers_initial = cmd->data.value;
+gossip_debug(GOSSIP_SERVER_DEBUG, "default_distr_dir_servers_initial = %d\n",
+                     fs_conf->default_distr_dir_servers_initial);
+    if(fs_conf->default_distr_dir_servers_initial <= 0)
+    {
+        return("Error DistrDirServersInitial must be positive.\n");
+    }
 
     return NULL;
 }
@@ -3774,8 +3789,16 @@ DOTCONF_CB(distr_dir_servers_max)
 {
     struct server_configuration_s *config_s =
             (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
 
-    config_s->distr_dir_servers_max = cmd->data.value;
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    fs_conf->default_distr_dir_servers_max = cmd->data.value;
+    if(fs_conf->default_distr_dir_servers_max <= 0)
+    {
+        return("Error DistrDirServersMax must be positive.\n");
+    }
 
     return NULL;
 }
@@ -3784,12 +3807,19 @@ DOTCONF_CB(distr_dir_split_size)
 {
     struct server_configuration_s *config_s =
             (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
 
-    config_s->distr_dir_split_size = cmd->data.value;
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    fs_conf->default_distr_dir_split_size = cmd->data.value;
+    if(fs_conf->default_distr_dir_split_size <= 0)
+    {
+        return("Error DistrDirSplitSize must be positive.\n");
+    }
 
     return NULL;
 }
-
 
 /*
  * Function: PINT_config_release
