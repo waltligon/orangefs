@@ -1981,8 +1981,6 @@ DOTCONF_CB(get_client_retry_limit)
     struct server_configuration_s *config_s = 
              (struct server_configuration_s *)cmd->context;
     config_s->client_retry_limit = cmd->data.value;
-gossip_debug(GOSSIP_SERVER_DEBUG, "client_retry_limit = %d\n",
-                     config_s->client_retry_limit);
     return NULL;
 }
 
@@ -2742,9 +2740,6 @@ DOTCONF_CB(get_attr_cache_size)
     assert(fs_conf);
 
     fs_conf->attr_cache_size = (int)cmd->data.value;
-gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "attr_cache_size = %d\n", 
-                     fs_conf->attr_cache_size);
     return NULL;
 }
 
@@ -3775,8 +3770,6 @@ DOTCONF_CB(distr_dir_servers_initial)
         PINT_llist_head(config_s->file_systems);
 
     fs_conf->default_distr_dir_servers_initial = cmd->data.value;
-gossip_debug(GOSSIP_SERVER_DEBUG, "default_distr_dir_servers_initial = %d\n",
-                     fs_conf->default_distr_dir_servers_initial);
     if(fs_conf->default_distr_dir_servers_initial <= 0)
     {
         return("Error DistrDirServersInitial must be positive.\n");
