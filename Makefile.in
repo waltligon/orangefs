@@ -92,8 +92,9 @@ BUILD_USER_ENV_VARS = @BUILD_USER_ENV_VARS@
 BUILD_UCACHE = @BUILD_UCACHE@
 BUILD_JNI = @BUILD_JNI@
 BUILD_FUSE = @BUILD_FUSE@
-BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
+BUILD_SERVER = @BUILD_SERVER@
+BUILD_CLIENT = @BUILD_CLIENT@
 BUILD_KERNEL = @BUILD_KERNEL@
 ENABLE_SECURITY_KEY = @ENABLE_SECURITY_KEY@
 ENABLE_SECURITY_CERT = @ENABLE_SECURITY_CERT@
@@ -846,7 +847,11 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
+ifdef BUILD_CLIENT
 all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools kernapps $(VISS) $(KARMA) $(FUSE) 
+else
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools $(VISS) $(KARMA) $(FUSE) 
+endif
 endif
 
 # target for building admin tools
@@ -1494,22 +1499,24 @@ endif
 
 ifdef BUILD_SERVER
 	install -m 755 $(ADMINTOOLS_SERVER) $(bindir)
-	install -m 755 $(KERNAPPS) $(KERNAPPSTHR) $(sbindir)
+    ifdef BUILD_CLIENT
+		install -m 755 $(KERNAPPS) $(KERNAPPSTHR) $(sbindir)
+    endif
     ifeq ($(NPTL_WORKAROUND),)
-	install -m 755 $(SERVER) $(sbindir)
+		install -m 755 $(SERVER) $(sbindir)
     else
-	install -m 755 $(srcdir)/$(SERVER_STUB) $(sbindir)/pvfs2-server
-	install -m 755 $(SERVER) $(sbindir)/pvfs2-server.bin
+		install -m 755 $(srcdir)/$(SERVER_STUB) $(sbindir)/pvfs2-server
+		install -m 755 $(SERVER) $(sbindir)/pvfs2-server.bin
     endif
 	rm -f $(bindir)/.pvfs2-genconfig-* &> /dev/null
     ifdef ENABLE_SECURITY_KEY
-	touch $(bindir)/.pvfs2-genconfig-key
+		touch $(bindir)/.pvfs2-genconfig-key
         ifeq ($(UID),0)
-		chmod ug+s ${bindir}/pvfs2-gencred
+			chmod ug+s ${bindir}/pvfs2-gencred
         endif
     endif
     ifdef ENABLE_SECURITY_CERT
-	touch $(bindir)/.pvfs2-genconfig-cert
+		touch $(bindir)/.pvfs2-genconfig-cert
     endif
 endif
 	# create etc dir under install dir

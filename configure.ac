@@ -491,12 +491,6 @@ AC_ARG_ENABLE(karma,
 [test_for_karma]
 )
 
-dnl shared or static client library (see --enable-shared below)
-AC_ARG_ENABLE(static,
-[  --disable-static        Do not build static client library],
-[build_static=$enableval], [build_static=yes])
-AC_SUBST(build_static)
-
 dnl NOTE: removing the linux-gnu host check for now; we may want to put it back
 dnl before releaseing any code, though...  -Phil
 dnl 
@@ -991,11 +985,22 @@ AC_ARG_ENABLE(segv-backtrace,
 )
 AC_SUBST(PVFS2_SEGV_BACKTRACE)
 
+dnl kernel module client and client-core
+AC_ARG_ENABLE(client,
+    [  --disable-client        Do not build client and client-core],
+    [BUILD_CLIENT=""], [BUILD_CLIENT=1])
+AC_SUBST(BUILD_CLIENT)
+
+dnl shared or static client library (see --enable-shared below)
+AC_ARG_ENABLE(static,
+    [  --disable-static        Do not build static client library],
+    [build_static=$enableval], [build_static=yes])
+AC_SUBST(build_static)
+
 dnl shared or static client library
 AC_ARG_ENABLE(shared,
     [  --enable-shared         Build shared client library],
-    [build_shared=$enableval],
-    [build_shared=no])
+    [build_shared=$enableval], [build_shared=no])
 AC_SUBST(build_shared)
 
 dnl Bad things happen in the makefile if you happen to --disable-static
@@ -1889,6 +1894,24 @@ fi
 # print PVFS configs (not used by BMI)
 if test "x$BUILD_BMI_ONLY" != "x1" ; then
 
+if test "x$BUILD_SERVER" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
+   AC_MSG_RESULT([PVFS2 configured to build server                  : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured to build server                  :  no])
+fi
+
+if test "x$BUILD_CLIENT" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
+   AC_MSG_RESULT([PVFS2 configured to build client-core             : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured to build client-core             :  no])
+fi
+
+if test "x$BUILD_KERNEL" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
+   AC_MSG_RESULT([PVFS2 configured to build kernel module           : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured to build kernel module           :  no])
+fi
+
 if test "x$BUILD_KARMA" = "x1" ; then
    AC_MSG_RESULT([PVFS2 configured to build karma gui               : yes])
 else
@@ -1955,6 +1978,12 @@ else
    AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          : yes])
 fi
 
+if test "x$ENABLE_PROFILING" = "x1"; then
+   AC_MSG_RESULT([PVFS2 configured with profiling enabled           : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured with profiling enabled           :  no])
+fi
+
 if test "x$ENABLE_CAPCACHE" = "x1"; then
    AC_MSG_RESULT([PVFS2 server capability cache enabled             : yes])
 else
@@ -1983,18 +2012,6 @@ if test "x$ENABLE_SECURITY_CERT" = "x1"; then
    AC_MSG_RESULT([PVFS2 configured with certificate-based security  : yes])
 else
    AC_MSG_RESULT([PVFS2 configured with certificate-based security  :  no])
-fi
-
-if test "x$BUILD_SERVER" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
-   AC_MSG_RESULT([PVFS2 server will be built                        : yes])
-else
-   AC_MSG_RESULT([PVFS2 server will be built                        :  no])
-fi
-
-if test "x$ENABLE_PROFILING" = "x1"; then
-   AC_MSG_RESULT([PVFS2 configured with profiling enabled           : yes])
-else
-   AC_MSG_RESULT([PVFS2 configured with profiling enabled           :  no])
 fi
 
 if test "x$BUILD_USRINT" = "x1" ; then
