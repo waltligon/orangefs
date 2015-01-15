@@ -1051,7 +1051,6 @@ static PINT_sm_action lookup_segment_verify_attr_present(
         gossip_debug(GOSSIP_LOOKUP_DEBUG, " -- NO attrs for %s\n",
                      cur_seg->seg_name);
 
-        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
         PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,  
                                    cur_seg->seg_resolved_refn,
                                    (PVFS_ATTR_COMMON_ALL |

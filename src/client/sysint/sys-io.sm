@@ -693,7 +693,6 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
            (js_p->error_code == IO_RETRY) ||
            (js_p->error_code == IO_RENEW_CAPABILITY));
 
-    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->object_ref,
                                IO_ATTR_MASKS, 

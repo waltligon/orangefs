@@ -1059,8 +1059,6 @@ static PINT_sm_action create_crdirent_failure(struct PINT_smcb *smcb,
                      "will retry getattr and crdirent (attempt number %d).\n",
                      sm_p->u.create.retry_count);
         
-        /* clear attributes */
-        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
         /* clear acache content */
         PINT_acache_invalidate(sm_p->object_ref);
         /* clear capcache content */

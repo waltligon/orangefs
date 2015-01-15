@@ -133,6 +133,7 @@ typedef struct PINT_sm_getattr_state
 
 #define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
     do { \
+        PINT_free_object_attr(&(_state).attr); \
         memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
         (_state).object_ref = _objref; \
         (_state).req_attrmask = _mask; \

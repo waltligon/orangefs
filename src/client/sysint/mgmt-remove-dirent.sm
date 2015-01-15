@@ -310,8 +310,6 @@ static PINT_sm_action mgmt_remove_dirent_retry_or_fail(
                      sm_p->u.mgmt_remove_dirent.retry_count);
 */
         
-        /* setup getattr */
-        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
         /* clear acache content */
         PINT_acache_invalidate(sm_p->parent_ref);
         

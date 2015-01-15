@@ -550,8 +550,6 @@ static PINT_sm_action mkdir_crdirent_failure(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: received -PVFS_EAGAIN, will retry getattr and crdirent (attempt number %d).\n",
                      sm_p->u.mkdir.retry_count);
 
-        /* clear attributes */
-        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
         /* clear acache content */
         PINT_acache_invalidate(sm_p->object_ref);
         /* clear capcache content */

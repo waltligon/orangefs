@@ -217,8 +217,6 @@ static PINT_sm_action mgmt_create_dirent_init(struct PINT_smcb *smcb,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_create_dirent_init called\n");
 
-    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
-
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->parent_ref,
                                PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_HINT |
@@ -333,8 +331,6 @@ static PINT_sm_action mgmt_create_dirent_retry_or_fail(struct PINT_smcb *smcb,
            sm_p->u.mgmt_create_dirent.retry_count);
 */
  
-        /* setup getattr */
-        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
         /* clear acache content */
         PINT_acache_invalidate(sm_p->parent_ref);
         
