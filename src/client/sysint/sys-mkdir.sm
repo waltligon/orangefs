@@ -246,10 +246,10 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     server_config = PINT_get_server_config_struct(parent_ref.fs_id);
     fs_config = PINT_config_find_fs_id(server_config, parent_ref.fs_id);
     PINT_put_server_config_struct(server_config);
-    sm_p->u.create.metadata_sid_count =
+    sm_p->u.mkdir.metadata_sid_count =
                             fs_config->metadata_replication_factor;
-    sm_p->u.create.datafile_sid_count =
-                            fs_config->default_dfile_replication_factor;
+    sm_p->u.mkdir.dirdata_sid_count =
+                            fs_config->metadata_replication_factor;
 
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints,
@@ -540,7 +540,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                            &sm_p->u.mkdir.metadata_handle,
                            sm_p->u.mkdir.metadata_sid_count, /* in */
                            &sm_p->u.mkdir.metadata_sid_array,
-                           sm_p->u.mkdir.dirdata_count,     /* in */
+                           sm_p->u.mkdir.sys_attr.distr_dir_servers_max, /* in */
                            &sm_p->u.mkdir.dirdata_handles,
                            sm_p->u.mkdir.dirdata_sid_count, /* in */
                            &sm_p->u.mkdir.dirdata_sid_array);
@@ -582,6 +582,11 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->comp_fn = mkdir_msg_comp_fn;
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+    }
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
