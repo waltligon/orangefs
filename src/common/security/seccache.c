@@ -35,12 +35,14 @@
 #define LOCK_LOCK_NULL(__lock) __LOCK_LOCK(__lock, NULL)
 
 /* note: log a warning but do not exit calling function */
-#define LOCK_UNLOCK(__lock) do { \
-                                if (lock_unlock((__lock)) != 0) \
-                                { \
-                                    gossip_err("Warning: could not unlock cache lock\n"); \
-                                } \
-                            } while (0)
+#define LOCK_UNLOCK(__lock) \
+ do { \
+     if (lock_unlock((__lock)) != 0) \
+     { \
+         gossip_err("%s: warning: could not unlock cache lock\n", \
+                    __func__); \
+     } \
+ } while (0)
 
 
 /*** internal functions ***/
@@ -75,8 +77,13 @@ static void PINT_seccache_print_stats(seccache_t *cache)
 
 static int lock_init(seccache_lock_t *lock)
 {
-    *lock = (seccache_lock_t) GEN_SHARED_MUTEX_INITIALIZER_NP;
-
+    int ret;
+    /* *lock = (seccache_lock_t) GEN_SHARED_MUTEX_INITIALIZER_NP; */
+    ret = gen_shared_mutex_init(lock);
+    if(ret != 0)
+    {
+        return -1;
+    }
     return 0;
 }
 
@@ -136,7 +143,7 @@ static int PINT_seccache_rm_expired_entries(seccache_t *cache,
                                             uint16_t index)
 {
     seccache_entry_t now_entry;
-    int hash_index;
+    uint16_t hash_index;
 
     SECCACHE_ENTER_FN();
 
@@ -155,13 +162,13 @@ static int PINT_seccache_rm_expired_entries(seccache_t *cache,
     if (all)
     {
         gossip_debug(GOSSIP_SECCACHE_DEBUG,
-            "Removing all entries with timeouts before %llu\n",
-            llu(now_entry.expiration));
+            "%s: %s cache - removing all entries with timeouts before %llu\n",
+            __func__, cache->desc, llu(now_entry.expiration));
         for (hash_index = 0; hash_index < cache->hash_limit; hash_index++)
         {
             gossip_debug(GOSSIP_SECCACHE_DEBUG,
-                "searching chain at hash_index = %d\n",
-                hash_index);
+                "%s: %s cache - searching chain @ index %u\n",
+                __func__, cache->desc, hash_index);
             seccache_entry_t *rem_entry = NULL;
             while ((rem_entry = PINT_llist_rem(
                 cache->hash_table[hash_index],
@@ -181,7 +188,8 @@ static int PINT_seccache_rm_expired_entries(seccache_t *cache,
     {
         /* remove expired entries from the hash table chain at index */
         gossip_debug(GOSSIP_SECCACHE_DEBUG,
-            "searching chain at hash_index = %d\n", index);
+            "%s: %s cache - searching chain @ index %u\n",
+            __func__, cache->desc, index);
         seccache_entry_t * rem_entry = NULL;
         while ((rem_entry = PINT_llist_rem(
                 cache->hash_table[index],
@@ -191,8 +199,6 @@ static int PINT_seccache_rm_expired_entries(seccache_t *cache,
             cache->methods.debug("*** Removing", rem_entry->data);
 
             cache->methods.cleanup(rem_entry);
-
-            free(rem_entry);
 
             cache->stats.removed++;
             cache->stats.entry_count--;
@@ -209,8 +215,8 @@ static int PINT_seccache_rm_expired_entries(seccache_t *cache,
 int PINT_seccache_expired_default(void *entry1, 
                                   void *entry2)
 {
-    if (((seccache_entry_t *) entry1)->expiration >= 
-        ((seccache_entry_t *)entry2)->expiration)
+    if (((seccache_entry_t *) entry1)->expiration >
+        ((seccache_entry_t *) entry2)->expiration)
     {
         /* entry has expired */
         return 0;
@@ -464,9 +470,10 @@ void PINT_seccache_cleanup(seccache_t *cache)
     free(cache);
 }
 
-/* locates an entry given the specified data */
-seccache_entry_t * PINT_seccache_lookup(seccache_t *cache, 
-                                        void *data)
+/* locates an entry given the specified data and compare function */
+seccache_entry_t * PINT_seccache_lookup_cmp(seccache_t *cache, 
+                                            int (*compare)(void *, void *),
+                                            void *data)
 {
     seccache_entry_t *curr_entry, now_entry;
     uint16_t index = 0;
@@ -485,6 +492,9 @@ seccache_entry_t * PINT_seccache_lookup(seccache_t *cache,
     /* compute the hash table index using the data */
     index = cache->methods.get_index(data, cache->hash_limit);
 
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: %s cache - searching index %u\n",
+                 __func__, cache->desc, index);
+
     /* acquire the lock */
     LOCK_LOCK_NULL(&cache->lock);
 
@@ -492,13 +502,13 @@ seccache_entry_t * PINT_seccache_lookup(seccache_t *cache,
     curr_entry = (seccache_entry_t *) PINT_llist_search(
         cache->hash_table[index],
         data,
-        cache->methods.compare);
+        (compare != NULL) ? compare : cache->methods.compare);
 
     /* unlock the cache lock */
     LOCK_UNLOCK(&cache->lock);
 
-    gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s cache: %s\n",
-                 cache->desc, (curr_entry != NULL) ? "hit" : "miss");
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: %s cache - %s\n",
+                 __func__, cache->desc, (curr_entry != NULL) ? "hit" : "miss");
 
     /* check expiration */
     if (curr_entry != NULL)
@@ -507,8 +517,8 @@ seccache_entry_t * PINT_seccache_lookup(seccache_t *cache,
         /* 0 returned if expired */
         if (cache->methods.expired(&now_entry, curr_entry) == 0)
         {            
-            gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s cache: entry %p expired\n",
-                         cache->desc, curr_entry);
+            gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: %s cache - entry %p "
+                         "expired\n", __func__, cache->desc, curr_entry);
 
             PINT_seccache_remove(cache, curr_entry);
 
@@ -534,6 +544,12 @@ seccache_entry_t * PINT_seccache_lookup(seccache_t *cache,
     SECCACHE_EXIT_FN();
 
     return curr_entry;
+}
+
+seccache_entry_t *PINT_seccache_lookup(seccache_t *cache,
+                                       void *data)
+{
+    return PINT_seccache_lookup_cmp(cache, NULL, data);
 }
 
 /* inserts an entry with the given data */
@@ -588,9 +604,9 @@ int PINT_seccache_insert(seccache_t *cache,
         return -PVFS_ENOMEM;
     }
 
-    gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s cache: entry %p (data %p) added "
-                 "to the head of the linked list @ index = %d\n", cache->desc,
-                 entry, entry->data, index);
+    gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: %s cache - entry %p (data %p) "
+                 "added to the head of the linked list @ index = %d\n",
+                 __func__, cache->desc, entry, entry->data, index);
 
     /* unlock the cache lock */
     LOCK_UNLOCK(&cache->lock);
@@ -639,12 +655,12 @@ int PINT_seccache_remove(seccache_t *cache,
     /* free memory */
     if (rem_entry != NULL)
     {
-        gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s cache: removed entry %p at "
-                     "index %hd\n", cache->desc, rem_entry, index);
+        gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: %s cache - removed entry %p @ "
+                     "index %u\n", __func__, cache->desc, rem_entry, index);
 
+        /* frees the data and entry */
         cache->methods.cleanup(rem_entry);
 
-        free(rem_entry);
         cache->stats.removed++;
         cache->stats.entry_count--;
     }

@@ -928,10 +928,14 @@ int lock_init(ucache_lock_t * lock)
         return -1;
     }
     #elif LOCK_TYPE == 3
-    *lock = (ucache_lock_t) GEN_SHARED_MUTEX_INITIALIZER_NP; //GEN_SHARED_MUTEX_INITIALIZER_NP;
-    rc = 0;
+    /* *lock = (ucache_lock_t) GEN_SHARED_MUTEX_INITIALIZER_NP; */
+    rc = gen_shared_mutex_init(lock);
+    if(rc != 0)
+    {
+        return -1;
+    }
     #endif
-    return rc;
+    return 0;
 }
 
 /** 

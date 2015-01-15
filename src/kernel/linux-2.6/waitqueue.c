@@ -142,6 +142,9 @@ retry_servicing:
         ret = wait_for_matching_downcall(op);
     }
 
+    gossip_debug(GOSSIP_WAIT_DEBUG, "%s: downcall returned %d "
+                 "with status %d\n", __func__, ret, op->downcall.status);
+
     if(ret < 0)
     {
         /* failed to get matching downcall */
@@ -158,6 +161,9 @@ retry_servicing:
         op->downcall.status = pvfs2_normalize_to_errno(op->downcall.status);
         ret = op->downcall.status;
     }
+
+    gossip_debug(GOSSIP_WAIT_DEBUG, "%s: downcall status set to %d\n",
+                 __func__, op->downcall.status);
 
     if(!(flags & PVFS2_OP_INTERRUPTIBLE)) 
     {

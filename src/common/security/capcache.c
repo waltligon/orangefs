@@ -10,11 +10,16 @@
 
 #ifdef ENABLE_CAPCACHE
 
+#if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
+#define ENABLE_SECURITY_MODE
+#endif
+
 #include <malloc.h>
 #include <string.h>
 
 #include "capcache.h"
 #include "security-util.h"
+#include "server-config.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "murmur3.h"
@@ -25,17 +30,18 @@
 seccache_t *capcache = NULL;
 
 /*** capability cache methods ***/
-/* static int PINT_capcache_expired(void *entry1, void *entry2); */
-static void PINT_capcache_set_expired(seccache_entry_t *entry, PVFS_time timeout);
-static uint16_t PINT_capcache_get_index(void *data, uint64_t hash_limit);
+static void PINT_capcache_set_expired(seccache_entry_t *entry,
+                                      PVFS_time timeout);
+static uint16_t PINT_capcache_get_index(void *data,
+                                        uint64_t hash_limit);
 static int PINT_capcache_compare(void *data, void *entry);
 static void PINT_capcache_cleanup(void *entry);
 static void PINT_capcache_debug(const char *prefix,
-                                void *data);
+                               void *data);
+int PINT_capcache_remove(seccache_entry_t * entry);
 
 /* method table */
 static seccache_methods_t capcache_methods = {    
-    /* PINT_capcache_expired */
     PINT_seccache_expired_default,
     PINT_capcache_set_expired,
     PINT_capcache_get_index,
@@ -154,10 +160,16 @@ static int PINT_capcache_compare(void * data,
  */
 static void PINT_capcache_cleanup(void *entry)
 {
-    if (entry != NULL && ((seccache_entry_t *) entry)->data != NULL)
+    if (entry != NULL)
     {
-        PINT_cleanup_capability((PVFS_capability *) 
-                                 ((seccache_entry_t *)entry)->data);
+        if (((seccache_entry_t *) entry)->data != NULL)
+        {
+            PINT_cleanup_capability((PVFS_capability *) 
+                                    ((seccache_entry_t *)entry)->data);
+            free(((seccache_entry_t *)entry)->data);
+        }
+        free(entry);
+        entry = NULL;
     }
 }
 
@@ -169,7 +181,7 @@ static void PINT_capcache_cleanup(void *entry)
 static void PINT_capcache_debug(const char *prefix,
                                 void *data)
 {
-    char sig_buf[10], mask_buf[10];
+    char sig_buf[16], mask_buf[16];
     PVFS_capability *cap;
     int i;
 
@@ -273,7 +285,7 @@ int PINT_capcache_quick_sign(PVFS_capability * cap)
     /* copy capability timeout & signature */
     curr_cap = (PVFS_capability *) curr_entry->data;
     /* check timeout */
-    if (PINT_util_get_current_time() >= curr_cap->timeout)
+    if (PINT_util_get_current_time() > curr_cap->timeout)
     {
         gossip_debug(GOSSIP_SECCACHE_DEBUG, "%s: entry timed out\n",
                      __func__);
@@ -294,6 +306,7 @@ int PINT_capcache_quick_sign(PVFS_capability * cap)
  */
 int PINT_capcache_init(void)
 {
+    struct server_configuration_s *config = PINT_get_server_config();
 
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Initializing capability cache...\n");
 
@@ -304,7 +317,7 @@ int PINT_capcache_init(void)
     }
 
     /* Set timeout */
-    PINT_seccache_set(capcache, SECCACHE_TIMEOUT, CAPCACHE_TIMEOUT);
+    PINT_seccache_set(capcache, SECCACHE_TIMEOUT, config->capcache_timeout);
 
     return 0;
 }

@@ -129,7 +129,9 @@ PVFS_error PVFS_isys_fs_add(
     void* user_ptr)
 {
     int ret = -PVFS_EINVAL;
-    int i;
+    int i,try_again_count
+         ,try_again
+         ,try_again_limit=3;
     struct server_configuration_s *new_server_config = NULL;
     PVFS_BMI_addr_t test_addr;
     PINT_smcb *smcb = NULL;
@@ -158,9 +160,35 @@ PVFS_error PVFS_isys_fs_add(
         ret = BMI_addr_lookup(&test_addr, mntent->pvfs_config_servers[i]);
         if (ret == 0)
         {
+            /* Bail out when first valid BMI method is found */
             break;
         }
-    }
+
+        try_again_count = 0;
+        try_again = 1;
+
+       do
+       {
+          gossip_err("%s:Retrying BMI_addr_lookup for %s.\n",__func__,mntent->pvfs_config_servers[i]);
+          ret = BMI_addr_lookup(&test_addr, mntent->pvfs_config_servers[i]);
+          if (ret == 0)
+          {
+             try_again=0;
+          }
+          else
+          {
+             try_again_count++;
+             if (try_again_count == try_again_limit)
+             {
+                try_again=0;
+             }
+          }
+       } while (try_again);
+       if (try_again_count != try_again_limit)
+       {
+          break;
+       }
+    }/*end for*/
 
     if (i == mntent->num_pvfs_config_servers)
     {
@@ -175,11 +203,12 @@ PVFS_error PVFS_isys_fs_add(
     }
     mntent->the_pvfs_config_server = mntent->pvfs_config_servers[i];
 
-    PINT_smcb_alloc(&smcb, PVFS_SYS_FS_ADD,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
+    PINT_smcb_alloc(&smcb,
+                    PVFS_SYS_FS_ADD,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
     if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
@@ -187,9 +216,8 @@ PVFS_error PVFS_isys_fs_add(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     sm_p->u.get_config.mntent = mntent;
-    sm_p->u.get_config.config = 
-        (struct server_configuration_s *)malloc(
-        sizeof(struct server_configuration_s));
+    sm_p->u.get_config.config = (struct server_configuration_s *)malloc(
+                                       sizeof(struct server_configuration_s));
     if (!sm_p->u.get_config.config)
     {
         ret = -PVFS_ENOMEM;
@@ -210,8 +238,7 @@ PVFS_error PVFS_isys_fs_add(
 
     PINT_msgpair_init(&sm_p->msgarray_op);
 
-    return PINT_client_state_machine_post(
-        smcb,  op_id, user_ptr);
+    return PINT_client_state_machine_post(smcb,  op_id, user_ptr);
 }
 
 int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
@@ -511,7 +538,10 @@ static PINT_sm_action fs_add_parent_cleanup(struct PINT_smcb *smcb, job_status_s
                  (void *)&sm_p->u.get_config.config->tcp_buffer_size_receive);
     /*
      * Force the connection to the config server down so future transfers
-     * will get the new buffer size.
+     * will get the new buffer size.  Retries of BMI_addr_lookup is not needed
+     * here, since a non-zero return code indicates that the connection is gone
+     * (or never existed), and this section of code is trying to cleanup
+     * the connection.
      */
     ret = BMI_addr_lookup(&addr,
                           sm_p->u.get_config.mntent->the_pvfs_config_server);
@@ -642,6 +672,9 @@ static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
         msg_p->comp_fn = server_fetch_config_comp_fn;
         msg_p->svr_addr = sm_p->fetch_config.addr_array[i];
     }
+
+    PINT_cleanup_capability(&capability);
+
     /* don't complain so much about servers we can't reach yet */
     sm_p->msgarray_op.params.quiet_flag = 1; 
 

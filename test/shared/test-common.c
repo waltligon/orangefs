@@ -324,6 +324,9 @@ int stat_file(
     char *args[7];
     char **ptr = args;
 
+    memset(&args,        0, sizeof(args));
+
+
 
     if(verbose) { printf("\tPerforming stat on [%s]\n", fileName); }
    
@@ -589,6 +592,9 @@ int create_directory_intl(
     char *args[7];
     char **ptr = args;
 
+    memset(&args,        0, sizeof(args));
+
+
     char * token = NULL;
    
     if(verbose) { printf("\tCreating [%s] using mode [%o]:\n", directory, mode); }
@@ -755,12 +761,15 @@ int pvfs2_remove(
     char **ptr = args;
     char * token = NULL;
 
+    memset(&args,        0, sizeof(args));
 
 	snprintf(cmd, sizeof(cmd), "%spvfs2-rm", pvfsEXELocation);
 
 	*ptr++ = cmd;
 	//*ptr++ = (char*)filename;
 
+	*ptr++ = "-r";
+	*ptr++ = "-f";
 	/* Use strtok to support multiple directories */
 	/* TODO: Make this smart enough to recognize escaped and quoted spaces */
 	token = strtok((char*)filename,WHITE_SPACE);
@@ -776,7 +785,7 @@ int pvfs2_remove(
 	}
 	else
 	{
-		printf("\nRUNNING->%s %s ", cmd, filename);
+		printf("\nRUNNING->%s -r -f %s ", cmd, filename);
 	}
 
 	ret = run_external_command(cmd,args);
@@ -897,6 +906,8 @@ int change_mode(
     char *args[7];
     char **ptr = args;
 
+    memset(&args,        0, sizeof(args));
+
    
     if(verbose) { printf("\tChanging mode on [%s] to [%o]\n", fileName, mode); }
    
@@ -975,6 +986,8 @@ int change_owner(
     char cmd[PATH_MAX] = "";
     char *args[7];
     char **ptr = args;
+
+    memset(&args,        0, sizeof(args));
 
    
     if(verbose)
@@ -1513,6 +1526,7 @@ int create_symlink(
     char *args[7];
     char **ptr = args;
 
+    memset(&args,        0, sizeof(args));
     
     /* Remove symlink first */ 
     remove_symlink(linkName,use_pvfs2_lib,verbose); 

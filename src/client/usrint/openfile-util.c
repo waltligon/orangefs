@@ -205,11 +205,6 @@ static void cleanup_usrint_internal(void)
 /* static int pvfs_sys_init_elf(void) GCC_UNUSED; */
 static int pvfs_lib_init_flag = 0;      /* initialization done */
 
-/* table of signals handlers replace with ours */
-static void signal_handler(int sig);
-static void init_signal_handlers(void);
-static void (*default_handler[32])(int);
-
 posix_ops glibc_ops;
 
 /* wrapper so we can call getpwd for initialization
@@ -767,59 +762,23 @@ static void cleanup_usrint_internal(void)
         close_descriptor_area_list(qlist_entry(qh, pvfs_desc_list_t, link));
     }
     /* unlink our area - remains until all others have unmapped */
-    glibc_ops.munmap(shmctrl, shmsize);
-    glibc_ops.close(shmobj);
-    glibc_ops.unlink(shmobjpath);
+    if (shmctrl)
+    {
+        glibc_ops.munmap(shmctrl, shmsize);
+    }
+    if (shmobj >= 0)
+    {
+        glibc_ops.close(shmobj);
+    }
+    if (strnlen(shmobjpath, sizeof(shmobjpath)))
+    {
+        glibc_ops.unlink(shmobjpath);
+    }
     /* clear globals */
     shmobj = -1;
     shmctrl = NULL;
     descriptor_table = NULL;
     memset(shmobjpath, 0, sizeof(shmobjpath));
-}
-
-/** generic usrint signal handler
- */
-static void signal_handler(int sig)
-{
-    cleanup_usrint_internal();
-    (*default_handler[sig])(sig);
-}
-
-/** sets up signal handlers to run cleanup on abort
- *  abort (via various sources) does not run destructors
- *  and thus we need to try to catch those and run it ourselves
- *  The application might replace these handlers - they SHOULD call our
- *  handler after theirs (unless they recover from the abort) but they
- *  might not.  Not much we can do if they don't.  This should run
- *  before any other handlers are set up.
- */
-static void init_signal_handlers(void)
-{
-    default_handler[SIGHUP] = signal(SIGHUP, signal_handler);
-    default_handler[SIGINT] = signal(SIGINT, signal_handler);
-    default_handler[SIGQUIT] = signal(SIGQUIT, signal_handler);
-    default_handler[SIGILL] = signal(SIGILL, signal_handler);
-    default_handler[SIGABRT] = signal(SIGABRT, signal_handler);
-    default_handler[SIGFPE] = signal(SIGFPE, signal_handler);
-    default_handler[SIGSEGV] = signal(SIGSEGV, signal_handler);
-    default_handler[SIGPIPE] = signal(SIGPIPE, signal_handler);
-    default_handler[SIGALRM] = signal(SIGALRM, signal_handler);
-    default_handler[SIGTERM] = signal(SIGTERM, signal_handler);
-    default_handler[SIGUSR1] = signal(SIGUSR1, signal_handler);
-    default_handler[SIGUSR2] = signal(SIGUSR2, signal_handler);
-    default_handler[SIGBUS] = signal(SIGBUS, signal_handler);
-    default_handler[SIGPOLL] = signal(SIGPOLL, signal_handler);
-    default_handler[SIGPROF] = signal(SIGPROF, signal_handler);
-    default_handler[SIGSYS] = signal(SIGSYS, signal_handler);
-    default_handler[SIGTRAP] = signal(SIGTRAP, signal_handler);
-    default_handler[SIGVTALRM] = signal(SIGVTALRM, signal_handler);
-    default_handler[SIGXCPU] = signal(SIGXCPU, signal_handler);
-    default_handler[SIGXFSZ] = signal(SIGXFSZ, signal_handler);;
-    default_handler[SIGIOT] = signal(SIGIOT, signal_handler);
-    /* default_handler[SIGEMT] = signal(SIGEMT, signal_handler); */
-    default_handler[SIGIO] = signal(SIGIO, signal_handler);
-    default_handler[SIGPWR] = signal(SIGPWR, signal_handler);
-    /* default_handler[SIGLOST] = signal(SIGLOST, signal_handler); */
 }
 
 #if PVFS_UCACHE_ENABLE
@@ -927,6 +886,10 @@ static int init_usrint_internal(void)
     /**************************************/
     /*       BEGIN INITIALIZATION         */
     /**************************************/
+
+#if PVFS_USER_ENV_VARS_ENABLED
+    env_vars_struct_initialize(&env_vars);
+#endif /* USER_ENVIRONMENT_VARIABLES */
 
     /* this allows system calls to be run */
     /* init_glibc_malloc(); */
@@ -1214,8 +1177,7 @@ static int init_usrint_internal(void)
    }
 #endif
 
-    /* create handlers to run cleanup before aborting */
-    init_signal_handlers();
+    /* env_vars_struct_dump(&env_vars); */
 
     init_debug("finished with initialization\n");
 
@@ -1591,6 +1553,7 @@ static void init_descriptor_area_internal(void)
 
     /* unlink the /dev/shm entry - noone should need to open it again */
     glibc_ops.unlink(shmobjpath);
+    memset(shmobjpath, 0, sizeof(shmobjpath));
 
     /* clear shared memory */
 	memset(shmctrl, 0, shmsize);

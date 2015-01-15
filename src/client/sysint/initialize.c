@@ -19,6 +19,7 @@
 #include "acache.h"
 #include "ncache.h"
 #include "rcache.h"
+#include "client-capcache.h"
 #include "pint-cached-config.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
@@ -42,22 +43,28 @@ PINT_event_id PINT_client_sys_event_id;
 
 int pint_client_pid;
 
+/* set to one when init is done */
+#ifdef WIN32
+int pvfs_sys_init_flag = 0;
+#endif 
+
 typedef enum
 {
-    CLIENT_NO_INIT         =      0,
-    CLIENT_ENCODER_INIT    = (1 << 0),
-    CLIENT_BMI_INIT        = (1 << 1),
-    CLIENT_FLOW_INIT       = (1 << 2),
-    CLIENT_JOB_INIT        = (1 << 3),
-    CLIENT_JOB_CTX_INIT    = (1 << 4),
-    CLIENT_ACACHE_INIT     = (1 << 5),
-    CLIENT_NCACHE_INIT     = (1 << 6),
-    CLIENT_CONFIG_MGR_INIT = (1 << 7),
-    CLIENT_REQ_SCHED_INIT  = (1 << 8),
+    CLIENT_NO_INIT           =       0,
+    CLIENT_ENCODER_INIT      = (1 << 0),
+    CLIENT_BMI_INIT          = (1 << 1),
+    CLIENT_FLOW_INIT         = (1 << 2),
+    CLIENT_JOB_INIT          = (1 << 3),
+    CLIENT_JOB_CTX_INIT      = (1 << 4),
+    CLIENT_ACACHE_INIT       = (1 << 5),
+    CLIENT_NCACHE_INIT       = (1 << 6),
+    CLIENT_CONFIG_MGR_INIT   = (1 << 7),
+    CLIENT_REQ_SCHED_INIT    = (1 << 8),
     CLIENT_JOB_TIME_MGR_INIT = (1 << 9),
-    CLIENT_DIST_INIT       = (1 << 10),
-    CLIENT_SECURITY_INIT   = (1 << 11),
-    CLIENT_RCACHE_INIT     = (1 << 12)
+    CLIENT_DIST_INIT         = (1 << 10),
+    CLIENT_SECURITY_INIT     = (1 << 11),
+    CLIENT_RCACHE_INIT       = (1 << 12),
+    CLIENT_CAPCACHE_INIT     = (1 << 13)
 } PINT_client_status_flag;
 
 /* PVFS_sys_initialize()
@@ -66,7 +73,7 @@ typedef enum
  * data structures.  Must be called before any other system interface
  * function.
  *
- * This should run once and only one even in multithreaded environment.
+ * This should run once and only once even in multithreaded environment.
  *
  * the default_debug_mask is used if not overridden by the
  * PVFS2_DEBUGMASK environment variable at run-time.  allowable string
@@ -77,7 +84,9 @@ typedef enum
  */
 int PVFS_sys_initialize(uint64_t default_debug_mask)
 {
+#ifndef WIN32
     static int pvfs_sys_init_flag = 0; /* set to one when init is done */
+#endif
     static int pvfs_sys_init_in_progress = 0;
     static gen_mutex_t init_mutex = GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
 
@@ -174,7 +183,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     }
     client_status_flag |= CLIENT_SECURITY_INIT;
     
-    /* initlialize the protocol encoder */
+    /* initialize the protocol encoder */
     ret = PINT_encode_initialize();
     if (ret < 0)
     {
@@ -237,7 +246,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
         goto error_exit;
     }
     client_status_flag |= CLIENT_JOB_CTX_INIT;
-        
+
     /* initialize the attribute cache and set the default timeout */
     ret = PINT_acache_initialize();
     if (ret < 0)
@@ -246,6 +255,15 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
         goto error_exit;        
     }
     client_status_flag |= CLIENT_ACACHE_INIT;
+
+    /* initialize the client capcache and set the default timeout */
+    ret = PINT_client_capcache_initialize();
+    if (ret < 0)
+    {
+        gossip_lerr("Error initializing client capcache\n");
+        goto error_exit;
+    }
+    client_status_flag |= CLIENT_CAPCACHE_INIT;
 
     /* initialize the name lookup cache and set the default timeout */
     ret = PINT_ncache_initialize();
@@ -311,6 +329,11 @@ error_exit:
 
     id_gen_safe_finalize();
 
+    if (client_status_flag & CLIENT_CAPCACHE_INIT)
+    {
+        PINT_client_capcache_finalize();
+    }
+
     if (client_status_flag & CLIENT_CONFIG_MGR_INIT)
     {
         PINT_server_config_mgr_finalize();
@@ -374,6 +397,10 @@ error_exit:
     PINT_smcb_free(smcb);
 
 local_exit:
+
+#ifdef WIN32
+    pvfs_sys_init_in_progress = 0;
+#endif
 
     gen_mutex_unlock(&init_mutex);
 

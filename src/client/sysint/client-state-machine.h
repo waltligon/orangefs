@@ -86,6 +86,7 @@ typedef struct PINT_client_mirror_ctx PINT_client_getattr_mirror_ctx;
 
 /* flag to disable cached lookup during getattr nested sm */
 #define PINT_SM_GETATTR_BYPASS_CACHE 1
+#define PINT_SM_GETATTR_CAPCACHE_HIT 2
 
 typedef struct PINT_sm_getattr_state
 {
@@ -143,14 +144,19 @@ typedef struct PINT_sm_getattr_state
 
 #define PINT_SM_DATAFILE_SIZE_ARRAY_INIT(_array, _count) \
     do { \
-        (*(_array)) = malloc(sizeof(PVFS_size) * (_count)); \
-        memset(*(_array), 0, (sizeof(PVFS_size) * (_count))); \
+        (*(_array)) = calloc((_count), sizeof(PVFS_size)); \
     } while(0)
 
 #define PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(_array) \
     do { \
         free(*(_array)); \
         *(_array) = NULL; \
+    } while(0)
+
+#define PINT_SM_DATAFILE_SIZE_ARRAY_DUP(_dest,_src,_count) \
+    do { \
+        (*(_dest)) = calloc((_count), sizeof(PVFS_size)); \
+        memcpy(*(_dest), _src, sizeof(PVFS_size) * (_count)); \
     } while(0)
 
 /* PINT_client_sm_recv_state_s
@@ -189,16 +195,14 @@ struct PINT_client_create_sm
     PINT_dist *dist;
     PVFS_sys_layout layout;
 
-    PVFS_handle metafile_handle;
-    int datafile_count;
-    PVFS_handle *datafile_handles;
-    int stuffed;
     PVFS_object_attr store_attr;
 
     int dirent_file_count;
     PVFS_handle *dirent_handle;
 
     PVFS_handle handles[2];
+
+    struct PVFS_servresp_create server_resp; /* data returned from the server request */
 };
 
 struct PINT_client_mkdir_sm
@@ -212,7 +216,6 @@ struct PINT_client_mkdir_sm
     int retry_count;
     int stored_error_code;
     PVFS_handle metafile_handle;
-    PINT_sm_getattr_state metafile_getattr;
 
     /* keep first */
     PINT_dist *dist;
@@ -247,12 +250,14 @@ struct PINT_client_setattr_sm
 struct PINT_client_mgmt_remove_dirent_sm
 {
     char *entry;
+    int retry_count;
 };
 
 struct PINT_client_mgmt_create_dirent_sm
 {
     char *entry;
     PVFS_handle entry_handle;
+    int retry_count;
 };
 
 struct PINT_client_mgmt_get_dirdata_handle_sm
@@ -816,9 +821,7 @@ enum
     PVFS_MGMT_GET_DIRDATA_HANDLE   = 80,
     PVFS_MGMT_GET_UID_LIST         = 81, 
     PVFS_MGMT_GET_DIRDATA_ARRAY    = 82,
-#ifdef ENABLE_SECURITY_CERT
     PVFS_MGMT_GET_USER_CERT        = 83,
-#endif
     PVFS_SERVER_GET_CONFIG         = 200,
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
@@ -827,11 +830,7 @@ enum
 
 #define PVFS_OP_SYS_MAXVALID  22
 #define PVFS_OP_SYS_MAXVAL 69
-#ifdef ENABLE_SECURITY_CERT
 #define PVFS_OP_MGMT_MAXVALID 84
-#else
-#define PVFS_OP_MGMT_MAXVALID 83
-#endif
 #define PVFS_OP_MGMT_MAXVAL 199
 
 int PINT_client_io_cancel(job_id_t id);
@@ -852,14 +851,14 @@ void PINT_mgmt_release(PVFS_mgmt_op_id op_id);
 do {                                                          \
     if (user_cred_p == NULL)                                  \
     {                                                         \
-        gossip_lerr("Invalid user credentials! (nil)\n");     \
+        gossip_err("Invalid user credentials! (nil)\n");      \
         free(sm_p);                                           \
-        return -PVFS_EINVAL;                                  \
+        return -PVFS_EACCES;                                  \
     }                                                         \
     sm_p_cred_p = PINT_dup_credential(user_cred_p);           \
     if (!sm_p_cred_p)                                         \
     {                                                         \
-        gossip_lerr("Failed to copy user credentials\n");     \
+        gossip_err("Failed to copy user credentials\n");      \
         free(sm_p);                                           \
         return -PVFS_ENOMEM;                                  \
     }                                                         \

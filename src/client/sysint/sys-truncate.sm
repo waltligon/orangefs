@@ -177,7 +177,7 @@ PVFS_error PVFS_sys_truncate(
         PVFS_perror_gossip("PVFS_isys_truncate call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "truncate", &error);
         if (ret)
@@ -185,9 +185,8 @@ PVFS_error PVFS_sys_truncate(
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -313,8 +312,6 @@ static PINT_sm_action truncate_inspect_attr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    /* TODO: orange-security: check write access? */
 
     /* determine if we need to unstuff or not to service this request */
     if(unstuff_needed(
@@ -458,7 +455,13 @@ static int unstuff_comp_fn(
     }
 
     assert(resp_p->op == PVFS_SERV_UNSTUFF);
-    
+
+#if 0 /* Don't cache size_array. */
+    PINT_acache_update(sm_p->object_ref,
+        &resp_p->u.unstuff.attr,
+        NULL,
+        NULL);
+#endif
     PINT_acache_update(sm_p->object_ref,
         &resp_p->u.unstuff.attr,
         NULL);

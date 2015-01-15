@@ -175,11 +175,12 @@ static pvfs2_kernel_op_t *op_alloc_common(int32_t op_linger, int32_t type)
         spin_unlock(&next_tag_value_lock);
         new_op->upcall.type = type;
         new_op->attempts = 0;
-        gossip_debug(GOSSIP_CACHE_DEBUG, "Alloced OP (%p: %llu %s)\n", new_op, llu(new_op->tag), get_opname_string(new_op));
+        gossip_debug(GOSSIP_CACHE_DEBUG, "Alloced OP (%p: %llu %s)\n", new_op,
+                     llu(new_op->tag), get_opname_string(new_op));
 
 #ifdef HAVE_FROM_KUID
-       new_op->upcall.uid = from_kuid(&init_user_ns, current_fsuid());
-       new_op->upcall.gid = from_kgid(&init_user_ns, current_fsgid());
+        new_op->upcall.uid = from_kuid(&init_user_ns, current_fsuid());
+        new_op->upcall.gid = from_kgid(&init_user_ns, current_fsgid());
 #elif defined(HAVE_CURRENT_FSUID)
         new_op->upcall.uid = current_fsuid();
         new_op->upcall.gid = current_fsgid();
@@ -187,6 +188,10 @@ static pvfs2_kernel_op_t *op_alloc_common(int32_t op_linger, int32_t type)
         new_op->upcall.uid = current->fsuid;
         new_op->upcall.gid = current->fsgid;
 #endif
+        gossip_debug(GOSSIP_CACHE_DEBUG, "OP %llu user: (%u, %u)\n",
+                     llu(new_op->tag), new_op->upcall.uid, 
+                     new_op->upcall.gid);
+
         new_op->op_linger = new_op->op_linger_tmp = op_linger;
     }
     else
@@ -210,7 +215,8 @@ void op_release(pvfs2_kernel_op_t *pvfs2_op)
 {
     if (pvfs2_op)
     {
-        gossip_debug(GOSSIP_CACHE_DEBUG, "Releasing OP (%p: %llu)\n", pvfs2_op, llu(pvfs2_op->tag));
+        gossip_debug(GOSSIP_CACHE_DEBUG, "Releasing OP (%p: %llu)\n", pvfs2_op,
+                     llu(pvfs2_op->tag));
         pvfs2_op_initialize(pvfs2_op);
         kmem_cache_free(op_cache, pvfs2_op);
     }

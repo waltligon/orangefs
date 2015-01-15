@@ -139,6 +139,7 @@ static PINT_sm_action mgmt_noop_setup_msgpair(
 
     PINT_null_capability(&capability);
     PINT_SERVREQ_MGMT_NOOP_FILL(sm_p->msgarray_op.msgpair.req, capability, sm_p->hints);
+    PINT_cleanup_capability(&capability);
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     js_p->error_code = 0;

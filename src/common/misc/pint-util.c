@@ -120,23 +120,23 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
     if (dest && src)
     {
-	if (src->mask & PVFS_ATTR_COMMON_UID)
+        if (src->mask & PVFS_ATTR_COMMON_UID)
         {
             dest->owner = src->owner;
         }
-	if (src->mask & PVFS_ATTR_COMMON_GID)
+        if (src->mask & PVFS_ATTR_COMMON_GID)
         {
             dest->group = src->group;
         }
-	if (src->mask & PVFS_ATTR_COMMON_PERM)
+        if (src->mask & PVFS_ATTR_COMMON_PERM)
         {
             dest->perms = src->perms;
         }
-	if (src->mask & PVFS_ATTR_COMMON_ATIME)
+        if (src->mask & PVFS_ATTR_COMMON_ATIME)
         {
             dest->atime = src->atime;
         }
-	if (src->mask & PVFS_ATTR_COMMON_CTIME)
+        if (src->mask & PVFS_ATTR_COMMON_CTIME)
         {
             dest->ctime = src->ctime;
         }
@@ -144,7 +144,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
         {
             dest->mtime = src->mtime;
         }
-	if (src->mask & PVFS_ATTR_COMMON_TYPE)
+        if (src->mask & PVFS_ATTR_COMMON_TYPE)
         {
             dest->objtype = src->objtype;
         }
@@ -276,7 +276,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             dest->u.data.size = src->u.data.size;
         }
 
-	if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
+        if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
             (src->objtype == PVFS_TYPE_METAFILE))
         {      
             if(src->mask & PVFS_ATTR_META_DFILES)
@@ -382,7 +382,8 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             }
         }
 
-	dest->mask = src->mask;
+        dest->mask = src->mask;
+
         ret = 0;
     }
     return ret;
@@ -398,17 +399,15 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
             {
                 free(attr->capability.signature);
             }            
-            attr->capability.signature = NULL;
             if (attr->capability.handle_array)
             {
                 free(attr->capability.handle_array);
             }            
-            attr->capability.handle_array = NULL;
             if (attr->capability.issuer)
             {
                 free(attr->capability.issuer);
             }
-            attr->capability.issuer = NULL;
+            memset(&attr->capability, 0, sizeof(PVFS_capability));
         }
         if (attr->mask & PVFS_ATTR_META_DFILES)
         {
@@ -603,6 +602,26 @@ struct timespec PINT_util_get_abs_timespec(int microsecs)
     tv.tv_sec = result.tv_sec;
     tv.tv_nsec = result.tv_usec * 1e3;
     return tv;
+}
+
+PVFS_uid PINT_util_getuid(void)
+{
+#ifdef WIN32
+    /* TODO! */
+    return (PVFS_uid) 999;
+#else
+    return (PVFS_uid) getuid();
+#endif
+}
+
+PVFS_gid PINT_util_getgid(void)
+{
+#ifdef WIN32
+    /* TODO! */
+    return (PVFS_gid) 999;
+#else
+    return (PVFS_gid) getgid();
+#endif
 }
 
 /*                                                              

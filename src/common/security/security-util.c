@@ -188,10 +188,8 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
  */
 void PINT_debug_capability(const PVFS_capability *cap, const char *prefix)
 {
-    char sig_buf[10], mask_buf[10]; 
+    char sig_buf[16], mask_buf[16];
     int i;
-
-    assert(cap);
 
     if (strlen(cap->issuer) == 0)
     {
@@ -238,15 +236,12 @@ void PINT_cleanup_capability(PVFS_capability *cap)
         {
             free(cap->signature);
         }
-        if (cap->issuer)
+        if (cap->issuer && (cap->issuer != PVFS2_BLANK_ISSUER))
         {
             free(cap->issuer);
         }
-        
-        cap->handle_array = NULL;
-        cap->signature = NULL;
-        cap->sig_size = 0;
-        cap->issuer = NULL;
+
+        memset(cap, 0, sizeof(PVFS_capability));
     }
 }
 
@@ -462,6 +457,95 @@ void PINT_cleanup_credential(PVFS_credential *cred)
 
     }
 }
+
+#ifdef WIN32
+
+#define USERNAME_VAR_LEN    10
+
+/* copy string segment */
+#define COPY_STR_SEG(pin, pout, ind, start, end) \
+    for (ind = (start); ind < (end); ind++) \
+       *pout++ = pin[ind]
+                    
+/* PINT_get_security_path
+ *
+ * (Windows only) Replace %USERNAME% with userid 
+ */
+int PINT_get_security_path(const char *inpath, 
+                           const char *userid, 
+                           char *outpath, 
+                           unsigned int outlen)
+{
+    char *uppath, *pvar, *pseg, *pout;
+    unsigned int i, nvars, ind, tstart[16], sstart;
+
+    if (inpath == NULL || strlen(inpath) == 0 ||
+        userid == NULL || strlen(userid) == 0 ||
+        outpath == NULL || outlen == 0) 
+    {
+        return -PVFS_EINVAL;
+    }
+
+    /* make upper case string */
+    uppath = strdup(inpath);
+    
+    _strupr(uppath);
+
+    /* find %USERNAME% tokens */
+    for (i = 0, pseg = uppath; 
+        (pvar = strstr(pseg, "%USERNAME%")) && i < 16;
+        pseg += (pvar - pseg) + USERNAME_VAR_LEN)
+    {
+        tstart[i++] = pvar - uppath;
+    }
+         
+    nvars = i;
+
+    /* check output length */
+    if (strlen(inpath) - (nvars * USERNAME_VAR_LEN) + 
+        (nvars * strlen(userid)) + 1 > outlen)
+    {
+        free(uppath);
+        return -PVFS_EOVERFLOW;
+    }
+
+    /* no substitutions to make */
+    if (nvars == 0)
+    {
+        /* simply copy string - note length already checked */
+        strcpy(outpath, inpath);
+
+        return 0;
+    }
+
+    /* replace each token */
+    for (i = 0, sstart = 0, outpath[0] = '\0', pout = outpath;
+        i < nvars; 
+        sstart += tstart[i] + USERNAME_VAR_LEN, i++)
+    {
+        /* append segment prior to token i */
+        COPY_STR_SEG(inpath, pout, ind, sstart, tstart[i]);
+
+        /* append userid substitution */
+        COPY_STR_SEG(userid, pout, ind, 0, strlen(userid));
+
+        /* segment after last token */
+        if (i+1 == nvars)
+        {
+            /* copy remainder of string */
+            COPY_STR_SEG(inpath, pout, ind, tstart[i] + USERNAME_VAR_LEN, 
+                strlen(inpath));
+        }        
+    }
+    
+    /* null-terminate output string */
+    *pout = '\0';
+
+    free(uppath);
+
+    return 0;
+}
+#endif
 
 /*
  * Local variables:

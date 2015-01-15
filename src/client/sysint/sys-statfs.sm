@@ -157,7 +157,7 @@ PVFS_error PVFS_sys_statfs(
         PVFS_perror_gossip("PVFS_isys_statfs call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "statfs", &error);
         if (ret)
@@ -165,12 +165,10 @@ PVFS_error PVFS_sys_statfs(
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_sys_statfs completed\n");
-
-    PINT_sys_release(op_id);
     return error;
 }
 

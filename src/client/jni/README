@@ -9,18 +9,10 @@ Brief Documentation - OrangeFS JNI and Hadoop Client
 ===============================================================================
 Step 1: 
 
-  JNI Only Instructions:
+  JNI Instructions:
 
     ./configure --prefix=/opt/orangefs --enable-shared \
             --enable-jni --with-jdk=<path_to_jdk>
-    make
-    sudo make install
-
-  JNI and Hadoop Instructions:
-
-    ./configure --prefix=/opt/orangefs --enable-shared \
-            --enable-jni --with-jdk=<path_to_jdk> \
-            --enable-hadoop --with-hadoop=<path_to_hadoop_src>
     make
     sudo make install
 
@@ -59,5 +51,5 @@ Step 3:
 
   example of building and running Main.java:
 
-    javac -cp ".:/opt/orangefs/lib/ofs_jni.jar" Main.java
-    java -cp ".:/opt/orangefs/lib/ofs_jni.jar" Main
+    javac -cp ".:/opt/orangefs/lib/orangefs-jni-2.9.0.jar" Main.java
+    java -cp ".:/opt/orangefs/lib/orangefs-jni-2.9.0.jar" Main

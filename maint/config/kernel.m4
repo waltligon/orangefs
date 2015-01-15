@@ -1522,10 +1522,10 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	)
 	CFLAGS=$tmp_cflags
 
-        dnl check for posix_acl_create
+        dnl check for three arg posix_acl_create
 	dnl tmp_cflags=$CFLAGS
 	dnl CFLAGS="$CFLAGS -Werror"
-	AC_MSG_CHECKING(for posix_acl_create)
+	AC_MSG_CHECKING(for three arg posix_acl_create)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#ifdef HAVE_KCONFIG
@@ -1540,14 +1540,40 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 		posix_acl_create(&acl, GFP_KERNEL, &mode);
 	], 
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_POSIX_ACL_CREATE, 1, [Define if posix_acl_create_masq accepts umode_t type]),
+	AC_DEFINE(HAVE_POSIX_ACL_CREATE_3, 1, [Define if posix_acl_create has three arguments]),
 	AC_MSG_RESULT(no)
 	)
+	CFLAGS=$tmp_cflags
 
-        dnl check for posix_acl_chmod
+        dnl check for four arg posix_acl_create
 	dnl tmp_cflags=$CFLAGS
 	dnl CFLAGS="$CFLAGS -Werror"
-	AC_MSG_CHECKING(for posix_acl_chmod)
+	AC_MSG_CHECKING(for four arg posix_acl_create)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
+		#include <linux/fs.h>
+		#include <linux/posix_acl.h>
+		struct inode *dir;
+		struct posix_acl *default_acl;
+		struct posix_acl *acl;
+		umode_t mode = 0;
+	],
+	[
+		posix_acl_create(dir, &mode, &default_acl, &acl);
+	], 
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_POSIX_ACL_CREATE_4, 1, [Define if posix_acl_create has four arguments]),
+	AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
+
+        dnl check for three arg posix_acl_chmod
+	dnl tmp_cflags=$CFLAGS
+	dnl CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for three argument posix_acl_chmod)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#ifdef HAVE_KCONFIG
@@ -1563,10 +1589,32 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 		posix_acl_chmod(&acl, GFP_KERNEL, inode->i_mode );
 	], 
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_POSIX_ACL_CHMOD, 1, [Define if posix_acl_chmod exists]),
+	AC_DEFINE(HAVE_POSIX_ACL_CHMOD_3, 1, [Define if posix_acl_chmod exists and has three arguments]),
 	AC_MSG_RESULT(no)
 	)
+	CFLAGS=$tmp_cflags
 
+        dnl check for two arg posix_acl_chmod
+	dnl tmp_cflags=$CFLAGS
+	dnl CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for two argument posix_acl_chmod)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
+		#include <linux/fs.h>
+		#include <linux/posix_acl.h>
+		struct inode *inode;
+	],
+	[
+		posix_acl_chmod(inode, inode->i_mode);
+	], 
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_POSIX_ACL_CHMOD_2, 1, [Define if posix_acl_chmod exists and has two arguments]),
+	AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
 
         dnl check for posix_acl_clone
 	dnl tmp_cflags=$CFLAGS
@@ -1588,6 +1636,7 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_DEFINE(HAVE_POSIX_ACL_CLONE, 1, [Define if posix_acl_clone exists]),
 	AC_MSG_RESULT(no)
 	)
+	CFLAGS=$tmp_cflags
 
         dnl check for fsync with loff_t  
 	tmp_cflags=$CFLAGS
@@ -2754,6 +2803,33 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	AC_MSG_RESULT(no)
 	)
         CFLAGS=$tmp_cflags
+
+
+        dnl in 3.11 and up, a d_count() function is provided that returns the value
+        dnl of d_lockref.count.  In SLES 11-SP3, the new structure is being used (struct lockref d_lockref)
+        dnl but the function d_count() is not in their version of Linux (3.0.101-0.35-default), instead
+        dnl there is a #define d_count d_lockref.count.
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+        AC_MSG_CHECKING(for function d_count)
+        AC_TRY_COMPILE([
+                #define __KERNEL__
+        #ifdef HAVE_KCONFIG
+        #include <linux/kconfig.h>
+        #endif
+                #include <linux/fs.h>
+                #include <linux/dcache.h>
+                struct dentry d;
+                unsigned int x;
+        ],
+        [
+                x = d_count(d);
+        ],
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(HAVE_D_COUNT_FUNCTION, 1, [define if d_count() is provided]),
+        AC_MSG_RESULT(no)
+        )
+        CFLAGS=$tmp_cflags 
 
         dnl permission function pointer in the inode_operations struct now
         dnl takes three params with the third being an unsigned int (circa

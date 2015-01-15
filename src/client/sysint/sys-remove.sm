@@ -217,6 +217,7 @@ PVFS_error PVFS_isys_remove(
     sm_p->u.remove.object_name = object_name;
     sm_p->parent_ref  = parent_ref;
     sm_p->u.remove.stored_error_code = 0;
+    sm_p->u.remove.retry_count = 0;
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &parent_ref.handle);
 
@@ -254,7 +255,7 @@ PVFS_error PVFS_sys_remove(
         PVFS_perror_gossip("PVFS_isys_remove call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "remove", &error);
         if (ret)
@@ -262,9 +263,8 @@ PVFS_error PVFS_sys_remove(
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -330,7 +330,6 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
         msg_p->req,
         sm_p->parent_capability,
         sm_p->parent_ref.fs_id,
-        sm_p->parent_ref.handle,
         sm_p->getattr.attr.dirdata_handles[dirdata_server_index],
         sm_p->u.remove.object_name,
         sm_p->hints);
@@ -584,10 +583,14 @@ static PINT_sm_action remove_crdirent_retry_or_fail(
                  "remove state: crdirent_retry_or_fail\n");
 
     /* try again if we get a dirdata mismatch. */
-    if (js_p->error_code == -PVFS_EAGAIN)
+    if (js_p->error_code == -PVFS_EAGAIN &&
+        sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit)
     {
+        sm_p->u.remove.retry_count++;
+
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "  received -PVFS_EAGAIN, wrong dirdata server, will do getattr and retry crdirent!\n");
+                "  received -PVFS_EAGAIN, wrong dirdata server or revoked capability,\n  will do getattr and retry crdirent (attempt number %d)!\n",
+                sm_p->u.remove.retry_count);
 
         /* clear acache content */
         PINT_acache_invalidate(sm_p->parent_ref);
@@ -636,8 +639,11 @@ static PINT_sm_action remove_rmdirent_retry_or_fail(
                  "remove state: rmdirent_retry_or_fail\n");
 
     /* try again if we get a dirdata mismatch. */
-    if (js_p->error_code == -PVFS_EAGAIN)
+    if (js_p->error_code == -PVFS_EAGAIN &&
+        sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit)
     {
+        sm_p->u.remove.retry_count++;
+
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                 "  received -PVFS_EAGAIN, wrong dirdata server, will do getattr and retry rmdirent!\n");
 

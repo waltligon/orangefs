@@ -50,6 +50,7 @@
   1999-10-18 lpd Fixed typo in header comment (ansi2knr rather than md5).
   1999-05-03 lpd Original version.
  */
+#include "pvfs2-internal.h"
 
 #include "md5.h"
 #include <string.h>

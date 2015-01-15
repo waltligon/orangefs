@@ -80,10 +80,10 @@ creat01 creat01
 creat03 creat03
 creat04 creat04
 creat05 creat05
-creat06 creat06
+#creat06 creat06
 # creat07 has changed in ltp 20120903. No longer recognizes -F option
 #creat07 creat07 -F $LTPROOT/testcases/bin/test1
-creat07 creat07
+#creat07 creat07
 creat08 creat08
 dup06 dup06
 dup07 dup07
@@ -95,7 +95,7 @@ dup205 dup205
 fchdir01 fchdir01
 fchdir02 fchdir02
 fchdir03 fchdir03
-fchown04 export change_owner=$LTPROOT/testcases/bin/change_owner;fchown04
+#fchown04 export change_owner=$LTPROOT/testcases/bin/change_owner;fchown04
 fchown05 fchown05
 fcntl01 fcntl01
 fcntl06 fcntl06
@@ -108,7 +108,7 @@ fstat02 fstat02
 fstat03 fstat03
 fstat04 fstat04
 fstat05 fstat05
-fstatfs02 fstatfs02
+#fstatfs02 fstatfs02 #This test fails on SLES11 SP3 for reasons not related to OrangeFS
 fsync03 fsync03
 ftruncate01 ftruncate01
 ftruncate02 ftruncate02
@@ -119,8 +119,6 @@ getcwd02 getcwd02
 getcwd03 getcwd03
 getdents01 getdents01
 getdents02 getdents02
-getdents03 getdents03
-getdents04 getdents04
 ioperm01 ioperm01
 iopl01 iopl01
 iopl02 iopl02
@@ -137,7 +135,7 @@ lstat01 lstat01
 lstat03 lstat03
 mallopt01 mallopt01
 mkdir02 mkdir02
-mkdir03 mkdir03
+#mkdir03 mkdir03
 mkdir04 mkdir04
 mkdir05 mkdir05
 mkdir05A symlink01 -T mkdir05
@@ -152,8 +150,6 @@ mremap02 mremap02
 mremap03 mremap03
 mremap04 mremap04
 msync03 msync03
-msync04 msync04
-msync05 msync05
 nftw01 nftw01
 nftw6401 nftw6401
 open01A symlink01 -T open01

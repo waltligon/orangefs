@@ -140,7 +140,7 @@ PVFS_error PVFS_sys_flush(
         PVFS_perror_gossip("PVFS_isys_flush call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "flush", &error);
         if (ret)
@@ -148,9 +148,8 @@ PVFS_error PVFS_sys_flush(
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -229,6 +228,8 @@ static int flush_datafile_setup_msgpairarray(
             msg_p->comp_fn = NULL;
         }
     }
+
+    PINT_cleanup_capability(&capability);
 
     ret = PINT_serv_msgpairarray_resolve_addrs(&sm_p->msgarray_op);
     if (ret)
