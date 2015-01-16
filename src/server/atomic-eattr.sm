@@ -913,7 +913,7 @@ static PINT_sm_action check_immutable(struct PINT_smcb *smcb
         }
 
         memset(&hint, 0, sizeof(hint));
-        memcpy(&hint, v->buffer, sizeof(v->buffer));
+        memcpy(&hint, v->buffer, v->buffer_sz);
 
         gossip_debug(GOSSIP_MIRROR_DEBUG,"My converted buffer is %llu.\n"
                                         ,llu(hint.flags));

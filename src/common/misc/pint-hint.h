@@ -12,6 +12,16 @@
 #define PVFS_HINT_MAX_LENGTH 1024
 #define PVFS_HINT_MAX_NAME_LENGTH 512
 
+#define PVFS_HINT_PARAM_VAL_SEP ":"
+#define PVFS_HINT_PARAM_VAL_PAIRS_SEP "+"
+#define PVFS_HINT_PARAM_VAL_PAIR_MAX_STRLEN \
+             (PVFS_HINT_MAX_LENGTH + PVFS_HINT_MAX_NAME_LENGTH + 1)
+#define PVFS_HINT_PARAM_VAL_PAIRS_MAX 3 /* two d stripe uses largest number
+                                           of distribution param/value pairs */
+#define PVFS_HINT_PARAM_VAL_PAIRS_MAX_STRLEN \
+             (((PVFS_HINT_PARAM_VAL_PAIR_MAX_STRLEN + 1) *  \
+              PVFS_HINT_PARAM_VAL_PAIRS_MAX) - 1)
+
 #define PINT_HINT_TRANSFER 0x01
 
 #include "pvfs2-internal.h"
@@ -30,7 +40,10 @@ enum PINT_hint_type
     PINT_HINT_LAYOUT,
     PINT_HINT_DFILE_COUNT,
     PINT_HINT_SERVERLIST,
-    PINT_HINT_CACHE
+    PINT_HINT_CACHE,
+    PINT_HINT_LOCAL_UID,
+    PINT_HINT_OWNER_GID,
+    PINT_HINT_DISTRIBUTION_PV
 };
 
 typedef struct PVFS_hint_s
@@ -51,23 +64,23 @@ typedef struct PVFS_hint_s
 void encode_PINT_hint(char **pptr, const PINT_hint *hint);
 void decode_PINT_hint(char **pptr, PINT_hint **hint);
 
-void *PINT_hint_get_value_by_type(struct PVFS_hint_s *hint, enum PINT_hint_type type,
+void *PINT_hint_get_value_by_type(struct PVFS_hint_s *hint,
+                                  enum PINT_hint_type type,
                                   int *length);
 
-void *PINT_hint_get_value_by_name(
-    struct PVFS_hint_s *hint, const char *name, int *length);
+void *PINT_hint_get_value_by_name(struct PVFS_hint_s *hint,
+                                  const char *name,
+                                  int *length);
 
-int PVFS_hint_add_internal(
-    PVFS_hint *hint,
-    enum PINT_hint_type type,
-    int length,
-    void *value);
+int PVFS_hint_add_internal(PVFS_hint *hint,
+                           enum PINT_hint_type type,
+                           int length,
+                           void *value);
 
-int PVFS_hint_replace_internal(
-    PVFS_hint *hint,
-    enum PINT_hint_type type,
-    int length,
-    void *value);
+int PVFS_hint_replace_internal(PVFS_hint *hint,
+                               enum PINT_hint_type type,
+                               int length,
+                               void *value);
 
 #define PINT_HINT_GET_REQUEST_ID(hints) \
     PINT_hint_get_value_by_type(hints, PINT_HINT_REQUEST_ID, NULL) ? \
@@ -79,7 +92,7 @@ int PVFS_hint_replace_internal(
 
 #define PINT_HINT_GET_HANDLE(hints) \
     PINT_hint_get_value_by_type(hints, PINT_HINT_HANDLE, NULL) ? \
-    *(uint64_t *)PINT_hint_get_value_by_type(hints, PINT_HINT_HANDLE, NULL) : 0
+    *(PVFS_handle *)PINT_hint_get_value_by_type(hints, PINT_HINT_HANDLE, NULL) : PVFS_HANDLE_NULL
 
 #define PINT_HINT_GET_OP_ID(hints) \
     PINT_hint_get_value_by_type(hints, PINT_HINT_OP_ID, NULL) ? \
@@ -88,6 +101,14 @@ int PVFS_hint_replace_internal(
 #define PINT_HINT_GET_RANK(hints) \
     PINT_hint_get_value_by_type(hints, PINT_HINT_RANK, NULL) ? \
     *(uint32_t *)PINT_hint_get_value_by_type(hints, PINT_HINT_RANK, NULL) : 0
+
+#define PINT_HINT_GET_LOCAL_UID(hints) \
+    PINT_hint_get_value_by_type(hints, PINT_HINT_LOCAL_UID, NULL) ? \
+    *(PVFS_uid *)PINT_hint_get_value_by_type(hints, PINT_HINT_LOCAL_UID, NULL) : -1
+
+#define PINT_HINT_GET_OWNER_GID(hints) \
+    PINT_hint_get_value_by_type(hints, PINT_HINT_OWNER_GID, NULL) ? \
+    *(PVFS_gid *)PINT_hint_get_value_by_type(hints, PINT_HINT_OWNER_GID, NULL) : -1
 
 #endif /* __PINT_HINT_H__ */
 

@@ -97,9 +97,9 @@ struct PINT_tcache_entry
 struct PINT_tcache
 {
     /** comparison function */
-    int (*compare_key_entry)(void* key, struct qhash_head* link);
+    int (*compare_key_entry)(const void* key, struct qhash_head* link);
     /** hash function */
-    int (*hash_key)(void* key, int table_size);
+    int (*hash_key)(const void* key, int table_size);
     /** function that can be used to free payload pointer */
     int (*free_payload)(void* payload);
 
@@ -137,8 +137,8 @@ enum PINT_tcache_options
 };
 
 struct PINT_tcache* PINT_tcache_initialize(
-    int (*compare_key_entry) (void *key, struct qhash_head* link),
-    int (*hash_key) (void *key, int table_size),
+    int (*compare_key_entry) (const void *key, struct qhash_head* link),
+    int (*hash_key) (const void *key, int table_size),
     int (*free_payload) (void* payload),
     int table_size);
 

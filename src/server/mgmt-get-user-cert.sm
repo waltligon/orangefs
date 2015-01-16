@@ -386,7 +386,7 @@ static PINT_sm_action get_user_cert_gen_cert(
     EVP_PKEY *keypair = NULL;
     RSA *rsa_privkey, *rsa_uprivkey;
     unsigned char *dec_key, *pdec_key, *penc_key;
-    int ret, index, flen, dlen, bufrem, maxflen, tlen;
+    int ret, index, flen, dlen, bufrem, tlen;
     X509_NAME *name = NULL;
     X509_EXTENSION *ext;
     X509V3_CTX ctx;
@@ -406,7 +406,6 @@ static PINT_sm_action get_user_cert_gen_cert(
 
     /* alloc buffers */
     flen = RSA_size(rsa_privkey); /* block size */
-    maxflen = flen - 12; /* max plaintext per block */
     /* total enc. key size */
     bufrem = s_op->req->u.mgmt_get_user_cert.enc_key_size; 
     dec_key = (unsigned char *) malloc(bufrem);
@@ -425,7 +424,6 @@ static PINT_sm_action get_user_cert_gen_cert(
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: decrypting key: bufrem = %d   "
                      "flen = %d\n", __func__, bufrem, flen);
-        /* flen = bufrem < maxflen ? bufrem : maxflen; */
         dlen = RSA_private_decrypt(flen, penc_key, pdec_key, rsa_privkey, 
                                    RSA_PKCS1_PADDING);
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: decrypting key: dlen = %d\n",
@@ -496,11 +494,15 @@ static PINT_sm_action get_user_cert_gen_cert(
     /* set expiration */
     X509_gmtime_adj(X509_get_notBefore(xcert), 0);
     if (s_op->req->u.mgmt_get_user_cert.exp != 0)
+    {
         X509_gmtime_adj(X509_get_notAfter(xcert),
-                        (long) s_op->req->u.mgmt_get_user_cert.exp * 60);
+            (long) s_op->req->u.mgmt_get_user_cert.exp * 24 * 60 * 60);
+    }
     else
+    {
         X509_gmtime_adj(X509_get_notAfter(xcert), 
-                        (long) config->user_cert_exp * 24 * 60 * 60);
+            (long) config->user_cert_exp * 24 * 60 * 60);
+    }
 
     /* set public key */
     X509_set_pubkey(xcert, keypair);
@@ -570,6 +572,7 @@ static PINT_sm_action get_user_cert_gen_cert(
     /* cleanup */
     EVP_PKEY_free(keypair);
     PINT_cleanup_cert(pcert);
+    free(pcert);
     X509_free(xcert);
     
 #endif

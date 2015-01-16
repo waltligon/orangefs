@@ -35,9 +35,9 @@ struct dbpf_keyval_pcache_entry
 };
 
 static int dbpf_keyval_pcache_compare(
-    void * key, struct qhash_head * link);
+    const void * key, struct qhash_head * link);
 static int dbpf_keyval_pcache_hash(
-    void * key, int size);
+    const void * key, int size);
 static int dbpf_keyval_pcache_entry_free(
     void * entry);
 
@@ -84,10 +84,11 @@ gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "dbpf_keyval_pcache_finalize");
     free(cache);
 }
 
-static int dbpf_keyval_pcache_compare(void * key, struct qhash_head * link)
+static int dbpf_keyval_pcache_compare(const void * key,
+                                      struct qhash_head * link)
 {
-    struct dbpf_keyval_pcache_key * key_entry = 
-             (struct dbpf_keyval_pcache_key *)key;
+    const struct dbpf_keyval_pcache_key * key_entry = 
+                    (const struct dbpf_keyval_pcache_key *)key;
     struct dbpf_keyval_pcache_entry * link_entry =
              (struct dbpf_keyval_pcache_entry *)
              (qhash_entry(link, struct PINT_tcache_entry, hash_link))->payload;
@@ -121,10 +122,10 @@ do { \
       c=c-a;  c=c-b;  c=c^(b>>15); \
 } while(0)
 
-static int dbpf_keyval_pcache_hash(void * key, int size)
+static int dbpf_keyval_pcache_hash(const void * key, int size)
 {
-    struct dbpf_keyval_pcache_entry *key_entry =
-                    (struct dbpf_keyval_pcache_entry *)key;
+    const struct dbpf_keyval_pcache_entry * key_entry =
+                    (const struct dbpf_keyval_pcache_entry *)key;
 
     uint64_t handle = PVFS_OID_hash64(&key_entry->handle);
 

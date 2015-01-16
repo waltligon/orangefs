@@ -208,13 +208,6 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
     int ret;
 
 
-    gossip_err("%s:REQUEST:path(%s) fs_id(%d) parent handle(%s) attrmask(0x%0x)\n"
-              ,__func__
-              ,s_op->req->u.lookup_path.path
-              ,s_op->req->u.lookup_path.fs_id
-              ,PVFS_OID_str(&s_op->req->u.lookup_path.handle)
-              ,s_op->req->u.lookup_path.attrmask);
-
     /* Assuming that the s_op->attr and s_op->ds_attr are always a directory object,
      * defined by the handle in the lookup_path request.  Prelude uses that handle
      * to access the dspace attributes, storing them in s_op->ds_attr and s_op->attr.
@@ -247,8 +240,6 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
           return SM_ACTION_COMPLETE;
        }
     }
-
-    gossip_err("%s: metasidcnt(%d)\n",__func__,s_op->metasidcnt);
 
     /* fill in the lookup portion of the PINT_server_op */
     s_op->u.lookup.segp = NULL;
@@ -351,8 +342,6 @@ static PINT_sm_action lookup_read_object_metadata(
     s_op->u.lookup.seg_nr++;
     s_op->u.lookup.array_index = s_op->u.lookup.seg_nr - 1;
 
-    gossip_err("%s:array_index:(%d)\n",__func__,s_op->u.lookup.array_index);
-
     /* From the dirdata directory entry, we have a handle representing a
      * dspace object.  We don't know, yet, if this object is a metafile or
      * another directory until we retrieve it.  
@@ -370,12 +359,6 @@ static PINT_sm_action lookup_read_object_metadata(
         s_op->resp.u.lookup_path.sid_array[i] = s_op->u.lookup.keyval_temp_store[j].sid;
         s_op->resp.u.lookup_path.sid_count++;
     }
-
-    gossip_err("%s:sid for metadata object(%s)\n"
-              ,__func__
-              ,PVFS_SID_str(&s_op->u.lookup.keyval_temp_store[1].sid));
-
-    gossip_err("%s:oid for metadata object(%s)\n",__func__,PVFS_OID_str(&handle));
 
     /* Does the handle's dspace entry reside locally or remotely?  If remotely,
      * then we are done.
@@ -540,39 +523,6 @@ static PINT_sm_action lookup_setup_getattr_request(
       return SM_ACTION_COMPLETE;
    }
    
-   gossip_err("%s\n"
-              "s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index].objtype(%d)\n"
-              "         .mask(0x%0x)\n"
-              "         .owner(%d)\n"
-              "         .group(%d)\n"
-              "         .perms(%o)\n"
-              "         .atime(%d)\n"
-              "         .mtime(%d)\n"
-              "         .ctime(%d)\n"
-              "         .ntime(%d)\n"
-              "         .capability.issuer(%s) fs_id(%llu)\n"
-              "         .dist(%p)\n"
-              "         .dfile_array(%p)\n"
-              "         .sid_array(%p)\n"
-              "         .size(%d)\n"
-              ,__func__
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].objtype
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].mask
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].owner
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].group
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].perms
-              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].atime
-              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].mtime
-              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].ctime
-              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].ntime
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].capability.issuer
-              ,llu(s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].capability.fsid)
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].u.meta.dist
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].u.meta.dfile_array
-              ,s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].u.meta.sid_array
-              ,(int)s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ].u.meta.size);
-
-
    getattr_op->attr = s_op->resp.u.lookup_path.attr_array[ s_op->u.lookup.array_index ];
 
    getattr_op->req = s_op->req;
@@ -619,8 +569,6 @@ static PINT_sm_action lookup_verify_getattr_results(
 
    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
 
-   gossip_err("%s: js_p->error_code=%d\n",__func__,js_p->error_code);
-
    if ( js_p->error_code )
    {
       goto out;
@@ -630,45 +578,6 @@ static PINT_sm_action lookup_verify_getattr_results(
 
    resp_attr = &(getattr_op->resp.u.getattr.attr);
 
-   gossip_err("%s\n"
-              "resp_attr.objtype(%d)\n"
-              "         .mask(0x%0x)\n"
-              "         .owner(%d)\n"
-              "         .group(%d)\n"
-              "         .perms(%o)\n"
-              "         .atime(%d)\n"
-              "         .mtime(%d)\n"
-              "         .ctime(%d)\n"
-              "         .ntime(%d)\n"
-              "         .capability.fsid(%llu) issuer(%s)\n"
-              "         .dist(%p)\n"
-              "         .dfile_array(%p) dfile_count(%d) dfile_array[0](%s)\n"
-              "         .sid_array(%p) sid_count(%d)\n"
-              "         .size(%d)\n"
-              ,__func__
-              ,resp_attr->objtype
-              ,resp_attr->mask
-              ,resp_attr->owner
-              ,resp_attr->group
-              ,resp_attr->perms
-              ,(int)resp_attr->atime
-              ,(int)resp_attr->mtime
-              ,(int)resp_attr->ctime
-              ,(int)resp_attr->ntime
-              ,llu(resp_attr->capability.fsid)
-              ,resp_attr->capability.issuer
-              ,resp_attr->u.meta.dist
-              ,resp_attr->u.meta.dfile_array
-              ,resp_attr->u.meta.dfile_count
-              ,PVFS_OID_str(&resp_attr->u.meta.dfile_array[0])
-              ,resp_attr->u.meta.sid_array
-              ,resp_attr->u.meta.sid_count
-              ,(int)resp_attr->u.meta.size);
-
-   gossip_err("resp_attr.sid_array[0]:(%s)\n",PVFS_SID_str(&resp_attr->u.meta.sid_array[0]));
-
-   gossip_err("array_index:(%d)\n",s_op->u.lookup.array_index);
-   
    ret = PINT_copy_object_attr( &s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.array_index],resp_attr );
    if (ret)
    {
@@ -930,40 +839,10 @@ static PINT_sm_action lookup_read_num_directory_entry_handles(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
 
-    gossip_err("%s:s_op->attrs:\n"
-               "%s:s_op->attrs.objtype(%d)\n"
-               "%s:           .u.dir.dirent_count(%d)\n"
-               "%s:                 .dist_dir_attr.tree_height(%d)\n"
-               "%s:                               .dirdata_count(%d)\n"
-               "%s:                               .sid_count(%d)\n"
-               "%s:                               .bitmap_size(%d)\n"
-               "%s:                               .split_size(%d)\n"
-               "%s:                               .server_no(%d)\n"
-               "%s:                               .branch_level(%d)\n"
-               "%s:                 .dist_dir_bitmap(%p)\n"
-               "%s:                 .dirdata_handles(%p)\n"
-               "%s:                 .dirdata_sids(%p)\n"
-               ,__func__
-               ,__func__,s_op->attr.objtype
-               ,__func__,(int)s_op->attr.u.dir.dirent_count
-               ,__func__,s_op->attr.u.dir.dist_dir_attr.tree_height
-               ,__func__,s_op->attr.u.dir.dist_dir_attr.dirdata_count
-               ,__func__,s_op->attr.u.dir.dist_dir_attr.sid_count
-               ,__func__,s_op->attr.u.dir.dist_dir_attr.bitmap_size
-               ,__func__,s_op->attr.u.dir.dist_dir_attr.split_size
-               ,__func__,s_op->attr.u.dir.dist_dir_attr.server_no
-               ,__func__,s_op->attr.u.dir.dist_dir_attr.branch_level
-               ,__func__,s_op->attr.u.dir.dist_dir_bitmap
-               ,__func__,s_op->attr.u.dir.dirdata_handles
-               ,__func__,s_op->attr.u.dir.dirdata_sids);
-
     /* use the base handle if we haven't looked up a segment yet. In this
      * case, the dist_dir_attr values are already provided by the prelude
      * and are stored in s_op->attr.  No need to do another lookup.
      */
-
-    gossip_err("%s:s_op->u.lookup.seg_nr(%d)\n",__func__,s_op->u.lookup.seg_nr);
-    gossip_err("%s:s_op->u.lookup.array_index(%d)\n",__func__,s_op->u.lookup.array_index);
 
     if (s_op->u.lookup.seg_nr == 0)
     {
@@ -1020,7 +899,7 @@ static PINT_sm_action lookup_get_dirdata_from_keyval(
 
 
     assert(attr->u.dir.dist_dir_attr.dirdata_count > 0 &&
-        attr->u.dir.dist_dir_attr.bitmap_size > 0);
+           attr->u.dir.dist_dir_attr.bitmap_size > 0);
 
     /* use the base handle if we haven't looked up a segment yet */
     if (s_op->u.lookup.seg_nr == 0)
@@ -1055,6 +934,8 @@ static PINT_sm_action lookup_get_dirdata_from_keyval(
     if(!attr->u.dir.dist_dir_bitmap ||
             !attr->u.dir.dirdata_handles)
     {
+        free(attr->u.dir.dist_dir_bitmap);
+        free(attr->u.dir.dirdata_handles);
         js_p->error_code = -PVFS_ENOMEM;
         goto error_out;
     }
@@ -1062,20 +943,14 @@ static PINT_sm_action lookup_get_dirdata_from_keyval(
     /* Beginning of sids is immediately following the dirdata handles */
     attr->u.dir.dirdata_sids = (PVFS_SID *)&attr->u.dir.dirdata_handles[ attr->u.dir.dist_dir_attr.dirdata_count ];
 
-    gossip_err("%s: dirdata_handles(%p):sizeof(%ld)  dirdata_sids(%p):sizeof(%ld)\n"
-              ,__func__
-              ,attr->u.dir.dirdata_handles
-              ,sizeof(PVFS_handle)
-              ,attr->u.dir.dirdata_sids
-              ,sizeof(PVFS_SID));
-    
-
     /* total 2 keyvals, DIST_DIRDATA_BITMAP, DIST_DIRDATA_HANDLES */
     keyval_count = 2;
 
     s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
     if(!s_op->key_a)
     {
+        free(attr->u.dir.dist_dir_bitmap);
+        free(attr->u.dir.dirdata_handles);
         js_p->error_code = -PVFS_ENOMEM;
         goto error_out;
     }
@@ -1109,6 +984,10 @@ static PINT_sm_action lookup_get_dirdata_from_keyval(
     s_op->error_a = (PVFS_error*)calloc(keyval_count, sizeof(PVFS_error));
     if (!s_op->error_a)
     {
+        free(attr->u.dir.dist_dir_bitmap);
+        free(attr->u.dir.dirdata_handles);
+        free(s_op->key_a);
+        free(s_op->val_a);
         js_p->error_code = -PVFS_ENOMEM;
         goto error_out;
     }
@@ -1181,7 +1060,6 @@ static PINT_sm_action lookup_compute_directory_entry_location(
     int i;
 
     /* find the segment that we should look up in the directory */
-    gossip_err("%s:path:(%s)\n",__func__,s_op->req->u.lookup_path.path);
     ret = PINT_string_next_segment(s_op->req->u.lookup_path.path,
                                    &s_op->u.lookup.segp,
                                    &s_op->u.lookup.segstate);
@@ -1226,17 +1104,6 @@ static PINT_sm_action lookup_compute_directory_entry_location(
                                        s_op->u.lookup.dirdata_server_index]),
                  s_op->u.lookup.segp, (int) strlen(s_op->u.lookup.segp));
 
-    gossip_err("%s:dirdata_sids[%d]=%s(%p)\n"
-               ,__func__
-               ,s_op->u.lookup.dirdata_sid_index
-               ,PVFS_SID_str(&s_op->u.lookup.attr.u.dir.dirdata_sids[s_op->u.lookup.dirdata_sid_index])
-               ,&s_op->u.lookup.attr.u.dir.dirdata_sids[0]);
-
-    gossip_err("%s:dirdata_handles[0]=%s(%p)\n"
-              ,__func__
-              ,PVFS_OID_str(&s_op->u.lookup.attr.u.dir.dirdata_handles[0])
-              ,&s_op->u.lookup.attr.u.dir.dirdata_handles[0]);
-
     /* For that dirdata handle, do any of its sids identify the local machine? 
      * If not, then we start with the first one in the list.  MSGPAIR will access 
      * the other sids, if the first one fails.
@@ -1278,13 +1145,8 @@ static PINT_sm_action lookup_read_directory_entry_local(
     s_op->key.buffer = s_op->u.lookup.segp;
     s_op->key.buffer_sz = strlen(s_op->u.lookup.segp) + 1;
 
-    gossip_err("%s:s_op->u.lookup.segp(%s)\n",__func__,s_op->u.lookup.segp);
-
-
     /* TJS: Read in SID information to temporary location.  Copy back into
      * response array in next state */
-    gossip_err("%s:s_op->metasidcnt(%d)\n",__func__,s_op->metasidcnt);
-
     s_op->u.lookup.keyval_temp_store = (PVFS_ID *)malloc(
                                                 sizeof(PVFS_handle) +
                                                 (sizeof(PVFS_SID) * 
@@ -1317,7 +1179,7 @@ static PINT_sm_action lookup_read_directory_entry_remote(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
     int ret;
-    PVFS_capability null_cap;
+    PVFS_capability capability;
 
     gossip_debug(GOSSIP_LOOKUP_DEBUG, "lookup state: read_directory_entry_remote\n");
 
@@ -1326,16 +1188,18 @@ static PINT_sm_action lookup_read_directory_entry_remote(
     msg_p = &s_op->msgarray_op.msgpair;
     PINT_serv_init_msgarray_params(s_op, s_op->req->u.lookup_path.fs_id);
 
-    PINT_null_capability(&null_cap);
+    PINT_null_capability(&capability);
 
     PINT_SERVREQ_MGMT_GET_DIRENT_FILL(
             msg_p->req,
-            null_cap,
+            capability,
             s_op->req->u.lookup_path.fs_id,
             s_op->u.lookup.attr.u.dir.dirdata_handles[
                                           s_op->u.lookup.dirdata_server_index],
             s_op->u.lookup.segp,
             NULL);
+
+    PINT_cleanup_capability(&capability);
 
     msg_p->fs_id = s_op->req->u.lookup_path.fs_id;
     msg_p->handle =
@@ -1441,74 +1305,6 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
     }
 
 
-if (js_p->error_code == 0)
-{
-    gossip_err("%s\n"
-               "s_op->resp.op(%d)\n"
-               "s_op->resp.status(%d)\n"
-               "s_op->resp.u.lookup_path.handle_count(%u)\n"
-               "                        .attr_count(%u)\n"
-               "                        .sid_count(%u)\n"
-               "                        .handle_array(%s)\n"
-               "                        .attr_array(%p)\n"
-               "                        .sid_array(%p)\n"
-               ,__func__
-               ,(int)s_op->resp.op
-               ,s_op->resp.status
-               ,s_op->resp.u.lookup_path.handle_count
-               ,s_op->resp.u.lookup_path.attr_count
-               ,s_op->resp.u.lookup_path.sid_count
-               ,PVFS_OID_str(&s_op->resp.u.lookup_path.handle_array[0])
-               ,s_op->resp.u.lookup_path.attr_array
-               ,s_op->resp.u.lookup_path.sid_array);
-   gossip_err("sid_array[0]:(%s)\n",PVFS_SID_str(&s_op->resp.u.lookup_path.sid_array[0]));
-
-
-   gossip_err("%s\n"
-              "s_op->resp.u.lookup_path.attr_array[0].objtype(%d)\n"
-              "                                      .mask(0x%0x)\n"
-              "                                      .owner(%d)\n"
-              "                                      .group(%d)\n"
-              "                                      .perms(%o)\n"
-              "                                      .atime(%d)\n"
-              "                                      .mtime(%d)\n"
-              "                                      .ctime(%d)\n"
-              "                                      .ntime(%d)\n"
-              "                                      .capability(%p)\n"
-              "                                      .u.meta.dist(%p)\n"
-              "                                             .dfile_array(%p) .dfile_count(%u)\n"
-              "                                             .sid_array(%p) .sid_count(%u)\n"
-              "                                             .size(%d)\n"
-              "                                             .mirror_mode(%d)\n"
-              "                                             .stuffed(%d)\n"
-              "                                             .stuffed_size(%d)\n"
-              "                                             .hint(0x%08x)\n"
-              ,__func__
-              ,s_op->resp.u.lookup_path.attr_array[0].objtype
-              ,s_op->resp.u.lookup_path.attr_array[0].mask
-              ,s_op->resp.u.lookup_path.attr_array[0].owner
-              ,s_op->resp.u.lookup_path.attr_array[0].group
-              ,s_op->resp.u.lookup_path.attr_array[0].perms
-              ,(int)s_op->resp.u.lookup_path.attr_array[0].atime
-              ,(int)s_op->resp.u.lookup_path.attr_array[0].mtime
-              ,(int)s_op->resp.u.lookup_path.attr_array[0].ctime
-              ,(int)s_op->resp.u.lookup_path.attr_array[0].ntime
-              ,&s_op->resp.u.lookup_path.attr_array[0].capability
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.dist
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.dfile_array
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.dfile_count
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.sid_array
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.sid_count
-              ,(int)s_op->resp.u.lookup_path.attr_array[0].u.meta.size
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.mirror_mode
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.stuffed
-              ,s_op->resp.u.lookup_path.attr_array[0].u.meta.stuffed_size
-              ,(unsigned int)(s_op->resp.u.lookup_path.attr_array[0].u.meta.hint.flags));
-
-    gossip_err("dfile(0):(%s)\n",PVFS_OID_str(&s_op->resp.u.lookup_path.attr_array[0].u.meta.dfile_array[0]));
-    gossip_err("sid(0)  :(%s)\n",PVFS_SID_str(&s_op->resp.u.lookup_path.attr_array[0].u.meta.sid_array[0]));
-} /* end if */
-
     return SM_ACTION_COMPLETE;
 }
 
@@ -1541,6 +1337,18 @@ static PINT_sm_action lookup_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
         free(s_op->u.lookup.ds_attr_array);
         s_op->u.lookup.ds_attr_array = NULL;
     }
+
+    free(s_op->u.lookup.attr.u.dir.dist_dir_bitmap);
+    s_op->u.lookup.attr.u.dir.dist_dir_bitmap = NULL;
+    free(s_op->u.lookup.attr.u.dir.dirdata_handles);
+    s_op->u.lookup.attr.u.dir.dirdata_handles = NULL;
+
+    free(s_op->key_a);
+    s_op->key_a = NULL;
+    free(s_op->val_a);
+    s_op->val_a = NULL;
+    free(s_op->error_a);
+    s_op->error_a = NULL;
 
     return(server_state_machine_complete(smcb));
 }

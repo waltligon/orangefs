@@ -124,13 +124,13 @@ nested machine pvfs2_prelude_sm
 static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int ret;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_MIRROR_DEBUG,
                  "Executing pvfs2_prelude_sm:prelude_setup...\n");
-    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tbase frame:%d\tframe count:%d\n"
-                                    , smcb->base_frame,smcb->frame_count);
-
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,
+                 "\tbase frame:%d\tframe count:%d\n"
+                 ,smcb->base_frame,smcb->frame_count);
 
     ret = PINT_server_req_get_object_ref(s_op->req,
                                          &s_op->target_fs_id,
@@ -139,6 +139,7 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     {
         js_p->error_code = -PVFS_EINVAL;
     }
+
     s_op->access_type = PINT_server_req_get_access_type(s_op->req);
     s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
 
@@ -207,8 +208,10 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
     if (s_op->prelude_mask & PRELUDE_GETATTR_DONE)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-             "(%p) %s (prelude sm) state: getattr already done... skipping.\n",
-             s_op, PINT_map_server_op_to_string(s_op->req->op));
+                     "(%p) %s (prelude sm) state: getattr already done... "
+                     "skipping.\n", s_op,
+                     PINT_map_server_op_to_string(s_op->req->op));
+
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -225,7 +228,6 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
      */
     if (!PVFS_OID_cmp(&s_op->target_handle, &PVFS_HANDLE_NULL))
     {
-
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -285,7 +287,6 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         s_op->ds_attr.u.datafile.b_size = 0;
         create_object = 1;
         js_p->error_code = 0;
-        gossip_err("%s: Need to create dspace entry...\n",__func__);
     }
 
     /*
@@ -310,9 +311,10 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     if (s_op->prelude_mask & PRELUDE_PERM_CHECK_DONE)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-           "(%p) %s (prelude sm) state: perm check already done... skipping.\n",
-           s_op, PINT_map_server_op_to_string(s_op->req->op));
-        goto complete;
+                     "(%p) %s (prelude sm) state: perm check already done... "
+                     "skipping.\n", s_op,
+                     PINT_map_server_op_to_string(s_op->req->op));
+        return SM_ACTION_COMPLETE;
     }
 
     PINT_debug_capability(&s_op->req->capability, "Received");
@@ -337,6 +339,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     {
 #ifdef ENABLE_CREDCACHE
         credcache_hit = (PINT_credcache_lookup(cred) != NULL);
+
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cred cache %s\n", __func__,
                      (credcache_hit) ? "hit" : "miss");
 #endif
@@ -360,7 +363,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                          cred->issuer);
 
             /* have client try again on timeout */
-            if (PINT_util_get_current_time() >= cred->timeout)
+            if (PINT_util_get_current_time() > cred->timeout)
             {
                 js_p->error_code = -PVFS_EAGAIN;
             }
@@ -373,7 +376,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         }
     }
 
-    if (s_op->target_fs_id != PVFS_FS_ID_NULL && cred != NULL)
+    if ((s_op->target_fs_id != PVFS_FS_ID_NULL) && (cred != NULL))
     {
         PVFS_uid uid, translated_uid;
         PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS], translated_gid;
@@ -444,7 +447,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     capcache_hit = 1;
     if (!PINT_capability_is_null(&s_op->req->capability))
     {        
-        capcache_hit = (PINT_capcache_lookup(&s_op->req->capability) != NULL);
+        capcache_hit = (PINT_capcache_lookup(&s_op->req->capability) != NULL);        
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cap cache %s!\n", __func__,
                      (capcache_hit) ? "hit" : "miss");
     }
@@ -469,7 +472,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                      s_op->req->capability.issuer);
 
         /* have client try again on timeout */
-        if (PINT_util_get_current_time() >= s_op->req->capability.timeout)
+        if (PINT_util_get_current_time() > s_op->req->capability.timeout)
         {
             js_p->error_code = -PVFS_EAGAIN;
         }
@@ -479,6 +482,13 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         }
         
         goto complete;
+    }
+
+    /* anything else we treat as a real error */
+    if (js_p->error_code)
+    {
+        js_p->error_code = -PVFS_ERROR_CODE(-js_p->error_code);
+        return SM_ACTION_COMPLETE;
     }
 
     js_p->error_code = ret;

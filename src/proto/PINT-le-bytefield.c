@@ -25,7 +25,10 @@
 #include "src/io/description/pint-distribution.h"  /* for PINT_dist_lookup */
 #include "pvfs2-internal.h"
 #include "pint-hint.h"
+#include "pint-util.h"
 #include "security-util.h"
+
+const char PVFS2_BLANK_ISSUER[] = "";
 
 /* defined later */
 static int check_req_size(struct PVFS_server_req *req);
@@ -328,9 +331,13 @@ static void lebf_initialize(void)
                 respsize = extra_size_PVFS_servresp_mgmt_get_uid;
                 break;
             case PVFS_SERV_TREE_SETATTR:
-                req.u.tree_setattr.num_servers = 0;
+                zero_credential(&req.u.tree_setattr.credential);
+                req.u.tree_setattr.handle_count = 0;
                 req.u.tree_setattr.handle_array = NULL;
+                resp.u.tree_setattr.handle_count = 0;
+                resp.u.tree_setattr.status = NULL;
                 reqsize = extra_size_PVFS_servreq_tree_setattr;
+                respsize = extra_size_PVFS_servresp_tree_setattr;
                 break;
             case PVFS_SERV_MGMT_GET_DIRENT:
                 req.u.mgmt_get_dirent.entry = tmp_name;
@@ -343,6 +350,9 @@ static void lebf_initialize(void)
                 break;
 #endif
             case PVFS_SERV_MGMT_SPLIT_DIRENT:
+                req.u.mgmt_split_dirent.nentries = 0;
+                req.u.mgmt_split_dirent.entry_handles = NULL;
+                req.u.mgmt_split_dirent.entry_names = NULL;
                 reqsize = extra_size_PVFS_servreq_mgmt_split_dirent;
                 break;
             case PVFS_SERV_MGMT_GET_USER_CERT:
@@ -597,7 +607,6 @@ static int lebf_encode_req(struct PVFS_server_req *req,
         CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
-
         case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_PROTO_ERROR:
@@ -701,15 +710,14 @@ static int lebf_encode_resp(struct PVFS_server_resp *resp,
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
         CASE(PVFS_SERV_TREE_REMOVE, tree_remove);
         CASE(PVFS_SERV_TREE_GETATTR, tree_getattr);
+        CASE(PVFS_SERV_TREE_SETATTR, tree_setattr);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
-
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
-        case PVFS_SERV_TREE_SETATTR:
         case PVFS_SERV_SETATTR:
         case PVFS_SERV_SETEATTR:
         case PVFS_SERV_DELEATTR:
@@ -839,7 +847,6 @@ static int lebf_decode_req(void *input_buffer,
         CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
-
         case PVFS_SERV_SMALL_IO:
         case PVFS_SERV_BATCH_CREATE:
         case PVFS_SERV_GETCONFIG:
@@ -936,17 +943,16 @@ static int lebf_decode_resp(void *input_buffer,
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
         CASE(PVFS_SERV_TREE_REMOVE, tree_remove);
         CASE(PVFS_SERV_TREE_GETATTR, tree_getattr);
+        CASE(PVFS_SERV_TREE_SETATTR, tree_setattr);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
-
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_BATCH_CREATE:
         case PVFS_SERV_BATCH_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
-        case PVFS_SERV_TREE_SETATTR:
         case PVFS_SERV_SETATTR:
         case PVFS_SERV_SETEATTR:
         case PVFS_SERV_DELEATTR:
@@ -1037,6 +1043,9 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_CREATE:
                 decode_free(req->u.create.credential.group_array);
                 decode_free(req->u.create.credential.signature);
+#ifdef ENABLE_SECURITY_CERT
+                decode_free(req->u.create.credential.certificate.buf);
+#endif
                 if (req->u.create.attr.mask & PVFS_ATTR_META_DIST)
                 {
                     decode_free(req->u.create.attr.u.meta.dist);
@@ -1086,6 +1095,9 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                  */
                 decode_free(req->u.mkdir.credential.group_array);
                 decode_free(req->u.mkdir.credential.signature);
+#ifdef ENABLE_SECURITY_CERT
+                decode_free(req->u.mkdir.credential.certificate.buf);
+#endif
                 if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DIST)
                 {
                     decode_free(req->u.mkdir.attr.u.meta.dist);
@@ -1108,6 +1120,9 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_SETATTR:
                 decode_free(req->u.setattr.credential.group_array);
                 decode_free(req->u.setattr.credential.signature);
+#ifdef ENABLE_SECURITY_CERT
+                decode_free(req->u.setattr.credential.certificate.buf);
+#endif
                 if (req->u.setattr.attr.mask & PVFS_ATTR_META_DIST)
                 {
                     decode_free(req->u.setattr.attr.u.meta.dist);
@@ -1135,22 +1150,37 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.tree_remove.handle_array);
                 decode_free(req->u.tree_remove.credential.group_array);
                 decode_free(req->u.tree_remove.credential.signature);
+#ifdef ENABLE_SECURITY_CERT
+                decode_free(req->u.tree_remove.credential.certificate.buf);
+#endif
                 break;
 
             case PVFS_SERV_TREE_GET_FILE_SIZE:
                 decode_free(req->u.tree_get_file_size.handle_array);
                 decode_free(req->u.tree_get_file_size.credential.group_array);
                 decode_free(req->u.tree_get_file_size.credential.signature);
+#ifdef ENABLE_SECURITY_CERT
+                decode_free(req->u.tree_get_file_size.credential.certificate.buf);
+#endif
                 break;
 
             case PVFS_SERV_TREE_GETATTR:
                 decode_free(req->u.tree_getattr.handle_array);
                 decode_free(req->u.tree_getattr.credential.group_array);
                 decode_free(req->u.tree_getattr.credential.signature);
+#ifdef ENABLE_SECURITY_CERT
+                decode_free(req->u.tree_getattr.credential.certificate.buf);
+#endif
                 break;
 
             case PVFS_SERV_TREE_SETATTR:
                 decode_free(req->u.tree_setattr.handle_array);
+                PINT_free_object_attr(&req->u.tree_setattr.attr);
+                decode_free(req->u.tree_setattr.credential.group_array);
+                decode_free(req->u.tree_setattr.credential.signature);
+#ifdef ENABLE_SECURITY_CERT
+                decode_free(req->u.tree_setattr.credential.certificate.buf);
+#endif
                 break;
 
             case PVFS_SERV_LISTATTR:
@@ -1163,6 +1193,9 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_GETATTR:
                 decode_free(req->u.getattr.credential.group_array);
                 decode_free(req->u.getattr.credential.signature);
+#ifdef ENABLE_SECURITY_CERT
+                decode_free(req->u.getattr.credential.certificate.buf);
+#endif
                 break;
 
             case PVFS_SERV_SETEATTR:
@@ -1184,15 +1217,44 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_UNSTUFF:
                 decode_free(req->u.unstuff.credential.group_array);
                 decode_free(req->u.unstuff.credential.signature);
+#ifdef ENABLE_SECURITY_CERT
+                decode_free(req->u.unstuff.credential.certificate.buf);
+#endif
+                break;
+
+            case PVFS_SERV_LOOKUP_PATH:
+                decode_free(req->u.lookup_path.credential.group_array);
+                decode_free(req->u.lookup_path.credential.signature);
+#ifdef ENABLE_SECURITY_CERT
+                decode_free(req->u.lookup_path.credential.certificate.buf);
+#endif
+                break;
+
+            case PVFS_SERV_CRDIRENT:
+                decode_free(req->u.crdirent.credential.group_array);
+                decode_free(req->u.crdirent.credential.signature);
+#ifdef ENABLE_SECURITY_CERT
+                decode_free(req->u.crdirent.credential.certificate.buf);
+#endif
+                break;
+
+            case PVFS_SERV_REMOVE:
+                decode_free(req->u.remove.credential.group_array);
+                decode_free(req->u.remove.credential.signature);
+#ifdef ENABLE_SECURITY_CERT
+                decode_free(req->u.remove.credential.certificate.buf);
+#endif
+                break;
+
+            case PVFS_SERV_MGMT_SPLIT_DIRENT:
+                decode_free(req->u.mgmt_split_dirent.entry_handles);
+                decode_free(req->u.mgmt_split_dirent.entry_names);
                 break;
 
             case PVFS_SERV_GETCONFIG:
-            case PVFS_SERV_LOOKUP_PATH:
-            case PVFS_SERV_REMOVE:
             case PVFS_SERV_MGMT_REMOVE_OBJECT:
             case PVFS_SERV_MGMT_REMOVE_DIRENT:
             case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
-            case PVFS_SERV_CRDIRENT:
             case PVFS_SERV_RMDIRENT:
             case PVFS_SERV_CHDIRENT:
             case PVFS_SERV_TRUNCATE:
@@ -1206,7 +1268,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_MGMT_EVENT_MON:
             case PVFS_SERV_MGMT_GET_UID:
             case PVFS_SERV_MGMT_GET_DIRENT:
-            case PVFS_SERV_MGMT_SPLIT_DIRENT:
             case PVFS_SERV_DELEATTR:
             case PVFS_SERV_LISTEATTR:
             case PVFS_SERV_BATCH_REMOVE:
@@ -1280,10 +1341,17 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     break;
                 
                 case PVFS_SERV_CREATE:
-                    decode_free(resp->u.create.capability.signature);
-                    /* V3 remove this:
-                    decode_free(resp->u.create.capability.handle_array);
-                    decode_free(resp->u.create.datafile_handles); */
+/* V3 we might need to put this back */
+#if 0                
+                    if (resp->u.create.metafile_attrs.mask &
+                        PVFS_ATTR_CAPABILITY )
+#endif
+                    {
+                        decode_free(resp->u.create.capability.signature);
+                        decode_free(resp->u.create.capability.handle_array);
+                        /* V3 remove this:
+                        decode_free(resp->u.create.datafile_handles); */
+                    }
                     break;
 
                 case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
@@ -1429,10 +1497,13 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     decode_free(resp->u.tree_getattr.error);
                     break;
 
+                case PVFS_SERV_TREE_SETATTR:
+                    decode_free(resp->u.tree_setattr.status);
+                    break;
+
                 case PVFS_SERV_MGMT_GET_UID:
                     decode_free(resp->u.mgmt_get_uid.uid_info_array);
                     break;
-
                 case PVFS_SERV_MGMT_GET_USER_CERT:
                     decode_free(resp->u.mgmt_get_user_cert.cert.buf); 
                     break;
@@ -1465,7 +1536,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_PROTO_ERROR:
                 case PVFS_SERV_BATCH_REMOVE:
                 case PVFS_SERV_IMM_COPIES:
-                case PVFS_SERV_TREE_SETATTR:
                 case PVFS_SERV_MGMT_GET_DIRENT:
 /* V3 - no longer needed */
 #if 0
@@ -1514,14 +1584,14 @@ static int check_resp_size(struct PVFS_server_resp *resp)
 
 static void zero_capability(PVFS_capability *cap)
 {
-    cap->issuer = "";
+    cap->issuer = (char *) PVFS2_BLANK_ISSUER;
     cap->sig_size = 0;
     cap->num_handles = 0;
 }
 
 static void zero_credential(PVFS_credential *cred)
 {
-    cred->issuer = "";
+    cred->issuer = (char *) PVFS2_BLANK_ISSUER;
     cred->num_groups = 0;
     cred->sig_size = 0;
 }

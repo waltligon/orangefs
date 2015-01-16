@@ -89,11 +89,6 @@ enum
    PERF_NCACHE_ENABLED = 9,
 };
 
-/** ncache performance counter keys */
-extern struct PINT_perf_key ncache_keys[];
-
-void PINT_ncache_enable_perf_counter(struct PINT_perf_counter* pc);
-
 int PINT_ncache_initialize(void);
 
 void PINT_ncache_finalize(void);
@@ -118,7 +113,9 @@ int PINT_ncache_update(
 
 void PINT_ncache_invalidate(
     const char* entry, 
-    const PVFS_object_ref* parent_ref); 
+    const PVFS_object_ref* parent_ref);
+
+struct PINT_perf_counter* PINT_ncache_get_pc(void);
 
 #endif /* __NCACHE_H */
 

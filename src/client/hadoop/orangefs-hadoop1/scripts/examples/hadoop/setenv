@@ -1,0 +1,9 @@
+# *** User should set JAVA_HOME environment variable elsewhere. For example:
+# export JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64
+#
+
+# Common Variables sourced by other scripts in this directory
+#HADOOP_PREFIX=
+#HADOOP_CONF_DIR=
+HADOOP_LOG_DIR="/tmp/hadoop-$USER/hadoop1logs"
+HADOOP_LOCAL_DIR="/tmp/hadoop-$USER/hadoop1local"

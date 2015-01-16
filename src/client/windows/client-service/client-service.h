@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2011 Clemson University and Omnibond LLC
+ * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -11,19 +11,19 @@
 #ifndef __CLIENT_SERVICE_H
 #define __CLIENT_SERVICE_H
 
-#include "quicklist.h"
+#include "wincommon.h"
 
-#define USER_MODE_NONE 0
-#define USER_MODE_LIST 1
-#define USER_MODE_CERT 2
-#define USER_MODE_LDAP 3
+#define STR_BUF_LEN         320
 
-#define SECURITY_MODE_NONE 0
-#define SECURITY_MODE_KEY  1
-#define SECURITY_MODE_CERT 2
+#define USER_MODE_NONE        0
+#define USER_MODE_LIST        1
+#define USER_MODE_CERT        2
+#define USER_MODE_LDAP        3
+#define USER_MODE_SERVER      4
 
-#define CERT_MODE_PROXY 0
-#define CERT_MODE_USER  1
+#define SECURITY_MODE_DEFAULT 0
+#define SECURITY_MODE_KEY     1
+#define SECURITY_MODE_CERT    2
 
 typedef struct
 {
@@ -48,23 +48,26 @@ typedef struct
                  new_dir_perms;
     int debug;
     int debug_stderr;
-    char debug_mask[256];
+    char debug_mask[STR_BUF_LEN];
     int debug_file_flag;
     char debug_file[MAX_PATH];
     int user_mode;
     int security_mode;
     int security_timeout;
     char key_file[MAX_PATH];
-    int cert_mode;
+    void *private_key;
     char cert_dir_prefix[MAX_PATH];
     char ca_file[MAX_PATH];
-    char cert_file[MAX_PATH];
     LDAP_OPTIONS ldap;
 } ORANGEFS_OPTIONS, *PORANGEFS_OPTIONS;
 
 void DbgPrint(char *format, ...);
 
-BOOL report_error_event(char *message, 
-                        BOOL startup);
+#define report_error(msg, err)            _report_error(msg, err, FALSE)
+
+/* report error through logging mechanism */
+void _report_error(const char *msg, 
+                   int err,
+                   BOOL startup);
 
 #endif

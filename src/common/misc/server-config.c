@@ -137,7 +137,11 @@ static DOTCONF_CB(directio_timeout);
 
 static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
-static DOTCONF_CB(get_security_timeout);
+static DOTCONF_CB(get_credential_timeout);
+static DOTCONF_CB(get_capability_timeout);
+static DOTCONF_CB(get_credcache_timeout);
+static DOTCONF_CB(get_capcache_timeout);
+static DOTCONF_CB(get_certcache_timeout);
 static DOTCONF_CB(get_ca_file);
 static DOTCONF_CB(get_user_cert_dn);
 static DOTCONF_CB(get_user_cert_exp);
@@ -313,13 +317,25 @@ static const configoption_t options[] =
     {"ServerKey", ARG_STR, get_server_key, NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, NULL},
 
-    /* Security timeout in seconds
-     * Note: May be in the Defaults section for backwards-compatibility.
-     * For newly-generated configuration files it should appear in the
-     * Security section.
-     */
-    {"SecurityTimeout", ARG_INT, get_security_timeout, NULL,
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS|CTX_SECURITY, "3600"},
+    /* Credential timeout in seconds */
+    {"CredentialTimeoutSecs", ARG_INT, get_credential_timeout, NULL,
+        CTX_SECURITY, "3600"},
+
+    /* Capability timeout in seconds */
+    {"CapabilityTimeoutSecs", ARG_INT, get_capability_timeout, NULL,
+        CTX_SECURITY, "600"},
+
+    /* Credential cache timeout in seconds */
+    {"CredentialCacheTimeoutSecs", ARG_INT, get_credcache_timeout, NULL,
+        CTX_SECURITY, "3600"},
+
+    /* Capability cache timeout in seconds */
+    {"CapabilityCacheTimeoutSecs", ARG_INT, get_capcache_timeout, NULL,
+        CTX_SECURITY, "600"},
+
+    /* Certificate cache timeout in seconds */
+    {"CertificateCacheTimeoutSecs", ARG_INT, get_certcache_timeout, NULL,
+        CTX_SECURITY, "3600"},
 
     /* Path to CA certificate file in PEM format.
      * Note: May be in the Defaults section for backwards-compatibility.
@@ -411,7 +427,7 @@ static const configoption_t options[] =
 
     /* LDAP server timeout for searches (in seconds) 
      */
-    {"SearchTimeout", ARG_INT, get_ldap_search_timeout, NULL,
+    {"SearchTimeoutSecs", ARG_INT, get_ldap_search_timeout, NULL,
         CTX_LDAP, "15"},
 
     /* This groups the Server definition options including alias, SID,
@@ -1369,14 +1385,16 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
         gossip_err("Configuration file error. No keystore path specified.\n");
         return 1;
     }
+#endif
 
+#if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
     if ((server_flag & PARSE_CONFIG_SERVER) && !config_s->serverkey_path)
     {
         gossip_err("Configuration file error. No server key path "
                    "specified.\n");
         return 1;
     }
-#endif /* ENABLE_SECURITY */
+#endif
 
 #ifdef ENABLE_SECURITY_CERT
     if (server_flag && !config_s->ca_file)
@@ -1508,8 +1526,15 @@ DOTCONF_CB(enter_defaults_context)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
+    const char *error = NULL;
     config_s->configuration_context = CTX_DEFAULTS;
 
+    /* We initialize security defaults here also, so they are set even
+       if the <Security> context is omitted. */
+    if ((error = PINT_dotconf_set_defaults(cmd->configfile, CTX_SECURITY)))
+    {
+        return error;
+    }
     return PINT_dotconf_set_defaults(cmd->configfile, CTX_DEFAULTS);
 }
 
@@ -1525,8 +1550,11 @@ DOTCONF_CB(enter_security_context)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
+
     config_s->prev_context = config_s->configuration_context;
     config_s->configuration_context = CTX_SECURITY;
+
+    /* note: defaults set in enter_defaults_context */
     return NULL;
 }
 
@@ -1981,8 +2009,6 @@ DOTCONF_CB(get_client_retry_limit)
     struct server_configuration_s *config_s = 
              (struct server_configuration_s *)cmd->context;
     config_s->client_retry_limit = cmd->data.value;
-gossip_debug(GOSSIP_SERVER_DEBUG, "client_retry_limit = %d\n",
-                     config_s->client_retry_limit);
     return NULL;
 }
 
@@ -2742,9 +2768,6 @@ DOTCONF_CB(get_attr_cache_size)
     assert(fs_conf);
 
     fs_conf->attr_cache_size = (int)cmd->data.value;
-gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "attr_cache_size = %d\n", 
-                     fs_conf->attr_cache_size);
     return NULL;
 }
 
@@ -3234,7 +3257,7 @@ DOTCONF_CB(get_param)
 
     if (NULL != param)
     {
-        memset(param, 0, sizeof(param));
+        memset(param, 0, sizeof(*param));
         param->name = (cmd->data.str ? strdup(cmd->data.str) : NULL);
         PINT_llist_add_to_tail(config_s->default_dist_config.param_list,
                                param);
@@ -3474,13 +3497,106 @@ DOTCONF_CB(get_server_key)
     return NULL;
 }
 
-DOTCONF_CB(get_security_timeout)
+DOTCONF_CB(get_credential_timeout)
 {
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
-    config_s->security_timeout = cmd->data.value;
+                    (struct server_configuration_s *)cmd->context;    
+
+    if (cmd->data.value >= PVFS2_SECURITY_TIMEOUT_MIN &&
+        cmd->data.value <= PVFS2_SECURITY_TIMEOUT_MAX)
+    {
+        config_s->credential_timeout = (int) cmd->data.value;
+    }
+    else
+    {
+        gossip_err("Warning: CredentialTimeoutSecs value invalid (%ld) - "
+                   "using default (%d)\n", cmd->data.value, 
+                   config_s->credential_timeout);
+    }
+    
     return NULL;
 }
+
+DOTCONF_CB(get_capability_timeout)
+{
+    struct server_configuration_s *config_s =
+                 (struct server_configuration_s *)cmd->context;
+
+    if (cmd->data.value >= PVFS2_SECURITY_TIMEOUT_MIN &&
+        cmd->data.value <= PVFS2_SECURITY_TIMEOUT_MAX)
+    {
+        config_s->capability_timeout = (int) cmd->data.value;
+    }
+    else
+    {
+        gossip_err("Warning: CapabilityTimeoutSecs value invalid (%ld) - "
+                   "using default (%d)\n", cmd->data.value,
+                   config_s->capability_timeout);
+    }
+
+    return NULL;
+}
+
+DOTCONF_CB(get_credcache_timeout)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    if (cmd->data.value >= PVFS2_SECURITY_TIMEOUT_MIN &&
+        cmd->data.value <= PVFS2_SECURITY_TIMEOUT_MAX)
+    {
+        config_s->credcache_timeout = (int) cmd->data.value;
+    }
+    else
+    {
+        gossip_err("Warning: CredentialCacheTimeoutSecs value invalid (%ld) - "
+                   "using default (%d)\n", cmd->data.value,
+                   config_s->credcache_timeout);
+    }
+
+    return NULL;
+}
+
+DOTCONF_CB(get_capcache_timeout)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    if (cmd->data.value >= PVFS2_SECURITY_TIMEOUT_MIN &&
+        cmd->data.value <= PVFS2_SECURITY_TIMEOUT_MAX)
+    {
+        config_s->capcache_timeout = (int) cmd->data.value;
+    }
+    else
+    {
+        gossip_err("Warning: CapabilityCacheTimeoutSecs value invalid (%ld) - "
+                   "using default (%d)\n", cmd->data.value,
+                   config_s->capcache_timeout);
+    }
+
+    return NULL;
+}
+
+DOTCONF_CB(get_certcache_timeout)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    if (cmd->data.value >= PVFS2_SECURITY_TIMEOUT_MIN &&
+        cmd->data.value <= PVFS2_SECURITY_TIMEOUT_MAX)
+    {
+        config_s->certcache_timeout = (int) cmd->data.value;
+    }
+    else
+    {
+        gossip_err("Warning: CertificateCacheTimeoutSecs value invalid (%ld) - "
+                   "using default (%d)\n", cmd->data.value,
+                   config_s->certcache_timeout);
+    }
+
+    return NULL;
+}
+
 
 DOTCONF_CB(get_ca_file)
 { 
@@ -3775,8 +3891,6 @@ DOTCONF_CB(distr_dir_servers_initial)
         PINT_llist_head(config_s->file_systems);
 
     fs_conf->default_distr_dir_servers_initial = cmd->data.value;
-gossip_debug(GOSSIP_SERVER_DEBUG, "default_distr_dir_servers_initial = %d\n",
-                     fs_conf->default_distr_dir_servers_initial);
     if(fs_conf->default_distr_dir_servers_initial <= 0)
     {
         return("Error DistrDirServersInitial must be positive.\n");
@@ -3936,6 +4050,12 @@ void PINT_config_release(struct server_configuration_s *config_s)
         {
             free(config_s->db_cache_type);
             config_s->db_cache_type = NULL;
+        }
+
+        if (config_s->server_alias)
+        {
+            free(config_s->server_alias);
+            config_s->server_alias = NULL;
         }
 
         free(config_s->keystore_path);

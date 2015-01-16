@@ -9,6 +9,7 @@
  *
  *  PVFS2 user interface routines - low level calls to system interface
  */
+
 #define USRINT_SOURCE 1
 #include "usrint.h"
 #include "posix-ops.h"
@@ -438,7 +439,6 @@ static int iocommon_parse_serverlist(char *serverlist,
     free(server_array);
     return 0;
 }
-    
 
 /**
  * Create a file via the PVFS system interface
@@ -461,6 +461,9 @@ int iocommon_create_file(const char *filename,
     PVFS_sys_dist *dist = NULL;
     PVFS_sys_layout *layout = NULL;
     PVFS_hint hints = NULL;
+#if 0
+    PVFS_hint standby_hint; /* We need this if file_creation_param is null. */
+#endif /* PVFS_USER_ENV_VARS_ENABLED */
 
     gossip_debug(GOSSIP_USRINT_DEBUG,
                  "iocommon_create_file: called with %s\n", filename);
@@ -477,6 +480,22 @@ int iocommon_create_file(const char *filename,
     attr.ctime = attr.atime;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
+#if 0
+    /* TODO: check for pertinent environment variable hints that should be
+     * applied here. Also must check if a regular hint was specified or not.
+     * If so then resolve any conflicts (define a policy of which takes
+     * precedence) and update the hint.
+     * If not, then we must fill in the standby_hint with hint info from the
+     * environment variable hints. */
+    if(env_vars.env_var_array[ORANGEFS_DIST_NAME]|
+       env_vars.env_var_array[ORANGEFS_NUM_DFILES]|... && !file_creation_param)
+    {
+        printf("pertinent environment variable hint specified"
+               " && no hint detected!\n");
+    }
+#endif /* PVFS_USER_ENV_VARS_ENABLED */
+    /* ====================================================================== */
+
     if (file_creation_param) /* these are hints */
     {
         int length;
@@ -487,8 +506,29 @@ int iocommon_create_file(const char *filename,
                                             &length);
         if (value)
         {
+#if 0
+            printf("HINT DETECTED:\n"
+                   "\tPINT_HINT_DISTRIBUTION -> value = %s\n", (char *) value);
+#endif
             dist = PVFS_sys_dist_lookup((char *)value);
-            if (!dist) /* distribution not found */
+            if (dist)
+            {
+                value = PINT_hint_get_value_by_type(file_creation_param,
+                                                    PINT_HINT_DISTRIBUTION_PV,
+                                                    &length);
+                /* This should come in as a string here and get tokenized into 
+                 * potentially multiple param:value pairs delimited by a '+'.*/
+                if(value)
+                {
+#if 0
+                    printf("\tPINT_HINT_DISTRIBUTION_PV -> value = %s\n",
+                           (char *) value);
+#endif
+                    /* Uses inplace iterator */
+                    PVFS_dist_pv_pairs_extract_and_add(value, (void *) dist);
+                }
+            }
+            else /* distribution not found */
             {
                 rc = EINVAL;
                 goto errorout;
@@ -903,6 +943,7 @@ pvfs_descriptor *iocommon_open(const char *path,
     char *directory = NULL;
     char *filename = NULL;
     char error_path[PVFS_NAME_MAX];
+    int defer_bits = 0; /* used when creating a file */
     PVFS_object_ref file_ref;
     PVFS_object_ref parent_ref;
     pvfs_descriptor *pd = NULL; /* invalid pd until file is opened */
@@ -1044,12 +1085,12 @@ pvfs_descriptor *iocommon_open(const char *path,
              */
             char *tmp_path;
             int dlen = strlen(pdir->s->dpath);
-            int plen = strlen(directory);
+            int plen = strlen(path);
             int mlen = dlen + plen + 2;
             tmp_path = (char *)malloc(mlen);
             strncpy(tmp_path, pdir->s->dpath, dlen + 1);
             strncat(tmp_path, "/", 1);
-            strncat(tmp_path, directory, plen);
+            strncat(tmp_path, path, plen);
             Ppath = PVFS_new_path(tmp_path);
 
             rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
@@ -1185,6 +1226,20 @@ createfile:
     /* Now create the file relative to the directory */
     errno = orig_errno;
     errno = 0;
+    /* see if the mode provides bits allowing the user to access the
+     * file - it might not in some situations and we want to set those
+     * bits on until this fd is closed.
+     */
+    if ((((flags & O_RDONLY) || (flags & O_RDWR))) && !(mode & S_IRUSR))
+    {
+        defer_bits |= S_IRUSR;
+        mode |= S_IRUSR;
+    }
+    if (((flags & O_WRONLY) || (flags & O_RDWR)) && !(mode & S_IWUSR))
+    {
+        defer_bits |= S_IWUSR;
+        mode |= S_IWUSR;
+    }
     rc = iocommon_create_file(filename,
                               mode,
                               file_creation_param,
@@ -1267,6 +1322,7 @@ finish:
                           NULL);
     IOCOMMON_CHECK_ERR(rc);
     pd->s->mode = attributes_resp.attr.perms; /* this may change */
+    pd->s->mode_deferred = defer_bits; /* save these until close */
 
     if (attributes_resp.attr.objtype == PVFS_TYPE_METAFILE)
     {
@@ -2682,7 +2738,33 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
     buf->st_gid = attr.group;
     buf->st_rdev = 0; /* no dev special files */
     buf->st_size = attr.size;
+#if defined(PVFS_USER_ENV_VARS_ENABLED) && PVFS_USER_ENV_VARS_ENABLED
+    if(env_vars.env_var_array[ORANGEFS_STRIP_SIZE_AS_BLKSIZE].env_var_value &&
+       strcmp(env_vars.env_var_array[ORANGEFS_STRIP_SIZE_AS_BLKSIZE].env_var_value, "true") == 0)
+    {
+        if(attr.dfile_count > 0)
+        {
+            buf->st_blksize = attr.blksize / attr.dfile_count;
+        }
+        else
+        {
+            buf->st_blksize = attr.blksize;
+        }
+        /*
+        printf("ORANGEFS_STRIP_SIZE_AS_BLKSIZE=%s\n",
+               env_vars.env_var_array[ORANGEFS_STRIP_SIZE_AS_BLKSIZE].env_var_value);
+        printf("attr.blksize=%llu\n", (long long unsigned int) attr.blksize);
+        printf("dfile_count=%d\n", attr.dfile_count);
+        printf("buf->st_blksize=%llu\n", (long long unsigned int) buf->st_blksize);
+        */
+    }
+    else
+    {
+        buf->st_blksize = attr.blksize;
+    }
+#else
     buf->st_blksize = attr.blksize;
+#endif
     buf->st_blocks = (attr.size + (S_BLKSIZE - 1)) / S_BLKSIZE;
     /* we don't have nsec so we left the memset zero them */
     buf->st_atime = attr.atime;
@@ -2739,7 +2821,33 @@ int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
     buf->st_gid = attr.group;
     buf->st_rdev = 0; /* no dev special files */
     buf->st_size = attr.size;
+#if defined(PVFS_USER_ENV_VARS_ENABLED) && PVFS_USER_ENV_VARS_ENABLED
+    if(env_vars.env_var_array[ORANGEFS_STRIP_SIZE_AS_BLKSIZE].env_var_value &&
+       strcmp(env_vars.env_var_array[ORANGEFS_STRIP_SIZE_AS_BLKSIZE].env_var_value, "true") == 0)
+    {
+        if(attr.dfile_count > 0)
+        {
+            buf->st_blksize = attr.blksize / attr.dfile_count;
+        }
+        else
+        {
+            buf->st_blksize = attr.blksize;
+        }
+        /*
+        printf("ORANGEFS_STRIP_SIZE_AS_BLKSIZE=%s\n",
+               env_vars.env_var_array[ORANGEFS_STRIP_SIZE_AS_BLKSIZE].env_var_value);
+        printf("attr.blksize=%llu\n", (long long unsigned int) attr.blksize);
+        printf("dfile_count=%d\n", attr.dfile_count);
+        printf("buf->st_blksize=%llu\n", (long long unsigned int) buf->st_blksize);
+        */
+    }
+    else
+    {
+        buf->st_blksize = attr.blksize;
+    }
+#else
     buf->st_blksize = attr.blksize;
+#endif
     buf->st_blocks = (attr.size + (S_BLKSIZE - 1)) / S_BLKSIZE;
     /* we don't have nsec so we left the memset zero them */
     buf->st_atime = attr.atime;

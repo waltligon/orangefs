@@ -4,7 +4,10 @@
  * See COPYING in top-level directory.
  */
 
+#if !defined(_XOPEN_SOURCE) || _XOPEN_SOURCE < 600
 #define _XOPEN_SOURCE 600
+#endif
+
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>

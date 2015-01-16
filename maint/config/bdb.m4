@@ -62,6 +62,18 @@ AC_DEFUN([AX_BERKELEY_DB],
         dnl The next few lines try to find db.h and libdb.so where ever
         dnl they might be stashed below /usr/include and /usr/lib(64)
         dnl and add those locations to CFLAGS and LDFLAGS.
+	dnl
+        dnl when we have rpm, we can use it to insure that the 
+        dnl db.h and libdb that we find are from the same package.
+        dnl If we don't have rpm, we'll just hope they're from the same
+        dnl package...
+        RPMPATH=`which rpm`
+        if test "$RPMPATH" != ""
+        then
+          RPMCOMMAND="rpm -qf "
+        else
+          RPMCOMMAND=": # "
+        fi
         DBDOTH=""
         for i in `find /usr/include -name db.h`
         do
@@ -77,7 +89,7 @@ AC_DEFUN([AX_BERKELEY_DB],
         then
           DB_CFLAGS="-I `dirname $DBDOTH`"
           CFLAGS="$CFLAGS $DB_CFLAGS"
-          DBPACKAGE=`rpm -qf $DBDOTH`
+          DBPACKAGE=`$RPMCOMMAND -qf $DBDOTH`
         else
           DBPACKAGE=""
         fi
@@ -92,7 +104,7 @@ AC_DEFUN([AX_BERKELEY_DB],
       
         for i in `find "$LIBPATH" -name libdb.so`
         do
-          LIBPACKAGE=`rpm -qf $i`
+          LIBPACKAGE=`$RPMCOMMAND -qf $i`
           if test "$DBPACKAGE" = "$LIBPACKAGE"
           then
             LDFLAGS="$LDFLAGS -L"`dirname $i`

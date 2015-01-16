@@ -90,10 +90,10 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src);
 void PINT_free_object_attr(PVFS_object_attr *attr);
 void PINT_time_mark(PINT_time_marker* out_marker);
 void PINT_time_diff(PINT_time_marker mark1, 
-    PINT_time_marker mark2,
-    double* out_wtime_sec,
-    double* out_utime_sec,
-    double* out_stime_sec);
+                    PINT_time_marker mark2,
+                    double* out_wtime_sec,
+                    double* out_utime_sec,
+                    double* out_stime_sec);
 
 #ifdef HAVE_SYS_VFS_H
 
@@ -165,6 +165,9 @@ PVFS_time PINT_util_mktime_version(PVFS_time time);
 PVFS_time PINT_util_mkversion_time(PVFS_time version);
 
 struct timespec PINT_util_get_abs_timespec(int microsecs);
+
+PVFS_uid PINT_util_getuid(void);
+PVFS_gid PINT_util_getgid(void);
 
 char *PINT_util_bytes2str(unsigned char *bytes, char *output, size_t count);
 

@@ -212,6 +212,8 @@ static PINT_sm_action mgmt_get_dirdata_handle_setup_msgpair(
                                               sm_p->parent_ref.handle,
                                               sm_p->hints);
 
+    PINT_cleanup_capability(&capability);
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "- doing MGMT_GET_DIRDATA_HANDLE "
                  "under %s,%d\n", PVFS_OID_str(&sm_p->parent_ref.handle),
                  sm_p->parent_ref.fs_id);

@@ -275,7 +275,7 @@ PVFS_error PVFS_sys_symlink(char *entry_name,
         PVFS_perror_gossip("PVFS_isys_symlink call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "symlink", &error);
         if (ret)
@@ -283,9 +283,8 @@ PVFS_error PVFS_sys_symlink(char *entry_name,
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -325,6 +324,7 @@ static int symlink_setattr_comp_fn(void *v_p,
     if(resp_p->status == 0)
     {
         PINT_CONVERT_ATTR(&attr, &sm_p->u.sym.sys_attr, 0);
+        /* V3 check if this is correct - changed in V2.9 */
         PINT_acache_update(sm_p->object_ref, &attr, NULL);
     }
 
@@ -456,7 +456,6 @@ static PINT_sm_action getattr_crdirent_init(struct PINT_smcb *smcb,
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: grabbing cap crdirent\n");
 
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
@@ -562,7 +561,6 @@ static PINT_sm_action getattr_new_metafile_init(struct PINT_smcb *smcb,
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: grabbing cap for meta\n");
 
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,

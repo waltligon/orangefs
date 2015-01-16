@@ -24,12 +24,24 @@
 #include "pint-uid-map.h"
 #include "sid.h"
 
-int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i);
+/* V3 */
+#if 0
+static int split_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int i);
+static int tree_setattr_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int index);
+#endif
 
 enum
 {
     SPLIT_REQUIRED = 131,
     SPLIT_FATAL_ERROR,
+    NOTIFY_DIRDATA,
+    LOCAL_METAHANDLE,
     REMOTE_METAHANDLE,
     REMOVE_ENTRIES_REQUIRED
 };
@@ -847,6 +859,8 @@ static int PINT_get_object_ref_crdirent(struct PVFS_server_req *req,
     *handle = req->u.crdirent.dirdata_handle;
     return 0;                       
 }
+
+
 
 struct PINT_server_req_params pvfs2_crdirent_params =
 {

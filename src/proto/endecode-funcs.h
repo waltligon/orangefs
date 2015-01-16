@@ -22,6 +22,7 @@ typedef uint8_t  u_int8_t;
 /* typeof not available on Windows */
 #define typeof(t)   t
 #endif
+
 #include <assert.h>
 
 /*
@@ -1598,6 +1599,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##tn1(pptr, &x->n1); \
     for (i=0; i<x->n1; i++) \
         encode_##ta1(pptr, &(x)->a1[i]); \
+    encode_##t6(pptr, &x->x6); \
     encode_##tn2(pptr, &x->n2); \
     for (i=0; i<x->n2; i++) \
         encode_##ta2(pptr, &(x)->a2[i]); \
@@ -1612,6 +1614,7 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
     x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
     for (i=0; i<x->n1; i++) \
         decode_##ta1(pptr, &(x)->a1[i]); \
+    decode_##t6(pptr, &x->x6); \
     decode_##tn2(pptr, &x->n2); \
     x->a2 = decode_malloc(x->n2* sizeof(*x->a2)); \
     for (i=0; i<x->n2; i++) \
@@ -1624,6 +1627,7 @@ static inline void defree_##name(struct name *x) { \
     defree_##t4(&x->x4); \
     defree_##t5(&x->x5); \
     if (x->n1 > 0) decode_free(x->a1); \
+    defree_##t6(&x->x6); \
     if (x->n2 > 0) decode_free(x->a2); \
 }
 

@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2011 Clemson University and Omnibond LLC
+ * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -78,6 +78,31 @@ int fs_io(enum PVFS_io_type io_type,
                  offset, \
                  write_len, \
                  credential)  fs_io(PVFS_IO_WRITE, fs_path, buffer, buffer_len, offset, write_len, credential)
+
+int fs_io2(enum PVFS_io_type io_type,
+           PVFS_object_ref object_ref,
+           void *buffer,
+           size_t buffer_len,
+           uint64_t offset,
+           PVFS_size *op_len,
+           PVFS_credential *credential,
+           PVFS_Request req);
+
+#define fs_read2(object_ref, \
+                 buffer, \
+                 buffer_len, \
+                 offset, \
+                 read_len, \
+                 credential, \
+                 req)  fs_io2(PVFS_IO_READ, object_ref, buffer, buffer_len, offset, read_len, credential, req)
+
+#define fs_write2(object_ref, \
+                  buffer, \
+                  buffer_len, \
+                  offset, \
+                  write_len, \
+                  credential, \
+                  req)  fs_io2(PVFS_IO_WRITE, object_ref, buffer, buffer_len, offset, write_len, credential, req)
 
 int fs_flush(char *fs_path,
              PVFS_credential *credential);
