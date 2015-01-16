@@ -88,12 +88,15 @@ machine pvfs2_server_get_config_sm
  * machine from the fs_add SM.
  */
 /*
-  given mount information, retrieve the server's configuration by
-  issuing a getconfig operation.  on successful response, we parse the
-  configuration and fill in the config object specified.
-
-  returns 0 on success, -errno on error
-*/
+ * given mount information, retrieve the server's configuration by
+ * issuing a getconfig operation.  on successful response, we parse the
+ * configuration and fill in the config object specified.
+ *
+ * returns 0 on success, -errno on error
+ *
+ * This function is never called except by a test program.  This SM is
+ * normally called as part of the fs_add SM.
+ */
 int PINT_server_get_config(struct server_configuration_s *config,
                            struct PVFS_sys_mntent* mntent_p,
                            const PVFS_credential *credential,

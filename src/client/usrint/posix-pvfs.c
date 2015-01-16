@@ -853,6 +853,12 @@ int pvfs_close(int fd)
         }
     }
 #endif
+/* This looks like an early attempt to get posixish behavior when
+ * creating a file without permissions for owner.  clrflags does not
+ * seem to be set anywhere, so this should never be invoked - there is
+ * now a similar implmentation in iocommon/openfile-util so I think this
+ * can be removed.  WBL
+ */
     /* see if we need to clear any mode bits */
     if (pd->s && pd->s->fsops == &pvfs_ops)
     {
@@ -1940,13 +1946,7 @@ int pvfs_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 int pvfs_getdents(unsigned int fd, struct dirent *dirp, unsigned int size)
 {
     pvfs_descriptor *pd;
-
     gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_getdents: called with %d\n", fd);
-    if (fd < 0)
-    {
-        errno = EBADF;
-        return -1;
-    }
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {
@@ -1959,13 +1959,7 @@ int pvfs_getdents(unsigned int fd, struct dirent *dirp, unsigned int size)
 int pvfs_getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int size)
 {
     pvfs_descriptor *pd;
-
     gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_getdents64: called with %d\n", fd);
-    if (fd < 0)
-    {
-        errno = EBADF;
-        return -1;
-    }
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {

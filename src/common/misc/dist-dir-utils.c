@@ -10,6 +10,7 @@
 #include <math.h>
 #include <assert.h>
 
+#include "pvfs2-internal.h"
 #include "dist-dir-utils.h"
 #include "md5.h"
 

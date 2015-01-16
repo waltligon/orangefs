@@ -16,7 +16,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <usrint.h>
-#include <posix-pvfs.h>
+#include <recursive-remove.h>
+#include <str-utils.h>
 #include "org_orangefs_usrint_PVFS2STDIOJNI.h"
 
 /* TODO: relocate these maybe to pvfs2-types.h? */
@@ -26,83 +27,10 @@
 #define MAX_GROUPNAME_LENGTH 32
 
 /* Forward declarations of non-native functions */
-static char *combine(char* s1, char* s2, char* dest);
-static int fill_dirent(JNIEnv *env, struct dirent *ptr, jobject *inst);
-static int get_comb_len(char* s1, char* s2);
 static int get_groupname_by_gid(gid_t gid, char *groupname);
 static int get_username_by_uid(uid_t uid, char *username);
-static inline int is_dot_dir(char * dirent_name);
-static inline int is_lostfound_dir(char * dirent_name);
-/* TODO: relocate recursive delete related functions so other utilities can
- * make use of them. */
-static int recursive_delete(char *dir);
-static int remove_files_in_dir(char *dir, DIR* dirp);
-
-/** Combine the two strings with a forward slash between.
- * Don't forget to memset the string!!! The resulting string is stored in dest.
- * Ensure dest is large enough to contain the resulting string.
- */
-static char *combine(char* s1, char* s2, char* dest)
-{
-    strcat(dest, s1);
-    strcat(dest, "/");
-    return strcat(dest, s2);
-}
-
-/* Convert allocated struct DIR to an instance of our Dirent Class */
-static int fill_dirent(JNIEnv *env, struct dirent *ptr, jobject *inst)
-{
-    int num_fields = 5;
-    char *field_names[] =
-    {
-        "d_ino", "d_off", "d_reclen", "d_type", "d_name" };
-    char *field_types[] =
-    {
-        "J", "J", "I", "Ljava/lang/String;", "Ljava/lang/String;" };
-    jfieldID fids[num_fields];
-    char *cls_name = "org/orangefs/usrint/Dirent";
-    jclass cls = (*env)->FindClass(env, cls_name);
-    if (!cls)
-    {
-        JNI_ERROR("invalid class: %s\n", cls_name);
-        free(ptr);
-        return -1;
-    }
-    int fid_index = 0;
-    for (; fid_index < num_fields; fid_index++)
-    {
-        fids[fid_index] = (*env)->GetFieldID(env, cls, field_names[fid_index],
-                field_types[fid_index]);
-        if (!fids[fid_index])
-        {
-            JNI_ERROR("invalid field requested: %s\n", field_names[fid_index]);
-            free(ptr);
-            return -1;
-        }
-    }
-    *inst = (*env)->AllocObject(env, cls);
-
-    /* Load object with data from structure using
-     * constructor or set methods.
-     */
-    (*env)->SetLongField(env, *inst, fids[0], ptr->d_ino);
-    (*env)->SetLongField(env, *inst, fids[1], ptr->d_off);
-    (*env)->SetIntField(env, *inst, fids[2], ptr->d_reclen);
-    (*env)->SetCharField(env, *inst, fids[3], (char) ptr->d_type);
-    jstring d_name_string = (*env)->NewStringUTF(env, ptr->d_name);
-    (*env)->SetObjectField(env, *inst, fids[4], d_name_string);
-
-    free(ptr);
-    return 0;
-}
-
-/** Return the length of the resulting string assuming s1 and s2 will be
- * combined with a separating slash and null terminating byte.
- */
-static int get_comb_len(char* s1, char* s2)
-{
-    return (int) (strlen(s1) + strlen(s2) + 2);
-}
+static int get_gid_by_groupname(gid_t *gid, char *groupname);
+static int get_uid_by_username(uid_t *uid, char *username);
 
 static int get_groupname_by_gid(gid_t gid, char *groupname)
 {
@@ -115,7 +43,6 @@ static int get_groupname_by_gid(gid_t gid, char *groupname)
     }
     strcpy(groupname, groupp->gr_name);
     return 0;
-
 }
 
 static int get_username_by_uid(uid_t uid, char *username)
@@ -131,162 +58,61 @@ static int get_username_by_uid(uid_t uid, char *username)
     return 0;
 }
 
-/* Returns non-zero (true) if the supplied directory entry name corresponds
- * to the dot directories: {".", ".."}. Otherwise, returns 0;
- */
-static inline int is_dot_dir(char * dirent_name)
-{
-    return (int) ((strcmp(dirent_name, ".") == 0)
-            || (strcmp(dirent_name, "..") == 0));
-}
-
-/* Returns non-zero(true) if the supplied directory entry name corresponds to
- * the OrangeFS specific directory called "lost+found". */
-static inline int is_lostfound_dir(char * dirent_name)
-{
-    return (int) (strcmp(dirent_name, "lost+found") == 0);
-}
-
-/* Recursively delete the path specified by dir. */
-static int recursive_delete(char *dir)
+static int get_gid_by_groupname(gid_t *gid, char *groupname)
 {
     JNI_PFI();
-    JNI_PRINT("dir=%s\n", dir);
-    int ret = -1;
-    DIR * dirp = NULL;
-    struct dirent * direntp = NULL;
+    struct group *groupp = NULL;
 
-    /* Open the directory specified by dir */
-    errno = 0;
-    dirp = opendir(dir);
-    if (!dirp)
+    /* Check for NULL ptr */
+    if (!gid)
+    {
+    	JNI_ERROR("gid is NULL!\n");
+    	return -1;
+    }
+
+    /* Get "struct group" using groupname */
+    groupp = getgrnam(groupname);
+    if (groupp == NULL )
     {
         JNI_PERROR();
         return -1;
     }
 
-    /* Remove all files in the current directory */
-    if (remove_files_in_dir(dir, dirp) != 0)
-    {
-        JNI_ERROR("remove_files_in_dir failed on directory: %s\n", dir);
-        return -1;
-    }
+    /* set value referenced by gid pointer equal to
+     * gr_gid of "struct group" */
+    *gid = groupp->gr_gid;
+    JNI_PRINT("gid of groupname(%s) = %d\n", groupname, (int) *gid);
 
-    /* Rewind directory stream and call recursive delete on the directories
-     * in this directory.
-     */
-    rewinddir(dirp);
-    JNI_PRINT("rewinddir succeeded!\n");
-    while(1)
-    {
-        JNI_PRINT("calling readdir on dirp=%p\n", (void *) dirp);
-        errno = 0;
-        if((direntp = readdir(dirp)) == NULL)
-        {
-            if(errno != 0)
-            {
-                JNI_PERROR();
-                return -1;
-            }
-            break;
-        }
-        if(is_dot_dir(direntp->d_name) || is_lostfound_dir(direntp->d_name))
-        {
-            continue;
-        }
-        size_t abs_path_len = get_comb_len(dir, direntp->d_name);
-        char abs_path[abs_path_len];
-        memset((void *) abs_path, 0, abs_path_len);
-        combine(dir, direntp->d_name, abs_path);
-        /* Determine if this entry is a file or directory. */
-        struct stat buf;
-        JNI_PRINT("calling pvfs_stat_mask on file: %s\n", abs_path);
-        errno = 0;
-        ret = pvfs_stat_mask(abs_path, &buf, PVFS_ATTR_SYS_TYPE);
-        if(ret < 0)
-        {
-            JNI_PERROR();
-            return ret;
-        }
-        if(S_ISDIR(buf.st_mode))
-        {
-            ret = recursive_delete(abs_path);
-            if(ret < 0)
-            {
-                JNI_ERROR("recursive_delete failed on path:%s\n", abs_path);
-                return -1;
-            }
-        }
-    }
-
-    /* Close current directory before we attempt removal */
-    errno = 0;
-    if (closedir(dirp) != 0)
-    {
-        JNI_PERROR();
-        return -1;
-    }
-    errno = 0;
-    if (rmdir(dir) != 0)
-    {
-        JNI_PERROR();
-        return -1;
-    }
+    /* Return 0 on success */
     return 0;
 }
 
-/* Remove all files discovered in the open directory pointed to by dirp. */
-static int remove_files_in_dir(char *dir, DIR* dirp)
+static int get_uid_by_username(uid_t *uid, char *username)
 {
-    int ret = -1;
-    struct dirent* direntp = NULL;
     JNI_PFI();
-    /* Rewind this directory stream back to the beginning. */
-    JNI_PRINT("rewinding dirp = %p\n", dirp);
-    rewinddir(dirp);
-    JNI_PRINT("rewinddir succeeded!\n");
-    /* Loop over directory contents */
-    while(1)
+    struct passwd *pwdp = NULL;
+
+    /* Check for NULL ptr */
+    if(!uid)
     {
-        errno = 0;
-        if((direntp = readdir(dirp)) == NULL)
-        {
-            if(errno != 0)
-            {
-                JNI_PERROR();
-                return -1;
-            }
-            break;
-        }
-        JNI_PRINT("direntp->d_name = %s\n", direntp->d_name);
-        size_t abs_path_len = get_comb_len(dir, direntp->d_name);
-        char abs_path[abs_path_len];
-        memset((void *) abs_path, 0, abs_path_len);
-        combine(dir, direntp->d_name, abs_path);
-        /* Determine if this entry is a file or directory. */
-        struct stat buf;
-        errno = 0;
-        ret = pvfs_stat_mask(abs_path, &buf, PVFS_ATTR_SYS_TYPE);
-        if(ret < 0)
-        {
-            JNI_PERROR();
-            return ret;
-        }
-        /* Skip directories. */
-        if(S_ISDIR(buf.st_mode))
-        {
-            continue;
-        }
-        /* Unlink file. */
-        JNI_PRINT("Unlinking file=%s\n", abs_path);
-        errno = 0;
-        ret = unlink(abs_path);
-        if (ret == -1)
-        {
-            JNI_PERROR();
-            return ret;
-        }
+    	JNI_ERROR("uid is NULL!\n");
+    	return -1;
     }
+
+    /* Get "struct passwd" using username */
+    pwdp = getpwnam(username);
+    if (pwdp == NULL )
+    {
+        JNI_PERROR();
+        return -1;
+    }
+
+    /* set value referenced by uid pointer equal to
+     * pw_uid of "struct passwd" */
+    *uid = pwdp->pw_uid;
+    JNI_PRINT("uid of username(%s) = %d\n", username, (int) *uid);
+
+    /* Return 0 on success */
     return 0;
 }
 
@@ -388,25 +214,18 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fdopen(JNIEnv *env, jobject obj, jint fd,
 }
 
 /* fdopendir */
-JNIEXPORT jobject JNICALL
+JNIEXPORT jlong JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_fdopendir(JNIEnv *env, jobject obj,
         jint fd)
 {
     JNI_PFI();
-    JNI_PRINT("fd = %d\n", (int) fd);
-    struct dirent *dir;
-    jobject dir_obj = (jobject) 0;
-    dir = (struct dirent *) fdopendir((int) fd);
+    DIR *dir = fdopendir(fd);
     if (dir == NULL )
     {
         JNI_PERROR();
-        return dir_obj;
+        return (jlong) NULL;
     }
-    if (fill_dirent(env, dir, &dir_obj) != 0)
-    {
-        JNI_ERROR("fill_dirent failed");
-    }
-    return dir_obj;
+    return (jlong) dir;
 }
 
 /* feof */
@@ -878,6 +697,10 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fseek(JNIEnv *env, jobject obj,
         jlong stream, jlong offset, jlong whence)
 {
     JNI_PFI();
+    JNI_PRINT("stream = %llu\noffset = %llu\nwhence = %llu\n",
+              (long long unsigned int) stream,
+              (long long unsigned int) offset,
+              (long long unsigned int) whence);
     jint ret = (jint) fseek((FILE *) stream, (long) offset, (int) whence);
     if (ret != 0)
     {
@@ -1138,8 +961,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_getEntriesInDir(JNIEnv *env, jobject obj,
         direntp = readdir(dirp);
         if (direntp)
         {
-            if (is_dot_dir(direntp->d_name) ||
-                    is_lostfound_dir(direntp->d_name))
+            if (PINT_is_dot_dir(direntp->d_name))
             {
                 continue;
             }
@@ -1182,39 +1004,78 @@ error_out:
     return objArrayList;
 }
 
-JNIEXPORT jobjectArray JNICALL
-Java_org_orangefs_usrint_PVFS2STDIOJNI_getUsernameGroupname(JNIEnv *env,
-        jobject obj, jint uid, jint gid)
+JNIEXPORT jstring JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_getGroupname(JNIEnv *env,
+        jobject obj, jint gid)
 {
     JNI_PFI();
     int ret = 0;
-    jobjectArray obj_ret = (jobjectArray) (jobject) 0;
-    char username[MAX_USERNAME_LENGTH + 1];
     char groupname[MAX_GROUPNAME_LENGTH + 1];
-
-    ret = get_username_by_uid(uid, username);
-    if (ret != 0)
-    {
-        return obj_ret;
-    }
-    JNI_PRINT("uid, username = <%u, %s>\n", uid, username);
 
     ret = get_groupname_by_gid(gid, groupname);
     if (ret != 0)
     {
-        return obj_ret;
+        return NULL_JOBJECT;
     }
     JNI_PRINT("gid, groupname = <%u, %s>\n", gid, groupname);
+    return (*env)->NewStringUTF(env, groupname);
+}
 
-    obj_ret = (*env)->NewObjectArray(env, (jsize) 2,
-            (*env)->FindClass(env, "java/lang/String"),
-            (*env)->NewStringUTF(env, ""));
+JNIEXPORT jstring JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_getUsername(JNIEnv *env,
+        jobject obj, jint uid)
+{
+    JNI_PFI();
+    int ret = 0;
+    char username[MAX_USERNAME_LENGTH + 1];
 
-    (*env)->SetObjectArrayElement(env, obj_ret, 0,
-            (*env)->NewStringUTF(env, username));
-    (*env)->SetObjectArrayElement(env, obj_ret, 1,
-            (*env)->NewStringUTF(env, groupname));
-    return obj_ret;
+    ret = get_username_by_uid(uid, username);
+    if (ret != 0)
+    {
+        return NULL_JOBJECT;
+    }
+    JNI_PRINT("uid, username = <%u, %s>\n", uid, username);
+    return (*env)->NewStringUTF(env, username);
+}
+
+JNIEXPORT jint JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_getGid(JNIEnv *env,
+        jobject obj, jstring groupname)
+{
+    JNI_PFI();
+    int ret = 0;
+    char cgroupname[MAX_GROUPNAME_LENGTH + 1];
+    int cgroupname_len = (*env)->GetStringLength(env, groupname);
+    (*env)->GetStringUTFRegion(env, groupname, 0, cgroupname_len, cgroupname);
+
+    gid_t gid;
+    ret = get_gid_by_groupname(&gid, cgroupname);
+    if (ret != 0)
+    {
+        return (jint) -1;
+    }
+    JNI_PRINT("gid, groupname = <%u, %s>\n", gid, cgroupname);
+    return (jint) gid;
+}
+
+JNIEXPORT jint JNICALL
+Java_org_orangefs_usrint_PVFS2STDIOJNI_getUid(JNIEnv *env,
+        jobject obj, jstring username)
+{
+    JNI_PFI();
+    int ret = 0;
+    char cusername[MAX_USERNAME_LENGTH + 1];
+    int cusername_len = (*env)->GetStringLength(env, username);
+    (*env)->GetStringUTFRegion(env, username, 0, cusername_len, cusername);
+
+    uid_t uid;
+    ret = get_uid_by_username(&uid, cusername);
+    if (ret != 0)
+    {
+        return (jint) -1;
+    }
+    JNI_PRINT("uid, username = <%u, %s>\n", uid, cusername);
+    return (jint) 0;
 }
 
 /* getw */
@@ -1271,28 +1132,23 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_mkstemp(JNIEnv *env, jobject obj,
 }
 
 /* opendir */
-JNIEXPORT jobject JNICALL
+JNIEXPORT jlong JNICALL
 Java_org_orangefs_usrint_PVFS2STDIOJNI_opendir(JNIEnv *env, jobject obj,
         jstring name)
 {
     JNI_PFI();
-    struct dirent *dir;
-    jobject dir_obj = (jobject) 0;
+    DIR *dir;
     char cname[PVFS_NAME_MAX];
     int cname_len = (*env)->GetStringLength(env, name);
     (*env)->GetStringUTFRegion(env, name, 0, cname_len, cname);
     JNI_PRINT("name = %s\n", cname);
-    dir = (struct dirent *) opendir(cname);
+    dir = opendir(cname);
     if (dir == NULL )
     {
         JNI_PERROR();
-        return dir_obj;
+        return (jlong) NULL;
     }
-    if (fill_dirent(env, dir, &dir_obj) != 0)
-    {
-        JNI_ERROR("fill_dirent failed");
-    }
-    return dir_obj;
+    return (jlong) dir;
 }
 
 /* putc */
@@ -1416,9 +1272,9 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_readdir(JNIEnv *env, jobject obj,
     return direntp;
 }
 
-/* recursive_delete */
+/* recursiveDeleteDir */
 JNIEXPORT jint JNICALL
-Java_org_orangefs_usrint_PVFS2STDIOJNI_recursiveDelete(JNIEnv *env, jobject obj,
+Java_org_orangefs_usrint_PVFS2STDIOJNI_recursiveDeleteDir(JNIEnv *env, jobject obj,
         jstring path)
 {
     JNI_PFI();
@@ -1426,10 +1282,10 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_recursiveDelete(JNIEnv *env, jobject obj,
     char cpath[PVFS_NAME_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-    ret = recursive_delete(cpath);
+    ret = recursive_delete_dir(cpath);
     if (ret == -1)
     {
-        JNI_ERROR("recursiveDelete error\n");
+        JNI_ERROR("recursiveDeleteDir error\n");
     }
     return ret;
 }

@@ -736,6 +736,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
         }
 
         dest->mask = src->mask;
+
         ret = 0;
     }
     return ret;
@@ -751,28 +752,22 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
             {
                 free(attr->capability.signature);
             }            
-            attr->capability.signature = NULL;
             if (attr->capability.handle_array)
             {
                 free(attr->capability.handle_array);
             }            
-            attr->capability.handle_array = NULL;
             if (attr->capability.issuer)
             {
                 free(attr->capability.issuer);
             }
-            attr->capability.issuer = NULL;
+            memset(&attr->capability, 0, sizeof(PVFS_capability));
         }
-
-        if (attr->objtype == PVFS_TYPE_METAFILE)
+        if (attr->mask & PVFS_ATTR_META_DFILES)
         {
-            if (attr->mask & PVFS_ATTR_META_DFILES)
+            if (attr->u.meta.dfile_array)
             {
-                if (attr->u.meta.dfile_array)
-                {
-                    free(attr->u.meta.dfile_array);
-                    attr->u.meta.dfile_array = NULL;
-                }
+                free(attr->u.meta.dfile_array);
+                attr->u.meta.dfile_array = NULL;
                 if (attr->u.meta.sid_array)
                 {
                     free(attr->u.meta.sid_array);
@@ -783,51 +778,45 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
 #if 0
             if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
             {
-                if (attr->u.meta.mirror_dfile_array)
-                {
-                    free(attr->u.meta.mirror_dfile_array);
-                    attr->u.meta.mirror_dfile_array = NULL;
-                }
+                free(attr->u.meta.mirror_dfile_array);
+                attr->u.meta.mirror_dfile_array = NULL;
             }
 #endif
-            if (attr->mask & PVFS_ATTR_META_DIST)
+        }
+        if (attr->mask & PVFS_ATTR_META_DIST)
+        {
+            if (attr->u.meta.dist)
             {
-                if (attr->u.meta.dist)
-                {
-                    PINT_dist_free(attr->u.meta.dist);
-                    attr->u.meta.dist = NULL;
-                }
+                PINT_dist_free(attr->u.meta.dist);
+                attr->u.meta.dist = NULL;
             }
         }
-        else if (attr->objtype == PVFS_TYPE_SYMLINK)
+        if (attr->mask & PVFS_ATTR_SYMLNK_TARGET)
         {
-            if (attr->mask & PVFS_ATTR_SYMLNK_TARGET)
+            if ((attr->u.sym.target_path_len > 0) &&
+                attr->u.sym.target_path)
             {
-                if ((attr->u.sym.target_path_len > 0) &&
-                    attr->u.sym.target_path)
-                {
-                    free(attr->u.sym.target_path);
-                    attr->u.sym.target_path = NULL;
-                }
+                free(attr->u.sym.target_path);
+                attr->u.sym.target_path = NULL;
             }
         }
-        else if (attr->objtype == PVFS_TYPE_DIRECTORY)
+        if ((attr->mask & PVFS_ATTR_DIR_HINT) || 
+            (attr->mask & PVFS_ATTR_DIR_DIRENT_COUNT))
         {
-            if ((attr->mask & PVFS_ATTR_DIR_HINT) || 
-                (attr->mask & PVFS_ATTR_DIR_DIRENT_COUNT))
+            if (attr->u.dir.hint.dist_name)
             {
-                if (attr->u.dir.hint.dist_name)
-                {
-                    free(attr->u.dir.hint.dist_name);
-                    attr->u.dir.hint.dist_name = NULL;
-                }
-                if (attr->u.dir.hint.dist_params)
-                {
-                    free(attr->u.dir.hint.dist_params);
-                    attr->u.dir.hint.dist_params = NULL;
-                }
+                free(attr->u.dir.hint.dist_name);
+                attr->u.dir.hint.dist_name = NULL;
             }
-            if (attr->mask & PVFS_ATTR_DISTDIR_ATTR)
+            if (attr->u.dir.hint.dist_params)
+            {
+                free(attr->u.dir.hint.dist_params);
+                attr->u.dir.hint.dist_params = NULL;
+            }
+        }
+        if (attr->mask & PVFS_ATTR_DISTDIR_ATTR)
+        {   
+            if (attr->dist_dir_bitmap)
             {   
                 if (attr->u.dir.dist_dir_bitmap)
                 {   
@@ -839,6 +828,11 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                     free(attr->u.dir.dirdata_handles);
                     attr->u.dir.dirdata_handles = NULL;
                 }
+            }
+            if (attr->dirdata_handles)
+            {
+                free(attr->dirdata_handles);
+                attr->dirdata_handles = NULL;
             }
         }
     }
@@ -975,6 +969,26 @@ struct timespec PINT_util_get_abs_timespec(int microsecs)
     tv.tv_sec = result.tv_sec;
     tv.tv_nsec = result.tv_usec * 1e3;
     return tv;
+}
+
+PVFS_uid PINT_util_getuid(void)
+{
+#ifdef WIN32
+    /* TODO! */
+    return (PVFS_uid) 999;
+#else
+    return (PVFS_uid) getuid();
+#endif
+}
+
+PVFS_gid PINT_util_getgid(void)
+{
+#ifdef WIN32
+    /* TODO! */
+    return (PVFS_gid) 999;
+#else
+    return (PVFS_gid) getgid();
+#endif
 }
 
 /*                                                              

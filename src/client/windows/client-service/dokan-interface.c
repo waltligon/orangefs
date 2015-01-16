@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2011 Clemson University and Omnibond LLC
+ * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -32,9 +32,13 @@
 #include "user-cache.h"
 #include "ldap-support.h"
 #include "cred.h"
+#include "io-cache.h"
 
 BOOL g_UseStdErr;
 BOOL g_DebugMode;
+
+/* normally on; disable only for testing */
+#define USE_IO_CACHE
 
 extern struct qlist_head user_list;
 
@@ -66,39 +70,12 @@ extern PORANGEFS_OPTIONS goptions;
 
 #define DEBUG_PATH(path)   DbgPrint("   resolved path: %s\n", path)
 
-#if 0
-/* we now debug through gossip */
-void DbgInit()
-{
-    char exe_path[MAX_PATH], *p;
-    int ret;
-
-    if (g_DebugMode)
-    {
-        /* create log file in exe directory */
-        ret = GetModuleFileName(NULL, exe_path, MAX_PATH);
-        if (ret != 0)
-        {
-            /* get directory */
-            p = strrchr(exe_path, '\\');
-            if (p)
-                *p = '\0';
-
-            strcat(exe_path, "\\orangefs.log");
-
-            g_DebugFile = fopen(exe_path, "a");
-        }
-    }
-}
-#endif
-
 #define DEBUG_BUF_SIZE    8192
 void DbgPrint(char *format, ...)
 {
     if (g_DebugMode) 
     {
         char buffer[DEBUG_BUF_SIZE];        
-        /* SYSTEMTIME sys_time; */            
         va_list argp;
 
         va_start(argp, format);
@@ -109,31 +86,11 @@ void DbgPrint(char *format, ...)
 #ifdef _DEBUG
         /* debug to debugger window */
         OutputDebugString(buffer);
-#endif
-        /*
-        GetLocalTime(&sys_time);
-        fprintf(g_DebugFile, "[%d-%02d-%02d %02d:%02d:%02d.%03d] (%4u) %s", 
-                sys_time.wYear, sys_time.wMonth, sys_time.wDay, 
-                sys_time.wHour, sys_time.wMinute, sys_time.wSecond, sys_time.wMilliseconds,
-                GetThreadId(GetCurrentThread()),
-                buffer);
-        fflush(g_DebugFile);
-        */
-        
+#endif        
         /* use gossip to debug to file or stderr (set in config file) */
         gossip_debug(GOSSIP_WIN_CLIENT_DEBUG, "%s", buffer);
     }
 }
-
-#if 0
-void DbgClose()
-{
-    if (g_DebugFile != NULL) {
-        fprintf(g_DebugFile, "\n");
-        fclose(g_DebugFile);
-    }
-}
-#endif
 
 /* map a file system error code to a Dokan/Windows code 
    -1 is used as a default error */
@@ -402,101 +359,103 @@ int cred_compare(void *key,
 
 /* Get credential for requestor.
    Assumes credential is allocated but fields are not. */
-static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
-                                     PVFS_credential *credential)
+static int get_requestor_credential(PDOKAN_FILE_INFO file_info,                                    
+                                    PVFS_credential *credential)
 {
     HANDLE htoken;
     PTOKEN_USER token_user;
     char buffer[1024], user_name[256], domain_name[256];
     DWORD user_len = 256, domain_len = 256, return_len, err;
     SID_NAME_USE snu;
-    ASN1_UTCTIME *expires;
-    int ret;
+    ASN1_UTCTIME *expires = NULL;
+    int cache_hit, ret = 0;
 
     DbgPrint("   get_requestor_credential: enter\n");
 
     /* get requesting user information */
     htoken = DokanOpenRequestorToken(file_info);
-    if (htoken == INVALID_HANDLE_VALUE)
+    if (htoken != INVALID_HANDLE_VALUE)
     {
-        DbgPrint("   get_requestor_credential: DokanOpenRequestorToken failed\n");
-        return -ERROR_INVALID_HANDLE;
+        if (!GetTokenInformation(htoken, TokenUser, buffer, sizeof(buffer), &return_len))
+        {
+            err = GetLastError();
+            DbgPrint("   get_requestor_credential: GetTokenInformation failed: %d\n", err);
+            CloseHandle(htoken);
+            return err * -1;
+        }   
+
+        token_user = (PTOKEN_USER) buffer;
+
+        if (!LookupAccountSid(NULL, token_user->User.Sid, user_name, &user_len,
+                              domain_name, &domain_len, &snu))
+        {
+            err = GetLastError();
+            DbgPrint("   get_requestor_credential: LookupAccountSid failed: %u\n", err);
+            CloseHandle(htoken);
+            return err * -1;
+        }        
+    }
+    else
+    {
+        /* not all operations have a requestor */
+        DbgPrint("   get_requestor_credential: no requestor\n");
+
+        if (goptions->user_mode == USER_MODE_SERVER)
+        {
+            /* this will cause the code below to use the certificate for the
+               SYSTEM user */
+            strcpy(user_name, "SYSTEM");
+        }
+        else
+        {
+            ret = get_system_credential(credential);
+            if (ret != 0)
+            {
+                report_error("Error: no system credential", ret);
+            }
+            return (ret == 0) ? 0 : -ERROR_ACCESS_DENIED;
+        }
     }
 
-    if (!GetTokenInformation(htoken, TokenUser, buffer, sizeof(buffer), &return_len))
-    {
-        err = GetLastError();
-        DbgPrint("   get_requestor_credential: GetTokenInformation failed: %d\n", err);
-        CloseHandle(htoken);
-        return err * -1;
-    }
-
-    token_user = (PTOKEN_USER) buffer;
-
-    if (!LookupAccountSid(NULL, token_user->User.Sid, user_name, &user_len,
-                          domain_name, &domain_len, &snu))
-    {
-        err = GetLastError();
-        DbgPrint("   get_requestor_credential: LookupAccountSid failed: %u\n", err);
-        CloseHandle(htoken);
-
-        return err * -1;
-    }
-
+    DbgPrint("   get_requestor_credential: requestor: %s\n", user_name);
     
-    /* system user functions as root */
-    if (!stricmp(user_name, "SYSTEM"))
-    {
-        init_credential(credential);
-        credential->userid = 0;
-        credential_add_group(credential, 0);
-        credential_set_timeout(credential, PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
-
-        CloseHandle(htoken);
-
-        return 0;
-    }
-
     /* search user list for credential */
-    ret = get_cache_user(user_name, credential);
-    if (ret == 1)
+    cache_hit = get_cache_user(user_name, credential);
+    if (cache_hit == USER_CACHE_MISS)
     {
         /* cache miss */
         if (goptions->user_mode == USER_MODE_LIST)
         {
-            /* credential should be cached, so can't locate credential
-               for requesting user */
-            DbgPrint("   get_requestor_credential:  user %s not found\n", user_name);
-            ret = -ERROR_USER_PROFILE_LOAD;
+            /* get system user credential */
+            if (!stricmp(user_name, "SYSTEM"))
+            {
+                ret = get_system_credential(credential);
+            }
+            else
+            {
+                DbgPrint("   get_requestor_credential:  user %s not found\n", user_name);
+                ret = -ERROR_USER_PROFILE_LOAD;
+            }
         }
         else if (goptions->user_mode == USER_MODE_CERT)
         {
             /* load credential from certificate */
-            ret = get_cert_credential(htoken, user_name, credential, &expires);
-            if (ret == 0)
-            {
-                add_cache_user(user_name, credential, expires);
-            }
-            else
-            {
-                /* error reporting has been done through DbgPrint...
-                   result is access denied */
-                ret = -ERROR_ACCESS_DENIED;
-            }
+            ret = get_proxy_cert_credential(htoken, user_name, credential, &expires);
         }
-        else /* user-mode == LDAP */ 
+        else if (goptions->user_mode == USER_MODE_LDAP) 
         {
             ret = get_ldap_credential(user_name, credential);
-            if  (ret == 0)
-            {
-                add_cache_user(user_name, credential, NULL);
-            }
-            else
-            {
-                /* error reporting has been done through DbgPrint...
-                   result is access denied */
-                ret = -ERROR_ACCESS_DENIED;
-            }
+        }
+        else if (goptions->user_mode == USER_MODE_SERVER)
+        {            
+            /* TODO - key mode */
+            ret = get_user_cert_credential(htoken, user_name, credential, &expires);
+        }
+
+        /* cache user if credential created */
+        if (ret == 0)
+        {
+            add_cache_user(user_name, credential, expires);
         }
     }
 
@@ -504,7 +463,8 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
 
     DbgPrint("   get_requestor_credential: exit\n");
 
-    return ret;
+    /* if credential can't be created return access denied */
+    return (ret == 0) ? 0 : -ERROR_ACCESS_DENIED;
 }
 
 /* Get FS credential from cache or mapping system (based on requestor) */
@@ -531,10 +491,15 @@ static int get_credential(PDOKAN_FILE_INFO file_info,
             /* if cache hit -- return credential */
             entry = qhash_entry(item, struct context_entry, hash_link);
             PINT_copy_credential(&(entry->credential), credential);
-            /* update timeout */
-            credential_set_timeout(credential, PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
-            DbgPrint("   get_credential:  found (%d:%d)\n", 
-                      credential->userid, credential->group_array[0]);
+            if (goptions->user_mode != USER_MODE_SERVER)
+            {
+                DbgPrint("   get_credential:  found (%d:%d)\n", 
+                    credential->userid, credential->group_array[0]);
+            }
+            else
+            {
+                DbgPrint("   get_credential:  found\n");
+            }
         }
         else
         {
@@ -548,8 +513,17 @@ static int get_credential(PDOKAN_FILE_INFO file_info,
         /* retrieve credential for the requestor */
         ret = get_requestor_credential(file_info, credential);
         if (ret == 0)
-            DbgPrint("   get_credential:  requestor credential (%d:%d)\n", 
-              credential->userid, credential->group_array[0]);
+        {
+            if (goptions->user_mode != USER_MODE_SERVER)
+            {
+                DbgPrint("   get_credential:  requestor credential (%d:%d)\n", 
+                    credential->userid, credential->group_array[0]);
+            }
+            else
+            {
+                DbgPrint("   get_credential:  requestor credential OK\n");
+            }
+        }
     }
 
     DbgPrint("   get_credential:  exit\n");
@@ -604,22 +578,39 @@ static int check_perm(PVFS_sys_attr *attr, PVFS_credential *credential, int perm
 {
     int mask;
 
-    /* root user (uid 0 or gid 0) always has rights */
-    if (credential->userid == 0 || credential_in_group(credential, 0))
-        return 1;
+    if (goptions->user_mode != USER_MODE_SERVER)
+    {
+        /* root user (uid 0 or gid 0) always has rights */
+        if (credential->userid == 0 || credential_in_group(credential, 0))
+            return 1;
     
-    if (attr->owner == credential->userid)
-        /* use owner mask */
-        mask = (attr->perms >> 6) & 7;
-    else if (credential_in_group(credential, attr->group))
-        /* use group mask */
-        mask = (attr->perms >> 3) & 7;
-    else
-        /* use other mask */
-        mask = attr->perms & 7;
+        if (attr->owner == credential->userid)
+            /* use owner mask */
+            mask = (attr->perms >> 6) & 7;
+        else if (credential_in_group(credential, attr->group))
+            /* use group mask */
+            mask = (attr->perms >> 3) & 7;
+        else
+            /* use other mask */
+            mask = attr->perms & 7;
 
-    if (mask & perm)
-        return 1;
+        if (mask & perm)
+        {
+            return 1;
+        }
+    }
+    else
+    {
+        /* in server-side user mode, user is listed as having permission if 
+           any users have permission; server will handle insufficent perms. 
+           FUTURE: request rights mask from server (need new server request)
+         */        
+        if (((attr->perms & 7) & perm) || (((attr->perms >> 3) & 7) & perm) ||
+            (((attr->perms >> 6) & 7) & perm))
+        {
+            return 1;
+        }    
+    }
 
     return 0;
 }
@@ -1148,11 +1139,70 @@ PVFS_Dokan_cleanup(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
+#ifdef USE_IO_CACHE
+    PVFS_object_ref object_ref;
+    PVFS_Request req;
+    enum PVFS_io_type io_type;
+    int update_flag;
+    PVFS_credential credential;
+    PVFS_sys_attr attr;
+    char *fs_path = NULL;
+    int cache_ret, ret, err;
+#endif
+
     DbgPrint("Cleanup: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
+#ifdef USE_IO_CACHE
+    cache_ret = io_cache_get(DokanFileInfo->Context, &object_ref, &req,
+        &io_type, &update_flag);
+    if (cache_ret == IO_CACHE_HIT)
+    {
+        if (update_flag)
+        {
+            /* get credential */
+            err = get_credential(DokanFileInfo, &credential);
+            CRED_CHECK("Cleanup", err);
+
+            /* get file system path */
+            fs_path = get_fs_path(FileName);
+            if (fs_path == NULL)
+                return -1;
+
+            if (io_type == PVFS_IO_READ)
+            {
+                /* update access time */
+                attr.mask = PVFS_ATTR_SYS_ATIME;
+                attr.atime = time(NULL);
+            }
+            else /* PVFS_IO_WRITE */
+            {
+                attr.mask = PVFS_ATTR_SYS_ATIME|PVFS_ATTR_SYS_MTIME;
+                attr.atime = attr.mtime = time(NULL);
+            }
+
+            ret = fs_setattr(fs_path, &attr, &credential);
+            if (ret != 0)
+            {
+                DbgPrint("   time operation failed: %d\n", ret);
+            }        
+
+            free(fs_path);
+
+            PINT_cleanup_credential(&credential);
+        }
+        /* remove from cache */
+	    io_cache_remove(DokanFileInfo->Context);
+    }
+    else if (cache_ret != IO_CACHE_MISS)
+    {
+        DbgPrint("   cache error: %d\n", cache_ret);
+    }
+#endif
+
     DbgPrint("Cleanup exit: %d\n", 0);
 
+    /* note result of time operation is not returned */
     return 0;
 }
 
@@ -1166,11 +1216,18 @@ PVFS_Dokan_read_file(
     LONGLONG         Offset,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *fs_path;
+    char *fs_path = NULL;
     PVFS_size len64;
-    PVFS_credential credential;
+#ifdef USE_IO_CACHE
+    PVFS_object_ref object_ref;
+    PVFS_Request req;
+    enum PVFS_io_type io_type;
+    int update_flag;
+#else
     PVFS_sys_attr attr;
-    int ret, ret2, err;
+#endif
+    PVFS_credential credential;
+    int ret, cache_ret, err;
     
     DbgPrint("ReadFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -1186,26 +1243,76 @@ PVFS_Dokan_read_file(
     err = get_credential(DokanFileInfo, &credential);
     CRED_CHECK("ReadFile", err);
 
+    /* check IO cache */
+#ifdef USE_IO_CACHE
+    cache_ret = io_cache_get(DokanFileInfo->Context, &object_ref, &req, 
+                       &io_type, &update_flag);
+    if (cache_ret == IO_CACHE_HIT)
+    {
+        ret = fs_read2(object_ref, Buffer, BufferLength, Offset, 
+                        &len64, &credential, req);
+
+    }
+    else if (cache_ret != IO_CACHE_MISS)
+    {
+        /* error */
+        report_error("Write file: cache error: ", cache_ret);
+
+        goto read_file_exit;
+    }
+#endif
+
     /* get file system path */
     fs_path = get_fs_path(FileName);
     if (fs_path == NULL)
         return -1;
-    
+
+#ifdef USE_IO_CACHE
+    if (cache_ret == IO_CACHE_MISS)
+    {
+        ret = fs_lookup(fs_path, &credential, &object_ref.handle);
+        if (ret != 0)
+        {
+            report_error("Read file: lookup error: ", ret);
+
+            goto read_file_exit;
+        }
+
+        object_ref.fs_id = fs_get_id(0);
+
+        ret = PVFS_Request_contiguous((int32_t) BufferLength, PVFS_BYTE, &req);
+        if (ret != 0)
+        {
+            report_error("Read file: request error: ", ret);
+
+            goto read_file_exit;
+        }
+
+        ret = fs_read2(object_ref, Buffer, BufferLength, Offset,
+                       &len64, &credential, req);
+        if (ret == 0)
+        {
+            cache_ret = io_cache_add(DokanFileInfo->Context, &object_ref, req, 
+                                PVFS_IO_READ, 1);
+            if (cache_ret != 0)
+            {
+                report_error("Read file: error adding context to IO cache: ", cache_ret);
+            }
+        }
+    }
+#else
+
     /* perform the read operation */
     ret = fs_read(fs_path, Buffer, BufferLength, Offset, &len64, &credential);
+
+#endif
+
     *ReadLength = (DWORD) len64;
 
-    /* set the access time */
-    if (ret == 0)
-    {
-        attr.mask = PVFS_ATTR_SYS_ATIME;
-        attr.atime = time(NULL);
-        ret2 = fs_setattr(fs_path, &attr, &credential);
-        if (ret2 != 0)
-            DbgPrint("   fs_setattr returned %d\n", ret2);
-    }
+read_file_exit:
 
-    free(fs_path);
+    if (fs_path != NULL)
+        free(fs_path);
     PINT_cleanup_credential(&credential);
 
     err = error_map(ret);
@@ -1225,11 +1332,19 @@ PVFS_Dokan_write_file(
     LONGLONG         Offset,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *fs_path;
+    char *fs_path = NULL;
     PVFS_size len64;
     PVFS_credential credential;
+#ifdef USE_IO_CACHE
+    PVFS_object_ref object_ref;
+    PVFS_Request req;
+    enum PVFS_io_type io_type;
+    int update_flag;
+#else
     PVFS_sys_attr attr;
-    int ret, ret2, err;
+#endif
+    
+    int ret, cache_ret, err;
 
     DbgPrint("WriteFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -1238,15 +1353,66 @@ PVFS_Dokan_write_file(
     err = get_credential(DokanFileInfo, &credential);
     CRED_CHECK("WriteFile", err);
 
+    /* check IO cache */
+#ifdef USE_IO_CACHE
+    cache_ret = io_cache_get(DokanFileInfo->Context, &object_ref, &req, 
+                             &io_type, &update_flag);
+    if (cache_ret == IO_CACHE_HIT)
+    {
+        ret = fs_write2(object_ref, (void *) Buffer, NumberOfBytesToWrite,
+                        Offset, &len64, &credential, req);
+    }
+    else if (cache_ret != IO_CACHE_MISS)
+    {
+        /* error */
+        report_error("Write File: cache error: ", cache_ret);
+
+        goto write_file_exit;
+    }
+#endif
+
     /* get file system path */
     fs_path = get_fs_path(FileName);
     if (fs_path == NULL)
         return -1;
+
+#ifdef USE_IO_CACHE
+    if (cache_ret == IO_CACHE_MISS)
+    {
+        ret = fs_lookup(fs_path, &credential, &object_ref.handle);
+        if (ret != 0)
+        {
+            report_error("Write File: lookup error: ", ret);
+
+            goto write_file_exit;
+        }
+
+        object_ref.fs_id = fs_get_id(0);
+
+        ret = PVFS_Request_contiguous((int32_t) NumberOfBytesToWrite, PVFS_BYTE, &req);
+        if (ret != 0)
+        {
+            report_error("Read file: request error: ", ret);
+
+            goto write_file_exit;
+        }
     
+        ret = fs_write2(object_ref, (void *) Buffer, NumberOfBytesToWrite,
+                        Offset, &len64, &credential, req);
+        if (ret == 0)
+        {
+            cache_ret = io_cache_add(DokanFileInfo->Context, &object_ref, req,
+                                     PVFS_IO_WRITE, 1);
+            if (cache_ret != 0)
+            {
+                report_error("Read File: error adding context to IO cache: ", cache_ret);
+            }
+        }
+    }
+#else
     /* perform the write operation */
     ret = fs_write(fs_path, (void *) Buffer, NumberOfBytesToWrite, Offset, 
                    &len64, &credential);
-    *NumberOfBytesWritten = (DWORD) len64;
 
     /* set the modify and access times */
     if (ret == 0)
@@ -1257,8 +1423,16 @@ PVFS_Dokan_write_file(
         if (ret2 != 0)
             DbgPrint("   fs_setattr returned %d\n", ret2);
     }
+#endif
 
-    free(fs_path);
+    *NumberOfBytesWritten = (DWORD) len64;
+
+write_file_exit:
+
+    if (fs_path != NULL)
+    {
+        free(fs_path);
+    }
     PINT_cleanup_credential(&credential);
 
     err = error_map(ret);
@@ -1345,7 +1519,7 @@ PVFS_Dokan_get_file_information(
     {       
         filename = (char *) malloc(strlen(fs_path) + 1);
         MALLOC_CHECK(filename);
-        PINT_remove_base_dir(fs_path, filename, strlen(fs_path) + 1);        
+        PINT_remove_base_dir(fs_path, filename, (int) strlen(fs_path) + 1);        
         
         ret = PVFS_sys_attr_to_file_info(filename, &credential, &attr, 
             HandleFileInformation);
@@ -2211,16 +2385,15 @@ PVFS_Dokan_get_disk_free_space(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     int ret, err;
+    PVFS_gid gid = 0;
     PVFS_credential credential;
 
     DbgPrint("GetDiskFreeSpace\n");
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
     /* use root credential for this function */
-    err = init_credential(&credential);
+    err = get_credential(DokanFileInfo, &credential);
     CRED_CHECK("GetDiskFreeSpace", err);
-    credential_add_group(&credential, 0);
-    credential_set_timeout(&credential, PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
 
     ret = fs_get_diskfreespace(&credential,
                                (PVFS_size *) FreeBytesAvailable, 

@@ -182,7 +182,7 @@ PVFS_error PVFS_sys_setattr(PVFS_object_ref ref,
         PVFS_perror_gossip("PVFS_isys_setattr call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "setattr", &error);
         if (ret)
@@ -190,9 +190,8 @@ PVFS_error PVFS_sys_setattr(PVFS_object_ref ref,
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -300,6 +299,9 @@ static PINT_sm_action setattr_cleanup(struct PINT_smcb *smcb,
     if(sm_p->error_code == 0)
     {
         PINT_CONVERT_ATTR(&attr, &sm_p->u.setattr.sys_attr, 0);
+#if 0 /* Don't cache size_array. */
+        PINT_acache_update(sm_p->object_ref, &attr, NULL, NULL);
+#endif
         PINT_acache_update(sm_p->object_ref, &attr, NULL);
     }
     else

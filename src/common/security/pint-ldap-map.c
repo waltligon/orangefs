@@ -565,7 +565,7 @@ int PINT_ldap_authenticate(const char *userid,
     LDAPMessage *res, *entry;
 
     if (userid == NULL || strlen(userid) == 0 ||
-        password == NULL || strlen(password) == 0)
+        password == NULL)
     {
         gossip_err("%s: userid and/or password is NULL or blank\n", __func__);
         return -PVFS_EINVAL;

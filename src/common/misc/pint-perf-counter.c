@@ -391,16 +391,13 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
                     return(-PVFS_ENOMEM);
                 }
                 memset(s, 0, sizeof(sizeof(struct PINT_perf_sample)));
-                s->value = (int64_t *)
-                        malloc(pc->key_count * sizeof(int64_t));
+                s->value = calloc(pc->key_count, sizeof *(s->value));
                 if(!s->value);
                 {
                     free(s);
                     gen_mutex_unlock(&pc->mutex);
                     return(-PVFS_ENOMEM);
                 }
-                memset(s->value, 0,
-                        sizeof(pc->key_count * sizeof(int64_t)));
                 /* adding just after first sample */
                 s->next = pc->sample->next;
                 pc->sample->next = s;

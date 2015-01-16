@@ -48,8 +48,8 @@ static gen_mutex_t s_server_config_mgr_mutex = GEN_MUTEX_INITIALIZER;
  */
 static int s_min_handle_recycle_timeout_in_sec = -1;
 
-static int hash_fsid(void *key, int table_size);
-static int hash_fsid_compare(void *key, struct qlist_head *link);
+static int hash_fsid(const void *key, int table_size);
+static int hash_fsid_compare(const void *key, struct qlist_head *link);
 
 #define SC_MGR_INITIALIZED() (s_fsid_to_config_table)
 
@@ -436,16 +436,16 @@ int PINT_server_config_mgr_get_abs_min_handle_recycle_time(void)
 }
 #endif
 
-static int hash_fsid(void *key, int table_size)
+static int hash_fsid(const void *key, int table_size)
 {
-    PVFS_fs_id fs_id = *((PVFS_fs_id *)key);
+    const PVFS_fs_id fs_id = *((const PVFS_fs_id *)key);
     return (int)(fs_id % table_size);
 }
 
-static int hash_fsid_compare(void *key, struct qlist_head *link)
+static int hash_fsid_compare(const void *key, struct qlist_head *link)
 {
     server_config_t *config = NULL;
-    PVFS_fs_id fs_id = *((PVFS_fs_id *)key);
+    PVFS_fs_id fs_id = *((const PVFS_fs_id *)key);
 
     config = qlist_entry(link, server_config_t, hash_link);
     assert(config);

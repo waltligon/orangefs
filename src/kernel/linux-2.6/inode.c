@@ -177,23 +177,19 @@ struct address_space_operations pvfs2_address_operations =
 void pvfs2_truncate(struct inode *inode)
 {
     loff_t orig_size = pvfs2_i_size_read(inode);
+    char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
     if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
         return;
-    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_truncate called on inode %llu "
-                "with size %ld\n", llu(get_handle_from_ino(inode)), (long) orig_size);
+    gossip_debug(GOSSIP_INODE_DEBUG,
+                 "pvfs2: pvfs2_truncate called on inode %s "
+                 "with size %ld\n",
+                 k2s(get_khandle_from_ino(inode),s),
+                 (long) orig_size);
+    kfree(s);
 
-    /* successful truncate when size changes also requires mtime updates 
-     * although the mtime updates are propagated lazily!
-     */
-    if (pvfs2_truncate_inode(inode, inode->i_size) == 0
-            && (orig_size != pvfs2_i_size_read(inode)))
-    {
-        pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
-        SetMtimeFlag(pvfs2_inode);
-        inode->i_mtime = CURRENT_TIME;
-        mark_inode_dirty_sync(inode);
-    }
+    pvfs2_truncate_inode(inode, inode->i_size);
+
 }
 
 /** Change attributes of an object referenced by dentry.
@@ -202,6 +198,7 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
 {
     int ret = -EINVAL;
     struct inode *inode = dentry->d_inode;
+    loff_t orig_size = i_size_read(inode);
 
     gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_setattr: called on %s\n", 
                  dentry->d_name.name);
@@ -230,9 +227,26 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
         }
 
         setattr_copy(inode, iattr);
+
         mark_inode_dirty(inode);
         ret = 0;
 #endif /* HAVE_INODE_SETATTR */
+
+/*
+* Only change the c/mtime if we are changing the size or we are
+* explicitly asked to change it.  This handles the semantic difference
+* between truncate() and ftruncate() as implemented in the VFS.
+*
+* The regular truncate() case without ATTR_CTIME and ATTR_MTIME is a
+* special case where we need to update the times despite not having
+* these flags set.  For all other operations the VFS set these flags
+* explicitly if it wants a timestamp update.
+*/
+        if (orig_size != i_size_read(inode) &&
+           !(iattr->ia_valid & (ATTR_CTIME | ATTR_MTIME))) {
+          iattr->ia_ctime = iattr->ia_mtime = current_fs_time(inode->i_sb);
+          iattr->ia_valid |= ATTR_CTIME | ATTR_MTIME;
+        }
     
         gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_setattr: inode_setattr returned %d\n", ret);
 
@@ -320,10 +334,20 @@ int pvfs2_getattr(
         pvfs2_inode = PVFS2_I(inode);
         kstat->blksize = pvfs2_inode->blksize;
     }
+    else if (ret == -EINTR)
+    {
+        /* In this case, an interrupt signal was pending when we wanted to wait for the getattr op.
+         * So, instead of going to sleep with a pending interrupt, we allow the interrupt to take
+         * precedence.  However, we don't want to mark the inode "bad" in this case; we want the
+         * getattr to be retried.
+         */
+         gossip_debug(GOSSIP_INODE_DEBUG,"%s:%s:%d Received EINTR(%d)\n",__FILE__,__func__,__LINE__,ret);
+         ret = -EAGAIN; 
+    }
     else
     {
         /* assume an I/O error and flag inode as bad */
-        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
+        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode with return code(%d)\n", __FILE__,  __func__, __LINE__,ret);
         pvfs2_make_bad_inode(inode);
     }
     return ret;
@@ -371,7 +395,7 @@ int pvfs2_getattr_lite(
     else
     {
         /* assume an I/O error and flag inode as bad */
-        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
+        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode (ret:%d)\n", __FILE__,  __func__, __LINE__,ret);
         pvfs2_make_bad_inode(inode);
     }
     return ret;
@@ -430,11 +454,11 @@ struct inode_operations pvfs2_file_inode_operations =
  * that will be used as a hash-index from where the handle will
  * be searched for in the VFS hash table of inodes.
  */
-static inline ino_t pvfs2_handle_hash(PVFS_object_ref *ref)
+static inline ino_t pvfs2_handle_hash(PVFS_object_kref *ref)
 {
     if (!ref)
         return 0;
-    return pvfs2_handle_to_ino(ref->handle);
+    return pvfs2_khandle_to_ino(&(ref->khandle));
 }
 
 /* the ->set callback of iget5_locked and friends. Sorta equivalent to the ->read_inode()
@@ -443,7 +467,7 @@ static inline ino_t pvfs2_handle_hash(PVFS_object_ref *ref)
 int pvfs2_set_inode(struct inode *inode, void *data)
 {
     /* callbacks to set inode number handle */
-    PVFS_object_ref *ref = (PVFS_object_ref *) data;
+    PVFS_object_kref *ref = (PVFS_object_kref *) data;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
     /* Make sure that we have sane parameters */
@@ -454,7 +478,7 @@ int pvfs2_set_inode(struct inode *inode, void *data)
         return 0;
     pvfs2_inode_initialize(pvfs2_inode);
     pvfs2_inode->refn.fs_id  = ref->fs_id;
-    pvfs2_inode->refn.handle = ref->handle;
+    pvfs2_inode->refn.khandle = ref->khandle;
     return 0;
 }
 
@@ -467,11 +491,13 @@ pvfs2_test_inode(struct inode *inode, unsigned long ino, void *data)
 #endif
 {
     /* callbacks to determine if handles match */
-    PVFS_object_ref *ref = (PVFS_object_ref *) data;
+    PVFS_object_kref *ref = (PVFS_object_kref *) data;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
     pvfs2_inode = PVFS2_I(inode);
-    return (pvfs2_inode->refn.handle == ref->handle && pvfs2_inode->refn.fs_id == ref->fs_id);
+    return (!PVFS_khandle_cmp(&(pvfs2_inode->refn.khandle), &(ref->khandle)) &&
+            pvfs2_inode->refn.fs_id == ref->fs_id);
+
 }
 #endif
 
@@ -492,10 +518,11 @@ pvfs2_test_inode(struct inode *inode, unsigned long ino, void *data)
  * Boy, this function is so ugly with all these macros. I wish I could find a better
  * way to reduce the macro clutter.
  */
-struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, int keep_locked)
+struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_kref *ref, int keep_locked)
 {
     struct inode *inode = NULL;
     unsigned long hash;
+    char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
 #if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED)
     hash = pvfs2_handle_hash(ref);
@@ -505,7 +532,7 @@ struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, in
     inode = iget4_locked(sb, hash, pvfs2_test_inode, ref);
 #endif
 #else
-    hash = (unsigned long) ref->handle;
+    hash = pvfs2_khandle_to_ino(ref->khandle)
 #ifdef HAVE_IGET_LOCKED
     inode = iget_locked(sb, hash);
 #else
@@ -540,8 +567,13 @@ struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, in
         }
 #endif
     }
-    gossip_debug(GOSSIP_INODE_DEBUG, "iget handle %llu, fsid %d hash %ld i_ino %lu\n",
-                 ref->handle, ref->fs_id, hash, inode->i_ino);
+    gossip_debug(GOSSIP_INODE_DEBUG,
+                 "iget handle %s, fsid %d hash %ld i_ino %lu\n",
+                 k2s(&(ref->khandle),s),
+                 ref->fs_id,
+                 hash,
+                 inode->i_ino);
+    kfree(s);
     return inode;
 }
 
@@ -553,11 +585,12 @@ struct inode *pvfs2_get_custom_inode_common(
     struct inode *dir,
     int mode,
     dev_t dev,
-    PVFS_object_ref object,
+    PVFS_object_kref object,
     int from_create)
 {
     struct inode *inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
+    char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
     gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_get_custom_inode_common: called\n  (sb is %p | "
                 "MAJOR(dev)=%u | MINOR(dev)=%u)\n", sb, MAJOR(dev),
@@ -605,7 +638,7 @@ struct inode *pvfs2_get_custom_inode_common(
                 "pvfs2_get_custom_inode_common: inode: %p, inode->i_mode %o\n",
                 inode, inode->i_mode);
         inode->i_mapping->host = inode;
-#ifdef HAVE_CURRENT_FSUID
+#if defined(HAVE_CURRENT_FSUID) || defined(HAVE_FROM_KUID)
         inode->i_uid = current_fsuid();
         inode->i_gid = current_fsgid();
 #else
@@ -660,8 +693,10 @@ struct inode *pvfs2_get_custom_inode_common(
             goto error;
 	}
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
-        gossip_debug(GOSSIP_ACL_DEBUG, "Initializing ACL's for inode %llu\n", 
-                llu(get_handle_from_ino(inode)));
+        gossip_debug(GOSSIP_ACL_DEBUG,
+                     "Initializing ACL's for inode %s\n", 
+                     k2s(get_khandle_from_ino(inode),s));
+        kfree(s);
         /* Initialize the ACLs of the new inode */
         pvfs2_init_acl(inode, dir);
 #endif

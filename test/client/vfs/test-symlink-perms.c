@@ -287,19 +287,21 @@ int destroy_symlink_perms(const char * file_name, const char * symlink_name,
 {
     int  ret = 0;
    
-    ret = remove_file(file_name, opts->use_pvfs2_lib, opts->verbose);
-    if(ret != TEST_COMMON_SUCCESS)
-    {
-        printf("\tUnable to remove file [%s]\n", file_name);
-        return(ret);
-    }
- 
+
     ret = remove_symlink(symlink_name, opts->use_pvfs2_lib, opts->verbose);
     if(ret != TEST_COMMON_SUCCESS)
     {
         printf("\tUnable to remove symlink [%s]\n", symlink_name);
         return(ret);
     }
+
+    ret = remove_file(file_name, opts->use_pvfs2_lib, opts->verbose);
+    if(ret != TEST_COMMON_SUCCESS)
+    {
+        printf("\tUnable to remove file [%s]\n", file_name);
+        return(ret);
+    }
+
 
     return(0);
 }

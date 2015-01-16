@@ -31,6 +31,7 @@
 #include "pvfs-sid.h"
 #include "dist-dir-utils.h"
 #include "server-config.h"
+#include "client-capcache.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -193,19 +194,26 @@ PVFS_error PVFS_isys_create(char *object_name,
         return -PVFS_ENAMETOOLONG;
     }
 
-    if (attr.owner != credential->userid)
+#ifndef ENABLE_SECURITY_CERT
+    /* if owner/group differ from credential values, and credential is 
+       not for root, create with owner/group equal to credential values
+       (in cert. mode the credential fields aren't used) */
+    if (attr.owner != credential->userid &&
+        credential->userid != 0)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing owner uid %d with %d "
                      "on create\n", attr.owner, credential->userid);
         attr.owner = credential->userid;
     }
 
-    if (attr.group != credential->group_array[0])
+    if (attr.group != credential->group_array[0] && 
+        credential->group_array[0] != 0)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing group gid %d with %d "
                      "on create\n", attr.group, credential->group_array[0]);
         attr.group = credential->group_array[0];
     }
+#endif
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_CREATE,
@@ -360,7 +368,7 @@ PVFS_error PVFS_sys_create(
         PVFS_perror_gossip("PVFS_isys_create call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "create", &error);
         if (ret)
@@ -368,9 +376,8 @@ PVFS_error PVFS_sys_create(
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -390,7 +397,9 @@ static int create_comp_fn(void *v_p,
     }
 
 /* There really isn't anything to do any more - the rest of this stuff
- * is not needed any more
+ * is not needed any more - BUT if we want to return creation times from
+ * the new object we would need to get them here and stash them in the
+ * attr struct in the frame.
  */
 
 /* V3 handles no longer returned from metaserver but passed TO it */
@@ -404,7 +413,7 @@ static int create_comp_fn(void *v_p,
 
     if(!sm_p->u.create.datafile_handles)
     {
-        return -PVFS_ENOMEM;
+       return ret;
     }
 
     memcpy(sm_p->u.create.datafile_handles,
@@ -1032,21 +1041,40 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
 static PINT_sm_action create_crdirent_failure(struct PINT_smcb *smcb,
                                               job_status_s *js_p)
 {
+    PVFS_uid local_uid;
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: crdirent_failure\n");
 
     /* if need to retry. clear the error_code and setup getattr. */
-    if(js_p->error_code == -PVFS_EAGAIN)
+    if(js_p->error_code == -PVFS_EAGAIN &&
+       sm_p->u.create.retry_count < sm_p->msgarray_op.params.retry_limit)
     {
+        /* used to have a special retry thing, should now be handled by
+         * MPA
+         */
+        sm_p->u.create.retry_count++;
+
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "create: received -PVFS_EAGAIN, "
-                     "will retry getattr and crdirent.\n");
-
-        /* setup getattr */
-        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+                     "will retry getattr and crdirent (attempt number %d).\n",
+                     sm_p->u.create.retry_count);
+        
         /* clear acache content */
         PINT_acache_invalidate(sm_p->object_ref);
+        /* clear capcache content */
+        local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
 
+        if (local_uid == (PVFS_uid) -1)
+        {
+            local_uid = PINT_util_getuid();
+
+            PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
+                          sizeof(PVFS_uid), &local_uid);
+        }
+
+        PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+
+        /* set up new getattr */
         PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                    sm_p->object_ref,
                                    PVFS_ATTR_DISTDIR_ATTR,
@@ -1070,14 +1098,10 @@ static PINT_sm_action create_crdirent_failure(struct PINT_smcb *smcb,
 static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_size tmp_size = 0;
+    PVFS_size data_size = 0;
     int ret;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: cleanup\n");
-
-    PINT_free_object_attr(&sm_p->u.create.attr);
-
-    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     sm_p->error_code = (sm_p->u.create.stored_error_code ?
                         sm_p->u.create.stored_error_code :
@@ -1125,18 +1149,15 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
             sm_p->u.create.attr.mask |= PVFS_ATTR_META_DIST;
         }
 
+
         /* we only insert a cache entry if the entire create succeeds,
          * set size to 0 
+         * we know that the file size is zero, since we just created it. 
          */ 
-        /* Also, make sure to clear time masks.  The server is responsible
-         * for setting that.
-         */
-        sm_p->u.create.attr.mask &= (~(PVFS_ATTR_COMMON_MTIME));
-        sm_p->u.create.attr.mask &= (~(PVFS_ATTR_COMMON_CTIME));
-        sm_p->u.create.attr.mask &= (~(PVFS_ATTR_COMMON_ATIME));
+
         ret = PINT_acache_update(sm_p->object_ref,
                                  &sm_p->u.create.attr,
-                                 &tmp_size);
+                                 &data_size);
         if(ret < 0)
         {
             js_p->error_code = ret;

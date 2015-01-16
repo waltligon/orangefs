@@ -204,8 +204,11 @@ int run_tests(global_options *options, list_node *test_list)
                 break;
             }
             else if (ret != 0) {
-                fprintf(stderr, "Test %s exited with technical error %d\n",
-                    op_table[i].name, ret);
+                char errbuf[512];
+
+                strerror_s(errbuf, sizeof(errbuf), ret);
+                fprintf(stderr, "Test %s exited with technical error: %s (%d)\n",
+                    op_table[i].name, errbuf, ret);
                 break;
             }
         }
@@ -228,8 +231,11 @@ int run_tests(global_options *options, list_node *test_list)
                 }
                 else if (ret != 0)
                 {
-                    fprintf(stderr, "Test %s exited with technical error %d\n",
-                        op->name, ret);
+                    char errbuf[512];
+
+                    strerror_s(errbuf, sizeof(errbuf), ret);
+                    fprintf(stderr, "Test %s exited with technical error: %s (%d)\n",
+                        op->name, errbuf, ret);
                     break;
                 }
             }
