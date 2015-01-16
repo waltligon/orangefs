@@ -13,8 +13,10 @@ OSRC := \
 	$(DIR)/request.c \
 	$(DIR)/ucache.c \
 	$(DIR)/posix-pvfs.c  \
-    $(DIR)/aio-pvfs.c \
-	$(DIR)/env-vars.c
+        $(DIR)/aio-pvfs.c \
+	$(DIR)/env-vars.c \
+	$(DIR)/mmap.c \
+	$(DIR)/recursive-remove.c
 
 USRC := \
 	$(DIR)/posix.c \
@@ -23,9 +25,7 @@ USRC := \
 	$(DIR)/overunder.c \
 	$(DIR)/fts.c \
 	$(DIR)/glob.c \
-	$(DIR)/error.c \
-	$(DIR)/mmap.c \
-	$(DIR)/recursive-remove.c
+	$(DIR)/error.c 
 
 # list of all .c files (generated or otherwise) that belong in library
 OLIBSRC += $(OSRC)

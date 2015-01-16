@@ -141,6 +141,10 @@ typedef struct filesystem_configuration_s
     int32_t directio_timeout;
 
     int32_t split_mem_limit;
+
+    int32_t default_distr_dir_servers_initial;
+    int32_t default_distr_dir_servers_max;
+    int32_t default_distr_dir_split_size;
 } filesystem_configuration_t;
 
 typedef struct distribution_param_config_s
@@ -276,10 +280,6 @@ typedef struct server_configuration_s
     void *private_data;
     int32_t tree_width;
     int32_t tree_threshold;
-
-    int32_t distr_dir_servers_initial;
-    int32_t distr_dir_servers_max;
-    int32_t distr_dir_split_size;
 } server_configuration_t;
 
 enum

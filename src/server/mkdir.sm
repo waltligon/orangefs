@@ -189,14 +189,8 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
-    job_id_t j_id;
+//    job_id_t j_id;
     PVFS_ds_attributes *ds_attr = NULL;
-
-    /* save the handle from the mkdir in the response */
-    s_op->resp.u.mkdir.handle = js_p->handle;
-
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new directory has handle %s\n",
-                 PVFS_OID_str(&js_p->handle));
 
     ds_attr = (&s_op->ds_attr);
     PVFS_ds_init_time(ds_attr);
@@ -205,6 +199,8 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
                  "%llu\n\tmtime is %llu\n", llu(ds_attr->mtime),
                  llu(PINT_util_mkversion_time(ds_attr->mtime)));
 
+#if 0
+ECQ: Make it compile
     ret = job_trove_dspace_setattr(s_op->u.mkdir.fs_id,
                                    s_op->resp.u.mkdir.handle,
                                    ds_attr, 
@@ -215,6 +211,7 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
                                    &j_id,
                                    server_job_context,
                                    s_op->req->hints);
+#endif
 
     return ret;
 }
@@ -245,15 +242,16 @@ static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
     int num_total_dirdata_servers=0;
     int num_total_dirdata_sids=0;   /* This needs to be set properly */
     int num_initial_dirdata_servers=0;
-    int num_meta=0;
+//    int num_meta=0;
     int split_size=0;
-    server_configuration_t *user_opts = get_server_config_struct();
+//    server_configuration_t *user_opts = get_server_config_struct();
     int ret = -1;
     unsigned char *c;
     int i;
 
     attr = (&s_op->attr);
 
+#if 0
     /* if received >0, use; else use config_file value,*/
     if(s_op->req->u.mkdir.distr_dir_servers_max > 0)
     {
@@ -310,6 +308,7 @@ static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
 
     /* set num_dirdata_servers for pre-allocation of dirdata handles */
     s_op->u.mkdir.num_dirdata_servers = num_total_dirdata_servers;
+#endif
 
 
     /* init meta handle dist_dir_struct */
@@ -323,6 +322,8 @@ static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
 
     assert(ret == 0);
 
+#if 0
+ECQ: Make it compile
     gossip_debug(GOSSIP_MKDIR_DEBUG, 
             "mkdir: Init dist-dir-attr for dir meta handle %s "
             "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
@@ -334,6 +335,7 @@ static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
             attr->u.dir.dist_dir_attr.split_size,
             attr->u.dir.dist_dir_attr.server_no,
             attr->u.dir.dist_dir_attr.branch_level);
+#endif
 
     /* gossip bitmap, may adjust later */
     gossip_debug(GOSSIP_MKDIR_DEBUG,
@@ -516,9 +518,12 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
                                   s_op->u.mkdir.handle_array_remote[i];
     }
 
+#if 0
+ECQ: Make it compile
     gossip_debug(GOSSIP_MKDIR_DEBUG, 
                  "\t mkdir: dirdata handles array of directory %s.\n",
                  PVFS_OID_str(&s_op->resp.u.mkdir.handle));
+#endif
 
     for(i = 0; i < s_op->u.mkdir.num_dirdata_servers; i++)
     {
@@ -636,7 +641,7 @@ static PINT_sm_action mkdir_write_keyval_to_meta_handle(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr;
     int ret = -1;
-    job_id_t j_id;
+//    job_id_t j_id;
 
     /* total 3 keyvals,
      * PVFS_DIST_DIR_ATTR, PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES */
@@ -687,6 +692,8 @@ static PINT_sm_action mkdir_write_keyval_to_meta_handle(
     s_op->val_a[2].buffer_sz = OSASZ(attr->u.dir.dist_dir_attr.dirdata_count,
                                      attr->u.dir.dist_dir_attr.sid_count);
 
+#if 0
+ECQ: Make it compile
     gossip_debug(GOSSIP_MKDIR_DEBUG, 
             "  writing dist-dir-struct keyvals for meta handle: %s "
             "\t with server_no=%d and branch_level=%d \n", 
@@ -710,17 +717,17 @@ static PINT_sm_action mkdir_write_keyval_to_meta_handle(
                                   server_job_context,
                                   s_op->req->hints);
 
+#endif
     return ret;
 }
 
 static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+//    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+#if 0
+ECQ: Make it compile
     s_op->resp.u.mkdir.handle = PVFS_HANDLE_NULL;
-
-    /* clean up objects */
-    PINT_free_object_attr(s_op->u.mkdir.saved_attr);
-    PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
+#endif
 
     if (js_p->error_code > -1)
     {

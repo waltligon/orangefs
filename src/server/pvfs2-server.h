@@ -375,6 +375,8 @@ struct PINT_server_lookup_op
 
     int dirdata_server_index;
     int dirdata_sid_index;
+
+    int array_index;
 };
 
 struct PINT_server_readdir_op
@@ -628,6 +630,7 @@ struct PINT_server_unstuff_op
 
 struct PINT_server_tree_communicate_op
 {
+    int num_pjmp_frames;
     int num_partitions;
     PVFS_handle* handle_array_local; 
     PVFS_handle* handle_array_remote; 
@@ -773,58 +776,45 @@ typedef struct PINT_server_op
 } PINT_server_op;
 
 /* V3 call to server_local needs a propoer argument */
-#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb,                      \
-                                             __s_op,                      \
-                                             __handle,                    \
-                                             __fs_id,                     \
-                                             __location,                  \
-                                             __req,                       \
-                                             __task_id)                   \
-    do {                                                                  \
-/* \
-      char server_name[1024];                                             \
-      struct server_configuration_s *server_config =                      \
-                                    get_server_config_struct();           \
-*/ \
-      __s_op = malloc(sizeof(struct PINT_server_op));                     \
-      if(!__s_op)                                                         \
-      {                                                                   \
-          return -PVFS_ENOMEM;                                            \
-      }                                                                   \
-      memset(__s_op, 0, sizeof(struct PINT_server_op));                   \
-      __s_op->req = &__s_op->decoded.stub_dec.req;                        \
-      PINT_sm_push_frame(__smcb, __task_id, __s_op);                      \
-/* \
-      if (__location != LOCAL_OPERATION &&                                \
-          __location != REMOTE_OPERATION &&                               \
-          PVFS_OID_cmp(&(__handle), &PVFS_HANDLE_NULL))                   \
-      {                                                                   \
-          PINT_cached_config_get_server_name(server_name,                 \
-                                             1024,                        \
-                                             __handle,                    \
-                                             __fs_id);                    \
-      }                                                                   \
-*/ \
-      if (__location != REMOTE_OPERATION &&                               \
-         (__location == LOCAL_OPERATION ||                                \
-         (PVFS_OID_cmp(&(__handle), &PVFS_HANDLE_NULL) &&                 \
-/* \
-         !strcmp(server_config->host_id, server_name))))                  \
-*/ \
-         !PINT_cached_config_server_local(&PVFS_SID_NULL))))              \
-      {                                                                   \
-          __location = LOCAL_OPERATION;                                   \
-          __req = __s_op->req;                                            \
-          __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE |                 \
-                                 PRELUDE_PERM_CHECK_DONE |                \
-                                 PRELUDE_LOCAL_CALL;                      \
-      }                                                                   \
-      else                                                                \
-      {                                                                   \
-        memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op));     \
-        PINT_serv_init_msgarray_params(__s_op, __fs_id);                  \
-      }                                                                   \
-    } while (0)
+#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb,                        \
+                                             __s_op,                        \
+                                             __sid,                         \
+                                             __fs_id,                       \
+                                             __location,                    \
+                                             __req,                         \
+                                             __task_id)                     \
+do {                                                                        \
+      struct server_configuration_s *__config = get_server_config_struct(); \
+      __s_op = (PINT_server_op *)malloc(sizeof(struct PINT_server_op));     \
+      if(!__s_op)                                                           \
+      {                                                                     \
+          gossip_err("%s:Error allocating subordinate server frame\n"       \
+                    ,__func__);                                             \
+          return -PVFS_ENOMEM;                                              \
+      }                                                                     \
+      memset(__s_op, 0, sizeof(struct PINT_server_op));                     \
+      __s_op->req = &__s_op->decoded.stub_dec.req;                          \
+      PINT_sm_push_frame(__smcb, __task_id, __s_op);                        \
+      if (__location != REMOTE_OPERATION &&                                 \
+           (__location == LOCAL_OPERATION ||                                \
+             (!PVFS_SID_is_null(&(__sid)) &&                                \
+              !PVFS_SID_cmp(&(__sid),&(__config->host_sid))                 \
+             )                                                              \
+           )                                                                \
+         )                                                                  \
+      {                                                                     \
+          __location = LOCAL_OPERATION;                                     \
+          __req = __s_op->req;                                              \
+          __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE  |                  \
+                                 PRELUDE_PERM_CHECK_DONE |                  \
+                                 PRELUDE_LOCAL_CALL;                        \
+      }                                                                     \
+      else                                                                  \
+      {                                                                     \
+        memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op));       \
+        PINT_serv_init_msgarray_params(__s_op, __fs_id);                    \
+      }                                                                     \
+} while (0)
 
 #define PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(__s_op) \
     do { \

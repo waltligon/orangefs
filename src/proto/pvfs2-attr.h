@@ -120,7 +120,8 @@
 #define PVFS_ATTR_DATA_SIZE          (1 << 20)   /* replace with latest bit */
 
 #define PVFS_ATTR_DATA_ALL \
-             PVFS_ATTR_DATA_SIZE
+                (PVFS_ATTR_DATA_SIZE | PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_MTIME | \
+              PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_NTIME | PVFS_ATTR_COMMON_TYPE)
 
 /* internal attribute masks for symlink objects */
 #define PVFS_ATTR_SYMLNK_TARGET      (1 << 24)
@@ -316,9 +317,9 @@ static inline void decode_PVFS_metafile_attr(char **pptr,
 }
 
 #define defree_PVFS_metafile_attr(x) \
-do {                                 \
-    defree_PINT_dist(&(x)->dist);    \
-    decode_free(&(x)->dfile_array);  \
+do { \
+    defree_PINT_dist(&(x)->dist); \
+    decode_free((x)->dfile_array); \
 } while(0)
 
 #endif
@@ -559,8 +560,10 @@ static inline void encode_PVFS_dirdata_attr(char **pptr,
     int index_i;                                                              
 
     encode_PVFS_size(pptr, &(x)->dirent_count);                               
+
     /* void ptr not encoded or decoded */                                     
     encode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);                     
+
 
     for (index_i = 0; index_i<(x)->dist_dir_attr.bitmap_size; index_i++)      
     {                                                                         

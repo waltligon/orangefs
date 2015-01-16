@@ -343,9 +343,12 @@ static void lebf_initialize(void)
                 req.u.mgmt_get_dirent.entry = tmp_name;
                 reqsize = extra_size_PVFS_servreq_mgmt_get_dirent;
                 break;
+/* V3 - no longer needed */
+#if 0
             case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
                 /* nothing special */
                 break;
+#endif
             case PVFS_SERV_MGMT_SPLIT_DIRENT:
                 req.u.mgmt_split_dirent.nentries = 0;
                 req.u.mgmt_split_dirent.entry_handles = NULL;
@@ -597,7 +600,10 @@ static int lebf_encode_req(struct PVFS_server_req *req,
         CASE(PVFS_SERV_LISTATTR,  listattr);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
+/* V3 - no longer needed */
+#if 0
         CASE(PVFS_SERV_MGMT_CREATE_ROOT_DIR, mgmt_create_root_dir);
+#endif
         CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
@@ -724,7 +730,10 @@ static int lebf_encode_resp(struct PVFS_server_resp *resp,
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_IMM_COPIES:
         case PVFS_SERV_MGMT_SETPARAM:
+/* V3 - no longer needed */
+#if 0
         case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
+#endif
         case PVFS_SERV_MGMT_SPLIT_DIRENT:
             /* nothing else */
             break;
@@ -831,7 +840,10 @@ static int lebf_decode_req(void *input_buffer,
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
+/* V3 - no longer needed */
+#if 0
         CASE(PVFS_SERV_MGMT_CREATE_ROOT_DIR, mgmt_create_root_dir);
+#endif
         CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
@@ -951,7 +963,10 @@ static int lebf_decode_resp(void *input_buffer,
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_IMM_COPIES:
         case PVFS_SERV_MGMT_SETPARAM:
+/* V3 - no longer needed */
+#if 0
         case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
+#endif
         case PVFS_SERV_MGMT_SPLIT_DIRENT:
             /* nothing else */
             break;
@@ -978,6 +993,7 @@ static int lebf_decode_resp(void *input_buffer,
     }
 
 out:
+
     return(ret);
 }
 
@@ -1256,7 +1272,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_LISTEATTR:
             case PVFS_SERV_BATCH_REMOVE:
             case PVFS_SERV_IMM_COPIES:
+/* V3 - no longer needed */
+#if 0
             case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
+#endif
             case PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ:
             case PVFS_SERV_MGMT_GET_USER_CERT:
               /*nothing to free*/
@@ -1284,10 +1303,24 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             {                
                 case PVFS_SERV_LOOKUP_PATH: 
                 {
-                    struct PVFS_servresp_lookup_path *lookup =
-                                 &resp->u.lookup_path;
-                    decode_free(lookup->handle_array);
-                    decode_free(lookup->attr_array);
+                    struct PVFS_servresp_lookup_path *lookup = &resp->u.lookup_path;
+                    int i;
+                    if ( lookup->handle_count > 0 && lookup->handle_array )
+                    {
+                     decode_free(lookup->handle_array);
+                    }
+                    if ( lookup->sid_count > 0 && lookup->sid_array )
+                    {
+                       decode_free(lookup->sid_array);
+                    }
+                    if ( lookup->attr_count > 0 && lookup->attr_array )
+                    {
+                       for (i=0; i<lookup->attr_count; i++)
+                       {
+                           defree_PVFS_object_attr(&lookup->attr_array[i]);
+                       }
+                       decode_free(lookup->attr_array);
+                    }
                     break;
                 }
                 
@@ -1504,7 +1537,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_BATCH_REMOVE:
                 case PVFS_SERV_IMM_COPIES:
                 case PVFS_SERV_MGMT_GET_DIRENT:
+/* V3 - no longer needed */
+#if 0
                 case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
+#endif
                 case PVFS_SERV_MGMT_SPLIT_DIRENT:
                     /*nothing to free */
                     break;
