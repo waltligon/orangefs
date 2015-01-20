@@ -130,9 +130,9 @@ struct runfunc_decl_entry
     struct qhash_head link;
 };
 
-static int runfunc_compare(void *key, struct qhash_head *link)
+static int runfunc_compare(const void *key, struct qhash_head *link)
 {
-    if(!strcmp((char *)key, 
+    if(!strcmp((const char *)key, 
                qhash_entry(link, struct runfunc_decl_entry, link)->func_name))
     {
         return 1;
@@ -140,9 +140,9 @@ static int runfunc_compare(void *key, struct qhash_head *link)
     return 0;
 }
 
-static int runfunc_hash(void *key, int table_size)
+static int runfunc_hash(const void *key, int table_size)
 {
-    char *k = (char *)key;
+    const char *k = key;
     int g, h = 0;
     while(*k)
     {

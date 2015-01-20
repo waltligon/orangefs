@@ -945,6 +945,7 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
                                    s_op->req->u.crdirent.fs_id,
                                    PVFS_TYPE_DIRDATA,
                                    s_op->attr,
+                                   0,    /* V3 FIXME caller hndl indx */
                                    num_remote_dirdata_handles,
                                    remote_dirdata_handles,
                                    0,    /* V3 FIXME sid count */

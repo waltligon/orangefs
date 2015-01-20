@@ -189,8 +189,6 @@ static PINT_sm_action mgmt_remove_init(struct PINT_smcb *smcb,
 
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     
-    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
-
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->parent_ref,
                                PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_HINT |

@@ -16,12 +16,14 @@
 #include "pint-hint.h"
 #include "gossip.h"
 #include "pvfs2-debug.h"
+#include "pvfs2-debug.h"
 
 DEFINE_STATIC_ENDECODE_FUNCS(uint64_t, uint64_t);
 DEFINE_STATIC_ENDECODE_FUNCS(int64_t, int64_t);
 DEFINE_STATIC_ENDECODE_FUNCS(uint32_t, uint32_t);
 DEFINE_STATIC_ENDECODE_FUNCS(int32_t, int32_t);
 DEFINE_STATIC_ENDECODE_FUNCS(string, char *);
+DEFINE_STATIC_ENDECODE_FUNCS(PVFS_handle, PVFS_handle);
 
 struct PINT_hint_info
 {
@@ -54,8 +56,8 @@ static const struct PINT_hint_info hint_types[] = {
     {PINT_HINT_HANDLE,
      PINT_HINT_TRANSFER,
      PVFS_HINT_HANDLE_NAME,
-     encode_func_uint64_t,
-     decode_func_uint64_t,
+     encode_func_PVFS_handle,
+     decode_func_PVFS_handle,
      sizeof(PVFS_handle)},
 
     {PINT_HINT_OP_ID,
@@ -110,6 +112,27 @@ static const struct PINT_hint_info hint_types[] = {
     {PINT_HINT_CACHE,
      0,
      PVFS_HINT_CACHE_NAME,
+     encode_func_uint32_t,
+     decode_func_uint32_t,
+     sizeof(uint32_t)},
+
+    {PINT_HINT_LOCAL_UID,
+     0,
+     PVFS_HINT_LOCAL_UID_NAME,
+     encode_func_uint32_t,
+     decode_func_uint32_t,
+     sizeof(uint32_t)},
+
+    {PINT_HINT_OWNER_GID,
+     PINT_HINT_TRANSFER,
+     PVFS_HINT_OWNER_GID_NAME,
+     encode_func_uint32_t,
+     decode_func_uint32_t,
+     sizeof(uint32_t)},
+
+    {PINT_HINT_DISTRIBUTION_PV,
+     0,
+     PVFS_HINT_DISTRIBUTION_PV_NAME,
      encode_func_uint32_t,
      decode_func_uint32_t,
      sizeof(uint32_t)},

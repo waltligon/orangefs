@@ -218,7 +218,7 @@ PVFS_error PVFS_sys_readdirplus(PVFS_object_ref ref,
         PVFS_perror_gossip("PVFS_isys_readdirplus call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "readdirplus", &error);
         if (ret)
@@ -226,9 +226,8 @@ PVFS_error PVFS_sys_readdirplus(PVFS_object_ref ref,
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -1084,7 +1083,7 @@ static PINT_sm_action readdirplus_cleanup(struct PINT_smcb *smcb,
                 resp_attr_i->dfile_count = obj_attr_i->u.meta.dfile_count;
                 resp_attr_i->mask |= PVFS_ATTR_SYS_DFILE_COUNT;
             }
-/* V2 remove */
+/* V3 remove */
 #if 0
             if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_MIRROR_DFILES)
             {
@@ -1120,13 +1119,19 @@ static PINT_sm_action readdirplus_cleanup(struct PINT_smcb *smcb,
                               &sm_p->u.readdirplus.handle_count,
                               &sm_p->u.readdirplus.handles);
 
-    for (i = 0; i < readdirplus_resp->pvfs_dirent_outcount; i++) 
+    if (sm_p->u.readdirplus.size_array != NULL)
     {
-        if (sm_p->u.readdirplus.size_array[i])
+
+        for (i = 0; i < readdirplus_resp->pvfs_dirent_outcount; i++) 
         {
-            free(sm_p->u.readdirplus.size_array[i]);
-            sm_p->u.readdirplus.size_array[i] = NULL;
+            if (sm_p->u.readdirplus.size_array[i])
+            {
+                free(sm_p->u.readdirplus.size_array[i]);
+                sm_p->u.readdirplus.size_array[i] = NULL;
+            }
         }
+        free(sm_p->u.readdirplus.size_array);
+        sm_p->u.readdirplus.size_array = NULL;
     }
 
     free(sm_p->u.readdirplus.size_array);
@@ -1136,7 +1141,8 @@ static PINT_sm_action readdirplus_cleanup(struct PINT_smcb *smcb,
 
     for (i = 0; i < readdirplus_resp->pvfs_dirent_outcount; i++)
     {
-        PINT_free_object_attr(&sm_p->u.readdirplus.obj_attr_array[i]);
+        free(sm_p->u.readdirplus.input_handle_array);
+        sm_p->u.readdirplus.input_handle_array = NULL;
     }
 
     free(sm_p->u.readdirplus.obj_attr_array);

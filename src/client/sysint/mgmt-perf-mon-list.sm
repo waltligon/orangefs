@@ -258,6 +258,8 @@ static PINT_sm_action mgmt_perf_mon_list_setup_msgpair(struct PINT_smcb *smcb,
 	msg_p->svr_addr = sm_p->u.perf_mon_list.addr_array[i];
     }
 
+    PINT_cleanup_capability(&capability);
+
     /* immediate return: next state jumps to msgpairarray machine */
     js_p->error_code = 0;
 

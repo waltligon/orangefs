@@ -56,7 +56,7 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
                                           job_status_s *js_p);
 
 static inline int io_decode_message_recv(PINT_sm_msgpair_state *msg_p,
-                                         struct PINT_decoded_msg *decoded_resp,
+                                         struct PINT_decoded_msg *decoded_msg,
                                          struct PVFS_server_resp **resp);
 
 static inline int io_post_flow(PINT_smcb *smcb, PINT_sm_msgpair_state *msg_p);
@@ -954,7 +954,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[mop->index];
     int ret = -PVFS_EINVAL;
-    struct PINT_decoded_msg decoded_resp;
+    struct PINT_decoded_msg decoded_msg;
     const char* server_string = NULL;
     int server_type;
 
@@ -1001,7 +1001,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
     /* this is an IO read, do we do this here? was it not done before? */
     ret = PINT_serv_decode_resp(msg_p->fs_id,
                                 msg_p->encoded_resp_p,
-                                &decoded_resp,
+                                &decoded_msg,
                                 &msg_p->svr_addr,
                                 msg_p->recv_status.actual_size,
                                 &resp_p);
@@ -1113,15 +1113,30 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
     /* free all the resources that we used to send and receive. */
     ret = PINT_serv_free_msgpair_resources(&msg_p->encoded_req,
                                            msg_p->encoded_resp_p,
-                                           &decoded_resp,
+                                           &decoded_msg,
                                            &msg_p->svr_addr,
                                            msg_p->max_resp_sz);
+
+    /* cleanup capability
+     * Maybe should be part of serv_free_msgpair_resources - V3
+     */
+    PINT_cleanup_capability(&msg_p->req.capability);
+
     if (ret)
     {
         PVFS_perror_gossip("Failed to free msgpair resources", ret);
         js_p->error_code = ret;
         return SM_ACTION_TERMINATE;
     }
+
+ /* Old code - but why don't we ever set complete to 1?
+  * This may be something we need to do, or may be obsolete - V3
+  */
+    /*
+     * mark that this msgpair has been completed and should not be
+     * retried in the case of possible future retries
+     */
+     msg_p->complete = 1;
 
     if (msg_p->op_action == PVFS_MPA_RETRY)
     {
@@ -1233,7 +1248,7 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[mop->index];
     int ret = -PVFS_EINVAL;
     unsigned long status_user_tag = 0;
-    struct PINT_decoded_msg decoded_resp;
+    struct PINT_decoded_msg decoded_msg;
     struct PVFS_server_resp *resp = NULL;
 
     gossip_debug(GOSSIP_IO_DEBUG,
@@ -1256,7 +1271,7 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
     }
 
     /* decode the response from the server */
-    ret = io_decode_message_recv(msg_p, &decoded_resp, &resp);
+    ret = io_decode_message_recv(msg_p, &decoded_msg, &resp);
     if (ret)
     {
         {
@@ -1290,12 +1305,12 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
     /* now we can destroy I/O request response resources */
     ret = PINT_serv_free_msgpair_resources(&msg_p->encoded_req,
                                            msg_p->encoded_resp_p,
-                                           &decoded_resp,
+                                           &decoded_msg,
                                            &msg_p->svr_addr,
                                            msg_p->max_resp_sz);
 
-    memset(&msg_p->encoded_req, 0, sizeof(msg_p->encoded_req));
     msg_p->encoded_resp_p = NULL;
+    PINT_cleanup_capability(&msg_p->req.capability);
 
     if (ret)
     {
@@ -1308,18 +1323,18 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
 }
 
 static inline int io_decode_message_recv(PINT_sm_msgpair_state *msg_p,
-                                         struct PINT_decoded_msg *decoded_resp,
+                                         struct PINT_decoded_msg *decoded_msg,
                                          struct PVFS_server_resp **resp)
 {
     int ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_IO_DEBUG, "- io_decode_message_reccv called\n");
 
-    assert(msg_p && decoded_resp && resp);
+    assert(msg_p && decoded_msg && resp);
 
     ret = PINT_serv_decode_resp(msg_p->fs_id,
                                 msg_p->encoded_resp_p,
-                                decoded_resp,
+                                decoded_msg,
                                 &msg_p->svr_addr,
                                 msg_p->recv_status.actual_size,
                                 resp);
@@ -1358,12 +1373,19 @@ static inline int io_decode_message_recv(PINT_sm_msgpair_state *msg_p,
 
         PINT_serv_free_msgpair_resources(&msg_p->encoded_req,
                                          msg_p->encoded_resp_p,
-                                         decoded_resp,
+                                         decoded_msg,
                                          &msg_p->svr_addr,
                                          msg_p->max_resp_sz);
             
-        memset(&msg_p->encoded_req, 0, sizeof(msg_p->encoded_req));
         msg_p->encoded_resp_p = NULL;
+        PINT_cleanup_capability(&msg_p->req.capability);
+
+        if (ret)
+        {
+            PVFS_perror_gossip("PINT_serv_free_msgpair_resources "
+                               "failed", ret);
+            return ret;
+        }
     }
     return ret;
 }
@@ -1640,7 +1662,7 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
         }
         else if (cur_ctx->write_ack_has_been_posted)
         {
-            struct PINT_decoded_msg decoded_resp;
+            struct PINT_decoded_msg decoded_msg;
             struct PVFS_server_resp *resp = NULL;
             /*
               size for writes are reported in the final ack, but we
@@ -1649,7 +1671,7 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
             ret = PINT_serv_decode_resp(
                                      cur_ctx->msg.fs_id,
                                      cur_ctx->write_ack.encoded_resp_p,
-                                     &decoded_resp,
+                                     &decoded_msg,
                                      &cur_ctx->msg.svr_addr,
                                      cur_ctx->write_ack.recv_status.actual_size,
                                      &resp);
@@ -1666,7 +1688,7 @@ static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
                 /* pass along the error code from the server as well */
                 ret = resp->status;
 
-                PINT_decode_release(&decoded_resp, PINT_DECODE_RESP);
+                PINT_decode_release(&decoded_msg, PINT_DECODE_RESP);
             }
             else
             {
@@ -1765,7 +1787,7 @@ int PINT_msgarray_status(PINT_sm_msgarray_op *op)
 
 int PINT_serv_decode_resp(PVFS_fs_id fs_id,
                           void *encoded_resp_p,
-                          struct PINT_decoded_msg *decoded_resp_p,
+                          struct PINT_decoded_msg *decoded_msg_p,
                           PVFS_BMI_addr_t *svr_addr_p,
                           int actual_resp_sz,
                           struct PVFS_server_resp **resp_out_pp)
@@ -1775,12 +1797,12 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
 
     ret = PINT_decode(encoded_resp_p,
                       PINT_DECODE_RESP,
-                      decoded_resp_p, /* holds data on decoded resp */
+                      decoded_msg_p, /* holds data on decoded msg */
                       *svr_addr_p,
                       actual_resp_sz);
     if (ret > -1)
     {
-        *resp_out_pp = (struct PVFS_server_resp *)decoded_resp_p->buffer;
+        *resp_out_pp = (struct PVFS_server_resp *)decoded_msg_p->buffer;
         if ((*resp_out_pp)->op == PVFS_SERV_PROTO_ERROR)
         {
 
@@ -1810,19 +1832,25 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
 
 int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
                                      void *encoded_resp_p,
-                                     struct PINT_decoded_msg *decoded_resp_p,
+                                     struct PINT_decoded_msg *decoded_msg_p,
                                      PVFS_BMI_addr_t *svr_addr_p,
                                      int max_resp_sz)
 {
     int ret = -PVFS_EINVAL;
 
-    if (encoded_req_p && decoded_resp_p && svr_addr_p)
+    if (encoded_req_p &&
+        encoded_resp_p &&
+        decoded_msg_p &&
+        svr_addr_p)
     {
         PINT_encode_release(encoded_req_p, PINT_ENCODE_REQ);
         memset(encoded_req_p, 0, sizeof(*encoded_req_p));
 
-        PINT_decode_release(decoded_resp_p, PINT_DECODE_RESP);
-        memset(decoded_resp_p, 0, sizeof(*decoded_resp_p));
+        /* this should release the msg struct but not the resp buffer
+         * it points to
+         */
+        PINT_decode_release(decoded_msg_p, PINT_DECODE_RESP);
+        memset(decoded_msg_p, 0, sizeof(*decoded_msg_p));
 
         BMI_memfree(*svr_addr_p, encoded_resp_p, max_resp_sz, BMI_RECV);
         encoded_resp_p = NULL;

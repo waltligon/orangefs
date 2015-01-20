@@ -29,6 +29,7 @@
 #include "sid.h"
 #include "pvfs2-dist-simple-stripe.h"
 #include "dist-dir-utils.h"
+#include "client-capcache.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -92,7 +93,7 @@ machine pvfs2_client_mkdir_sm
         run mkdir_msg_failure;
         default => cleanup;
     }
-    
+
     state mkdir_getattr_setup
     {
         run mkdir_getattr_setup;
@@ -244,7 +245,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
                   sizeof(PVFS_handle),
                   &parent_ref.handle);
 
-/* TODO: For now, just use round robin layout. */
+    /* TODO: For now, just use round robin layout. */
     sm_p->u.mkdir.layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Creating directory named %s "
@@ -283,7 +284,7 @@ PVFS_error PVFS_sys_mkdir(char *object_name,
         PVFS_perror_gossip("PVFS_isys_mkdir call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "mkdir", &error);
         if (ret)
@@ -291,9 +292,8 @@ PVFS_error PVFS_sys_mkdir(char *object_name,
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -539,21 +539,40 @@ static PINT_sm_action mkdir_crdirent_failure(struct PINT_smcb *smcb,
                                              job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_uid local_uid;
 
     /* if need to retry. clear the error_code and setup getattr. */
-    if(js_p->error_code == -PVFS_EAGAIN)
+    if(js_p->error_code == -PVFS_EAGAIN &&
+       sm_p->u.mkdir.retry_count < sm_p->msgarray_op.params.retry_limit)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: received -PVFS_EAGAIN, will retry getattr and crdirent.\n");
+        sm_p->u.mkdir.retry_count++;
 
-        /* setup getattr */
-        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: received -PVFS_EAGAIN, will retry getattr and crdirent (attempt number %d).\n",
+                     sm_p->u.mkdir.retry_count);
+
         /* clear acache content */
         PINT_acache_invalidate(sm_p->object_ref);
+        /* clear capcache content */
+        local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
 
+        if (local_uid == (PVFS_uid) -1)
+        {
+            local_uid = PINT_util_getuid();
+
+            PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
+                          sizeof(PVFS_uid), &local_uid);
+        }
+
+        PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+
+        /* TODO: free cap? */
+
+        /* set up new getattr */
         PINT_SM_GETATTR_STATE_FILL(
                 sm_p->getattr,
                 sm_p->object_ref,
-                PVFS_ATTR_DISTDIR_ATTR,
+                PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|
+                    PVFS_ATTR_CAPABILITY|PVFS_ATTR_DISTDIR_ATTR,
                 PVFS_TYPE_DIRECTORY,
                 0);
 
@@ -644,8 +663,6 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
 
     PVFS_util_release_sys_attr(&sm_p->u.mkdir.sys_attr);
     PINT_free_object_attr(&sm_p->getattr.attr);
-
-    PINT_SM_GETATTR_STATE_CLEAR(sm_p->u.mkdir.metafile_getattr);
     
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
@@ -768,7 +785,6 @@ static PINT_sm_action mkdir_getattr_setup(struct PINT_smcb *smcb,
     
     return SM_ACTION_COMPLETE;
 }
-
 
 static PINT_sm_action mkdir_seteattr_setup_msgpair(struct PINT_smcb *smcb,
                                                    job_status_s *js_p)

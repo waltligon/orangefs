@@ -1,0 +1,114 @@
+#
+# OpenSSL example configuration file.
+# This is mostly being used for generation of certificate requests.
+#
+
+# This definition stops the following lines choking if HOME isn't
+# defined.
+HOME                           = .
+RANDFILE                       = $ENV::HOME/.rnd
+
+# Extra OBJECT IDENTIFIER info:
+#oid_file                      = $ENV::HOME/.oid
+oid_section                    = new_oids
+
+# To use this configuration file with the "-extfile" option of the
+# "openssl x509" utility, name here the section containing the
+# X.509v3 extensions to use:
+# extensions                   = 
+# (Alternatively, use a configuration file that has only
+# X.509v3 extensions in its main [= default] section.)
+
+[ new_oids ]
+
+# We can add new OIDs in here for use by 'ca' and 'req'.
+# Add a simple OID like this:
+# testoid1                     = 1.2.3.4
+# Or use config file substitution like this:
+# testoid2=${testoid1}.5.6
+
+####################################################################
+[ req ]
+default_bits                   = 2048
+#default_keyfile                = pvfs2-ca-key-pass.pem
+prompt                         = no
+distinguished_name             = req_distinguished_name
+attributes                     = req_attributes
+x509_extensions                = v3_ca        # The extentions to add to the self signed cert
+
+# Passwords for private keys if not present they will be prompted for
+# input_password               = secret
+# output_password              = secret
+
+# This sets a mask for permitted string types. There are several options. 
+# default: PrintableString, T61String, BMPString.
+# pkix: PrintableString, BMPString.
+# utf8only: only UTF8Strings.
+# nombstr : PrintableString, T61String (no BMPStrings or UTF8Strings).
+# MASK:XXXX a literal mask value.
+# WARNING: current versions of Netscape crash on BMPStrings or UTF8Strings
+# so use this option with caution!
+string_mask                    = nombstr
+
+# req_extensions               = v3_req # The extensions to add to a certificate request
+
+[ req_distinguished_name ]
+CN                             = OrangeFS Test CA
+OU                             = OrangeFS
+O                              = Omnibond LLC
+C                              = US
+
+# SET-ex3                      = SET extension number 3
+
+[ req_attributes ]
+#challengePassword             = A challenge password
+#challengePassword_min         = 4
+#challengePassword_max         = 20
+
+#unstructuredName              = An optional company name
+
+[ v3_req ]
+
+# Extensions to add to a certificate request
+
+basicConstraints               = CA:FALSE
+keyUsage                       = nonRepudiation, digitalSignature, keyEncipherment
+
+[ v3_ca ]
+
+
+# Extensions for a typical CA
+
+
+# PKIX recommendation.
+
+subjectKeyIdentifier           = hash
+
+authorityKeyIdentifier         = keyid:always,issuer:always
+
+# This is what PKIX recommends but some broken software chokes on critical
+# extensions.
+#basicConstraints              = critical,CA:true
+# So we do this instead.
+basicConstraints               = CA:true
+
+# Key usage: this is typical for a CA certificate. However since it will
+# prevent it being used as an test self-signed certificate it is best
+# left out by default.
+# keyUsage                     = cRLSign, keyCertSign
+
+# Some might want this also
+# nsCertType                   = sslCA, emailCA
+
+# Include email address in subject alt name: another PKIX recommendation
+# subjectAltName               = email:copy
+# Copy issuer details
+# issuerAltName                = issuer:copy
+
+# DER hex encoding of an extension: beware experts only!
+# obj                          = DER:02:03
+# Where 'obj' is a standard or added object
+# You can even override a supported extension:
+# basicConstraints             = critical, DER:30:03:01:01:FF
+
+

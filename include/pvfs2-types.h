@@ -531,8 +531,9 @@ endecode_fields_12(
     uint64_t, handles_available_count,
     uint64_t, handles_total_count);
 
-/** object reference (uniquely refers to a single file, directory, or
- *  symlink) metadata object.
+/*
+ * object reference (uniquely refers to a single file, directory, or
+ * symlink) metadata object.
  */
 typedef struct PVFS_object_ref_s
 {
@@ -601,6 +602,42 @@ do { \
     } \
     memset(oref, 0; sizeof(PVFS_object_ref)); \
 } while (0)
+
+/* kernel compatibility version of a PVFS_handle */
+typedef struct PVFS_khandle_s
+{
+    union
+    {
+        unsigned char u[16];
+        uint32_t slice[4];
+    };
+} PVFS_khandle __attribute__ (( __aligned__ (8)));
+
+
+/*
+ * kernel version of an object ref.
+ */
+typedef struct PVFS_object_kref_s
+{
+    PVFS_khandle khandle;
+    int32_t fs_id;
+    int32_t __pad1;
+} PVFS_object_kref;
+
+/*
+ * The kernel module will put the appropriate bytes of the khandle
+ * into ihash.u and perceive them as an inode number through ihash.ino.
+ * The slices are handy in encode and decode dirents...
+ */
+struct ihash
+{
+    union
+    {
+        unsigned char u[8];
+        uint64_t ino;
+        uint32_t slice[2];
+    };
+};
 
 /* max length of BMI style URI's for identifying servers */
 #define PVFS_MAX_SERVER_ADDR_LEN  256
@@ -1206,9 +1243,14 @@ struct profiler
  * New types for robust security implementation.
  */
 #define PVFS2_DEFAULT_CREDENTIAL_TIMEOUT (3600)   /* 1 hour */
+#define PVFS2_DEFAULT_CAPABILITY_TIMEOUT (600)
 #define PVFS2_DEFAULT_CREDENTIAL_KEYPATH SYSCONFDIR "/pvfs2-clientkey.pem"
 #define PVFS2_DEFAULT_CREDENTIAL_SERVICE_USERS SYSCONFDIR \
         "/orangefs-service-users"
+#define PVFS2_SECURITY_TIMEOUT_MIN   5
+#define PVFS2_SECURITY_TIMEOUT_MAX   (10*365*24*60*60)   /* ten years */
+
+extern const char PVFS2_BLANK_ISSUER[];
 
 typedef unsigned char *PVFS_cert_data;
 

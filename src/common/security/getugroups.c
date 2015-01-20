@@ -27,6 +27,8 @@
 #include <errno.h>
 #include <string.h>
 
+#include "pvfs2-internal.h"
+
 #define STREQ(s1, s2) ((strcmp (s1, s2) == 0))
 
 /* Like `getgroups', but for user USERNAME instead of for the current

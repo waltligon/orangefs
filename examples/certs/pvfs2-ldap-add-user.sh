@@ -14,26 +14,30 @@
 
 usage () 
 {
-    echo "USAGE: $0 [-D <admin dn>] [-w <admin password>] <logon name> <container dn>"
+    echo "USAGE: $0 [-H <hosturi>] [-D <admin dn>] [-w <admin password>] <logon name> <container dn>"
+    echo "       hosturi: uri of remote LDAP server (ldap://ldap-server)"
     echo "       admin dn: dn of LDAP administrator"
     echo "       admin password: password of LDAP admin, leave blank for prompt"
     echo "       logon name: logon name of user in /etc/passwd that will be created"
     echo "       container dn: dn of container object for new user"
 }
 
-while getopts "D:w:" option
+while getopts "D:w:H:" option
 do
     case $option in
+        H)
+            hosturi=$OPTARG
+        ;;
         D)
             admindn=$OPTARG
         ;;
-	w)
-	    adminpw=$OPTARG
+        w)
+            adminpw=$OPTARG
         ;;
-	*)
-	    usage
-	    exit 1
-	;;
+        *)
+            usage
+            exit 1
+        ;;
     esac
 done
 
@@ -51,6 +55,10 @@ fi
 # bind option
 if [ $admindn ]; then
     bindopt="-D"
+fi
+# hostname option
+if [ $hosturi ]; then
+    hostopt="-H"
 fi
 
 # password option (-W to prompt)
@@ -91,7 +99,8 @@ if [ ! $givenname ]; then
 fi
 
 # execute the ldapadd using localhost
-ldapadd $bindopt $admindn $pwdopt $adminpw -x <<_EOF
+
+ldapadd $hostopt $hosturi $bindopt $admindn $pwdopt $adminpw -x <<_EOF
 dn: cn=${username},${container}
 cn: $username
 uid: $username

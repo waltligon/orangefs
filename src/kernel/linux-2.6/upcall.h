@@ -20,7 +20,7 @@ typedef struct
     int32_t count;
     int32_t __pad1;
     int64_t offset;
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
     enum PVFS_io_type io_type;
     int32_t readahead_size;
 } pvfs2_io_request_t;
@@ -29,7 +29,7 @@ typedef struct
 {
     int32_t buf_index;
     int32_t count;
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
     enum PVFS_io_type io_type;
     int32_t __pad1;
 } pvfs2_iox_request_t;
@@ -38,20 +38,20 @@ typedef struct
 {
     int32_t sym_follow;
     int32_t __pad1;
-    PVFS_object_ref parent_refn;
+    PVFS_object_kref parent_refn;
     char d_name[PVFS2_NAME_LEN];
 } pvfs2_lookup_request_t;
 
 typedef struct
 {
-    PVFS_object_ref parent_refn;
+    PVFS_object_kref parent_refn;
     PVFS_sys_attr attributes;
     char d_name[PVFS2_NAME_LEN];
 } pvfs2_create_request_t;
 
 typedef struct
 {
-    PVFS_object_ref parent_refn;
+    PVFS_object_kref parent_refn;
     PVFS_sys_attr attributes;
     char entry_name[PVFS2_NAME_LEN];
     char target[PVFS2_NAME_LEN];
@@ -59,33 +59,33 @@ typedef struct
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
     uint32_t        mask;
     uint32_t        __pad1;
 } pvfs2_getattr_request_t;
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
     PVFS_sys_attr attributes;
 } pvfs2_setattr_request_t;
 
 typedef struct
 {
-    PVFS_object_ref parent_refn;
+    PVFS_object_kref parent_refn;
     char d_name[PVFS2_NAME_LEN];
 } pvfs2_remove_request_t;
 
 typedef struct
 {
-    PVFS_object_ref parent_refn;
+    PVFS_object_kref parent_refn;
     PVFS_sys_attr attributes;
     char d_name[PVFS2_NAME_LEN];
 } pvfs2_mkdir_request_t;
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
     PVFS_ds_position token;
     int32_t max_dirent_count;
     int32_t buf_index;
@@ -93,7 +93,7 @@ typedef struct
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
     PVFS_ds_position token;
     int32_t max_dirent_count;
     uint32_t mask;
@@ -103,8 +103,8 @@ typedef struct
 
 typedef struct
 {
-    PVFS_object_ref old_parent_refn;
-    PVFS_object_ref new_parent_refn;
+    PVFS_object_kref old_parent_refn;
+    PVFS_object_kref new_parent_refn;
     char d_old_name[PVFS2_NAME_LEN];
     char d_new_name[PVFS2_NAME_LEN];
 } pvfs2_rename_request_t;
@@ -117,13 +117,13 @@ typedef struct
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
     PVFS_size size;
 } pvfs2_truncate_request_t;
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
 } pvfs2_mmap_ra_cache_flush_request_t;
 
 typedef struct
@@ -140,7 +140,7 @@ typedef struct
 
 typedef struct 
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
     int32_t key_sz;
     int32_t __pad1;
     char key[PVFS_MAX_XATTR_NAMELEN];
@@ -148,7 +148,7 @@ typedef struct
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
     PVFS_keyval_pair keyval;
     int32_t   flags;
     int32_t   __pad1;
@@ -156,7 +156,7 @@ typedef struct
 
 typedef struct 
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
     int32_t  requested_count;
     int32_t  __pad1;
     PVFS_ds_position token;
@@ -164,7 +164,7 @@ typedef struct
 
 typedef struct 
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
     int32_t key_sz;
     int32_t __pad1;
     char key[PVFS_MAX_XATTR_NAMELEN];
@@ -177,7 +177,7 @@ typedef struct
 
 typedef struct
 {
-    PVFS_object_ref refn;
+    PVFS_object_kref refn;
 } pvfs2_fsync_request_t;
 
 enum pvfs2_param_request_type
@@ -199,17 +199,23 @@ enum pvfs2_param_request_op
     PVFS2_PARAM_REQUEST_OP_NCACHE_HARD_LIMIT = 9,
     PVFS2_PARAM_REQUEST_OP_NCACHE_SOFT_LIMIT = 10,
     PVFS2_PARAM_REQUEST_OP_NCACHE_RECLAIM_PERCENTAGE = 11,
+#if 0
     PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_TIMEOUT_MSECS = 12,
     PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_HARD_LIMIT = 13,
     PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_SOFT_LIMIT = 14,
     PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_RECLAIM_PERCENTAGE = 15,
+#endif
     PVFS2_PARAM_REQUEST_OP_CLIENT_DEBUG = 16,
     PVFS2_PARAM_REQUEST_OP_CCACHE_TIMEOUT_SECS = 17,
     PVFS2_PARAM_REQUEST_OP_CCACHE_HARD_LIMIT = 18,
     PVFS2_PARAM_REQUEST_OP_CCACHE_SOFT_LIMIT = 19,
-    PVFS2_PARAM_REQUEST_OP_CCACHE_RECLAIM_PERCENTAGE = 20
-};  
-    
+    PVFS2_PARAM_REQUEST_OP_CCACHE_RECLAIM_PERCENTAGE = 20,
+    PVFS2_PARAM_REQUEST_OP_CAPCACHE_TIMEOUT_SECS = 21,
+    PVFS2_PARAM_REQUEST_OP_CAPCACHE_HARD_LIMIT = 22,
+    PVFS2_PARAM_REQUEST_OP_CAPCACHE_SOFT_LIMIT = 23,
+    PVFS2_PARAM_REQUEST_OP_CAPCACHE_RECLAIM_PERCENTAGE = 24
+};
+
 typedef struct
 {
     enum pvfs2_param_request_type type;
@@ -222,7 +228,10 @@ enum pvfs2_perf_count_request_type
 {
     PVFS2_PERF_COUNT_REQUEST_ACACHE = 1,
     PVFS2_PERF_COUNT_REQUEST_NCACHE = 2,
+    PVFS2_PERF_COUNT_REQUEST_CAPCACHE = 3
+#if 0
     PVFS2_PERF_COUNT_REQUEST_STATIC_ACACHE = 3,
+#endif
 };
 typedef struct
 {

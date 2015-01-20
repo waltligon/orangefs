@@ -141,7 +141,7 @@ PVFS_error PVFS_sys_flush(PVFS_object_ref ref,
         PVFS_perror_gossip("PVFS_isys_flush call", ret);
         error = ret;
     }
-    else
+    else if (!ret && op_id != -1)
     {
         ret = PVFS_sys_wait(op_id, "flush", &error);
         if (ret)
@@ -149,9 +149,8 @@ PVFS_error PVFS_sys_flush(PVFS_object_ref ref,
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
+        PINT_sys_release(op_id);
     }
-
-    PINT_sys_release(op_id);
     return error;
 }
 
@@ -221,7 +220,7 @@ static int flush_datafile_setup_msgpairarray(struct PINT_smcb *smcb,
             msg_p->sid_array = &attr->u.meta.sid_array[i * dfilesids];
             msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
             msg_p->comp_fn = NULL;
-            PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+            ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
         }
         else
         {
@@ -248,15 +247,17 @@ static int flush_datafile_setup_msgpairarray(struct PINT_smcb *smcb,
             msg_p->sid_array = sm_p->object_ref.sid_array;
             msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
             msg_p->comp_fn = NULL;
-            PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+            ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+        }
+        if (ret)
+        {
+            gossip_err("Error: failed to resolve server addresses.\n");
+            js_p->error_code = ret;
+            break;
         }
     }
 
-    if (ret)
-    {
-        gossip_err("Error: failed to resolve server addresses.\n");
-        js_p->error_code = ret;
-    }
+    PINT_cleanup_capability(&capability);
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;

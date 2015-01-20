@@ -571,6 +571,8 @@ struct PINT_server_mkdir_op
     PVFS_fs_id fs_id;
     PVFS_handle handle;        /* metadata handle passed by request */
     PVFS_size init_dirdata_size;
+    PVFS_capability *saved_capability;
+    PVFS_object_attr *saved_attr;
 
     /* dist-dir-struct
      * not in resp, only return meta handle
@@ -741,7 +743,7 @@ typedef struct PINT_server_op
         struct PINT_server_getconfig_op getconfig;
         struct PINT_server_lookup_op lookup;
         struct PINT_server_crdirent_op crdirent;
-        // struct PINT_server_setattr_op setattr;
+        /* struct PINT_server_setattr_op setattr; */
         struct PINT_server_readdir_op readdir;
         struct PINT_server_remove_op remove;
         struct PINT_server_chdirent_op chdirent;
@@ -822,6 +824,12 @@ typedef struct PINT_server_op
         memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op));     \
         PINT_serv_init_msgarray_params(__s_op, __fs_id);                  \
       }                                                                   \
+    } while (0)
+
+#define PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(__s_op) \
+    do { \
+        PINT_cleanup_capability(&__s_op->req->capability); \
+        free(__s_op); \
     } while (0)
 
 /* state machine permission function */
@@ -1016,6 +1024,15 @@ extern struct PINT_state_machine_s pvfs2_tree_getattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_dirdata_split_sm;
+
+extern void tree_getattr_free(PINT_server_op *s_op);
+extern void tree_remove_free(PINT_server_op *s_op);
+
+/* V3 */
+#if 0
+/* Exported Prototypes */
+struct server_configuration_s *get_server_config_struct(void);
+#endif
 
 /* exported state machine resource reclamation function */
 int server_post_unexpected_recv(void);

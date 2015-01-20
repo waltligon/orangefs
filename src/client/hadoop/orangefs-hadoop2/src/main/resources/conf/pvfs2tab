@@ -1,0 +1,1 @@
+tcp://localhost:3334/orangefs /mnt/orangefs pvfs2 defaults,noauto 0 0

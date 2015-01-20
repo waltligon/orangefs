@@ -8,7 +8,6 @@
 #include <string.h>
 #include <assert.h>
 
-/* TODO: TEMP */
 #include "pvfs2-config.h"
 #include "server-config.h"
 #include "pvfs2-server.h"
@@ -22,6 +21,11 @@
 #include "dist-dir-utils.h"
 #include "pint-uid-map.h"
 #include "sid.h"
+
+static int tree_setattr_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int index);
 
 %%
 
@@ -358,6 +362,9 @@ static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
             !s_op->u.mkdir.handle_array_local ||
             !s_op->u.mkdir.handle_array_remote )
     {
+        free(attr->u.dir.dirdata_handles);
+        free(s_op->u.mkdir.handle_array_local);
+        free(s_op->u.mkdir.handle_array_remote);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -384,6 +391,7 @@ static PINT_sm_action mkdir_create_local_dirdata_dspace(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_handle *handle_array = NULL;
+    PVFS_object_attr *attr GCC_UNUSED;
     int ret = -PVFS_ENOMEM;
     job_id_t tmp_id;
 
@@ -439,6 +447,11 @@ static PINT_sm_action mkdir_create_local_dirdata_dspace(struct PINT_smcb *smcb,
                                        &tmp_id,
                                        server_job_context, 
                                        s_op->req->hints);
+
+/* V3 */
+#if 0
+    free(extent_array.extent_array);
+#endif
 
     return(ret);
 }
@@ -562,16 +575,21 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
                                    s_op->u.mkdir.fs_id,
                                    PVFS_TYPE_DIRDATA,
                                    attr,
+                                   0, /* caller_handle_index */
                                    s_op->attr.u.dir.dist_dir_attr.dirdata_count,
                                    s_op->attr.u.dir.dirdata_handles,
                                    s_op->attr.u.dir.dist_dir_attr.sid_count,
                                    s_op->attr.u.dir.dirdata_sids,
                                    NULL);
 
+    /* save objects so they can be freed */
+    s_op->u.mkdir.saved_attr = &msg_p->req.u.mkdir.attr;
+    s_op->u.mkdir.saved_capability = &msg_p->req.capability;
+
     msg_p->fs_id = s_op->u.mkdir.fs_id;
     msg_p->handle = s_op->attr.u.dir.dirdata_handles[0];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = NULL;
+    msg_p->comp_fn = tree_setattr_comp_fn;
 
     /* V3 */
 #if 0
@@ -592,6 +610,19 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
+static int tree_setattr_comp_fn(void *v_p,
+                                struct PVFS_server_resp *resp_p,
+                                int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = &mop->msgpair;;
+
+    assert(msg_p->req.op == PVFS_SERV_TREE_SETATTR);
+    PINT_free_object_attr(&(msg_p->req).u.tree_setattr.attr);
+    return 0;
+}
+
 /* V3 SIDs will get added to the handles, possibly the bitmap too, and
  * the attr should be moved into the dspace record
  */
@@ -610,6 +641,10 @@ static PINT_sm_action mkdir_write_keyval_to_meta_handle(
     /* total 3 keyvals,
      * PVFS_DIST_DIR_ATTR, PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES */
     int keyval_count = 3;
+
+    /* free saved capability */
+    PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
+    s_op->u.mkdir.saved_capability = NULL;
 
     /* !!!! this is to set meta handle keyval,
      * use dist_dir_attr in s_op->attr 
@@ -683,6 +718,10 @@ static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     s_op->resp.u.mkdir.handle = PVFS_HANDLE_NULL;
 
+    /* clean up objects */
+    PINT_free_object_attr(s_op->u.mkdir.saved_attr);
+    PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
+
     if (js_p->error_code > -1)
     {
         js_p->error_code = -PVFS_EINVAL;
@@ -703,6 +742,18 @@ static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
  */
 static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    free(s_op->attr.u.dir.dirdata_handles);
+    free(s_op->attr.u.dir.dist_dir_bitmap);
+    free(s_op->u.mkdir.handle_array_local);
+    free(s_op->u.mkdir.handle_array_remote);
+    free(s_op->key_a);
+    free(s_op->val_a);
+    free(s_op->error_a);
+    if (s_op->msgarray_op.count > 0)
+    {
+        PINT_free_object_attr(&s_op->req->u.tree_setattr.attr);
+    }
     return(server_state_machine_complete(smcb));
 }
 
@@ -714,6 +765,14 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
     PVFS_uid uid;
     uint32_t num_groups;
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
+
+    s_op->attr.u.dir.dirdata_handles = NULL;
+    s_op->attr.u.dir.dist_dir_bitmap = NULL;
+    s_op->u.mkdir.handle_array_local = NULL;
+    s_op->u.mkdir.handle_array_remote = NULL;
+    s_op->key_a = NULL;
+    s_op->val_a = NULL;
+    s_op->error_a = NULL;
 
     s_op->u.mkdir.fs_id = s_op->req->u.mkdir.fs_id;
     s_op->u.mkdir.handle = s_op->req->u.mkdir.handle;
@@ -773,7 +832,7 @@ static inline int PINT_get_object_ref_mkdir(struct PVFS_server_req *req,
     *fs_id = req->u.mkdir.fs_id;
     *handle = PVFS_HANDLE_NULL;
     return 0;
-};
+}
 
 static int perm_mkdir(PINT_server_op *s_op)
 {

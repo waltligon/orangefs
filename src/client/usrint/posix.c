@@ -34,28 +34,24 @@ int fadvise64(int, off64_t, off64_t, int);
  */
 
 /*
- * open wrapper
- */ 
-int open(const char *path, int flags, ...)
+ * open_internal wrapper
+ */
+static int open_internal(const char *path, int flags, va_list ap)
 {
     int rc = 0;
-    va_list ap; 
-    mode_t mode = 0; 
+    mode_t mode = 0;
     PVFS_hint hints;  /* need to figure out how to set default */
     pvfs_descriptor *pd;
-    
+
     gossip_debug(GOSSIP_USRINT_DEBUG, "posix.c open: called with %s\n", path);
-    va_start(ap, flags); 
     if (flags & O_CREAT)
-        mode = va_arg(ap, mode_t); 
+        mode = va_arg(ap, mode_t);
     else
         mode = 0777;
     if (flags & O_HINTS)
         hints = va_arg(ap, PVFS_hint);
     else
        hints = PVFS_HINT_NULL;
-    va_end(ap); 
-
 
     if (!path)
     {
@@ -97,7 +93,7 @@ int open(const char *path, int flags, ...)
         }
         gen_mutex_unlock(&pd->s->lock);
         gen_mutex_unlock(&pd->lock);
-        rc = pd->fd; 
+        rc = pd->fd;
     }
     goto cleanup;
 errorout:
@@ -109,36 +105,43 @@ cleanup:
 }
 
 /*
- * open64 wrapper 
+ * open wrapper
  */
-int open64(const char *path, int flags, ...)
-{ 
+int open(const char *path, int flags, ...)
+{
     int fd;
-    int mode = 0;
     va_list ap;
     va_start(ap, flags);
-    if (flags & O_CREAT)
-    {
-        mode = va_arg(ap, int);
-    }
-    fd = open(path, flags|O_LARGEFILE, mode); 
+    fd = open_internal(path, flags, ap);
     va_end(ap);
     return fd;
 }
 
-int openat(int dirfd, const char *path, int flags, ...)
+/*
+ * open64 wrapper
+ */
+int open64(const char *path, int flags, ...)
+{
+    int fd;
+    va_list ap;
+    va_start(ap, flags);
+    fd = open_internal(path, flags|O_LARGEFILE, ap);
+    va_end(ap);
+    return fd;
+}
+
+static int openat_internal(int dirfd, const char *path, int flags, va_list ap)
 {
     int fd; 
     int mode = 0;
-    pvfs_descriptor *pd; 
-    va_list ap;
-    
+    pvfs_descriptor *pd;
+
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
-    va_start(ap, flags);
+
     if (flags & O_CREAT)
     {
         mode = va_arg(ap, int);
@@ -161,6 +164,16 @@ int openat(int dirfd, const char *path, int flags, ...)
             fd = -1;
         }
     }
+
+    return fd;
+}
+
+int openat(int dirfd, const char *path, int flags, ...)
+{
+    int fd;
+    va_list ap;
+    va_start(ap, flags);
+    fd = openat_internal(dirfd, path, flags, ap);
     va_end(ap);
     return fd;
 }
@@ -168,14 +181,9 @@ int openat(int dirfd, const char *path, int flags, ...)
 int openat64(int dirfd, const char *path, int flags, ...)
 {
     int fd;
-    int mode = 0;
     va_list ap;
     va_start(ap, flags);
-    if (flags & O_CREAT)
-    {
-        mode = va_arg(ap, int);
-    }
-    fd = openat(dirfd, path, flags|O_LARGEFILE, mode); 
+    fd = openat_internal(dirfd, path, flags|O_LARGEFILE, ap);
     va_end(ap);
     return fd;
 }

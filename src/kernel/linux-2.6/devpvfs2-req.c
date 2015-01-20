@@ -281,28 +281,28 @@ static ssize_t pvfs2_devreq_writev(
     buffer = dev_req_alloc();
     if (!buffer)
     {
-	return -ENOMEM;
+        return -ENOMEM;
     }
     ptr = buffer;
 
     for (i = 0; i < notrailer_count; i++)
     {
-	if (iov[i].iov_len > num_remaining)
-	{
-	    gossip_err("writev error: Freeing buffer and returning\n");
-	    dev_req_release(buffer);
-	    return -EMSGSIZE;
-	}
-	ret = copy_from_user(ptr, iov[i].iov_base, iov[i].iov_len);
+        if (iov[i].iov_len > num_remaining)
+        {
+            gossip_err("writev error: Freeing buffer and returning\n");
+            dev_req_release(buffer);
+            return -EMSGSIZE;
+        }
+        ret = copy_from_user(ptr, iov[i].iov_base, iov[i].iov_len);
         if (ret)
         {
             gossip_err("Failed to copy data from user space\n");
-	    dev_req_release(buffer);
+            dev_req_release(buffer);
             return -EIO;
         }
-	num_remaining -= iov[i].iov_len;
-	ptr += iov[i].iov_len;
-	payload_size += iov[i].iov_len;
+        num_remaining -= iov[i].iov_len;
+        ptr += iov[i].iov_len;
+        payload_size += iov[i].iov_len;
     }
     total_returned_size = payload_size;
 
@@ -338,22 +338,22 @@ static ssize_t pvfs2_devreq_writev(
     hash_link = qhash_search_and_remove(htable_ops_in_progress, &(tag));
     if (hash_link)
     {
-	op = qhash_entry(hash_link, pvfs2_kernel_op_t, list);
-	if (op)
-	{
+        op = qhash_entry(hash_link, pvfs2_kernel_op_t, list);
+        if (op)
+        {
             /* Increase ref count! */
             get_op(op);
-	    /* cut off magic and tag from payload size */
-	    payload_size -= (2*sizeof(int32_t) + sizeof(uint64_t));
-	    if (payload_size <= sizeof(pvfs2_downcall_t))
-	    {
-		/* copy the passed in downcall into the op */
-		memcpy(&op->downcall, ptr, sizeof(pvfs2_downcall_t));
-	    }
-	    else
-	    {
-		gossip_debug(GOSSIP_DEV_DEBUG, "writev: Ignoring %d bytes\n", payload_size);
-	    }
+            /* cut off magic and tag from payload size */
+            payload_size -= (2*sizeof(int32_t) + sizeof(uint64_t));
+            if (payload_size <= sizeof(pvfs2_downcall_t))
+            {
+                /* copy the passed in downcall into the op */
+                memcpy(&op->downcall, ptr, sizeof(pvfs2_downcall_t));
+            }
+            else
+            {
+                gossip_debug(GOSSIP_DEV_DEBUG, "writev: Ignoring %d bytes\n", payload_size);
+            }
 
             /* Do not allocate needlessly if client-core forgets to reset trailer size on op errors */
             if (op->downcall.status == 0 && op->downcall.trailer_size > 0)
@@ -553,12 +553,12 @@ static ssize_t pvfs2_devreq_writev(
                 */
                 wake_up_interruptible(&op->waitq);
             }
-	}
+        }
     }
     else
     {
         /* ignore downcalls that we're not interested in */
-	gossip_debug(GOSSIP_DEV_DEBUG, "WARNING: No one's waiting for tag %llu\n", llu(tag));
+        gossip_debug(GOSSIP_DEV_DEBUG, "WARNING: No one's waiting for tag %llu\n", llu(tag));
     }
     dev_req_release(buffer);
 
@@ -817,7 +817,7 @@ static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
             return(ret);
         break;
     default:
-	return -ENOIOCTLCMD;
+        return -ENOIOCTLCMD;
     }
     return -ENOIOCTLCMD;
 }
@@ -1076,8 +1076,8 @@ int pvfs2_dev_init(void)
                                       &pvfs2_devreq_file_operations);
     if (pvfs2_dev_major < 0)
     {
-	gossip_debug(GOSSIP_INIT_DEBUG, "Failed to register /dev/%s (error %d)\n",
-		    PVFS2_REQDEVICE_NAME, pvfs2_dev_major);
+        gossip_debug(GOSSIP_INIT_DEBUG, "Failed to register /dev/%s (error %d)\n",
+                    PVFS2_REQDEVICE_NAME, pvfs2_dev_major);
         pvfs2_ioctl32_cleanup();
         return pvfs2_dev_major;
     }
@@ -1095,7 +1095,7 @@ int pvfs2_dev_init(void)
 #endif
 
     gossip_debug(GOSSIP_INIT_DEBUG, "*** /dev/%s character device registered ***\n",
-		PVFS2_REQDEVICE_NAME);
+                PVFS2_REQDEVICE_NAME);
     gossip_debug(GOSSIP_INIT_DEBUG, "'mknod /dev/%s c %d 0'.\n", PVFS2_REQDEVICE_NAME,
                 pvfs2_dev_major);
     return 0;
@@ -1121,13 +1121,8 @@ static unsigned int pvfs2_devreq_poll(
 {
     int poll_revent_mask = 0;
 
-    gossip_debug(GOSSIP_WAIT_DEBUG,"%s:Is daemon in service(%d).\n"
-                                  ,__func__
-                                  ,is_daemon_in_service());
-
     if (open_access_count == 1)
     {
-        gossip_debug(GOSSIP_WAIT_DEBUG,"%s:About to call poll_wait.\n",__func__);
         poll_wait(file, &pvfs2_request_list_waitq, poll_table);
 
         spin_lock(&pvfs2_request_list_lock);
