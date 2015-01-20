@@ -193,6 +193,8 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
+    struct server_configuration_s *server_config = NULL;
+    struct filesystem_configuration_s *fs_config = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_mkdir entered\n");
 
@@ -207,8 +209,9 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) !=
         PVFS_ATTR_SYS_ALL_SETABLE)
     {
-        gossip_lerr("PVFS_isys_mkdir() failure: invalid attributes "
-                    "specified\n");
+        gossip_lerr("PVFS_isys_mkdir() failure: invalid attribute mask %d, "
+                    "expected SYS_ALL_SETABLE (%d)\n",
+                    attr.mask, PVFS_ATTR_SYS_ALL_SETABLE);
         return ret;
     }
 
@@ -236,8 +239,18 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     PVFS_util_copy_sys_attr(&sm_p->u.mkdir.sys_attr, &attr);
     sm_p->u.mkdir.mkdir_resp = resp;
     sm_p->u.mkdir.stored_error_code = 0;
+    sm_p->u.mkdir.retry_count = 0;
 
     sm_p->parent_ref = parent_ref;
+
+    /* V3 need to add config default and dir override ability */
+    server_config = PINT_get_server_config_struct(parent_ref.fs_id);
+    fs_config = PINT_config_find_fs_id(server_config, parent_ref.fs_id);
+    PINT_put_server_config_struct(server_config);
+    sm_p->u.mkdir.metadata_sid_count =
+                            fs_config->metadata_replication_factor;
+    sm_p->u.mkdir.dirdata_sid_count =
+                            fs_config->metadata_replication_factor;
 
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints,
@@ -353,15 +366,16 @@ static PINT_sm_action mkdir_init(struct PINT_smcb *smcb,
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: init\n");
-
     assert((js_p->error_code == 0) ||
            (js_p->error_code == MKDIR_RETRY));
 
+    /* set up to read the attributes of the parent,
+     * which must be a directory
+     */
     PINT_SM_GETATTR_STATE_FILL(
                     sm_p->getattr,
                     sm_p->parent_ref,
-                    (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_HINT |
+                    (PVFS_ATTR_COMMON_NOTIME | PVFS_ATTR_DIR_HINT |
                          PVFS_ATTR_CAPABILITY | PVFS_ATTR_DISTDIR_ATTR), 
                      PVFS_TYPE_DIRECTORY,
                     0);
@@ -381,12 +395,131 @@ static PINT_sm_action mkdir_init(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+/** looks at the attributes of the parent directory and decides if it impacts
+ *  the mkdir in any way
+ */
+static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
+                                                   job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr = NULL;
+    int i;
+    int32_t distr_dir_servers_initial_requested = 0;
+    int32_t distr_dir_servers_max_requested = 0;
+    int32_t distr_dir_split_size_requested = 0;
+    int ret = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: parent_getattr_inspect\n");
+
+    attr = &sm_p->getattr.attr;
+    assert(attr);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+        "parent owner: %d, group: %d, perms: %d, dirdata_count: %d\n",
+        (int)attr->owner, (int)attr->group, (int)attr->perms,
+        attr->u.dir.dist_dir_attr.dirdata_count);
+    for (i = 0; i < attr->u.dir.dist_dir_attr.dirdata_count; i++)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "                           dirdata_handle[%d] = %s\n",
+                     i, PVFS_OID_str(&attr->u.dir.dirdata_handles[i]));
+    }
+
+    /* do we have a setgid bit? */
+    if(attr->perms & PVFS_G_SGID)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "parent has setgid bit set.\n");
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     " - modifying requested attr for new file.\n");
+        sm_p->u.mkdir.sys_attr.group = attr->group;
+        sm_p->u.mkdir.sys_attr.perms |= PVFS_G_SGID;
+        /* note that permission checking is left to server even in this case */
+    }
+
+    /* set values of distributed directory parameters,
+     * priority for determining user's preference for number of data files:
+     * 1) values passed into sys_mkdir
+     * 2) directory hints (not yet implemented)
+     * 3) mount options (not yet implemented)
+     * 4) system default
+     */
+    if (sm_p->u.mkdir.sys_attr.distr_dir_servers_initial > 0)
+    {
+        distr_dir_servers_initial_requested =
+            sm_p->u.mkdir.sys_attr.distr_dir_servers_initial;
+    }
+    else
+    {
+        ; /* TODO ECQ - If we implement a directory hint or mount
+           * option check it here. */
+    }
+    if (sm_p->u.mkdir.sys_attr.distr_dir_servers_max > 0)
+    {
+        distr_dir_servers_max_requested =
+            sm_p->u.mkdir.sys_attr.distr_dir_servers_max;
+    }
+    else
+    {
+        ; /* TODO ECQ - If we implement a directory hint or mount
+           * option check it here. */
+    }
+    if (sm_p->u.mkdir.sys_attr.distr_dir_split_size > 0)
+    {
+        distr_dir_split_size_requested =
+            sm_p->u.mkdir.sys_attr.distr_dir_split_size;
+    }
+    else
+    {
+        ; /* TODO ECQ - If we implement a directory hint or mount
+           * option check it here. */
+    }
+
+    /* Final determination based on config and number of meta
+     * servers present.
+     */
+    ret = PINT_cached_config_get_default_distr_dir_params(
+                             sm_p->parent_ref.fs_id,
+                             distr_dir_servers_initial_requested,
+                             &sm_p->u.mkdir.sys_attr.distr_dir_servers_initial,
+                             distr_dir_servers_max_requested,
+                             &sm_p->u.mkdir.sys_attr.distr_dir_servers_max,
+                             distr_dir_split_size_requested,
+                             &sm_p->u.mkdir.sys_attr.distr_dir_split_size);
+    if (ret < 0)
+    {
+        gossip_err("Error: failed to get distributed directory parameters\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "Setting distributed directory initial "
+                 "servers to %d [requested %d]\n",
+                 sm_p->u.mkdir.sys_attr.distr_dir_servers_initial,
+                 distr_dir_servers_initial_requested);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "Setting distributed directory max "
+                 "servers to %d [requested %d]\n",
+                 sm_p->u.mkdir.sys_attr.distr_dir_servers_max,
+                 distr_dir_servers_max_requested);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "Setting distributed directory split size "
+                 "to %d [requested %d]\n",
+                 sm_p->u.mkdir.sys_attr.distr_dir_split_size,
+                 distr_dir_split_size_requested);
+
+
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * setup message pair for the mkdir request
+ */
 static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                                               job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -395,45 +528,67 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting mkdir req, "
-            "[distr_dir_servers_initial=%d]\n", sm_p->u.mkdir.distr_dir_servers_initial);
+            "[distr_dir_servers_initial=%d]\n", sm_p->u.mkdir.sys_attr.distr_dir_servers_initial);
 
-    /* V3 add the OID and SIDs for this create 
-     * this also sets the correct number of replicants
-     * creating one object
+    /* Allocate OIDs and SIDs for a directory.
+     * There is one OID for the metadata, and n OIDs for the dirdata
+     * and each OID has multiple SIDs.
+     * We send this request to one meta server, which in turn sends it
+     * to the other meta servers.
      */
-    PVFS_OBJ_gen_meta(&sm_p->object_ref, 1, sm_p->parent_ref.fs_id);
-
-    PINT_msgpairarray_init(&sm_p->msgarray_op, sm_p->object_ref.sid_count);
-    msg_p = &sm_p->msgarray_op.msgarray[0];
-
-    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
+    /* V3 TODO - Do we want to skip oid allocation if this
+     *           is a retry?
+     */
+    ret = PVFS_OBJ_gen_dir(sm_p->object_ref.fs_id,
+                           &sm_p->u.mkdir.metadata_handle,
+                           sm_p->u.mkdir.metadata_sid_count, /* in */
+                           &sm_p->u.mkdir.metadata_sid_array,
+                           sm_p->u.mkdir.sys_attr.distr_dir_servers_max, /* in */
+                           &sm_p->u.mkdir.dirdata_handles,
+                           sm_p->u.mkdir.dirdata_sid_count, /* in */
+                           &sm_p->u.mkdir.dirdata_sid_array);
+    if(ret != 0)
     {
-        PINT_SERVREQ_MKDIR_FILL(msg_p->req,
-                                sm_p->getattr.attr.capability,
-                                *sm_p->cred_p,
-                                sm_p->object_ref.fs_id,
-                                sm_p->object_ref.handle, /* object */
-                                sm_p->parent_ref.handle, /* back ptr */
-                                sm_p->parent_ref.sid_array[0],
-                                sm_p->u.mkdir.sys_attr,
-                                sm_p->u.mkdir.distr_dir_servers_initial,
-                                sm_p->u.mkdir.distr_dir_servers_max,
-                                sm_p->u.mkdir.distr_dir_split_size,
-                                sm_p->u.mkdir.layout,
-                                sm_p->hints);
+        gossip_err("Failed to generate OIDs and SIDs for new directory\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
 
-        msg_p->msgclass = PVFS_IO_METADATA;
-        msg_p->msgdir = PVFS_IO_WRITE;
-        msg_p->fs_id = sm_p->parent_ref.fs_id;
-        msg_p->handle = sm_p->object_ref.handle;
-        /* V3 this assumes fan out from client */
-        msg_p->sid_count = 1;
-        msg_p->sid_index = 0;
-        msg_p->sid_array = &sm_p->object_ref.sid_array[i];
-        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
-        msg_p->comp_fn = mkdir_msg_comp_fn;
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
 
-        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+    PINT_SERVREQ_MKDIR_FILL(msg_p->req,
+                            sm_p->getattr.attr.capability,
+                            *sm_p->cred_p,
+                            sm_p->u.mkdir.sys_attr,
+                            sm_p->object_ref.fs_id,
+                            *sm_p->u.mkdir.metadata_handle, /* object */
+                            sm_p->u.mkdir.metadata_sid_count,
+                            sm_p->u.mkdir.metadata_sid_array,
+                            &sm_p->parent_ref.handle, /* back ptr */
+                            sm_p->parent_ref.sid_array,
+                            sm_p->u.mkdir.dirdata_count,
+                            sm_p->u.mkdir.dirdata_handles,
+                            sm_p->u.mkdir.dirdata_sid_count,
+                            sm_p->u.mkdir.dirdata_sid_array,
+                            sm_p->hints);
+
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
+    msg_p->fs_id = sm_p->parent_ref.fs_id;
+    msg_p->handle = *sm_p->u.mkdir.metadata_handle;
+    /* V3 this assumes fan out from client */
+    msg_p->sid_count = sm_p->u.mkdir.metadata_sid_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = sm_p->u.mkdir.metadata_sid_array;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = mkdir_msg_comp_fn;
+
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
     }
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
@@ -487,7 +642,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "hooking dirent %s (%s) under "
                  "parent handle %s, dirdata_handle %s with server_no=%d\n",
                  sm_p->u.mkdir.object_name,
-                 PVFS_OID_str(&sm_p->u.mkdir.metafile_handle),
+                 PVFS_OID_str(sm_p->u.mkdir.metadata_handle),
                  PVFS_OID_str(&sm_p->object_ref.handle),
                  PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
                                                   dirdata_server_index]),
@@ -663,6 +818,8 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
 
     PVFS_util_release_sys_attr(&sm_p->u.mkdir.sys_attr);
     PINT_free_object_attr(&sm_p->getattr.attr);
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->u.mkdir.metadata_getattr);
     
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
@@ -714,70 +871,13 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
     return SM_ACTION_TERMINATE;
 }
 
-/** looks at the attributes of the parent directory and decides if it impacts
- *  the mkdir in any way
- */
-static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
-                                                   job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *attr = NULL;
-    int i;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: parent_getattr_inspect\n");
-
-    attr = &sm_p->getattr.attr;
-    assert(attr);
-
-    /* !!! change later */
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-        "parent owner: %d, group: %d, perms: %d, dirdata_count: %d\n",
-        (int)attr->owner, (int)attr->group, (int)attr->perms,
-        attr->u.dir.dist_dir_attr.dirdata_count);
-    for (i = 0; i < attr->u.dir.dist_dir_attr.dirdata_count; i++)
-    {
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "                           dirdata_handle[%d] = %s\n",
-                     i, PVFS_OID_str(&attr->u.dir.dirdata_handles[i]));
-    }
-
-    /* do we have a setgid bit? */
-    if(attr->perms & PVFS_G_SGID)
-    {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "parent has setgid bit set.\n");
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     " - modifying requested attr for new file.\n");
-        sm_p->u.mkdir.sys_attr.group = attr->group;
-        sm_p->u.mkdir.sys_attr.perms |= PVFS_G_SGID;
-        /* note that permission checking is left to server even in this case */
-    }
-
-    /* set value of num_dirent_files,
-     * not considering parent_# since it doesn't have direct relation.
-     * here, if user has inputs, send it, otherwise, send 0. 
-     * on server side, if met 0, use config_file data,
-     * otherwise use user set value   */
-
-    /* get command line value of NumDirdata from sys_attr */
-    sm_p->u.mkdir.distr_dir_servers_initial =
-        sm_p->u.mkdir.sys_attr.distr_dir_servers_initial;
-    sm_p->u.mkdir.distr_dir_servers_max = 
-        sm_p->u.mkdir.sys_attr.distr_dir_servers_max;
-    sm_p->u.mkdir.distr_dir_split_size =
-        sm_p->u.mkdir.sys_attr.distr_dir_split_size;
-
-
-    /* note: if select less # of dirdata servers, need to modify getattr, etc. to contact only active servers, not all dirdata servers */
-
-    return SM_ACTION_COMPLETE;
-}
 
 static PINT_sm_action mkdir_getattr_setup(struct PINT_smcb *smcb,
                                           job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_SM_GETATTR_STATE_FILL(sm_p->u.mkdir.metafile_getattr,
+    PINT_SM_GETATTR_STATE_FILL(sm_p->u.mkdir.metadata_getattr,
                                sm_p->object_ref,
                                PVFS_ATTR_CAPABILITY, 
                                PVFS_TYPE_DIRECTORY,
@@ -905,7 +1005,7 @@ static PINT_sm_action mkdir_seteattr_setup_msgpair(struct PINT_smcb *smcb,
     msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_SETEATTR_FILL(msg_p->req,
-                               sm_p->u.mkdir.metafile_getattr.attr.capability,
+                               sm_p->u.mkdir.metadata_getattr.attr.capability,
                                sm_p->object_ref.fs_id,
                                sm_p->object_ref.handle,
                                sm_p->object_ref.sid_count,

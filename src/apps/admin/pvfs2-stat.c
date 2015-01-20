@@ -89,7 +89,7 @@ int main(int argc, char **argv)
       return(-1);
    }
    
-    /* Allocate enough space to hold file system id for each directory */
+   /* Allocate enough space to hold file system id for each directory */
    pfs_id = (PVFS_fs_id *)calloc(user_opts.nNumFiles, sizeof(PVFS_fs_id));
    
    if(pfs_id == NULL)
@@ -97,7 +97,7 @@ int main(int argc, char **argv)
       fprintf(stderr, "Unable to allocate memory\n");
       return(-1);
    }
-   
+
    
    for(i = 0; i < user_opts.nNumFiles; i++)
    {
@@ -129,6 +129,11 @@ int main(int argc, char **argv)
          fprintf(stderr, "Error: could not find file system for %s\n", 
                  user_opts.pszFiles[i]);
          return(-1);
+      }
+      
+      if ( strlen(ppszPvfsPath[i]) == 0 )
+      {
+         memcpy(ppszPvfsPath[i],"/",strlen("/"));
       }
    }
 
@@ -235,8 +240,13 @@ static int do_stat(const char             * pszFile,
       return -1;
    }
 
+   if (opts->nVerbose)
+   {
+      fprintf(stderr, "PVFS_sys_lookup call on (%s)\n",pszRelativeFile);
+   }
+
    ref = lk_response.ref;
-   
+
    ret = PVFS_sys_getattr(ref, 
                           PVFS_ATTR_SYS_ALL_NOHINT,
                           credentials, 
@@ -248,6 +258,7 @@ static int do_stat(const char             * pszFile,
       PVFS_perror("PVFS_sys_getattr", ret);
       return -1;
    }
+
 
    /* Display the attributes for the file */
    print_stats(&ref,
@@ -399,7 +410,7 @@ void print_stats(const PVFS_object_ref * ref,
    fprintf(stdout, "  Relative Name : %s\n",  pszRelativeName);
    fprintf(stdout, "  fs ID         : %d\n",  ref->fs_id);
    fprintf(stdout, "  Handle        : %s\n",  PVFS_OID_str(&ref->handle));
-   fprintf(stdout, "  Mask          : %o\n",  attr->mask);
+   fprintf(stdout, "  Mask          : %x\n",  attr->mask);
    if(attr->mask & PVFS_ATTR_SYS_PERM)
    {
       fprintf(stdout, "  Permissions   : %o\n",  attr->perms);
@@ -437,11 +448,32 @@ void print_stats(const PVFS_object_ref * ref,
       {
          fprintf(stdout, "  Size          : 4096\n");
       }
-      else
+      else 
       {
          fprintf(stdout, "  Size          : %lld\n",      lld(attr->size));
       }
 
+   }
+   else
+   {  /* a size wasn't returned by getattr */
+      switch (attr->objtype)
+      {
+         case PVFS_TYPE_DIRECTORY:
+         {
+            fprintf(stdout, "  Size          : 4096\n");
+            break;
+         }
+         case PVFS_TYPE_METAFILE:
+         {
+            fprintf(stdout, "  Size          : none (datafiles not yet created)\n");
+            break;
+         }
+         default:
+         {
+            fprintf(stdout, "  Size          : none\n");
+            break;
+         }
+      }/*end switch*/
    }
    if(attr->mask & PVFS_ATTR_SYS_UID)
    {

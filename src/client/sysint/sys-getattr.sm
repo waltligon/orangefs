@@ -619,29 +619,37 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
          * individual handle, then we must invalidate the size array
          * and return an error code.
          */
-        for (i = 0; i < resp_p->u.tree_get_file_size.handle_count; i++)
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG
-                         ,"%s: error[%d]:%d\tsize[%d]:%d\n"
-                         ,__func__
-                         ,i
-                         ,(int)resp_p->u.tree_get_file_size.error[i]
-                         ,i
-                         ,(int)resp_p->u.tree_get_file_size.size[i]);
+   gossip_debug(GOSSIP_GETATTR_DEBUG,"%s:handle_count(%u)\n",__func__
+                                                            ,resp_p->u.tree_get_file_size.handle_count);
 
-            if (resp_p->u.tree_get_file_size.error[i] != 0)
-            {
-                gossip_debug(GOSSIP_GETATTR_DEBUG
-                             ,"%s: error[%d] is %d\n"
-                             ,__func__
-                             ,i
-                             ,resp_p->u.tree_get_file_size.error[i]);
-                memset(getattr->size_array, 0, sizeof(*getattr->size_array));
-                return (resp_p->u.tree_get_file_size.error[i]);
-            }
+   getattr->size = 0;
+   for (i = 0; i < resp_p->u.tree_get_file_size.handle_count; i++)
+   {
+       gossip_debug(GOSSIP_GETATTR_DEBUG
+                    ,"%s: error[%d]:%d\tsize[%d]:%d\n"
+                    ,__func__
+                    ,i
+                    ,(int)resp_p->u.tree_get_file_size.error[i]
+                    ,i
+                    ,(int)resp_p->u.tree_get_file_size.size[i]);
 
-            getattr->size_array[i] = resp_p->u.tree_get_file_size.size[i];
-        } /* end for */
+       if (resp_p->u.tree_get_file_size.error[i] != 0)
+       {
+           gossip_debug(GOSSIP_GETATTR_DEBUG
+                        ,"%s: error[%d] is %d\n"
+                        ,__func__
+                        ,i
+                        ,resp_p->u.tree_get_file_size.error[i]);
+           memset(getattr->size_array, 0, sizeof(*getattr->size_array));
+           getattr->size = 0;
+           return (resp_p->u.tree_get_file_size.error[i]);
+       }
+
+       getattr->size_array[i] = resp_p->u.tree_get_file_size.size[i];
+       getattr->size += getattr->size_array[i];
+   } /* end for */
+
+   getattr->attr.mask |= PVFS_ATTR_DATA_SIZE;
 
 #if 0
     } /* end if */
@@ -1169,6 +1177,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     int i = 0;
     PVFS_handle *handles;
 #endif
+
     PVFS_capability capability;
 
     gossip_debug(GOSSIP_MIRROR_DEBUG,
@@ -1186,6 +1195,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
 
     attr = &sm_p->getattr.attr;
     assert(attr);
+
 
     /* Note: permission not required for tree_get_file_size op */
     PINT_null_capability(&capability);
@@ -1692,7 +1702,9 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
     }
 
 
-    /* find out active dirdata handles */
+    /* find out active dirdata handles. (active refers to dirdata handles
+     * having directory entries) 
+     */
     tmp_index = 0;
     for(i = 0; i < attr->u.dir.dist_dir_attr.dirdata_count; i++)
     {
@@ -1727,6 +1739,8 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
                      PVFS_OID_str(&attr->u.dir.dirdata_handles[cur_index]),
                      sm_p->getattr.object_ref.fs_id);
             
+
+
         PINT_SERVREQ_GETATTR_FILL(
                     msg_p->req,
                     capability,
@@ -1786,6 +1800,9 @@ static int getattr_dirdata_getattr_comp_fn(void *v_p,
     PVFS_object_attr *resp_attr_p = NULL;
     int cur_index;
 
+    /*NOTE: The getattr response is of type PVFS_TYPE_DIRDATA, so we should be
+     *      looking in the dirdata structure, not the dir structure, for values.
+     */ 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "getattr_dirdata_getattr_comp_fn called\n");
     gossip_debug(GOSSIP_CLIENT_DEBUG, "dirdata getattr[%d] got response %d\n",
@@ -1803,7 +1820,6 @@ static int getattr_dirdata_getattr_comp_fn(void *v_p,
     cur_index = sm_p->getattr.active_dirdata_index[index];
 
     assert(resp_attr_p->objtype == PVFS_TYPE_DIRDATA);
-    /* also assert timestamp? */
     assert(resp_attr_p->mask & PVFS_ATTR_DIR_DIRENT_COUNT);
     assert( (cur_index >= 0) &&
             (cur_index < attr_p->u.dir.dist_dir_attr.dirdata_count));
@@ -1812,23 +1828,31 @@ static int getattr_dirdata_getattr_comp_fn(void *v_p,
             "dirdata getattr[%d] (#[%d]) returns attrs: "
             "[dirent_count=%llu, atime = %llu, mtime = %llu, ctime = %llu]\n",
             index, cur_index,
-            llu(resp_attr_p->u.dir.dirent_count),
+            llu(resp_attr_p->u.dirdata.dirent_count),
             llu(resp_attr_p->atime),
             llu(resp_attr_p->mtime),
             llu(resp_attr_p->ctime));
 
     /* update timestamp and dirent_count */
-    sm_p->getattr.size_array[cur_index] = resp_attr_p->u.dir.dirent_count;
-    attr_p->u.dir.dirent_count += resp_attr_p->u.dir.dirent_count;
+    sm_p->getattr.size_array[cur_index] = resp_attr_p->u.dirdata.dirent_count;
 
-    /* Flipping on PVFS_ATTR_DIR_DIRENT_COUNT here is required for acache
-     * functionalilty. */
-    attr_p->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
-    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "%s: dirent_count = %lld\n",
-                 __func__,
-                 lld(attr_p->u.dir.dirent_count));
+    /* we are adding the directory entry count from the DIRDATA object to the
+     * total directory entry count.  A directory may have several DIRDATA objects,
+     * so we must combine each directory entry count from each DIRDATA object in
+     * order to calculate the total number of entries in a directory.
+     */
+    attr_p->u.dir.dirent_count += resp_attr_p->u.dirdata.dirent_count;
 
+    /* If we have a non-zero dirent count, then make sure other function calls know
+     * that we have a valid dirent count by setting the DIRENT_COUNT bit in the
+     * attribute mask.
+     */
+    if ( resp_attr_p->u.dirdata.dirent_count != 0 )
+    {
+       attr_p->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
+    }
+
+    /* Reset times if they are newer than the ones we already have. */
     if(attr_p->atime < resp_attr_p->atime)
     {   
         attr_p->atime = resp_attr_p->atime;
@@ -2115,13 +2139,13 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
     attr = &sm_p->getattr.attr;
     assert(attr);
     
+
     /* If we get to this state action, 
      * the getattr state machine was invoked, so
      * we can assume that one of the PVFS_[i]sys_getattr functions
      * was called, and the response field must be filled in for the
      * user.
      */
-
     sysresp = sm_p->u.getattr.getattr_resp_p;
     
     /*
@@ -2130,6 +2154,7 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
      * the PVFS_sys_attr object.  The caller of PVFS_[i]sys_getattr
      * must free it.
      */
+
     if(attr->objtype == PVFS_TYPE_SYMLINK &&
        attr->mask & PVFS_ATTR_SYMLNK_TARGET)
     {
@@ -2150,7 +2175,7 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
         /* Copy if there are any special object specific flags */
         sysresp->attr.flags = attr->u.meta.hint.flags;
         /* special case for when users ask for dfile count */
-        if (sm_p->getattr.req_attrmask & PVFS_ATTR_META_DFILES)
+        if (attr->mask & PVFS_ATTR_META_DFILES)
         {
             sysresp->attr.dfile_count = attr->u.meta.dfile_count;
         }
@@ -2175,7 +2200,7 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
         sysresp->attr.dfile_count = attr->u.dir.hint.dfile_count;
         /* 
          * If we retrieved any extended attributes for the directory
-         * in question, the caller's responsibility to free it up
+         * in question, it is the caller's responsibility to free it up
          */
         if (attr->u.dir.hint.dist_name_len > 0 && 
             (sm_p->getattr.req_attrmask & PVFS_ATTR_DIR_HINT))
@@ -2209,25 +2234,26 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
     }
 
     /* copy outgoing sys_attr fields from returned object_attr */
-    sysresp->attr.owner = attr->owner;
-    sysresp->attr.group = attr->group;
-    sysresp->attr.perms = attr->perms;
-    sysresp->attr.atime = attr->atime;
-    sysresp->attr.mtime = attr->mtime;
-    sysresp->attr.ctime = attr->ctime;
-    sysresp->attr.ntime = attr->ntime;
-    /* this is done below - WBL */
-    /*sysresp->attr.mask  = PVFS_util_object_to_sys_attr_mask(attr->mask);*/
+    sysresp->attr.owner   = attr->owner;
+    sysresp->attr.group   = attr->group;
+    sysresp->attr.perms   = attr->perms;
+    sysresp->attr.atime   = attr->atime;
+    sysresp->attr.mtime   = attr->mtime;
+    sysresp->attr.ctime   = attr->ctime;
+    sysresp->attr.ntime   = attr->ntime;
+    sysresp->attr.objtype = attr->objtype;
+
     sysresp->attr.mask  = 0;
     sysresp->attr.size  = 0;
-    sysresp->attr.objtype = attr->objtype;
 
     if (js_p->error_code == 0)
     {
+
         /* convert outgoing attribute mask based on what we got */
         sysresp->attr.mask = PVFS_util_object_to_sys_attr_mask(attr->mask);
 
-        if (sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
+
+        if (attr->mask & PVFS_ATTR_DATA_SIZE)
         {
             if( attr->objtype == PVFS_TYPE_DATAFILE )
             {
@@ -2250,20 +2276,29 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
                                                   attr->u.meta.dfile_count);
             sysresp->attr.mask |= PVFS_ATTR_SYS_BLKSIZE;
         }
+        else
+        {
+            /* we can't return the blocksize */
+            /* unfortunately, PVFS_util_object_to_sys_attr_mask adds PVFS_ATTR_SYS_BLKSIZE to
+             * the mask by checking only for the meta distribution and not both the meta
+             * distribution and dfile count.  So, we have to remove it.
+             */
+            sysresp->attr.mask &= (~PVFS_ATTR_SYS_BLKSIZE);
+        }
 
         /* if this is a symlink, add the link target */
-        if (sm_p->getattr.req_attrmask & PVFS_ATTR_SYMLNK_TARGET)
+        if (attr->mask & PVFS_ATTR_SYMLNK_TARGET)
         {
             sysresp->attr.mask |= PVFS_ATTR_SYS_LNK_TARGET;
         }
 
-        if(sm_p->getattr.req_attrmask & PVFS_ATTR_DIR_DIRENT_COUNT)
+        if(attr->mask & PVFS_ATTR_DIR_DIRENT_COUNT)
         {
             sysresp->attr.dirent_count = attr->u.dir.dirent_count;
             sysresp->attr.mask |= PVFS_ATTR_SYS_DIRENT_COUNT;
         }
 
-        if (sm_p->getattr.req_attrmask & PVFS_ATTR_DISTDIR_ATTR)
+        if (attr->mask & PVFS_ATTR_DISTDIR_ATTR)
         {
             sysresp->attr.distr_dir_servers_max =
                                 attr->u.dir.dist_dir_attr.dirdata_count;

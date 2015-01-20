@@ -115,14 +115,13 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 43 */ {PVFS_SERV_MGMT_GET_UID, &pvfs2_uid_mgmt_params},
     /* 44 */ {PVFS_SERV_TREE_SETATTR, &pvfs2_tree_setattr_params},
     /* 45 */ {PVFS_SERV_MGMT_GET_DIRENT, &pvfs2_mgmt_get_dirent_params},
-    /* 46 */ {PVFS_SERV_MGMT_CREATE_ROOT_DIR, &pvfs2_mgmt_create_root_dir_params},
-    /* 47 */ {PVFS_SERV_MGMT_SPLIT_DIRENT, &pvfs2_mgmt_split_dirent_params},
-    /* 48 */ {PVFS_SERV_ATOMICEATTR, &pvfs2_atomic_eattr_params},
-    /* 49 */ {PVFS_SERV_GET_CONFIG, &pvfs2_server_get_config_params},
-    /* 50 */ {PVFS_SERV_TREE_GETATTR, &pvfs2_tree_getattr_params},
+    /* 46 */ {PVFS_SERV_MGMT_SPLIT_DIRENT, &pvfs2_mgmt_split_dirent_params},
+    /* 47 */ {PVFS_SERV_ATOMICEATTR, &pvfs2_atomic_eattr_params},
+    /* 48 */ {PVFS_SERV_GET_CONFIG, &pvfs2_server_get_config_params},
+    /* 49 */ {PVFS_SERV_TREE_GETATTR, &pvfs2_tree_getattr_params},
 #ifdef ENABLE_SECURITY_CERT
-    /* 51 */ {PVFS_SERV_MGMT_GET_USER_CERT, &pvfs2_get_user_cert_params},
-    /* 52 */ {PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, &pvfs2_get_user_cert_keyreq_params}
+    /* 50 */ {PVFS_SERV_MGMT_GET_USER_CERT, &pvfs2_get_user_cert_params},
+    /* 51 */ {PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, &pvfs2_get_user_cert_keyreq_params}
 #else
     /* 50 */ {PVFS_SERV_MGMT_GET_USER_CERT, NULL},
     /* 51 */ {PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, NULL}

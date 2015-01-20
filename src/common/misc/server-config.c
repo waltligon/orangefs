@@ -3910,8 +3910,16 @@ DOTCONF_CB(distr_dir_servers_initial)
 {
     struct server_configuration_s *config_s =
         (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
 
-    config_s->distr_dir_servers_initial = cmd->data.value;
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    fs_conf->default_distr_dir_servers_initial = cmd->data.value;
+    if(fs_conf->default_distr_dir_servers_initial <= 0)
+    {
+        return("Error DistrDirServersInitial must be positive.\n");
+    }
 
     return NULL;
 }
@@ -3920,8 +3928,16 @@ DOTCONF_CB(distr_dir_servers_max)
 {
     struct server_configuration_s *config_s =
             (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
 
-    config_s->distr_dir_servers_max = cmd->data.value;
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    fs_conf->default_distr_dir_servers_max = cmd->data.value;
+    if(fs_conf->default_distr_dir_servers_max <= 0)
+    {
+        return("Error DistrDirServersMax must be positive.\n");
+    }
 
     return NULL;
 }
@@ -3930,12 +3946,19 @@ DOTCONF_CB(distr_dir_split_size)
 {
     struct server_configuration_s *config_s =
             (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
 
-    config_s->distr_dir_split_size = cmd->data.value;
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    fs_conf->default_distr_dir_split_size = cmd->data.value;
+    if(fs_conf->default_distr_dir_split_size <= 0)
+    {
+        return("Error DistrDirSplitSize must be positive.\n");
+    }
 
     return NULL;
 }
-
 
 /*
  * Function: PINT_config_release
