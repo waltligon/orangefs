@@ -202,6 +202,7 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
                                   attr->u.meta.sid_count,
                                   attr->u.meta.sid_array,
                                   sm_p->hints);
+
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->object_ref.fs_id;
