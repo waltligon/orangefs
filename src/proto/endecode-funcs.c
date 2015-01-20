@@ -63,6 +63,25 @@ void decode_func_string(char **pptr, void *x)
     decode_string(pptr, (char **)x);
 }
 
+void encode_func_handle(char **pptr, void *x)
+{
+    encode_PVFS_handle(pptr, (char **)x);
+}
+
+void decode_func_handle(char **pptr, void *x)
+{
+    decode_PVFS_handle(pptr, (char **)x);
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
 /*
  * Local variables:
  *  mode: c

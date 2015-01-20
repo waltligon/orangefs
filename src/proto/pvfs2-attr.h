@@ -111,7 +111,7 @@
 
 #define PVFS_ATTR_META_ALL                             \
         (PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES | \
-        PVFS_ATTR_META_MIRROR_DFILES)
+        PVFS_ATTR_META_MIRROR_DFILES | PVFS_ATTR_COMMON_ALL)
 
 #define PVFS_ATTR_META_UNSTUFFED     (1 << 13)
 
@@ -120,14 +120,13 @@
 #define PVFS_ATTR_DATA_SIZE          (1 << 20)   /* replace with latest bit */
 
 #define PVFS_ATTR_DATA_ALL \
-                (PVFS_ATTR_DATA_SIZE | PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_MTIME | \
-              PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_NTIME | PVFS_ATTR_COMMON_TYPE)
+             (PVFS_ATTR_DATA_SIZE | PVFS_ATTR_TIME_ALL)
 
 /* internal attribute masks for symlink objects */
 #define PVFS_ATTR_SYMLNK_TARGET      (1 << 24)
 
 #define PVFS_ATTR_SYMLNK_ALL \
-             PVFS_ATTR_SYMLNK_TARGET
+             (PVFS_ATTR_SYMLNK_TARGET | PVFS_ATTR_COMMON_ALL)
 
 /* internal attribute masks for directory objects */
 #define PVFS_ATTR_DIR_DIRENT_COUNT   (1 << 26)   /* replace with latest bit */
@@ -136,11 +135,11 @@
 
 #define PVFS_ATTR_DIR_ALL \
              (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT | \
-              PVFS_ATTR_DIR_DIRDATA | PVFS_ATTR_DISTDIR_ATTR)
+              PVFS_ATTR_DIR_DIRDATA | PVFS_ATTR_DISTDIR_ATTR | \
+              PVFS_ATTR_COMMON_ALL)
 
 #define PVFS_ATTR_DIRDATA_ALL \
-             (PVFS_ATTR_DIR_DIRENT_COUNT | \
-              PVFS_ATTR_DIR_DIRDATA | PVFS_ATTR_DISTDIR_ATTR)
+             (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_TIME_ALL)
 
 /* internal attribute mask for distributed directory information */
 /* this may be in the meta or dirdata area depending on objtype */
@@ -206,29 +205,6 @@ typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 
-#if 0
-#define encode_PVFS_metafile_attr(pptr,x)                               \
-do {                                                                    \
-    int dfiles_i, sid_i;                                                \
-    encode_PINT_dist(pptr, &(x)->dist);                                 \
-    encode_uint32_t(pptr, &(x)->mirror_mode);                           \
-    encode_uint32_t(pptr, &(x)->stuffed);                               \
-    encode_uint32_t(pptr, &(x)->stuffed_size);                          \
-    encode_uint32_t(pptr, &(x)->dfile_count);                           \
-    encode_uint32_t(pptr, &(x)->sid_count);                             \
-    encode_skip4(pptr,);                                                \
-    for (dfiles_i = 0; dfiles_i < (x)->dfile_count; dfiles_i++)         \
-    {                                                                   \
-        encode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);          \
-    }                                                                   \
-    for (sid_i = 0; sid_i < (x)->dfile_count * (x)->sid_count; sid_i++) \
-    {                                                                   \
-        encode_PVFS_SID(pptr, &(x)->sid_array[sid_i]);                  \
-    }                                                                   \
-    encode_PVFS_metafile_hint(pptr, &(x)->hint);                        \
-} while (0)
-#endif
-
 static inline void encode_PVFS_metafile_attr(char **pptr,
                                              const PVFS_metafile_attr *x)
 {
@@ -258,32 +234,6 @@ static inline void encode_PVFS_metafile_attr(char **pptr,
 /* This decodes OIDs and SIDs into a contiguous array to make it easier
  * to write to the database
  */
-#if 0
-#define decode_PVFS_metafile_attr(pptr,x)                               \
-do {                                                                    \
-    int dfiles_i, sid_i;                                                \
-    decode_PINT_dist(pptr, &(x)->dist);                                 \
-    (x)->dist_size = PINT_DIST_PACK_SIZE((x)->dist);                    \
-    decode_uint32_t(pptr, &(x)->mirror_mode);                           \
-    decode_uint32_t(pptr, &(x)->stuffed);                               \
-    decode_uint32_t(pptr, &(x)->stuffed_size);                          \
-    decode_uint32_t(pptr, &(x)->dfile_count);                           \
-    decode_uint32_t(pptr, &(x)->sid_count);                             \
-    decode_skip4(pptr,);                                                \
-    (x)->dfile_array = decode_malloc(                                   \
-                       OSASZ((x)->dfile_count, (x)->sid_count));        \
-    (x)->sid_array = (PVFS_SID *)&((x)->dfile_array[(x)->dfile_count]); \
-    for (dfiles_i = 0; dfiles_i < (x)->dfile_count; dfiles_i++)         \
-    {                                                                   \
-	decode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);          \
-    }                                                                   \
-    for (sid_i = 0; sid_i < (x)->dfile_count * (x)->sid_count; sid_i++) \
-    {                                                                   \
-	decode_PVFS_SID(pptr, &(x)->sid_array[sid_i]);                  \
-    }                                                                   \
-    decode_PVFS_metafile_hint(pptr, &(x)->hint);                        \
-} while (0)
-#endif
 
 static inline void decode_PVFS_metafile_attr(char **pptr,
                                              PVFS_metafile_attr *x)
@@ -377,33 +327,6 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 
-#if 0
-#define encode_PVFS_directory_attr(pptr, x)                                   \
-do {                                                                          \
-    int index_i;                                                              \
-    encode_PVFS_size(pptr, &(x)->dirent_count);                               \
-    encode_PVFS_directory_hint(pptr, &(x)->hint);                             \
-    encode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);                     \
-    for (index_i = 0; index_i < (x)->dist_dir_attr.bitmap_size; index_i++)    \
-    {                                                                         \
-        encode_PVFS_dist_dir_bitmap_basetype(pptr,                            \
-                                             &(x)->dist_dir_bitmap[index_i]); \
-    }                                                                         \
-    align8(pptr);                                                             \
-    for (index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count; index_i++)  \
-    {                                                                         \
-        encode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);             \
-    }                                                                         \
-    for (index_i = 0;                                                         \
-         index_i < (x)->dist_dir_attr.dirdata_count *                         \
-                   (x)->dist_dir_attr.sid_count;                              \
-         index_i++)                                                           \
-    {                                                                         \
-        encode_PVFS_SID(pptr, &(x)->dirdata_sids[index_i]);                   \
-    }                                                                         \
-} while(0)
-#endif
-
 static inline void encode_PVFS_directory_attr(char **pptr,
                                               const PVFS_directory_attr *x)
 {
@@ -437,36 +360,6 @@ static inline void encode_PVFS_directory_attr(char **pptr,
 /* This decodes OIDs and SIDs into a contiguous array to make it easier
  * to write to the database
  */
-#if 0
-#define decode_PVFS_directory_attr(pptr, x) do {                              \
-    int index_i;                                                              \
-    decode_PVFS_size(pptr, &(x)->dirent_count);                               \
-    decode_PVFS_directory_hint(pptr, &(x)->hint);                             \
-    decode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);                     \
-    (x)->dist_dir_bitmap = decode_malloc((x)->dist_dir_attr.bitmap_size *     \
-                                      sizeof(PVFS_dist_dir_bitmap_basetype)); \
-    for(index_i = 0; index_i < (x)->dist_dir_attr.bitmap_size; index_i++)     \
-    {                                                                         \
-        decode_PVFS_dist_dir_bitmap_basetype(pptr,                            \
-                                             &(x)->dist_dir_bitmap[index_i]); \
-    }                                                                         \
-    align8(pptr);                                                             \
-    (x)->dirdata_handles = decode_malloc(OSASZ(                               \
-                                        (x)->dist_dir_attr.dirdata_count,     \
-                                        (x)->dist_dir_attr.sid_count));       \
-    (x)->dirdata_sids =                                                       \
-         (PVFS_SID *)&(x)->dirdata_handles[(x)->dist_dir_attr.dirdata_count]; \
-    for(index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count; index_i++)   \
-    {                                                                         \
-        decode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);             \
-    }                                                                         \
-    for(index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count *             \
-                               (x)->dist_dir_attr.sid_count; index_i++)       \
-    {                                                                         \
-        decode_PVFS_SID(pptr, &(x)->dirdata_sids[index_i]);                   \
-    }                                                                         \
-} while(0)
-#endif
 
 static inline void decode_PVFS_directory_attr(char **pptr,
                                               PVFS_directory_attr *x)
@@ -529,31 +422,6 @@ typedef struct PVFS_dirdata_attr_s PVFS_dirdata_attr;
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 
-#if 0
-#define encode_PVFS_dirdata_attr(pptr, x)                                     \
-do {                                                                          \
-    int index_i;                                                              \
-    encode_PVFS_size(pptr, &(x)->dirent_count);                               \
-    /* void ptr not encoded or decoded */                                     \
-    encode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);                     \
-    for (index_i = 0; index_i<(x)->dist_dir_attr.bitmap_size; index_i++)      \
-    {                                                                         \
-        encode_PVFS_dist_dir_bitmap_basetype(pptr,                            \
-                                             &(x)->dist_dir_bitmap[index_i]); \
-    }                                                                         \
-    align8(pptr);                                                             \
-    for (index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count; index_i++)  \
-    {                                                                         \
-        encode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);             \
-    }                                                                         \
-    for (index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count *            \
-                                (x)->dist_dir_attr.sid_count; index_i++)      \
-    {                                                                         \
-        encode_PVFS_SID(pptr, &(x)->dirdata_sids[index_i]);                   \
-    }                                                                         \
-} while(0)
-#endif
-
 static inline void encode_PVFS_dirdata_attr(char **pptr,
                                             const PVFS_dirdata_attr *x)
 {
@@ -587,38 +455,6 @@ static inline void encode_PVFS_dirdata_attr(char **pptr,
 /* This decodes OIDs and SIDs into a contiguous array to make it easier
  * to write to the database
  */
-
-#if 0
-#define decode_PVFS_dirdata_attr(pptr, x)                                     \
-do {                                                                          \
-    int index_i;                                                              \
-    decode_PVFS_size(pptr, &(x)->dirent_count);                               \
-    /* void ptr not encoded or decoded */                                     \
-    decode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);                     \
-    (x)->dist_dir_bitmap = decode_malloc((x)->dist_dir_attr.bitmap_size *     \
-                                     sizeof(PVFS_dist_dir_bitmap_basetype));  \
-    for(index_i = 0; index_i < (x)->dist_dir_attr.bitmap_size; index_i++)     \
-    {                                                                         \
-        decode_PVFS_dist_dir_bitmap_basetype(pptr,                            \
-                                             &(x)->dist_dir_bitmap[index_i]); \
-    }                                                                         \
-    align8(pptr);                                                             \
-    (x)->dirdata_handles = decode_malloc(OSASZ(                               \
-                                        (x)->dist_dir_attr.dirdata_count,     \
-                                        (x)->dist_dir_attr.sid_count));       \
-    (x)->dirdata_sids =                                                       \
-         (PVFS_SID *)&(x)->dirdata_handles[(x)->dist_dir_attr.dirdata_count]; \
-    for(index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count; index_i++)   \
-    {                                                                         \
-        decode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);             \
-    }                                                                         \
-    for(index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count *             \
-                               (x)->dist_dir_attr.sid_count; index_i++)       \
-    {                                                                         \
-        decode_PVFS_SID(pptr, &(x)->dirdata_sids[index_i]);                   \
-    }                                                                         \
-} while(0)
-#endif
 
 static inline void decode_PVFS_dirdata_attr(char **pptr,
                                             PVFS_dirdata_attr *x)

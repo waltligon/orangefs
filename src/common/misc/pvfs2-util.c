@@ -2293,6 +2293,14 @@ uint32_t PVFS_util_sys_to_object_attr_mask(uint32_t sys_attrmask)
     {
         attrmask |= PVFS_ATTR_CAPABILITY;
     }
+    if(sys_attrmask & PVFS_ATTR_SYS_FASTEST)
+    {
+        attrmask |= PVFS_ATTR_FASTEST;
+    }
+    else
+    {
+        attrmask |= PVFS_ATTR_LATEST;  /* default */
+    }
     if(sys_attrmask & PVFS_ATTR_SYS_UID)
     {
         attrmask |= PVFS_ATTR_COMMON_UID;

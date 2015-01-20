@@ -87,7 +87,6 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   PVFS_object_ref parent_ref;
   PVFS_credential credentials;
   PVFS_sysresp_getattr resp_getattr;
-  PVFS_sys_attr old_attr;
   PVFS_sys_attr new_attr;
   uint32_t attrmask;
   /* translate local path into pvfs2 relative path */
@@ -174,6 +173,7 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
   attrmask = (PVFS_ATTR_SYS_ALL_SETABLE);
     
+#if 0
   ret = PVFS_sys_getattr(resp_lookup.ref,
                          attrmask,
                          &credentials,
@@ -184,8 +184,10 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
     PVFS_perror("PVFS_sys_getattr",ret);
     return -1;
   }
-  old_attr = resp_getattr.attr;
-  new_attr = old_attr;
+  new_attr = resp_getattr.attr;
+#else
+printf("About to call setattr\n");
+#endif
 
   new_attr.perms = perms;
   new_attr.mask = PVFS_ATTR_SYS_PERM;

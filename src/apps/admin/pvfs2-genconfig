@@ -46,6 +46,8 @@ my $opt_root_dirdata_handle = '';
 my $opt_fsid = '';
 my $opt_fsname = '';
 my $opt_default_num_dfiles = '';
+my $opt_default_meta_replication = '';
+my $opt_default_dfile_replication = '';
 my $opt_default_flow_buffer_size = '';
 my $opt_default_flow_buffer_count = '';
 my $opt_dist_name = '';
@@ -507,7 +509,8 @@ sub emit_distribution
 sub emit_filesystem
 {
     my ($target, $name, $fs_id, $root_handle, $root_dirdata_handle,
-        $default_num_dfiles, $default_flow_buffer_size,
+        $default_num_dfiles, $default_meta_replication,
+        $default_dfile_replication, $default_flow_buffer_size,
         $default_flow_buffer_count) = @_;
 
     my($stuffing);
@@ -530,6 +533,14 @@ sub emit_filesystem
     if($default_num_dfiles > 0)
     {
         print $target "\tDefaultNumDFiles $default_num_dfiles\n";
+    }
+    if($default_meta_replication > 0)
+    {
+        print $target "\tMetaReplicationFactor $default_meta_replication\n";
+    }
+    if($default_dfile_replication > 0)
+    {
+        print $target "\tDefaultDFileReplication $default_dfile_replication\n";
     }
 
     # Rules for default stuffing setting: only enable it if every I/O server
@@ -1078,6 +1089,34 @@ sub get_default_num_dfiles
         $default_num_dfiles = -1;
     }
     return $default_num_dfiles;
+}
+
+sub get_default_meta_replication
+{
+    my $default_meta_replication;
+    if ($opt_default_meta_replication)
+    {
+        $default_meta_replication = $opt_default_meta_replication;
+    }
+    else
+    {
+        $default_meta_replication = -1;
+    }
+    return $default_meta_replication;
+}
+
+sub get_default_dfile_replication
+{
+    my $default_dfile_replication;
+    if ($opt_default_dfile_replication)
+    {
+        $default_dfile_replication = $opt_default_dfile_replication;
+    }
+    else
+    {
+        $default_dfile_replication = -1;
+    }
+    return $default_dfile_replication;
 }
 
 sub get_default_flow_buffer_size
@@ -2078,6 +2117,8 @@ GetOptions('protocol=s' => \$opt_protocol,
     'tracing'       => \$opt_tracing,
     'logstamp=s'    => \$opt_logstamp,
     'default-num-dfiles=i' => \$opt_default_num_dfiles,
+    'default-meta-replication=i' => \$opt_default_meta_replication,
+    'default-dfile-replication=i' => \$opt_default_dfile_replication,
     'flow-buffer-size=i' => \$opt_default_flow_buffer_size,
     'flow-buffer-count=i' => \$opt_default_flow_buffer_count,
     'root-handle=i' => \$opt_root_handle,
@@ -2349,6 +2390,8 @@ my $logging = get_logging();
 my $tracing = get_tracing();
 my $logstamp = get_logstamp();
 my $default_num_dfiles = get_default_num_dfiles();
+my $default_meta_replication = get_default_meta_replication();
+my $default_dfile_replication = get_default_dfile_replication();
 my $default_flow_buffer_size = get_default_flow_buffer_size();
 my $default_flow_buffer_count = get_default_flow_buffer_count();
 my $root_handle = get_root_handle();
@@ -2376,7 +2419,8 @@ emit_defaults($output_target, $num_unexp_reqs,
 emit_aliases($output_target);
 emit_filesystem($output_target, $fsname , $fsid,
                 $root_handle, $root_dirdata_handle,
-                $default_num_dfiles, 
+                $default_num_dfiles, $default_meta_replication,
+                $default_dfile_replication,
                 $default_flow_buffer_size, $default_flow_buffer_count);
 
 if ($opt_metaspec) {

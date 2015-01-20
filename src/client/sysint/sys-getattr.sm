@@ -49,7 +49,7 @@ extern job_context_id pint_client_sm_context;
 enum
 {
     GETATTR_CACHE_MISS = 1,
-    GETATTR_NEED_DATAFILE_SIZES = 2,
+    GETATTR_NEED_DATAFILE_ATTRS = 2,
     GETATTR_IO_RETRY = 3,
     GETATTR_NEED_DIRDATA_ATTRS = 4
 };
@@ -67,7 +67,7 @@ static int getattr_dirdata_getattr_comp_fn(void *v_p,
 
 %%
 
-nested machine pvfs2_client_datafile_getattr_sizes_sm
+nested machine pvfs2_client_datafile_getattr_sm
 {
     state datafile_getattr_setup_msgpairarray
     {
@@ -147,7 +147,7 @@ nested machine pvfs2_client_getattr_sm
     {
         jump pvfs2_msgpairarray_sm;
         success => acache_insert;
-        GETATTR_NEED_DATAFILE_SIZES => datafile_get_sizes;
+        GETATTR_NEED_DATAFILE_ATTRS => datafile_get_attrs;
         GETATTR_NEED_DIRDATA_ATTRS => dirdata_get_attrs;
         default => object_getattr_failure;
     }
@@ -170,9 +170,9 @@ nested machine pvfs2_client_getattr_sm
         default => cleanup;
     }
 
-    state datafile_get_sizes
+    state datafile_get_attrs
     {
-        jump pvfs2_client_datafile_getattr_sizes_sm;
+        jump pvfs2_client_datafile_getattr_sm;
         success => attr_mask_include_size;
         default => cleanup;
     }
@@ -237,7 +237,10 @@ PVFS_error PVFS_isys_getattr(PVFS_object_ref ref,
         return ret;
     }
     
-    if (attrmask & ~(PVFS_ATTR_SYS_ALL))
+    /* attrmask can have PVFS_ATTR_CAPABILITY, PVFS_ATTR_ALL,
+     * PVFS_ATTR_FASTER or PVFS_ATTR_LATEST
+     */
+    if (attrmask & ~(PVFS_ATTR_SYS_ALL_VALID))
     {
         gossip_err("invalid attrmask\n");
         return ret;
@@ -320,7 +323,7 @@ PVFS_error PVFS_sys_getattr(PVFS_object_ref ref,
 /*
  * copies data from getattr response into the user supplied sys_attr
  * structure.  returns 0 for directories and symlinks, and
- * GETATTR_NEED_DATAFILE_SIZES for a metafile (when appropriate)
+ * GETATTR_NEED_DATAFILE_ATTRS for a metafile (when appropriate)
  */
 static int getattr_object_getattr_comp_fn(void *v_p,
                                           struct PVFS_server_resp *resp_p,
@@ -349,7 +352,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     PINT_copy_object_attr(&sm_p->getattr.attr,
                           &resp_p->u.getattr.attr);
 
-    attr =  &sm_p->getattr.attr;
+    attr = &sm_p->getattr.attr;  /* returned atributes */
 
     /* if the ref_type mask is set to a non-zero value (!PVFS_TYPE_NONE)
      * a -PVFS_error will be triggered if the
@@ -418,8 +421,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                 }
             }
 #endif
-            if (sm_p->msgarray_op.msgpair.req.u.getattr.attrmask &
-                PVFS_ATTR_META_DFILES)
+            if (attr->mask & PVFS_ATTR_META_DFILES)
             {
                 /* if we requested the datafile handles for the file, did
                  * the datafile array get populated?
@@ -435,7 +437,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                  * going to have to do a full data file fetch. 
                  * (that's expensive)
                  */
-                if (sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
+                if (attr->mask & PVFS_ATTR_DATA_SIZE)
                 {
                     /* is the file stuffed? */
                     if(!(attr->mask & PVFS_ATTR_META_UNSTUFFED))
@@ -448,11 +450,15 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                             "detected stuffed file.\n");
                         return(0);
                     }
-                    /* if caller asked for the size, then we need
+                    /* if caller asked for the latest size and time
+                     * stamps, then we need
                      * to jump to the datafile_getattr state, which
                      * will retrieve the datafile sizes for us.
                      */
-                    return GETATTR_NEED_DATAFILE_SIZES;
+                    if (sm_p->getattr.req_attrmask & PVFS_ATTR_LATEST)
+                    {
+                        return GETATTR_NEED_DATAFILE_ATTRS;
+                    }
                 }
             }
             return 0;
@@ -489,8 +495,10 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                 /* gossip bitmap */
                 gossip_debug(GOSSIP_CLIENT_DEBUG,
                         "sys-getattr: dist_dir_bitmap as:\n");
+
                 for(tmp_i = attr->u.dir.dist_dir_attr.bitmap_size - 1;
-                        tmp_i >= 0 ; tmp_i--)
+                    tmp_i >= 0;
+                    tmp_i--)
                 {
                     c = (unsigned char *)(attr->u.dir.dist_dir_bitmap + tmp_i);
                     gossip_debug(GOSSIP_MKDIR_DEBUG,
@@ -515,13 +523,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
             }
 
             /* need to gather dirdata attr */
-            if(sm_p->getattr.req_attrmask &
-                    (PVFS_ATTR_DIR_DIRENT_COUNT |
-                     PVFS_ATTR_COMMON_ATIME |
-                     PVFS_ATTR_COMMON_CTIME |
-                     PVFS_ATTR_COMMON_MTIME |
-                     0 )
-              )
+            if (sm_p->getattr.req_attrmask & PVFS_ATTR_LATEST)
             {
                 assert(attr->mask & PVFS_ATTR_DISTDIR_ATTR);
 
@@ -682,8 +684,9 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
  * found, but the attribute mask did not include values required
  * by the requested mask (req_attrmask).
  * </li>
- * <li><b>default (0)</b> - The requested attribute was found in
- * the attribute cache and its mask values were sufficient.
+ * <li><b>GETATTR_NEED_DATAFILE_ATTRS</b> - The requested attribute was found
+ * in the attribute cache and the mask was sufficient, but the data file size
+ * was requested for this handle, so we need to get that next.
  * </li>
  *
  * @return This function should always return SM_ACTION_COMPLETE
@@ -796,6 +799,15 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    /* Report a miss if capability is expired or within 
+     * CAP_TIMEOUT_BUFFER of expiration
+     *
+     * sampson: TODO: in practice the acache timeout is likely 
+     * much less than the capability timeout. Therefore it is
+     * unlikely the capability will have expired. Additionally
+     * this code may not be needed when more sophisticated caches
+     * are added.  We DO care about the capability flag.
+     */
     /* V3 note a chunck of code that checked for timed out capabilities
      * was removed here - pretty sure that was right, but this is here
      * as a marker just in case
@@ -909,7 +921,15 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
-    else
+  
+    /* check if the only thing missing is the file size, then
+     * we don't need to do the object getattr operation, we only
+     * need to do the datafile getattr operation, so we return
+     * the GETATTR_NEED_DATAFILE_ATTRS error code which will make
+     * the getattr-dowork state machine jump to the datafile getattr
+     * operation state. 
+     */
+    if(missing_attrs == PVFS_ATTR_DATA_SIZE)
     {
         /* Some attr(s) are missing. */
         gossip_debug(GOSSIP_ACACHE_DEBUG, 
@@ -934,7 +954,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
              * get that first.
              */
 
-            js_p->error_code = GETATTR_NEED_DATAFILE_SIZES;
+            js_p->error_code = GETATTR_NEED_DATAFILE_ATTRS;
             gossip_debug(GOSSIP_ACACHE_DEBUG,
                          "acache: acache hit, need sizes[%s]\n",
                          PVFS_OID_str(&object_ref.handle));

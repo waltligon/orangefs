@@ -343,14 +343,14 @@ void print_dspace( DBT key, DBT val )
     if (hex)
     {
         printf("(fsid: %d)(handle: %s)(uid: %u)(gid: %u)"
-           "(perm: %u)(ctime: %s)(mtime: %s)(atime: %s)(ntime: %s)\n",
+           "(perm: %o)(ctime: %s)(mtime: %s)(atime: %s)(ntime: %s)\n",
            v->fs_id, PVFS_OID_str(&v->handle), v->uid, v->gid, v->mode,
            ctimeStr, mtimeStr, atimeStr, ntimeStr);
     }
     else
     {
          printf("(fsid: %d)(handle: %s)(uid: %u)(gid: %u)"
-           "(perm: %u)(ctime: %s)(mtime: %s)(atime: %s)(ntime: %s)",
+           "(perm: %o)(ctime: %s)(mtime: %s)(atime: %s)(ntime: %s)",
            v->fs_id, PVFS_OID_str(&v->handle), v->uid, v->gid, v->mode,
            ctimeStr, mtimeStr, atimeStr, ntimeStr);
     }
