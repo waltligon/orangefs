@@ -637,7 +637,7 @@ int pvfs2_mkspace(char *data_path,
                                       key_a,
                                       val_a,
                                       rec_count,
-                                       0,    /* flags */
+                                      0,    /* flags */
                                       NULL, /* vtag */
                                       NULL, /* user ptr */
                                       trove_context,

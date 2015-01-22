@@ -273,7 +273,7 @@ machine pvfs2_client_io_sm
 
     state io_datafile_size
     {
-        jump pvfs2_client_datafile_getattr_sizes_sm;
+        jump pvfs2_client_datafile_getattr_sm;
         success => io_analyze_size_results;
         default => io_cleanup;
     }

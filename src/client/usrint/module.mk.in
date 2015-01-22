@@ -13,7 +13,7 @@ OSRC := \
 	$(DIR)/request.c \
 	$(DIR)/ucache.c \
 	$(DIR)/posix-pvfs.c  \
-        $(DIR)/aio-pvfs.c \
+    $(DIR)/aio-pvfs.c \
 	$(DIR)/env-vars.c \
 	$(DIR)/mmap.c \
 	$(DIR)/recursive-remove.c

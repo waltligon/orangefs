@@ -259,13 +259,6 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
                   sizeof(uint32_t),
                   &s_op->req->op);
 
-    memset(&req_ctrl, 0, sizeof(struct PINT_server_req_ctrl));
-    remote_op_cnt = PINT_server_req_get_ctrl(s_op->req, &req_ctrl);
-
-    /* Record how many frames should be popped
-     * during cleanup. +1 for the local op 
-     */
-    s_op->num_pjmp_frames = 1 + remote_op_cnt;
 
     /* Setup 1 local op */
     local_op_frame = (struct PINT_server_op *)
@@ -274,11 +267,13 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     {
         return -PVFS_ENOMEM;
     }
+    s_op->num_pjmp_frames = 1;
 
     /* this is the original request so we copy the frame from the
      * original and push it onto the framestack
      */
     memcpy(local_op_frame, s_op, sizeof(struct PINT_server_op));
+    local_op_frame->num_pjmp_frames = 0;
     ret = PINT_sm_push_frame(smcb, LOCAL_OPERATION, local_op_frame);
     if(ret < 0)
     {
@@ -286,7 +281,8 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
                     "local_op!\n");
     }
 
-    if (s_op->req->ctrl.mode == PVFS_REQ_REPLICATE)
+    if (s_op->req->ctrl.mode == PVFS_REQ_REPLICATE &&
+        s_op->req->ctrl.type == PVFS_REQ_PRIMARY)
     {
         /* The local op nolonger cares about this field, and the other
          * remote ops all need the same value.  Possibly TREE or other
@@ -294,6 +290,15 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
          */
         s_op->req->ctrl.type = PVFS_REQ_SECONDARY;
 
+        memset(&req_ctrl, 0, sizeof(struct PINT_server_req_ctrl));
+        remote_op_cnt = PINT_server_req_get_ctrl(s_op->req, &req_ctrl);
+
+        /* Record how many frames should be popped
+         * during cleanup. +1 for the local op 
+         */
+        s_op->num_pjmp_frames += remote_op_cnt;
+
+        gossip_err("Pushing %d frames\n", remote_op_cnt + 1);
         /* malloc for each remote_op SM a msg_op and push to frame stack */
         for(remote_op = 0; remote_op < remote_op_cnt; remote_op++)
         {
@@ -313,7 +318,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
             msg_p->fs_id = req_ctrl.fs_id;
             /* assuming normal case one handle for now */
             msg_p->handle = *req_ctrl.handles;
-            msg_p->sid_count = req_ctrl.sid_count;
+            msg_p->sid_count = 1; /* each message handes 1 SID */
             msg_p->sid_index = 0;
             msg_p->sid_array = &req_ctrl.sids[remote_op];
             msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
@@ -333,6 +338,10 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
                             "remote_op %d!\n", remote_op);
             }
         }
+    }
+    else
+    {
+        gossip_err("Pushing 1 frame\n");
     }
     /* for now other modes are ignored, treated as single op */
     js_p->error_code = 0;
@@ -354,11 +363,18 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
                   "s_op->num_pjmp_frames = %d\n",
                   s_op->num_pjmp_frames);
 
+    gossip_err("Poping %d frames\n", s_op->num_pjmp_frames);
     for (popped_count = 0;
          popped_count < s_op->num_pjmp_frames;
          popped_count++)
     {
         popped_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, &remaining);
+        if (!popped_op)
+        {
+            gossip_err("Failed to pop a frame\n");
+            js_p->error_code = -1;
+            return SM_ACTION_COMPLETE;
+        }
         gossip_ldebug(GOSSIP_SERVER_DEBUG,
                       "popping frame\n"
                       "\ttask_id = %d\n"
@@ -397,7 +413,7 @@ static PINT_sm_action unexp_remote_post(struct PINT_smcb *smcb,
 {
     PFI();
     js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 static PINT_sm_action unexp_local_pre(struct PINT_smcb *smcb,
@@ -448,7 +464,7 @@ static PINT_sm_action unexp_local_post(struct PINT_smcb *smcb,
 {
     PFI();
     js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 /*
