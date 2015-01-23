@@ -759,6 +759,26 @@ PVFS_error PINT_client_state_machine_testsome(
     int *error_code_array,
     int timeout_ms);
 
+/* exposed wrappers around the id-generator code */
+static inline int PINT_id_gen_safe_register(
+    PVFS_sys_op_id *new_id,
+    void *item)
+{
+    return id_gen_safe_register(new_id, item);
+}
+
+static inline void *PINT_id_gen_safe_lookup(
+    PVFS_sys_op_id id)
+{
+    return id_gen_safe_lookup(id);
+}
+
+static inline int PINT_id_gen_safe_unregister(
+    PVFS_sys_op_id id)
+{
+    return id_gen_safe_unregister(id);
+}
+
 /* debugging method for getting a string macthing the op_type */
 const char *PINT_client_get_name_str(int op_type);
 

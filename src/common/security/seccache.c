@@ -91,7 +91,7 @@ static int lock_init(seccache_lock_t *lock)
  * Acquires the lock referenced by lock and returns 0 on
  * Success; otherwise, returns -1 and sets errno.
  */
-static int lock_lock(seccache_lock_t *lock)
+static inline int lock_lock(seccache_lock_t *lock)
 {
     return gen_mutex_lock(lock);
 }
@@ -100,9 +100,32 @@ static int lock_lock(seccache_lock_t *lock)
  * Unlocks the lock.
  * If successful, return zero; otherwise, return -1 and sets errno.
  */
-static int lock_unlock(seccache_lock_t *lock)
+static inline int lock_unlock(seccache_lock_t *lock)
 {
     return gen_mutex_unlock(lock);
+}
+
+/** lock_trylock
+ * Tries the lock to see if it's available:
+ * Returns 0 if lock has not been acquired ie: success
+ * Otherwise, returns -1
+ */
+static inline int lock_trylock(seccache_lock_t *lock)
+{
+    int ret = -1;
+
+    ret = gen_mutex_trylock(lock);
+    if (ret != 0)
+    {
+        ret = -1;
+    }
+
+    if (ret == 0)
+    {
+        /* Unlock before leaving if lock wasn't already set */
+        ret = lock_unlock(lock);
+    }
+    return ret;
 }
 
 /** PINT_seccache_rm_expired_entries

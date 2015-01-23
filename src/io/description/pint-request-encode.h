@@ -9,8 +9,10 @@
 
 #include "gossip.h"
 /* linearize the PINT_Request tree into a contiguous array */
-static inline int linearize_PVFS_Request(struct PINT_Request *req,
-    struct PINT_Request **linearized_req)
+inline static int 
+linearize_PVFS_Request(
+    struct PINT_Request * req, 
+    struct PINT_Request ** linearized_req)
 {
     int ret = 0;
     struct PINT_Request * linreq;
@@ -52,8 +54,10 @@ static inline int linearize_PVFS_Request(struct PINT_Request *req,
     return ret;
 }
 
-static inline int encode_PVFS_Request_fields(char **pptr,
-    struct PINT_Request *rp)
+inline static int 
+encode_PVFS_Request_fields(
+    char ** pptr,
+    struct PINT_Request * rp)
 {
     u_int32_t encti;
     encode_PVFS_offset(pptr, &(rp)->offset);
@@ -81,8 +85,10 @@ static inline int encode_PVFS_Request_fields(char **pptr,
 }
 
 /* encode a linearized array of the above things, assumes space exists */
-static inline int encode_linearized_PVFS_Request(char **pptr,
-    struct PINT_Request *rp)
+inline static int
+encode_linearized_PVFS_Request(
+    char ** pptr,
+    struct PINT_Request * rp)
 {
     int i, ret;
     for (i = 0; i <= rp->num_nested_req; i++) 
@@ -96,7 +102,9 @@ static inline int encode_linearized_PVFS_Request(char **pptr,
     return 0;
 }
 
-static inline int encode_PINT_Request(char **pptr, struct PINT_Request **rp)
+inline static
+int encode_PINT_Request(char ** pptr, 
+                        struct PINT_Request ** rp)
 {
     int ret;
     struct PINT_Request * linreq;
@@ -116,7 +124,9 @@ static inline int encode_PINT_Request(char **pptr, struct PINT_Request **rp)
     return ret;
 }
 
-static inline int decode_PINT_Request(char **pptr, struct PINT_Request **req)
+inline static
+int decode_PINT_Request(char ** pptr,
+                        struct PINT_Request ** req)
 {
     u_int32_t encti;
     int i;

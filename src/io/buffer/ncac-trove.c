@@ -8,9 +8,14 @@
 #include "state.h"
 #include "pvfs2-internal.h"
 
-static void offset_shorten(int s_cnt, PVFS_offset *stream_offset_array,
-    PVFS_size *stream_size_array, int m_cnt, char **mem_offset_array,
-    PVFS_size *mem_size_array, int *new_s_cnt, int *new_m_cnt); 
+static inline void  offset_shorten( int s_cnt, 
+					  PVFS_offset *stream_offset_array,
+					  PVFS_size *stream_size_array,
+					  int m_cnt, 
+					  char **mem_offset_array,
+					  PVFS_size *mem_size_array,
+					  int *new_s_cnt, int *new_m_cnt);
+
 
 int NCAC_aio_read_ext( PVFS_fs_id coll_id, PVFS_handle handle, 
 		       PVFS_context_id context, struct aiovec *aiovec, 
@@ -79,8 +84,13 @@ int NCAC_aio_read_ext( PVFS_fs_id coll_id, PVFS_handle handle,
 
     }
 
-    offset_shorten(s_cnt, stream_offset_array, stream_size_array, m_cnt,
-        mem_offset_array, mem_size_array, &s_cnt, &m_cnt);
+    offset_shorten( s_cnt, 
+					stream_offset_array,
+					stream_size_array,
+					m_cnt, 
+					mem_offset_array,
+					mem_size_array,
+					&s_cnt, &m_cnt);
 
     DPRINT("--------------after offset_shorten: s_cnt=%d\n", s_cnt);
     for (i=0; i< s_cnt; i++ ) {
@@ -166,8 +176,13 @@ int NCAC_aio_write( PVFS_fs_id coll_id,
 
     }
 
-    offset_shorten(s_cnt, stream_offset_array, stream_size_array, m_cnt,
-        mem_offset_array, mem_size_array, &s_cnt, &m_cnt);
+    offset_shorten( s_cnt, 
+					stream_offset_array,
+					stream_size_array,
+					m_cnt, 
+					mem_offset_array,
+					mem_size_array,
+					&s_cnt, &m_cnt);
 
 
 #ifdef DEBUG
@@ -286,9 +301,13 @@ int NCAC_check_ioreq(struct extent *extent)
  * Reduce <file offset, len> and <mem offset, len>  pairs in-place.  
  */
 
-static void offset_shorten(int s_cnt, PVFS_offset *stream_offset_array,
-    PVFS_size *stream_size_array, int m_cnt, char **mem_offset_array,
-    PVFS_size *mem_size_array, int *new_s_cnt, int *new_m_cnt)
+static inline void  offset_shorten( int s_cnt, 
+					  PVFS_offset *stream_offset_array,
+					  PVFS_size *stream_size_array,
+					  int m_cnt, 
+					  char **mem_offset_array,
+					  PVFS_size *mem_size_array,
+					  int *new_s_cnt, int *new_m_cnt)
 {
 
     int i = 0;

@@ -84,8 +84,7 @@ static int PINT_context_finalize(void)
         int i = 0;
         for(; i < pint_contexts->table_size; ++i)
         {
-            qlist_for_each_entry_safe(ctx, tmp, &(pint_contexts->array[i]),
-                link, struct PINT_context, struct PINT_context)
+            qlist_for_each_entry_safe(ctx, tmp, &(pint_contexts->array[i]), link)
             {
                 qhash_del(&ctx->link);
                 PINT_close_context(ctx->id);

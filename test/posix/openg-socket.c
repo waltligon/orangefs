@@ -42,7 +42,7 @@ static long openfh(const void *, size_t);
 static long openg(const char *, void *, size_t *, int, int);
 */
 
-static double usec_diff(double *end, double *begin)
+static inline double usec_diff(double *end, double *begin)
 {
 	return (*end - *begin);
 }

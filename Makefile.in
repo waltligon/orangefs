@@ -271,7 +271,7 @@ CFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
 CFLAGS += @OPENSSL_CPPFLAGS@
 
 # always want these gcc flags
-GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes -std=c99
+GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes
 
 ifneq (,$(STRICT_CFLAGS))
     GCC_CFLAGS += -Wcast-align -Wbad-function-cast
@@ -528,14 +528,14 @@ endif
 #            configure step to enable the jni layer to be built and 
 #            so JAVA_HOME can be set to the desired JDK.
 #
-#	--enable-shared must be specified during the configure step so that
+#   --enable-shared must be specified during the configure step so that
 #            shared libraries will be built
 #
 ifdef BUILD_JNI
 JAVA_HOME := @JAVA_HOME@
 CFLAGS += -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux
 JAVAH := $(JAVA_HOME)/bin/javah -J-Xmx256m
-MVN := `which mvn`
+MVN := mvn
 JNI_DIR := $(srcdir)/src/client/jni
 JNI_JAVA_DIR := $(srcdir)/src/client/jni/src/main/java
 ORGDIR := $(JNI_JAVA_DIR)/org/orangefs/usrint

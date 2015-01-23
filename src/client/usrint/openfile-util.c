@@ -525,7 +525,7 @@ static void pvfs_desc_free(int desc, struct qlist_head *pool)
         qlist_add_tail(&newseg->link, pool);
     }
     /* find the segment to insert the path before */
-    qlist_for_each_entry (seg, pool, link, index_rec_t)
+    qlist_for_each_entry (seg, pool, link)
     {
         if (seg->first > desc)
         {
@@ -638,7 +638,7 @@ static void path_index_return(char *path)
         gossip_lerr("path_index_find sees empty free list\n");
     }
     /* find the segment to insert the path before */
-    qlist_for_each_entry (seg, &path_index, link, index_rec_t)
+    qlist_for_each_entry (seg, &path_index, link)
     {
         if (seg->first > offset)
         {
@@ -698,7 +698,7 @@ static char *path_index_find(int size)
         gossip_lerr("path_index_find sees empty free list\n");
         return NULL;
     }
-    qlist_for_each_entry (seg, &path_index, link, index_rec_t)
+    qlist_for_each_entry (seg, &path_index, link)
     {
         if (seg->size > size)
         {
@@ -858,7 +858,8 @@ static int init_usrint_internal(void)
     int rc = 0;
     int i;
 
-    static gen_mutex_t mutex = GEN_RECURSIVE_MUTEX_INITIALIZER; 
+    /* The recursive mutex */
+    static gen_mutex_t rec_mutex = GEN_RECURSIVE_MUTEX_INITIALIZER_NP; 
 
     /* only one initialize happens */
     if(pvfs_lib_init_flag)
@@ -870,10 +871,10 @@ static int init_usrint_internal(void)
     errno_in = errno;
 
     /* make sure no double inits */
-    gen_mutex_lock(&mutex);
+    gen_mutex_lock(&rec_mutex);
     if(pvfs_lib_init_flag || pvfs_initializing_flag)
     {
-        gen_mutex_unlock(&mutex);
+        gen_mutex_unlock(&rec_mutex);
         /* make sure errors in here don't carry out */
         errno = errno_in;
         return 1;
@@ -1176,11 +1177,13 @@ static int init_usrint_internal(void)
    }
 #endif
 
+    /* env_vars_struct_dump(&env_vars); */
+
     init_debug("finished with initialization\n");
 
     pvfs_lib_init_flag = 1;
     pvfs_initializing_flag = 0;
-    gen_mutex_unlock(&mutex);
+    gen_mutex_unlock(&rec_mutex);
     /* make sure errors in here don't carry out */
     errno = errno_in;
     return 0;
@@ -1277,7 +1280,7 @@ static pvfs_desc_list_t *find_descriptor_area_list(
                                   pvfs_descriptor_status *stat)
 {
     pvfs_desc_list_t *pdl;
-    qlist_for_each_entry(pdl, &desc_list, link, pvfs_desc_list_t)
+    qlist_for_each_entry(pdl, &desc_list, link)
     {
         int64_t diff = PDLOFF(stat, pdl) - PDLOFF(pdl->ptr->status_pool, pdl);
         if (diff >= 0 && diff < pdl->ptr->status_pool_size)

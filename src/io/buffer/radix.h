@@ -52,14 +52,14 @@ void *rst_delete(rst_t *t, unsigned long index);
 
 void rst_init(rst_t *t, unsigned long (* get_value)(const void *), int max_b);
 
-static inline void *radix_tree_lookup(struct radix_tree_root *tree,
-    unsigned long index)
+static inline void *radix_tree_lookup( struct radix_tree_root *tree, 
+									   unsigned long index )
 {
 	return rst_find(tree, index);
 }
 
-static inline int radix_tree_insert(struct radix_tree_root *tree,
-    unsigned long index, void *item)
+static inline int radix_tree_insert(struct radix_tree_root *tree, 
+									unsigned long index, void *item)
 {
 	void *ret;
 
@@ -71,14 +71,14 @@ static inline int radix_tree_insert(struct radix_tree_root *tree,
 }
 
 static inline void radix_tree_delete(struct radix_tree_root *tree,
-    unsigned long index)
+									 unsigned long index)
 {
 	rst_delete(tree, index);
     return;
 }
 
-static inline void init_single_radix_tree(struct radix_tree_root *tree,
-    unsigned long (* get_value)(const void *), int max_b)
+static inline void init_single_radix_tree( struct radix_tree_root *tree, 
+					   unsigned long (* get_value)(const void *), int max_b )
 {
 	
 	rst_init(tree, get_value, max_b);

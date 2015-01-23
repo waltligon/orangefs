@@ -220,67 +220,11 @@ int ucache_open_file(PVFS_fs_id *fs_id,
                      PVFS_handle *handle, 
                      struct file_ent_s **fent);
 int ucache_close_file(struct file_ent_s *fent);
-
-/**
- * Returns a pointer to the mtbl corresponding to the blk & ent.
- * Input must be reliable otherwise invalid mtbl could be returned.
- */
-static inline struct mem_table_s *ucache_get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent)
-{
-    if( mtbl_blk < BLOCKS_IN_CACHE &&
-        mtbl_ent < MEM_TABLE_ENTRY_COUNT)
-    {
-        return &(ucache->b[mtbl_blk].mtbl[mtbl_ent]);
-    }
-    else
-    {
-        return (struct mem_table_s *)NILP;
-    }
-
-}
-
-/**
- * Returns ptr to block in ucache based on file and offset
- */
-static inline void *ucache_lookup(struct file_ent_s *fent, uint64_t offset,
-    uint16_t *block_ndx)
-{
-    if(DBG)
-    {
-        printf("offset = %lu\n", offset);
-    }
-    void *retVal = (void *) NIL;
-    if(fent)
-    {
-        lock_lock(ucache_lock);
-        struct mem_table_s *mtbl = ucache_get_mtbl(fent->mtbl_blk,
-            fent->mtbl_ent);
-        retVal = lookup_mem(mtbl,
-                            offset,
-                            block_ndx,
-                            NULL,
-                            NULL);
-        lock_unlock(ucache_lock);
-    }
-    return retVal;
-}
-
-/**
- * Prepares the data structures for block storage.
- * On success, returns a pointer to where the block of data should be written.
- * On failure, returns NIL.
- */
-static inline void *ucache_insert(struct file_ent_s *fent,
-                    uint64_t offset,
-                    uint16_t *block_ndx
-)
-{
-    lock_lock(ucache_lock);
-    void * retVal = insert_mem(fent, offset, block_ndx);
-    lock_unlock(ucache_lock);
-    return (retVal);
-}
-
+inline struct mem_table_s *ucache_get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent);
+inline void *ucache_lookup(struct file_ent_s *fent, uint64_t offset, uint16_t *block_ndx);
+inline void *ucache_insert(struct file_ent_s *fent, 
+                    uint64_t offset, 
+                    uint16_t *block_ndx);
 int ucache_info(FILE *out, char *flags);
 
 int ucache_flush_cache(void); 
@@ -293,116 +237,11 @@ int ucache_init_file_table(char forceCreation);
 int wipe_ucache(void);
 
 /* Lock Routines */
+inline ucache_lock_t *get_lock(uint16_t block_index);
 int lock_init(ucache_lock_t * lock);
-
-/**
- * Returns a pointer to the lock corresponding to the block_index.
- * If the index is out of range, then 0 is returned.
- */
-static inline ucache_lock_t *get_lock(uint16_t block_index)
-{
-    if(block_index >= (BLOCKS_IN_CACHE + 1))
-    {
-        return (ucache_lock_t *)0;
-    }
-    return &ucache_locks[block_index];
-}
-
-/** 
- * Returns 0 when lock is locked; otherwise, return -1 and sets errno.
- */
-static inline int lock_lock(ucache_lock_t * lock)
-{
-    int rc = 0;
-    #if LOCK_TYPE == 0
-    return sem_wait(lock);
-    #elif LOCK_TYPE == 1
-/*
-    while(1)
-    {
-        rc = pthread_mutex_trylock(lock);
-        if(rc != 0)
-        {
-            printf("couldn't lock lock 0X%lX\n", (long unsigned int) lock); 
-            fflush(stdout);
-            rc = -1;
-        }
-        else
-        {
-            break;
-        }
-    }
-*/
-    rc = pthread_mutex_lock(lock);
-    return rc;
-    #elif LOCK_TYPE == 2
-    return pthread_spin_lock(lock);
-    #elif LOCK_TYPE == 3
-    rc = gen_mutex_lock(lock);
-    return rc;
-    #endif   
-}
-
-/** 
- * If successful, return zero; otherwise, return -1 and sets errno. 
- */
-static inline int lock_unlock(ucache_lock_t * lock)
-{
-    #if LOCK_TYPE == 0
-    return sem_post(lock);
-    #elif LOCK_TYPE == 1
-    return pthread_mutex_unlock(lock); 
-    #elif LOCK_TYPE == 2
-    return pthread_spin_unlock(lock);
-    #elif LOCK_TYPE == 3
-    return gen_mutex_unlock(lock);
-    #endif
-}
-
-/** 
- * Tries the lock to see if it's available:
- * Returns 0 if lock has not been aquired ie: success
- * Otherwise, returns -1
- */
-static inline int lock_trylock(ucache_lock_t * lock)
-{
-    int rc = -1;
-    #if (LOCK_TYPE == 0)
-    int sval = 0;
-    rc = sem_getvalue(lock, &sval);
-    if(sval <= 0 || rc == -1){
-        rc = -1;
-    }
-    else
-    {
-        rc = 0;
-    }
-    #elif (LOCK_TYPE == 1)
-    rc = pthread_mutex_trylock(lock);
-    if( rc != 0)
-    {
-        rc = -1;
-    }
-    #elif (LOCK_TYPE == 2)
-    rc = pthread_spin_trylock(lock);
-    if(rc != 0)
-    {
-        rc = -1;
-    }
-    #elif LOCK_TYPE == 3
-    rc = gen_mutex_trylock(lock);
-    if(rc != 0)
-    {
-        rc = -1;
-    }
-    #endif
-    if(rc == 0)
-    {
-        /* Unlock before leaving if lock wasn't already set */
-        rc = lock_unlock(lock);
-    }
-    return rc;
-}
+inline int lock_lock(ucache_lock_t * lock);
+inline int lock_unlock(ucache_lock_t * lock);
+inline int lock_trylock(ucache_lock_t * lock);
 
 #endif /* UCACHE_H */
 

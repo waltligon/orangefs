@@ -24,7 +24,7 @@
 #if 0
 #define memdebug fprintf
 #else
-static void memdebug(FILE *stream, char *format, ...)
+static inline void memdebug(FILE *stream, char *format, ...)
 {
     /* this is just a dummy function to eat varargs */
     return;
@@ -117,6 +117,12 @@ void clean_free(void *ptr)
 #include "gen-locks.h"
 #include "gossip.h"
 
+#if PVFS2_SIZEOF_VOIDP == 64
+    typedef uint64_t ptrint_t;
+#else
+    typedef uint32_t ptrint_t;
+#endif
+
 /* we don't want any crazy redefs below
  * want to call real malloc, free, etc.
  * our .h file does lots of defs, and we
@@ -208,7 +214,7 @@ static struct glibc_malloc_ops_s glibc_malloc_ops = {
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
 
-static void *my_glibc_malloc(size_t size)
+static inline void *my_glibc_malloc(size_t size)
 {
     if (glibc_malloc_ops.malloc)
     {
@@ -228,7 +234,7 @@ static void *my_glibc_malloc(size_t size)
     }
 }
 
-static void *my_glibc_realloc(void *mem, size_t size)
+static inline void *my_glibc_realloc(void *mem, size_t size)
 {
     if (glibc_malloc_ops.realloc)
     {
@@ -248,7 +254,7 @@ static void *my_glibc_realloc(void *mem, size_t size)
     }
 }
 
-static void my_glibc_free(void *mem)
+static inline void my_glibc_free(void *mem)
 {
     if (glibc_malloc_ops.free)
     {
@@ -264,6 +270,28 @@ static void my_glibc_free(void *mem)
         else
         {
             return free(mem);
+        }
+    }
+}
+
+static inline int my_glibc_posix_memalign(void **mem,
+                                          size_t alignment,
+                                          size_t size)
+{
+    if (glibc_malloc_ops.posix_memalign)
+    {
+        return glibc_malloc_ops.posix_memalign(mem, alignment, size);
+    }
+    else
+    {
+        init_glibc_malloc();
+        if (glibc_malloc_ops.posix_memalign)
+        {
+            return glibc_malloc_ops.posix_memalign(mem, alignment, size);
+        }
+        else
+        {
+            return posix_memalign(mem, alignment, size);
         }
     }
 }
@@ -324,9 +352,9 @@ void *PINT_malloc(size_t size)
 #endif
 
     memdebug(stderr, "call to MALLOC size %d addr %p returning %p \n",
-             (int)size, mem, (void *)((unsigned char *)mem + EXTRA_SIZE));
+             (int)size, mem, (void *)((ptrint_t)mem + EXTRA_SIZE));
 
-    return (void *)((unsigned char *)mem + EXTRA_SIZE);
+    return (void *)((ptrint_t)mem + EXTRA_SIZE);
 }
 
 void *PINT_calloc(size_t nmemb, size_t size)
@@ -365,12 +393,11 @@ int PINT_posix_memalign(void **mem, size_t alignment, size_t size)
 #if PVFS_MALLOC_ZERO
     memset(mem_orig, 0, sizeplus);
 #endif
-    aligned = (void *)(
-        (size_t)((unsigned char *)mem_orig + EXTRA_SIZE + alignplus - 1) &
-        (~alignplus + 1));
+    aligned = (void *)(((ptrint_t)mem_orig + EXTRA_SIZE + alignplus - 1) &
+                       (~alignplus + 1));
     *mem = aligned;
 
-    extra = (extra_t *)((unsigned char *)aligned - EXTRA_SIZE);
+    extra = (extra_t *)((ptrint_t)aligned - EXTRA_SIZE);
 #if !PVFS_MALLOC_ZERO
     memset(extra, 0, EXTRA_SIZE);
 #endif
@@ -425,7 +452,7 @@ void *PINT_realloc(void *mem, size_t size)
     void *ptr = NULL;
     size_t newsize = 0;
     extra_t *extra = NULL;
-    ptrdiff_t region_offset;
+    ptrint_t region_offset;
 
     if (mem == NULL)
     {
@@ -438,7 +465,7 @@ void *PINT_realloc(void *mem, size_t size)
         return NULL;
     }
 
-    extra = (void *)((unsigned char *)mem - EXTRA_SIZE);
+    extra = (void *)((ptrint_t)mem - EXTRA_SIZE);
 #if PVFS_MALLOC_MAGIC
     if (extra->magic != PVFS_MALLOC_MAGIC_NUM)
     {
@@ -448,7 +475,7 @@ void *PINT_realloc(void *mem, size_t size)
         return NULL;
     }
 #endif
-    region_offset = (unsigned char *)mem - (unsigned char *)extra->mem;
+    region_offset = (ptrint_t)mem - (ptrint_t)extra->mem;
     newsize = region_offset + size;
     /* glibc realloc will keep our extra structures in place */
     ptr =  my_glibc_realloc(extra->mem, newsize);
@@ -456,14 +483,14 @@ void *PINT_realloc(void *mem, size_t size)
     {
         return NULL;
     }
-    extra = (extra_t *)(((unsigned char *)ptr + region_offset) - EXTRA_SIZE);
+    extra = (extra_t *)(((ptrint_t)ptr + region_offset) - EXTRA_SIZE);
     extra->mem = ptr;
     extra->size = newsize;
 
     memdebug(stderr, "call to REALLOC size %d addr %p newaddr %p returned %p\n",
-        (int)size, mem, ptr, (void *)((unsigned char *)ptr + region_offset));
+             (int)size, mem, ptr, (void *)((ptrint_t)ptr + region_offset));
 
-    return (void *)((unsigned char *)ptr + region_offset);
+    return (void *)((ptrint_t)ptr + region_offset);
 }
 
 char *PINT_strdup(const char *str)
@@ -517,7 +544,7 @@ void PINT_free(void *mem)
         return;
     }
 
-    extra = (void *)((unsigned char *)mem - EXTRA_SIZE);
+    extra = (void *)((ptrint_t)mem - EXTRA_SIZE);
     orig_mem = extra->mem;
 
     memdebug(stderr, "call to FREE addr %p real addr %p", mem, orig_mem);
@@ -550,7 +577,8 @@ void init_glibc_malloc(void)
 {
     static int init_flag = 0;
     static int recurse_flag = 0;
-    static gen_mutex_t init_mutex = GEN_MUTEX_INITIALIZER;
+    static gen_mutex_t init_mutex = 
+                       (gen_mutex_t)GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
     void *libc_handle;
 
     /* prevent multiple threads from running this */

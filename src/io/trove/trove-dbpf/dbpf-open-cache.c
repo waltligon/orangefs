@@ -92,7 +92,7 @@ static void close_fd(
     int fd, 
     enum open_cache_open_type type);
 
-static struct open_cache_entry * dbpf_open_cache_find_entry(
+inline static struct open_cache_entry * dbpf_open_cache_find_entry(
     struct qlist_head * list, 
     const char * list_name,
     TROVE_coll_id coll_id,
@@ -586,7 +586,7 @@ static void dbpf_open_cache_entries_finalize(struct qlist_head *list)
     pthread_cancel(dbpf_unlink_context.thread_id);
 }
 
-static struct open_cache_entry * dbpf_open_cache_find_entry(
+inline static struct open_cache_entry * dbpf_open_cache_find_entry(
     struct qlist_head * list, 
     const char * list_name,
     TROVE_coll_id coll_id,

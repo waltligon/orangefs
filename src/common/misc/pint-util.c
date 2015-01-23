@@ -650,6 +650,9 @@ char *PINT_util_bytes2str(unsigned char *bytes, char *output, size_t count)
 
 }
 
+#ifndef WIN32
+inline
+#endif
 void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x)
 {
     const char *addr_str;
@@ -659,12 +662,18 @@ void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x)
 }
 
 /* determines how much protocol space a BMI_addr_t encoding will consume */
+#ifndef WIN32
+inline
+#endif
 int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x)
 {
     const char *addr_str;
     addr_str = BMI_addr_rev_lookup(*x);
     return(encode_string_size_check(&addr_str));
 }
+#ifndef WIN32
+inline
+#endif
 void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x)
 {
     char *addr_string;
@@ -672,6 +681,9 @@ void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x)
     BMI_addr_lookup(x, addr_string);
 }
 
+#ifndef WIN32
+inline
+#endif
 void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
 {
     int tmp_size;
@@ -707,6 +719,9 @@ void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
     }
 }
 
+#ifndef WIN32
+inline
+#endif
 void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x)
 {
     int i;

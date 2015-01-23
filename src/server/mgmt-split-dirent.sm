@@ -292,7 +292,7 @@ static PINT_sm_action mgmt_split_dirent_cleanup(
 }
 
 
-static int PINT_get_object_ref_mgmt_split_dirent(
+static inline int PINT_get_object_ref_mgmt_split_dirent(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
     *fs_id = req->u.mgmt_split_dirent.fs_id;

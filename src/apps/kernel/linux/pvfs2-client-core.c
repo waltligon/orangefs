@@ -266,7 +266,7 @@ static void reset_ncache_timeout(void);
 static int set_ncache_parameters(options_t* s_opts);
 static int set_capcache_parameters(options_t* s_opts);
 static void finalize_perf_items(int n, ... );
-static void fill_hints(PVFS_hint *hints, vfs_request_t *req);
+inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req);
 
 static PVFS_credential *lookup_credential(
     PVFS_uid uid,
@@ -340,16 +340,16 @@ static void pvfs2_khandle_from_handle(PVFS_handle *handle,
 
   memset(khandle,0,16);
 
-  ihandle.u.ino = *handle;
+  ihandle.ino = *handle;
 
-  khandle->u.u[0] = ihandle.u.u[0];
-  khandle->u.u[1] = ihandle.u.u[1];
-  khandle->u.u[2] = ihandle.u.u[2];
-  khandle->u.u[3] = ihandle.u.u[3];
-  khandle->u.u[12] = ihandle.u.u[4];
-  khandle->u.u[13] = ihandle.u.u[5];
-  khandle->u.u[14] = ihandle.u.u[6];
-  khandle->u.u[15] = ihandle.u.u[7];
+  khandle->u[0] = ihandle.u[0];
+  khandle->u[1] = ihandle.u[1];
+  khandle->u[2] = ihandle.u[2];
+  khandle->u[3] = ihandle.u[3];
+  khandle->u[12] = ihandle.u[4];
+  khandle->u[13] = ihandle.u[5];
+  khandle->u[14] = ihandle.u[6];
+  khandle->u[15] = ihandle.u[7];
 }
 
 static void client_segfault_handler(int signum, siginfo_t *info, void *secret)
@@ -573,7 +573,7 @@ static void *exec_remount(void *ptr)
     return NULL;
 }
 
-static void log_operation_timing(vfs_request_t *vfs_request)
+static inline void log_operation_timing(vfs_request_t *vfs_request)
 {
 #ifdef CLIENT_CORE_OP_TIMING
     double wtime = 0.0f, utime = 0.0f, stime = 0.0f;
@@ -1499,7 +1499,7 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
 }
 
 
-static int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
+static inline int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
         pvfs2_upcall_t *in_upcall, int mount) 
 {
     char *ptr = NULL, *ptrcomma = NULL;
@@ -2772,12 +2772,12 @@ static long encode_dirents(pvfs2_readdir_response_t *ptr, PVFS_sysresp_readdir *
     {
         enc_string(pptr, &readdir->dirent_array[i].d_name);
         /* format the handle as a khandle */
-        s.u.ino = readdir->dirent_array[i].handle; 
-        *(unsigned int *) *pptr = s.u.slice[0];
+        s.ino = readdir->dirent_array[i].handle; 
+        *(unsigned int *) *pptr = s.slice[0];
         *pptr += 4;
 	memset((void *)*pptr,0,8);
         *pptr += 8;
-        *(unsigned int *) *pptr = s.u.slice[1];
+        *(unsigned int *) *pptr = s.slice[1];
         *pptr += 4;
     }
     return ((unsigned long) *pptr - (unsigned long) ptr);
@@ -2901,7 +2901,7 @@ err:
    this method has the ability to overwrite/scrub the error code
    passed down to the vfs
 */
-static void package_downcall_members(
+static inline void package_downcall_members(
     vfs_request_t *vfs_request, int *error_code)
 {
     int ret = -PVFS_EINVAL;
@@ -3480,7 +3480,7 @@ static void package_downcall_members(
 
 }
 
-static PVFS_error repost_unexp_vfs_request(
+static inline PVFS_error repost_unexp_vfs_request(
     vfs_request_t *vfs_request, char *completion_handle_desc)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -3509,7 +3509,7 @@ static PVFS_error repost_unexp_vfs_request(
     return ret;
 }
 
-static PVFS_error handle_unexp_vfs_request(
+static inline PVFS_error handle_unexp_vfs_request(
     vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -5276,7 +5276,7 @@ static void set_device_parameters(options_t *s_opts)
 
 static int get_mac(void);
 
-static void fill_hints(PVFS_hint *hints, vfs_request_t *req)
+inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req)
 {
     int32_t mac;
 

@@ -462,9 +462,8 @@ int iocommon_create_file(const char *filename,
     PVFS_sys_dist *dist = NULL;
     PVFS_sys_layout *layout = NULL;
     PVFS_hint hints = NULL;
-
-#if PVFS_USER_ENV_VARS_ENABLED
-    PVFS_hint no_hint_hint; /* We need this if file_creation_param is null. */
+#if 0
+    PVFS_hint standby_hint; /* We need this if file_creation_param is null. */
 #endif /* PVFS_USER_ENV_VARS_ENABLED */
 
     gossip_debug(GOSSIP_USRINT_DEBUG,
@@ -482,14 +481,18 @@ int iocommon_create_file(const char *filename,
     attr.ctime = attr.atime;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
-#if PVFS_USER_ENV_VARS_ENABLED
-
-    /* env_vars_struct_dump(&env_vars); */
-
-    if(env_vars.env_var_present && !file_creation_param)
+#if 0
+    /* TODO: check for pertinent environment variable hints that should be
+     * applied here. Also must check if a regular hint was specified or not.
+     * If so then resolve any conflicts (define a policy of which takes
+     * precedence) and update the hint.
+     * If not, then we must fill in the standby_hint with hint info from the
+     * environment variable hints. */
+    if(env_vars.env_var_array[ORANGEFS_DIST_NAME]|
+       env_vars.env_var_array[ORANGEFS_NUM_DFILES]|... && !file_creation_param)
     {
-        /* TODO */
-        printf("env_var_present && no hint detected!\n");
+        printf("pertinent environment variable hint specified"
+               " && no hint detected!\n");
     }
 #endif /* PVFS_USER_ENV_VARS_ENABLED */
     /* ====================================================================== */
@@ -2727,7 +2730,33 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
     buf->st_gid = attr.group;
     buf->st_rdev = 0; /* no dev special files */
     buf->st_size = attr.size;
+#if PVFS_USER_ENV_VARS_ENABLED
+    if(env_vars.env_var_array[ORANGEFS_STRIP_SIZE_AS_BLKSIZE].env_var_value &&
+       strcmp(env_vars.env_var_array[ORANGEFS_STRIP_SIZE_AS_BLKSIZE].env_var_value, "true") == 0)
+    {
+        if(attr.dfile_count > 0)
+        {
+            buf->st_blksize = attr.blksize / attr.dfile_count;
+        }
+        else
+        {
+            buf->st_blksize = attr.blksize;
+        }
+        /*
+        printf("ORANGEFS_STRIP_SIZE_AS_BLKSIZE=%s\n",
+               env_vars.env_var_array[ORANGEFS_STRIP_SIZE_AS_BLKSIZE].env_var_value);
+        printf("attr.blksize=%llu\n", (long long unsigned int) attr.blksize);
+        printf("dfile_count=%d\n", attr.dfile_count);
+        printf("buf->st_blksize=%llu\n", (long long unsigned int) buf->st_blksize);
+        */
+    }
+    else
+    {
+        buf->st_blksize = attr.blksize;
+    }
+#else
     buf->st_blksize = attr.blksize;
+#endif
     buf->st_blocks = (attr.size + (S_BLKSIZE - 1)) / S_BLKSIZE;
     /* we don't have nsec so we left the memset zero them */
     buf->st_atime = attr.atime;
@@ -2783,7 +2812,33 @@ int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
     buf->st_gid = attr.group;
     buf->st_rdev = 0; /* no dev special files */
     buf->st_size = attr.size;
+#if PVFS_USER_ENV_VARS_ENABLED
+    if(env_vars.env_var_array[ORANGEFS_STRIP_SIZE_AS_BLKSIZE].env_var_value &&
+       strcmp(env_vars.env_var_array[ORANGEFS_STRIP_SIZE_AS_BLKSIZE].env_var_value, "true") == 0)
+    {
+        if(attr.dfile_count > 0)
+        {
+            buf->st_blksize = attr.blksize / attr.dfile_count;
+        }
+        else
+        {
+            buf->st_blksize = attr.blksize;
+        }
+        /*
+        printf("ORANGEFS_STRIP_SIZE_AS_BLKSIZE=%s\n",
+               env_vars.env_var_array[ORANGEFS_STRIP_SIZE_AS_BLKSIZE].env_var_value);
+        printf("attr.blksize=%llu\n", (long long unsigned int) attr.blksize);
+        printf("dfile_count=%d\n", attr.dfile_count);
+        printf("buf->st_blksize=%llu\n", (long long unsigned int) buf->st_blksize);
+        */
+    }
+    else
+    {
+        buf->st_blksize = attr.blksize;
+    }
+#else
     buf->st_blksize = attr.blksize;
+#endif
     buf->st_blocks = (attr.size + (S_BLKSIZE - 1)) / S_BLKSIZE;
     /* we don't have nsec so we left the memset zero them */
     buf->st_atime = attr.atime;

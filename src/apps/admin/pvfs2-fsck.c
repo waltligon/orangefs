@@ -29,43 +29,6 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-/* utility functions */
-static struct options *parse_args(int argc, char* argv[]);
-static void usage(int argc, char** argv);
-static char *get_type_str(int type);
-
-static struct handlelist *handlelist_initialize(unsigned long *handle_counts,
-                                                int server_count);
-
-static void handlelist_add_handle(struct handlelist *hl,
-                                  PVFS_handle handles,
-                                  int server_idx);
-
-static void handlelist_add_handles(struct handlelist *hl,
-                                   PVFS_handle *handles,
-                                   unsigned long handle_count,
-                                   int server_idx);
-
-static void handlelist_finished_adding_handles(struct handlelist *hl);
-
-static int handlelist_find_handle(struct handlelist *hl,
-                                  PVFS_handle handle,
-                                  int *server_idx_p);
-
-static void handlelist_remove_handle(struct handlelist *hl,
-                                     PVFS_handle handle,
-                                     int server_idx);
-
-static int handlelist_return_handle(struct handlelist *hl,
-                                    PVFS_handle *handle_p,
-                                    int *server_idx_p);
-
-static void handlelist_finalize(struct handlelist **hl);
-
-#if 0
-static void handlelist_print(struct handlelist *hl);
-#endif
-
 struct options
 {
     char *mnt_point;

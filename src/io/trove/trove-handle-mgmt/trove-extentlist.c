@@ -31,7 +31,7 @@ static int avltree_extent_search(
     TROVE_handle handle,
     TROVE_handle *f_p,
     TROVE_handle *l_p);
-static void extent_init(
+static inline void extent_init(
     struct TROVE_handle_extent *e,
     TROVE_handle first,
     TROVE_handle last);
@@ -52,7 +52,7 @@ static uint64_t g_counter = 0;
  * last: end of extent range
  * returns: nothing. what could go wrong?
  */
-static void extent_init(struct TROVE_handle_extent *e,
+static inline void extent_init(struct TROVE_handle_extent *e,
                                TROVE_handle first,
                                TROVE_handle last) 
 {

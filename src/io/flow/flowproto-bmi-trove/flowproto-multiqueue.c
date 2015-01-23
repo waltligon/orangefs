@@ -143,7 +143,7 @@ static void trove_write_callback_fn(void *user_ptr,
  * ways, depending on if the function is triggered from an external thread
  * or in a direct invocation
  */
-static void bmi_send_callback_wrapper(void *user_ptr,
+static inline void bmi_send_callback_wrapper(void *user_ptr,
                                              PVFS_size actual_size,
                                              PVFS_error error_code)
 {
@@ -163,7 +163,7 @@ static void bmi_send_callback_wrapper(void *user_ptr,
     }
 }
 
-static void bmi_recv_callback_wrapper(void *user_ptr,
+static inline void bmi_recv_callback_wrapper(void *user_ptr,
                                              PVFS_size actual_size,
                                              PVFS_error error_code)
 {
@@ -182,7 +182,7 @@ static void bmi_recv_callback_wrapper(void *user_ptr,
     }
 }
 
-static void trove_read_callback_wrapper(void *user_ptr,
+static inline void trove_read_callback_wrapper(void *user_ptr,
                                                PVFS_error error_code)
 {
     struct fp_private_data *flow_data = 
@@ -201,7 +201,7 @@ static void trove_read_callback_wrapper(void *user_ptr,
     }
 }
 
-static void trove_write_callback_wrapper(void *user_ptr,
+static inline void trove_write_callback_wrapper(void *user_ptr,
                                                 PVFS_error error_code)
 {
     struct fp_private_data *flow_data = 

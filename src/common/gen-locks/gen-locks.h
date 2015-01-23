@@ -71,13 +71,31 @@ int gen_posix_cond_broadcast(pthread_cond_t *cond);
 typedef pthread_mutex_t gen_mutex_t;
 typedef pthread_t       gen_thread_t;
 typedef pthread_cond_t  gen_cond_t;
-#define GEN_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
+#define GEN_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER;
+#define GEN_COND_INITIALIZER PTHREAD_COND_INITIALIZER;
+
+#ifdef __USE_GNU
+/* Support for custom static initializer for a recursive pthread mutex */
+/* Newer pthread.h provide this, use what is there if we can */
+# if defined PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+#  define GEN_RECURSIVE_MUTEX_INITIALIZER_NP \
+          PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+# else
+#  if __WORDSIZE == 64
+#   define GEN_RECURSIVE_MUTEX_INITIALIZER_NP \
+           { { 0, 0, 0, 0, PTHREAD_MUTEX_RECURSIVE_NP, 0, { 0, 0 } } }
+#  else
+#   define GEN_RECURSIVE_MUTEX_INITIALIZER_NP \
+           { { 0, 0, 0, PTHREAD_MUTEX_RECURSIVE_NP, 0, { 0 } } }
+#  endif /* __WORDSIZE */
+# endif /* PTHREAD_RECURSIVE */
+#endif /* __USE_GNU */
+
+
 #ifdef __DARWIN__
-#define GEN_RECURSIVE_MUTEX_INITIALIZER_NP PTHREAD_RECURSIVE_MUTEX_INITIALIZER
-#else
-#define GEN_RECURSIVE_MUTEX_INITIALIZER PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+# define GEN_RECURSIVE_MUTEX_INITIALIZER_NP PTHREAD_RECURSIVE_MUTEX_INITIALIZER
 #endif
-#define GEN_COND_INITIALIZER PTHREAD_COND_INITIALIZER
+
 
 #define gen_mutex_lock(m) gen_posix_mutex_lock(m)
 #define gen_mutex_unlock(m) gen_posix_mutex_unlock(m)
@@ -102,6 +120,8 @@ typedef pthread_cond_t  gen_cond_t;
 
 typedef HANDLE gen_mutex_t;
 typedef HANDLE gen_thread_t;
+
+#define GEN_RECURSIVE_MUTEX_INITIALIZER_NP INVALID_HANDLE_VALUE
 
 /* Implementation based on Pthreads-win32 - POSIX Threads Library for Win32
  * Copyright (C) 1998 John E. Bossom
@@ -166,6 +186,7 @@ typedef unsigned long gen_thread_t;
 typedef int gen_cond_t;
 
 #define GEN_MUTEX_INITIALIZER 0
+#define GEN_RECURSIVE_MUTEX_INITIALIZER_NP 0
 #define GEN_COND_INITIALIZER 0
 
 static inline int gen_mutex_lock(gen_mutex_t *mutex_p)

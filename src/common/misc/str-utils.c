@@ -20,6 +20,16 @@
 #include "str-utils.h"
 #include "pvfs-path.h"
 
+/* PINT_merged_path_len()
+ *
+ * Return the length of the resulting string assuming s1 and s2 will be
+ * combined with a separating slash and null terminating byte.
+ */
+inline short PINT_merged_path_len(char* s1, char* s2)
+{
+    return (short) (strlen(s1) + strlen(s2) + 2);
+}
+
 /* PINT_merge_paths()
  * 
  * s1 (an absolute path), a single '/' character, and s2 ( a relative path) are all appended to dest.
@@ -48,6 +58,17 @@ int PINT_merge_paths(char* s1, char* s2, char* dest)
     strcat(dest, "/");
     strcat(dest, s2);
     return 0;
+}
+
+/* PINT_is_dot_dir()
+ * 
+ * Returns non-zero (true) if the supplied directory entry name corresponds
+ * to the dot directories: {".", ".."}. Otherwise, returns 0;
+ */
+inline int PINT_is_dot_dir(char * dirent_name)
+{
+    return (int) ((strcmp(dirent_name, ".") == 0)
+            || (strcmp(dirent_name, "..") == 0));
 }
 
 /* PINT_string_rm_extra_slashes()

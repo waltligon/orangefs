@@ -1022,7 +1022,7 @@ int write_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
 } /* end msgpair completion function mirror_comp_fn */
 
 /* set handle and fs-id ... required by the state machine processor */
-static int PINT_get_object_ref_mirror( struct PVFS_server_req *req,
+static inline int PINT_get_object_ref_mirror( struct PVFS_server_req *req,
                                               PVFS_fs_id *fs_id,
                                               PVFS_handle *handle )
 {

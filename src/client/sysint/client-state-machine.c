@@ -306,7 +306,7 @@ static PVFS_error completion_list_retrieve_some_completed(
     return 0;
 }
 
-static int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
+static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
 {
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /*
@@ -339,26 +339,6 @@ static int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
         (PINT_smcb_complete(smcb) ? "complete" : "NOT complete"));
 
     return (sm_base_p->u.io.total_cancellations_remaining != 0);
-}
-
-/* exposed wrappers around the id-generator code */
-static int PINT_id_gen_safe_register(
-    PVFS_sys_op_id *new_id,
-    void *item)
-{
-    return id_gen_safe_register(new_id, item);
-}
-
-static void *PINT_id_gen_safe_lookup(
-    PVFS_sys_op_id id)
-{
-    return id_gen_safe_lookup(id);
-}
-
-static int PINT_id_gen_safe_unregister(
-    PVFS_sys_op_id id)
-{
-    return id_gen_safe_unregister(id);
 }
 
 /* this array must be ordered to match the enum in client-state-machine.h */ 

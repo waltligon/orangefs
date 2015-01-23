@@ -88,7 +88,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     static int pvfs_sys_init_flag = 0; /* set to one when init is done */
 #endif
     static int pvfs_sys_init_in_progress = 0;
-    static gen_mutex_t init_mutex = GEN_RECURSIVE_MUTEX_INITIALIZER;
+    static gen_mutex_t init_mutex = GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
 
     int ret = -PVFS_EINVAL;
     const char *debug_mask_str = NULL, *debug_file = NULL;

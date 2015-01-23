@@ -130,21 +130,6 @@ static void finalize_bufmap_descriptors(void)
     return;
 }
 
-/* log to base 2 when we know that number is a power of 2 */
-static int LOG2(int number)
-{
-    int count = 0;
-    if (number == 0 || (number & (number - 1))) 
-    {
-        return -1;
-    }
-    while (number >>= 1)
-    {
-        count++;
-    }
-    return count;
-}
-
 /* pvfs_bufmap_initialize()
  *
  * initializes the mapped buffer interface

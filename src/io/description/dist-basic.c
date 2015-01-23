@@ -89,6 +89,8 @@ static char *params_string(void *params)
 }
 
 
+static PVFS_basic_params basic_params;
+
 static PINT_dist_methods basic_methods = {
     logical_to_physical_offset,
     physical_to_logical_offset,
@@ -110,7 +112,7 @@ PINT_dist basic_dist = {
     PVFS_DIST_BASIC_NAME,
     roundup8(PVFS_DIST_BASIC_NAME_SIZE), /* name size */
     0, /* param size */
-    NULL,
+    &basic_params,
     &basic_methods
 };
 #else
@@ -118,7 +120,7 @@ PINT_dist basic_dist = {
     .dist_name = PVFS_DIST_BASIC_NAME,
     .name_size = roundup8(PVFS_DIST_BASIC_NAME_SIZE), /* name size */
     .param_size = 0, /* param size */
-    .params = NULL,
+    .params = &basic_params,
     .methods = &basic_methods
 };
 #endif

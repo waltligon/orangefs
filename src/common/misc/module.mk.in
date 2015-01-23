@@ -22,6 +22,7 @@ LIBSRC += $(DIR)/server-config.c \
           $(DIR)/pint-eattr.c \
  	      $(DIR)/pint-malloc.c \
           $(DIR)/pint-hint.c \
+          $(DIR)/pint-mem.c \
           $(DIR)/pint-uid-mgmt.c \
           $(DIR)/dist-dir-utils.c \
           $(DIR)/md5.c
@@ -43,6 +44,7 @@ SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/realpath.c \
              $(DIR)/msgpairarray.c \
              $(DIR)/pint-eattr.c \
+             $(DIR)/pint-mem.c \
 	  		 $(DIR)/pint-malloc.c \
              $(DIR)/pint-hint.c \
              $(DIR)/pint-uid-mgmt.c \

@@ -78,7 +78,7 @@ static MPI_Datatype build_data_type(void)
 	return d;
 }
 
-static double msec_diff(double *end, double *begin)
+static inline double msec_diff(double *end, double *begin)
 {
 	return (*end - *begin);
 }

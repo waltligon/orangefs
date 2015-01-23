@@ -764,7 +764,7 @@ static inline int PINT_get_object_ref_##req_name(                        \
 static inline int PINT_get_credential_##req_name(        \
     struct PVFS_server_req *req, PVFS_credential **cred) \
 {                                                        \
-    *cred = &req->u.req_name.credential;                 \
+    *cred = &req->u.req_name.credential;                  \
     return 0;                                            \
 }
 

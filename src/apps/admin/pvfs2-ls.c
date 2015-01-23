@@ -151,7 +151,7 @@ do {                                                        \
   left or right justified based on the src string;
   caller must free ptr passed out as *out_str_p
 */
-static void format_size_string(
+static inline void format_size_string(
     char *src_str, int num_spaces_total, char **out_str_p,
     int right_justified, int hard_limit)
 {

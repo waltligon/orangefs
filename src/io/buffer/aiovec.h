@@ -47,8 +47,7 @@ static inline unsigned aiovec_space(struct aiovec *pvec)
 /*
  * Add an extent to a pagevec.  Returns the number of slots still available.
  */
-static inline unsigned aiovec_add(struct aiovec *pvec, struct extent *extent,
-    PVFS_offset pos, PVFS_size fsize, char * memoff, PVFS_size msize)
+static inline unsigned aiovec_add(struct aiovec *pvec, struct extent *extent, PVFS_offset pos, PVFS_size fsize, char * memoff, PVFS_size msize)
 {
         
 	pvec->extent_array[pvec->nr] = extent;

@@ -198,23 +198,6 @@ void PINT_dev_finalize(void)
     }
 }
 
-#ifdef WITH_LINUX_KMOD
-/* log to base 2 when we know that number is a power of 2 */
-static int LOG2(int number)
-{
-    int count = 0;
-    if (number == 0 || (number & (number - 1))) 
-    {
-        return -1;
-    }
-    while (number >>= 1)
-    {
-        count++;
-    }
-    return count;
-}
-#endif
-
 /* PINT_dev_get_mapped_regions()
  *
  * creates a set of memory buffers that are shared between user space and 

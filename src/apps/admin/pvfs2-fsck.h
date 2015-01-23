@@ -7,6 +7,11 @@
 #ifndef __PVFS2_FSCK_H
 #define __PVFS2_FSCK_H
 
+/* utility functions */
+static struct options *parse_args(int argc, char* argv[]);
+static void usage(int argc, char** argv);
+static char *get_type_str(int type);
+
 /* processing functions */
 struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
 				    PVFS_BMI_addr_t *addr_array,
@@ -78,6 +83,38 @@ struct handlelist {
     unsigned long *size_array;
     unsigned long *used_array;
 };
+
+static struct handlelist *handlelist_initialize(unsigned long *handle_counts,
+						int server_count);
+
+static void handlelist_add_handle(struct handlelist *hl,
+				  PVFS_handle handles,
+				  int server_idx);
+
+static void handlelist_add_handles(struct handlelist *hl,
+				   PVFS_handle *handles,
+				   unsigned long handle_count,
+				   int server_idx);
+
+static void handlelist_finished_adding_handles(struct handlelist *hl);
+
+static int handlelist_find_handle(struct handlelist *hl,
+				  PVFS_handle handle,
+				  int *server_idx_p);
+
+static void handlelist_remove_handle(struct handlelist *hl,
+				     PVFS_handle handle,
+				     int server_idx);
+
+static int handlelist_return_handle(struct handlelist *hl,
+				    PVFS_handle *handle_p,
+				    int *server_idx_p);
+
+static void handlelist_finalize(struct handlelist **hl);
+
+#if 0
+static void handlelist_print(struct handlelist *hl);
+#endif
 
 #endif
 

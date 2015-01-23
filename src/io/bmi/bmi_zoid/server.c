@@ -84,6 +84,14 @@ static bmi_method_addr_p get_client_addr(int zoid_addr);
 static int enqueue_no_mem(method_op_p op, bmi_size_t total_size);
 static int send_post_cmd(method_op_p op);
 
+
+/* These symbols come from external libraries that would need to be linked
+   even on the client-side, even though the client never actually invokes
+   them.  */
+typeof(shm_open) shm_open __attribute__((weak));
+typeof(shm_unlink) shm_unlink __attribute__((weak));
+
+
 /* Invoked on BMI_initialize.  */
 int
 BMI_zoid_server_initialize(void)
@@ -308,9 +316,8 @@ BMI_zoid_server_testunexpected(int incount, int* outcount,
 	return -BMI_EINVAL;
     }
 
-    if (socket_read(zoid_fd, &resp,
-                offsetof(struct ZBMIControlUnexpTestResp, buffers)) !=
-                offsetof(struct ZBMIControlUnexpTestResp, buffers))
+    if (socket_read(zoid_fd, &resp, offsetof(typeof(resp), buffers)) !=
+	offsetof(typeof(resp), buffers))
     {
 	perror("read");
 	release_zoid_socket(zoid_release);
@@ -347,7 +354,7 @@ BMI_zoid_server_testunexpected(int incount, int* outcount,
 	info[i].tag = buf_descs->tag;
 
 	buf_descs = (struct ZBMIControlBufDesc*)
-	    (((char*)buf_descs) + offsetof(struct ZBMIControlBufDesc, list) +
+	    (((char*)buf_descs) + offsetof(typeof(*buf_descs), list) +
 	     buf_descs->list_count * sizeof(buf_descs->list[0]));
     }
 
@@ -589,7 +596,7 @@ zoid_server_test_common(int incount, bmi_op_id_t* id_array,
     pthread_mutex_unlock(&error_ops_mutex);
 
     hdr = ZBMI_CONTROL_TEST;
-    cmd_len = offsetof(struct ZBMIControlTestCmd, zoid_ids) +
+    cmd_len = offsetof(typeof(*cmd), zoid_ids) +
 	incount_fwd * sizeof(cmd->zoid_ids[0]);
     cmd = alloca(cmd_len);
 
@@ -633,9 +640,8 @@ zoid_server_test_common(int incount, bmi_op_id_t* id_array,
 	return -BMI_EINVAL;
     }
 
-    if (socket_read(zoid_fd, &resp,
-            offsetof(struct ZBMIControlTestResp, list)) !=
-            offsetof(struct ZBMIControlTestResp, list))
+    if (socket_read(zoid_fd, &resp, offsetof(typeof(resp), list)) !=
+	offsetof(typeof(resp), list))
     {
 	perror("read");
 	release_zoid_socket(zoid_release);
@@ -1116,7 +1122,7 @@ send_post_cmd(method_op_p op)
 	   ZBMI_CONTROL_POST_RECV);
     list_count_zoid = (((struct ZoidServerMethodData*)op->method_data)->
 		       tmp_buffer ? 1 : op->list_count);
-    cmd_len = offsetof(struct ZBMIControlPostCmd, buf.list) +
+    cmd_len = offsetof(typeof(*cmd), buf.list) +
 	list_count_zoid * sizeof(cmd->buf.list[0]);
     cmd = alloca(cmd_len);
     cmd->bmi_id = op->op_id;
