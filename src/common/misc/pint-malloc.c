@@ -550,8 +550,7 @@ void init_glibc_malloc(void)
 {
     static int init_flag = 0;
     static int recurse_flag = 0;
-    static gen_mutex_t init_mutex = 
-                       (gen_mutex_t)GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
+    static gen_mutex_t init_mutex = GEN_MUTEX_INITIALIZER;
     void *libc_handle;
 
     /* prevent multiple threads from running this */

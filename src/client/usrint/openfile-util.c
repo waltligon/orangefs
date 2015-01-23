@@ -858,8 +858,7 @@ static int init_usrint_internal(void)
     int rc = 0;
     int i;
 
-    /* The recursive mutex */
-    static gen_mutex_t rec_mutex = GEN_RECURSIVE_MUTEX_INITIALIZER_NP; 
+    static gen_mutex_t mutex = GEN_RECURSIVE_MUTEX_INITIALIZER; 
 
     /* only one initialize happens */
     if(pvfs_lib_init_flag)
@@ -871,10 +870,10 @@ static int init_usrint_internal(void)
     errno_in = errno;
 
     /* make sure no double inits */
-    gen_mutex_lock(&rec_mutex);
+    gen_mutex_lock(&mutex);
     if(pvfs_lib_init_flag || pvfs_initializing_flag)
     {
-        gen_mutex_unlock(&rec_mutex);
+        gen_mutex_unlock(&mutex);
         /* make sure errors in here don't carry out */
         errno = errno_in;
         return 1;
@@ -1183,7 +1182,7 @@ static int init_usrint_internal(void)
 
     pvfs_lib_init_flag = 1;
     pvfs_initializing_flag = 0;
-    gen_mutex_unlock(&rec_mutex);
+    gen_mutex_unlock(&mutex);
     /* make sure errors in here don't carry out */
     errno = errno_in;
     return 0;
