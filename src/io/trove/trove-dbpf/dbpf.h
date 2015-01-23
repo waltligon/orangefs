@@ -147,8 +147,48 @@ do {                                                                     \
            KEYVAL_DBNAME);                                               \
 } while (0)
 
-int dbpf_pread(int fd, void *buf, size_t count, off_t offset);
-int dbpf_pwrite(int fd, const void *buf, size_t count, off_t offset);
+static inline int dbpf_pread(int fd, void *buf, size_t count, off_t offset)
+{
+    int ret = 0;
+    int ret_size = 0;
+
+    do
+    {
+        ret = pread(fd, ((char *)buf) + ret_size, 
+                    count - ret_size, offset + ret_size);
+        if (ret)
+        {
+            ret_size += ret;
+        }
+    } while( (ret == -1 && errno == EINTR) || (ret_size < count && ret > 0) );
+
+    if(ret < 0)
+    {
+        return ret;
+    }
+    return ret_size;
+}
+
+static inline int dbpf_pwrite(int fd, const void *buf, size_t count, off_t offset)
+{
+    int ret = 0;
+    int ret_size = 0;
+    do
+    {
+        ret = pwrite(fd, ((char *)buf) + ret_size, 
+                     count - ret_size, offset + ret_size);
+        if (ret)
+        {
+            ret_size += ret;
+        }
+    } while( (ret == -1 && errno == EINTR)  || (ret_size < count && ret > 0) );
+
+    if(ret < 0)
+    {
+        return -trove_errno_to_trove_error(errno);
+    }
+    return ret_size;
+}
 
 extern struct TROVE_bstream_ops dbpf_bstream_ops;
 extern struct TROVE_dspace_ops dbpf_dspace_ops;

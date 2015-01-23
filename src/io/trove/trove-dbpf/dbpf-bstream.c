@@ -706,7 +706,7 @@ static int dbpf_bstream_write_list(TROVE_coll_id coll_id,
  *
  * opcode parameter should be LIO_READ or LIO_WRITE
  */
-inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
+int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
                                 TROVE_handle handle,
                                 char **mem_offset_array,
                                 TROVE_size *mem_size_array,
@@ -1291,49 +1291,6 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 }
 
 #endif
-
-inline int dbpf_pread(int fd, void *buf, size_t count, off_t offset)
-{
-    int ret = 0;
-    int ret_size = 0;
-
-    do
-    {
-        ret = pread(fd, ((char *)buf) + ret_size, 
-                    count - ret_size, offset + ret_size);
-        if (ret)
-        {
-            ret_size += ret;
-        }
-    } while( (ret == -1 && errno == EINTR) || (ret_size < count && ret > 0) );
-
-    if(ret < 0)
-    {
-        return ret;
-    }
-    return ret_size;
-}
-
-inline int dbpf_pwrite(int fd, const void *buf, size_t count, off_t offset)
-{
-    int ret = 0;
-    int ret_size = 0;
-    do
-    {
-        ret = pwrite(fd, ((char *)buf) + ret_size, 
-                     count - ret_size, offset + ret_size);
-        if (ret)
-        {
-            ret_size += ret;
-        }
-    } while( (ret == -1 && errno == EINTR)  || (ret_size < count && ret > 0) );
-
-    if(ret < 0)
-    {
-        return -trove_errno_to_trove_error(errno);
-    }
-    return ret_size;
-}
 
 static struct dbpf_aio_ops aio_ops =
 {

@@ -14,23 +14,6 @@
 #include "trove.h"
 #include "gossip.h"
 
-/* struct handle_ledger
- *
- * Structure used internally for maintaining state.  Opaque pointers
- * passed back to the caller.
- */
-struct handle_ledger {
-    struct TROVE_handle_extentlist free_list;
-    struct TROVE_handle_extentlist recently_freed_list;
-    struct TROVE_handle_extentlist overflow_list;
-    char *store_name;
-    FILE *backing_store; 
-    TROVE_handle free_list_handle;
-    TROVE_handle recently_freed_list_handle;
-    TROVE_handle overflow_list_handle;
-    uint64_t cutoff;	/* when to start trying to reuse handles */
-};
-
 /* Functions used only internally:
  */
 
@@ -447,47 +430,6 @@ static int handle_store_load(TROVE_coll_id coll_id,
     return 0;
 }
 #endif
-
-/* trove_handle_ledger_addextent:  add a new legal extent from which the ledger
- *   can dole out handles.  
- *
- *	hl	struct handle_ledger to which we add stuff
- *	extent	the new legal extent
- *
- * return:
- *    0 if ok
- *    nonzero if not
- */
-inline int trove_handle_ledger_addextent(struct handle_ledger *hl, 
-	TROVE_extent * extent)
-{
-   return extentlist_addextent(&(hl->free_list), 
-	   extent->first, extent->last);
-}
-
-/* trove_handle_remove: 
- *	take a specific handle out of the valid handle space 
- *
- * returns
- *  0 if ok
- *  nonzero  on error
- */
-
-inline int trove_handle_remove(struct handle_ledger *hl, TROVE_handle handle)
-{
-    return extentlist_handle_remove(&(hl->free_list), handle);
-}
-
-/* trove_handle_ledger_set_threshold()
- * hl:  handle ledger object we will modify
- * nhandles:  number of total handles in the system. we will make a cutoff
- *                 value based upon this number
- */
-inline void trove_handle_ledger_set_threshold(struct handle_ledger *hl,
-					    uint64_t nhandles)
-{
-    hl->cutoff = (nhandles/4)+1;
-}
 
 /*
  * Local variables:
