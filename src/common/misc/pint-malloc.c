@@ -268,28 +268,6 @@ static void my_glibc_free(void *mem)
     }
 }
 
-static int my_glibc_posix_memalign(void **mem,
-                                          size_t alignment,
-                                          size_t size)
-{
-    if (glibc_malloc_ops.posix_memalign)
-    {
-        return glibc_malloc_ops.posix_memalign(mem, alignment, size);
-    }
-    else
-    {
-        init_glibc_malloc();
-        if (glibc_malloc_ops.posix_memalign)
-        {
-            return glibc_malloc_ops.posix_memalign(mem, alignment, size);
-        }
-        else
-        {
-            return posix_memalign(mem, alignment, size);
-        }
-    }
-}
-
 void *PINT_malloc_minimum(size_t size)
 {
     void *mem;
