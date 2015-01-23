@@ -443,7 +443,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
     } while (0)
 
 /* return 1 if string is a uid/gid number */
-int PINT_is_idnum(const char *str)
+static int PINT_is_idnum(const char *str)
 {
     char *pstr, *endptr;
     unsigned long id;
