@@ -525,7 +525,7 @@ static void pvfs_desc_free(int desc, struct qlist_head *pool)
         qlist_add_tail(&newseg->link, pool);
     }
     /* find the segment to insert the path before */
-    qlist_for_each_entry (seg, pool, link)
+    qlist_for_each_entry (seg, pool, link, index_rec_t)
     {
         if (seg->first > desc)
         {
@@ -638,7 +638,7 @@ static void path_index_return(char *path)
         gossip_lerr("path_index_find sees empty free list\n");
     }
     /* find the segment to insert the path before */
-    qlist_for_each_entry (seg, &path_index, link)
+    qlist_for_each_entry (seg, &path_index, link, index_rec_t)
     {
         if (seg->first > offset)
         {
@@ -698,7 +698,7 @@ static char *path_index_find(int size)
         gossip_lerr("path_index_find sees empty free list\n");
         return NULL;
     }
-    qlist_for_each_entry (seg, &path_index, link)
+    qlist_for_each_entry (seg, &path_index, link, index_rec_t)
     {
         if (seg->size > size)
         {
@@ -1280,7 +1280,7 @@ static pvfs_desc_list_t *find_descriptor_area_list(
                                   pvfs_descriptor_status *stat)
 {
     pvfs_desc_list_t *pdl;
-    qlist_for_each_entry(pdl, &desc_list, link)
+    qlist_for_each_entry(pdl, &desc_list, link, pvfs_desc_list_t)
     {
         int64_t diff = PDLOFF(stat, pdl) - PDLOFF(pdl->ptr->status_pool, pdl);
         if (diff >= 0 && diff < pdl->ptr->status_pool_size)

@@ -2502,11 +2502,7 @@ static void bmi_check_addr_force_drop (void)
                                 link);
         gen_mutex_unlock(&bmi_addr_force_drop_list_mutex);
         gen_mutex_lock(&ref_mutex);
-#ifdef WIN32
         qlist_for_each_entry(ref_item, cur_ref_list, list_link, ref_st)
-#else
-        qlist_for_each_entry(ref_item, cur_ref_list, list_link)
-#endif
         {
              if ((ref_item->ref_count == 0) &&
                  (ref_item->interface->method_name == drop_item->method_name))

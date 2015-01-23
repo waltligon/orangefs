@@ -1,6 +1,7 @@
 #ifndef _LIST_H
 #define _LIST_H
 
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
 /*
@@ -185,23 +186,6 @@ static inline void list_splice_init(struct list_head *list,
 	}
 }
 
-#undef offsetof
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
-
-/**
- * container_of - cast a member of a structure out to the containing structure
- *
- * @ptr:        the pointer to the member.
- * @type:       the type of the container struct this is embedded in.
- * @member:     the name of the member within the struct.
- *
- */
-#define container_of(ptr, type, member) ({                      \
-        __typeof__( ((type *)0)->member ) *__mptr = (ptr);    \
-        (type *)( (char *)__mptr - offsetof(type,member) );})
-
-
-
 /**
  * list_entry - get the struct for this entry
  * @ptr:        the &struct list_head pointer.
@@ -209,6 +193,7 @@ static inline void list_splice_init(struct list_head *list,
  * @member:     the name of the list_struct within the struct.
  */
 #define list_entry(ptr, type, member) \
-        container_of(ptr, type, member)
+        ((type *)((struct list_head *)(ptr)- \
+        (ptrdiff_t)offsetof(type, member)))
 
 #endif
