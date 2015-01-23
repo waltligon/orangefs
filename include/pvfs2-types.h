@@ -497,7 +497,7 @@ typedef struct {
    union {
      unsigned char u[16];
      unsigned int slice[4];
-   };
+   } u;
 } PVFS_khandle __attribute__ (( __aligned__ (8)));
 
 
@@ -521,7 +521,7 @@ struct ihash {
     unsigned char u[8];
     uint64_t ino;
     unsigned int slice[2];
-  };
+  } u;
 };
 
 /* max length of BMI style URI's for identifying servers */

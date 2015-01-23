@@ -340,16 +340,16 @@ static void pvfs2_khandle_from_handle(PVFS_handle *handle,
 
   memset(khandle,0,16);
 
-  ihandle.ino = *handle;
+  ihandle.u.ino = *handle;
 
-  khandle->u[0] = ihandle.u[0];
-  khandle->u[1] = ihandle.u[1];
-  khandle->u[2] = ihandle.u[2];
-  khandle->u[3] = ihandle.u[3];
-  khandle->u[12] = ihandle.u[4];
-  khandle->u[13] = ihandle.u[5];
-  khandle->u[14] = ihandle.u[6];
-  khandle->u[15] = ihandle.u[7];
+  khandle->u.u[0] = ihandle.u.u[0];
+  khandle->u.u[1] = ihandle.u.u[1];
+  khandle->u.u[2] = ihandle.u.u[2];
+  khandle->u.u[3] = ihandle.u.u[3];
+  khandle->u.u[12] = ihandle.u.u[4];
+  khandle->u.u[13] = ihandle.u.u[5];
+  khandle->u.u[14] = ihandle.u.u[6];
+  khandle->u.u[15] = ihandle.u.u[7];
 }
 
 static void client_segfault_handler(int signum, siginfo_t *info, void *secret)
@@ -2772,12 +2772,12 @@ static long encode_dirents(pvfs2_readdir_response_t *ptr, PVFS_sysresp_readdir *
     {
         enc_string(pptr, &readdir->dirent_array[i].d_name);
         /* format the handle as a khandle */
-        s.ino = readdir->dirent_array[i].handle; 
-        *(unsigned int *) *pptr = s.slice[0];
+        s.u.ino = readdir->dirent_array[i].handle; 
+        *(unsigned int *) *pptr = s.u.slice[0];
         *pptr += 4;
 	memset((void *)*pptr,0,8);
         *pptr += 8;
-        *(unsigned int *) *pptr = s.slice[1];
+        *(unsigned int *) *pptr = s.u.slice[1];
         *pptr += 4;
     }
     return ((unsigned long) *pptr - (unsigned long) ptr);

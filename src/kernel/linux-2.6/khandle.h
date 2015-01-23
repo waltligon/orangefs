@@ -32,9 +32,9 @@ static __inline__ int PVFS_khandle_cmp(const PVFS_khandle *kh1,
   int i;
 
   for (i = 15; i >= 0; i--) {
-    if (kh1->u[i] > kh2->u[i])
+    if (kh1->u.u[i] > kh2->u.u[i])
       return 1;
-    if (kh1->u[i] < kh2->u[i])
+    if (kh1->u.u[i] < kh2->u.u[i])
       return -1;
   }
 
@@ -51,7 +51,7 @@ static __inline__ void PVFS_khandle_to(const PVFS_khandle *kh,
   memset(p, 0, size);
 
   for (i = 0; i < 16 && i < size; i++)
-    c[i] = kh->u[i];
+    c[i] = kh->u.u[i];
 }
 
 /* copy a khandle from a field of arbitrary size */
@@ -64,7 +64,7 @@ static __inline__ void PVFS_khandle_from(PVFS_khandle *kh,
   memset(kh, 0, 16);
 
   for (i = 0; i < 16 && i < size; i++)
-    kh->u[i] = c[i];
+    kh->u.u[i] = c[i];
 }
 
 /* ino_t descends from "unsigned long", 8 bytes, 64 bits. */
@@ -72,16 +72,16 @@ static ino_t pvfs2_khandle_to_ino(PVFS_khandle *khandle)
 {
   struct ihash ihandle;
 
-  ihandle.u[0] = khandle->u[0];
-  ihandle.u[1] = khandle->u[1];
-  ihandle.u[2] = khandle->u[2];
-  ihandle.u[3] = khandle->u[3];
-  ihandle.u[4] = khandle->u[12];
-  ihandle.u[5] = khandle->u[13];
-  ihandle.u[6] = khandle->u[14];
-  ihandle.u[7] = khandle->u[15];
+  ihandle.u.u[0] = khandle->u.u[0];
+  ihandle.u.u[1] = khandle->u.u[1];
+  ihandle.u.u[2] = khandle->u.u[2];
+  ihandle.u.u[3] = khandle->u.u[3];
+  ihandle.u.u[4] = khandle->u.u[12];
+  ihandle.u.u[5] = khandle->u.u[13];
+  ihandle.u.u[6] = khandle->u.u[14];
+  ihandle.u.u[7] = khandle->u.u[15];
 
-  return ihandle.ino;
+  return ihandle.u.ino;
 }
 
 /*

@@ -23,7 +23,7 @@ char *k2s(PVFS_khandle *khandle, char *s) {
 
   /* determine size of handle. */
   for (i=4; i <= 11; i++)
-    if (khandle->u[i] != '\0') {
+    if (khandle->u.u[i] != '\0') {
       is64bit = 0;
       break;
     }
@@ -34,15 +34,15 @@ char *k2s(PVFS_khandle *khandle, char *s) {
      * khandle in an ihash union and sprintf the uint64_t
      * view into the return string.
      */
-    bit64.u[0] = khandle->u[0];
-    bit64.u[1] = khandle->u[1];
-    bit64.u[2] = khandle->u[2];
-    bit64.u[3] = khandle->u[3];
-    bit64.u[4] = khandle->u[12];
-    bit64.u[5] = khandle->u[13];
-    bit64.u[6] = khandle->u[14];
-    bit64.u[7] = khandle->u[15];
-    sprintf(s,"%llu", (unsigned long long) bit64.ino);
+    bit64.u.u[0] = khandle->u.u[0];
+    bit64.u.u[1] = khandle->u.u[1];
+    bit64.u.u[2] = khandle->u.u[2];
+    bit64.u.u[3] = khandle->u.u[3];
+    bit64.u.u[4] = khandle->u.u[12];
+    bit64.u.u[5] = khandle->u.u[13];
+    bit64.u.u[6] = khandle->u.u[14];
+    bit64.u.u[7] = khandle->u.u[15];
+    sprintf(s,"%llu", (unsigned long long) bit64.u.ino);
   } else {
     /*
      * For 128 bit handles, each byte can be represented
@@ -70,14 +70,14 @@ char *k2s(PVFS_khandle *khandle, char *s) {
      * code with a single sprintf line... something
      * like this:
      *
-     *     snprintf(s, 39, "%pUL", khandle->u);
+     *     snprintf(s, 39, "%pUL", khandle->u.u);
      *
      * However, we need to use k2s from the client-core,
      * so we'll stick with this home-grown code for now.
      */
     for (i = 0; i < 16; i++) {
-      left = hex_lookup[khandle->u[i] >> 4];
-      right = khandle->u[i] << 4;
+      left = hex_lookup[khandle->u.u[i] >> 4];
+      right = khandle->u.u[i] << 4;
       right = hex_lookup[right >> 4];
       sprintf(s + (i * 2 + dash_count), "%c", left);
       sprintf(s + (i * 2 + 1 + dash_count), "%c", right);
