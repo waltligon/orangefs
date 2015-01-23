@@ -10,15 +10,32 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 
-short PINT_merged_path_len(
-    char* s1,
-    char* s2);
+/* PINT_merged_path_len()
+ *
+ * Return the length of the resulting string assuming s1 and s2 will be
+ * combined with a separating slash and null terminating byte.
+ */
+static inline short PINT_merged_path_len(char* s1, char* s2)
+{
+    return (short) (strlen(s1) + strlen(s2) + 2);
+}
+
 int PINT_merge_paths(
     char* s1,
     char* s2,
     char* dest);
-int PINT_is_dot_dir(
-    char * dirent_name);
+
+/* PINT_is_dot_dir()
+ *
+ * Returns non-zero (true) if the supplied directory entry name corresponds
+ * to the dot directories: {".", ".."}. Otherwise, returns 0;
+ */
+static inline int PINT_is_dot_dir(char * dirent_name)
+{
+    return (int) ((strcmp(dirent_name, ".") == 0)
+            || (strcmp(dirent_name, "..") == 0));
+}
+
 void PINT_string_rm_extra_slashes(
     char *s);
 void PINT_string_rm_extra_slashes_rts(

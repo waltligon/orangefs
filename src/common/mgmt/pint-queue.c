@@ -183,22 +183,6 @@ int PINT_queue_add_trigger(PINT_queue_id queue_id,
     return 0;
 }
 
-inline int PINT_queue_count(PINT_queue_id qid)
-{
-    struct PINT_queue_s *queue;
-    int count;
-    queue = id_gen_fast_lookup(qid);
-    if(!queue)
-    {
-        return -PVFS_EINVAL;
-    }
-
-    gen_mutex_lock(&queue->mutex);
-    count = queue->count;
-    gen_mutex_unlock(&queue->mutex);
-    return count;
-}
-
 static int PINT_queue_insert(PINT_queue_id qid,
                              PINT_queue_entry_t *entry,
                              int front)
