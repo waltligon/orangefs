@@ -117,12 +117,6 @@ void clean_free(void *ptr)
 #include "gen-locks.h"
 #include "gossip.h"
 
-#if PVFS2_SIZEOF_VOIDP == 64
-    typedef uint64_t ptrint_t;
-#else
-    typedef uint32_t ptrint_t;
-#endif
-
 /* we don't want any crazy redefs below
  * want to call real malloc, free, etc.
  * our .h file does lots of defs, and we
@@ -352,9 +346,9 @@ void *PINT_malloc(size_t size)
 #endif
 
     memdebug(stderr, "call to MALLOC size %d addr %p returning %p \n",
-             (int)size, mem, (void *)((ptrint_t)mem + EXTRA_SIZE));
+             (int)size, mem, (void *)((unsigned char *)mem + EXTRA_SIZE));
 
-    return (void *)((ptrint_t)mem + EXTRA_SIZE);
+    return (void *)((unsigned char *)mem + EXTRA_SIZE);
 }
 
 void *PINT_calloc(size_t nmemb, size_t size)
@@ -393,11 +387,12 @@ int PINT_posix_memalign(void **mem, size_t alignment, size_t size)
 #if PVFS_MALLOC_ZERO
     memset(mem_orig, 0, sizeplus);
 #endif
-    aligned = (void *)(((ptrint_t)mem_orig + EXTRA_SIZE + alignplus - 1) &
-                       (~alignplus + 1));
+    aligned = (void *)(
+        (size_t)((unsigned char *)mem_orig + EXTRA_SIZE + alignplus - 1) &
+        (~alignplus + 1));
     *mem = aligned;
 
-    extra = (extra_t *)((ptrint_t)aligned - EXTRA_SIZE);
+    extra = (extra_t *)((unsigned char *)aligned - EXTRA_SIZE);
 #if !PVFS_MALLOC_ZERO
     memset(extra, 0, EXTRA_SIZE);
 #endif
@@ -452,7 +447,7 @@ void *PINT_realloc(void *mem, size_t size)
     void *ptr = NULL;
     size_t newsize = 0;
     extra_t *extra = NULL;
-    ptrint_t region_offset;
+    ptrdiff_t region_offset;
 
     if (mem == NULL)
     {
@@ -465,7 +460,7 @@ void *PINT_realloc(void *mem, size_t size)
         return NULL;
     }
 
-    extra = (void *)((ptrint_t)mem - EXTRA_SIZE);
+    extra = (void *)((unsigned char *)mem - EXTRA_SIZE);
 #if PVFS_MALLOC_MAGIC
     if (extra->magic != PVFS_MALLOC_MAGIC_NUM)
     {
@@ -475,7 +470,7 @@ void *PINT_realloc(void *mem, size_t size)
         return NULL;
     }
 #endif
-    region_offset = (ptrint_t)mem - (ptrint_t)extra->mem;
+    region_offset = (unsigned char *)mem - (unsigned char *)extra->mem;
     newsize = region_offset + size;
     /* glibc realloc will keep our extra structures in place */
     ptr =  my_glibc_realloc(extra->mem, newsize);
@@ -483,14 +478,14 @@ void *PINT_realloc(void *mem, size_t size)
     {
         return NULL;
     }
-    extra = (extra_t *)(((ptrint_t)ptr + region_offset) - EXTRA_SIZE);
+    extra = (extra_t *)(((unsigned char *)ptr + region_offset) - EXTRA_SIZE);
     extra->mem = ptr;
     extra->size = newsize;
 
     memdebug(stderr, "call to REALLOC size %d addr %p newaddr %p returned %p\n",
-             (int)size, mem, ptr, (void *)((ptrint_t)ptr + region_offset));
+        (int)size, mem, ptr, (void *)((unsigned char *)ptr + region_offset));
 
-    return (void *)((ptrint_t)ptr + region_offset);
+    return (void *)((unsigned char *)ptr + region_offset);
 }
 
 char *PINT_strdup(const char *str)
@@ -544,7 +539,7 @@ void PINT_free(void *mem)
         return;
     }
 
-    extra = (void *)((ptrint_t)mem - EXTRA_SIZE);
+    extra = (void *)((unsigned char *)mem - EXTRA_SIZE);
     orig_mem = extra->mem;
 
     memdebug(stderr, "call to FREE addr %p real addr %p", mem, orig_mem);
