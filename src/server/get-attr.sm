@@ -1633,6 +1633,8 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    strcpy(respattr->capability.issuer, "S:");
+    strcat(respattr->capability.issuer, config->server_alias);
 
 #if defined(ENABLE_CAPCACHE) && defined(ENABLE_SECURITY_MODE)
     /* if capability fields match cached capability, use

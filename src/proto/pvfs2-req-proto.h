@@ -1318,6 +1318,8 @@ struct PVFS_servreq_mkdir
     PVFS_handle *dirdata_handles; /* array of dirdata handles */
     int32_t dirdata_sid_count;    /* # of sids per dirdata handle */
     PVFS_SID *dirdata_sid_array;  /* sids for dirdata handles */
+    int32_t dist_dir_servers_initial; /* initial # of active dirdata handles */
+    int32_t dist_dir_split_size;  /* # of dirents to reach for split to occur */
 };
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -1357,6 +1359,8 @@ static inline void encode_PVFS_servreq_mkdir(char **pptr,
     {
         encode_PVFS_SID((pptr), &(x)->dirdata_sid_array[i]);
     }
+    encode_int32_t((pptr), &(x)->dist_dir_servers_initial);
+    encode_int32_t((pptr), &(x)->dist_dir_split_size);
 }
 
 static inline void decode_PVFS_servreq_mkdir(char **pptr,
@@ -1403,6 +1407,8 @@ static inline void decode_PVFS_servreq_mkdir(char **pptr,
     {
         decode_PVFS_SID((pptr), &(x)->dirdata_sid_array[i]);
     }
+    decode_int32_t((pptr), &(x)->dist_dir_servers_initial);
+    decode_int32_t((pptr), &(x)->dist_dir_split_size);
 }
 
 static inline void defree_PVFS_servreq_mkdir(struct PVFS_servreq_mkdir *x)
@@ -1434,11 +1440,13 @@ static inline void defree_PVFS_servreq_mkdir(struct PVFS_servreq_mkdir *x)
                                 __dirdata_handles,         \
                                 __dirdata_sid_count,       \
                                 __dirdata_sid_array,       \
+                                __dist_dir_servers_initial,\
+                                __dist_dir_split_size,     \
                                 __hints)                   \
 do {                                                       \
     memset(&(__req), 0, sizeof(__req));                    \
     (__req).op = PVFS_SERV_MKDIR;                          \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;                \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                   \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                  \
     PVFS_REQ_COPY_CAPABILITY((__cap), (__req));            \
     (__req).u.mkdir.credential = (__cred);                 \
@@ -1452,6 +1460,10 @@ do {                                                       \
     (__req).u.mkdir.dirdata_handles = (__dirdata_handles); \
     (__req).u.mkdir.dirdata_sid_count = (__dirdata_sid_count); \
     (__req).u.mkdir.dirdata_sid_array = (__dirdata_sid_array); \
+    (__req).u.mkdir.dist_dir_servers_initial =             \
+            (__dist_dir_servers_initial);                  \
+    (__req).u.mkdir.dist_dir_split_size =                  \
+            (__dist_dir_split_size);                       \
     (__attr).objtype = PVFS_TYPE_DIRECTORY;                \
     (__attr).mask   |= PVFS_ATTR_SYS_TYPE;                 \
     PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);\

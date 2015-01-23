@@ -41,50 +41,25 @@ nested machine pvfs2_mkdir_work_sm
     state set_attrib
     {
         run mkdir_setattrib;
-        success => create_dist_dir_struct;
+        success => create_dirdata;
         default => err_msg;
     }
 
-    state create_dist_dir_struct
+    state create_dirdata
     {
-        run mkdir_create_dist_dir_struct;
-        success => create_local_dirdata_dspace;
+        run mkdir_create_dirdata;
+        success => write_keyval_to_meta_handle;
         default => err_msg;
     }
 
-    state create_local_dirdata_dspace
-    {
-        run mkdir_create_local_dirdata_dspace;
-        success => request_remote_dirdata_dspace;
-        default => err_msg;
-    }
-
-    state request_remote_dirdata_dspace
-    {
-        run mkdir_request_remote_dirdata_dspace;
-        success => fill_handles_to_dist_dir_struct;
-        default => err_msg;
-    }
-
-    state fill_handles_to_dist_dir_struct
-    {
-        run mkdir_fill_handles_to_dist_dir_struct;
-        default => remote_dirdata_attr_and_keyval_setup_msgpair;
-    }
-
-    state remote_dirdata_attr_and_keyval_setup_msgpair
-    {
-        run mkdir_remote_dirdata_attr_and_keyval_setup_msgpair;
-        success => remote_dirdata_attr_and_keyval_xfer_msgpair;
-        default => err_msg;
-    }
-
+/*
     state remote_dirdata_attr_and_keyval_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
         success => write_keyval_to_meta_handle;
         default => err_msg;
     }
+*/
 
     state write_keyval_to_meta_handle
     {
@@ -189,7 +164,7 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
-//    job_id_t j_id;
+    job_id_t j_id;
     PVFS_ds_attributes *ds_attr = NULL;
 
     ds_attr = (&s_op->ds_attr);
@@ -199,10 +174,8 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
                  "%llu\n\tmtime is %llu\n", llu(ds_attr->mtime),
                  llu(PINT_util_mkversion_time(ds_attr->mtime)));
 
-#if 0
-ECQ: Make it compile
     ret = job_trove_dspace_setattr(s_op->u.mkdir.fs_id,
-                                   s_op->resp.u.mkdir.handle,
+                                   s_op->u.mkdir.handle,
                                    ds_attr, 
                                    TROVE_SYNC,
                                    smcb,
@@ -211,13 +184,12 @@ ECQ: Make it compile
                                    &j_id,
                                    server_job_context,
                                    s_op->req->hints);
-#endif
 
     return ret;
 }
 
 /*
- * Function: mkdir_create_dist_dir_struct
+ * Function: mkdir_create_dirdata
  *
  * Params:   server_op *s_op, 
  *           job_status_s *js_p
@@ -227,115 +199,41 @@ ECQ: Make it compile
  * Synopsis: Initialize dist_dir_struct in s_op->attr.u.dir and s_op->u.mkdir
  *           
  */
-/* V3
- * For V3, this state may also be able to obtain the necessary OIDs and SIDs
- * and format them correctly in the dist dir data structures.
- * The SIDs for one OID should include the local server. The SIDs for all
- * other OIDs should *not* include the local server (or only as a replica).
- * (Need to think about overall strategy for choosing these SIDs.)
-*/
-static PINT_sm_action mkdir_create_dist_dir_struct(struct PINT_smcb *smcb,
-                                                   job_status_s *js_p)
+static PINT_sm_action mkdir_create_dirdata(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr;
-    int num_total_dirdata_servers=0;
-    int num_total_dirdata_sids=0;   /* This needs to be set properly */
-    int num_initial_dirdata_servers=0;
-//    int num_meta=0;
-    int split_size=0;
-//    server_configuration_t *user_opts = get_server_config_struct();
     int ret = -1;
     unsigned char *c;
     int i;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_object_attr dirdata_attr;
 
     attr = (&s_op->attr);
-
-#if 0
-    /* if received >0, use; else use config_file value,*/
-    if(s_op->req->u.mkdir.distr_dir_servers_max > 0)
-    {
-        num_total_dirdata_servers = s_op->req->u.mkdir.distr_dir_servers_max;
-    }
-    else
-    {
-        num_total_dirdata_servers = user_opts->distr_dir_servers_max;
-    }
-
-    /* if received >0, use; else use config_file value,*/
-    if(s_op->req->u.mkdir.distr_dir_servers_initial > 0)
-    {
-        num_initial_dirdata_servers = s_op->req->u.mkdir.distr_dir_servers_initial;
-    }
-    else
-    {
-        num_initial_dirdata_servers = user_opts->distr_dir_servers_initial;
-    }
-
-    /* if received >0, use; else use config_file value,*/
-    if(s_op->req->u.mkdir.distr_dir_split_size > 0)
-    {
-        split_size = s_op->req->u.mkdir.distr_dir_split_size;
-    }
-    else
-    {
-        split_size = user_opts->distr_dir_split_size;
-    }
-
-    /* Check to make sure too many dirdata servers were not requested. */
-    ret = PINT_cached_config_get_num_meta(s_op->u.mkdir.fs_id,
-                                            &num_meta);
-    if(ret < 0)
-    {
-        gossip_err("Error: failed to get number of metadata servers\n");
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
-
-    if(num_initial_dirdata_servers > num_total_dirdata_servers)
-    {
-        js_p->error_code = -PVFS_EINVAL;
-        return SM_ACTION_COMPLETE;
-    }
-    if(num_initial_dirdata_servers > num_meta)
-    {
-        num_initial_dirdata_servers = num_meta;
-    }
-    if(num_total_dirdata_servers > num_meta)
-    {
-        num_total_dirdata_servers = num_meta;
-    }
-
-    /* set num_dirdata_servers for pre-allocation of dirdata handles */
-    s_op->u.mkdir.num_dirdata_servers = num_total_dirdata_servers;
-#endif
-
 
     /* init meta handle dist_dir_struct */
     ret = PINT_init_dist_dir_state(&attr->u.dir.dist_dir_attr,
                                    &attr->u.dir.dist_dir_bitmap,
-                                   num_total_dirdata_servers,
-                                   num_total_dirdata_sids,
+                                   s_op->req->u.mkdir.dirdata_count,
+                                   s_op->req->u.mkdir.dirdata_sid_count,
                                    0,
-                                   num_initial_dirdata_servers,
-                                   split_size);
+                                   s_op->req->u.mkdir.dist_dir_servers_initial,
+                                   s_op->req->u.mkdir.dist_dir_split_size);
 
     assert(ret == 0);
 
-#if 0
-ECQ: Make it compile
     gossip_debug(GOSSIP_MKDIR_DEBUG, 
             "mkdir: Init dist-dir-attr for dir meta handle %s "
             "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
-            PVFS_OID_str(&s_op->resp.u.mkdir.handle),
+            PVFS_OID_str(&s_op->u.mkdir.handle),
             attr->u.dir.dist_dir_attr.tree_height,
             attr->u.dir.dist_dir_attr.dirdata_count,
             attr->u.dir.dist_dir_attr.bitmap_size,
-            attr->u.dir.dist_dir_attr.split_size,
+            s_op->req->u.mkdir.dist_dir_split_size,
             attr->u.dir.dist_dir_attr.server_no,
             attr->u.dir.dist_dir_attr.branch_level);
-#endif
 
     /* gossip bitmap, may adjust later */
     gossip_debug(GOSSIP_MKDIR_DEBUG,
@@ -352,234 +250,68 @@ ECQ: Make it compile
     /* allocate dirdata handle space, similar to create.sm */
     attr->u.dir.dirdata_handles = malloc(
             sizeof(*attr->u.dir.dirdata_handles) *
-            num_total_dirdata_servers);
-    s_op->u.mkdir.handle_array_local = malloc(
-            sizeof(*s_op->u.mkdir.handle_array_local) *
-            num_total_dirdata_servers);
-    s_op->u.mkdir.handle_array_remote = malloc(
-            sizeof(*s_op->u.mkdir.handle_array_remote) *
-            num_total_dirdata_servers);
+            s_op->req->u.mkdir.dirdata_count);
+    attr->u.dir.dirdata_sids = malloc(
+            sizeof(*attr->u.dir.dirdata_sids) *
+            s_op->req->u.mkdir.dirdata_sid_count);
 
-    if(!attr->u.dir.dirdata_handles ||
-            !s_op->u.mkdir.handle_array_local ||
-            !s_op->u.mkdir.handle_array_remote )
+    if (!attr->u.dir.dirdata_handles || !attr->u.dir.dirdata_sids)
     {
-        free(attr->u.dir.dirdata_handles);
-        free(s_op->u.mkdir.handle_array_local);
-        free(s_op->u.mkdir.handle_array_remote);
+        if (attr->u.dir.dirdata_handles)
+        {
+            free(attr->u.dir.dirdata_handles);
+        }
+        if (attr->u.dir.dirdata_sids)
+        {
+            free(attr->u.dir.dirdata_sids);
+        }
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
-    return SM_ACTION_COMPLETE; 
-}
+    /* Copy OIDs and SIDs into the dist dir storage for these values. */
+    memcpy(&attr->u.dir.dirdata_handles,
+           s_op->req->u.mkdir.dirdata_handles,
+           sizeof(*attr->u.dir.dirdata_handles) *
+                  s_op->req->u.mkdir.dirdata_count);
+    memcpy(&attr->u.dir.dirdata_sids,
+           s_op->req->u.mkdir.dirdata_sid_array,
+           sizeof(*attr->u.dir.dirdata_sids) *
+                  s_op->req->u.mkdir.dirdata_sid_count);
 
-/** Creates local dirdata dspace records for new directory
- * Function: mkdir_create_local_dirdata_dspace
- *
- * Params:   server_op *s_op, 
- *           job_status_s *js_p
- *
- * Returns:  int
- *
- * Synopsis: Store local dirdata info.
- *           
- */
-/*
- * V3 - May be able to incorporate into mkdir_create_dist_dir_struct 
- */
-static PINT_sm_action mkdir_create_local_dirdata_dspace(struct PINT_smcb *smcb,
-                                                        job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_handle *handle_array = NULL;
-    PVFS_object_attr *attr GCC_UNUSED;
-    int ret = -PVFS_ENOMEM;
-    job_id_t tmp_id;
 
-    assert(s_op->u.mkdir.num_dirdata_servers > 0);
-
-    /* dirdata on every meta server */
-    s_op->u.mkdir.handle_array_local_count = 1;
-    s_op->u.mkdir.handle_array_remote_count = 
-                    s_op->u.mkdir.num_dirdata_servers - 1;
-
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "creating %d local dirdata files\n", 
-                    s_op->u.mkdir.handle_array_local_count);
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "creating %d remote dirdata files\n", 
-                    s_op->u.mkdir.handle_array_remote_count);
-
-    if(s_op->u.mkdir.handle_array_local_count == 0)
-    {
-        /* no local work to do */
-        js_p->error_code = 0;
-        return(SM_ACTION_COMPLETE);
-    }
-
-    /* where does handle_array come from? who allocates these OIDs, this
-     * code or trove?
-     * from ECQ: This code (or above in mkdir_create_dist_dir_struct) should
-     * allocate these OIDs. If it were done by trove then choosing of
-     * local and remote OIDs would have to be handled differently.
-     */
-
-/* no extents in V3 */
-#if 0
-    ret = PINT_config_get_meta_handle_extent_array(
-        user_opts, s_op->u.mkdir.fs_id, &extent_array);
-    assert(ret == 0);
-    assert(extent_array.extent_count > 0);
-
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " local dirdata handle(s) will "
-                 "be in starting hrange[0] %llu-%llu\n",
-                 llu(extent_array.extent_array[0].first),
-                 llu(extent_array.extent_array[0].last));
-#endif
-
-    ret = job_trove_dspace_create_list(s_op->req->u.mkdir.fs_id,
-                                       handle_array,
-                                       s_op->u.mkdir.handle_array_local,
-                                       s_op->u.mkdir.handle_array_local_count,
-                                       PVFS_TYPE_DIRDATA, 
-                                       NULL,
-                                       TROVE_SYNC,
-                                       smcb,
-                                       0,
-                                       js_p,
-                                       &tmp_id,
-                                       server_job_context, 
-                                       s_op->req->hints);
-
-/* V3 */
-#if 0
-    free(extent_array.extent_array);
-#endif
-
-    return(ret);
-}
-
-/* V3 remove this state action */
-static PINT_sm_action mkdir_request_remote_dirdata_dspace(
-                                                   struct PINT_smcb *smcb,
-                                                   job_status_s *js_p)
-{
-/* No pools in V3 */
-#if 0
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -1;
-    job_id_t j_id;
-
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "  local dirdata handle (%llu)\n",
-                 PVFS_OID_str($s_op->u.mkdir.handle_array_local[0]));
-
-    if(s_op->u.mkdir.handle_array_remote_count == 0)
-    {
-        js_p->error_code = 0;
-        return(SM_ACTION_COMPLETE);
-    }
-
-    ret = job_precreate_pool_get_handles(
-                                 s_op->req->u.mkdir.fs_id,
-                                 s_op->u.mkdir.handle_array_remote_count,
-                                 PVFS_TYPE_DIRDATA,
-                                 NULL, /* server string set to NULL for now */
-                                 s_op->u.mkdir.handle_array_remote,
-                                 0,
-                                 smcb,
-                                 0,
-                                 js_p,
-                                 &j_id,
-                                 server_job_context,
-                                 s_op->req->hints);
-    return ret;
-#endif
-
-    return(SM_ACTION_COMPLETE);
-
-}
-
-/* V3 this nolonger needs a request - we generate OIDs and SIDs locally */
-static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
-                                                     struct PINT_smcb *smcb,
-                                                     job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *attr;
-    int i;
-
-    attr = &s_op->attr;
-
-    /* fill dirdata_handles array */
-    attr->u.dir.dirdata_handles[0] = s_op->u.mkdir.handle_array_local[0];
-
-    for(i = 0; i < s_op->u.mkdir.num_dirdata_servers - 1; i++)
-    {
-        attr->u.dir.dirdata_handles[i + 1] =
-                                  s_op->u.mkdir.handle_array_remote[i];
-    }
-
-#if 0
-ECQ: Make it compile
-    gossip_debug(GOSSIP_MKDIR_DEBUG, 
-                 "\t mkdir: dirdata handles array of directory %s.\n",
-                 PVFS_OID_str(&s_op->resp.u.mkdir.handle));
-#endif
-
-    for(i = 0; i < s_op->u.mkdir.num_dirdata_servers; i++)
-    {
-        gossip_debug(GOSSIP_MKDIR_DEBUG, 
-                     "\t\tdirdata server %d: %s.\n",
-                     i, PVFS_OID_str(&attr->u.dir.dirdata_handles[i]));
-    }
-
-    return SM_ACTION_COMPLETE;
-}
-
-/** Sets up msgpairarray to create dirdata objects on remote servers
- */
-static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
-                                                      struct PINT_smcb *smcb,
-                                                      job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_object_attr attr;
-    int ret;
-
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "mkdir state: send_remote_dir_data\n");
-
-    /* !!! set dirdata attr, set all the static component */
-    memcpy(&attr, &s_op->req->u.mkdir.attr, sizeof(attr));
-    attr.objtype = PVFS_TYPE_DIRDATA;
-    PINT_dist_dir_attr_copyto(attr.u.dir.dist_dir_attr,
+    /* set dirdata attr, set all the static component */
+    memcpy(&dirdata_attr, &s_op->req->u.mkdir.attr, sizeof(attr));
+    dirdata_attr.objtype = PVFS_TYPE_DIRDATA;
+    PINT_dist_dir_attr_copyto(dirdata_attr.u.dir.dist_dir_attr,
                               s_op->attr.u.dir.dist_dir_attr);
     /* V3 this should go in dirdata, not dir */
-    /* need to get sids here, are all other fields in order? */
-    attr.u.dir.dirdata_handles = s_op->attr.u.dir.dirdata_handles;
-    attr.u.dir.dist_dir_bitmap = s_op->attr.u.dir.dist_dir_bitmap;
-    attr.mask = PVFS_ATTR_COMMON_ALL;
-    attr.mask |= PVFS_ATTR_DISTDIR_ATTR;
+    dirdata_attr.u.dir.dirdata_handles = s_op->attr.u.dir.dirdata_handles;
+    dirdata_attr.u.dir.dirdata_sids = s_op->attr.u.dir.dirdata_sids;
+    dirdata_attr.u.dir.dist_dir_bitmap = s_op->attr.u.dir.dist_dir_bitmap;
+    dirdata_attr.mask = PVFS_ATTR_COMMON_ALL;
+    dirdata_attr.mask |= PVFS_ATTR_DISTDIR_ATTR;
 
     gossip_debug(
             GOSSIP_MKDIR_DEBUG,
             "  SENDING attrs: [owner = %d, group = %d\n\t"
             "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
             "ctime = %llu ]\n",
-            attr.owner, attr.group, attr.perms,
-            attr.objtype, llu(attr.atime),
-            llu(PINT_util_mkversion_time(attr.mtime)), llu(attr.ctime));
+            dirdata_attr.owner, dirdata_attr.group, dirdata_attr.perms,
+            dirdata_attr.objtype, llu(dirdata_attr.atime),
+            llu(PINT_util_mkversion_time(dirdata_attr.mtime)),
+            llu(dirdata_attr.ctime));
 
     PINT_msgpair_init(&s_op->msgarray_op);
     msg_p = &s_op->msgarray_op.msgpair;
     PINT_serv_init_msgarray_params(s_op, s_op->u.mkdir.fs_id);
-
 
     PINT_SERVREQ_TREE_SETATTR_FILL(msg_p->req,
                                    s_op->req->capability,
                                    s_op->req->u.mkdir.credential,
                                    s_op->u.mkdir.fs_id,
                                    PVFS_TYPE_DIRDATA,
-                                   attr,
+                                   dirdata_attr,
                                    0, /* caller_handle_index */
                                    s_op->attr.u.dir.dist_dir_attr.dirdata_count,
                                    s_op->attr.u.dir.dirdata_handles,
@@ -595,13 +327,6 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
     msg_p->handle = s_op->attr.u.dir.dirdata_handles[0];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = tree_setattr_comp_fn;
-
-    /* V3 */
-#if 0
-    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
-                                           msg_p->handle,
-                                           msg_p->fs_id);
-#endif
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
@@ -752,8 +477,6 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     free(s_op->attr.u.dir.dirdata_handles);
     free(s_op->attr.u.dir.dist_dir_bitmap);
-    free(s_op->u.mkdir.handle_array_local);
-    free(s_op->u.mkdir.handle_array_remote);
     free(s_op->key_a);
     free(s_op->val_a);
     free(s_op->error_a);
@@ -775,8 +498,6 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
 
     s_op->attr.u.dir.dirdata_handles = NULL;
     s_op->attr.u.dir.dist_dir_bitmap = NULL;
-    s_op->u.mkdir.handle_array_local = NULL;
-    s_op->u.mkdir.handle_array_remote = NULL;
     s_op->key_a = NULL;
     s_op->val_a = NULL;
     s_op->error_a = NULL;

@@ -539,7 +539,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     /* V3 TODO - Do we want to skip oid allocation if this
      *           is a retry?
      */
-    ret = PVFS_OBJ_gen_dir(sm_p->object_ref.fs_id,
+    ret = PVFS_OBJ_gen_dir(sm_p->parent_ref.fs_id,
                            &sm_p->u.mkdir.metadata_handle,
                            sm_p->u.mkdir.metadata_sid_count, /* in */
                            &sm_p->u.mkdir.metadata_sid_array,
@@ -561,7 +561,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                             sm_p->getattr.attr.capability,
                             *sm_p->cred_p,
                             sm_p->u.mkdir.sys_attr,
-                            sm_p->object_ref.fs_id,
+                            sm_p->parent_ref.fs_id,
                             *sm_p->u.mkdir.metadata_handle, /* object */
                             sm_p->u.mkdir.metadata_sid_count,
                             sm_p->u.mkdir.metadata_sid_array,
@@ -571,6 +571,8 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                             sm_p->u.mkdir.dirdata_handles,
                             sm_p->u.mkdir.dirdata_sid_count,
                             sm_p->u.mkdir.dirdata_sid_array,
+                            sm_p->u.mkdir.sys_attr.distr_dir_servers_initial,
+                            sm_p->u.mkdir.sys_attr.distr_dir_split_size,
                             sm_p->hints);
 
     msg_p->msgclass = PVFS_IO_METADATA;
@@ -768,7 +770,7 @@ static PINT_sm_action mkdir_delete_handle_setup_msgpair(struct PINT_smcb *smcb,
     PINT_SERVREQ_REMOVE_FILL(msg_p->req,
                              sm_p->getattr.attr.capability,
                              *sm_p->cred_p,
-                             sm_p->object_ref.fs_id,
+                             sm_p->parent_ref.fs_id,
                              sm_p->object_ref.handle,
                              sm_p->object_ref.sid_count,
                              sm_p->object_ref.sid_array,
@@ -829,7 +831,7 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
 
     if (sm_p->error_code == 0)
     {
-        sm_p->u.mkdir.mkdir_resp->ref.fs_id = sm_p->object_ref.fs_id;
+        sm_p->u.mkdir.mkdir_resp->ref.fs_id = sm_p->parent_ref.fs_id;
         sm_p->u.mkdir.mkdir_resp->ref.handle = sm_p->object_ref.handle;
         sm_p->u.mkdir.mkdir_resp->ref.sid_count = sm_p->object_ref.sid_count;
         sm_p->u.mkdir.mkdir_resp->ref.sid_array = sm_p->object_ref.sid_array;
@@ -1006,7 +1008,7 @@ static PINT_sm_action mkdir_seteattr_setup_msgpair(struct PINT_smcb *smcb,
 
     PINT_SERVREQ_SETEATTR_FILL(msg_p->req,
                                sm_p->u.mkdir.metadata_getattr.attr.capability,
-                               sm_p->object_ref.fs_id,
+                               sm_p->parent_ref.fs_id,
                                sm_p->object_ref.handle,
                                sm_p->object_ref.sid_count,
                                sm_p->object_ref.sid_array,
@@ -1018,7 +1020,7 @@ static PINT_sm_action mkdir_seteattr_setup_msgpair(struct PINT_smcb *smcb,
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
-    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
     msg_p->sid_count = sm_p->object_ref.sid_count;
     msg_p->sid_index = 0;

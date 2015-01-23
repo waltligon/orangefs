@@ -1532,6 +1532,12 @@ int PINT_cached_config_get_default_distr_dir_params(PVFS_fs_id fs_id,
     int rc;
     int32_t num_meta_servers = 0;
 
+/* V3 ECQ Todo: This code is currently setting arbitrary numbers when
+ * the pertinent config values are not found. This is because the
+ * config values are currently broken but I didn't want to take the 
+ * time right now to figure out why. This has to be fixed! 
+ */
+
     /* Locate the filesystem configuration for this fs id */
     hash_link = qhash_search(PINT_fsid_config_cache_table, &(fs_id));
     if (! hash_link)
