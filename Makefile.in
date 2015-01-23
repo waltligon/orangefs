@@ -271,7 +271,7 @@ CFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
 CFLAGS += @OPENSSL_CPPFLAGS@
 
 # always want these gcc flags
-GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes
+GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes -std=c99
 
 ifneq (,$(STRICT_CFLAGS))
     GCC_CFLAGS += -Wcast-align -Wbad-function-cast
