@@ -119,13 +119,9 @@ struct PINT_manager_event_handler_entry_s
 static void PINT_manager_op_start(PINT_manager_t manager, PINT_operation_t *op);
 static void PINT_manager_op_end(PINT_manager_t manager, PINT_operation_t *op);
 
-inline static int PINT_op_entry_create(struct PINT_op_entry **op,
-                                       void *user_ptr,
-                                       PINT_service_callout callout,
-                                       void *op_ptr,
-                                       PVFS_hint hint,
-                                       PVFS_id_gen_t wq_id,
-                                       PINT_context_id context_id);
+static int PINT_op_entry_create(struct PINT_op_entry **op, void *user_ptr,
+    PINT_service_callout callout, void *op_ptr, PVFS_hint hint,
+    PVFS_id_gen_t wq_id, PINT_context_id context_id);
 
 /**
  * Create a manager that can be referenced and used for posting
@@ -662,13 +658,9 @@ int PINT_manager_ctx_post(PINT_manager_t manager,
     return ret;
 }
 
-inline static int PINT_op_entry_create(struct PINT_op_entry **op,
-                                       void *user_ptr,
-                                       PINT_service_callout callout,
-                                       void *op_ptr,
-                                       PVFS_hint hint,
-                                       PVFS_id_gen_t wq_id,
-                                       PINT_context_id context_id)
+static int PINT_op_entry_create(struct PINT_op_entry **op, void *user_ptr,
+    PINT_service_callout callout, void *op_ptr, PVFS_hint hint,
+    PVFS_id_gen_t wq_id, PINT_context_id context_id)
 {
     struct PINT_op_entry *opentry;
 

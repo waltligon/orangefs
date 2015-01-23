@@ -57,8 +57,8 @@ int64_t s_dbpf_metadata_writes = 0, s_dbpf_metadata_reads = 0;
 extern TROVE_method_callback global_trove_method_callback;
 extern struct TROVE_bstream_ops *bstream_method_table[];
 
-static inline void organize_post_op_statistics(
-    enum dbpf_op_type op_type, TROVE_op_id op_id)
+static void organize_post_op_statistics(enum dbpf_op_type op_type,
+    TROVE_op_id op_id)
 {
     switch(op_type)
     {

@@ -17,9 +17,9 @@ static void NCAC_read_request_from_list_lock(struct list_head *head, NCAC_lock *
 
 /* This file contains NCAC internal functions. */
 
-static inline struct inode *get_inode( PVFS_fs_id, PVFS_handle , PVFS_context_id);
-static inline int NCAC_rwjob_prepare_single(NCAC_req_t *ncac_req);
-static inline int NCAC_rwjob_prepare_list(NCAC_req_t *ncac_req);
+static struct inode *get_inode( PVFS_fs_id, PVFS_handle , PVFS_context_id);
+static int NCAC_rwjob_prepare_single(NCAC_req_t *ncac_req);
+static int NCAC_rwjob_prepare_list(NCAC_req_t *ncac_req);
 
 /* get_internal_req(): get a internal request structure from the free
  * list. To avoid dynamic allocation, for the timebeing, I hard code
@@ -29,7 +29,7 @@ static inline int NCAC_rwjob_prepare_list(NCAC_req_t *ncac_req);
  *
  */
 
-static inline struct NCAC_req * get_internal_req_lock( PVFS_fs_id fsid, PVFS_handle hndl)
+static struct NCAC_req * get_internal_req_lock( PVFS_fs_id fsid, PVFS_handle hndl)
 {
 
 	NCAC_req_t *req=NULL;
@@ -242,7 +242,7 @@ int NCAC_rwjob_prepare(NCAC_req_t *ncac_req, NCAC_reply_t *reply )
  *  buffers are same.
  */
 
-static inline int NCAC_rwjob_prepare_single(NCAC_req_t *ncac_req)
+static int NCAC_rwjob_prepare_single(NCAC_req_t *ncac_req)
 {
 	int extcnt;  /* cache extent count */
     int comcnt;  /* communication buffer count */
@@ -362,7 +362,7 @@ static int comp_pos(const void *x1, const void *x2)
     return 0;
 }
 
-static inline int NCAC_rwjob_prepare_list(NCAC_req_t *ncac_req)
+static int NCAC_rwjob_prepare_list(NCAC_req_t *ncac_req)
 {
 	int extcnt;  /* cache extent count */
     int comcnt;  /* communication buffer count */
@@ -744,7 +744,7 @@ int NCAC_done_request( int id )
 	return ret;
 }
 
-static inline struct inode *search_inode_list (PVFS_handle handle)
+static struct inode *search_inode_list (PVFS_handle handle)
 {
 	int inode_index;
 	struct inode * cur;
@@ -766,7 +766,7 @@ static inline struct inode *search_inode_list (PVFS_handle handle)
  * get_inode should be called under some lock because two callers may
  *     work on the same collision list.  
  */
-static inline struct inode *get_inode(PVFS_fs_id coll_id, 
+static struct inode *get_inode(PVFS_fs_id coll_id, 
 				PVFS_handle handle, PVFS_context_id context_id)
 {
 	struct inode *inode;
@@ -809,14 +809,14 @@ static inline struct inode *get_inode(PVFS_fs_id coll_id,
 
 
 
-static inline void extent_dump(struct extent *extent)
+static void extent_dump(struct extent *extent)
 {
 	fprintf(stderr, "flags:%x\t status:%d\t	index:%d\t\n", (int)extent->flags, extent->status, (int)extent->index);
 	fprintf(stderr, "writes:%d\t reads:%d\t	ioreq:%lld\t\n", extent->writes, extent->reads, lld(extent->ioreq));
 
 }
 
-static inline void list_dump(struct list_head *head)
+static void list_dump(struct list_head *head)
 {
     struct extent *page;
     struct list_head *tmp;
@@ -849,7 +849,7 @@ void cache_dump_inactive_list(void)
    list_dump(&cache->inactive_list);
 }
 
-static inline void req_list_dump(struct list_head *head)
+static void req_list_dump(struct list_head *head)
 {
     NCAC_req_t *req;
     struct list_head *tmp;
@@ -881,7 +881,7 @@ static void job_list_dump(void)
    req_list_dump(&NCAC_dev.prepare_list);
 }
 
-static inline void list_dump_list(struct list_head *head)
+static void list_dump_list(struct list_head *head)
 {
     struct extent *page;
     struct list_head *tmp;

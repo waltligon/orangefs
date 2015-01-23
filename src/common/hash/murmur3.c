@@ -12,18 +12,12 @@
 //-----------------------------------------------------------------------------
 // Platform-specific functions and macros
 
-#ifdef __GNUC__
-#define FORCE_INLINE __attribute__((always_inline)) inline
-#else
-#define FORCE_INLINE
-#endif
-
-static inline FORCE_INLINE uint32_t rotl32 ( uint32_t x, int8_t r )
+static uint32_t rotl32 ( uint32_t x, int8_t r )
 {
   return (x << r) | (x >> (32 - r));
 }
 
-static inline FORCE_INLINE uint64_t rotl64 ( uint64_t x, int8_t r )
+static uint64_t rotl64 ( uint64_t x, int8_t r )
 {
   return (x << r) | (x >> (64 - r));
 }
@@ -42,7 +36,7 @@ static inline FORCE_INLINE uint64_t rotl64 ( uint64_t x, int8_t r )
 //-----------------------------------------------------------------------------
 // Finalization mix - force all bits of a hash block to avalanche
 
-static inline FORCE_INLINE uint32_t fmix32 ( uint32_t h )
+static uint32_t fmix32 ( uint32_t h )
 {
   h ^= h >> 16;
   h *= 0x85ebca6b;
@@ -55,7 +49,7 @@ static inline FORCE_INLINE uint32_t fmix32 ( uint32_t h )
 
 //----------
 
-static inline FORCE_INLINE uint64_t fmix64 ( uint64_t k )
+static uint64_t fmix64 ( uint64_t k )
 {
   k ^= k >> 33;
   k *= BIG_CONSTANT(0xff51afd7ed558ccd);

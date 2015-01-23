@@ -749,7 +749,7 @@ static PINT_sm_action mkdir_prep_sm(
     return SM_ACTION_COMPLETE;
 }
 
-static inline int PINT_get_object_ref_mkdir(
+static int PINT_get_object_ref_mkdir(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
     *fs_id = req->u.mkdir.fs_id;

@@ -147,8 +147,8 @@ do {                                                                     \
            KEYVAL_DBNAME);                                               \
 } while (0)
 
-inline int dbpf_pread(int fd, void *buf, size_t count, off_t offset);
-inline int dbpf_pwrite(int fd, const void *buf, size_t count, off_t offset);
+int dbpf_pread(int fd, void *buf, size_t count, off_t offset);
+int dbpf_pwrite(int fd, const void *buf, size_t count, off_t offset);
 
 extern struct TROVE_bstream_ops dbpf_bstream_ops;
 extern struct TROVE_dspace_ops dbpf_dspace_ops;
@@ -435,23 +435,13 @@ struct dbpf_bstream_rw_list_op
     void *queued_op_ptr;
 };
 
-inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
-                                TROVE_handle handle,
-                                char **mem_offset_array,
-                                TROVE_size *mem_size_array,
-                                int mem_count,
-                                TROVE_offset *stream_offset_array,
-                                TROVE_size *stream_size_array,
-                                int stream_count,
-                                TROVE_size *out_size_p,
-                                TROVE_ds_flags flags,
-                                TROVE_vtag_s *vtag,
-                                void *user_ptr,
-                                TROVE_context_id context_id,
-                                TROVE_op_id *out_op_id_p,
-                                int opcode,
-                                struct dbpf_aio_ops * aio_ops,
-                                PVFS_hint  hints);
+int dbpf_bstream_rw_list(TROVE_coll_id coll_id, TROVE_handle handle,
+    char **mem_offset_array, TROVE_size *mem_size_array, int mem_count,
+    TROVE_offset *stream_offset_array, TROVE_size *stream_size_array,
+    int stream_count, TROVE_size *out_size_p, TROVE_ds_flags flags,
+    TROVE_vtag_s *vtag, void *user_ptr, TROVE_context_id context_id,
+    TROVE_op_id *out_op_id_p, int opcode, struct dbpf_aio_ops * aio_ops,
+    PVFS_hint  hints);
 
 enum dbpf_key_type
 {

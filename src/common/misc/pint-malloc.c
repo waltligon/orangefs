@@ -24,7 +24,7 @@
 #if 0
 #define memdebug fprintf
 #else
-static inline void memdebug(FILE *stream, char *format, ...)
+static void memdebug(FILE *stream, char *format, ...)
 {
     /* this is just a dummy function to eat varargs */
     return;
@@ -208,7 +208,7 @@ static struct glibc_malloc_ops_s glibc_malloc_ops = {
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
 
-static inline void *my_glibc_malloc(size_t size)
+static void *my_glibc_malloc(size_t size)
 {
     if (glibc_malloc_ops.malloc)
     {
@@ -228,7 +228,7 @@ static inline void *my_glibc_malloc(size_t size)
     }
 }
 
-static inline void *my_glibc_realloc(void *mem, size_t size)
+static void *my_glibc_realloc(void *mem, size_t size)
 {
     if (glibc_malloc_ops.realloc)
     {
@@ -248,7 +248,7 @@ static inline void *my_glibc_realloc(void *mem, size_t size)
     }
 }
 
-static inline void my_glibc_free(void *mem)
+static void my_glibc_free(void *mem)
 {
     if (glibc_malloc_ops.free)
     {
@@ -268,7 +268,7 @@ static inline void my_glibc_free(void *mem)
     }
 }
 
-static inline int my_glibc_posix_memalign(void **mem,
+static int my_glibc_posix_memalign(void **mem,
                                           size_t alignment,
                                           size_t size)
 {

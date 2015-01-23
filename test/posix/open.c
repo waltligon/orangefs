@@ -34,7 +34,7 @@
 #endif
 
 #if 0
-static inline double msec_diff(double *end, double *begin)
+static double msec_diff(double *end, double *begin)
 {
 	return (*end - *begin);
 }

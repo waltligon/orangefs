@@ -16,9 +16,9 @@
 NCAC_dev_t NCAC_dev;
 struct inode *inode_arr[MAX_INODE_NUM];
 
-static inline void init_free_extent_list(int num);
-static inline void init_free_req_list(int num);
-static inline void init_cache_stack_list(void);
+static void init_free_extent_list(int num);
+static void init_free_req_list(int num);
+static void init_cache_stack_list(void);
 
 unsigned long radix_get_value(const void *item);
 
@@ -94,7 +94,7 @@ unsigned long radix_get_value(const void *item)
     return e->index;
 }
 
-static inline void init_free_extent_list(int num)
+static void init_free_extent_list(int num)
 {
     int i;
     struct extent *start;
@@ -118,7 +118,7 @@ static inline void init_free_extent_list(int num)
     cache->nr_dirty = 0;
 }
 
-static inline void init_free_req_list(int num)
+static void init_free_req_list(int num)
 {
     int i;
     struct NCAC_req *start;
@@ -140,7 +140,7 @@ static inline void init_free_req_list(int num)
 	
 }
 
-static inline void init_cache_stack_list()
+static void init_cache_stack_list()
 {
     struct cache_stack *cache;
 

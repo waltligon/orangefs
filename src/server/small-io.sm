@@ -301,7 +301,7 @@ static int perm_small_io(PINT_server_op *s_op)
     return ret;
 }
 
-static inline enum PINT_server_req_access_type PINT_server_req_access_small_io(
+static enum PINT_server_req_access_type PINT_server_req_access_small_io(
     struct PVFS_server_req *req)
 {
     if(req->u.io.io_type == PVFS_IO_READ)

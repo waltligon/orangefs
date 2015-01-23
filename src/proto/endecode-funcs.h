@@ -115,7 +115,7 @@
     } else { \
 	    *(u_int32_t *) (*(pptr)+4) = 0; \
 	    *(pptr) += 8; \
-    } \
+    }; \
 } while (0)
 #else
 #define encode_string(pptr,pbuf) do { \
@@ -129,7 +129,7 @@
     } else { \
 	    *(u_int32_t *) *(pptr) = 0; \
 	    *(pptr) += 8; \
-    } \
+    }; \
 } while (0)
 #endif
 
@@ -209,7 +209,7 @@ static inline void decode_free (void *p) {
 #define endecode_fields_1_generic(name, sname, t1, x1) \
 static inline void encode_##name(char **pptr, const sname *x) { \
     encode_##t1(pptr, &x->x1); \
-} \
+}; \
 static inline void decode_##name(char **pptr, sname *x) { \
     decode_##t1(pptr, &x->x1); \
 }
@@ -223,7 +223,7 @@ static inline void decode_##name(char **pptr, sname *x) { \
 static inline void encode_##name(char **pptr, const sname *x) { \
     encode_##t1(pptr, &x->x1); \
     encode_##t2(pptr, &x->x2); \
-} \
+}; \
 static inline void decode_##name(char **pptr, sname *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -239,7 +239,7 @@ static inline void encode_##name(char **pptr, const sname *x) { \
     encode_##t1(pptr, &x->x1); \
     encode_##t2(pptr, &x->x2); \
     encode_##t3(pptr, &x->x3); \
-} \
+}; \
 static inline void decode_##name(char **pptr, sname *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -257,7 +257,7 @@ static inline void encode_##name(char **pptr, const sname *x) { \
     encode_##t2(pptr, &x->x2); \
     encode_##t3(pptr, &x->x3); \
     encode_##t4(pptr, &x->x4); \
-} \
+}; \
 static inline void decode_##name(char **pptr, sname *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -277,7 +277,7 @@ static inline void encode_##name(char **pptr, const sname *x) { \
     encode_##t3(pptr, &x->x3); \
     encode_##t4(pptr, &x->x4); \
     encode_##t5(pptr, &x->x5); \
-} \
+}; \
 static inline void decode_##name(char **pptr, sname *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -299,7 +299,7 @@ static inline void encode_##name(char **pptr, const sname *x) { \
     encode_##t4(pptr, &x->x4); \
     encode_##t5(pptr, &x->x5); \
     encode_##t6(pptr, &x->x6); \
-} \
+}; \
 static inline void decode_##name(char **pptr, sname *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -323,7 +323,7 @@ static inline void encode_##name(char **pptr, const name *x) { \
     encode_##t5(pptr, &x->x5); \
     encode_##t6(pptr, &x->x6); \
     encode_##t7(pptr, &x->x7); \
-} \
+}; \
 static inline void decode_##name(char **pptr, name *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -343,7 +343,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { \
     encode_##t5(pptr, &x->x5); \
     encode_##t6(pptr, &x->x6); \
     encode_##t7(pptr, &x->x7); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -364,7 +364,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { \
     encode_##t6(pptr, &x->x6); \
     encode_##t7(pptr, &x->x7); \
     encode_##t8(pptr, &x->x8); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -387,7 +387,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { \
     encode_##t7(pptr, &x->x7); \
     encode_##t8(pptr, &x->x8); \
     encode_##t9(pptr, &x->x9); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -412,7 +412,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { \
     encode_##t8(pptr, &x->x8); \
     encode_##t9(pptr, &x->x9); \
     encode_##t10(pptr, &x->x10); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -439,7 +439,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { \
     encode_##t9(pptr, &x->x9); \
     encode_##t10(pptr, &x->x10); \
     encode_##t11(pptr, &x->x11); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -468,7 +468,7 @@ static inline void encode_##name(char **pptr, const name *x) { \
     encode_##t10(pptr, &x->x10); \
     encode_##t11(pptr, &x->x11); \
     encode_##t12(pptr, &x->x12); \
-} \
+}; \
 static inline void decode_##name(char **pptr, name *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -502,7 +502,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { \
     encode_##t13(pptr, &x->x13); \
     encode_##t14(pptr, &x->x14); \
     encode_##t15(pptr, &x->x15); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -540,7 +540,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { \
     encode_##t14(pptr, &x->x14); \
     encode_##t15(pptr, &x->x15); \
     encode_##t16(pptr, &x->x16); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -581,7 +581,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { \
     encode_##t15(pptr, &x->x15); \
     encode_##t16(pptr, &x->x16); \
     encode_##t17(pptr, &x->x17); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -611,7 +611,7 @@ static inline void encode_##name(char **pptr, const sname *x) { tn1 i; \
     encode_##tn1(pptr, &x->n1); \
     for (i=0; i<x->n1; i++) \
 	encode_##ta1(pptr, &(x)->a1[i]); \
-} \
+}; \
 static inline void decode_##name(char **pptr, sname *x) { tn1 i; \
     decode_##t1(pptr, &x->x1); \
     decode_##tn1(pptr, &x->n1); \
@@ -629,7 +629,7 @@ static inline void encode_##name(char **pptr, const sname *x) { tn1 i; \
 	encode_##ta1(pptr, &(x)->a1[i]); \
     for (i=0; i<x->n1; i++) \
 	encode_##ta2(pptr, &(x)->a2[i]); \
-} \
+}; \
 static inline void decode_##name(char **pptr, sname *x) { tn1 i; \
     decode_##t1(pptr, &x->x1); \
     decode_##tn1(pptr, &x->n1); \
@@ -659,13 +659,13 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##tn1(pptr, &x->n1); \
     for (i=0; i<x->n1; i++) { int n; n = i; \
         encode_##ta1(pptr, &(x)->a1[n]); \
-    } \
+    }; \
     encode_##t2(pptr, &x->x2); \
     encode_##tn2(pptr, &x->n2); \
     for (i=0; i<x->n2; i++) { int n; n = i; \
         encode_##ta2(pptr, &(x)->a2[n]); \
-    } \
-} \
+    }; \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t1(pptr, &x->x1); \
     decode_##tn1(pptr, &x->n1); \
@@ -687,7 +687,7 @@ static inline void encode_##name(char **pptr, const sname *x) { int i; \
     encode_##tn1(pptr, &x->n1); \
     for (i=0; i<x->n1; i++) \
 	encode_##ta1(pptr, &(x)->a1[i]); \
-} \
+}; \
 static inline void decode_##name(char **pptr, sname *x) { int i; \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -712,7 +712,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
 	encode_##ta1(pptr, &(x)->a1[i]); \
     for (i=0; i<x->n1; i++) \
 	encode_##ta2(pptr, &(x)->a2[i]); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -734,7 +734,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##tn1(pptr, &x->n1); \
     for (i=0; i<x->n1; i++) \
 	encode_##ta1(pptr, &(x)->a1[i]); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -757,7 +757,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
 	encode_##ta1(pptr, &(x)->a1[i]); \
     for (i=0; i<x->n1; i++) \
 	encode_##ta2(pptr, &(x)->a2[i]); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -787,7 +787,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
      encode_##ta2(pptr, &(x)->a2[i]); \
      for (i=0; i<x->n1; i++) \
      encode_##ta3(pptr, &(x)->a3[i]); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
      decode_##t1(pptr, &x->x1); \
      decode_##t2(pptr, &x->x2); \
@@ -815,7 +815,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##tn1(pptr, &x->n1); \
     for (i=0; i<x->n1; i++) \
 	encode_##ta1(pptr, &(x)->a1[i]); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -838,7 +838,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##tn1(pptr, &x->n1); \
     for (i=0; i<x->n1; i++) \
 	encode_##ta1(pptr, &(x)->a1[i]); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -853,23 +853,23 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
 
 #ifdef WIN32
 #define DEFINE_STATIC_ENDECODE_FUNCS(__name__, __type__) \
-static void encode_func_##__name__(char **pptr, void *x) \
+static inline void encode_func_##__name__(char **pptr, void *x) \
 { \
     encode_##__name__(pptr, (__type__ *)x); \
 }; \
-static void decode_func_##__name__(char **pptr, void *x) \
+static inline void decode_func_##__name__(char **pptr, void *x) \
 { \
     decode_##__name__(pptr, (__type__ *)x); \
 }
 #else
 #define DEFINE_STATIC_ENDECODE_FUNCS(__name__, __type__) \
 __attribute__((unused)) \
-static void encode_func_##__name__(char **pptr, void *x) \
+static inline void encode_func_##__name__(char **pptr, void *x) \
 { \
     encode_##__name__(pptr, (__type__ *)x); \
 }; \
 __attribute__((unused)) \
-static void decode_func_##__name__(char **pptr, void *x) \
+static inline void decode_func_##__name__(char **pptr, void *x) \
 { \
     decode_##__name__(pptr, (__type__ *)x); \
 }
@@ -914,7 +914,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
         for (i=0; i<x->n2; i++) \
             encode_##ta2(pptr, &(x)->a2[i]); \
     align8(pptr); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -962,7 +962,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     align8(pptr); \
     encode_##t6(pptr, &x->x6); \
     align8(pptr); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
@@ -1006,7 +1006,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
         encode_##ta1(pptr, &(x)->a1[i]); \
     for (i=0; i<x->n1; i++) \
         encode_##ta2(pptr, &(x)->a2[i]); \
-} \
+}; \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \

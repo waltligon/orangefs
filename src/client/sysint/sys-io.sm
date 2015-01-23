@@ -53,24 +53,24 @@ enum
 
 /* Helper functions local to sys-io.sm. */
 
-static inline int io_complete_context_send_or_recv(
+static int io_complete_context_send_or_recv(
     PINT_smcb *smcb, job_status_s *js_p);
 
-static inline int io_decode_ack_response(
+static int io_decode_ack_response(
     PINT_client_io_ctx *cur_ctx,
     struct PINT_decoded_msg *decoded_resp,
     struct PVFS_server_resp **resp);
 
-static inline int io_post_flow(
+static int io_post_flow(
     PINT_smcb *smcb, PINT_client_io_ctx *cur_ctx);
 
-static inline int io_post_write_ack_recv(
+static int io_post_write_ack_recv(
     PINT_smcb *smcb, PINT_client_io_ctx * cur_ctx);
 
-static inline int io_process_context_recv(
+static int io_process_context_recv(
     PINT_client_sm *sm_p, job_status_s *js_p, PINT_client_io_ctx **out_ctx);
 
-static inline int io_check_context_status(
+static int io_check_context_status(
     PINT_client_io_ctx *cur_ctx, int io_type,
     PVFS_size *total_size);
 
@@ -2088,7 +2088,7 @@ static PINT_sm_action io_cleanup(
     return SM_ACTION_TERMINATE;
 }
 
-static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
+static int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
                                          struct PINT_decoded_msg *decoded_resp,
                                          struct PVFS_server_resp **resp)
 {
@@ -2154,7 +2154,7 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
  * at present), or not until the ack from the request is received (as
  * in the case of reads).
  */
-static inline int io_post_flow(PINT_smcb *smcb,
+static int io_post_flow(PINT_smcb *smcb,
                                PINT_client_io_ctx *cur_ctx)
 {
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -2312,7 +2312,7 @@ static inline int io_post_flow(PINT_smcb *smcb,
     return 0;
 }
 
-static inline int io_post_write_ack_recv(PINT_smcb *smcb,
+static int io_post_write_ack_recv(PINT_smcb *smcb,
                                          PINT_client_io_ctx * cur_ctx)
 {
     PINT_client_sm * sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -2382,7 +2382,7 @@ static inline int io_post_write_ack_recv(PINT_smcb *smcb,
   returns 0 on send completion; IO_RECV_COMPLETED on recv completion,
   and -PVFS_error on failure
 */
-static inline int io_complete_context_send_or_recv(PINT_smcb *smcb,
+static int io_complete_context_send_or_recv(PINT_smcb *smcb,
                                                    job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL, index = 0;
@@ -2454,7 +2454,7 @@ static inline int io_complete_context_send_or_recv(PINT_smcb *smcb,
  * in response to the I/O request.  This is called for each I/O context
  * i.e. each specific server response for each datafile.
  */
-static inline int io_process_context_recv(PINT_client_sm *sm_p,
+static int io_process_context_recv(PINT_client_sm *sm_p,
                                           job_status_s *js_p, 
                                           PINT_client_io_ctx **out_ctx)
 {
@@ -2529,7 +2529,7 @@ static inline int io_process_context_recv(PINT_client_sm *sm_p,
     return ret;
 }
 
-static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
+static int io_check_context_status(PINT_client_io_ctx *cur_ctx,
                                           int io_type,
                                           PVFS_size *total_size)
 {

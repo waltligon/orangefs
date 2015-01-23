@@ -266,7 +266,7 @@ static void reset_ncache_timeout(void);
 static int set_ncache_parameters(options_t* s_opts);
 static int set_capcache_parameters(options_t* s_opts);
 static void finalize_perf_items(int n, ... );
-inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req);
+static void fill_hints(PVFS_hint *hints, vfs_request_t *req);
 
 static PVFS_credential *lookup_credential(
     PVFS_uid uid,
@@ -573,7 +573,7 @@ static void *exec_remount(void *ptr)
     return NULL;
 }
 
-static inline void log_operation_timing(vfs_request_t *vfs_request)
+static void log_operation_timing(vfs_request_t *vfs_request)
 {
 #ifdef CLIENT_CORE_OP_TIMING
     double wtime = 0.0f, utime = 0.0f, stime = 0.0f;
@@ -1499,7 +1499,7 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
 }
 
 
-static inline int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
+static int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
         pvfs2_upcall_t *in_upcall, int mount) 
 {
     char *ptr = NULL, *ptrcomma = NULL;
@@ -2901,7 +2901,7 @@ err:
    this method has the ability to overwrite/scrub the error code
    passed down to the vfs
 */
-static inline void package_downcall_members(
+static void package_downcall_members(
     vfs_request_t *vfs_request, int *error_code)
 {
     int ret = -PVFS_EINVAL;
@@ -3480,7 +3480,7 @@ static inline void package_downcall_members(
 
 }
 
-static inline PVFS_error repost_unexp_vfs_request(
+static PVFS_error repost_unexp_vfs_request(
     vfs_request_t *vfs_request, char *completion_handle_desc)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -3509,7 +3509,7 @@ static inline PVFS_error repost_unexp_vfs_request(
     return ret;
 }
 
-static inline PVFS_error handle_unexp_vfs_request(
+static PVFS_error handle_unexp_vfs_request(
     vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -5276,7 +5276,7 @@ static void set_device_parameters(options_t *s_opts)
 
 static int get_mac(void);
 
-inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req)
+static void fill_hints(PVFS_hint *hints, vfs_request_t *req)
 {
     int32_t mac;
 

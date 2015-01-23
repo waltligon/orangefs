@@ -71,7 +71,7 @@ enum test_types
     TEST_PATH_LOOKUP
 };
 
-static void setup_ptstests(config *myconfig) {
+static inline void setup_ptstests(config *myconfig) {
 
    /* 
      example test setup, must define the three following values (pointers):

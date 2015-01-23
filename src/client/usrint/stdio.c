@@ -70,10 +70,8 @@ int _IO_ferror_unlocked (_IO_FILE *stream);
 extern DIR *fdopendir (int __fd);
 #endif
 
-static inline void init_stdio(void); /* wrapper to check if init is done before
-                                      * calling the real init function -
-                                      * allows us to inline
-                                      */
+static void init_stdio(void); /* wrapper to check if init is done before
+                               * calling the real init function */
 static void cleanup_stdio_internal(void) GCC_DESTRUCTOR(CLEANUP_PRIORITY_STDIO);
 static void init_stdio_internal(void) GCC_CONSTRUCTOR(INIT_PRIORITY_STDIO);
 static int init_flag = 0;
@@ -258,9 +256,8 @@ FILE *stderr = &pvfs_stderr_stream;
 
 /* this gets called all over the place to make sure initialization is
  * done so we made is small and inlined it - if init not done call the
- * real init function - which in theory was done before main
- */
-static inline void init_stdio(void)
+ * real init function - which in theory was done before main */
+static void init_stdio(void)
 {
     /* if we've already done this bail right away */
     if (init_flag)
@@ -277,7 +274,7 @@ static inline void init_stdio(void)
  *  check for the flag to see if the lock is being used.
  */
 
-static inline void lock_init_stream(FILE *stream)
+static void lock_init_stream(FILE *stream)
 {
     if (!stream->_lock)
     {
@@ -294,7 +291,7 @@ static inline void lock_init_stream(FILE *stream)
     }
 }
 
-static inline void lock_stream(FILE *stream)
+static void lock_stream(FILE *stream)
 {
     if (!ISFLAGSET(stream, _IO_USER_LOCK))
     {
@@ -302,7 +299,7 @@ static inline void lock_stream(FILE *stream)
     }
 }
 
-static inline int trylock_stream(FILE *stream)
+static int trylock_stream(FILE *stream)
 {
     if (!ISFLAGSET(stream, _IO_USER_LOCK))
     {
@@ -311,7 +308,7 @@ static inline int trylock_stream(FILE *stream)
     return 0;
 }
 
-static inline void unlock_stream(FILE *stream)
+static void unlock_stream(FILE *stream)
 {
     if (!ISFLAGSET(stream, _IO_USER_LOCK))
     {
@@ -319,7 +316,7 @@ static inline void unlock_stream(FILE *stream)
     }
 }
 
-static inline void lock_fini_stream(FILE *stream)
+static void lock_fini_stream(FILE *stream)
 {
     if (!ISFLAGSET(stream, _IO_USER_LOCK))
     {
