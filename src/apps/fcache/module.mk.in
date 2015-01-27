@@ -1,0 +1,10 @@
+
+ifdef BUILD_FCACHE
+
+DIR := src/apps/fcache
+
+FCACHEDSRC := \
+        $(DIR)/fcached.c
+
+endif # BUILD_FCACHE
+
