@@ -33,10 +33,131 @@ static int write_pidfile(int pidfile_fd);
 static void remove_pidfile(void);
 static void cleanup(void);
 static void usage(int argc, char **argv);
-
+static void parse_args(int argc, char **argv);
 
 static char * logfile_pathname = NULL;
 static char * pidfile_pathname = NULL;
+
+int main(int argc, char *argv[])
+{
+    char * tmp = NULL;
+    int pidfile_fd = 0;
+    int ret = 0;
+    /* TODO: unsigned char foreground = 0; */
+
+    ret = atexit(cleanup);
+    if(ret != 0)
+    {
+        fprintf(stderr,
+                "fcached failed to register the cleanup function with atexit, "
+                "ret = %d\n", ret);
+        exit(EXIT_FAILURE);
+    }
+
+    parse_args(argc, argv);
+
+    /* Change program state to reflect provided options... */
+    /* --------------------------------------------------- */
+    /*  Run in foreground ?
+     *   - then don't daemonize and have gossip write to stderr
+     *   - otherwise, have stderr written to logfile and daemonize!
+     */
+    /* TODO */
+
+    logfile_pathname = obtain_pathname(
+        logfile_pathname,
+        FCACHE_LOGFILE_ENV_VAR,
+        NULL,
+        FCACHE_LOGFILE_DEFAULT);
+
+#if 0
+    fprintf(stdout, "INFO: logfile_pathname = %s\n", logfile_pathname);
+#endif
+
+    if(logfile_pathname == NULL)
+    {
+        perror("Error: fcached failed to obtain and/or allocate the "
+               "logfile_pathname");
+        exit(EXIT_FAILURE);
+    }
+
+    ret = gossip_enable_file(logfile_pathname, "a");
+    if(ret != 0)
+    {
+        fprintf(stderr, "fcached failed to open the logfile: %s\n",
+                logfile_pathname);
+        exit(EXIT_FAILURE);
+    }
+
+    tmp = pidfile_pathname;
+    pidfile_pathname = obtain_pathname(
+        pidfile_pathname,
+        FCACHE_PIDFILE_ENV_VAR,
+        NULL,
+        FCACHE_PIDFILE_DEFAULT);
+
+#if 0
+    fprintf(stdout, "INFO: pidfile_pathname = %s\n", pidfile_pathname);
+#endif
+
+    if(pidfile_pathname == NULL && (
+       tmp != NULL ||
+       getenv(FCACHE_PIDFILE_ENV_VAR) != NULL ||
+       FCACHE_PIDFILE_DEFAULT != NULL))
+    {
+        perror("Error: fcached failed to obtain and/or allocate the "
+               "pidfile_pathname although it was specified");
+        exit(EXIT_FAILURE);
+    }
+
+    if(pidfile_pathname != NULL)
+    {
+        pidfile_fd = open_pidfile(pidfile_pathname);
+        if(pidfile_fd == -1)
+        {
+            fprintf(stderr,
+                    "fcached failed to open the pidfile or register the "
+                    "remove_pidfile function with the atexit function: "
+                    "pidfile_pathname = %s\n",
+                    pidfile_pathname);
+            perror("...the reason is");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    /* ...TODO make this process a daemon ... */
+
+    if(pidfile_pathname != NULL)
+    {
+#if 0
+        printf("WRITING PIDFILE: pidfile_fd = %d\n", pidfile_fd);
+#endif
+        ret = write_pidfile(pidfile_fd);
+        if(ret == -1)
+        {
+            fprintf(stderr,
+                    "fcached failed to write the pidfile or close it: "
+                    "pidfile_pathname = %s\n",
+                    pidfile_pathname);
+            perror("Error: fcached failed to write the pidfile or close it");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    gossip_set_debug_mask(1, GOSSIP_FCACHE_DEBUG);
+    gossip_debug(GOSSIP_FCACHE_DEBUG, "fcached starting...\n");
+
+
+    /* TODO: cache initialization */
+    sleep(20);
+
+
+    gossip_debug(GOSSIP_FCACHE_DEBUG, "fcached started successfully.\n");
+
+    /* TODO: remove this! */
+    exit(EXIT_SUCCESS);
+    return 0;
+}
 
 /**
  * Obtains a path name from the various methods of configuration in the
@@ -167,22 +288,9 @@ static void usage(int argc, char **argv)
     fprintf(stderr, "usage: %s\n", argv[0]);
 }
 
-int main(int argc, char *argv[])
+static void parse_args(int argc, char **argv)
 {
-    char * logfile_pathname_local = NULL;
-    char * pidfile_pathname_local = NULL;
-    int pidfile_fd = 0;
-    int ret = 0;
-    /* TODO: unsigned char foreground = 0; */
-
-    ret = atexit(cleanup);
-    if(ret != 0)
-    {
-        fprintf(stderr,
-                "fcached failed to register the cleanup function with atexit, "
-                "ret = %d\n", ret);
-        exit(EXIT_FAILURE);
-    }
+    int ret = -1;
 
     while(1)
     {
@@ -213,11 +321,11 @@ int main(int argc, char *argv[])
                 break;
             case 'l':
                 printf("option -l with value '%s'\n", optarg);
-                logfile_pathname_local = optarg;
+                logfile_pathname = optarg;
                 break;
             case 'p':
                 printf("option -p with value '%s'\n", optarg);
-                pidfile_pathname_local = optarg;
+                pidfile_pathname = optarg;
                 break;
             case '?':
                 usage(argc, argv);
@@ -251,106 +359,4 @@ int main(int argc, char *argv[])
         usage(argc, argv);
         exit(EXIT_FAILURE);
     }
-
-    /* Change program state to reflect provided options... */
-    /* --------------------------------------------------- */
-    /*  Run in foreground ?
-     *   - then don't daemonize and have gossip write to stderr
-     *   - otherwise, have stderr written to logfile and daemonize!
-     */
-    /* TODO */
-
-
-    logfile_pathname = obtain_pathname(
-        logfile_pathname_local,
-        FCACHE_LOGFILE_ENV_VAR,
-        NULL,
-        FCACHE_LOGFILE_DEFAULT);
-
-#if 0
-    fprintf(stdout, "INFO: logfile_pathname = %s\n", logfile_pathname);
-#endif
-
-    if(logfile_pathname == NULL)
-    {
-        perror("Error: fcached failed to obtain and/or allocate the "
-               "logfile_pathname");
-        exit(EXIT_FAILURE);
-    }
-
-    ret = gossip_enable_file(logfile_pathname, "a");
-    if(ret != 0)
-    {
-        fprintf(stderr, "fcached failed to open the logfile: %s\n",
-                logfile_pathname);
-        exit(EXIT_FAILURE);
-    }
-
-    pidfile_pathname = obtain_pathname(
-        pidfile_pathname_local,
-        FCACHE_PIDFILE_ENV_VAR,
-        NULL,
-        FCACHE_PIDFILE_DEFAULT);
-
-#if 0
-    fprintf(stdout, "INFO: pidfile_pathname = %s\n", pidfile_pathname);
-#endif
-
-    if(pidfile_pathname == NULL && (
-       pidfile_pathname_local != NULL ||
-       getenv(FCACHE_PIDFILE_ENV_VAR) != NULL ||
-       FCACHE_PIDFILE_DEFAULT != NULL))
-    {
-        perror("Error: fcached failed to obtain and/or allocate the "
-               "pidfile_pathname although it was specified");
-        exit(EXIT_FAILURE);
-    }
-
-    if(pidfile_pathname != NULL)
-    {
-        pidfile_fd = open_pidfile(pidfile_pathname);
-        if(pidfile_fd == -1)
-        {
-            fprintf(stderr,
-                    "fcached failed to open the pidfile or register the "
-                    "remove_pidfile function with the atexit function: "
-                    "pidfile_pathname = %s\n",
-                    pidfile_pathname);
-            perror("...the reason is");
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    /* ...TODO make this process a daemon ... */
-
-    if(pidfile_pathname != NULL)
-    {
-#if 0
-        printf("WRITING PIDFILE: pidfile_fd = %d\n", pidfile_fd);
-#endif
-        ret = write_pidfile(pidfile_fd);
-        if(ret == -1)
-        {
-            fprintf(stderr,
-                    "fcached failed to write the pidfile or close it: "
-                    "pidfile_pathname = %s\n",
-                    pidfile_pathname);
-            perror("Error: fcached failed to write the pidfile or close it");
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    gossip_set_debug_mask(1, GOSSIP_FCACHE_DEBUG);
-    gossip_debug(GOSSIP_FCACHE_DEBUG, "fcached starting...\n");
-
-
-    /* TODO: cache initialization */
-    sleep(20);
-
-
-    gossip_debug(GOSSIP_FCACHE_DEBUG, "fcached started successfully.\n");
-
-    /* TODO: remove this! */
-    exit(EXIT_SUCCESS);
-    return 0;
 }
