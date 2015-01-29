@@ -432,7 +432,7 @@ do {                                                                       \
     int mask;                                                              \
     memset(&(__req), 0, sizeof(__req));                                    \
     (__req).op = PVFS_SERV_CREATE;                                         \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;                                \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                                   \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                                  \
     (__req).hints = (__hints);                                             \
     PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                            \
@@ -1481,11 +1481,12 @@ struct PVFS_servreq_crdirent
     PVFS_handle dirdata_handle;  /* handle of directory bucket */
     PVFS_fs_id fs_id;            /* file system */
     int32_t sid_count;           /* reflexive - of bucket */
+    int32_t new_sid_count;       /* # of sids in new_sid_array */
     PVFS_SID *new_sid_array;     /* stored with new entry */
     PVFS_SID *parent_sid_array;  /* stored with new entry */
     PVFS_SID *dirdata_sid_array; /* reflexive - of bucket */
 };
-endecode_fields_6aaa_struct(
+endecode_fields_7aaa_struct(
     PVFS_servreq_crdirent,
     PVFS_credential, credential,
     string, name,
@@ -1494,6 +1495,7 @@ endecode_fields_6aaa_struct(
     PVFS_handle, dirdata_handle,
     PVFS_fs_id, fs_id,
     int32_t, sid_count,
+    int32_t, new_sid_count,
     PVFS_SID, new_sid_array,
     PVFS_SID, parent_sid_array,
     PVFS_SID, dirdata_sid_array);
@@ -1511,15 +1513,16 @@ endecode_fields_6aaa_struct(
                                    __name,                        \
                                    __new_handle,                  \
                                    __new_sid_array,               \
+                                   __new_sid_count,               \
                                    __parent_handle,               \
                                    __parent_sid_array,            \
                                    __hints)                       \
 do {                                                              \
     memset(&(__req), 0, sizeof(__req));                           \
     (__req).op = PVFS_SERV_CRDIRENT;                              \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;                       \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                          \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                         \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));           \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                   \
     (__req).u.crdirent.credential = (__cred);                     \
     (__req).hints = (__hints);                                    \
     (__req).u.crdirent.name = (__name);                           \
@@ -1529,6 +1532,7 @@ do {                                                              \
     (__req).u.crdirent.fs_id = (__fs_id);                         \
     (__req).u.crdirent.sid_count = (__sid_count);                 \
     (__req).u.crdirent.new_sid_array = (__new_sid_array);         \
+    (__req).u.crdirent.new_sid_count = (__new_sid_count);         \
     (__req).u.crdirent.dirdata_sid_array = (__dirdata_sid_array); \
     (__req).u.crdirent.parent_sid_array = (__parent_sid_array);   \
 } while (0)

@@ -298,7 +298,6 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
          */
         s_op->num_pjmp_frames += remote_op_cnt;
 
-        gossip_err("Pushing %d frames\n", remote_op_cnt + 1);
         /* malloc for each remote_op SM a msg_op and push to frame stack */
         for(remote_op = 0; remote_op < remote_op_cnt; remote_op++)
         {
@@ -341,7 +340,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     }
     else
     {
-        gossip_err("Pushing 1 frame\n");
+        //gossip_err("Pushing 1 frame\n");
     }
     /* for now other modes are ignored, treated as single op */
     js_p->error_code = 0;
@@ -363,7 +362,6 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
                   "s_op->num_pjmp_frames = %d\n",
                   s_op->num_pjmp_frames);
 
-    gossip_err("Poping %d frames\n", s_op->num_pjmp_frames);
     for (popped_count = 0;
          popped_count < s_op->num_pjmp_frames;
          popped_count++)

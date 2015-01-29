@@ -203,6 +203,10 @@ int main(int argc, char **argv)
             }
         }
 
+
+        printf("parent_ref.sid_count(%d)\n",parent_ref.sid_count);
+
+
         rc = PVFS_sys_create(filename,
                              parent_ref,
                              attr,

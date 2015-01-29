@@ -668,6 +668,11 @@ PVFS_error PVFS_sys_lookup(PVFS_fs_id fs_id,
     {
         ret = PINT_cached_config_get_root_ref(fs_id, &parent);
 
+        gossip_err("%s: parent-ref.handle(%s) sid_count(%d)\n"
+                  ,__func__
+                  ,PVFS_OID_str(&parent.handle)
+                  ,parent.sid_count);
+
         if (ret < 0)
         {
             return ret;
