@@ -298,7 +298,7 @@ endecode_fields_7a1a_struct(
     PVFS_SID, sid_array);
 #endif
 
-/* custom encode/decode macros */
+/* custom encode/decode macros to deal with OID/SID arrays cleanly */
 #if 0
 
     if ((x)->parent && !PVFS_OID_is_null((x)->parent))                     \
@@ -432,7 +432,7 @@ do {                                                                       \
     int mask;                                                              \
     memset(&(__req), 0, sizeof(__req));                                    \
     (__req).op = PVFS_SERV_CREATE;                                         \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;                                \
+    (__req).ctrl.mode = PVFS_REQ_REPLICATE;                                \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                                  \
     (__req).hints = (__hints);                                             \
     PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                            \

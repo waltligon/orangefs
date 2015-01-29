@@ -140,6 +140,7 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {DIST_DIR_ATTR_KEYSTR, DIST_DIR_ATTR_KEYLEN},
     {DIST_DIRDATA_BITMAP_KEYSTR, DIST_DIRDATA_BITMAP_KEYLEN},
     {DIST_DIRDATA_HANDLES_KEYSTR, DIST_DIRDATA_HANDLES_KEYLEN},
+    {OBJECT_PARENT_KEYSTR, OBJECT_PARENT_KEYLEN},
 };
 
 /* These three are used continuously in our wait loop.  They could be

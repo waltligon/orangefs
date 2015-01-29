@@ -412,7 +412,7 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
     job_id_t j_id;
 
     /* start with 2 keyvals: the distribution and the datafile handles */
-    int keyval_count = 2;
+    int keyval_count = 3;
 
     s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
     if(!s_op->key_a)
@@ -443,6 +443,13 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
 
     s_op->val_a[1].buffer_sz = s_op->req->u.create.attr.u.meta.dist_size;
     s_op->val_a[1].buffer = malloc(s_op->val_a[1].buffer_sz);
+
+    s_op->key_a[2].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
+    s_op->key_a[2].buffer = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
+
+    s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.create.sid_count);
+    s_op->val_a[2].buffer = s_op->req->u.create.parent;
+
     if(!s_op->val_a[1].buffer)
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -828,12 +835,28 @@ static int perm_create(PINT_server_op *s_op)
     return 0;
 }
 
+static int create_get_ctrl(struct PVFS_server_req *req,
+                           struct PINT_server_req_ctrl *ctrl)
+{
+    /* this sets up a standard replication */
+    /* generates a request to each of sid_count SIDs */
+    /* all with the same UID */
+    ctrl->fs_id = req->u.create.fs_id;
+    ctrl->handles = &req->u.create.handle;
+    ctrl->count = 1;
+    ctrl->sids = &req->u.create.sid_array[1];
+    ctrl->sid_count = req->u.create.sid_count - 1;
+    /* return number of new remote messages */
+    return ctrl->sid_count;
+}
+
 struct PINT_server_req_params pvfs2_create_params =
 {
     .string_name = "create",
     .get_object_ref = PINT_get_object_ref_create,
     .get_credential = PINT_get_credential_create,
     .perm = perm_create,
+    .get_ctrl = create_get_ctrl,
     .access_type = PINT_server_req_modify,
     .state_machine = &pvfs2_create_sm
 };

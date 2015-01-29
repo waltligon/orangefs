@@ -107,8 +107,8 @@ enum
     NUM_DFILES_REQ_KEY       = 6,       
     DIST_DIR_ATTR_KEY        = 7,
     DIST_DIRDATA_BITMAP_KEY  = 8,
-    DIST_DIRDATA_HANDLES_KEY = 9
-
+    DIST_DIRDATA_HANDLES_KEY = 9,
+    OBJECT_PARENT_KEY        = 10
 };
 
 /* This is defined in src/server/get-attr.sm

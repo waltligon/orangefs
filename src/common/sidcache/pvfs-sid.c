@@ -410,7 +410,7 @@ int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
     *datafile_handles = (PVFS_OID *)malloc(datafile_count * sizeof(PVFS_OID));
     for (i = 0; i < datafile_count; i++)
     {
-        PVFS_OID_gen(*datafile_handles);
+        PVFS_OID_gen(&((*datafile_handles)[i]));
     }
 
     /* generate SIDs for datafile objects */

@@ -441,7 +441,7 @@ void print_keyval( DBT key, DBT val )
             {
                 PVFS_handle *handle = val.data;
 
-                printf("(/dh)(%d) -> ", key.size);
+                printf("(dh)(%d) -> ", key.size);
                 while ((char *)handle - (char *)val.data < val.size)
                 {
                     printf("(%s)", PVFS_OID_str(handle));
@@ -496,7 +496,7 @@ void print_keyval( DBT key, DBT val )
                                (int)sizeof(int32_t));
                         break;
                     default:
-                        printf("(unrecognized: %d) (%d)\n",
+                        printf("(unrecognized layout: %d) (%d)\n",
                                *(uint32_t *)val.data,
                                (int)sizeof(int32_t));
                         break;
@@ -509,6 +509,19 @@ void print_keyval( DBT key, DBT val )
                        key.size,
                        *(uint32_t *)val.data,
                        val.size);
+            }
+            /* parent handle */
+            else if( strncmp(k->key, "pa", 3) == 0)
+            {
+                PVFS_handle *handle = val.data;
+
+                printf("(pa)(%d) -> ", key.size);
+                while ((char *)handle - (char *)val.data < val.size)
+                {
+                    printf("(%s)", PVFS_OID_str(handle));
+                    handle++;
+                }
+                printf(" (%d)\n", val.size);
             }
             /* dist directory attr */
             else if( strncmp(k->key, "/dda", 5) == 0 )
