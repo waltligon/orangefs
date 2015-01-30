@@ -12,6 +12,10 @@
 #ifndef __SRC_PROTO_ENDECODE_FUNCS_H
 #define __SRC_PROTO_ENDECODE_FUNCS_H
 
+#ifdef WIN32
+#include "wincommon.h"
+#endif
+
 #include "src/io/bmi/bmi-byteswap.h"
 #include <stdint.h>
 #include <assert.h>

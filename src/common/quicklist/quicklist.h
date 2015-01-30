@@ -19,6 +19,9 @@
 #ifndef QUICKLIST_H
 #define QUICKLIST_H
 
+#ifdef WIN32
+#include "wincommon.h"
+#endif
 #include <stdlib.h>
 
 struct qlist_head {

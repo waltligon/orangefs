@@ -21,9 +21,6 @@
     <ClCompile Include="..\..\..\..\src\common\misc\pint-event.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\src\common\misc\pint-mem.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\src\common\misc\str-utils.c">
       <Filter>Source Files</Filter>
     </ClCompile>

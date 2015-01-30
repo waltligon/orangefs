@@ -13,9 +13,10 @@
 
 #include <Windows.h>
 #include <sys/timeb.h>
+#include <stdint.h>
 
-#define __inline__     _inline
-#define inline         _inline
+#define __inline__     __inline
+#define inline         __inline
 #define __func__       __FUNCTION__
 
 /* ignore the __attribute__ keyword */
@@ -26,6 +27,10 @@
 #define strdup(s)      _strdup(s)
 #define strcasecmp     stricmp
 #define strncasecmp    strnicmp
+
+/* types */
+typedef uint32_t u_int32_t;
+typedef uint64_t u_int64_t;
 
 /*
  * gettimeofday

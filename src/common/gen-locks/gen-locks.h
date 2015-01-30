@@ -103,6 +103,8 @@ typedef pthread_cond_t  gen_cond_t;
 typedef HANDLE gen_mutex_t;
 typedef HANDLE gen_thread_t;
 
+#define GEN_RECURSIVE_MUTEX_INITIALIZER INVALID_HANDLE_VALUE
+
 /* Implementation based on Pthreads-win32 - POSIX Threads Library for Win32
  * Copyright (C) 1998 John E. Bossom
  * Copyright (C) 1999,2005 Pthreads-win32 contributors

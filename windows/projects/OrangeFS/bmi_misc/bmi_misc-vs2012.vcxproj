@@ -189,7 +189,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\..\src\common\misc\errno-mapping.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\pint-event.c" />
-    <ClCompile Include="..\..\..\..\src\common\misc\pint-mem.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\str-utils.c" />
   </ItemGroup>
   <ItemGroup>
