@@ -1481,7 +1481,7 @@ struct PVFS_servreq_crdirent
     PVFS_handle dirdata_handle;  /* handle of directory bucket */
     PVFS_fs_id fs_id;            /* file system */
     int32_t sid_count;           /* reflexive - of bucket */
-    int32_t new_sid_count;       /* # of sids in new_sid_array */
+    int32_t new_sid_count;       /* # of sids in new_sid_array;could be different than parent. */
     PVFS_SID *new_sid_array;     /* stored with new entry */
     PVFS_SID *parent_sid_array;  /* stored with new entry */
     PVFS_SID *dirdata_sid_array; /* reflexive - of bucket */
@@ -1520,7 +1520,7 @@ endecode_fields_7aaa_struct(
 do {                                                              \
     memset(&(__req), 0, sizeof(__req));                           \
     (__req).op = PVFS_SERV_CRDIRENT;                              \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;                          \
+    (__req).ctrl.mode = PVFS_REQ_REPLICATE;                       \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                         \
     PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                   \
     (__req).u.crdirent.credential = (__cred);                     \

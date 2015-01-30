@@ -1224,7 +1224,7 @@ static int setattr_get_ctrl(struct PVFS_server_req *req,
 {
     /* this sets up a standard replication */
     /* generates a request to each of sid_count SIDs */
-    /* all with the same UID */
+    /* all with the same UUID */
     ctrl->fs_id = req->u.setattr.fs_id;
     ctrl->handles = &req->u.setattr.handle;
     ctrl->count = 1;
