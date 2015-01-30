@@ -2051,6 +2051,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
             case 'r':
           do_rmfs:
                 s_server_options.server_remove_storage_space = 1;
+                break;
             case 'f':
           do_mkfs:
                 s_server_options.server_create_storage_space = 1;
