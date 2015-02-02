@@ -102,6 +102,7 @@ nested machine pvfs2_set_attr_work_sm
     state write_distr_dir_data_if_required
     {
         run setattr_write_distr_dir_data_if_required;
+        success => setobj_attrib;
         default => work_cleanup;
     }
 
