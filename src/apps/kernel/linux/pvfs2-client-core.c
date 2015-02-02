@@ -333,25 +333,6 @@ do {                                                                         \
 #  error Unknown instruction pointer location for your architecture, configure with --disable-segv-backtrace.
 #endif
 
-static void pvfs2_khandle_from_handle(PVFS_handle *handle,
-                               PVFS_khandle *khandle)
-{
-  struct ihash ihandle;
-
-  memset(khandle,0,16);
-
-  ihandle.ino = *handle;
-
-  khandle->u[0] = ihandle.u[0];
-  khandle->u[1] = ihandle.u[1];
-  khandle->u[2] = ihandle.u[2];
-  khandle->u[3] = ihandle.u[3];
-  khandle->u[12] = ihandle.u[4];
-  khandle->u[13] = ihandle.u[5];
-  khandle->u[14] = ihandle.u[6];
-  khandle->u[15] = ihandle.u[7];
-}
-
 static void client_segfault_handler(int signum, siginfo_t *info, void *secret)
 {
     void *trace[16];
@@ -387,6 +368,25 @@ static void client_segfault_handler(int signum)
     gossip_disable();
 #endif
     abort();
+}
+
+static void pvfs2_khandle_from_handle(PVFS_handle *handle,
+                               PVFS_khandle *khandle)
+{
+  struct ihash ihandle;
+
+  memset(khandle,0,16);
+
+  ihandle.ino = *handle;
+
+  khandle->u[0] = ihandle.u[0];
+  khandle->u[1] = ihandle.u[1];
+  khandle->u[2] = ihandle.u[2];
+  khandle->u[3] = ihandle.u[3];
+  khandle->u[12] = ihandle.u[4];
+  khandle->u[13] = ihandle.u[5];
+  khandle->u[14] = ihandle.u[6];
+  khandle->u[15] = ihandle.u[7];
 }
 
 static void client_core_sig_handler(int signum)
