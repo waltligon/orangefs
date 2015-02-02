@@ -45,7 +45,10 @@ typedef int64_t BMI_addr_t;
  * error codes look like */
 typedef int32_t bmi_error_code_t; /**< error code information */
 
-#define BMI_MAX_ADDR_LEN 256
+/* This is potentially constrained by limits hardcoded in the config
+ * file parser and/or the tab file parser
+ */
+#define BMI_MAX_ADDR_LEN 2048
 
 /** BMI method initialization flags */
 enum
@@ -89,7 +92,8 @@ enum
     BMI_TCP_BUFFER_RECEIVE_SIZE = 12,
     BMI_TCP_CLOSE_SOCKET = 13,
     BMI_OPTIMISTIC_BUFFER_REG = 14,
-    BMI_TCP_CHECK_UNEXPECTED = 15
+    BMI_TCP_CHECK_UNEXPECTED = 15,
+    BMI_TRANSPORT_METHODS_STRING = 16,
 };
 
 enum BMI_io_type

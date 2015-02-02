@@ -112,139 +112,178 @@ static int ib_check_cq(void)
 {
     int ret = 0;
 
-    for (;;) {
-	struct bmi_ib_wc wc;
-	int vret;
+    for (;;) 
+    {
+        struct bmi_ib_wc wc;
+        int vret;
 
-	vret = check_cq(&wc);
-	if (vret == 0)
-	    break;  /* empty */
+        vret = check_cq(&wc);
+        if (vret == 0)
+        {
+            break;  /* empty */
+        }
 
-	debug(4, "%s: found something", __func__);
-	++ret;
-	if (wc.status != 0) {
-	    struct buf_head *bh = ptr_from_int64(wc.id);
-	    /* opcode is not necessarily valid; only wr_id, status, qp_num,
-	     * and vendor_err can be relied upon */
-	    if (wc.opcode == BMI_IB_OP_SEND) {
-		debug(0, "%s: entry id 0x%llx SEND error %s to %s", __func__,
-		  llu(wc.id), wc_status_string(wc.status), bh->c->peername);
-		if (wc.id) {
-		    ib_connection_t *c = ptr_from_int64(wc.id);
-		    if (c->cancelled) {
-			debug(0,
-			  "%s: ignoring send error on cancelled conn to %s",
-			  __func__, bh->c->peername);
-		    }
-		}
-	    } else {
-		warning("%s: entry id 0x%llx opcode %s error %s from %s", 
-		  __func__,
-		  llu(wc.id), wc_opcode_string(wc.opcode),
-		  wc_status_string(wc.status), bh->c->peername);
-		continue;
-	    }
-	}
+        debug(4, "%s: found something", __func__);
+        ++ret;
+        if (wc.status != 0) 
+        {
+            struct buf_head *bh = ptr_from_int64(wc.id);
+            /* opcode is not necessarily valid; only wr_id, status, qp_num,
+             * and vendor_err can be relied upon */
+            if (wc.opcode == BMI_IB_OP_SEND) 
+            {
+                debug(0, "%s: entry id 0x%llx SEND error %s to %s", __func__,
+                  llu(wc.id), wc_status_string(wc.status), bh->c->peername);
+                if (wc.id) 
+                {
+                    ib_connection_t *c = ptr_from_int64(wc.id);
+                    if (c->cancelled) 
+                    {
+                        debug(0,
+                          "%s: ignoring send error on cancelled conn to %s",
+                          __func__, bh->c->peername);
+                    }
+                }
+            } 
+            else 
+            {
+                warning("%s: entry id 0x%llx opcode %s error %s from %s", 
+                  __func__,
+                  llu(wc.id), wc_opcode_string(wc.opcode),
+                  wc_status_string(wc.status), bh->c->peername);
+                continue;
+            }
+        }
 
-	if (wc.opcode == BMI_IB_OP_RECV) {
-	    /*
-	     * Remote side did a send to us.
-	     */
-	    msg_header_common_t mh_common;
-	    struct buf_head *bh = ptr_from_int64(wc.id);
-	    char *ptr = bh->buf;
-	    u_int32_t byte_len = wc.byte_len;
+        if (wc.opcode == BMI_IB_OP_RECV) 
+        {
+            /*
+             * Remote side did a send to us.
+             */
+            msg_header_common_t mh_common;
+            struct buf_head *bh = ptr_from_int64(wc.id);
+            char *ptr = bh->buf;
+            u_int32_t byte_len = wc.byte_len;
 
-	    VALGRIND_MAKE_MEM_DEFINED(ptr, byte_len);
-	    decode_msg_header_common_t(&ptr, &mh_common);
-	    bh->c->send_credit += mh_common.credit;
+            VALGRIND_MAKE_MEM_DEFINED(ptr, byte_len);
+            decode_msg_header_common_t(&ptr, &mh_common);
+            bh->c->send_credit += mh_common.credit;
 
-	    debug(2, "%s: recv from %s len %d type %s credit %d",
-		  __func__, bh->c->peername, byte_len,
-		  msg_type_name(mh_common.type), mh_common.credit);
-	    if (mh_common.type == MSG_CTS) {
-		/* incoming CTS messages go to the send engine */
-		encourage_send_incoming_cts(bh, byte_len);
-	    } else {
-		/* something for the recv side, no known rq yet */
-		encourage_recv_incoming(bh, mh_common.type, byte_len);
-	    }
+            debug(2, "%s: recv from %s len %d type %s credit %d",
+              __func__, bh->c->peername, byte_len,
+              msg_type_name(mh_common.type), mh_common.credit);
+            if (mh_common.type == MSG_CTS) 
+            {
+                /* incoming CTS messages go to the send engine */
+                encourage_send_incoming_cts(bh, byte_len);
+            } 
+            else 
+            {
+                /* something for the recv side, no known rq yet */
+                encourage_recv_incoming(bh, mh_common.type, byte_len);
+            }
 
-	} else if (wc.opcode == BMI_IB_OP_RDMA_WRITE) {
+        } 
+        else if (wc.opcode == BMI_IB_OP_RDMA_WRITE) 
+        {
+            /* completion event for the rdma write we initiated, used
+             * to signal memory unpin etc. */
+            struct ib_work *sq = ptr_from_int64(wc.id);
 
-	    /* completion event for the rdma write we initiated, used
-	     * to signal memory unpin etc. */
-	    struct ib_work *sq = ptr_from_int64(wc.id);
+            debug(3, "%s: sq %p %s", __func__, sq,
+                  sq_state_name(sq->state.send));
 
-	    debug(3, "%s: sq %p %s", __func__, sq,
-	          sq_state_name(sq->state.send));
+            bmi_ib_assert(sq->state.send == SQ_WAITING_DATA_SEND_COMPLETION,
+                  "%s: wrong send state %s", __func__,
+                  sq_state_name(sq->state.send));
 
-	    bmi_ib_assert(sq->state.send == SQ_WAITING_DATA_SEND_COMPLETION,
-			  "%s: wrong send state %s", __func__,
-			  sq_state_name(sq->state.send));
-
-	    sq->state.send = SQ_WAITING_RTS_DONE_BUFFER;
+            sq->state.send = SQ_WAITING_RTS_DONE_BUFFER;
 
 #if !MEMCACHE_BOUNCEBUF
-	    memcache_deregister(ib_device->memcache, &sq->buflist);
+            memcache_deregister(ib_device->memcache, &sq->buflist);
 #endif
-	    debug(2, "%s: sq %p RDMA write done, now %s", __func__, sq,
-	          sq_state_name(sq->state.send));
+            debug(2, "%s: sq %p RDMA write done, now %s", __func__, sq,
+                  sq_state_name(sq->state.send));
 
-	    encourage_rts_done_waiting_buffer(sq);
+            encourage_rts_done_waiting_buffer(sq);
 
-	} else if (wc.opcode == BMI_IB_OP_SEND) {
+        } 
+        else if (wc.opcode == BMI_IB_OP_SEND) 
+        {
+            struct buf_head *bh = ptr_from_int64(wc.id);
+            struct ib_work *sq = bh->sq;
 
-	    struct buf_head *bh = ptr_from_int64(wc.id);
-	    struct ib_work *sq = bh->sq;
+            if (sq == NULL) 
+            {
+                /* MSG_BYE or MSG_CREDIT */
+                debug(2, "%s: MSG_BYE or MSG_CREDIT completed locally",
+                      __func__);
+            } 
+            else if (sq->type == BMI_SEND) 
+            {
+                sq_state_t state = sq->state.send;
 
-	    if (sq == NULL) {
-		/* MSG_BYE or MSG_CREDIT */
-		debug(2, "%s: MSG_BYE or MSG_CREDIT completed locally",
-		      __func__);
-	    } else if (sq->type == BMI_SEND) {
-		sq_state_t state = sq->state.send;
+                if (state == SQ_WAITING_EAGER_SEND_COMPLETION)
+                {
+                    sq->state.send = SQ_WAITING_USER_TEST;
+                }
+                else if (state == SQ_WAITING_RTS_SEND_COMPLETION)
+                {
+                    sq->state.send = SQ_WAITING_CTS;
+                }
+                else if (state == SQ_WAITING_RTS_SEND_COMPLETION_GOT_CTS)
+                {
+                    sq->state.send = SQ_WAITING_DATA_SEND_COMPLETION;
+                }
+                else if (state == SQ_WAITING_RTS_DONE_SEND_COMPLETION)
+                {
+                    sq->state.send = SQ_WAITING_USER_TEST;
+                }
+                else if (state == SQ_CANCELLED)
+                {
+                    ;
+                }
+                else
+                {
+                    bmi_ib_assert(0, "%s: unknown send state %s (%d) of sq %p",
+                          __func__, sq_state_name(sq->state.send),
+                          sq->state.send, sq);
+                }
+                debug(2, "%s: send to %s completed locally: sq %p -> %s",
+                      __func__, bh->c->peername, sq,
+                      sq_state_name(sq->state.send));
+            } 
+            else 
+            {
+                struct ib_work *rq = sq;  /* rename */
+                rq_state_t state = rq->state.recv;
 
-		if (state == SQ_WAITING_EAGER_SEND_COMPLETION)
-		    sq->state.send = SQ_WAITING_USER_TEST;
-		else if (state == SQ_WAITING_RTS_SEND_COMPLETION)
-		    sq->state.send = SQ_WAITING_CTS;
-		else if (state == SQ_WAITING_RTS_SEND_COMPLETION_GOT_CTS)
-		    sq->state.send = SQ_WAITING_DATA_SEND_COMPLETION;
-		else if (state == SQ_WAITING_RTS_DONE_SEND_COMPLETION)
-		    sq->state.send = SQ_WAITING_USER_TEST;
-		else if (state == SQ_CANCELLED)
-		    ;
-		else
-		    bmi_ib_assert(0, "%s: unknown send state %s (%d) of sq %p",
-				  __func__, sq_state_name(sq->state.send),
-				  sq->state.send, sq);
-		debug(2, "%s: send to %s completed locally: sq %p -> %s",
-		      __func__, bh->c->peername, sq,
-		      sq_state_name(sq->state.send));
+                if (state & RQ_RTS_WAITING_CTS_SEND_COMPLETION)
+                {
+                    rq->state.recv &= ~RQ_RTS_WAITING_CTS_SEND_COMPLETION;
+                }
+                else if (state == RQ_CANCELLED)
+                {
+                    ;
+                }
+                else
+                {
+                    bmi_ib_assert(0, "%s: unknown recv state %s of rq %p",
+                          __func__, rq_state_name(rq->state.recv), rq);
+                }
+                debug(2, "%s: send to %s completed locally: rq %p -> %s",
+                      __func__, bh->c->peername, rq,
+                      rq_state_name(rq->state.recv));
+            }
 
-	    } else {
-		struct ib_work *rq = sq;  /* rename */
-		rq_state_t state = rq->state.recv;
-		
-		if (state & RQ_RTS_WAITING_CTS_SEND_COMPLETION)
-		    rq->state.recv &= ~RQ_RTS_WAITING_CTS_SEND_COMPLETION;
-		else if (state == RQ_CANCELLED)
-		    ;
-		else
-		    bmi_ib_assert(0, "%s: unknown recv state %s of rq %p",
-				  __func__, rq_state_name(rq->state.recv), rq);
-		debug(2, "%s: send to %s completed locally: rq %p -> %s",
-		      __func__, bh->c->peername, rq,
-		      rq_state_name(rq->state.recv));
-	    }
+            qlist_add_tail(&bh->list, &bh->c->eager_send_buf_free);
 
-	    qlist_add_tail(&bh->list, &bh->c->eager_send_buf_free);
-
-	} else {
-	    error("%s: cq entry id 0x%llx opcode %d unexpected", __func__,
-	      llu(wc.id), wc.opcode);
-	}
+        } 
+        else 
+        {
+            error("%s: cq entry id 0x%llx opcode %d unexpected", __func__,
+              llu(wc.id), wc.opcode);
+        }
     }
     return ret;
 }
@@ -329,7 +368,14 @@ static void encourage_send_waiting_buffer(struct ib_work *sq)
 	/*
 	 * Eager send.
 	 */
+/** dreynol **/
+#if 0   /* old */
 	msg_header_eager_t mh_eager;
+#endif 
+#if 1   /* new */
+	msg_header_eager_t mh_eager = { { 0, 0 }, 0, 0 };
+#endif
+/* dreynol */
 	char *ptr = bh->buf;
 
 	msg_header_init(&mh_eager.c, c, sq->is_unexpected
@@ -353,7 +399,14 @@ static void encourage_send_waiting_buffer(struct ib_work *sq)
 	 * Request to send, rendez-vous.  Include the mop id in the message
 	 * which will be returned to us in the CTS so we can look it up.
 	 */
+/** dreynol **/
+#if 0	/* old */
 	msg_header_rts_t mh_rts;
+#endif
+#if 1	/* new */
+	msg_header_rts_t mh_rts = { { 0, 0 }, 0, 0, 0, 0 };
+#endif
+/* dreynol */ 
 	char *ptr = bh->buf;
 
 	msg_header_init(&mh_rts.c, c, MSG_RTS);
@@ -486,173 +539,194 @@ encourage_recv_incoming(struct buf_head *bh, msg_type_t type, u_int32_t byte_len
 
     debug(4, "%s: incoming msg type %s", __func__, msg_type_name(type));
 
-    if (type == MSG_EAGER_SEND) {
+    if (type == MSG_EAGER_SEND) 
+    {
+        msg_header_eager_t mh_eager;
 
-	msg_header_eager_t mh_eager;
+        ptr = bh->buf;
+        decode_msg_header_eager_t(&ptr, &mh_eager);
 
-	ptr = bh->buf;
-	decode_msg_header_eager_t(&ptr, &mh_eager);
+        debug(2, "%s: recv eager len %u", __func__, byte_len);
 
-	debug(2, "%s: recv eager len %u", __func__, byte_len);
-
-	rq = find_matching_recv(RQ_WAITING_INCOMING, c, mh_eager.bmi_tag);
-	if (rq) {
-	    bmi_size_t len = byte_len - sizeof(mh_eager);
-	    if (len > rq->buflist.tot_len)
-		error("%s: EAGER received %lld too small for buffer %lld",
-		  __func__, lld(len), lld(rq->buflist.tot_len));
-
-	    memcpy_to_buflist(&rq->buflist,
-	                      (msg_header_eager_t *) bh->buf + 1,
-			      len);
-
-	    /* re-post */
-	    post_rr(c, bh);
-
-	    rq->state.recv = RQ_EAGER_WAITING_USER_TEST;
-	    debug(2, "%s: matched rq %p now %s", __func__, rq,
-	      rq_state_name(rq->state.recv));
-#if MEMCACHE_EARLY_REG
-	    /* if a big receive was posted but only a small message came
-	     * through, unregister it now */
-	    if (rq->buflist.tot_len > ib_device->eager_buf_payload) {
-		debug(2, "%s: early registration not needed, dereg after eager",
-		  __func__);
-		memcache_deregister(ib_device->memcache, &rq->buflist);
-	    }
-#endif
-
-	} else {
-	    rq = alloc_new_recv(c, bh);
-	    /* return value for when user does post_recv for this one */
-	    rq->bmi_tag = mh_eager.bmi_tag;
-	    rq->state.recv = RQ_EAGER_WAITING_USER_POST;
-	    /* do not repost or ack, keeping bh until user test */
-	    debug(2, "%s: new rq %p now %s", __func__, rq,
-	      rq_state_name(rq->state.recv));
-	}
-	rq->actual_len = byte_len - sizeof(mh_eager);
-
-    } else if (type == MSG_EAGER_SENDUNEXPECTED) {
-
-	msg_header_eager_t mh_eager;
-
-	ptr = bh->buf;
-	decode_msg_header_eager_t(&ptr, &mh_eager);
-
-	debug(2, "%s: recv eager unexpected len %u", __func__, byte_len);
-
-	rq = alloc_new_recv(c, bh);
-	/* return values for when user does testunexpected for this one */
-	rq->bmi_tag = mh_eager.bmi_tag;
-	rq->state.recv = RQ_EAGER_WAITING_USER_TESTUNEXPECTED;
-	rq->actual_len = byte_len - sizeof(mh_eager);
-	/* do not repost, keeping bh until user test */
-	debug(2, "%s: new rq %p now %s", __func__, rq,
-	  rq_state_name(rq->state.recv));
-
-    } else if (type == MSG_RTS) {
-	/*
-	 * Sender wants to send a big message, initiates rts/cts protocol.
-	 * Has the user posted a matching receive for it yet?
-	 */
-	msg_header_rts_t mh_rts;
-
-	ptr = bh->buf;
-	decode_msg_header_rts_t(&ptr, &mh_rts);
-
-	debug(2, "%s: recv RTS len %lld mopid %llx", __func__,
-	      lld(mh_rts.tot_len), llu(mh_rts.mop_id));
-
-	rq = find_matching_recv(RQ_WAITING_INCOMING, c, mh_rts.bmi_tag);
-	if (rq) {
-	    if ((int)mh_rts.tot_len > rq->buflist.tot_len) {
-		error("%s: RTS received %llu too small for buffer %llu",
-		  __func__, llu(mh_rts.tot_len), llu(rq->buflist.tot_len));
-	    }
-	    rq->state.recv = RQ_RTS_WAITING_CTS_BUFFER;
-	    debug(2, "%s: matched rq %p MSG_RTS now %s", __func__, rq,
-	      rq_state_name(rq->state.recv));
-	} else {
-	    rq = alloc_new_recv(c, bh);
-	    /* return value for when user does post_recv for this one */
-	    rq->bmi_tag = mh_rts.bmi_tag;
-	    rq->state.recv = RQ_RTS_WAITING_USER_POST;
-	    debug(2, "%s: new rq %p MSG_RTS now %s", __func__, rq,
-	      rq_state_name(rq->state.recv));
-	}
-	rq->actual_len = mh_rts.tot_len;
-	rq->rts_mop_id = mh_rts.mop_id;
-
-	post_rr(c, bh);
-
-	if (rq->state.recv == RQ_RTS_WAITING_CTS_BUFFER) {
-	    int ret;
-	    ret = send_cts(rq);
-	    if (ret == 0) {
-		rq->state.recv = RQ_RTS_WAITING_RTS_DONE |
-                    RQ_RTS_WAITING_CTS_SEND_COMPLETION |
-                    RQ_RTS_WAITING_USER_TEST;
+        rq = find_matching_recv(RQ_WAITING_INCOMING, c, mh_eager.bmi_tag);
+        if (rq) 
+        {
+            bmi_size_t len = byte_len - sizeof(mh_eager);
+            if (len > rq->buflist.tot_len)
+            {
+                error("%s: EAGER received %lld too small for buffer %lld",
+              __func__, lld(len), lld(rq->buflist.tot_len));
             }
-	    /* else keep waiting until we can send that cts */
-	}
 
-    } else if (type == MSG_RTS_DONE) {
+            memcpy_to_buflist(&rq->buflist,
+                              (msg_header_eager_t *) bh->buf + 1,
+                      len);
 
-	msg_header_rts_done_t mh_rts_done;
-	struct ib_work *rqt;
+            /* re-post */
+            post_rr(c, bh);
 
-	ptr = bh->buf;
-	decode_msg_header_rts_done_t(&ptr, &mh_rts_done);
-
-	debug(2, "%s: recv RTS_DONE mop_id %llx", __func__,
-	      llu(mh_rts_done.mop_id));
-
-	rq = NULL;
-	qlist_for_each_entry(rqt, &ib_device->recvq, list) {
-	    if (rqt->c == c && rqt->rts_mop_id == mh_rts_done.mop_id &&
-		rqt->state.recv & RQ_RTS_WAITING_RTS_DONE) {
-		rq = rqt;
-		break;
-	    }
-	}
-
-	if (rq == NULL) {
-		warning("%s: mop_id %llx in RTS_DONE message not found",
-			      __func__, llu(mh_rts_done.mop_id));
-	}
-	else {
-#if MEMCACHE_BOUNCEBUF
-		memcpy_to_buflist(&rq->buflist, reg_recv_buflist_buf,
-	                  rq->buflist.tot_len);
-#else
-		memcache_deregister(ib_device->memcache, &rq->buflist);
+            rq->state.recv = RQ_EAGER_WAITING_USER_TEST;
+            debug(2, "%s: matched rq %p now %s", __func__, rq,
+              rq_state_name(rq->state.recv));
+#if MEMCACHE_EARLY_REG
+            /* if a big receive was posted but only a small message came
+             * through, unregister it now */
+            if (rq->buflist.tot_len > ib_device->eager_buf_payload) 
+            {
+                debug(2, "%s: early registration not needed, dereg after eager",
+                  __func__);
+                memcache_deregister(ib_device->memcache, &rq->buflist);
+            }
 #endif
-	}
+        } 
+        else 
+        {
+            rq = alloc_new_recv(c, bh);
+            /* return value for when user does post_recv for this one */
+            rq->bmi_tag = mh_eager.bmi_tag;
+            rq->state.recv = RQ_EAGER_WAITING_USER_POST;
+            /* do not repost or ack, keeping bh until user test */
+            debug(2, "%s: new rq %p now %s", __func__, rq,
+              rq_state_name(rq->state.recv));
+        }
+        rq->actual_len = byte_len - sizeof(mh_eager);
+    } 
+    else if (type == MSG_EAGER_SENDUNEXPECTED) 
+    {
+        msg_header_eager_t mh_eager;
 
-	post_rr(c, bh);
+        ptr = bh->buf;
+        decode_msg_header_eager_t(&ptr, &mh_eager);
 
-	if (rq) {
-		rq->state.recv &= ~RQ_RTS_WAITING_RTS_DONE;
-	}
+        debug(2, "%s: recv eager unexpected len %u", __func__, byte_len);
 
-    } else if (type == MSG_BYE) {
-	/*
-	 * Other side requests connection close.  Do it.
-	 */
-	debug(2, "%s: recv BYE", __func__);
-	post_rr(c, bh);
-	ib_close_connection(c);
+        rq = alloc_new_recv(c, bh);
+        /* return values for when user does testunexpected for this one */
+        rq->bmi_tag = mh_eager.bmi_tag;
+        rq->state.recv = RQ_EAGER_WAITING_USER_TESTUNEXPECTED;
+        rq->actual_len = byte_len - sizeof(mh_eager);
+        /* do not repost, keeping bh until user test */
+        debug(2, "%s: new rq %p now %s", __func__, rq,
+          rq_state_name(rq->state.recv));
 
-    } else if (type == MSG_CREDIT) {
+    } 
+    else if (type == MSG_RTS) 
+    {
+        /*
+         * Sender wants to send a big message, initiates rts/cts protocol.
+         * Has the user posted a matching receive for it yet?
+         */
+        msg_header_rts_t mh_rts;
 
-	/* already added the credit in check_cq */
-	debug(2, "%s: recv CREDIT", __func__);
-	post_rr(c, bh);
+        ptr = bh->buf;
+        decode_msg_header_rts_t(&ptr, &mh_rts);
 
-    } else {
-	error("%s: unknown message header type %d len %u", __func__,
-	      type, byte_len);
+        debug(2, "%s: recv RTS len %lld mopid %llx", __func__,
+              lld(mh_rts.tot_len), llu(mh_rts.mop_id));
+
+        rq = find_matching_recv(RQ_WAITING_INCOMING, c, mh_rts.bmi_tag);
+        if (rq) 
+        {
+            if ((int)mh_rts.tot_len > rq->buflist.tot_len) 
+            {
+                error("%s: RTS received %llu too small for buffer %llu",
+                  __func__, llu(mh_rts.tot_len), llu(rq->buflist.tot_len));
+            }
+            rq->state.recv = RQ_RTS_WAITING_CTS_BUFFER;
+            debug(2, "%s: matched rq %p MSG_RTS now %s", __func__, rq,
+              rq_state_name(rq->state.recv));
+        } 
+        else 
+        {
+            rq = alloc_new_recv(c, bh);
+            /* return value for when user does post_recv for this one */
+            rq->bmi_tag = mh_rts.bmi_tag;
+            rq->state.recv = RQ_RTS_WAITING_USER_POST;
+            debug(2, "%s: new rq %p MSG_RTS now %s", __func__, rq,
+              rq_state_name(rq->state.recv));
+        }
+        rq->actual_len = mh_rts.tot_len;
+        rq->rts_mop_id = mh_rts.mop_id;
+
+        post_rr(c, bh);
+
+        if (rq->state.recv == RQ_RTS_WAITING_CTS_BUFFER) 
+        {
+            int ret;
+            ret = send_cts(rq);
+            if (ret == 0) 
+            {
+                rq->state.recv = RQ_RTS_WAITING_RTS_DONE |
+                            RQ_RTS_WAITING_CTS_SEND_COMPLETION |
+                            RQ_RTS_WAITING_USER_TEST;
+            }
+            /* else keep waiting until we can send that cts */
+        }
+
+    } 
+    else if (type == MSG_RTS_DONE) 
+    {
+        msg_header_rts_done_t mh_rts_done;
+        struct ib_work *rqt;
+
+        ptr = bh->buf;
+        decode_msg_header_rts_done_t(&ptr, &mh_rts_done);
+
+        debug(2, "%s: recv RTS_DONE mop_id %llx", __func__,
+              llu(mh_rts_done.mop_id));
+
+        rq = NULL;
+        qlist_for_each_entry(rqt, &ib_device->recvq, list) 
+        {
+            if (rqt->c == c && rqt->rts_mop_id == mh_rts_done.mop_id &&
+                rqt->state.recv & RQ_RTS_WAITING_RTS_DONE) 
+            {
+                rq = rqt;
+                break;
+            }
+        }
+
+        if (rq == NULL) 
+        {
+            warning("%s: mop_id %llx in RTS_DONE message not found",
+                      __func__, llu(mh_rts_done.mop_id));
+        }
+        else 
+        {
+#if MEMCACHE_BOUNCEBUF
+            memcpy_to_buflist(&rq->buflist, reg_recv_buflist_buf,
+                          rq->buflist.tot_len);
+#else
+            memcache_deregister(ib_device->memcache, &rq->buflist);
+#endif
+        }
+
+        post_rr(c, bh);
+
+        if (rq) 
+        {
+            rq->state.recv &= ~RQ_RTS_WAITING_RTS_DONE;
+    	}
+    } 
+    else if (type == MSG_BYE) 
+    {
+        /*
+         * Other side requests connection close.  Do it.
+         */
+        debug(2, "%s: recv BYE", __func__);
+        post_rr(c, bh);
+        ib_close_connection(c);
+    } 
+    else if (type == MSG_CREDIT) 
+    {
+        /* already added the credit in check_cq */
+        debug(2, "%s: recv CREDIT", __func__);
+        post_rr(c, bh);
+    } 
+    else 
+    {
+        error("%s: unknown message header type %d len %u", __func__,
+              type, byte_len);
     }
 }
 
@@ -668,8 +742,8 @@ static void encourage_rts_done_waiting_buffer(struct ib_work *sq)
 
     bh = get_eager_buf(c);
     if (!bh) {
-	debug(2, "%s: sq %p no free send buffers to %s",
-	      __func__, sq, c->peername);
+    debug(2, "%s: sq %p no free send buffers to %s",
+          __func__, sq, c->peername);
 	return;
     }
     sq->bh = bh;
@@ -969,7 +1043,9 @@ post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
     gen_mutex_lock(&interface_mutex);
     ret = ensure_connected(remote_map);
     if (ret)
-    	goto out;
+    {
+        goto out;
+    }
     ibmap = remote_map->method_data;
     c = ibmap->c;
 
@@ -979,40 +1055,50 @@ post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
     /* check to see if matching recv is in the queue */
     rq = find_matching_recv(
       RQ_EAGER_WAITING_USER_POST | RQ_RTS_WAITING_USER_POST, c, tag);
-    if (rq) {
-	debug(2, "%s: rq %p matches %s", __func__, rq,
-	  rq_state_name(rq->state.recv));
-    } else {
-	/* alloc and build new recvq structure */
-	rq = alloc_new_recv(c, NULL);
-	rq->state.recv = RQ_WAITING_INCOMING;
-	rq->bmi_tag = tag;
-	debug(2, "%s: new rq %p", __func__, rq);
+    if (rq) 
+    {
+        debug(2, "%s: rq %p matches %s", __func__, rq,
+          rq_state_name(rq->state.recv));
+    } 
+    else 
+    {
+        /* alloc and build new recvq structure */
+        rq = alloc_new_recv(c, NULL);
+        rq->state.recv = RQ_WAITING_INCOMING;
+        rq->bmi_tag = tag;
+        debug(2, "%s: new rq %p", __func__, rq);
     }
 
-    if (numbufs == 0) {
-	rq->buflist_one_buf.recv = *buffers;
-	rq->buflist_one_len = *sizes;
-	rq->buflist.num = 1;
-	rq->buflist.buf.recv = &rq->buflist_one_buf.recv;
-	rq->buflist.len = &rq->buflist_one_len;
-    } else {
-	rq->buflist.num = numbufs;
-	rq->buflist.buf.recv = buffers;
-	rq->buflist.len = sizes;
+    if (numbufs == 0) 
+    {
+        rq->buflist_one_buf.recv = *buffers;
+        rq->buflist_one_len = *sizes;
+        rq->buflist.num = 1;
+        rq->buflist.buf.recv = &rq->buflist_one_buf.recv;
+        rq->buflist.len = &rq->buflist_one_len;
+    } 
+    else 
+    {
+        rq->buflist.num = numbufs;
+        rq->buflist.buf.recv = buffers;
+        rq->buflist.len = sizes;
     }
     rq->buflist.tot_len = 0;
     for (i=0; i<rq->buflist.num; i++)
-	rq->buflist.tot_len += sizes[i];
+    {
+        rq->buflist.tot_len += sizes[i];
+    }
 
     /*
      * This passed-in total length field does not make much sense
      * to me, but I'll at least check it for accuracy.
      */
     if (rq->buflist.tot_len != tot_expected_len)
-	error("%s: user-provided tot len %lld"
-	  " does not match buffer list tot len %lld",
-	  __func__, lld(tot_expected_len), lld(rq->buflist.tot_len));
+    {
+        error("%s: user-provided tot len %lld"
+            " does not match buffer list tot len %lld",
+            __func__, lld(tot_expected_len), lld(rq->buflist.tot_len));
+    }
 
     /* generate identifier used by caller to test for message later */
     mop = bmi_ib_malloc(sizeof(*mop));
@@ -1025,54 +1111,59 @@ post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
     rq->mop = mop;
 
     /* handle the two "waiting for a local user post" states */
-    if (rq->state.recv == RQ_EAGER_WAITING_USER_POST) {
+    if (rq->state.recv == RQ_EAGER_WAITING_USER_POST) 
+    {
+        msg_header_eager_t mh_eager;
+        char *ptr = rq->bh->buf;
 
-	msg_header_eager_t mh_eager;
-	char *ptr = rq->bh->buf;
+        decode_msg_header_eager_t(&ptr, &mh_eager);
 
-	decode_msg_header_eager_t(&ptr, &mh_eager);
+        debug(2, "%s: rq %p state %s finish eager directly", __func__,
+          rq, rq_state_name(rq->state.recv));
+        if (rq->actual_len > tot_expected_len) 
+        {
+            error("%s: received %lld matches too-small buffer %lld",
+              __func__, lld(rq->actual_len), lld(rq->buflist.tot_len));
+        }
 
-	debug(2, "%s: rq %p state %s finish eager directly", __func__,
-	  rq, rq_state_name(rq->state.recv));
-	if (rq->actual_len > tot_expected_len) {
-	    error("%s: received %lld matches too-small buffer %lld",
-	      __func__, lld(rq->actual_len), lld(rq->buflist.tot_len));
-	}
+        memcpy_to_buflist(&rq->buflist,
+                          (msg_header_eager_t *) rq->bh->buf + 1,
+                          rq->actual_len);
 
-	memcpy_to_buflist(&rq->buflist,
-	                  (msg_header_eager_t *) rq->bh->buf + 1,
-	                  rq->actual_len);
+        /* re-post */
+        post_rr(rq->c, rq->bh);
 
-	/* re-post */
-	post_rr(rq->c, rq->bh);
-
-	/* now just wait for user to test, never do "immediate completion" */
-	rq->state.recv = RQ_EAGER_WAITING_USER_TEST;
-	goto out;
-
-    } else if (rq->state.recv == RQ_RTS_WAITING_USER_POST) {
-	int sret;
-	debug(2, "%s: rq %p %s send cts", __func__, rq,
-	  rq_state_name(rq->state.recv));
-	/* try to send, or wait for send buffer space */
-	rq->state.recv = RQ_RTS_WAITING_CTS_BUFFER;
+        /* now just wait for user to test, never do "immediate completion" */
+        rq->state.recv = RQ_EAGER_WAITING_USER_TEST;
+        goto out;
+    } 
+    else if (rq->state.recv == RQ_RTS_WAITING_USER_POST) 
+    {
+        int sret;
+        debug(2, "%s: rq %p %s send cts", __func__, rq,
+          rq_state_name(rq->state.recv));
+        /* try to send, or wait for send buffer space */
+        rq->state.recv = RQ_RTS_WAITING_CTS_BUFFER;
 #if MEMCACHE_EARLY_REG
-	memcache_register(ib_device->memcache, &rq->buflist);
+        memcache_register(ib_device->memcache, &rq->buflist);
 #endif
-	sret = send_cts(rq);
-	if (sret == 0) {
+        sret = send_cts(rq);
+        if (sret == 0) 
+        {
             rq->state.recv = RQ_RTS_WAITING_RTS_DONE |
                 RQ_RTS_WAITING_CTS_SEND_COMPLETION |
                 RQ_RTS_WAITING_USER_TEST;
         }
-	goto out;
+        goto out;
     }
 
 #if MEMCACHE_EARLY_REG
     /* but remember that this might not be used if the other side sends
      * less than we posted for receive; that's legal */
     if (rq->buflist.tot_len > ib_device->eager_buf_payload)
-	memcache_register(ib_device->memcache, &rq->buflist);
+    {
+        memcache_register(ib_device->memcache, &rq->buflist);
+    }
 #endif
 
   out:
@@ -1114,53 +1205,71 @@ test_sq(struct ib_work *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
     debug(9, "%s: sq %p outid %p err %p size %p user_ptr %p complete %d",
       __func__, sq, outid, err, size, user_ptr, complete);
 
-    if (sq->state.send == SQ_WAITING_USER_TEST) {
-	if (complete) {
-	    debug(2, "%s: sq %p completed %lld to %s", __func__,
-	      sq, lld(sq->buflist.tot_len), sq->c->peername);
-	    *outid = sq->mop->op_id;
-	    *err = 0;
-	    *size = sq->buflist.tot_len;
-	    if (user_ptr)
-		*user_ptr = sq->mop->user_ptr;
-	    qlist_del(&sq->list);
-	    id_gen_fast_unregister(sq->mop->op_id);
-	    c = sq->c;
-	    free(sq->mop);
-	    free(sq);
-	    --c->refcnt;
-	    if (c->closed || c->cancelled)
-		ib_close_connection(c);
-	    return 1;
-	}
-    /* this state needs help, push it (ideally would be triggered
-     * when the resource is freed... XXX */
-    } else if (sq->state.send == SQ_WAITING_BUFFER) {
-	debug(2, "%s: sq %p %s, encouraging", __func__, sq,
-	  sq_state_name(sq->state.send));
-	encourage_send_waiting_buffer(sq);
-    } else if (sq->state.send == SQ_WAITING_RTS_DONE_BUFFER) {
-	debug(2, "%s: sq %p %s, encouraging", __func__, sq,
-	  sq_state_name(sq->state.send));
-	encourage_rts_done_waiting_buffer(sq);
-    } else if (sq->state.send == SQ_CANCELLED && complete) {
-	debug(2, "%s: sq %p cancelled", __func__, sq);
-	*outid = sq->mop->op_id;
-	*err = -PVFS_ETIMEDOUT;
-	if (user_ptr)
-	    *user_ptr = sq->mop->user_ptr;
-	qlist_del(&sq->list);
-	id_gen_fast_unregister(sq->mop->op_id);
-	c = sq->c;
-	free(sq->mop);
-	free(sq);
-	--c->refcnt;
-	if (c->closed || c->cancelled)
-	    ib_close_connection(c);
-	return 1;
-    } else {
-	debug(9, "%s: sq %p found, not done, state %s", __func__,
-	  sq, sq_state_name(sq->state.send));
+    if (sq->state.send == SQ_WAITING_USER_TEST) 
+    {
+        if (complete) 
+        {
+            debug(2, "%s: sq %p completed %lld to %s", __func__,
+              sq, lld(sq->buflist.tot_len), sq->c->peername);
+            *outid = sq->mop->op_id;
+            *err = 0;
+            *size = sq->buflist.tot_len;
+            if (user_ptr)
+            {
+                *user_ptr = sq->mop->user_ptr;
+            }
+            qlist_del(&sq->list);
+            id_gen_fast_unregister(sq->mop->op_id);
+            c = sq->c;
+            free(sq->mop);
+            free(sq);
+            --c->refcnt;
+            if (c->closed || c->cancelled)
+            {
+                ib_close_connection(c);
+            }
+            return 1;
+        }
+        /* this state needs help, push it (ideally would be triggered
+         * when the resource is freed... XXX */
+    } 
+    else if (sq->state.send == SQ_WAITING_BUFFER) 
+    {
+        debug(2, "%s: sq %p %s, encouraging", __func__, sq,
+          sq_state_name(sq->state.send));
+        encourage_send_waiting_buffer(sq);
+    } 
+    else if (sq->state.send == SQ_WAITING_RTS_DONE_BUFFER) 
+    {
+        debug(2, "%s: sq %p %s, encouraging", __func__, sq,
+          sq_state_name(sq->state.send));
+        encourage_rts_done_waiting_buffer(sq);
+    } 
+    else if (sq->state.send == SQ_CANCELLED && complete) 
+    {
+        debug(2, "%s: sq %p cancelled", __func__, sq);
+        *outid = sq->mop->op_id;
+        *err = -PVFS_ETIMEDOUT;
+        if (user_ptr)
+        {
+            *user_ptr = sq->mop->user_ptr;
+        }
+        qlist_del(&sq->list);
+        id_gen_fast_unregister(sq->mop->op_id);
+        c = sq->c;
+        free(sq->mop);
+        free(sq);
+        --c->refcnt;
+        if (c->closed || c->cancelled)
+        {
+            ib_close_connection(c);
+        }
+        return 1;
+    } 
+    else 
+    {
+    debug(9, "%s: sq %p found, not done, state %s", __func__,
+      sq, sq_state_name(sq->state.send));
     }
     return 0;
 }
@@ -1180,60 +1289,79 @@ test_rq(struct ib_work *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
       __func__, rq, outid, err, size, user_ptr, complete);
 
     if (rq->state.recv == RQ_EAGER_WAITING_USER_TEST 
-      || rq->state.recv == RQ_RTS_WAITING_USER_TEST) {
-	if (complete) {
-	    debug(2, "%s: rq %p completed %lld from %s", __func__,
-	      rq, lld(rq->actual_len), rq->c->peername);
-	    *err = 0;
-	    *size = rq->actual_len;
-	    if (rq->mop) {
-		*outid = rq->mop->op_id;
-		if (user_ptr)
-		    *user_ptr = rq->mop->user_ptr;
-		id_gen_fast_unregister(rq->mop->op_id);
-		free(rq->mop);
-	    }
-	    qlist_del(&rq->list);
-	    c = rq->c;
-	    free(rq);
-	    --c->refcnt;
-	    if (c->closed || c->cancelled)
-		ib_close_connection(c);
-	    return 1;
-	}
-    /* this state needs help, push it (ideally would be triggered
-     * when the resource is freed...) XXX */
-    } else if (rq->state.recv == RQ_RTS_WAITING_CTS_BUFFER) {
-	int ret;
-	debug(2, "%s: rq %p %s, encouraging", __func__, rq,
-	  rq_state_name(rq->state.recv));
-	ret = send_cts(rq);
-	if (ret == 0) {
+      || rq->state.recv == RQ_RTS_WAITING_USER_TEST) 
+    {
+        if (complete) 
+        {
+            debug(2, "%s: rq %p completed %lld from %s", __func__,
+              rq, lld(rq->actual_len), rq->c->peername);
+            *err = 0;
+            *size = rq->actual_len;
+            if (rq->mop) 
+            {
+                *outid = rq->mop->op_id;
+                if (user_ptr)
+                {
+                   *user_ptr = rq->mop->user_ptr;
+                }
+                id_gen_fast_unregister(rq->mop->op_id);
+                free(rq->mop);
+            }
+            qlist_del(&rq->list);
+            c = rq->c;
+            free(rq);
+            --c->refcnt;
+            if (c->closed || c->cancelled)
+            {
+                ib_close_connection(c);
+            }
+            return 1;
+        }
+        /* this state needs help, push it (ideally would be triggered
+         * when the resource is freed...) XXX */
+    } 
+    else if (rq->state.recv == RQ_RTS_WAITING_CTS_BUFFER) 
+    {
+        int ret;
+        debug(2, "%s: rq %p %s, encouraging", __func__, rq,
+          rq_state_name(rq->state.recv));
+        ret = send_cts(rq);
+        if (ret == 0) 
+        {
             rq->state.recv = RQ_RTS_WAITING_RTS_DONE |
                 RQ_RTS_WAITING_CTS_SEND_COMPLETION |
                 RQ_RTS_WAITING_USER_TEST;
         } /* else keep waiting until we can send that cts */
-	debug(2, "%s: rq %p now %s", __func__, rq, rq_state_name(rq->state.recv));
-    } else if (rq->state.recv == RQ_CANCELLED && complete) {
-	debug(2, "%s: rq %p cancelled", __func__, rq);
-	*err = -PVFS_ETIMEDOUT;
-	if (rq->mop) {
-	    *outid = rq->mop->op_id;
-	    if (user_ptr)
-		*user_ptr = rq->mop->user_ptr;
-	    id_gen_fast_unregister(rq->mop->op_id);
-	    free(rq->mop);
-	}
-	qlist_del(&rq->list);
-	c = rq->c;
-	free(rq);
-	--c->refcnt;
-	if (c->closed || c->cancelled)
-	    ib_close_connection(c);
-	return 1;
-    } else {
-	debug(9, "%s: rq %p found, not done, state %s", __func__,
-	  rq, rq_state_name(rq->state.recv));
+        debug(2, "%s: rq %p now %s", __func__, rq, rq_state_name(rq->state.recv));
+    } 
+    else if (rq->state.recv == RQ_CANCELLED && complete) 
+    {
+        debug(2, "%s: rq %p cancelled", __func__, rq);
+        *err = -PVFS_ETIMEDOUT;
+        if (rq->mop) 
+        {
+            *outid = rq->mop->op_id;
+            if (user_ptr)
+            {
+                *user_ptr = rq->mop->user_ptr;
+            }
+            id_gen_fast_unregister(rq->mop->op_id);
+            free(rq->mop);
+        }
+        qlist_del(&rq->list);
+        c = rq->c;
+        free(rq);
+        --c->refcnt;
+        if (c->closed || c->cancelled)
+        {
+            ib_close_connection(c);
+        }
+        return 1;
+    } 
+    else 
+    {
+        debug(9, "%s: rq %p found, not done, state %s", __func__,
+          rq, rq_state_name(rq->state.recv));
     }
     return 0;
 }
@@ -1399,49 +1527,55 @@ restart:
     activity += ib_check_cq();
 
     n = 0;
-    qlist_for_each(l, &ib_device->recvq) {
-	struct ib_work *rq = qlist_upcast(l);
-	if (rq->state.recv == RQ_EAGER_WAITING_USER_TESTUNEXPECTED) {
-	    msg_header_eager_t mh_eager;
-	    char *ptr = rq->bh->buf;
-	    ib_connection_t *c = rq->c;
+    qlist_for_each(l, &ib_device->recvq) 
+    {
+        struct ib_work *rq = qlist_upcast(l);
+        if (rq->state.recv == RQ_EAGER_WAITING_USER_TESTUNEXPECTED) 
+        {
+            msg_header_eager_t mh_eager;
+            char *ptr = rq->bh->buf;
+            ib_connection_t *c = rq->c;
 
-	    decode_msg_header_eager_t(&ptr, &mh_eager);
+            decode_msg_header_eager_t(&ptr, &mh_eager);
 
-	    debug(2, "%s: found waiting testunexpected", __func__);
-	    ui->error_code = 0;
-	    ui->addr = c->remote_map;  /* hand back permanent method_addr */
-	    ui->buffer = bmi_ib_malloc((unsigned long) rq->actual_len);
-	    ui->size = rq->actual_len;
-	    memcpy(ui->buffer,
-	           (msg_header_eager_t *) rq->bh->buf + 1,
-	           (size_t) ui->size);
-	    ui->tag = rq->bmi_tag;
-	    /* re-post the buffer in which it was sitting, just unexpecteds */
-	    post_rr(c, rq->bh);
-	    n = 1;
-	    qlist_del(&rq->list);
-	    free(rq);
-	    --c->refcnt;
-	    if (c->closed || c->cancelled)
-		ib_close_connection(c);
-	    goto out;
-	}
+            debug(2, "%s: found waiting testunexpected", __func__);
+            ui->error_code = 0;
+            ui->addr = c->remote_map;  /* hand back permanent method_addr */
+            ui->buffer = bmi_ib_malloc((unsigned long) rq->actual_len);
+            ui->size = rq->actual_len;
+            memcpy(ui->buffer,
+                   (msg_header_eager_t *) rq->bh->buf + 1,
+                   (size_t) ui->size);
+            ui->tag = rq->bmi_tag;
+            /* re-post the buffer in which it was sitting, just unexpecteds */
+            post_rr(c, rq->bh);
+            n = 1;
+            qlist_del(&rq->list);
+            free(rq);
+            --c->refcnt;
+            if (c->closed || c->cancelled)
+            {
+                ib_close_connection(c);
+            }
+            goto out;
+        }
     }
 
   out:
     gen_mutex_unlock(&interface_mutex);
 
-    if (activity == 0 && n == 0 && max_idle_time > 0) {
-	/*
-	 * Block if told to from above, also polls TCP listening socket.
-	 */
-	debug(8, "%s: last activity too long ago, blocking", __func__);
-	activity = ib_block_for_activity(max_idle_time);
-	if (activity == 1) {   /* IB action, go do it immediately */
-	    gen_mutex_lock(&interface_mutex);
-	    goto restart;
-	}
+    if (activity == 0 && n == 0 && max_idle_time > 0) 
+    {
+        /*
+         * Block if told to from above, also polls TCP listening socket.
+         */
+        debug(8, "%s: last activity too long ago, blocking", __func__);
+        activity = ib_block_for_activity(max_idle_time);
+        if (activity == 1) 
+        {   /* IB action, go do it immediately */
+            gen_mutex_lock(&interface_mutex);
+            goto restart;
+        }
     }
 
     ib_tcp_server_check_new_connections();
@@ -1480,67 +1614,94 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
     ib_check_cq();
     mop = id_gen_fast_lookup(id);
     tsq = mop->method_data;
-    if (tsq->type == BMI_SEND) {
-	/*
-	 * Cancelling completed operations is fine, they will be
-	 * tested later.  Any others trigger full shutdown of the
-	 * connection.
-	 */
-	if (tsq->state.send != SQ_WAITING_USER_TEST)
-	    c = tsq->c;
-    } else {
-	/* actually a recv */
-	struct ib_work *rq = mop->method_data;
-	if (!(rq->state.recv == RQ_EAGER_WAITING_USER_TEST 
-	   || rq->state.recv == RQ_RTS_WAITING_USER_TEST))
-	    c = rq->c;
+    if (tsq->type == BMI_SEND) 
+    {
+        /*
+         * Cancelling completed operations is fine, they will be
+         * tested later.  Any others trigger full shutdown of the
+         * connection.
+         */
+        if (tsq->state.send != SQ_WAITING_USER_TEST)
+        {
+            c = tsq->c;
+        }
+    } 
+    else 
+    {
+        /* actually a recv */
+        struct ib_work *rq = mop->method_data;
+        if (!(rq->state.recv == RQ_EAGER_WAITING_USER_TEST 
+           || rq->state.recv == RQ_RTS_WAITING_USER_TEST))
+        {
+            c = rq->c;
+        }
     }
 
-    if (c && !c->cancelled) {
-	/*
-	 * In response to a cancel, forcibly close the connection.  Don't send
-	 * a bye message first since it may be the case that the peer is dead
-	 * anyway.  Do not close the connection until all the sq/rq on it have
-	 * gone away.
-	 */
-	struct qlist_head *l;
+    if (c && !c->cancelled) 
+    {
+        /*
+         * In response to a cancel, forcibly close the connection.  Don't send
+         * a bye message first since it may be the case that the peer is dead
+         * anyway.  Do not close the connection until all the sq/rq on it have
+         * gone away.
+         */
+        struct qlist_head *l;
 
-	c->cancelled = 1;
-	drain_qp(c);
-	qlist_for_each(l, &ib_device->sendq) {
-	    struct ib_work *sq = qlist_upcast(l);
-	    if (sq->c != c) continue;
+        c->cancelled = 1;
+        drain_qp(c);
+        qlist_for_each(l, &ib_device->sendq) 
+        {
+            struct ib_work *sq = qlist_upcast(l);
+            if (sq->c != c) 
+            {
+                continue;
+            }
 #if !MEMCACHE_BOUNCEBUF
-	    if (sq->state.send == SQ_WAITING_DATA_SEND_COMPLETION)
-		memcache_deregister(ib_device->memcache, &sq->buflist);
-#  if MEMCACHE_EARLY_REG
-	    /* pin when sending rts, so also must dereg in this state */
-	    if (sq->state.send == SQ_WAITING_RTS_SEND_COMPLETION ||
-	        sq->state.send == SQ_WAITING_RTS_SEND_COMPLETION_GOT_CTS ||
-	        sq->state.send == SQ_WAITING_CTS)
-		memcache_deregister(ib_device->memcache, &sq->buflist);
-#  endif
+            if (sq->state.send == SQ_WAITING_DATA_SEND_COMPLETION)
+            {
+                memcache_deregister(ib_device->memcache, &sq->buflist);
+            }
+    #if MEMCACHE_EARLY_REG
+            /* pin when sending rts, so also must dereg in this state */
+            if (sq->state.send == SQ_WAITING_RTS_SEND_COMPLETION ||
+                sq->state.send == SQ_WAITING_RTS_SEND_COMPLETION_GOT_CTS ||
+                sq->state.send == SQ_WAITING_CTS)
+            {
+                memcache_deregister(ib_device->memcache, &sq->buflist);
+            }
+    #endif
 #endif
-	    if (sq->state.send != SQ_WAITING_USER_TEST)
-		sq->state.send = SQ_CANCELLED;
-	}
-	qlist_for_each(l, &ib_device->recvq) {
-	    struct ib_work *rq = qlist_upcast(l);
-	    if (rq->c != c) continue;
+            if (sq->state.send != SQ_WAITING_USER_TEST)
+            {
+                sq->state.send = SQ_CANCELLED;
+            }
+        }
+        qlist_for_each(l, &ib_device->recvq) {
+            struct ib_work *rq = qlist_upcast(l);
+            if (rq->c != c) 
+            {
+                continue;
+            }
 #if !MEMCACHE_BOUNCEBUF
-	    if (rq->state.recv & RQ_RTS_WAITING_RTS_DONE)
-		memcache_deregister(ib_device->memcache, &rq->buflist);
-#  if MEMCACHE_EARLY_REG
+            if (rq->state.recv & RQ_RTS_WAITING_RTS_DONE)
+            {
+                memcache_deregister(ib_device->memcache, &rq->buflist);
+            }
+    #if MEMCACHE_EARLY_REG
             /* pin on post, dereg all these */
-	    if (rq->state.recv == RQ_WAITING_INCOMING
-	      && rq->buflist.tot_len > ib_device->eager_buf_payload)
-		memcache_deregister(ib_device->memcache, &rq->buflist);
-#  endif
+            if (rq->state.recv == RQ_WAITING_INCOMING
+              && rq->buflist.tot_len > ib_device->eager_buf_payload)
+            {
+                memcache_deregister(ib_device->memcache, &rq->buflist);
+            }
+    #endif
 #endif
-	    if (!(rq->state.recv == RQ_EAGER_WAITING_USER_TEST 
-	       || rq->state.recv == RQ_RTS_WAITING_USER_TEST))
-		rq->state.recv = RQ_CANCELLED;
-	}
+            if (!(rq->state.recv == RQ_EAGER_WAITING_USER_TEST 
+               || rq->state.recv == RQ_RTS_WAITING_USER_TEST))
+            {
+                rq->state.recv = RQ_CANCELLED;
+            }
+        }
     }
 
     gen_mutex_unlock(&interface_mutex);
@@ -1552,7 +1713,7 @@ BMI_ib_rev_lookup(struct bmi_method_addr *meth)
 {
     ib_method_addr_t *ibmap = meth->method_data;
     if (!ibmap->c)
-	return "(unconnected)";
+    return "(unconnected)";
     else
 	return ibmap->c->peername;
 }

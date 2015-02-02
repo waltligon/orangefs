@@ -46,7 +46,19 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-event.h"
 #include "pint-util.h"
+#include "pint-malloc.h"
 #include "pint-uid-mgmt.h"
+#include "pint-security.h"
+#include "security-util.h"
+#ifdef ENABLE_CAPCACHE
+#include "capcache.h"
+#endif
+#ifdef ENABLE_CREDCACHE
+#include "credcache.h"
+#endif
+#ifdef ENABLE_CERTCACHE
+#include "certcache.h"
+#endif
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -113,6 +125,8 @@ static char startup_cwd[PATH_MAX+1];
  * we're able to use sizeof here because sizeof an inlined string ("") gives
  * the length of the string with the null terminator
  */
+/* These are defined in src/common/pvfs2-internal.h
+ */
 PINT_server_trove_keys_s Trove_Common_Keys[] =
 {
     {ROOT_HANDLE_KEYSTR, ROOT_HANDLE_KEYLEN},
@@ -121,7 +135,10 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {METAFILE_DIST_KEYSTR, METAFILE_DIST_KEYLEN},
     {SYMLINK_TARGET_KEYSTR, SYMLINK_TARGET_KEYLEN},
     {METAFILE_LAYOUT_KEYSTR, METAFILE_LAYOUT_KEYLEN},
-    {NUM_DFILES_REQ_KEYSTR, NUM_DFILES_REQ_KEYLEN}
+    {NUM_DFILES_REQ_KEYSTR, NUM_DFILES_REQ_KEYLEN},
+    {DIST_DIR_ATTR_KEYSTR, DIST_DIR_ATTR_KEYLEN},
+    {DIST_DIRDATA_BITMAP_KEYSTR, DIST_DIRDATA_BITMAP_KEYLEN},
+    {DIST_DIRDATA_HANDLES_KEYSTR, DIST_DIRDATA_HANDLES_KEYLEN},
 };
 
 /* These three are used continuously in our wait loop.  They could be
@@ -139,6 +156,7 @@ static int server_initialize(
 static int server_initialize_subsystems(
     PINT_server_status_flag *server_status_flag);
 static int server_setup_signal_handlers(void);
+static int server_check_if_root_directory_created(void);
 static int server_purge_unexpected_recv_machines(void);
 static int server_setup_process_environment(int background);
 static int server_shutdown(
@@ -186,6 +204,9 @@ int main(int argc, char **argv)
 
     /* Passed to server shutdown function */
     server_status_flag = SERVER_DEFAULT_INIT;
+
+    /* Set up out malloc wrapper by grabbing pointers to glibc malloc */
+    init_glibc_malloc();
 
     /* Enable the gossip interface to send out stderr and set an
      * initial debug mask so that we can output errors at startup.
@@ -342,6 +363,15 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 
+    /* we have to take care of creating the distributed root
+     * directory and making the lost+found directory if needed */
+    ret = server_check_if_root_directory_created();
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("Error: failed to create root handle! It needs to communicate with all servers. Please try again when all servers are up!!\n", ret);
+        goto server_shutdown;
+    }
+
     gossip_debug_fp(stderr, 'S', GOSSIP_LOGSTAMP_DATETIME,
                     "PVFS2 Server ready.\n");
 
@@ -471,6 +501,7 @@ static void remove_pidfile(void)
  *
  * Handles:
  * - backgrounding, redirecting logging
+ * - starting the security module
  * - initializing all the subsystems (BMI, Trove, etc.)
  * - setting up the state table used to map new requests to
  *   state machines
@@ -547,6 +578,63 @@ static int server_initialize(
         gossip_err("Error: Could not start server; aborting.\n");
         return ret;
     }
+
+    /* initialize the security module */
+    ret = PINT_security_initialize();
+    if (ret < 0)
+    {
+        gossip_err("Error: Could not initialize security module; "
+                   "aborting.\n");
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_SECURITY_INIT;
+
+#ifdef ENABLE_CAPCACHE
+    /* initialize the capability cache */
+    ret = PINT_capcache_init();
+    if(ret < 0)
+    {
+        gossip_err("Error: Could not initialize capability cache;"
+                   " aborting.\n");
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_CAPCACHE_INIT;
+#endif /* ENABLE_CAPCACHE */
+
+#ifdef ENABLE_CREDCACHE
+    /* initialize the credential cache */
+    ret = PINT_credcache_init();
+    if(ret < 0)
+    {
+        gossip_err("Error: Could not initialize credential cache;"
+                   " aborting.\n");
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_CREDCACHE_INIT;
+#endif
+
+#ifdef ENABLE_CERTCACHE
+    /* initialize the certificate cache */
+    ret = PINT_certcache_init();
+    if (ret < 0)
+    {
+        gossip_err("Error: Could not initialize certificate cache;"
+                   " aborting.\n");
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_CERTCACHE_INIT;
+
+    /* cache CA cert */
+    ret = PINT_security_cache_ca_cert();
+    if (ret != 0)
+    {
+        gossip_err("Warning: could not cache CA certificate: %d.\n", ret);
+    }
+#endif
 
     /* Initialize the bmi, flow, trove and job interfaces */
     ret = server_initialize_subsystems(server_status_flag);
@@ -750,7 +838,28 @@ static int server_initialize_subsystems(
     BMI_set_info(0, BMI_TRUSTED_CONNECTION, (void *) &server_config);
     gossip_debug(GOSSIP_SERVER_DEBUG, "Enabling trusted connections!\n");
 #endif
+
+    /* Set the buffer size according to configuration file */
+    BMI_set_info(0, BMI_TCP_BUFFER_SEND_SIZE, 
+                 (void *)&server_config.tcp_buffer_size_send);
+    BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, 
+                 (void *)&server_config.tcp_buffer_size_receive);
+
     *server_status_flag |= SERVER_BMI_INIT;
+
+    /**********************/
+
+    ret = PINT_cached_config_initialize();
+    if(ret < 0)
+    {
+        gossip_err("Error initializing cached_config interface.\n");
+        return(ret);
+    }
+    *server_status_flag |= SERVER_CACHED_CONFIG_INIT;
+
+    /**********************/
+
+    /*********** START OF TROVE INITIALIZATION ************/
 
     ret = trove_collection_setinfo(0, 0, TROVE_DB_CACHE_SIZE_BYTES,
                                    &server_config.db_cache_size_bytes);
@@ -763,7 +872,8 @@ static int server_initialize_subsystems(
 
     /* help trove chose a differentiating shm key if needed for Berkeley DB */
     shm_key_hint = generate_shm_key_hint(&server_index);
-    gossip_debug(GOSSIP_SERVER_DEBUG, "Server using shm key hint: %d\n", shm_key_hint);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "Server using shm key hint: %d\n", shm_key_hint);
     ret = trove_collection_setinfo(0, 0, TROVE_SHM_KEY_HINT, &shm_key_hint);
     assert(ret == 0);
 
@@ -774,18 +884,14 @@ static int server_initialize_subsystems(
         init_flags |= TROVE_DB_CACHE_MMAP;
     }
 
-    /* Set the buffer size according to configuration file */
-    BMI_set_info(0, BMI_TCP_BUFFER_SEND_SIZE, 
-                 (void *)&server_config.tcp_buffer_size_send);
-    BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, 
-                 (void *)&server_config.tcp_buffer_size_receive);
+/********/
 
-    ret = trove_initialize(
-        server_config.trove_method, 
-        trove_coll_to_method_callback,
-        server_config.data_path,
-		server_config.meta_path,
-        init_flags);
+
+    ret = trove_initialize(server_config.trove_method, 
+                           trove_coll_to_method_callback,
+                           server_config.data_path,
+		           server_config.meta_path,
+                           init_flags);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: trove_initialize", ret);
@@ -803,15 +909,9 @@ static int server_initialize_subsystems(
         return ret;
     }
 
-    *server_status_flag |= SERVER_TROVE_INIT;
-
-    ret = PINT_cached_config_initialize();
-    if(ret < 0)
-    {
-        gossip_err("Error initializing cached_config interface.\n");
-        return(ret);
-    }
-
+    /* This must be done after the trove initialize and before we
+     * initialize the various file systems
+     */
     /* initialize the flow interface */
     ret = PINT_flow_initialize(server_config.flow_modules, 0);
 
@@ -832,8 +932,7 @@ static int server_initialize_subsystems(
             break;
         }
 
-        ret = PINT_cached_config_handle_load_mapping(cur_fs,
-                &server_config);
+        ret = PINT_cached_config_handle_load_mapping(cur_fs, &server_config);
         if(ret)
         {
             PVFS_perror("Error: PINT_handle_load_mapping", ret);
@@ -845,37 +944,38 @@ static int server_initialize_subsystems(
            can't error out since they're just hints.  thus, we
            complain in logging and continue.
            */
-        ret = trove_collection_setinfo(
-            cur_fs->coll_id, 0,
-            TROVE_DIRECTIO_THREADS_NUM,
-            (void *)&cur_fs->directio_thread_num);
+        ret = trove_collection_setinfo(cur_fs->coll_id,
+                                       0,
+                                       TROVE_DIRECTIO_THREADS_NUM,
+                                       (void *)&cur_fs->directio_thread_num);
         if (ret < 0)
         {
             gossip_err("Error setting directio threads num\n");
         }
 
-        ret = trove_collection_setinfo(
-            cur_fs->coll_id, 0,
-            TROVE_DIRECTIO_OPS_PER_QUEUE,
-            (void *)&cur_fs->directio_ops_per_queue);
+        ret = trove_collection_setinfo(cur_fs->coll_id,
+                                       0,
+                                       TROVE_DIRECTIO_OPS_PER_QUEUE,
+                                       (void *)&cur_fs->directio_ops_per_queue);
         if (ret < 0)
         {
             gossip_err("Error setting directio ops per queue\n");
         }
 
-        ret = trove_collection_setinfo(
-            cur_fs->coll_id, 0,
-            TROVE_DIRECTIO_TIMEOUT,
-            (void *)&cur_fs->directio_timeout);
+        ret = trove_collection_setinfo(cur_fs->coll_id,
+                                       0,
+                                       TROVE_DIRECTIO_TIMEOUT,
+                                       (void *)&cur_fs->directio_timeout);
         if (ret < 0)
         {
             gossip_err("Error setting directio threads num\n");
         }
 
-        ret = trove_collection_lookup(
-            cur_fs->trove_method,
-            cur_fs->file_system_name, &(orig_fsid), NULL, NULL);
-
+        ret = trove_collection_lookup(cur_fs->trove_method,
+                                      cur_fs->file_system_name,
+                                      &(orig_fsid),
+                                      NULL,
+                                      NULL);
         if (ret < 0)
         {
             gossip_err("Error initializing trove for filesystem %s\n",
@@ -902,9 +1002,8 @@ static int server_initialize_subsystems(
          * are meta and which are data at this level, so we lump them
          * all together and hand them to trove-handle-mgmt.
          */
-        cur_merged_handle_range =
-            PINT_config_get_merged_handle_range_str(
-                &server_config, cur_fs);
+        cur_merged_handle_range = PINT_config_get_merged_handle_range_str(
+                                             &server_config, cur_fs);
 
         /*
          * error out if we're not configured to house either a meta or
@@ -916,8 +1015,9 @@ static int server_initialize_subsystems(
                         "(alias %s) specified in file system %s\n",
                         server_config.host_id,
                         PINT_config_get_host_alias_ptr(
-                            &server_config, server_config.host_id),
-                        cur_fs->file_system_name);
+                                                    &server_config,
+                                                    server_config.host_id),
+                                                    cur_fs->file_system_name);
             return -1;
         }
         else
@@ -935,9 +1035,10 @@ static int server_initialize_subsystems(
               complain in logging and continue.
             */
             ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context, 
-                TROVE_COLLECTION_HANDLE_TIMEOUT,
-                (void *)&cur_fs->handle_recycle_timeout_sec);
+                                   cur_fs->coll_id,
+                                   trove_context,
+                                   TROVE_COLLECTION_HANDLE_TIMEOUT,
+                                   (void *)&cur_fs->handle_recycle_timeout_sec);
             if (ret < 0)
             {
                 gossip_err("Error setting handle timeout\n");
@@ -948,33 +1049,40 @@ static int server_initialize_subsystems(
                 cur_fs->attr_cache_max_num_elems)
             {
                 ret = trove_collection_setinfo(
-                    cur_fs->coll_id, trove_context, 
-                    TROVE_COLLECTION_ATTR_CACHE_KEYWORDS,
-                    (void *)cur_fs->attr_cache_keywords);
+                                       cur_fs->coll_id,
+                                       trove_context, 
+                                       TROVE_COLLECTION_ATTR_CACHE_KEYWORDS,
+                                       (void *)cur_fs->attr_cache_keywords);
                 if (ret < 0)
                 {
                     gossip_err("Error setting attr cache keywords\n");
                 }
+
                 ret = trove_collection_setinfo(
-                    cur_fs->coll_id, trove_context, 
-                    TROVE_COLLECTION_ATTR_CACHE_SIZE,
-                    (void *)&cur_fs->attr_cache_size);
+                                       cur_fs->coll_id,
+                                       trove_context, 
+                                       TROVE_COLLECTION_ATTR_CACHE_SIZE,
+                                       (void *)&cur_fs->attr_cache_size);
                 if (ret < 0)
                 {
                     gossip_err("Error setting attr cache size\n");
                 }
+
                 ret = trove_collection_setinfo(
-                    cur_fs->coll_id, trove_context, 
-                    TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
-                    (void *)&cur_fs->attr_cache_max_num_elems);
+                                     cur_fs->coll_id,
+                                     trove_context, 
+                                     TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
+                                     (void *)&cur_fs->attr_cache_max_num_elems);
                 if (ret < 0)
                 {
                     gossip_err("Error setting attr cache max num elems\n");
                 }
+
                 ret = trove_collection_setinfo(
-                    cur_fs->coll_id, trove_context, 
-                    TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
-                    (void *)0);
+                                       cur_fs->coll_id,
+                                       trove_context, 
+                                       TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
+                                       (void *)0);
                 if (ret < 0)
                 {
                     gossip_err("Error initializing the attr cache\n");
@@ -988,9 +1096,10 @@ static int server_initialize_subsystems(
               a number of attributes on startup during an iterate.
             */
             ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context,
-                TROVE_COLLECTION_HANDLE_RANGES,
-                (void *)cur_merged_handle_range);
+                                   cur_fs->coll_id,
+                                   trove_context,
+                                   TROVE_COLLECTION_HANDLE_RANGES,
+                                   (void *)cur_merged_handle_range);
             if (ret < 0)
             {
                 gossip_err("Error adding handle range %s to "
@@ -1001,9 +1110,10 @@ static int server_initialize_subsystems(
             }
 
             ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context,
-                TROVE_COLLECTION_COALESCING_HIGH_WATERMARK,
-                (void *)&cur_fs->coalescing_high_watermark);
+                                  cur_fs->coll_id,
+                                  trove_context,
+                                  TROVE_COLLECTION_COALESCING_HIGH_WATERMARK,
+                                  (void *)&cur_fs->coalescing_high_watermark);
             if(ret < 0)
             {
                 gossip_err("Error setting coalescing high watermark\n");
@@ -1011,9 +1121,10 @@ static int server_initialize_subsystems(
             }
 
             ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context,
-                TROVE_COLLECTION_COALESCING_LOW_WATERMARK,
-                (void *)&cur_fs->coalescing_low_watermark);
+                                  cur_fs->coll_id,
+                                  trove_context,
+                                  TROVE_COLLECTION_COALESCING_LOW_WATERMARK,
+                                  (void *)&cur_fs->coalescing_low_watermark);
             if(ret < 0)
             {
                 gossip_err("Error setting coalescing low watermark\n");
@@ -1021,9 +1132,10 @@ static int server_initialize_subsystems(
             }
             
             ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context,
-                TROVE_COLLECTION_META_SYNC_MODE,
-                (void *)&cur_fs->trove_sync_meta);
+                                  cur_fs->coll_id,
+                                  trove_context,
+                                  TROVE_COLLECTION_META_SYNC_MODE,
+                                  (void *)&cur_fs->trove_sync_meta);
             if(ret < 0)
             {
                 gossip_err("Error setting coalescing low watermark\n");
@@ -1031,9 +1143,10 @@ static int server_initialize_subsystems(
             } 
             
             ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context,
-                TROVE_COLLECTION_IMMEDIATE_COMPLETION,
-                (void *)&cur_fs->immediate_completion);
+                                  cur_fs->coll_id,
+                                  trove_context,
+                                  TROVE_COLLECTION_IMMEDIATE_COMPLETION,
+                                  (void *)&cur_fs->immediate_completion);
             if(ret < 0)
             {
                 gossip_err("Error setting trove immediate completion\n");
@@ -1057,14 +1170,18 @@ static int server_initialize_subsystems(
             gossip_debug(GOSSIP_SERVER_DEBUG, "Export options for "
                          "%s:\n RootSquash %s\n AllSquash %s\n ReadOnly %s\n"
                          " AnonUID %u\n AnonGID %u\n", cur_fs->file_system_name,
-                         (cur_fs->exp_flags & TROVE_EXP_ROOT_SQUASH) ? "yes" : "no",
-                         (cur_fs->exp_flags & TROVE_EXP_ALL_SQUASH)  ? "yes" : "no",
-                         (cur_fs->exp_flags & TROVE_EXP_READ_ONLY)   ? "yes" : "no",
+                         (cur_fs->exp_flags & TROVE_EXP_ROOT_SQUASH) ?
+                                                               "yes" : "no",
+                         (cur_fs->exp_flags & TROVE_EXP_ALL_SQUASH)  ?
+                                                               "yes" : "no",
+                         (cur_fs->exp_flags & TROVE_EXP_READ_ONLY)   ?
+                                                               "yes" : "no",
                          cur_fs->exp_anon_uid, cur_fs->exp_anon_gid);
 
-            /* format and pass sync mode to the flow implementation */
-            snprintf(buf, 16, "%d,%d", cur_fs->coll_id,
-                     cur_fs->trove_sync_data);
+            /* format and pass sync mode to the flow implementation 
+             * for each file system configured
+             */
+            snprintf(buf, 16, "%d,%d", cur_fs->coll_id, cur_fs->trove_sync_data);
             PINT_flow_setinfo(NULL, FLOWPROTO_DATA_SYNC_MODE, buf);
 
             trove_close_context(cur_fs->coll_id, trove_context);
@@ -1073,8 +1190,6 @@ static int server_initialize_subsystems(
 
         cur = PINT_llist_next(cur);
     }
-
-    *server_status_flag |= SERVER_CACHED_CONFIG_INIT;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "Storage Init Complete (%s)\n", SERVER_STORAGE_MODE);
@@ -1092,6 +1207,10 @@ static int server_initialize_subsystems(
         gossip_err("trove_migrate failed: ret=%d\n", ret);
         return(ret);
     }
+
+    *server_status_flag |= SERVER_TROVE_INIT;
+
+    /*********** END OF TROVE INITIALIZATION ************/
 
     ret = job_time_mgr_init();
     if(ret < 0)
@@ -1230,6 +1349,98 @@ static int server_setup_signal_handlers(void)
     sigaction (SIGUSR1, &ign_action, NULL);
     sigaction (SIGUSR2, &ign_action, NULL);
 
+    return 0;
+}
+
+/* checks if the server is the owner of the root handles. if so, ensures that
+ * DIST_DIR_STRUCT exists. if it doesn't, puts the server in
+ * admin mode and submits a create_root_dir state machine to take care of it
+ */
+static int server_check_if_root_directory_created( void )
+{
+
+    PINT_llist *cur_f = server_config.file_systems;
+    struct filesystem_configuration_s *cur_fs;
+    char handle_server[BMI_MAX_ADDR_LEN];
+    job_status_s js;
+    job_id_t j_id;
+    PVFS_ds_keyval key, val;
+    struct PINT_smcb *tmp_op = NULL;
+    PINT_server_op *tmp_sop = NULL;
+    int ret = -1, outcount = 0;
+
+    PVFS_handle root_handle = 0;
+    PVFS_dist_dir_attr dist_dir_attr;
+
+    /* iterate through list of file systems */
+    while(cur_f)
+    {
+        cur_fs = PINT_llist_head(cur_f);
+        if (!cur_fs)
+        {
+            break;
+        }
+
+        /*
+           check if root handle is in our handle range for this fs.
+           if it is, we're responsible for creating it on disk when
+           creating the storage space
+         */
+        root_handle = cur_fs->root_handle;
+
+        ret = PINT_cached_config_get_server_name( handle_server,
+                BMI_MAX_ADDR_LEN-1, root_handle, cur_fs->coll_id);
+        if( ret == 0 && strcmp(handle_server, server_config.host_id) == 0 )
+        {
+            /* we own this handle, hurrah! now look if we have a DIST_DIR_ATTR keyval
+             * record, we want one. */
+            key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
+            key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
+            val.buffer_sz = sizeof(PVFS_dist_dir_attr);
+            val.buffer = &dist_dir_attr;
+
+            ret = job_trove_keyval_read(cur_fs->coll_id, root_handle,
+                    &key, &val,
+                    0, NULL, NULL, 0,
+                    &js, &j_id, server_job_context,
+                    NULL);
+            while(ret == 0)
+            {
+                ret = job_test(j_id, &outcount, NULL, &js,
+                        PVFS2_SERVER_DEFAULT_TIMEOUT_MS, server_job_context);
+            }
+
+            if(js.error_code != 0)
+            {
+                /* launch root-dir-create noreq state machine */
+                   ret = server_state_machine_alloc_noreq(
+                   PVFS_SERV_MGMT_CREATE_ROOT_DIR, &(tmp_op));
+                if (ret < 0)
+                {
+                    return ret;
+                }
+
+                tmp_sop = PINT_sm_frame(tmp_op, PINT_FRAME_CURRENT);
+                tmp_sop->target_fs_id = cur_fs->coll_id;
+                tmp_sop->target_handle = root_handle;
+                ret = server_state_machine_start_noreq(tmp_op);
+
+                if (ret < 0)
+                {
+                    PVFS_perror_gossip("Error: failed to start root directory "
+                            "creation noreq state machine.\n",
+                            ret);
+                    PINT_smcb_free(tmp_op);
+                    return ret;
+                }
+            }
+            else // debug print
+            {
+                gossip_debug(GOSSIP_SERVER_DEBUG, "root dir already setup.\n");
+            }
+        }
+        cur_f = PINT_llist_next(cur_f);
+    }
     return 0;
 }
 
@@ -1610,6 +1821,37 @@ static int server_shutdown(
                      "interface         [ stopped ]\n");
     }
 
+    if (status & SERVER_SECURITY_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting security "
+                     "module           [   ...   ]\n");
+        PINT_security_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         security "
+                     "module           [ stopped ]\n");
+    }
+
+#ifdef ENABLE_CAPCACHE    
+    if (status & SERVER_CAPCACHE_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting capability "
+                     "cache           [   ...   ]\n");
+        PINT_capcache_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         capability "
+                     "cache           [ stopped ]\n");
+    }
+#endif /* ENABLE_CAPCACHE */
+
+#ifdef ENABLE_CERTCACHE    
+    if (status & SERVER_CERTCACHE_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting certificate "
+                     "cache           [   ...   ]\n");
+        PINT_certcache_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         certificate "
+                     "cache           [ stopped ]\n");
+    }
+#endif /* ENABLE_CERTCACHE */
+
     if (status & SERVER_ENCODER_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting encoder "
@@ -1681,7 +1923,7 @@ static void server_sig_handler(int sig)
     {
         if (sig != SIGSEGV)
         {
-            gossip_err("\nPVFS2 server got signal %d "
+            gossip_err("PVFS2 server got signal %d "
                        "(server_status_flag: %d)\n",
                        sig, (int)server_status_flag);
         }
@@ -1832,7 +2074,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         }
     }
 
-    if(argc < optind)
+    if(argc <= optind)
     {
         gossip_err("Missing config file in command line arguments\n");
         goto parse_cmd_line_args_failure;
@@ -1889,12 +2131,6 @@ static int server_parse_cmd_line_args(int argc, char **argv)
             gossip_err("Failure copying configuration file path\n");
             goto parse_cmd_line_args_failure;
         }
-    }
-
-    if( fs_conf == NULL )
-    {
-        gossip_err("Failure copying configuration file path\n");
-        goto parse_cmd_line_args_failure;
     }
 
     if(argc - total_arguments > 2)
@@ -2189,6 +2425,27 @@ int server_state_machine_start_noreq(struct PINT_smcb *smcb)
     return ret;
 }
 
+/* server_state_machine_complete_noreq()
+ *
+ * stripped down version of the standard complete function. This removes
+ * items associated with handling/freeing requests structs and BMI connections
+ * when cause problems when there is no request or connection to cleanup.
+ *  
+ * returns 0
+ */ 
+int server_state_machine_complete_noreq(PINT_smcb *smcb)
+{
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_id_gen_t tmp_id;
+        
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: %p\n", __func__, smcb);
+    id_gen_fast_register(&tmp_id, s_op);
+                
+    qlist_del(&s_op->next);
+                
+    return SM_ACTION_TERMINATE;
+}
+
 /* server_state_machine_complete()
  *
  * function to be called at the completion of state machine execution;
@@ -2305,14 +2562,15 @@ static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id coll_id)
 }
 
 #ifndef GOSSIP_DISABLE_DEBUG
+
+/* sampson: new capability-based version */
 void PINT_server_access_debug(PINT_server_op * s_op,
                               int64_t debug_mask,
                               const char * format,
                               ...)
 {
     static char pint_access_buffer[GOSSIP_BUF_SIZE];
-    struct passwd* pw;
-    struct group* gr;
+    char sig_buf[10], mask_buf[10];
     va_list ap;
 
     if ((gossip_debug_on) &&
@@ -2321,24 +2579,37 @@ void PINT_server_access_debug(PINT_server_op * s_op,
     {
         va_start(ap, format);
 
-        pw = getpwuid(s_op->req->credentials.uid);
-        gr = getgrgid(s_op->req->credentials.gid);
-        snprintf(pint_access_buffer, GOSSIP_BUF_SIZE,
-            "%s.%s@%s H=%llu S=%p: %s: %s",
-            ((pw) ? pw->pw_name : "UNKNOWN"),
-            ((gr) ? gr->gr_name : "UNKNOWN"),
-            BMI_addr_rev_lookup_unexpected(s_op->addr),
-            llu(s_op->target_handle),
-            s_op,
-            PINT_map_server_op_to_string(s_op->req->op),
-            format);
+        if (strlen(s_op->req->capability.issuer) == 0)
+        {
+            snprintf(pint_access_buffer, GOSSIP_BUF_SIZE,
+                "null@%s H=%llu S=%p: %s: %s",
+                BMI_addr_rev_lookup_unexpected(s_op->addr),
+                llu(s_op->target_handle),
+                s_op,
+                PINT_map_server_op_to_string(s_op->req->op),
+                format);
+        }
+        else
+        {
+            snprintf(pint_access_buffer, GOSSIP_BUF_SIZE,
+                "%s@%s %s sig=%s H=%llu S=%p: %s: %s",
+                s_op->req->capability.issuer,
+                BMI_addr_rev_lookup_unexpected(s_op->addr),
+                PINT_print_op_mask(s_op->req->capability.op_mask, mask_buf),
+                PINT_util_bytes2str(s_op->req->capability.signature, 
+                                    sig_buf, 4),
+                llu(s_op->target_handle),
+                s_op,
+                PINT_map_server_op_to_string(s_op->req->op),
+                format);                
+        }
 
         __gossip_debug_va(debug_mask, 'A', pint_access_buffer, ap);
 
         va_end(ap);
     }
 }
-#endif
+#endif /* GOSSIP_DISABLE_DEBUG */
 
 /* generate_shm_key_hint()
  *
