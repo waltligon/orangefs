@@ -1672,8 +1672,8 @@ static inline void defree_##name(struct name *x) { \
     if (x->n1 > 0) decode_free(x->a2); \
 }
 
-/* special case where we have three arrays of the same size after 6 fields */
-#define endecode_fields_7aaa_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6, tn1, n1, tn2, n2, ta1, a1, ta2, a2, ta3, a3) \
+/* special case where we have an array of one size, then two arrays of the same size after 6 fields */
+#define endecode_fields_6a2a_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6, tn1, n1, tn2, n2, ta1, a1, ta2, a2, ta3, a3) \
 static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##t1(pptr, &x->x1);           \
     encode_##t2(pptr, &x->x2);           \

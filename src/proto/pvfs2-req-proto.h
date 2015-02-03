@@ -1486,7 +1486,7 @@ struct PVFS_servreq_crdirent
     PVFS_SID *parent_sid_array;  /* stored with new entry */
     PVFS_SID *dirdata_sid_array; /* reflexive - of bucket */
 };
-endecode_fields_7aaa_struct(
+endecode_fields_6a2a_struct(
     PVFS_servreq_crdirent,
     PVFS_credential, credential,
     string, name,

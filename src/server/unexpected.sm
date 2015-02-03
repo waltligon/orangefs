@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <assert.h>
 
 #include "pvfs2-server.h"
 #include "pvfs2-internal.h"
@@ -312,6 +313,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
             PINT_msgpair_init(remote_op_frame);
             msg_p = &remote_op_frame->msgpair;
             memcpy(&msg_p->req, s_op->req, sizeof(struct PVFS_server_req));
+            PVFS_REQ_COPY_CAPABILITY(s_op->req->capability,msg_p->req);
             msg_p->msgclass = PVFS_IO_METADATA;
             msg_p->msgdir = PVFS_IO_WRITE;
             msg_p->fs_id = req_ctrl.fs_id;

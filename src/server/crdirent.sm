@@ -528,10 +528,6 @@ static PINT_sm_action crdirent_write_directory_entry(struct PINT_smcb *smcb,
     /* Set up a temporary buffer to store the new handle and SIDs in db */
     /* Copy handle and SIDs in to the new buffer */
 
-    gossip_err("%s:sid_count(%d)\n"
-              ,__func__
-              ,s_op->req->u.crdirent.sid_count);
-
     s_op->u.crdirent.keyval_temp_store =
                   (PVFS_ID *)malloc(OSASZ(1, s_op->req->u.crdirent.new_sid_count));
 

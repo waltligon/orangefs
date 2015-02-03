@@ -249,11 +249,6 @@ PVFS_error PVFS_isys_create(char *object_name,
 
     sm_p->parent_ref = parent_ref;
 
-
-    gossip_err("%s:sm_p->parent_ref.sid_count(%d)\n"
-              ,__func__
-              ,sm_p->parent_ref.sid_count);
-
     if(attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
     {
         sm_p->u.create.user_requested_num_data_files = attr.dfile_count;
@@ -893,14 +888,6 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    gossip_err("%s:datafile_sid_count(%d)\n"
-              ,__func__
-              ,sm_p->u.create.datafile_sid_count);
-    
-    gossip_err("%s: u.create.attr.u.meta.sid_count(%d)\n"
-              ,__func__
-              ,sm_p->u.create.attr.u.meta.sid_count);
-
     /* object ref will now refer to newly created metadata object */
     sm_p->object_ref.handle = *sm_p->u.create.metadata_handle;
     sm_p->object_ref.fs_id = sm_p->parent_ref.fs_id;
@@ -935,12 +922,6 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
                              sm_p->u.create.datafile_sid_count,
                              sm_p->u.create.datafile_sid_array,
                              sm_p->hints);
-
-    gossip_err("%s: metadata_sid_count(%d) datafile_sid_count(%d) datafile_sid_array(%p)\n"
-              ,__func__
-              ,sm_p->u.create.metadata_sid_count
-              ,sm_p->u.create.datafile_sid_count
-              ,sm_p->u.create.datafile_sid_array);
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
@@ -1039,14 +1020,6 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                 sm_p->parent_ref.handle,      /* back ptr to dir */
                 sm_p->parent_ref.sid_array,   /* back ptr to dir */
                 sm_p->hints);
-
-    gossip_err("%s:sm_p->parent_ref.sid_count(%d)\n"
-              ,__func__
-              ,sm_p->parent_ref.sid_count);
-
-    gossip_err("%s:sm_p->object_ref.sid_count(%d)\n"
-              ,__func__
-              ,sm_p->object_ref.sid_count);
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
