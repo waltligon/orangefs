@@ -342,6 +342,9 @@ class OFSTestNetwork(object):
         cloud_nodes = [node for node in self.network_nodes if node.is_cloud == True]
         self.updateNodes(cloud_nodes)   
 
+        #Wait 3 minutes for node to reboot
+        print "Waiting 180s for nodes to reboot."
+        time.sleep(180)
 
     ##
     # @fn updateEtcHosts(self,node_list=None):
