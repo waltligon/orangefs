@@ -519,6 +519,7 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                                sm_p->u.sym.link_name,
                                sm_p->object_ref.handle,    /* new handle */
                                sm_p->object_ref.sid_array, /* new sid array */
+                               sm_p->object_ref.sid_count, 
                                sm_p->parent_ref.handle,
                                sm_p->parent_ref.sid_array,
                                sm_p->hints);

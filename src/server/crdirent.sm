@@ -527,15 +527,16 @@ static PINT_sm_action crdirent_write_directory_entry(struct PINT_smcb *smcb,
 
     /* Set up a temporary buffer to store the new handle and SIDs in db */
     /* Copy handle and SIDs in to the new buffer */
+
     s_op->u.crdirent.keyval_temp_store =
-                  (PVFS_ID *)malloc(OSASZ(1, s_op->req->u.crdirent.sid_count));
+                  (PVFS_ID *)malloc(OSASZ(1, s_op->req->u.crdirent.new_sid_count));
 
     s_op->u.crdirent.keyval_temp_store[0].oid =
                             s_op->req->u.crdirent.new_handle;
 
     memcpy(&(s_op->u.crdirent.keyval_temp_store[1]),
            s_op->req->u.crdirent.new_sid_array,
-           SASZ(s_op->req->u.crdirent.sid_count));
+           SASZ(s_op->req->u.crdirent.new_sid_count));
 
     /* This buffer came from one of two places, either phase two of
      * creating the directory space when we wrote the value back to
@@ -546,13 +547,15 @@ static PINT_sm_action crdirent_write_directory_entry(struct PINT_smcb *smcb,
     s_op->key.buffer_sz = strlen(s_op->req->u.crdirent.name) + 1;
     s_op->key.buffer = s_op->req->u.crdirent.name;
 
-    s_op->val.buffer_sz = OSASZ(1, s_op->req->u.crdirent.sid_count);
+    s_op->val.buffer_sz = OSASZ(1, s_op->req->u.crdirent.new_sid_count);
     s_op->val.buffer = s_op->u.crdirent.keyval_temp_store;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  writing new directory entry "
-                 "for %s (handle = %s) to dirdata dspace %s\n",
-                 s_op->req->u.crdirent.name,
-                 PVFS_OID_str(&s_op->req->u.crdirent.new_handle),
+                 "for %s (handle = %s)\n"
+                 ,s_op->req->u.crdirent.name,
+                 PVFS_OID_str(&s_op->req->u.crdirent.new_handle));
+
+    gossip_debug(GOSSIP_SERVER_DEBUG," to dirdata dspace %s\n",
                  PVFS_OID_str(&s_op->req->u.crdirent.dirdata_handle));
 
     keyval_flags = TROVE_SYNC;
@@ -860,16 +863,38 @@ static int PINT_get_object_ref_crdirent(struct PVFS_server_req *req,
     return 0;                       
 }
 
+static int crdirent_get_ctrl(struct PVFS_server_req *req,
+                             struct PINT_server_req_ctrl *ctrl)
+{
+   /* this sets up a standard replication */
+   /* generates a request to each of sid_count SIDs */
+   /* all with the same UUID */
 
+   /* We are replicating the dirdata information for a 
+    * directory entry
+    */
+
+   ctrl->fs_id     = req->u.crdirent.fs_id;
+   ctrl->handles   = &req->u.crdirent.dirdata_handle;
+   ctrl->count     = 1;
+   ctrl->sids      = &req->u.crdirent.dirdata_sid_array[1];
+   ctrl->sid_count = req->u.crdirent.sid_count - 1;
+
+   return ctrl->sid_count;
+}
+
+PINT_GET_CREDENTIAL_DEFINE(crdirent);
 
 struct PINT_server_req_params pvfs2_crdirent_params =
 {
-    .string_name = "crdirent",
-    .perm = perm_crdirent,
-    .access_type = PINT_server_req_modify,
-    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .string_name    = "crdirent",
+    .perm           = perm_crdirent,
+    .access_type    = PINT_server_req_modify,
+    .sched_policy   = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_crdirent,
-    .state_machine = &pvfs2_crdirent_sm
+    .get_credential = PINT_get_credential_crdirent,
+    .get_ctrl       = crdirent_get_ctrl,
+    .state_machine  = &pvfs2_crdirent_sm
 };
 
 /*

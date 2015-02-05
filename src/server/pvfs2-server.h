@@ -855,7 +855,7 @@ struct PINT_server_req_ctrl
 {
     PVFS_fs_id fs_id;
     PVFS_OID *handles;
-    int count;
+    int count;          /* number of handles */
     PVFS_SID *sids;
     int sid_count;
 };
