@@ -567,7 +567,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                             sm_p->u.mkdir.metadata_sid_array,
                             &sm_p->parent_ref.handle, /* back ptr */
                             sm_p->parent_ref.sid_array,
-                            sm_p->u.mkdir.dirdata_count,
+                            sm_p->u.mkdir.sys_attr.distr_dir_servers_max,
                             sm_p->u.mkdir.dirdata_handles,
                             sm_p->u.mkdir.dirdata_sid_count,
                             sm_p->u.mkdir.dirdata_sid_array,

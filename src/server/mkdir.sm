@@ -52,21 +52,21 @@ nested machine pvfs2_mkdir_work_sm
         default => err_msg;
     }
 
-/*
-    state remote_dirdata_attr_and_keyval_xfer_msgpair
-    {
-        jump pvfs2_msgpairarray_sm;
-        success => write_keyval_to_meta_handle;
-        default => err_msg;
-    }
-*/
-
     state write_keyval_to_meta_handle
     {
         run mkdir_write_keyval_to_meta_handle;
+/*        success => return; */
+        success => temp1;
+        default => err_msg;
+    }
+
+    state temp1
+    {
+        run temp1;
         success => return;
         default => err_msg;
     }
+
     state err_msg 
     {
         run mkdir_error;
@@ -92,6 +92,13 @@ machine pvfs2_mkdir_sm
     state work
     {
         jump pvfs2_mkdir_work_sm;
+/*        default => final_response; */
+        default => temp2;
+    }
+
+    state temp2
+    {
+        run temp2;
         default => final_response;
     }
 
@@ -196,99 +203,36 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
  *
  * Returns:  int
  *
- * Synopsis: Initialize dist_dir_struct in s_op->attr.u.dir and s_op->u.mkdir
+ * Synopsis: 
  *           
  */
 static PINT_sm_action mkdir_create_dirdata(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *attr;
     int ret = -1;
-    unsigned char *c;
-    int i;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_object_attr dirdata_attr;
 
-    attr = (&s_op->attr);
 
-    /* init meta handle dist_dir_struct */
-    ret = PINT_init_dist_dir_state(&attr->u.dir.dist_dir_attr,
-                                   &attr->u.dir.dist_dir_bitmap,
-                                   s_op->req->u.mkdir.dirdata_count,
-                                   s_op->req->u.mkdir.dirdata_sid_count,
-                                   0,
-                                   s_op->req->u.mkdir.dist_dir_servers_initial,
-                                   s_op->req->u.mkdir.dist_dir_split_size);
+    gossip_debug(
+            GOSSIP_MKDIR_DEBUG,
+            "  s_op->req->u.mkdir.attr: [owner = %d, group = %d\n\t"
+            "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
+            "ctime = %llu ]\n",
+            s_op->req->u.mkdir.attr.owner, s_op->req->u.mkdir.attr.group, s_op->req->u.mkdir.attr.perms,
+            s_op->req->u.mkdir.attr.objtype, llu(s_op->req->u.mkdir.attr.atime),
+            llu(PINT_util_mkversion_time(s_op->req->u.mkdir.attr.mtime)),
+            llu(s_op->req->u.mkdir.attr.ctime));
 
-    assert(ret == 0);
-
-    gossip_debug(GOSSIP_MKDIR_DEBUG, 
-            "mkdir: Init dist-dir-attr for dir meta handle %s "
-            "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
-            "split_size=%d, server_no=%d and branch_level=%d\n",
-            PVFS_OID_str(&s_op->u.mkdir.handle),
-            attr->u.dir.dist_dir_attr.tree_height,
-            attr->u.dir.dist_dir_attr.dirdata_count,
-            attr->u.dir.dist_dir_attr.bitmap_size,
-            s_op->req->u.mkdir.dist_dir_split_size,
-            attr->u.dir.dist_dir_attr.server_no,
-            attr->u.dir.dist_dir_attr.branch_level);
-
-    /* gossip bitmap, may adjust later */
-    gossip_debug(GOSSIP_MKDIR_DEBUG,
-            "mkdir: Init dist_dir_bitmap as:\n");
-    for(i = attr->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
-    {
-        c = (unsigned char *)(attr->u.dir.dist_dir_bitmap + i);
-        gossip_debug(GOSSIP_MKDIR_DEBUG,
-                " i=%d : %02x %02x %02x %02x\n",
-                i, c[3], c[2], c[1], c[0]);
-    }
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "\n");
-
-    /* allocate dirdata handle space, similar to create.sm */
-    attr->u.dir.dirdata_handles = malloc(
-            sizeof(*attr->u.dir.dirdata_handles) *
-            s_op->req->u.mkdir.dirdata_count);
-    attr->u.dir.dirdata_sids = malloc(
-            sizeof(*attr->u.dir.dirdata_sids) *
-            s_op->req->u.mkdir.dirdata_sid_count);
-
-    if (!attr->u.dir.dirdata_handles || !attr->u.dir.dirdata_sids)
-    {
-        if (attr->u.dir.dirdata_handles)
-        {
-            free(attr->u.dir.dirdata_handles);
-        }
-        if (attr->u.dir.dirdata_sids)
-        {
-            free(attr->u.dir.dirdata_sids);
-        }
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-
-    /* Copy OIDs and SIDs into the dist dir storage for these values. */
-    memcpy(&attr->u.dir.dirdata_handles,
-           s_op->req->u.mkdir.dirdata_handles,
-           sizeof(*attr->u.dir.dirdata_handles) *
-                  s_op->req->u.mkdir.dirdata_count);
-    memcpy(&attr->u.dir.dirdata_sids,
-           s_op->req->u.mkdir.dirdata_sid_array,
-           sizeof(*attr->u.dir.dirdata_sids) *
-                  s_op->req->u.mkdir.dirdata_sid_count);
-
-
-    /* set dirdata attr, set all the static component */
-    memcpy(&dirdata_attr, &s_op->req->u.mkdir.attr, sizeof(attr));
+    /* Create an attr structure to use for dirdata objects. */
+    memcpy(&dirdata_attr, &s_op->req->u.mkdir.attr, sizeof(dirdata_attr));
     dirdata_attr.objtype = PVFS_TYPE_DIRDATA;
-    PINT_dist_dir_attr_copyto(dirdata_attr.u.dir.dist_dir_attr,
-                              s_op->attr.u.dir.dist_dir_attr);
-    /* V3 this should go in dirdata, not dir */
-    dirdata_attr.u.dir.dirdata_handles = s_op->attr.u.dir.dirdata_handles;
-    dirdata_attr.u.dir.dirdata_sids = s_op->attr.u.dir.dirdata_sids;
-    dirdata_attr.u.dir.dist_dir_bitmap = s_op->attr.u.dir.dist_dir_bitmap;
+    PINT_dist_dir_attr_copyto(dirdata_attr.u.dirdata.dist_dir_attr,
+                              s_op->req->u.mkdir.attr.u.dir.dist_dir_attr);
+    dirdata_attr.u.dirdata.dirdata_handles = s_op->req->u.mkdir.attr.u.dir.dirdata_handles;
+    dirdata_attr.u.dirdata.dirdata_sids = s_op->req->u.mkdir.attr.u.dir.dirdata_sids;
+    dirdata_attr.u.dirdata.dist_dir_bitmap = s_op->req->u.mkdir.attr.u.dir.dist_dir_bitmap;
     dirdata_attr.mask = PVFS_ATTR_COMMON_ALL;
     dirdata_attr.mask |= PVFS_ATTR_DISTDIR_ATTR;
 
@@ -313,18 +257,22 @@ static PINT_sm_action mkdir_create_dirdata(struct PINT_smcb *smcb,
                                    PVFS_TYPE_DIRDATA,
                                    dirdata_attr,
                                    0, /* caller_handle_index */
-                                   s_op->attr.u.dir.dist_dir_attr.dirdata_count,
-                                   s_op->attr.u.dir.dirdata_handles,
-                                   s_op->attr.u.dir.dist_dir_attr.sid_count,
-                                   s_op->attr.u.dir.dirdata_sids,
+                                   s_op->req->u.mkdir.attr.u.dir.dist_dir_attr.dirdata_count,
+                                   s_op->req->u.mkdir.attr.u.dir.dirdata_handles,
+                                   s_op->req->u.mkdir.attr.u.dir.dist_dir_attr.sid_count,
+                                   s_op->req->u.mkdir.attr.u.dir.dirdata_sids,
                                    NULL);
 
     /* save objects so they can be freed */
     s_op->u.mkdir.saved_attr = &msg_p->req.u.mkdir.attr;
     s_op->u.mkdir.saved_capability = &msg_p->req.capability;
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = s_op->u.mkdir.fs_id;
-    msg_p->handle = s_op->attr.u.dir.dirdata_handles[0];
+    msg_p->handle = s_op->req->u.mkdir.attr.u.dir.dirdata_handles[0];
+    msg_p->sid_count = s_op->req->u.mkdir.attr.u.dir.dist_dir_attr.sid_count;
+    msg_p->sid_array = s_op->req->u.mkdir.attr.u.dir.dirdata_sids;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = tree_setattr_comp_fn;
 
@@ -366,20 +314,17 @@ static PINT_sm_action mkdir_write_keyval_to_meta_handle(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr;
     int ret = -1;
-//    job_id_t j_id;
+    job_id_t j_id;
 
-    /* total 3 keyvals,
-     * PVFS_DIST_DIR_ATTR, PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES */
-    int keyval_count = 3;
+    /* total 2 keyvals,
+     * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES */
+    int keyval_count = 2;
 
     /* free saved capability */
     PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
     s_op->u.mkdir.saved_capability = NULL;
 
-    /* !!!! this is to set meta handle keyval,
-     * use dist_dir_attr in s_op->attr 
-     */
-    attr = &s_op->attr;
+    attr = &s_op->req->u.mkdir.attr;
 
     s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
     if(!s_op->key_a)
@@ -396,40 +341,22 @@ static PINT_sm_action mkdir_write_keyval_to_meta_handle(
         return SM_ACTION_COMPLETE;
     }
     memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
-//TODO: make sure this stuff is right
-    s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
-    s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
+    s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
+    s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
 
-    s_op->val_a[0].buffer = &attr->u.dir.dist_dir_attr;
-    s_op->val_a[0].buffer_sz = sizeof(attr->u.dir.dist_dir_attr);
-
-    s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
-    s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
-
-    s_op->val_a[1].buffer_sz = attr->u.dir.dist_dir_attr.bitmap_size * 
+    s_op->val_a[0].buffer_sz = attr->u.dir.dist_dir_attr.bitmap_size * 
                                sizeof(PVFS_dist_dir_bitmap_basetype);
-    s_op->val_a[1].buffer = attr->u.dir.dist_dir_bitmap;
+    s_op->val_a[0].buffer = attr->u.dir.dist_dir_bitmap;
 
-    s_op->key_a[2].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
-    s_op->key_a[2].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
-//Make sure this attr fields get allocated contiguously
-    s_op->val_a[2].buffer = attr->u.dir.dirdata_handles;
-    s_op->val_a[2].buffer_sz = OSASZ(attr->u.dir.dist_dir_attr.dirdata_count,
+    s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
+    s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
+    s_op->val_a[1].buffer = attr->u.dir.dirdata_handles;
+    s_op->val_a[1].buffer_sz = OSASZ(attr->u.dir.dist_dir_attr.dirdata_count,
                                      attr->u.dir.dist_dir_attr.sid_count);
-
-#if 0
-ECQ: Make it compile
-    gossip_debug(GOSSIP_MKDIR_DEBUG, 
-            "  writing dist-dir-struct keyvals for meta handle: %s "
-            "\t with server_no=%d and branch_level=%d \n", 
-            PVFS_OID_str(&s_op->resp.u.mkdir.handle),
-            attr->u.dir.dist_dir_attr.server_no,
-            attr->u.dir.dist_dir_attr.branch_level);
-
 
     ret = job_trove_keyval_write_list(
                                   s_op->req->u.mkdir.fs_id,
-                                  s_op->resp.u.mkdir.handle, /* meta handle */
+                                  s_op->u.mkdir.handle, /* meta handle */
                                   s_op->key_a,
                                   s_op->val_a,
                                   keyval_count,
@@ -442,18 +369,31 @@ ECQ: Make it compile
                                   server_job_context,
                                   s_op->req->hints);
 
-#endif
     return ret;
+}
+
+static int temp1(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "  s_op->req->op = %d\n\t",
+            s_op->req->op);
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static int temp2(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "  s_op->req->op = %d\n\t",
+            s_op->req->op);
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
 }
 
 static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 {
-//    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-#if 0
-ECQ: Make it compile
-    s_op->resp.u.mkdir.handle = PVFS_HANDLE_NULL;
-#endif
-
     if (js_p->error_code > -1)
     {
         js_p->error_code = -PVFS_EINVAL;
@@ -475,8 +415,8 @@ ECQ: Make it compile
 static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    free(s_op->attr.u.dir.dirdata_handles);
-    free(s_op->attr.u.dir.dist_dir_bitmap);
+    free(s_op->req->u.mkdir.attr.u.dir.dirdata_handles);
+    free(s_op->req->u.mkdir.attr.u.dir.dist_dir_bitmap);
     free(s_op->key_a);
     free(s_op->val_a);
     free(s_op->error_a);
@@ -495,6 +435,7 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
     PVFS_uid uid;
     uint32_t num_groups;
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
+    int ret;
 
     s_op->attr.u.dir.dirdata_handles = NULL;
     s_op->attr.u.dir.dist_dir_bitmap = NULL;
@@ -517,8 +458,6 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
     if (a_p->mask & (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID) &&
         (a_p->owner == PVFS_UID_MAX || a_p->group == PVFS_GID_MAX))
     {
-        int ret;
-
         ret  = PINT_map_credential(&s_op->req->u.mkdir.credential, 
                                    &uid, &num_groups, group_array);
         if (ret != 0)
@@ -547,6 +486,23 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
 
     /* translate attrs to storage attr format */
     ds_attr = (&s_op->ds_attr);
+    ret = PINT_init_dist_dir_state(&a_p->u.dir.dist_dir_attr,
+                                   &a_p->u.dir.dist_dir_bitmap,
+                                   s_op->req->u.mkdir.dirdata_count,
+                                   s_op->req->u.mkdir.dirdata_sid_count,
+                                   0,
+                                   s_op->req->u.mkdir.dist_dir_servers_initial,
+                                   s_op->req->u.mkdir.dist_dir_split_size);
+
+    assert(ret == 0);
+
+    PINT_debug_dist_dir_attr(GOSSIP_MKDIR_DEBUG, a_p->u.dir.dist_dir_attr);
+    PINT_debug_dist_dir_bitmap(GOSSIP_MKDIR_DEBUG, a_p->u.dir.dist_dir_attr,
+                               a_p->u.dir.dist_dir_bitmap);
+
+    a_p->u.dir.dirdata_handles = s_op->req->u.mkdir.dirdata_handles;
+    a_p->u.dir.dirdata_sids = s_op->req->u.mkdir.dirdata_sid_array;
+
     PVFS_ds_attr_from_object_attr(ds_attr, a_p);
 
     js_p->error_code = 0;
