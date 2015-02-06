@@ -2544,7 +2544,7 @@ endecode_fields_1_struct(
 do {                                                                   \
     memset(&(__req), 0, sizeof(__req));                                \
     (__req).op = PVFS_SERV_MGMT_BGPROC_LIST;                           \
-    (__req).capability = (__cap);                                      \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                        \
 } while (0)
 
 struct PVFS_servresp_mgmt_bgproc_list
@@ -2577,7 +2577,7 @@ endecode_fields_1_struct(
 do {                                                                   \
     memset(&(__req), 0, sizeof(__req));                                \
     (__req).op = PVFS_SERV_MGMT_BGPROC_START;                          \
-    (__req).capability = (__cap);                                      \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                        \
     (__req).u.mgmt_bgproc_start.name = (__name);                       \
 } while (0)
 
@@ -2608,7 +2608,7 @@ endecode_fields_1_struct(
 do {                                                                   \
     memset(&(__req), 0, sizeof(__req));                                \
     (__req).op = PVFS_SERV_MGMT_BGPROC_KILL;                           \
-    (__req).capability = (__cap);                                      \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                        \
     (__req).u.mgmt_bgproc_kill.id = (__id);                            \
 } while (0)
 
