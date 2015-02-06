@@ -410,14 +410,14 @@ int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
     *datafile_handles = (PVFS_OID *)malloc(datafile_count * sizeof(PVFS_OID));
     for (i = 0; i < datafile_count; i++)
     {
-        PVFS_OID_gen(&((*datafile_handles)[i]));
+        PVFS_OID_gen(&(*datafile_handles)[i]);
     }
 
     /* generate SIDs for datafile objects */
     *datafile_sid_array = (PVFS_SID *)malloc(datafile_count *
                                              datafile_sid_count *
                                              sizeof(PVFS_SID));
-    n = datafile_sid_count;
+    n = datafile_sid_count * datafile_count;
     PVFS_SID_get_server_next_n(NULL, *datafile_sid_array, &n, SID_SERVER_DATA);
     return ret;
 }

@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <assert.h>
 
 #include "pvfs2-server.h"
 #include "pvfs2-internal.h"
@@ -476,7 +477,6 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
                   "s_op->num_pjmp_frames = %d\n",
                   s_op->num_pjmp_frames);
 
-    gossip_err("Poping %d frames\n", s_op->num_pjmp_frames);
     for (popped_count = 0;
          popped_count < s_op->num_pjmp_frames;
          popped_count++)
