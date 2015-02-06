@@ -700,6 +700,7 @@ static int dbpf_bstream_write_list(TROVE_coll_id coll_id,
                                 hints);
 }
 
+/* WAS MARKED INLINE */
 /* dbpf_bstream_rw_list()
  *
  * Handles queueing of both read and write list operations
