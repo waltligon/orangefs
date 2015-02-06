@@ -156,7 +156,8 @@
         PVFS_ATTR_META_DFILES  | PVFS_ATTR_META_MIRROR_DFILES | \
         PVFS_ATTR_META_UNSTUFFED)
 
-/* extended hint attributes for a metafile object */
+/* extended hint attributes for a metafile object  V3 */
+#if 0
 struct PVFS_metafile_hint_s
 {
     PVFS_flags flags;
@@ -167,6 +168,7 @@ endecode_fields_1(
     PVFS_metafile_hint,
     PVFS_flags, flags);
 #endif
+#endif
 
 /* attributes specific to metadata objects */
 struct PVFS_metafile_attr_s
@@ -176,27 +178,25 @@ struct PVFS_metafile_attr_s
     uint32_t dist_size;  /* not sent across wire, each side may be diff */
 
     /* list of datafiles */
-    PVFS_handle *dfile_array;
     uint32_t dfile_count;
+    PVFS_handle *dfile_array;
 
     /* list of sids */
     /* V3 there are dfile_count * (sid_count + 1) sids */
     PVFS_SID *sid_array;
     uint32_t sid_count;
 
-    /* This is a placeholder for volatile file size */
-    PVFS_size size;       /* file size, volatile, may be wrong */   
-
-    /* list of mirrored datafiles */
-    /* V3 eventually these should go away */
-    PVFS_mirror_mode mirror_mode;
+    uint32_t mirror_mode;
     //PVFS_handle *mirror_dfile_array; /* V3 remove this replaced by sids */
     //uint32_t mirror_copies_count;    /* V3 replaced with sid_count */
 
-    int32_t stuffed;      /* is object currently stuffed */
-    int32_t stuffed_size; /* threshold size of unstuffing */
+    /* This is a placeholder for volatile file size 64-bit */
+    PVFS_size size;        /* file size, volatile, may be wrong */   
 
-    PVFS_metafile_hint hint;
+    uint32_t stuffed;      /* is object currently stuffed */
+    uint32_t stuffed_size; /* threshold size of unstuffing */
+
+    uint64_t flags;        /* bit field for flags such as IMMUTABLE */
 };
 
 typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
@@ -228,7 +228,7 @@ static inline void encode_PVFS_metafile_attr(char **pptr,
     {                                                                   
         encode_PVFS_SID(pptr, &x->sid_array[sid_i]);                  
     }                                                                   
-    encode_PVFS_metafile_hint(pptr, &x->hint);                        
+    encode_uint64_t(pptr, &x->flags);                        
 }
 
 /* This decodes OIDs and SIDs into a contiguous array to make it easier
@@ -263,7 +263,7 @@ static inline void decode_PVFS_metafile_attr(char **pptr,
     {                                                                   
 	decode_PVFS_SID(pptr, &(x)->sid_array[sid_i]);                  
     }                                                                   
-    decode_PVFS_metafile_hint(pptr, &(x)->hint);                        
+    decode_uint64_t(pptr, &(x)->flags);                        
 }
 
 #define defree_PVFS_metafile_attr(x) \

@@ -676,8 +676,8 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
  *
  * @param js_p Contains the return code to be set by this function in the
  * @ref error_code field.  This determines the next state action to jump
- * to in the getattr-dowork state machine.  Possible values for js_p->error_code
- * are:
+ * to in the getattr-dowork state machine.
+ * Possible values for js_p->error_code are:
  * <ul>
  * <li><b>GETATTR_CACHE_MISS</b> - The requested attribute was
  * not found in the attribute cache, or the attributes were
@@ -999,8 +999,8 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
  *
  * @param js_p Contains the return code to be set by this function in the
  * @ref error_code field.  This determines the next state action to jump
- * to in the getattr-dowork state machine.  Possible values for js_p->error_code
- * are:
+ * to in the getattr-dowork state machine. 
+ * Possible values for js_p->error_code are:
  * <ul>
  * <li><b>GETATTR_CACHE_MISS</b> - Either the acache missed in
  * the prior state, or the capcache missed.
@@ -2173,7 +2173,7 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
     if(attr->objtype == PVFS_TYPE_METAFILE) 
     {
         /* Copy if there are any special object specific flags */
-        sysresp->attr.flags = attr->u.meta.hint.flags;
+        sysresp->attr.flags = attr->u.meta.flags;
         /* special case for when users ask for dfile count */
         if (attr->mask & PVFS_ATTR_META_DFILES)
         {

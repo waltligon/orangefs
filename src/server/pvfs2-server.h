@@ -32,7 +32,6 @@
 #include "PINT-reqproto-encode.h"
 #include "msgpairarray.h"
 #include "pvfs2-req-proto.h"
-#include "pvfs2-mirror.h"
 #include "state-machine.h"
 #include "pint-event.h"
 #include "server-config.h"
@@ -107,8 +106,8 @@ enum
     NUM_DFILES_REQ_KEY       = 6,       
     DIST_DIR_ATTR_KEY        = 7,
     DIST_DIRDATA_BITMAP_KEY  = 8,
-    DIST_DIRDATA_HANDLES_KEY = 9
-
+    DIST_DIRDATA_HANDLES_KEY = 9,
+    OBJECT_PARENT_KEY        = 10
 };
 
 /* This is defined in src/server/get-attr.sm
@@ -243,12 +242,12 @@ struct PINT_server_create_copies_op
     uint32_t io_servers_required;
 
     /*mirroring mode. attribute key is user.pvfs2.mirror.mode*/
-    MIRROR_MODE mirror_mode;
+    uint32_t mirror_mode;
 
     /*the expected mirroring mode tells us how to edit the retrieved mirroring*/
     /*mode.  Example: if mirroring was called when immutable was set, then    */
     /*the expected mirroring mode would be MIRROR_ON_IMMUTABLE.               */
-    MIRROR_MODE expected_mirror_mode;
+    uint32_t expected_mirror_mode;
 
     /*buffer holding list of remote servers for all copies of the file*/
     char **my_remote_servers;
@@ -732,6 +731,7 @@ typedef struct PINT_server_op
      * careful about nesting
      */
     int num_pjmp_frames;
+    struct PINT_mpa_join *join;
 
     /* Used just about everywhere so this is a std place to keep it */
     int32_t metasidcnt; /* number of sids per handle for metadata */
@@ -901,8 +901,8 @@ struct PINT_server_req_params
     int (*get_credential)(struct PVFS_server_req *req,
                           PVFS_credential **cred);
 
-    int (*get_ctrl)(struct PVFS_server_req *req,
-                    struct PINT_server_req_ctrl *req_ctrl);
+    void (*get_ctrl)(struct PVFS_server_req *req,
+                     struct PINT_server_req_ctrl *req_ctrl);
 
     /* The state machine that performs the request */
     struct PINT_state_machine_s *state_machine;
@@ -928,8 +928,8 @@ int PINT_server_req_get_object_ref(struct PVFS_server_req *req,
 int PINT_server_req_get_credential(struct PVFS_server_req *req,
                                    PVFS_credential **cred);
 
-int PINT_server_req_get_ctrl(struct PVFS_server_req *req,
-                             struct PINT_server_req_ctrl *ctrl);
+void PINT_server_req_get_ctrl(struct PVFS_server_req *req,
+                              struct PINT_server_req_ctrl *ctrl);
 
 /* This hideous bit of code declares a function that takes a
  * pointer to a PVFS_server_req and returns pointer to another

@@ -1096,6 +1096,54 @@ static inline void defree_##name(struct name *x) { \
     if (x->n2 > 0) decode_free(x->a3); \
 }
 
+/* special case where we have 2 fields then 1 array of a different size and 
+ * then 2 fields then 3 arrays of the same size */
+#define endecode_fields_2a2aaa_struct(name, t1, x1, t2, x2, tn1, n1, ta1, a1, t3, x3, t4, x4, tn2, n2, ta2, a2, ta3, a3, ta4, a4) \
+static inline void encode_##name(char **pptr, const struct name *x) { int i; \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##tn1(pptr, &x->n1); \
+    for (i=0; i<x->n1; i++) \
+	    encode_##ta1(pptr, &(x)->a1[i]); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##tn2(pptr, &x->n2); \
+    for (i=0; i<x->n2; i++) \
+	    encode_##ta2(pptr, &(x)->a2[i]); \
+    for (i=0; i<x->n2; i++) \
+	    encode_##ta3(pptr, &(x)->a3[i]); \
+    for (i=0; i<x->n2; i++) \
+	    encode_##ta4(pptr, &(x)->a4[i]); \
+} \
+static inline void decode_##name(char **pptr, struct name *x) { int i; \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##tn1(pptr, &x->n1); \
+    x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
+    for (i=0; i<x->n1; i++) \
+	    decode_##ta1(pptr, &(x)->a1[i]); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##tn2(pptr, &x->n2); \
+    x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
+    for (i=0; i<x->n2; i++) \
+	    decode_##ta2(pptr, &(x)->a2[i]); \
+    for (i=0; i<x->n2; i++) \
+	    decode_##ta3(pptr, &(x)->a3[i]); \
+    for (i=0; i<x->n2; i++) \
+	    decode_##ta4(pptr, &(x)->a4[i]); \
+} \
+static inline void defree_##name(struct name *x) { \
+    defree_##t1(&x->x1); \
+    defree_##t2(&x->x2); \
+    if (x->n1 > 0) decode_free(x->a1); \
+    defree_##t3(&x->x3); \
+    defree_##t4(&x->x4); \
+    if (x->n2 > 0) decode_free(x->a2); \
+    if (x->n2 > 0) decode_free(x->a3); \
+    if (x->n2 > 0) decode_free(x->a4); \
+}
+
 /* 3 fields, then an array */
 #define endecode_fields_3a_struct(name, t1, x1, t2, x2, t3, x3, tn1, n1, ta1, a1) \
 static inline void encode_##name(char **pptr, const struct name *x) { int i; \

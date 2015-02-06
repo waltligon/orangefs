@@ -21,7 +21,6 @@
 #include <ctype.h>
 
 #include "pvfs2.h"
-#include "pvfs2-mirror.h"
 
 struct options_t
 {
@@ -76,7 +75,7 @@ int main(int argc, char **argv)
        else {
           printf("Mirroring Mode : ");
 
-          switch((MIRROR_MODE)mode)
+          switch(mode)
           {
              case NO_MIRRORING:
              {

@@ -34,6 +34,14 @@ enum {
     OP_CANCELLED = 4
 };
 
+static int unexpected_replicate_comp_fn(void *v_p,
+                                        struct PVFS_server_resp *resp_p,
+                                        int index);
+
+static int unexpected_tree_comp_fn(void *v_p,
+                                   struct PVFS_server_resp *resp_p,
+                                   int index);
+
 %%
 
 nested machine pvfs2_unexpected_local_sm
@@ -117,6 +125,36 @@ machine pvfs2_unexpected_sm
 }
 
 %%
+
+/* ------------------ COMPLETION FUNCTIONS --------------------- */
+
+static int unexpected_replicate_comp_fn(void *v_p,
+                                        struct PVFS_server_resp *resp_p,
+                                        int index)
+{
+    /* This will be the appropriate place to signal completions of
+     * replica updates if we want to return early.  We can also signal
+     * completion of a replica read in the event it is faster than any
+     * other - we can ignore other results.  Not exactly sure how that
+     * will fit in.  - WBL
+     */
+    PFI();
+    return 0;
+}
+
+static int unexpected_tree_comp_fn(void *v_p,
+                                   struct PVFS_server_resp *resp_p,
+                                   int index)
+{
+    /* This will be the appropriate place to signal completions of
+     * replica updates if we want to return early.  We can also signal
+     * completion of a replica read in the event it is faster than any
+     * other - we can ignore other results.  Not exactly sure how that
+     * will fit in.  - WBL
+     */
+    PFI();
+    return 0;
+}
 
 /* ---------------------- STATE ACTIONS ------------------------ */
 
@@ -274,7 +312,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
      * original and push it onto the framestack
      */
     memcpy(local_op_frame, s_op, sizeof(struct PINT_server_op));
-    local_op_frame->num_pjmp_frames = 0;
+    gossip_err("Pushing 1 frame\n");
     ret = PINT_sm_push_frame(smcb, LOCAL_OPERATION, local_op_frame);
     if(ret < 0)
     {
@@ -282,9 +320,14 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
                     "local_op!\n");
     }
 
-    if (s_op->req->ctrl.mode == PVFS_REQ_REPLICATE &&
+    /* Replicate and Tree are very similar so we share a lot of code */
+    if ((s_op->req->ctrl.mode == PVFS_REQ_REPLICATE ||
+         s_op->req->ctrl.mode == PVFS_REQ_TREE) &&
         s_op->req->ctrl.type == PVFS_REQ_PRIMARY)
     {
+        /* This is a writing operation that must be replicated
+         * and this is the original (primary) copy
+         */
         /* The local op nolonger cares about this field, and the other
          * remote ops all need the same value.  Possibly TREE or other
          * protocls will do things differently
@@ -292,38 +335,99 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
         s_op->req->ctrl.type = PVFS_REQ_SECONDARY;
 
         memset(&req_ctrl, 0, sizeof(struct PINT_server_req_ctrl));
-        remote_op_cnt = PINT_server_req_get_ctrl(s_op->req, &req_ctrl);
+        PINT_server_req_get_ctrl(s_op->req, &req_ctrl);
+        gossip_err("Ctrl sid_count = %d\n",req_ctrl.sid_count);
+        gossip_err("Ctrl count = %d\n",req_ctrl.count);
+        
+        switch (s_op->req->ctrl.mode)
+        {
+        case PVFS_REQ_REPLICATE:
+            /* subtract 1 for the local op */
+            remote_op_cnt = req_ctrl.sid_count - 1;
+            break;
+        case PVFS_REQ_TREE:
+            /* subtract 1 for the local op */
+            remote_op_cnt = req_ctrl.count - 1;
+            break;
+        default:
+            remote_op_cnt = 0;
+            break;
+        }
 
-        /* Record how many frames should be popped
-         * during cleanup. +1 for the local op 
+        /* This must be inside the "if" to work right otherwise we think
+         * we need remote ops be really don't
          */
-        s_op->num_pjmp_frames += remote_op_cnt;
+        if (remote_op_cnt > 0)
+        {
+            /* Record how many frames should be popped during cleanup.
+             * 1 for the local op +1 for any remote ops
+             */
+            s_op->num_pjmp_frames += remote_op_cnt;
+        }
+        else
+        {
+            /* normally replicate but there are no replicants so skip */
+            goto noremote;
+        }
 
-        /* malloc for each remote_op SM a msg_op and push to frame stack */
+        /* Allocate a structure to manage syncing the SMs */
+        local_op_frame->join =
+                (struct PINT_mpa_join *)calloc(1, sizeof(struct PINT_mpa_join));
+#ifdef PVFS_MPA_JOIN
+        gen_mutex_init(&local_op_frame->join);
+#endif
+
+        /* allocate frame for PJMP */
+        remote_op_frame = (struct PINT_sm_msgarray_op *)
+                             calloc(1, sizeof(struct PINT_sm_msgarray_op));
+        if (!remote_op_frame)
+        {
+            free(local_op_frame->join);
+            free(local_op_frame);
+            return -PVFS_ENOMEM;
+        }
+        /* these are used to synchronize end of message with op */
+        remote_op_frame->join = local_op_frame->join;
+
+        /* set up frame and allocate msgpairs */
+        PINT_msgpairarray_init(remote_op_frame, remote_op_cnt);
+
+        /* for each msgpair */
+        gossip_err("Pushing %d frames\n", remote_op_cnt);
         for(remote_op = 0; remote_op < remote_op_cnt; remote_op++)
         {
             PINT_sm_msgpair_state *msg_p;
-            remote_op_frame = (struct PINT_sm_msgarray_op *)
-                                 calloc(1, sizeof(struct PINT_sm_msgarray_op));
-            if (!remote_op_frame)
-            {
-                return -PVFS_ENOMEM;
-            }
+            msg_p = &remote_op_frame->msgarray[remote_op];
 
-            PINT_msgpair_init(remote_op_frame);
-            msg_p = &remote_op_frame->msgpair;
             memcpy(&msg_p->req, s_op->req, sizeof(struct PVFS_server_req));
-            PVFS_REQ_COPY_CAPABILITY(s_op->req->capability,msg_p->req);
+            PINT_copy_capability(&s_op->req->capability,
+                                 &msg_p->req.capability);
             msg_p->msgclass = PVFS_IO_METADATA;
             msg_p->msgdir = PVFS_IO_WRITE;
             msg_p->fs_id = req_ctrl.fs_id;
             /* assuming normal case one handle for now */
-            msg_p->handle = *req_ctrl.handles;
-            msg_p->sid_count = 1; /* each message handes 1 SID */
-            msg_p->sid_index = 0;
-            msg_p->sid_array = &req_ctrl.sids[remote_op];
-            msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-            msg_p->comp_fn = NULL;
+            switch (s_op->req->ctrl.mode)
+            {
+            case PVFS_REQ_REPLICATE:
+                msg_p->handle = *req_ctrl.handles;
+                msg_p->sid_count = 1; /* each message handes 1 SID */
+                msg_p->sid_index = 0;
+                msg_p->sid_array = &req_ctrl.sids[remote_op + 1];
+                msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+                msg_p->comp_fn = unexpected_replicate_comp_fn;
+                break;
+            case PVFS_REQ_TREE:
+                msg_p->handle = *req_ctrl.handles;
+                msg_p->sid_count = req_ctrl.sid_count;
+                msg_p->sid_index = 0;
+                msg_p->sid_array = 
+                           &req_ctrl.sids[(remote_op + 1) * req_ctrl.sid_count];
+                msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+                msg_p->comp_fn = unexpected_tree_comp_fn;
+                break;
+            default:
+                break;
+            }
 
             ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
             if (ret)
@@ -331,20 +435,29 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
                 gossip_err("Failed to map meta server address\n");
                 js_p->error_code = ret;
             }
-
-            ret = PINT_sm_push_frame(smcb, REMOTE_OPERATION, remote_op_frame);
-            if(ret < 0)
-            {
-                gossip_lerr("unexpected_pjmp_setup failed to push frame for "
-                            "remote_op %d!\n", remote_op);
-            }
+        }
+        /* now push remote ops frame */
+        ret = PINT_sm_push_frame(smcb, REMOTE_OPERATION, remote_op_frame);
+        if(ret < 0)
+        {
+            gossip_lerr("unexpected_pjmp_setup failed to push frame for "
+                        "remote_ops!\n");
         }
     }
-    else
+    else if (s_op->req->ctrl.mode == PVFS_REQ_TREE &&
+             s_op->req->ctrl.type == PVFS_REQ_PRIMARY)
     {
-        //gossip_err("Pushing 1 frame\n");
+        /* The request has a list of handles and we need to copy
+         * the request out to these.  We must determine the number
+         * of copies to make.  The configuration tells us how many ways
+         * to divide the list, and what a minimum list size is (below
+         * which we do not divide)
+         */
     }
     /* for now other modes are ignored, treated as single op */
+noremote:
+    /* Do nothing but just run the request as normal */
+
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -385,6 +498,10 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
         /* check for return codes and errors */
         /* comm failures need to be recorded at least */
 
+        if (popped_op->join)
+        {
+            free(popped_op->join);
+        }
         free(popped_op);
     }
     js_p->error_code = 0;
@@ -422,6 +539,8 @@ static PINT_sm_action unexp_local_pre(struct PINT_smcb *smcb,
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_id_gen_t tmp_id;
     PFI();
+
+    /* Should we run prelude here - simplify SM code */
 
 #if 0
     qlist_del(&s_op->next);
@@ -462,7 +581,20 @@ static PINT_sm_action unexp_local_pre(struct PINT_smcb *smcb,
 static PINT_sm_action unexp_local_post(struct PINT_smcb *smcb,
                                        job_status_s *js_p)
 {
+    PINT_server_op *frame = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PFI();
+    /* check frame->join schedule hold if not ready */
+    if (frame->join)
+    {
+#ifdef PVFS_MPA_JOIN
+        gen_mutex_lock(&frame->join.mutex);
+#endif
+        /* insert join code here */
+#ifdef PVFS_MPA_JOIN
+        gen_mutex_unlock(&frame->join.mutex);
+#endif
+    }
+    /* generate response */
     js_p->error_code = 0;
     return SM_ACTION_TERMINATE;
 }

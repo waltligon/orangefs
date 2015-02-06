@@ -886,7 +886,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
     }
     /* cannot write to an immutable file */
     if (sm_p->u.io.io_type == PVFS_IO_WRITE
-        && (attr->u.meta.hint.flags & PVFS_IMMUTABLE_FL))
+        && (attr->u.meta.flags & PVFS_IMMUTABLE_FL))
     {
         js_p->error_code = -PVFS_EPERM;
         goto exit;

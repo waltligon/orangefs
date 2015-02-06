@@ -154,6 +154,9 @@
 #define NUM_DFILES_REQ_KEYSTR   "nd\0"
 #define NUM_DFILES_REQ_KEYLEN   3
 
+#define OBJECT_PARENT_KEYSTR    "pa\0"
+#define OBJECT_PARENT_KEYLEN    3
+
 /* Optional xattrs have "user.pvfs2." as a prefix 
  * These are used to define the table Trove_Special_keys in
  * the file src/server/get-attr.sm
