@@ -261,7 +261,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         dest->u.meta.mirror_mode = src->u.meta.mirror_mode;
         dest->u.meta.stuffed = src->u.meta.stuffed;
         dest->u.meta.stuffed_size = src->u.meta.stuffed_size;
-        dest->u.meta.hint.flags = src->u.meta.hint.flags;
+        dest->u.meta.flags = src->u.meta.flags;
         /**/
         break;
     case PVFS_TYPE_DATAFILE:

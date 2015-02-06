@@ -2173,7 +2173,7 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
     if(attr->objtype == PVFS_TYPE_METAFILE) 
     {
         /* Copy if there are any special object specific flags */
-        sysresp->attr.flags = attr->u.meta.hint.flags;
+        sysresp->attr.flags = attr->u.meta.flags;
         /* special case for when users ask for dfile count */
         if (attr->mask & PVFS_ATTR_META_DFILES)
         {

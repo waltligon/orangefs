@@ -10,6 +10,7 @@
 #include <assert.h>
 
 #include "server-config.h"
+#include "pvfs2-types.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "pvfs2-internal.h"
@@ -18,7 +19,6 @@
 #include "pint-eattr.h"
 #include "pint-cached-config.h"
 #include "pvfs2-dist-basic.h"
-#include "pvfs2-mirror.h"
 #include "security-util.h"
 #include "sid.h"
 
@@ -405,7 +405,7 @@ static PINT_sm_action inspect_source_info (struct PINT_smcb *smcb,
                 js_p->error_code = NOTHING_TO_DO;
                 goto error_exit;
             }
-            imm_p->mirror_mode = *(MIRROR_MODE *)sm_p->val_a[i].buffer;
+            imm_p->mirror_mode = *(uint32_t *)sm_p->val_a[i].buffer;
             gossip_debug(GOSSIP_MIRROR_DEBUG,
                          "\tRetrieved mirroring mode is %d.\n",
                          imm_p->mirror_mode);
@@ -934,7 +934,7 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_MIRROR_DEBUG, "stuffed size: %d\n",
                  sm_p->target_object_attr->u.meta.stuffed_size);
     gossip_debug(GOSSIP_MIRROR_DEBUG,"hint.flags: %llu\n",
-                 llu(sm_p->target_object_attr->u.meta.hint.flags));
+                 llu(sm_p->target_object_attr->u.meta.flags));
     gossip_debug(GOSSIP_MIRROR_DEBUG,"dfile array P: %p\n",
                  sm_p->target_object_attr->u.meta.dfile_array);
 

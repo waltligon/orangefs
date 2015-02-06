@@ -2651,7 +2651,7 @@ endecode_fields_2a1aa_struct(
 do {                                              \
     memset(&(__req), 0, sizeof(__req));           \
     (__req).op = PVFS_SERV_SETEATTR;              \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;       \
+    (__req).ctrl.mode = PVFS_REQ_REPLICATE;       \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;         \
     PVFS_REQ_COPY_CAPABILITY((__cap), (__req));   \
     (__req).hints = (__hints);                    \
@@ -2674,6 +2674,8 @@ struct PVFS_servreq_atomiceattr
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
+    int32_t sid_count;
+    PVFS_SID *sid_array;
     int32_t flags;
     int32_t opcode;
     int32_t nkey;
@@ -2681,10 +2683,12 @@ struct PVFS_servreq_atomiceattr
     PVFS_ds_keyval *val;    /* attribute value to set */
     PVFS_size *valsz;       /* array of value buffer sizes for recv */
 };
-endecode_fields_4aaa_struct(
+endecode_fields_2a2aaa_struct(
     PVFS_servreq_atomiceattr,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
+    int32_t, sid_count,
+    PVFS_SID, sid_array,     /* reflexive */
     int32_t, flags,
     int32_t, opcode,
     int32_t, nkey,
@@ -2696,32 +2700,36 @@ endecode_fields_4aaa_struct(
      PVFS_REQ_LIMIT_EATTR_LIST + sizeof(PVFS_size) * \
      PVFS_REQ_LIMIT_EATTR_LIST)
 
-#define PINT_SERVREQ_ATOMICEATTR_FILL(__req,      \
-                                  __cap,          \
-                                  __fsid,         \
-                                  __handle,       \
-                                  __flags,        \
-                                  __nkey,         \
-                                  __key_array,    \
-                                  __val_array,    \
-                                  __size_array,   \
-                                  __opcode,       \
-                                  __hints)        \
-do {                                              \
-    memset(&(__req), 0, sizeof(__req));           \
-    (__req).op = PVFS_SERV_ATOMICEATTR;           \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;       \
-    (__req).ctrl.type = PVFS_REQ_PRIMARY;         \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));   \
-    (__req).hints = (__hints);                    \
-    (__req).u.atomiceattr.fs_id = (__fsid);       \
-    (__req).u.atomiceattr.handle = (__handle);    \
-    (__req).u.atomiceattr.flags = (__flags);      \
-    (__req).u.atomiceattr.nkey = (__nkey);        \
-    (__req).u.atomiceattr.key = (__key_array);    \
-    (__req).u.atomiceattr.val = (__val_array);    \
-    (__req).u.atomiceattr.valsz = (__size_array); \
-    (__req).u.atomiceattr.opcode = (__opcode);    \
+#define PINT_SERVREQ_ATOMICEATTR_FILL(__req,         \
+                                  __cap,             \
+                                  __fsid,            \
+                                  __handle,          \
+                                  __sid_count,       \
+                                  __sid_array,       \
+                                  __flags,           \
+                                  __nkey,            \
+                                  __key_array,       \
+                                  __val_array,       \
+                                  __size_array,      \
+                                  __opcode,          \
+                                  __hints)           \
+do {                                                 \
+    memset(&(__req), 0, sizeof(__req));              \
+    (__req).op = PVFS_SERV_ATOMICEATTR;              \
+    (__req).ctrl.mode = PVFS_REQ_REPLICATE;          \
+    (__req).ctrl.type = PVFS_REQ_PRIMARY;            \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));      \
+    (__req).hints = (__hints);                       \
+    (__req).u.atomiceattr.fs_id = (__fsid);          \
+    (__req).u.atomiceattr.handle = (__handle);       \
+    (__req).u.atomiceattr.sid_count = (__sid_count); \
+    (__req).u.atomiceattr.sid_array = (__sid_array); \
+    (__req).u.atomiceattr.flags = (__flags);         \
+    (__req).u.atomiceattr.nkey = (__nkey);           \
+    (__req).u.atomiceattr.key = (__key_array);       \
+    (__req).u.atomiceattr.val = (__val_array);       \
+    (__req).u.atomiceattr.valsz = (__size_array);    \
+    (__req).u.atomiceattr.opcode = (__opcode);       \
 } while (0)
 
 

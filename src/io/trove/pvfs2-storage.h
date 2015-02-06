@@ -40,8 +40,7 @@ struct PVFS_ds_metadata_attr_s
     uint32_t mirror_mode;  /* sync model for replication */
     uint32_t stuffed;      /* is this file stuffed */
     uint32_t stuffed_size; /* size threshold for unstuffing */
-    uint32_t hint_flags; ; /* various hint modes */
-    int32_t __pad1;
+    uint64_t flags;        /* various hint modes */
 };
 
 struct PVFS_ds_datafile_attr_s
@@ -156,7 +155,7 @@ do {                                                                   \
         (__oa)->u.meta.mirror_mode = (__dsa)->u.metafile.mirror_mode;  \
         (__oa)->u.meta.stuffed = (__dsa)->u.metafile.stuffed;          \
         (__oa)->u.meta.stuffed_size = (__dsa)->u.metafile.stuffed_size; \
-        (__oa)->u.meta.hint.flags = (__dsa)->u.metafile.hint_flags;    \
+        (__oa)->u.meta.flags = (__dsa)->u.metafile.flags;              \
         break;                                                         \
     case PVFS_TYPE_DATAFILE :                                          \
         (__oa)->u.data.size = (__dsa)->u.datafile.b_size;              \
@@ -222,7 +221,7 @@ do {                                                                   \
         (__dsa)->u.metafile.mirror_mode = (__oa)->u.meta.mirror_mode;  \
         (__dsa)->u.metafile.stuffed = (__oa)->u.meta.stuffed;          \
         (__dsa)->u.metafile.stuffed_size = (__oa)->u.meta.stuffed_size; \
-        (__dsa)->u.metafile.hint_flags = (__oa)->u.meta.hint.flags;    \
+        (__dsa)->u.metafile.flags = (__oa)->u.meta.flags;              \
         break;                                                         \
     case PVFS_TYPE_DATAFILE :                                          \
         (__dsa)->u.datafile.b_size = (__oa)->u.data.size;              \

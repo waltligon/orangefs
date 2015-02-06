@@ -84,7 +84,7 @@ nested machine pvfs2_get_attr_work_sm
     {
         run getattr_verify_attribs;
         STATE_SYMLINK => read_symlink_target;
-        STATE_METAFILE => read_metafile_hint;
+        STATE_METAFILE => read_datafile_handles;
         STATE_DIR => get_bitmap_and_dirdata_handles;
         default => setup_resp;
         /* STATE_DIR => get_dist_dir_attr; */
@@ -101,6 +101,7 @@ nested machine pvfs2_get_attr_work_sm
 
 /* METAFILE */
 
+/*
     state read_metafile_hint
     {
         run getattr_read_metafile_hint;
@@ -110,12 +111,11 @@ nested machine pvfs2_get_attr_work_sm
     state interpret_metafile_hint
     {
         run getattr_interpret_metafile_hint;
-        /*
         STATE_METAFILE => read_metafile_datafile_handles_if_required;
         default => check_if_capability_required;
-        */
         default => read_datafile_handles;
     }
+*/
 
     state read_datafile_handles
     {
@@ -686,43 +686,7 @@ static PINT_sm_action getattr_read_symlink_target(struct PINT_smcb *smcb,
     return ret;
 }
 
-static PINT_sm_action getattr_interpret_metafile_hint(PINT_smcb *smcb,
-                                                      job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *respattr = NULL;
-    PVFS_metafile_attr *meta = &(s_op->resp.u.getattr.attr.u.meta); 
-    respattr = &s_op->resp.u.getattr.attr;
-
-    assert(respattr->objtype == PVFS_TYPE_METAFILE);
-
-    if (js_p->error_code == 0 || js_p->error_code == -TROVE_ENOENT)
-    {
-        if (js_p->error_code == 0)
-        {
-            memcpy(&(meta->hint), s_op->val.buffer, sizeof(meta->hint));
-        }
-
-        gossip_debug(GOSSIP_GETATTR_DEBUG, " * client wants extra "
-                     "meta info, about to retrieve it now\n");
-        js_p->error_code = STATE_METAFILE;
-
-        if ( (respattr->mask  & PVFS_ATTR_META_MIRROR_DFILES) && 
-            !(meta->hint.flags & PVFS_MIRROR_FL) ) 
-        {
-            respattr->mask &= ~(PVFS_ATTR_META_MIRROR_DFILES);
-        }
-    }
-    else
-    {
-        /*If we hit an error the DIST & DFILES are no longer valid*/
-        respattr->mask &= ~PVFS_ATTR_META_DIST;
-        respattr->mask &= ~PVFS_ATTR_META_DFILES;
-        respattr->mask &= ~PVFS_ATTR_META_MIRROR_DFILES;
-    }
-    return SM_ACTION_COMPLETE;
-}
-
+#if 0
 static PINT_sm_action getattr_read_metafile_hint(struct PINT_smcb *smcb,
                                                  job_status_s *js_p)
 {
@@ -732,7 +696,7 @@ static PINT_sm_action getattr_read_metafile_hint(struct PINT_smcb *smcb,
     char *buf = NULL;
 
     assert(s_op->attr.objtype == PVFS_TYPE_METAFILE);
-    buf = (char *) calloc(sizeof(PVFS_metafile_hint) + 1, 1);
+    buf = (char *) calloc(sizeof(uint32_t) + 1, 1);
     if (buf == NULL) 
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -778,6 +742,44 @@ static PINT_sm_action getattr_read_metafile_hint(struct PINT_smcb *smcb,
 
     return ret;
 }
+
+static PINT_sm_action getattr_interpret_metafile_hint(PINT_smcb *smcb,
+                                                      job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *respattr = NULL;
+    PVFS_metafile_attr *meta = &(s_op->resp.u.getattr.attr.u.meta); 
+    respattr = &s_op->resp.u.getattr.attr;
+
+    assert(respattr->objtype == PVFS_TYPE_METAFILE);
+
+    if (js_p->error_code == 0 || js_p->error_code == -TROVE_ENOENT)
+    {
+        if (js_p->error_code == 0)
+        {
+            memcpy(&(meta->flags), s_op->val.buffer, sizeof(meta->flags));
+        }
+
+        gossip_debug(GOSSIP_GETATTR_DEBUG, " * client wants extra "
+                     "meta info, about to retrieve it now\n");
+        js_p->error_code = STATE_METAFILE;
+
+        if ( (respattr->mask  & PVFS_ATTR_META_MIRROR_DFILES) && 
+            !(meta->flags & PVFS_MIRROR_FL) ) 
+        {
+            respattr->mask &= ~(PVFS_ATTR_META_MIRROR_DFILES);
+        }
+    }
+    else
+    {
+        /*If we hit an error the DIST & DFILES are no longer valid*/
+        respattr->mask &= ~PVFS_ATTR_META_DIST;
+        respattr->mask &= ~PVFS_ATTR_META_DFILES;
+        respattr->mask &= ~PVFS_ATTR_META_MIRROR_DFILES;
+    }
+    return SM_ACTION_COMPLETE;
+}
+#endif
 
 /* V3 rename ... _read_datafile_handles_ ... */
 static PINT_sm_action getattr_read_datafile_handles(struct PINT_smcb *smcb,

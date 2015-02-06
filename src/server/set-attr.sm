@@ -178,7 +178,7 @@ static PINT_sm_action setattr_verify_attribs(struct PINT_smcb *smcb,
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
     char ostr[32], gstr[32];
 
-    a_p = &s_op->attr;
+    a_p = &s_op->attr; /* attributes read during prelude */
     req_a_p = &s_op->req->u.setattr.attr;
 
     gossip_debug(GOSSIP_SETATTR_DEBUG, "  attrs read from dspace:\n\t"
@@ -934,17 +934,17 @@ static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(
                                    0,    /* caller_handle_index */
                                    s_op->attr.u.dir.dist_dir_attr.dirdata_count,
                                    s_op->attr.u.dir.dirdata_handles,
-                                   0,    /* sid count V3 FIXME */
-                                   NULL, /* sid array V3 FIXME */
+                                   s_op->attr.u.dir.dist_dir_attr.sid_count,
+                                   s_op->attr.u.dir.dirdata_sids,
                                    NULL);
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = s_op->req->u.setattr.fs_id;
     msg_p->handle = s_op->attr.u.dir.dirdata_handles[0];
-    msg_p->sid_count = 0; /* V3 FIXME */
+    msg_p->sid_count = s_op->attr.u.dir.dist_dir_attr.sid_count;
     msg_p->sid_index = 0;
-    msg_p->sid_array = NULL; /* V3 FIXME */
+    msg_p->sid_array = s_op->attr.u.dir.dirdata_sids; 
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = tree_setattr_comp_fn;
 
@@ -953,6 +953,7 @@ static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(
     {
         gossip_err("Failed to map dirdata server address\n");
         js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
     }
 
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
@@ -1219,8 +1220,8 @@ static int perm_setattr(PINT_server_op *s_op)
     return 0;
 }
 
-static int setattr_get_ctrl(struct PVFS_server_req *req,
-                            struct PINT_server_req_ctrl *ctrl)
+static void setattr_get_ctrl(struct PVFS_server_req *req,
+                             struct PINT_server_req_ctrl *ctrl)
 {
     /* this sets up a standard replication */
     /* generates a request to each of sid_count SIDs */
@@ -1230,8 +1231,6 @@ static int setattr_get_ctrl(struct PVFS_server_req *req,
     ctrl->count = 1;
     ctrl->sids = &req->u.setattr.sid_array[1];
     ctrl->sid_count = req->u.setattr.sid_count - 1;
-    /* return number of new remote messages */
-    return ctrl->sid_count;
 }
 
 PINT_GET_OBJECT_REF_DEFINE(setattr);

@@ -248,8 +248,8 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     assert(attr->u.meta.dist_size > 0);
 
     /* cannot truncate an append-only or immutable file */
-    if ((attr->u.meta.hint.flags & PVFS_IMMUTABLE_FL)
-        || (attr->u.meta.hint.flags & PVFS_APPEND_FL))
+    if ((attr->u.meta.flags & PVFS_IMMUTABLE_FL)
+        || (attr->u.meta.flags & PVFS_APPEND_FL))
     {
         js_p->error_code = -PVFS_EPERM;
         return 1;

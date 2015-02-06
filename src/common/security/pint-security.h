@@ -127,6 +127,7 @@
 #endif
 
 int PINT_security_initialize(void);
+
 int PINT_security_finalize(void);
 
 #ifdef ENABLE_CERTCACHE
@@ -134,16 +135,20 @@ int PINT_security_cache_ca_cert(void);
 #endif
 
 int PINT_init_capability(PVFS_capability *cap);
+
 int PINT_sign_capability(PVFS_capability *cap);
+
 int PINT_verify_capability(const PVFS_capability *cap);
+
 int PINT_server_to_server_capability(PVFS_capability *capability,
                                      PVFS_fs_id fs_id,
                                      int num_handles,
                                      PVFS_handle *handle_array);
 
-
 int PINT_init_credential(PVFS_credential *cred);
+
 int PINT_sign_credential(PVFS_credential *cred);
+
 int PINT_verify_credential(const PVFS_credential *cred);
 
 void PINT_security_error(const char *prefix, 

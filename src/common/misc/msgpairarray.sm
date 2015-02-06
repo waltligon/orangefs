@@ -253,8 +253,9 @@ static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
             {
                char buf[1024];
                PVFS_strerror_r(error_code, buf, 1024);
-               gossip_err("error code (%d) returned from pjmp in MPA: %s\n",
-                          error_code, buf);
+               gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                            "error code (%d) returned from pjmp in MPA: %s\n",
+                            error_code, buf);
             }
         }
         if ((submop->count != mop->count && js_p->error_code == 0))
@@ -1131,7 +1132,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
     {
         PVFS_perror_gossip("Failed to free msgpair resources", ret);
         js_p->error_code = ret;
-        return SM_ACTION_TERMINATE;
+        goto errorout;
     }
 
  /* Old code - but why don't we ever set complete to 1?
@@ -1141,7 +1142,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
      * mark that this msgpair has been completed and should not be
      * retried in the case of possible future retries
      */
-     msg_p->complete = 1;
+    msg_p->complete = 1;
 
     if (msg_p->op_action == PVFS_MPA_RETRY)
     {
@@ -1217,10 +1218,20 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
     {
         return SM_ACTION_COMPLETE; /* Go back and retry the message */
     }
-    else
+
+errorout:
+    /* Last thing before message is complete is check for join */
+    if (mop->join)
     {
-        return SM_ACTION_TERMINATE; /* Done with this message / child SM */
+#ifdef PVFS_MPA_JOIN_LOCK
+        gen_mutex_lock(mop->join.mutex);
+#endif
+        mop->join->count++;
+#ifdef PVFS_MPA_JOIN_LOCK
+        gen_mutex_unlock(mop->join.mutex);
+#endif
     }
+    return SM_ACTION_TERMINATE; /* Done with this message / child SM */
 }
 
 /*  This message failed in a bad way we could not retry or otherwise

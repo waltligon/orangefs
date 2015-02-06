@@ -69,6 +69,7 @@
 #define endecode_fields_2aa_struct(n,t1,x1,t2,x2,tn1,n1,ta1,a1,ta2,a2) struct endecode_fake_struct
 #define endecode_fields_2a1a_struct(n,t1,x1,t2,x2,tn1,n1,ta1,a1,t3,x3,tn2,n2,ta2,a2) struct endecode_fake_struct
 #define endecode_fields_2a1aa_struct(n,t1,x1,t2,x2,tn1,n1,ta1,a1,t3,x3,tn2,n2,ta2,a2,ta3,a3) struct endecode_fake_struct
+#define endecode_fields_2a2aaa_struct(name, t1, x1, t2, x2, tn1, n1, ta1, a1, t3, x3, t4, x4, tn2, n2, ta2, a2, ta3, a3, ta4, a4) struct endecode_fake_struct
 #define endecode_fields_3a_struct(n,t1,x1,t2,x2,t3,x3,tn1,n1,ta1,a1) struct endecode_fake_struct
 #define endecode_fields_3a1a_struct(n,t1,x1,t2,x2,t3,x3,tn1,n1,ta1,a1,t4,x4,tn2,n2,ta2,a2) struct endecode_fake_struct
 #define endecode_fields_4aa_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,tn1,n1,ta1,a1,ta2,a2) struct endecode_fake_struct

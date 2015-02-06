@@ -76,14 +76,14 @@ struct req_sched_list
 struct req_sched_element
 {
     enum PVFS_server_op op;
-    struct qlist_head list_link;	/* ties it to a queue */
-    struct qlist_head ready_link;	/* ties to ready queue */
-    void *user_ptr;		/* user pointer */
-    req_sched_id id;		/* unique identifier */
-    struct req_sched_list *list_head;	/* points to head of queue */
-    enum req_sched_states state;	/* state of this element */
+    struct qlist_head list_link;        /* ties it to a queue */
+    struct qlist_head ready_link;       /* ties to ready queue */
+    void *user_ptr;                     /* user pointer */
+    req_sched_id id;                    /* unique identifier */
+    struct req_sched_list *list_head;   /* points to head of queue */
+    enum req_sched_states state;        /* state of this element */
     PVFS_handle handle;
-    struct timeval tv;			/* used for timer events */
+    struct timeval tv;                  /* used for timer events */
     /* indicates type of access needed by this op */
     enum PINT_server_req_access_type access_type;
     int mode_change; /* specifies that the element is a mode change */
@@ -97,26 +97,21 @@ static struct qhash_table *req_sched_table;
 /* queue of requests that are ready for service (in case
  * test_world is called 
  */
-static QLIST_HEAD(
-    ready_queue);
+static QLIST_HEAD(ready_queue);
 
 /* queue of timed operations */
-static QLIST_HEAD(
-    timer_queue);
+static QLIST_HEAD(timer_queue);
 
 /* queue of mode requests */
-static QLIST_HEAD(
-    mode_queue);
+static QLIST_HEAD(mode_queue);
 
-static int hash_handle(
-    const void *handle,
-    int table_size);
-static int hash_handle_compare(
-    const void *key,
-    struct qlist_head *link);
+static int hash_handle(const void *handle, int table_size);
+
+static int hash_handle_compare(const void *key, struct qlist_head *link);
 
 /* count of how many items are known to the scheduler */
 static int sched_count = 0;
+
 /* mode of the scheduler */
 static enum PVFS_server_mode current_mode = PVFS_SERVER_NORMAL_MODE;
 
@@ -134,8 +129,7 @@ enum PVFS_server_mode PINT_req_sched_get_mode(void)
  *
  *  \return 0 on success, -errno on failure
  */
-int PINT_req_sched_initialize(
-    void)
+int PINT_req_sched_initialize(void)
 {
     /* build hash table */
     req_sched_table = qhash_init(hash_handle_compare, hash_handle, 1021);
@@ -151,19 +145,23 @@ int PINT_req_sched_initialize(
  */
 int PINT_timer_queue_finalize(void)
 {
-   struct qlist_head *scratch=NULL;
-   struct qlist_head *iterator=NULL;
-   struct req_sched_element *element=NULL;
+   struct qlist_head *scratch = NULL;
+   struct qlist_head *iterator = NULL;
+   struct req_sched_element *element = NULL;
 
-   qlist_for_each_safe(iterator,scratch,&timer_queue)
+   qlist_for_each_safe(iterator, scratch, &timer_queue)
    {
-       element = qlist_entry(iterator,struct req_sched_element,list_link);
+       element = qlist_entry(iterator, struct req_sched_element, list_link);
        qlist_del(&(element->list_link));
        if (element && element->user_ptr)
-          free(element->user_ptr);
+       {
+           free(element->user_ptr);
+       }
        if (element)
-          free(element);
-       element=NULL;
+       {
+           free(element);
+       }
+       element = NULL;
    }
 
   return(0);
@@ -175,8 +173,7 @@ int PINT_timer_queue_finalize(void)
  *
  *  \return 0 on success, -errno on failure
  */
-int PINT_req_sched_finalize(
-    void)
+int PINT_req_sched_finalize(void)
 {
     int i;
     struct req_sched_list *tmp_list;
@@ -192,12 +189,12 @@ int PINT_req_sched_finalize(
 	/* remove any queues from the table */
 	qlist_for_each_safe(iterator, scratch, &(req_sched_table->array[i]))
 	{
-	    tmp_list = qlist_entry(iterator, struct req_sched_list,
-				   hash_link);
+	    tmp_list = qlist_entry(iterator, struct req_sched_list, hash_link);
 	    /* remove any elements from each queue */
 	    qlist_for_each_safe(iterator2, scratch2, &(tmp_list->req_list))
 	    {
-		tmp_element = qlist_entry(iterator2, struct req_sched_element,
+		tmp_element = qlist_entry(iterator2, 
+                                          struct req_sched_element,
 					  list_link);
 		free(tmp_element);
 		/* note: no need to delete from list; we are
@@ -228,7 +225,8 @@ int PINT_req_sched_change_mode(enum PVFS_server_mode mode,
 
     /* create a structure to store in the request queues */
     mode_element = (struct req_sched_element *) malloc(
-        sizeof(struct req_sched_element));
+                    sizeof(struct req_sched_element));
+
     if (!mode_element)
     {
         return (-errno);
@@ -244,9 +242,12 @@ int PINT_req_sched_change_mode(enum PVFS_server_mode mode,
 
     /* will this be the front of the queue */
     if(qlist_empty(&mode_queue))
+    {
         mode_change_ready = 1;
+    }
 
     qlist_add_tail(&(mode_element->list_link), &mode_queue);
+
     if(mode_change_ready)
     {
         if(mode == PVFS_SERVER_NORMAL_MODE)
@@ -290,8 +291,11 @@ static int PINT_req_sched_in_admin_mode(void)
 {
     struct req_sched_element *mode_element = NULL;
     if(!qlist_empty(&mode_queue))
-        mode_element = qlist_entry(mode_queue.next, struct req_sched_element,
+    {
+        mode_element = qlist_entry(mode_queue.next, 
+                                   struct req_sched_element,
                                    list_link);
+    }
     if(current_mode == PVFS_SERVER_ADMIN_MODE ||
        (mode_element && mode_element->mode == PVFS_SERVER_ADMIN_MODE))
     {
@@ -308,8 +312,9 @@ static int PINT_req_sched_schedule_mode_change(void)
     /* NOTE: only transitions to admin mode are ever queued */
     if(sched_count == 0 && !qlist_empty(&mode_queue))
     {
-	next_element = qlist_entry(mode_queue.next, struct req_sched_element,
-	    list_link);
+	next_element = qlist_entry(mode_queue.next,
+                                   struct req_sched_element,
+	                           list_link);
 	next_element->state = REQ_READY_TO_SCHEDULE;
 	qlist_add_tail(&next_element->ready_link, &ready_queue);
     }
@@ -317,7 +322,7 @@ static int PINT_req_sched_schedule_mode_change(void)
 }
 
 static void PINT_req_sched_do_change_mode(
-    struct req_sched_element *req_sched_element)
+                    struct req_sched_element *req_sched_element)
 {
     if(req_sched_element->mode_change)
     {
@@ -338,7 +343,7 @@ int PINT_req_sched_post(enum PVFS_server_op op,
                         enum PINT_server_req_access_type access_type,
                         enum PINT_server_sched_policy sched_policy,
 			void *in_user_ptr,
-			req_sched_id * out_id)
+			req_sched_id *out_id)
 {
     struct qlist_head *hash_link;
     int ret = -1;
@@ -375,7 +380,7 @@ int PINT_req_sched_post(enum PVFS_server_op op,
 
     /* create a structure to store in the request queues */
     tmp_element = (struct req_sched_element *) malloc(sizeof(struct
-							     req_sched_element));
+                                                      req_sched_element));
     if (!tmp_element)
     {
 	return (-errno);
@@ -406,15 +411,14 @@ int PINT_req_sched_post(enum PVFS_server_op op,
     if (hash_link)
     {
 	/* we already have a queue for this handle */
-	tmp_list = qlist_entry(hash_link, struct req_sched_list,
-			       hash_link);
+	tmp_list = qlist_entry(hash_link, struct req_sched_list, hash_link);
     }
     else
     {
 	/* no queue yet for this handle */
 	/* create one and add it in */
 	tmp_list = (struct req_sched_list *)malloc(
-            sizeof(struct req_sched_list));
+                                     sizeof(struct req_sched_list));
 	if (!tmp_list)
 	{
 	    free(tmp_element);
@@ -460,8 +464,9 @@ int PINT_req_sched_post(enum PVFS_server_op op,
             tmp_flag = 0;
             qlist_for_each(iterator, &tmp_list->req_list)
             {
-                tmp_element2 = qlist_entry(iterator, struct req_sched_element,
-                    list_link);
+                tmp_element2 = qlist_entry(iterator,
+                                           struct req_sched_element,
+                                           list_link);
                 if(tmp_element2->op != PVFS_SERV_IO)
                 {
                     tmp_flag = 1;
@@ -485,8 +490,8 @@ int PINT_req_sched_post(enum PVFS_server_op op,
             }
 	}
 	else if (access_type == PINT_SERVER_REQ_READONLY &&
-	    next_element->state == REQ_SCHEDULED &&
-	    last_element->state == REQ_SCHEDULED)
+	         next_element->state == REQ_SCHEDULED &&
+	         last_element->state == REQ_SCHEDULED)
         {
             /* possible read only optimization: see if all scheduled ops 
              * for this handle are read only.  If so, we can allow another 
@@ -495,8 +500,9 @@ int PINT_req_sched_post(enum PVFS_server_op op,
             tmp_flag = 0;
             qlist_for_each(iterator, &tmp_list->req_list)
             {
-                tmp_element2 = qlist_entry(iterator, struct req_sched_element,
-                    list_link);
+                tmp_element2 = qlist_entry(iterator, 
+                                           struct req_sched_element,
+                                           list_link);
                 if(tmp_element2->access_type == PINT_SERVER_REQ_MODIFY)
                 {
                     tmp_flag = 1;
@@ -570,10 +576,9 @@ int PINT_req_sched_post(enum PVFS_server_op op,
  *  \return 1 on immediate completion, 0 if caller should test later,
  *  -errno on failure
  */
-int PINT_req_sched_post_timer(
-    int msecs,
-    void *in_user_ptr,
-    req_sched_id * out_id)
+int PINT_req_sched_post_timer(int msecs,
+                              void *in_user_ptr,
+                              req_sched_id * out_id)
 {
     struct req_sched_element *tmp_element;
     struct req_sched_element *next_element;
@@ -582,11 +587,13 @@ int PINT_req_sched_post_timer(
     int found = 0;
 
     if(msecs < 1)
+    {
 	return(1);
+    }
 
     /* create a structure to store in the request queues */
     tmp_element = (struct req_sched_element *)malloc(
-        sizeof(struct req_sched_element));
+                    sizeof(struct req_sched_element));
     if (!tmp_element)
     {
 	return (-errno);
@@ -615,8 +622,10 @@ int PINT_req_sched_post_timer(
     qlist_for_each_safe(iterator, scratch, &timer_queue)
     {
 	/* look for first entry that comes after our current one */
-	next_element = qlist_entry(iterator, struct req_sched_element,
-	    list_link);
+	next_element = qlist_entry(iterator,
+                                   struct req_sched_element,
+	                           list_link);
+
 	if((next_element->tv.tv_sec > tmp_element->tv.tv_sec)
 	    || (next_element->tv.tv_sec == tmp_element->tv.tv_sec 
 		&& next_element->tv.tv_usec > tmp_element->tv.tv_usec))
@@ -650,9 +659,7 @@ int PINT_req_sched_post_timer(
  *
  *  \return 0 on success, -errno on failure 
  */
-int PINT_req_sched_unpost(
-    req_sched_id in_id,
-    void **returned_user_ptr)
+int PINT_req_sched_unpost(req_sched_id in_id, void **returned_user_ptr)
 {
     struct req_sched_element *tmp_element = NULL;
     struct req_sched_element *next_element = NULL;
@@ -685,7 +692,8 @@ int PINT_req_sched_unpost(
 
     qlist_del(&(tmp_element->list_link));
 
-    /* special operations, like mode changes, may not be associated with a list */
+    /* special operations, like mode changes,
+     * may not be associated with a list */
     if(tmp_element->list_head)
     {
 	/* see if there is another request queued behind this one */
@@ -756,10 +764,9 @@ int PINT_req_sched_unpost(
  *  \return 1 on immediate successful completion, 0 to test later,
  *  -errno on failure
  */
-int PINT_req_sched_release(
-    req_sched_id in_completed_id,
-    void *in_user_ptr,
-    req_sched_id * out_id)
+int PINT_req_sched_release(req_sched_id in_completed_id,
+                           void *in_user_ptr,
+                           req_sched_id * out_id)
 {
     struct req_sched_element *tmp_element = NULL;
     struct req_sched_list *tmp_list = NULL;
@@ -1109,7 +1116,8 @@ int PINT_req_sched_testworld(
 		out_id_array[*inout_count_p] = tmp_element->id;
 		if (returned_user_ptr_array)
 		{
-		    returned_user_ptr_array[*inout_count_p] = tmp_element->user_ptr;
+		    returned_user_ptr_array[*inout_count_p] =
+                                            tmp_element->user_ptr;
 		}
 		out_status_array[*inout_count_p] = 0;
 		(*inout_count_p)++;
@@ -1147,9 +1155,13 @@ int PINT_req_sched_testworld(
         PINT_req_sched_do_change_mode(tmp_element);
     }
     if (*inout_count_p > 0)
+    {
 	return (1);
+    }
     else
+    {
 	return (0);
+    }
 }
 
 /* hash_handle()
@@ -1158,9 +1170,7 @@ int PINT_req_sched_testworld(
  *
  * returns integer offset into table
  */
-static int hash_handle(
-    const void *handle,
-    int table_size)
+static int hash_handle(const void *handle, int table_size)
 {
     /* TODO: update this later with a better hash function,
      * depending on what handles look like, for now just modding
@@ -1182,9 +1192,7 @@ static int hash_handle(
  *
  * returns 1 if match found, 0 otherwise
  */
-static int hash_handle_compare(
-    const void *key,
-    struct qlist_head *link)
+static int hash_handle_compare(const void *key, struct qlist_head *link)
 {
     struct req_sched_list *my_list;
     const PVFS_handle *real_handle = key;

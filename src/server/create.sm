@@ -835,7 +835,7 @@ static int perm_create(PINT_server_op *s_op)
     return 0;
 }
 
-static int create_get_ctrl(struct PVFS_server_req *req,
+static void create_get_ctrl(struct PVFS_server_req *req,
                            struct PINT_server_req_ctrl *ctrl)
 {
     /* this sets up a standard replication */
@@ -844,10 +844,8 @@ static int create_get_ctrl(struct PVFS_server_req *req,
     ctrl->fs_id = req->u.create.fs_id;
     ctrl->handles = &req->u.create.handle;
     ctrl->count = 1;
-    ctrl->sids = &req->u.create.sid_array[1];
-    ctrl->sid_count = req->u.create.sid_count - 1;
-    /* return number of new remote messages */
-    return ctrl->sid_count;
+    ctrl->sids = req->u.create.sid_array;
+    ctrl->sid_count = req->u.create.sid_count;
 }
 
 struct PINT_server_req_params pvfs2_create_params =
