@@ -403,7 +403,7 @@ void warning_errno(const char *fmt, ...) __attribute__((format(printf,1,2)));
 void warning_xerrno(int errnum, const char *fmt, ...)
   __attribute__((format(printf,2,3)));
 void info(const char *fmt, ...) __attribute__((format(printf,1,2)));
-void *bmi_ib_malloc(unsigned long n) __attribute__((malloc));
+void *bmi_ib_malloc(unsigned long n); /* removed "malloc" attribute */
 void *qlist_del_head(struct qlist_head *list);
 void *qlist_try_del_head(struct qlist_head *list);
 const char *sq_state_name(sq_state_t num);
