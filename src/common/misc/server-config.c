@@ -173,9 +173,12 @@ const char *contextchecker(command_t *cmd, unsigned long mask);
 static int is_valid_alias(PINT_llist * host_aliases, char *str);
 static int is_valid_host(host_alias_t *host);
 static void free_host_alias(void *ptr);
+static int compare_fs_id(void *a, void *b);
 static void free_filesystem(void *ptr);
+#if 0
 static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
                             struct filesystem_configuration_s *src_fs);
+#endif
 static int cache_config_files(struct server_configuration_s *config_s,
                               char *global_config_filename);
 static int is_populated_filesystem_configuration(
@@ -678,7 +681,7 @@ static const configoption_t options[] =
      * replication).
      */
     {"MetaReplicationFactor", ARG_INT, get_filesystem_replication, NULL,
-            CTX_FILESYSTEM, "1"},
+            CTX_FILESYSTEM, NULL},
 
     /* maximum number of AIO operations that Trove will allow to run
      * concurrently 
@@ -1110,7 +1113,7 @@ static const configoption_t options[] =
      * and it determines whether to use that value or not.
      */
     {"DefaultDFileReplication", ARG_INT, get_default_dfile_replication, NULL,
-        CTX_FILESYSTEM, "0"},
+        CTX_FILESYSTEM, NULL},
 
     {"ImmediateCompletion", ARG_STR, get_immediate_completion, NULL,
         CTX_STORAGEHINTS, "no"},
@@ -1696,7 +1699,7 @@ DOTCONF_CB(enter_filesystem_context)
     fs_conf = (struct filesystem_configuration_s *)
             malloc(sizeof(struct filesystem_configuration_s));
     assert(fs_conf); /* TODO: replace this with error handleing */
-    memset(fs_conf,0,sizeof(struct filesystem_configuration_s));
+    memset(fs_conf, 0, sizeof(struct filesystem_configuration_s));
 
     /* fill any fs defaults here */
     fs_conf->flowproto = FLOWPROTO_DEFAULT;
@@ -1706,6 +1709,8 @@ DOTCONF_CB(enter_filesystem_context)
     fs_conf->fp_buffer_size = -1;
     fs_conf->fp_buffers_per_flow = -1;
     fs_conf->file_stuffing = 1;
+    fs_conf->metadata_replication_factor = 0;
+    fs_conf->default_dfile_replication_factor = 0;
 
     if (!config_s->file_systems)
     {
@@ -1732,6 +1737,15 @@ DOTCONF_CB(exit_filesystem_context)
       make sure last fs config object is valid
       (i.e. has all required values filled in)
     */
+    if (fs_conf->metadata_replication_factor < 1)
+    {
+        /* This should mean it has not been set, so make it 1 */
+        fs_conf->metadata_replication_factor = 1;
+    }
+    if (fs_conf->default_dfile_replication_factor < 1)
+    {
+        fs_conf->default_dfile_replication_factor = 1;
+    }
     if (!is_populated_filesystem_configuration(fs_conf))
     {
         gossip_err("Error: File system configuration is invalid!\n");
@@ -3027,7 +3041,7 @@ DOTCONF_CB(get_name)
                 PINT_llist_head(config_s->file_systems);
         if (fs_conf->file_system_name)
         {
-            gossip_err("WARNING: Overwriting %s with %s\n",
+            gossip_err("WARNING: Overwriting Filesystem Name %s with %s\n",
                        fs_conf->file_system_name,cmd->data.str);
         }
         fs_conf->file_system_name =
@@ -3065,7 +3079,7 @@ DOTCONF_CB(get_filesystem_replication)
     }
     if (fs_conf->metadata_replication_factor)
     {
-        gossip_err("WARNING: Overwriting %d with %d\n",
+        gossip_err("WARNING: Overwriting Metadata Replication Factor %d with %d\n",
                    (int)fs_conf->metadata_replication_factor,
                    (int)cmd->data.value);
     }
@@ -3083,7 +3097,7 @@ DOTCONF_CB(get_filesystem_collid)
             PINT_llist_head(config_s->file_systems);
     if (fs_conf->coll_id)
     {
-        gossip_err("WARNING: Overwriting %d with %d\n",
+        gossip_err("WARNING: Overwriting Filesystem ID %d with %d\n",
                    (int)fs_conf->coll_id, (int)cmd->data.value);
     }
     fs_conf->coll_id = (PVFS_fs_id)cmd->data.value;
@@ -4150,6 +4164,7 @@ static int is_valid_filesystem_configuration(
     int ret = 1;
     if (ret == 0)
     {
+        /* V3 get rid of this - no longer makes sense */
         gossip_err("RootHandle (%s) is NOT within the meta handle "
                    "ranges specified for this filesystem (%s).\n",
                    PVFS_OID_str(&fs->root_handle),fs->file_system_name);
@@ -4168,6 +4183,17 @@ static void free_host_alias(void *ptr)
         free(alias->attributes);
         free(alias);
     }
+}
+
+static int compare_fs_id(void *key, void *item)
+{
+    struct filesystem_configuration_s *fs = NULL;
+    int *k = NULL;
+
+    fs = (struct filesystem_configuration_s *)item;
+    k = (int *)key;
+
+    return *k - fs->coll_id;
 }
 
 static void free_filesystem(void *ptr)
@@ -4263,6 +4289,7 @@ static void free_filesystem(void *ptr)
  * FOr now this code still exists but should be removed as soon as
  * feasible!!!    WBL V3
  */
+#if 0
 static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
                             struct filesystem_configuration_s *src_fs)
 {
@@ -4403,7 +4430,7 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
                     (int *) calloc(src_fs->root_squash_count, sizeof(int));
             assert(dest_fs->root_squash_netmasks); /* TODO; replace with error handling */
             memcpy(dest_fs->root_squash_netmasks,
-                   src_fs->root_squash_netmasks,
+                   src_fs->root_squash_netmasksj,
                    src_fs->root_squash_count * sizeof(int));
         }
         if (src_fs->all_squash_count > 0 && src_fs->all_squash_hosts)
@@ -4435,6 +4462,7 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
         dest_fs->fp_buffers_per_flow = src_fs->fp_buffers_per_flow;
     }
 }
+#endif
 
 /* V3 currently obsolete - seems like a useful func not sure why its
  * static
@@ -4918,8 +4946,12 @@ int PINT_config_trim_filesystems_except(struct server_configuration_s *config_s,
                                         PVFS_fs_id fs_id)
 {
     int ret = -PVFS_EINVAL;
-    PINT_llist *cur = NULL, *new_fs_list = NULL;
-    struct filesystem_configuration_s *cur_fs = NULL, *new_fs = NULL;
+/* V3
+    PINT_llist *cur = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
+*/
+    PINT_llist *new_fs_list = NULL;
+    void *new_fs = NULL;
 
     if (config_s)
     {
@@ -4929,6 +4961,14 @@ int PINT_config_trim_filesystems_except(struct server_configuration_s *config_s,
             return -PVFS_ENOMEM;
         }
 
+/* This seems kind of silly, we look for the FS with
+ * the right id, then we copy it, delete the old list
+ * and make this is the only FS.  Why not simply remove
+ * the one we want from the old list, delete the old
+ * list and add this to the new list?  Copying the FS
+ * record is error prone.  WBL V3
+ */
+#if 0
         cur = config_s->file_systems;
         while(cur)
         {
@@ -4954,8 +4994,14 @@ int PINT_config_trim_filesystems_except(struct server_configuration_s *config_s,
             }
             cur = PINT_llist_next(cur);
         }
+    #endif
 
-        PINT_llist_free(config_s->file_systems,free_filesystem);
+        new_fs = PINT_llist_rem(config_s->file_systems,
+                                &fs_id,
+                                compare_fs_id);
+        PINT_llist_add_to_head(new_fs_list, new_fs);
+
+        PINT_llist_free(config_s->file_systems, free_filesystem);
         config_s->file_systems = new_fs_list;
 
         if (PINT_llist_count(config_s->file_systems) == 1)

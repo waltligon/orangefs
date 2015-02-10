@@ -28,45 +28,37 @@ struct PINT_llist
 };
 
 /* PROTOTYPES */
-PINT_llist_p PINT_llist_new(
-    void);
-int PINT_llist_empty(
-    PINT_llist_p);
-int PINT_llist_add_to_head(
-    PINT_llist_p,
-    void *);
-int PINT_llist_add_to_tail(
-    PINT_llist_p,
-    void *);
-int PINT_llist_doall(
-    PINT_llist_p,
-    int (*fn) (void *));
-int PINT_llist_doall_arg(
-    PINT_llist_p l_p,
-    int (*fn) (void *item,
-	       void *arg),
-    void *arg);
-void PINT_llist_free(
-    PINT_llist_p,
-    void (*fn) (void *));
-void *PINT_llist_search(
-    PINT_llist_p,
-    void *,
-    int (*comp) (void *,
-		 void *));
-void *PINT_llist_rem(
-    PINT_llist_p,
-    void *,
-    int (*comp) (void *,
-		 void *));
-void *PINT_llist_head(
-    PINT_llist_p);
-void *PINT_llist_tail(
-    PINT_llist_p);
-int PINT_llist_count(
-    PINT_llist_p l_p);
-PINT_llist_p PINT_llist_next(
-    PINT_llist_p entry);
+PINT_llist_p PINT_llist_new( void);
+
+int PINT_llist_empty( PINT_llist_p);
+
+int PINT_llist_add_to_head( PINT_llist_p, void *);
+
+int PINT_llist_add_to_tail( PINT_llist_p, void *);
+
+int PINT_llist_doall( PINT_llist_p, int (*fn) (void *));
+
+int PINT_llist_doall_arg(PINT_llist_p l_p,
+                         int (*fn) (void *item, void *arg),
+                         void *arg);
+
+void PINT_llist_free( PINT_llist_p, void (*fn) (void *));
+
+void *PINT_llist_search(PINT_llist_p,
+                        void *,
+                        int (*comp) (void *, void *));
+
+void *PINT_llist_rem(PINT_llist_p,
+                     void *,
+                     int (*comp) (void *, void *));
+
+void *PINT_llist_head( PINT_llist_p);
+
+void *PINT_llist_tail( PINT_llist_p);
+
+int PINT_llist_count( PINT_llist_p l_p);
+
+PINT_llist_p PINT_llist_next( PINT_llist_p entry);
 
 
 #endif

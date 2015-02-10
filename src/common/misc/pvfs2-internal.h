@@ -26,18 +26,21 @@
 #  if __GNUC__ >= 4 && __GNUC_MINOR__ >= 4
 #    define GCC_CONSTRUCTOR(priority) __attribute__((constructor(priority)))
 #    define GCC_DESTRUCTOR(priority)  __attribute__((destructor(priority)))
-#    define GCC_UNUSED  __attribute__((unused))
+#    define GCC_UNUSED  __attribute__((__unused__))
+#    define GCC_MALLOC __attribute__((__malloc__))
 #    define PVFS_INIT(f) 
 #  else
-#    define GCC_CONSTRUCTOR(priority) __attribute__((constructor))
-#    define GCC_DESTRUCTOR(priority)  __attribute__((destructor))
-#    define GCC_UNUSED  __attribute__((unused))
+#    define GCC_CONSTRUCTOR(priority) __attribute__((__constructor__))
+#    define GCC_DESTRUCTOR(priority)  __attribute__((__destructor__))
+#    define GCC_MALLOC __attribute__((__malloc__))
+#    define GCC_UNUSED  __attribute__((__unused__))
 #    define PVFS_INIT(f) 
 #  endif
 #else
 #  define GCC_CONSTRUCTOR(priority) 
 #  define GCC_DESTRUCTOR(priority)
-#  define GCC_UNUSED  __attribute__((unused))
+#  define GCC_MALLOC
+#  define GCC_UNUSED  __attribute__((__unused__))
 #  define PVFS_INIT(f) f()
 #endif
 
