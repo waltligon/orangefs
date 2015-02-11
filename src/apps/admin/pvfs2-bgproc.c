@@ -168,7 +168,7 @@ main(int argc, char **argv)
 	int mode = 0, ret;
 	unsigned long id;
 	PVFS_fs_id fs_id;
-	size_t i;
+	size_t i, j;
 	char ch;
 
 	/* Parse command line. */
@@ -242,7 +242,7 @@ main(int argc, char **argv)
 		break;}
 	case MODE_LIST:
 		{unsigned long entries, *ids;
-		char *names;
+		char **names;
 		ids = calloc(aa->count, sizeof *ids);
 		if (!ids)
 			err(1, "malloc");
@@ -251,10 +251,13 @@ main(int argc, char **argv)
 			err(1, "malloc");
 		for (i = 0; i < aa->count; i++) {
 			ret = PVFS_mgmt_bgproc_list(fs_id, aa->addrs[i],
-			    &entries, ids, &names);
+			    &entries, &ids, &names);
 			if (ret < 0)
 				errp(1, ret, "PVFS_mgmt_bgproc_list");
-			printf("%lu\n", (unsigned long)i);
+			for (j = 0; j < entries; j++) {
+				printf("%lu\t%s\t%lu\n", (unsigned long)i,
+				    names[j], ids[j]);
+			}
 		}
 		break;}
 	case MODE_START:

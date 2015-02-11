@@ -641,8 +641,8 @@ struct PINT_client_mgmt_bgproc_list_sm
     PVFS_fs_id fs_id;
     PVFS_id_gen_t addr;
     unsigned long *entries;
-    unsigned long *ids;
-    char **names;
+    unsigned long **ids;
+    char ***names;
 };
 
 struct PINT_client_mgmt_bgproc_start_sm

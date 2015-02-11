@@ -45,8 +45,8 @@ PVFS_error PVFS_imgmt_bgproc_list(
     PVFS_fs_id fs_id,
     PVFS_BMI_addr_t addr,
     unsigned long *entries,
-    unsigned long *ids,
-    char **names,
+    unsigned long **ids,
+    char ***names,
     PVFS_mgmt_op_id *op_id,
     void *user_ptr)
 {
@@ -93,8 +93,8 @@ PVFS_error PVFS_mgmt_bgproc_list(
     PVFS_fs_id fs_id,
     PVFS_BMI_addr_t addr,
     unsigned long *entries,
-    unsigned long *ids,
-    char **names)
+    unsigned long **ids,
+    char ***names)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
@@ -129,6 +129,10 @@ static PINT_sm_action mgmt_bgproc_list_setup_msgpair(
     int i;
 
     PINT_null_capability(&capability);
+
+    *sm_p->u.mgmt_bgproc_list.entries = 0;
+    *sm_p->u.mgmt_bgproc_list.ids = NULL;
+    *sm_p->u.mgmt_bgproc_list.names = NULL;
 
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
@@ -170,11 +174,45 @@ static PINT_sm_action mgmt_bgproc_list_cleanup(
 static int bgproc_list_comp_fn(void* v_p, struct PVFS_server_resp *resp_p,
     int i)
 {
+    PINT_client_sm *sm_p;
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-    /* XXX: alloc ? */
-    *(sm_p->u.mgmt_bgproc_list.entries) = resp_p->u.mgmt_bgproc_list.num_procs;
-    sm_p->u.mgmt_bgproc_list.ids[i] = resp_p->u.mgmt_bgproc_list.ids[i];
-    sm_p->u.mgmt_bgproc_list.names[i] = resp_p->u.mgmt_bgproc_list.names[i];
+    size_t start, j;
+    void *p;
+
+    sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+
+    start = *sm_p->u.mgmt_bgproc_list.entries;
+    *sm_p->u.mgmt_bgproc_list.entries += resp_p->u.mgmt_bgproc_list.num_procs;
+    if (*sm_p->u.mgmt_bgproc_list.entries > 0) {
+        p = realloc(*sm_p->u.mgmt_bgproc_list.ids,
+            sizeof **sm_p->u.mgmt_bgproc_list.ids *
+            *sm_p->u.mgmt_bgproc_list.entries);
+        if (!p)
+        {
+            gossip_lerr("out of memory");
+            free(*sm_p->u.mgmt_bgproc_list.ids);
+            free(*sm_p->u.mgmt_bgproc_list.names);
+            return -1;
+        }
+        *sm_p->u.mgmt_bgproc_list.names = p;
+        p = realloc(*sm_p->u.mgmt_bgproc_list.names,
+            sizeof **sm_p->u.mgmt_bgproc_list.names *
+            *sm_p->u.mgmt_bgproc_list.entries);
+        if (!p)
+        {
+            gossip_lerr("out of memory");
+            free(*sm_p->u.mgmt_bgproc_list.ids);
+            free(*sm_p->u.mgmt_bgproc_list.names);
+            return -1;
+        }
+        *sm_p->u.mgmt_bgproc_list.names = p;
+    }
+
+    for (j = 0; j < resp_p->u.mgmt_bgproc_list.num_procs; j++) {
+        (*sm_p->u.mgmt_bgproc_list.ids)[start+j] =
+            resp_p->u.mgmt_bgproc_list.ids[j];
+        (*sm_p->u.mgmt_bgproc_list.names)[start+j] =
+            resp_p->u.mgmt_bgproc_list.names[j];
+    }
     return 0;
 }

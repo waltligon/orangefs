@@ -478,8 +478,8 @@ PVFS_error PVFS_imgmt_bgproc_list(
     PVFS_fs_id fs_id,
     PVFS_BMI_addr_t addr,
     unsigned long *entries,
-    unsigned long *ids,
-    char **names,
+    unsigned long **ids,
+    char ***names,
     PVFS_mgmt_op_id *op_id,
     void *user_ptr);
 
@@ -487,8 +487,8 @@ PVFS_error PVFS_mgmt_bgproc_list(
     PVFS_fs_id fs_id,
     PVFS_BMI_addr_t addr,
     unsigned long *entries,
-    unsigned long *ids,
-    char **names);
+    unsigned long **ids,
+    char ***names);
 
 PVFS_error PVFS_imgmt_bgproc_start(
     PVFS_fs_id fs_id,
