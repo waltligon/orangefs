@@ -1373,10 +1373,15 @@ class OFSTestNode(object):
             self.setEnvironmentVariable("HADOOP_CONF_DIR", self.hadoop_location+"/etc/hadoop")
         if rc != 0:
             output = []
-            self.changeDirectory("/opt")
             
+            self.changeDirectory("/opt")
+            print "Downloading %s" % self.hadoop_version
             self.runSingleCommand("wget --quiet http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
+            print "Installing %s to %s" % (self.hadoop_version,self.hadoop_location)
             self.runSingleCommand("tar -zxf %s.tar.gz" % self.hadoop_version)
+        else:
+            print "Found %s at %s" % (self.hadoop_version,self.hadoop_location)
+                                
         
 
 
@@ -1983,7 +1988,7 @@ class OFSTestNode(object):
             configure_opts = configure_opts+" --disable-opt"
 
         if enable_hadoop == True:
-            configure_opts =  configure_opts + " --with-jdk=%s --enable-jni " % self.jdk6_location
+            configure_opts =  configure_opts + " --with-jdk=%s --enable-jni --enable-user-env-vars" % self.jdk6_location
             enable_shared = True
 
 
