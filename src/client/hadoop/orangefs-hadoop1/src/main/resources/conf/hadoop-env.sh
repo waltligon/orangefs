@@ -64,4 +64,5 @@ export LD_LIBRARY_PATH="$ORANGEFS_PREFIX/lib"
 export JNI_LIBRARY_PATH="$ORANGEFS_PREFIX/lib"
 export HADOOP_CLASSPATH="$JNI_LIBRARY_PATH/orangefs-jni-2.9.0.jar:$JNI_LIBRARY_PATH/orangefs-hadoop1-2.9.0.jar"
 export PVFS2TAB_FILE="/tmp/orangefs_hadoop_storage/pvfs2tab"
+export ORANGEFS_STRIP_SIZE_AS_BLKSIZE=true
 export HADOOP_LOG_DIR=/tmp/hadoop-${USER}/hadoop1logs

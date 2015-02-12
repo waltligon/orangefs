@@ -44,6 +44,7 @@ if [ "$HADOOP_CLASSPATH" ]; then
 else
     export HADOOP_CLASSPATH="$JNI_LIBRARY_PATH/orangefs-hadoop2-2.9.0.jar:$JNI_LIBRARY_PATH/orangefs-jni-2.9.0.jar"
 fi
+export ORANGEFS_STRIP_SIZE_AS_BLKSIZE=true
 #end of custom additions for OrangeFS
 
 # Extra Java CLASSPATH elements.  Automatically insert capacity-scheduler.

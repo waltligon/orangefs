@@ -297,6 +297,7 @@ static PINT_sm_action crdirent_setup_op(
     s_op->u.crdirent.dirent_handle = s_op->req->u.crdirent.dirent_handle;
     s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
     s_op->u.crdirent.dir_attr_update_required = 0;
+    s_op->u.crdirent.remote_dirdata_handles = NULL;
 
     memset(&(s_op->u.crdirent.dirdata_ds_attr), 0, sizeof(PVFS_ds_attributes));
     memset(&s_op->u.crdirent.capability, 0, sizeof(PVFS_capability));
@@ -1096,7 +1097,6 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_handle *remote_dirdata_handles = NULL;
     int num_remote_dirdata_handles = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_object_attr *attr_p = NULL;
@@ -1115,7 +1115,8 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
        Don't want to send to it. Also no need to send to the
        dirdata server that is the target of the split.      */
     attr_p = &s_op->attr;
-    remote_dirdata_handles = (PVFS_handle *) malloc(sizeof(PVFS_handle) *
+    s_op->u.crdirent.remote_dirdata_handles =
+        (PVFS_handle *) malloc(sizeof(PVFS_handle) *
         attr_p->dist_dir_attr.num_servers);
     for (i = 0; i < attr_p->dist_dir_attr.num_servers; i++)
     {
@@ -1129,7 +1130,7 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
         if (strcmp(server_config->host_id, server_name))
         {
             /* remote */
-            remote_dirdata_handles[num_remote_dirdata_handles] =
+            s_op->u.crdirent.remote_dirdata_handles[num_remote_dirdata_handles] =
                 attr_p->dirdata_handles[i];
             num_remote_dirdata_handles++;
         }
@@ -1150,11 +1151,11 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
             s_op->attr,
             0,
             num_remote_dirdata_handles,
-            remote_dirdata_handles,
+            s_op->u.crdirent.remote_dirdata_handles,
             NULL);
 
         msg_p->fs_id = s_op->req->u.crdirent.fs_id;
-        msg_p->handle = remote_dirdata_handles[0];
+        msg_p->handle = s_op->u.crdirent.remote_dirdata_handles[0];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = tree_setattr_comp_fn;
 
@@ -1173,10 +1174,6 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
     else
     {
         js_p->error_code = 0;
-    }
-    if (remote_dirdata_handles)
-    {
-        free(remote_dirdata_handles);
     }
     return SM_ACTION_COMPLETE;
 }
@@ -1751,6 +1748,10 @@ static PINT_sm_action crdirent_cleanup(
     if (s_op->u.crdirent.dist)
     {
         PINT_dist_free(s_op->u.crdirent.dist);
+    }
+    if (s_op->u.crdirent.remote_dirdata_handles)
+    {
+        free(s_op->u.crdirent.remote_dirdata_handles);
     }
 
     PINT_cleanup_capability(&s_op->u.crdirent.capability);

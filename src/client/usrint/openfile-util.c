@@ -289,7 +289,11 @@ static int my_glibc_getdents64(u_int fd, struct dirent64 *dirp, u_int count)
 
 static int my_glibc_fadvise64(int fd, off64_t offset, off64_t len, int advice)
 {
+#ifdef __arm__
+    return syscall(__NR_arm_fadvise64_64, fd, advice, offset, len);
+#else
     return syscall(SYS_fadvise64, fd, offset, len, advice);
+#endif
 }
 
 static int my_glibc_fadvise(int fd, off_t offset, off_t len, int advice)
@@ -1176,6 +1180,8 @@ static int init_usrint_internal(void)
                    "PVFS AIO interface failed to initialize\n");
    }
 #endif
+
+    /* env_vars_struct_dump(&env_vars); */
 
     init_debug("finished with initialization\n");
 
