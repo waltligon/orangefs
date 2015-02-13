@@ -395,6 +395,7 @@ class OFSTestNetwork(object):
         # Wait for reboot
         print "Waiting 180 seconds for nodes to reboot"
         time.sleep(180)
+        print "Nodes rebooted."
         # workaround for strange cuer1 issue where hostname changes on reboot.
         for node in node_list:
             # node information may have changed during reboot.
@@ -1646,7 +1647,7 @@ class OFSTestNetwork(object):
             node.runSingleCommand('sed -i s,/usr/lib/jvm/java-7-openjdk-amd64,%s,g %s/hadoop-env.sh' % (node.jdk6_location,hadoop_conf ))
             
             node.runSingleCommand('sed -i s,/opt/orangefs-trunk,%s,g %s/hadoop-env.sh' % (node.ofs_installation_location,hadoop_conf ))
-            
+            node.runSingleCommand("echo 'export ORANGEFS_STRIP_SIZE_AS_BLKSIZE=true' >> %s/hadoop-env.sh" % hadoop_conf)
             # update core-site.xml
             node.runSingleCommand("sed -i s,/mnt/orangefs,%s,g %s/core-site.xml" % (node.ofs_mount_point,hadoop_conf))
             # Core site points to the OrangeFS on the master node

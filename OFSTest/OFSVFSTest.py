@@ -209,7 +209,7 @@ def bonnie(testing_node,output=[]):
             return rc
         
     testing_node.changeDirectory(testing_node.ofs_mount_point)
-    rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/bonnie++-1.03e/bonnie++  -n 1:0:0:1  -r 8 -s 16 ",output)
+    rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/bonnie++-1.03e/bonnie++  -n 4:1:1:1  -r 16 -s 1024 ",output)
     
 
     return rc
@@ -269,7 +269,7 @@ def dbench(testing_node,output=[]):
     testing_node.changeDirectory(testing_node.ofs_mount_point)
     
     
-    rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/dbench-3.03/dbench -c client.txt 10 -t 300 ",output)
+    rc = testing_node.runSingleCommand(testing_node.ofs_extra_tests_location+"/dbench-3.03/dbench -c client.txt 100 -t 300 ",output)
     
 
     return rc
@@ -408,7 +408,7 @@ def iozone(testing_node,output=[]):
         if rc != 0:
             return rc
     
-    rc = testing_node.runSingleCommand("./iozone -a -y 4096 -q $((1024*16)) -n 4096 -g $((1024*16*2)) -f %s/test_iozone_file" % testing_node.ofs_mount_point,output)
+    rc = testing_node.runSingleCommand("./iozone -a -y 4096 -q $((1024*16)) -n 4096 -g $((1024*16*4)) -f %s/test_iozone_file" % testing_node.ofs_mount_point,output)
         
     return rc
 
@@ -672,18 +672,18 @@ tests = [
 #ltp,
 append,
 append2,
-
-fdtree,
-fstest,
-fsx,
-iozone,
 mkdir_vfs,
 shelltest,
 symlink_vfs,
 tail,
 vfs_cp,
+simultaneous_ls,
+
+fdtree,
+fstest,
+fsx,
+iozone,
 bonnie,
 dbench,
-ltp,
-simultaneous_ls
+ltp
  ]

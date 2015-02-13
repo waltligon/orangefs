@@ -553,8 +553,11 @@ class OFSTestNode(object):
             output.append(i)
 
         logging.debug("RC: %r" % p.returncode)
-        logging.debug("STDOUT: %s" % output[1] )
-        logging.debug("STDERR: %s" % output[2] )
+	try:
+	        logging.debug("STDOUT: %s" % output[1] )
+        	logging.debug("STDERR: %s" % output[2] )
+	except:
+		pass
         
         return p.returncode
     
@@ -1304,11 +1307,11 @@ class OFSTestNode(object):
             
             # install maven in RHEL 6
             if "6." in self.distro:
-                install_commands.append("cd /opt; wget --quiet http://apache.mesi.com.ar/maven/maven-3/3.2.3/binaries/apache-maven-3.2.3-bin.tar.gz")
-                install_commands.append("cd /opt; tar xf apache-maven-3.2.3-bin.tar.gz")
-                install_commands.append("ln -s /opt/apache-maven-3.2.3/bin/mvn /usr/bin/mvn")
-                self.setEnvironmentVariable("M2_HOME", "/opt/apache-maven-3.2.3")
-                self.setEnvironmentVariable("M2", "/opt/apache-maven-3.2.3/bin")
+                install_commands.append("cd /opt; wget --quiet http://apache.mesi.com.ar/maven/maven-3/3.2.*/binaries/apache-maven-3.2.*-bin.tar.gz")
+                install_commands.append("cd /opt; tar xf apache-maven-3.2.*-bin.tar.gz")
+                install_commands.append("ln -s /opt/apache-maven-3.2.*/bin/mvn /usr/bin/mvn")
+                self.setEnvironmentVariable("M2_HOME", "/opt/apache-maven-3.2.*")
+                self.setEnvironmentVariable("M2", "/opt/apache-maven-3.2.*/bin")
             
 
         
@@ -1329,7 +1332,11 @@ class OFSTestNode(object):
 
     def installDB4(self):
         # db4 is built from scratch for all systems to have a consistant version.
-        
+        self.db4_lib_dir = self.db4_dir+"/lib"
+        rc = self.runSingleCommand("[ -f %s/libdb.so ]" % self.db4_lib_dir)
+        if rc == 0: 
+            print "Found %s/libdb.so" % self.db4_lib_dir
+            return
         
 
         self.changeDirectory("/home/%s" % self.current_user)
@@ -1344,7 +1351,7 @@ class OFSTestNode(object):
         print "Installing Berkeley DB 4.8.30 to %s..." % self.db4_dir
         self.runSingleCommand("make install")
 
-        self.db4_lib_dir = self.db4_dir+"/lib"
+        
    
         # Add DB4 to the library path.
         self.setEnvironmentVariable("LD_LIBRARY_PATH","%s:$LD_LIBRARY_PATH" % self.db4_lib_dir)
@@ -1366,10 +1373,15 @@ class OFSTestNode(object):
             self.setEnvironmentVariable("HADOOP_CONF_DIR", self.hadoop_location+"/etc/hadoop")
         if rc != 0:
             output = []
-            self.changeDirectory("/opt")
             
+            self.changeDirectory("/opt")
+            print "Downloading %s" % self.hadoop_version
             self.runSingleCommand("wget --quiet http://www.gtlib.gatech.edu/pub/apache/hadoop/core/%s/%s.tar.gz" % (self.hadoop_version,self.hadoop_version),output )
+            print "Installing %s to %s" % (self.hadoop_version,self.hadoop_location)
             self.runSingleCommand("tar -zxf %s.tar.gz" % self.hadoop_version)
+        else:
+            print "Found %s at %s" % (self.hadoop_version,self.hadoop_location)
+                                
         
 
 
@@ -1976,7 +1988,7 @@ class OFSTestNode(object):
             configure_opts = configure_opts+" --disable-opt"
 
         if enable_hadoop == True:
-            configure_opts =  configure_opts + " --with-jdk=%s --enable-jni " % self.jdk6_location
+            configure_opts =  configure_opts + " --with-jdk=%s --enable-jni --enable-user-env-vars" % self.jdk6_location
             enable_shared = True
 
 
@@ -2469,6 +2481,7 @@ class OFSTestNode(object):
 
         # for all the aliases in the file
         for alias in self.alias_list:
+            logging.info("looking for alias for hostname " + self.hostname)
             # if the alias is for THIS host
             if self.hostname in alias:
                 
