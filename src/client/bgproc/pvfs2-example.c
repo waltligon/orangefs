@@ -1,6 +1,9 @@
-#include <stdlib.h>
+#include <limits.h>
+#include <unistd.h>
 
 int main(void)
 {
-	return EXIT_SUCCESS;
+	while (1)
+		sleep(UINT_MAX);
+	return 0;
 }
