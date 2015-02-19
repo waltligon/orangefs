@@ -21,6 +21,12 @@
 #include "dist-dir-utils.h"
 #include "pint-uid-map.h"
 
+
+enum state_codes
+{
+    SKIP=100;
+};
+
 static int tree_setattr_comp_fn(
         void *v_p,
         struct PVFS_server_resp *resp_p,
@@ -32,14 +38,14 @@ nested machine pvfs2_mkdir_work_sm
 {
     state create
     {
-        run mkdir_create;
+        run mkdir_directory_dspace_create;
         success => set_attrib;
         default => err_msg;
     }
 
     state set_attrib
     {
-        run mkdir_setattrib;
+        run mkdir_directory_dspace_setattr;
         success => create_dist_dir_struct;
         default => err_msg;
     }
@@ -53,14 +59,22 @@ nested machine pvfs2_mkdir_work_sm
 
     state create_local_dirdata_dspace
     {
-        run mkdir_create_local_dirdata_dspace;
-        success => request_remote_dirdata_dspace;
+        run mkdir_dirdata_dspace_create
+        success => setattr_on_local_dirdata_dspace;
         default => err_msg;
     }
 
-    state request_remote_dirdata_dspace
+    state setattr_on_local_dirdata_dspace
+    {
+        run mkdir_dirdata_dspace_setattr;
+        success => setattr_on_remote_dirdata_dspace;
+        default => err_msg;
+    }
+
+    state setattr_on_remote_dirdata_dspace;
     {
         run mkdir_request_remote_dirdata_dspace;
+        skip    => setattr_on_local_dirdata_keyval;
         success => fill_handles_to_dist_dir_struct;
         default => err_msg;
     }
@@ -85,9 +99,9 @@ nested machine pvfs2_mkdir_work_sm
         default => err_msg;
     }
 
-    state write_keyval_to_meta_handle
+    state setattr_on_local_dirdata_keyval
     {
-        run mkdir_write_keyval_to_meta_handle;
+        run mkdir_dirdata_keyval_setattr;
         success => return;
         default => err_msg;
     }
@@ -147,7 +161,7 @@ machine pvfs2_mkdir_sm
  * NOTE: returned handle will pop out in js_p->handle (the job status
  * struct).
  */
-static PINT_sm_action mkdir_create(
+static PINT_sm_action mkdir_directory_dspace_create(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -174,7 +188,7 @@ static PINT_sm_action mkdir_create(
 }
 
 /*
- * Function: mkdir_setattrib
+ * Function: mkdir_directory_dspace_setattr
  *
  * Params:   server_op *s_op, 
  *           job_status_s *js_p
@@ -184,7 +198,7 @@ static PINT_sm_action mkdir_create(
  * Synopsis: 
  *           
  */
-static PINT_sm_action mkdir_setattrib(
+static PINT_sm_action mkdir_directory_dspace_setattr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -347,7 +361,7 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
     return SM_ACTION_COMPLETE; 
 }
 
-static PINT_sm_action mkdir_create_local_dirdata_dspace(
+static PINT_sm_action mkdir_dirdata_dspace_create(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -371,12 +385,6 @@ static PINT_sm_action mkdir_create_local_dirdata_dspace(
     gossip_debug(GOSSIP_MKDIR_DEBUG, "creating %d remote dirdata files\n", 
         s_op->u.mkdir.handle_array_remote_count);
 
-    if(s_op->u.mkdir.handle_array_local_count == 0)
-    {
-        /* no local work to do */
-        js_p->error_code = 0;
-        return(SM_ACTION_COMPLETE);
-    }
 
     ret = PINT_config_get_meta_handle_extent_array(
         user_opts, s_op->u.mkdir.fs_id, &extent_array);
@@ -408,6 +416,34 @@ static PINT_sm_action mkdir_create_local_dirdata_dspace(
     return(ret);
 }
 
+
+
+static PINT_sm_action mkdir_dirdata_dspace_setattr(struct PINT_smcb *smcb,
+                                                   job_status_s *js_p)
+{
+   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   int ret = -PVFS_EINVAL;
+   job_id_t j_id;
+   PVFS_ds_attributes ds_attr;
+
+   PVFS_object_attr_overwrite_setable(ds_attr,s_op->attr);
+
+
+
+   ret = job_trove_dspace_setattr(
+          fs_id,
+          distdir handle,
+          ds_attr,
+          TROVE_SYNC,
+          smcb, 0, js_p, &j_id, server_job_context, 
+          s_op->req->hints);
+
+   return (ret);
+}/* end setattr_on_local_dirdata_dspace */
+
+
+
+
 static PINT_sm_action mkdir_request_remote_dirdata_dspace(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -421,7 +457,7 @@ static PINT_sm_action mkdir_request_remote_dirdata_dspace(
 
     if(s_op->u.mkdir.handle_array_remote_count == 0)
     {
-        js_p->error_code = 0;
+        js_p->error_code = SKIP;
         return(SM_ACTION_COMPLETE);
     }
 
@@ -557,7 +593,7 @@ static int tree_setattr_comp_fn(void *v_p,
     return 0;
 }
 
-static PINT_sm_action mkdir_write_keyval_to_meta_handle(
+static PINT_sm_action mkdir_dirdata_keyval_setattr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
