@@ -235,7 +235,7 @@ typedef struct PVFS_sysresp_listeattr_s PVFS_sysresp_listeattr;
 /* system interface function prototypes */
 /****************************************/
 
-int PVFS_sys_initialize(uint64_t default_debug_mask);
+int PVFS_sys_initialize(PVFS_debug_mask default_debug_mask);
 
 int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent);
 

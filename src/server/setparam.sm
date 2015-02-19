@@ -64,7 +64,7 @@ static PINT_sm_action setparam_work(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1, tmp_on = 0;
     job_id_t tmp_id;
-    uint64_t tmp_mask = 0;
+    PVFS_debug_mask tmp_mask = GOSSIP_NO_DEBUG;
     PVFS_handle tmp_handle = PVFS_HANDLE_NULL;
     struct server_configuration_s *user_opts;
     struct filesystem_configuration_s *fs_conf;
@@ -74,8 +74,8 @@ static PINT_sm_action setparam_work(
     {
         case PVFS_SERV_PARAM_GOSSIP_MASK:
             gossip_get_debug_mask(&tmp_on, &tmp_mask);
-            gossip_set_debug_mask(1,
-                                  s_op->req->u.mgmt_setparam.value.u.value);
+            gossip_set_debug_mask(1, 
+                       s_op->req->u.mgmt_setparam.value.u.mask_value);
             js_p->error_code = 0;
             return SM_ACTION_COMPLETE;
         case PVFS_SERV_PARAM_INVALID:

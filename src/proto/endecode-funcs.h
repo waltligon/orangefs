@@ -1084,6 +1084,7 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
     x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
     for (i=0; i<x->n2; i++) \
 	    decode_##ta2(pptr, &(x)->a2[i]); \
+    x->a3 = decode_malloc(x->n2 * sizeof(*x->a3)); \
     for (i=0; i<x->n2; i++) \
 	    decode_##ta3(pptr, &(x)->a3[i]); \
 } \
@@ -1478,6 +1479,43 @@ static inline void defree_##name(struct name *x) {                            \
         case en1: defree_##ut1(&x->uname.un1); break;                         \
         case en2: defree_##ut2(&x->uname.un1); break;                         \
         case en3: defree_##ut3(&x->uname.un1); break;                         \
+        default: assert(0);                                                   \
+    }                                                                         \
+}
+
+/* union of four types with an enum to select proper type */
+#define encode_enum_union_4_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2, ut3, un3, en3, ut4, un4, en4)    \
+static inline void encode_##name(char **pptr, const struct name *x)           \
+{                                                                             \
+    encode_enum(pptr, &x->ename);                                             \
+    switch(x->ename)                                                          \
+    {                                                                         \
+        case en1: encode_##ut1(pptr, &x->uname.un1); break;                   \
+        case en2: encode_##ut2(pptr, &x->uname.un2); break;                   \
+        case en3: encode_##ut3(pptr, &x->uname.un3); break;                   \
+        case en4: encode_##ut4(pptr, &x->uname.un4); break;                   \
+        default: assert(0);                                                   \
+    }                                                                         \
+}                                                                             \
+static inline void decode_##name(char **pptr, struct name *x)                 \
+{                                                                             \
+    decode_enum(pptr, &x->ename);                                             \
+    switch(x->ename)                                                          \
+    {                                                                         \
+        case en1: decode_##ut1(pptr, &x->uname.un1); break;                   \
+        case en2: decode_##ut2(pptr, &x->uname.un2); break;                   \
+        case en3: decode_##ut3(pptr, &x->uname.un3); break;                   \
+        case en4: decode_##ut4(pptr, &x->uname.un4); break;                   \
+        default: assert(0);                                                   \
+    }                                                                         \
+}                                                                             \
+static inline void defree_##name(struct name *x) {                            \
+    switch(x->ename)                                                          \
+    {                                                                         \
+        case en1: defree_##ut1(&x->uname.un1); break;                         \
+        case en2: defree_##ut2(&x->uname.un2); break;                         \
+        case en3: defree_##ut3(&x->uname.un3); break;                         \
+        case en4: defree_##ut4(&x->uname.un4); break;                         \
         default: assert(0);                                                   \
     }                                                                         \
 }

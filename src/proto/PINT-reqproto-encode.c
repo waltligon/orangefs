@@ -151,16 +151,16 @@ int PINT_encode(void* input_buffer,
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_decode(void* input_buffer,
+int PINT_decode(void *input_buffer,
 		enum PINT_encode_msg_type input_type,
-		struct PINT_decoded_msg* target_msg,
+		struct PINT_decoded_msg *target_msg,
 		PVFS_BMI_addr_t target_addr,
 		PVFS_size size)
 {
     int i=0;
-    char* buffer_index = (char*)input_buffer + PINT_ENC_GENERIC_HEADER_SIZE;
+    char *buffer_index = (char *)input_buffer + PINT_ENC_GENERIC_HEADER_SIZE;
     int size_index = (int)size - PINT_ENC_GENERIC_HEADER_SIZE;
-    char* enc_type_ptr = (char*)input_buffer + 4;
+    char *enc_type_ptr = (char *)input_buffer + 4;
     int ret;
     int32_t enc_type_recved, proto_ver_recved;
     int proto_major_recved, proto_minor_recved;
@@ -178,8 +178,8 @@ int PINT_decode(void* input_buffer,
     }
     
     /* pull the encoding type and protocol version out */
-    proto_ver_recved = (int)bmitoh32(*((int32_t*)input_buffer));
-    enc_type_recved = bmitoh32(*((int32_t*)enc_type_ptr));
+    proto_ver_recved = (int)bmitoh32(*((int32_t *)input_buffer));
+    enc_type_recved = bmitoh32(*((int32_t *)enc_type_ptr));
     proto_major_recved = proto_ver_recved / 1000;
     proto_minor_recved = proto_ver_recved - (proto_major_recved*1000);
 
@@ -231,29 +231,29 @@ int PINT_decode(void* input_buffer,
         return(-PVFS_EPROTONOSUPPORT);
     }
 
-    for(i=0; i<ENCODING_TABLE_SIZE; i++)
+    for(i = 0; i < ENCODING_TABLE_SIZE; i++)
     {
-	if(PINT_encoding_table[i] && (PINT_encoding_table[i]->enc_type
-            == enc_type_recved))
+	if(PINT_encoding_table[i] && 
+           (PINT_encoding_table[i]->enc_type == enc_type_recved))
        	{
-	    struct PVFS_server_req* tmp_req GCC_UNUSED;
-	    struct PVFS_server_req* tmp_resp GCC_UNUSED;
+	    struct PVFS_server_req *tmp_req GCC_UNUSED;
+	    struct PVFS_server_req *tmp_resp GCC_UNUSED;
 	    target_msg->enc_type = enc_type_recved;
 	    if(input_type == PINT_DECODE_REQ)
 	    {
 		ret = PINT_encoding_table[i]->op->decode_req(buffer_index,
-		    size_index,
-		    target_msg,
-		    target_addr);
+		                                             size_index,
+		                                             target_msg,
+		                                             target_addr);
 		tmp_req = target_msg->buffer;
 		return(ret);
 	    }
 	    else if(input_type == PINT_DECODE_RESP)
 	    {
 		ret = PINT_encoding_table[i]->op->decode_resp(buffer_index,
-		    size_index,
-		    target_msg,
-		    target_addr);
+		                                              size_index,
+		                                              target_msg,
+		                                              target_addr);
 		tmp_resp = target_msg->buffer;
 		return(ret);
 	    }

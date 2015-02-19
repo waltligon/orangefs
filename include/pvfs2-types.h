@@ -225,7 +225,21 @@ endecode_fields_1a(
     skip4,,
     uint32_t, extent_count,
     PVFS_handle_extent, extent_array);
+
 #endif
+
+/* Gossip Masks are all over the code */
+
+typedef struct PVFS_debug_mask_s
+{
+    uint64_t mask1;
+    uint64_t mask2;
+} PVFS_debug_mask;
+
+endecode_fields_2(
+        PVFS_debug_mask,
+        uint64_t, mask1,
+        uint64_t, mask2);
 
 /* Layout algorithm for converting from server lists in the config
  * to a list of servers to use to store datafiles for a file.
@@ -758,7 +772,8 @@ enum PVFS_mgmt_param_type
 {
     PVFS_MGMT_PARAM_TYPE_UINT64,
     PVFS_MGMT_PARAM_TYPE_STRING,
-    PVFS_MGMT_PARAM_TYPE_HANDLE
+    PVFS_MGMT_PARAM_TYPE_HANDLE,
+    PVFS_MGMT_PARAM_TYPE_MASK
 } ;
 
 struct PVFS_mgmt_setparam_value
@@ -767,16 +782,18 @@ struct PVFS_mgmt_setparam_value
     union
     {
         uint64_t value;
+        PVFS_debug_mask mask_value;
         char *string_value;
         PVFS_handle handle_value;
     } u;
 };
 
-encode_enum_union_3_struct(
+encode_enum_union_4_struct(
     PVFS_mgmt_setparam_value, type, u,
-    uint64_t,    value,        PVFS_MGMT_PARAM_TYPE_UINT64,
-    string,      string_value, PVFS_MGMT_PARAM_TYPE_STRING,
-    PVFS_handle, handle_value, PVFS_MGMT_PARAM_TYPE_HANDLE);
+    uint64_t,                value, PVFS_MGMT_PARAM_TYPE_UINT64,
+    PVFS_debug_mask,    mask_value, PVFS_MGMT_PARAM_TYPE_MASK,
+    string,           string_value, PVFS_MGMT_PARAM_TYPE_STRING,
+    PVFS_handle,      handle_value, PVFS_MGMT_PARAM_TYPE_HANDLE);
 
 enum PVFS_server_mode
 {
@@ -839,6 +856,7 @@ typedef struct {
  * They can then be used as libc's perror ised used, by the programmer.
  * WBL 8/14
  */
+/* These are defined in src/common/misc/errno-mapping.c */
 int PVFS_strerror_r(int errnum, char *buf, int n);
 void PVFS_perror(const char *text, int retcode);
 void PVFS_perror_gossip(const char* text, int retcode);

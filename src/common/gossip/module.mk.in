@@ -1,9 +1,9 @@
 GOSSIP_ENABLE_BACKTRACE = @GOSSIP_ENABLE_BACKTRACE@
 
 DIR := src/common/gossip
-LIBSRC += $(DIR)/gossip.c
-SERVERSRC += $(DIR)/gossip.c
-LIBBMISRC += $(DIR)/gossip.c
+LIBSRC += $(DIR)/gossip.c $(DIR)/gossip-flags.c
+SERVERSRC += $(DIR)/gossip.c $(DIR)/gossip-flags.c
+LIBBMISRC += $(DIR)/gossip.c $(DIR)/gossip-flags.c
 ifdef GOSSIP_ENABLE_BACKTRACE
 MODCFLAGS_$(DIR)/gossip.c := -DGOSSIP_ENABLE_BACKTRACE
 endif

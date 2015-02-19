@@ -178,6 +178,8 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: init "
                  "(%d msgpair(s))\n", smcb, mop->count);
 
+    PVFS_perror_gossip_verbose();
+
     assert(mop->count > 0);
 
     js_p->error_code = 0;
@@ -280,6 +282,7 @@ static PINT_sm_action msgpairarray_done(struct PINT_smcb *smcb,
 {
     int task_id, error_code, remaining;
     /* can we pop this before we return? */
+    PVFS_perror_gossip_verbose();
     PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining);
     return SM_ACTION_COMPLETE;
 }

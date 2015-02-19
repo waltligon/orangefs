@@ -37,7 +37,7 @@
 int gossip_debug_on = 0;
 
 /** controls the mask level for debugging messages */
-uint64_t gossip_debug_mask = 0;
+PVFS_debug_mask gossip_debug_mask = {0, 0};
 
 enum
 {
@@ -68,17 +68,16 @@ static enum gossip_logstamp internal_logstamp = GOSSIP_LOGSTAMP_DEFAULT;
 static int gossip_disable_stderr(void);
 static int gossip_disable_file(void);
 
-static int gossip_debug_fp_va(FILE *fp, char prefix, const char *format, va_list ap, enum
-gossip_logstamp ts);
-static int gossip_debug_syslog(
-    char prefix,
-    const char *format,
-    va_list ap);
-static int gossip_err_syslog(
-    const char *format,
-    va_list ap);
-static int gossip_disable_syslog(
-    void);
+static int gossip_debug_fp_va(FILE *fp,
+                              char prefix,
+                              const char *format,
+                              va_list ap,
+                              enum gossip_logstamp ts);
+static int gossip_debug_syslog(char prefix,
+                               const char *format,
+                               va_list ap);
+static int gossip_err_syslog(const char *format, va_list ap);
+static int gossip_disable_syslog(void);
 
 
 /*****************************************************************
@@ -95,19 +94,17 @@ static int gossip_disable_syslog(
 /** Only a stub on Windows
  *  TODO: possibly add logging to Windows Event Log
  */
-int gossip_enable_syslog(
-    int priority)
+int gossip_enable_syslog(int priority)
 {
     return 0;
 }
 #else
-int gossip_enable_syslog(
-    int priority)
+int gossip_enable_syslog(int priority)
 {
 
     /* keep up with the existing logging settings */
     int tmp_debug_on = gossip_debug_on;
-    uint64_t tmp_debug_mask = gossip_debug_mask;
+    PVFS_debug_mask tmp_debug_mask = gossip_debug_mask;
 
     /* turn off any running facility */
     gossip_disable();
@@ -129,13 +126,12 @@ int gossip_enable_syslog(
  *
  *  \return 0 on success, -errno on failure.
  */
-int gossip_enable_stderr(
-    void)
+int gossip_enable_stderr(void)
 {
 
     /* keep up with the existing logging settings */
     int tmp_debug_on = gossip_debug_on;
-    uint64_t tmp_debug_mask = gossip_debug_mask;
+    PVFS_debug_mask tmp_debug_mask = gossip_debug_mask;
 
     /* turn off any running facility */
     gossip_disable();
@@ -155,14 +151,12 @@ int gossip_enable_stderr(
  *
  *  \return 0 on success, -errno on failure.
  */
-int gossip_enable_file(
-    const char *filename,
-    const char *mode)
+int gossip_enable_file(const char *filename, const char *mode)
 {
 
     /* keep up with the existing logging settings */
     int tmp_debug_on = gossip_debug_on;
-    uint64_t tmp_debug_mask = gossip_debug_mask;
+    PVFS_debug_mask tmp_debug_mask = gossip_debug_mask;
 
     /* turn off any running facility */
     gossip_disable();
@@ -182,9 +176,7 @@ int gossip_enable_file(
     return 0;
 }
 
-int gossip_reopen_file(
-    const char *filename,
-    const char *mode)
+int gossip_reopen_file(const char *filename, const char *mode)
 {
     if( gossip_facility != GOSSIP_FILE )
     {
@@ -203,8 +195,7 @@ int gossip_reopen_file(
  *
  *  \return 0 on success, -errno on failure.
  */
-int gossip_disable(
-    void)
+int gossip_disable(void)
 {
     int ret = -EINVAL;
 
@@ -224,7 +215,7 @@ int gossip_disable(
     }
 
     gossip_debug_on = 0;
-    gossip_debug_mask = 0;
+    gossip_debug_mask = GOSSIP_NO_DEBUG;
 
     return ret;
 }
@@ -234,9 +225,7 @@ int gossip_disable(
  *
  *  \return 0 on success, -errno on failure.
  */
-int gossip_get_debug_mask(
-    int *debug_on,
-    uint64_t *mask)
+int gossip_get_debug_mask(int *debug_on, PVFS_debug_mask *mask)
 {
     *debug_on = gossip_debug_on;
     *mask = gossip_debug_mask;
@@ -249,9 +238,7 @@ int gossip_get_debug_mask(
  *
  *  \return 0 on success, -errno on failure.
  */
-int gossip_set_debug_mask(
-    int debug_on,
-    uint64_t mask)
+int gossip_set_debug_mask(int debug_on, PVFS_debug_mask mask)
 {
     if ((debug_on != 0) && (debug_on != 1))
     {
@@ -269,8 +256,7 @@ int gossip_set_debug_mask(
  *
  * returns 0 on success, -errno on failure
  */
-int gossip_set_logstamp(
-    enum gossip_logstamp ts)
+int gossip_set_logstamp(enum gossip_logstamp ts)
 {
     internal_logstamp = ts;
     return(0);
@@ -284,11 +270,9 @@ int gossip_set_logstamp(
  *
  * returns 0
  */
-int __gossip_debug_stub(
-    uint64_t mask,
-    char prefix,
-    const char *format,
-    ...)
+int __gossip_debug_stub(PVFS_debug_mask mask,
+                        char prefix,
+                        const char *format, ...)
 {
     return 0;
 }
@@ -303,11 +287,10 @@ int __gossip_debug_stub(
  *
  * returns 0 on success, -errno on failure
  */
-int __gossip_debug(
-    uint64_t mask,
-    char prefix,
-    const char *format,
-    ...)
+int __gossip_debug(PVFS_debug_mask mask,
+                   char prefix,
+                   const char *format,
+                   ...)
 {
     int ret = -EINVAL;
     va_list ap;
@@ -320,11 +303,10 @@ int __gossip_debug(
     return ret;
 }
 
-int __gossip_debug_va(
-    uint64_t mask,
-    char prefix,
-    const char *format,
-    va_list ap)
+int __gossip_debug_va(PVFS_debug_mask mask,
+                      char prefix,
+                      const char *format,
+                      va_list ap)
 {
     int ret = -EINVAL;
 
@@ -333,7 +315,8 @@ int __gossip_debug_va(
      */
 #ifndef __GNUC__
     /* exit quietly if we aren't meant to print */
-    if ((!gossip_debug_on) || !(gossip_debug_mask & mask) ||
+    if ((!gossip_debug_on) || 
+        !gossip_isset(gossip_debug_mask, mask) || 
         (!gossip_facility))
     {
         return 0;
@@ -371,9 +354,7 @@ int __gossip_debug_va(
  *
  *  \return 0 on success, -errno on failure.
  */
-int gossip_err(
-    const char *format,
-    ...)
+int gossip_err(const char *format, ...)
 {
     va_list ap;
     int ret = -EINVAL;
@@ -460,18 +441,12 @@ void gossip_backtrace(void)
 /** Only a stub on Windows
  *  TODO: possibly add logging to Windows Event Log
  */
-static int gossip_debug_syslog(
-    char prefix,
-    const char *format,
-    va_list ap)
+static int gossip_debug_syslog(char prefix, const char *format, va_list ap)
 {
     return 0;
 }
 #else
-static int gossip_debug_syslog(
-    char prefix,
-    const char *format,
-    va_list ap)
+static int gossip_debug_syslog( char prefix, const char *format, va_list ap)
 {
     char buffer[GOSSIP_BUF_SIZE];
     char *bptr = buffer;
@@ -494,8 +469,10 @@ static int gossip_debug_syslog(
 }
 #endif
 
-int gossip_debug_fp(FILE *fp, char prefix, 
-                    enum gossip_logstamp ts, const char *format, ...)
+int gossip_debug_fp(FILE *fp,
+                    char prefix, 
+                    enum gossip_logstamp ts,
+                    const char *format, ...)
 {
     int ret;
     va_list ap;
@@ -514,8 +491,11 @@ int gossip_debug_fp(FILE *fp, char prefix,
  *
  * returns 0 on success, -errno on failure
  */
-static int gossip_debug_fp_va(FILE *fp, char prefix,
-    const char *format, va_list ap, enum gossip_logstamp ts)
+static int gossip_debug_fp_va(FILE *fp,
+                              char prefix,
+                              const char *format,
+                              va_list ap,
+                              enum gossip_logstamp ts)
 {
     char buffer[GOSSIP_BUF_SIZE], *bptr = buffer;
     int bsize = sizeof(buffer), temp_size;
@@ -605,16 +585,12 @@ static int gossip_debug_fp_va(FILE *fp, char prefix,
 /** just a stub on Windows
  *  TODO: possibly add errors to Windows Event Log
  */
-static int gossip_err_syslog(
-    const char *format,
-    va_list ap)
+static int gossip_err_syslog(const char *format, va_list ap)
 {
     return 0;
 }
 #else
-static int gossip_err_syslog(
-    const char *format,
-    va_list ap)
+static int gossip_err_syslog(const char *format, va_list ap)
 {
     /* for syslog we have the opportunity to change the priority level
      * for errors
@@ -649,8 +625,7 @@ static int gossip_disable_stderr(
  *
  * returns 0 on success, -errno on failure
  */
-static int gossip_disable_file(
-    void)
+static int gossip_disable_file(void)
 {
     if (internal_log_file)
     {
@@ -670,14 +645,12 @@ static int gossip_disable_file(
 /** just a stub on Windows
  * TODO: Possibly add logging to Windows Event Log
  */
-static int gossip_disable_syslog(
-    void)
+static int gossip_disable_syslog(void)
 {
     return 0;
 }
 #else
-static int gossip_disable_syslog(
-    void)
+static int gossip_disable_syslog(void)
 {
     closelog();
     return 0;

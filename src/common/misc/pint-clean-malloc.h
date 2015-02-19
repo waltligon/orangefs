@@ -8,7 +8,7 @@
 #ifndef PINT_CLEAN_MALLOC_H
 #define PINT_CLEAN_MALLOC_H
 
-#include <pvfs2-internal.h>
+#include <pint-gccdefs.h>
 
 extern void *clean_malloc(size_t size) GCC_MALLOC;
 extern void *clean_calloc(size_t nmemb, size_t size) GCC_MALLOC;

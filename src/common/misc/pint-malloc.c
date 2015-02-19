@@ -359,7 +359,11 @@ void *PINT_malloc(size_t size)
 
 void *PINT_calloc(size_t nmemb, size_t size)
 {
-    return PINT_malloc(nmemb * size);
+    void *p = PINT_malloc(nmemb * size);
+#if !PVFS_MALLOC_ZERO
+    memset(p, 0, nmemb * size);
+#endif
+    return p;
 }
 
 int PINT_posix_memalign(void **mem, size_t alignment, size_t size)

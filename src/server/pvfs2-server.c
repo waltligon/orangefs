@@ -187,7 +187,7 @@ int main(int argc, char **argv)
 {
     int ret = -1, siglevel = 0;
     struct PINT_smcb *tmp_op = NULL;
-    uint64_t debug_mask = 0;
+    PVFS_debug_mask debug_mask = GOSSIP_NO_DEBUG;
 
 #ifdef WITH_MTRACE
     mtrace();
@@ -289,8 +289,9 @@ int main(int argc, char **argv)
     debug_mask = PVFS_debug_eventlog_to_mask(server_config.event_logging);
     gossip_set_debug_mask(1, debug_mask);
     gossip_set_logstamp(server_config.logstamp_type);
-    gossip_debug(GOSSIP_SERVER_DEBUG,"Logging %s (mask %llu)\n",
-                 server_config.event_logging, llu(debug_mask));
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Logging %s (mask %llu %llu)\n",
+                 server_config.event_logging, 
+                 llu(debug_mask.mask1), llu(debug_mask.mask2));
 
     /* remove storage space and exit if requested */
     if (s_server_options.server_remove_storage_space)
@@ -588,7 +589,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
 {
     int ret = 0, i = 0; 
     FILE *dummy;
-    uint64_t debug_mask = 0;
+    PVFS_debug_mask debug_mask = GOSSIP_NO_DEBUG;
     
     assert(server_config.logfile != NULL);
 
@@ -1667,7 +1668,7 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret)
  */
 static void hup_sighandler(int sig, siginfo_t *info, void *secret)
 {
-    uint64_t debug_mask;
+    PVFS_debug_mask debug_mask;
     int debug_on;
 
     /* Let's make sure this message is printed out */
@@ -2827,17 +2828,20 @@ static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id coll_id)
 #ifndef GOSSIP_DISABLE_DEBUG
 
 /* sampson: new capability-based version */
-void PINT_server_access_debug(PINT_server_op * s_op,
-                              int64_t debug_mask,
-                              const char * format,
+void PINT_server_access_debug(PINT_server_op *s_op,
+                              PVFS_debug_mask debug_mask,
+                              const char *format,
                               ...)
 {
     static char pint_access_buffer[GOSSIP_BUF_SIZE];
     char sig_buf[10], mask_buf[10];
+    PVFS_debug_mask gossip_mask;
+    int gossip_on;
     va_list ap;
 
+    gossip_get_debug_mask(&gossip_on, &gossip_mask);
     if ((gossip_debug_on) &&
-        (gossip_debug_mask & debug_mask) &&
+        gossip_isset(gossip_mask, debug_mask) &&
         (gossip_facility))
     {
         va_start(ap, format);

@@ -14,7 +14,8 @@
 #include "gossip.h"
 #include "pvfs2-types.h"
 
-static inline void PINT_attr_dump_object_type(uint64_t gossip_mask, PVFS_object_attr *attr_p)
+static inline void PINT_attr_dump_object_type(PVFS_debug_mask gossip_mask,
+                                              PVFS_object_attr *attr_p)
 {
     /* Now, show type specific fields */
     if(attr_p->mask & PVFS_ATTR_COMMON_TYPE)
@@ -47,7 +48,8 @@ static inline void PINT_attr_dump_object_type(uint64_t gossip_mask, PVFS_object_
 }
 
 /* helper function for debugging */
-static inline void PINT_attrmask_print(int debug, uint32_t attrmask)
+static inline void PINT_attrmask_print(PVFS_debug_mask debug,
+                                       uint32_t attrmask)
 {
     gossip_debug(debug, "mask = 0x%x:\n", attrmask);
     if (attrmask & PVFS_ATTR_COMMON_UID) gossip_debug(debug, "\tPVFS_ATTR_COMMON_UID\n");

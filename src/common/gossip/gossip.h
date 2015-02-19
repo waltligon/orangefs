@@ -32,14 +32,17 @@
 #endif
 #endif
 #include "pvfs2-config.h"
+#include "pvfs2-types.h"
+#include "pvfs2-debug.h"
 
 /********************************************************************
  * Visible interface
  */
 
-extern uint64_t gossip_debug_mask;
+extern PVFS_debug_mask gossip_debug_mask;
 extern int gossip_debug_on;
 extern int gossip_facility;
+
 
 #define GOSSIP_BUF_SIZE 5120
 
@@ -92,8 +95,8 @@ int gossip_enable_stderr(void);
 int gossip_enable_file(const char *filename, const char *mode);
 int gossip_reopen_file(const char *filename, const char *mode);
 int gossip_disable(void);
-int gossip_set_debug_mask(int debug_on, uint64_t mask);
-int gossip_get_debug_mask(int *debug_on, uint64_t *mask);
+int gossip_set_debug_mask(int debug_on, PVFS_debug_mask mask);
+int gossip_get_debug_mask(int *debug_on, PVFS_debug_mask *mask);
 int gossip_set_logstamp(enum gossip_logstamp ts);
 
 void gossip_backtrace(void);
@@ -101,13 +104,13 @@ void gossip_backtrace(void);
 #ifdef __GNUC__
 
 /* do printf style type checking if built with gcc */
-int __gossip_debug(uint64_t mask,
+int __gossip_debug(PVFS_debug_mask mask,
                    char prefix,
                    const char *format,
                    ...) __attribute__ ((format(printf, 3, 4)));
 int gossip_err(const char *format,
                ...) __attribute__ ((format(printf, 1, 2)));
-int __gossip_debug_va(uint64_t mask,
+int __gossip_debug_va(PVFS_debug_mask mask,
                       char prefix,
                       const char *format,
                       va_list ap);
@@ -120,16 +123,70 @@ int gossip_debug_fp(FILE *fp,
 #ifdef GOSSIP_DISABLE_DEBUG
 #define gossip_debug(mask, format, f...) do {} while(0)
 #define gossip_perf_log(format, f...) do {} while(0)
+#define gossip_isset(__m1, __m2) 0
 #define gossip_debug_enabled(__m) 0
-#else
+#else /* GOSSIP_DISABLE_DEBUG */
 
-#define gossip_debug_enabled(__m) \
-    (gossip_debug_on && (gossip_debug_mask & __m))
+#define gossip_isset(__m1,__m2) ((__m1.mask1 & (__m2).mask1) || \
+                                 (__m1.mask2 & (__m2).mask2))
+
+#define gossip_debug_enabled(__m)  \
+                  (gossip_debug_on && gossip_isset(gossip_debug_mask, __m))
+
+#if 0
+/* Gossip Debug Mask inline funccombine multiple mask values into one
+ * This is done at runtime so it is best avoided where possible but it
+ * can be very convenient in some places
+ */
+static inline PVFS_debug_mask GDM_OR(int count, ...)
+{
+    PVFS_debug_mask mask = {GOSSIP_NO_DEBUG_INIT};
+    va_list args;
+    va_start(args, count);
+    if (count < 0)
+    {
+        return mask;
+    }
+    while (count--)
+    {
+        PVFS_debug_mask mask2 = va_arg(args, PVFS_debug_mask);;
+        mask.mask1 = mask.mask1 | mask2.mask1;
+        mask.mask2 = mask.mask2 | mask2.mask2;
+    }
+    va_end(args);
+    return mask;
+}
+
+static inline PVFS_debug_mask GDM_AND(int count, ...)
+{
+    PVFS_debug_mask mask = {__DEBUG_ALL_INIT};
+    va_list args;
+    va_start(args, count);
+    if (count < 0)
+    {
+        return mask;
+    }
+    while (count--)
+    {
+        PVFS_debug_mask mask2 = va_arg(args, PVFS_debug_mask);;
+        mask.mask1 = mask.mask1 & mask2.mask1;
+        mask.mask2 = mask.mask2 & mask2.mask2;
+    }
+    va_end(args);
+    return mask;
+}
+
+static inline int GDM_ZERO(PVFS_debug_mask mask)
+{
+    return mask.mask1 || mask.mask2;
+}
+#endif
 
 /* try to avoid function call overhead by checking masks in macro */
 #define gossip_debug(mask, format, f...)                  \
 do {                                                      \
-    if ((gossip_debug_on) && (gossip_debug_mask & mask) &&\
+    if ((gossip_debug_on) &&                              \
+        gossip_isset(gossip_debug_mask, mask) &&          \
         (gossip_facility))                                \
     {                                                     \
         __gossip_debug(mask, '?', format, ##f);           \
@@ -138,7 +195,7 @@ do {                                                      \
 #define gossip_perf_log(format, f...)                     \
 do {                                                      \
     if ((gossip_debug_on) &&                              \
-        (gossip_debug_mask & GOSSIP_PERFCOUNTER_DEBUG) && \
+        gossip_isset(gossip_debug_mask, GOSSIP_PERFCOUNTER_DEBUG) &&  \
         (gossip_facility))                                \
     {                                                     \
         __gossip_debug(GOSSIP_PERFCOUNTER_DEBUG, 'P',     \
@@ -151,20 +208,20 @@ do {                                                      \
 /* do file and line number printouts w/ the GNU preprocessor */
 #define gossip_ldebug(mask, format, f...)                  \
 do {                                                       \
-    gossip_debug(mask, "%s: " format, __func__ , ##f); \
+    gossip_debug(mask, "%s: " format, __func__ , ##f);     \
 } while(0)
 
-#define gossip_lerr(format, f...)                  \
-do {                                               \
+#define gossip_lerr(format, f...)                          \
+do {                                                       \
     gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
-    gossip_backtrace();                            \
+    gossip_backtrace();                                    \
 } while(0)
 #else /* ! __GNUC__ */
 
-#define gossip_perf_log(format, ...)                     \
+#define gossip_perf_log(format, ...)                      \
 do {                                                      \
     if ((gossip_debug_on) &&                              \
-        (gossip_debug_mask & GOSSIP_PERFCOUNTER_DEBUG) && \
+        gossip_isset(gossip_debug_mask, GOSSIP_PERFCOUNTER_DEBUG) &&  \
         (gossip_facility))                                \
     {                                                     \
         __gossip_debug(GOSSIP_PERFCOUNTER_DEBUG, 'P',     \
@@ -172,33 +229,39 @@ do {                                                      \
     }                                                     \
 } while(0)
 
-int __gossip_debug(uint64_t mask, char prefix, const char *format, ...);
-int __gossip_debug_va(uint64_t mask,
+int __gossip_debug(PVFS_debug_mask mask, char prefix, const char *format, ...);
+int __gossip_debug_va(PVFS_debug_mask mask,
                       char prefix,
                       const char *format,
                       va_list ap);
-int __gossip_debug_stub(uint64_t mask, char prefix, const char *format, ...);
+int __gossip_debug_stub(PVFS_debug_mask mask,
+                        char prefix,
+                        const char *format,
+                        ...);
 int gossip_err(const char *format, ...);
 
 #ifdef GOSSIP_DISABLE_DEBUG
 #ifdef WIN32
 #define gossip_debug(__m, __f, ...) __gossip_debug_stub(__m, '?', __f, __VA_ARGS__);
 #define gossip_ldebug(__m, __f, ...) __gossip_debug_stub(__m, '?', __f, __VA_ARGS__);
-#else
+#else /* WIN32 */
 #define gossip_debug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
 #define gossip_ldebug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
-#endif
+#endif /* WIN32 */
+#define gossip_isset(__m1, __m2) 0
 #define gossip_debug_enabled(__m) 0
-#else
+#else /* GOSSIP_DISABLE_DEBUG */
 #ifdef WIN32
 #define gossip_debug(__m, __f, ...) __gossip_debug(__m, '?', __f, __VA_ARGS__);
 #define gossip_ldebug(__m, __f, ...) __gossip_debug(__m, '?', __f, __VA_ARGS__);
-#else
+#else /* WIN32 */
 #define gossip_debug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
 #define gossip_ldebug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
-#endif
-#define gossip_debug_enabled(__m) \
-            ((gossip_debug_on != 0) && (__m & gossip_debug_mask))
+#endif /* WIN32 */
+#define gossip_isset(__m1, __m2) ((__m1.mask1 & (__m2).mask1) || \
+                                  (__m1.mask2 & (__m2).mask2))
+#define gossip_debug_enabled(__m) ((gossip_debug_on != 0) && \
+                                   gossip_isset(gossip_debug_mask, __m))
 #endif /* GOSSIP_DISABLE_DEBUG */
 
 #define gossip_lerr gossip_err

@@ -972,12 +972,12 @@ const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
 #ifndef GOSSIP_DISABLE_DEBUG
 #ifdef WIN32
 void PINT_server_access_debug(PINT_server_op * s_op,
-                              int64_t debug_mask,
+                              PVFS_debug_mask debug_mask,
                               const char * format,
                               ...);
 #else
 void PINT_server_access_debug(PINT_server_op * s_op,
-                              int64_t debug_mask,
+                              PVFS_debug_mask debug_mask,
                               const char * format,
                               ...) __attribute__((format(printf, 3, 4)));
 #endif

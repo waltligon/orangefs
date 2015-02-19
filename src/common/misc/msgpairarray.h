@@ -164,7 +164,7 @@ typedef struct PINT_sm_msgpair_flow
 
 typedef struct PINT_mpa_join
 {
-    gen_mutex_t mutex; /* protext cound and join_state */
+    gen_mutex_t mutex; /* prtect count and join_state */
     int count;         /* how many messages have completed */
     int join_state;    /* 0 = not complete, 1 = complete */
 } PINT_mpa_join;

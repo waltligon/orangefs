@@ -2016,7 +2016,7 @@ const char* BMI_tcp_addr_rev_lookup_unexpected(bmi_method_addr_p map)
 {
     struct tcp_addr *tcp_addr_data = map->method_data;
     int debug_on;
-    uint64_t mask;
+    PVFS_debug_mask mask;
     socklen_t peerlen;
     struct sockaddr_in peer;
     int ret;
@@ -2035,7 +2035,7 @@ const char* BMI_tcp_addr_rev_lookup_unexpected(bmi_method_addr_p map)
      */
     gossip_get_debug_mask(&debug_on, &mask);
 
-    if(!debug_on || (!(mask & GOSSIP_ACCESS_HOSTNAMES)))
+    if(!debug_on || (!gossip_isset(mask, GOSSIP_ACCESS_HOSTNAMES)))
     {
         return(tcp_addr_data->peer);
     }
