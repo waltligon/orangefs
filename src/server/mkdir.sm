@@ -22,9 +22,9 @@
 #include "pint-uid-map.h"
 
 
-enum state_codes
+enum 
 {
-    SKIP=100;
+    SKIP = 100,
 };
 
 static int tree_setattr_comp_fn(
@@ -59,7 +59,7 @@ nested machine pvfs2_mkdir_work_sm
 
     state create_local_dirdata_dspace
     {
-        run mkdir_dirdata_dspace_create
+        run mkdir_dirdata_dspace_create;
         success => setattr_on_local_dirdata_dspace;
         default => err_msg;
     }
@@ -67,14 +67,14 @@ nested machine pvfs2_mkdir_work_sm
     state setattr_on_local_dirdata_dspace
     {
         run mkdir_dirdata_dspace_setattr;
-        success => setattr_on_remote_dirdata_dspace;
+        success => get_remote_dirdata_handles;
         default => err_msg;
     }
 
-    state setattr_on_remote_dirdata_dspace;
+    state get_remote_dirdata_handles
     {
-        run mkdir_request_remote_dirdata_dspace;
-        skip    => setattr_on_local_dirdata_keyval;
+        run mkdir_get_remote_dirdata_handles;
+        SKIP    => setattr_on_directory_keyval;
         success => fill_handles_to_dist_dir_struct;
         default => err_msg;
     }
@@ -95,16 +95,24 @@ nested machine pvfs2_mkdir_work_sm
     state remote_dirdata_attr_and_keyval_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => write_keyval_to_meta_handle;
+        success => setattr_on_directory_keyval;
         default => err_msg;
     }
 
-    state setattr_on_local_dirdata_keyval
+    state setattr_on_directory_keyval
+    {
+        run mkdir_directory_keyval_setattr;
+        success => setattr_on_dirdata_keyval;
+        default => err_msg;
+    }
+
+    state setattr_on_dirdata_keyval
     {
         run mkdir_dirdata_keyval_setattr;
         success => return;
         default => err_msg;
     }
+
     state err_msg 
     {
         run mkdir_error;
@@ -403,7 +411,7 @@ static PINT_sm_action mkdir_dirdata_dspace_create(
         s_op->u.mkdir.handle_array_local_count,
         PVFS_TYPE_DIRDATA, 
         NULL,
-        TROVE_SYNC,
+        0,
         smcb,
         0,
         js_p,
@@ -424,19 +432,34 @@ static PINT_sm_action mkdir_dirdata_dspace_setattr(struct PINT_smcb *smcb,
    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
    int ret = -PVFS_EINVAL;
    job_id_t j_id;
-   PVFS_ds_attributes ds_attr;
 
-   PVFS_object_attr_overwrite_setable(ds_attr,s_op->attr);
+   /* s_op->ds_attr was not filled in by prelude b/c we are creating new
+    * entries; thus, it is okay to use this space for other purposes.
+    */
+   PVFS_ds_attributes *ds_attr = &s_op->ds_attr;
 
+   /* js_p->handle contains the metadata handle for the dirdata dspace entry
+    * created in the previous step.
+    */
+   s_op->u.mkdir.handle_array_local[0] = js_p->handle;
+   s_op->attr.dirdata_handles[0]       = js_p->handle;
 
+   ds_attr->type   = PVFS_TYPE_DIRDATA;
+   ds_attr->uid    = s_op->attr.owner;
+   ds_attr->gid    = s_op->attr.group;
+   ds_attr->mode   = s_op->attr.perms;
 
-   ret = job_trove_dspace_setattr(
-          fs_id,
-          distdir handle,
-          ds_attr,
-          TROVE_SYNC,
-          smcb, 0, js_p, &j_id, server_job_context, 
-          s_op->req->hints);
+   ds_attr->ctime = time(NULL);
+   ds_attr->atime = ds_attr->ctime;
+   ds_attr->mtime = ds_attr->ctime;
+ 
+
+   ret = job_trove_dspace_setattr( s_op->req->u.mkdir.fs_id,
+                                   s_op->u.mkdir.handle_array_local[0],
+                                   ds_attr,
+                                   0,
+                                   smcb, 0, js_p, &j_id, server_job_context, 
+                                   s_op->req->hints);
 
    return (ret);
 }/* end setattr_on_local_dirdata_dspace */
@@ -444,7 +467,7 @@ static PINT_sm_action mkdir_dirdata_dspace_setattr(struct PINT_smcb *smcb,
 
 
 
-static PINT_sm_action mkdir_request_remote_dirdata_dspace(
+static PINT_sm_action mkdir_get_remote_dirdata_handles(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -489,8 +512,9 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
     attr = &s_op->attr;
 
     /* fill dirdata_handles array */
-    attr->dirdata_handles[0] =
+    /*attr->dirdata_handles[0] =
         s_op->u.mkdir.handle_array_local[0];
+     */
 
     for(i = 0; i < s_op->u.mkdir.num_dirdata_servers - 1; i++)
     {
@@ -593,7 +617,7 @@ static int tree_setattr_comp_fn(void *v_p,
     return 0;
 }
 
-static PINT_sm_action mkdir_dirdata_keyval_setattr(
+static PINT_sm_action mkdir_directory_keyval_setattr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -604,13 +628,6 @@ static PINT_sm_action mkdir_dirdata_keyval_setattr(
     /* total 3 keyvals, PVFS_DIST_DIR_ATTR, PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES */
     int keyval_count = 3;
 
-    /* free saved capability */
-    PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
-    s_op->u.mkdir.saved_capability = NULL;
-
-    /* !!!! this is to set meta handle keyval,
-     * use dist_dir_attr in s_op->attr 
-     */
     attr = &s_op->attr;
 
     s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
@@ -661,7 +678,7 @@ static PINT_sm_action mkdir_dirdata_keyval_setattr(
 
     ret = job_trove_keyval_write_list(
             s_op->req->u.mkdir.fs_id,
-            s_op->resp.u.mkdir.handle, /* meta handle */
+            s_op->resp.u.mkdir.handle, /* directory metadata handle */
             s_op->key_a, s_op->val_a,
             keyval_count, TROVE_SYNC, NULL, smcb,
             0, js_p, &j_id, server_job_context,
@@ -669,6 +686,41 @@ static PINT_sm_action mkdir_dirdata_keyval_setattr(
 
     return ret;
 }
+
+static PINT_sm_action mkdir_dirdata_keyval_setattr(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t j_id;
+
+    /* total 3 keyvals, PVFS_DIST_DIR_ATTR, PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES */
+    int keyval_count = 3;
+
+    /* free saved capability */
+    PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
+    s_op->u.mkdir.saved_capability = NULL;
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, 
+            "  writing dist-dir-struct keyvals for meta handle: %llu "
+            "\t with server_no=%d and branch_level=%d \n", 
+            llu(s_op->attr.dirdata_handles[0]),
+            s_op->attr.dist_dir_attr.server_no,
+            s_op->attr.dist_dir_attr.branch_level);
+
+
+    ret = job_trove_keyval_write_list(
+            s_op->req->u.mkdir.fs_id,
+            s_op->attr.dirdata_handles[0], /* local dirdata metadata handle */
+            s_op->key_a, s_op->val_a,
+            keyval_count, TROVE_SYNC, NULL, smcb,
+            0, js_p, &j_id, server_job_context,
+            s_op->req->hints);
+
+    return ret;
+}
+
+
 
 static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 {
