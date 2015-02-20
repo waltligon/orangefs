@@ -374,7 +374,7 @@ class OFSTestNode(object):
         # That's a better solution than what Openstack gives us. So why not? 
         if self.is_cloud == True:
             
-            suse_host = "ofsnode-%d" % (self.node_number)
+            suse_host = "ofsnode-%03d" % (self.node_number)
             msg = "Renaming %s based node to %s" % (self.distro,suse_host)
             print msg
             logging.info(msg)
