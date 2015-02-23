@@ -438,13 +438,11 @@ static PINT_sm_action mkdir_dirdata_dspace_setattr(struct PINT_smcb *smcb,
     */
    PVFS_ds_attributes *ds_attr = &s_op->ds_attr;
 
-   /* js_p->handle contains the metadata handle for the dirdata dspace entry
-    * created in the previous step.
-    */
-   s_op->u.mkdir.handle_array_local[0] = js_p->handle;
-   s_op->attr.dirdata_handles[0]       = js_p->handle;
+   s_op->attr.dirdata_handles[0] = s_op->u.mkdir.handle_array_local[0];
 
    ds_attr->type   = PVFS_TYPE_DIRDATA;
+   ds_attr->fs_id  = s_op->req->u.mkdir.fs_id;
+   ds_attr->handle = s_op->u.mkdir.handle_array_local[0];
    ds_attr->uid    = s_op->attr.owner;
    ds_attr->gid    = s_op->attr.group;
    ds_attr->mode   = s_op->attr.perms;
@@ -455,7 +453,7 @@ static PINT_sm_action mkdir_dirdata_dspace_setattr(struct PINT_smcb *smcb,
  
 
    ret = job_trove_dspace_setattr( s_op->req->u.mkdir.fs_id,
-                                   s_op->u.mkdir.handle_array_local[0],
+                                   s_op->attr.dirdata_handles[0],                                 
                                    ds_attr,
                                    0,
                                    smcb, 0, js_p, &j_id, server_job_context, 
@@ -511,15 +509,13 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
 
     attr = &s_op->attr;
 
-    /* fill dirdata_handles array */
-    /*attr->dirdata_handles[0] =
-        s_op->u.mkdir.handle_array_local[0];
-     */
 
-    for(i = 0; i < s_op->u.mkdir.num_dirdata_servers - 1; i++)
+    /* dirdata_handles[0] was set in a previous state; so, all we need to do
+     * here is gather up the remote handles.
+     */
+    for(i = 1; i < s_op->u.mkdir.num_dirdata_servers; i++)
     {
-        attr->dirdata_handles[i+1] =
-            s_op->u.mkdir.handle_array_remote[i];
+        attr->dirdata_handles[i] = s_op->u.mkdir.handle_array_remote[i];
     }
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, 
@@ -536,7 +532,9 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
+          struct PINT_smcb *smcb, 
+          job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
@@ -586,7 +584,7 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(struct 
     s_op->u.mkdir.saved_capability = &msg_p->req.capability;
 
     msg_p->fs_id = s_op->u.mkdir.fs_id;
-    msg_p->handle = s_op->attr.dirdata_handles[0];
+    msg_p->handle = s_op->attr.dirdata_handles[1];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = tree_setattr_comp_fn;
 
