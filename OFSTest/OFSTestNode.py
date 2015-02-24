@@ -1325,8 +1325,8 @@ class OFSTestNode(object):
             self.runSingleCommandAsRoot("cd /opt; wget --quiet http://apache.mesi.com.ar/maven/maven-3/3.2.*/binaries/apache-maven-3.2.*-bin.tar.gz")
             self.runSingleCommandAsRoot("cd /opt; tar xf apache-maven-3.2.*-bin.tar.gz")
             self.runSingleCommandAsRoot("ln -s /opt/apache-maven-3.2.*/bin/mvn /usr/bin/mvn")
-            self.setEnvironmentVariable("M2_HOME", "/opt/apache-maven-3.2.*")
-            self.setEnvironmentVariable("M2", "/opt/apache-maven-3.2.*/bin")
+            self.setEnvironmentVariable("M2_HOME", "/opt/apache-maven-3.2.?")
+            self.setEnvironmentVariable("M2", "/opt/apache-maven-3.2.?/bin")
             
 
     def installDB4(self):
