@@ -7,6 +7,8 @@
 #include "pvfs2-server.h"
 #include "pvfs2-internal.h"
 
+#include "bgproc-pipe.h"
+
 %%
 
 machine pvfs2_mgmt_bgproc_list_sm
@@ -33,7 +35,19 @@ machine pvfs2_mgmt_bgproc_list_sm
 static PINT_sm_action mgmt_bgproc_list_do_work(struct PINT_smcb *smcb,
                                               job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    long r;
+
     js_p->error_code = 0;
+
+    r = bgproc_list(&s_op->resp.u.mgmt_bgproc_list.num_procs,
+        &s_op->resp.u.mgmt_bgproc_list.ids,
+        &s_op->resp.u.mgmt_bgproc_list.names);
+    if (r == -1) {
+        js_p->error_code = -PVFS_EIO;
+        s_op->resp.u.mgmt_bgproc_list.num_procs = 0;
+    }
+
     return SM_ACTION_COMPLETE;
 }
 

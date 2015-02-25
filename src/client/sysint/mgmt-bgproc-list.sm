@@ -194,7 +194,7 @@ static int bgproc_list_comp_fn(void* v_p, struct PVFS_server_resp *resp_p,
             free(*sm_p->u.mgmt_bgproc_list.names);
             return -1;
         }
-        *sm_p->u.mgmt_bgproc_list.names = p;
+        *sm_p->u.mgmt_bgproc_list.ids = p;
         p = realloc(*sm_p->u.mgmt_bgproc_list.names,
             sizeof **sm_p->u.mgmt_bgproc_list.names *
             *sm_p->u.mgmt_bgproc_list.entries);
@@ -212,7 +212,7 @@ static int bgproc_list_comp_fn(void* v_p, struct PVFS_server_resp *resp_p,
         (*sm_p->u.mgmt_bgproc_list.ids)[start+j] =
             resp_p->u.mgmt_bgproc_list.ids[j];
         (*sm_p->u.mgmt_bgproc_list.names)[start+j] =
-            resp_p->u.mgmt_bgproc_list.names[j];
+            strdup(resp_p->u.mgmt_bgproc_list.names[j]);
     }
     return 0;
 }

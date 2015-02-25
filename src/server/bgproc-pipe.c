@@ -108,28 +108,71 @@ fail:
     return -1;
 }
 
-long bgproc_start(const char *name)
+uint32_t bgproc_start(const char *name)
 {
     unsigned char req[200], resp[200];
-    size_t len;
+    size_t len, olen;
     len = strlen(name);
     if (len + 6 > sizeof req)
         return -1;
-    req[0] = sizeof req >> 8 & 0xff;
-    req[1] = sizeof req & 0xff;
+    req[0] = (len+6) >> 8 & 0xff;
+    req[1] = (len+6) & 0xff;
     req[2] = TYPE_START >> 8 & 0xff;
     req[3] = TYPE_START & 0xff;
     req[4] = len >> 8 & 0xff;
     req[5] = len & 0xff;
     memcpy(req+6, name, len);
-    len = sizeof resp;
-    if (bgproc_request(req, sizeof req, resp, &len) == -1)
+    olen = sizeof resp;
+    if (bgproc_request(req, len+6, resp, &olen) == -1)
         return -1;
-    if ((resp[0] << 8 | resp[1]) != len)
+    if ((resp[0] << 8 | resp[1]) != olen)
         return -1;
-    if (len < 6)
+    if (olen < 6)
         return -1;
     if ((resp[2] << 8 | resp[3]) != TYPE_START)
         return -1;
     return (int)(resp[4] << 8 | resp[5]);
+}
+
+int bgproc_list(uint32_t *num_procs, uint32_t **ids, char ***names)
+{
+    unsigned char req[4], resp[200];
+    size_t olen, i, j;
+    req[0] = 0;
+    req[1] = 4;
+    req[2] = TYPE_LIST >> 8 & 0xff;
+    req[3] = TYPE_LIST & 0xff;
+    olen = sizeof resp;
+    if (bgproc_request(req, 4, resp, &olen) == -1)
+        return -1;
+    if ((resp[0] << 8 | resp[1]) != olen)
+        return -1;
+    if ((resp[2] << 8 | resp[3]) != TYPE_LIST)
+        return -1;
+    j = 6;
+    *num_procs = (resp[4] << 8 | resp[5]);
+    *ids = calloc(*num_procs, sizeof **ids);
+    *names = calloc(*num_procs, sizeof **names);
+    for (i = 0; i < *num_procs; i++)
+        (*names)[i] = NULL;
+    for (i = 0; i < *num_procs; i++)
+    {
+        size_t len;
+        (*ids)[i] = resp[j] << 8 | resp[j+1];
+        j += 2;
+        len = resp[j] << 8 | resp[j+1];
+        j += 2;
+        (*names)[i] = malloc(len+1);
+        if (!(*names)[i])
+            goto fail;
+        memcpy((*names)[i], resp+j, len);
+        j += len;
+    }
+    return 0;
+fail:
+    for (i = 0; i < *num_procs; i++)
+        free((*names)[i]);
+    free(*ids);
+    free(*names);
+    return -1;
 }

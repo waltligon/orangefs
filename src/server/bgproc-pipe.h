@@ -7,4 +7,5 @@
 extern int bgproc_pipes[2];
 
 int bgproc_startup(void);
-long bgproc_start(const char *name);
+uint32_t bgproc_start(const char *name);
+int bgproc_list(uint32_t *num_procs, uint32_t **ids, char ***names);

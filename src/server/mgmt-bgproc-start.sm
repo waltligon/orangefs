@@ -9,9 +9,6 @@
 
 #include "bgproc-pipe.h"
 
-#include <assert.h>
-#include <unistd.h>
-
 %%
 
 machine pvfs2_mgmt_bgproc_start_sm
@@ -41,9 +38,13 @@ static PINT_sm_action mgmt_bgproc_start_do_work(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     long r;
 
+    js_p->error_code = 0;
+
     r = bgproc_start(s_op->req->u.mgmt_bgproc_start.name);
-    if (r == -1)
+    if (r == -1) {
+        js_p->error_code = -PVFS_EIO;
         goto fail;
+    }
 
     s_op->resp.u.mgmt_bgproc_start.status = 1;
     s_op->resp.u.mgmt_bgproc_start.id = r;

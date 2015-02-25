@@ -204,6 +204,8 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_USERID_PWD 256
 /* max size of encrypted private key for cert request (in bytes) */
 #define PVFS_REQ_LIMIT_ENC_KEY 16384
+#define PVFS_REQ_LIMIT_NUM_BGPROCS 64
+#define PVFS_REQ_LIMIT_BGPROC_NAME 256
 /* create *********************************************************/
 /* - used to create an object.  This creates a metadata handle,
  * a datafile handle, and links the datafile handle to the metadata handle.
@@ -2560,6 +2562,9 @@ endecode_fields_1aa_struct(
     uint32_t, ids,
     string, names);
 
+#define extra_size_PVFS_servresp_mgmt_bgproc_list                      \
+    (PVFS_REQ_LIMIT_NUM_BGPROCS * (4 + PVFS_REQ_LIMIT_BGPROC_NAME))
+
 /* mgmt_bgproc_start ****************************************************/
 /* - start a background processes on this server */
 
@@ -2570,6 +2575,9 @@ struct PVFS_servreq_mgmt_bgproc_start
 endecode_fields_1_struct(
     PVFS_servreq_mgmt_bgproc_start,
     string, name);
+
+#define extra_size_PVFS_servreq_mgmt_bgproc_start                      \
+    PVFS_REQ_LIMIT_BGPROC_NAME
 
 #define PINT_SERVREQ_MGMT_BGPROC_START_FILL(__req,                     \
                                             __cap,                     \

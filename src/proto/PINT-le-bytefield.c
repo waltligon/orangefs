@@ -360,10 +360,10 @@ static void lebf_initialize(void)
                 respsize = extra_size_PVFS_servresp_mgmt_get_user_cert_keyreq;
                 break;
             case PVFS_SERV_MGMT_BGPROC_LIST:
-                /* nothing special */
+                respsize = extra_size_PVFS_servresp_mgmt_bgproc_list;
                 break;
             case PVFS_SERV_MGMT_BGPROC_START:
-                /* nothing special */
+                reqsize = extra_size_PVFS_servreq_mgmt_bgproc_start;
                 break;
             case PVFS_SERV_MGMT_BGPROC_KILL:
                 /* nothing special */
@@ -1377,10 +1377,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                    }
                 case PVFS_SERV_MGMT_BGPROC_LIST:
                    {
-                      uint32_t i;
                       decode_free(resp->u.mgmt_bgproc_list.ids);
-                      for (i = 0; i < resp->u.mgmt_bgproc_list.num_procs; i++)
-                          decode_free(resp->u.mgmt_bgproc_list.names[i]);
                       decode_free(resp->u.mgmt_bgproc_list.names);
                       break;
                    }
