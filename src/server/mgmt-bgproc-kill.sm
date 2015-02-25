@@ -37,8 +37,14 @@ static PINT_sm_action mgmt_bgproc_kill_do_work(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+static int perm_mgmt_bgproc_kill(PINT_server_op *s_op)
+{
+    return 0;
+}
+
 struct PINT_server_req_params pvfs2_mgmt_bgproc_kill_params =
 {
+    .perm = perm_mgmt_bgproc_kill,
     .string_name = "mgmt_bgproc_kill",
     .state_machine = &pvfs2_mgmt_bgproc_kill_sm
 };

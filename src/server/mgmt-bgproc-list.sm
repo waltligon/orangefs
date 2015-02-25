@@ -51,8 +51,14 @@ static PINT_sm_action mgmt_bgproc_list_do_work(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+static int perm_mgmt_bgproc_list(PINT_server_op *s_op)
+{
+    return 0;
+}
+
 struct PINT_server_req_params pvfs2_mgmt_bgproc_list_params =
 {
+    .perm = perm_mgmt_bgproc_list,
     .string_name = "mgmt_bgproc_list",
     .state_machine = &pvfs2_mgmt_bgproc_list_sm
 };

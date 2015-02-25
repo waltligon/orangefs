@@ -55,8 +55,14 @@ fail:
     return SM_ACTION_COMPLETE;
 }
 
+static int perm_mgmt_bgproc_start(PINT_server_op *s_op)
+{
+    return 0;
+}
+
 struct PINT_server_req_params pvfs2_mgmt_bgproc_start_params =
 {
+    .perm = perm_mgmt_bgproc_start,
     .string_name = "mgmt_bgproc_start",
     .state_machine = &pvfs2_mgmt_bgproc_start_sm
 };
