@@ -891,6 +891,8 @@ do {                                                                      \
     (__req).hints = (__hints);                                            \
     (__req).u.setattr.fs_id = (__fsid);                                   \
     (__req).u.setattr.handle = (__handle);                                \
+    gossip_err("%s:(__req).u.setattr.handle(%llu)\n",__func__,llu((__req).u.setattr.handle)); \
+    gossip_err("%s:(__handle)(%llu)\n",__func__,llu((__handle))); \
     (__attr).objtype = (__objtype);                                       \
     (__attr).mask |= PVFS_ATTR_SYS_TYPE;                                  \
     PINT_CONVERT_ATTR(&(__req).u.setattr.attr, &(__attr), __extra_amask); \

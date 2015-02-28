@@ -476,6 +476,8 @@ static PINT_sm_action mkdir_get_remote_dirdata_handles(
         GOSSIP_MKDIR_DEBUG, "  local dirdata handle (%llu)\n",
         llu(s_op->u.mkdir.handle_array_local[0]));
 
+    gossip_err("%s:handle_array_remote_count(%d)\n",__func__,s_op->u.mkdir.handle_array_remote_count);
+
     if(s_op->u.mkdir.handle_array_remote_count == 0)
     {
         js_p->error_code = SKIP;
@@ -505,7 +507,7 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr;
-    int i;
+    int i,j;
 
     attr = &s_op->attr;
 
@@ -513,9 +515,9 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
     /* dirdata_handles[0] was set in a previous state; so, all we need to do
      * here is gather up the remote handles.
      */
-    for(i = 1; i < s_op->u.mkdir.num_dirdata_servers; i++)
+    for(i = 1,j=0; i < s_op->u.mkdir.num_dirdata_servers; i++,j++)
     {
-        attr->dirdata_handles[i] = s_op->u.mkdir.handle_array_remote[i];
+        attr->dirdata_handles[i] = s_op->u.mkdir.handle_array_remote[j];
     }
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, 
@@ -575,16 +577,20 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
         PVFS_TYPE_DIRDATA,
         attr,
         0,
-        s_op->attr.dist_dir_attr.num_servers,
-        s_op->attr.dirdata_handles,
+        s_op->u.mkdir.handle_array_remote_count,
+        /*s_op->attr.dist_dir_attr.num_servers,*/
+        s_op->u.mkdir.handle_array_remote,
+        /*s_op->attr.dirdata_handles,*/
         NULL);
 
+/*TODO - BECKY - THESE SHOULD BE DONE ELSEWHERE */
     /* save objects so they can be freed */
     s_op->u.mkdir.saved_attr = &msg_p->req.u.mkdir.attr;
     s_op->u.mkdir.saved_capability = &msg_p->req.capability;
 
     msg_p->fs_id = s_op->u.mkdir.fs_id;
-    msg_p->handle = s_op->attr.dirdata_handles[1];
+    msg_p->handle = s_op->u.mkdir.handle_array_remote[0]; 
+                     /*s_op->attr.dirdata_handles[1]; */
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = tree_setattr_comp_fn;
 

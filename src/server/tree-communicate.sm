@@ -279,6 +279,8 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
         }
     }/*end for*/
 
+    gossip_err("%s:handle_array_local_count(%d)\n",__func__,s_op->u.tree_communicate.handle_array_local_count);
+
     if (s_op->u.tree_communicate.handle_array_local_count > 0) {
 
         for (i=0; i<s_op->u.tree_communicate.handle_array_local_count; i++)
@@ -286,6 +288,9 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
             /* Create a stack frame for the local operation. */
             s_op->num_pjmp_frames++;
             js_p->error_code = LOCAL_OPERATION;
+
+
+            gossip_err("%s#1:handle_array_local[%d]=(%llu)\n",__func__,i,llu(s_op->u.tree_communicate.handle_array_local[i]));
 
             PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, tree_communicate_s_op,
                 s_op->u.tree_communicate.handle_array_local[i],
@@ -302,6 +307,22 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                 PVFS_sys_attr dummy_sys_attr;
                 
                 memset(&dummy_sys_attr, 0, sizeof(PVFS_sys_attr));
+
+                gossip_err("%s:s_op->req->u.tree_setattr.attr.mask(0x%0x)\n",__func__
+                                                                            ,this_req->u.tree_setattr.attr.mask);
+                gossip_err("%s:s_op->req->u.tree_setattr.attr.dist_dir_attr.num_servers(%d)\n"
+                          ,__func__
+                          ,this_req->u.tree_setattr.attr.dist_dir_attr.num_servers);
+                gossip_err("%s:s_op->req->u.tree_setattr.attr.dist_dir_attr.server_no(%d)\n"
+                          ,__func__
+                          ,this_req->u.tree_setattr.attr.dist_dir_attr.server_no);
+                int j;
+                for (j=0; j<this_req->u.tree_setattr.attr.dist_dir_attr.num_servers; j++)
+                    gossip_err("%s:s_op->req->u.tree_setattr.attr.dirdata_handles[%d]=(%llu)\n"
+                              ,__func__
+                              ,j
+                              ,llu(this_req->u.tree_setattr.attr.dirdata_handles[j]));
+                gossip_err("%s:#2:handle_array_local[%d]=(%llu)\n",__func__,i,llu(s_op->u.tree_communicate.handle_array_local[i]));
                 
                 PINT_SERVREQ_SETATTR_FILL(
                     *req,
@@ -313,6 +334,10 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                     dummy_sys_attr,
                     0,
                     s_op->req->hints);
+
+                gossip_err("%s:AFTER SETATTR FILL:tree_communicate_s_op->req->u.setattr.handle(%llu)\n"
+                          ,__func__
+                          ,llu(tree_communicate_s_op->req->u.setattr.handle));
                     
                 /* copy to req->u.setattr.attr because of calling pvfs2_set_attr_work_sm next */
                 PINT_copy_object_attr(&req->u.setattr.attr,
@@ -322,6 +347,23 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                 req->u.setattr.attr.mask |= PVFS_ATTR_COMMON_TYPE;
                 
                 tree_communicate_s_op->local_index = i;
+
+                gossip_err("%s:tree_op->req->u.setattr.handle(%llu)\n",__func__
+                                                                      ,llu(req->u.setattr.handle));
+                gossip_err("%s:tree_op->req->u.setattr.attr.dist_dir_attr.num_servers(%d)\n"
+                          ,__func__
+                          ,req->u.setattr.attr.dist_dir_attr.num_servers);
+                gossip_err("%s:tree_op->req->u.setattr.attr.dist_dir_attr.server_no(%d)\n"
+                          ,__func__
+                          ,req->u.setattr.attr.dist_dir_attr.server_no);
+                gossip_err("%s:tree_op->req->u.setattr.attr.mask(0x%0x8)\n"
+                          ,__func__
+                          ,req->u.setattr.attr.mask);
+                for (j=0; j<req->u.setattr.attr.dist_dir_attr.num_servers; j++)
+                    gossip_err("%s:tree_op->req->u.setattr.attr.dirdata_handles[%d]=(%llu)\n"
+                              ,__func__
+                              ,j
+                              ,llu(req->u.setattr.attr.dirdata_handles[j]));
 
                 break;
             }   
@@ -645,6 +687,18 @@ static PINT_sm_action tree_setattr_setup(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+
+    int i;
+    gossip_err("%s:handle_count(%d)\n",__func__,s_op->req->u.tree_setattr.handle_count);
+    for (i=0; i<s_op->req->u.tree_setattr.handle_count; i++)
+        gossip_err("%s:handle_array[%d]:(%llu)\n",__func__,i,llu(s_op->req->u.tree_setattr.handle_array[i]));
+
+
+    gossip_err("%s:attr mask(0x%0x)\n",__func__,s_op->req->u.tree_setattr.attr.mask);
+    gossip_err("%s:num_servers(%d) server_no(%d)\n",__func__,s_op->req->u.tree_setattr.attr.dist_dir_attr.num_servers
+                                                            ,s_op->req->u.tree_setattr.attr.dist_dir_attr.server_no);
+    for (i=0; i<s_op->req->u.tree_setattr.attr.dist_dir_attr.num_servers; i++)
+        gossip_err("%s:dirdata_handle[%d]=(%llu)\n",__func__,i,llu(s_op->req->u.tree_setattr.attr.dirdata_handles[i]));
 
     return (tree_communicate_partition_handles(smcb, js_p, s_op->req->u.tree_setattr.handle_count,
         s_op->req->u.tree_setattr.fs_id, PVFS_SERV_TREE_SETATTR,
@@ -1747,3 +1801,12 @@ struct PINT_server_req_params pvfs2_tree_getattr_params =
     .state_machine = &pvfs2_tree_getattr_sm
 };
 
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=9 sts=4 sw=4 expandtab
+ */
