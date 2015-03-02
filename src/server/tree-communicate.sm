@@ -347,6 +347,10 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                 req->u.setattr.attr.mask |= PVFS_ATTR_COMMON_TYPE;
                 
                 tree_communicate_s_op->local_index = i;
+ 
+                gossip_err("%s:LOOK HERE:tree_op->req->u.setattr.attr.dist_dir_attr.branch_level(%d)\n"
+                          ,__func__
+                          ,req->u.setattr.attr.dist_dir_attr.branch_level);                                                                   
 
                 gossip_err("%s:tree_op->req->u.setattr.handle(%llu)\n",__func__
                                                                       ,llu(req->u.setattr.handle));
