@@ -374,7 +374,7 @@ class OFSTestNode(object):
         # That's a better solution than what Openstack gives us. So why not? 
         if self.is_cloud == True:
             
-            suse_host = "ofsnode-%d" % (self.node_number)
+            suse_host = "ofsnode-%03d" % (self.node_number)
             msg = "Renaming %s based node to %s" % (self.distro,suse_host)
             print msg
             logging.info(msg)
@@ -1241,13 +1241,6 @@ class OFSTestNode(object):
                     return rc
                 #install_commands.append("yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user)
                 install_commands.append("rpm -i /home/%s/jdk-7u71-linux-x64.rpm" % self.current_user)
-                install_commands.append("cd /opt; wget http://apache.mesi.com.ar/maven/maven-3/3.2.3/binaries/apache-maven-3.2.3-bin.tar.gz")
-                install_commands.append("cd /opt; tar xf apache-maven-3.2.3-bin.tar.gz")
-                install_commands.append("ln -s /opt/apache-maven-3.2.3/bin/mvn /usr/bin/mvn")
-                install_commands.append("ln -s /opt/apache-maven-3.2.3/bin/mvn /usr/bin/mvn")
-                
-                self.setEnvironmentVariable("M2_HOME", "/opt/apache-maven-3.2.3")
-                self.setEnvironmentVariable("M2", "/opt/apache-maven-3.2.3/bin")
                 self.jdk6_location = "/usr/java/default"
             else:
                 #SLES uses IBM Java
@@ -1305,14 +1298,6 @@ class OFSTestNode(object):
             #install_commands.append("yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user)
             install_commands.append("rpm -i /home/%s/jdk-7u71-linux-x64.rpm" % self.current_user)
             
-            # install maven in RHEL 6
-            if "6." in self.distro:
-                install_commands.append("cd /opt; wget --quiet http://apache.mesi.com.ar/maven/maven-3/3.2.*/binaries/apache-maven-3.2.*-bin.tar.gz")
-                install_commands.append("cd /opt; tar xf apache-maven-3.2.*-bin.tar.gz")
-                install_commands.append("ln -s /opt/apache-maven-3.2.*/bin/mvn /usr/bin/mvn")
-                self.setEnvironmentVariable("M2_HOME", "/opt/apache-maven-3.2.*")
-                self.setEnvironmentVariable("M2", "/opt/apache-maven-3.2.*/bin")
-            
 
         
             for command in install_commands:
@@ -1328,7 +1313,23 @@ class OFSTestNode(object):
         else:
             print "Unknown system %s" % self.distro
         
-    
+        self.installMaven()
+        
+        
+    def installMaven(self):
+            
+        # Try to install maven via the package manager. If it's not there, download it.
+        rc = self.runSingleCommand("which mvn")
+            
+        if rc != 0:
+            self.runSingleCommandAsRoot("cd ~; wget --quiet http://apache.mesi.com.ar/maven/maven-3/3.2.*/binaries/apache-maven-3.2.*-bin.tar.gz")
+            self.runSingleCommandAsRoot("cd /opt; tar xf ~/apache-maven-3.2.*-bin.tar.gz")
+            maven_home = self.runSingleCommandBacktick("ls -d /opt/apache-maven-3.2.*")
+            self.runSingleCommandAsRoot("ln -s %s/bin/mvn /usr/bin/mvn" % maven_home)
+            
+            self.setEnvironmentVariable("M2_HOME", maven_home)
+            self.setEnvironmentVariable("M2", maven_home+"/bin")
+            
 
     def installDB4(self):
         # db4 is built from scratch for all systems to have a consistant version.

@@ -243,7 +243,7 @@ class OFSNovaConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManag
         new_instances = []
 
         for index in range(0,number_nodes):
-            instance = self.novaapi.servers.create("ofsnode-%d%s"%(index+1,instance_suffix), image.id, flavor.id, key_name=self.cloud_instance_key, nics = [ { "net-id" : self.nova_network_id } ])
+            instance = self.novaapi.servers.create("ofsnode-%03d%s"%(index+1,instance_suffix), image.id, flavor.id, key_name=self.cloud_instance_key, nics = [ { "net-id" : self.nova_network_id } ])
             msg = "Created new Cloud instance %s " % instance.name
             logging.info(msg)
             print msg
