@@ -313,7 +313,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                     dummy_sys_attr,
                     0,
                     s_op->req->hints);
-                    
+
                 /* copy to req->u.setattr.attr because of calling pvfs2_set_attr_work_sm next */
                 PINT_copy_object_attr(&req->u.setattr.attr,
                     &this_req->u.tree_setattr.attr);
@@ -322,7 +322,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                 req->u.setattr.attr.mask |= PVFS_ATTR_COMMON_TYPE;
                 
                 tree_communicate_s_op->local_index = i;
-
+ 
                 break;
             }   
             
@@ -644,7 +644,6 @@ static PINT_sm_action tree_setattr_setup(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-
 
     return (tree_communicate_partition_handles(smcb, js_p, s_op->req->u.tree_setattr.handle_count,
         s_op->req->u.tree_setattr.fs_id, PVFS_SERV_TREE_SETATTR,
@@ -1747,3 +1746,12 @@ struct PINT_server_req_params pvfs2_tree_getattr_params =
     .state_machine = &pvfs2_tree_getattr_sm
 };
 
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=9 sts=4 sw=4 expandtab
+ */

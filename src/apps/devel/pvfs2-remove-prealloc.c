@@ -58,6 +58,7 @@ void remove_preallocated_handles(DB *db_p_keyval, PVFS_handle pool_handle);
 void print_help(char *progname);
 int process_args(int argc, char ** argv);
 int PINT_trove_dbpf_keyval_compare(DB * dbp, const DBT * a, const DBT * b);
+void print_keyval( DBT key, DBT val );
 
 #define TROVE_db_cache_size_bytes 1610612736
 
@@ -266,7 +267,7 @@ void print_keyval( DBT key, DBT val )
         int s = 0;
         while(s < val.size )
         {
-            vh = *(uint64_t *)(val.data + s);
+            vh = *(uint64_t *)((unsigned char *)val.data + s);
             printf("(%llu)", llu(vh));
             s += sizeof(TROVE_handle);
         }
@@ -280,7 +281,7 @@ void print_keyval( DBT key, DBT val )
         * the PINT_dist struct is packed/encoded before writing to db. that
         * means the first uint32_t bytes are the length of the string, skip
         * it. */
-       char *dname = val.data + sizeof(uint32_t);
+       char *dname = (char *)val.data + sizeof(uint32_t);
        printf("(%s)(%d)\n", dname, val.size );
     }
 
