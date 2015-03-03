@@ -476,8 +476,6 @@ static PINT_sm_action mkdir_get_remote_dirdata_handles(
         GOSSIP_MKDIR_DEBUG, "  local dirdata handle (%llu)\n",
         llu(s_op->u.mkdir.handle_array_local[0]));
 
-    gossip_err("%s:handle_array_remote_count(%d)\n",__func__,s_op->u.mkdir.handle_array_remote_count);
-
     if(s_op->u.mkdir.handle_array_remote_count == 0)
     {
         js_p->error_code = SKIP;
@@ -583,8 +581,6 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
         /*s_op->attr.dirdata_handles,*/
         NULL);
 
-/*TODO - BECKY - THESE SHOULD BE DONE ELSEWHERE */
-    /* save objects so they can be freed */
     s_op->u.mkdir.saved_attr = &msg_p->req.u.mkdir.attr;
     s_op->u.mkdir.saved_capability = &msg_p->req.capability;
 

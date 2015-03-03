@@ -36,15 +36,12 @@ static int dist_dir_calc_branch_level(
 	server_no = dist_dir_attr->server_no;
 	num_servers = dist_dir_attr->num_servers;
 
-        gossip_err("%s:num_servers(%d) server_no(%d)\n",__func__,num_servers,server_no);
-
 	/* meta handle copy (server_no = -1) shall not reach here */
 	assert(server_no >= 0 && server_no < num_servers);
 	assert(bitmap != NULL);
 
 	if(!(TST_BIT(bitmap, server_no)))
 	{
-                gossip_err("%s:not an active server\n",__func__);
 		return -1; /* not an active server */
 	}
 
@@ -311,9 +308,6 @@ int PINT_dist_dir_set_serverno(const int server_no,
 
 
 	ddattr->server_no = server_no;
-        gossip_err("%s:ddattr->server_no(%d)\n"
-                  ,__func__
-                  ,ddattr->server_no);
 	
 	ddattr->branch_level = dist_dir_calc_branch_level(ddattr, ddbitmap);
 
