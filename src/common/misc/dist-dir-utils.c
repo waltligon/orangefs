@@ -306,6 +306,7 @@ int PINT_dist_dir_set_serverno(const int server_no,
 			server_no >= -1 &&
 			server_no < ddattr->num_servers);
 
+
 	ddattr->server_no = server_no;
 	
 	ddattr->branch_level = dist_dir_calc_branch_level(ddattr, ddbitmap);

@@ -359,15 +359,6 @@ static void lebf_initialize(void)
                 req.u.mgmt_get_user_cert_keyreq.fs_id = 0;
                 respsize = extra_size_PVFS_servresp_mgmt_get_user_cert_keyreq;
                 break;
-            case PVFS_SERV_MGMT_BGPROC_LIST:
-                respsize = extra_size_PVFS_servresp_mgmt_bgproc_list;
-                break;
-            case PVFS_SERV_MGMT_BGPROC_START:
-                reqsize = extra_size_PVFS_servreq_mgmt_bgproc_start;
-                break;
-            case PVFS_SERV_MGMT_BGPROC_KILL:
-                /* nothing special */
-                break;
             case PVFS_SERV_NUM_OPS:  /* sentinel, should not hit */
                 assert(0);
                 break;
@@ -550,9 +541,6 @@ static int lebf_encode_req(
         CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
-        CASE(PVFS_SERV_MGMT_BGPROC_LIST, mgmt_bgproc_list);
-        CASE(PVFS_SERV_MGMT_BGPROC_START, mgmt_bgproc_start);
-        CASE(PVFS_SERV_MGMT_BGPROC_KILL, mgmt_bgproc_kill);
         case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_PROTO_ERROR:
@@ -658,9 +646,6 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
-        CASE(PVFS_SERV_MGMT_BGPROC_LIST, mgmt_bgproc_list);
-        CASE(PVFS_SERV_MGMT_BGPROC_START, mgmt_bgproc_start);
-        CASE(PVFS_SERV_MGMT_BGPROC_KILL, mgmt_bgproc_kill);
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
@@ -784,9 +769,6 @@ static int lebf_decode_req(
         CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
-        CASE(PVFS_SERV_MGMT_BGPROC_LIST, mgmt_bgproc_list);
-        CASE(PVFS_SERV_MGMT_BGPROC_START, mgmt_bgproc_start);
-        CASE(PVFS_SERV_MGMT_BGPROC_KILL, mgmt_bgproc_kill);
         case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_IMM_COPIES:
@@ -882,9 +864,6 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
-        CASE(PVFS_SERV_MGMT_BGPROC_LIST, mgmt_bgproc_list);
-        CASE(PVFS_SERV_MGMT_BGPROC_START, mgmt_bgproc_start);
-        CASE(PVFS_SERV_MGMT_BGPROC_KILL, mgmt_bgproc_kill);
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_BATCH_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -1175,9 +1154,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
             case PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ:
             case PVFS_SERV_MGMT_GET_USER_CERT:
-            case PVFS_SERV_MGMT_BGPROC_LIST:
-            case PVFS_SERV_MGMT_BGPROC_START:
-            case PVFS_SERV_MGMT_BGPROC_KILL:
               /*nothing to free*/
                   break;
             case PVFS_SERV_INVALID:
@@ -1375,12 +1351,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                       decode_free(resp->u.mgmt_get_user_cert_keyreq.public_key.buf);
                       break;
                    }
-                case PVFS_SERV_MGMT_BGPROC_LIST:
-                   {
-                      decode_free(resp->u.mgmt_bgproc_list.ids);
-                      decode_free(resp->u.mgmt_bgproc_list.names);
-                      break;
-                   }
                 case PVFS_SERV_GETCONFIG:
                 case PVFS_SERV_REMOVE:
                 case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -1407,8 +1377,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_MGMT_GET_DIRENT:
                 case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
                 case PVFS_SERV_MGMT_SPLIT_DIRENT:
-                case PVFS_SERV_MGMT_BGPROC_START:
-                case PVFS_SERV_MGMT_BGPROC_KILL:
                   /*nothing to free */
                    break;
                 case PVFS_SERV_INVALID:

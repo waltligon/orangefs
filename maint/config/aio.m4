@@ -15,7 +15,7 @@ AC_DEFUN([AX_AIO],
         LIBS="$LIBS -laio"
     
         AC_COMPILE_IFELSE(
-    	    [#include "libaio.h"],
+    	    [AC_LANG_SOURCE([[#include "libaio.h"]])],
     	    [],
     	    [AC_MSG_ERROR(Invalid libaio path specified.  No libaio.h found.)])
     
@@ -38,7 +38,7 @@ AC_DEFUN([AX_AIO_OPTIONAL],
     LIBS="$LIBS -laio"
 
     AC_COMPILE_IFELSE(
-      [#include "libaio.h"],
+      [AC_LANG_SOURCE([[#include "libaio.h"]])],
       [],
       [AC_MSG_WARN(No libaio headers found.)])
 

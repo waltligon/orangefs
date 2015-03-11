@@ -60,8 +60,6 @@
 #include "certcache.h"
 #endif
 
-#include "bgproc-pipe.h"
-
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
 #endif
@@ -188,6 +186,7 @@ static int precreate_pool_count(
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
+
 struct server_configuration_s *PINT_get_server_config(void)
 {
     return &server_config;
@@ -273,10 +272,6 @@ int main(int argc, char **argv)
         {
             goto server_shutdown;
         }
-        gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
-        gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS2 Server: storage space removed. Exiting.\n");
-        gossip_set_debug_mask(1, debug_mask);
-        return(0);
     }
 
     /* create storage space and exit if requested */
@@ -287,10 +282,25 @@ int main(int argc, char **argv)
         {
             goto server_shutdown;
         }
+    }
+
+    if (s_server_options.server_remove_storage_space ||
+        s_server_options.server_create_storage_space)
+    {
         gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
-        gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS2 Server: storage space created. Exiting.\n");
+        if(s_server_options.server_remove_storage_space)
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "PVFS2 Server: storage space removed.\n");
+        }
+        if(s_server_options.server_create_storage_space)
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "PVFS2 Server: storage space created.\n");
+        }
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Exiting.\n");
         gossip_set_debug_mask(1, debug_mask);
-        return(0);
+        return 0;
     }
 
     server_job_id_array = (job_id_t *)
@@ -578,14 +588,6 @@ static int server_initialize(
     {
         gossip_err("Error: Could not start server; aborting.\n");
         return ret;
-    }
-
-    /* initialize the background process monitor */
-    ret = bgproc_startup();       
-    if (ret < 0)                   
-    {
-        gossip_err("Error: Cannot create background process monitor; aborting.\n");
-        return ret;           
     }
 
     /* initialize the security module */
@@ -2049,6 +2051,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
             case 'r':
           do_rmfs:
                 s_server_options.server_remove_storage_space = 1;
+                break;
             case 'f':
           do_mkfs:
                 s_server_options.server_create_storage_space = 1;

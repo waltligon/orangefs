@@ -65,9 +65,6 @@ extern struct PINT_server_req_params pvfs2_tree_getattr_params;
 extern struct PINT_server_req_params pvfs2_get_user_cert_params;
 extern struct PINT_server_req_params pvfs2_get_user_cert_keyreq_params;
 #endif
-extern struct PINT_server_req_params pvfs2_mgmt_bgproc_list_params;
-extern struct PINT_server_req_params pvfs2_mgmt_bgproc_start_params;
-extern struct PINT_server_req_params pvfs2_mgmt_bgproc_kill_params;
 
 /* table of incoming request types and associated parameters */
 struct PINT_server_req_entry PINT_server_req_table[] =
@@ -129,9 +126,6 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 50 */ {PVFS_SERV_MGMT_GET_USER_CERT, NULL},
     /* 51 */ {PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, NULL},
 #endif
-    /* 52 */ {PVFS_SERV_MGMT_BGPROC_LIST, &pvfs2_mgmt_bgproc_list_params},
-    /* 53 */ {PVFS_SERV_MGMT_BGPROC_START, &pvfs2_mgmt_bgproc_start_params},
-    /* 54 */ {PVFS_SERV_MGMT_BGPROC_KILL, &pvfs2_mgmt_bgproc_kill_params},
 };
 
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)

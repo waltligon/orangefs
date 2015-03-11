@@ -52,10 +52,7 @@ ifdef BUILD_SERVER
 		$(DIR)/mgmt-get-uid.c \
                 $(DIR)/mgmt-get-dirent.c \
                 $(DIR)/mgmt-create-root-dir.c \
-                $(DIR)/mgmt-split-dirent.c \
-                $(DIR)/mgmt-bgproc-list.c \
-                $(DIR)/mgmt-bgproc-start.c \
-                $(DIR)/mgmt-bgproc-kill.c
+                $(DIR)/mgmt-split-dirent.c
 
 ifdef ENABLE_SECURITY_CERT
 	SERVER_SMCGEN += \
@@ -64,7 +61,6 @@ endif
 
 	# c files that should be added to server library
 	SERVERSRC += \
-                $(DIR)/bgproc-pipe.c \
 		$(SERVER_SMCGEN)
 
 	# server only file

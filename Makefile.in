@@ -65,7 +65,6 @@ mandir = $(DESTDIR)@mandir@
 sbindir = $(DESTDIR)@sbindir@
 bindir = $(DESTDIR)@bindir@
 libdir = $(DESTDIR)@libdir@
-libexecdir = $(DESTDIR)@libexecdir@
 sysconfdir = $(DESTDIR)@sysconfdir@
 
 VPATH = $(srcdir)
@@ -266,8 +265,7 @@ CFLAGS += $(patsubst %,-I$(builddir)/%,$(GENINCLUDES))
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
 
   # make bindir and sysconfdir available to source files
-CFLAGS += -DBINDIR='"$(bindir)"' -DSBINDIR='"$(sbindir)"' \
-    -DSYSCONFDIR='"$(sysconfdir)"' -DLIBEXECDIR='"$(libexecdir)"'
+CFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
 
   # OpenSLL support
 CFLAGS += @OPENSSL_CPPFLAGS@
@@ -530,14 +528,14 @@ endif
 #            configure step to enable the jni layer to be built and 
 #            so JAVA_HOME can be set to the desired JDK.
 #
-#	--enable-shared must be specified during the configure step so that
+#   --enable-shared must be specified during the configure step so that
 #            shared libraries will be built
 #
 ifdef BUILD_JNI
 JAVA_HOME := @JAVA_HOME@
 CFLAGS += -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux
 JAVAH := $(JAVA_HOME)/bin/javah -J-Xmx256m
-MVN := `which mvn`
+MVN := mvn
 JNI_DIR := $(srcdir)/src/client/jni
 JNI_JAVA_DIR := $(srcdir)/src/client/jni/src/main/java
 ORGDIR := $(JNI_JAVA_DIR)/org/orangefs/usrint
@@ -578,10 +576,6 @@ LIBBMISRC :=
 endif
 # SERVERBINSRC is source files that don't get added to the server library but must be added to the server binary
 SERVERBINSRC :=
-# BGMONSRC is source code for the parallel background process monitor
-BGMONSRC :=
-# BGPROCSRC is source code for the parallel background processes
-BGPROCSRC :=
 # DOCSRC is source code for documentation
 DOCSRC :=
 # VISSRC is the source code for visualization tools
@@ -615,7 +609,6 @@ ifdef BUILD_SERVER
 SERVER_STUB := src/server/pvfs2-server-stub
 # SERVER is the pvfs2 server
 SERVER := src/server/pvfs2-server
-BGMON := src/server/pvfs2-bgmon
 endif
 
 # LIBRARIES is a list of the pvfs2 client libraries that will be installed
@@ -730,15 +723,6 @@ USERTOOLS := $(patsubst %.c,%, $(filter %.c, $(USERSRC)))
 # USERDEPENDS is a list of dependency files for user programs
 USERDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(USERSRC)))
 
-# BGPROCOBJS is a list of objects to put into the parallel background
-# processes
-BGPROCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(BGPROCSRC)))
-# BGPROCS is a list of parallel background processes
-BGPROCS := $(patsubst %.c,%, $(filter %.c, $(BGPROCSRC)))
-# BGPROCDEPENDS is a list of dependency files for the parallel background
-# processes
-BGPROCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(BGPROCSRC)))
-
 # UCACHEDOBJS is a list of ucached program objects
 UCACHEDOBJS := $(patsubst %.c,%.o, $(filter %.c,$(UCACHEDSRC)))
 # UCACHEDTOOLS is a list of ucached program executables
@@ -757,12 +741,6 @@ ifdef BUILD_SERVER
     # SERVERBINOBJS is a list of objects not in SERVEROBJS to put into the server
     SERVERBINOBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERBINSRC)))
     SERVERBINDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERBINSRC)))
-    # BGMONOBJS is a list of objects to put into the parallel background
-    # process monitor
-    BGMONOBJS := $(patsubst %.c,%.o, $(filter %.c,$(BGMONSRC)))
-    # BGMONDEPENDS is a list of dependency files for the paralle background
-    # process monitor
-    BGMONDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(BGMONSRC)))
 endif
 
 # MISCOBJS is a list of misc. objects not in the above categories
@@ -837,7 +815,7 @@ ifdef BUILD_BMI_ONLY
 DEPENDS := $(sort $(LIBBMIDEPENDS))
 else
 DEPENDS := $(sort $(LIBDEPENDS) $(ULIBDEPENDS) $(SERVERDEPENDS) \
-    $(SERVERBINDEPENDS) $(BGMONDEPENDS) $(MISCDEPENDS) $(USERDEPENDS) \
+    $(SERVERBINDEPENDS) $(MISCDEPENDS) $(USERDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) \
     $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS) \
     $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) \
@@ -851,7 +829,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(BGMON) $(KARMA) $(LIBRARIES) admintools usertools bgprocs ucachedtools kernapps $(VISS) $(KARMA) $(FUSE) 
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools kernapps $(VISS) $(KARMA) $(FUSE) 
 endif
 
 # target for building admin tools
@@ -859,9 +837,6 @@ admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
 
 #target for building user tools
 usertools: $(USERTOOLS)
-
-#target for building parallel background processes
-bgprocs: $(BGPROCS)
 
 # target for building ucached tools
 ucachedtools: $(UCACHEDTOOLS)
@@ -917,10 +892,6 @@ modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
 $(SERVER): $(SERVERBINOBJS) lib/libpvfs2-server.a 
 	$(Q) "  LD		$@"
 	$(E)$(LD) $^ -o $@ $(SERVER_LDFLAGS) $(SERVERLIBS)
-
-$(BGMON): $(BGMONOBJS) $(LIBRARIES)
-	$(Q) "  LD		$@"
-	$(E)$(LD) $(BGMONOBJS) -o $@ $(LDFLAGS) $(LIBS) $(call modldflags,$<)
 
 # special rules for admin tool objects which also require server components
 $(ADMINOBJS_SERVER): %.o: %.c
@@ -1243,14 +1214,14 @@ clean::
                 $(ULIBOBJS) $(OLIBOBJS) $(OLIBDEPENDS) \
                 $(ULIBPICOBJS) $(ULIBDEPENDS) $(OLIBPICOBJS) \
                 $(UCACHEDTOOLS) $(UCACHEDOBJS) \
-                $(SERVEROBJS) $(SERVERBINOBJS) $(BGMONOBJS) $(MISCOBJS) \
+                $(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
                 $(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
-                $(BGMON) $(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
+                $(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
                 $(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
-                $(USERTOOLS) $(USEROBJS) $(BGPROCS) $(BGPROCOBJS) \
-		$(DEVELTOOLS) $(DEVELOBJS) $(KERNAPPOBJS) \
-		$(KERNAPPS) $(KERNAPPSTHR) $(VISS) $(VISMISCOBJS) \
-		$(VISOBJS) $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMAOBJS) \
+                $(USERTOOLS) $(USEROBJS) $(DEVELTOOLS) $(DEVELOBJS) \
+                $(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
+                $(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
+                $(VISMISCDEPENDS) $(KARMAOBJS) \
                 $(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) \
                 $(BMILIBRARIES) $(FUSEOBJS) \
                 $(VISMISCDEPENDS) $(KARMAOBJS) \
@@ -1491,9 +1462,6 @@ ifdef BUILD_SERVER
 	install -m 755 $(srcdir)/$(SERVER_STUB) $(sbindir)/pvfs2-server
 	install -m 755 $(SERVER) $(sbindir)/pvfs2-server.bin
     endif
-	install -m 755 $(BGMON) $(sbindir)
-	install -d $(libexecdir)
-	install -m 755 $(BGPROCS) $(libexecdir)
 	rm -f $(bindir)/.pvfs2-genconfig-* &> /dev/null
     ifdef ENABLE_SECURITY_KEY
 	touch $(bindir)/.pvfs2-genconfig-key

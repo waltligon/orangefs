@@ -98,9 +98,6 @@ enum PVFS_server_op
     PVFS_SERV_TREE_GETATTR = 49,
     PVFS_SERV_MGMT_GET_USER_CERT = 50,
     PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 51,
-    PVFS_SERV_MGMT_BGPROC_LIST = 52,
-    PVFS_SERV_MGMT_BGPROC_START = 53,
-    PVFS_SERV_MGMT_BGPROC_KILL = 54,
 
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
@@ -204,8 +201,6 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_USERID_PWD 256
 /* max size of encrypted private key for cert request (in bytes) */
 #define PVFS_REQ_LIMIT_ENC_KEY 16384
-#define PVFS_REQ_LIMIT_NUM_BGPROCS 64
-#define PVFS_REQ_LIMIT_BGPROC_NAME 256
 /* create *********************************************************/
 /* - used to create an object.  This creates a metadata handle,
  * a datafile handle, and links the datafile handle to the metadata handle.
@@ -2529,105 +2524,6 @@ endecode_fields_1_struct(
 #define extra_size_PVFS_servresp_mgmt_get_user_cert_keyreq \
     PVFS_REQ_LIMIT_SECURITY_KEY
 
-/* mgmt_bgproc_list ***************************************************/
-/* - request a list of background processes running on this server */
-
-/* There cannot be an empty struct. */
-struct PVFS_servreq_mgmt_bgproc_list
-{
-    int empty;
-};
-endecode_fields_1_struct(
-    PVFS_servreq_mgmt_bgproc_list,
-    skip4,);
-
-#define PINT_SERVREQ_MGMT_BGPROC_LIST_FILL(__req,                      \
-                                           __cap)                      \
-do {                                                                   \
-    memset(&(__req), 0, sizeof(__req));                                \
-    (__req).op = PVFS_SERV_MGMT_BGPROC_LIST;                           \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                        \
-} while (0)
-
-struct PVFS_servresp_mgmt_bgproc_list
-{
-    uint32_t num_procs;
-    uint32_t *ids;
-    char **names;
-};
-endecode_fields_1aa_struct(
-    PVFS_servresp_mgmt_bgproc_list,
-    skip4,,
-    uint32_t, num_procs,
-    uint32_t, ids,
-    string, names);
-
-#define extra_size_PVFS_servresp_mgmt_bgproc_list                      \
-    (PVFS_REQ_LIMIT_NUM_BGPROCS * (4 + PVFS_REQ_LIMIT_BGPROC_NAME))
-
-/* mgmt_bgproc_start ****************************************************/
-/* - start a background processes on this server */
-
-struct PVFS_servreq_mgmt_bgproc_start
-{
-    char *name;
-};
-endecode_fields_1_struct(
-    PVFS_servreq_mgmt_bgproc_start,
-    string, name);
-
-#define extra_size_PVFS_servreq_mgmt_bgproc_start                      \
-    PVFS_REQ_LIMIT_BGPROC_NAME
-
-#define PINT_SERVREQ_MGMT_BGPROC_START_FILL(__req,                     \
-                                            __cap,                     \
-                                            __name)                    \
-do {                                                                   \
-    memset(&(__req), 0, sizeof(__req));                                \
-    (__req).op = PVFS_SERV_MGMT_BGPROC_START;                          \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                        \
-    (__req).u.mgmt_bgproc_start.name = (__name);                       \
-} while (0)
-
-struct PVFS_servresp_mgmt_bgproc_start
-{
-    uint32_t status;
-    uint32_t id;
-};
-endecode_fields_2_struct(
-    PVFS_servresp_mgmt_bgproc_start,
-    uint32_t, status,
-    uint32_t, id);
-
-/* mgmt_bgproc_kill ***************************************************/
-/* - kill a background processes on this server */
-
-struct PVFS_servreq_mgmt_bgproc_kill
-{
-    uint32_t id;
-};
-endecode_fields_1_struct(
-    PVFS_servreq_mgmt_bgproc_kill,
-    uint32_t, id);
-
-#define PINT_SERVREQ_MGMT_BGPROC_KILL_FILL(__req,                      \
-                                           __cap,                      \
-                                           __id)                       \
-do {                                                                   \
-    memset(&(__req), 0, sizeof(__req));                                \
-    (__req).op = PVFS_SERV_MGMT_BGPROC_KILL;                           \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                        \
-    (__req).u.mgmt_bgproc_kill.id = (__id);                            \
-} while (0)
-
-struct PVFS_servresp_mgmt_bgproc_kill
-{
-    uint32_t status;
-};
-endecode_fields_1_struct(
-    PVFS_servresp_mgmt_bgproc_kill,
-    uint32_t, status);
-
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
@@ -2682,9 +2578,6 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_split_dirent mgmt_split_dirent;
         struct PVFS_servreq_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servreq_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
-        struct PVFS_servreq_mgmt_bgproc_list mgmt_bgproc_list;
-        struct PVFS_servreq_mgmt_bgproc_start mgmt_bgproc_start;
-        struct PVFS_servreq_mgmt_bgproc_kill mgmt_bgproc_kill;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -2749,9 +2642,6 @@ struct PVFS_server_resp
         struct PVFS_servresp_mgmt_get_dirent mgmt_get_dirent;
         struct PVFS_servresp_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servresp_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
-        struct PVFS_servresp_mgmt_bgproc_list mgmt_bgproc_list;
-        struct PVFS_servresp_mgmt_bgproc_start mgmt_bgproc_start;
-        struct PVFS_servresp_mgmt_bgproc_kill mgmt_bgproc_kill;
     } u;
 };
 endecode_fields_2_struct(

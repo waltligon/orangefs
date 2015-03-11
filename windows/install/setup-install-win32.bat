@@ -1,5 +1,5 @@
 @echo off
-rem Builds directory structure for OrangeFS Windows Client installer (64-bit)
+rem Builds directory structure for OrangeFS Windows Client installer (32-bit)
 
 md install-root-win32
 cd install-root-win32
@@ -48,7 +48,7 @@ rem Grid utility
 copy ..\..\..\cert-utils\pvfs2-grid-proxy-init.sh OrangeFS\Client\Tools /y
 
 rem Create zip
-del ..\orangefs-windows-client-2.9.0-win32.zip
-winrar a ..\orangefs-windows-client-2.9.0-win32.zip Dokan OrangeFS
+del ..\orangefs-windows-client-2.9.1-win32.zip
+winrar a ..\orangefs-windows-client-2.9.1-win32.zip Dokan OrangeFS
 
 cd ..
