@@ -493,6 +493,8 @@ static PINT_sm_action mgmt_create_root_dir_fill_handles_to_dist_dir_struct(
     return SM_ACTION_COMPLETE;
 }
 
+/* Send only to remote dirdata servers. Values will be stored for the local
+ * dirdata handle in write_keyval_to_dirdata_handle */
 static PINT_sm_action mgmt_create_root_dir_remote_dirdata_attr_and_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -550,8 +552,8 @@ static PINT_sm_action mgmt_create_root_dir_remote_dirdata_attr_and_keyval_setup_
         PVFS_TYPE_DIRDATA,
         attr,
         0,
-        s_op->attr.dist_dir_attr.num_servers,
-        s_op->attr.dirdata_handles,
+        s_op->u.mgmt_create_root_dir.handle_array_remote_count,
+        s_op->u.mgmt_create_root_dir.handle_array_remote,
         NULL);
 
     msg_p->fs_id = s_op->target_fs_id;
