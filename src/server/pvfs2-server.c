@@ -59,6 +59,7 @@
 #ifdef ENABLE_CERTCACHE
 #include "certcache.h"
 #endif
+#include "parallel-bgproc.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -165,6 +166,7 @@ static int server_shutdown(
 static void reload_config(void);
 static void server_sig_handler(int sig);
 static void hup_sighandler(int sig, siginfo_t *info, void *secret);
+static void chld_sighandler(int sig, siginfo_t *info, void *secret);
 static int server_parse_cmd_line_args(int argc, char **argv);
 #ifdef __PVFS2_SEGV_BACKTRACE__
 static void bt_sighandler(int sig, siginfo_t *info, void *secret);
@@ -406,6 +408,11 @@ int main(int argc, char **argv)
                              server_config.logfile);
                 gossip_set_debug_mask(1, debug_mask);
                 signal_recvd_flag = 0; /* Reset the flag */
+            }
+            else if (signal_recvd_flag == SIGCHLD)
+            {
+                parallel_got_sigchld();
+                signal_recvd_flag = 0;
             }
             else
             {
@@ -1321,9 +1328,13 @@ static int server_setup_signal_handlers(void)
     struct sigaction new_action;
     struct sigaction ign_action;
     struct sigaction hup_action;
+    struct sigaction chld_action;
     hup_action.sa_sigaction = (void *)hup_sighandler;
     sigemptyset (&hup_action.sa_mask);
     hup_action.sa_flags = SA_RESTART | SA_SIGINFO;
+    chld_action.sa_sigaction = (void *)chld_sighandler;
+    sigemptyset (&chld_action.sa_mask);
+    chld_action.sa_flags = SA_RESTART | SA_SIGINFO;
 #ifdef __PVFS2_SEGV_BACKTRACE__
     struct sigaction segv_action;
 
@@ -1354,6 +1365,7 @@ static int server_setup_signal_handlers(void)
     sigaction (SIGSEGV, &new_action, NULL);
     sigaction (SIGABRT, &new_action, NULL);
 #endif
+    sigaction (SIGCHLD, &chld_action, NULL);
 
     /* ignore these */
     sigaction (SIGPIPE, &ign_action, NULL);
@@ -1528,6 +1540,18 @@ static void hup_sighandler(int sig, siginfo_t *info, void *secret)
     gossip_set_debug_mask(debug_on, debug_mask); /* Set to original values */
 
     /* Set the flag so the next server loop picks it up and reloads config */
+    signal_recvd_flag = sig;
+}
+
+/* chld_sighandler()
+ *
+ * Receive notification of child processes which have died or otherwise
+ * need to be waited on.
+ *
+ * no return value
+ */
+static void chld_sighandler(int sig, siginfo_t *info, void *secret)
+{
     signal_recvd_flag = sig;
 }
 

@@ -1,0 +1,176 @@
+/*
+ * Copyright 2015 Omnibond Systems L.L.C.
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <unistd.h>
+
+#include "client-state-machine.h"
+#include "pvfs2-internal.h"
+
+extern job_context_id pint_client_sm_context;
+
+%%
+
+machine pvfs2_client_mgmt_parallel_start_sm
+{
+    state setup_msgpair
+    {
+        run mgmt_parallel_start_setup_msgpair;
+        success => req_xfer_msgpair;
+        default => cleanup;
+    }
+    state req_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => cleanup;
+    }
+    state cleanup
+    {
+        run mgmt_parallel_start_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/*
+ * Send identical mgmt_parallel_start requests to an arbitrary number of
+ * servers.
+ */
+PVFS_error PVFS_imgmt_parallel_start(PVFS_fs_id fs_id, int server_count,
+    PVFS_BMI_addr_t *addr_array, int *statuses, pid_t *pids, char *name,
+    PVFS_mgmt_op_id *op_id, void *user_ptr)
+{
+    PINT_smcb *smcb;
+    PINT_client_sm *sm_p;
+    int ret;
+
+    if ((server_count < 1) || (!addr_array) || (!statuses) || (!pids) ||
+        (!name))
+    {
+        return -PVFS_EINVAL;
+    }
+
+    PINT_smcb_alloc(&smcb, PVFS_MGMT_PARALLEL_START,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (!smcb)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    sm_p->u.mgmt_parallel_start.fs_id = fs_id;
+    sm_p->u.mgmt_parallel_start.server_count = server_count;
+    sm_p->u.mgmt_parallel_start.addr_array = addr_array;
+    sm_p->u.mgmt_parallel_start.statuses = statuses;
+    sm_p->u.mgmt_parallel_start.pids = pids;
+    sm_p->u.mgmt_parallel_start.name = name;
+
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, server_count);
+    if (ret != 0)
+    {
+       PINT_smcb_free(smcb);
+       return ret;
+    }
+
+    return PINT_client_state_machine_post(
+        smcb, op_id, user_ptr);
+}
+
+/* PVFS_mgmt_parallel_start
+ *
+ * Send identical mgmt_parallel_start requests to an arbitrary number of
+ * servers.
+ */
+PVFS_error PVFS_mgmt_parallel_start(PVFS_fs_id fs_id, int server_count,
+    PVFS_BMI_addr_t *addr_array, int *statuses, pid_t *pids, char *name)
+{
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_mgmt_op_id op_id;
+
+    ret = PVFS_imgmt_parallel_start(fs_id, server_count, addr_array, statuses,
+        pids, name, &op_id, NULL);
+    if (ret)
+    {
+        PVFS_perror_gossip("PVFS_imgmt_parallel_start call", ret);
+        error = ret;
+    }
+    else
+    {
+        ret = PVFS_mgmt_wait(op_id, "mgmt_parallel_start", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
+            error = ret;
+        }
+    }
+    PINT_mgmt_release(op_id);
+    return error;
+}
+
+/*
+ * Fill in user pointers.
+ */
+static int mgmt_parallel_start_comp_fn(void* v_p,
+    struct PVFS_server_resp *resp_p, int i)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p;
+    sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    sm_p->u.mgmt_parallel_start.statuses[i] =
+        (int)resp_p->u.mgmt_parallel_start.status;
+    sm_p->u.mgmt_parallel_start.pids[i] =
+        (pid_t)resp_p->u.mgmt_parallel_start.pid;
+    return 0;
+}
+
+
+/*
+ * Allocate and fill in message pairs.
+ */
+static PINT_sm_action mgmt_parallel_start_setup_msgpair(struct PINT_smcb *smcb,
+                                                        job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability capability;
+    int i;
+
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_null_capability(&capability);
+
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
+    {
+        PINT_SERVREQ_MGMT_PARALLEL_START_FILL(
+            msg_p->req,
+            capability,
+            sm_p->u.mgmt_parallel_start.name);
+        msg_p->fs_id = sm_p->u.mgmt_parallel_start.fs_id;
+        msg_p->handle = PVFS_HANDLE_NULL;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = mgmt_parallel_start_comp_fn;
+        msg_p->svr_addr = sm_p->u.mgmt_parallel_start.addr_array[i];
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * Free the message pairs.
+ */
+static PINT_sm_action mgmt_parallel_start_cleanup(struct PINT_smcb *smcb,
+                                                  job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p;                        
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+    sm_p->error_code  = js_p->error_code;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
+}

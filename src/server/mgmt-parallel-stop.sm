@@ -1,0 +1,70 @@
+/*
+ * Copyright 2015 Omnibond Systems L.L.C.
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include "pvfs2-server.h"
+#include "pvfs2-internal.h"
+
+#include "parallel-bgproc.h"
+
+%%
+
+machine pvfs2_mgmt_parallel_stop_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        default => do_work;
+    }
+    state do_work
+    {
+        run mgmt_parallel_stop_do_work;
+        default => final_response;
+    }
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => terminate;
+    }
+}
+
+%%
+
+/*
+ * Call upon parallel bgproc code to stop a process.
+ */
+static PINT_sm_action mgmt_parallel_stop_do_work(struct PINT_smcb *smcb,
+                                                  job_status_s *js_p)
+{
+    struct PINT_server_op *s_op;
+    int r;
+    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    r = parallel_stop(s_op->req->u.mgmt_parallel_stop.pid);
+    if (r < 0)
+    {
+        js_p->error_code = r;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->resp.u.mgmt_parallel_stop.status = r;
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * Default permission function. Returns 0.
+ */
+static int perm_mgmt_parallel_stop(PINT_server_op *s_op)
+{
+    return 0;
+}
+
+/* XXX: What does perm and access_type mean when there is no object? */
+struct PINT_server_req_params pvfs2_mgmt_parallel_stop_params =
+{
+    .access_type = PINT_server_req_readonly,
+    .perm = perm_mgmt_parallel_stop,
+    .string_name = "mgmt_parallel_stop",
+    .state_machine = &pvfs2_mgmt_parallel_stop_sm
+};
+

@@ -98,6 +98,8 @@ enum PVFS_server_op
     PVFS_SERV_TREE_GETATTR = 49,
     PVFS_SERV_MGMT_GET_USER_CERT = 50,
     PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 51,
+    PVFS_SERV_MGMT_PARALLEL_START = 52,
+    PVFS_SERV_MGMT_PARALLEL_STOP = 53,
 
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
@@ -2524,6 +2526,66 @@ endecode_fields_1_struct(
 #define extra_size_PVFS_servresp_mgmt_get_user_cert_keyreq \
     PVFS_REQ_LIMIT_SECURITY_KEY
 
+/* mgmt_parallel_start ******************************************************/
+/* - start a process */
+
+struct PVFS_servreq_mgmt_parallel_start
+{
+    char *name;
+};
+endecode_fields_1_struct(
+    PVFS_servreq_mgmt_parallel_start,
+    string, name);
+
+#define PINT_SERVREQ_MGMT_PARALLEL_START_FILL(__req,                   \
+                                              __cap,                   \
+                                              __name)                  \
+do {                                                                   \
+    memset(&(__req), 0, sizeof(__req));                                \
+    (__req).op = PVFS_SERV_MGMT_PARALLEL_START;                        \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                        \
+    (__req).u.mgmt_parallel_start.name = (__name);                     \
+} while (0)
+
+struct PVFS_servresp_mgmt_parallel_start
+{
+    int32_t status;
+    uint32_t pid;
+};
+endecode_fields_2_struct(
+    PVFS_servresp_mgmt_parallel_start,
+    int32_t, status,
+    uint32_t, pid);
+
+/* mgmt_parallel_stop *******************************************************/
+/* - stop a process */
+
+struct PVFS_servreq_mgmt_parallel_stop
+{
+    uint32_t pid;
+};
+endecode_fields_1_struct(
+    PVFS_servreq_mgmt_parallel_stop,
+    uint32_t, pid);
+
+#define PINT_SERVREQ_MGMT_PARALLEL_STOP_FILL(__req,                    \
+                                              __cap,                   \
+                                              __pid)                   \
+do {                                                                   \
+    memset(&(__req), 0, sizeof(__req));                                \
+    (__req).op = PVFS_SERV_MGMT_PARALLEL_STOP;                        \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                        \
+    (__req).u.mgmt_parallel_stop.pid = (__pid);                        \
+} while (0)
+
+struct PVFS_servresp_mgmt_parallel_stop
+{
+    int32_t status;
+};
+endecode_fields_1_struct(
+    PVFS_servresp_mgmt_parallel_stop,
+    int32_t, status);
+
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
@@ -2578,6 +2640,8 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_split_dirent mgmt_split_dirent;
         struct PVFS_servreq_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servreq_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
+        struct PVFS_servreq_mgmt_parallel_start mgmt_parallel_start;
+        struct PVFS_servreq_mgmt_parallel_stop mgmt_parallel_stop;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -2642,6 +2706,8 @@ struct PVFS_server_resp
         struct PVFS_servresp_mgmt_get_dirent mgmt_get_dirent;
         struct PVFS_servresp_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servresp_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
+        struct PVFS_servresp_mgmt_parallel_start mgmt_parallel_start;
+        struct PVFS_servresp_mgmt_parallel_stop mgmt_parallel_stop;
     } u;
 };
 endecode_fields_2_struct(

@@ -474,6 +474,38 @@ PVFS_error PVFS_mgmt_get_user_cert(
     uint32_t exp);
 #endif /* ENABLE_SECURITY_CERT */
 
+PVFS_error PVFS_imgmt_parallel_start(
+    PVFS_fs_id fs_id,
+    int server_count,
+    PVFS_BMI_addr_t *addr_array,
+    int *statuses,
+    pid_t *pids,
+    char *name,
+    PVFS_mgmt_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_mgmt_parallel_start(
+    PVFS_fs_id fs_id,
+    int server_count,
+    PVFS_BMI_addr_t *addr_array,
+    int *statuses,
+    pid_t *pids,
+    char *name);
+
+PVFS_error PVFS_imgmt_parallel_stop(
+    PVFS_fs_id fs_id,
+    PVFS_BMI_addr_t addr,
+    int *status,
+    pid_t pid,
+    PVFS_mgmt_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_mgmt_parallel_stop(
+    PVFS_fs_id fs_id,
+    PVFS_BMI_addr_t addr,
+    int *status,
+    pid_t pid);
+
 #endif /* __PVFS2_MGMT_H */
 
 /* @} */

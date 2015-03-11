@@ -636,6 +636,24 @@ struct PINT_client_mgmt_get_user_cert_sm
 };
 #endif
 
+struct PINT_client_mgmt_parallel_start_sm
+{
+    PVFS_fs_id fs_id;
+    int server_count;
+    PVFS_BMI_addr_t *addr_array;
+    int *statuses;
+    pid_t *pids;
+    char *name;
+};
+
+struct PINT_client_mgmt_parallel_stop_sm
+{
+    PVFS_fs_id fs_id;
+    PVFS_BMI_addr_t addr;
+    pid_t pid;
+    int *status;
+};
+
 typedef struct 
 {
     PVFS_dirent **dirent_array;
@@ -723,6 +741,8 @@ typedef struct PINT_client_sm
 #ifdef ENABLE_SECURITY_CERT
         struct PINT_client_mgmt_get_user_cert_sm mgmt_get_user_cert;
 #endif
+        struct PINT_client_mgmt_parallel_start_sm mgmt_parallel_start;
+        struct PINT_client_mgmt_parallel_stop_sm mgmt_parallel_stop;
     } u;
 } PINT_client_sm;
 
@@ -822,6 +842,8 @@ enum
     PVFS_MGMT_GET_UID_LIST         = 81, 
     PVFS_MGMT_GET_DIRDATA_ARRAY    = 82,
     PVFS_MGMT_GET_USER_CERT        = 83,
+    PVFS_MGMT_PARALLEL_START       = 84,
+    PVFS_MGMT_PARALLEL_STOP        = 85,
     PVFS_SERVER_GET_CONFIG         = 200,
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
@@ -830,7 +852,7 @@ enum
 
 #define PVFS_OP_SYS_MAXVALID  22
 #define PVFS_OP_SYS_MAXVAL 69
-#define PVFS_OP_MGMT_MAXVALID 84
+#define PVFS_OP_MGMT_MAXVALID 86
 #define PVFS_OP_MGMT_MAXVAL 199
 
 int PINT_client_io_cancel(job_id_t id);
@@ -939,6 +961,8 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dirdata_array_sm;
 #ifdef ENABLE_SECURITY_CERT
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_user_cert_sm;
 #endif
+extern struct PINT_state_machine_s pvfs2_client_mgmt_parallel_start_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_parallel_stop_sm;
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;
