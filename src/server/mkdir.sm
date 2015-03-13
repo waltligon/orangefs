@@ -214,21 +214,33 @@ static PINT_sm_action mkdir_directory_dspace_setattr(
     job_id_t j_id;
     PVFS_ds_attributes *ds_attr = NULL;
 
-    /* save the handle from the mkdir in the response */
+    /* save the handle generated from job_trove_dspace_create into the response structure 
+     * and PVFS_ds_attributes structure
+     */
     s_op->resp.u.mkdir.handle = js_p->handle;
+    s_op->ds_attr.handle      = js_p->handle;
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new directory has handle %llu\n",
                  llu(js_p->handle));
 
     ds_attr = (&s_op->ds_attr);
+
     PVFS_ds_init_time(ds_attr);
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " setting directory version to "
                  "%llu\n\tmtime is %llu\n", llu(ds_attr->mtime),
                  llu(PINT_util_mkversion_time(ds_attr->mtime)));
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "%s:ds_attr->type(%d) ds_attr->handle(%llu) js_p->handle(%llu) uid(%d) gid(%d) mode(%o)\n"
+                ,__func__
+                ,ds_attr->type
+                ,llu(ds_attr->handle)
+                ,llu(s_op->resp.u.mkdir.handle)
+                ,ds_attr->uid
+                ,ds_attr->gid
+                ,ds_attr->mode);
 
     ret = job_trove_dspace_setattr(
-        s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
+        s_op->u.mkdir.fs_id, ds_attr->handle,
         ds_attr, 
         TROVE_SYNC,
         smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
@@ -411,7 +423,7 @@ static PINT_sm_action mkdir_dirdata_dspace_create(
         s_op->u.mkdir.handle_array_local_count,
         PVFS_TYPE_DIRDATA, 
         NULL,
-        0,
+        TROVE_SYNC,
         smcb,
         0,
         js_p,
@@ -433,8 +445,7 @@ static PINT_sm_action mkdir_dirdata_dspace_setattr(struct PINT_smcb *smcb,
    int ret = -PVFS_EINVAL;
    job_id_t j_id;
 
-   /* s_op->ds_attr was not filled in by prelude b/c we are creating new
-    * entries; thus, it is okay to use this space for other purposes.
+   /* s_op->ds_attr is filled in by prep_sm state.
     */
    PVFS_ds_attributes *ds_attr = &s_op->ds_attr;
 
@@ -450,12 +461,19 @@ static PINT_sm_action mkdir_dirdata_dspace_setattr(struct PINT_smcb *smcb,
    ds_attr->ctime = time(NULL);
    ds_attr->atime = ds_attr->ctime;
    ds_attr->mtime = ds_attr->ctime;
+
+   gossip_debug(GOSSIP_MKDIR_DEBUG,"%s:ds_attr->handle(%llu) uid(%d) gid(%d) mode(%o)\n"
+                                  ,__func__
+                                  ,llu(ds_attr->handle)
+                                  ,ds_attr->uid
+                                  ,ds_attr->gid
+                                  ,ds_attr->mode);
  
 
    ret = job_trove_dspace_setattr( s_op->req->u.mkdir.fs_id,
-                                   s_op->attr.dirdata_handles[0],                                 
+                                   ds_attr->handle,
                                    ds_attr,
-                                   0,
+                                   TROVE_SYNC,
                                    smcb, 0, js_p, &j_id, server_job_context, 
                                    s_op->req->hints);
 
@@ -829,9 +847,12 @@ static PINT_sm_action mkdir_prep_sm(
                  "group = %d, perms = %o]\n", a_p->owner, a_p->group,
                  a_p->perms);
 
-    /* translate attrs to storage attr format */
+    /* translate request attrs to storage attr format */
     ds_attr = (&s_op->ds_attr);
     PVFS_object_attr_to_ds_attr(a_p, ds_attr);
+
+    /* copy storage attributes into local object attribute structure */
+    PVFS_ds_attr_to_object_attr(ds_attr,&s_op->attr);
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;

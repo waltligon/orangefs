@@ -510,6 +510,14 @@ static PINT_sm_action crdirent_validate(
     PVFS_object_attr *attr_p = NULL;
     
     attr_p = &s_op->attr;
+
+
+    gossip_err("%s:filename(%s) new_handle(%llu) directory-handle(%llu) dirent_handle(%llu)\n"
+              ,__func__
+              ,s_op->req->u.crdirent.name
+              ,llu(s_op->req->u.crdirent.new_handle)
+              ,llu(s_op->req->u.crdirent.handle)
+              ,llu(s_op->req->u.crdirent.dirent_handle));
     
     /* gossip bitmap, since jump from get_bitmap_and_dirdata_handles*/
     gossip_debug(GOSSIP_SERVER_DEBUG, 
