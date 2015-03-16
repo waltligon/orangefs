@@ -100,13 +100,6 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb,
     s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
 
 
-    if ( s_op->req->op == PVFS_SERV_REMOVE )
-    {
-         gossip_err("%s:PVFS_SERV_REMOVE: s_op->req->u.remove.handle(%llu)\n"
-                   ,__func__
-                   ,llu(s_op->req->u.remove.handle));
-    }
-
     /* add the user to the uid mgmt system */
 /* TODO: not currently supported w/new security system
     ret = PINT_add_user_to_uid_mgmt(s_op->req->credentials.uid);
