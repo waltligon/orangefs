@@ -339,8 +339,10 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
 
         memset(&req_ctrl, 0, sizeof(struct PINT_server_req_ctrl));
         PINT_server_req_get_ctrl(s_op->req, &req_ctrl);
-        gossip_ldebug(GOSSIP_UNEXP_DEBUG, "Ctrl sid_count = %d\n",req_ctrl.sid_count);
-        gossip_ldebug(GOSSIP_UNEXP_DEBUG, "Ctrl count = %d\n",req_ctrl.count);
+        gossip_ldebug(GOSSIP_UNEXP_DEBUG,
+                      "Ctrl sid_count = %d\n",req_ctrl.sid_count);
+        gossip_ldebug(GOSSIP_UNEXP_DEBUG,
+                      "Ctrl count = %d\n",req_ctrl.count);
         
         switch (s_op->req->ctrl.mode)
         {

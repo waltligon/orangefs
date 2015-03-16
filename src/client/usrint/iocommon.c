@@ -16,6 +16,7 @@
 #include "openfile-util.h"
 #include "iocommon.h"
 #include "pvfs-path.h"
+#include "pvfs-sid.h"
 #if PVFS_UCACHE_ENABLE
 #include "ucache.h"
 #include "string.h"
@@ -384,6 +385,8 @@ static int iocommon_parse_serverlist(char *serverlist,
     int count;
     char *tok, *save_ptr;
     int i;
+    int ret;
+    struct SID_type_s stype = {SID_SERVER_DATA, fsid};
 
     /* expects slist->servers to be NULL */
     if (!slist || slist->servers)
@@ -398,7 +401,16 @@ static int iocommon_parse_serverlist(char *serverlist,
         return -1;
     }
     slist->count = atoi(tok);
+/* V3 cleanup */
+#if 0
     PINT_cached_config_count_servers(fsid, PINT_SERVER_TYPE_IO, &count);
+#endif
+    ret = PVFS_SID_count_io(fsid, &count);
+    if (ret < 0)
+    {
+        errno = EINVAL;
+        return -1;
+    }
     if (slist->count < 1 || slist->count > count)
     {
         errno = EINVAL;
@@ -419,10 +431,21 @@ static int iocommon_parse_serverlist(char *serverlist,
         errno = ENOMEM;
         return -1;
     }
+/* V3 cleanup */
+#if 0
     PINT_cached_config_get_server_array(fsid,
                                         PINT_SERVER_TYPE_IO,
                                         server_array,
                                         &count);
+#endif
+    ret = PVFS_SID_get_server_first_n(server_array, NULL, &count, stype);
+    if (ret < 0)
+    {
+        free(slist->servers);
+        free(server_array);
+        errno = EINVAL;
+        return ret;
+    }
     for (i = 0; i < slist->count; i++)
     {
         tok = strtok_r(NULL, ":", &save_ptr);

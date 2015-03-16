@@ -1152,6 +1152,7 @@ int PINT_cached_config_check_type(PVFS_fs_id fs_id,
 
 /* V3 becomes a SID cache function */
 
+#if 0
 /* PINT_cached_config_count_servers()
  *
  * counts the number of physical servers of the specified type
@@ -1299,7 +1300,6 @@ int PINT_cached_config_get_server_array(PVFS_fs_id fs_id,
 }
 
 /* V3 doesn't make sense - SID maps to server */
-#if 0
 /* PINT_cached_config_map_to_server()
  *
  * maps from a handle and fsid to a server address
@@ -1365,7 +1365,11 @@ int PINT_cached_config_get_num_dfiles(PVFS_fs_id fs_id,
     }
 
     /* Determine the number of I/O servers available */
+/* V3 cleanup */
+#if 0
     rc = PINT_cached_config_get_num_io(fs_id, &num_io_servers);
+#endif
+    rc = PVFS_SID_count_io(fs_id, &num_io_servers);
     if(rc < 0)
     {
         return(rc);
@@ -1399,6 +1403,8 @@ int PINT_cached_config_get_num_dfiles(PVFS_fs_id fs_id,
     return 0;
 }
 
+/* V3 cleanup */
+#if 0
 /* PINT_cached_config_get_num_meta()
  *
  * discovers the number of metadata servers available for a given file
@@ -1447,6 +1453,7 @@ int PINT_cached_config_get_num_io(PVFS_fs_id fs_id, int32_t *num_io)
     }
     return ret;
 }
+#endif
 
 /* PINT_cached_config_get_metadata_sid_count()
  *
@@ -1580,7 +1587,11 @@ int PINT_cached_config_get_default_distr_dir_params(PVFS_fs_id fs_id,
     }
 
     /* Determine the number of metadata servers available */
+/* V3 cleanup */
+#if 0
     rc = PINT_cached_config_get_num_meta(fs_id, &num_meta_servers);
+#endif
+    rc = PVFS_SID_count_meta(fs_id, &num_meta_servers);
     if(rc < 0)
     {
         return(rc);
@@ -1871,9 +1882,10 @@ int PINT_cached_config_get_server_list(PVFS_fs_id fs_id,
  */
 static int cache_server_array(PVFS_fs_id fs_id)
 {
-    int ret = -PVFS_EINVAL;
+    int ret = 0;
 /* V3 obsolete - info handled by SID cache now */
 #if 0
+    int ret = -PVFS_EINVAL;
     int i = 0, j = 0;
     char *server_bmi_str = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;

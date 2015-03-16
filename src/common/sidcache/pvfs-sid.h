@@ -41,6 +41,10 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid);
 /**
  * Count number of known servers with a given SID type
  */
+int PVFS_SID_count_type(PVFS_fs_id fs_id, int type, int *count);
+
+int PVFS_SID_count_all(PVFS_fs_id fs_id, int *count);
+
 int PVFS_SID_count_io(PVFS_fs_id fs_id, int *count);
 
 int PVFS_SID_count_meta(PVFS_fs_id fs_id, int *count);
@@ -58,19 +62,19 @@ int PVFS_SID_count_config(PVFS_fs_id fs_id, int *count);
  */
 int PVFS_SID_get_server_first(PVFS_BMI_addr_t *bmi_addr, 
                               PVFS_SID *sid,
-                              uint32_t stype);
+                              struct SID_type_s stype);
 int PVFS_SID_get_server_first_n(PVFS_BMI_addr_t *bmi_addr, 
                                 PVFS_SID *sid,
                                 int *n, /* inout */
-                                uint32_t stype);
+                                struct SID_type_s stype);
 
 int PVFS_SID_get_server_next(PVFS_BMI_addr_t *bmi_addr,
                              PVFS_SID *sid,
-                             uint32_t stype);
+                             struct SID_type_s stype);
 int PVFS_SID_get_server_next_n(PVFS_BMI_addr_t *bmi_addr, 
                                PVFS_SID *sid,
                                int *n, /* inout */
-                               uint32_t stype);
+                               struct SID_type_s stype);
 
 int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
                       PVFS_handle **handle,

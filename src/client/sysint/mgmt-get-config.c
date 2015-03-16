@@ -28,12 +28,11 @@ extern job_context_id pint_client_sm_context;
 
   returns 0 on success, -errno on error
 */
-int PVFS_mgmt_get_config(
-    const PVFS_fs_id * fsid,
-    PVFS_BMI_addr_t * addr,
-    char *fs_buf,
-    int fs_buf_size,
-    const PVFS_credential *credential)
+int PVFS_mgmt_get_config(const PVFS_fs_id *fsid,
+                         PVFS_BMI_addr_t *addr,
+                         char *fs_buf,
+                         int fs_buf_size,
+                         const PVFS_credential *credential)
 {
     int ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
@@ -47,7 +46,8 @@ int PVFS_mgmt_get_config(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_get_config entered\n");
 
-    PINT_smcb_alloc(&smcb, PVFS_SERVER_GET_CONFIG,
+    PINT_smcb_alloc(&smcb,
+                    PVFS_SERVER_GET_CONFIG,
                     sizeof(struct PINT_client_sm),
                     client_op_state_get_machine,
                     client_state_machine_terminate,

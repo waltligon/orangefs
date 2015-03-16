@@ -84,10 +84,13 @@ int main(int argc, char **argv)
 
         param_value.type = PVFS_MGMT_PARAM_TYPE_MASK;
         param_value.u.mask_value = user_opts->debug_mask;
-        ret = PVFS_mgmt_setparam_single(
-            cur_fs, &creds, PVFS_SERV_PARAM_GOSSIP_MASK,
-            &param_value, user_opts->single_server,
-            NULL, NULL);
+        ret = PVFS_mgmt_setparam_single(cur_fs,
+                                        &creds,
+                                        PVFS_SERV_PARAM_GOSSIP_MASK,
+                                        &param_value,
+                                        user_opts->single_server,
+                                        NULL,
+                                        NULL);
     }
     else
     {
@@ -95,16 +98,19 @@ int main(int argc, char **argv)
 
         param_value.type = PVFS_MGMT_PARAM_TYPE_MASK;
         param_value.u.mask_value = user_opts->debug_mask;
-        ret = PVFS_mgmt_setparam_all(
-            cur_fs, &creds, PVFS_SERV_PARAM_GOSSIP_MASK,
-            &param_value, NULL, NULL);
+        ret = PVFS_mgmt_setparam_all(cur_fs,
+                                     &creds,
+                                     PVFS_SERV_PARAM_GOSSIP_MASK,
+                                     &param_value,
+                                     NULL,
+                                     NULL);
     }
 
     if (ret)
     {
         char buf[64] = {0};
         PVFS_strerror_r(ret, buf, 64);
-        fprintf(stderr, "Setparam failure: %s\n", buf);
+        fprintf(stderr, "Setparam failure: %s (%d)\n", buf, ret);
     }
     return PVFS_sys_finalize();
 }

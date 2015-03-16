@@ -551,6 +551,7 @@ static int server_get_remote_config(
     PVFS_BMI_addr_t bmi_addr;
     struct PVFS_sys_mntent *mntent = NULL;
     PVFS_credential *credential = NULL;
+    struct SID_type_s cfg_server = {SID_SERVER_CONFIG, 0};
 
     /* Initialize the bmi and job interfaces */
     *server_status_flag |= SERVER_CLIENT_INIT;
@@ -561,7 +562,7 @@ static int server_get_remote_config(
         goto error_exit;
     }
     /* Find a config server in the SID cache */
-    ret = PVFS_SID_get_server_first(&bmi_addr, NULL, SID_SERVER_CONFIG);
+    ret = PVFS_SID_get_server_first(&bmi_addr, NULL, cfg_server);
 
     PINT_server_get_config(server_config, mntent, credential, NULL);
 

@@ -2969,7 +2969,9 @@ DOTCONF_CB(get_rootsrv)
     }
     /* This doesn't tell us much - we have no way to id which root */
     /* update server type n SIDcache */
-    SID_update_type(&root_alias->host_sid, SID_SERVER_ROOT);
+    SID_update_type_single(&root_alias->host_sid,
+                           SID_SERVER_ROOT,
+                           fs_conf->coll_id);
 
     /* add to list of root servers for this fs */
     if (!fs_conf->root_servers)
@@ -3203,6 +3205,7 @@ DOTCONF_CB(get_address_list)
 DOTCONF_CB(get_type_list)
 {
     int i;
+    int ret;
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
 
@@ -3214,8 +3217,13 @@ DOTCONF_CB(get_type_list)
     /* convert type string into bit field */
     for (i = 0; i < cmd->arg_count; i++)
     {
-        config_s->new_host->server_type |=
-                        SID_string_to_type(cmd->data.list[i]);
+        struct SID_type_s typebuf = {0, 0};
+        ret = SID_string_to_type(&typebuf, cmd->data.list[i]);
+        if (ret < 0)
+        {
+            return "Error: Invalid type string provided\n";
+        }
+        config_s->new_host->server_type |= typebuf.server_type;
     }
 
     return NULL;

@@ -170,11 +170,12 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
 
 /* These functions count servers of a given type
  */
-static int PVFS_SID_count_server(int *count, uint32_t stype)
+static int PVFS_SID_count_server(int *count, struct SID_type_s stype)
 {
     int ret = 0;
     DBT key, val;
     db_recno_t dbcountp = 0;
+    int get_flags;
 
     if (!count)
     {
@@ -184,11 +185,27 @@ static int PVFS_SID_count_server(int *count, uint32_t stype)
     SID_zero_dbt(&key, &val, NULL);
 
     gossip_debug(GOSSIP_SIDCACHE_DEBUG,
-                 "Counting servers of type %o\n", stype);
+                 "Counting servers of type %o\n", stype.server_type);
 
-    key.data = &stype;
-    key.size = sizeof(uint32_t);
-    key.ulen = sizeof(uint32_t);
+    if (stype.server_type == SID_SERVER_ALL)
+    {
+        key.data = &stype;
+        key.size = 0;
+        get_flags = DB_FIRST;
+    }
+    else if (stype.fsid)
+    {
+        key.data = &stype;
+        key.size = sizeof(stype);
+        get_flags = DB_SET_RANGE;
+    }
+    else
+    {
+        key.data = &(stype.server_type);
+        key.size = sizeof(stype.server_type);
+        get_flags = DB_SET_RANGE;
+    }
+    key.ulen = sizeof(struct SID_type_s);
     key.flags = DB_DBT_USERMEM;
 
     /* val is left empty for DB to fill in */
@@ -196,7 +213,7 @@ static int PVFS_SID_count_server(int *count, uint32_t stype)
     ret = SID_type_cursor->get(SID_type_cursor, /* type index */
                                &key,            /* key of secondary db  */
                                &val,            /* no val expected */
-                               DB_SET);         /* get flags */
+                               get_flags);      /* get flags */
     if(ret)
     {
         if (ret != DB_NOTFOUND)
@@ -219,36 +236,53 @@ static int PVFS_SID_count_server(int *count, uint32_t stype)
     return 0;
 }
 
+int PVFS_SID_count_type(PVFS_fs_id fs_id, int type, int *count)
+{
+    struct SID_type_s stype = {type, fs_id};
+    return PVFS_SID_count_server(count, stype);
+}
+
+int PVFS_SID_count_all(PVFS_fs_id fs_id, int *count)
+{
+    struct SID_type_s stype = {SID_SERVER_ALL, fs_id};
+    return PVFS_SID_count_server(count, stype);
+}
+
 int PVFS_SID_count_io(PVFS_fs_id fs_id, int *count)
 {
-    return PVFS_SID_count_server(count, SID_SERVER_DATA);
+    struct SID_type_s stype = {SID_SERVER_DATA, fs_id};
+    return PVFS_SID_count_server(count, stype);
 }
 
 int PVFS_SID_count_meta(PVFS_fs_id fs_id, int *count)
 {
-    return PVFS_SID_count_server(count, SID_SERVER_META);
+    struct SID_type_s stype = {SID_SERVER_META, fs_id};
+    return PVFS_SID_count_server(count, stype);
 }
 
 int PVFS_SID_count_root(PVFS_fs_id fs_id, int *count)
 {
-    return PVFS_SID_count_server(count, SID_SERVER_ROOT);
+    struct SID_type_s stype = {SID_SERVER_ROOT, fs_id};
+    return PVFS_SID_count_server(count, stype);
 }
 
 int PVFS_SID_count_prime(PVFS_fs_id fs_id, int *count)
 {
-    return PVFS_SID_count_server(count, SID_SERVER_PRIME);
+    struct SID_type_s stype = {SID_SERVER_PRIME, fs_id};
+    return PVFS_SID_count_server(count, stype);
 }
 
 int PVFS_SID_count_config(PVFS_fs_id fs_id, int *count)
 {
-    return PVFS_SID_count_server(count, SID_SERVER_CONFIG);
+    struct SID_type_s stype = {SID_SERVER_CONFIG, fs_id};
+    return PVFS_SID_count_server(count, stype);
 }
 
 /* These functions find servers of a given type
  */
 static int PVFS_SID_get_server(PVFS_BMI_addr_t *bmi_addr,
                                PVFS_SID *sid,
-                               uint32_t stype,
+                               struct SID_type_s stype,
                                uint32_t flag)
 {
     int ret = 0;
@@ -259,11 +293,19 @@ static int PVFS_SID_get_server(PVFS_BMI_addr_t *bmi_addr,
     SID_zero_dbt(&key, &val, NULL);
 
     gossip_debug(GOSSIP_SIDCACHE_DEBUG,
-                 "Searching for servers of type %o\n", stype);
+                 "Searching for servers of type %o\n", stype.server_type);
 
-    key.data = &stype;
-    key.size = sizeof(uint32_t);
-    key.ulen = sizeof(uint32_t);
+    if (stype.fsid)
+    {
+        key.data = &stype;
+        key.size = sizeof(stype);
+    }
+    else
+    {
+        key.data = &(stype.server_type);
+        key.size = sizeof(stype.server_type);
+    }
+    key.ulen = sizeof(struct SID_type_s);
     key.flags = DB_DBT_USERMEM;
 
     val.data = &sidval;
@@ -309,14 +351,14 @@ static int PVFS_SID_get_server(PVFS_BMI_addr_t *bmi_addr,
 
 int PVFS_SID_get_server_first(PVFS_BMI_addr_t *bmi_addr,
                               PVFS_SID *sid,
-                              uint32_t stype)
+                              struct SID_type_s stype)
 {
-    return PVFS_SID_get_server(bmi_addr, sid, stype, DB_SET);
+    return PVFS_SID_get_server(bmi_addr, sid, stype, DB_SET_RANGE);
 }
 
 int PVFS_SID_get_server_next(PVFS_BMI_addr_t *bmi_addr,
                              PVFS_SID *sid,
-                             uint32_t stype)
+                             struct SID_type_s stype)
 {
     return PVFS_SID_get_server(bmi_addr, sid, stype, DB_NEXT);
 }
@@ -327,47 +369,68 @@ int PVFS_SID_get_server_next(PVFS_BMI_addr_t *bmi_addr,
 static int PVFS_SID_get_server_n(PVFS_BMI_addr_t *bmi_addr,
                                  PVFS_SID *sid,
                                  int *n,  /* inout */
-                                 uint32_t stype,
+                                 struct SID_type_s stype,
                                  int flag)
 {
     int ret = 0;
     int i = 0;
+    PVFS_BMI_addr_t *badr = NULL;
+    PVFS_SID *sa = NULL;
+    unsigned int orig_type = 0;
+    unsigned int tmask = 0;
 
     if (*n <= 0)
     {
         *n = 0;
         return -PVFS_EINVAL;
     }
-    ret = PVFS_SID_get_server(bmi_addr, sid, stype, flag);
-    if (!ret)
+    /* loop for each type included in stype */
+    orig_type = stype.server_type;
+    tmask = SID_SERVER_ME;
+    for (i = 0; orig_type && tmask && i < *n; tmask >>= 1)
     {
-        for (i = 1; i < *n; i++)
+        if (orig_type & tmask)
         {
-            PVFS_BMI_addr_t *badr = bmi_addr ? &bmi_addr[i] : NULL;
-            PVFS_SID *sa = sid ? &sid[i] : NULL;
-            ret = PVFS_SID_get_server(badr, sa, stype, DB_NEXT);
-            if (ret)
+            badr = bmi_addr ? &bmi_addr[i] : NULL;
+            sa = sid ? &sid[i] : NULL;
+            stype.server_type = tmask;
+            ret = PVFS_SID_get_server(badr, sa, stype, flag);
+            if (!ret)
             {
-                break;
+                /* found item, no error */
+                for (i++; i < *n; i++)
+                {
+                    badr = bmi_addr ? &bmi_addr[i] : NULL;
+                    sa = sid ? &sid[i] : NULL;
+                    ret = PVFS_SID_get_server(badr, sa, stype, DB_NEXT);
+                    if (ret)
+                    {
+                        /* not found or error */
+                        break;
+                    }
+                }
             }
+            /* clear bit from orig_type */
+            orig_type &= ~tmask;
         }
     }
     *n = i;
-    return ret;
+    /* we don't return DB errors - an error means not found */
+    return 0;
 }
 
 int PVFS_SID_get_server_first_n(PVFS_BMI_addr_t *bmi_addr,
                                 PVFS_SID *sid,
                                 int *n,
-                                uint32_t stype)
+                                struct SID_type_s stype)
 {
-    return PVFS_SID_get_server_n(bmi_addr, sid, n, stype, DB_SET);
+    return PVFS_SID_get_server_n(bmi_addr, sid, n, stype, DB_SET_RANGE);
 }
 
 int PVFS_SID_get_server_next_n(PVFS_BMI_addr_t *bmi_addr,
                                PVFS_SID *sid,
                                int *n,
-                               uint32_t stype)
+                               struct SID_type_s stype)
 {
     return PVFS_SID_get_server_n(bmi_addr, sid, n, stype, DB_NEXT);
 }
@@ -396,6 +459,8 @@ int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
     int ret = 0;
     int n;
     int i;
+    struct SID_type_s meta_server = {SID_SERVER_META, 0};
+    struct SID_type_s data_server = {SID_SERVER_DATA, 0};
 
     /* generate metadata handle */
     *handle = malloc(sizeof(PVFS_handle));
@@ -404,7 +469,7 @@ int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
     /* generate SIDs for metadata object */
     *sid_array = (PVFS_SID *)malloc(sid_count * sizeof(PVFS_SID));
     n = sid_count;
-    PVFS_SID_get_server_first_n(NULL, *sid_array, &n, SID_SERVER_META);
+    PVFS_SID_get_server_first_n(NULL, *sid_array, &n, meta_server);
 
     /* generate dirdata handles */
     *datafile_handles = (PVFS_OID *)malloc(datafile_count * sizeof(PVFS_OID));
@@ -418,7 +483,7 @@ int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
                                              datafile_sid_count *
                                              sizeof(PVFS_SID));
     n = datafile_sid_count * datafile_count;
-    PVFS_SID_get_server_next_n(NULL, *datafile_sid_array, &n, SID_SERVER_DATA);
+    PVFS_SID_get_server_next_n(NULL, *datafile_sid_array, &n, data_server);
     return ret;
 }
 
@@ -437,6 +502,7 @@ int PVFS_OBJ_gen_dir(PVFS_fs_id fs_id,
     int ret = 0;
     int n;
     int i;
+    struct SID_type_s meta_server = {SID_SERVER_META, 0};
 
     /* generate metadata handle */
     *handle = malloc(sizeof(PVFS_handle));
@@ -445,7 +511,7 @@ int PVFS_OBJ_gen_dir(PVFS_fs_id fs_id,
     /* generate SIDs for metadata object */
     *sid_array = (PVFS_SID *)malloc(sid_count * sizeof(PVFS_SID));
     n = sid_count;
-    PVFS_SID_get_server_first_n(NULL, *sid_array, &n, SID_SERVER_META);
+    PVFS_SID_get_server_first_n(NULL, *sid_array, &n, meta_server);
 
     /* generate dirdata handles */
     *dirdata_handles = (PVFS_OID *)malloc(dirdata_count * sizeof(PVFS_OID));
@@ -459,7 +525,7 @@ int PVFS_OBJ_gen_dir(PVFS_fs_id fs_id,
                                              dirdata_sid_count *
                                              sizeof(PVFS_SID));
     n = dirdata_sid_count;
-    PVFS_SID_get_server_next_n(NULL, *dirdata_sid_array, &n, SID_SERVER_META);
+    PVFS_SID_get_server_next_n(NULL, *dirdata_sid_array, &n, meta_server);
     return ret;
 }
 /*

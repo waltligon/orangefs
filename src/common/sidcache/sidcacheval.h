@@ -21,6 +21,7 @@ typedef struct SID_cacheval_s
 struct SID_type_s
 {
     uint32_t server_type;
+    PVFS_fs_id fsid;
 };
 
 /* These are obsolete - they were using in an early implementation */
@@ -70,6 +71,8 @@ enum {
         (SID_SERVER_ROOT | SID_SERVER_PRIME | SID_SERVER_CONFIG | \
          SID_SERVER_META | SID_SERVER_DATA | SID_SERVER_DIRDATA | \
          SID_SERVER_SECURITY | SID_SERVER_LOCAL | SID_SERVER_ME)
+
+#define SID_SERVER_ALL SID_SERVER_VALID_TYPES
 
 /* these are defined in policyeval.c */
 /* they depend on SID_NUM_ATTR and thus they are here */

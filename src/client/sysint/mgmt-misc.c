@@ -70,12 +70,17 @@ PVFS_error PVFS_mgmt_statfs_all(PVFS_fs_id fs_id,
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t *addr_array = NULL;
     int real_count = 0;
+    struct SID_type_s stype = {SID_SERVER_ALL, fs_id};
 
+/* V3 cleanup */
+#if 0
     ret = PINT_cached_config_count_servers(
                             fs_id,
                             PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
                             &real_count);
+#endif
 
+    ret = PVFS_SID_count_all(fs_id, &real_count);
     if (ret < 0)
     {
 	return ret;
@@ -96,12 +101,17 @@ PVFS_error PVFS_mgmt_statfs_all(PVFS_fs_id fs_id,
     }
 
     /* generate default list of servers */
+
+/* V3 cleanup */
+#if 0
     ret = PINT_cached_config_get_server_array(
                             fs_id,
                             PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
                             addr_array,
                             &real_count);
+#endif
 
+    ret = PVFS_SID_get_server_first_n(addr_array, NULL, &real_count, stype);
     if (ret < 0)
     {
 	free(addr_array);
@@ -136,11 +146,17 @@ PVFS_error PVFS_mgmt_setparam_all(PVFS_fs_id fs_id,
     int count = 0;
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t *addr_array = NULL;
+    struct SID_type_s stype = {SID_SERVER_ALL, fs_id};
+
+/* V3 replace with SIDcache call */
+#if 0
     ret = PINT_cached_config_count_servers(
                             fs_id,
                             PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
                             &count);
+#endif
 
+    ret = PVFS_SID_count_all(fs_id, &count);
     if (ret < 0)
     {
 	return ret;
@@ -153,12 +169,17 @@ PVFS_error PVFS_mgmt_setparam_all(PVFS_fs_id fs_id,
     }
 
     /* generate default list of servers */
+
+/* V3 cleanup */
+#if 0
     ret = PINT_cached_config_get_server_array(
                                 fs_id,
                                 PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
                                 addr_array,
                                 &count);
+#endif
 
+    ret = PVFS_SID_get_server_first_n(addr_array, NULL, &count, stype);
     if (ret < 0)
     {
 	free(addr_array);
@@ -217,11 +238,16 @@ PVFS_error PVFS_mgmt_get_server_array(PVFS_fs_id fs_id,
                                       int *inout_count_p)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    struct SID_type_s stype = {server_type, fs_id};
 
+/* V3 cleanup */
+#if 0
     ret = PINT_cached_config_get_server_array(fs_id,
                                               server_type,
                                               addr_array,
                                               inout_count_p);
+#endif
+    ret = PVFS_SID_get_server_first_n(addr_array, NULL, inout_count_p, stype);
     return ret;
 }
 
@@ -238,7 +264,7 @@ PVFS_error PVFS_mgmt_count_servers(PVFS_fs_id fs_id,
 {
     PVFS_error ret = -PVFS_EINVAL;
 
-    ret = PINT_cached_config_count_servers(fs_id, server_type, count);
+    ret = PVFS_SID_count_type(fs_id, server_type, count);
     return ret;
 }
 

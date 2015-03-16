@@ -73,6 +73,7 @@ const char *PINT_cached_config_map_addr(
                 PVFS_BMI_addr_t addr,
                 int *server_type);
  
+#if 0
 int PINT_cached_config_get_server_array(
                 PVFS_fs_id fsid,
                 int server_type,
@@ -84,7 +85,6 @@ int PINT_cached_config_count_servers(
                 int server_type,
                 int *count);
 
-#if 0
 int PINT_cached_config_map_to_server(
                 PVFS_BMI_addr_t *server_addr,
                 PVFS_handle handle,
@@ -103,9 +103,11 @@ int PINT_cached_config_get_num_dfiles(PVFS_fs_id fsid,
                                       int32_t num_dfiles_requested,
                                       int32_t *num_dfiles);
 
+#if 0
 int PINT_cached_config_get_num_meta(PVFS_fs_id fsid, int32_t *num_meta);
 
 int PINT_cached_config_get_num_io(PVFS_fs_id fsid, int32_t *num_io);
+#endif
 
 int PINT_cached_config_get_metadata_sid_count(PVFS_fs_id fsid, int32_t *num_sid);
 

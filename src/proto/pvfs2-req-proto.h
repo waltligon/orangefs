@@ -2340,10 +2340,8 @@ do {                                                             \
     (__req).hints = (__hints);                                   \
     (__req).u.mgmt_setparam.fs_id = (__fsid);                    \
     (__req).u.mgmt_setparam.param = (__param);                   \
-    if(__value){                                                 \
-        (__req).u.mgmt_setparam.value.type = (__value)->type;    \
-        (__req).u.mgmt_setparam.value.u.value = (__value)->u.value; \
-    }                                                               \
+    (__req).u.mgmt_setparam.value = (__value);                   \
+    /* if type string should we dup the string??? */             \
 } while (0)
 
 /* mgmt_noop ********************************************************/

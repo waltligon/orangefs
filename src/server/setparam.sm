@@ -58,8 +58,8 @@ machine pvfs2_setparam_sm
  *
  * actually does the "work" involved in setting a runtime server parameter
  */
-static PINT_sm_action setparam_work(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action setparam_work(struct PINT_smcb *smcb,
+                                    job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1, tmp_on = 0;
