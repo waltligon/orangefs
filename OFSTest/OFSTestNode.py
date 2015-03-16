@@ -1297,7 +1297,7 @@ class OFSTestNode(object):
                 logging.exception(output)
                 return rc
             #install_commands.append("yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user)
-            install_commands.append("rpm -i /home/%s/jdk-7u71-linux-x64.rpm" % self.current_user)
+            install_commands.append("yum install -y /home/%s/jdk-7u71-linux-x64.rpm" % self.current_user)
             
 
         
