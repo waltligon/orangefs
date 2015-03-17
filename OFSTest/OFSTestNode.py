@@ -1316,6 +1316,11 @@ class OFSTestNode(object):
         
         self.installMaven()
         
+        if "centos linux 7" in self.distro.lower():
+            self.runSingleCommandAsRoot("/sbin/reboot&")
+            time.sleep(60)
+        
+        
         
     def installMaven(self):
             
