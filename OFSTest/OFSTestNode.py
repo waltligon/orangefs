@@ -1318,7 +1318,8 @@ class OFSTestNode(object):
         
         if "centos linux 7" in self.distro.lower():
             self.runSingleCommandAsRoot("nohup /sbin/reboot &")
-            time.sleep(60)
+            print "Rebooting node again"
+            time.sleep(120)
         
         
         
