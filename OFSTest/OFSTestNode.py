@@ -1291,14 +1291,14 @@ class OFSTestNode(object):
                 ]
             
             #install Sun Java 7
-            rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-7u71-linux-x64.rpm",output)
-             
-            if rc != 0:
-                logging.exception(output)
-                return rc
-            #install_commands.append("yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user)
-            install_commands.append("yum install -y /home/%s/jdk-7u71-linux-x64.rpm" % self.current_user)
-            
+#             rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-7u71-linux-x64.rpm",output)
+#              
+#             if rc != 0:
+#                 logging.exception(output)
+#                 return rc
+#             #install_commands.append("yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user)
+#             install_commands.append("yum install -y /home/%s/jdk-7u71-linux-x64.rpm" % self.current_user)
+#             
 
         
             for command in install_commands:
