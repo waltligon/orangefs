@@ -1317,7 +1317,7 @@ class OFSTestNode(object):
         self.installMaven()
         
         if "centos linux 7" in self.distro.lower():
-            self.runSingleCommandAsRoot("/sbin/reboot&")
+            self.runSingleCommandAsRoot("nohup /sbin/reboot &")
             time.sleep(60)
         
         
