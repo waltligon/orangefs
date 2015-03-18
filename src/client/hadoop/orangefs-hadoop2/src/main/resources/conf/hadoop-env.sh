@@ -40,9 +40,9 @@ export LD_LIBRARY_PATH=$ORANGEFS_PREFIX/lib
 export JNI_LIBRARY_PATH=$ORANGEFS_PREFIX/lib
 export PVFS2TAB_FILE=/tmp/orangefs_hadoop_storage/pvfs2tab
 if [ "$HADOOP_CLASSPATH" ]; then
-    export HADOOP_CLASSPATH="$HADOOP_CLASSPATH:$JNI_LIBRARY_PATH/orangefs-hadoop2-2.9.0.jar:$JNI_LIBRARY_PATH/orangefs-jni-2.9.0.jar"
+    export HADOOP_CLASSPATH="$HADOOP_CLASSPATH:$JNI_LIBRARY_PATH/orangefs-hadoop2-2.9.1.jar:$JNI_LIBRARY_PATH/orangefs-jni-2.9.1.jar"
 else
-    export HADOOP_CLASSPATH="$JNI_LIBRARY_PATH/orangefs-hadoop2-2.9.0.jar:$JNI_LIBRARY_PATH/orangefs-jni-2.9.0.jar"
+    export HADOOP_CLASSPATH="$JNI_LIBRARY_PATH/orangefs-hadoop2-2.9.1.jar:$JNI_LIBRARY_PATH/orangefs-jni-2.9.1.jar"
 fi
 export ORANGEFS_STRIP_SIZE_AS_BLKSIZE=true
 #end of custom additions for OrangeFS
