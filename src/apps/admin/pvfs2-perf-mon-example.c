@@ -19,6 +19,7 @@
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
 #include "pvfs2-internal.h"
+#include "bmi.h"
 
 #define HISTORY 5
 #define FREQUENCY 3
@@ -62,7 +63,6 @@ int main(int argc, char **argv)
     uint64_t* end_time_ms_array;
     uint32_t* next_id_array;
     PVFS_BMI_addr_t *addr_array;
-    int tmp_type;
     uint64_t next_time;
     float bw;
 
@@ -187,7 +187,7 @@ int main(int argc, char **argv)
 	for (i=0; i < io_server_count; i++)
 	{
 	    printf("\nread:  %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
+                   BMI_addr_rev_lookup(addr_array[i]));
 	    for (j=0; j < HISTORY; j++)
 	    {
 		/* only print valid measurements */
@@ -215,7 +215,7 @@ int main(int argc, char **argv)
 	    }
 
 	    printf("\nwrite: %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
+                   BMI_addr_rev_lookup(addr_array[i]));
 
 	    for (j=0; j < HISTORY; j++)
 	    {
@@ -246,7 +246,7 @@ int main(int argc, char **argv)
             printf("\n\nPVFS2 metadata op statistics (# of operations):\n");
             printf("==================================================");
             printf("\nread:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
+                   BMI_addr_rev_lookup(addr_array[i]));
 
 	    for(j = 0; j < HISTORY; j++)
 	    {
@@ -258,7 +258,7 @@ int main(int argc, char **argv)
 	    }
 
             printf("\nwrite:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
+                   BMI_addr_rev_lookup(addr_array[i]));
 
 	    for(j = 0; j < HISTORY; j++)
 	    {

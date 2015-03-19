@@ -16,6 +16,7 @@
 /*#include "trove-handle-mgmt.h"*/
 #include "pint-cached-config.h"
 #include "pint-security.h"
+#include "sid.h"
 
 #ifdef HAVE_SYSINFO
 #include <sys/sysinfo.h>
@@ -56,12 +57,15 @@ machine pvfs2_statfs_sm
  *
  * issue the trove call to retrieve fs statistics
  */
-static PINT_sm_action statfs_do_statfs(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action statfs_do_statfs(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     TROVE_context_id tmp_context;
+    PVFS_SID mysid;
+    uint32_t mytype;
+
     /* V3 */
 #if 0
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -73,13 +77,12 @@ static PINT_sm_action statfs_do_statfs(
     ret = trove_handle_get_statistics(
         s_op->req->u.statfs.fs_id,
         &s_op->resp.u.statfs.stat.handles_available_count);
-#endif
-
     if (ret < 0)
     {
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
+#endif
 
     /* find out how many total handles this server controls */
     /* V3 nolonger have assigned handles - remove from resp */
@@ -102,9 +105,10 @@ static PINT_sm_action statfs_do_statfs(
         return SM_ACTION_COMPLETE;
     }
 
-    ret = trove_collection_getinfo(
-        s_op->req->u.statfs.fs_id, tmp_context,
-        PVFS_COLLECTION_STATFS, &(s_op->resp.u.statfs.stat));
+    ret = trove_collection_getinfo(s_op->req->u.statfs.fs_id,
+                                   tmp_context,
+                                   PVFS_COLLECTION_STATFS,
+                                   &(s_op->resp.u.statfs.stat));
 
     /* close context regardless of whether getinfo was successful */
     trove_close_context(s_op->req->u.statfs.fs_id, tmp_context);
@@ -151,14 +155,15 @@ static PINT_sm_action statfs_do_statfs(
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static PINT_sm_action statfs_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action statfs_cleanup(struct PINT_smcb *smcb,
+                                     job_status_s *js_p)
 {
     return(server_state_machine_complete(smcb));
 }
 
-static inline int PINT_get_object_ref_statfs(
-    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+static inline int PINT_get_object_ref_statfs(struct PVFS_server_req *req,
+                                             PVFS_fs_id *fs_id,
+                                             PVFS_handle *handle)
 {
     *fs_id = req->u.statfs.fs_id;
     *handle = PVFS_HANDLE_NULL;

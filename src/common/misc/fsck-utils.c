@@ -318,9 +318,11 @@ int PVFS_fsck_check_server_configs(
         server_name = NULL;
 
         /* get the pretty server name */
-        server_name = PINT_cached_config_map_addr(
-                        *cur_fs, addresses[i], &server_type);
-        assert(server_name);
+        server_name = BMI_addr_rev_lookup(addresses[i]);
+        if(!server_name)
+        {
+             server_name = "[UNKNOWN]";
+        }
 
         fs_config = calloc(FS_CONFIG_BUFFER_SIZE, sizeof(char));
         if (fs_config == NULL)
@@ -330,10 +332,10 @@ int PVFS_fsck_check_server_configs(
         }
         
         ret = PVFS_mgmt_get_config(cur_fs,
-                                 &addresses[i],
-                                 fs_config,
-                                 FS_CONFIG_BUFFER_SIZE,
-                                 cred);
+                                   &addresses[i],
+                                   fs_config,
+                                   FS_CONFIG_BUFFER_SIZE,
+                                   cred);
         if (ret < 0)
         {
             PVFS_perror_gossip("PVFS_mgmt_get_config", ret);
@@ -1697,7 +1699,6 @@ static int PINT_handle_wrangler_display_stranded_handles(
     int ret = 0;
     int i = 0;
     int j = 0;
-    int server_type = 0;
     PVFS_sysresp_getattr attributes;
     PVFS_object_ref pref;
     const char *server_name = NULL;
@@ -1708,10 +1709,12 @@ static int PINT_handle_wrangler_display_stranded_handles(
     for (i = 0; i < PINT_handle_wrangler_handlelist.num_servers; i++)
     {
         /* get the pretty server name */
-        server_name = PINT_cached_config_map_addr(*cur_fs,
-                                             PINT_handle_wrangler_handlelist.
-                                             addr_array[i],
-                                             &server_type);
+        server_name = BMI_addr_rev_lookup(
+                            PINT_handle_wrangler_handlelist.addr_array[i]);
+        if(!server_name)
+        {
+             server_name = "[UNKNOWN]";
+        }
 
         for (j = 0; j < PINT_handle_wrangler_handlelist.size_array[i]; j++)
         {

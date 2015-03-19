@@ -191,7 +191,9 @@ static int statfs_list_comp_fn(void *v_p,
 {
     int j = 0;
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
+
 
     /* if this particular request was successful, then store the
      * statfs information in an array to be returned to caller
@@ -214,11 +216,19 @@ static int statfs_list_comp_fn(void *v_p,
         sm_stat->handles_available_count = resp_stat->handles_available_count;
         sm_stat->handles_total_count = resp_stat->handles_total_count;
 
-        sm_stat->bmi_address = PVFS_mgmt_map_addr(
-                                      sm_p->u.statfs_list.fs_id,
-                                      sm_p->msgarray_op.msgarray[i].svr_addr,
-                                      &sm_stat->server_type);
-        assert(sm_stat->bmi_address);
+        sm_stat->bmi_address = BMI_addr_rev_lookup(
+                                      sm_p->msgarray_op.msgarray[i].svr_addr);
+        if(!sm_stat->bmi_address)
+        {
+            sm_stat->bmi_address = "[UNKNOWN]";
+        }
+
+        /* look up server type on self */
+#if 0
+        PINT_cached_config_server_local(&mysid);
+        SID_get_type(&mysid, &mytype);
+        s_op->resp.u.statfs.stat.server_type = mytype;
+#endif
 
         assert(sm_stat->handles_total_count >=
                         sm_stat->handles_available_count);
@@ -229,7 +239,7 @@ static int statfs_list_comp_fn(void *v_p,
      */
     if (i == (sm_p->msgarray_op.count -1))
     {
-        for (j=0; j < sm_p->msgarray_op.count; j++)
+        for (j = 0; j < sm_p->msgarray_op.count; j++)
         {
             if (sm_p->msgarray_op.msgarray[j].op_status != 0)
             {
@@ -267,12 +277,14 @@ static PINT_sm_action mgmt_statfs_list_setup_msgpair(struct PINT_smcb *smcb,
         msg_p->msgclass = PVFS_IO_METADATA;
         msg_p->msgdir = PVFS_IO_READ;
 	msg_p->fs_id = sm_p->u.statfs_list.fs_id;
+        /* we don't use SID to address a server here only BMI addr */
 	msg_p->handle = PVFS_HANDLE_NULL;
 	msg_p->sid_count = 0;
 	msg_p->sid_index = 0;
 	msg_p->sid_array = NULL;
 	msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
 	msg_p->comp_fn = statfs_list_comp_fn;
+        /* here we set the BMI addr - should we use a SID instead? */
 	msg_p->svr_addr = sm_p->u.statfs_list.addr_array[i];
     }
 

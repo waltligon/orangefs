@@ -1055,8 +1055,14 @@ int PINT_cached_config_get_next_io(
 }
 #endif
 
-/* V3 becomes SID cache funcdtion */
-
+/* V3 cleanup
+ * This is only used for converting a BMI addr to a url string for error
+ * messages.  BMI has a nice interface to a hash table.  No point in
+ * adding an index to the SID cache, and the server part of cached config
+ * is gone.  Replace any calls to with with
+ * char *BMI_addr_rev_lookup(BMI_addr);
+ */
+#if 0
 /* PINT_cached_config_map_addr()
  *
  * takes an opaque server address and returns the server type and
@@ -1103,6 +1109,7 @@ const char *PINT_cached_config_map_addr(PVFS_fs_id fs_id,
     }
     return NULL;
 }
+#endif
 
 /* V3 becomes a SID cache function */
 

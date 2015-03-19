@@ -290,7 +290,6 @@ static int noop_all_servers(PVFS_fs_id fsid)
     int count;
     PVFS_BMI_addr_t* addr_array;
     int i;
-    int tmp;
  
     ret = PVFS_util_gen_credential_defaults(&creds);
     if (ret < 0)
@@ -326,7 +325,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
     for (i = 0; i < count; i++)
     {
 	printf("   %s ",
-               PVFS_mgmt_map_addr(fsid, addr_array[i], &tmp));
+               BMI_addr_rev_lookup(addr_array));
 	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i], NULL);
 	if (ret == 0)
 	{
@@ -335,7 +334,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
 	else
 	{
 	    printf("FAILURE: PVFS_mgmt_noop failed for server: %s\n",
-                   PVFS_mgmt_map_addr(fsid, addr_array[i], &tmp));
+                   BMI_addr_rev_lookup(addr_array[i]));
 	    return ret;
 	}
     }
@@ -368,7 +367,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
     for (i = 0; i < count; i++)
     {
 	printf("   %s ",
-               PVFS_mgmt_map_addr(fsid, addr_array[i], &tmp));
+               BMI_addr_rev_lookup(addr_array[i]));
 	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i], NULL);
 	if (ret == 0)
 	{
@@ -396,7 +395,6 @@ static int print_config(PVFS_fs_id fsid)
     PVFS_credential creds;
     int i;
     int ret = -1;
-    int tmp;
     int count;
     PVFS_BMI_addr_t *addr_array;
  
@@ -434,7 +432,7 @@ static int print_config(PVFS_fs_id fsid)
     for (i=0; i<count; i++)
     {
 	printf("   %s\n",
-               PVFS_mgmt_map_addr(fsid, addr_array[i], &tmp));
+               BMI_addr_rev_lookup(addr_array[i]));
     }
     free(addr_array);
 
@@ -465,7 +463,7 @@ static int print_config(PVFS_fs_id fsid)
     for(i=0; i<count; i++)
     {
 	printf("   %s\n",
-               PVFS_mgmt_map_addr(fsid, addr_array[i], &tmp));
+               BMI_addr_rev_lookup(addr_array[i]));
     }
     free(addr_array);
 

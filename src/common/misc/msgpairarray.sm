@@ -963,7 +963,6 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
     int ret = -PVFS_EINVAL;
     struct PINT_decoded_msg decoded_msg;
     const char* server_string = NULL;
-    int server_type;
 
     /* response structure (decoded) */
     struct PVFS_server_resp *resp_p = NULL;
@@ -985,12 +984,10 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
         char s[1024];
         /* this just deals with printing error warnings */
         PVFS_strerror_r(msg_p->op_status, s, sizeof(s));
-        server_string = PINT_cached_config_map_addr(msg_p->fs_id,
-                                                    msg_p->svr_addr,
-                                                    &server_type);
+        server_string = BMI_addr_rev_lookup(msg_p->svr_addr);
         if(!server_string)
         {
-            server_string = BMI_addr_rev_lookup(msg_p->svr_addr);
+            server_string = "[UNKNOWN]";
         }
 
         gossip_err("Warning: msgpair failed to %s, will retry: %s\n",
@@ -1187,9 +1184,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
         {
             /* Not going to retry so log it */
             char s[1024];
-            server_string = PINT_cached_config_map_addr(msg_p->fs_id,
-                                                        msg_p->svr_addr,
-                                                        &server_type);
+            server_string = BMI_addr_rev_lookup(msg_p->svr_addr);
             if(!server_string)
             {
                 server_string = "[UNKNOWN]";
@@ -1811,7 +1806,7 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
                           int actual_resp_sz,
                           struct PVFS_server_resp **resp_out_pp)
 {
-    int ret = -1, server_type = 0;
+    int ret = -1;
     const char *server_string;
 
 
@@ -1833,9 +1828,11 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
 
             if (fs_id != PVFS_FS_ID_NULL)
             {
-                server_string = PINT_cached_config_map_addr(fs_id,
-                                                            *svr_addr_p,
-                                                            &server_type);
+                server_string = BMI_addr_rev_lookup(*svr_addr_p);
+                if(!server_string)
+                {
+                    server_string = "[UNKNOWN]";
+                }
                 gossip_err("   Server: %s.\n", server_string);
             }
             else

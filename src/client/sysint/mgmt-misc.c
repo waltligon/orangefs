@@ -25,6 +25,8 @@
 #include "client-state-machine.h"
 #include "sid.h"
 
+/* V3 cleanup - use BMI_rev_lookup instread */
+#if 0
 /** Maps a given opaque server address back to a string address.  Also
  *  fills in server type.
  *
@@ -37,8 +39,6 @@ const char *PVFS_mgmt_map_addr(PVFS_fs_id fs_id,
     return PINT_cached_config_map_addr(fs_id, addr, server_type);
 }
 
-/* V3 this is replaced */
-#if 0
 PVFS_error PVFS_mgmt_map_handle(PVFS_fs_id fs_id,
                                 PVFS_handle handle,
                                 PVFS_BMI_addr_t *addr)
@@ -111,6 +111,11 @@ PVFS_error PVFS_mgmt_statfs_all(PVFS_fs_id fs_id,
                             &real_count);
 #endif
 
+    /* to fix server type field, return SIDs here, then look them up to
+     * get the server type with SID_get_type after the statfs_list
+     * alternatively the server could look itself up as part of the
+     * statfs call.
+     */
     ret = PVFS_SID_get_server_first_n(addr_array, NULL, &real_count, stype);
     if (ret < 0)
     {

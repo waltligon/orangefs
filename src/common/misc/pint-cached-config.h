@@ -66,14 +66,12 @@ int PINT_cached_config_get_next_io(
                 int num_servers,
                 PVFS_BMI_addr_t *io_addr_array,
                 PVFS_handle_extent_array *io_handle_extent_array);
-#endif
 
 const char *PINT_cached_config_map_addr(
                 PVFS_fs_id fsid,
                 PVFS_BMI_addr_t addr,
                 int *server_type);
  
-#if 0
 int PINT_cached_config_get_server_array(
                 PVFS_fs_id fsid,
                 int server_type,
