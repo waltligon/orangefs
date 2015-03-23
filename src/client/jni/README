@@ -16,8 +16,7 @@ Step 1:
     make
     sudo make install
 
-  For comprehensive documentation on using Hadoop with OrangeFS, please see:
-    http://www.omnibond.com/orangefs/docs/v_2_8_8/index.htm#Hadoop_Client.htm
+  For comprehensive documentation on using Hadoop with OrangeFS, please visit docs.orangefs.com/.
 
 ===============================================================================
 Step 2:
