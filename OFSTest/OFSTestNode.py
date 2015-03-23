@@ -1126,7 +1126,7 @@ class OFSTestNode(object):
                 "DEBIAN_FRONTEND=noninteractive apt-get update", 
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-\\`uname -r\\` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime gdb maven", # openjdk-7-jdk openjdk-7-jre openjdk-7-jre-lib", 
-                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q libfuse2 fuse-utils libfuse-dev",
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q fuse libfuse2 libfuse-dev",
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q autofs nfs-kernel-server rpcbind nfs-common nfs-kernel-server", 
                 # needed for Ubuntu 10.04
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q linux-image",
