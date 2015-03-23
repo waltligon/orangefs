@@ -35,14 +35,15 @@ export MALLOC_ARENA_MAX=4
 export HADOOP_CONF_DIR=${HADOOP_CONF_DIR:-"/etc/hadoop"}
 
 #Custom Additions for OrangeFS
-export ORANGEFS_PREFIX=/opt/orangefs-trunk
+export ORANGEFS_VERSION="@PVFS2_VERSION_MAJOR@.@PVFS2_VERSION_MINOR@.@PVFS2_VERSION_SUB@"
+export ORANGEFS_PREFIX=/opt/orangefs
 export LD_LIBRARY_PATH=$ORANGEFS_PREFIX/lib
 export JNI_LIBRARY_PATH=$ORANGEFS_PREFIX/lib
 export PVFS2TAB_FILE=/tmp/orangefs_hadoop_storage/pvfs2tab
 if [ "$HADOOP_CLASSPATH" ]; then
-    export HADOOP_CLASSPATH="$HADOOP_CLASSPATH:$JNI_LIBRARY_PATH/orangefs-hadoop2-2.9.1.jar:$JNI_LIBRARY_PATH/orangefs-jni-2.9.1.jar"
+    export HADOOP_CLASSPATH="$HADOOP_CLASSPATH:$JNI_LIBRARY_PATH/orangefs-hadoop2-${ORANGEFS_VERSION}.jar:$JNI_LIBRARY_PATH/orangefs-jni-${ORANGEFS_VERSION}.jar"
 else
-    export HADOOP_CLASSPATH="$JNI_LIBRARY_PATH/orangefs-hadoop2-2.9.1.jar:$JNI_LIBRARY_PATH/orangefs-jni-2.9.1.jar"
+    export HADOOP_CLASSPATH="$JNI_LIBRARY_PATH/orangefs-hadoop2-${ORANGEFS_VERSION}.jar:$JNI_LIBRARY_PATH/orangefs-jni-${ORANGEFS_VERSION}.jar"
 fi
 export ORANGEFS_STRIP_SIZE_AS_BLKSIZE=true
 #end of custom additions for OrangeFS

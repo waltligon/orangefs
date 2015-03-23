@@ -1289,6 +1289,12 @@ distclean: cleaner docsclean
 	rm -rf lib
 	rm -f src/server/simple.conf
 	rm -f src/apps/admin/pvfs2-config
+	rm -f src/client/hadoop/orangefs-hadoop1/pom.xml \
+		src/client/hadoop/orangefs-hadoop1/src/main/resources/conf/hadoop-env.sh \
+		src/client/hadoop/orangefs-hadoop2/pom.xml \
+		src/client/hadoop/orangefs-hadoop2/src/main/resources/conf/hadoop-env.sh \
+		src/client/jni/pom.xml
+
 ifndef DIST_RELEASE
 	rm -f $(SMCGEN)
 endif
