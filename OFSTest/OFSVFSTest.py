@@ -693,7 +693,7 @@ def linux_untar(testing_node,output=[]):
     rc = testing_node.runSingleCommand("cd %s; tar xf /tmp/linux-3.18.9.tar" % testing_node.ofs_mount_point)
     
     total_time = datetime.now()-ts
-    print "Total time to untar Linux 3.18.9 source is " + total_time + " ms"
+    print "Total time to untar Linux 3.18.9 source is %r ms" % total_time
     
     return rc
 
