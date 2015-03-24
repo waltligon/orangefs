@@ -866,9 +866,11 @@ class OFSTestNode(object):
                 
                 rc = self.runSingleCommandAsRoot("perl -e \\\"s/\\`uname -r\\`/\\`rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel\\`/g\\\" -p -i /boot/grub/grub.conf")
                 
-
+            else:
+                rc = self.runSingleCommandAsRoot("mkdir -p /var/log/journal")
+                
             rc = self.runSingleCommandAsRoot("nohup /sbin/reboot &")
-
+            
         #self.runAllBatchCommands()
         msg = "Node "+self.hostname+" at "+self.ip_address+" updated."
         print msg

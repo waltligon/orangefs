@@ -22,6 +22,7 @@
 
 
 import inspect
+from datetime import datetime
 
 header = "OFS VFS Test(kmod)"
 prefix = "vfs-kmod"
@@ -668,6 +669,34 @@ def simultaneous_ls(testing_node,output=[]):
     rc = testing_node.runSingleCommand("eval %s & %s" % (pvfs2_ls,pvfs2_ls),output)
     return rc
 
+def dd(testing_node,output=[]):
+
+    
+    rc = testing_node.runSingleCommand("dd if=/dev/urandom of=/tmp/gigfile bs=2M count=512", output)
+    if rc != 0:
+        return rc
+    
+    rc = testing_node.runSingleCommand("dd if=/tmp/gigfile of=%s/gigfile bs=16M " % testing_node.ofs_mount_point, output)
+    print output[1]
+    print output[2]
+    
+    return rc
+
+def linux_untar(testing_node,output=[]):
+    
+    rc = testing_node.runSingleCommand("cd /tmp; wget http://devorange.clemson.edu/pvfs/linux-3.18.9.tar.gz", output)
+    
+    rc = testing_node.runSingleCommand("cd /tmp; gunzip linux-3.18.9.tar.gz",output)
+    
+    ts = datetime.now()
+    
+    rc = testing_node.runSingleCommand("cd %s; tar xf /tmp/linux-3.18.9.tar" % testing_node.ofs_mount_point)
+    
+    total_time = datetime.now()-ts
+    print "Total time to untar Linux 3.18.9 source is " + total_time + " ms"
+    
+    return rc
+
 tests = [ 
 #ltp,
 append,
@@ -679,6 +708,8 @@ tail,
 vfs_cp,
 simultaneous_ls,
 
+dd,
+linux_untar,
 fdtree,
 fstest,
 fsx,
