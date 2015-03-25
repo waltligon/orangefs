@@ -217,7 +217,7 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
                          "pvfs2_lookup: Adding *negative* dentry %p\n for %s\n",
                          dentry, dentry->d_name.name);
 
-            d_add(dentry, inode);
+            //d_add(dentry, inode);
 
             res = NULL;
             goto out;
