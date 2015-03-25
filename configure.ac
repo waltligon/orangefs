@@ -658,6 +658,24 @@ AC_TRY_COMPILE(
     ,
     AC_MSG_RESULT(no)
 )
+
+dnl Check for updated selinux so it won't break usrint
+AC_MSG_CHECKING([for security_context_t in setfilecon])
+AC_TRY_COMPILE(
+    [
+        #include <selinux/selinux.h>
+    ],
+    [
+        int ret;
+        security_context_t sc_t;
+	    ret = setfilecon("somepath", sc_t);
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(USE_SECONTEXT, 1, Define if setfilecon uses security_context_t)
+    ,
+    AC_MSG_RESULT(no)
+)
+
 dnl Check byte ordering
 AC_C_BIGENDIAN
 

@@ -78,25 +78,31 @@ int fgetfilecon(int fd, security_context_t *con)
     return -1;
 }
 
-int setfscreatecon(security_context_t con)
+#ifdef USE_SECONTEXT 
+typedef security_context_t u_security_context;
+#else
+typedef const char *u_security_context;
+#endif
+
+int setfscreatecon(u_security_context con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int setfilecon(const char *path, security_context_t con)
+int setfilecon(const char *path, u_security_context con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int lsetfilecon(const char *path, security_context_t con)
+int lsetfilecon(const char *path, u_security_context con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int fsetfilecon(int fd, security_context_t con)
+int fsetfilecon(int fd, u_security_context con)
 {
     errno = ENOTSUP;
     return -1;
