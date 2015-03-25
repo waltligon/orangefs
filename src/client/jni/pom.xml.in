@@ -7,7 +7,7 @@
     <groupId>org.orangefs.usrint</groupId>
     <artifactId>orangefs-jni</artifactId>
     <packaging>jar</packaging>
-    <version>2.9.1</version>
+    <version>@PVFS2_VERSION_MAJOR@.@PVFS2_VERSION_MINOR@.@PVFS2_VERSION_SUB@</version>
     <name>orangefs-jni</name>
 
     <properties>

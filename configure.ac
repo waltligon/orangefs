@@ -1859,6 +1859,11 @@ doc/random/module.mk
 examples/orangefs-server
 examples/orangefs-client
 doc/doxygen/pvfs2-doxygen.conf
+src/client/jni/pom.xml
+src/client/hadoop/orangefs-hadoop1/pom.xml
+src/client/hadoop/orangefs-hadoop1/src/main/resources/conf/hadoop-env.sh
+src/client/hadoop/orangefs-hadoop2/pom.xml
+src/client/hadoop/orangefs-hadoop2/src/main/resources/conf/hadoop-env.sh
 )
 
 chmod +x $BUILD_ABSOLUTE_TOP/src/apps/admin/pvfs2-config
