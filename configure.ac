@@ -662,7 +662,7 @@ AC_TRY_COMPILE(
 dnl Check for updated selinux so it won't break usrint
 AC_MSG_CHECKING([for security_context_t in setfilecon])
 old_cflags="$CFLAGS"
-CFLAGS="$CFLAGS -Wall -Werror"
+CFLAGS="$CFLAGS -Werror"
 AC_TRY_COMPILE(
     [
         #include <stdio.h>
@@ -677,9 +677,10 @@ AC_TRY_COMPILE(
         security_context_t sc_t = NULL;
 	    ret = setfilecon("somepath", sc_t);
     ],
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(USE_SECONTEXT, 1, Define if setfilecon uses security_context_t)
-    ,
+    [
+       AC_MSG_RESULT(yes)
+       AC_DEFINE(HAVE_SECURITY_CONTEXT, 1, Define if setfilecon uses security_context_t)
+    ],
     AC_MSG_RESULT(no)
 )
 CFLAGS="$old_cflags"

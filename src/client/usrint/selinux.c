@@ -78,13 +78,15 @@ int fgetfilecon(int fd, security_context_t *con)
     return -1;
 }
 
-#ifdef USE_SECONTEXT 
+#ifdef HAVE_SECURITY_CONTEXT 
 typedef security_context_t u_security_context;
+typedef u_security_context const_u_security_context;
 #else
-typedef const char *u_security_context;
+typedef char *u_security_context;
+typedef const u_security_context const_u_security_context;
 #endif
 
-int setfscreatecon(u_security_context con)
+int setfscreatecon(const_u_security_context con)
 {
     errno = ENOTSUP;
     return -1;
