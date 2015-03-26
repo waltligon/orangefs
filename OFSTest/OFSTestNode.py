@@ -160,6 +160,11 @@ class OFSTestNode(object):
         # This is the location of the OrangeFS storage
         self.ofs_storage_location = ""
 
+        ## @var ofs_metadata_location
+        # This is the location of the OrangeFS metadata
+        self.ofs_metadata_location = ""
+
+
         ## @var ofs_installation_location
         # This is where OrangeFS is installed. Defaults to /opt/orangefs
         self.ofs_installation_location = ""
@@ -2369,7 +2374,7 @@ class OFSTestNode(object):
       
     
        
-    def configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_storage_location="",ofs_conf_file=None,security=None):
+    def configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_storage_location="",ofs_metadata_location="",ofs_conf_file=None,security=None,dedicated_metadata_server=False,dedicated_client=False):
         
             
         self.ofs_fs_name=ofs_fs_name
@@ -2379,14 +2384,34 @@ class OFSTestNode(object):
         if ofs_storage_location == "":
             self.ofs_storage_location  = self.ofs_installation_location + "/data"
         else:
-            self.ofs_storage_location = self.ofs_storage_location
+            self.ofs_storage_location = ofs_storage_location
+        
+        if ofs_metadata_location == "":
+            self.ofs_metadata_location = self.ofs_installation_location + "/metadata"
+        else:
+            self.ofs_metadata_location = ofs_metadata_location
+            
            
         # ofs_hosts is a list of ofs hosts separated by white space.
         ofs_host_str = ""
+        metadata_host_str = ""
         
         # Add each ofs host to the string of hosts.
+        
+               
         for ofs_host in ofs_hosts_v:
-            ofs_host_str = ofs_host_str + ofs_host.hostname + ":"+self.ofs_tcp_port+","
+            if dedicated_metadata_server == True and metadata_host_str == "":
+                metadata_host_str = ofs_host.hostname + ":"+self.ofs_tcp_port
+            else:   
+                ofs_host_str = ofs_host_str + ofs_host.hostname + ":"+self.ofs_tcp_port+","
+        
+        # sanity check.
+        if ofs_host_str == "":
+            ofs_host_str = metadata_host_str
+            
+        if dedicated_metadata_server == False:
+            metadata_host_str = ofs_host_str
+            
         
         #strip the trailing comma
         ofs_host_str = ofs_host_str.rstrip(',')
@@ -2419,7 +2444,7 @@ class OFSTestNode(object):
             
         self.runSingleCommand("mkdir -p %s/etc" % self.ofs_installation_location)
         if configuration_options == "":
-            genconfig_str="%s/bin/pvfs2-genconfig %s/etc/orangefs.conf --protocol tcp --iospec=\"%s\" --metaspec=\"%s\" --storage=%s %s --logfile=%s/pvfs2-server-%s.log --quiet" % (self.ofs_installation_location,self.ofs_installation_location,ofs_host_str,ofs_host_str,self.ofs_storage_location,security_args,self.ofs_installation_location,self.ofs_branch)
+            genconfig_str="%s/bin/pvfs2-genconfig %s/etc/orangefs.conf --protocol tcp --iospec=\"%s\" --metaspec=\"%s\" --storage=%s --metadata=%s %s --logfile=%s/pvfs2-server-%s.log --quiet" % (self.ofs_installation_location,self.ofs_installation_location,ofs_host_str,metadata_host_str,self.ofs_storage_location,self.ofs_metadata_location,security_args,self.ofs_installation_location,self.ofs_branch)
         else:
             genconfig_str="%s/bin/pvfs2-genconfig %s/etc/orangefs.conf %s --quiet" % (self.ofs_installation_location,self.ofs_installation_location,configuration_options)
         

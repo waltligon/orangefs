@@ -337,6 +337,13 @@ class OFSTestConfig(object):
         self.instance_suffix = "" # Web Interface: auto
         
         
+        self.dedicated_metadata_server = False
+        self.ofs_metadata_location = ""
+        self.ofs_data_location = ""
+        self.restart_ofs = False
+        self.dedicated_client = False
+        
+        
         
     
     ##
@@ -732,3 +739,19 @@ class OFSTestConfig(object):
         temp = d.get('stop_on_failure')
         if temp != None:
             self.stop_on_failure = temp
+
+        temp = d.get('restart_ofs')
+        if temp != None:
+            self.restart_ofs = temp
+        
+        temp = d.get('ofs_metadata_location')
+        if temp != None:
+            self.ofs_metadata_location = temp
+        
+        temp = d.get('dedicated_metadata_server')
+        if temp != None:
+            self.dedicated_metadata_server = temp
+
+        temp = d.get('dedicated_client')
+        if temp != None:
+            self.dedicated_client = temp

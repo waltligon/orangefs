@@ -709,12 +709,12 @@ vfs_cp,
 simultaneous_ls,
 
 dd,
-linux_untar,
 fdtree,
 fstest,
 fsx,
 iozone,
 bonnie,
 dbench,
-ltp
+ltp,
+linux_untar
  ]

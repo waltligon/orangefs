@@ -652,12 +652,12 @@ class OFSTestNetwork(object):
 
  
        
-    def configureOFSServer(self,ofs_fs_name,master_node=None,node_list=None,pvfs2genconfig_opts="",security=None):
+    def configureOFSServer(self,ofs_fs_name,master_node=None,node_list=None,ofs_data_location="",ofs_metadata_location="",pvfs2genconfig_opts="",security=None,dedicated_metadata_server=False,dedicated_client=False):
         if node_list == None:
             node_list = self.network_nodes
         if master_node == None:
             master_node = node_list[0]
-        return master_node.configureOFSServer(ofs_hosts_v=node_list,ofs_fs_name=ofs_fs_name,configuration_options=pvfs2genconfig_opts,security=security)
+        return master_node.configureOFSServer(ofs_hosts_v=node_list,ofs_fs_name=ofs_fs_name,ofs_data_location=ofs_data_location,ofs_metadata_location=ofs_metadata_location,configuration_options=pvfs2genconfig_opts,security=security,dedicated_metadata_server=dedicated_metadata_server,dedicated_client=dedicated_client)
 
    
     ##    
