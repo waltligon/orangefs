@@ -661,13 +661,20 @@ AC_TRY_COMPILE(
 
 dnl Check for updated selinux so it won't break usrint
 AC_MSG_CHECKING([for security_context_t in setfilecon])
+old_cflags="$CFLAGS"
+CFLAGS="$CFLAGS -Wall -Werror"
 AC_TRY_COMPILE(
     [
+        #include <stdio.h>
         #include <selinux/selinux.h>
+        int setfilecon(const char *path, security_context_t con)
+        {
+            return 0;
+        }
     ],
     [
         int ret;
-        security_context_t sc_t;
+        security_context_t sc_t = NULL;
 	    ret = setfilecon("somepath", sc_t);
     ],
     AC_MSG_RESULT(yes)
@@ -675,6 +682,7 @@ AC_TRY_COMPILE(
     ,
     AC_MSG_RESULT(no)
 )
+CFLAGS="$old_cflags"
 
 dnl Check byte ordering
 AC_C_BIGENDIAN
@@ -1788,22 +1796,23 @@ dnl
 dnl glibc 2.15 and later don't declare gets anymore for ISO C11 mode 
 dnl and if _GNU_SOURCE is defined.
 dnl     - http://gcc.gnu.org/bugzilla/show_bug.cgi?id=51785
-AC_MSG_CHECKING([for gets])
+AC_MSG_CHECKING([for gets in stdio.h])
 oldcflags="$CFLAGS"
 CFLAGS="$CFLAGS -Werror"
 AC_TRY_COMPILE(
     [
-      #include <stdio.h>
+       #include <stdio.h>
     ],
     [
-      char *s;
-      gets(s);
+       char *s;
+       gets(s);
     ],
-    AC_MSG_RESULT(yes)
-    ,
     [
-      AC_MSG_RESULT(no)
-      AC_DEFINE(GETS_IS_GONE, 1, Define if gets is gone from stdio.h)
+       AC_MSG_RESULT(yes)
+       AC_DEFINE(HAVE_STDIO_GETS, 1, Define if gets supported in stdio.h)
+    ],
+    [
+       AC_MSG_RESULT(no)
     ]
 )
 CFLAGS="$oldcflags"

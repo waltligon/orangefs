@@ -70,6 +70,13 @@ int _IO_ferror_unlocked (_IO_FILE *stream);
 extern DIR *fdopendir (int __fd);
 #endif
 
+/* gets - this is depricated and dangerous but here in case old programs
+ * still use it
+ */
+#ifndef HAVE_STDIO_GETS
+extern char *gets(char *s);
+#endif
+
 static inline void init_stdio(void); /* wrapper to check if init is done before
                                       * calling the real init function -
                                       * allows us to inline
@@ -2051,7 +2058,8 @@ int getw(FILE *stream)
 }
 
 /**
- * gets
+ * gets - this is depricated and dangerous but here in case old programs
+ * still use it
  */
 char *gets(char *s)
 {
