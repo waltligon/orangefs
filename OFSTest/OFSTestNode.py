@@ -156,9 +156,9 @@ class OFSTestNode(object):
         # This is the location of the OrangeFS source
         self.ofs_source_location = ""
         
-        ## @var ofs_storage_location
+        ## @var ofs_data_location
         # This is the location of the OrangeFS storage
-        self.ofs_storage_location = ""
+        self.ofs_data_location = ""
 
         ## @var ofs_metadata_location
         # This is the location of the OrangeFS metadata
@@ -2359,7 +2359,7 @@ class OFSTestNode(object):
 
 
     ##
-    # @fn configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_storage_location="",ofs_conf_file=None,security=None):
+    # @fn configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_data_location="",ofs_conf_file=None,security=None):
     #
     # This function runs the configuration programs and puts the result in self.ofs_installation_location/etc/orangefs.conf 
     # @param self The object pointer
@@ -2367,24 +2367,24 @@ class OFSTestNode(object):
     # @param ofs_fs_name OrangeFS filesystem name in url
     # @param configuration_options Additional configuration options
     # @param ofs_source_location Location of OrangeFS source
-    # @param ofs_storage_location Location of OrangeFS storage
+    # @param ofs_data_location Location of OrangeFS storage
     # @param ofs_conf_file Configuration file name. Default is [OFS location]/etc/orangefs.conf
     # @param security OFS security level None,"Key","Cert"
 
       
     
        
-    def configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_storage_location="",ofs_metadata_location="",ofs_conf_file=None,security=None,dedicated_metadata_server=False,dedicated_client=False):
+    def configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_data_location="",ofs_metadata_location="",ofs_conf_file=None,security=None,dedicated_metadata_server=False,dedicated_client=False):
         
             
         self.ofs_fs_name=ofs_fs_name
         
         self.changeDirectory(self.ofs_installation_location)
         
-        if ofs_storage_location == "":
-            self.ofs_storage_location  = self.ofs_installation_location + "/data"
+        if ofs_data_location == "":
+            self.ofs_data_location  = self.ofs_installation_location + "/data"
         else:
-            self.ofs_storage_location = ofs_storage_location
+            self.ofs_data_location = ofs_data_location
         
         if ofs_metadata_location == "":
             self.ofs_metadata_location = self.ofs_installation_location + "/metadata"
@@ -2444,7 +2444,7 @@ class OFSTestNode(object):
             
         self.runSingleCommand("mkdir -p %s/etc" % self.ofs_installation_location)
         if configuration_options == "":
-            genconfig_str="%s/bin/pvfs2-genconfig %s/etc/orangefs.conf --protocol tcp --iospec=\"%s\" --metaspec=\"%s\" --storage=%s --metadata=%s %s --logfile=%s/pvfs2-server-%s.log --quiet" % (self.ofs_installation_location,self.ofs_installation_location,ofs_host_str,metadata_host_str,self.ofs_storage_location,self.ofs_metadata_location,security_args,self.ofs_installation_location,self.ofs_branch)
+            genconfig_str="%s/bin/pvfs2-genconfig %s/etc/orangefs.conf --protocol tcp --iospec=\"%s\" --metaspec=\"%s\" --storage=%s --metadata=%s %s --logfile=%s/pvfs2-server-%s.log --quiet" % (self.ofs_installation_location,self.ofs_installation_location,ofs_host_str,metadata_host_str,self.ofs_data_location,self.ofs_metadata_location,security_args,self.ofs_installation_location,self.ofs_branch)
         else:
             genconfig_str="%s/bin/pvfs2-genconfig %s/etc/orangefs.conf %s --quiet" % (self.ofs_installation_location,self.ofs_installation_location,configuration_options)
         
