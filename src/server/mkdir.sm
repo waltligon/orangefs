@@ -22,10 +22,12 @@
 #include "pint-uid-map.h"
 #include "sid.h"
 
+/*
 static int tree_setattr_comp_fn(
         void *v_p,
         struct PVFS_server_resp *resp_p,
         int index);
+*/
 
 %%
 
@@ -41,30 +43,44 @@ nested machine pvfs2_mkdir_work_sm
     state set_attrib
     {
         run mkdir_setattrib;
-        success => create_dirdata;
+/*        success => create_dirdata; */
+        success => write_keyval_to_meta_handle;
         default => err_msg;
     }
 
+/*
     state create_dirdata
     {
         run mkdir_create_dirdata;
         success => write_keyval_to_meta_handle;
         default => err_msg;
     }
+*/
 
     state write_keyval_to_meta_handle
     {
         run mkdir_write_keyval_to_meta_handle;
-/*        success => return; */
-        success => temp1;
+        success => setup_getattr_request;
         default => err_msg;
     }
 
-    state temp1
+    state setup_getattr_request
     {
-        run temp1;
-        success => return;
+        run mkdir_setup_getattr_request;
+        success => initiate_getattr_request;
         default => err_msg;
+    }
+
+    state initiate_getattr_request
+    {
+        jump pvfs2_get_attr_work_sm;
+        default => setup_resp;
+    }
+
+    state setup_resp
+    {
+        run mkdir_setup_response;
+        default => return;
     }
 
     state err_msg 
@@ -92,13 +108,6 @@ machine pvfs2_mkdir_sm
     state work
     {
         jump pvfs2_mkdir_work_sm;
-/*        default => final_response; */
-        default => temp2;
-    }
-
-    state temp2
-    {
-        run temp2;
         default => final_response;
     }
 
@@ -206,6 +215,7 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
  * Synopsis: 
  *           
  */
+#if 0
 static PINT_sm_action mkdir_create_dirdata(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
@@ -300,6 +310,7 @@ static int tree_setattr_comp_fn(void *v_p,
     PINT_free_object_attr(&(msg_p->req).u.tree_setattr.attr);
     return 0;
 }
+#endif
 
 /* V3 SIDs will get added to the handles, possibly the bitmap too, and
  * the attr should be moved into the dspace record
@@ -372,26 +383,98 @@ static PINT_sm_action mkdir_write_keyval_to_meta_handle(
     return ret;
 }
 
-static int temp1(struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+/*
+ * Function: mkdir_setup_getattr_request
+ *
+ * Synopsis: Retrieve information about the new directory to return to the
+ * client.
+ *
+ */
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "  s_op->req->op = %d\n\t",
-            s_op->req->op);
-    js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
+static PINT_sm_action mkdir_setup_getattr_request(
+                                            struct PINT_smcb *smcb,
+                                            job_status_s *js_p)
+{
+   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   struct PINT_server_op *getattr_op;
+   int ret;
+
+   getattr_op = calloc(1,sizeof(*getattr_op));
+   if ( !getattr_op )
+   {
+      js_p->error_code = -PVFS_ENOMEM;
+      return SM_ACTION_COMPLETE;
+   }
+
+   getattr_op->attr = s_op->resp.u.mkdir.attr;
+
+   getattr_op->req = s_op->req;
+
+   getattr_op->u.getattr.fs_id      = s_op->req->u.mkdir.fs_id;
+   getattr_op->u.getattr.handle     = s_op->req->u.mkdir.handle;
+   getattr_op->u.getattr.attrmask   = PVFS_ATTR_READ_ALL_FASTEST;
+   getattr_op->u.getattr.credential = s_op->req->u.mkdir.credential;
+
+   ret = PINT_sm_push_frame(smcb, 0, getattr_op);
+   if ( ret < 0 )
+   {
+      gossip_err("%s:Error pushing getattr frame onto mkdir stack:ret(%d)\n",__func__,ret);
+      free(getattr_op);
+      js_p->error_code = ret;
+      return SM_ACTION_COMPLETE;
+   }
+
+   return SM_ACTION_COMPLETE;
+
 }
 
-static int temp2(struct PINT_smcb *smcb, job_status_s *js_p)
+/*
+ * Function: mkdir_setup_response
+ *
+ * Synopsis: This getattr request is returning attributes for a the new
+ * directory metafile object.
+ *  Check the results and prepare to return attributes to the client.
+ *
+ */
+static PINT_sm_action mkdir_setup_response(
+        struct PINT_smcb *smcb,
+        job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   struct PINT_server_op *getattr_op;
+   struct PINT_server_op *s_op;
+   int task_id;
+   int remaining;
+#if 0
+   int ret;
+   PVFS_object_attr *resp_attr;
+#endif
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "  s_op->req->op = %d\n\t",
-            s_op->req->op);
-    js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
+   getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
+
+#if 0
+   if ( js_p->error_code )
+   {
+      goto out;
+   }
+
+   s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+   resp_attr = &(getattr_op->resp.u.mkdir.attr);
+
+   ret = PINT_copy_object_attr( &s_op->resp.u.mkdir.attr,resp_attr );
+   if (ret)
+   {
+      gossip_err("%s:Error copying metafile attributes from getattr to lookup:ret(%d)\n",__func__,ret);
+      js_p->error_code = ret;
+      goto out;
+   }
+
+out:
+#endif
+   s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   free(getattr_op);
+   return SM_ACTION_COMPLETE;
 }
-
 static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     if (js_p->error_code > -1)
@@ -419,7 +502,6 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     free(s_op->req->u.mkdir.attr.u.dir.dist_dir_bitmap);
     free(s_op->key_a);
     free(s_op->val_a);
-    free(s_op->error_a);
     if (s_op->msgarray_op.count > 0)
     {
         PINT_free_object_attr(&s_op->req->u.tree_setattr.attr);

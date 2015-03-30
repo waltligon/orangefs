@@ -318,7 +318,6 @@ static int mkdir_msg_comp_fn(void *v_p,
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-    PVFS_object_attr attr;
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir_msg_comp_fn\n");
 
@@ -329,11 +328,8 @@ static int mkdir_msg_comp_fn(void *v_p,
         return resp_p->status;
     }
 
-    /* also insert entry into attr cache */
-    PINT_CONVERT_ATTR(&attr, &sm_p->u.mkdir.sys_attr, 0);
-    /* V3 need to put capability into the acache */
-    attr.capability = resp_p->u.mkdir.capability;
-    PINT_acache_update(sm_p->object_ref, &attr, NULL);
+    /* insert entry into attr cache */
+    PINT_acache_update(sm_p->object_ref, &resp_p->u.mkdir.attr, NULL);
 
     return 0;
 }

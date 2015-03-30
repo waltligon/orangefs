@@ -1471,15 +1471,15 @@ do {                                                       \
 
 struct PVFS_servresp_mkdir
 {
-    PVFS_capability capability; /* capability for new directory */
+    PVFS_object_attr attr; /* attr for new directory */
 };
 
 /* V3: TJS: Need to update struct with array */
 
 endecode_fields_1_struct(
     PVFS_servresp_mkdir,
-    PVFS_capability, capability);
-#define extra_size_PVFS_servresp_mkdir extra_size_PVFS_capability
+    PVFS_object_attr, attr);
+#define extra_size_PVFS_servresp_mkdir extra_size_PVFS_object_attr
 
 /* create dirent ***********************************************/
 /* - creates a new entry within an existing directory */
