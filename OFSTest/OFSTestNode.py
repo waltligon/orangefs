@@ -2200,6 +2200,9 @@ class OFSTestNode(object):
             logging.exception("Could not configure OrangeFS tests")
             return rc
         
+        #kludge because posix tests break compile on non x86 platforms.
+        self.runSingleCommand("rm -rf %s/test/posix" % self.ofs_source_location)
+        
         rc = self.runSingleCommand("make all")
         if rc != 0:
             logging.exception( "Could not build (make) OrangeFS tests")
