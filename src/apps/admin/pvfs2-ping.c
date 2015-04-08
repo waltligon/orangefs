@@ -325,7 +325,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
     for (i = 0; i < count; i++)
     {
 	printf("   %s ",
-               BMI_addr_rev_lookup(addr_array));
+               BMI_addr_rev_lookup(addr_array[i]));
 	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i], NULL);
 	if (ret == 0)
 	{

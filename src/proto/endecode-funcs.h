@@ -216,7 +216,7 @@ typedef uint8_t  u_int8_t;
 #define encode_PVFS_ds_keyval(pptr,pbuf) do { \
     u_int32_t len = ((PVFS_ds_keyval *)pbuf)->buffer_sz; \
     *(u_int32_t *) *(pptr) = htobmi32(len); \
-    memcpy(*(pptr)+4, ((PVFS_ds_keyval *)pbuf)->buffer, len); \
+    if (len){memcpy(*(pptr)+4, ((PVFS_ds_keyval *)pbuf)->buffer, len);} \
     *(pptr) += roundup8(4 + len); \
 } while (0)
 #define decode_PVFS_ds_keyval(pptr,pbuf) do { \
@@ -1129,8 +1129,10 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
     x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
     for (i=0; i<x->n2; i++) \
 	    decode_##ta2(pptr, &(x)->a2[i]); \
+    x->a3 = decode_malloc(x->n2 * sizeof(*x->a3)); \
     for (i=0; i<x->n2; i++) \
 	    decode_##ta3(pptr, &(x)->a3[i]); \
+    x->a4 = decode_malloc(x->n2 * sizeof(*x->a4)); \
     for (i=0; i<x->n2; i++) \
 	    decode_##ta4(pptr, &(x)->a4[i]); \
 } \
@@ -1140,6 +1142,59 @@ static inline void defree_##name(struct name *x) { \
     if (x->n1 > 0) decode_free(x->a1); \
     defree_##t3(&x->x3); \
     defree_##t4(&x->x4); \
+    if (x->n2 > 0) decode_free(x->a2); \
+    if (x->n2 > 0) decode_free(x->a3); \
+    if (x->n2 > 0) decode_free(x->a4); \
+}
+
+/* special case where we have 2 fields then 1 array of a different size and 
+ * then 3 fields then 3 arrays of the same size */
+#define endecode_fields_2a3aaa_struct(name, t1, x1, t2, x2, tn1, n1, ta1, a1, t3, x3, t4, x4, t5, x5, tn2, n2, ta2, a2, ta3, a3, ta4, a4) \
+static inline void encode_##name(char **pptr, const struct name *x) { int i; \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##tn1(pptr, &x->n1); \
+    for (i=0; i<x->n1; i++) \
+	    encode_##ta1(pptr, &(x)->a1[i]); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##t5(pptr, &x->x5); \
+    encode_##tn2(pptr, &x->n2); \
+    for (i=0; i<x->n2; i++) \
+	    encode_##ta2(pptr, &(x)->a2[i]); \
+    for (i=0; i<x->n2; i++) \
+	    encode_##ta3(pptr, &(x)->a3[i]); \
+    for (i=0; i<x->n2; i++) \
+	    encode_##ta4(pptr, &(x)->a4[i]); \
+} \
+static inline void decode_##name(char **pptr, struct name *x) { int i; \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##tn1(pptr, &x->n1); \
+    x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
+    for (i=0; i<x->n1; i++) \
+	    decode_##ta1(pptr, &(x)->a1[i]); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##t5(pptr, &x->x5); \
+    decode_##tn2(pptr, &x->n2); \
+    x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
+    for (i=0; i<x->n2; i++) \
+	    decode_##ta2(pptr, &(x)->a2[i]); \
+    x->a3 = decode_malloc(x->n2 * sizeof(*x->a3)); \
+    for (i=0; i<x->n2; i++) \
+	    decode_##ta3(pptr, &(x)->a3[i]); \
+    x->a4 = decode_malloc(x->n2 * sizeof(*x->a4)); \
+    for (i=0; i<x->n2; i++) \
+	    decode_##ta4(pptr, &(x)->a4[i]); \
+} \
+static inline void defree_##name(struct name *x) { \
+    defree_##t1(&x->x1); \
+    defree_##t2(&x->x2); \
+    if (x->n1 > 0) decode_free(x->a1); \
+    defree_##t3(&x->x3); \
+    defree_##t4(&x->x4); \
+    defree_##t5(&x->x5); \
     if (x->n2 > 0) decode_free(x->a2); \
     if (x->n2 > 0) decode_free(x->a3); \
     if (x->n2 > 0) decode_free(x->a4); \

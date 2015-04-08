@@ -3,5 +3,6 @@ DIR := src/apps/user
 USERSRC := \
 	$(DIR)/getmattr.c \
 	$(DIR)/pvfs2-rm.c \
+	$(DIR)/ofs-xattr.c \
 	$(DIR)/setmattr.c
  

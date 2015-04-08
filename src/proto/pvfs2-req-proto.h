@@ -2681,72 +2681,73 @@ struct PVFS_servreq_atomiceattr
     int32_t flags;
     int32_t opcode;
     int32_t nkey;
-    PVFS_ds_keyval *key;    /* attribute key */
-    PVFS_ds_keyval *val;    /* attribute value to set */
-    PVFS_size *valsz;       /* array of value buffer sizes for recv */
+    PVFS_ds_keyval *key;        /* attribute key */
+    PVFS_ds_keyval *old_val;    /* attribute value to compare */
+    PVFS_ds_keyval *new_val;    /* attribute value to set */
 };
-endecode_fields_2a2aaa_struct(
+endecode_fields_2a3aaa_struct(
     PVFS_servreq_atomiceattr,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
     int32_t, sid_count,
     PVFS_SID, sid_array,     /* reflexive */
+    skip4,,
     int32_t, flags,
     int32_t, opcode,
     int32_t, nkey,
     PVFS_ds_keyval, key,
-    PVFS_ds_keyval, val,
-    PVFS_size, valsz);
+    PVFS_ds_keyval, old_val,
+    PVFS_ds_keyval, new_val);
 #define extra_size_PVFS_servreq_atomiceattr                         \
     ((PVFS_REQ_LIMIT_EATTR_KEY_LEN + PVFS_REQ_LIMIT_EATTR_VAL_LEN) * \
      PVFS_REQ_LIMIT_EATTR_LIST + sizeof(PVFS_size) * \
      PVFS_REQ_LIMIT_EATTR_LIST)
 
-#define PINT_SERVREQ_ATOMICEATTR_FILL(__req,         \
-                                  __cap,             \
-                                  __fsid,            \
-                                  __handle,          \
-                                  __sid_count,       \
-                                  __sid_array,       \
-                                  __flags,           \
-                                  __nkey,            \
-                                  __key_array,       \
-                                  __val_array,       \
-                                  __size_array,      \
-                                  __opcode,          \
-                                  __hints)           \
-do {                                                 \
-    memset(&(__req), 0, sizeof(__req));              \
-    (__req).op = PVFS_SERV_ATOMICEATTR;              \
-    (__req).ctrl.mode = PVFS_REQ_REPLICATE;          \
-    (__req).ctrl.type = PVFS_REQ_PRIMARY;            \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));      \
-    (__req).hints = (__hints);                       \
-    (__req).u.atomiceattr.fs_id = (__fsid);          \
-    (__req).u.atomiceattr.handle = (__handle);       \
-    (__req).u.atomiceattr.sid_count = (__sid_count); \
-    (__req).u.atomiceattr.sid_array = (__sid_array); \
-    (__req).u.atomiceattr.flags = (__flags);         \
-    (__req).u.atomiceattr.nkey = (__nkey);           \
-    (__req).u.atomiceattr.key = (__key_array);       \
-    (__req).u.atomiceattr.val = (__val_array);       \
-    (__req).u.atomiceattr.valsz = (__size_array);    \
-    (__req).u.atomiceattr.opcode = (__opcode);       \
+#define PINT_SERVREQ_ATOMICEATTR_FILL(__req,           \
+                                      __cap,           \
+                                      __fsid,          \
+                                      __handle,        \
+                                      __sid_count,     \
+                                      __sid_array,     \
+                                      __flags,         \
+                                      __opcode,        \
+                                      __nkey,          \
+                                      __key_array,     \
+                                      __old_val_array, \
+                                      __new_val_array, \
+                                      __hints)         \
+do {                                                   \
+    memset(&(__req), 0, sizeof(__req));                \
+    (__req).op = PVFS_SERV_ATOMICEATTR;                \
+    (__req).ctrl.mode = PVFS_REQ_REPLICATE;            \
+    (__req).ctrl.type = PVFS_REQ_PRIMARY;              \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));        \
+    (__req).hints = (__hints);                         \
+    (__req).u.atomiceattr.fs_id = (__fsid);            \
+    (__req).u.atomiceattr.handle = (__handle);         \
+    (__req).u.atomiceattr.sid_count = (__sid_count);   \
+    (__req).u.atomiceattr.sid_array = (__sid_array);   \
+    (__req).u.atomiceattr.flags = (__flags);           \
+    (__req).u.atomiceattr.opcode = (__opcode);         \
+    (__req).u.atomiceattr.nkey = (__nkey);             \
+    (__req).u.atomiceattr.key = (__key_array);         \
+    (__req).u.atomiceattr.old_val = (__old_val_array); \
+    (__req).u.atomiceattr.new_val = (__new_val_array); \
 } while (0)
 
 
 struct PVFS_servresp_atomiceattr
 {
     int32_t nkey;           /* number of values returned */
-    PVFS_ds_keyval *val;    /* array of values returned */
     PVFS_error *err;        /* array of error codes */
+    PVFS_ds_keyval *ret_val; /* array of return values */
 };
 endecode_fields_1aa_struct(
     PVFS_servresp_atomiceattr,
     skip4,,
     int32_t, nkey,
-    PVFS_ds_keyval, val,
-    PVFS_error, err);
+    PVFS_error, err,
+    PVFS_ds_keyval, ret_val);
 #define extra_size_PVFS_servresp_atomiceattr             \
     ((PVFS_REQ_LIMIT_EATTR_VAL_LEN + sizeof(PVFS_error)) \
      * PVFS_REQ_LIMIT_EATTR_LIST)

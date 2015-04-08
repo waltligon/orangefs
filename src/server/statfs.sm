@@ -63,8 +63,6 @@ static PINT_sm_action statfs_do_statfs(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     TROVE_context_id tmp_context;
-    PVFS_SID mysid;
-    uint32_t mytype;
 
     /* V3 */
 #if 0

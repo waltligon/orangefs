@@ -113,7 +113,7 @@ static PINT_sm_action atomiceattr_setup_resp(struct PINT_smcb *smcb,
     js_p->error_code = 0;
 
     /* ensure not too many keys were requested */
-    if( s_op->req->u.atomiceattr.nkey > PVFS_MAX_XATTR_LISTLEN )
+    if(s_op->req->u.atomiceattr.nkey > PVFS_MAX_XATTR_LISTLEN)
     {
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
@@ -126,7 +126,12 @@ static PINT_sm_action atomiceattr_setup_resp(struct PINT_smcb *smcb,
                 (char *) s_op->req->u.atomiceattr.key[i].buffer);
 
         /* ensure no buffer_sz is too large */
-        if( s_op->req->u.atomiceattr.key[i].buffer_sz > PVFS_MAX_XATTR_NAMELEN )
+        if((s_op->req->u.atomiceattr.key[i].buffer_sz >
+                                            PVFS_MAX_XATTR_NAMELEN) ||
+           (s_op->req->u.atomiceattr.key[i].buffer_sz >
+                                            PVFS_MAX_XATTR_VALUELEN) ||
+           (s_op->req->u.atomiceattr.key[i].buffer_sz >
+                                            PVFS_MAX_XATTR_NAMELEN))
         {
             js_p->error_code = -PVFS_EINVAL;
             return SM_ACTION_COMPLETE;
@@ -143,43 +148,60 @@ static PINT_sm_action atomiceattr_setup_resp(struct PINT_smcb *smcb,
         }
     }
 
-    s_op->resp.u.atomiceattr.val =
-                   malloc(s_op->req->u.atomiceattr.nkey*sizeof(PVFS_ds_keyval));
-    if (!s_op->resp.u.atomiceattr.val)
+    /* allocate memory for the array of return values */
+    s_op->resp.u.atomiceattr.ret_val = malloc(s_op->req->u.atomiceattr.nkey *
+                                              sizeof(PVFS_ds_keyval));
+    if (!s_op->resp.u.atomiceattr.ret_val)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
-    s_op->resp.u.atomiceattr.err =
-                    malloc(s_op->req->u.atomiceattr.nkey*sizeof(PVFS_error));
+    /* allocated memory for the array of error codes */
+    s_op->resp.u.atomiceattr.err = malloc(s_op->req->u.atomiceattr.nkey *
+                                          sizeof(PVFS_error));
     if (!s_op->resp.u.atomiceattr.err)
     {
-        free(s_op->resp.u.atomiceattr.val);
+        free(s_op->resp.u.atomiceattr.ret_val);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
+    /* allocate buffers for return values */
     s_op->resp.u.atomiceattr.nkey = s_op->req->u.atomiceattr.nkey;
     for (i = 0; i < s_op->req->u.atomiceattr.nkey; i++)
     {
-        s_op->resp.u.atomiceattr.val[i].buffer = malloc(
-                        s_op->req->u.atomiceattr.valsz[i]);
-        if (!s_op->resp.u.atomiceattr.val[i].buffer)
+        s_op->resp.u.atomiceattr.ret_val[i].buffer =
+                                 malloc(PVFS_MAX_XATTR_VALUELEN);
+        if (!s_op->resp.u.atomiceattr.ret_val[i].buffer)
         {
             for(--i; i >= 0; --i)
             {
-                free(s_op->resp.u.atomiceattr.val[i].buffer);
+                free(s_op->resp.u.atomiceattr.ret_val[i].buffer);
             }
             s_op->resp.u.atomiceattr.nkey = 0;
-            free (s_op->resp.u.atomiceattr.val);
+            free (s_op->resp.u.atomiceattr.ret_val);
             free (s_op->resp.u.atomiceattr.err);
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
         }
-        s_op->resp.u.atomiceattr.val[i].buffer_sz =
-                        s_op->req->u.atomiceattr.valsz[i];
+        s_op->resp.u.atomiceattr.ret_val[i].buffer_sz =
+                                            PVFS_MAX_XATTR_VALUELEN;
     }
+
+    /* allocate arrays for writeback */
+    s_op->key_a = (PVFS_ds_keyval *)malloc(s_op->req->u.atomiceattr.nkey *
+                                           sizeof(PVFS_ds_keyval));
+    s_op->val_a = (PVFS_ds_keyval *)malloc(s_op->req->u.atomiceattr.nkey *
+                                           sizeof(PVFS_ds_keyval));
+    for (i = 0; i < s_op->req->u.atomiceattr.nkey; i++)
+    {
+        s_op->key_a[i].buffer = (char *)malloc(PVFS_MAX_XATTR_NAMELEN);
+        s_op->key_a[i].buffer_sz = PVFS_MAX_XATTR_NAMELEN;
+        s_op->val_a[i].buffer = (char *)malloc(PVFS_MAX_XATTR_VALUELEN);
+        s_op->val_a[i].buffer_sz = PVFS_MAX_XATTR_VALUELEN;
+    }
+    s_op->free_val = 1;
 
     return SM_ACTION_COMPLETE;
 }
@@ -200,7 +222,7 @@ static PINT_sm_action atomiceattr_read_eattrib(struct PINT_smcb *smcb,
     ret = job_trove_keyval_read_list(s_op->req->u.atomiceattr.fs_id,
                                      s_op->req->u.atomiceattr.handle,
                                      s_op->req->u.atomiceattr.key,
-                                     s_op->resp.u.atomiceattr.val,
+                                     s_op->resp.u.atomiceattr.ret_val,
                                      s_op->resp.u.atomiceattr.err,
                                      s_op->req->u.atomiceattr.nkey,
                                      0,
@@ -232,37 +254,30 @@ static PINT_sm_action atomiceattr_check_resp(struct PINT_smcb *smcb,
     /* it is the only thing returned across the wire */
     for (k = 0; k < s_op->resp.u.atomiceattr.nkey; k++)
     {
-        /* this is all or nothing */
-        /* why not use s_op->resp.u.atomiceattr.err */
-        /* which seems to be filled in by Trove? */
-        /* NOTE: Exactly as stated above.  Why not use the err array? */
-        if (js_p->error_code == 0)
+        if (s_op->resp.u.atomiceattr.err[k])
         {
-            /* this checks to see if the attr is a */
-            /* PVFS specific attr and if so encodes */
-            /* it because it is binary */
-            ret = PINT_eattr_encode(&s_op->req->u.atomiceattr.key[k],
-                                    &s_op->resp.u.atomiceattr.val[k]);
-            if(ret != 0)
-            {
-                gossip_err("%s: failed encoding extended attribute: %s\n",
-                           __func__,
-                           (char *)s_op->req->u.atomiceattr.key[k].buffer);
-                s_op->resp.u.atomiceattr.err[k] = ret;
-            }
+            /* in case of any errors, we initialize it to 0 */
+            s_op->resp.u.atomiceattr.ret_val[k].buffer_sz = 0;
+            continue;
+        }
+        /* this checks to see if the attr is a */
+        /* list of PVFS handles and if so encodes it */
+        ret = PINT_eattr_encode(&s_op->req->u.atomiceattr.key[k],
+                                &s_op->resp.u.atomiceattr.ret_val[k]);
+        if(ret != 0)
+        {
+            gossip_err("%s: failed encoding extended attribute: %s\n",
+                       __func__,
+                       (char *)s_op->req->u.atomiceattr.key[k].buffer);
+            s_op->resp.u.atomiceattr.err[k] = ret;
+        }
 
-            /* put the returned read buffer size in buffer_sz */
-            s_op->resp.u.atomiceattr.val[k].buffer_sz =
-                    s_op->resp.u.atomiceattr.val[k].read_sz;
-            gossip_debug(GOSSIP_GETEATTR_DEBUG, "key %s, read_sz = %d\n",
-                (char *) s_op->req->u.atomiceattr.key[k].buffer, 
-                s_op->resp.u.atomiceattr.val[k].buffer_sz);
-        }
-        /* in case of any errors, we initialize it to 0 */
-        else
-        {
-            s_op->resp.u.atomiceattr.val[k].buffer_sz = 0;
-        }
+        /* put the returned read buffer size in buffer_sz */
+        s_op->resp.u.atomiceattr.ret_val[k].buffer_sz =
+                         s_op->resp.u.atomiceattr.ret_val[k].read_sz;
+        gossip_debug(GOSSIP_GETEATTR_DEBUG, "key %s, read_sz = %d\n",
+            (char *) s_op->req->u.atomiceattr.key[k].buffer, 
+            s_op->resp.u.atomiceattr.ret_val[k].buffer_sz);
     }
     
     return SM_ACTION_COMPLETE;
@@ -287,17 +302,22 @@ static int atomiceattr_modify_eattrib(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i;
-    
-    char *error = (char *)malloc(s_op->req->u.atomiceattr.nkey * sizeof(char));
-    if(!error)
-    {
-        gossip_lerr("Cannot allocate memory for temporary error array\n");
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
 
+#if 0
+    int num_errors = 0;
+    int32_t *oldval = NULL;
+    int32_t *newval = NULL;
+    PVFS_ds_keyval tmp_key;
+    PVFS_ds_keyval tmp_val;
+    PVFS_size tmp_valsz;
+#endif
+    
+    js_p->error_code = 0;
+    s_op->keyval_count = 0; /* this will control what is written back */
     switch(s_op->req->u.atomiceattr.opcode)
     {
+/* This is to be removed in favor of compare and swap */
+#if 0
         case PVFS_TEST_AND_SET:
         {
             for(i = 0; i < s_op->req->u.atomiceattr.nkey; i++)
@@ -314,14 +334,18 @@ static int atomiceattr_modify_eattrib(struct PINT_smcb *smcb,
                  * we point ints to them and use integer arithmetic. We do not
                  * want to read from or write to memory outside the buffer.
                  */
-                if((s_op->resp.u.atomiceattr.val[i].buffer_sz != sizeof(int32_t)) || (s_op->req->u.atomiceattr.val[i].buffer_sz != sizeof(int32_t)))
+                if((s_op->resp.u.atomiceattr.val[i].buffer_sz != 
+                           sizeof(int32_t)) ||
+                   (s_op->req->u.atomiceattr.val[i].buffer_sz !=
+                           sizeof(int32_t)))
                 {
-                    gossip_debug(GOSSIP_SETEATTR_DEBUG,"error: test and set requires 32-bit operands\n");
+                    gossip_debug(GOSSIP_SETEATTR_DEBUG,
+                            "error: test and set requires 32-bit operands\n");
                     error[i] = 1;
                     continue;
                 }
-                int32_t *oldval = (int32_t *)s_op->resp.u.atomiceattr.val[i].buffer;
-                int32_t *newval = (int32_t *)s_op->req->u.atomiceattr.val[i].buffer;
+                oldval = (int32_t *)s_op->resp.u.atomiceattr.val[i].buffer;
+                newval = (int32_t *)s_op->req->u.atomiceattr.val[i].buffer;
             
                 /* Perform the test */
                 if(*oldval == 0)
@@ -337,33 +361,73 @@ static int atomiceattr_modify_eattrib(struct PINT_smcb *smcb,
             }
             break;
         }
+#endif
+        /* compare and swap needs two values old and new */
         case PVFS_SWAP:
         {
-            /* The values to set are not modified */
             for(i = 0; i < s_op->req->u.atomiceattr.nkey; i++)
             {
-                error[i] = 0;
-                
+                int len;
                 if(s_op->resp.u.atomiceattr.err[i])
                 {
-                    error[i] = 1;
+                    /* ignore failed reads */
+                    continue;
+                }
+
+                /* note that they way this code works is it favors
+                 * the size of the old_val.  If the request send an
+                 * old_val shorter than the one in the attrib it will
+                 * only check for a match of that part of the string
+                 * ignoring the rest.  Not sure if we want it that way
+                 * but it could be useful.  Change if we decide
+                 * otherwise
+                 */
+                len = s_op->req->u.atomiceattr.old_val[i].buffer_sz;
+
+                if (len > s_op->resp.u.atomiceattr.ret_val[i].buffer_sz)
+                {
+                    /* attrib shorter than old_val automatic fail */
+                    s_op->resp.u.atomiceattr.err[i] = -PVFS_EPERM;
+                    continue;
+                }
+
+                s_op->keyval_count = 0;
+                if (!strncmp(s_op->req->u.atomiceattr.old_val[i].buffer,
+                             s_op->resp.u.atomiceattr.ret_val[i].buffer,
+                             len))
+                {
+                    memcpy(&s_op->key_a[s_op->keyval_count],
+                           &s_op->req->u.atomiceattr.key[i],
+                           sizeof(PVFS_ds_keyval));
+                    memcpy(&s_op->val_a[s_op->keyval_count],
+                           &s_op->req->u.atomiceattr.new_val[i],
+                           sizeof(PVFS_ds_keyval));
+                    s_op->keyval_count++;
+                }
+                else
+                {   
+                    /* existing attrib does not match attrib sent in
+                     * request so we cannot update.  this is sort of
+                     * like failing due to permissions, so we'll use
+                     * that unless someone finds a better code
+                     */
+                    s_op->resp.u.atomiceattr.err[i] = -PVFS_EPERM;
                 }
             }
             break;
         }
         case PVFS_FETCH_AND_ADD:
         {            
+            int32_t val = 0;
+
             /* Add each of the current eattrib by the requested value
              * The results are stored in the request and these results will be 
              * set to eattribs later
              */       
             for(i = 0; i < s_op->req->u.atomiceattr.nkey; i++)
             {
-                error[i] = 0;
-                
                 if(s_op->resp.u.atomiceattr.err[i])
                 {
-                    error[i] = 1;
                     continue;
                 }
                 
@@ -371,17 +435,34 @@ static int atomiceattr_modify_eattrib(struct PINT_smcb *smcb,
                  * we point ints to them and use integer arithmetic. We do not
                  * want to read from or write to memory outside the buffer.
                  */
-                if((s_op->resp.u.atomiceattr.val[i].buffer_sz != sizeof(int32_t)) ||
-                   (s_op->req->u.atomiceattr.val[i].buffer_sz != sizeof(int32_t)))
+                if((s_op->resp.u.atomiceattr.ret_val[i].buffer_sz !=
+                            sizeof(int32_t)) ||
+                   (s_op->req->u.atomiceattr.new_val[i].buffer_sz !=
+                            sizeof(int32_t)))
                 {
-                    gossip_debug(GOSSIP_SETEATTR_DEBUG,"error: fetch and add requires 32-bit operands\n");
-                    error[i] = 1;
+                    gossip_debug(GOSSIP_SETEATTR_DEBUG,
+                           "error: fetch and add requires 32-bit operands\n");
                     continue;
                 }
                 
-                int32_t *lval = (int32_t *)s_op->req->u.atomiceattr.val[i].buffer;
-                int32_t *rval = (int32_t *)s_op->resp.u.atomiceattr.val[i].buffer;
-                *lval += *rval;
+                memcpy(&s_op->key_a[s_op->keyval_count],
+                       &s_op->req->u.atomiceattr.key[i],
+                       sizeof(PVFS_ds_keyval));
+
+                /* portability issues here 
+                 * server doesn't know what is in an eattrib buffer so
+                 * it is not byteswapped when sent up or back.  Thus,
+                 * for this to work we have to know that the machine
+                 * that send this eattrib value is the same as the
+                 * server.
+                 */
+                val = *(int32_t *)s_op->resp.u.atomiceattr.ret_val[i].buffer;
+                val += *(int32_t *)s_op->req->u.atomiceattr.new_val[i].buffer;
+
+                *(int32_t *)s_op->val_a[s_op->keyval_count].buffer = val;
+                s_op->val_a[s_op->keyval_count].buffer_sz = sizeof(int32_t);
+
+                s_op->keyval_count++;
             }
             break;
         }
@@ -392,42 +473,11 @@ static int atomiceattr_modify_eattrib(struct PINT_smcb *smcb,
             break;
         }
     }
-    
-    
-    /* Rearrage request array to remove any erroneous entries */
-    int num_errors = 0;
-    PVFS_ds_keyval tmp_key;
-    PVFS_ds_keyval tmp_val;
-    PVFS_size tmp_valsz;
-    
-    for(i = 0; i < s_op->resp.u.atomiceattr.nkey; i++)
+
+    if (!s_op->keyval_count)
     {
-        if(error[i])
-        {
-            num_errors++;
-        }
-        else if(num_errors > 0)
-        {
-            tmp_key = s_op->req->u.atomiceattr.key[i-num_errors];
-            s_op->req->u.atomiceattr.key[i-num_errors] = 
-                                        s_op->req->u.atomiceattr.key[i];
-            s_op->req->u.atomiceattr.key[i] = tmp_key;
-            
-            tmp_val = s_op->req->u.atomiceattr.val[i-num_errors];
-            s_op->req->u.atomiceattr.val[i-num_errors] = 
-                                        s_op->req->u.atomiceattr.val[i];
-            s_op->req->u.atomiceattr.val[i] = tmp_val;
-            
-            tmp_valsz = s_op->req->u.atomiceattr.valsz[i-num_errors];
-            s_op->req->u.atomiceattr.valsz[i-num_errors] = 
-                                        s_op->req->u.atomiceattr.valsz[i];
-            s_op->req->u.atomiceattr.valsz[i] = tmp_valsz;
-        }
+        js_p->error_code = 1; /* causes SM to skip writeback state */
     }
-    
-    s_op->req->u.atomiceattr.nkey -= num_errors;
-    
-    free(error);
     
     return SM_ACTION_COMPLETE;
 }
@@ -461,38 +511,37 @@ static int atomiceattr_verify_eattribs(struct PINT_smcb *smcb,
      * retrieving the currently set attributes
      * So checking the value lengths is all that we need to do here
      */
-    for( i = 0; i < s_op->req->u.atomiceattr.nkey; i++ )
+    for( i = 0; i < s_op->keyval_count; i++ )
     {
-        if( s_op->req->u.atomiceattr.val[i].buffer_sz > PVFS_MAX_XATTR_VALUELEN )
+        if(s_op->val_a[i].buffer_sz > PVFS_MAX_XATTR_VALUELEN)
         {
             js_p->error_code = -PVFS_EINVAL;
             return SM_ACTION_COMPLETE;
         }
     }
 
-    /* iterate through the keys that are being written */
+    /* verify the namespace for each key - should have been done already */
     int j = 0;
     char *valBuf = NULL;
-    for (i = 0; i < s_op->req->u.atomiceattr.nkey; i++)
+    for (i = 0; i < s_op->keyval_count; i++)
     {
 #ifndef GOSSIP_DISABLE_DEBUG
         if (gossip_debug_on)
         {
             gossip_debug(GOSSIP_MIRROR_DEBUG
-                    ,"\tkey:%s\n"
-                    ,(char *)s_op->req->u.atomiceattr.key[i].buffer);
-            valBuf = (char *)s_op->req->u.atomiceattr.val[i].buffer;
-            for (j=0; j<s_op->req->u.atomiceattr.val[i].buffer_sz; j++)
+                        ,"\tkey:%s\n"
+                        ,(char *)s_op->key_a[i].buffer);
+            valBuf = (char *)s_op->val_a[i].buffer;
+            for (j = 0; j < s_op->val_a[i].buffer_sz; j++)
             {
-                gossip_debug(GOSSIP_MIRROR_DEBUG,"\tval[%d]=%#x\n"
-                                            ,j
-                                            ,(unsigned int)valBuf[j]);
+                gossip_debug(GOSSIP_MIRROR_DEBUG,"\tval_a[%d]=%#x\n"
+                                                ,j
+                                                ,(unsigned int)valBuf[j]);
             }
         }
 #endif
-        js_p->error_code = PINT_eattr_namespace_verify(
-            &s_op->req->u.atomiceattr.key[i],
-            &s_op->req->u.atomiceattr.val[i]);
+        js_p->error_code = PINT_eattr_namespace_verify(&s_op->key_a[i],
+                                                       &s_op->val_a[i]);
 
         if(js_p->error_code)
         {
@@ -534,9 +583,9 @@ static int atomiceattr_setobj_eattribs(struct PINT_smcb *smcb,
 
     ret = job_trove_keyval_write_list(s_op->req->u.atomiceattr.fs_id,
                                       s_op->req->u.atomiceattr.handle,
-                                      s_op->req->u.atomiceattr.key,
-                                      s_op->req->u.atomiceattr.val,
-                                      s_op->req->u.atomiceattr.nkey,
+                                      s_op->key_a,
+                                      s_op->val_a,
+                                      s_op->keyval_count,
                                       trove_flags,
                                       NULL,
                                       smcb,
@@ -565,13 +614,13 @@ static int atomiceattr_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     int i;
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     
-    for(i = 0; i < s_op->resp.u.atomiceattr.nkey; i++)
+    if (s_op->resp.u.atomiceattr.ret_val)
     {
-        free(s_op->resp.u.atomiceattr.val[i].buffer);
-    }
-    if (s_op->resp.u.atomiceattr.val)
-    {
-        free(s_op->resp.u.atomiceattr.val);
+        for(i = 0; i < s_op->resp.u.atomiceattr.nkey; i++)
+        {
+            free(s_op->resp.u.atomiceattr.ret_val[i].buffer);
+        }
+        free(s_op->resp.u.atomiceattr.ret_val);
     }
     if (s_op->resp.u.atomiceattr.err)
     {
@@ -581,15 +630,14 @@ static int atomiceattr_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     /*free key/val structs from the s_op*/
     init_keyval_structs(s_op,s_op->free_val);
 
-
     return(server_state_machine_complete(smcb));
 }
 
-/*This function initializes the keyval structures. It also assumes that the key
- *is always allocated, while the val may not be.  free_val is turned on, if
- *the val must be deallocated; otherwise, val is not deallocated, just initial-
- *ized.
-*/
+/* This function initializes the keyval structures.
+ * It also assumes that the key is always allocated, while the val may not be.
+ * free_val is turned on, if the val must be deallocated; otherwise, val is
+ * not deallocated, just initialized.
+ */
 static void init_keyval_structs(PINT_server_op *s_op, int free_val)
 {
    int i;
@@ -597,39 +645,39 @@ static void init_keyval_structs(PINT_server_op *s_op, int free_val)
    /* initialize val */
    if (free_val)
    {
-      if (s_op->val.buffer)
-      {
-         free(s_op->val.buffer);
-      }
-      memset(&(s_op->val), 0, sizeof(PVFS_ds_keyval));
-      for (i = 0; i < s_op->keyval_count; i++)
-      {
-          if (s_op->val_a && s_op->val_a[i].buffer)
-          {
-              free(s_op->val_a[i].buffer);
-          }
-      }
-      if (s_op->val_a)
-      {
-          free(s_op->val_a);
-      }
-      s_op->val_a = NULL;
+       if (s_op->val.buffer)
+       {
+           free(s_op->val.buffer);
+       }
+       memset(&(s_op->val), 0, sizeof(PVFS_ds_keyval));
+       for (i = 0; i < s_op->keyval_count; i++)
+       {
+           if (s_op->val_a && s_op->val_a[i].buffer)
+           {
+               free(s_op->val_a[i].buffer);
+           }
+       }
+       if (s_op->val_a)
+       {
+           free(s_op->val_a);
+       }
+       s_op->val_a = NULL;
    } 
    else
    {
-      memset(&(s_op->val),0,sizeof(PVFS_ds_keyval));
-      if (s_op->val_a)
-      {
-          free(s_op->val_a);
-      }
-      s_op->val_a = NULL;
+       memset(&(s_op->val), 0, sizeof(PVFS_ds_keyval));
+       if (s_op->val_a)
+       {
+           free(s_op->val_a);
+       }
+       s_op->val_a = NULL;
    }
 
    /* initialize key */
    if (s_op->key.buffer)
    {
-      free(s_op->key.buffer);
-      memset(&(s_op->key),0,sizeof(PVFS_ds_keyval));
+       free(s_op->key.buffer);
+       memset(&(s_op->key), 0, sizeof(PVFS_ds_keyval));
    }
    for (i = 0; i < s_op->keyval_count; i++)
    {

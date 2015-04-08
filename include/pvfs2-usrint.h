@@ -294,6 +294,39 @@ extern ssize_t pvfs_lgetxattr(const char *path, const char *name,
 extern ssize_t pvfs_fgetxattr(int fd, const char *name,
                               void *value, size_t size);
 
+extern ssize_t pvfs_atomicxattr(const char *path,
+                                int opcode,
+                                const char *name,
+                                void *old_value,
+                                size_t old_valsize,
+                                void *new_value,
+                                size_t new_valsize,
+                                void *response,
+                                size_t respsize,
+                                int flags);
+
+extern ssize_t pvfs_latomicxattr(const char *path,
+                                 int opcode,
+                                 const char *name,
+                                 void *old_value,
+                                 size_t old_valsize,
+                                 void *new_value,
+                                 size_t new_valsize,
+                                 void *response,
+                                 size_t respsize,
+                                 int flags);
+
+extern ssize_t pvfs_fatomicxattr(int fd,
+                                 int opcode,
+                                 const char *name,
+                                 void *old_value,
+                                 size_t old_valsize,
+                                 void *new_value,
+                                 size_t new_valsize,
+                                 void *response,
+                                 size_t respsize,
+                                 int flags);
+
 extern ssize_t pvfs_listxattr(const char *path, char *list, size_t size);
 
 extern ssize_t pvfs_llistxattr(const char *path, char *list, size_t size);

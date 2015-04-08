@@ -602,9 +602,9 @@ struct PINT_client_atomiceattr_sm
                       if they should exist (XATTR_REPLACE) or neither */
     int32_t opcode;
     PVFS_ds_keyval *key_array;
-    PVFS_size *size_array;
-    PVFS_sysresp_geteattr *resp_p;
-    PVFS_ds_keyval *val_array;    
+    PVFS_ds_keyval *old_val_array;    
+    PVFS_ds_keyval *new_val_array;    
+    PVFS_sysresp_atomiceattr *resp_p;
 };
 
 struct PINT_client_deleattr_sm

@@ -18,6 +18,7 @@
 #include "client-state-machine.h"
 #include "pvfs2-debug.h"
 #include "pvfs2-util.h"
+#include "pvfs2-usrint.h"
 #include "job.h"
 #include "gossip.h"
 #include "str-utils.h"
@@ -74,8 +75,9 @@ PVFS_error PVFS_isys_atomiceattr_list(PVFS_object_ref ref,
                                       const PVFS_credential *credential,
                                       int32_t nkey,
                                       PVFS_ds_keyval *key_array,
-                                      PVFS_ds_keyval *val_array,
-                                      PVFS_sysresp_geteattr *resp_p,
+                                      PVFS_ds_keyval *old_val_array,
+                                      PVFS_ds_keyval *new_val_array,
+                                      PVFS_sysresp_atomiceattr *resp_p,
                                       int32_t flags,
                                       PVFS_sys_op_id *op_id,
                                       int32_t opcode,
@@ -97,20 +99,22 @@ PVFS_error PVFS_isys_atomiceattr_list(PVFS_object_ref ref,
          *       This needs to change in set-eattr.sm
          */
         
-        gossip_debug(GOSSIP_SETEATTR_DEBUG,"Setting extended attributes:\n");
+        gossip_debug(GOSSIP_SETEATTR_DEBUG,"Atomic read/write extended attributes:\n");
         for(i = 0; i < nkey; ++i)
         {
-            char *valBuf = (char *)val_array[i].buffer;
+            char *valBuf = (char *)old_val_array[i].buffer;
             int j;
 
             gossip_debug(GOSSIP_SETEATTR_DEBUG,"eattr[%d]: key=%s\n"
                                               , i
                                               ,(char *)key_array[i].buffer);
                         
-            for (j=0; j<val_array[i].buffer_sz; j++)
-                gossip_debug(GOSSIP_SETEATTR_DEBUG,"          val[%d]=%#x\n"
+            for (j = 0; j < old_val_array[i].buffer_sz; j++)
+            {
+                gossip_debug(GOSSIP_SETEATTR_DEBUG,"      old_val[%d]=%#x\n"
                                                   ,j
                                                   ,(unsigned int)valBuf[j]);
+            }
         }/*end for*/
     } /*end if*/
 
@@ -139,13 +143,24 @@ PVFS_error PVFS_isys_atomiceattr_list(PVFS_object_ref ref,
     PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.atomiceattr.nkey = nkey;
     sm_p->u.atomiceattr.key_array = key_array;
-    sm_p->u.atomiceattr.val_array = val_array;
+    sm_p->u.atomiceattr.old_val_array = old_val_array;
+    sm_p->u.atomiceattr.new_val_array = new_val_array;
     sm_p->u.atomiceattr.resp_p = resp_p;
     sm_p->u.atomiceattr.opcode = opcode;
     sm_p->u.atomiceattr.flags = flags;
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
+
+    if (sm_p->u.atomiceattr.opcode == PVFS_FETCH_AND_ADD)
+    {
+        int i;
+        for (i = 0; i < nkey; i++)
+        {
+            sm_p->u.atomiceattr.old_val_array[i].buffer = "";
+            sm_p->u.atomiceattr.old_val_array[i].buffer_sz = 0;
+        }
+    }
 
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->object_ref,
@@ -162,8 +177,9 @@ PVFS_error PVFS_sys_atomiceattr_list(PVFS_object_ref ref,
                                      const PVFS_credential *credential,
                                      int32_t nkey,
                                      PVFS_ds_keyval *key_array,
-                                     PVFS_ds_keyval *val_array,
-                                     PVFS_sysresp_geteattr *resp_p,
+                                     PVFS_ds_keyval *old_val_array,
+                                     PVFS_ds_keyval *new_val_array,
+                                     PVFS_sysresp_atomiceattr *resp_p,
                                      int32_t flags,
                                      int32_t opcode,
                                      PVFS_hint hints)
@@ -177,7 +193,8 @@ PVFS_error PVFS_sys_atomiceattr_list(PVFS_object_ref ref,
                                      credential,
                                      nkey,
                                      key_array,
-                                     val_array,
+                                     old_val_array,
+                                     new_val_array,
                                      resp_p,
                                      flags,
                                      &op_id,
@@ -207,22 +224,20 @@ PVFS_error PVFS_sys_atomiceattr_list(PVFS_object_ref ref,
 PVFS_error PVFS_sys_atomiceattr(PVFS_object_ref ref,
                                 const PVFS_credential *credential,
                                 PVFS_ds_keyval *key_p,
-                                PVFS_ds_keyval *val_p,
-                                PVFS_ds_keyval *response,
+                                PVFS_ds_keyval *old_val_p,
+                                PVFS_ds_keyval *new_val_p,
+                                PVFS_sysresp_atomiceattr *resp_p,
                                 int32_t flags,
                                 int32_t opcode,
                                 PVFS_hint hints)
 {
-    PVFS_sysresp_geteattr resp_p;
-    PVFS_error tmp_err;
-    resp_p.val_array = response;
-    resp_p.err_array = &tmp_err;
     return PVFS_sys_atomiceattr_list(ref,
                                      credential,
                                      1,
                                      key_p,
-                                     val_p,
-                                     &resp_p,
+                                     old_val_p,
+                                     new_val_p,
+                                     resp_p,
                                      flags,
                                      opcode,
                                      hints);
@@ -234,38 +249,26 @@ static PINT_sm_action atomic_eattr_setup_msgpair(struct PINT_smcb *smcb,
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    int i;
     PINT_sm_msgpair_state *msg_p;
 
     assert(sm_p->getattr.attr.mask & PVFS_ATTR_CAPABILITY);
     
-    /* this will be the array of value buffer sizes for the old attributes */
-    sm_p->u.atomiceattr.size_array =
-             (PVFS_size *)malloc(sm_p->u.atomiceattr.nkey *
-                                 sizeof (PVFS_size));
-
-    /* fill the array pulling out of the value array */
-    /* we don't want to send the unused fields in this array */
-    for (i = 0; i < sm_p->u.atomiceattr.nkey; i++)
-        sm_p->u.atomiceattr.size_array[i] =
-            sm_p->u.atomiceattr.resp_p->val_array[i].buffer_sz;
-   
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_ATOMICEATTR_FILL(msg_p->req,
-                                   sm_p->getattr.attr.capability,
-                                   sm_p->object_ref.fs_id,
-                                   sm_p->object_ref.handle,
-                                   sm_p->object_ref.sid_count,
-                                   sm_p->object_ref.sid_array,
-                                   sm_p->u.atomiceattr.flags,
-                                   sm_p->u.atomiceattr.nkey,
-                                   sm_p->u.atomiceattr.key_array,
-                                   sm_p->u.atomiceattr.val_array,
-                                   sm_p->u.atomiceattr.size_array,
-                                   sm_p->u.atomiceattr.opcode,
-                                   sm_p->hints);
+                                  sm_p->getattr.attr.capability,
+                                  sm_p->object_ref.fs_id,
+                                  sm_p->object_ref.handle,
+                                  sm_p->object_ref.sid_count,
+                                  sm_p->object_ref.sid_array,
+                                  sm_p->u.atomiceattr.flags,
+                                  sm_p->u.atomiceattr.opcode,
+                                  sm_p->u.atomiceattr.nkey,
+                                  sm_p->u.atomiceattr.key_array,
+                                  sm_p->u.atomiceattr.old_val_array,
+                                  sm_p->u.atomiceattr.new_val_array,
+                                  sm_p->hints);
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
@@ -276,11 +279,6 @@ static PINT_sm_action atomic_eattr_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->sid_array = sm_p->object_ref.sid_array;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = atomic_eattr_comp_fn;
-
-#if 0
-    ret = PINT_cached_config_map_to_server(
-            &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-#endif
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
 
@@ -300,8 +298,6 @@ static PINT_sm_action atomic_eattr_cleanup(struct PINT_smcb *smcb,
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, 
                  "atomic_eattr state: atomic_eattr_cleanup\n");
-    /* free the array malloc'd above */
-    free(sm_p->u.atomiceattr.size_array);
     sm_p->error_code  = js_p->error_code;
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
@@ -321,14 +317,15 @@ static int atomic_eattr_comp_fn(void *v_p,
     int ret = 0;
     int decode_ret;
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     PINT_sm_msgpair_state *msg_p;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-        "get_eattr completion fn: atomic_eattr_comp_fn\n");
+                 "get_eattr completion fn: atomic_eattr_comp_fn\n");
 
     /* only posted one msgpair */
-    assert(i==0);
+    assert(i == 0);
 
     /* if this particular request was successful, then store the server
      * response and let the caller sort it out */
@@ -349,7 +346,7 @@ static int atomic_eattr_comp_fn(void *v_p,
             mink = resp_p->u.atomiceattr.nkey;
             gossip_err("Successful call returned fewer values than requested\n");
         }
-        if (!resp_p->u.atomiceattr.val)
+        if (!resp_p->u.atomiceattr.ret_val)
         {
             gossip_err("Successful call returned NULL value list\n");
             return -1;
@@ -359,38 +356,46 @@ static int atomic_eattr_comp_fn(void *v_p,
         for (k = 0; k < sm_p->u.atomiceattr.nkey; k++)
         {
             gossip_debug(GOSSIP_GETEATTR_DEBUG,"resp_read_sz = %d\n",
-                    resp_p->u.atomiceattr.val[k].read_sz);
+                    resp_p->u.atomiceattr.ret_val[k].read_sz);
             gossip_debug(GOSSIP_GETEATTR_DEBUG,"resp_buff_sz = %d\n",
-                    resp_p->u.atomiceattr.val[k].buffer_sz);
+                    resp_p->u.atomiceattr.ret_val[k].buffer_sz);
             gossip_debug(GOSSIP_GETEATTR_DEBUG,"sm_buff_sz = %d\n",
                     sm_p->u.atomiceattr.resp_p->val_array[k].buffer_sz);
             gossip_debug(GOSSIP_GETEATTR_DEBUG,"resp_buff_ = %s\n",
-                    (char *)resp_p->u.atomiceattr.val[k].buffer);
-            /* out the actual read_sz in its place */
-            sm_p->u.atomiceattr.resp_p->val_array[k].read_sz =
-                    resp_p->u.atomiceattr.val[k].buffer_sz;
+                    (char *)resp_p->u.atomiceattr.ret_val[k].buffer);
+            /* put the error code in its place */
             sm_p->u.atomiceattr.resp_p->err_array[k] =
-                    resp_p->u.atomiceattr.err[k];
+                                   resp_p->u.atomiceattr.err[k];
+            /* put the actual read_sz in its place */
+            sm_p->u.atomiceattr.resp_p->val_array[k].read_sz =
+                                   resp_p->u.atomiceattr.ret_val[k].buffer_sz;
             /* check for too big a return message */
+            if (sm_p->u.atomiceattr.resp_p->val_array[k].read_sz &&
+                (sm_p->u.atomiceattr.resp_p->val_array[k].read_sz <=
+                        sm_p->u.atomiceattr.resp_p->val_array[k].buffer_sz))
+            {
+                gossip_debug(GOSSIP_GETEATTR_DEBUG,"copying\n");
+                memcpy(sm_p->u.atomiceattr.resp_p->val_array[k].buffer,
+                       resp_p->u.atomiceattr.ret_val[k].buffer,
+                       sm_p->u.atomiceattr.resp_p->val_array[k].read_sz);
+            }
+            else /* oops, error! returned too much data */
+            {
+                gossip_debug(GOSSIP_GETEATTR_DEBUG,"clearing on error\n");
+                memset(sm_p->u.atomiceattr.resp_p->val_array[k].buffer,
+                       0,
+                       sm_p->u.atomiceattr.resp_p->val_array[k].buffer_sz);
+                /* record an error, but keep going */
+                if (sm_p->u.atomiceattr.resp_p->err_array[k] == 0)
+                {
+                    sm_p->u.atomiceattr.resp_p->err_array[k] = -PVFS_EMSGSIZE;
+                    /* otherwise keep the original error */
+                }
+            }
+
+            /* not sure if this works in error condition */
             if(resp_p->u.atomiceattr.err[k] == 0)
             {
-                if (sm_p->u.atomiceattr.resp_p->val_array[k].read_sz <=
-                        sm_p->u.atomiceattr.resp_p->val_array[k].buffer_sz)
-                {
-                    gossip_debug(GOSSIP_GETEATTR_DEBUG,"copying\n");
-                    memcpy(sm_p->u.atomiceattr.resp_p->val_array[k].buffer,
-                            resp_p->u.atomiceattr.val[k].buffer,
-                            sm_p->u.atomiceattr.resp_p->val_array[k].read_sz);
-                }
-                else /* oops, error! returned too much data */
-                {
-                    gossip_debug(GOSSIP_GETEATTR_DEBUG,"clearing on error\n");
-                    memset(sm_p->u.atomiceattr.resp_p->val_array[k].buffer,0,
-                            sm_p->u.atomiceattr.resp_p->val_array[k].buffer_sz);
-                    /* record an error, but keep going */
-                    ret = -PVFS_EMSGSIZE;
-                }
-
                 /* seems ok - decode the eattrs we know about */
                 decode_ret = PINT_eattr_decode(
                         &sm_p->u.atomiceattr.key_array[k],
@@ -403,7 +408,7 @@ static int atomic_eattr_comp_fn(void *v_p,
                     return decode_ret;
                 }
             }
-        }
+        } 
     }
     else
     {
