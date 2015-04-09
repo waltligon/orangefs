@@ -11,7 +11,8 @@ CSRC := \
 	$(DIR)/mgmt-get-config.c \
 	$(DIR)/mgmt-misc.c \
 	$(DIR)/sys-dist.c \
-	$(DIR)/error-details.c
+	$(DIR)/error-details.c \
+	$(DIR)/init-vars.c
 
 CLIENT_SMCGEN := \
 	$(DIR)/remove.c \
