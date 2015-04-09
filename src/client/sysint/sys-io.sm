@@ -552,12 +552,12 @@ static PINT_sm_action io_inspect_attr(struct PINT_smcb *smcb,
     }
 
     /* Note: see initialize.c to see how relatime gets set.
-     *   if relatime < 0, then relatime feature disabled
+     *   if relatime < 0,  then relatime feature disabled
      *   if relatime == 0, then always update atime
-     *   if relatime > 0, then atime is updated only if relatime seconds have
-     *                    elapsed since last atime update. (We won't update
-     *                    atime for every write like the Linux Kernel's
-     *                    relatime. Ideally, do that server side.)
+     *   if relatime > 0,  then atime is updated only if relatime seconds have
+     *                     elapsed since last atime update. (We won't update
+     *                     atime for every write like the Linux Kernel's
+     *                     relatime. Ideally, do that server side.)
      */
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "Checking if atime update necessary using "
@@ -565,11 +565,14 @@ static PINT_sm_action io_inspect_attr(struct PINT_smcb *smcb,
                  relatime_timeout);
     curtime = PINT_util_get_current_time();
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "attr->atime     = %llu\n", llu(sm_p->getattr.attr.atime));
+                 "attr->atime     = %llu\n",
+                 llu(sm_p->getattr.attr.atime));
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "attr->mtime     = %llu\n", llu(sm_p->getattr.attr.mtime));
+                 "attr->mtime     = %llu\n",
+                 llu(sm_p->getattr.attr.mtime));
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "currtime.tv_sec = %llu\n", llu(curtime));
+                 "currtime = %llu\n",
+                 llu(curtime));
     if(relatime_timeout >= 0 &&
        (sm_p->getattr.attr.atime + relatime_timeout) <= curtime)
     {
@@ -585,33 +588,35 @@ static PINT_sm_action io_inspect_attr(struct PINT_smcb *smcb,
         PINT_msgpair_init(&sm_p->msgarray_op);
         msg_p = &sm_p->msgarray_op.msgpair;
 
-        PINT_SERVREQ_SETATTR_FILL(
-            msg_p->req,
-            sm_p->getattr.attr.capability,
-            *sm_p->cred_p,
-            sm_p->object_ref.fs_id,
-            sm_p->object_ref.handle,
-            PVFS_TYPE_METAFILE,
-            atime_update_attr,
-            0,
-            sm_p->hints);
-
-        sm_p->getattr.attr.atime = curtime;
-        sm_p->getattr.attr.mask |= PVFS_ATTR_SYS_ATIME_SET | PVFS_ATTR_SYS_MTIME_SET;
-        sm_p->getattr.attr.mask &= ~(PVFS_ATTR_SYS_ATIME_SET | PVFS_ATTR_SYS_MTIME_SET);
+        PINT_SERVREQ_SETATTR_FILL(msg_p->req,
+                                  sm_p->getattr.attr.capability,
+                                  *sm_p->cred_p,
+                                  sm_p->object_ref.fs_id,
+                                  sm_p->object_ref.handle,
+                                  PVFS_TYPE_METAFILE,
+                                  atime_update_attr,
+                                  0,
+                                  sm_p->hints);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "%s: I/O atime setattr mask (for acache update): %x\n",
+                     "%s: I/O atime setattr mask (sent to server): %x\n",
                      __func__,
                      msg_p->req.u.setattr.attr.mask);
+
+#define DO_ACACHE_UPDATE 1
+#if DO_ACACHE_UPDATE == 1
+        /* Used to update acache in completion function. */
+        sm_p->getattr.attr.atime = curtime;
+#endif
 
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = sm_p->object_ref.handle;
         msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = io_atime_setattr_comp_fn;
 
-        ret = PINT_cached_config_map_to_server(
-            &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+        ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
+                                               msg_p->handle,
+                                               msg_p->fs_id);
 
         if (ret)
         {
@@ -631,8 +636,8 @@ static PINT_sm_action io_inspect_attr(struct PINT_smcb *smcb,
 }
 
 static int io_atime_setattr_comp_fn(void *v_p,
-                             struct PVFS_server_resp *resp_p,
-                             int index)
+                                    struct PVFS_server_resp *resp_p,
+                                    int index)
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p;
@@ -645,9 +650,19 @@ static int io_atime_setattr_comp_fn(void *v_p,
 
     if(resp_p->status == 0)
     {
-        PVFS_object_attr attr;
-        PINT_CONVERT_ATTR(&attr, &sm_p->getattr.attr, 0);
-        PINT_acache_update(tmp_ref, &attr, NULL);
+#if DO_ACACHE_UPDATE == 1
+        /* TODO: resolve issues with acache_update. */
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "%s: I/O atime attr mask (for acache update): %x\n",
+                     __func__,
+                     sm_p->getattr.attr.mask);
+        PINT_acache_update(tmp_ref,
+                           &sm_p->getattr.attr,
+                           (sm_p->getattr.attr.mask & PVFS_ATTR_DATA_SIZE ?
+                           &sm_p->getattr.size : NULL));
+#else
+        PINT_acache_invalidate(tmp_ref);
+#endif
     }
     else
     {
@@ -3549,12 +3564,6 @@ static int unstuff_comp_fn(void *v_p,
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "Updating attributes after unstuff\n");
 
-#if 0 /* Don't cache size_array. */
-        PINT_acache_update(sm_p->object_ref,
-                           &resp_p->u.unstuff.attr,
-                           NULL,
-                           NULL); /* TODO should we try to cache size_array here? */
-#endif
         PINT_acache_update(sm_p->object_ref,
                            &resp_p->u.unstuff.attr,
                            NULL);
@@ -3570,13 +3579,6 @@ static int unstuff_comp_fn(void *v_p,
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "Updating attributes before reading "
                      "beyond stuffing boundary.\n");
-
-#if 0 /* Don't cache size_array. */
-        PINT_acache_update(sm_p->object_ref,
-                           &resp_p->u.getattr.attr,
-                           NULL,
-                           NULL); /* TODO should we try to cache size_array here? */
-#endif
         PINT_acache_update(sm_p->object_ref,
                            &resp_p->u.getattr.attr,
                            NULL);
