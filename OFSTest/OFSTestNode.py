@@ -2410,7 +2410,7 @@ class OFSTestNode(object):
                 ofs_host_port_str = ""
                 current_port = self.ofs_tcp_port
                 for i in range(0,servers_per_node):
-                    ofs_host_port_str = "%s%s:%d," % ofs_host_port_str,ofs_host.hostname,current_port
+                    ofs_host_port_str = "%s%s:%d," % (ofs_host_port_str,ofs_host.hostname,current_port)
                     current_port += 1
                     
                 ofs_host_str = ofs_host_str+ofs_host_port_str
