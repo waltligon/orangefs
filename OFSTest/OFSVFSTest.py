@@ -548,7 +548,7 @@ def ltp(testing_node,output=[]):
 
 def mkdir_vfs(testing_node,output=[]):
 
-    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%d --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
 
@@ -585,7 +585,7 @@ def shelltest(testing_node,output=[]):
 # 
 def symlink_vfs(testing_node,output=[]):
 
-    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%d --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
 
@@ -692,8 +692,8 @@ def linux_untar(testing_node,output=[]):
     
     rc = testing_node.runSingleCommandAsRoot("cd %s; tar xf /tmp/linux-3.18.9.tar" % testing_node.ofs_mount_point)
     
-    total_time = datetime.now()-ts
-    print "Total time to untar Linux 3.18.9 source is %r ms" % total_time
+    total_time = str(datetime.now()-ts)
+    print "Total time to untar Linux 3.18.9 source is %s ms" % total_time
     
     return rc
 

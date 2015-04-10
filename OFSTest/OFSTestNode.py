@@ -195,7 +195,7 @@ class OFSTestNode(object):
         
         ## @var ofs_tcp_port
         # default tcp port
-        self.ofs_tcp_port = "3396"
+        self.ofs_tcp_port = 3396
         
         ## @var db4_dir
         # berkeley db4 location
@@ -2377,7 +2377,7 @@ class OFSTestNode(object):
       
     
        
-    def configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_data_location="",ofs_metadata_location="",ofs_conf_file=None,security=None,dedicated_metadata_server=False,dedicated_client=False):
+    def configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_data_location="",ofs_metadata_location="",ofs_conf_file=None,security=None,dedicated_metadata_server=False,dedicated_client=False,servers_per_node=1):
         
             
         self.ofs_fs_name=ofs_fs_name
@@ -2404,10 +2404,16 @@ class OFSTestNode(object):
                
         for ofs_host in ofs_hosts_v:
             if dedicated_metadata_server == True and metadata_host_str == "":
-                metadata_host_str = ofs_host.hostname + ":"+self.ofs_tcp_port
+                metadata_host_str = ofs_host.hostname + ":%d" % self.ofs_tcp_port
             else:   
-                ofs_host_str = ofs_host_str + ofs_host.hostname + ":"+self.ofs_tcp_port+","
-        
+                
+                ofs_host_port_str = ""
+                current_port = self.ofs_tcp_port
+                for i in range(0,servers_per_node):
+                    ofs_host_port_str = "%s%s:%d," % ofs_host_port_str,ofs_host.hostname,current_port
+                    current_port += 1
+                    
+                ofs_host_str = ofs_host_str+ofs_host_port_str
         # sanity check.
         if ofs_host_str == "":
             ofs_host_str = metadata_host_str
@@ -2552,7 +2558,7 @@ class OFSTestNode(object):
         self.ofs_mount_point = "/tmp/mount/orangefs"
         self.runSingleCommand("mkdir -p "+ self.ofs_mount_point)
         self.runSingleCommand("mkdir -p %s/etc" % self.ofs_installation_location)
-        self.runSingleCommand("echo \"tcp://%s:%s/%s %s pvfs2 defaults 0 0\" > %s/etc/orangefstab" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point,self.ofs_installation_location))
+        self.runSingleCommand("echo \"tcp://%s:%d/%s %s pvfs2 defaults 0 0\" > %s/etc/orangefstab" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point,self.ofs_installation_location))
         self.runSingleCommandAsRoot("ln -s %s/etc/orangefstab /etc/pvfs2tab" % self.ofs_installation_location)
         self.setEnvironmentVariable("PVFS2TAB_FILE",self.ofs_installation_location + "/etc/orangefstab")
        
@@ -2714,14 +2720,14 @@ class OFSTestNode(object):
         
         # mount with fuse
         if mount_fuse == True:
-            print "Mounting OrangeFS service at tcp://%s:%s/%s at mount_point %s via fuse" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point)
-            self.runSingleCommand("%s/bin/pvfs2fuse %s -o fs_spec=tcp://%s:%s/%s -o nonempty" % (self.ofs_installation_location,self.ofs_mount_point,self.hostname,self.ofs_tcp_port,self.ofs_fs_name),output)
+            print "Mounting OrangeFS service at tcp://%s:%d/%s at mount_point %s via fuse" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point)
+            self.runSingleCommand("%s/bin/pvfs2fuse %s -o fs_spec=tcp://%s:%d/%s -o nonempty" % (self.ofs_installation_location,self.ofs_mount_point,self.hostname,self.ofs_tcp_port,self.ofs_fs_name),output)
             #print output
             
         #mount with kmod
         else:
-            print "Mounting OrangeFS service at tcp://%s:%s/%s at mount_point %s" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point)
-            self.runSingleCommandAsRoot("mount -t pvfs2 tcp://%s:%s/%s %s" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point))
+            print "Mounting OrangeFS service at tcp://%s:%d/%s at mount_point %s" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point)
+            self.runSingleCommandAsRoot("mount -t pvfs2 tcp://%s:%d/%s %s" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point))
 
         
         print "Waiting 30 seconds for mount"            

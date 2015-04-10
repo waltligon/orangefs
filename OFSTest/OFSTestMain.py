@@ -441,6 +441,7 @@ class OFSTestMain(object):
                                                  ofs_metadata_location = self.config.ofs_metadata_location,
                                                  dedicated_metadata_server=self.config.dedicated_metadata_server,
                                                  dedicated_client=self.config.dedicated_client,
+                                                 servers_per_node=self.config.servers_per_node
                                                  )
 
         if rc != 0:

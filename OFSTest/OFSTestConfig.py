@@ -227,7 +227,7 @@ class OFSTestConfig(object):
         
         ## @var ofs_tcp_port
         # TCP port on which to run OrangeFS
-        self.ofs_tcp_port = "3396" # Web Interface: auto
+        self.ofs_tcp_port = 3396 # Web Interface: auto
         
         ## @var ofs_mount_as_fuse
         # Mount filesystem using the fuse module instead of kernel module.
@@ -342,6 +342,7 @@ class OFSTestConfig(object):
         self.ofs_data_location = ""
         self.restart_ofs = False
         self.dedicated_client = False
+        self.servers_per_node = 1
         
         
         
@@ -755,3 +756,8 @@ class OFSTestConfig(object):
         temp = d.get('dedicated_client')
         if temp != None:
             self.dedicated_client = temp
+
+        temp = d.get('servers_per_node')
+        if temp != None:
+            self.servers_per_node=1
+        
