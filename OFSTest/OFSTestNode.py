@@ -2491,7 +2491,7 @@ class OFSTestNode(object):
 
         
       
-    def startOFSServer(self,run_as_root=False):
+    def startOFSServer(self,run_as_root=False,debug_mask="network,client,server"):
         
         output = []
         self.changeDirectory(self.ofs_installation_location)
@@ -2563,7 +2563,7 @@ class OFSTestNode(object):
         self.setEnvironmentVariable("PVFS2TAB_FILE",self.ofs_installation_location + "/etc/orangefstab")
        
         # set the debug mask
-        self.runSingleCommand("%s/bin/pvfs2-set-debugmask -m %s \"all\"" % (self.ofs_installation_location,self.ofs_mount_point))
+        self.runSingleCommand("%s/bin/pvfs2-set-debugmask -m %s \"%s\"" % (self.ofs_installation_location,self.ofs_mount_point,debug_mask))
        
         return 0
     
