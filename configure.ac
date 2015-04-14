@@ -660,26 +660,26 @@ AC_TRY_COMPILE(
 )
 
 dnl Check for updated selinux so it won't break usrint
-AC_MSG_CHECKING([for security_context_t in setfilecon])
+AC_MSG_CHECKING([for const security_context_t in setfilecon])
 old_cflags="$CFLAGS"
 CFLAGS="$CFLAGS -Werror"
 AC_TRY_COMPILE(
     [
         #include <stdio.h>
         #include <selinux/selinux.h>
-        int setfilecon(const char *path, security_context_t con)
+        int setfilecon(const char *path, const char *con)
         {
             return 0;
         }
     ],
     [
         int ret;
-        security_context_t sc_t = NULL;
+        const char *sc_t = NULL;
 	    ret = setfilecon("somepath", sc_t);
     ],
     [
        AC_MSG_RESULT(yes)
-       AC_DEFINE(HAVE_SECURITY_CONTEXT, 1, Define if setfilecon uses security_context_t)
+       AC_DEFINE(HAVE_CONST_SECURITY_CONTEXT, 1, Define if setfilecon uses a const security_context_t)
     ],
     AC_MSG_RESULT(no)
 )
