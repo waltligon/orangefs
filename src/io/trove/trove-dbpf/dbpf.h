@@ -21,6 +21,7 @@ extern "C" {
 #include "dbpf-keyval-pcache.h"
 #include "dbpf-open-cache.h"
 #include "pint-event.h"
+#include "dbpf-db.h"
 
 /* For unknown Berkeley DB errors, we return some large value
  */
@@ -205,8 +206,8 @@ struct dbpf_storage
     int refct;
     char *data_path;   /* path to data storage directory */
     char *meta_path;   /* path to metadata storage directory */
-    DB *sto_attr_db;
-    DB *coll_db;
+    dbpf_db *sto_attr_db;
+    dbpf_db *coll_db;
 };
 
 struct dbpf_collection
@@ -215,9 +216,9 @@ struct dbpf_collection
     char *name;
     char *data_path;  /* path to data collection directory */
     char *meta_path;  /* path to metadata collection directory */
-    DB *coll_attr_db;
-    DB *ds_db;
-    DB *keyval_db;
+    dbpf_db *coll_attr_db;
+    dbpf_db *ds_db;
+    dbpf_db *keyval_db;
     DB_ENV *coll_env;
     TROVE_coll_id coll_id;
     TROVE_handle root_dir_handle;

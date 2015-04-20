@@ -1207,18 +1207,6 @@ static int server_initialize_subsystems(
     gossip_debug(GOSSIP_SERVER_DEBUG, "%d filesystem(s) initialized\n",
                  PINT_llist_count(server_config.file_systems));
 
-    /*
-     * Migrate database if needed
-     */
-    ret = trove_migrate(server_config.trove_method,
-			server_config.data_path,
-			server_config.meta_path);
-    if (ret < 0)
-    {
-        gossip_err("trove_migrate failed: ret=%d\n", ret);
-        return(ret);
-    }
-
     *server_status_flag |= SERVER_TROVE_INIT;
 
     /*********** END OF TROVE INITIALIZATION ************/

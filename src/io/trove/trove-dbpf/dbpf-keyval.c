@@ -258,12 +258,10 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
 
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
 {
-    int ret = -TROVE_EINVAL;
-    struct dbpf_keyval_db_entry key_entry;
-    DBT key, data;
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
-
-    memset(&key, 0, sizeof(key));
+    struct dbpf_keyval_db_entry key_entry;
+    struct dbpf_data key, data;
+    int ret;
 
     key_entry.handle = op_p->handle;
     if (op_p->flags & TROVE_KEYVAL_DIRECTORY_ENTRY)
@@ -278,17 +276,12 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
            op_p->u.k_read.key->buffer, 
            op_p->u.k_read.key->buffer_sz);
     key.data = &key_entry;
-    key.size = key.ulen = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
-        op_p->u.k_read.key->buffer_sz);
-    key.flags = DB_DBT_USERMEM;
+    key.len = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(op_p->u.k_read.key->buffer_sz);
 
-    memset(&data, 0, sizeof(data));
     data.data = op_p->u.k_read.val->buffer;
-    data.ulen = op_p->u.k_read.val->buffer_sz;
-    data.flags = DB_DBT_USERMEM;
+    data.len = op_p->u.k_read.val->buffer_sz;
 
-    ret = op_p->coll_p->keyval_db->get(
-        op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+    ret = dbpf_db_get(op_p->coll_p->keyval_db, &key, &data);
     if (ret != 0)
     {
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
@@ -299,19 +292,18 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
                      db_strerror(ret));
 
         /* if data buffer is too small returns ERANGE error */
-        if (data.ulen < data.size)
+        if (ret == ERANGE)
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                         "warning: Value buffer too small %d < %d\n",
-                         data.ulen, data.size);
+                         "warning: Value buffer too small\n");
             /* let the user know */
-            op_p->u.k_read.val->read_sz = data.size;
+            op_p->u.k_read.val->read_sz = data.len;
         }
 
         ret = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
     }
-    op_p->u.k_read.val->read_sz = data.size;
+    op_p->u.k_read.val->read_sz = data.len;
 
     /* cache this data in the attr cache if we can */
     if(!(op_p->flags & TROVE_BINARY_KEY))
@@ -319,7 +311,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
         gen_mutex_lock(&dbpf_attr_cache_mutex);
         if (dbpf_attr_cache_elem_set_data_based_on_key(
                 ref, key_entry.key,
-                op_p->u.k_read.val->buffer, data.size))
+                op_p->u.k_read.val->buffer, data.len))
         {
             /*
              * NOTE: this can happen if the keyword isn't registered, or if
@@ -464,8 +456,8 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
         tmpdata.ulen = op_p->u.k_write.val.buffer_sz;
         tmpdata.data = (void *) malloc(tmpdata.ulen);
         tmpdata.flags = DB_DBT_USERMEM;
-        ret = op_p->coll_p->keyval_db->get(
-            op_p->coll_p->keyval_db, NULL, &key, &tmpdata, 0);
+        ret = op_p->coll_p->keyval_db->db->get(
+            op_p->coll_p->keyval_db->db, NULL, &key, &tmpdata, 0);
         /* A failed get implies that keys possibly did not exist */
         if (ret != 0)
         {
@@ -479,8 +471,8 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
             {
                 if(ret != DB_NOTFOUND)
                 {
-                    op_p->coll_p->keyval_db->err(
-                        op_p->coll_p->keyval_db, ret, "keyval_db->get");
+                    op_p->coll_p->keyval_db->db->err(
+                        op_p->coll_p->keyval_db->db, ret, "keyval_db->get");
                 }
                 ret = -dbpf_db_error_to_trove_error(ret);
             }
@@ -504,16 +496,16 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
                      key.size);
     }
 
-    ret = op_p->coll_p->keyval_db->put(
-        op_p->coll_p->keyval_db, NULL, &key, &data, dbflags);
+    ret = op_p->coll_p->keyval_db->db->put(
+        op_p->coll_p->keyval_db->db, NULL, &key, &data, dbflags);
     /* Either a put error or key already exists */
     if (ret != 0 )
     {
 	gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
 		     "keyval_db->put failed. ret=%d\n", ret);
 
-        /*op_p->coll_p->keyval_db->err(
-            op_p->coll_p->keyval_db, ret, "keyval_db->put keyval write");
+        /*op_p->coll_p->keyval_db->db->err(
+            op_p->coll_p->keyval_db->db, ret, "keyval_db->put keyval write");
 	*/
         ret = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
@@ -646,7 +638,7 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
                      (char *)op_p->u.k_remove.key.buffer);
     }
                  
-    ret = dbpf_keyval_do_remove(op_p->coll_p->keyval_db, 
+    ret = dbpf_keyval_do_remove(op_p->coll_p->keyval_db->db, 
                                 op_p->handle,
                                 (op_p->flags & TROVE_KEYVAL_DIRECTORY_ENTRY ?
                                      DBPF_DIRECTORY_ENTRY_TYPE :
@@ -737,7 +729,7 @@ static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
     /* read each key to see if it is present */
     for (k = 0; k < op_p->u.k_remove_list.count; k++)
     {
-        ret = dbpf_keyval_do_remove(op_p->coll_p->keyval_db,
+        ret = dbpf_keyval_do_remove(op_p->coll_p->keyval_db->db,
                                     op_p->handle,
                                     (op_p->flags & TROVE_KEYVAL_DIRECTORY_ENTRY ?
                                          DBPF_DIRECTORY_ENTRY_TYPE :
@@ -767,8 +759,8 @@ static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
         data.ulen = sizeof(TROVE_keyval_handle_info);
         data.flags = DB_DBT_USERMEM;
 
-        ret = op_p->coll_p->keyval_db->get(
-            op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+        ret = op_p->coll_p->keyval_db->db->get(
+            op_p->coll_p->keyval_db->db, NULL, &key, &data, 0);
         if(ret == DB_NOTFOUND)
         {
             /* doesn't exist yet so we can set to 0 */
@@ -777,8 +769,8 @@ static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
         }
         else if(ret != 0)
         {
-            op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, "DB->get");
+            op_p->coll_p->keyval_db->db->err(
+                op_p->coll_p->keyval_db->db, ret, "DB->get");
             return -dbpf_db_error_to_trove_error(ret);
         }
 
@@ -788,12 +780,12 @@ static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
                  "[DBPF KEYVAL]: handle_info keyval_remove_list: handle: %llu, count: %d\n",
                  llu(op_p->handle), info.count); 
 
-        ret = op_p->coll_p->keyval_db->put(
-            op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+        ret = op_p->coll_p->keyval_db->db->put(
+            op_p->coll_p->keyval_db->db, NULL, &key, &data, 0);
         if(ret != 0)
         {
-            op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, 
+            op_p->coll_p->keyval_db->db->err(
+                op_p->coll_p->keyval_db->db, ret, 
                 "keyval_db->put keyval handle info ops");
             return -dbpf_db_error_to_trove_error(ret);
         }
@@ -922,7 +914,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
         tmp_callback = PINT_dbpf_dspace_remove_keyval;
     }
 
-    ret = PINT_dbpf_keyval_iterate(op_p->coll_p->keyval_db,
+    ret = PINT_dbpf_keyval_iterate(op_p->coll_p->keyval_db->db,
                                    op_p->handle,
                                    (op_p->flags & TROVE_KEYVAL_DIRECTORY_ENTRY ?
                                        DBPF_DIRECTORY_ENTRY_TYPE :
@@ -1100,7 +1092,7 @@ static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
         type = DBPF_ATTRIBUTE_TYPE;
     }
 
-    ret = PINT_dbpf_keyval_iterate(op_p->coll_p->keyval_db,
+    ret = PINT_dbpf_keyval_iterate(op_p->coll_p->keyval_db->db,
                                    op_p->handle,
                                    type,
                                    op_p->coll_p->pcache,
@@ -1214,9 +1206,9 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
 
 static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
 {
-    int ret = -TROVE_EINVAL, i = 0;
+    int ret, i = 0;
     struct dbpf_keyval_db_entry key_entry;
-    DBT key, data;
+    struct dbpf_data key, data;
     int success_count = 0;
 
     for(i = 0; i < op_p->u.k_read_list.count; i++)
@@ -1235,19 +1227,14 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
                op_p->u.k_read_list.key_array[i].buffer,
                op_p->u.k_read_list.key_array[i].buffer_sz);
 
-        memset(&key, 0, sizeof(key));
         key.data = &key_entry;
-        key.size = key.ulen = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
+        key.len = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
             op_p->u.k_read_list.key_array[i].buffer_sz);
-        key.flags = DB_DBT_USERMEM;
 
-        memset(&data, 0, sizeof(data));
         data.data = op_p->u.k_read_list.val_array[i].buffer;
-        data.ulen = op_p->u.k_read_list.val_array[i].buffer_sz;
-        data.flags = DB_DBT_USERMEM;
+        data.len = op_p->u.k_read_list.val_array[i].buffer_sz;
 
-        ret = op_p->coll_p->keyval_db->get(
-            op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+        ret = dbpf_db_get(op_p->coll_p->keyval_db, &key, &data);
         if (ret != 0)
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
@@ -1256,13 +1243,14 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
             /* if data buffer is too small returns ERANGE error */
             /* we could check fpr DB_BUFFER_SMALL rather than */
             /* compare these, but this seems to work */
-            if (data.ulen < data.size)
+            if (ret == ERANGE)
             {
                 gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                         "warning: Value buffer too small %d < %d\n",
-                         data.ulen, data.size);
+                         "warning: Value buffer too small %d < %zu\n",
+                         op_p->u.k_read_list.val_array[i].buffer_sz,
+                         data.len);
                 /* let the user know */
-                op_p->u.k_read_list.val_array[i].read_sz = data.size;
+                op_p->u.k_read_list.val_array[i].read_sz = data.len;
                 /* this is still a success */
                 success_count++;
             }
@@ -1280,7 +1268,7 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
         {
             success_count++;
             op_p->u.k_read_list.err_array[i] = 0;
-            op_p->u.k_read_list.val_array[i].read_sz = data.size;
+            op_p->u.k_read_list.val_array[i].read_sz = data.len;
         }
     }
 
@@ -1385,8 +1373,8 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         data.ulen = PVFS_NAME_MAX;
         data.flags |= DB_DBT_USERMEM;
 
-        ret = op_p->coll_p->keyval_db->get(
-            op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+        ret = op_p->coll_p->keyval_db->db->get(
+            op_p->coll_p->keyval_db->db, NULL, &key, &data, 0);
         /* check for DB_BUFFER_SMALL in case the key is there but the data
          * is simply too big for the temporary data buffer used
          */
@@ -1405,8 +1393,8 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
                 continue;
             }
 
-            op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, "DB->get");
+            op_p->coll_p->keyval_db->db->err(
+                op_p->coll_p->keyval_db->db, ret, "DB->get");
             ret = -dbpf_db_error_to_trove_error(ret);
             goto return_error;
         }
@@ -1448,12 +1436,12 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
                          key.size);
         }
 
-        ret = op_p->coll_p->keyval_db->put(
-            op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+        ret = op_p->coll_p->keyval_db->db->put(
+            op_p->coll_p->keyval_db->db, NULL, &key, &data, 0);
         if (ret != 0)
         {
-            op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, 
+            op_p->coll_p->keyval_db->db->err(
+                op_p->coll_p->keyval_db->db, ret, 
                 "keyval_db->put keyval write list");
             ret = -dbpf_db_error_to_trove_error(ret);
             goto return_error;
@@ -1562,8 +1550,8 @@ static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL;
 
-    if ((ret = op_p->coll_p->keyval_db->sync(
-                op_p->coll_p->keyval_db, 0)) != 0)
+    if ((ret = op_p->coll_p->keyval_db->db->sync(
+                op_p->coll_p->keyval_db->db, 0)) != 0)
     {
         ret = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
@@ -2078,34 +2066,29 @@ static int dbpf_keyval_get_handle_info(
 
 static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op * op_p)
 {
-    DBT key, data;
-    int ret = -TROVE_EINVAL;
     struct dbpf_keyval_db_entry key_entry;
+    struct dbpf_data key, data;
+    int ret;
 
     memset(&key_entry, 0, sizeof(key_entry));
     key_entry.handle = op_p->handle;
     key_entry.type = DBPF_COUNT_TYPE;
 
-    memset(&key, 0, sizeof(key));
-    memset(&data, 0, sizeof(data));
     key.data = &key_entry;
-    key.size = key.ulen = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0);
-    key.flags = DB_DBT_USERMEM;
+    key.len = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0);
     data.data = op_p->u.k_get_handle_info.info;
-    data.ulen = sizeof(TROVE_keyval_handle_info);
-    data.flags = DB_DBT_USERMEM;
+    data.len = sizeof(TROVE_keyval_handle_info);
 
-    ret = op_p->coll_p->keyval_db->get(
-        op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+    ret = dbpf_db_get(op_p->coll_p->keyval_db, &key, &data);
     if(ret != 0)
     {
-        if(ret != DB_NOTFOUND)
+        if(ret != ENOENT)
         {
-            op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, "keyval_db->get (handle info)");
+            op_p->coll_p->keyval_db->db->err(
+                op_p->coll_p->keyval_db->db, ret, "keyval_db->get (handle info)");
         }
 
-        return -dbpf_db_error_to_trove_error(ret);
+        return -trove_errno_to_trove_error(ret);
     }
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
@@ -2142,8 +2125,8 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
         data.ulen = sizeof(TROVE_keyval_handle_info);
         data.flags = DB_DBT_USERMEM;
 
-        ret = op_p->coll_p->keyval_db->get(
-            op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+        ret = op_p->coll_p->keyval_db->db->get(
+            op_p->coll_p->keyval_db->db, NULL, &key, &data, 0);
         if(ret == DB_NOTFOUND)
         {
             /* doesn't exist yet so we can set to 0 */
@@ -2152,8 +2135,8 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
         }
         else if(ret != 0)
         {
-            op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, "DB->get");
+            op_p->coll_p->keyval_db->db->err(
+                op_p->coll_p->keyval_db->db, ret, "DB->get");
             return -dbpf_db_error_to_trove_error(ret);
         }
        
@@ -2190,12 +2173,12 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
                 /* special case if we get down to zero remove this
                  * keyval as well
                  */
-                op_p->coll_p->keyval_db->del(
-                    op_p->coll_p->keyval_db, NULL, &key, 0);
+                op_p->coll_p->keyval_db->db->del(
+                    op_p->coll_p->keyval_db->db, NULL, &key, 0);
                 if(ret != 0)
                 {
-                    op_p->coll_p->keyval_db->err(
-                        op_p->coll_p->keyval_db, ret, "DB->del");
+                    op_p->coll_p->keyval_db->db->err(
+                        op_p->coll_p->keyval_db->db, ret, "DB->del");
                     return -dbpf_db_error_to_trove_error(ret);
                 }
 
@@ -2203,12 +2186,12 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
             }
         }
 
-        ret = op_p->coll_p->keyval_db->put(
-            op_p->coll_p->keyval_db, NULL, &key, &data, 0);
+        ret = op_p->coll_p->keyval_db->db->put(
+            op_p->coll_p->keyval_db->db, NULL, &key, &data, 0);
         if(ret != 0)
         {
-            op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, 
+            op_p->coll_p->keyval_db->db->err(
+                op_p->coll_p->keyval_db->db, ret, 
                 "keyval_db->put keyval handle info ops");
             return -dbpf_db_error_to_trove_error(ret);
         }

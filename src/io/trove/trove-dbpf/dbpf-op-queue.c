@@ -336,11 +336,11 @@ int dbpf_queue_or_service(
 
         if(DBPF_OP_IS_KEYVAL(op_p->type))
         {
-            dbp = op_p->coll_p->keyval_db;
+            dbp = op_p->coll_p->keyval_db->db;
         }
         else
         {
-            dbp = op_p->coll_p->ds_db;
+            dbp = op_p->coll_p->ds_db->db;
         }
 
         DBPF_DB_SYNC_IF_NECESSARY(op_p, dbp, ret);

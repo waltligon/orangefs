@@ -222,48 +222,6 @@ AC_DEFUN([AX_BERKELEY_DB],
     AC_MSG_RESULT(no)
     have_db_stat_malloc=no)
 
-    dnl Test to check for txnid parameter to DB stat (DB 4.3.xx+)
-    if test "x$have_db_stat_malloc" = "xno" ; then
-    
-       AC_MSG_CHECKING(for txnid parameter to DB stat function)
-       AC_TRY_COMPILE([
-       #include <db.h>
-       ], [
-       int ret = 0;
-       DB *db = db;
-       DB_TXN *txnid = txnid;
-       u_int32_t flags = 0;
-    
-        ret = db->stat(db, txnid, NULL, flags);
-        ], AC_MSG_RESULT(yes)
-        AC_DEFINE(HAVE_TXNID_PARAMETER_TO_DB_STAT, 1, 
-        Define if DB stat function takes txnid parameter)
-        have_txnid_param_to_stat=yes,
-        AC_MSG_RESULT(no)
-        have_txnid_param_to_stat=no)
-    
-    fi
-    
-    dnl Test to check for txnid parameter to DB open (DB4.1+)
-    AC_MSG_CHECKING(for txnid parameter to DB open function)
-    AC_TRY_COMPILE([
-    #include <db.h>
-    ], [
-    int ret = 0;
-    DB *db = NULL;
-    DB_TXN *txnid = NULL;
-    char *file = NULL;
-    char *database = NULL;
-    DBTYPE type = 0;
-    u_int32_t flags = 0;
-    int mode = 0;
-    
-    ret = db->open(db, txnid, file, database, type, flags, mode);
-    ], AC_MSG_RESULT(yes)
-    AC_DEFINE(HAVE_TXNID_PARAMETER_TO_DB_OPEN, 1,
-    Define if DB open function takes a txnid parameter),
-    AC_MSG_RESULT(no))
-    
     dnl check for DB_DIRTY_READ (it is not in db-3.2.9, for example)
     AC_MSG_CHECKING(for DB_DIRTY_READ flag)
     AC_TRY_COMPILE([

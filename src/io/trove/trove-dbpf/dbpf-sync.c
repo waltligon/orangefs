@@ -158,13 +158,13 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
     {
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                      "[SYNC_COALESCE]: sync context type is DSPACE\n");
-        dbp = qop_p->op.coll_p->ds_db;
+        dbp = qop_p->op.coll_p->ds_db->db;
     }
     else if( sync_context_type == COALESCE_CONTEXT_KEYVAL ) 
     {
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                      "[SYNC_COALESCE]: sync context type is KEYVAL\n");
-        dbp = qop_p->op.coll_p->keyval_db;
+        dbp = qop_p->op.coll_p->keyval_db->db;
     }
 
     if ( ! coll->meta_sync_enabled )
