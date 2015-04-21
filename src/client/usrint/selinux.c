@@ -54,57 +54,103 @@
  * the real version of this for regular files
  */
 
-int getfscreatecon(security_context_t *con)
+int getfscreatecon(char **con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int getfilecon(const char *path, security_context_t *con)
+int getfscreatecon_raw(char **con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int lgetfilecon(const char *path, security_context_t *con)
+int getfilecon(const char *path, char **con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int fgetfilecon(int fd, security_context_t *con)
+int getfilecon_raw(const char *path, char **con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-#ifdef HAVE_SECURITY_CONTEXT 
-typedef security_context_t u_security_context;
-typedef u_security_context const_u_security_context;
+int lgetfilecon(const char *path, char **con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int lgetfilecon_raw(const char *path, char **con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int fgetfilecon(int fd, char **con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int fgetfilecon_raw(int fd, char **con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+#ifdef HAVE_CONST_SECURITY_CONTEXT 
+#define CONST const
 #else
-typedef char *u_security_context;
-typedef const u_security_context const_u_security_context;
+#define CONST 
 #endif
 
-int setfscreatecon(const_u_security_context con)
+int setfscreatecon(CONST char *con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int setfilecon(const char *path, u_security_context con)
+int setfscreatecon_raw(CONST char *con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int lsetfilecon(const char *path, u_security_context con)
+int setfilecon(const char *path, CONST char *con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int fsetfilecon(int fd, u_security_context con)
+int setfilecon_raw(const char *path, CONST char *con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int lsetfilecon(const char *path, CONST char *con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int lsetfilecon_raw(const char *path, CONST char *con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int fsetfilecon(int fd, CONST char *con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int fsetfilecon_raw(int fd, CONST char *con)
 {
     errno = ENOTSUP;
     return -1;
