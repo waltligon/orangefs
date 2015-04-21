@@ -404,7 +404,8 @@ static PINT_sm_action rmdirent_update_directory_attr(
  * into an error to return to the user if possible, and print an error
  * if something unexpected has occurred.
  *
- * NOTE: we shouldn't ever actually hit this state, because nothing
+ * NOTE: we should only ever hit this state with PVFS_EAGAIN if a client
+ * has old information after a directory has split. Otherwise, nothing
  * else should be modifying trove in such a way that the keyval isn't
  * there at this point, because the keyval read has to have succeeded
  * for us to get this far.
@@ -421,7 +422,7 @@ static PINT_sm_action rmdirent_remove_directory_entry_failure(
 	    js_p->error_code = -PVFS_ENOENT;
 	    break;
         case -PVFS_EAGAIN:
-            gossip_lerr("mismatch dirdata!!\n");
+            gossip_debug(GOSSIP_SERVER_DEBUG, "mismatch dirdata!!\n");
             break;
 	default:
             gossip_lerr("unexpected error %d\n", js_p->error_code);
