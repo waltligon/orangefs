@@ -136,8 +136,8 @@ def TestDFSIO_write(testing_node,output=[]):
 def terasort_full(testing_node,output=[]):
     
 
-    # generate 50G of data. Not much, but good enough to kick the tires.
-    gensize = 500000000 
+    # generate 5G of data. Not much, but good enough to kick the tires.
+    gensize = 50000000 
      
     rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s  teragen %d /user/%s/terasort5-input" % (testing_node.hadoop_location,testing_node.hadoop_examples_location,gensize,testing_node.current_user),output)
     if rc != 0:
