@@ -459,13 +459,13 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
         
         for idx,instance in enumerate(new_instances):
             instance.update()
-            logging.debug("Instance %s at %s ext %s has state %s with code %r" % (instance.id,instance.ip_address,ip_addresses[idx],instance.state,instance.state_code))
+            logging.debug("Instance %s at %s has state %s with code %r" % (instance.id,instance.ip_address,instance.state,instance.state_code))
             
             while instance.state_code == 0:
                 
                 time.sleep(10)
                 instance.update()
-                logging.debug("Instance %s at %s ext %s has state %s with code %r" % (instance.id,instance.ip_address,ip_addresses[idx],instance.state,instance.state_code))
+                logging.debug("Instance %s at %s has state %s with code %r" % (instance.id,instance.ip_address,instance.state,instance.state_code))
             
             
         
