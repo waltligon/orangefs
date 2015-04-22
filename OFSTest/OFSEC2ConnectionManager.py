@@ -192,7 +192,7 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
     #
 
     def getAllCloudImages(self):
-        self.checkEC2Connection()        
+        self.checkCloudConnection()        
         self.cloud_image_list = self.ec2_connection.get_all_images()
         
         return self.cloud_image_list
@@ -251,7 +251,7 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
     #		
         
     def createNewCloudInstances(self,number_nodes,image_name,flavor_name,subnet_id=None,instance_suffix=""):
-        self.checkEC2Connection()  
+        self.checkCloudConnection()  
         
         # This creates a new instance for the system of a given machine type
         

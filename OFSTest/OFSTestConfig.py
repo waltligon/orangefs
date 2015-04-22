@@ -512,8 +512,14 @@ class OFSTestConfig(object):
         # one username for all nodes
         temp = d.get('node_username')
         if temp != None:
-            for node in nodelist:
-                self.node_usernames.append(temp)
+
+            if self.number_new_cloud_nodes > 0:
+                for i in range (0,self.number_new_cloud_nodes):
+                    self.node_username.append(temp)
+            else:
+                for node in nodelist:
+                    self.node_usernames.append(temp)
+
         
         temp = d.get('ofs_resource_location')
         if temp != None:
