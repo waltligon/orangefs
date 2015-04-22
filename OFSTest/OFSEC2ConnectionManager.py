@@ -33,7 +33,7 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
     #
 
     
-    def __init__(self,cloud_config_file=None,region_name=None):
+    def __init__(self,cloud_config_file=None,region_name='us-east'):
         
         super(OFSEC2ConnectionManager,self).__init__()
         ##
@@ -65,20 +65,26 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
         # @brief The ec2.connection.EC2Connection object.
         self.ec2_connection = None
         
-        # @var self.ec2_region_name
-        # @brief EC2 region name. Required to connect.
-        self.ec2_is_secure = False
         
         # @var self.ec2_is_secure
         # @brief Is this http or https?
-        self.cloud_instance_key = None
-               
+        
+        self.ec2_is_secure = False
+        
+        
         # @var String self.cloud_instance_key
         # @brief Name of key (in EC2) used to access instance via SSH
-        self.cloud_instance_key_location = None
+        self.cloud_instance_key = None
+               
         
         # @var String self.cloud_instance_key_location
         # @brief  *.pem ssh key used to access instance.
+        self.cloud_instance_key_location = None
+        
+    
+        # @var self.ec2_region_name
+        # @brief EC2 region name. Required to connect.
+        
         self.ec2_region_name = None
     
         # Default region name is RegionOne
@@ -137,10 +143,17 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
                 self.ec2_endpoint = url_v[3]
                 
                 # then comes the port, convert to integer
-                self.ec2_port = int(url_v[4])
+                # TODO: Make this actually parse a URL properly.
+                try:
+                    self.ec2_port = int(url_v[4])
+                except:
+                    self.ec2_port = ""
                 
                 # finally, the path is all elements from 5 to the end
-                path_v = url_v[5:]
+                try:
+                    path_v = url_v[5:]
+                except:
+                    path_v = []
                 
                 self.ec2_path = '/'.join(path_v)
                 
