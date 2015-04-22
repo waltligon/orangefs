@@ -175,7 +175,7 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
         
 
         logging.debug("EC2 region is %r" % self.ec2_region)
-        logging.debug("ec2.connection.EC2Connection(aws_access_key_id=%s,aws_secret_access_key=%s,is_secure=self.ec2_is_secure,port=%d,debug=2,region=%s,path=%s)" % (self.ec2_access_key,self.ec2_secret_key,self.ec2_port,self.ec2_region,self.ec2_path))
+        logging.debug("ec2.connection.EC2Connection(aws_access_key_id=%s,aws_secret_access_key=%s,is_secure=self.ec2_is_secure,port=%r,debug=2,region=%s,path=%r)" % (self.ec2_access_key,self.ec2_secret_key,self.ec2_port,self.ec2_region,self.ec2_path))
         
         self.ec2_connection = ec2.connection.EC2Connection(aws_access_key_id=self.ec2_access_key,aws_secret_access_key=self.ec2_secret_key,is_secure=self.ec2_is_secure,port=self.ec2_port
         ,debug=debug,region=self.ec2_region,path=self.ec2_path)
