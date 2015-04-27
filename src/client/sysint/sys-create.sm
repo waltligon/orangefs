@@ -948,10 +948,21 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->req.u.create.attr.u.meta.stuffed_size = 0;
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
-    /* V3 how to handle failure here ?
-     * If we have to do a SID lookup we need to have SM block on
-     * that action, or call a nested SM or something
-     */
+    if (ret < 0)
+    {
+        /* This will cause encode to fail if not resolved 
+         * In current (devel) version we assume all servers are known
+         * rendering this a true error - but eventually we will need to
+         * have resolution code
+         */
+        gossip_err("PVFS_sys_create: failed to look up SID\n");
+        /* V3 how to handle failure here ?
+         * If we have to do a SID lookup we need to have SM block on
+         * that action, or call a nested SM or something
+         *
+         * Should return a SM error code, call a lookup SM, then resume
+         */
+    }
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;

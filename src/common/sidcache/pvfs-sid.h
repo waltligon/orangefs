@@ -49,6 +49,10 @@ int PVFS_SID_count_io(PVFS_fs_id fs_id, int *count);
 
 int PVFS_SID_count_meta(PVFS_fs_id fs_id, int *count);
 
+int PVFS_SID_count_dirm(PVFS_fs_id fs_id, int *count);
+
+int PVFS_SID_count_dird(PVFS_fs_id fs_id, int *count);
+
 int PVFS_SID_count_root(PVFS_fs_id fs_id, int *count);
 
 int PVFS_SID_count_prime(PVFS_fs_id fs_id, int *count);

@@ -1560,7 +1560,7 @@ DOTCONF_CB(exit_defaults_context)
 DOTCONF_CB(enter_security_context)
 {
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                  (struct server_configuration_s *)cmd->context;
 
     config_s->prev_context = config_s->configuration_context;
     config_s->configuration_context = CTX_SECURITY;
@@ -1572,7 +1572,7 @@ DOTCONF_CB(enter_security_context)
 DOTCONF_CB(exit_security_context)
 {
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                  (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = config_s->prev_context;
     return NULL;
 }
@@ -1580,7 +1580,7 @@ DOTCONF_CB(exit_security_context)
 DOTCONF_CB(enter_server_context)
 {
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                  (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_SERVER;
     return NULL;
 }
@@ -1588,7 +1588,7 @@ DOTCONF_CB(enter_server_context)
 DOTCONF_CB(exit_server_context)
 {
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                  (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_GLOBAL;
     return NULL;
 }
@@ -1596,7 +1596,7 @@ DOTCONF_CB(exit_server_context)
 DOTCONF_CB(enter_serverdef_context)
 {
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                  (struct server_configuration_s *)cmd->context;
     /* begin defining a new server */
     if (config_s->new_host)
     {
@@ -1605,15 +1605,24 @@ DOTCONF_CB(enter_serverdef_context)
         free_host_alias(config_s->new_host);
     }
     config_s->new_host = (host_alias_t *)malloc(sizeof(host_alias_t));
+    config_s->new_host->server_type = PINT_llist_new();
     config_s->configuration_context = CTX_SERVERDEF;
     return NULL;
+}
+
+/* This only exists to match argument types for an llist doall below
+ */
+static int SID_update_type_2(void *item, void *arg);
+static int SID_update_type_2(void *item, void *arg)
+{
+    return SID_update_type((PVFS_SID *)arg, (struct SID_type_s *)item);
 }
 
 DOTCONF_CB(exit_serverdef_context)
 {
     int ret;
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                  (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_SERVER;
     /* end defining a new server */
     if (!config_s->new_host)
@@ -1650,6 +1659,7 @@ DOTCONF_CB(exit_serverdef_context)
      */
     if (!strcmp(config_s->server_alias, config_s->new_host->host_alias))
     {
+        struct SID_type_s *type_buf = NULL;
         /* This is our address - save the information */
         if (config_s->host_id != NULL)
         {
@@ -1659,12 +1669,21 @@ DOTCONF_CB(exit_serverdef_context)
         }
         config_s->host_sid = config_s->new_host->host_sid;
         config_s->host_id = strdup(config_s->new_host->bmi_address);
-        config_s->new_host->server_type |= SID_SERVER_ME;
+        type_buf = (struct SID_type_s *)malloc(sizeof(struct SID_type_s));
+        if (!type_buf)
+        {
+            return "Error: out of memory\n";
+        }
+        type_buf->server_type = SID_SERVER_ME;
+        type_buf->fsid = 0;
+        PINT_llist_add_to_tail(config_s->new_host->server_type,
+                               (void *)type_buf);
     }
 
     /* add type records to SID cache */
-    ret = SID_update_type(&config_s->new_host->host_sid,
-                          config_s->new_host->server_type);
+    ret = PINT_llist_doall_arg(config_s->new_host->server_type,
+                               SID_update_type_2,
+                               (void *)&config_s->new_host->host_sid);
     if (ret != 0)
     {
         return "Error: server type records not added to SID cache\n";
@@ -1677,8 +1696,7 @@ DOTCONF_CB(exit_serverdef_context)
         config_s->host_aliases = PINT_llist_new();
     }
 
-    PINT_llist_add_to_tail(config_s->host_aliases,
-                           (void *)config_s->new_host);
+    PINT_llist_add_to_tail(config_s->host_aliases, (void *)config_s->new_host);
 
     config_s->new_host = NULL;
     return NULL;
@@ -1697,7 +1715,7 @@ DOTCONF_CB(enter_filesystem_context)
     }
 
     fs_conf = (struct filesystem_configuration_s *)
-            malloc(sizeof(struct filesystem_configuration_s));
+                        malloc(sizeof(struct filesystem_configuration_s));
     assert(fs_conf); /* TODO: replace this with error handleing */
     memset(fs_conf, 0, sizeof(struct filesystem_configuration_s));
 
@@ -1716,7 +1734,7 @@ DOTCONF_CB(enter_filesystem_context)
     {
         config_s->file_systems = PINT_llist_new();
     }
-    PINT_llist_add_to_head(config_s->file_systems,(void *)fs_conf);
+    PINT_llist_add_to_head(config_s->file_systems, (void *)fs_conf);
     assert(PINT_llist_head(config_s->file_systems) == (void *)fs_conf);
     config_s->configuration_context = CTX_FILESYSTEM;
 
@@ -2946,8 +2964,9 @@ DOTCONF_CB(get_rootsrv)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                        (struct server_configuration_s *)cmd->context;
     struct host_alias_s *root_alias = NULL;
+    struct SID_type_s type_buf = {0, 0};
 
     fs_conf = (struct filesystem_configuration_s *)
                             PINT_llist_head(config_s->file_systems);
@@ -2968,10 +2987,11 @@ DOTCONF_CB(get_rootsrv)
         return "Error: RootServer alias not found\n";
     }
     /* This doesn't tell us much - we have no way to id which root */
-    /* update server type n SIDcache */
+    /* update server type in SIDcache */
+    type_buf.server_type = SID_SERVER_ROOT;
+    type_buf.fsid = fs_conf->coll_id;
     SID_update_type_single(&root_alias->host_sid,
-                           SID_SERVER_ROOT,
-                           fs_conf->coll_id);
+                           &type_buf);
 
     /* add to list of root servers for this fs */
     if (!fs_conf->root_servers)
@@ -3040,21 +3060,21 @@ DOTCONF_CB(get_name)
         struct filesystem_configuration_s *fs_conf = NULL;
 
         fs_conf = (struct filesystem_configuration_s *)
-                PINT_llist_head(config_s->file_systems);
+                              PINT_llist_head(config_s->file_systems);
         if (fs_conf->file_system_name)
         {
             gossip_err("WARNING: Overwriting Filesystem Name %s with %s\n",
                        fs_conf->file_system_name,cmd->data.str);
         }
         fs_conf->file_system_name =
-                (cmd->data.str ? strdup(cmd->data.str) : NULL);
+                      (cmd->data.str ? strdup(cmd->data.str) : NULL);
     }
     else if (config_s->configuration_context == CTX_DISTRIBUTION)
     {
         if (0 == config_s->default_dist_config.name)
         {
             config_s->default_dist_config.name =
-                    (cmd->data.str ? strdup(cmd->data.str) : NULL);
+                          (cmd->data.str ? strdup(cmd->data.str) : NULL);
             config_s->default_dist_config.param_list = PINT_llist_new();
         }
         else
@@ -3118,7 +3138,7 @@ static int compare_aliases(void *vkey,
 DOTCONF_CB(get_alias)
 {
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                        (struct server_configuration_s *)cmd->context;
 
     if (cmd->arg_count != 1)
     {
@@ -3202,29 +3222,84 @@ DOTCONF_CB(get_address_list)
     return NULL;
 }
 
+/*
+ * First argument may be fs_id either numerical or name
+ * otherwise fs_id is 0 signifying ALL FS's
+ */
 DOTCONF_CB(get_type_list)
 {
     int i;
     int ret;
+    int len;
+    struct SID_type_s *type_buf = NULL;
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                       (struct server_configuration_s *)cmd->context;
 
     if (cmd->arg_count < 1)
     {
         return "Error: Type must include at least one server type\n";
     }
 
-    /* convert type string into bit field */
-    for (i = 0; i < cmd->arg_count; i++)
+    type_buf = (struct SID_type_s *)malloc(sizeof(struct SID_type_s));
+    if (!type_buf)
     {
-        struct SID_type_s typebuf = {0, 0};
-        ret = SID_string_to_type(&typebuf, cmd->data.list[i]);
+        return "Error: out of memory\n";
+    }
+    type_buf->server_type = 0;
+    type_buf->fsid = 0;
+
+    len = strlen(cmd->data.list[0]);
+
+    /* check to see if an fs_id is provided */
+    if (cmd->data.list[0][0] == '(' &&
+        cmd->data.list[0][len - 1] == ')')
+    {   
+        int j = 0, nondig = 0;
+        /* see if fsid is numeric */
+        for (j = 1; j < len - 1; j++)
+        {
+            if (isdigit(cmd->data.list[0][j]))
+            {
+                continue;
+            }
+            /* non-digit we will assume fs name */
+            nondig = 1;
+            break;
+        }
+        if (nondig)
+        {
+            cmd->data.list[0][len - 1] = 0;
+            type_buf->fsid = PINT_config_get_fs_id_by_fs_name(
+                                                   config_s,
+                                                   &cmd->data.list[0][1]);
+        }
+        else
+        {
+            type_buf->fsid = atoi(&cmd->data.list[0][1]);
+        }
+        i = 1;
+    }
+    else
+    {
+        type_buf->fsid = 0; /* applies to all FS */
+        i = 0;
+    }
+
+    /* convert type string into bit field */
+    for (; i < cmd->arg_count; i++)
+    {
+        ret = SID_string_to_type(cmd->data.list[i]);
         if (ret < 0)
         {
+            free(type_buf);
             return "Error: Invalid type string provided\n";
         }
-        config_s->new_host->server_type |= typebuf.server_type;
+        type_buf->server_type |= ret;
     }
+
+    /* add to list of type records to be added to sidcache later */
+    PINT_llist_add_to_tail(config_s->new_host->server_type, 
+                           (void *)type_buf);
 
     return NULL;
 }

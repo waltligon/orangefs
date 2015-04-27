@@ -63,7 +63,7 @@ static int SID_create_type_table(void);
 static char *SID_type_to_string(char *buf, struct SID_type_s typeval, int n);
 static int SID_type_store(PVFS_SID *sid, FILE *outpfile);
 static int SID_cache_update_type(const PVFS_SID *sid_server,
-                                 uint32_t new_type_val);
+                                 struct SID_type_s *new_type_val);
 static int SID_cache_update_type_single(const PVFS_SID *sid_server,
                                         uint32_t new_type_val,
                                         PVFS_fs_id fsid);
@@ -151,7 +151,8 @@ struct type_conv
     {SID_SERVER_LOCAL       , "LOCAL"} ,
     {SID_SERVER_META        , "META"} ,
     {SID_SERVER_DATA        , "DATA"} ,
-    {SID_SERVER_DIRDATA     , "DIRDATA"} ,
+    {SID_SERVER_DIRM        , "DIR"} ,
+    {SID_SERVER_DIRD        , "DIRDATA"} ,
     {SID_SERVER_SECURITY    , "SECURITY"} ,
     /* these should always be last */
     {SID_SERVER_ME          , "ME"} ,
@@ -191,12 +192,17 @@ static char *SID_type_to_string(char *buf, struct SID_type_s typeval, int n)
     return buf;
 }
  
-/* This function is exported for parsing the config file */
-int SID_string_to_type(struct SID_type_s *sidtype, const char *typestring)
+/* This function is exported for parsing the config file 
+ * Looks for predefined strings that represent types
+ * returns positive numerical* representation of type
+ * or 0 if type not found or negative on error
+ */
+int SID_string_to_type(const char *typestring)
 {
     int i;
     char *mytype;
     int len;
+    int server_type = 0;
 
     if(!typestring)
     {
@@ -205,7 +211,6 @@ int SID_string_to_type(struct SID_type_s *sidtype, const char *typestring)
 
     len = 0;
     while(typestring[len] != 0 &&
-          typestring[len] != '(' &&
           len < MAX_TYPE_STR + 1)
     {
         len++;
@@ -214,15 +219,6 @@ int SID_string_to_type(struct SID_type_s *sidtype, const char *typestring)
     if (len > MAX_TYPE_STR)
     {
         return -PVFS_EINVAL;
-    }
-
-    if (typestring[len] == '(')
-    {
-        sidtype->fsid = atoi(&typestring[len + 1]);
-    }
-    else
-    {
-        sidtype->fsid = 0;
     }
 
     mytype = (char *)malloc(len);
@@ -240,17 +236,16 @@ int SID_string_to_type(struct SID_type_s *sidtype, const char *typestring)
 
     if (type_conv_table[i].typeval == SID_SERVER_NULL)
     {
-        sidtype->server_type = SID_SERVER_NULL;
-        sidtype->fsid = 0;
+        server_type = SID_SERVER_NULL;
         free(mytype);
         return -PVFS_EINVAL;
     }
 
-    sidtype->server_type = type_conv_table[i].typeval;
+    server_type = type_conv_table[i].typeval;
 
     free(mytype);
 
-    return 0;
+    return server_type;
 }
 
 /* We are expecting a string of the form "someattr=val" where val is an
@@ -555,7 +550,7 @@ static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
     DBT index_val;
     char linebuff[TYPELINELEN];
     char *lineptr = linebuff;
-    char *saveptr = NULL;
+    char *saveptr = linebuff;
     char *typeword;
     PVFS_SID sid_buf;
     struct SID_type_s type_buf;
@@ -593,10 +588,11 @@ static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
     {
         /* read next word */
         memset(typeword, 0, 50);
-#if 1
+
         /* strtok is not reentrant, strtok_r is not standard (gcc
          * extension) need to add config support to select the right
          * approach - V3
+         * NOTE: strtok_r is POSIX 2001
          */
 # if 1
         typeword = strtok_r(lineptr, " \t\n", &saveptr);
@@ -608,23 +604,15 @@ static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
             return 0; /* no more type tokens */
         }
         lineptr = NULL; /* subsequent calls from saved string pointer */
-#else
-        /* This is incomplete code using sscanf - has problems that must
-         * be fixed to be usable, namely, the lineptr has to be moved by
-         * the number of chars consumed in the sscanf, which is not
-         * generally possible to determine without lots of effort
-         */
-        ret = sscanf(lineptr, " %49s", typeword);
-        if(ret <= 0)
-        {
-            break; /* scanf error or end of string tokens */
-        }
-        /* move lineptr */
-#endif
+
+        /* V3 NEEDS TO BE DONE */
+        /* check for an fs_id and set in buffer */
+        type_buf.fsid = 0; /* applies to all fs */
 
         /* a zero return is an invalid typeval */
-        if (!(ret = SID_string_to_type(&type_buf, typeword)))
+        if (0 < (ret = SID_string_to_type(typeword)))
         {
+            type_buf.server_type = ret; /* numerical type value */
             /* insert into type database */
             ret = SID_type_db->put(SID_type_db,
                                    NULL,
@@ -648,7 +636,7 @@ static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
         }
         else
         {
-            break; /* invalid type string */
+            break; /* invalid type string or error in string-to-type */
         }
     }
     return(ret);    
@@ -958,7 +946,7 @@ int SID_cache_lookup_bmi(DB *dbp, const PVFS_SID *search_sid, char **bmi_url)
 int SID_cache_update_server(DB *dbp,
                             const PVFS_SID *sid_server,
                             SID_cacheval_t *new_attrs,
-                            uint32_t sid_types)
+                            struct SID_type_s *sid_types)
 {
     int ret = 0;                   /* Function return value */
     SID_cacheval_t *current_attrs; /* Temp SID_cacheval_t used to get current 
@@ -1183,21 +1171,25 @@ int SID_cache_update_type_single(const PVFS_SID *sid_server,
     return ret;    
 }
 
-int SID_cache_update_type(const PVFS_SID *sid_server, uint32_t new_type_val)
+int SID_cache_update_type(const PVFS_SID *sid_server,
+                          struct SID_type_s *new_type_val)
 {
     int ret = 0;
     uint32_t mask = 0;
+    uint32_t type_val = new_type_val->server_type;
 
-    for(mask = 1; mask != 0 && new_type_val != 0; mask <<= 1)
+    for(mask = 1; mask != 0 && type_val != 0; mask <<= 1)
     {
-        if (new_type_val & mask)
+        if (type_val & mask)
         {
             if ((mask & SID_SERVER_VALID_TYPES))
             {
-                ret = SID_cache_update_type_single(sid_server, mask, 0);
+                ret = SID_cache_update_type_single(sid_server,
+                                                   mask,
+                                                   new_type_val->fsid);
             }
             /* allows loop to exit when all present types are coded */
-            new_type_val &= ~mask;
+            type_val &= ~mask;
         }
     }
     return ret;
@@ -2838,7 +2830,7 @@ int SID_finalize(void)
     return ret;
 }
 
-int SID_update_type(const PVFS_SID *sid, int new_server_type)
+int SID_update_type(const PVFS_SID *sid, struct SID_type_s *new_server_type)
 {
     int ret = 0;
     ret = SID_cache_update_type(sid, new_server_type);
@@ -2846,11 +2838,12 @@ int SID_update_type(const PVFS_SID *sid, int new_server_type)
 }
 
 int SID_update_type_single(const PVFS_SID *sid,
-                           int new_server_type,
-                           int fsid)
+                           struct SID_type_s *new_server_type)
 {
     int ret = 0;
-    ret = SID_cache_update_type_single(sid, new_server_type, fsid);
+    ret = SID_cache_update_type_single(sid,
+                                       new_server_type->server_type,
+                                       new_server_type->fsid);
     return ret;
 }
 

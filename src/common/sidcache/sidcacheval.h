@@ -20,26 +20,9 @@ typedef struct SID_cacheval_s
 
 struct SID_type_s
 {
+    PVFS_fs_id fsid;      /* want to sort by fsid first */
     uint32_t server_type;
-    PVFS_fs_id fsid;
 };
-
-/* These are obsolete - they were using in an early implementation */
-/* V3 remove these */
-#if 0
-/* These are the key structures for the type db */
-typedef struct SID_type_db_key_s
-{
-    uint32_t typeval;
-    PVFS_SID sid;
-} SID_type_db_key;
-
-typedef struct SID_type_index_key_s
-{
-    PVFS_SID sid;
-    uint32_t typeval;
-} SID_type_index_key;
-#endif
 
 /* Server_type flags
  * Built-in flags indicate what the server does
@@ -61,15 +44,17 @@ enum {
     SID_SERVER_LOCAL =    0010UL,
     SID_SERVER_META =     0020UL,
     SID_SERVER_DATA =     0040UL,
-    SID_SERVER_DIRDATA =  0100UL,
-    SID_SERVER_SECURITY = 0200UL,
+    SID_SERVER_DIRM =     0100UL,
+    SID_SERVER_DIRD =     0200UL,
+    SID_SERVER_SECURITY = 0400UL,
     /* This should always be last */
     SID_SERVER_ME =       020000000000UL
 };
 
 #define SID_SERVER_VALID_TYPES \
         (SID_SERVER_ROOT | SID_SERVER_PRIME | SID_SERVER_CONFIG | \
-         SID_SERVER_META | SID_SERVER_DATA | SID_SERVER_DIRDATA | \
+         SID_SERVER_META | SID_SERVER_DATA | SID_SERVER_DIRD | \
+         SID_SERVER_DIRM | \
          SID_SERVER_SECURITY | SID_SERVER_LOCAL | SID_SERVER_ME)
 
 #define SID_SERVER_ALL SID_SERVER_VALID_TYPES

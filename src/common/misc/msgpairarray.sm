@@ -344,7 +344,9 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
 
     msg_p->op_status = 0;
 
-    /* if this is a retry message will already be encoded */
+    /* if this is a retry message will already be encoded and
+     * we will skip this section 
+     */
     if (msg_p->encoded_resp_p == NULL)
     {
         if (msg_p->fs_id != PVFS_FS_ID_NULL)

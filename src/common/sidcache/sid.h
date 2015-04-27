@@ -19,12 +19,12 @@ extern int SID_add(const PVFS_SID *sid,
                    const char *url,
                    int attributes[]);
 extern int SID_delete(const PVFS_SID *sid);
-extern int SID_update_type(const PVFS_SID *sid, int new_server_type_field);
+extern int SID_update_type(const PVFS_SID *sid,
+                           struct SID_type_s *new_server_type);
 extern int SID_update_type_single(const PVFS_SID *sid,
-                                  int new_server_type,
-                                  int fsid);
+                                  struct SID_type_s *new_server_type);
 extern int SID_update_attributes(const PVFS_SID *sid_server, int new_attr[]);
-extern int SID_string_to_type(struct SID_type_s *buf, const char *typestring);
+extern int SID_string_to_type(const char *typestring);
 extern int SID_set_attr(const char *attrstring, int **attributes);
 extern int SID_get_type(PVFS_SID *sid, uint32_t *typeval);
 extern int SID_finalize(void);
