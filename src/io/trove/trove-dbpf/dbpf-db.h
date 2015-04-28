@@ -21,3 +21,5 @@ struct dbpf_data
 
 int dbpf_db_open(DB *, struct dbpf_db **);
 int dbpf_db_get(struct dbpf_db *, struct dbpf_data *, struct dbpf_data *);
+int dbpf_db_put(struct dbpf_db *, struct dbpf_data *, struct dbpf_data *);
+int dbpf_db_putonce(struct dbpf_db *, struct dbpf_data *, struct dbpf_data *);

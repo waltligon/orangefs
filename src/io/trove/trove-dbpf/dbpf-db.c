@@ -40,6 +40,8 @@ int dbpf_db_get(struct dbpf_db *db, struct dbpf_data *key,
     if (r != 0)
     {
         switch (r) {
+        case DB_BUFFER_SMALL:
+            return ERANGE;
         case DB_NOTFOUND:
             return ENOENT;
         }
@@ -52,4 +54,34 @@ int dbpf_db_get(struct dbpf_db *db, struct dbpf_data *key,
     }
     val->len = db_data.size;
     return 0;
+}
+
+int dbpf_db_put(struct dbpf_db *db, struct dbpf_data *key,
+    struct dbpf_data *val)
+{
+    DBT db_key, db_data;
+    int r;
+    db_key.data = key->data;
+    db_key.ulen = db_key.size = key->len;
+    db_key.flags = DB_DBT_USERMEM;
+    db_data.data = val->data;
+    db_data.ulen = db_data.size = val->len;
+    db_data.flags = DB_DBT_USERMEM;
+    r = db->db->put(db->db, NULL, &db_key, &db_data, 0);
+    return r;
+}
+
+int dbpf_db_putonce(struct dbpf_db *db, struct dbpf_data *key,
+    struct dbpf_data *val)
+{
+    DBT db_key, db_data;
+    int r;
+    db_key.data = key->data;
+    db_key.ulen = db_key.size = key->len;
+    db_key.flags = DB_DBT_USERMEM;
+    db_data.data = val->data;
+    db_data.ulen = db_data.size = val->len;
+    db_data.flags = DB_DBT_USERMEM;
+    r = db->db->put(db->db, NULL, &db_key, &db_data, DB_NOOVERWRITE);
+    return r;
 }
