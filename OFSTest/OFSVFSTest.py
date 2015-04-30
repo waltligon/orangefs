@@ -22,6 +22,7 @@
 
 
 import inspect
+from datetime import datetime
 
 header = "OFS VFS Test(kmod)"
 prefix = "vfs-kmod"
@@ -547,7 +548,7 @@ def ltp(testing_node,output=[]):
 
 def mkdir_vfs(testing_node,output=[]):
 
-    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%d --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-mkdir --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
 
@@ -584,7 +585,7 @@ def shelltest(testing_node,output=[]):
 # 
 def symlink_vfs(testing_node,output=[]):
 
-    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%s --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
+    options = "--hostname=%s --fs-name=%s --network-proto=tcp --port=%d --exe-path=%s/bin --print-results --verbose" % (testing_node.hostname,testing_node.ofs_fs_name,testing_node.ofs_tcp_port,testing_node.ofs_installation_location)
     rc = testing_node.runSingleCommand("PATH=%s/bin:$PATH %s/test/test-symlink-perms --directory %s %s" % (testing_node.ofs_installation_location,testing_node.ofs_installation_location,testing_node.ofs_mount_point,options),output)
     return rc
 
@@ -668,6 +669,34 @@ def simultaneous_ls(testing_node,output=[]):
     rc = testing_node.runSingleCommand("eval %s & %s" % (pvfs2_ls,pvfs2_ls),output)
     return rc
 
+def dd(testing_node,output=[]):
+
+    
+    rc = testing_node.runSingleCommand("dd if=/dev/urandom of=/tmp/gigfile bs=2M count=512", output)
+    if rc != 0:
+        return rc
+    
+    rc = testing_node.runSingleCommand("dd if=/tmp/gigfile of=%s/gigfile bs=16M " % testing_node.ofs_mount_point, output)
+    print output[1]
+    print output[2]
+    
+    return rc
+
+def linux_untar(testing_node,output=[]):
+    
+    rc = testing_node.runSingleCommand("cd /tmp; wget http://devorange.clemson.edu/pvfs/linux-3.18.9.tar.gz", output)
+    
+    rc = testing_node.runSingleCommand("cd /tmp; gunzip linux-3.18.9.tar.gz",output)
+    
+    ts = datetime.now()
+    
+    rc = testing_node.runSingleCommandAsRoot("cd %s; tar xf /tmp/linux-3.18.9.tar" % testing_node.ofs_mount_point)
+    
+    total_time = str(datetime.now()-ts)
+    print "Total time to untar Linux 3.18.9 source is %s ms" % total_time
+    
+    return rc
+
 tests = [ 
 #ltp,
 append,
@@ -679,11 +708,13 @@ tail,
 vfs_cp,
 simultaneous_ls,
 
+dd,
 fdtree,
 fstest,
 fsx,
 iozone,
 bonnie,
 dbench,
-ltp
+ltp,
+linux_untar
  ]

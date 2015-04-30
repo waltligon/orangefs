@@ -227,7 +227,7 @@ class OFSTestConfig(object):
         
         ## @var ofs_tcp_port
         # TCP port on which to run OrangeFS
-        self.ofs_tcp_port = "3396" # Web Interface: auto
+        self.ofs_tcp_port = 3396 # Web Interface: auto
         
         ## @var ofs_mount_as_fuse
         # Mount filesystem using the fuse module instead of kernel module.
@@ -335,6 +335,14 @@ class OFSTestConfig(object):
         # Suffix to add to instance name.
         # usually the same as the output directory.
         self.instance_suffix = "" # Web Interface: auto
+        
+        
+        self.dedicated_metadata_server = False
+        self.ofs_metadata_location = ""
+        self.ofs_data_location = ""
+        self.restart_ofs = False
+        self.dedicated_client = False
+        self.servers_per_node = 1
         
         
         
@@ -504,8 +512,14 @@ class OFSTestConfig(object):
         # one username for all nodes
         temp = d.get('node_username')
         if temp != None:
-            for node in nodelist:
-                self.node_usernames.append(temp)
+
+            if self.number_new_cloud_nodes > 0:
+                for i in range (0,self.number_new_cloud_nodes):
+                    self.node_username.append(temp)
+            else:
+                for node in nodelist:
+                    self.node_usernames.append(temp)
+
         
         temp = d.get('ofs_resource_location')
         if temp != None:
@@ -732,3 +746,24 @@ class OFSTestConfig(object):
         temp = d.get('stop_on_failure')
         if temp != None:
             self.stop_on_failure = temp
+
+        temp = d.get('restart_ofs')
+        if temp != None:
+            self.restart_ofs = temp
+        
+        temp = d.get('ofs_metadata_location')
+        if temp != None:
+            self.ofs_metadata_location = temp
+        
+        temp = d.get('dedicated_metadata_server')
+        if temp != None:
+            self.dedicated_metadata_server = temp
+
+        temp = d.get('dedicated_client')
+        if temp != None:
+            self.dedicated_client = temp
+
+        temp = d.get('servers_per_node')
+        if temp != None:
+            self.servers_per_node=1
+        

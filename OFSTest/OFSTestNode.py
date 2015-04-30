@@ -156,9 +156,14 @@ class OFSTestNode(object):
         # This is the location of the OrangeFS source
         self.ofs_source_location = ""
         
-        ## @var ofs_storage_location
+        ## @var ofs_data_location
         # This is the location of the OrangeFS storage
-        self.ofs_storage_location = ""
+        self.ofs_data_location = ""
+
+        ## @var ofs_metadata_location
+        # This is the location of the OrangeFS metadata
+        self.ofs_metadata_location = ""
+
 
         ## @var ofs_installation_location
         # This is where OrangeFS is installed. Defaults to /opt/orangefs
@@ -190,7 +195,7 @@ class OFSTestNode(object):
         
         ## @var ofs_tcp_port
         # default tcp port
-        self.ofs_tcp_port = "3396"
+        self.ofs_tcp_port = 3396
         
         ## @var db4_dir
         # berkeley db4 location
@@ -853,21 +858,24 @@ class OFSTestNode(object):
             # Uninstall the old kernel
             # Must escape double quotes and backquotes for command to run correctly on remote machine.
             # Otherwise shell will interpret them for local machine and commands won't work.
-            rc = self.runSingleCommandAsRoot("\\`uname -r\\`")
-            
-            rc = self.runSingleCommandAsRoot("rpm -e kernel-\\`uname -r\\`")
-            
-            rc = self.runSingleCommandAsRoot("echo \\\"\\`rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel\\`\\\"")
-            
-                        
-            rc = self.runSingleCommandAsRoot("perl -e \\\"s/\\`uname -r\\`/\\`rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel\\`/g\\\" -p /boot/grub/grub.conf")
-            
-            
-            rc = self.runSingleCommandAsRoot("perl -e \\\"s/\\`uname -r\\`/\\`rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel\\`/g\\\" -p -i /boot/grub/grub.conf")
-            
-
+            if "6." in self.distro or "5." in self.distro:
+                rc = self.runSingleCommandAsRoot("\\`uname -r\\`")
+                
+                rc = self.runSingleCommandAsRoot("rpm -e kernel-\\`uname -r\\`")
+                
+                rc = self.runSingleCommandAsRoot("echo \\\"\\`rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel\\`\\\"")
+                
+                            
+                rc = self.runSingleCommandAsRoot("perl -e \\\"s/\\`uname -r\\`/\\`rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel\\`/g\\\" -p /boot/grub/grub.conf")
+                
+                
+                rc = self.runSingleCommandAsRoot("perl -e \\\"s/\\`uname -r\\`/\\`rpm -q --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel\\`/g\\\" -p -i /boot/grub/grub.conf")
+                
+            else:
+                rc = self.runSingleCommandAsRoot("mkdir -p /var/log/journal")
+                
             rc = self.runSingleCommandAsRoot("nohup /sbin/reboot &")
-
+            
         #self.runAllBatchCommands()
         msg = "Node "+self.hostname+" at "+self.ip_address+" updated."
         print msg
@@ -1125,7 +1133,7 @@ class OFSTestNode(object):
                 "DEBIAN_FRONTEND=noninteractive apt-get update", 
                 #documentation needs to be updated. linux-headers needs to be added for ubuntu!
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssl gcc g++ gfortran flex bison libssl-dev linux-source perl make linux-headers-\\`uname -r\\` zip subversion automake autoconf  pkg-config rpm patch libuu0 libuu-dev libuuid1 uuid uuid-dev uuid-runtime gdb maven", # openjdk-7-jdk openjdk-7-jre openjdk-7-jre-lib", 
-                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q libfuse2 fuse-utils libfuse-dev",
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -q fuse libfuse2 libfuse-dev",
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q autofs nfs-kernel-server rpcbind nfs-common nfs-kernel-server", 
                 # needed for Ubuntu 10.04
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -q linux-image",
@@ -1290,14 +1298,14 @@ class OFSTestNode(object):
                 ]
             
             #install Sun Java 7
-            rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-7u71-linux-x64.rpm",output)
-             
-            if rc != 0:
-                logging.exception(output)
-                return rc
-            #install_commands.append("yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user)
-            install_commands.append("rpm -i /home/%s/jdk-7u71-linux-x64.rpm" % self.current_user)
-            
+#             rc = self.runSingleCommand("wget --quiet http://devorange.clemson.edu/pvfs/jdk-7u71-linux-x64.rpm",output)
+#              
+#             if rc != 0:
+#                 logging.exception(output)
+#                 return rc
+#             #install_commands.append("yes y | bash /home/%s/jdk-6u45-linux-x64-rpm.bin" % self.current_user)
+#             install_commands.append("yum install -y /home/%s/jdk-7u71-linux-x64.rpm" % self.current_user)
+#             
 
         
             for command in install_commands:
@@ -1314,6 +1322,12 @@ class OFSTestNode(object):
             print "Unknown system %s" % self.distro
         
         self.installMaven()
+        
+        if "centos linux 7" in self.distro.lower():
+            self.runSingleCommandAsRoot("nohup /sbin/reboot &")
+            print "Rebooting node again"
+            time.sleep(120)
+        
         
         
     def installMaven(self):
@@ -2186,6 +2200,9 @@ class OFSTestNode(object):
             logging.exception("Could not configure OrangeFS tests")
             return rc
         
+        #kludge because posix tests break compile on non x86 platforms.
+        self.runSingleCommand("rm -rf %s/test/posix" % self.ofs_source_location)
+        
         rc = self.runSingleCommand("make all")
         if rc != 0:
             logging.exception( "Could not build (make) OrangeFS tests")
@@ -2345,7 +2362,7 @@ class OFSTestNode(object):
 
 
     ##
-    # @fn configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_storage_location="",ofs_conf_file=None,security=None):
+    # @fn configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_data_location="",ofs_conf_file=None,security=None):
     #
     # This function runs the configuration programs and puts the result in self.ofs_installation_location/etc/orangefs.conf 
     # @param self The object pointer
@@ -2353,31 +2370,57 @@ class OFSTestNode(object):
     # @param ofs_fs_name OrangeFS filesystem name in url
     # @param configuration_options Additional configuration options
     # @param ofs_source_location Location of OrangeFS source
-    # @param ofs_storage_location Location of OrangeFS storage
+    # @param ofs_data_location Location of OrangeFS storage
     # @param ofs_conf_file Configuration file name. Default is [OFS location]/etc/orangefs.conf
     # @param security OFS security level None,"Key","Cert"
 
       
     
        
-    def configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_storage_location="",ofs_conf_file=None,security=None):
+    def configureOFSServer(self,ofs_hosts_v,ofs_fs_name,configuration_options="",ofs_source_location="",ofs_data_location="",ofs_metadata_location="",ofs_conf_file=None,security=None,dedicated_metadata_server=False,dedicated_client=False,servers_per_node=1):
         
             
         self.ofs_fs_name=ofs_fs_name
         
         self.changeDirectory(self.ofs_installation_location)
         
-        if ofs_storage_location == "":
-            self.ofs_storage_location  = self.ofs_installation_location + "/data"
+        if ofs_data_location == "":
+            self.ofs_data_location  = self.ofs_installation_location + "/data"
         else:
-            self.ofs_storage_location = self.ofs_storage_location
+            self.ofs_data_location = ofs_data_location
+        
+        if ofs_metadata_location == "":
+            self.ofs_metadata_location = self.ofs_installation_location + "/metadata"
+        else:
+            self.ofs_metadata_location = ofs_metadata_location
+            
            
         # ofs_hosts is a list of ofs hosts separated by white space.
         ofs_host_str = ""
+        metadata_host_str = ""
         
         # Add each ofs host to the string of hosts.
+        
+               
         for ofs_host in ofs_hosts_v:
-            ofs_host_str = ofs_host_str + ofs_host.hostname + ":"+self.ofs_tcp_port+","
+            if dedicated_metadata_server == True and metadata_host_str == "":
+                metadata_host_str = ofs_host.hostname + ":%d" % self.ofs_tcp_port
+            else:   
+                
+                ofs_host_port_str = ""
+                current_port = self.ofs_tcp_port
+                for i in range(0,servers_per_node):
+                    ofs_host_port_str = "%s%s:%d," % (ofs_host_port_str,ofs_host.hostname,current_port)
+                    current_port += 1
+                    
+                ofs_host_str = ofs_host_str+ofs_host_port_str
+        # sanity check.
+        if ofs_host_str == "":
+            ofs_host_str = metadata_host_str
+            
+        if dedicated_metadata_server == False:
+            metadata_host_str = ofs_host_str
+            
         
         #strip the trailing comma
         ofs_host_str = ofs_host_str.rstrip(',')
@@ -2410,7 +2453,7 @@ class OFSTestNode(object):
             
         self.runSingleCommand("mkdir -p %s/etc" % self.ofs_installation_location)
         if configuration_options == "":
-            genconfig_str="%s/bin/pvfs2-genconfig %s/etc/orangefs.conf --protocol tcp --iospec=\"%s\" --metaspec=\"%s\" --storage=%s %s --logfile=%s/pvfs2-server-%s.log --quiet" % (self.ofs_installation_location,self.ofs_installation_location,ofs_host_str,ofs_host_str,self.ofs_storage_location,security_args,self.ofs_installation_location,self.ofs_branch)
+            genconfig_str="%s/bin/pvfs2-genconfig %s/etc/orangefs.conf --protocol tcp --iospec=\"%s\" --metaspec=\"%s\" --storage=%s --metadata=%s %s --logfile=%s/pvfs2-server-%s.log --quiet" % (self.ofs_installation_location,self.ofs_installation_location,ofs_host_str,metadata_host_str,self.ofs_data_location,self.ofs_metadata_location,security_args,self.ofs_installation_location,self.ofs_branch)
         else:
             genconfig_str="%s/bin/pvfs2-genconfig %s/etc/orangefs.conf %s --quiet" % (self.ofs_installation_location,self.ofs_installation_location,configuration_options)
         
@@ -2448,7 +2491,7 @@ class OFSTestNode(object):
 
         
       
-    def startOFSServer(self,run_as_root=False):
+    def startOFSServer(self,run_as_root=False,debug_mask="network,client,server"):
         
         output = []
         self.changeDirectory(self.ofs_installation_location)
@@ -2515,12 +2558,12 @@ class OFSTestNode(object):
         self.ofs_mount_point = "/tmp/mount/orangefs"
         self.runSingleCommand("mkdir -p "+ self.ofs_mount_point)
         self.runSingleCommand("mkdir -p %s/etc" % self.ofs_installation_location)
-        self.runSingleCommand("echo \"tcp://%s:%s/%s %s pvfs2 defaults 0 0\" > %s/etc/orangefstab" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point,self.ofs_installation_location))
+        self.runSingleCommand("echo \"tcp://%s:%d/%s %s pvfs2 defaults 0 0\" > %s/etc/orangefstab" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point,self.ofs_installation_location))
         self.runSingleCommandAsRoot("ln -s %s/etc/orangefstab /etc/pvfs2tab" % self.ofs_installation_location)
         self.setEnvironmentVariable("PVFS2TAB_FILE",self.ofs_installation_location + "/etc/orangefstab")
        
         # set the debug mask
-        self.runSingleCommand("%s/bin/pvfs2-set-debugmask -m %s \"all\"" % (self.ofs_installation_location,self.ofs_mount_point))
+        self.runSingleCommand("%s/bin/pvfs2-set-debugmask -m %s \"%s\"" % (self.ofs_installation_location,self.ofs_mount_point,debug_mask))
        
         return 0
     
@@ -2677,14 +2720,14 @@ class OFSTestNode(object):
         
         # mount with fuse
         if mount_fuse == True:
-            print "Mounting OrangeFS service at tcp://%s:%s/%s at mount_point %s via fuse" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point)
-            self.runSingleCommand("%s/bin/pvfs2fuse %s -o fs_spec=tcp://%s:%s/%s -o nonempty" % (self.ofs_installation_location,self.ofs_mount_point,self.hostname,self.ofs_tcp_port,self.ofs_fs_name),output)
+            print "Mounting OrangeFS service at tcp://%s:%d/%s at mount_point %s via fuse" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point)
+            self.runSingleCommand("%s/bin/pvfs2fuse %s -o fs_spec=tcp://%s:%d/%s -o nonempty" % (self.ofs_installation_location,self.ofs_mount_point,self.hostname,self.ofs_tcp_port,self.ofs_fs_name),output)
             #print output
             
         #mount with kmod
         else:
-            print "Mounting OrangeFS service at tcp://%s:%s/%s at mount_point %s" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point)
-            self.runSingleCommandAsRoot("mount -t pvfs2 tcp://%s:%s/%s %s" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point))
+            print "Mounting OrangeFS service at tcp://%s:%d/%s at mount_point %s" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point)
+            self.runSingleCommandAsRoot("mount -t pvfs2 tcp://%s:%d/%s %s" % (self.hostname,self.ofs_tcp_port,self.ofs_fs_name,self.ofs_mount_point))
 
         
         print "Waiting 30 seconds for mount"            

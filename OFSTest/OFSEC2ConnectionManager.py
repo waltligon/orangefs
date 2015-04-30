@@ -33,7 +33,7 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
     #
 
     
-    def __init__(self,cloud_config_file=None,region_name=None):
+    def __init__(self,cloud_config_file=None,region_name='us-east'):
         
         super(OFSEC2ConnectionManager,self).__init__()
         ##
@@ -65,20 +65,26 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
         # @brief The ec2.connection.EC2Connection object.
         self.ec2_connection = None
         
-        # @var self.ec2_region_name
-        # @brief EC2 region name. Required to connect.
-        self.ec2_is_secure = False
         
         # @var self.ec2_is_secure
         # @brief Is this http or https?
-        self.cloud_instance_key = None
-               
+        
+        self.ec2_is_secure = False
+        
+        
         # @var String self.cloud_instance_key
         # @brief Name of key (in EC2) used to access instance via SSH
-        self.cloud_instance_key_location = None
+        self.cloud_instance_key = None
+               
         
         # @var String self.cloud_instance_key_location
         # @brief  *.pem ssh key used to access instance.
+        self.cloud_instance_key_location = None
+        
+    
+        # @var self.ec2_region_name
+        # @brief EC2 region name. Required to connect.
+        
         self.ec2_region_name = None
     
         # Default region name is RegionOne
@@ -137,10 +143,17 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
                 self.ec2_endpoint = url_v[3]
                 
                 # then comes the port, convert to integer
-                self.ec2_port = int(url_v[4])
+                # TODO: Make this actually parse a URL properly.
+                try:
+                    self.ec2_port = int(url_v[4])
+                except:
+                    self.ec2_port = ""
                 
                 # finally, the path is all elements from 5 to the end
-                path_v = url_v[5:]
+                try:
+                    path_v = url_v[5:]
+                except:
+                    path_v = []
                 
                 self.ec2_path = '/'.join(path_v)
                 
@@ -162,7 +175,7 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
         
 
         logging.debug("EC2 region is %r" % self.ec2_region)
-        logging.debug("ec2.connection.EC2Connection(aws_access_key_id=%s,aws_secret_access_key=%s,is_secure=self.ec2_is_secure,port=%d,debug=2,region=%s,path=%s)" % (self.ec2_access_key,self.ec2_secret_key,self.ec2_port,self.ec2_region,self.ec2_path))
+        logging.debug("ec2.connection.EC2Connection(aws_access_key_id=%s,aws_secret_access_key=%s,is_secure=self.ec2_is_secure,port=%r,debug=2,region=%s,path=%r)" % (self.ec2_access_key,self.ec2_secret_key,self.ec2_port,self.ec2_region,self.ec2_path))
         
         self.ec2_connection = ec2.connection.EC2Connection(aws_access_key_id=self.ec2_access_key,aws_secret_access_key=self.ec2_secret_key,is_secure=self.ec2_is_secure,port=self.ec2_port
         ,debug=debug,region=self.ec2_region,path=self.ec2_path)
@@ -179,7 +192,7 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
     #
 
     def getAllCloudImages(self):
-        self.checkEC2Connection()        
+        self.checkCloudConnection()        
         self.cloud_image_list = self.ec2_connection.get_all_images()
         
         return self.cloud_image_list
@@ -238,7 +251,7 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
     #		
         
     def createNewCloudInstances(self,number_nodes,image_name,flavor_name,subnet_id=None,instance_suffix=""):
-        self.checkEC2Connection()  
+        self.checkCloudConnection()  
         
         # This creates a new instance for the system of a given machine type
         
@@ -446,13 +459,13 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
         
         for idx,instance in enumerate(new_instances):
             instance.update()
-            logging.debug("Instance %s at %s ext %s has state %s with code %r" % (instance.id,instance.ip_address,ip_addresses[idx],instance.state,instance.state_code))
+            logging.debug("Instance %s at %s has state %s with code %r" % (instance.id,instance.ip_address,instance.state,instance.state_code))
             
             while instance.state_code == 0:
                 
                 time.sleep(10)
                 instance.update()
-                logging.debug("Instance %s at %s ext %s has state %s with code %r" % (instance.id,instance.ip_address,ip_addresses[idx],instance.state,instance.state_code))
+                logging.debug("Instance %s at %s has state %s with code %r" % (instance.id,instance.ip_address,instance.state,instance.state_code))
             
             
         

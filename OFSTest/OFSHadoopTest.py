@@ -136,16 +136,16 @@ def TestDFSIO_write(testing_node,output=[]):
 def terasort_full(testing_node,output=[]):
     
 
-    # generate 500M of data. Not much, but good enough to kick the tires.
-    gensize = 5000000
+    # generate 1G of data. Not much, but good enough to kick the tires.
+    gensize = 10000000 
      
-    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s  teragen %d /user/%s/terasort5-input" % (testing_node.hadoop_location,testing_node.hadoop_examples_location,gensize,testing_node.current_user),output)
+    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s  teragen %d /user/%s/terasort1G-input" % (testing_node.hadoop_location,testing_node.hadoop_examples_location,gensize,testing_node.current_user),output)
     if rc != 0:
         return rc    
-    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s  terasort /user/%s/terasort5-input /user/%s/terasort5-output" % (testing_node.hadoop_location,testing_node.hadoop_examples_location,testing_node.current_user,testing_node.current_user),output)
+    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s  terasort /user/%s/terasort1G-input /user/%s/terasort1G-output" % (testing_node.hadoop_location,testing_node.hadoop_examples_location,testing_node.current_user,testing_node.current_user),output)
     if rc != 0:
         return rc    
-    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s  teravalidate /user/%s/terasort5-output /user/%s/terasort5-validate" % (testing_node.hadoop_location,testing_node.hadoop_examples_location,testing_node.current_user,testing_node.current_user),output)
+    rc = testing_node.runSingleCommand("%s/bin/hadoop jar %s  teravalidate /user/%s/terasort1G-output /user/%s/terasort1G-validate" % (testing_node.hadoop_location,testing_node.hadoop_examples_location,testing_node.current_user,testing_node.current_user),output)
 
     return rc      
 ##

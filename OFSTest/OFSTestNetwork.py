@@ -652,12 +652,12 @@ class OFSTestNetwork(object):
 
  
        
-    def configureOFSServer(self,ofs_fs_name,master_node=None,node_list=None,pvfs2genconfig_opts="",security=None):
+    def configureOFSServer(self,ofs_fs_name,master_node=None,node_list=None,ofs_data_location="",ofs_metadata_location="",pvfs2genconfig_opts="",security=None,dedicated_metadata_server=False,dedicated_client=False,servers_per_node=1):
         if node_list == None:
             node_list = self.network_nodes
         if master_node == None:
             master_node = node_list[0]
-        return master_node.configureOFSServer(ofs_hosts_v=node_list,ofs_fs_name=ofs_fs_name,configuration_options=pvfs2genconfig_opts,security=security)
+        return master_node.configureOFSServer(ofs_hosts_v=node_list,ofs_fs_name=ofs_fs_name,ofs_data_location=ofs_data_location,ofs_metadata_location=ofs_metadata_location,configuration_options=pvfs2genconfig_opts,security=security,dedicated_metadata_server=dedicated_metadata_server,dedicated_client=dedicated_client,servers_per_node=servers_per_node)
 
    
     ##    
@@ -1651,10 +1651,10 @@ class OFSTestNetwork(object):
             # update core-site.xml
             node.runSingleCommand("sed -i s,/mnt/orangefs,%s,g %s/core-site.xml" % (node.ofs_mount_point,hadoop_conf))
             # Core site points to the OrangeFS on the master node
-            node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%s,g %s/core-site.xml" % (master_node.hostname,master_node.ofs_tcp_port,hadoop_conf))
+            node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%d,g %s/core-site.xml" % (master_node.hostname,master_node.ofs_tcp_port,hadoop_conf))
             
             # update mapred-site.xml
-            node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%s,g %s/mapred-site.xml" % (node.hostname,node.ofs_tcp_port,hadoop_conf))
+            node.runSingleCommand("sed -i s,localhost-orangefs:3334,%s:%d,g %s/mapred-site.xml" % (node.hostname,node.ofs_tcp_port,hadoop_conf))
             node.runSingleCommand("sed -i s/localhost/%s/g %s/mapred-site.xml" % (master_node.hostname,hadoop_conf))
             
             node.runSingleCommand("sed -i s/localhost/%s/g %s/yarn-site.xml" % (master_node.hostname,hadoop_conf))

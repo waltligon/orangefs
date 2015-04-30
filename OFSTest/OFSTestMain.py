@@ -433,7 +433,16 @@ class OFSTestMain(object):
         print ""
         print "==================================================================="
         print "Configure OrangeFS Server"
-        rc = self.ofs_network.configureOFSServer(ofs_fs_name=self.config.ofs_fs_name,pvfs2genconfig_opts=self.config.pvfs2genconfig_opts,security=self.config.ofs_security_mode)
+        rc = self.ofs_network.configureOFSServer(
+                                                 ofs_fs_name=self.config.ofs_fs_name,
+                                                 pvfs2genconfig_opts=self.config.pvfs2genconfig_opts,
+                                                 security=self.config.ofs_security_mode,
+                                                 ofs_data_location = self.config.ofs_data_location,
+                                                 ofs_metadata_location = self.config.ofs_metadata_location,
+                                                 dedicated_metadata_server=self.config.dedicated_metadata_server,
+                                                 dedicated_client=self.config.dedicated_client,
+                                                 servers_per_node=self.config.servers_per_node
+                                                 )
 
         if rc != 0:
             print "Could not configure OrangeFS servers. Aborting."
@@ -931,6 +940,6 @@ class OFSTestMain(object):
         if self.config.cloud_delete_after_test == True:
             print "Test complete. Deleting all cloud nodes."
             self.terminateAllCloudNodes()
-        else:
+        elif self.config.restart_ofs == True:
             print "Test complete. Restarting OrangeFS clients and servers"
             self.restartOFS()
