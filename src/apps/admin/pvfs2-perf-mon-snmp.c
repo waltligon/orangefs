@@ -37,6 +37,10 @@
 #define OID_SMALL_WRITE ".1.3.6.1.4.1.7778.9"
 #define OID_FLOW_READ ".1.3.6.1.4.1.7778.10"
 #define OID_FLOW_WRITE ".1.3.6.1.4.1.7778.11"
+#define OID_REQ_CREATE ".1.3.6.1.4.1.7778.12"
+#define OID_REQ_REMOVE ".1.3.6.1.4.1.7778.13"
+#define OID_REQ_MKDIR ".1.3.6.1.4.1.7778.14"
+#define OID_REQ_RMDIR ".1.3.6.1.4.1.7778.15"
 
 #define INT_TYPE "INTEGER"
 #define CNT_TYPE "COUNTER"
@@ -68,6 +72,10 @@ static struct MGMT_perf_iod key_table[] =
    {OID_SMALL_WRITE, CNT_TYPE, PINT_PERF_SMALL_WRITE, "Bytes Written by Small_IO"},
    {OID_FLOW_READ, CNT_TYPE, PINT_PERF_FLOW_READ, "Bytes Read by Flow"},
    {OID_FLOW_WRITE, CNT_TYPE, PINT_PERF_FLOW_WRITE, "Bytes Written by Flow"},
+   {OID_REQ_CREATE, CNT_TYPE, PINT_PERF_CREATE, "create requests called"},
+   {OID_REQ_REMOVE, CNT_TYPE, PINT_PERF_REMOVE, "remove requests called"},
+   {OID_REQ_MKDIR, CNT_TYPE, PINT_PERF_MKDIR, "mkdir requests called"},
+   {OID_REQ_RMDIR, CNT_TYPE, PINT_PERF_RMDIR, "rmdir requests called"},
    {NULL, NULL, -1, NULL}   /* this halts the key count */
 };
 
