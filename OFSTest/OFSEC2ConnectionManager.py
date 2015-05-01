@@ -491,6 +491,9 @@ class OFSEC2ConnectionManager(OFSCloudConnectionManager.OFSCloudConnectionManage
             # Create the node and get the instance name
             if "ubuntu" in image_name:
                 name = 'ubuntu'
+            elif "debian" in image_name:
+                name = 'debian'
+
             elif "fedora" in image_name:
                 # fedora 18 = cloud-user, fedora 19 = fedora
                 
