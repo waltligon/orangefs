@@ -33,8 +33,6 @@
 #include "extent-utils.h"
 #include "security-util.h"
 
-#define	MAX_PARTITIONS	2
-
 enum
 {
     LOCAL_OPERATION = 2,
@@ -399,15 +397,17 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
 
     if (s_op->u.tree_communicate.handle_array_remote_count > 0) {
 
-        /* Decide how to divide the remote handles. If there are only a few
-           (MAX_PARTITIONS or fewer) then go ahead and send to each remaining
-           server individually. */
-        if (s_op->u.tree_communicate.handle_array_remote_count > MAX_PARTITIONS)
-        {
-            num_partitions = MAX_PARTITIONS;
-            num_files_per_server = s_op->u.tree_communicate.handle_array_remote_count /
-                                       MAX_PARTITIONS;
-            if (num_partitions * num_files_per_server <
+      /* Decide how to divide the remote handles. If there are only a few
+         (fewer than tree_threshhold from the config file) then go ahead and
+         send to each remaining server individually. */
+      if (s_op->u.tree_communicate.handle_array_remote_count >
+          server_config->tree_threshold)
+      {
+          num_partitions = server_config->tree_width;
+          num_files_per_server =
+                   s_op->u.tree_communicate.handle_array_remote_count /
+                   server_config->tree_width;
+          if (num_partitions * num_files_per_server <
                    s_op->u.tree_communicate.handle_array_remote_count) {
                 num_files_per_server++;
             }
