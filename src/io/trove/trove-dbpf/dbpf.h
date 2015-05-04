@@ -652,7 +652,7 @@ do {                                                          \
     ret = 0;                                                  \
     if (dbpf_op_ptr->flags & TROVE_SYNC)                      \
     {                                                         \
-        if ((tmp_ret = db_ptr->sync(db_ptr, 0)) != 0)         \
+        if ((tmp_ret = dbpf_db_sync(db_ptr)) != 0)            \
         {                                                     \
             gossip_err("db SYNC failed: %s\n",                \
                        db_strerror(tmp_ret));                 \

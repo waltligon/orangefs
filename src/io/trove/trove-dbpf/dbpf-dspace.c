@@ -364,7 +364,7 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL;
     TROVE_handle new_handle = TROVE_HANDLE_NULL;
-    DBT key;
+    struct dbpf_data key;
     int i;
     int j;
 
@@ -398,11 +398,9 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
                 if(op_p->u.d_create_list.out_handle_array_p[j] 
                     != TROVE_HANDLE_NULL)
                 {
-                    memset(&key, 0, sizeof(key));
                     key.data = &op_p->u.d_create_list.out_handle_array_p[j];
-                    key.size = key.ulen = sizeof(TROVE_handle);
-                    op_p->coll_p->ds_db->db->del(op_p->coll_p->ds_db->db, 
-                        NULL, &key, 0);
+                    key.len = sizeof(TROVE_handle);
+                    dbpf_db_del(op_p->coll_p->ds_db, &key);
 
                     trove_handle_free(op_p->coll_p->coll_id, 
                         op_p->u.d_create_list.out_handle_array_p[j]);
@@ -512,31 +510,26 @@ static int remove_one_handle(
 {
     int count = 0;
     int ret = -TROVE_EINVAL;
-    DBT key;
+    struct dbpf_data key;
 
-    memset(&key, 0, sizeof(key));
     key.data = &ref.handle;
-    key.size = sizeof(TROVE_handle);
+    key.len = sizeof(TROVE_handle);
 
-    ret = coll_p->ds_db->db->del(coll_p->ds_db->db, NULL, &key, 0);
-    switch (ret)
+    ret = dbpf_db_del(coll_p->ds_db, &key);
+    if (ret == ENOENT)
     {
-        case DB_NOTFOUND:
-            gossip_err("tried to remove non-existant dataspace\n");
-/*
-            ret = -TROVE_ENOENT;
-            goto return_error;
-*/
-            break;
-        default:
-            coll_p->ds_db->db->err(
-                coll_p->ds_db->db, ret, "dbpf_dspace_remove");
-            ret = -dbpf_db_error_to_trove_error(ret);
-            goto return_error;
-        case 0:
-            gossip_debug(GOSSIP_TROVE_DEBUG, "removed dataspace with "
-                         "handle %llu\n", llu(ref.handle));
-            break;
+        gossip_err("tried to remove non-existant dataspace\n");
+    }
+    else if (ret != 0)
+    {
+        gossip_err("TROVE:DBPF:Berkeley DB dbpf_dspace_remove");
+        ret = -dbpf_db_error_to_trove_error(ret);
+        goto return_error;
+    }
+    else
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "removed dataspace with handle %llu\n",
+            llu(ref.handle));
     }
 
     /* if this attr is in the dbpf attr cache, remove it */
@@ -605,7 +598,7 @@ static int dbpf_dspace_remove_list_op_svc(struct dbpf_op *op_p)
     /* we still do a non-coalesced sync of the keyval db here
      * because we're in a dspace operation
      */
-    DBPF_DB_SYNC_IF_NECESSARY(op_p, op_p->coll_p->keyval_db->db, ret);
+    DBPF_DB_SYNC_IF_NECESSARY(op_p, op_p->coll_p->keyval_db, ret);
     if(ret < 0)
     {
         return(ret);
@@ -632,7 +625,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     /* we still do a non-coalesced sync of the keyval db here
      * because we're in a dspace operation
      */
-    DBPF_DB_SYNC_IF_NECESSARY(op_p, op_p->coll_p->keyval_db->db, ret);
+    DBPF_DB_SYNC_IF_NECESSARY(op_p, op_p->coll_p->keyval_db, ret);
     if(ret < 0)
     {
         return(ret);
@@ -1396,8 +1389,7 @@ int dbpf_dspace_attr_set(struct dbpf_collection *coll_p,
     ret = dbpf_db_put(coll_p->ds_db, &key, &data);
     if (ret != 0)
     {
-        coll_p->ds_db->db->err(
-            coll_p->ds_db->db, ret, "dspace_db->put setattr");
+        gossip_err("TROVE:DBPF:Berkeley DB dspace_db->put setattr");
         return -dbpf_db_error_to_trove_error(ret);
     }
 
@@ -1444,7 +1436,7 @@ int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
     {
         if (ret != ENOENT)
         {
-            coll_p->ds_db->db->err(coll_p->ds_db->db, ret, "DB->get");
+            gossip_err("TROVE:DBPF:Berkeley DB DB->get");
         }
         return -trove_errno_to_trove_error(ret);
     }

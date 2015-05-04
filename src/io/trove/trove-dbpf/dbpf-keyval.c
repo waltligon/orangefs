@@ -116,7 +116,7 @@ struct dbpf_keyval_db_entry
 extern gen_mutex_t dbpf_attr_cache_mutex;
 
 static int dbpf_keyval_do_remove(
-    DB *db_p, TROVE_handle handle, char type,
+    struct dbpf_db *db_p, TROVE_handle handle, char type,
     TROVE_keyval_s *key, TROVE_keyval_s *val);
 
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p);
@@ -456,8 +456,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
             {
                 if(ret != ENOENT)
                 {
-                    op_p->coll_p->keyval_db->db->err(
-                        op_p->coll_p->keyval_db->db, ret, "keyval_db->get");
+                    gossip_err("TROVE:DBPF:Berkeley DB keyval_db->get");
                 }
                 ret = -trove_errno_to_trove_error(ret);
             }
@@ -497,8 +496,8 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 	gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
 		     "keyval_db->put failed. ret=%d\n", ret);
 
-        /*op_p->coll_p->keyval_db->db->err(
-            op_p->coll_p->keyval_db->db, ret, "keyval_db->put keyval write");
+        /*
+        gossip_err("TROVE:DBPF:Berkeley DB keyval_db->put keyval write");
 	*/
         ret = -trove_errno_to_trove_error(ret);
         goto return_error;
@@ -632,7 +631,7 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
                      (char *)op_p->u.k_remove.key.buffer);
     }
                  
-    ret = dbpf_keyval_do_remove(op_p->coll_p->keyval_db->db, 
+    ret = dbpf_keyval_do_remove(op_p->coll_p->keyval_db, 
                                 op_p->handle,
                                 (op_p->flags & TROVE_KEYVAL_DIRECTORY_ENTRY ?
                                      DBPF_DIRECTORY_ENTRY_TYPE :
@@ -721,7 +720,7 @@ static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
     /* read each key to see if it is present */
     for (k = 0; k < op_p->u.k_remove_list.count; k++)
     {
-        ret = dbpf_keyval_do_remove(op_p->coll_p->keyval_db->db,
+        ret = dbpf_keyval_do_remove(op_p->coll_p->keyval_db,
                                     op_p->handle,
                                     (op_p->flags & TROVE_KEYVAL_DIRECTORY_ENTRY ?
                                          DBPF_DIRECTORY_ENTRY_TYPE :
@@ -755,8 +754,7 @@ static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
         }
         else if(ret != 0)
         {
-            op_p->coll_p->keyval_db->db->err(
-                op_p->coll_p->keyval_db->db, ret, "DB->get");
+            gossip_err("TROVE:DBPF:Berkeley DB DB->get");
             return -trove_errno_to_trove_error(ret);
         }
 
@@ -769,9 +767,7 @@ static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
         ret = dbpf_db_put(op_p->coll_p->keyval_db, &key, &data);
         if(ret != 0)
         {
-            op_p->coll_p->keyval_db->db->err(
-                op_p->coll_p->keyval_db->db, ret, 
-                "keyval_db->put keyval handle info ops");
+            gossip_err("TROVE:DBPF:Berkeley DB keyval_db->put keyval handle info ops");
             return -trove_errno_to_trove_error(ret);
         }
     }
@@ -1371,8 +1367,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
                 continue;
             }
 
-            op_p->coll_p->keyval_db->db->err(
-                op_p->coll_p->keyval_db->db, ret, "DB->get");
+            gossip_err("TROVE:DBPF:Berkeley DB DB->get");
             ret = -trove_errno_to_trove_error(ret);
             goto return_error;
         }
@@ -1413,9 +1408,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         ret = dbpf_db_put(op_p->coll_p->keyval_db, &key, &data);
         if (ret != 0)
         {
-            op_p->coll_p->keyval_db->db->err(
-                op_p->coll_p->keyval_db->db, ret, 
-                "keyval_db->put keyval write list");
+            gossip_err("TROVE:DBPF:Berkeley DB keyval_db->put keyval write list");
             ret = -trove_errno_to_trove_error(ret);
             goto return_error;
         }
@@ -1523,8 +1516,8 @@ static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL;
 
-    if ((ret = op_p->coll_p->keyval_db->db->sync(
-                op_p->coll_p->keyval_db->db, 0)) != 0)
+    ret = dbpf_db_sync(op_p->coll_p->keyval_db);
+    if (ret == 0)
     {
         ret = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
@@ -1687,12 +1680,12 @@ return_error:
 }
 
 static int dbpf_keyval_do_remove(
-    DB *db_p, TROVE_handle handle, char type,
+    struct dbpf_db *db_p, TROVE_handle handle, char type,
     TROVE_keyval_s *key, TROVE_keyval_s *val)
 {
     int ret;
     struct dbpf_keyval_db_entry key_entry;
-    DBT db_key, db_val;
+    struct dbpf_data db_key, db_val;
 
     #if 0
     /* not safe to print this if it may be a binary key */
@@ -1706,36 +1699,33 @@ static int dbpf_keyval_do_remove(
 
     memcpy(key_entry.key, key->buffer, key->buffer_sz);
 
-    memset(&db_key, 0, sizeof(db_key));
     db_key.data = &key_entry;
-    db_key.size = db_key.ulen = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(key->buffer_sz);
-    db_key.flags = DB_DBT_USERMEM;
+    db_key.len = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(key->buffer_sz);
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                 "keyval_db->del(handle= %llu, type = %c, key= %*s (%d)) size=%d\n",
+                 "keyval_db->del(handle= %llu, type = %c, key= %*s (%d)) "
+                 "size=%zu\n",
                  llu(key_entry.handle),
                  key_entry.type,
                  key->buffer_sz,
                  key_entry.key,
                  key->buffer_sz,
-                 db_key.size);
+                 db_key.len);
 
 
     if(val && val->buffer)
     {
-        memset(&db_val, 0, sizeof(DBT));
-        db_val.flags |= DB_DBT_USERMEM;
         db_val.data = val->buffer;
-        db_val.ulen = val->buffer_sz;
-        ret = db_p->get(db_p, NULL, &db_key, &db_val, 0);
+        db_val.len = val->buffer_sz;
+        ret = dbpf_db_get(db_p, &db_key, &db_val);
         if(ret != 0)
         {
             ret = -dbpf_db_error_to_trove_error(ret);
         }
-        val->read_sz = db_val.size;
+        val->read_sz = db_val.len;
     }
 
-    ret = db_p->del(db_p, NULL, &db_key, 0);
+    ret = dbpf_db_del(db_p, &db_key);
     if(ret != 0)
     {
         ret = -dbpf_db_error_to_trove_error(ret);
@@ -2057,8 +2047,7 @@ static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op * op_p)
     {
         if(ret != ENOENT)
         {
-            op_p->coll_p->keyval_db->db->err(
-                op_p->coll_p->keyval_db->db, ret, "keyval_db->get (handle info)");
+            gossip_err("TROVE:DBPF:Berkeley DB keyval_db->get (handle info)");
         }
 
         return -trove_errno_to_trove_error(ret);
@@ -2081,7 +2070,6 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
                                        enum dbpf_handle_info_action action)
 {
     struct dbpf_data key, data;
-    DBT db_key;
     int ret = -TROVE_EINVAL;
     TROVE_keyval_handle_info info;
     struct dbpf_keyval_db_entry key_entry;
@@ -2103,8 +2091,7 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
         }
         else if(ret != 0)
         {
-            op_p->coll_p->keyval_db->db->err(
-                op_p->coll_p->keyval_db->db, ret, "DB->get");
+            gossip_err("TROVE:DBPF:Berkeley DB DB->get");
             return -trove_errno_to_trove_error(ret);
         }
        
@@ -2141,16 +2128,10 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
                 /* special case if we get down to zero remove this
                  * keyval as well
                  */
-                memset(&db_key, 0, sizeof db_key);
-                db_key.flags = DB_DBT_USERMEM;
-                db_key.data = &key_entry;
-                db_key.size = db_key.ulen = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0);
-                op_p->coll_p->keyval_db->db->del(
-                    op_p->coll_p->keyval_db->db, NULL, &db_key, 0);
+                ret = dbpf_db_del(op_p->coll_p->keyval_db, &key);
                 if(ret != 0)
                 {
-                    op_p->coll_p->keyval_db->db->err(
-                        op_p->coll_p->keyval_db->db, ret, "DB->del");
+                    gossip_err("TROVE:DBPF:Berkeley DB DB->del");
                     return -dbpf_db_error_to_trove_error(ret);
                 }
 
@@ -2161,9 +2142,7 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
         ret = dbpf_db_put(op_p->coll_p->keyval_db, &key, &data);
         if (ret != 0)
         {
-            op_p->coll_p->keyval_db->db->err(
-                op_p->coll_p->keyval_db->db, ret, 
-                "keyval_db->put keyval handle info ops");
+            gossip_err("TROVE:DBPF:Berkeley DB keyval_db->put keyval handle info ops");
             return -trove_errno_to_trove_error(ret);
         }
     }

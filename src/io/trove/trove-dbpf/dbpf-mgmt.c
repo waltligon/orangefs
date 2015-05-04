@@ -85,16 +85,6 @@ static int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
 
 #define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD)
 
-static void dbpf_db_error_callback(
-#ifdef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
-    const DB_ENV *dbenv, 
-#endif
-    const char *errpfx, 
-#ifdef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
-    const 
-#endif
-    char * msg);
-
 DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
 {
     int ret;
@@ -145,9 +135,6 @@ retry:
         *error = ret;
         return NULL;
     }
-
-    /* set the error callback for all databases opened with this environment */
-    dbenv->set_errcall(dbenv, dbpf_db_error_callback);
 
     if(TROVE_db_cache_size_bytes != 0)
     {
@@ -512,7 +499,7 @@ int dbpf_collection_seteattr(TROVE_coll_id coll_id,
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    ret = coll_p->coll_attr_db->db->sync(coll_p->coll_attr_db->db, 0);
+    ret = dbpf_db_sync(coll_p->coll_attr_db);
     if (ret != 0)
     {
         gossip_lerr("dbpf_collection_seteattr: %s\n", db_strerror(ret));
@@ -572,7 +559,7 @@ int dbpf_collection_deleattr(TROVE_coll_id coll_id,
     int ret = -TROVE_EINVAL;
     struct dbpf_storage *sto_p = NULL;
     struct dbpf_collection *coll_p = NULL;
-    DBT db_key;
+    struct dbpf_data key;
 
     sto_p = my_storage_p;
     if (sto_p == NULL)
@@ -585,19 +572,17 @@ int dbpf_collection_deleattr(TROVE_coll_id coll_id,
         return ret;
     }
 
-    memset(&db_key, 0, sizeof(db_key));
-    db_key.data = key_p->buffer;
-    db_key.size = key_p->buffer_sz;
+    key.data = key_p->buffer;
+    key.len = key_p->buffer_sz;
 
-    ret = coll_p->coll_attr_db->db->del(coll_p->coll_attr_db->db,
-                                    NULL, &db_key, 0);
+    ret = dbpf_db_del(coll_p->coll_attr_db, &key);
     if (ret != 0)
     {
         gossip_lerr("%s: %s\n", __func__, db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    ret = coll_p->coll_attr_db->db->sync(coll_p->coll_attr_db->db, 0);
+    ret = dbpf_db_sync(coll_p->coll_attr_db);
     if (ret != 0)
     {
         gossip_lerr("%s: %s\n", __func__, db_strerror(ret));
@@ -857,8 +842,7 @@ int dbpf_finalize(void)
     {
         if( my_storage_p->sto_attr_db )
         {
-            ret = my_storage_p->sto_attr_db->db->sync(
-                my_storage_p->sto_attr_db->db, 0);
+            ret = dbpf_db_sync(my_storage_p->sto_attr_db);
             if (ret)
             {
                 gossip_err("dbpf_finalize attr sync: %s\n", db_strerror(ret));
@@ -877,9 +861,9 @@ int dbpf_finalize(void)
             gossip_err("dbpf_finalize: attribute database not defined\n");
         }
 
-        if( my_storage_p->coll_db->db )
+        if( my_storage_p->coll_db )
         {
-            ret = my_storage_p->coll_db->db->sync(my_storage_p->coll_db->db, 0);
+            ret = dbpf_db_sync(my_storage_p->coll_db);
             if (ret)
             {
                 gossip_err("dbpf_finalize collection sync: %s\n", 
@@ -1083,7 +1067,7 @@ int dbpf_collection_create(char *collname,
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    ret = sto_p->coll_db->db->sync(sto_p->coll_db->db, 0);
+    ret = dbpf_db_sync(sto_p->coll_db);
     if (ret)
     {
         gossip_err("dbpf_collection_create: %s\n", db_strerror(ret));
@@ -1203,7 +1187,7 @@ int dbpf_collection_create(char *collname,
                    db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
     }
-    db_p->db->sync(db_p->db, 0);
+    dbpf_db_sync(db_p);
     db_close(db_p->db);
     free(db_p);
 
@@ -1281,7 +1265,7 @@ int dbpf_collection_remove(char *collname,
     char path_name[PATH_MAX];
     struct dbpf_storage *sto_p = NULL;
     struct dbpf_collection_db_entry db_data;
-    DBT key, data;
+    struct dbpf_data key, data;
     int ret = 0, i = 0;
     DIR *current_dir = NULL;
     struct dirent *current_dirent = NULL;
@@ -1304,30 +1288,28 @@ int dbpf_collection_remove(char *collname,
     memset(&data, 0, sizeof(data));
 
     key.data = collname;
-    key.size = strlen(collname) + 1;
-    key.flags = DB_DBT_USERMEM;
+    key.len = strlen(collname) + 1;
     data.data = &db_data;
-    data.ulen = sizeof(db_data);
-    data.flags = DB_DBT_USERMEM;
+    data.len = sizeof(db_data);
 
-    ret = sto_p->coll_db->db->get(sto_p->coll_db->db, NULL, &key, &data, 0);
+    ret = dbpf_db_get(sto_p->coll_db, &key, &data);
     if (ret != 0)
     {
-        sto_p->coll_db->db->err(sto_p->coll_db->db, ret, "DB->get collection");
+        gossip_err("TROVE:DBPF:Berkeley DB DB->get collection");
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    ret = sto_p->coll_db->db->del(sto_p->coll_db->db, NULL, &key, 0);
+    ret = dbpf_db_del(sto_p->coll_db, &key);
     if (ret != 0)
     {
-        sto_p->coll_db->db->err(sto_p->coll_db->db, ret, "DB->del");
+        gossip_err("TROVE:DBPF:Berkeley DB DB->del");
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    ret = sto_p->coll_db->db->sync(sto_p->coll_db->db, 0);
+    ret = dbpf_db_sync(sto_p->coll_db);
     if (ret != 0)
     {
-        sto_p->coll_db->db->err(sto_p->coll_db->db, ret, "DB->sync");
+        gossip_err("TROVE:DBPF:Berkeley DB DB->sync");
         return -dbpf_db_error_to_trove_error(ret);
     }
 
@@ -1670,7 +1652,7 @@ int dbpf_collection_clear(TROVE_coll_id coll_id)
     }
 
     if ( (coll_p->coll_attr_db->db != NULL ) &&
-         (ret = coll_p->coll_attr_db->db->sync(coll_p->coll_attr_db->db, 0))
+         (ret = dbpf_db_sync(coll_p->coll_attr_db))
         != 0)
     {
         gossip_err("db_sync(coll_attr_db): %s\n", db_strerror(ret));
@@ -1683,7 +1665,7 @@ int dbpf_collection_clear(TROVE_coll_id coll_id)
     }
 
     if ( (coll_p->ds_db->db != NULL ) &&
-         (ret = coll_p->ds_db->db->sync(coll_p->ds_db->db, 0)) != 0)
+         (ret = dbpf_db_sync(coll_p->ds_db)) != 0)
     {
         gossip_err("db_sync(coll_ds_db): %s\n", db_strerror(ret));
     }
@@ -1695,7 +1677,7 @@ int dbpf_collection_clear(TROVE_coll_id coll_id)
     }
 
     if ( (coll_p->keyval_db->db != NULL ) &&
-         (ret = coll_p->keyval_db->db->sync(coll_p->keyval_db->db, 0)) != 0)
+         (ret = dbpf_db_sync(coll_p->keyval_db)) != 0)
     {
         gossip_err("db_sync(coll_keyval_db): %s\n", db_strerror(ret));
     }
@@ -1774,8 +1756,7 @@ int dbpf_collection_lookup(char *collname,
     {
         if (ret != ENOENT)
         {
-            my_storage_p->coll_db->db->err(my_storage_p->coll_db->db, ret,
-                "DB->get collection");
+            gossip_err("TROVE:DBPF:Berkeley DB DB->get collection");
             gossip_debug(GOSSIP_TROVE_DEBUG, "lookup got error (%d)\n", ret);
         }
         return -trove_errno_to_trove_error(ret);
@@ -2218,7 +2199,7 @@ int db_open(DB *db_p, const char *dbname, int flags, int mode)
             if(ret != 0)
             {
                 /* well, we tried.  ok nothing we can do */
-                db_p->err(db_p, ret, "%s", dbname);
+                gossip_err("TROVE:DBPF:Berkeley DB %s", dbname);
                 return ret;
             }
 
@@ -2230,7 +2211,7 @@ int db_open(DB *db_p, const char *dbname, int flags, int mode)
                                   flags,
                                   mode)) != 0)
             {
-                db_p->err(db_p, ret, "%s", dbname);
+                gossip_err("TROVE:DBPF:Berkeley DB %s", dbname);
                 return ret;
             }
         }
@@ -2274,7 +2255,7 @@ static int dbpf_db_create(char *dbname,
 
     if ((ret = db_open(db_p, dbname, TROVE_DB_CREATE_FLAGS, TROVE_DB_MODE)) != 0)
     {
-        db_p->err(db_p, ret, "%s", dbname);
+        gossip_err("TROVE:DBPF:Berkeley DB %s", dbname);
         db_close(db_p);
         return -dbpf_db_error_to_trove_error(ret);
     }
@@ -2311,8 +2292,6 @@ static dbpf_db *dbpf_bdb_open(
         return NULL;
     }
 
-    db_p->set_errpfx(db_p, "TROVE:DBPF:Berkeley DB");
-
     if(compare_fn)
     {
         db_p->set_bt_compare(db_p, compare_fn);
@@ -2320,7 +2299,7 @@ static dbpf_db *dbpf_bdb_open(
 
     if (flags && (ret = db_p->set_flags(db_p, flags)) != 0)
     {
-        db_p->err(db_p, ret, "%s: set_flags", dbname);
+        gossip_err("TROVE:DBPF:Berkeley DB %s: set_flags", dbname);
         *error_p = -dbpf_db_error_to_trove_error(ret);
         db_close(db_p);
         return NULL;
@@ -2340,19 +2319,6 @@ static dbpf_db *dbpf_bdb_open(
         return NULL;
     }
     return db;
-}
-
-static void dbpf_db_error_callback(
-#ifdef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
-    const DB_ENV *dbenv, 
-#endif
-    const char *errpfx, 
-#ifdef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
-    const 
-#endif
-    char *msg)
-{
-    gossip_err("%s: %s\n", errpfx, msg);
 }
 
 /* dbpf_mgmt_direct_ops

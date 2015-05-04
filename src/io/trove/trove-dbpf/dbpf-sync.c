@@ -26,7 +26,7 @@ extern gen_mutex_t dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 extern pthread_cond_t dbpf_op_completed_cond;
 
 static int dbpf_sync_db(
-    DB * dbp, 
+    struct dbpf_db * dbp, 
     enum s_sync_context_e sync_context_type, 
     dbpf_sync_context_t * sync_context)
 {
@@ -36,7 +36,7 @@ static int dbpf_sync_db(
                  "in coalesce_queue:%d pending:%d\n",
                  sync_context_type, sync_context->coalesce_counter, 
                  sync_context->sync_counter);
-    ret = dbp->sync(dbp, 0);
+    ret = dbpf_db_sync(dbp);
     if(ret != 0)
     {
         gossip_err("db SYNC failed: %s\n",
@@ -109,7 +109,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
 {
 
     int ret = 0;
-    DB * dbp = NULL;
+    struct dbpf_db * dbp = NULL;
     dbpf_sync_context_t * sync_context;
     dbpf_queued_op_t *ready_op;
     int sync_context_type;
@@ -158,13 +158,13 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
     {
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                      "[SYNC_COALESCE]: sync context type is DSPACE\n");
-        dbp = qop_p->op.coll_p->ds_db->db;
+        dbp = qop_p->op.coll_p->ds_db;
     }
     else if( sync_context_type == COALESCE_CONTEXT_KEYVAL ) 
     {
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                      "[SYNC_COALESCE]: sync context type is KEYVAL\n");
-        dbp = qop_p->op.coll_p->keyval_db->db;
+        dbp = qop_p->op.coll_p->keyval_db;
     }
 
     if ( ! coll->meta_sync_enabled )

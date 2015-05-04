@@ -25,6 +25,11 @@ int dbpf_db_open(DB *bdb, struct dbpf_db **db)
     return 0;
 }
 
+int dbpf_db_sync(struct dbpf_db *db)
+{
+    return db->db->sync(db->db, 0);
+}
+
 int dbpf_db_get(struct dbpf_db *db, struct dbpf_data *key,
     struct dbpf_data *val)
 {
@@ -70,6 +75,13 @@ int dbpf_db_put(struct dbpf_db *db, struct dbpf_data *key,
     db_data.ulen = db_data.size = val->len;
     db_data.flags = DB_DBT_USERMEM;
     r = db->db->put(db->db, NULL, &db_key, &db_data, 0);
+    if (r != 0)
+    {
+        switch (r) {
+        case DB_NOTFOUND:
+            return ENOENT;
+        }
+    }
     return r;
 }
 
@@ -85,5 +97,30 @@ int dbpf_db_putonce(struct dbpf_db *db, struct dbpf_data *key,
     db_data.ulen = db_data.size = val->len;
     db_data.flags = DB_DBT_USERMEM;
     r = db->db->put(db->db, NULL, &db_key, &db_data, DB_NOOVERWRITE);
+    if (r != 0)
+    {
+        switch (r) {
+        case DB_NOTFOUND:
+            return ENOENT;
+        }
+    }
+    return r;
+}
+
+int dbpf_db_del(struct dbpf_db *db, struct dbpf_data *key)
+{
+    DBT db_key;
+    int r;
+    db_key.data = key->data;
+    db_key.ulen = db_key.size = key->len;
+    db_key.flags = DB_DBT_USERMEM;
+    r = db->db->del(db->db, NULL, &db_key, 0);
+    if (r != 0)
+    {
+        switch (r) {
+        case DB_NOTFOUND:
+            return ENOENT;
+        }
+    }
     return r;
 }
