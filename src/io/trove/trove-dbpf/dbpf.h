@@ -656,7 +656,7 @@ do {                                                          \
         {                                                     \
             gossip_err("db SYNC failed: %s\n",                \
                        db_strerror(tmp_ret));                 \
-            ret = -dbpf_db_error_to_trove_error(tmp_ret);     \
+            ret = -trove_errno_to_trove_error(tmp_ret);       \
         }                                                     \
         gossip_debug(                                         \
           GOSSIP_TROVE_DEBUG, "db SYNC called "               \

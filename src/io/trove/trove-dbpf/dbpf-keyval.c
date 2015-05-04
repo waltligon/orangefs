@@ -300,7 +300,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
             op_p->u.k_read.val->read_sz = data.len;
         }
 
-        ret = -dbpf_db_error_to_trove_error(ret);
+        ret = -trove_errno_to_trove_error(ret);
         goto return_error;
     }
     op_p->u.k_read.val->read_sz = data.len;
@@ -1240,7 +1240,7 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
                 op_p->u.k_read_list.val_array[i].read_sz = 0;
             }
             op_p->u.k_read_list.err_array[i] = 
-                -dbpf_db_error_to_trove_error(ret);
+                -trove_errno_to_trove_error(ret);
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                     "Trove error set to %d\n",
                     op_p->u.k_read_list.err_array[i]);
@@ -1519,7 +1519,7 @@ static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p)
     ret = dbpf_db_sync(op_p->coll_p->keyval_db);
     if (ret == 0)
     {
-        ret = -dbpf_db_error_to_trove_error(ret);
+        ret = -trove_errno_to_trove_error(ret);
         goto return_error;
     }
 
@@ -1563,7 +1563,7 @@ int PINT_dbpf_keyval_iterate(
 
         gossip_lerr("db_p->cursor failed: db error %s\n", db_strerror(ret));
         *count = 0;
-        return -dbpf_db_error_to_trove_error(ret);
+        return -trove_errno_to_trove_error(ret);
     }
 
     if(pos == TROVE_ITERATE_START)
@@ -1720,7 +1720,7 @@ static int dbpf_keyval_do_remove(
         ret = dbpf_db_get(db_p, &db_key, &db_val);
         if(ret != 0)
         {
-            ret = -dbpf_db_error_to_trove_error(ret);
+            ret = -trove_errno_to_trove_error(ret);
         }
         val->read_sz = db_val.len;
     }
@@ -1728,7 +1728,7 @@ static int dbpf_keyval_do_remove(
     ret = dbpf_db_del(db_p, &db_key);
     if(ret != 0)
     {
-        ret = -dbpf_db_error_to_trove_error(ret);
+        ret = -trove_errno_to_trove_error(ret);
     }
 
     return ret;
@@ -1949,7 +1949,7 @@ static int dbpf_keyval_iterate_cursor_get(
         gossip_lerr("Failed to perform cursor get:"
                     "\n\thandle: %llu\n\ttype: %d\n\tdb error: %s\n",
                     llu(key_entry.handle), db_flags, db_strerror(ret));
-        return -dbpf_db_error_to_trove_error(ret);
+        return -trove_errno_to_trove_error(ret);
     }
 
     if(key_entry.handle != handle || key_entry.type != type)
@@ -2132,7 +2132,7 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
                 if(ret != 0)
                 {
                     gossip_err("TROVE:DBPF:Berkeley DB DB->del");
-                    return -dbpf_db_error_to_trove_error(ret);
+                    return -trove_errno_to_trove_error(ret);
                 }
 
                 return 0;

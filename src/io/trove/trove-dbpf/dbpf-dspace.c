@@ -523,7 +523,7 @@ static int remove_one_handle(
     else if (ret != 0)
     {
         gossip_err("TROVE:DBPF:Berkeley DB dbpf_dspace_remove");
-        ret = -dbpf_db_error_to_trove_error(ret);
+        ret = -trove_errno_to_trove_error(ret);
         goto return_error;
     }
     else
@@ -1390,7 +1390,7 @@ int dbpf_dspace_attr_set(struct dbpf_collection *coll_p,
     if (ret != 0)
     {
         gossip_err("TROVE:DBPF:Berkeley DB dspace_db->put setattr");
-        return -dbpf_db_error_to_trove_error(ret);
+        return -trove_errno_to_trove_error(ret);
     }
 
     /* now that the disk is updated, update the cache if necessary */
@@ -2122,7 +2122,7 @@ static int dbpf_dspace_create_store_handle(
     else if ((ret != ENOENT))
     {
         gossip_err("error in dspace create (db_p->get failed).\n");
-        ret = -dbpf_db_error_to_trove_error(ret);
+        ret = -trove_errno_to_trove_error(ret);
         return(ret);
     }
     
@@ -2165,7 +2165,7 @@ static int dbpf_dspace_create_store_handle(
     if (ret != 0)
     {
         gossip_err("error in dspace create (db_p->put failed).\n");
-        ret = -dbpf_db_error_to_trove_error(ret);
+        ret = -trove_errno_to_trove_error(ret);
         return(ret);
     }
 
