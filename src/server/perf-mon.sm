@@ -76,12 +76,14 @@ machine pvfs2_perf_mon_sm
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static PINT_sm_action perf_mon_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action perf_mon_cleanup(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if(s_op->resp.u.mgmt_perf_mon.perf_array)
+    {
         free(s_op->resp.u.mgmt_perf_mon.perf_array);
+    }
 
     return(server_state_machine_complete(smcb));
 }
@@ -90,16 +92,16 @@ static PINT_sm_action perf_mon_cleanup(
  *
  * gathers statistics and builds response
  */
-static PINT_sm_action perf_mon_do_work(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action perf_mon_do_work(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i;
     int valid_count = 0;
     uint32_t tmp_next_id;
     int ret = -1;
-    uint32_t key_count = 0;
-    uint32_t sample_count = 0;
+    uint32_t key_count = 0;    /* how many different counters */
+    uint32_t sample_count = 0; /* also called history count */
 
 #ifdef __PVFS2_DISABLE_PERF_COUNTERS__
     gossip_err("Error: perf_mon request received, but perf counters are disabled.\n");
@@ -107,9 +109,10 @@ static PINT_sm_action perf_mon_do_work(
     return SM_ACTION_COMPLETE;
 #endif
 
-    /* how many keys and history intervals do we have in the perf counter? */
-    ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_KEY_COUNT, 
-            &key_count);
+    /* how many keys do we have in the perf counter? */
+    ret = PINT_perf_get_info(PINT_server_pc,
+                             PINT_PERF_KEY_COUNT, 
+                             &key_count);
     if(ret < 0)
     {
         return SM_ACTION_COMPLETE;
@@ -121,9 +124,10 @@ static PINT_sm_action perf_mon_do_work(
         key_count = s_op->req->u.mgmt_perf_mon.key_count;
     }
 
-    /* how many keys and history intervals do we have in the perf counter? */
-    ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_HISTORY_SIZE, 
-            &sample_count);
+    /* how many history intervals do we have in the perf counter? */
+    ret = PINT_perf_get_info(PINT_server_pc,
+                             PINT_PERF_HISTORY_SIZE, 
+                             &sample_count);
     if(ret < 0)
     {
         js_p->error_code = ret;
@@ -144,24 +148,24 @@ static PINT_sm_action perf_mon_do_work(
     }
 
     /* allocate memory to hold statistics */
-    s_op->resp.u.mgmt_perf_mon.perf_array 
-            = (int64_t *)malloc(sample_count * (key_count + 2)
-             * sizeof(int64_t));
+    s_op->resp.u.mgmt_perf_mon.perf_array =
+            (int64_t *)malloc(sample_count * (key_count + 2) * sizeof(int64_t));
     if(!s_op->resp.u.mgmt_perf_mon.perf_array)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    memset(s_op->resp.u.mgmt_perf_mon.perf_array, 0,
-            sample_count * (key_count + 2) * sizeof(int64_t));
+    memset(s_op->resp.u.mgmt_perf_mon.perf_array,
+           0,
+           sample_count * (key_count + 2) * sizeof(int64_t));
 
     /* fill in some of the response */
     s_op->resp.u.mgmt_perf_mon.cur_time_ms = PINT_util_get_time_ms();
-    s_op->resp.u.mgmt_perf_mon.suggested_next_id 
-            = s_op->req->u.mgmt_perf_mon.next_id;
+    s_op->resp.u.mgmt_perf_mon.suggested_next_id =
+                    s_op->req->u.mgmt_perf_mon.next_id;
     s_op->resp.u.mgmt_perf_mon.key_count = key_count;
     s_op->resp.u.mgmt_perf_mon.perf_array_count =
-            (key_count + 2) * sample_count;
+                    (key_count + 2) * sample_count;
 
     /* make sure we have scratch memory to use as an intermediate
      * buffer for performance counters
@@ -175,10 +179,14 @@ static PINT_sm_action perf_mon_do_work(
         return SM_ACTION_COMPLETE;
     }
 
+    /* copy data from actual counter linked list format
+     * into a temporary array where we can then copy to
+     * response array
+     */
     PINT_perf_retrieve(PINT_server_pc,
-                        static_value_array,
-                        static_key_count,
-                        static_history_size);
+                       static_value_array,
+                       static_key_count,
+                       static_history_size);
 
     /* we are filling per_array in backwards, but this is the order
      * karma and other programs that collect data over multiple
@@ -272,9 +280,10 @@ static int reallocate_static_arrays_if_needed(void)
     unsigned int key_count;
     int ret = -1;
 
-    /* how many keys and history intervals do we have in the perf counter? */
-    ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_KEY_COUNT, 
-            &key_count);
+    /* how many keys do we have in the perf counter? */
+    ret = PINT_perf_get_info(PINT_server_pc,
+                             PINT_PERF_KEY_COUNT, 
+                             &key_count);
     if(ret < 0)
     {
         return(ret);
@@ -288,8 +297,9 @@ static int reallocate_static_arrays_if_needed(void)
     assert(key_count == static_key_count);
 
     /* get server history size - this can change */
-    ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_HISTORY_SIZE, 
-            &history_size);
+    ret = PINT_perf_get_info(PINT_server_pc,
+                             PINT_PERF_HISTORY_SIZE, 
+                             &history_size);
     if(ret < 0)
     {
         return(ret);

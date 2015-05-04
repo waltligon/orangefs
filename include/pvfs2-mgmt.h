@@ -76,6 +76,8 @@ enum PINT_server_perf_keys
     PINT_PERF_REMOVE = 13,              /* remove requests called */
     PINT_PERF_MKDIR = 14,               /* mkdir requests called */
     PINT_PERF_RMDIR = 15,               /* rmdir requests called */
+    PINT_PERF_GETATTR = 16,             /* getattr requests called */
+    PINT_PERF_SETATTR = 17,             /* setattr requests called */
 };
 
 /* low level information about individual server level objects */

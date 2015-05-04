@@ -41,6 +41,8 @@
 #define OID_REQ_REMOVE ".1.3.6.1.4.1.7778.13"
 #define OID_REQ_MKDIR ".1.3.6.1.4.1.7778.14"
 #define OID_REQ_RMDIR ".1.3.6.1.4.1.7778.15"
+#define OID_REQ_GETATTR ".1.3.6.1.4.1.7778.16"
+#define OID_REQ_SETATTR ".1.3.6.1.4.1.7778.17"
 
 #define INT_TYPE "INTEGER"
 #define CNT_TYPE "COUNTER"
@@ -76,6 +78,8 @@ static struct MGMT_perf_iod key_table[] =
    {OID_REQ_REMOVE, CNT_TYPE, PINT_PERF_REMOVE, "remove requests called"},
    {OID_REQ_MKDIR, CNT_TYPE, PINT_PERF_MKDIR, "mkdir requests called"},
    {OID_REQ_RMDIR, CNT_TYPE, PINT_PERF_RMDIR, "rmdir requests called"},
+   {OID_REQ_GETATTR, CNT_TYPE, PINT_PERF_GETATTR, "getattr requests called"},
+   {OID_REQ_SETATTR, CNT_TYPE, PINT_PERF_SETATTR, "setattr requests called"},
    {NULL, NULL, -1, NULL}   /* this halts the key count */
 };
 

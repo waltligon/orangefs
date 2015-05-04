@@ -61,6 +61,8 @@ struct PINT_perf_key server_keys[] =
     {"remove requests called", PINT_PERF_REMOVE, PINT_PERF_PRESERVE},
     {"mkdir requests called", PINT_PERF_MKDIR, PINT_PERF_PRESERVE},
     {"rmdir requests called", PINT_PERF_RMDIR, PINT_PERF_PRESERVE},
+    {"getattr requests called", PINT_PERF_GETATTR, PINT_PERF_PRESERVE},
+    {"setattr requests called", PINT_PERF_SETATTR, PINT_PERF_PRESERVE},
     {NULL, 0, 0},
 };
 
