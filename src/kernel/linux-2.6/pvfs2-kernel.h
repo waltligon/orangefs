@@ -125,6 +125,20 @@ typedef unsigned long sector_t;
 #include "khandle.h"
 /* end khandle stuff  *******************************************************/
 
+/*
+ * for a long time f_dentry was defined in fs.h/struct file...
+ *
+ * It is gone now, and we use it in a lot of lines of code...
+ *
+ * We have a kernel.m4 test that sets HAVE_F_DENTRY if it is 
+ * still in the files struct. If it is not there, we can define it,
+ * and our lines of code will all still work, at least until they
+ * change the files struct beyond recognition...
+ */
+#ifndef HAVE_F_DENTRY
+#define f_dentry        f_path.dentry
+#endif
+
 
 /*
   this attempts to disable the annotations used by the 'sparse' kernel
