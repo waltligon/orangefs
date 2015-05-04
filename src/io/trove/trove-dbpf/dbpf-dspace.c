@@ -1385,18 +1385,15 @@ int dbpf_dspace_attr_set(struct dbpf_collection *coll_p,
                          TROVE_ds_attributes *attr)
 {
     int ret;
-    DBT key, data;
+    struct dbpf_data key, data;
 
-    memset(&key, 0, sizeof(key));
     key.data = &ref.handle;
-    key.size = sizeof(TROVE_handle);
+    key.len = sizeof(TROVE_handle);
 
-    memset(&data, 0, sizeof(data));
     data.data = attr;
-    data.size = sizeof(*attr);
+    data.len = sizeof(*attr);
 
-    ret = coll_p->ds_db->db->put(
-        coll_p->ds_db->db, NULL, &key, &data, 0);
+    ret = dbpf_db_put(coll_p->ds_db, &key, &data);
     if (ret != 0)
     {
         coll_p->ds_db->db->err(
@@ -2109,32 +2106,28 @@ static int dbpf_dspace_create_store_handle(
 {
     int ret = -TROVE_EINVAL;
     TROVE_ds_attributes attr;
-    DBT key, data;
+    struct dbpf_data key, data;
     TROVE_object_ref ref = {TROVE_HANDLE_NULL, coll_p->coll_id};
     char filename[PATH_MAX + 1] = {0};
 
     memset(&attr, 0, sizeof(attr));
     attr.type = type;
 
-    memset(&key, 0, sizeof(key));
     key.data = &new_handle;
-    key.size = key.ulen = sizeof(new_handle);
-    key.flags = DB_DBT_USERMEM;
+    key.len = sizeof(new_handle);
 
-    memset(&data, 0, sizeof(data));
     data.data = &attr;
-    data.size = data.ulen = sizeof(attr);
-    data.flags |= DB_DBT_USERMEM;
+    data.len = sizeof(attr);
 
     /* check to see if handle is already used */
-    ret = coll_p->ds_db->db->get(coll_p->ds_db->db, NULL, &key, &data, 0);
+    ret = dbpf_db_get(coll_p->ds_db, &key, &data);
     if (ret == 0)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "handle (%llu) already exists.\n",
                      llu(new_handle));
         return(-TROVE_EEXIST);
     }
-    else if ((ret != DB_NOTFOUND) && (ret != DB_KEYEMPTY))
+    else if ((ret != ENOENT))
     {
         gossip_err("error in dspace create (db_p->get failed).\n");
         ret = -dbpf_db_error_to_trove_error(ret);
@@ -2172,12 +2165,11 @@ static int dbpf_dspace_create_store_handle(
         }
     }
      
-    memset(&data, 0, sizeof(data));
     data.data = &attr;
-    data.size = sizeof(attr);
+    data.len = sizeof(attr);
     
     /* create new dataspace entry */
-    ret = coll_p->ds_db->db->put(coll_p->ds_db->db, NULL, &key, &data, 0);
+    ret = dbpf_db_put(coll_p->ds_db, &key, &data);
     if (ret != 0)
     {
         gossip_err("error in dspace create (db_p->put failed).\n");

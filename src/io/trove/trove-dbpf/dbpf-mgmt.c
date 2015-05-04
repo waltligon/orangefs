@@ -487,7 +487,7 @@ int dbpf_collection_seteattr(TROVE_coll_id coll_id,
     int ret = -TROVE_EINVAL;
     struct dbpf_storage *sto_p = NULL;
     struct dbpf_collection *coll_p = NULL;
-    DBT db_key, db_data;
+    struct dbpf_data key, data;
 
     sto_p = my_storage_p;
     if (sto_p == NULL)
@@ -500,15 +500,12 @@ int dbpf_collection_seteattr(TROVE_coll_id coll_id,
         return ret;
     }
 
-    memset(&db_key, 0, sizeof(db_key));
-    memset(&db_data, 0, sizeof(db_data));
-    db_key.data = key_p->buffer;
-    db_key.size = key_p->buffer_sz;
-    db_data.data = val_p->buffer;
-    db_data.size = val_p->buffer_sz;
+    key.data = key_p->buffer;
+    key.len = key_p->buffer_sz;
+    data.data = val_p->buffer;
+    data.len = val_p->buffer_sz;
 
-    ret = coll_p->coll_attr_db->db->put(coll_p->coll_attr_db->db,
-                                    NULL, &db_key, &db_data, 0);
+    ret = dbpf_db_put(coll_p->coll_attr_db, &key, &data);
     if (ret != 0)
     {
         gossip_lerr("dbpf_collection_seteattr: %s\n", db_strerror(ret));
@@ -1044,7 +1041,7 @@ int dbpf_collection_create(char *collname,
     struct dbpf_storage *sto_p;
     struct dbpf_collection_db_entry db_data;
     dbpf_db *db_p = NULL;
-    DBT key, data;
+    struct dbpf_data key, data;
     struct stat dirstat;
     struct stat dbstat;
     char path_name[PATH_MAX] = {0}, dir[PATH_MAX] = {0};
@@ -1056,23 +1053,18 @@ int dbpf_collection_create(char *collname,
     }
     sto_p = my_storage_p;
 
-    memset(&key, 0, sizeof(key));
-    memset(&data, 0, sizeof(data));
-
     key.data = collname;
-    key.size = strlen(collname)+1;
-    key.flags = DB_DBT_USERMEM;
+    key.len = strlen(collname)+1;
     data.data = &db_data;
-    data.ulen = sizeof(db_data);
-    data.flags = DB_DBT_USERMEM;
+    data.len = sizeof(db_data);
 
     /* ensure that the collection record isn't already there */
-    ret = sto_p->coll_db->db->get(sto_p->coll_db->db, NULL, &key, &data, 0);
-    if (ret != DB_NOTFOUND)
+    ret = dbpf_db_get(sto_p->coll_db, &key, &data);
+    if (ret != ENOENT)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "coll %s already exists with "
-                     "coll_id %d, len = %d.\n",
-                     collname, db_data.coll_id, data.size);
+                     "coll_id %d, len = %zu.\n",
+                     collname, db_data.coll_id, data.len);
         return -dbpf_db_error_to_trove_error(ret);
     }
 
@@ -1080,11 +1072,11 @@ int dbpf_collection_create(char *collname,
     db_data.coll_id = new_coll_id;
 
     key.data = collname;
-    key.size = strlen(collname)+1;
+    key.len = strlen(collname)+1;
     data.data = &db_data;
-    data.size = sizeof(db_data);
+    data.len = sizeof(db_data);
 
-    ret = sto_p->coll_db->db->put(sto_p->coll_db->db, NULL, &key, &data, 0);
+    ret = dbpf_db_put(sto_p->coll_db, &key, &data);
     if (ret)
     {
         gossip_err("dbpf_collection_create: %s\n", db_strerror(ret));
@@ -1181,14 +1173,12 @@ int dbpf_collection_create(char *collname,
        store trove-dbpf version string in the collection.  this is used
        to know what format the metadata is stored in on disk.
        */
-    memset(&key, 0, sizeof(key));
-    memset(&data, 0, sizeof(data));
     key.data = TROVE_DBPF_VERSION_KEY;
-    key.size = strlen(TROVE_DBPF_VERSION_KEY);
+    key.len = strlen(TROVE_DBPF_VERSION_KEY);
     data.data = TROVE_DBPF_VERSION_VALUE;
-    data.size = strlen(TROVE_DBPF_VERSION_VALUE);
+    data.len = strlen(TROVE_DBPF_VERSION_VALUE);
 
-    ret = db_p->db->put(db_p->db, NULL, &key, &data, 0);
+    ret = dbpf_db_put(db_p, &key, &data);
     if (ret != 0)
     {
         gossip_err("db_p->put failed writing trove-dbpf version "
@@ -1201,14 +1191,12 @@ int dbpf_collection_create(char *collname,
         "collection attribute database\n", TROVE_DBPF_VERSION_VALUE);
 
     /* store initial handle value */
-    memset(&key, 0, sizeof(key));
-    memset(&data, 0, sizeof(data));
     key.data = LAST_HANDLE_STRING;
-    key.size = sizeof(LAST_HANDLE_STRING);
+    key.len = sizeof(LAST_HANDLE_STRING);
     data.data = &zero;
-    data.size = sizeof(zero);
+    data.len = sizeof(zero);
 
-    ret = db_p->db->put(db_p->db, NULL, &key, &data, 0);
+    ret = dbpf_db_put(db_p, &key, &data);
     if (ret != 0)
     {
         gossip_err("db_p->put failed writing initial handle value: %s\n",

@@ -42,6 +42,8 @@ int dbpf_db_get(struct dbpf_db *db, struct dbpf_data *key,
         switch (r) {
         case DB_BUFFER_SMALL:
             return ERANGE;
+        case DB_KEYEMPTY:
+            return ENOENT;
         case DB_NOTFOUND:
             return ENOENT;
         }
