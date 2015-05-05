@@ -200,6 +200,77 @@ int PINT_dbpf_keyval_iterate(
 int PINT_dbpf_dspace_remove_keyval(
     void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
 
+/**
+ * Structure for key in the keyval DB:
+ *
+ * The keys in the keyval database are now stored as the following
+ * struct (dbpf_keyval_db_entry).  The size of key field (the common
+ * name or component name of the key) is not explicitly specified in the
+ * struct, instead it is calculated from the DBT->size field of the
+ * berkeley db key using the macros below.  Its important that the
+ * 'size' and 'ulen' fields of the DBT key struct are set correctly when
+ * calling get and put.  'size' should be the actual size of the string, 'ulen'
+ * should be the size available for the dbpf_keyval_db_entry struct, most
+ * likely sizeof(struct dbpf_keyval_db_entry).
+ */
+
+/* Note - DBPF_MAX_KEY_LENGTH is also defined in trove-migrate.c. Any
+ * change should be evaluated for its impact there.
+ */
+#define DBPF_MAX_KEY_LENGTH PVFS_NAME_MAX
+
+struct dbpf_keyval_db_entry
+{
+    TROVE_handle handle;
+    char type; /* will be one of the types enumerated by dbpf_key_type */
+    char key[DBPF_MAX_KEY_LENGTH];
+};
+
+#define DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(_size) \
+    (sizeof(TROVE_handle) + sizeof(char) + _size)
+
+#define DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(_size) \
+    (_size - sizeof(TROVE_handle) - sizeof(char))
+
+/**
+ * The keyval database contains attributes for pvfs2 handles
+ * (files, directories, symlinks, etc.) that are not considered
+ * common attributes.  Each key in the keyval database consists of a
+ * handle and a string.  The handles can be of different types, and the strings
+ * vary based on the type of handle and the data to be stored (the value for that
+ * key).  The following table lists all the currently stored keyvals, 
+ * based on their handle type:
+ *
+ * Handle Type   Key Class   Key                       Value    
+ * ================================================================
+ * 
+ * meta-file     COMMON      "mh"                      Datafile Array
+ * meta-file     COMMON      "md"                      Distribution
+ * symlink       COMMON      "st"                      Target Handle
+ * directory     COMMON      "de"                      Entries Handle
+ * dir-ent       COMPONENT   <component name>          Entry Handle
+ * [metafile, 
+ *  symlink, 
+ *  directory]   XATTR       <extended attribute name> <extended attribute content>
+ *
+ * The descriptions for the common keys are:
+ *
+ * md:  (m)etafile (d)istribution - stores the distribution type
+ * mh:  stores the (d)atafile (h)andles that exist for this metafile
+ * st:  stores the (s)ymlink (t)arget path that the symlink references
+ * de:  stores the handle that manages the (d)irectory (e)ntries for this directory
+ *
+ * The <component name> strings are the actual object names 
+ * (files, directories, etc) in the directory.  They map to the handles for those 
+ * objects.
+ *
+ * There is also now a special 'null' keyval that has a handle and the null
+ * string as its key.  This acts as handle info for a particular handle.  This
+ * is useful for dir-ent handles, where the number of entries on that handle
+ * must be counted.  The null keyval is accessed internally, based on flags
+ * passed in through the API.
+ */
+
 struct dbpf_storage
 {
     TROVE_ds_flags flags;
@@ -219,7 +290,6 @@ struct dbpf_collection
     dbpf_db *coll_attr_db;
     dbpf_db *ds_db;
     dbpf_db *keyval_db;
-    DB_ENV *coll_env;
     TROVE_coll_id coll_id;
     TROVE_handle root_dir_handle;
     struct dbpf_storage *storage;
@@ -249,13 +319,6 @@ struct dbpf_collection_db_entry
 /* entry types */
 #define DBPF_ENTRY_TYPE_CONST      0x01
 #define DBPF_ENTRY_TYPE_COMPONENT  0x02
-
-int PINT_trove_dbpf_keyval_compare(
-    DB * dbp, const DBT * a, const DBT * b);
-int PINT_trove_dbpf_ds_attr_compare(
-    DB * dbp, const DBT * a, const DBT * b);
-int PINT_trove_dbpf_ds_attr_compare_reversed(
-    DB * dbp, const DBT * a, const DBT * b);
 
 int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
                          TROVE_object_ref ref,
@@ -699,8 +762,6 @@ do {                                                         \
 
 extern DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *err_p);
 extern int dbpf_putdb_env(DB_ENV *dbenv, const char *path);
-extern int db_open(DB *db_p, const char *dbname, int, int);
-extern int db_close(DB *db_p);
 
 int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p);
 

@@ -42,77 +42,6 @@ static uint32_t readdir_session = 0;
 
 extern int synccount;
 
-/**
- * Structure for key in the keyval DB:
- *
- * The keys in the keyval database are now stored as the following
- * struct (dbpf_keyval_db_entry).  The size of key field (the common
- * name or component name of the key) is not explicitly specified in the
- * struct, instead it is calculated from the DBT->size field of the
- * berkeley db key using the macros below.  Its important that the
- * 'size' and 'ulen' fields of the DBT key struct are set correctly when
- * calling get and put.  'size' should be the actual size of the string, 'ulen'
- * should be the size available for the dbpf_keyval_db_entry struct, most
- * likely sizeof(struct dbpf_keyval_db_entry).
- */
-
-/* Note - DBPF_MAX_KEY_LENGTH is also defined in trove-migrate.c. Any
- * change should be evaluated for its impact there.
- */
-#define DBPF_MAX_KEY_LENGTH PVFS_NAME_MAX
-
-struct dbpf_keyval_db_entry
-{
-    TROVE_handle handle;
-    char type; /* will be one of the types enumerated by dbpf_key_type */
-    char key[DBPF_MAX_KEY_LENGTH];
-};
-
-#define DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(_size) \
-    (sizeof(TROVE_handle) + sizeof(char) + _size)
-
-#define DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(_size) \
-    (_size - sizeof(TROVE_handle) - sizeof(char))
-
-/**
- * The keyval database contains attributes for pvfs2 handles
- * (files, directories, symlinks, etc.) that are not considered
- * common attributes.  Each key in the keyval database consists of a
- * handle and a string.  The handles can be of different types, and the strings
- * vary based on the type of handle and the data to be stored (the value for that
- * key).  The following table lists all the currently stored keyvals, 
- * based on their handle type:
- *
- * Handle Type   Key Class   Key                       Value    
- * ================================================================
- * 
- * meta-file     COMMON      "mh"                      Datafile Array
- * meta-file     COMMON      "md"                      Distribution
- * symlink       COMMON      "st"                      Target Handle
- * directory     COMMON      "de"                      Entries Handle
- * dir-ent       COMPONENT   <component name>          Entry Handle
- * [metafile, 
- *  symlink, 
- *  directory]   XATTR       <extended attribute name> <extended attribute content>
- *
- * The descriptions for the common keys are:
- *
- * md:  (m)etafile (d)istribution - stores the distribution type
- * mh:  stores the (d)atafile (h)andles that exist for this metafile
- * st:  stores the (s)ymlink (t)arget path that the symlink references
- * de:  stores the handle that manages the (d)irectory (e)ntries for this directory
- *
- * The <component name> strings are the actual object names 
- * (files, directories, etc) in the directory.  They map to the handles for those 
- * objects.
- *
- * There is also now a special 'null' keyval that has a handle and the null
- * string as its key.  This acts as handle info for a particular handle.  This
- * is useful for dir-ent handles, where the number of entries on that handle
- * must be counted.  The null keyval is accessed internally, based on flags
- * passed in through the API.
- */
-
 extern gen_mutex_t dbpf_attr_cache_mutex;
 
 static int dbpf_keyval_do_remove(
@@ -2148,40 +2077,6 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
     }
 
     return 0;
-}
-
-int PINT_trove_dbpf_keyval_compare(
-    DB * dbp, const DBT * a, const DBT * b)
-{
-    struct dbpf_keyval_db_entry db_entry_a;
-    struct dbpf_keyval_db_entry db_entry_b;
-
-    memcpy(&db_entry_a, a->data, sizeof(struct dbpf_keyval_db_entry));
-    memcpy(&db_entry_b, b->data, sizeof(struct dbpf_keyval_db_entry));
-
-    if(db_entry_a.handle != db_entry_b.handle)
-    {
-        return (db_entry_a.handle < db_entry_b.handle) ? -1 : 1;
-    }
-
-    if(db_entry_a.type != db_entry_b.type)
-    {
-        return (db_entry_a.type < db_entry_b.type) ? -1 : 1;
-    }
-
-    if(a->size > b->size)
-    {
-        return 1;
-    }
-
-    if(a->size < b->size)
-    {
-        return -1;
-    }
-
-    /* must be equal */
-    return (memcmp(db_entry_a.key, db_entry_b.key,
-                    DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->size)));
 }
 
 struct TROVE_keyval_ops dbpf_keyval_ops =

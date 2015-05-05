@@ -8,21 +8,105 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
-#include <pvfs2-internal.h>
+#include <gossip.h>
 
 #include <db.h>
 
-#include "dbpf-db.h"
+#include "dbpf.h"
 
-int dbpf_db_open(DB *bdb, struct dbpf_db **db)
+static int ds_attr_compare(DB *dbp, const DBT *a, const DBT *b)
 {
+    TROVE_handle handle_a, handle_b;
+
+    memcpy(&handle_a, a->data, sizeof(TROVE_handle));
+    memcpy(&handle_b, b->data, sizeof(TROVE_handle));
+
+    if (handle_a == handle_b)
+    {
+        return 0;
+    }
+    return (handle_a > handle_b) ? -1 : 1;
+}
+
+static int keyval_compare(DB *dbp, const DBT *a, const DBT *b)
+{
+    struct dbpf_keyval_db_entry db_entry_a, db_entry_b;
+
+    memcpy(&db_entry_a, a->data, sizeof(struct dbpf_keyval_db_entry));
+    memcpy(&db_entry_b, b->data, sizeof(struct dbpf_keyval_db_entry));
+
+    if (db_entry_a.handle != db_entry_b.handle)
+    {
+        return (db_entry_a.handle < db_entry_b.handle) ? -1 : 1;
+    }
+
+    if (db_entry_a.type != db_entry_b.type)
+    {
+        return (db_entry_a.type < db_entry_b.type) ? -1 : 1;
+    }
+
+    if (a->size > b->size)
+    {
+        return 1;
+    }
+    else if (a->size < b->size)
+    {
+        return -1;
+    }
+    /* else must be equal */
+    return (memcmp(db_entry_a.key, db_entry_b.key,
+        DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->size)));
+}
+
+int dbpf_db_open(char *name, int flags, int compare, struct dbpf_db **db)
+{
+    int r;
     *db = malloc(sizeof **db);
     if (!db)
     {
         return errno;
     }
-    (*db)->db = bdb;
+    r = db_create(&(*db)->db, NULL, 0);
+    if (r)
+    {
+        free(db);
+        return r;
+    }
+ 
+    r = (*db)->db->set_flags((*db)->db, flags);
+    if (r)
+    {
+        gossip_err("TROVE:DBPF:Berkeley DB %s failed to set_flags", name);
+        (*db)->db->close((*db)->db, 0);
+        free(db);
+        return r;
+    }
+    if (compare == DBPF_DB_COMPARE_DS_ATTR)
+    {
+        (*db)->db->set_bt_compare((*db)->db, ds_attr_compare);
+    }
+    else if (compare == DBPF_DB_COMPARE_KEYVAL)
+    {
+        (*db)->db->set_bt_compare((*db)->db, keyval_compare);
+    }
+    r = (*db)->db->open((*db)->db, NULL, name, NULL, TROVE_DB_TYPE,
+        TROVE_DB_OPEN_FLAGS, 0);
+    if (r)
+    {
+        gossip_err("TROVE:DBPF:Berkeley DB %s failed to open", name);
+        (*db)->db->close((*db)->db, 0);
+        free(db);
+        return r;
+    }
     return 0;
+}
+
+int dbpf_db_close(struct dbpf_db *db)
+{
+    int r;
+    r = db->db->close(db->db, 0);
+    free(db);
+    return r;
 }
 
 int dbpf_db_sync(struct dbpf_db *db)

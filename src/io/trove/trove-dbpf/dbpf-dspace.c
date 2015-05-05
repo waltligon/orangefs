@@ -2051,40 +2051,6 @@ static int dbpf_dspace_testsome(
     return ((out_count > 0) ? 1 : 0);
 }
 
-int PINT_trove_dbpf_ds_attr_compare_reversed(
-    DB * dbp, const DBT * a, const DBT * b)
-{
-    TROVE_handle handle_a = 0;
-    TROVE_handle handle_b = 0;
-
-    memcpy(&handle_a, a->data, sizeof(TROVE_handle));
-    memcpy(&handle_b, b->data, sizeof(TROVE_handle));
-
-    if(handle_a == handle_b)
-    {
-        return 0;
-    }
-
-    return (handle_a < handle_b) ? -1 : 1;
-}
-
-int PINT_trove_dbpf_ds_attr_compare(
-    DB * dbp, const DBT * a, const DBT * b)
-{
-    TROVE_handle handle_a = 0;
-    TROVE_handle handle_b = 0;
-
-    memcpy(&handle_a, a->data, sizeof(TROVE_handle));
-    memcpy(&handle_b, b->data, sizeof(TROVE_handle));
-
-    if(handle_a == handle_b)
-    {
-        return 0;
-    }
-
-    return (handle_a > handle_b) ? -1 : 1;
-}
-
 /* dbpf_dspace_create_store_handle()
  *
  * records persisent record of new dspace within trove
