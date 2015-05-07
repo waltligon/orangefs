@@ -84,16 +84,7 @@
 #define ACACHE_ENABLE TCACHE_ENABLE
 #define ACACHE_RECLAIM_PERCENTAGE TCACHE_RECLAIM_PERCENTAGE
 
-#define STATIC_ACACHE_OPT 1024
-
-#define STATIC_ACACHE_TIMEOUT_MSECS (TCACHE_TIMEOUT_MSECS | STATIC_ACACHE_OPT)
-#define STATIC_ACACHE_NUM_ENTRIES (TCACHE_NUM_ENTRIES | STATIC_ACACHE_OPT)
-#define STATIC_ACACHE_HARD_LIMIT (TCACHE_HARD_LIMIT | STATIC_ACACHE_OPT)
-#define STATIC_ACACHE_SOFT_LIMIT (TCACHE_SOFT_LIMIT | STATIC_ACACHE_OPT)
-#define STATIC_ACACHE_ENABLE (TCACHE_ENABLE | STATIC_ACACHE_OPT)
-#define STATIC_ACACHE_RECLAIM_PERCENTAGE (TCACHE_RECLAIM_PERCENTAGE | STATIC_ACACHE_OPT)
-
-enum 
+enum
 {
     PERF_ACACHE_NUM_ENTRIES = 0,
     PERF_ACACHE_SOFT_LIMIT = 1,
@@ -119,16 +110,6 @@ int PINT_acache_set_info(
     enum PINT_acache_options option,
     unsigned int arg);
 
-#if 0 /* Don't cache size_array. */
-int PINT_acache_get_cached_entry(
-    PVFS_object_ref refn,
-    PVFS_object_attr* attr,
-    int* attr_status,
-    PVFS_size* size,
-    int* size_status,
-    PVFS_size** size_array,
-    int* size_array_status);
-#endif
 int PINT_acache_get_cached_entry(
     PVFS_object_ref refn,
     PVFS_object_attr* attr,
@@ -136,13 +117,6 @@ int PINT_acache_get_cached_entry(
     PVFS_size* size,
     int* size_status);
 
-#if 0 /* Don't cache size_array. */
-int PINT_acache_update(
-    PVFS_object_ref refn, 
-    PVFS_object_attr *attr,
-    PVFS_size* size,
-    PVFS_size* size_array);
-#endif
 int PINT_acache_update(
     PVFS_object_ref refn, 
     PVFS_object_attr *attr,

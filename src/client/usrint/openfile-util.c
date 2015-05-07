@@ -904,7 +904,7 @@ static int init_usrint_internal(void)
     PINT_initrand();
 
     /* if this fails not much we can do about it */
-    /* atexit(usrint_cleanup); */
+    atexit(cleanup_usrint_internal);
 
     /* we assume if we are running this code this program was
      * just exec'd and the parent may or may not have been PVFS enabled
