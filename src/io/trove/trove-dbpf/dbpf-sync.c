@@ -26,7 +26,7 @@ extern gen_mutex_t dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 extern pthread_cond_t dbpf_op_completed_cond;
 
 static int dbpf_sync_db(
-    struct dbpf_db * dbp, 
+    dbpf_db * dbp, 
     enum s_sync_context_e sync_context_type, 
     dbpf_sync_context_t * sync_context)
 {
@@ -40,7 +40,7 @@ static int dbpf_sync_db(
     if(ret != 0)
     {
         gossip_err("db SYNC failed: %s\n",
-                   db_strerror(ret));
+                   strerror(ret));
         ret = -trove_errno_to_trove_error(ret);
         return ret;
     }
@@ -109,7 +109,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
 {
 
     int ret = 0;
-    struct dbpf_db * dbp = NULL;
+    dbpf_db * dbp = NULL;
     dbpf_sync_context_t * sync_context;
     dbpf_queued_op_t *ready_op;
     int sync_context_type;

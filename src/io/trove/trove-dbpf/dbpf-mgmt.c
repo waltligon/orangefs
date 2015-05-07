@@ -81,10 +81,7 @@ static int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
                                      void **user_ptrs,
                                      PVFS_error *errors);
 
-#define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD)
-
 static int dbpf_db_create(char *dbname, 
-                          DB_ENV *envp, 
                           uint32_t flags);
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
@@ -726,14 +723,14 @@ int dbpf_storage_create(char *data_path,
     }
 
     DBPF_GET_STO_ATTRIB_DBNAME(sto_attrib_dbname, PATH_MAX, meta_path);
-    ret = dbpf_db_create(sto_attrib_dbname, NULL, 0);
+    ret = dbpf_db_create(sto_attrib_dbname, 0);
     if (ret != 0)
     {
         return ret;
     }
 
     DBPF_GET_COLLECTIONS_DBNAME(collections_dbname, PATH_MAX, meta_path);
-    ret = dbpf_db_create(collections_dbname, NULL, DB_RECNUM);
+    ret = dbpf_db_create(collections_dbname, 0);
     if (ret != 0)
     {
         gossip_lerr("dbpf_storage_create: removing storage attribute database after failed create attempt");
@@ -938,7 +935,7 @@ int dbpf_collection_create(char *collname,
     }
     else if(ret < 0)
     {
-	ret = dbpf_db_create(path_name, NULL, 0);
+	ret = dbpf_db_create(path_name, 0);
         if (ret != 0)
         {
             gossip_err("dbpf_db_create failed on attrib db %s\n", path_name);
@@ -1000,7 +997,7 @@ int dbpf_collection_create(char *collname,
     }
     if(ret < 0)
     {
-        ret = dbpf_db_create(path_name, NULL, 0);
+        ret = dbpf_db_create(path_name, 0);
         if (ret != 0)
         {
             gossip_err("dbpf_db_create failed on %s\n", path_name);
@@ -1017,7 +1014,7 @@ int dbpf_collection_create(char *collname,
     }
     if(ret < 0)
     {
-        ret = dbpf_db_create(path_name, NULL, 0);
+        ret = dbpf_db_create(path_name, 0);
         if (ret != 0)
         {
             gossip_err("dbpf_db_create failed on %s\n", path_name);
@@ -1261,8 +1258,7 @@ collection_remove_failure:
     return ret;
 }
 
-int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
-                            TROVE_keyval_s *name_array,
+int dbpf_collection_iterate(TROVE_keyval_s *name_array,
                             TROVE_coll_id *coll_id_array,
                             int *inout_count_p,
                             TROVE_ds_flags flags,
@@ -1271,154 +1267,54 @@ int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
                             TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL, i = 0;
-    db_recno_t recno = {0};
-    DB *db_p = NULL;
-    DBC *dbc_p = NULL;
-    DBT key, data;
+    dbpf_cursor *dbc = NULL;
+    struct dbpf_data key, data;
     struct dbpf_collection_db_entry db_entry;
 
-    /* if caller passed that they're are at the end, return 0 */
-    if (*inout_position_p == TROVE_ITERATE_END)
-    {
-        *inout_count_p = 0;
-        return 1;
-    }
-
-    /* collection db is stored with storage space info */
-    db_p = my_storage_p->coll_db->db;
-
     /* get a cursor */
-    ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
+    ret = dbpf_db_cursor(my_storage_p->coll_db, &dbc);
     if (ret != 0)
     {
-        ret = -dbpf_db_error_to_trove_error(ret);
+        ret = -trove_errno_to_trove_error(ret);
         goto return_error;
-    }
-
-    /* see keyval iterate for discussion of this implementation */
-    if (*inout_position_p != TROVE_ITERATE_START)
-    {
-        /* need to position cursor before reading.  note that this
-         * will actually position the cursor over the last thing that
-         * was read on the last call, so we don't need to return what
-         * we get back.  here we make sure that the key is big
-         * enough to hold the position that we need to pass in.
-         */
-       
-        memset(&key, 0, sizeof(key));
-        key.data = name_array[0].buffer;
-        key.ulen = name_array[0].buffer_sz;
-        *(db_recno_t *)key.data = (db_recno_t) *inout_position_p;
-        key.size = sizeof(db_recno_t);
-        key.flags |= DB_DBT_USERMEM;
-
-        memset(&data, 0, sizeof(data));
-        data.data = &db_entry;
-        data.size = data.ulen = sizeof(db_entry);
-        data.flags |= DB_DBT_USERMEM;
-
-        /* position the cursor and grab the first key/value pair */
-        ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
-        if (ret == DB_NOTFOUND)
-        {
-            goto return_ok;
-        }
-        else if (ret != 0)
-        {
-            ret = -dbpf_db_error_to_trove_error(ret);
-            goto return_error;
-        }
     }
 
     for (i = 0; i < *inout_count_p; i++)
     {
-        memset(&key, 0, sizeof(key));
         key.data = name_array[i].buffer;
-        key.size = key.ulen = name_array[i].buffer_sz;
-        key.flags |= DB_DBT_USERMEM;
+        key.len = name_array[i].buffer_sz;
 
-        memset(&data, 0, sizeof(data));
         data.data = &db_entry;
-        data.size = data.ulen = sizeof(db_entry);
-        data.flags |= DB_DBT_USERMEM;
+        data.len = sizeof(db_entry);
 
-        ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
-        if (ret == DB_NOTFOUND)
+        ret = dbpf_db_cursor_get(dbc, &key, &data, DBPF_DB_CURSOR_NEXT,
+            name_array[i].buffer_sz);
+        if (ret == ENOENT)
         {
             goto return_ok;
         }
         else if (ret != 0)
         {
-            ret = -dbpf_db_error_to_trove_error(ret);
+            ret = -trove_errno_to_trove_error(ret);
             goto return_error;
         }
         coll_id_array[i] = db_entry.coll_id;
     }
 
 return_ok:
-    if (ret == DB_NOTFOUND)
-    {
-        *inout_position_p = TROVE_ITERATE_END;
-    }
-    else
-    {
-        char buf[64];
-        /* get the record number to return.
-         *
-         * note: key field is ignored by c_get in this case.  sort of.
-         * i'm not actually sure what they mean by "ignored", because
-         * it sure seems to matter what you put in there...
-         */
-        memset(&key, 0, sizeof(key));
-        key.data = buf;
-        key.size = key.ulen = 64;
-        key.dlen = 64;
-        key.doff = 0;
-        key.flags |= DB_DBT_USERMEM | DB_DBT_PARTIAL;
-
-        memset(&data, 0, sizeof(data));
-        data.data = &recno;
-        data.size = data.ulen = sizeof(recno);
-        data.flags |= DB_DBT_USERMEM;
-
-        ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
-        if (ret == DB_NOTFOUND)
-        {
-            gossip_debug(GOSSIP_TROVE_DEBUG,
-                         "warning: keyval iterate -- notfound\n");
-        }
-        else if (ret != 0)
-        {
-            gossip_debug(GOSSIP_TROVE_DEBUG, "warning: keyval iterate -- "
-                         "some other failure @ recno\n");
-            ret = -dbpf_db_error_to_trove_error(ret);
-        }
-
-        assert(recno != TROVE_ITERATE_START &&
-               recno != TROVE_ITERATE_END);
-        *inout_position_p = recno;
-    }
-    /*
-       'position' points us to the record we just read, or is set to
-       END
-       */
-
     *inout_count_p = i;
 
-    ret = dbc_p->c_close(dbc_p);
+    ret = dbpf_db_cursor_close(dbc);
     if (ret != 0)
     {
-        ret = -dbpf_db_error_to_trove_error(ret);
+        ret = -trove_errno_to_trove_error(ret);
         goto return_error;
     }
     return 1;
 
 return_error:
 
-    if (dbc_p)
-    {
-        dbc_p->c_close(dbc_p);
-    }
+    dbpf_db_cursor_close(dbc);
 
     gossip_lerr("dbpf_collection_iterate_op_svc: %s\n", db_strerror(ret));
 
@@ -1853,7 +1749,7 @@ struct dbpf_storage *dbpf_storage_lookup(
 
     DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, meta_path);
 
-    ret = dbpf_db_open(path_name, DB_RECNUM, 0, &sto_p->coll_db);
+    ret = dbpf_db_open(path_name, 0, 0, &sto_p->coll_db);
     if (ret)
     {
         *error_p = ret;
@@ -1942,13 +1838,12 @@ static int dbpf_mkpath(char *pathname, mode_t mode)
  * a db plus files storage region.
  */
 static int dbpf_db_create(char *dbname,
-                          DB_ENV *envp,
                           uint32_t flags)
 {
     int ret = -TROVE_EINVAL;
     DB *db_p = NULL;
 
-    if ((ret = db_create(&db_p, envp, 0)) != 0)
+    if ((ret = db_create(&db_p, NULL, 0)) != 0)
     {
         gossip_lerr("dbpf_storage_create: %s\n", db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);

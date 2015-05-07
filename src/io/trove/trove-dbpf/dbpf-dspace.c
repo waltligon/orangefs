@@ -8,7 +8,6 @@
 #include <sys/stat.h>
 #include <stdio.h>
 #include <string.h>
-#include <db.h>
 #include <time.h>
 #include <stdlib.h>
 #ifdef HAVE_MALLOC_H
@@ -549,7 +548,7 @@ static int remove_one_handle(
      * of a handle without having to post more operations though.
      */
     ret = PINT_dbpf_keyval_iterate(
-        coll_p->keyval_db->db,
+        coll_p->keyval_db,
         ref.handle,
         DBPF_ATTRIBUTE_TYPE,
         coll_p->pcache,
@@ -638,19 +637,16 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 }
 
 int PINT_dbpf_dspace_remove_keyval(
-    void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val)
+    dbpf_cursor *dbc, TROVE_handle handle, TROVE_keyval_s *key,
+    TROVE_keyval_s *val)
 {
     int ret;
-    DBC * dbc_p = (DBC *)args;
-
-    ret = dbc_p->c_del(dbc_p, 0);
+    ret = dbpf_db_cursor_del(dbc);
     if(ret != 0)
     {
-        ret = -dbpf_db_error_to_trove_error(ret);
+        ret = -trove_errno_to_trove_error(ret);
     }
-
     return ret;
-
 }
 
 static int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
@@ -702,17 +698,9 @@ static int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL, i = 0;
-    DBC *dbc_p = NULL;
-    DBT key, data;
-    void * multiples_buffer = NULL;
+    dbpf_cursor *dbc = NULL;
+    struct dbpf_data key, data;
     TROVE_handle dummy_handle;
-    TROVE_handle aligned_handle;
-    size_t sizeof_handle = 0, sizeof_attr = 0;
-    int start_size;
-    void *tmp_ptr;
-    void *tmp_handle;
-    void *tmp_attr GCC_UNUSED;
-    uint32_t dbpagesize = TROVE_DEFAULT_DB_PAGESIZE;
     TROVE_ds_attributes attr;
 
     if (*op_p->u.d_iterate_handles.position_p == TROVE_ITERATE_END)
@@ -723,10 +711,10 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     }
 
     /* get a cursor */
-    ret = op_p->coll_p->ds_db->db->cursor(op_p->coll_p->ds_db->db, NULL, &dbc_p, 0);
+    ret = dbpf_db_cursor(op_p->coll_p->ds_db, &dbc);
     if (ret != 0)
     {
-        ret = -dbpf_db_error_to_trove_error(ret);
+        ret = -trove_errno_to_trove_error(ret);
         gossip_err("failed to get a cursor\n");
         goto return_error;
     }
@@ -748,25 +736,22 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
          * well, so that we can use the same loop below to read the
          * remainder in this or the above case.
          */
-        memset(&key, 0, sizeof(key));
         dummy_handle = *op_p->u.d_iterate_handles.position_p;
         key.data  = &dummy_handle;
-        key.size  = key.ulen = sizeof(TROVE_handle);
-        key.flags |= DB_DBT_USERMEM;
+        key.len = sizeof dummy_handle;
 
-        memset(&data, 0, sizeof(data));
         data.data = &attr;
-        data.size = data.ulen = sizeof(attr);
-        data.flags |= DB_DBT_USERMEM;
+        data.len = sizeof(attr);
 
-        ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RANGE);
-        if (ret == DB_NOTFOUND)
+        ret = dbpf_db_cursor_get(dbc, &key, &data, DBPF_DB_CURSOR_SET_RANGE,
+            sizeof dummy_handle);
+        if (ret == ENOENT)
         {
             goto return_ok;
         }
         else if (ret != 0)
         {
-            ret = -dbpf_db_error_to_trove_error(ret);
+            ret = -trove_errno_to_trove_error(ret);
             gossip_err("failed to set cursor position at handle: %llu\n",
                        llu(*(TROVE_handle *)op_p->u.d_iterate_handles.position_p));
             goto return_error;
@@ -774,24 +759,21 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     }
     else
     {
-        memset(&key, 0, sizeof(key));
-        key.data  = &dummy_handle;
-        key.size  = key.ulen = sizeof(TROVE_handle);
-        key.flags |= DB_DBT_USERMEM;
+        key.data = &dummy_handle;
+        key.len =  sizeof(TROVE_handle);
 
-        memset(&data, 0, sizeof(data));
         data.data = &attr;
-        data.size = data.ulen = sizeof(attr);
-        data.flags |= DB_DBT_USERMEM;
+        data.len = sizeof(attr);
 
-        ret = dbc_p->c_get(dbc_p, &key, &data, DB_FIRST);
-        if (ret == DB_NOTFOUND)
+        ret = dbpf_db_cursor_get(dbc, &key, &data, DBPF_DB_CURSOR_FIRST,
+            sizeof(TROVE_handle));
+        if (ret == ENOENT)
         {
             goto return_ok;
         }
         else if (ret != 0)
         {
-            ret = -dbpf_db_error_to_trove_error(ret);
+            ret = -trove_errno_to_trove_error(ret);
             gossip_err("failed to set cursor position at handle: %llu\n",
                        llu(*(TROVE_handle *)op_p->u.d_iterate_handles.position_p));
             goto return_error;
@@ -801,194 +783,56 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     op_p->u.d_iterate_handles.handle_array[i] = dummy_handle;
     ++i;
 
-    start_size = ((sizeof(TROVE_handle) + sizeof(attr)) *
-                  (*op_p->u.d_iterate_handles.count_p - 1));
-    /* round up to the nearest 1024 */
-    start_size = (start_size + 1023) & (~(unsigned long)1023);
-
-#ifdef HAVE_DB_GET_PAGESIZE
-    ret = op_p->coll_p->ds_db->db->get_pagesize(op_p->coll_p->ds_db->db, &dbpagesize);
-#endif
-
-    /* multiples_buffer = PINT_mem_aligned_alloc(start_size, * dbpagesize); */
-    posix_memalign(&multiples_buffer, dbpagesize, start_size);
-    if(!multiples_buffer)
-    {
-        ret = -TROVE_ENOMEM;
-        goto return_error;
-    }
-
     key.data = &dummy_handle;
-    key.size = key.ulen = sizeof(TROVE_handle);
-    key.flags = DB_DBT_USERMEM;
+    key.len = sizeof dummy_handle;
+    data.data = &attr;
+    data.len = sizeof attr;
 
-    data.data = multiples_buffer;
-    data.size = data.ulen = start_size;
-    data.flags = DB_DBT_USERMEM;
-
-    tmp_ptr = NULL;
     while(i < *op_p->u.d_iterate_handles.count_p)
     {
-        ret = dbc_p->c_get(dbc_p, &key, &data, DB_MULTIPLE_KEY|DB_NEXT);
-
-#ifdef HAVE_DB_BUFFER_SMALL
-        if(ret == DB_BUFFER_SMALL)
-#else
-        if(ret == ENOMEM)
-#endif
-        {
-            /* need to allocate more and try again */
-            free(multiples_buffer);
-            /* multiples_buffer = PINT_mem_aligned_alloc(data.size,
-             *                                           dbpagesize);
-             */
-            posix_memalign(&multiples_buffer, dbpagesize, start_size);
-            if(!multiples_buffer)
-            {
-                ret = -TROVE_ENOMEM;
-                goto return_error;
-            }
-            data.data = multiples_buffer;
-            data.ulen = data.size;
-
-            ret = dbc_p->c_get(dbc_p, &key, &data, DB_MULTIPLE_KEY|DB_NEXT);
-        }
-
-        if(ret == DB_NOTFOUND)
+        ret = dbpf_db_cursor_get(dbc, &key, &data, DBPF_DB_CURSOR_NEXT,
+            sizeof dummy_handle);
+        if(ret == ENOENT)
         {
             goto return_ok;
         }
-
-        if(ret < 0)
+        else if(ret < 0)
         {
-            ret = -dbpf_db_error_to_trove_error(ret);
+            ret = -trove_errno_to_trove_error(ret);
             gossip_err("c_get failed on iteration %d\n", i);
             goto return_error;
         }
-
-        DB_MULTIPLE_INIT(tmp_ptr, &data);
-
-        /* read handles until we run out of handles or space in buffer */
-        for (; i < *op_p->u.d_iterate_handles.count_p; i++)
-        {
-            /* the semantics of this macro are a little odd.  after
-             * it returns, tmp_handle points into the data buffer
-             * (multiples_buffer) at the location of the key, so the
-             * pointer value of tmp_buffer actually changes, and it
-             * must be derefenced to get the handle value.
-             */
-
-            DB_MULTIPLE_KEY_NEXT(tmp_ptr, &data,
-                                 tmp_handle, sizeof_handle,
-                                 tmp_attr, sizeof_attr);
-            if(!tmp_ptr)
-            {
-                break;
-            }
-
-            /* verify sizes are correct */
-            if(sizeof_handle != sizeof(TROVE_handle) ||
-               sizeof_attr != sizeof(attr))
-            {
-                gossip_err("Warning: got invalid handle or key size in dbpf_dspace_iterate_handles().\n");
-                gossip_err("Warning: skipping entry.\n");
-                i--;
-                continue;
-            }
-
-            /* check for duplicates */
-            memcpy(&aligned_handle, tmp_handle, sizeof(TROVE_handle));
-            if(i > 0 && aligned_handle == op_p->u.d_iterate_handles.handle_array[i-1])
-            {
-                gossip_err("Warning: got duplicate handle %llu.\n", llu(aligned_handle));
-                gossip_err("Warning: skipping entry.\n");
-                i--;
-                continue;
-            }
-
-            op_p->u.d_iterate_handles.handle_array[i] = aligned_handle;
-        }
+        op_p->u.d_iterate_handles.handle_array[i++] = dummy_handle;
     }
 
-    if(i == *op_p->u.d_iterate_handles.count_p && tmp_ptr)
-    {
-        /* we ran out of count_p before tmp_ptr became NULL, so
-         * MULTIPLE_KEY returned more entries (because of the buffer
-         * size being page aligned), than the caller requested.  Set
-         * the position to the next handle after the last one we
-         * return
-         */
-        sizeof_handle = sizeof(TROVE_handle);
-        sizeof_attr = sizeof(attr);
-        do
-        {
-            /* verify sizes are correct */
-            if(sizeof_handle != sizeof(TROVE_handle) ||
-               sizeof_attr != sizeof(attr))
-            {
-                gossip_err("Warning: got invalid handle or key size in dbpf_dspace_iterate_handles().\n");
-                gossip_err("Warning: skipping entry.\n");
-            }
-            DB_MULTIPLE_KEY_NEXT(tmp_ptr, &data,
-                                 tmp_handle, sizeof_handle,
-                                 tmp_attr, sizeof_attr);
-            if(!tmp_ptr)
-            {
-                goto get_next;
-            }
-
-            memcpy(&aligned_handle, tmp_handle, sizeof(TROVE_handle));
-            if(aligned_handle == op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p])
-            {
-                gossip_err("Warning: found duplicate handle: %llu\n", llu(aligned_handle));
-                gossip_err("Warning: skipping entry.\n");
-            }
-
-        } while (sizeof_handle != sizeof(TROVE_handle) ||
-           sizeof_attr != sizeof(attr) ||
-           aligned_handle == op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p]);
-
-        *op_p->u.d_iterate_handles.position_p = aligned_handle;
-        goto return_ok;
-    }
-
-get_next:
     /* get the record number to return.
      *
      * note: key field is ignored by c_get in this case
      */
-    memset(&key, 0, sizeof(key));
     key.data = &dummy_handle;
-    key.size = key.ulen = sizeof(dummy_handle);
-    key.flags |= DB_DBT_USERMEM;
+    key.len = sizeof(dummy_handle);
 
-    memset(&data, 0, sizeof(data));
     data.data = &attr;
-    data.size = data.ulen = sizeof(attr);
-    data.flags |= DB_DBT_USERMEM;
+    data.len = sizeof(attr);
 
-    ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
-    if (ret == DB_NOTFOUND)
+    ret = dbpf_db_cursor_get(dbc, &key, &data, DBPF_DB_CURSOR_NEXT,
+        sizeof dummy_handle);
+    if (ret == ENOENT)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- notfound\n");
+        goto return_ok;
     }
     else if (ret != 0)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- some other "
                      "failure @ recno\n");
-        ret = -dbpf_db_error_to_trove_error(ret);
-    }
-    if(*op_p->u.d_iterate_handles.count_p > 0 && 
-        dummy_handle == op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p])
-    {
-        gossip_err("Warning: found duplicate handle: %llu\n", llu(dummy_handle));
-        gossip_err("Warning: skipping entry.\n");
-        (*op_p->u.d_iterate_handles.count_p)--;
+        ret = -trove_errno_to_trove_error(ret);
+        goto return_error;
     }
     *op_p->u.d_iterate_handles.position_p = dummy_handle;
 
 return_ok:
-    if (ret == DB_NOTFOUND)
+    if (ret == ENOENT)
     {
         /* if off the end of the database, return TROVE_ITERATE_END */
         *op_p->u.d_iterate_handles.position_p = TROVE_ITERATE_END;
@@ -997,17 +841,7 @@ return_ok:
 
     *op_p->u.d_iterate_handles.count_p = i;
 
-    if (dbc_p)
-    {
-        dbc_p->c_close(dbc_p);
-    }
-
-    if(multiples_buffer)
-    {
-        /* PINT_mem_aligned_free(multiples_buffer); */
-        free(multiples_buffer);
-
-    }
+    dbpf_db_cursor_close(dbc);
 
     return 1;
 
@@ -1015,16 +849,7 @@ return_error:
     *op_p->u.d_iterate_handles.count_p = i;
     PVFS_perror_gossip("dbpf_dspace_iterate_handles_op_svc", ret);
 
-    if (dbc_p)
-    {
-        dbc_p->c_close(dbc_p);
-    }
-
-    if(multiples_buffer)
-    {
-        /* PINT_mem_aligned_free(multiples_buffer); */
-        free(multiples_buffer);
-    }
+    dbpf_db_cursor_close(dbc);
 
     return ret;
 }

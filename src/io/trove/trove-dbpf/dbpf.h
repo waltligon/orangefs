@@ -13,7 +13,6 @@
 extern "C" {
 #endif
 
-#include <db.h>
 #include <aio.h>
 #include "trove.h"
 #include "gen-locks.h"
@@ -184,10 +183,10 @@ struct dbpf_aio_ops
 };
 
 typedef int (* PINT_dbpf_keyval_iterate_callback)(
-    void *, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
+    dbpf_cursor *, TROVE_handle handle, TROVE_keyval_s *, TROVE_keyval_s *);
 
 int PINT_dbpf_keyval_iterate(
-    DB *db_p,
+    dbpf_db *db,
     TROVE_handle handle,
     char type,
     PINT_dbpf_keyval_pcache *pcache,    
@@ -198,7 +197,7 @@ int PINT_dbpf_keyval_iterate(
     PINT_dbpf_keyval_iterate_callback callback);
 
 int PINT_dbpf_dspace_remove_keyval(
-    void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
+    dbpf_cursor *, TROVE_handle handle, TROVE_keyval_s *, TROVE_keyval_s *);
 
 /**
  * Structure for key in the keyval DB:
@@ -718,7 +717,7 @@ do {                                                          \
         if ((tmp_ret = dbpf_db_sync(db_ptr)) != 0)            \
         {                                                     \
             gossip_err("db SYNC failed: %s\n",                \
-                       db_strerror(tmp_ret));                 \
+                       strerror(tmp_ret));                    \
             ret = -trove_errno_to_trove_error(tmp_ret);       \
         }                                                     \
         gossip_debug(                                         \
@@ -760,9 +759,6 @@ do {                                                         \
                     ++s_dbpf_metadata_writes, PINT_PERF_SET);\
 } while(0)
 
-extern DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *err_p);
-extern int dbpf_putdb_env(DB_ENV *dbenv, const char *path);
-
 int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p);
 
 struct dbpf_storage *dbpf_storage_lookup(
@@ -794,8 +790,7 @@ int dbpf_collection_lookup(char *collname,
 
 int dbpf_collection_clear(TROVE_coll_id coll_id);
 
-int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
-                            TROVE_keyval_s *name_array,
+int dbpf_collection_iterate(TROVE_keyval_s *name_array,
                             TROVE_coll_id *coll_id_array,
                             int *inout_count_p,
                             TROVE_ds_flags flags,
