@@ -95,7 +95,9 @@ enum
     PERF_ACACHE_PURGES = 6,
     PERF_ACACHE_REPLACEMENTS = 7,
     PERF_ACACHE_DELETIONS = 8,
-    PERF_ACACHE_ENABLED = 9
+    PERF_ACACHE_ENABLED = 9,
+    PERF_ACACHE_ATTR_INVAL = 10,
+    PERF_ACACHE_SIZE_INVAL = 11
 };
 
 int PINT_acache_initialize(void);
@@ -119,6 +121,11 @@ int PINT_acache_get_cached_entry(
 
 int PINT_acache_update(
     PVFS_object_ref refn, 
+    PVFS_object_attr *attr,
+    PVFS_size* size);
+
+int PINT_acache_amend(
+    PVFS_object_ref refn,
     PVFS_object_attr *attr,
     PVFS_size* size);
 

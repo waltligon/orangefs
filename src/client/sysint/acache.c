@@ -71,6 +71,8 @@ static struct PINT_perf_key acache_keys[] =
     {"ACACHE_REPLACEMENTS", PERF_ACACHE_REPLACEMENTS, 0},
     {"ACACHE_DELETIONS", PERF_ACACHE_DELETIONS, 0},
     {"ACACHE_ENABLED", PERF_ACACHE_ENABLED, PINT_PERF_PRESERVE},
+    {"ACACHE_ATTR_INVAL", PERF_ACACHE_ATTR_INVAL, 0},
+    {"ACACHE_SIZE_INVAL", PERF_ACACHE_SIZE_INVAL, 0},
     {NULL, 0, 0},
 };
 
@@ -411,7 +413,7 @@ void PINT_acache_invalidate(
     {
         PINT_tcache_delete(acache, tmp_entry);
         PINT_perf_count(acache_pc,
-                        PERF_ACACHE_DELETIONS,
+                        PERF_ACACHE_ATTR_INVAL,
                         1,
                         PINT_PERF_ADD);
     }
@@ -456,7 +458,7 @@ void PINT_acache_invalidate_size(
         tmp_payload = tmp_entry->payload;
         tmp_payload->attr.mask &= ~(PVFS_ATTR_DATA_SIZE);
         PINT_perf_count(acache_pc,
-                        PERF_ACACHE_DELETIONS,
+                        PERF_ACACHE_SIZE_INVAL,
                         1,
                         PINT_PERF_ADD);
     }
@@ -466,7 +468,7 @@ void PINT_acache_invalidate_size(
 }
 
 /**
- * Adds a set of attributes to the cache.
+ * Adds object attributes to the acache.
  * Replaces previously existing cache entry of same object reference if found.
  * The given attributes are _copied_ into the cache.
  * The size will not be cached if size is NULL.
@@ -578,6 +580,46 @@ int PINT_acache_update(
     return(0);
 }
 
+int PINT_acache_amend(
+    PVFS_object_ref refn,   /**< object to update */
+    PVFS_object_attr *attr, /**< attributes to copy into cache */
+    PVFS_size* size)        /**< logical file size (NULL if not available) */
+{
+    int status;
+    struct PINT_tcache_entry* tmp_entry;
+    int ret;
+
+    gen_mutex_lock(&acache_mutex);
+
+    /* find out if the entry is already in the cache */
+    ret = PINT_tcache_lookup(acache,
+                             &refn,
+                             &tmp_entry,
+                             &status);
+
+    if(ret < 0 || status != 0)
+    {
+        gossip_err("%s:acache payload not found or attr status invalid.\n",
+                   __func__);
+        gen_mutex_unlock(&acache_mutex);
+        return PINT_acache_update(refn, attr, size);
+    }
+    else
+    {
+        gossip_err("%s:acache payload found and attr status okay.\n",
+                   __func__);
+        gen_mutex_unlock(&acache_mutex);
+        /* NOTE: this is where we should merge attrs provided with those
+         * already present in acache. Performing update for now. */
+        return PINT_acache_update(refn, attr, size);
+    }
+
+/*
+    gen_mutex_unlock(&acache_mutex);
+    return 0;
+*/
+}
+
 /**
  * Returns the perf counter associated with this acache instance.
  */
@@ -631,17 +673,17 @@ static int acache_compare_key_entry(const void* key, struct qhash_head* link)
     const PVFS_object_ref* real_key = (const PVFS_object_ref*)key;
     struct acache_payload* tmp_payload = NULL;
     struct PINT_tcache_entry* tmp_entry = NULL;
-  
+
     tmp_entry = qhash_entry(link, struct PINT_tcache_entry, hash_link);
     assert(tmp_entry);
-  
+
     tmp_payload = (struct acache_payload*)tmp_entry->payload;
     if(real_key->handle == tmp_payload->refn.handle &&
        real_key->fs_id == tmp_payload->refn.fs_id)
     {
         return(1);
     }
-  
+
     return(0);
 }
   
