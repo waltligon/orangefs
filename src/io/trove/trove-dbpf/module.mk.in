@@ -11,7 +11,6 @@ SERVERSRC += \
 	$(DIR)/dbpf-op.c \
 	$(DIR)/dbpf-op-queue.c \
 	$(DIR)/dbpf-thread.c \
-	$(DIR)/dbpf-error.c \
 	$(DIR)/dbpf-mgmt.c \
 	$(DIR)/dbpf-keyval-pcache.c \
 	$(DIR)/dbpf-sync.c \

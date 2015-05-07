@@ -96,7 +96,8 @@ static int keyval_compare(DB *dbp, const DBT *a, const DBT *b)
         DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->size)));
 }
 
-int dbpf_db_open(char *name, int flags, int compare, struct dbpf_db **db)
+int dbpf_db_open(char *name, int flags, int compare, struct dbpf_db **db,
+    int create)
 {
     int r;
     *db = malloc(sizeof **db);
@@ -127,8 +128,8 @@ int dbpf_db_open(char *name, int flags, int compare, struct dbpf_db **db)
     {
         (*db)->db->set_bt_compare((*db)->db, keyval_compare);
     }
-    r = (*db)->db->open((*db)->db, NULL, name, NULL, TROVE_DB_TYPE,
-        TROVE_DB_OPEN_FLAGS, 0);
+    r = (*db)->db->open((*db)->db, NULL, name, NULL, DB_BTREE,
+        create ? DB_CREATE : 0, 0);
     if (r)
     {
         gossip_err("TROVE:DBPF:Berkeley DB %s failed to open", name);
