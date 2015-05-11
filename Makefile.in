@@ -163,7 +163,8 @@ INCLUDES := \
     src/common/gossip \
     src/common/gen-locks \
     src/common/events \
-    src/client/usrint
+    src/client/usrint \
+    src/common/lmdb
 GENINCLUDES := \
 	include
 else
@@ -177,6 +178,7 @@ INCLUDES := \
     src/common/gen-locks \
     src/common/events \
     src/common/security \
+    src/common/lmdb \
     src/client/usrint \
     src/io/trove \
     src/io/bmi \
@@ -210,7 +212,6 @@ LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += @LDFLAGS@
 SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@ @LDAP_LDFLAGS@
-DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
 PICFLAGS = -fPIC
 # Libraries - rt libs tend to depend on other libs so they go first
@@ -364,7 +365,7 @@ endif
 #SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_TROVE_SUPPORT__
 
 SERVERCFLAGS = @CFLAGS@ -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
--D__PVFS2_TROVE_THREADED__ @MISC_TROVE_FLAGS@ @DB_CFLAGS@ \
+-D__PVFS2_TROVE_THREADED__ @MISC_TROVE_FLAGS@ \
 -D__PVFS2_TROVE_SUPPORT__ -D__PVFS2_SERVER__
 
 # server side flow protocol connecting BMI with NCAC cache
@@ -376,7 +377,7 @@ SERVERCFLAGS += @OPENSSL_CPPFLAGS@
 # LDAP support
 SERVERCFLAGS += @LDAP_CPPFLAGS@
 
-SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ @OPENSSL_LIB@ -lm @LDAP_LIB@
+SERVERLIBS = -lpvfs2-server @LIBS@ @OPENSSL_LIB@ -lm @LDAP_LIB@
 
 ifdef NEEDS_LIBRT 
 	SERVERLIBS += -lrt
@@ -903,10 +904,10 @@ $(ADMINTOOLS_SERVER): %: %.o
 	$(Q) "  LD		$@"
 	$(E)$(LD) $< $(LDFLAGS) $(SERVER_LDFLAGS) $(SERVERLIBS) -o $@
 
-# special rules for devel tool objects which also require db components
+# special rules for devel tool objects
 $(DEVELOBJS): %.o: %.c
 	$(Q) "  CC              $@"
-	$(E) $(CC) $(CFLAGS) $(DB_CFLAGS) $(call modcflags,$<) $< -c -o $@
+	$(E) $(CC) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 
 ifdef BUILD_BMI_ONLY
 # rule for building the bmi library
@@ -1023,11 +1024,10 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 	$(Q) "  LD		$@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $< $(VISMISCOBJS) $(LIBS) $(call modldflags,$<)
 
-# rule for building development tools and its objects. don't know why db isn't
-# already in libs.
+# rule for building development tools and its objects.
 $(DEVELTOOLS): %: %.o
 	$(Q) "  LD 		$@"
-	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBS) -ldb $(call modldflags,$<)
+	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBS) $(call modldflags,$<)
 
 ifdef BUILD_JNI
 $(OFS_JNI_JAR): $(JNIJAVA)
@@ -1313,7 +1313,7 @@ nodep:; @:
 # default rule for generating dependency files
 %.d: %.c
 	$(Q) "  DEP		$@"
-	$(E)CC="$(CC)" $(srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(DB_CFLAGS) $(call modcflags,$<) $< > $@
+	$(E)CC="$(CC)" $(srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
 
 # default rules for building documents in .tex format:
 # TODO: these documentation rules are a big hack!

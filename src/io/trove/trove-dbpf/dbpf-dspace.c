@@ -515,14 +515,14 @@ static int remove_one_handle(
     key.len = sizeof(TROVE_handle);
 
     ret = dbpf_db_del(coll_p->ds_db, &key);
-    if (ret == ENOENT)
+    if (ret == TROVE_ENOENT)
     {
         gossip_err("tried to remove non-existant dataspace\n");
     }
     else if (ret != 0)
     {
         gossip_err("TROVE:DBPF:Berkeley DB dbpf_dspace_remove");
-        ret = -trove_errno_to_trove_error(ret);
+        ret = -ret;
         goto return_error;
     }
     else
@@ -644,7 +644,7 @@ int PINT_dbpf_dspace_remove_keyval(
     ret = dbpf_db_cursor_del(dbc);
     if(ret != 0)
     {
-        ret = -trove_errno_to_trove_error(ret);
+        ret = -ret;
     }
     return ret;
 }
@@ -714,7 +714,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     ret = dbpf_db_cursor(op_p->coll_p->ds_db, &dbc);
     if (ret != 0)
     {
-        ret = -trove_errno_to_trove_error(ret);
+        ret = -ret;
         gossip_err("failed to get a cursor\n");
         goto return_error;
     }
@@ -745,13 +745,13 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 
         ret = dbpf_db_cursor_get(dbc, &key, &data, DBPF_DB_CURSOR_SET_RANGE,
             sizeof dummy_handle);
-        if (ret == ENOENT)
+        if (ret == TROVE_ENOENT)
         {
             goto return_ok;
         }
         else if (ret != 0)
         {
-            ret = -trove_errno_to_trove_error(ret);
+            ret = -ret;
             gossip_err("failed to set cursor position at handle: %llu\n",
                        llu(*(TROVE_handle *)op_p->u.d_iterate_handles.position_p));
             goto return_error;
@@ -767,13 +767,13 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 
         ret = dbpf_db_cursor_get(dbc, &key, &data, DBPF_DB_CURSOR_FIRST,
             sizeof(TROVE_handle));
-        if (ret == ENOENT)
+        if (ret == TROVE_ENOENT)
         {
             goto return_ok;
         }
         else if (ret != 0)
         {
-            ret = -trove_errno_to_trove_error(ret);
+            ret = -ret;
             gossip_err("failed to set cursor position at handle: %llu\n",
                        llu(*(TROVE_handle *)op_p->u.d_iterate_handles.position_p));
             goto return_error;
@@ -792,13 +792,13 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     {
         ret = dbpf_db_cursor_get(dbc, &key, &data, DBPF_DB_CURSOR_NEXT,
             sizeof dummy_handle);
-        if(ret == ENOENT)
+        if(ret == TROVE_ENOENT)
         {
             goto return_ok;
         }
         else if(ret < 0)
         {
-            ret = -trove_errno_to_trove_error(ret);
+            ret = -ret;
             gossip_err("c_get failed on iteration %d\n", i);
             goto return_error;
         }
@@ -817,7 +817,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 
     ret = dbpf_db_cursor_get(dbc, &key, &data, DBPF_DB_CURSOR_NEXT,
         sizeof dummy_handle);
-    if (ret == ENOENT)
+    if (ret == TROVE_ENOENT)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- notfound\n");
         goto return_ok;
@@ -826,13 +826,13 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- some other "
                      "failure @ recno\n");
-        ret = -trove_errno_to_trove_error(ret);
+        ret = -ret;
         goto return_error;
     }
     *op_p->u.d_iterate_handles.position_p = dummy_handle;
 
 return_ok:
-    if (ret == ENOENT)
+    if (ret == TROVE_ENOENT)
     {
         /* if off the end of the database, return TROVE_ITERATE_END */
         *op_p->u.d_iterate_handles.position_p = TROVE_ITERATE_END;
@@ -916,7 +916,7 @@ static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
     if (ret)
     {
         /* error in accessing database */
-        ret = -trove_errno_to_trove_error(ret);
+        ret = -ret;
         goto return_error;
     }
 
@@ -1215,7 +1215,7 @@ int dbpf_dspace_attr_set(struct dbpf_collection *coll_p,
     if (ret != 0)
     {
         gossip_err("TROVE:DBPF:Berkeley DB dspace_db->put setattr");
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     /* now that the disk is updated, update the cache if necessary */
@@ -1259,11 +1259,11 @@ int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
     ret = dbpf_db_get(coll_p->ds_db, &key, &data);
     if (ret)
     {
-        if (ret != ENOENT)
+        if (ret != TROVE_ENOENT)
         {
             gossip_err("TROVE:DBPF:Berkeley DB DB->get");
         }
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     gossip_debug(
@@ -1910,10 +1910,10 @@ static int dbpf_dspace_create_store_handle(
                      llu(new_handle));
         return(-TROVE_EEXIST);
     }
-    else if ((ret != ENOENT))
+    else if ((ret != TROVE_ENOENT))
     {
         gossip_err("error in dspace create (db_p->get failed).\n");
-        ret = -trove_errno_to_trove_error(ret);
+        ret = -ret;
         return(ret);
     }
     
@@ -1956,7 +1956,7 @@ static int dbpf_dspace_create_store_handle(
     if (ret != 0)
     {
         gossip_err("error in dspace create (db_p->put failed).\n");
-        ret = -trove_errno_to_trove_error(ret);
+        ret = -ret;
         return(ret);
     }
 

@@ -41,7 +41,7 @@ static int dbpf_sync_db(
     {
         gossip_err("db SYNC failed: %s\n",
                    strerror(ret));
-        ret = -trove_errno_to_trove_error(ret);
+        ret = -ret;
         return ret;
     }
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,

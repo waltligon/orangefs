@@ -293,14 +293,14 @@ int dbpf_collection_seteattr(TROVE_coll_id coll_id,
     if (ret != 0)
     {
         gossip_lerr("dbpf_collection_seteattr: %s\n", strerror(ret));
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     ret = dbpf_db_sync(coll_p->coll_attr_db);
     if (ret != 0)
     {
         gossip_lerr("dbpf_collection_seteattr: %s\n", strerror(ret));
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     return 1;
@@ -339,7 +339,7 @@ int dbpf_collection_geteattr(TROVE_coll_id coll_id,
     {
         gossip_debug(GOSSIP_TROVE_DEBUG,
             "dbpf_collection_geteattr: %s\n", strerror(ret));
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     val_p->read_sz = data.len;
@@ -376,14 +376,14 @@ int dbpf_collection_deleattr(TROVE_coll_id coll_id,
     if (ret != 0)
     {
         gossip_lerr("%s: %s\n", __func__, strerror(ret));
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     ret = dbpf_db_sync(coll_p->coll_attr_db);
     if (ret != 0)
     {
         gossip_lerr("%s: %s\n", __func__, strerror(ret));
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     return 1;
@@ -643,14 +643,14 @@ int dbpf_finalize(void)
             if (ret)
             {
                 gossip_err("dbpf_finalize attr sync: %s\n", strerror(ret));
-                return -trove_errno_to_trove_error(ret);
+                return -ret;
             }
 
             ret = dbpf_db_close(my_storage_p->sto_attr_db);
             if (ret)
             {
                 gossip_err("dbpf_finalize attr close: %s\n", strerror(ret));
-                return -trove_errno_to_trove_error(ret);
+                return -ret;
             }
         }
         else
@@ -665,7 +665,7 @@ int dbpf_finalize(void)
             {
                 gossip_err("dbpf_finalize collection sync: %s\n", 
                            strerror(ret));
-                return -trove_errno_to_trove_error(ret);
+                return -ret;
             }
     
             ret = dbpf_db_close(my_storage_p->coll_db);
@@ -673,7 +673,7 @@ int dbpf_finalize(void)
             {
                 gossip_err("dbpf_finalize collection close: %s\n", 
                            strerror(ret));
-                return -trove_errno_to_trove_error(ret);
+                return -ret;
             }
         }
         else
@@ -839,12 +839,12 @@ int dbpf_collection_create(char *collname,
 
     /* ensure that the collection record isn't already there */
     ret = dbpf_db_get(sto_p->coll_db, &key, &data);
-    if (ret != ENOENT)
+    if (ret != TROVE_ENOENT)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "coll %s already exists with "
                      "coll_id %d, len = %zu.\n",
                      collname, db_data.coll_id, data.len);
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     memset(&db_data, 0, sizeof(db_data));
@@ -859,14 +859,14 @@ int dbpf_collection_create(char *collname,
     if (ret)
     {
         gossip_err("dbpf_collection_create: %s\n", strerror(ret));
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     ret = dbpf_db_sync(sto_p->coll_db);
     if (ret)
     {
         gossip_err("dbpf_collection_create: %s\n", strerror(ret));
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     DBPF_GET_DATA_DIRNAME(path_name, PATH_MAX, sto_p->data_path);
@@ -962,7 +962,7 @@ int dbpf_collection_create(char *collname,
     {
         gossip_err("db_p->put failed writing trove-dbpf version "
                    "string: %s\n", strerror(ret));
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     gossip_debug(
@@ -980,7 +980,7 @@ int dbpf_collection_create(char *collname,
     {
         gossip_err("db_p->put failed writing initial handle value: %s\n",
                    strerror(ret));
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
     dbpf_db_sync(db_p);
     dbpf_db_close(db_p);
@@ -1090,21 +1090,21 @@ int dbpf_collection_remove(char *collname,
     if (ret != 0)
     {
         gossip_err("TROVE:DBPF:Berkeley DB DB->get collection");
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     ret = dbpf_db_del(sto_p->coll_db, &key);
     if (ret != 0)
     {
         gossip_err("TROVE:DBPF:Berkeley DB DB->del");
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     ret = dbpf_db_sync(sto_p->coll_db);
     if (ret != 0)
     {
         gossip_err("TROVE:DBPF:Berkeley DB DB->sync");
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     if ((db_collection = dbpf_collection_find_registered(db_data.coll_id)) == NULL) {
@@ -1273,7 +1273,7 @@ int dbpf_collection_iterate(TROVE_keyval_s *name_array,
     ret = dbpf_db_cursor(my_storage_p->coll_db, &dbc);
     if (ret != 0)
     {
-        ret = -trove_errno_to_trove_error(ret);
+        ret = -ret;
         goto return_error;
     }
 
@@ -1287,13 +1287,13 @@ int dbpf_collection_iterate(TROVE_keyval_s *name_array,
 
         ret = dbpf_db_cursor_get(dbc, &key, &data, DBPF_DB_CURSOR_NEXT,
             name_array[i].buffer_sz);
-        if (ret == ENOENT)
+        if (ret == TROVE_ENOENT)
         {
             goto return_ok;
         }
         else if (ret != 0)
         {
-            ret = -trove_errno_to_trove_error(ret);
+            ret = -ret;
             goto return_error;
         }
         coll_id_array[i] = db_entry.coll_id;
@@ -1305,7 +1305,7 @@ return_ok:
     ret = dbpf_db_cursor_close(dbc);
     if (ret != 0)
     {
-        ret = -trove_errno_to_trove_error(ret);
+        ret = -ret;
         goto return_error;
     }
     return 1;
@@ -1438,12 +1438,12 @@ int dbpf_collection_lookup(char *collname,
     ret = dbpf_db_get(my_storage_p->coll_db, &key, &data);
     if (ret != 0)
     {
-        if (ret != ENOENT)
+        if (ret != TROVE_ENOENT)
         {
             gossip_err("TROVE:DBPF:Berkeley DB DB->get collection");
             gossip_debug(GOSSIP_TROVE_DEBUG, "lookup got error (%d)\n", ret);
         }
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     /*
@@ -1530,7 +1530,7 @@ int dbpf_collection_lookup(char *collname,
         free(coll_p->data_path);
         free(coll_p->name);
         free(coll_p);
-        return -trove_errno_to_trove_error(ret);
+        return -ret;
     }
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "collection lookup: version is "
@@ -1843,12 +1843,12 @@ static int dbpf_db_create(char *dbname)
     r = dbpf_db_open(dbname, 0, 0, &db, 1);
     if (r)
     {
-        return -trove_errno_to_trove_error(r);
+        return -r;
     }
     r = dbpf_db_close(db);
     if (r)
     {
-        return -trove_errno_to_trove_error(r);
+        return -r;
     }
     return 0;
 }

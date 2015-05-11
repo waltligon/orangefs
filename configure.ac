@@ -254,12 +254,10 @@ AC_ARG_ENABLE(server,
 [  --disable-server        Disables building of PVFS2 server],
 [if test "x$enableval" = "xyes" ; then
     BUILD_SERVER=1
-    NEED_BERKELEY_DB=yes
 else
     BUILD_SERVER=""
 fi],
-    BUILD_SERVER=1
-    NEED_BERKELEY_DB=yes)
+    BUILD_SERVER=1)
 AC_SUBST(BUILD_SERVER)
 
 dnl locate OpenSSL libraries
@@ -409,9 +407,7 @@ AC_SUBST(BUILD_BMI_ONLY)
 dnl if we're only building the BMI lib, disable checks for server and DB.
 if test "x$BUILD_BMI_ONLY" = "x1"; then
 	BUILD_SERVER=""
-	NEED_BERKELEY_DB=no
 	AC_SUBST(BUILD_SERVER)
-	AC_SUBST(NEED_BERKELEY_DB)
 fi
 
 dnl a mechanism to turn off perf counters
@@ -698,12 +694,6 @@ AC_ARG_WITH(mtrace,
 [  --with-mtrace           Use mtrace (must set MALLOC_TRACE to output file)],
 CFLAGS="$CFLAGS -include mcheck.h"
 AC_DEFINE(WITH_MTRACE, 1, Define if mtrace memory leak detection was enabled)
-)
-
-dnl This particular one enables berkeley db to emit detected errors
-AC_ARG_WITH(berkdb-debug,
-[  --with-berkdb-debug     Use berkeley db error reporting (if detected).],
-AC_DEFINE(BERKDB_ERROR_REPORTING, 1, Define if berkeley db error reporting was enabled)
 )
 
 TAU_INCS=
@@ -1421,18 +1411,6 @@ AC_ARG_WITH(valgrind,
     fi
 ])
 
-if test "x$NEED_BERKELEY_DB" = "xyes" ; then
-    dnl
-    dnl make sure that required db development package is installed
-    dnl and valid; path can be specified at configure time
-    dnl
-    AC_ARG_WITH(db,
-           [  --with-db=<dir>         Location of installed DB package (default=/usr)],
-    	   [AX_BERKELEY_DB(${withval})],
-	   [AX_BERKELEY_DB("")])
-fi
-dnl end of NEED_BERKELEY_DB section
-
 if test "x$BUILD_SERVER" = "x1"; then
 	dnl check if -lrt is required
 	AX_CHECK_NEEDS_LIBRT
@@ -1831,6 +1809,7 @@ AC_OUTPUT(include/pvfs2.h
 Makefile
 module.mk
 src/apps/admin/module.mk
+src/apps/admin/lmdb/module.mk
 src/apps/admin/pvfs2-config
 src/apps/devel/module.mk
 src/apps/karma/module.mk
@@ -1856,6 +1835,7 @@ src/common/mgmt/module.mk
 src/common/security/module.mk
 src/common/hash/module.mk
 src/common/token-utils/module.mk
+src/common/lmdb/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
@@ -2101,13 +2081,6 @@ if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
 		    times on the fast interface.  Suggest you configure with
 		    "--without-bmi-tcp" for the best performance.])
     fi
-fi
-
-if test x$HAVE_DB_OLD = x1; then
-    AC_MSG_WARN([The detected version of Berkeley DB is not at least 4.8.30.
-                    Metadata corruption has been documented in versions prior 
-                    to 4.8.30. It is highly recommended that you update the 
-                    version of Berkeley DB you are building against.])
 fi
 
 AC_MSG_RESULT()

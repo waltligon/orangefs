@@ -10,54 +10,52 @@
 
 #include <gossip.h>
 
-#include <db.h>
+#include <lmdb.h>
 
 #include "dbpf.h"
 
 struct dbpf_db {
-    DB *db;
+    MDB_env *env;
+    MDB_dbi dbi;
 };
 
 struct dbpf_cursor {
-    DBC *dbc;
+    MDB_cursor *cursor;
+    MDB_txn *txn;
 };
 
-static PVFS_error db_error(int db_error_value)
+static int db_error(int e)
 {
     /* values greater than zero are errno values */
-    if (db_error_value > 0)
+    if (e > 0)
     {
-        return trove_errno_to_trove_error(db_error_value);
+        /* XXX: no need to pass return of this function into
+         * here as almost all of the code does. */
+        return trove_errno_to_trove_error(e);
     }
-
-    switch (db_error_value)
+    else if (!e)
     {
-        case 0:
-            return 0;
-        case DB_NOTFOUND:
-        case DB_KEYEMPTY:
-            return ENOENT;
-        case DB_KEYEXIST:
-            return EEXIST;
-        case DB_LOCK_DEADLOCK:
-            return EDEADLK;
-        case DB_LOCK_NOTGRANTED:
-            return ENOLCK;
-        case DB_RUNRECOVERY:
-            gossip_err("Error: DB_RUNRECOVERY encountered.\n");
-            return EIO;
-        case DB_BUFFER_SMALL:
-            return ERANGE;
+        return 0;
     }
-    return DBPF_ERROR_UNKNOWN; /* return some identifiable value */
+    switch (e)
+    {
+    case MDB_NOTFOUND:
+        return TROVE_ENOENT;
+    }
+    return DBPF_ERROR_UNKNOWN;
 }
 
-static int ds_attr_compare(DB *dbp, const DBT *a, const DBT *b)
+static int ds_attr_compare(const MDB_val *a, const MDB_val *b)
 {
     TROVE_handle handle_a, handle_b;
-
-    memcpy(&handle_a, a->data, sizeof(TROVE_handle));
-    memcpy(&handle_b, b->data, sizeof(TROVE_handle));
+    if (a->mv_size < sizeof handle_a ||
+        b->mv_size < sizeof handle_b)
+    {
+        gossip_err("inconsistency in ds_attr_compare: size too small\n");
+        abort();
+    }
+    memcpy(&handle_a, a->mv_data, sizeof handle_a);
+    memcpy(&handle_b, b->mv_data, sizeof handle_b);
 
     if (handle_a == handle_b)
     {
@@ -66,157 +64,257 @@ static int ds_attr_compare(DB *dbp, const DBT *a, const DBT *b)
     return (handle_a > handle_b) ? -1 : 1;
 }
 
-static int keyval_compare(DB *dbp, const DBT *a, const DBT *b)
+static int keyval_compare(const MDB_val *a, const MDB_val *b)
 {
     struct dbpf_keyval_db_entry db_entry_a, db_entry_b;
-
-    memcpy(&db_entry_a, a->data, sizeof(struct dbpf_keyval_db_entry));
-    memcpy(&db_entry_b, b->data, sizeof(struct dbpf_keyval_db_entry));
+    if (sizeof db_entry_a < a->mv_size ||
+        sizeof db_entry_b < b->mv_size)
+    {
+        gossip_err("inconsistency in keyval_compare: size too small\n");
+        abort();
+    }
+    memcpy(&db_entry_a, a->mv_data, a->mv_size);
+    memcpy(&db_entry_b, b->mv_data, b->mv_size);
 
     if (db_entry_a.handle != db_entry_b.handle)
     {
         return (db_entry_a.handle < db_entry_b.handle) ? -1 : 1;
     }
-
     if (db_entry_a.type != db_entry_b.type)
     {
         return (db_entry_a.type < db_entry_b.type) ? -1 : 1;
     }
-
-    if (a->size > b->size)
+    if (a->mv_size > b->mv_size)
     {
         return 1;
     }
-    else if (a->size < b->size)
+    else if (a->mv_size < b->mv_size)
     {
         return -1;
     }
     /* else must be equal */
     return (memcmp(db_entry_a.key, db_entry_b.key,
-        DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->size)));
+        DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->mv_size)));
 }
 
 int dbpf_db_open(char *name, int flags, int compare, struct dbpf_db **db,
     int create)
 {
+    MDB_txn *txn;
     int r;
+
     *db = malloc(sizeof **db);
     if (!*db)
     {
-        return errno;
+        return db_error(errno);
     }
-    r = db_create(&(*db)->db, NULL, 0);
+
+    r = mdb_env_create(&(*db)->env);
     if (r)
     {
+        mdb_env_close((*db)->env);
         free(*db);
         return db_error(r);
     }
- 
-    r = (*db)->db->set_flags((*db)->db, flags);
+
+    if (create)
+    {
+        r = mkdir(name, TROVE_DB_MODE|S_IXUSR|S_IXGRP|S_IXOTH);
+        if (r)
+        {
+            mdb_env_close((*db)->env);
+            free(*db);
+            return db_error(errno);
+        }
+    }
+    r = mdb_env_open((*db)->env, name, 0, TROVE_DB_MODE);
     if (r)
     {
-        gossip_err("TROVE:DBPF:Berkeley DB %s failed to set_flags", name);
-        (*db)->db->close((*db)->db, 0);
+        mdb_env_close((*db)->env);
         free(*db);
         return db_error(r);
     }
+
+    r = mdb_txn_begin((*db)->env, NULL, MDB_RDONLY, &txn);
+    if (r)
+    {
+        mdb_env_close((*db)->env);
+        free(*db);
+        return db_error(r);
+    }
+
+    r = mdb_dbi_open(txn, NULL, create ? MDB_CREATE : 0, &(*db)->dbi);
+    if (r)
+    {
+        mdb_txn_abort(txn);
+        mdb_env_close((*db)->env);
+        free(*db);
+        return db_error(r);
+    }
+
     if (compare == DBPF_DB_COMPARE_DS_ATTR)
     {
-        (*db)->db->set_bt_compare((*db)->db, ds_attr_compare);
+        r = mdb_set_compare(txn, (*db)->dbi, ds_attr_compare);
     }
     else if (compare == DBPF_DB_COMPARE_KEYVAL)
     {
-        (*db)->db->set_bt_compare((*db)->db, keyval_compare);
+        r = mdb_set_compare(txn, (*db)->dbi, keyval_compare);
     }
-    r = (*db)->db->open((*db)->db, NULL, name, NULL, DB_BTREE,
-        create ? DB_CREATE : 0, 0);
     if (r)
     {
-        gossip_err("TROVE:DBPF:Berkeley DB %s failed to open", name);
-        (*db)->db->close((*db)->db, 0);
+        mdb_txn_abort(txn);
+        mdb_env_close((*db)->env);
         free(*db);
         return db_error(r);
     }
+
+    r = mdb_txn_commit(txn);
+    if (r)
+    {
+        mdb_env_close((*db)->env);
+        free(*db);
+        return db_error(errno);
+    }
+
     return 0;
 }
 
 int dbpf_db_close(struct dbpf_db *db)
 {
-    int r;
-    r = db->db->close(db->db, 0);
+    mdb_env_close(db->env);
     free(db);
-    return db_error(r);
+    return 0;
 }
 
 int dbpf_db_sync(struct dbpf_db *db)
 {
-    return db_error(db->db->sync(db->db, 0));
+    return db_error(mdb_env_sync(db->env, 0));
 }
 
 int dbpf_db_get(struct dbpf_db *db, struct dbpf_data *key,
     struct dbpf_data *val)
 {
-    DBT db_key, db_data;
+    MDB_val db_key, db_data;
+    MDB_txn *txn;
     int r;
-    db_key.data = key->data;
-    db_key.ulen = db_key.size = key->len;
-    db_key.flags = DB_DBT_USERMEM;
-    db_data.data = val->data;
-    db_data.ulen = val->len;
-    db_data.flags = DB_DBT_USERMEM;
-    r = db->db->get(db->db, NULL, &db_key, &db_data, 0);
-    if (r == DB_BUFFER_SMALL)
-    {
-        val->len = db_data.size;
-        return db_error(r);
-    }
-    else if (r)
+
+    db_key.mv_size = key->len;
+    db_key.mv_data = key->data;
+
+    r = mdb_txn_begin(db->env, NULL, MDB_RDONLY, &txn);
+    if (r)
     {
         return db_error(r);
     }
-    if (val->len < db_data.size)
+    r = mdb_get(txn, db->dbi, &db_key, &db_data);
+    if (r)
     {
-        val->len = db_data.size;
-        return ERANGE;
+        mdb_txn_abort(txn);
+        return db_error(r);
     }
-    val->len = db_data.size;
+    r = mdb_txn_commit(txn);
+    if (r)
+    {
+        return db_error(r);
+    }
+
+    if (db_data.mv_size > val->len)
+    {
+        return db_error(ERANGE);
+    }
+    memcpy(val->data, db_data.mv_data, db_data.mv_size);
+    val->len = db_data.mv_size;
     return 0;
 }
 
 int dbpf_db_put(struct dbpf_db *db, struct dbpf_data *key,
     struct dbpf_data *val)
 {
-    DBT db_key, db_data;
-    db_key.data = key->data;
-    db_key.ulen = db_key.size = key->len;
-    db_key.flags = DB_DBT_USERMEM;
-    db_data.data = val->data;
-    db_data.ulen = db_data.size = val->len;
-    db_data.flags = DB_DBT_USERMEM;
-    return db_error(db->db->put(db->db, NULL, &db_key, &db_data, 0));
+    MDB_val db_key, db_data;
+    MDB_txn *txn;
+    int r;
+
+    db_key.mv_size = key->len;
+    db_key.mv_data = key->data;
+    db_data.mv_size = val->len;
+    db_data.mv_data = val->data;
+
+    r = mdb_txn_begin(db->env, NULL, 0, &txn);
+    if (r)
+    {
+        return db_error(r);
+    }
+    r = mdb_put(txn, db->dbi, &db_key, &db_data, 0);
+    if (r)
+    {
+        mdb_txn_abort(txn);
+        return db_error(r);
+    }
+    r = mdb_txn_commit(txn);
+    if (r)
+    {
+        return db_error(r);
+    }
+    return 0;
 }
 
 int dbpf_db_putonce(struct dbpf_db *db, struct dbpf_data *key,
     struct dbpf_data *val)
 {
-    DBT db_key, db_data;
-    db_key.data = key->data;
-    db_key.ulen = db_key.size = key->len;
-    db_key.flags = DB_DBT_USERMEM;
-    db_data.data = val->data;
-    db_data.ulen = db_data.size = val->len;
-    db_data.flags = DB_DBT_USERMEM;
-    return db_error(db->db->put(db->db, NULL, &db_key, &db_data,
-        DB_NOOVERWRITE));
+    MDB_val db_key, db_data;
+    MDB_txn *txn;
+    int r;
+
+    db_key.mv_size = key->len;
+    db_key.mv_data = key->data;
+    db_data.mv_size = val->len;
+    db_data.mv_data = val->data;
+
+    r = mdb_txn_begin(db->env, NULL, 0, &txn);
+    if (r)
+    {
+        return db_error(r);
+    }
+    r = mdb_put(txn, db->dbi, &db_key, &db_data, MDB_NOOVERWRITE);
+    if (r)
+    {
+        mdb_txn_abort(txn);
+        return db_error(r);
+    }
+    r = mdb_txn_commit(txn);
+    if (r)
+    {
+        return db_error(r);
+    }
+    return 0;
 }
 
 int dbpf_db_del(struct dbpf_db *db, struct dbpf_data *key)
 {
-    DBT db_key;
-    db_key.data = key->data;
-    db_key.ulen = db_key.size = key->len;
-    db_key.flags = DB_DBT_USERMEM;
-    return db_error(db->db->del(db->db, NULL, &db_key, 0));
+    MDB_val db_key;
+    MDB_txn *txn;
+    int r;
+
+    db_key.mv_size = key->len;
+    db_key.mv_data = key->data;
+
+    r = mdb_txn_begin(db->env, NULL, 0, &txn);
+    if (r)
+    {
+        return db_error(r);
+    }
+    r = mdb_del(txn, db->dbi, &db_key, NULL);
+    if (r)
+    {
+        mdb_txn_abort(txn);
+        return db_error(r);
+    }
+    r = mdb_txn_commit(txn);
+    if (r)
+    {
+        return db_error(r);
+    }
+    return 0;
 }
 
 int dbpf_db_cursor(struct dbpf_db *db, struct dbpf_cursor **dbc)
@@ -225,11 +323,19 @@ int dbpf_db_cursor(struct dbpf_db *db, struct dbpf_cursor **dbc)
     *dbc = malloc(sizeof **dbc);
     if (!*dbc)
     {
-        return errno;
+        return db_error(errno);
     }
-    r = db->db->cursor(db->db, NULL, &(*dbc)->dbc, 0);
+
+    r = mdb_txn_begin(db->env, NULL, 0, &(*dbc)->txn);
     if (r)
     {
+        free(*dbc);
+        return db_error(r);
+    }
+    r = mdb_cursor_open((*dbc)->txn, db->dbi, &(*dbc)->cursor);
+    if (r)
+    {
+        mdb_txn_abort((*dbc)->txn);
         free(*dbc);
         return db_error(r);
     }
@@ -239,72 +345,65 @@ int dbpf_db_cursor(struct dbpf_db *db, struct dbpf_cursor **dbc)
 int dbpf_db_cursor_close(struct dbpf_cursor *dbc)
 {
     int r;
-    r = dbc->dbc->c_close(dbc->dbc);
+    mdb_cursor_close(dbc->cursor);
+    r = mdb_txn_commit(dbc->txn);
+    if (r)
+    {
+        free(dbc);
+        return db_error(r);
+    }
     free(dbc);
-    return db_error(r);
+    return 0;
 }
 
 int dbpf_db_cursor_get(struct dbpf_cursor *dbc, struct dbpf_data *key,
     struct dbpf_data *val, int op, size_t maxkeylen)
 {
-    DBT db_key, db_data;
-    int r, flags;
-    db_key.data = key->data;
-    db_key.size = key->len;
-    db_key.ulen = maxkeylen;
-    db_key.flags = DB_DBT_USERMEM;
-    db_data.data = val->data;
-    db_data.ulen = val->len;
-    db_data.flags = DB_DBT_USERMEM;
-    if (op == DBPF_DB_CURSOR_NEXT)
-    {
-        flags = DB_NEXT;
+    MDB_val db_key, db_data;
+    int db_op, r;
+    switch (op) {
+    case DBPF_DB_CURSOR_NEXT:
+        db_op = MDB_NEXT;
+        break;
+    case DBPF_DB_CURSOR_CURRENT:
+        db_op = MDB_GET_CURRENT;
+        break;
+    case DBPF_DB_CURSOR_SET:
+        db_key.mv_size = key->len;
+        db_key.mv_data = key->data;
+        db_op = MDB_SET_KEY;
+        break;
+    case DBPF_DB_CURSOR_SET_RANGE:
+        db_key.mv_size = key->len;
+        db_key.mv_data = key->data;
+        db_op = MDB_SET_RANGE;
+        break;
+    case DBPF_DB_CURSOR_FIRST:
+        db_op = MDB_FIRST;
+        break;
     }
-    else if (op == DBPF_DB_CURSOR_CURRENT)
-    {
-        flags = DB_CURRENT;
-    }
-    else if (op == DBPF_DB_CURSOR_SET)
-    {
-        flags = DB_SET;
-    }
-    else if (op == DBPF_DB_CURSOR_SET_RANGE)
-    {
-        flags = DB_SET_RANGE;
-    }
-    else if (op == DBPF_DB_CURSOR_FIRST)
-    {
-        flags = DB_FIRST;
-    }
-    r = dbc->dbc->c_get(dbc->dbc, &db_key, &db_data, flags);
-    if (r == DB_BUFFER_SMALL)
-    {
-        key->len = db_key.size;
-        val->len = db_data.size;
-        return db_error(r);
-    }
-    else if (r)
+    r = mdb_cursor_get(dbc->cursor, &db_key, &db_data, db_op);
+    if (r)
     {
         return db_error(r);
     }
-    if (key->len < db_key.size)
+
+    if (db_key.mv_size > maxkeylen)
     {
-        key->len = db_key.size;
-        val->len = db_data.size;
-        return ERANGE;
+        return db_error(ERANGE);
     }
-    if (val->len < db_data.size)
+    memcpy(key->data, db_key.mv_data, db_key.mv_size);
+    key->len = db_key.mv_size;
+    if (db_data.mv_size > val->len)
     {
-        key->len = db_key.size;
-        val->len = db_data.size;
-        return ERANGE;
+        return db_error(ERANGE);
     }
-    key->len = db_key.size;
-    val->len = db_data.size;
+    memcpy(val->data, db_data.mv_data, db_data.mv_size);
+    val->len = db_data.mv_size;
     return 0;
 }
 
 int dbpf_db_cursor_del(struct dbpf_cursor *dbc)
 {
-    return db_error(dbc->dbc->c_del(dbc->dbc, 0));
+    return db_error(mdb_cursor_del(dbc->cursor, 0));
 }
