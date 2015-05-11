@@ -161,11 +161,14 @@ static PINT_sm_action perf_mon_do_work(struct PINT_smcb *smcb,
 
     /* fill in some of the response */
     s_op->resp.u.mgmt_perf_mon.cur_time_ms = PINT_util_get_time_ms();
+
     s_op->resp.u.mgmt_perf_mon.suggested_next_id =
-                    s_op->req->u.mgmt_perf_mon.next_id;
+                                         s_op->req->u.mgmt_perf_mon.next_id;
+
     s_op->resp.u.mgmt_perf_mon.key_count = key_count;
-    s_op->resp.u.mgmt_perf_mon.perf_array_count =
-                    (key_count + 2) * sample_count;
+
+    s_op->resp.u.mgmt_perf_mon.perf_array_count = (key_count + 2) *
+                                                  sample_count;
 
     /* make sure we have scratch memory to use as an intermediate
      * buffer for performance counters
@@ -208,8 +211,8 @@ static PINT_sm_action perf_mon_do_work(struct PINT_smcb *smcb,
          * 3) if the start time has rolled over within MAX_NEXT_ID
          */
         if(tmp_next_id != 0 &&
-                ((tmp_next_id >= s_op->req->u.mgmt_perf_mon.next_id) ||
-                ((s_op->req->u.mgmt_perf_mon.next_id - tmp_next_id) >
+           ((tmp_next_id >= s_op->req->u.mgmt_perf_mon.next_id) ||
+            ((s_op->req->u.mgmt_perf_mon.next_id - tmp_next_id) >
                 (MAX_NEXT_ID / 2))))
         {
             /* found oldest valid sample */
@@ -225,6 +228,8 @@ static PINT_sm_action perf_mon_do_work(struct PINT_smcb *smcb,
             memcpy(&SOP_PERF_SAMP(valid_count),
                     &STATIC_SAMP(i),
                     key_count * sizeof(int64_t));
+
+            /* timestamp */
             memcpy(&SOP_PERF_TIME(valid_count),
                     &STATIC_TIME(i),
                     2 * sizeof(int64_t));
@@ -241,6 +246,8 @@ static PINT_sm_action perf_mon_do_work(struct PINT_smcb *smcb,
             memcpy(&SOP_PERF_SAMP(valid_count),
                     &STATIC_SAMP(0),
                     key_count * sizeof(int64_t));
+
+            /* timestamp */
             memcpy(&SOP_PERF_TIME(valid_count),
                     &STATIC_TIME(0),
                     2 * sizeof(int64_t));
@@ -253,7 +260,9 @@ static PINT_sm_action perf_mon_do_work(struct PINT_smcb *smcb,
     if(valid_count > 0)
     {
         s_op->resp.u.mgmt_perf_mon.end_time_ms = 
-                    SOP_PERF_TIME(valid_count-1) + SOP_PERF_INTV(valid_count-1);
+                                 SOP_PERF_TIME(valid_count - 1) +
+                                 SOP_PERF_INTV(valid_count - 1);
+
         s_op->resp.u.mgmt_perf_mon.suggested_next_id = 
                     (SOP_PERF_TIME(valid_count-1) + 1) % MAX_NEXT_ID;
     }
@@ -312,8 +321,9 @@ static int reallocate_static_arrays_if_needed(void)
         {
             free(static_value_array);
         }
-        static_value_array = (int64_t *)
-                malloc(history_size * (key_count + 2) * sizeof(int64_t));
+        static_value_array = (int64_t *)malloc(history_size * 
+                                              (key_count + 2) * 
+                                              sizeof(int64_t));
         if(!static_value_array)
         {
             return(-PVFS_ENOMEM);

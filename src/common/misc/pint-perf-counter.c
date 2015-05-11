@@ -189,8 +189,7 @@ struct PINT_perf_counter *PINT_perf_initialize(struct PINT_perf_key *key_array)
  * resets all counters within a perf counter instance, except for those that
  * have the PRESERVE bit set
  */
-void PINT_perf_reset(
-    struct PINT_perf_counter* pc)
+void PINT_perf_reset(struct PINT_perf_counter* pc)
 {
     int i;
     struct PINT_perf_sample *s;
