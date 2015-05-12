@@ -127,7 +127,7 @@ int dbpf_db_open(char *name, int flags, int compare, struct dbpf_db **db,
             return db_error(errno);
         }
     }
-    r = mdb_env_open((*db)->env, name, 0, TROVE_DB_MODE);
+    r = mdb_env_open((*db)->env, name, MDB_NOSYNC, TROVE_DB_MODE);
     if (r)
     {
         mdb_env_close((*db)->env);
