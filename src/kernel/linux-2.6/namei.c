@@ -217,6 +217,20 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
                          "pvfs2_lookup: Adding *negative* dentry %p\n for %s\n",
                          dentry, dentry->d_name.name);
 
+           /*
+            * set the pvfs2 specific dentry operations pointer for
+            * the negative dentry that we're adding now so that
+            * a potential future lookup of this cached negative
+            * dentry can be properly revalidated.
+            */
+            if (!dentry->d_op) {
+#ifdef HAVE_D_SET_D_OP
+              d_set_d_op(dentry, &pvfs2_dentry_operations);
+#else
+              dentry->d_op = &pvfs2_dentry_operations;
+#endif
+            }
+
             d_add(dentry, inode);
 
             res = NULL;

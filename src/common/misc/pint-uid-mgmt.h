@@ -20,16 +20,18 @@ typedef struct
         {
         PVFS_uid uid;
         uint64_t count;
+        struct timeval tv0;
         struct timeval tv;
         } PVFS_uid_info_s;
 endecode_fields_2_struct(
         timeval,
         uint64_t, tv_sec,
         uint32_t, tv_usec);
-endecode_fields_3(
+endecode_fields_4(
         PVFS_uid_info_s,
         PVFS_uid, uid,
         uint64_t, count,
+        timeval, tv0,
         timeval, tv);
 
 /* our uid management structure */

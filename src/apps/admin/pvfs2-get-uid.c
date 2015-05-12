@@ -10,7 +10,7 @@
 #include "pint-cached-config.h"
 
 #define UID_HISTORY_MAX_SECS 4294967295UL /* max uint32_t val */
-#define UID_SERV_LIST_SIZE 25           /* maximum servers to get stats from */
+#define UID_SERV_LIST_SIZE 64            /* maximum servers to get stats from */
 
 struct options
 {
@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
     PVFS_BMI_addr_t *addr_array, server_addr;
     PVFS_uid_info_s **uid_info_array;
     uint32_t *uid_info_count;
-    char uid_timestamp[64], curTime[64];
+    char uid_timestamp0[64], uid_timestamp[64], curTime[64];
     struct options *prog_opts = NULL;
     int ret = 0;
     int i, j;
@@ -186,10 +186,13 @@ int main(int argc, char *argv[])
         for (j = 0; j < uid_info_count[i]; j++)
         {
 
+            PINT_util_parse_timeval(uid_info_array[i][j].tv0, uid_timestamp0);
             PINT_util_parse_timeval(uid_info_array[i][j].tv, uid_timestamp);
-            printf("\tUID: %-10u\tcount: %-10llu\t%s\n", uid_info_array[i][j].uid,
+            printf("\tUID: %-10u\tcount: %-10llu\t%s\t%s\n",
+                   uid_info_array[i][j].uid,
                    (long long unsigned int)uid_info_array[i][j].count,
-                    uid_timestamp);
+                   uid_timestamp0,
+                   uid_timestamp);
         }
         printf("\n");
     }

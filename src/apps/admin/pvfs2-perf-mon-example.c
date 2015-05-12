@@ -27,7 +27,7 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-#define MAX_KEY_CNT 4;
+#define MAX_KEY_CNT 18
 /* macros for accessing data returned from server */
 #define VALID_FLAG(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + key_cnt] != 0.0)
 #define ID(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + key_cnt])
@@ -36,14 +36,45 @@
 #define WRITE(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 1])
 #define METADATA_READ(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 2])
 #define METADATA_WRITE(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 3])
+#define DSPACE_OPS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 4])
+#define KEYVAL_OPS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 5])
+#define SCHEDULE(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 6])
+#define REQUESTS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 7])
+#define SMALL_READS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 8])
+#define SMALL_WRITES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 9])
+#define FLOW_READS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 10])
+#define FLOW_WRITES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 11])
+#define CREATES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 12])
+#define REMOVES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 13])
+#define MKDIRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 14])
+#define RMDIRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 15])
+#define GETATTRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 16])
+#define SETATTRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 17])
 
 int key_cnt; /* holds the Number of keys */
+
+#define PRINT_COUNTER(s, c) \
+do { \
+    int j; \
+    printf(s); \
+    for(j = 0; j < user_opts->history; j++) \
+    { \
+        if (!VALID_FLAG(i, j)) \
+        { \
+            printf("\tXXXX"); \
+            continue; \
+        } \
+        printf("\t%llu", llu(c)); \
+    } \
+} while(0);
 
 
 struct options
 {
     char* mnt_point;
     int mnt_point_set;
+    int history;
+    int keys;
 };
 
 static struct options* parse_args(int argc, char* argv[]);
@@ -55,7 +86,7 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    int i,j;
+    int i, j;
     PVFS_credential cred;
     int io_server_count;
     int64_t** perf_matrix;
@@ -74,6 +105,11 @@ int main(int argc, char **argv)
 	usage(argc, argv);
 	return(-1);
     }
+    if (user_opts->history == 0)
+    {
+        user_opts->history = HISTORY;
+    }
+    printf("\nhistory: %d\n", user_opts->history);
 
     ret = PVFS_util_init_defaults();
     if(ret < 0)
@@ -84,7 +120,9 @@ int main(int argc, char **argv)
 
     /* translate local path into pvfs2 relative path */
     ret = PVFS_util_resolve(user_opts->mnt_point,
-        &cur_fs, pvfs_path, PVFS_NAME_MAX);
+                            &cur_fs,
+                            pvfs_path,
+                            PVFS_NAME_MAX);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_util_resolve", ret);
@@ -99,8 +137,9 @@ int main(int argc, char **argv)
     }
 
     /* count how many I/O servers we have */
-    ret = PVFS_mgmt_count_servers(cur_fs, PVFS_MGMT_IO_SERVER,
-	&io_server_count);
+    ret = PVFS_mgmt_count_servers(cur_fs,
+                                  PVFS_MGMT_IO_SERVER,
+	                          &io_server_count);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers", ret);
@@ -108,15 +147,17 @@ int main(int argc, char **argv)
     }
 
     /* allocate a 2 dimensional array for statistics */
-    perf_matrix = (int64_t **)malloc(io_server_count*sizeof(int64_t *));
+    perf_matrix = (int64_t **)malloc(io_server_count * sizeof(int64_t *));
     if(!perf_matrix)
     {
 	perror("malloc");
 	return(-1);
     }
-    for(i=0; i<io_server_count; i++)
+    for(i = 0; i < io_server_count; i++)
     {
-	perf_matrix[i] = (int64_t *)malloc(HISTORY * sizeof(int64_t));
+	perf_matrix[i] = (int64_t *)malloc((MAX_KEY_CNT + 2) * 
+                                           user_opts->history *
+                                           sizeof(int64_t));
 	if (perf_matrix[i] == NULL)
 	{
 	    perror("malloc");
@@ -133,7 +174,7 @@ int main(int argc, char **argv)
 	perror("malloc");
 	return -1;
     }
-    memset(next_id_array, 0, io_server_count*sizeof(uint32_t));
+    memset(next_id_array, 0, io_server_count * sizeof(uint32_t));
 
     /* allocate an array to keep up with end times from each server */
     end_time_ms_array = (uint64_t *)malloc(io_server_count * sizeof(uint64_t));
@@ -144,8 +185,8 @@ int main(int argc, char **argv)
     }
 
     /* build a list of servers to talk to */
-    addr_array = (PVFS_BMI_addr_t *)
-	malloc(io_server_count * sizeof(PVFS_BMI_addr_t));
+    addr_array = (PVFS_BMI_addr_t *)malloc(io_server_count *
+                 sizeof(PVFS_BMI_addr_t));
     if (addr_array == NULL)
     {
 	perror("malloc");
@@ -174,54 +215,64 @@ int main(int argc, char **argv)
 				      next_id_array,
 				      io_server_count, 
                                       &key_cnt,
-				      HISTORY,
-				      NULL, NULL);
+				      user_opts->history,
+				      NULL,
+                                      NULL);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
 	    return -1;
 	}
 
-	printf("\nPVFS2 I/O server bandwith statistics (MB/sec):\n");
+	printf("\nPVFS2 I/O server counters\n"); 
 	printf("==================================================\n");
-	for (i=0; i < io_server_count; i++)
+	for (i = 0; i < io_server_count; i++)
 	{
-	    printf("\nread:  %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
-	    for (j=0; j < HISTORY; j++)
+	    printf("\nSERVER: %s\n", 
+                       PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
+	    printf("\ndata read: ");
+	    for (j = 0; j < user_opts->history; j++)
 	    {
 		/* only print valid measurements */
-		if(!VALID_FLAG(i,j))
-		    break;
+		if(!VALID_FLAG(i, j))
+                {
+		    printf("\tXXXX");
+		    continue;
+                }
 
 		/* shortcut if measurement is zero */
-		if(READ(i,j) == 0)
+		if(READ(i, j) == 0)
 		{
 		    printf("\t0.0");
 		    continue;
 		}
 
 		/* figure out what time interval to use */
-		if (j == (HISTORY-1) || !VALID_FLAG(i,j+1))
+		if (j == (user_opts->history - 1) || !VALID_FLAG(i, j + 1))
+                {
 		    next_time = end_time_ms_array[i];
+                }
 		else
-		    next_time = START_TIME(i,j+1);
+                {
+		    next_time = START_TIME(i, j + 1);
+                }
 
 		/* bw calculation */
-		bw = ((float)READ(i,j) * 1000.0)/ 
-		    (float)(next_time - START_TIME(i,j));
-		bw = bw / (float)(1024.0*1024.0);
+		bw = ((float)READ(i, j) * 1000.0) / 
+		                (float)(next_time - START_TIME(i, j));
+		bw = bw / (float)(1024.0 * 1024.0);
 		printf("\t%10f", bw);
 	    }
 
-	    printf("\nwrite: %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
-
-	    for (j=0; j < HISTORY; j++)
+	    printf("\ndata write: ");
+	    for (j = 0; j < user_opts->history; j++)
 	    {
 		/* only print valid measurements */
-		if (!VALID_FLAG(i,j))
-		    break;
+		if (!VALID_FLAG(i, j))
+                {
+		    printf("\tXXXX");
+		    continue;
+                }
 
 		/* shortcut if measurement is zero */
 		if (WRITE(i,j) == 0)
@@ -231,52 +282,39 @@ int main(int argc, char **argv)
 		}
 
 		/* figure out what time interval to use */
-		if (j == (HISTORY-1) || !VALID_FLAG(i,j+1))
+		if (j == (user_opts->history - 1) || !VALID_FLAG(i, j + 1))
+                {
 		    next_time = end_time_ms_array[i];
+                }
 		else
-		    next_time = START_TIME(i,j+1);
+                {
+		    next_time = START_TIME(i, j + 1);
+                }
 
 		/* bw calculation */
-		bw = ((float)WRITE(i,j) * 1000.0)/ 
-		    (float)(next_time - START_TIME(i,j));
+		bw = ((float)WRITE(i, j) * 1000.0) / 
+		                (float)(next_time - START_TIME(i, j));
 		bw = bw / (float)(1024.0*1024.0);
 		printf("\t%10f", bw);
 	    }
 
-            printf("\n\nPVFS2 metadata op statistics (# of operations):\n");
-            printf("==================================================");
-            printf("\nread:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
-
-	    for(j = 0; j < HISTORY; j++)
-	    {
-		if (!VALID_FLAG(i,j))
-                {
-		    break;
-                }
-		printf("\t%llu", llu(METADATA_READ(i,j)));
-	    }
-
-            printf("\nwrite:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
-
-	    for(j = 0; j < HISTORY; j++)
-	    {
-		if (!VALID_FLAG(i,j))
-                {
-		    break;
-                }
-		printf("\t%llu", llu(METADATA_WRITE(i,j)));
-	    }
-
-	    printf("\ntimestep:\t\t\t");
-	    for(j=0; j<HISTORY; j++)
-	    {
-		if(!VALID_FLAG(i,j))
-		    break;
-
-		printf("\t%u", (unsigned)ID(i,j));
-	    }
+            PRINT_COUNTER("\nmeta read: ", METADATA_READ(i, j));
+            PRINT_COUNTER("\nmeta write: ", METADATA_WRITE(i, j));
+            PRINT_COUNTER("\ndspace ops: ", DSPACE_OPS(i, j));
+            PRINT_COUNTER("\nkeyval ops: ", KEYVAL_OPS(i, j));
+            PRINT_COUNTER("\nscheduled: ", SCHEDULE(i, j));
+            PRINT_COUNTER("\nrequests: ", REQUESTS(i, j));
+            PRINT_COUNTER("\nsmall reads: ", SMALL_READS(i, j));
+            PRINT_COUNTER("\nsmall writes: ", SMALL_WRITES(i, j));
+            PRINT_COUNTER("\nflow reads: ", FLOW_READS(i, j));
+            PRINT_COUNTER("\nflow writes: ", FLOW_WRITES(i, j));
+            PRINT_COUNTER("\ncreates: ", CREATES(i, j));
+            PRINT_COUNTER("\nremoves: ", REMOVES(i, j));
+            PRINT_COUNTER("\nmkdirs:  ", MKDIRS(i, j));
+            PRINT_COUNTER("\nrmdir:   ", RMDIRS(i, j));
+            PRINT_COUNTER("\ngetattrs: ", GETATTRS(i, j));
+            PRINT_COUNTER("\nsetattrs: ", SETATTRS(i, j));
+	    PRINT_COUNTER("\ntimestep: ", (unsigned)ID(i, j));
 	    printf("\n");
 	}
 	fflush(stdout);
@@ -297,7 +335,7 @@ int main(int argc, char **argv)
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    char flags[] = "vm:";
+    char flags[] = "vm:h:k:";
     int one_opt = 0;
     int len = 0;
 
@@ -317,18 +355,24 @@ static struct options* parse_args(int argc, char* argv[])
     {
 	switch(one_opt)
         {
+            case('h'):
+                tmp_opts->history = atoi(optarg);
+                break;
+            case('k'):
+                tmp_opts->keys = atoi(optarg);
+                break;
             case('v'):
                 printf("%s\n", PVFS2_VERSION);
                 exit(0);
 	    case('m'):
-		len = strlen(optarg)+1;
-		tmp_opts->mnt_point = (char*)malloc(len+1);
+		len = strlen(optarg) + 1;
+		tmp_opts->mnt_point = (char*)malloc(len + 1);
 		if(!tmp_opts->mnt_point)
 		{
 		    free(tmp_opts);
 		    return(NULL);
 		}
-		memset(tmp_opts->mnt_point, 0, len+1);
+		memset(tmp_opts->mnt_point, 0, len + 1);
 		ret = sscanf(optarg, "%s", tmp_opts->mnt_point);
 		if(ret < 1){
 		    free(tmp_opts);
