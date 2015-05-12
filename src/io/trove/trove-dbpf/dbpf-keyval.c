@@ -1482,7 +1482,7 @@ int PINT_dbpf_keyval_iterate(
     skey.buffer_sz = PVFS_NAME_MAX;
     key = &skey;
 
-    ret = dbpf_db_cursor(db, &dbc);
+    ret = dbpf_db_cursor(db, &dbc, 0);
     if (ret != 0)
     {
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,

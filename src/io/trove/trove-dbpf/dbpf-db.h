@@ -30,7 +30,7 @@ int dbpf_db_get(dbpf_db *, struct dbpf_data *, struct dbpf_data *);
 int dbpf_db_put(dbpf_db *, struct dbpf_data *, struct dbpf_data *);
 int dbpf_db_putonce(dbpf_db *, struct dbpf_data *, struct dbpf_data *);
 int dbpf_db_del(dbpf_db *, struct dbpf_data *);
-int dbpf_db_cursor(dbpf_db *, dbpf_cursor **);
+int dbpf_db_cursor(dbpf_db *, dbpf_cursor **, int);
 int dbpf_db_cursor_close(dbpf_cursor *);
 int dbpf_db_cursor_get(struct dbpf_cursor *, struct dbpf_data *,
     struct dbpf_data *, int, size_t);

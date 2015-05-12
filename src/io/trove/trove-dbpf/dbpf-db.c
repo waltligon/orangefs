@@ -317,7 +317,7 @@ int dbpf_db_del(struct dbpf_db *db, struct dbpf_data *key)
     return 0;
 }
 
-int dbpf_db_cursor(struct dbpf_db *db, struct dbpf_cursor **dbc)
+int dbpf_db_cursor(struct dbpf_db *db, struct dbpf_cursor **dbc, int rdonly)
 {
     int r;
     *dbc = malloc(sizeof **dbc);
@@ -326,7 +326,7 @@ int dbpf_db_cursor(struct dbpf_db *db, struct dbpf_cursor **dbc)
         return db_error(errno);
     }
 
-    r = mdb_txn_begin(db->env, NULL, 0, &(*dbc)->txn);
+    r = mdb_txn_begin(db->env, NULL, rdonly ? MDB_RDONLY : 0, &(*dbc)->txn);
     if (r)
     {
         free(*dbc);

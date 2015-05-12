@@ -1270,7 +1270,7 @@ int dbpf_collection_iterate(TROVE_keyval_s *name_array,
     struct dbpf_collection_db_entry db_entry;
 
     /* get a cursor */
-    ret = dbpf_db_cursor(my_storage_p->coll_db, &dbc);
+    ret = dbpf_db_cursor(my_storage_p->coll_db, &dbc, 1);
     if (ret != 0)
     {
         ret = -ret;

@@ -711,7 +711,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     }
 
     /* get a cursor */
-    ret = dbpf_db_cursor(op_p->coll_p->ds_db, &dbc);
+    ret = dbpf_db_cursor(op_p->coll_p->ds_db, &dbc, 1);
     if (ret != 0)
     {
         ret = -ret;
