@@ -579,6 +579,7 @@ int PINT_acache_update(
     return(0);
 }
 
+#if 0
 int PINT_acache_amend(
     PVFS_object_ref refn,   /**< object to update */
     PVFS_object_attr *attr, /**< attributes to copy into cache */
@@ -618,6 +619,7 @@ int PINT_acache_amend(
     return 0;
 */
 }
+#endif
 
 /**
  * Returns the perf counter associated with this acache instance.

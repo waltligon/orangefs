@@ -656,10 +656,10 @@ static int io_atime_setattr_comp_fn(void *v_p,
                      "%s: I/O atime attr mask (for acache update): %x\n",
                      __func__,
                      sm_p->getattr.attr.mask);
-        PINT_acache_amend(tmp_ref,
-                          &sm_p->getattr.attr,
-                          (sm_p->getattr.attr.mask & PVFS_ATTR_DATA_SIZE ?
-                          &sm_p->getattr.size : NULL));
+        PINT_acache_update(tmp_ref,
+                           &sm_p->getattr.attr,
+                           (sm_p->getattr.attr.mask & PVFS_ATTR_DATA_SIZE ?
+                           &sm_p->getattr.size : NULL));
 #else
         PINT_acache_invalidate(tmp_ref);
 #endif
@@ -3564,9 +3564,9 @@ static int unstuff_comp_fn(void *v_p,
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "Updating attributes after unstuff\n");
 
-        PINT_acache_amend(sm_p->object_ref,
-                          &resp_p->u.unstuff.attr,
-                          NULL);
+        PINT_acache_update(sm_p->object_ref,
+                           &resp_p->u.unstuff.attr,
+                           NULL);
 
         /* replace attrs found by getattr */
         /* PINT_copy_object_attr() takes care of releasing old memory */
@@ -3579,9 +3579,9 @@ static int unstuff_comp_fn(void *v_p,
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "Updating attributes before reading "
                      "beyond stuffing boundary.\n");
-        PINT_acache_amend(sm_p->object_ref,
-                          &resp_p->u.getattr.attr,
-                          NULL);
+        PINT_acache_update(sm_p->object_ref,
+                           &resp_p->u.getattr.attr,
+                           NULL);
 
         /* replace attrs found by getattr */
         /* PINT_copy_object_attr() takes care of releasing old memory */

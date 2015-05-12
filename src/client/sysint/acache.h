@@ -123,10 +123,12 @@ int PINT_acache_update(
     PVFS_object_attr *attr,
     PVFS_size* size);
 
+#if 0
 int PINT_acache_amend(
     PVFS_object_ref refn,
     PVFS_object_attr *attr,
     PVFS_size* size);
+#endif
 
 void PINT_acache_invalidate(
     PVFS_object_ref refn);
