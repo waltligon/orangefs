@@ -12,22 +12,21 @@
 #  if __GNUC__ >= 4 && __GNUC_MINOR__ >= 4
 #    define GCC_CONSTRUCTOR(priority) __attribute__((constructor(priority)))
 #    define GCC_DESTRUCTOR(priority)  __attribute__((destructor(priority)))
-#    define GCC_UNUSED  __attribute__((__unused__))
-#    define GCC_MALLOC __attribute__((__malloc__))
-#    define PVFS_INIT(f) 
 #  else
 #    define GCC_CONSTRUCTOR(priority) __attribute__((__constructor__))
 #    define GCC_DESTRUCTOR(priority)  __attribute__((__destructor__))
-#    define GCC_MALLOC __attribute__((__malloc__))
-#    define GCC_UNUSED  __attribute__((__unused__))
-#    define PVFS_INIT(f) 
 #  endif
+#  define GCC_MALLOC __attribute__((__malloc__))
+#  define GCC_UNUSED  __attribute__((__unused__))
+#  define PVFS_INIT(f) 
+#  define GCC_USE_ATEXIT 0
 #else
 #  define GCC_CONSTRUCTOR(priority) 
 #  define GCC_DESTRUCTOR(priority)
 #  define GCC_MALLOC
 #  define GCC_UNUSED  __attribute__((__unused__))
 #  define PVFS_INIT(f) f()
+#  define GCC_USE_ATEXIT 1
 #endif
 
 /* Init priorities define the order of initialization - defined here so
