@@ -872,28 +872,12 @@ static int server_initialize_subsystems(
 
     /*********** START OF TROVE INITIALIZATION ************/
 
-    ret = trove_collection_setinfo(0, 0, TROVE_DB_CACHE_SIZE_BYTES,
-                                   &server_config.db_cache_size_bytes);
-    /* this should never fail */
-    assert(ret == 0);
     ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
                                    &server_config.trove_max_concurrent_io);
     /* this should never fail */
     assert(ret == 0);
 
-    /* help trove chose a differentiating shm key if needed for Berkeley DB */
-    shm_key_hint = generate_shm_key_hint(&server_index);
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "Server using shm key hint: %d\n", shm_key_hint);
-    ret = trove_collection_setinfo(0, 0, TROVE_SHM_KEY_HINT, &shm_key_hint);
-    assert(ret == 0);
-
-    if(server_config.db_cache_type && (!strcmp(server_config.db_cache_type,
-                                               "mmap")))
-    {
-        /* set db cache type to mmap rather than sys */
-        init_flags |= TROVE_DB_CACHE_MMAP;
-    }
+    generate_shm_key_hint(&server_index);
 
 /********/
 

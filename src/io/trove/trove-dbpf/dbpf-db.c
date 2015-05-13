@@ -97,7 +97,7 @@ static int keyval_compare(const MDB_val *a, const MDB_val *b)
         DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->mv_size)));
 }
 
-int dbpf_db_open(char *name, int flags, int compare, struct dbpf_db **db,
+int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
     int create)
 {
     MDB_txn *txn;

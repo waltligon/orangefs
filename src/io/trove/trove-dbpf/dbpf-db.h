@@ -23,7 +23,7 @@ struct dbpf_data
 #define DBPF_DB_CURSOR_SET_RANGE 3
 #define DBPF_DB_CURSOR_FIRST 4
 
-int dbpf_db_open(char *, int, int, dbpf_db **, int);
+int dbpf_db_open(char *, int, dbpf_db **, int);
 int dbpf_db_close(dbpf_db *);
 int dbpf_db_sync(dbpf_db *);
 int dbpf_db_get(dbpf_db *, struct dbpf_data *, struct dbpf_data *);
