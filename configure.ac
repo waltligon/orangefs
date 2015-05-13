@@ -303,12 +303,14 @@ AC_ARG_ENABLE(capcache,
 else
     ENABLE_CAPCACHE=
 fi],
-[ENABLE_CAPCACHE=1
- AC_DEFINE(ENABLE_CAPCACHE, 1, Define if capability cache is enabled)]
+[if test "x$ENABLE_SECURITY_KEY" = "x1" -o "x$ENABLE_SECURITY_CERT" = "x1"; then
+    ENABLE_CAPCACHE=1
+    AC_DEFINE(ENABLE_CAPCACHE, 1, Define if capability cache is enabled)
+else
+    ENABLE_CAPCACHE=
+fi]
 )
 AC_SUBST(ENABLE_CAPCACHE)
-
-
 
 dnl check for credential cache
 AC_ARG_ENABLE(credcache,
