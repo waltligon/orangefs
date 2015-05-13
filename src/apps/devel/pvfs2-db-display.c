@@ -8,11 +8,6 @@
  * Utility for displaying PVFS Berkeley DBs in textual form for debugging
  *   */
 
-/* This is a kludge to keep calloc and free from being redefined
-   to our PINT_ versions. That way we can keep from having a depency
-   on the pvfs library. */
-#define PINT_MALLOC_H
-
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
@@ -23,31 +18,13 @@
 #include "trove-types.h"
 #include "pvfs2-storage.h"
 #include "pvfs2-internal.h"
+#include "trove-dbpf/dbpf.h"
 
 #define COLLECTION_FILE         "collections.db"
 #define STORAGE_FILE            "storage_attributes.db"
 #define DATASPACE_FILE          "dataspace_attributes.db"
 #define KEYVAL_FILE             "keyval.db"
 #define COLLECTION_ATTR_FILE    "collection_attributes.db"
-
-/* from src/io/trove/trove-dbpf/dbpf-keyval.c and include/pvfs2-types.h */
-#define DBPF_MAX_KEY_LENGTH 256
-
-/* from src/io/trove/trove-dbpf/dbpf.h */
-enum dbpf_key_type
-{
-    DBPF_DIRECTORY_ENTRY_TYPE = 'd',
-    DBPF_ATTRIBUTE_TYPE = 'a',
-    DBPF_COUNT_TYPE = 'c'
-};
-
-/* from src/io/trove/trove-dbpf/dbpf-keyval.c */
-struct dbpf_keyval_db_entry
-{
-    TROVE_handle handle;
-    char type;
-    char key[DBPF_MAX_KEY_LENGTH];
-};
 
 typedef struct
 {
@@ -60,27 +37,21 @@ typedef struct
 static options_t opts;
 int hex = 0;
 
-int open_db( DB **db_p, char *path, int type, int set_keyval_compare, int flags);
-void close_db( DB *db_p );
-void iterate_database(DB *db_p, void (*print)(DBT key, DBT val) );
-void print_collection( DBT key, DBT val );
-void print_storage( DBT key, DBT val );
-void print_dspace( DBT key, DBT val );
-void print_keyval( DBT key, DBT val );
-void print_collection_attr( DBT key, DBT val );
+void iterate_database(dbpf_db *db_p, void (*print)(struct dbpf_data key,
+    struct dbpf_data val));
+void print_collection( struct dbpf_data key, struct dbpf_data val );
+void print_storage( struct dbpf_data key, struct dbpf_data val );
+void print_dspace( struct dbpf_data key, struct dbpf_data val );
+void print_keyval( struct dbpf_data key, struct dbpf_data val );
+void print_collection_attr( struct dbpf_data key, struct dbpf_data val );
 void print_help(char *progname);
 void print_ds_type( PVFS_ds_type type );
 int process_args(int argc, char ** argv);
-int PINT_trove_dbpf_keyval_compare(DB * dbp, const DBT * a, const DBT * b);
 
 int main( int argc, char **argv )
 {
-    DB *db_p = NULL;
-    DB_ENV *dbe_p = NULL;
+    dbpf_db *db_p = NULL;
     char *path = NULL;
-    u_int32_t db_flags = DB_RDONLY|DB_THREAD, 
-              env_flags = DB_CREATE | DB_INIT_MPOOL,
-              type = DB_UNKNOWN;
     int ret, path_len; 
 
     if( (ret = process_args( argc, argv)) != 0 )
@@ -98,190 +69,136 @@ int main( int argc, char **argv )
         return ENOMEM;
     }
 
-    ret = db_env_create(&dbe_p, 0);
-    if (ret != 0) 
-    {
-        printf("Error creating env handle: %s\n", db_strerror(ret));
-        return -1;
-    }
-
-    /* Open the environment. */
-    ret = dbe_p->open(dbe_p,
-                      opts.dbpath,
-                      env_flags,
-                      0);
-    if (ret != 0) 
-    {
-        printf("Environment open failed: %s", db_strerror(ret));
-        return -1;
-    } 
-
     /* open and print each database */
 
     /* collection database */
     sprintf(path, "%s/%s", opts.dbpath, COLLECTION_FILE );
-    ret = open_db( &db_p, path, type, 0, db_flags);
+    ret = dbpf_db_open(path, 0, 0, &db_p, 0);
     if (ret == 0) 
     {
         printf("Collection Database\n");
         iterate_database(db_p, &print_collection );
-        close_db(db_p);
+        dbpf_db_close(db_p);
     }
     
     /* storage database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s", opts.dbpath, STORAGE_FILE );
-    ret = open_db( &db_p, path, type, 0, db_flags);
+    ret = dbpf_db_open(path, 0, 0, &db_p, 0);
     if (ret == 0) 
     {
         printf("Storage Database\n");
         iterate_database(db_p, &print_storage );
-        close_db(db_p);
+        dbpf_db_close(db_p);
     }
 
     /* dspace database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, DATASPACE_FILE );
-    ret = open_db( &db_p, path, type, 0, db_flags);
+    ret = dbpf_db_open(path, 0, DBPF_DB_COMPARE_DS_ATTR, &db_p, 0);
     if (ret == 0) 
     {
         printf("Dataspace Database\n");
         iterate_database(db_p, &print_dspace );
-        close_db(db_p);
+        dbpf_db_close(db_p);
     }
 
     /* keyval database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, KEYVAL_FILE );
-    ret = open_db( &db_p, path, type, 1, db_flags);
+    ret = dbpf_db_open(path, 0, DBPF_DB_COMPARE_KEYVAL, &db_p, 0);
     if (ret == 0) 
     {
         printf("Keyval Database\n");
         iterate_database(db_p, &print_keyval );
-        close_db(db_p);
+        dbpf_db_close(db_p);
     }
 
     /* collection attribute database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, COLLECTION_ATTR_FILE );
-    ret = open_db( &db_p, path, type, 0, db_flags);
+    ret = dbpf_db_open(path, 0, 0, &db_p, 0);
     if (ret == 0) 
     {
         printf("Collection Attributes Database\n");
         iterate_database(db_p, &print_collection_attr );
-        close_db(db_p);
+        dbpf_db_close(db_p);
     }
-
-    dbe_p->close(dbe_p, 0);
 
     free(path);
     return 0;
 }
 
-int open_db( DB **db_p, char *path, int type, int set_keyval_compare, int flags)
+void iterate_database(dbpf_db *db_p, void (*print)(struct dbpf_data key,
+    struct dbpf_data val) )
 {
     int ret = 0;
+    dbpf_cursor *dbc_p = NULL;
+    struct dbpf_data key, val;
 
-    ret = db_create(db_p, NULL, 0);
-    if (ret != 0) 
-    {
-        close_db( *db_p );
-        printf("Couldn't create db_p for %s: %s\n", path, db_strerror(ret));
-        return ret;
-    }
-
-    if (set_keyval_compare)
-    {
-        (*db_p)->set_bt_compare((*db_p), PINT_trove_dbpf_keyval_compare);
-    }
-
-    ret = (*db_p)->open(*db_p, NULL, path, NULL, type, flags, 0 );
-    if (ret != 0) 
-    {
-        close_db( *db_p );
-        printf("Couldn't open %s: %s\n", path, db_strerror(ret));
-        return ret;
-    }
-    return ret;
-}
-
-void close_db( DB *db_p )
-{
-    int ret = 0;
-    if( db_p )
-    {
-        ret = db_p->close(db_p, 0);
-    }
-
-    if (ret != 0) 
-    {
-        printf("Couldn't close db_p: %s\n", db_strerror(ret));
-    }
-    return;
-}
-
-void iterate_database(DB *db_p, void (*print)(DBT key, DBT val) )
-{
-    int ret = 0;
-    DBC *dbc_p = NULL;
-    DBT key, val;
-
-    ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
+    ret = dbpf_db_cursor(db_p, &dbc_p, 1);
     if( ret != 0 )
     {
         printf("Unable to open cursor to print db: %s\n", 
-               db_strerror(ret));
+               strerror(ret));
+        return;
+    }
+
+    key.len = 1024; 
+    key.data = malloc(1024); 
+    val.len = 1024; 
+    val.data = malloc(1024); 
+    if (!key.data || !val.data)
+    {
+        printf("Unable to allocate memory\n");
         return;
     }
  
-    memset(&key, 0, sizeof(key));
-    memset(&val, 0, sizeof(val));
- 
     printf("-------- Start database --------\n");
-    while ((ret = dbc_p->c_get(dbc_p, &key, &val, DB_NEXT)) == 0)
+    while ((ret = dbpf_db_cursor_get(dbc_p, &key, &val, DBPF_DB_CURSOR_NEXT, 1024)) == 0)
     {
         print( key, val );
-        memset(key.data, 0, key.size);
-        memset(val.data, 0, val.size);
+        key.len = 1024; 
+        val.len = 1024; 
     }
 
-    if( ret != DB_NOTFOUND )
+    if( ret != TROVE_ENOENT )
     {
-        printf("**** an error occurred (%s) ****\n", db_strerror(ret));
+        printf("**** an error occurred (%s) ****\n", strerror(ret));
     }
     printf("-------- End database --------\n\n");
 
-    dbc_p->c_close( dbc_p );
+    dbpf_db_cursor_close(dbc_p);
     return;
 }
 
-void print_collection( DBT key, DBT val )
+void print_collection( struct dbpf_data key, struct dbpf_data val )
 {
     char *k;
     int32_t v;
     k = key.data;
     v = *(int32_t *)val.data;
     if (hex) 
-        printf("(%s)(%d) -> (%x)(%d)\n", k, key.size, v, val.size);
+        printf("(%s)(%zu) -> (%x)(%zu)\n", k, key.len, v, val.len);
     else
-        printf("(%s)(%d) -> (%d)(%d)\n", k, key.size, v, val.size);
+        printf("(%s)(%zu) -> (%d)(%zu)\n", k, key.len, v, val.len);
     return;
 }
 
-void print_storage( DBT key, DBT val )
+void print_storage( struct dbpf_data key, struct dbpf_data val )
 {
     char *k;
     int32_t v;
     k = key.data;
     v = *(int32_t *)val.data;
     if (hex) 
-        printf("(%s)(%d) -> (%x)(%d)\n", k, key.size, v, val.size);
+        printf("(%s)(%zu) -> (%x)(%zu)\n", k, key.len, v, val.len);
     else
-        printf("(%s)(%d) -> (%d)(%d)\n", k, key.size, v, val.size);
+        printf("(%s)(%zu) -> (%d)(%zu)\n", k, key.len, v, val.len);
     return;
 }
 
-void print_dspace( DBT key, DBT val )
+void print_dspace( struct dbpf_data key, struct dbpf_data val )
 {
     uint64_t k;
     struct PVFS_ds_attributes_s *v;
@@ -334,17 +251,17 @@ void print_dspace( DBT key, DBT val )
 
 
     if (hex)
-        printf("(%llx)(%d) -> ", llu(k), key.size);
+        printf("(%llx)(%zu) -> ", llu(k), key.len);
     else
-        printf("(%llu)(%d) -> ", llu(k), key.size);
+        printf("(%llu)(%zu) -> ", llu(k), key.len);
 
     print_ds_type( v->type );
 
     if (hex) {
         printf("(fsid: %d)(handle: %llx)(uid: %u)(gid: %u)"
-           "(perm: %u)(ctime: %s)(mtime: %s)(atime: %s)(%d)\n",
+           "(perm: %u)(ctime: %s)(mtime: %s)(atime: %s)(%zu)\n",
            v->fs_id, llu(v->handle), v->uid, v->gid, v->mode,
-           ctimeStr, mtimeStr, atimeStr, val.size);
+           ctimeStr, mtimeStr, atimeStr, val.len);
     }
     else {
          printf("(fsid: %d)(handle: %llu)(uid: %u)(gid: %u)"
@@ -357,27 +274,27 @@ void print_dspace( DBT key, DBT val )
     switch (v->type)
     {
         case PVFS_TYPE_METAFILE:
-            printf("(dfile_count: %u)(dist_size: %u)(%d)\n",
-                    v->u.metafile.dfile_count, v->u.metafile.dist_size, val.size);
+            printf("(dfile_count: %u)(dist_size: %u)(%zu)\n",
+                    v->u.metafile.dfile_count, v->u.metafile.dist_size, val.len);
             break;
 
         case PVFS_TYPE_DATAFILE:
-            printf("(bsize: %llu)(%d)\n", llu(v->u.datafile.b_size), val.size);
+            printf("(bsize: %llu)(%zu)\n", llu(v->u.datafile.b_size), val.len);
             break;
 
         case PVFS_TYPE_DIRDATA:
-            printf("(count: %llu)(%d)\n", llu(v->u.dirdata.count), val.size);
+            printf("(count: %llu)(%zu)\n", llu(v->u.dirdata.count), val.len);
             break;
 
         default:
-            printf("(%d)\n", val.size);
+            printf("(%zu)\n", val.len);
             break;
     }
 
     return;
 }
 
-void print_keyval( DBT key, DBT val )
+void print_keyval( struct dbpf_data key, struct dbpf_data val )
 {
     struct dbpf_keyval_db_entry *k;
     uint64_t vh, kh;
@@ -395,21 +312,21 @@ void print_keyval( DBT key, DBT val )
     {
         case DBPF_DIRECTORY_ENTRY_TYPE:
             vh = *(uint64_t *)val.data;
-            printf("(%s)(%d) -> (%llu)(%d)\n", k->key,  key.size, llu(vh), val.size);
+            printf("(%s)(%zu) -> (%llu)(%zu)\n", k->key,  key.len, llu(vh), val.len);
             break;
 
         case DBPF_ATTRIBUTE_TYPE:
             if( strncmp(k->key, "dh", 3) == 0) /* datafile handle */
             {
-               printf("(dh)(%d) -> ",key.size);
+               printf("(dh)(%zu) -> ",key.len);
                int s = 0;
-               while (s < val.size)
+               while (s < val.len)
                {
                    vh = *(uint64_t *)((unsigned char *)val.data + s);
                    printf("(%llu) ", llu(vh));
                    s += sizeof(TROVE_handle);
                }
-               printf("(%d)\n",val.size);
+               printf("(%zu)\n",val.len);
             }
             else if( strncmp(k->key, "md", 3) == 0 ) /* metafile dist */
             {
@@ -418,17 +335,17 @@ void print_keyval( DBT key, DBT val )
                 * means the first uint32_t bytes are the length of the string, skip
                 * it. */
                char *dname = (char *)val.data + sizeof(uint32_t);
-               printf("(md)(%d) -> (%s)(%d)\n", key.size, dname, val.size );
+               printf("(md)(%zu) -> (%s)(%zu)\n", key.len, dname, val.len );
             }
             else if( strncmp(k->key, "st", 3) == 0 ) /* symlink target */
             {
-                printf("(st)(%d) -> (%s)(%d)\n", key.size, (char *) val.data, val.size);
+                printf("(st)(%zu) -> (%s)(%zu)\n", key.len, (char *) val.data, val.len);
             }
             else if( strncmp(k->key, "ml", 3) == 0 ) /* metafile layout */
             {
                int32_t layout;
 
-               printf("(ml)(%d) -> ", key.size);
+               printf("(ml)(%zu) -> ", key.len);
 
                /* just print the name of the layout, the rest is extra. */
                layout = *(int32_t *)val.data;
@@ -455,16 +372,16 @@ void print_keyval( DBT key, DBT val )
             else if( strncmp(k->key, "nd", 3) == 0 ) /* num dfiles req */
             {
                 vi = *(uint32_t *)val.data;
-                printf("(nd)(%d) -> (%d)\n", key.size, vi);
+                printf("(nd)(%zu) -> (%d)\n", key.len, vi);
             }
             else if( strncmp(k->key, "/dda", 5) == 0 ) /* dist directory attr */
             {
                 PVFS_dist_dir_attr *dist_dir_attr = (PVFS_dist_dir_attr *) val.data;
 
-                if (val.size == sizeof(PVFS_dist_dir_attr))
+                if (val.len == sizeof(PVFS_dist_dir_attr))
                 {
-                    printf("(/dda)(%d) -> (%d)(%d)(%d)(%d)(%d)(%d)\n",
-                        key.size,
+                    printf("(/dda)(%zu) -> (%d)(%d)(%d)(%d)(%d)(%d)\n",
+                        key.len,
                         dist_dir_attr->tree_height,
                         dist_dir_attr->num_servers,
                         dist_dir_attr->bitmap_size,
@@ -474,15 +391,15 @@ void print_keyval( DBT key, DBT val )
                 }
                 else
                 {
-                    printf("(/dda)(%d) -> Invalid size for distributed directory attributes.\n", key.size);
+                    printf("(/dda)(%zu) -> Invalid size for distributed directory attributes.\n", key.len);
                 }
             }
             else if( strncmp(k->key, "/ddh", 5) == 0 ) /* dist directory handles */
             {
                 PVFS_handle *handle = val.data;
 
-                printf("(/ddh)(%d) -> ", key.size);
-                while ( (unsigned char *)handle - (unsigned char *)val.data < val.size)
+                printf("(/ddh)(%zu) -> ", key.len);
+                while ( (unsigned char *)handle - (unsigned char *)val.data < val.len)
                 {
                     printf("(%llu)", llu(*handle));
                     handle++;
@@ -494,20 +411,20 @@ void print_keyval( DBT key, DBT val )
                 int i;
                 unsigned char *c = NULL;
 
-                printf("(/ddb)(%d) -> ", key.size);
-                for(i = val.size - 1; i >= 0 ; i--)
+                printf("(/ddb)(%zu) -> ", key.len);
+                for(i = val.len - 1; i >= 0 ; i--)
                 {
                     c = (unsigned char *)((unsigned char *)val.data + i);
                     printf(" %02x %02x %02x %02x", c[3], c[2], c[1], c[0]);
                 }
                 printf("\n");
             }
-            else if (key.size == 17)
+            else if (key.len == 17)
             {
                 char *tmp;
                 tmp = k->key;
                 kh = *(uint64_t *)tmp;
-                printf("(%llu)(%d) -> (%d)\n", llu(kh), key.size, val.size);
+                printf("(%llu)(%zu) -> (%zu)\n", llu(kh), key.len, val.len);
             }
             else
             {
@@ -517,7 +434,7 @@ void print_keyval( DBT key, DBT val )
 
         case DBPF_COUNT_TYPE:
             vh = *(uint64_t *)val.data;
-            printf("()(%d) -> (%llu)(%d)\n", key.size, llu(vh), val.size);
+            printf("()(%zu) -> (%llu)(%zu)\n", key.len, llu(vh), val.len);
             break;
 
         default:
@@ -527,24 +444,24 @@ void print_keyval( DBT key, DBT val )
     return;
 }
 
-void print_collection_attr( DBT key, DBT val )
+void print_collection_attr( struct dbpf_data key, struct dbpf_data val )
 {
     char *k, *vs;
     uint64_t vu;
     k = key.data;
-    printf("(%s)(%d) -> ", k, key.size);
-    if( val.size == 8 )
+    printf("(%s)(%zu) -> ", k, key.len);
+    if( val.len == 8 )
     {
         vu = *(uint64_t *)val.data;
         if (hex)
-            printf("(%llx)(%d)\n", llu(vu), val.size);
+            printf("(%llx)(%zu)\n", llu(vu), val.len);
         else
-            printf("(%llu)(%d)\n", llu(vu), val.size);
+            printf("(%llu)(%zu)\n", llu(vu), val.len);
     }
     else
     {
         vs = val.data;
-        printf("(%s)(%d)\n", vs, val.size);
+        printf("(%s)(%zu)\n", vs, val.len);
     }
     return;
 }
@@ -660,38 +577,6 @@ void print_ds_type( PVFS_ds_type type )
             printf("type: unknown");
             break;
     }
-}
-
-#define DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(_size) \
-    (_size - sizeof(TROVE_handle))
-
-int PINT_trove_dbpf_keyval_compare(
-    DB * dbp, const DBT * a, const DBT * b)
-{
-    struct dbpf_keyval_db_entry db_entry_a;
-    struct dbpf_keyval_db_entry db_entry_b;
-
-    memcpy(&db_entry_a, a->data, sizeof(struct dbpf_keyval_db_entry));
-    memcpy(&db_entry_b, b->data, sizeof(struct dbpf_keyval_db_entry));
-
-    if(db_entry_a.handle != db_entry_b.handle)
-    {
-        return (db_entry_a.handle < db_entry_b.handle) ? -1 : 1;
-    }
-
-    if(a->size > b->size)
-    {
-        return 1;
-    }
-
-    if(a->size < b->size)
-    {
-        return -1;
-    }
-
-    /* must be equal */
-    return (memcmp(db_entry_a.key, db_entry_b.key,
-                    DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->size)));
 }
 
 /*

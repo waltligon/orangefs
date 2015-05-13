@@ -1026,8 +1026,9 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 
 # rule for building development tools and its objects.
 $(DEVELTOOLS): %: %.o
-	$(Q) "  LD 		$@"
-	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBS) $(call modldflags,$<)
+	$(Q) "  LD              $@"
+	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBRARIES) lib/libpvfs2-server.a $(call modldflags,$<)
+
 
 ifdef BUILD_JNI
 $(OFS_JNI_JAR): $(JNIJAVA)
