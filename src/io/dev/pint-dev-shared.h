@@ -30,7 +30,7 @@
  * region into.  In some sense it governs the number of concurrent I/O
  * operations that we will allow
  */
-#define PVFS2_BUFMAP_DEFAULT_DESC_COUNT    5
+#define PVFS2_BUFMAP_DEFAULT_DESC_COUNT    10
 
 /*
   by default, we assume each description size is 4MB; this value
@@ -67,7 +67,7 @@ static inline int LOG2(int number)
     return count;
 }
 
-#define PVFS2_READDIR_DEFAULT_DESC_COUNT  5
+#define PVFS2_READDIR_DEFAULT_DESC_COUNT  32
 #define PVFS2_READDIR_DEFAULT_DESC_SIZE  (128 * 1024)
 #define PVFS2_READDIR_DEFAULT_DESC_SHIFT 17
 #define PVFS2_READDIR_DEFAULT_TOTAL_SIZE \

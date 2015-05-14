@@ -407,6 +407,7 @@ struct PINT_server_crdirent_op
     split_msg_boundary *msg_boundaries;
     PVFS_ds_keyval *entries_key_a;
     PVFS_ds_keyval *entries_val_a;
+    PVFS_handle *remote_dirdata_handles;
 };
 
 struct PINT_server_rmdirent_op

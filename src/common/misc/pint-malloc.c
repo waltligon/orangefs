@@ -24,11 +24,7 @@
 #if 0
 #define memdebug fprintf
 #else
-static inline void memdebug(FILE *stream, char *format, ...)
-{
-    /* this is just a dummy function to eat varargs */
-    return;
-}
+#define memdebug(stream, format, ...)
 #endif
 
 /*

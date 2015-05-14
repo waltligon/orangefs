@@ -405,7 +405,7 @@ void print_keyval( DBT key, DBT val )
                int s = 0;
                while (s < val.size)
                {
-                   vh = *(uint64_t *)(val.data + s);
+                   vh = *(uint64_t *)((unsigned char *)val.data + s);
                    printf("(%llu) ", llu(vh));
                    s += sizeof(TROVE_handle);
                }
@@ -417,7 +417,7 @@ void print_keyval( DBT key, DBT val )
                 * the PINT_dist struct is packed/encoded before writing to db. that
                 * means the first uint32_t bytes are the length of the string, skip
                 * it. */
-               char *dname = val.data + sizeof(uint32_t);
+               char *dname = (char *)val.data + sizeof(uint32_t);
                printf("(md)(%d) -> (%s)(%d)\n", key.size, dname, val.size );
             }
             else if( strncmp(k->key, "st", 3) == 0 ) /* symlink target */
@@ -482,7 +482,7 @@ void print_keyval( DBT key, DBT val )
                 PVFS_handle *handle = val.data;
 
                 printf("(/ddh)(%d) -> ", key.size);
-                while ((void *) handle - val.data < val.size)
+                while ( (unsigned char *)handle - (unsigned char *)val.data < val.size)
                 {
                     printf("(%llu)", llu(*handle));
                     handle++;
@@ -497,7 +497,7 @@ void print_keyval( DBT key, DBT val )
                 printf("(/ddb)(%d) -> ", key.size);
                 for(i = val.size - 1; i >= 0 ; i--)
                 {
-                    c = (unsigned char *)(val.data + i);
+                    c = (unsigned char *)((unsigned char *)val.data + i);
                     printf(" %02x %02x %02x %02x", c[3], c[2], c[1], c[0]);
                 }
                 printf("\n");

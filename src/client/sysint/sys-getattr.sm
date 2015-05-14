@@ -349,9 +349,6 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     int ret = -1;
     int attr_status = -1;
     int size_status = -1;
-#if 0 /* Don't cache size_array. */
-    int size_array_status = -1;
-#endif
 
     js_p->error_code = 0;
 
@@ -415,15 +412,6 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-#if 0 /* Don't cache size_array. */
-    ret = PINT_acache_get_cached_entry(object_ref,
-                                       &sm_p->getattr.attr,
-                                       &attr_status,
-                                       &sm_p->getattr.size,
-                                       &size_status,
-                                       &sm_p->getattr.size_array,
-                                       &size_array_status);
-#endif
     ret = PINT_acache_get_cached_entry(object_ref,
                                        &sm_p->getattr.attr,
                                        &attr_status,
@@ -561,26 +549,15 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_ACACHE_DEBUG, 
                      "%s: TRULY MISSING attrs:\n",
                      __func__);
-        PINT_attrmask_print(GOSSIP_ACACHE_DEBUG,missing_attrs);
+        PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, missing_attrs);
 
         /* Was the size missing? */
         if(missing_attrs & PVFS_ATTR_DATA_SIZE)
         {
             gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: NOTE, PVFS_ATTR_DATA_SIZE --> ACACHE MISS.\n",
+                         "%s: NOTE, MISSING PVFS_ATTR_DATA_SIZE --> ACACHE MISS.\n",
                          __func__);
         }
-
-#if 0 /* Don't cache size_array. */
-        /* Was the size_array missing? */
-        if(missing_attrs & PVFS_ATTR_DIR_DIRENT_COUNT)
-        {
-            gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: NOTE, PVFS_ATTR_DIR_DIRENT_COUNT --> "
-                         "ACACHE MISS.\n",
-                         __func__);
-        }
-#endif
     }
 
     /* MISS */
@@ -656,7 +633,7 @@ static PINT_sm_action getattr_client_capcache_lookup(struct PINT_smcb *smcb,
     if (local_uid == (PVFS_uid) -1)
     {
         local_uid = PINT_util_getuid();
-        
+
         PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
                       sizeof(PVFS_uid), &local_uid);
     }

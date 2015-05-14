@@ -272,6 +272,7 @@ static PINT_sm_action mgmt_create_root_dir_create_dist_dir_struct(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    server_configuration_s *user_opts = get_server_config_struct();
     PVFS_object_attr *attr;
     int num_total_dirdata_servers, num_initial_dirdata_servers;
     int ret = -1;
@@ -281,7 +282,7 @@ static PINT_sm_action mgmt_create_root_dir_create_dist_dir_struct(
     js_p->error_code = 0;
     attr = (&s_op->attr);
 
-    /* use total # of meta servers as the num_total_dirdata_servers */
+    /* Find total # of meta servers */
     ret = PINT_cached_config_get_num_meta(s_op->target_fs_id,
                                             &num_total_dirdata_servers);
     if(ret < 0)
@@ -289,6 +290,12 @@ static PINT_sm_action mgmt_create_root_dir_create_dist_dir_struct(
         gossip_err("Error: failed to get number of metadata servers\n");
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
+    }
+
+    /* Honor max # of dirdata servers from config file */
+    if (user_opts->distr_dir_servers_max < num_total_dirdata_servers)
+    {
+        num_total_dirdata_servers = user_opts->distr_dir_servers_max;
     }
 
     /* set num_dirdata_servers for pre-allocation of dirdata handles */
