@@ -2420,14 +2420,14 @@ struct PVFS_servreq_mgmt_iterate_handles
     PVFS_fs_id fs_id;
     int32_t handle_count;
     int32_t flags;
-    PVFS_ds_position position;
+    PVFS_handle *position;
 };
 endecode_fields_4_struct(
     PVFS_servreq_mgmt_iterate_handles,
     PVFS_fs_id, fs_id,
     int32_t, handle_count,
     int32_t, flags,
-    PVFS_ds_position, position);
+    PVFS_handle, position);
 
 #define PINT_SERVREQ_MGMT_ITERATE_HANDLES_FILL(__req,              \
                                         __cap,                     \
@@ -2451,13 +2451,13 @@ do {                                                               \
 
 struct PVFS_servresp_mgmt_iterate_handles
 {
-    PVFS_ds_position position;
+    PVFS_handle *position;
     PVFS_handle *handle_array;
     int handle_count;
 };
 endecode_fields_2a_struct(
     PVFS_servresp_mgmt_iterate_handles,
-    PVFS_ds_position, position,
+    PVFS_handle, position,
     skip4,,
     int32_t, handle_count,
     PVFS_handle, handle_array);

@@ -2975,7 +2975,7 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
  * returns 0 on success, 1 on immediate completion, -PVFS_error on failure
  */
 int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
-                                     PVFS_ds_position position,
+                                     PVFS_handle *position,
                                      PVFS_handle *handle_array,
                                      int count,
                                      PVFS_ds_flags flags,
@@ -3005,7 +3005,7 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
-    jd->u.trove.position = position;
+    jd->u.trove.position_h = position;
     jd->u.trove.count = count;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
@@ -3015,7 +3015,7 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_iterate_handles(coll_id,
-                                       &(jd->u.trove.position),
+                                       jd->u.trove.position_h,
                                        handle_array,
                                        &(jd->u.trove.count),
                                        flags,
@@ -3044,7 +3044,7 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->vtag = jd->u.trove.vtag;
-        out_status_p->position = jd->u.trove.position;
+        out_status_p->position_h = jd->u.trove.position_h;
         out_status_p->count = jd->u.trove.count;
         dealloc_job_desc(jd);
         jd = NULL;

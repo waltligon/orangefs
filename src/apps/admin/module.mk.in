@@ -40,7 +40,4 @@ endif
 
 ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \
-	$(DIR)/pvfs2-change-fsid.c \
 	$(DIR)/pvfs2-showcoll.c
-
-#	$(DIR)/pvfs2-migrate-collection.c \ 

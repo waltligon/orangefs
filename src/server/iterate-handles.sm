@@ -137,7 +137,7 @@ static PINT_sm_action iterate_handles_fill_resp(
     }
 
     s_op->resp.u.mgmt_iterate_handles.handle_count = js_p->count;
-    s_op->resp.u.mgmt_iterate_handles.position = js_p->position;
+    s_op->resp.u.mgmt_iterate_handles.position = js_p->position_h;
 
     return SM_ACTION_COMPLETE;
 }

@@ -975,13 +975,6 @@ static int server_initialize_subsystems(
         /* this should never fail */
         ret = trove_collection_setinfo(0,
                                        0,
-                                       TROVE_DB_CACHE_SIZE_BYTES,
-                                       &server_config.db_cache_size_bytes);
-        assert(ret == 0);
-
-        /* this should never fail */
-        ret = trove_collection_setinfo(0,
-                                       0,
                                        TROVE_MAX_CONCURRENT_IO,
                                        &server_config.trove_max_concurrent_io);
         assert(ret == 0);
@@ -993,19 +986,6 @@ static int server_initialize_subsystems(
         gossip_debug(GOSSIP_SERVER_DEBUG,
                      "Server using shm key hint: %d\n",
                      shm_key_hint);
-
-        ret = trove_collection_setinfo(0,
-                                       0,
-                                       TROVE_SHM_KEY_HINT,
-                                       &shm_key_hint);
-        assert(ret == 0);
-
-        if(server_config.db_cache_type &&
-           (!strcmp(server_config.db_cache_type, "mmap")))
-        {
-            /* set db cache type to mmap rather than sys */
-            init_flags |= TROVE_DB_CACHE_MMAP;
-        }
 
         /* Fire up TROVE */
         ret = trove_initialize(server_config.trove_method, 
@@ -1296,18 +1276,6 @@ static int server_initialize_subsystems(
         gossip_debug(GOSSIP_SERVER_DEBUG,
                      "%d filesystem(s) initialized\n",
                      PINT_llist_count(server_config.file_systems));
-
-        /*
-         * Migrate database if needed
-         */
-        ret = trove_migrate(server_config.trove_method,
-			    server_config.data_path,
-			    server_config.meta_path);
-        if (ret < 0)
-        {
-            gossip_err("trove_migrate failed: ret=%d\n", ret);
-            return(ret);
-        }
 
         *server_status_flag |= SERVER_FILESYS_INIT;
     }

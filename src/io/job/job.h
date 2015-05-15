@@ -40,7 +40,8 @@ typedef struct job_status
     int error_code;		/* returned by all operations */
     PVFS_size actual_size;	/* resize, bmi_recv */
     PVFS_vtag *vtag;		/* most trove operations */
-    PVFS_ds_position position;	/* iterate, iterate_keys, iterate_handles */
+    PVFS_ds_position position;	/* iterate, iterate_keys */
+    PVFS_handle *position_h;	/* iterate_handles */
     PVFS_handle handle;		/* dspace_create */
     PVFS_ds_type type;		/* dspace_verify */
     PVFS_fs_id coll_id;		/* fs_lookup */
@@ -498,7 +499,7 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
 
 /* iterates through all handles in a collection */
 int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
-                                     PVFS_ds_position position,
+                                     PVFS_handle *position,
                                      PVFS_handle *handle_array,
                                      int count,
                                      PVFS_ds_flags flags,

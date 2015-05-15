@@ -26,6 +26,11 @@ extern struct TROVE_bstream_ops alt_aio_bstream_ops;
 extern struct TROVE_bstream_ops null_aio_bstream_ops;
 extern struct TROVE_bstream_ops dbpf_bstream_direct_ops;
 
+static TROVE_handle _TROVE_HANDLE_START = {{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}};
+static TROVE_handle _TROVE_HANDLE_END = {{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 254}};
+TROVE_handle *TROVE_HANDLE_START = &_TROVE_HANDLE_START;
+TROVE_handle *TROVE_HANDLE_END = &_TROVE_HANDLE_END;
+
 /* currently we only have one method for these tables to refer to */
 struct TROVE_mgmt_ops *mgmt_method_table[] =
 {
@@ -231,7 +236,6 @@ int trove_collection_lookup(TROVE_method_id method_id,
 }
 
 int trove_collection_iterate(TROVE_method_id method_id,
-                             TROVE_ds_position *inout_position_p,
                              TROVE_keyval_s *name_array,
                              TROVE_coll_id *coll_id_array,
                              int *inout_count_p,
@@ -240,8 +244,7 @@ int trove_collection_iterate(TROVE_method_id method_id,
                              void *user_ptr,
                              TROVE_op_id *out_op_id_p)
 {
-    int ret = mgmt_method_table[method_id]->collection_iterate(inout_position_p,
-                                                               name_array,
+    int ret = mgmt_method_table[method_id]->collection_iterate(name_array,
                                                                coll_id_array,
                                                                inout_count_p,
                                                                flags,

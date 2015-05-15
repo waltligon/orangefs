@@ -284,7 +284,7 @@ struct TROVE_dspace_ops
 
 
     int (*dspace_iterate_handles)(TROVE_coll_id coll_id,
-				  TROVE_ds_position *position_p,
+				  TROVE_handle *position_p,
 			 	  TROVE_handle *handle_array,
 				  int *inout_count_p,
 		 		  TROVE_ds_flags flags,
@@ -401,8 +401,7 @@ struct TROVE_mgmt_ops
 
     int (*collection_clear)(TROVE_coll_id coll_id);
 
-    int (*collection_iterate)(TROVE_ds_position *inout_position_p,
-			      TROVE_keyval_s *name_array,
+    int (*collection_iterate)(TROVE_keyval_s *name_array,
 			      TROVE_coll_id *coll_id_array,
 			      int *inout_count_p,
 			      TROVE_ds_flags flags,
