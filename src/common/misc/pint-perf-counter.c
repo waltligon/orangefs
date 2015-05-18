@@ -57,6 +57,12 @@ struct PINT_perf_key server_keys[] =
     {"bytes written by small_io", PINT_PERF_SMALL_WRITE, PINT_PERF_PRESERVE},
     {"bytes read by flow", PINT_PERF_FLOW_READ, PINT_PERF_PRESERVE},
     {"bytes written by flow", PINT_PERF_FLOW_WRITE, PINT_PERF_PRESERVE},
+    {"create requests called", PINT_PERF_CREATE, PINT_PERF_PRESERVE},
+    {"remove requests called", PINT_PERF_REMOVE, PINT_PERF_PRESERVE},
+    {"mkdir requests called", PINT_PERF_MKDIR, PINT_PERF_PRESERVE},
+    {"rmdir requests called", PINT_PERF_RMDIR, PINT_PERF_PRESERVE},
+    {"getattr requests called", PINT_PERF_GETATTR, PINT_PERF_PRESERVE},
+    {"setattr requests called", PINT_PERF_SETATTR, PINT_PERF_PRESERVE},
     {NULL, 0, 0},
 };
 
@@ -183,8 +189,7 @@ struct PINT_perf_counter *PINT_perf_initialize(struct PINT_perf_key *key_array)
  * resets all counters within a perf counter instance, except for those that
  * have the PRESERVE bit set
  */
-void PINT_perf_reset(
-    struct PINT_perf_counter* pc)
+void PINT_perf_reset(struct PINT_perf_counter* pc)
 {
     int i;
     struct PINT_perf_sample *s;
