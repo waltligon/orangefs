@@ -97,6 +97,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     PINT_smcb *smcb = NULL;
     uint64_t debug_mask = 0;
     char *event_mask = NULL;
+	char *relatime_timeout_str = NULL;
 
     if (pvfs_sys_init_flag)
     {
@@ -144,7 +145,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
      *                    atime for every write like the Linux Kernel's
      *                    relatime. Ideally, do that server side.)
      */
-    char * relatime_timeout_str = getenv("PVFS2_RELATIME_TIMEOUT");
+    relatime_timeout_str = getenv("PVFS2_RELATIME_TIMEOUT");
     if(relatime_timeout_str != NULL)
     {
         relatime_timeout = atoi(relatime_timeout_str);
