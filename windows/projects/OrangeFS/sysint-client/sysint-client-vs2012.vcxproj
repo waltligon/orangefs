@@ -223,6 +223,7 @@
     <ClCompile Include="..\..\..\..\src\client\sysint\finalize.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\fs-add.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\getparent.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\init-vars.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\initialize.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-create-dirent.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-event-mon-list.c" />
@@ -273,6 +274,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\..\src\client\sysint\acache.h" />
     <ClInclude Include="..\..\..\..\src\client\sysint\client-state-machine.h" />
+    <ClInclude Include="..\..\..\..\src\client\sysint\init-vars.h" />
     <ClInclude Include="..\..\..\..\src\client\sysint\ncache.h" />
     <ClInclude Include="..\..\..\..\src\client\sysint\pint-sysint-utils.h" />
     <ClInclude Include="..\..\..\..\src\client\sysint\rcache.h" />

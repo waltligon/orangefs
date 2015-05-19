@@ -177,6 +177,9 @@
     <ClCompile Include="..\..\..\..\src\common\token-utils\token-utils.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\init-vars.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\src\client\sysint\acache.h">
@@ -195,6 +198,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\src\common\token-utils\token-utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\src\client\sysint\init-vars.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
