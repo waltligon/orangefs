@@ -178,6 +178,11 @@ typedef struct
     char buffer[PERF_COUNT_BUF_SIZE];
 } pvfs2_perf_count_response_t;
 
+typedef struct
+{
+	char buffer[PVFS2_MAX_DEBUG_ARRAY_LEN];
+} pvfs2_client_debug_mask_response_t;
+
 #define FS_KEY_BUF_SIZE 4096
 typedef struct
 {
@@ -220,6 +225,7 @@ typedef struct
 /* 	pvfs2_fsync_response_t fsync; */
         pvfs2_param_response_t param;
         pvfs2_perf_count_response_t perf_count;
+	pvfs2_client_debug_mask_response_t client_debug_mask;
         pvfs2_fs_key_response_t fs_key;
     } resp;
 } pvfs2_downcall_t;

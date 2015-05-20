@@ -515,6 +515,8 @@ int PINT_dev_test_unexpected(
             ret = -(PVFS_EPROTO|PVFS_ERROR_DEV);
             goto dev_test_unexp_error;
         }
+gossip_err("*proto_ver:%d: PVFS_KERNEL_PROTO_VERSION:%d:\n",
+           *proto_ver, PVFS_KERNEL_PROTO_VERSION);
         if(*proto_ver != PVFS_KERNEL_PROTO_VERSION)
         {
             gossip_err("Error: protocol versions do not match.\n");

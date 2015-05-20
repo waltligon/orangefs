@@ -37,6 +37,7 @@
 #define PVFS2_VFS_OP_REMOVEXATTR       0xFF000013
 #define PVFS2_VFS_OP_PARAM             0xFF000014
 #define PVFS2_VFS_OP_PERF_COUNT        0xFF000015
+#define PVFS2_VFS_OP_CLIENT_DEBUG_MASK 0xFF000016
 #define PVFS2_VFS_OP_CANCEL            0xFF00EE00
 #define PVFS2_VFS_OP_FSYNC             0xFF00EE01
 #define PVFS2_VFS_OP_FSKEY             0xFF00EE02
@@ -46,8 +47,9 @@
 /* Misc constants. Please retain them as multiples of 8!
  * Otherwise 32-64 bit interactions will be messed up :)
  */
-#define PVFS2_NAME_LEN                 0x00000100
-#define PVFS2_MAX_DEBUG_STRING_LEN     0x00000400
+#define PVFS2_NAME_LEN			0x00000100
+#define PVFS2_MAX_DEBUG_STRING_LEN	0x00000400
+#define PVFS2_MAX_DEBUG_ARRAY_LEN	0x00000800
 
 /* MAX_DIRENT_COUNT cannot be larger than PVFS_REQ_LIMIT_LISTATTR.
  * The value of PVFS_REQ_LIMIT_LISTATTR has been changed from 113 to 60 
