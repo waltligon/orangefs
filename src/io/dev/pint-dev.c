@@ -515,9 +515,13 @@ int PINT_dev_test_unexpected(
             ret = -(PVFS_EPROTO|PVFS_ERROR_DEV);
             goto dev_test_unexp_error;
         }
-gossip_err("*proto_ver:%d: PVFS_KERNEL_PROTO_VERSION:%d:\n",
-           *proto_ver, PVFS_KERNEL_PROTO_VERSION);
-        if(*proto_ver != PVFS_KERNEL_PROTO_VERSION)
+
+	/*
+ 	 * *proto_ver is 0 when the upstream kernel module is in use.
+ 	 */
+	if ((*proto_ver != PVFS_KERNEL_PROTO_VERSION) &&
+		(*proto_ver != 0))
+
         {
             gossip_err("Error: protocol versions do not match.\n");
             gossip_err("Please check that your pvfs2 module "
