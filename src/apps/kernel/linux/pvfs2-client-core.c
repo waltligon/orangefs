@@ -1060,6 +1060,7 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.readdirplus.mask,
         &vfs_request->response.readdirplus,
         &vfs_request->op_id, (void *)vfs_request, hints);
+    vfs_request->hints = hints;
 
     if (credential)
     {
@@ -2312,6 +2313,7 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
         &vfs_request->op_id,
         hints,
         (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (credential)
     {
@@ -2533,6 +2535,7 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
             &vfs_request->op_ids[i],
             hints,
             (void *)vfs_request);
+        vfs_request->hints = hints;
 
         if (credential)
         {
