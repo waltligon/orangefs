@@ -926,7 +926,8 @@ $(ADMINOBJS_SERVER): %.o: %.c
 # special rules for admin tools which also require server components
 $(ADMINTOOLS_SERVER): %: %.o
 	$(Q) "  LD		$@"
-	$(E)$(LD) $< $(LDFLAGS) $(SERVER_LDFLAGS) $(SERVERLIBS) -o $@
+	$(E)$(LD) $< $(LDFLAGS) $(SERVER_LDFLAGS) lib/libpvfs2-server.a \
+	    $(SERVERLIBS) -o $@
 
 # special rules for devel tool objects
 $(DEVELOBJS): %.o: %.c

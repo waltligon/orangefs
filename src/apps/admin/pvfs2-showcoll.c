@@ -275,12 +275,12 @@ static int print_dspaces(TROVE_coll_id coll_id,
 			 int no_root_handle)
 {
     int ret, count;
-    TROVE_ds_position pos;
+    TROVE_handle pos;
     TROVE_handle harray[64];
     TROVE_op_id op_id;
     TROVE_ds_state state;
 
-    pos = TROVE_ITERATE_START;
+    memcpy(&pos, TROVE_HANDLE_START, sizeof pos);
     count = 64;
 
     while (count > 0)

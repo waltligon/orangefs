@@ -683,7 +683,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
      * the database (first record) when used with DB_NEXT, so we don't
      * need to position with DB_FIRST.
      */
-    if (op_p->u.d_iterate_handles.position_p != TROVE_HANDLE_START)
+    if (memcmp(op_p->u.d_iterate_handles.position_p, TROVE_HANDLE_START,
+        sizeof *op_p->u.d_iterate_handles.position_p) != 0)
     {
         /* we need to position the cursor before we can read new
          * entries.  we will go ahead and read the first entry as
