@@ -4380,6 +4380,9 @@ int main(int argc, char **argv)
 
     job_close_context(s_client_dev_context);
 
+    PINT_tcache_finalize(credential_cache);
+    credential_cache = NULL;
+
 #ifdef USE_MMAP_RA_CACHE
     pvfs2_mmap_ra_cache_finalize();
 #endif
