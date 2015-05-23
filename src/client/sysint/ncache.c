@@ -141,7 +141,7 @@ void PINT_ncache_finalize(void)
 {
     gen_mutex_lock(&ncache_mutex);
 
-    if (ncache == NULL)
+    if(ncache != NULL)
     {
         PINT_tcache_finalize(ncache);
         ncache = NULL;
@@ -150,7 +150,7 @@ void PINT_ncache_finalize(void)
     gen_mutex_unlock(&ncache_mutex);
     return;
 }
-  
+
 /**
  * Retrieves parameters from the ncache 
  * @see PINT_tcache_options
