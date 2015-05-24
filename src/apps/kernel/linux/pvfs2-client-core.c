@@ -4390,6 +4390,10 @@ int main(int argc, char **argv)
     PINT_dev_finalize();
     PINT_dev_put_mapped_regions(NUM_MAP_DESC, s_io_desc);
 
+    PINT_smcb_free(acache_smcb);
+    PINT_smcb_free(ncache_smcb);
+    PINT_smcb_free(capcache_smcb);
+
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "calling PVFS_sys_finalize()\n");
 
