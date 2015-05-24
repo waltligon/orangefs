@@ -147,6 +147,12 @@ void PINT_ncache_finalize(void)
         ncache = NULL;
     }
 
+    if(ncache_pc != NULL)
+    {
+        PINT_perf_finalize(ncache_pc);
+        ncache_pc = NULL;
+    }
+
     gen_mutex_unlock(&ncache_mutex);
     return;
 }
