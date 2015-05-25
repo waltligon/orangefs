@@ -3436,6 +3436,12 @@ static void io_contexts_destroy(PINT_client_sm *sm_p)
         PINT_flow_clear(&(sm_p->u.io.contexts[i].flow_desc));
     }
 
+    /* cleanup memory allocated for the capabilities */
+    for (i=0; i<sm_p->u.io.context_count; i++)
+    {
+        PINT_cleanup_capability(&(sm_p->u.io.contexts[i].msg.req.capability));
+    }
+
     free(sm_p->u.io.contexts);
     sm_p->u.io.contexts = NULL;
     sm_p->u.io.context_count = 0;
