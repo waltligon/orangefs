@@ -1709,7 +1709,7 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             }
             else
             {
-                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                strncpy(vfs_request->out_downcall.resp.perf_count.buffer,
                     tmp_str, PERF_COUNT_BUF_SIZE);
                 free(tmp_str);
                 vfs_request->out_downcall.status = 0;
@@ -1725,7 +1725,7 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             }
             else
             {
-                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                strncpy(vfs_request->out_downcall.resp.perf_count.buffer,
                     tmp_str, PERF_COUNT_BUF_SIZE);
                 free(tmp_str);
                 vfs_request->out_downcall.status = 0;
@@ -1741,7 +1741,7 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             }
             else
             {
-                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                strncpy(vfs_request->out_downcall.resp.perf_count.buffer,
                     tmp_str, PERF_COUNT_BUF_SIZE);
                 free(tmp_str);
                 vfs_request->out_downcall.status = 0;
@@ -4390,8 +4390,11 @@ int main(int argc, char **argv)
     PINT_dev_finalize();
     PINT_dev_put_mapped_regions(NUM_MAP_DESC, s_io_desc);
 
+    PVFS_hint_free(acache_timer_sm_p->hints);
     PINT_smcb_free(acache_smcb);
+    PVFS_hint_free(ncache_timer_sm_p->hints);
     PINT_smcb_free(ncache_smcb);
+    PVFS_hint_free(capcache_timer_sm_p->hints);
     PINT_smcb_free(capcache_smcb);
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
