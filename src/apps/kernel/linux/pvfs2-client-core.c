@@ -1709,7 +1709,7 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             }
             else
             {
-                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                strncpy(vfs_request->out_downcall.resp.perf_count.buffer,
                     tmp_str, PERF_COUNT_BUF_SIZE);
                 free(tmp_str);
                 vfs_request->out_downcall.status = 0;
@@ -1725,7 +1725,7 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             }
             else
             {
-                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                strncpy(vfs_request->out_downcall.resp.perf_count.buffer,
                     tmp_str, PERF_COUNT_BUF_SIZE);
                 free(tmp_str);
                 vfs_request->out_downcall.status = 0;
@@ -1741,7 +1741,7 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             }
             else
             {
-                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                strncpy(vfs_request->out_downcall.resp.perf_count.buffer,
                     tmp_str, PERF_COUNT_BUF_SIZE);
                 free(tmp_str);
                 vfs_request->out_downcall.status = 0;
