@@ -4390,8 +4390,11 @@ int main(int argc, char **argv)
     PINT_dev_finalize();
     PINT_dev_put_mapped_regions(NUM_MAP_DESC, s_io_desc);
 
+    PVFS_hint_free(acache_timer_sm_p->hints);
     PINT_smcb_free(acache_smcb);
+    PVFS_hint_free(ncache_timer_sm_p->hints);
     PINT_smcb_free(ncache_smcb);
+    PVFS_hint_free(capcache_timer_sm_p->hints);
     PINT_smcb_free(capcache_smcb);
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
