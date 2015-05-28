@@ -4040,8 +4040,8 @@ int orangeAttrs(char *action, char *resource, apr_pool_t *pool,
          * we ended up setting as the default in the server
          * config...
          */
-        uid = strtoimax(conf->uid, 0, 0),
-        gid = strtoimax(conf->gid, 0, 0),
+        uid = strtoimax(conf->uid, 0, 0);
+        gid = strtoimax(conf->gid, 0, 0);
         if (credInit(&credential, pool, conf->certpath, drp->r->user,
                      uid, gid))
           return EACCES;
