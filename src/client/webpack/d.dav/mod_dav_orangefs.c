@@ -1542,9 +1542,10 @@ static dav_error *dav_orangefs_walk(const dav_walk_params *params,
        no response is sent back to the client for the PROPFIND. The MacOS 
        client responds to the situation by continuously pumping out PROPFINDS 
        until the log file on the Apache server fills up (or the universe 
-       becomes unhinged some other undesirable way). The same thing happens 
+       becomes unhinged in some other undesirable way). The same thing happens 
        with the apr repository, the "fault" is in Apache's (understandable) 
-       inability to respond to these kinds of requests when they fail, and             mostly in the MacOS's insistence on retaliating by launching a 
+       inability to respond to these kinds of requests when they fail, and
+       mostly in the MacOS's insistence on retaliating by launching a 
        denial-of-service attack on the Apache server.
 
        I think this thread from dev.httpd.apache.org sums it up...
