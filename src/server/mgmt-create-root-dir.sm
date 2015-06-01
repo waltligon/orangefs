@@ -37,6 +37,7 @@ enum
 };
 
 static char *lost_and_found_string = "lost+found";
+static int num_retries = 0;
 
 static int mkdir_lost_and_found_comp_fn(
         void *v_p,
@@ -76,7 +77,13 @@ machine pvfs2_mgmt_create_root_dir_sm
     {
         run mgmt_create_root_dir_request_remote_dirdata_dspace;
         success => create_local_dirdata_dspace;
-        default => cleanup_noreq;
+        default => retry_remote_dirdata_dspace;
+    }
+
+    state retry_remote_dirdata_dspace
+    {
+        run mgmt_create_root_dir_retry_remote_dirdata_dspace;
+        default => request_remote_dirdata_dspace;
     }
 
     state create_local_dirdata_dspace
@@ -374,6 +381,35 @@ static PINT_sm_action mgmt_create_root_dir_create_dist_dir_struct(
     return SM_ACTION_COMPLETE; 
 }
 
+static PINT_sm_action mgmt_create_root_dir_retry_remote_dirdata_dspace(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    job_id_t tmp_id;
+
+    if (++num_retries > 3)
+    {
+        gossip_err("Unable to create root directory."
+                   " Please ensure that all configured servers are running."
+                   " Will continue to retry...\n");
+        num_retries = 0;
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+             "Unable to obtain remote handles for root directory.\n");
+    }
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+        "Sleeping for 30 seconds before retrying.\n");
+
+    return(job_req_sched_post_timer(
+        (30*1000),
+        smcb,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context));
+}
 
 static PINT_sm_action mgmt_create_root_dir_request_remote_dirdata_dspace(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -381,7 +417,6 @@ static PINT_sm_action mgmt_create_root_dir_request_remote_dirdata_dspace(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t j_id;
-
 
     if(s_op->u.mgmt_create_root_dir.handle_array_remote_count == 0)
     {
@@ -406,8 +441,6 @@ static PINT_sm_action mgmt_create_root_dir_request_remote_dirdata_dspace(
     return ret;
 
 }
-
-
 
 static PINT_sm_action mgmt_create_root_dir_create_local_dirdata_dspace(
         struct PINT_smcb *smcb, job_status_s *js_p)

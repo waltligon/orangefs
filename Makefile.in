@@ -13,7 +13,6 @@
 # admintools     builds admin tools
 # usertools	     builds user tools
 # ucachedtools	 builds ucached tools
-# fcachedtools	 builds fcached tools
 # kernapps       builds userland helper programs for kernel driver
 # cscope         generates information for cscope utility
 # tags           generates tags file for use by editors
@@ -91,7 +90,7 @@ BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
 BUILD_USER_ENV_VARS = @BUILD_USER_ENV_VARS@
 BUILD_UCACHE = @BUILD_UCACHE@
-BUILD_FCACHE = @BUILD_FCACHE@
+BUILD_CLIENTCACHE = @BUILD_CLIENTCACHE@
 BUILD_JNI = @BUILD_JNI@
 BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
@@ -142,7 +141,7 @@ build_symbolic = @build_symbolic@
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean develtools dist distclean docs docsclean publish cscope tags codecheck admintools kernapps usertools ucachedtools fcachedtools
+.PHONY: all clean develtools dist distclean docs docsclean publish cscope tags codecheck admintools kernapps usertools ucachedtools
 
 ################################################################
 # Find project subdirectories
@@ -190,8 +189,7 @@ INCLUDES := \
     src/common/mgmt \
 	src/common/hash \
 	src/common/llist \
-	src/common/token-utils \
-	src/client/fcache
+	src/common/token-utils
 GENINCLUDES := \
 	include
 endif
@@ -571,8 +569,6 @@ OLIBSRC :=
 ULIBSRC :=
 # UCACHEDSRC is source code for ucached programs
 UCACHEDSRC :=
-# FCACHEDSRC is source code for fcached programs
-FCACHEDSRC :=
 # SERVERSRC is souce code for the pvfs2 server
 SERVERSRC :=
 ifdef BUILD_BMI_ONLY
@@ -735,13 +731,6 @@ UCACHEDTOOLS := $(patsubst %.c,%, $(filter %.c, $(UCACHEDSRC)))
 # UCACHEDDEPENDS is a list of dependency files for ucached programs
 UCACHEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(UCACHEDSRC)))
 
-# FCACHEDOBJS is a list of ucached program objects
-FCACHEDOBJS := $(patsubst %.c,%.o, $(filter %.c,$(FCACHEDSRC)))
-# FCACHEDTOOLS is a list of ucached program executables
-FCACHEDTOOLS := $(patsubst %.c,%, $(filter %.c, $(FCACHEDSRC)))
-# FCACHEDDEPENDS is a list of dependency files for fcached programs
-FCACHEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(FCACHEDSRC)))
-
 ifdef BUILD_SERVER
     ADMINOBJS_SERVER := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC_SERVER)))
     ADMINTOOLS_SERVER := $(patsubst %.c,%, $(filter %.c, $(ADMINSRC_SERVER)))
@@ -830,7 +819,7 @@ DEPENDS := $(sort $(LIBDEPENDS) $(ULIBDEPENDS) $(SERVERDEPENDS) \
     $(SERVERBINDEPENDS) $(MISCDEPENDS) $(USERDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) \
     $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS) \
-    $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) $(FCACHEDDEPENDS) \
+    $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) \
 	$(OLIBDEPENDS))
 endif
 
@@ -841,7 +830,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools fcachedtools kernapps $(VISS) $(KARMA) $(FUSE) 
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools kernapps $(VISS) $(KARMA) $(FUSE) 
 endif
 
 # target for building admin tools
@@ -852,9 +841,6 @@ usertools: $(USERTOOLS)
 
 # target for building ucached tools
 ucachedtools: $(UCACHEDTOOLS)
-
-# target for building fcached tools
-fcachedtools: $(FCACHEDTOOLS)
 
 # target for building kernel driver userland programs
 kernapps: $(KERNAPPS) $(KERNAPPSTHR)
@@ -1166,10 +1152,6 @@ $(UCACHEDTOOLS): %: %.o $(LIBRARIES)
 	$(Q) "  LD		$@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $< -lorangefs $(LIBS) $(call modldflags,$<)
 
-$(FCACHEDTOOLS): %: %.o $(LIBRARIES)
-	$(Q) "  LD		$@"
-	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS) $(call modldflags,$<)
-
 $(KERNAPPS): %: %.o $(LIBRARIES)
 $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
 	$(Q) "  LD		$@"
@@ -1233,7 +1215,6 @@ clean::
                 $(ULIBOBJS) $(OLIBOBJS) $(OLIBDEPENDS) \
                 $(ULIBPICOBJS) $(ULIBDEPENDS) $(OLIBPICOBJS) \
                 $(UCACHEDTOOLS) $(UCACHEDOBJS) \
-                $(FCACHEDTOOLS) $(FCACHEDOBJS) \
                 $(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
                 $(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
                 $(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
@@ -1449,10 +1430,6 @@ endif
 ifdef BUILD_UCACHE
 	install -d $(sbindir)
 	install -m 755 $(UCACHEDTOOLS) $(sbindir)
-endif
-ifdef BUILD_FCACHE
-	install -d $(sbindir)
-	install -m 755 $(FCACHEDTOOLS) $(sbindir)
 endif
 	# for compatibility in case anyone really wants "lsplus"
 	$(LN_S) pvfs2-ls $(bindir)/pvfs2-lsplus

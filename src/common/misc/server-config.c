@@ -3872,10 +3872,22 @@ void PINT_config_release(struct server_configuration_s *config_s)
             config_s->server_alias = NULL;
         }
 
-        free(config_s->keystore_path);
-        config_s->keystore_path = NULL;
-        free(config_s->serverkey_path);
-        config_s->serverkey_path = NULL;
+        if (config_s->keystore_path)
+        {   free(config_s->keystore_path);
+            config_s->keystore_path = NULL;
+        }
+
+        if (config_s->serverkey_path)
+        {
+            free(config_s->serverkey_path);
+            config_s->serverkey_path = NULL;
+        }
+
+        if(config_s->user_cert_dn)
+        {
+            free(config_s->user_cert_dn);
+            config_s->user_cert_dn = NULL;
+        }
     }
 }
 

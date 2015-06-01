@@ -1267,21 +1267,21 @@ AC_SUBST(BUILD_UCACHE)],
 AC_SUBST(BUILD_UCACHE)])
 
 dnl Method to enable user interface data cache
-BUILD_FCACHE=
-AC_ARG_ENABLE(fcache,
-[  --enable-fcache         Enables client file cache.],
+BUILD_CLIENTCACHE=
+AC_ARG_ENABLE(clientcache,
+[  --enable-clientcache         Enables client file cache.],
 [if test "x$enableval" = "xyes" ; then
-   AC_DEFINE(PVFS_FCACHE_ENABLE, 1,
+   AC_DEFINE(PVFS_CLIENTCACHE_ENABLE, 1,
       [Should we enable client file cache.])
-   BUILD_FCACHE=1
+   BUILD_CLIENTCACHE=1
 else
-   AC_DEFINE(PVFS_FCACHE_ENABLE, 0,
+   AC_DEFINE(PVFS_CLIENTCACHE_ENABLE, 0,
       [Should we enable client file cache.])
 fi
-AC_SUBST(BUILD_FCACHE)],
-[AC_DEFINE(PVFS_FCACHE_ENABLE, 0,
+AC_SUBST(BUILD_CLIENTCACHE)],
+[AC_DEFINE(PVFS_CLIENTCACHE_ENABLE, 0,
     [Should we enable client file cache.])
-AC_SUBST(BUILD_FCACHE)])
+AC_SUBST(BUILD_CLIENTCACHE)])
 
 dnl Method to set JAVA_HOME if it hasn't already been set using --with-jdk
 JAVA_HOME=
@@ -1856,7 +1856,6 @@ src/apps/karma/module.mk
 src/apps/vis/module.mk
 src/apps/fuse/module.mk
 src/apps/ucache/module.mk
-src/apps/fcache/module.mk
 src/apps/kernel/linux/module.mk
 src/apps/user/module.mk
 src/io/trove/module.mk
@@ -1895,7 +1894,6 @@ src/io/dev/module.mk
 src/proto/module.mk
 src/server/module.mk
 src/server/request-scheduler/module.mk
-src/client/fcache/module.mk
 src/client/jni/module.mk
 src/client/sysint/module.mk
 src/client/usrint/module.mk
@@ -2065,7 +2063,7 @@ else
    AC_MSG_RESULT([PVFS2 user interface library cache enabled        :  no])
 fi
 
-if test "x$BUILD_FCACHE" = "x1" ; then
+if test "x$BUILD_CLIENTCACHE" = "x1" ; then
    AC_MSG_RESULT([PVFS2 client file cache enabled                   : yes])
 else
    AC_MSG_RESULT([PVFS2 client file cache enabled                   :  no])

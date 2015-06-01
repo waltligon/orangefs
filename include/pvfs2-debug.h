@@ -81,7 +81,6 @@
 #define GOSSIP_USRINT_DEBUG            ((uint64_t)1 << 59)
 #define GOSSIP_RCACHE_DEBUG            ((uint64_t)1 << 60)
 #define GOSSIP_SECCACHE_DEBUG          ((uint64_t)1 << 61)
-#define GOSSIP_FCACHE_DEBUG            ((uint64_t)1 << 62)
 
 #define GOSSIP_BMI_DEBUG_ALL (uint64_t)                               \
 (GOSSIP_BMI_DEBUG_TCP + GOSSIP_BMI_DEBUG_CONTROL +                    \

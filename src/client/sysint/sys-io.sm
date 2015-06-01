@@ -367,6 +367,29 @@ PVFS_error PVFS_isys_io(PVFS_object_ref ref,
         return 1; 
     }
 
+    gossip_err("\"PVFS_isys_io\": {\n"
+               "    \"ref\": {\n"
+               "        \"fsid\": %d,\n"
+               "        \"handle\": %llu,\n"
+               "    },\n"
+               "    \"file_req\": {\n"
+               "        \"aggregate_size\": %lld,\n"
+               "    },\n"
+               "    \"mem_req\": {\n"
+               "        \"aggregate_size\": %lld,\n"
+               "    },\n"
+               "    \"file_req_offset\": %lld,\n"
+               "    \"uid\": %d,\n"
+               "    \"io_type\": %s,\n"
+               "}\n",
+               ref.fs_id,
+               (long long unsigned int) ref.handle,
+               (long long int) PINT_REQUEST_TOTAL_BYTES(file_req),
+               (long long int) PINT_REQUEST_TOTAL_BYTES(mem_req),
+               (long long int) file_req_offset,
+               (int) credential->userid,
+               io_type == 1 ? "PVFS_IO_READ" : "PVFS_IO_WRITE");
+
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_IO,
                     sizeof(struct PINT_client_sm),
@@ -1923,6 +1946,9 @@ static PINT_sm_action io_analyze_results(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_IO_DEBUG, "total bytes transferred is %lld\n",
                  lld(sm_p->u.io.total_size));
 
+    gossip_err("total bytes transferred is %lld\n",
+               lld(sm_p->u.io.total_size));
+
     if(sm_p->u.io.io_type == PVFS_IO_WRITE)
     {
         js_p->error_code = 0;
@@ -3434,6 +3460,12 @@ static void io_contexts_destroy(PINT_client_sm *sm_p)
     for(; i < sm_p->u.io.context_count; ++i)
     {
         PINT_flow_clear(&(sm_p->u.io.contexts[i].flow_desc));
+    }
+
+    /* cleanup memory allocated for the capabilities */
+    for (i=0; i<sm_p->u.io.context_count; i++)
+    {
+        PINT_cleanup_capability(&(sm_p->u.io.contexts[i].msg.req.capability));
     }
 
     free(sm_p->u.io.contexts);
