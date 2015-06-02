@@ -5,11 +5,14 @@ OrangeFS Release ChangeLog
 orangefs-2.9.2 (Subversion Tag v.2.9.2)
 http://www.orangefs.org/svn/orangefs/tags/v.2.9.2
 
-* - Client/Server
+* - Client/Server (Linux)
 	* - Automatically disabled capability caching, server side, when
 	default security is used.
 
 	* - Added TreeThreshold option in the server config file.
+
+	* - pvfs2-genconfig generates a config file with distributed
+	directories turned off, by default.
 
 	* - Added lazy atime support.  By default, atime for a file will be
 	updated upon a read or write if that atime has not been updated within
@@ -21,8 +24,11 @@ http://www.orangefs.org/svn/orangefs/tags/v.2.9.2
 		PVFS2_RELATIME_TIMEOUT  > 0, update atime for a read/write if atime has not
 		been updated within the last PVFS2_RELATIME_TIMEOUT seconds. 
 	
-	* - Added support for mixed endian environments involving distributed directories.
+	* - Added support for mixed endian environments for distributed directories.
 
+* - WebDav Client
+	* - Enabled PAM support.  The README file, in src/client/webpack,
+	describes how to use this feature.
 
 * - USRINT libraries
 	* - Modified selinux related files to allow compiles on both new and
