@@ -200,6 +200,24 @@ void clean_free(void *ptr)
 #undef PINT_free
 #endif
 
+/* Struct to handle PVFS malloc features is allocated just before the
+ * returned memory
+ */
+
+typedef struct extra_s
+{
+    void     *mem;
+    size_t   size;
+#if PVFS_MALLOC_MAGIC
+    uint32_t magic;
+#endif
+#if PVFS_MALLOC_CHECK_ALIGN
+    size_t   align;
+#endif
+} extra_t;
+
+#define EXTRA_SIZE (sizeof(extra_t))
+
 /* These routines call glibc version unless we don't have a pointer to
  * one in which case it calls the default version which we hope is
  * glibc.  We don't want our own macros defined in pint-malloc.h here so
@@ -292,6 +310,50 @@ static inline int my_glibc_posix_memalign(void **mem,
     }
 }
 
+int PINT_check_address(void *ptr)
+{
+    int is_valid = 0;
+    int fd[2];
+    if (!ptr)
+    {
+        return 0;
+    }
+    if (glibc_malloc_ops.pipe(fd) >= 0)
+    {
+        if (glibc_malloc_ops.write(fd[1], ptr, 128) > 0)
+        {
+            is_valid = 1;
+        }
+        else
+        {
+            is_valid = 0;
+        }
+    }
+    glibc_malloc_ops.close(fd[0]);
+    glibc_malloc_ops.close(fd[1]);
+    return is_valid;
+}
+
+int PINT_check_malloc(void *ptr)
+{
+    extra_t *extra;
+
+    if (!ptr)
+    {
+        return 0;
+    }
+    extra = (void *)((ptrint_t)ptr - EXTRA_SIZE);
+    if (!PINT_check_address((void *)extra))
+    {
+        return 0;
+    }
+    if (extra->magic == PVFS_MALLOC_MAGIC_NUM)
+    {
+        return 1;
+    }
+    return 0;
+}
+
 void *PINT_malloc_minimum(size_t size)
 {
     void *mem;
@@ -303,20 +365,6 @@ void *PINT_malloc_minimum(size_t size)
     memset(mem, 0, size);
     return mem;
 }
-
-typedef struct extra_s
-{
-    void     *mem;
-    size_t   size;
-#if PVFS_MALLOC_MAGIC
-    uint32_t magic;
-#endif
-#if PVFS_MALLOC_CHECK_ALIGN
-    size_t   align;
-#endif
-} extra_t;
-
-#define EXTRA_SIZE (sizeof(extra_t))
 
 void *PINT_malloc(size_t size)
 {
@@ -608,6 +656,9 @@ void init_glibc_malloc(void)
     glibc_malloc_ops.strdup = dlsym(libc_handle, "strdup");
     glibc_malloc_ops.strndup = dlsym(libc_handle, "strndup");
     glibc_malloc_ops.free = dlsym(libc_handle, "free");
+    glibc_malloc_ops.pipe = dlsym(libc_handle, "pipe");
+    glibc_malloc_ops.write = dlsym(libc_handle, "write");
+    glibc_malloc_ops.close = dlsym(libc_handle, "close");
     if (libc_handle != RTLD_DEFAULT) /* was NEXT but I think that was wrong */
     {
         dlclose(libc_handle);
