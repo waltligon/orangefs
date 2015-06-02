@@ -852,7 +852,7 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
          */
         if (ret == 0)
         {
-            ssize_t new_length;
+            ssize_t new_length=0;
             length = new_op->downcall.resp.getxattr.val_sz;
 /* NOTE - kernel/fs should never add or remove things from the value of
  * an xattr - this was a misguided approach
