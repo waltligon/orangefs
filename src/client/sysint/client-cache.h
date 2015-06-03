@@ -50,6 +50,7 @@ typedef struct cc_fent_s
     uint64_t file_size; /* Largest I/O offset seen by cache... */
     uint64_t file_handle;
     uint32_t fsid;
+    uint16_t prev; /* prev fent in ht chain. */
     uint16_t next; /* next fent in ht chain and free fents LL */
     uint16_t index; /* this fent's index in ftbl.fents */
     uint16_t ru_prev;      /* used in lru list */
@@ -87,5 +88,19 @@ typedef struct free_block_s
     uint16_t next; /* Index of next free block in LL */
 } free_block_t;
 
-/* pthread_rwlock_t rwlock; */
+int init_cache(
+    uint64_t cache_size,
+    uint64_t block_size,
+    uint16_t fent_limit,
+    uint16_t fent_ht_limit,
+    uint16_t ment_limit,
+    uint16_t ment_ht_limit);
+int finalize_cache(void);
+cc_fent_t *fent_lookup(uint64_t fhandle, uint32_t fsid);
+cc_fent_t *fent_insert(uint64_t fhandle, uint32_t fsid);
+int fent_remove_by_key(uint64_t fhandle, uint32_t fsid);
+int fent_remove(cc_fent_t *fentp);
+
+extern client_cache_t cc;
+/* extern pthread_rwlock_t rwlock; */
 #endif /* CLIENT_CACHE_H */
