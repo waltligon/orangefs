@@ -249,6 +249,8 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
             break;
         }
 
+        memset(ptr, 0, total_size);
+
         /* fixes a corruption issue on linux 2.4 kernels where the buffers are
          * not being pinned in memory properly 
          */

@@ -1060,6 +1060,7 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.readdirplus.mask,
         &vfs_request->response.readdirplus,
         &vfs_request->op_id, (void *)vfs_request, hints);
+    vfs_request->hints = hints;
 
     if (credential)
     {
@@ -1740,7 +1741,7 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             }
             else
             {
-                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                strncpy(vfs_request->out_downcall.resp.perf_count.buffer,
                     tmp_str, PERF_COUNT_BUF_SIZE);
                 free(tmp_str);
                 vfs_request->out_downcall.status = 0;
@@ -1756,7 +1757,7 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             }
             else
             {
-                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                strncpy(vfs_request->out_downcall.resp.perf_count.buffer,
                     tmp_str, PERF_COUNT_BUF_SIZE);
                 free(tmp_str);
                 vfs_request->out_downcall.status = 0;
@@ -1772,7 +1773,7 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             }
             else
             {
-                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                strncpy(vfs_request->out_downcall.resp.perf_count.buffer,
                     tmp_str, PERF_COUNT_BUF_SIZE);
                 free(tmp_str);
                 vfs_request->out_downcall.status = 0;
@@ -2344,6 +2345,7 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
         &vfs_request->op_id,
         hints,
         (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (credential)
     {
@@ -2565,6 +2567,7 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
             &vfs_request->op_ids[i],
             hints,
             (void *)vfs_request);
+        vfs_request->hints = hints;
 
         if (credential)
         {
@@ -4413,12 +4416,22 @@ int main(int argc, char **argv)
 
     job_close_context(s_client_dev_context);
 
+    PINT_tcache_finalize(credential_cache);
+    credential_cache = NULL;
+
 #ifdef USE_MMAP_RA_CACHE
     pvfs2_mmap_ra_cache_finalize();
 #endif
 
     PINT_dev_finalize();
     PINT_dev_put_mapped_regions(NUM_MAP_DESC, s_io_desc);
+
+    PVFS_hint_free(acache_timer_sm_p->hints);
+    PINT_smcb_free(acache_smcb);
+    PVFS_hint_free(ncache_timer_sm_p->hints);
+    PINT_smcb_free(ncache_smcb);
+    PVFS_hint_free(capcache_timer_sm_p->hints);
+    PINT_smcb_free(capcache_smcb);
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "calling PVFS_sys_finalize()\n");

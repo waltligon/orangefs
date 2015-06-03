@@ -181,6 +181,7 @@ int main (int argc, char ** argv)
     ret = 0;
 
 main_out:
+    PINT_cleanup_credential(&credentials);
     PVFS_sys_finalize();
     free(user_opts);
     free(buffer);

@@ -87,6 +87,10 @@ enum
     PVFS_FETCH_AND_ADD = 0xADD
 };
 
+/* functions to check fd or path validity */
+extern int pvfs_valid_path(const char *path);
+
+extern int pvfs_valid_fd(int fd);
 
 /* pvfs_open */
 extern int pvfs_open(const char *path, int flags, ...);
