@@ -2959,6 +2959,27 @@ int readdir_r(DIR *dir, struct dirent *entry, struct dirent **result)
 }
 
 /**
+ * readdir64_r wrapper
+ */
+int readdir64_r(DIR *dir, struct dirent64 *entry, struct dirent64 **result)
+{
+    struct dirent64 *val;
+    errno = 0;
+    val = readdir64(dir);
+    if(val){
+        *entry = *val;
+        *result = entry;
+    }
+    else{
+        if(errno != 0){
+            return errno;
+        }
+        *result = NULL;
+    }
+    return 0;
+}
+
+/**
  * readdir wrapper
  */
 struct dirent *readdir (DIR *dir)
@@ -3356,6 +3377,7 @@ static void init_stdio_internal(void)
     stdio_ops.fdopendir  = dlsym(RTLD_NEXT, "fdopendir" );
     stdio_ops.dirfd  = dlsym(RTLD_NEXT, "dirfd" );
     stdio_ops.readdir_r = dlsym(RTLD_NEXT, "readdir_r");
+    stdio_ops.readdir64_r = dlsym(RTLD_NEXT, "readdir64_r");
     stdio_ops.readdir  = dlsym(RTLD_NEXT, "readdir" );
     stdio_ops.readdir64  = dlsym(RTLD_NEXT, "readdir64" );
     stdio_ops.rewinddir  = dlsym(RTLD_NEXT, "rewinddir" );

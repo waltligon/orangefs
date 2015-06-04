@@ -81,6 +81,7 @@ struct stdio_ops_s
     DIR *(*fdopendir)(int fd);
     int (*dirfd)(DIR *dir);
     int (*readdir_r)(DIR *dir, struct dirent *entry, struct dirent **result);
+    int (*readdir64_r)(DIR *dir, struct dirent64 *entry, struct dirent64 **result);
     struct dirent *(*readdir)(DIR *dir);
     struct dirent64 *(*readdir64)(DIR *dir);
     void (*rewinddir)(DIR *dir);
