@@ -126,6 +126,7 @@ struct __dirstream {
     int _flags;       /**< general flags field */
     int fileno;       /**< file dscriptor of open dir */
     struct dirent de; /**< pointer to dirent read by readdir */
+    
     char *buf_base;   /**< pointer to beginning of buffer */
     char *buf_end;    /**< pointer to end of buffer */
     char *buf_act;    /**< pointer to end of active portion of buffer */
@@ -2366,6 +2367,7 @@ int printf(const char *format, ...)
     size_t len;
     va_list ap;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "Calling printf stdio.c\n");
     va_start(ap, format);
     len = vfprintf(stdout, format, ap);
     va_end(ap);
@@ -2589,7 +2591,11 @@ int ferror_unlocked (FILE *stream)
         gossip_debug(GOSSIP_USRINT_DEBUG, "ferror_unlocked returns %d\n", -1);
         return -1;
     }
-    gossip_debug(GOSSIP_USRINT_DEBUG, "ferror_unlocked returns %d\n", rc);
+    /* Had to comment this out because there was an issue
+     * with rc being undeclared. Has to do with the define
+     * PVFS_STDIO_REDEFSTREAM (Brian Atkinson)
+     */
+    //gossip_debug(GOSSIP_USRINT_DEBUG, "ferror_unlocked returns %d\n", rc);
     return ISFLAGSET(stream, _IO_ERR_SEEN);
 }
 
@@ -2929,6 +2935,27 @@ int dirfd (DIR *dir)
         return -1;
     }
     return dir->fileno;
+}
+
+/**
+ * readdir_r wrapper
+ */
+int readdir_r(DIR *dir, struct dirent *entry, struct dirent **result)
+{
+    struct dirent *val;
+    errno = 0;
+    val = readdir(dir);
+    if(val){
+        *entry = *val;
+        *result = entry;
+    }
+    else{
+        if(errno != 0){
+            return errno;
+        }
+        *result = NULL;
+    }
+    return 0;
 }
 
 /**
@@ -3328,6 +3355,7 @@ static void init_stdio_internal(void)
     stdio_ops.opendir  = dlsym(RTLD_NEXT, "opendir" );
     stdio_ops.fdopendir  = dlsym(RTLD_NEXT, "fdopendir" );
     stdio_ops.dirfd  = dlsym(RTLD_NEXT, "dirfd" );
+    stdio_ops.readdir_r = dlsym(RTLD_NEXT, "readdir_r");
     stdio_ops.readdir  = dlsym(RTLD_NEXT, "readdir" );
     stdio_ops.readdir64  = dlsym(RTLD_NEXT, "readdir64" );
     stdio_ops.rewinddir  = dlsym(RTLD_NEXT, "rewinddir" );

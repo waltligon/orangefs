@@ -112,6 +112,7 @@ int open(const char *path, int flags, ...)
     int fd;
     va_list ap;
     va_start(ap, flags);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "posix.c opening:%s\n", path);
     fd = open_internal(path, flags, ap);
     va_end(ap);
     return fd;
