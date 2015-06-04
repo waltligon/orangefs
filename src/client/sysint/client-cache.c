@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <pthread.h>
 #include <assert.h>
 
@@ -10,20 +11,227 @@ client_cache_t cc;
 
 static int fent_evict_mru();
 static int fent_evict_lru();
-
 static cc_fent_t *fent_get_next_free();
 static cc_fent_t *fent_getp_by_index(uint16_t index);
-
 static void fent_ht_remove(cc_fent_t *fentp);
 static void fent_ht_to_front(cc_fent_t *fentp);
-
+static cc_fent_t *fent_insert(uint64_t fhandle, uint32_t fsid);
+static cc_fent_t *fent_lookup(uint64_t fhandle, uint32_t fsid);
 static void fent_lru_remove(cc_fent_t *fentp);
 static void fent_lru_to_front(cc_fent_t *fentp);
-
 static int fent_match_key(cc_fent_t *fentp, uint64_t fhandle, uint32_t fsid);
-
+static int fent_remove(cc_fent_t *fentp);
 static int fent_remove_by_index(uint16_t index);
+static int fent_remove_by_key(uint64_t fhandle, uint32_t fsid);
 
+static int ment_dirty_flush(cc_mtbl_t *mtblp, cc_ment_t *mentp);
+static int ment_dirty_flush_by_index(cc_mtbl_t *mtblp, uint16_t index);
+static int ment_dirty_flush_by_key(cc_mtbl_t *mtblp, uint64_t tag);
+static int ment_dirty_flush_all(cc_mtbl_t *mtblp);
+static void ment_dirty_remove(cc_mtbl_t *mtblp, cc_ment_t *mentp);
+static void ment_dirty_to_front(cc_mtbl_t *mtblp, cc_ment_t *mentp);
+static int ment_evict_mru(cc_mtbl_t *mtblp);
+static int ment_evict_lru(cc_mtbl_t *mtblp);
+static cc_ment_t *ment_get_next_free(cc_mtbl_t *mtblp);
+static cc_ment_t *ment_getp_by_index(cc_mtbl_t *mtblp, uint16_t index);
+static void ment_ht_remove(cc_mtbl_t *mtblp, cc_ment_t *mentp);
+static void ment_ht_to_front(cc_mtbl_t *mtblp, cc_ment_t *mentp);
+static cc_ment_t *ment_insert(cc_mtbl_t *mtblp, uint64_t tag);
+static cc_ment_t *ment_lookup(cc_mtbl_t *mtblp, uint64_t tag);
+static void ment_lru_remove(cc_mtbl_t *mtblp, cc_ment_t *mentp);
+static void ment_lru_to_front(cc_mtbl_t *mtblp, cc_ment_t *mentp);
+static int ment_match_key(cc_ment_t *mentp, uint64_t tag);
+static int ment_remove(cc_mtbl_t *mtblp, cc_ment_t *mentp);
+static int ment_remove_by_index(cc_mtbl_t *mtblp, uint16_t index);
+static int ment_remove_by_key(cc_mtbl_t *mtblp, uint64_t tag);
+
+static int mtbl_finalize(cc_mtbl_t *mtblp);
+static int mtbl_init(cc_mtbl_t *mtblp,
+                     uint16_t ment_limit,
+                     uint16_t ment_ht_limit);
+
+
+static int fent_evict_mru()
+{
+    printf("%s: cc.ftbl.mru = %hu\n", __func__, cc.ftbl.mru);
+    assert(cc.ftbl.mru != NIL16);
+    return fent_remove_by_index(cc.ftbl.mru);
+}
+
+static int fent_evict_lru()
+{
+    //printf("%s: cc.ftbl.lru = %hu\n", __func__, cc.ftbl.lru);
+    assert(cc.ftbl.lru != NIL16);
+    return fent_remove_by_index(cc.ftbl.lru);
+}
+
+static cc_fent_t *fent_get_next_free()
+{
+    cc_fent_t *fentp = NULL;
+
+    if(cc.ftbl.free_fent == NIL16)
+    {
+        /* TODO attempt to evict file */
+        fent_evict_lru();
+        return fent_get_next_free(); /* Recurse (hopefully only once!) */
+    }
+
+    fentp = fent_getp_by_index(cc.ftbl.free_fent);
+    assert(fentp);
+    cc.ftbl.free_fent = fentp->next;
+
+    /* Initialize ht DLL values*/
+    fentp->prev = NIL16;
+    fentp->next = NIL16;
+
+    /* Initialize recently used list values. */
+    fentp->ru_prev = NIL16;
+    fentp->ru_next = NIL16;
+
+    return fentp;
+}
+
+static cc_fent_t *fent_getp_by_index(uint16_t index)
+{
+    if(index < cc.fent_limit)
+    {
+        return cc.ftbl.fents + index;
+    }
+    return NULL;
+}
+
+static void fent_ht_remove(cc_fent_t *fentp)
+{
+    cc_fent_t *prev = NULL;
+    cc_fent_t *next = NULL;
+    uint16_t bucket = NIL16;
+
+    assert(fentp);
+
+    bucket = (fentp->file_handle + fentp->fsid) % cc.fent_ht_limit;
+
+    prev = fent_getp_by_index(fentp->prev);
+    next = fent_getp_by_index(fentp->next);
+
+    fentp->prev = NIL16;
+    fentp->next = NIL16;
+
+    if(prev != NULL && next != NULL)
+    {
+        /* This entry is in between other entries, so we need to stitch the hole
+         * in the DLL that would be created by removing this item. */
+        /* There is no need to update the index stored in the bucket */
+        next->prev = prev->index;
+        prev->next = next->index;
+    }
+    if(prev == NULL && next == NULL)
+    {
+        /* Test if this is the only item on the DLL, or this is a new
+         * entry that cannot be removed. */
+        if(cc.ftbl.fents_ht[bucket] == fentp->index)
+        {
+            /* Must be the only item on the DLL. */
+            cc.ftbl.fents_ht[bucket] = NIL16;
+        }
+        else
+        {
+            /* This entry must be a new entry, so do nothing. */
+        }
+    }
+    else if(prev == NULL)
+    {
+        /* The first of multiple items on the DLL (aka the MRU entry). */
+        cc.ftbl.fents_ht[bucket] = next->index;
+        next->prev = NIL16;
+    }
+    else if(next == NULL)
+    {
+        /* The last of multiple items on the DLL (aka the LRU entry) */
+        prev->next = NIL16;
+    }
+    else
+    {
+        /* Shouldn't get here! */
+        assert(0);
+    }
+}
+
+static void fent_ht_to_front(cc_fent_t *fentp)
+{
+    cc_fent_t *old_head_fentp = NULL;
+    uint16_t bucket = NIL16;
+
+    assert(fentp);
+
+    fent_ht_remove(fentp);
+
+    bucket = (fentp->file_handle + fentp->fsid) % cc.fent_ht_limit;
+    old_head_fentp = fent_getp_by_index(cc.ftbl.fents_ht[bucket]);
+
+    if(old_head_fentp == NULL)
+    {
+        /* Previously, no entries in the DLL */
+        cc.ftbl.fents_ht[bucket] = fentp->index;
+        /* prev and next should already be NIL16 due to fent_ht_remove */
+    }
+    else
+    {
+        /* Previously, entry(s) in DLL. */
+        cc.ftbl.fents_ht[bucket] = fentp->index;
+        fentp->next = old_head_fentp->index;
+        old_head_fentp->prev = fentp->index;
+        /* fentp->prev should already be NIL16 due to fent_ht_remove */
+    }
+}
+
+static cc_fent_t *fent_insert(uint64_t fhandle, uint32_t fsid)
+{
+    cc_fent_t * new_fentp = NULL;
+    int ret = 0;
+
+    new_fentp = fent_get_next_free();
+    if(new_fentp == NULL)
+    {
+        return NULL;
+    }
+
+    /* Fill in fent values */
+    new_fentp->file_handle = fhandle;
+    new_fentp->fsid = fsid;
+    /* Note: prev, next, ru_prev, and ru_next already initialized to NIL16 */
+
+    /* Allocate and Initialize mtbl */
+    ret = mtbl_init(&new_fentp->mtbl, cc.ment_limit, cc.ment_ht_limit);
+    if(ret < 0)
+    {
+        return NULL;
+    }
+
+    fent_ht_to_front(new_fentp);
+    fent_lru_to_front(new_fentp);
+
+    return new_fentp;
+}
+
+static cc_fent_t *fent_lookup(uint64_t fhandle, uint32_t fsid)
+{
+    uint16_t bucket = 0;
+    cc_fent_t *fentp = NULL;
+
+    bucket = (fhandle + fsid) % cc.fent_ht_limit;
+
+    fentp = fent_getp_by_index(cc.ftbl.fents_ht[bucket]);
+    while(fentp != NULL)
+    {
+        if(fent_match_key(fentp, fhandle, fsid))
+        {
+            return fentp;
+        }
+        fentp = fent_getp_by_index(fentp->next);
+    }
+
+    return NULL;
+}
 
 static void fent_lru_remove(cc_fent_t *fentp)
 {
@@ -128,126 +336,15 @@ static int fent_match_key(cc_fent_t *fentp, uint64_t fhandle, uint32_t fsid)
     return 0;
 }
 
-static cc_fent_t *fent_getp_by_index(uint16_t index)
+static int fent_remove(cc_fent_t *fentp)
 {
-    if(index < cc.fent_limit)
-    {
-        return cc.ftbl.fents + index;
-    }
-    return NULL;
-}
-
-cc_fent_t *fent_lookup(uint64_t fhandle, uint32_t fsid)
-{
-    uint16_t bucket = 0;
-    cc_fent_t *fentp = NULL;
-
-    bucket = (fhandle + fsid) % cc.fent_ht_limit;
-
-    fentp = fent_getp_by_index(cc.ftbl.fents_ht[bucket]);
-    while(fentp != NULL)
-    {
-        if(fent_match_key(fentp, fhandle, fsid))
-        {
-            return fentp;
-        }
-        fentp = fent_getp_by_index(fentp->next);
-    }
-
-    return NULL;
-}
-
-static void fent_ht_to_front(cc_fent_t *fentp)
-{
-    cc_fent_t * old_head_fentp = NULL;
-    uint16_t bucket = NIL16;
-
-    assert(fentp);
-
-    fent_ht_remove(fentp);
-
-    bucket = (fentp->file_handle + fentp->fsid) % cc.fent_ht_limit;
-    old_head_fentp = fent_getp_by_index(cc.ftbl.fents_ht[bucket]);
-
-    if(old_head_fentp == NULL)
-    {
-        /* Previously, no entries in the DLL */
-        cc.ftbl.fents_ht[bucket] = fentp->index;
-        /* prev and next should already be NIL16 due to fent_ht_remove */
-    }
-    else
-    {
-        /* Previously, entry(s) in DLL. (MRU and LRU are different) */
-        cc.ftbl.fents_ht[bucket] = fentp->index;
-        fentp->next = old_head_fentp->index;
-        old_head_fentp->prev = fentp->index;
-        /* fentp->prev should already be NIL16 due to fent_ht_remove */
-    }
-}
-
-static void fent_ht_remove(cc_fent_t *fentp)
-{
-    cc_fent_t *prev = NULL;
-    cc_fent_t *next = NULL;
-    uint16_t bucket = NIL16;
-
-    assert(fentp);
-
-    bucket = (fentp->file_handle + fentp->fsid) % cc.fent_ht_limit;
-
-    prev = fent_getp_by_index(fentp->prev);
-    next = fent_getp_by_index(fentp->next);
-
-    fentp->prev = NIL16;
-    fentp->next = NIL16;
-
-    if(prev != NULL && next != NULL)
-    {
-        /* This entry is in between other entries, so we need to stitch the hole
-         * in the DLL that would be created by removing this item. */
-        /* There is no need to update the index stored in the bucket */
-        next->prev = prev->index;
-        prev->next = next->index;
-    }
-    if(prev == NULL && next == NULL)
-    {
-        /* Test if this is the only item on the DLL, or this is a new
-         * entry that cannot be removed. */
-        if(cc.ftbl.fents_ht[bucket] == fentp->index)
-        {
-            /* Must be the only item on the DLL. */
-            cc.ftbl.fents_ht[bucket] = NIL16;
-        }
-        else
-        {
-            /* This entry must be a new entry, so do nothing. */
-        }
-    }
-    else if(prev == NULL)
-    {
-        /* The first of multiple items on the DLL (aka the MRU entry). */
-        cc.ftbl.fents_ht[bucket] = next->index;
-        next->prev = NIL16;
-    }
-    else if(next == NULL)
-    {
-        /* The last of multiple items on the DLL (aka the LRU entry) */
-        prev->next = NIL16;
-    }
-    else
-    {
-        /* Shouldn't get here! */
-        assert(0);
-    }
-}
-
-static int fent_remove_by_index(uint16_t index)
-{
-    cc_fent_t *fentp = fent_getp_by_index(index);
     assert(fentp != NULL);
 
-    /* remove fent */
     /* TODO: Flush dirty data.*/
+    
+
+    /* TODO: Check error codes? */
+    mtbl_finalize(&fentp->mtbl);
 
     /* Remove from fents_ht */
     fent_ht_remove(fentp);
@@ -262,73 +359,270 @@ static int fent_remove_by_index(uint16_t index)
     return 0;
 }
 
-static int fent_evict_lru()
+static int fent_remove_by_index(uint16_t index)
 {
-    printf("%s: cc.ftbl.lru = %hu\n", __func__, cc.ftbl.lru);
-    assert(cc.ftbl.lru != NIL16);
-    return fent_remove_by_index(cc.ftbl.lru);
-}
+    cc_fent_t *fentp = fent_getp_by_index(index);
 
-/* Use only for testing at the moment. */
-static int fent_evict_mru()
-{
-    printf("%s: cc.ftbl.mru = %hu\n", __func__, cc.ftbl.mru);
-    assert(cc.ftbl.mru != NIL16);
-    return fent_remove_by_index(cc.ftbl.mru);
-}
-
-static cc_fent_t *fent_get_next_free()
-{
-    cc_fent_t *fentp = NULL;
-
-    if(cc.ftbl.free_fent == NIL16)
+    if(fentp == NULL)
     {
-        /* TODO attempt to evict file */
-        fent_evict_lru();
-        return fent_get_next_free(); /* Recurse (hopefully only once!) */
+        return -1;
+    }
+    return fent_remove(fentp);
+}
+
+static int fent_remove_by_key(uint64_t fhandle, uint32_t fsid)
+{
+    cc_fent_t *fentp = fent_lookup(fhandle, fsid);
+
+    if(fentp == NULL)
+    {
+        return -1;
+    }
+    return fent_remove(fentp);
+}
+
+static int ment_dirty_flush(cc_mtbl_t *mtblp, cc_ment_t *mentp)
+{
+    int ret = 0;
+
+    assert(mtblp && mentp);
+
+    /* TODO Flush dirty block data */
+
+    ment_dirty_remove(mtblp, mentp);
+
+    return 0;
+}
+
+static int ment_dirty_flush_by_index(cc_mtbl_t *mtblp, uint16_t index)
+{
+    assert(mtblp);
+    return ment_dirty_flush(mtblp, ment_getp_by_index(mtblp, index));
+}
+static int ment_dirty_flush_by_key(cc_mtbl_t *mtblp, uint64_t tag)
+{
+    cc_ment_t *mentp = NULL;
+
+    assert(mtblp);
+
+    mentp = ment_lookup(mtblp, tag);
+
+    if(mentp == NULL)
+    {
+        return -1;
     }
 
-    fentp = fent_getp_by_index(cc.ftbl.free_fent);
-    assert(fentp);
-    cc.ftbl.free_fent = fentp->next;
-
-    /* Initialize ht DLL values*/
-    fentp->prev = NIL16;
-    fentp->next = NIL16;
-
-    /* Initialize recently used list values. */
-    fentp->ru_prev = NIL16;
-    fentp->ru_next = NIL16;
-
-    return fentp;
+    return ment_dirty_flush(mtblp, mentp);
 }
 
-cc_fent_t *fent_insert(uint64_t fhandle, uint32_t fsid)
+static int ment_dirty_flush_all(cc_mtbl_t *mtblp)
 {
-    cc_fent_t * new_fentp = NULL;
+    int ret = 0;
 
-    new_fentp = fent_get_next_free();
-    if(new_fentp == NULL)
+    assert(mtblp);
+
+    while(mtblp->dirty_first != NIL16)
     {
-        return NULL;
+        ret = ment_dirty_flush_by_index(mtblp, mtblp->dirty_first);
+        if(ret < 0)
+        {
+            /* Error */
+            return -1;
+        }
+    }
+    return 0;
+}
+
+static void ment_dirty_remove(cc_mtbl_t *mtblp, cc_ment_t *mentp)
+{
+    cc_ment_t *dirty_prev = NULL;
+    cc_ment_t *dirty_next = NULL;
+
+    assert(mtblp && mentp);
+
+    dirty_prev = ment_getp_by_index(mtblp, mentp->dirty_prev);
+    dirty_next = ment_getp_by_index(mtblp, mentp->dirty_next);
+
+    mentp->dirty_prev = NIL16;
+    mentp->dirty_next = NIL16;
+
+    if(dirty_prev != NULL && dirty_next != NULL)
+    {
+        /* This entry is in between other entries, so we need to stitch the hole
+         * in the DLL that would be created by removing this item. */
+        /* There is no need to update the index stored in the bucket */
+        dirty_next->dirty_prev = dirty_prev->index;
+        dirty_prev->dirty_next = dirty_next->index;
+    }
+    if(dirty_prev == NULL && dirty_next == NULL)
+    {
+        /* Test if this is the only item on the DLL, or this is a new
+         * entry that cannot be removed. */
+        if(mtblp->dirty_first == mentp->index)
+        {
+            /* Must be the only item on the DLL. */
+            mtblp->dirty_first = NIL16;
+        }
+        else
+        {
+            /* This entry must be a new entry, so do nothing. */
+        }
+    }
+    else if(dirty_prev == NULL)
+    {
+        /* The first of multiple items on the DLL (aka the MRU entry). */
+        mtblp->dirty_first = dirty_next->index;
+        dirty_next->dirty_prev = NIL16;
+    }
+    else if(dirty_next == NULL)
+    {
+        /* The last of multiple items on the DLL (aka the LRU entry) */
+        dirty_prev->dirty_next = NIL16;
+    }
+    else
+    {
+        /* Shouldn't get here! */
+        assert(0);
+    }
+}
+
+static void ment_dirty_to_front(cc_mtbl_t *mtblp, cc_ment_t *mentp)
+{
+    cc_ment_t *old_dirty_first_mentp = NULL;
+
+    assert(mtblp && mentp);
+
+    ment_dirty_remove(mtblp, mentp);
+
+    old_dirty_first_mentp = ment_getp_by_index(mtblp, mtblp->dirty_first);
+
+    if(old_dirty_first_mentp == NULL)
+    {
+        /* Previously, no entries in the DLL */
+        mtblp->dirty_first = mentp->index;
+        /* dirty_prev and dirty_next should already be NIL16 due to ment_dirty_remove */
+    }
+    else
+    {
+        /* Previously, entry(s) in DLL. */
+        mtblp->dirty_first = mentp->index;
+        mentp->dirty_next = old_dirty_first_mentp->index;
+        old_dirty_first_mentp->dirty_prev = mentp->index;
+        /* mentp->dirty_prev should already be NIL16 due to ment_dirty_remove */
+    }
+}
+
+static int mtbl_finalize(cc_mtbl_t *mtblp)
+{
+    assert(mtblp);
+
+    /* TODO: flush dirty data */
+
+    free(mtblp->ments);
+    free(mtblp->ments_ht);
+    return 0;
+}
+
+static int mtbl_init(cc_mtbl_t *mtblp,
+                     uint16_t ment_limit,
+                     uint16_t ment_ht_limit)
+{
+    cc_ment_t *mentp = NULL;
+    unsigned int i = 0;
+
+    assert(mtblp);
+
+    /* TODO: We could support embedding the ment_limit and ment_ht_limit to
+     * support custom memory table limits on a per file basis via hints.*/
+#if 0
+    mtblp->ment_limit = ment_limit;
+    mtblp->ment_ht_limit = ment_ht_limit;
+#endif
+
+    /* Allocate memory for ments */
+    mtblp->ments = malloc(ment_limit * sizeof(cc_ment_t));
+    if(mtblp->ments == NULL)
+    {
+        fprintf(stderr, "%s: ERROR allocating memory for ments!\n", __func__);
+        return -1;
     }
 
-    /* Fill in fent values */
-    new_fentp->file_handle = fhandle;
-    new_fentp->fsid = fsid;
-    new_fentp->file_size = 0;
-    /* Note: prev, next, ru_prev, and ru_next already initialized to NIL16 */
+#if 0
+    printf("%s: ments bytes = %llu\n",
+           __func__,
+           (long long unsigned int) ment_limit * sizeof(cc_ment_t));
+#endif
 
+    /* Setup free ments LL */
+#if 0
+    printf("%s: first ment address = %p\n", __func__, mtblp->ments);
+#endif
+    mtblp->free_ment = 0;
+    for(i = 0, mentp = mtblp->ments;
+        i < (ment_limit - 1);
+        mentp++, i++)
+    {
+#if 0
+        printf("%s: ment address = %p\n", __func__, mentp);
+#endif
+        mentp->index = i;
+        mentp->next = i + 1;
+    }
+    mentp->index = i;
+    mentp->next = NIL16;
+
+    /* Allocate memory for ments ht */
+    mtblp->ments_ht = malloc(ment_ht_limit * sizeof(uint16_t));
+    if(mtblp->ments_ht == NULL)
+    {
+        fprintf(stderr,
+                "%s: ERROR allocating memory for ments_ht!\n",
+                __func__);
+        return -1;
+    }
+
+    /* Set all hash table buckets to NIL16 */
+    memset(mtblp->ments_ht, NIL8, ment_ht_limit * sizeof(uint16_t));
+#if 0
+    printf("%s: ments_ht bytes = %llu\n",
+           __func__,
+           (long long unsigned int) ment_ht_limit * sizeof(uint16_t));
+#endif
+
+    mtblp->max_offset_seen = 0;
+    mtblp->num_blocks = 0;
+    mtblp->mru = NIL16;
+    mtblp->lru = NIL16;
+    mtblp->dirty_first = NIL16;
+    mtblp->ref_cnt = 0;
+
+    return 0;
+}
+
+int client_cache_finalize(void)
+{
+    /* int ret = 0; */
+    /* int i = 0; */
+    printf("%s\n", __func__);
+
+    /* Flush all dirty blocks */
     /* TODO */
-    /* Allocate + Initialize mtbl */
 
-    fent_ht_to_front(new_fentp);
-    fent_lru_to_front(new_fentp);
+    /* Free blks memory region */
+    free(cc.blks);
 
-    return new_fentp;
+    /* Free fents memory region: */
+    /* TODO delve into fent and free underlying allocated structs like
+     * ments. */
+    free(cc.ftbl.fents);
+
+    /* Free fents_ht memory region: */
+    free(cc.ftbl.fents_ht);
+
+    return 0;
 }
 
-int init_cache(
+int client_cache_init(
     uint64_t cache_size,
     uint64_t block_size,
     uint16_t fent_limit,
@@ -336,8 +630,8 @@ int init_cache(
     uint16_t ment_limit,
     uint16_t ment_ht_limit)
 {
-    uint16_t *uint16p = NULL;
     void *voidp = NULL;
+    cc_fent_t *fentp = NULL;
     /* int ret = 0; */
     int i = 0;
 
@@ -396,7 +690,7 @@ int init_cache(
     ((free_block_t *) voidp)->next = NIL16;
 
     /* Allocate memory for fents */
-    cc.ftbl.fents = calloc(1, fent_limit * sizeof(cc_fent_t));
+    cc.ftbl.fents = malloc(fent_limit * sizeof(cc_fent_t));
     if(cc.ftbl.fents == NULL)
     {
         fprintf(stderr, "%s: ERROR allocating memory for fents!\n", __func__);
@@ -409,19 +703,19 @@ int init_cache(
     /* Setup free fents LL */
     printf("%s: first fent address = %p\n", __func__, cc.ftbl.fents);
     cc.ftbl.free_fent = 0;
-    for(i = 0, voidp = cc.ftbl.fents;
+    for(i = 0, fentp = cc.ftbl.fents;
         i < (cc.fent_limit - 1);
-        voidp += cc.fent_size, i++)
+        fentp++, i++)
     {
-        /* printf("%s: fent address = %p\n", __func__, voidp); */
-        ((cc_fent_t *) voidp)->index = i;
-        ((cc_fent_t *) voidp)->next = i + 1;
+        printf("%s: fent address = %p\n", __func__, fentp);
+        fentp->index = i;
+        fentp->next = i + 1;
     }
-    ((cc_fent_t *) voidp)->index = i;
-    ((cc_fent_t *) voidp)->next = NIL16;
+    fentp->index = i;
+    fentp->next = NIL16;
 
     /* Allocate memory for fents ht */
-    cc.ftbl.fents_ht = calloc(1, fent_ht_limit * sizeof(uint16_t));
+    cc.ftbl.fents_ht = malloc(fent_ht_limit * sizeof(uint16_t));
     if(cc.ftbl.fents_ht == NULL)
     {
         fprintf(stderr,
@@ -431,11 +725,7 @@ int init_cache(
     }
 
     /* Set all hash table buckets to NIL16 */
-    for(i = 0, uint16p = cc.ftbl.fents_ht; i < fent_ht_limit; i++, uint16p++)
-    {
-        /* printf("%s: uint16p = %p\n", __func__, uint16p); */
-        *uint16p = NIL16;
-    }
+    memset((void *) cc.ftbl.fents_ht, NIL8, fent_ht_limit * sizeof(uint16_t));
     printf("%s: fents_ht bytes = %llu\n",
            __func__,
            (long long unsigned int) fent_ht_limit * sizeof(uint16_t));
@@ -447,51 +737,13 @@ int init_cache(
     return 0;
 }
 
-int finalize_cache(void)
-{
-    /* int ret = 0; */
-    /* int i = 0; */
-    printf("%s\n", __func__);
-
-    /* Flush all dirty blocks */
-    /* TODO */
-
-    /* Free blks memory region */
-    if(cc.blks != NULL)
-    {
-        free(cc.blks);
-    }
-
-    /* Free fents memory region: */
-    if(cc.ftbl.fents != NULL)
-    {
-        /* TODO delve into fent and free underlying allocated structs like
-         * ments. */
-
-        free(cc.ftbl.fents);
-    }
-
-    /* Free fents_ht memory region: */
-    if(cc.ftbl.fents_ht != NULL)
-    {
-        free(cc.ftbl.fents_ht);
-    }
-
-    /* TODO */
-    /* For every bucket, walk the list and...*/
-        /* Free ments memory region */
-        /* For every bucket, walk the list and */
-
-    return 0;
-}
-
 int main(int argc, char** argv)
 {
     int ret = 0;
     int i = 0;
     printf("%s\n", __func__);
     printf("FYI: sizeof(pthread_rwlock_t) = %zu\n", sizeof(pthread_rwlock_t));
-    ret = init_cache(BYTE_LIMIT,
+    ret = client_cache_init(BYTE_LIMIT,
                      BLOCK_SIZE_B,
                      FENT_LIMIT,
                      FENT_HT_LIMIT,
@@ -499,8 +751,8 @@ int main(int argc, char** argv)
                      MENT_HT_LIMIT);
     if(ret != 0)
     {
-        fprintf(stderr, "%s: init_cache returned %d\n", __func__, ret);
-        finalize_cache();
+        //fprintf(stderr, "%s: init_cache returned %d\n", __func__, ret);
+        client_cache_finalize();
         return EXIT_FAILURE;
     }
 
@@ -511,21 +763,24 @@ int main(int argc, char** argv)
     uint64_t fhandle = 0;
     uint32_t fsid = 0;
     cc_fent_t * fentp;
-    for(; fhandle < FENT_LIMIT; fhandle++)
+    for(; fhandle < 1000; fhandle++)
     {
         fentp = fent_insert(fhandle, fsid);
+#if 0
         printf("%s: fentp returned by fent_insert = %p, fhandle = %llu\n",
                __func__,
                fentp,
                (long long unsigned int) fhandle);
+#endif
         assert(fentp);
     }
 
+#if 0
     /* Test 2: Look them up*/
     for(fhandle = 0, fsid = 0; fhandle < FENT_LIMIT * 2; fhandle++)
     {
         fentp = fent_lookup(fhandle, fsid);
-        assert(fentp);
+        //assert(fentp);
         printf("%s: fentp returned by fent_lookup = %p, fhandle = %llu\n",
                __func__,
                fentp,
@@ -537,9 +792,10 @@ int main(int argc, char** argv)
         fent_evict_lru();
         //fent_evict_mru();
     }
+#endif
 
     /* Done with tests. */
 
-    finalize_cache();
+    client_cache_finalize();
     return EXIT_SUCCESS;
 }
