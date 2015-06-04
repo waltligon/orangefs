@@ -9,6 +9,11 @@
 
 client_cache_t cc;
 
+static uint16_t blk_get_next_free();
+static void * blk_getp_by_index(uint16_t index);
+static void blk_push_free(uint16_t index);
+static void blk_zero(void *voidp);
+
 static int fent_evict_mru();
 static int fent_evict_lru();
 static cc_fent_t *fent_get_next_free();
@@ -50,6 +55,63 @@ static int mtbl_init(cc_mtbl_t *mtblp,
                      uint16_t ment_limit,
                      uint16_t ment_ht_limit);
 
+static uint16_t blk_get_next_free()
+{
+    cc_free_block_t *free_blkp = NULL;
+    uint16_t free_blk = NIL16;
+
+    /* If there are no more free blocks then evict the LRU ment of the LRU
+     * block */
+    if(cc.free_blk == NIL16)
+    {
+        cc_fent_t * fentp = NULL;
+        int ret = 0;
+
+        /* TODO: Check return value of eviction */
+        fentp = fent_getp_by_index(cc.ftbl.lru);
+        assert(fentp);
+        ret = ment_evict_lru(&fentp->mtbl);
+        assert(ret == 0);
+    }
+
+    /* Remove Block from the free block list. */
+    free_blk = cc.free_blk;
+    free_blkp = (cc_free_block_t *) blk_getp_by_index(free_blk);
+    assert(free_blkp);
+    cc.free_blk = free_blkp->next;
+
+    /* Zero out all bytes in this block */
+    blk_zero((void *) free_blkp);
+
+    return free_blk;
+}
+
+static void * blk_getp_by_index(uint16_t index)
+{
+    if(index < cc.num_blks)
+    {
+        return cc.blks + (index * cc.blk_size);
+    }
+    return NULL;
+}
+
+static void blk_push_free(uint16_t index)
+{
+    cc_free_block_t *blk = NULL;
+
+    blk = (cc_free_block_t *) blk_getp_by_index(index);
+    assert(blk);
+
+    blk->next = cc.free_blk;
+    cc.free_blk = index;
+}
+
+static void blk_zero(void *voidp)
+{
+    assert(voidp);
+
+    memset(voidp, 0, cc.blk_size);
+}
 
 static int fent_evict_mru()
 {
@@ -73,7 +135,6 @@ static cc_fent_t *fent_get_next_free()
     {
         /* TODO attempt to evict file */
         fent_evict_lru();
-        return fent_get_next_free(); /* Recurse (hopefully only once!) */
     }
 
     fentp = fent_getp_by_index(cc.ftbl.free_fent);
@@ -387,9 +448,12 @@ static int ment_dirty_flush(cc_mtbl_t *mtblp, cc_ment_t *mentp)
 
     assert(mtblp && mentp);
 
-    /* TODO Flush dirty block data */
-
-    ment_dirty_remove(mtblp, mentp);
+    if(mentp->dirty)
+    {
+        /* TODO Flush dirty block data */
+        
+        ment_dirty_remove(mtblp, mentp);
+    }
 
     return 0;
 }
@@ -399,6 +463,7 @@ static int ment_dirty_flush_by_index(cc_mtbl_t *mtblp, uint16_t index)
     assert(mtblp);
     return ment_dirty_flush(mtblp, ment_getp_by_index(mtblp, index));
 }
+
 static int ment_dirty_flush_by_key(cc_mtbl_t *mtblp, uint64_t tag)
 {
     cc_ment_t *mentp = NULL;
@@ -445,12 +510,12 @@ static void ment_dirty_remove(cc_mtbl_t *mtblp, cc_ment_t *mentp)
 
     mentp->dirty_prev = NIL16;
     mentp->dirty_next = NIL16;
+    mentp->dirty = 0;
 
     if(dirty_prev != NULL && dirty_next != NULL)
     {
         /* This entry is in between other entries, so we need to stitch the hole
          * in the DLL that would be created by removing this item. */
-        /* There is no need to update the index stored in the bucket */
         dirty_next->dirty_prev = dirty_prev->index;
         dirty_prev->dirty_next = dirty_next->index;
     }
@@ -510,6 +575,211 @@ static void ment_dirty_to_front(cc_mtbl_t *mtblp, cc_ment_t *mentp)
         old_dirty_first_mentp->dirty_prev = mentp->index;
         /* mentp->dirty_prev should already be NIL16 due to ment_dirty_remove */
     }
+
+    mentp->dirty = 1;
+}
+
+static int ment_evict_mru(cc_mtbl_t *mtblp)
+{
+    printf("%s: mtblp->mru = %hu\n", __func__, mtblp->mru);
+    assert(mtblp->mru != NIL16);
+    return ment_remove_by_index(mtblp, mtblp->mru);
+}
+
+static int ment_evict_lru(cc_mtbl_t *mtblp)
+{
+    printf("%s: mtblp->lru = %hu\n", __func__, mtblp->lru);
+    assert(mtblp->lru != NIL16);
+    return ment_remove_by_index(mtblp, mtblp->lru);
+}
+
+static cc_ment_t *ment_get_next_free(cc_mtbl_t *mtblp)
+{
+    cc_ment_t *mentp = NULL;
+    uint16_t blk_index = 0;
+
+    assert(mtblp);
+
+    if(mtblp->free_ment == NIL16)
+    {
+        /* TODO: Check return code and if it failed call evict on LRU block of
+         * LRU file */
+        ment_evict_lru(mtblp);
+    }
+
+    /* Get free block (if necessary, evict LRU ment of LRU fent) */
+    blk_index = blk_get_next_free();
+
+    mentp = ment_getp_by_index(mtblp, mtblp->free_ment);
+    assert(mentp);
+    mtblp->free_ment = mentp->next;
+
+    /* Associate block with the ment */
+    mentp->blk_index = blk_index;
+
+    /* Initialize ht DLL values*/
+    mentp->prev = NIL16;
+    mentp->next = NIL16;
+
+    /* Initialize recently used list values. */
+    mentp->ru_prev = NIL16;
+    mentp->ru_next = NIL16;
+
+    /* Initialize dirty list values */
+    mentp->dirty_prev = NIL16;
+    mentp->dirty_next = NIL16;
+    mentp->dirty = 0;
+
+    return mentp;
+}
+
+static cc_ment_t *ment_getp_by_index(cc_mtbl_t *mtblp, uint16_t index)
+{
+    if(index < cc.ment_limit)
+    {
+        return mtblp->ments + index;
+    }
+    return NULL;
+}
+
+static void ment_ht_remove(cc_mtbl_t *mtblp, cc_ment_t *mentp)
+{
+    cc_ment_t *prev = NULL;
+    cc_ment_t *next = NULL;
+    uint16_t bucket = NIL16;
+
+    assert(mentp);
+
+    bucket = mentp->tag % cc.ment_ht_limit;
+
+    prev = ment_getp_by_index(mtblp, mentp->prev);
+    next = ment_getp_by_index(mtblp, mentp->next);
+
+    mentp->prev = NIL16;
+    mentp->next = NIL16;
+
+    if(prev != NULL && next != NULL)
+    {
+        /* This entry is in between other entries, so we need to stitch the hole
+         * in the DLL that would be created by removing this item. */
+        /* There is no need to update the index stored in the bucket */
+        next->prev = prev->index;
+        prev->next = next->index;
+    }
+    if(prev == NULL && next == NULL)
+    {
+        /* Test if this is the only item on the DLL, or this is a new
+         * entry that cannot be removed. */
+        if(mtblp->ments_ht[bucket] == mentp->index)
+        {
+            /* Must be the only item on the DLL. */
+            mtblp->ments_ht[bucket] = NIL16;
+        }
+        else
+        {
+            /* This entry must be a new entry, so do nothing. */
+        }
+    }
+    else if(prev == NULL)
+    {
+        /* The first of multiple items on the DLL (aka the MRU entry). */
+        mtblp->ments_ht[bucket] = next->index;
+        next->prev = NIL16;
+    }
+    else if(next == NULL)
+    {
+        /* The last of multiple items on the DLL (aka the LRU entry) */
+        prev->next = NIL16;
+    }
+    else
+    {
+        /* Shouldn't get here! */
+        assert(0);
+    }
+}
+
+static void ment_ht_to_front(cc_mtbl_t *mtblp, cc_ment_t *mentp)
+{
+    cc_ment_t *old_head_mentp = NULL;
+    uint16_t bucket = NIL16;
+
+    assert(mtblp && mentp);
+
+    ment_ht_remove(mtblp, mentp);
+
+    bucket = mentp->tag % cc.ment_ht_limit;
+    old_head_mentp = ment_getp_by_index(mtblp, mtblp->ments_ht[bucket]);
+
+    if(old_head_mentp == NULL)
+    {
+        /* Previously, no entries in the DLL */
+        mtblp->ments_ht[bucket] = mentp->index;
+        /* prev and next should already be NIL16 due to ment_ht_remove */
+    }
+    else
+    {
+        /* Previously, entry(s) in DLL. */
+        mtblp->ments_ht[bucket] = mentp->index;
+        mentp->next = old_head_mentp->index;
+        old_head_mentp->prev = mentp->index;
+        /* mentp->prev should already be NIL16 due to ment_ht_remove */
+    }
+}
+
+static cc_ment_t *ment_insert(cc_mtbl_t *mtblp, uint64_t tag)
+{
+    cc_ment_t * new_mentp = NULL;
+    int ret = 0;
+
+    new_mentp = ment_get_next_free(mtblp);
+    assert(new_mentp);
+
+    /* Fill in ment values */
+    new_mentp->tag = tag;
+    /* Note: DLL items already initialized to NIL16 */
+
+
+    /* TODO perform R/W here or outside this function? */
+
+    ment_ht_to_front(mtblp, new_mentp);
+    ment_lru_to_front(mtblp, new_mentp);
+
+    return new_mentp;
+}
+
+static cc_ment_t *ment_lookup(cc_mtbl_t *mtblp, uint64_t tag)
+{
+    
+}
+
+static void ment_lru_remove(cc_mtbl_t *mtblp, cc_ment_t *mentp)
+{
+    
+}
+
+static void ment_lru_to_front(cc_mtbl_t *mtblp, cc_ment_t *mentp)
+{
+    
+}
+
+static int ment_match_key(cc_ment_t *mentp, uint64_t tag)
+{
+    
+}
+
+static int ment_remove(cc_mtbl_t *mtblp, cc_ment_t *mentp)
+{
+    
+}
+
+static int ment_remove_by_index(cc_mtbl_t *mtblp, uint16_t index)
+{
+    
+}
+
+static int ment_remove_by_key(cc_mtbl_t *mtblp, uint64_t tag)
+{
+    
 }
 
 static int mtbl_finalize(cc_mtbl_t *mtblp)
@@ -590,7 +860,7 @@ static int mtbl_init(cc_mtbl_t *mtblp,
 #endif
 
     mtblp->max_offset_seen = 0;
-    mtblp->num_blocks = 0;
+    mtblp->num_blks = 0;
     mtblp->mru = NIL16;
     mtblp->lru = NIL16;
     mtblp->dirty_first = NIL16;
@@ -599,7 +869,7 @@ static int mtbl_init(cc_mtbl_t *mtblp,
     return 0;
 }
 
-int client_cache_finalize(void)
+int client_cache_fini(void)
 {
     /* int ret = 0; */
     /* int i = 0; */
@@ -638,7 +908,7 @@ int client_cache_init(
     printf("%s\n", __func__);
 
     /* Store limits w/ cc */
-    cc.block_size = block_size;
+    cc.blk_size = block_size;
     cc.fent_limit = fent_limit;
     cc.fent_ht_limit = fent_ht_limit;
     cc.fent_size = (uint16_t) sizeof(cc_fent_t);
@@ -648,7 +918,7 @@ int client_cache_init(
 
     printf("%s: block_size = %llu\n",
            __func__,
-           (long long unsigned int) cc.block_size);
+           (long long unsigned int) cc.blk_size);
     printf("%s: fent_limit = %hu\n", __func__, cc.fent_limit);
     printf("%s: fent_ht_limit = %hu\n", __func__, cc.fent_ht_limit);
     printf("%s: fent_size = %hu\n", __func__, cc.fent_size);
@@ -657,21 +927,21 @@ int client_cache_init(
     printf("%s: ment_size = %hu\n", __func__, cc.ment_size);
 
     /* Allocate memory for blocks. */
-    cc.num_blocks = cache_size / block_size;
-    printf("%s: num_blocks = %d\n", __func__, cc.num_blocks);
-    if(cc.num_blocks == 0)
+    cc.num_blks = cache_size / block_size;
+    printf("%s: num_blocks = %d\n", __func__, cc.num_blks);
+    if(cc.num_blks == 0)
     {
         fprintf(stderr, "%s: WARN num_blocks is ZERO!\n", __func__);
         return 0;
     }
-    cc.blks = calloc(1, cc.num_blocks * block_size);
+    cc.blks = calloc(1, cc.num_blks * block_size);
     if(cc.blks == NULL)
     {
         fprintf(stderr, "%s: ERROR allocating memory for blks!\n", __func__);
         return -1;
     }
 
-    cc.cache_size = cc.num_blocks * block_size;
+    cc.cache_size = cc.num_blks * block_size;
     printf("%s: cacheable bytes = %llu = %Lf MiB\n",
            __func__,
            (long long unsigned int) cc.cache_size,
@@ -681,13 +951,13 @@ int client_cache_init(
     printf("%s: first block address = %p\n", __func__, cc.blks);
     cc.free_blk = 0;
     for(i = 0, voidp = cc.blks;
-        i < (cc.num_blocks - 1);
-        voidp += cc.block_size, i++)
+        i < (cc.num_blks - 1);
+        voidp += cc.blk_size, i++)
     {
         /* printf("%s: block address = %p\n", __func__, voidp); */
-        ((free_block_t *) voidp)->next = i + 1;
+        ((cc_free_block_t *) voidp)->next = i + 1;
     }
-    ((free_block_t *) voidp)->next = NIL16;
+    ((cc_free_block_t *) voidp)->next = NIL16;
 
     /* Allocate memory for fents */
     cc.ftbl.fents = malloc(fent_limit * sizeof(cc_fent_t));
@@ -752,7 +1022,7 @@ int main(int argc, char** argv)
     if(ret != 0)
     {
         //fprintf(stderr, "%s: init_cache returned %d\n", __func__, ret);
-        client_cache_finalize();
+        client_cache_fini();
         return EXIT_FAILURE;
     }
 
@@ -796,6 +1066,6 @@ int main(int argc, char** argv)
 
     /* Done with tests. */
 
-    client_cache_finalize();
+    client_cache_fini();
     return EXIT_SUCCESS;
 }
