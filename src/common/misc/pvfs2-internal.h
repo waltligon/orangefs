@@ -37,7 +37,7 @@
 #else
 #  define GCC_CONSTRUCTOR(priority) 
 #  define GCC_DESTRUCTOR(priority)
-#  define GCC_UNUSED  __attribute__((unused))
+#  define GCC_UNUSED
 #  define PVFS_INIT(f) f()
 #endif
 
