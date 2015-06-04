@@ -9,12 +9,13 @@
 #define PINT_MALLOC_H
 
 #include <stdint.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 
 #ifndef WIN32
 /* pint-malloc.c is not used on Windows */
+#include <unistd.h>
+
 struct glibc_malloc_ops_s
 {
     void *(*malloc)(size_t size);
