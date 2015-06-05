@@ -23,6 +23,9 @@
 #define NIL8  0XFF
 #define NIL16 0XFFFF
 
+//#define INLINE inline
+#define INLINE
+
 typedef struct cc_ment_s
 {
     uint64_t tag;           /* offset of data block in file */
