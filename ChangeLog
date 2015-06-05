@@ -30,9 +30,24 @@ http://www.orangefs.org/svn/orangefs/tags/v.2.9.2
 	* - Enabled PAM support.  The README file, in src/client/webpack,
 	describes how to use this feature.
 
-* - USRINT libraries
+* - USRINT libraries (libofs,liborangefs,liborangefsposix)
 	* - Modified selinux related files to allow compiles on both new and
 	old RHEL distributions.
+
+	* - __getdelim():  caller can now pass in a buffer pointer allocated
+	by pint-malloc OR regular malloc. NOTE: PINT-malloc is an internal
+	macro that reduces the likely hood of memory leaks.
+
+	* - Added new calls to PINT-malloc that checks the validity of a
+	pointer's address and determines if PINT-malloc was used to allocate
+	its memory.  This call is costly, making two system calls.  Use only
+	if necessary.
+
+	* - Added two new programs, ofs_rm.c and ofs_cp.c, that use the usrint
+	libraries and FTS.  These programs are still experimental but can be
+	used as a guidline for building your own programs using the usrint
+	libraries.  They are stored in src/apps/user and are currently NOT
+	installed in <install>/bin when a make is issued.
 
 
 * - HADOOP
@@ -46,13 +61,17 @@ http://www.orangefs.org/svn/orangefs/tags/v.2.9.2
 
 * - KERNEL MODULE
 	* - GOSSIP: changed GOSSIP_PROC_DEBUG to GOSSIP_CLIENTCORE_DEBUG
+
 	* - DCACHE: corrected problem where negative dentries did not have the
 	d_op field filled in with the OFS dentry operations functions, causing
 	the kernel to return file-not-found when the file was created outside
 	of the kernel.
+
 	* - Add configuration check for f_dentry in struct file, allowing for
 	compatibility with newer kernel versions.
 
+	* - Modified the handling of xattrs, i.e., the exact length of the
+	xattr's value will be correct, not length + 1.
 
 orangefs-2.9.1 (Subversion Tag v.2.9.1)
 http://www.orangefs.org/svn/orangefs/tags/v.2.9.1
