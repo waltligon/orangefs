@@ -1918,6 +1918,7 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
 			     (unsigned long long)mask2);
 		ret=gossip_set_debug_mask(1,mask);
 
+		return(0);
 		break;
 
         case PVFS2_PARAM_REQUEST_OP_PERF_TIME_INTERVAL_SECS:
