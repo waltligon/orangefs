@@ -1803,6 +1803,8 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
     int tmp_subsystem = -1;
     unsigned int tmp_perf_val;
     uint64_t mask = 0;
+    uint64_t mask1 = 0;
+    uint64_t mask2 = 0;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a param request for op %d\n",
@@ -1896,6 +1898,27 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             vfs_request->out_downcall.status = 0;
             vfs_request->out_downcall.resp.param.value=mask;
             return(0);
+
+	/*
+	 * This will have to be changed in 3.0 when there really are
+	 * two mask values associated with client debug. The upstream
+	 * version of the kernel module sends over two values. When
+	 * working with a 2.x client, mask1 is always 0. When working 
+	 * with 3.x either mask1 or mask2 may have values.
+	 */
+	case PVFS2_PARAM_REQUEST_OP_TWO_MASK_VALUES:
+		sscanf(vfs_request->in_upcall.req.param.s_value,
+		       "%llx %llx",
+			(unsigned long long *)&mask1,
+			(unsigned long long *)&mask2);
+		mask = mask2;
+		gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+			     "Got request to SET the client debug mask to "
+			     ":%llx:\n",
+			     (unsigned long long)mask2);
+		ret=gossip_set_debug_mask(1,mask);
+
+		break;
 
         case PVFS2_PARAM_REQUEST_OP_PERF_TIME_INTERVAL_SECS:
             if(vfs_request->in_upcall.req.param.type ==
