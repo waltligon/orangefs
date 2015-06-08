@@ -3879,8 +3879,8 @@ void PINT_config_release(struct server_configuration_s *config_s)
 
         if (config_s->serverkey_path)
         {
-            free(config_s->serverkey_path);
-            config_s->serverkey_path = NULL;
+           free(config_s->serverkey_path);
+           config_s->serverkey_path = NULL;
         }
 
         if (config_s->user_cert_dn)
