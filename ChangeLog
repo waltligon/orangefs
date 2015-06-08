@@ -51,7 +51,9 @@ http://www.orangefs.org/svn/orangefs/tags/v.2.9.2
 
 
 * - HADOOP
-	* - Modified build-and-install files to gather OrangeFS version information during configure time.
+	* - Modified build-and-install files to gather OrangeFS version information during configure time.	
+	* - OrangeFS is now available for both Hadoop 1.0 and 2.0.  See
+	documentation for further details.
 
 
 * - BMI and Native IB (in development)
