@@ -33,6 +33,9 @@ copy ..\..\openssl\bin64\release\*.dll OrangeFS\Client /y
 rem Client executable
 copy ..\..\projects\OrangeFS\x64\Release\orangefs-client.exe OrangeFS\Client /y
 
+rem orangefs-get-user-cert executable
+copy ..\..\projects\OrangeFS\x64\Release\orangefs-get-user-cert.exe OrangeFS\Client /y
+
 rem MS CRT files
 copy "C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\redist\x64\Microsoft.VC110.CRT\*.dll" OrangeFS\Client /y
 
@@ -48,7 +51,7 @@ rem Grid utility
 copy ..\..\..\cert-utils\pvfs2-grid-proxy-init.sh OrangeFS\Client\Tools /y
 
 rem Create zip
-del ..\orangefs-windows-client-2.9.1-win64.zip
-winrar a ..\orangefs-windows-client-2.9.1-win64.zip Dokan OrangeFS
+del ..\orangefs-windows-client-2.9.2-win64.zip
+winrar a ..\orangefs-windows-client-2.9.2-win64.zip Dokan OrangeFS
 
 cd ..
