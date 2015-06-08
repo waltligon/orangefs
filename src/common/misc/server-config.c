@@ -3883,12 +3883,12 @@ void PINT_config_release(struct server_configuration_s *config_s)
             config_s->serverkey_path = NULL;
         }
 
-        if(config_s->user_cert_dn)
+        if (config_s->user_cert_dn)
         {
             free(config_s->user_cert_dn);
             config_s->user_cert_dn = NULL;
         }
-    }
+    } /*end if config_s*/
 }
 
 static int is_valid_alias(PINT_llist * host_aliases, char *str)
