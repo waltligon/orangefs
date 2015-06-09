@@ -85,6 +85,7 @@ int PINT_dev_initialize(
     char *debug_string = getenv("PVFS2_KMODMASK");
     uint64_t debug_mask = 0;
     dev_mask_info_t mask_info;
+    int upstream_kmod = 0;
 
     if (!debug_string)
     {
@@ -145,10 +146,10 @@ int PINT_dev_initialize(
         return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
     }
 
-    /* push the kernel debug mask into the kernel, set gossip_debug_mask in the
-     * kernel and initialize the kernel debug string used by 
-     * /proc/sys/pvfs2/kernel-debug.
-    */
+    /*
+     * Push the kernel debug mask into the kernel, set gossip_debug_mask in
+     * the kernel and initialize the kernel debug string.
+     */
     mask_info.mask_type  = KERNEL_MASK;
     mask_info.mask_value = PVFS_kmod_eventlog_to_mask(debug_string);
     ret = ioctl(pdev_fd, PVFS_DEV_DEBUG, &mask_info);
@@ -161,12 +162,22 @@ int PINT_dev_initialize(
         return -(PVFS_ENODEV|PVFS_ERROR_DEV);
     }
 
+    /* Figure out whether or not we're using the upstream kernel module. */
+    ret = ioctl(pdev_fd, PVFS_DEV_UPSTREAM, &upstream_kmod);
+    if (ret < 0) {
+      gossip_err("%s: ioctl() PVFS_DEV_UPSTREAM failure :%d:\n", __func__, ret);
+      return (-(PVFS_ENODEV|PVFS_ERROR_DEV));
+    }
+
     /* push the client debug mask into the kernel and initialize the client 
-     * debug string used by /proc/sys/pvfs2/client-debug.  
-    */
-    mask_info.mask_type  = CLIENT_MASK;
-    mask_info.mask_value = gossip_debug_mask;
-    ret = ioctl(pdev_fd, PVFS_DEV_DEBUG, &mask_info);
+     * debug string. When the upstream kernel module is running, we don't
+     * know how to manipulate the client debug string yet.
+     */
+    if (!upstream_kmod) {
+      mask_info.mask_type  = CLIENT_MASK;
+      mask_info.mask_value = gossip_debug_mask;
+      ret = ioctl(pdev_fd, PVFS_DEV_DEBUG, &mask_info);
+    }
     if (ret < 0)
     {
         gossip_err("Error: ioctl() PVFS_DEV_DEBUG failure (client debug mask to"

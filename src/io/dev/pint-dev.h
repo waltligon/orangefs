@@ -22,8 +22,6 @@ typedef struct
   uint64_t mask_value;
 } dev_mask_info_t;
 
-
-
 enum pvfs_bufmap_type {
     BM_IO = 0,
     BM_READDIR = 1,
