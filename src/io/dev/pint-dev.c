@@ -85,7 +85,12 @@ int PINT_dev_initialize(
     char *debug_string = getenv("PVFS2_KMODMASK");
     uint64_t debug_mask = 0;
     dev_mask_info_t mask_info;
+    dev_mask2_info_t mask2_info;
     int upstream_kmod = 0;
+    char client_debug_array_string[PVFS2_MAX_DEBUG_ARRAY_LEN];
+    int i = 0;
+    int bytes = 0;
+    int offset = 0;
 
     if (!debug_string)
     {
@@ -170,19 +175,59 @@ int PINT_dev_initialize(
     }
 
     /* push the client debug mask into the kernel and initialize the client 
-     * debug string. When the upstream kernel module is running, we don't
-     * know how to manipulate the client debug string yet.
+     * debug string.
      */
     if (!upstream_kmod) {
       mask_info.mask_type  = CLIENT_MASK;
       mask_info.mask_value = gossip_debug_mask;
       ret = ioctl(pdev_fd, PVFS_DEV_DEBUG, &mask_info);
+      if (ret < 0)
+        gossip_err("%s: ioctl() PVFS_DEV_DEBUG failure.\n", __func__);
+    } else {
+      mask2_info.mask1_value = 0;
+      mask2_info.mask2_value = gossip_debug_mask;
+      ret = ioctl(pdev_fd, PVFS_DEV_CLIENT_MASK, &mask2_info);
+      if (ret < 0) {
+        gossip_err("%s: ioctl() PVFS_DEV_CLIENT_MASK failure.\n", __func__);
+        goto out;
+      }
+
+      /*
+       * Scrape a representation of s_keyword_mask_map into the buffer to
+       * send back to the kernel module.
+       *
+       * There's an extra "column", the 0, in each "line", to make the
+       * upstream version of the kmod agnostic WRT orangefs versions 2 and 3.
+       *
+       * This code will have to change in V3 when there really is
+       * two "columns" of mask values.
+       */
+      memset(client_debug_array_string, 0, PVFS2_MAX_DEBUG_ARRAY_LEN);
+      for (i = 0; i < num_keyword_mask_map; i++) {
+        bytes = snprintf(client_debug_array_string + offset,
+                         PVFS2_MAX_DEBUG_ARRAY_LEN - offset,
+                         "%s 0 %llx\n",
+                         s_keyword_mask_map[i].keyword,
+                         (unsigned long long)s_keyword_mask_map[i].
+                         mask_val);
+        if ((bytes + offset) < PVFS2_MAX_DEBUG_ARRAY_LEN) {
+          offset = strlen(client_debug_array_string);
+        } else {
+          gossip_err("%s: overflow!\n", __func__);
+          ret = -1;
+          goto out;
+        }
+      }
+      ret = ioctl(pdev_fd, PVFS_DEV_CLIENT_STRING, &client_debug_array_string);
+      if (ret < 0) {
+        gossip_err("%s: ioctl() PVFS_DEV_CLIENT_STRING failure.\n", __func__);
+        goto out;
+      }
     }
+
+out:
     if (ret < 0)
     {
-        gossip_err("Error: ioctl() PVFS_DEV_DEBUG failure (client debug mask to"
-                   " %x)\n"
-                  ,(unsigned int)gossip_debug_mask);
         close(pdev_fd);
         return -(PVFS_ENODEV|PVFS_ERROR_DEV);
     }

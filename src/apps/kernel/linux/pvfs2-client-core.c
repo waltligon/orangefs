@@ -1690,30 +1690,52 @@ fail_downcall:
 
 static PVFS_error service_client_debug_mask_request(vfs_request_t *vfs_request)
 {
-	int i;
+	int i = 0;
+	int bytes = 0;
 	int offset = 0;
-	char *client_debug_string;
+	char *client_debug_string = NULL;
 
 	gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-		     "Got a client debug mask request.\n");
+		     "Got a client debug mask array request.\n");
 
 	vfs_request->out_downcall.type = vfs_request->in_upcall.type;
 
 	/*
-	 * scrape a representation of s_keyword_mask_map into the buffer.
+	 * scrape a representation of s_keyword_mask_map into the buffer to
+	 * send back to the kernel module.
+	 *
 	 * There's an extra "column", the 0, in each "line", to make the
 	 * upstream version of the kmod agnostic WRT orangefs versions 2 and 3.
+	 * This code will have to change in V3 when there really is
+	 * two "columns" of mask values.
+	 *
+	 * The first "line" represents the current client debug mask, we'll
+	 * use it to set the client debug string as soon as the kmod gets
+	 * the keywords and mask values.
 	 */
 	client_debug_string =
 		vfs_request->out_downcall.resp.client_debug_mask.buffer;
 	memset(client_debug_string, 0, PVFS2_MAX_DEBUG_ARRAY_LEN);
 
+	bytes = snprintf(client_debug_string,
+			  PVFS2_MAX_DEBUG_ARRAY_LEN,
+			  "0 %llx\n",
+			  (unsigned long long) gossip_debug_mask);
+	offset += bytes;
+
 	for (i = 0; i < num_keyword_mask_map; i++) {
-		sprintf(client_debug_string + offset,
-			"%s 0 %llx\n",
-			s_keyword_mask_map[i].keyword,
-			(unsigned long long)s_keyword_mask_map[i].mask_val);
-		offset = strlen(client_debug_string);
+		bytes = snprintf(client_debug_string + offset,
+				  PVFS2_MAX_DEBUG_ARRAY_LEN - offset,
+				  "%s 0 %llx\n",
+				  s_keyword_mask_map[i].keyword,
+				  (unsigned long long)s_keyword_mask_map[i].
+					mask_val);
+		if ((bytes + offset) < PVFS2_MAX_DEBUG_ARRAY_LEN) {
+			offset = strlen(client_debug_string);
+		} else {
+			gossip_err("%s: overflow!\n", __func__);
+			break;
+		}
 	}
 
 	vfs_request->op_id = -1;
