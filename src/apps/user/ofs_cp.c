@@ -8,6 +8,9 @@
  * 	copy a file from a unix or PVFS2 file system to a unix or PVFS2 file
  * 	system.  Should replace pvfs2-import and pvfs2-export.
  */
+
+#include "orange.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -21,20 +24,7 @@
 #include <libgen.h>
 #include <getopt.h>
 
-#include "orange.h"
 #include "pint-sysint-utils.h"
-
-/* This forces inlines off for open variants, which play heck with
- * programs using the posix.c library
- */
-#ifdef __USE_FORTIFY_LEVEL
-#undef __USE_FORTIFY_LEVEL
-#endif
-#define __USE_FORTIFY_LEVEL 0
-
-#include <fcntl.h>
-/* This should be the last header so we don't affect any others
- */
 
 #define PVFS_ATTR_SYS_CP (PVFS_ATTR_SYS_TYPE | \
                           PVFS_ATTR_SYS_PERM | \
