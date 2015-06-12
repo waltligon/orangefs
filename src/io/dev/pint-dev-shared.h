@@ -110,6 +110,14 @@ struct PVFS_dev_map_desc
 #define DEV_CLIENT_STRING       0x9
 #define DEV_MAX_NR              0xa
 
+/*
+ * parameter structure used in PVFS_DEV_CLIENT_MASK ioctl command
+ */
+typedef struct {
+  uint64_t mask1_value;
+  uint64_t mask2_value;
+} dev_mask2_info_t;
+
 /* supported ioctls, codes are with respect to user-space */
 enum {
 PVFS_DEV_GET_MAGIC        = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAGIC, int32_t),
