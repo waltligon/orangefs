@@ -1688,60 +1688,6 @@ fail_downcall:
     goto ok;
 }
 
-static PVFS_error service_client_debug_mask_request(vfs_request_t *vfs_request)
-{
-	int i = 0;
-	int bytes = 0;
-	int offset = 0;
-	char *client_debug_string = NULL;
-
-	gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-		     "Got a client debug mask array request.\n");
-
-	vfs_request->out_downcall.type = vfs_request->in_upcall.type;
-
-	/*
-	 * scrape a representation of s_keyword_mask_map into the buffer to
-	 * send back to the kernel module.
-	 *
-	 * There's an extra "column", the 0, in each "line", to make the
-	 * upstream version of the kmod agnostic WRT orangefs versions 2 and 3.
-	 * This code will have to change in V3 when there really is
-	 * two "columns" of mask values.
-	 *
-	 * The first "line" represents the current client debug mask, we'll
-	 * use it to set the client debug string as soon as the kmod gets
-	 * the keywords and mask values.
-	 */
-	client_debug_string =
-		vfs_request->out_downcall.resp.client_debug_mask.buffer;
-	memset(client_debug_string, 0, PVFS2_MAX_DEBUG_ARRAY_LEN);
-
-	bytes = snprintf(client_debug_string,
-			  PVFS2_MAX_DEBUG_ARRAY_LEN,
-			  "0 %llx\n",
-			  (unsigned long long) gossip_debug_mask);
-	offset += bytes;
-
-	for (i = 0; i < num_keyword_mask_map; i++) {
-		bytes = snprintf(client_debug_string + offset,
-				  PVFS2_MAX_DEBUG_ARRAY_LEN - offset,
-				  "%s 0 %llx\n",
-				  s_keyword_mask_map[i].keyword,
-				  (unsigned long long)s_keyword_mask_map[i].
-					mask_val);
-		if ((bytes + offset) < PVFS2_MAX_DEBUG_ARRAY_LEN) {
-			offset = strlen(client_debug_string);
-		} else {
-			gossip_err("%s: overflow!\n", __func__);
-			break;
-		}
-	}
-
-	vfs_request->op_id = -1;
-	return 0;
-}
-
 static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
 {
     char* tmp_str;
@@ -3540,7 +3486,6 @@ static inline void package_downcall_members(
         }
         case PVFS2_VFS_OP_FS_UMOUNT:
         case PVFS2_VFS_OP_PERF_COUNT:
-        case PVFS2_VFS_OP_CLIENT_DEBUG_MASK:
         case PVFS2_VFS_OP_PARAM:
         case PVFS2_VFS_OP_FSKEY:
         case PVFS2_VFS_OP_CANCEL:
@@ -3733,9 +3678,6 @@ static inline PVFS_error handle_unexp_vfs_request(
             break;
         case PVFS2_VFS_OP_PERF_COUNT:
             ret = service_perf_count_request(vfs_request);
-            break;
-        case PVFS2_VFS_OP_CLIENT_DEBUG_MASK:
-            ret = service_client_debug_mask_request(vfs_request);
             break;
         case PVFS2_VFS_OP_PARAM:
             ret = service_param_request(vfs_request);
@@ -5069,7 +5011,6 @@ static char *get_vfs_op_name_str(int op_type)
         { PVFS2_VFS_OP_FSYNC,  "PVFS2_VFS_OP_FSYNC" },
         { PVFS2_VFS_OP_PARAM,  "PVFS2_VFS_OP_PARAM" },
         { PVFS2_VFS_OP_PERF_COUNT, "PVFS2_VFS_OP_PERF_COUNT" },
-        { PVFS2_VFS_OP_CLIENT_DEBUG_MASK, "PVFS2_VFS_OP_CLIENT_DEBUG_MASK" },
         { PVFS2_VFS_OP_FSKEY,  "PVFS2_VFS_OP_FSKEY" },
         { PVFS2_VFS_OP_FILE_IOX, "PVFS2_VFS_OP_FILE_IOX" },
         { 0, "UNKNOWN" }
