@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <getopt.h>
 #include "orange.h"
 #if 0
 #include <pvfs2-types.h>
@@ -175,7 +176,8 @@ int main(int argc, char **argv)
         case FTS_NSOK : /* no stat ok */
         case FTS_ERR :  /* error */
         default:
-            fprintf(stderr, "unexpected node type from fts_read\n");
+            fprintf(stderr, "%s: %s is not a removable file, directory, or symbolic link\n", argv[0], node->fts_path);
+            usage(argc, argv);
             ret = -1;
             goto main_out;
             break;
@@ -212,8 +214,20 @@ static int parse_args(int argc, char **argv, struct options *user_opts_p)
     int one_opt = 0;
     char flags[] = "vVdirf?";
     opterr = 0;
+    static struct option lopt[] = {
+        {"recursive", 0, NULL, 'r'},
+        {"interactive", 0, NULL, 'i'},
+        {"force", 0, NULL, 'f'},
+        {"help", 0, NULL, '?'},
+        {"Version", 0, NULL, 'V'},
+        {"verbose", 0, NULL, 'v'},
+        {"debug", 0, NULL, 'd'},
+        {NULL, 0, NULL, 0}
+    };
 
-    while((one_opt = getopt(argc, argv, flags)) != -1)
+    opterr = 0;
+
+    while((one_opt = getopt_long(argc, argv, flags, lopt, NULL)) != -1)
     {
         switch(one_opt)
         {
@@ -240,6 +254,7 @@ static int parse_args(int argc, char **argv, struct options *user_opts_p)
                 user_opts_p->recursive = 1;
                 break;
             case('?'):
+            default:
                 usage(argc, argv);
                 exit(EXIT_FAILURE);
         }
@@ -269,7 +284,14 @@ static int parse_args(int argc, char **argv, struct options *user_opts_p)
 
 static void usage(int argc, char **argv)
 {
-    fprintf(stderr, "Usage: %s [-vVidrf] pvfs2_filename[s]\n", argv[0]);
+    fprintf(stderr, "Usage: %s [-?vVidrf] pvfs2_filename[s]\n", argv[0]);
+    fprintf(stderr, "\t-?\thelp - print this message\n");
+    fprintf(stderr, "\t-v\tverbose - print informative messages\n");
+    fprintf(stderr, "\t-V\tVersion - print Version info\n");
+    fprintf(stderr, "\t-i\tinteractive - ask before removing each item\n");
+    fprintf(stderr, "\t-f\tforce - print nothing\n");
+    fprintf(stderr, "\t-d\tdebug - print debugging info\n");
+    fprintf(stderr, "\t-r\trecursive - remove directories and their contents\n");
 }
 
 /*
