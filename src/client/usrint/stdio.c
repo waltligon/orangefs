@@ -16,6 +16,10 @@
 #include "openfile-util.h"
 #include "stdio-ops.h"
 #include "locks.h"
+#include <ctype.h>
+#include <inttypes.h>
+#include <wchar.h>
+#include <wctype.h>
 
 #if 0
 #if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
@@ -76,6 +80,66 @@ extern DIR *fdopendir (int __fd);
 #ifndef HAVE_STDIO_GETS
 extern char *gets(char *s);
 #endif
+
+/*
+ * Flags used during convresion with vfscanf
+ */
+#define LONG      0x01    /* l: long or double */
+#define LONGDBL   0x02    /* L: long double */
+#define SHORT     0x04    /* h: short */
+#define SUPPRESS  0x08    /* *: suppress assignment */
+#define POINTER   0x10    /* p: void * (as hex) */
+#define NOSKIP    0x20    /* [ or c: do not skip blanks */
+#define LONGLONG  0x400   /* ll: long long (+ deprecated q: quad) */
+#define INTMAXT   0X800   /* j: intmax_t */
+#define PTRDIFFT  0x1000  /* t: ptrdiff_t */
+#define SIZET     0x2000  /* z: size_T */
+#define SHORTSHOT 0x4000  /* hh: char */
+#define UNSIGNED  0x8000  /* %[oupxX] conversions */
+
+/*
+ * The following are used in integral conversions only:
+ * SIGNOK, NDIGITS, PFXOK, and NZDIGITS
+ */
+#define SIGNOK    0X40    /* +/- is (still) legal) */
+#define NDIGITS   0x80    /* no digits detected */
+#define PFXOK     0X100   /* 0x prefix is (still) legal */
+#define NZDIGITS  0x200   /* no zero digits detected */
+#define HAVESIGN  0x10000 /* sign detected */
+
+/*
+ * Conversion types
+ */
+#define CT_CHAR   0       /* %c conversion */
+#define CT_CCL    1       /* %[...] conversion */
+#define CT_STRING 2       /* %s conversion */
+#define CT_INT    3       /* %[diopxX] conversion */
+#define CT_FLOAT  4       /* %[efgEFG] conversion */
+
+/*
+ * The following functions are solely used by the vfscanf function
+ */
+#define GETCHAR(type) ((flags & SUPPRESS) ? SUPPRESS_PTR : va_arg(ap, type))
+static const u_char *sccl(char *tab, cons u_char *fmt);
+static int parsefloat(FILE *stream, char *buf, char *end, locale_t locale);
+static inline int parseint(FILE *stream, char * __restrict buf, int width, int base, int flags);
+static inline int convert_char(FILE *stream, char *p, int width);
+static inline int convert_wchar(FILE *stream, wchar_t *wcp, int width, locale_t locale);
+static inline int convert_ccl(FILE *stream, char *p, int width, const char *ccltab);
+static inline int convert_wccl(FILE *stream, wchar_t *wcp, int width, const char *ccltab, locale_t locale);
+static inline int convert_string(FILE *stream, char *p, int width);
+static inline int convert_wstring(FILE *stream, wchar_t *wcp, int width, locale_t locale);
+
+
+/*
+ * Conversion functions are passed a pointer to this object instead of
+ * a real parameter to indicate that the assignment-suppression (*)
+ * flag was specified. 
+ */
+static const int suppress;
+#define SUPPRESS_PTR ((void *)&suppress)
+
+static const mbstate_t initial_mbs;
 
 static inline void init_stdio(void); /* wrapper to check if init is done before
                                       * calling the real init function -
@@ -263,6 +327,559 @@ static FILE pvfs_stderr_stream =
 FILE *stderr = &pvfs_stderr_stream;
 #endif
 #endif
+
+/*****************************************************************/
+/* This is used by vfscanf 
+ * the implementation just follows what is in freeBSD
+ * stdio vfscanf
+ */
+static const u_char *sccl(char *tab, cons u_char *fmt)
+{
+    /* Still need to figure this out. It uses locale variables!*/
+    int c, n, v, i;
+    
+}
+
+/*
+ * This function parses a floating point number from the
+ * file stream. It is used by scanf, fscanf, and vfscanf.
+ */
+static int parsefloat(FILE *stream, char *buf, char *end, locale_t locale)
+{
+    char *commit, *p;
+    int infnanpos = 0, decptpos = 0;
+    enum
+    {
+        S_START,
+        S_GOTSIGN,
+        S_INF,
+        S_NAN,
+        S_DONE,
+        S_MAYBEHEX,
+        S_DIGITS,
+        S_DECPT,
+        S_FRAC,
+        S_EXP,
+        S_EXPDIGITS
+    } state = S_START;
+    unsigned char c;
+    /* Need to figure this out!!!! (local_t)*/
+    const char *decpt = localeconv_l(local)->decimale_point;
+    int gotmantdig = 0, ishex = 0;
+
+    /*
+     * We set commit = p whenever the string we have read so far
+     * constitutes a valid representation of a floating point
+     * number by itself. At some point, the parse will complete
+     * or fail, and we will ungetc() back to the last commit point.
+     * To ensure taht the file offset getes updated properly, it is
+     * always necessary to read at least once character that doesn't
+     * match; thus, we can't short-circuit "infinity" or "nan(...)"
+     */
+    commit = buf - 1;
+    for(p = buf; p < end;)
+    {
+        c = *stream->_IO_read_ptr;
+reswitch:
+        switch (state)
+        {
+            case S_START:
+                state = S_GOTSIGN;
+                if(c == '-' || c == '+')
+                {
+                    break;
+                }
+                else
+                {
+                    goto reswitch;
+                }
+            case S_GOTSIGN:
+                switch (c)
+                {
+                    case '0':
+                        state = S_MAYBEHEX;
+                        commit = p;
+                        break;
+                    case 'I': case 'i':
+                        state = S_INF;
+                        break;
+                    case 'N': case 'n':
+                        state = S_NAN;
+                        break;
+                    default:
+                        state = S_DIGITS;
+                        goto reswitch;
+                }
+                break;
+            case S_INF:
+                if(infnanpos > 6 ||
+                   (c != "nfinity"[infnanpos] &&
+                    c != "NFINITY"[infnanpos]))
+                {
+                    goto parsedone;
+                }
+                if(infnanpos == 1 || infnanpos == 6)
+                {
+                    commit = p; /* inf or infitity */
+                }
+                infnanpos++;
+                break;
+            case S_NAN:
+                switch(infnanpos)
+                {
+                    case 0:
+                        if(c != 'A' && c != 'a')
+                        {
+                            goto parsedone;
+                        }
+                        break;
+                    case 1:
+                        if(c != 'N' && c != 'n')
+                        {
+                            goto parsedone;
+                        }
+                        else
+                        {
+                            commit = p;
+                        }
+                        break;
+                    case 2:
+                        if(c != '(')
+                        {
+                            goto parsedone;
+                        }
+                        break;
+                    default:
+                        if(c == ')')
+                        {
+                            commit = p;
+                            state = S_DONE;
+                        }
+                        else if(!isalnum(c) && c != '_')
+                        {
+                            goto parsedone;
+                        }
+                        break;
+                }
+                infnanpos++;
+                break;
+            case S_DONE:
+                goto parsedone;
+            case S_MAYBEHEX;
+                state = S_DIGITS;
+                if(c == 'X' || c == 'x')
+                {
+                    ishex = 1;
+                    break;
+                }
+                else /* we saw a '0', but no 'x' */
+                {
+                    gotmantdig = 1;
+                    goto reswitch;
+                }
+            case S_DIGITS:
+                if((ishex && isxdigit(c)) || isdigit(c))
+                {
+                    gotmantdig = 1;
+                    commit = p;
+                    break;
+                }
+                else
+                {
+                    state = S_DECPT;
+                    goto reswitch;
+                }
+            case S_DECPT:
+                if(c == decpt[decptpos])
+                {
+                    if(decpt[++decptpos] == '\0')
+                    {
+                        state = S_FRAC;
+                        if(gotmantdig)
+                        {
+                            commit = p;
+                        }
+                    }
+                    break;
+                }
+                else if(!decptpos)
+                {
+                    /* We didn't read any decpt characters */
+                    state = S_FRAC;
+                    goto reswitch;
+                }
+                else
+                {
+                    /*
+                     * We read part of the multibyte decimal point,
+                     * but the rest is invalid, so bail.
+                    */
+                    goto parsedone;
+                }
+            case S_FRAC:
+                if(((c == 'E' || c == 'e') && !ishex) ||
+                   ((c == 'P' || c == 'p') && ishex))
+                {
+                    if(!gotmantdig)
+                    {
+                        goto parsedone;
+                    }
+                    else
+                    {
+                        state = S_EXP;
+                    }
+                }
+                else if((ishex && isxdigit(c)) || isdigit(c))
+                {
+                    commit = p;
+                    gotmantdig = 1'
+                }
+                else
+                {
+                    goto parsedone;
+                }
+                break;
+            case S_EXP:
+                state = S_EXPDIGITS;
+                if(c == '-' || c == '+')
+                {
+                    break;
+                }
+                else
+                {
+                    goto reswitch;
+                }
+            case S_EXPDIGITS:
+                if(isdigit(c))
+                {
+                    commit = p;
+                }
+                else
+                {
+                    goto parsedone;
+                }
+                break;
+            default:
+                abort();
+        }
+        *p++ = c;
+        if(stream->_IO_read_ptr != stream->_IO_read_end)
+        {
+            stream->_IO_read_ptr++;
+        }
+        else if(pvfs_read_buf(stream))
+        {
+            break; /* EOF */
+        }
+    }
+
+parsedone:
+    while(commit < --p)
+    {
+        unget(*(u_char *)p, stream);
+    }
+    *++commit = '\0';
+    return (commit - buf);
+}
+
+/*
+ * This function parses an integer from file stream buffer.
+ * It is used for scanf, scanf, and vfscanf
+ */
+static inline int parseint(FILE *stream, char * __restrict buf, int width, int base, int flags)
+{
+    /* `basefix' is used to avoid `if' tests */
+    static const short basefix[17] =
+        {10, 1, 2, 3, 4, 5, 6, 7, 8, 9 , 10, 11, 12, 13, 14, 15, 16};
+    char *p;
+    int c;
+
+    flags |= SIGNOK | NDIGITS | NZDIGITS;
+    for(p = buf; width; width--)
+    {
+        c = *stream->_IO_read_ptr;
+        /* 
+         * Swith on the chacter; `goto ok' if we accept it
+         * as a part of the number
+        */
+        switch (c)
+        {
+            /*
+             * The digit 0 is always legal, but is special. For
+             * %i conversions, if no digits (zero or nonzero) have
+             * been scanned (only signs), we weill have base == 0.
+             * In that case, we should set it to 8 and enable 0x
+             * prefixing. Also, if we have not scanned zero
+             * digits before this, do not turn off prefixing
+             * (someone else will turn it off if we have scanned
+             * any nonzero digits).
+             */
+            case '0':
+                if(base == 0)
+                {
+                    base = 8;
+                    flas |= PFXOK;
+                }
+                if(flags & NZDIGITS)
+                {
+                    flags &= ~(SIGNOK | NZDIGITS | NDIGITS);
+                }
+                else
+                {
+                    flags &= ~(SIGNOK | PFXOK | NDIGITS)
+                }
+                goto ok;
+
+            /* 1 through 7 are always legal */
+            case '1': case '2': case '3':
+            case '4': case '5': case '6': case '7':
+                base = basefix[base];
+                flags &= ~(SIGNOK | PFXOK | NDIGITS);
+                goto ok;
+
+            /* digits 8 to 9 okk iff decimal or hex */
+            case '8': case '9':
+                base = basefix[base];
+                if(base <= 8)
+                {
+                    break; /* Not legal here */
+                }
+                flags &= ~(SIGNOK | PFXOK | NDIGITS);
+                goto ok;
+
+            /* letters ok iff hex */
+            case 'A': case 'B': case 'C':
+            case 'D': case 'E': case 'F':
+            case 'a': case 'b': case 'c':
+            case 'd': case 'e': case 'f':
+                /* no need to fix base here */
+                if(base <= 10)
+                {
+                    break; /* Not legal here */
+                }
+                flags &= ~(SIGNOK | PFXOK | NDIGITS);
+                goto ok;
+
+            /* sign ok only as first character */
+            case '+': case '-':
+                if(flags & SIGNOK)
+                {
+                    flags &= ~SIGNOK;
+                    flags |= HAVESIGN;
+                    goto ok;
+                }
+                break;
+            
+            /* x ok iff flag still set and 2nd character
+             * (or 3rd char if we have asign).
+             */
+            case 'x': case 'X':
+                if(flags & PFXOK && p ==
+                   buf + 1 + !!(flags & HAVESIGN))
+                {
+                    base = 16; /* if %i */
+                    flags &= ~PFXOK;
+                    goto ok;
+                }
+                break;
+        }
+        
+        /*
+         * If we got here, c is not a legal character for a
+         * number. Stop accumulating digits.
+         */
+        break;
+        
+ok:
+        /* 
+         * c is legal: store it and lokk at the next.
+         */
+        *p++ = c;
+        if(stream->_IO_read_ptr != stream->_IO_read_end)
+        {
+            stream->_IO_read_ptr++;
+        }
+        else if(pvfs_read_buf(stream))
+        {
+            break; /* EOF */
+        }
+    }
+
+    /* If we had only a sign, it is no good; push back the sign.
+     * If the number ends in `x', it was [sign] '0' 'x', so push
+     * back the x adn treat it as a [sign] '0'.
+     */
+
+    if(flags & NDIGITS)
+    {
+        if(p > buf)
+        {
+            ungetc(*(u_char *)--p, stream);
+        }
+        return 0;
+    }
+    c = ((u_char *)pi)[-1];
+    if(c == 'x' || c == 'X')
+    {
+        --p;
+        ungetc(c, stream);
+    }
+    return (p - buf);
+}
+
+static inline int convert_char(FILE *stream, char *p, int width)
+{
+    int n;
+
+    if(p == SUPPRESS_PTR)
+    {
+        size_t sum = 0;
+        for(;;)
+        {
+            if((n = (fp->_IO_read_end - fp->_IO_read_ptr)/sizeof(char))
+                < width)
+            {
+                sum += n;
+                width -= n;
+                stream->_IO_read_ptr += n;
+                if(pvfs_read_buf(stream))
+                {
+                    if(sum == 0)
+                    {
+                        return -1;
+                    }
+                    break;
+                }
+            }
+            else
+            {
+                sum += width;
+                stream->_IO_read_ptr += width;
+                break;
+            }
+        }
+        return sum;
+    }
+    else
+    {
+        size_t r = fread(p, 1, width, stream);
+        if(r == 0)
+        {
+            return -1;
+        }
+        return r;
+    }
+}
+
+static inline int convert_wchar(FILE *stream, wchar_t *wcp, int width, locale_t locale);
+
+static inline int convert_ccl(FILE *stream, char *p, int width, const char *ccltab)
+{
+    char *p0;
+    int n;
+    
+    if(p == SUPPRESS_PTR)
+    {
+        n = 0;
+        while(ccltab[*stream->_IO_read_ptr])
+        {
+            n++;
+            stream->_IO_read_ptr++;
+            if(--width == 0)
+            {
+                break;
+            }
+            if(stream->_IO_read_ptr == stream->_IO_read_end
+               && pvfs_read_buf(stream))
+            {
+                if(n == 0)
+                {
+                    return -1;
+                }
+                break;
+            }
+        }
+    }
+    else
+    {
+        p0 = p;
+        while(ccltab[*stream->_IO_read_ptr])
+        {
+            *p++ = *stream->_IO_read_ptr;
+            if(--width == 0)
+            {
+                break;
+            }
+            if(stream->_IO_read_ptr == stream->_IO_read_end
+               && pvfs_read_buf(stream))
+            {
+                if(p == p0)
+                {
+                    return -1;
+                }
+                break;
+            }    
+        }
+        n = p - p0;
+        if(n == 0)
+        {
+            return 0;
+        }
+        *p = 0;
+    }
+    return n;
+}
+
+static inline int convert_wccl(FILE *stream, wchar_t *wcp, int width, const char *ccltab, locale_t locale);
+
+static inline int convert_string(FILE *stream, char *p, int width)
+{
+    char *p0;
+    int n;
+
+    if(p == SUPPRESS_PTR)
+    {
+        n = 0;
+        while(!isspace(*stream->_IO_read_ptr))
+        {
+            n++;
+            stream->_IO_read_ptr++;
+            if(--width == 0)
+            {
+                break;
+            }
+            if((stream->_IO_read_ptr == stream->_IO_read_end)
+               && pvfs_read_buf(stream))
+            {
+                break;
+            }
+        }
+    }
+    else
+    {
+        p0 = p;
+        while(!isspace(*stream->_IO_read_ptr))
+        {
+            *p++ = stream->_IO_read_ptr++;
+            if(--width == 0)
+            {
+                break;
+            }
+            if((stream->_IO_read_ptr == stream->_IO_read_end)
+               && pvfs_read_buf(stream))
+            {
+                break;
+            } 
+        }
+        *p = 0;
+        n = p - p0;
+    }
+    return n;
+}
+
+static inline int convert_wstring(FILE *stream, wchar_t *wcp, int width, locale_t locale);
+
+/**************************************************************/
 
 /* this gets called all over the place to make sure initialization is
  * done so we made is small and inlined it - if init not done call the
@@ -2395,22 +3012,485 @@ void perror(const char *s)
 #endif
 }
 
-#if 0
+
 /* TODO: These are not implemented yet */
 
-scanf()
+int scanf(char const *format, ...)
 {
+    int len;
+    va_list ap;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "Calling scanf stdio.c\n");
+    va_start(ap, format);
+    len = vfscanf(stdin, format, ap);
+    va_end(ap);
+    return len;
 }
 
-fscanf()
+int fscanf(FILE *stream, const char *format, ...)
 {
+    int len;
+    va_list ap;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "Calling fscanf stdio.c\n");
+    va_start(ap, format);
+    len = vfscanf(stream, format, ap);
+    va_end(ap);
+    return len;
 }
 
-vfscanf()
+int vfscanf(FILE *stream, const char *format, va_list ap)
 {
+    int ret;
+    lock_stream(stream);
+    ret = svfscanf(stream, format, ap);
+    unlock_stream(stream);
+    return ret;
 }
 
+int svfscanf(FILE *stream, const char *format, va_list ap)
+{
+    const u_char *fmt = (const u_char *)format;
+    int c;            /* character from format, or conversion */
+    size_t width;     /* field width, or 0 */
+    int flags;        /* flags as defined above */
+    int nassigned;    /* number of fields assigned */
+    int nconversions; /* number of conversions */
+    int nr;           /* characters read by current conversion */
+    int nread;        /* number of characters consumed by stream */
+    int base;         /* base argument to conversion function */
+    char ccltab[256]; /* character class table for %[...] */
+    char buf[513];    /* buffer for numeric conversions
+                         Maximum length of numeric string 513 */
+    
+    gossip_debug(GOSSIP_USRINT_DEBUG, "Calling vfscanf stdio.c\n");
+    
+    PVFS_INIT(init_stdio);
+#if !PVFS_STDIO_REDEFSTREAM
+    if(stream == stdin || stream == stdout || stream == stderr)
+    {
+        return stdio_ops.vfscanf(stream, format, ap);
+    }  
 #endif
+    if(!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+#if !PVFS_STDIO_ON_LIBC_STREAMS
+        if(stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            return stdio_ops.vfscanf(stream, format, ap);   
+        }
+#endif
+        errno = EINVAL;
+        return 0;
+    }
+    
+    nassigned = 0;
+    nconversions = 0;
+    nread = 0;
+    for (;;)
+    {
+        c = *fmt++;
+        if(c == 0)
+        {
+            return nassigned;
+        }
+        if(isspace(c))
+        {
+            while((stream->_IO_read_ptr != stream->IO_read_end 
+                   || pvfs_read_buf(stream) == 0) 
+                   && isspace(*stream->_IO_read_ptr))
+            {
+                nread++;
+                //stream->_r --;
+                stream->_IO_read_ptr++;
+            }
+            continue;
+        }
+        if(c != '%'){
+            goto literal;
+        }
+        
+        width = 0;
+        flags = 0;
+
+        /*
+         * switch on the format. continue if done;
+         * break once format type is derived.
+         */
+again:
+        c = *fmt++;
+        switch(c)
+        {
+            case '%':
+literal:
+                if(stream->_IO_read_ptr == stream->_IO_read_end 
+                   //&& srefill(stream))
+                   && pvfs_read_buf(stream))
+                {
+                    goto input_failure;
+                }
+                if(*stream->_IO_read_ptr != c)
+                {
+                    goto match_failure;
+                }
+                //fp->_r--;
+                fp->_IO_read_ptr++;
+                nread++;
+                continue;
+            case '*':
+                flags |= SUPPRESS;
+                goto again;
+            case 'j':
+                flags |= INTMAXT;
+                goto again;
+            case 'l':
+                if(flags & LONG)
+                {
+                    flags &= ~LONG;
+                    flags |= LONGLONG;
+                }
+                else
+                {
+                    flags |= LONG;
+                }
+                goto again;
+            case 'q':
+                flags |= LONGLONG; /* note quite */
+                goto again;
+            case 't':
+                flags |= PTRDIFFT;
+                goto again;
+            case 'z':
+                flags |= SIZET;
+                goto again;
+            case 'L':
+                flags |= LONGDBL;
+                goto again;
+            case 'h':
+                if(flags & SHORT)
+                {
+                    flags &= ~SHORT;
+                    flags |= SHORTSHORT;
+                }
+                else
+                {
+                    flags |= SHORT;
+                }
+                goto again;
+            case '0': case '1': case '2': case '3': case '4' :
+            case '5': case '6': case '7': case '8': case '9' :
+                width = width * 10 + c - '0';
+                goto again;
+            /*
+             * Conversions
+             */
+            case 'd':
+                c = CT_INT;
+                base = 10;
+                break;
+            case 'i':
+                c = CT_INT;
+                base = 0;
+                break;
+            case 'o':
+                c = CT_INT;
+                flags |= UNSIGNED;
+                base = 8;
+                break;
+            case 'u':
+                c = CT_INT;
+                flags |= UNSIGNED;
+                base = 10;
+                break;
+            case 'X':
+            case 'x':
+                flags |= PFXOK /* enable 0x prefixing */
+                c = CT_INT;
+                flags |= UNSIGNED;
+                base = 16;
+                break;
+            case 'A': case 'E': case 'F': case 'G':
+            case 'a': case 'e': case 'f': case 'g':
+                c = CT_FLOAT;
+                break;
+            case 'S':
+                flags |= LONG;
+                /* FALLTHROUGH */
+            case 's':
+                c = CT_STRING;
+                break;
+            case '[':
+                fmt = sccl(ccltab, fmt);
+                flags |= NOSKIP;
+                c = CT_CCL;
+                break;
+            case 'C':
+                flags |= LONG;
+                /* FALLTHOUGH */
+            case 'c':
+                flags |= NOSKIP;
+                c = CT_CHAR;
+                break;
+            case 'p': /* pointer format like hex */
+                flags |= POINTER | PFXOK;
+                c = CT_INT; /* assumes sizeof(unitmax_t) */
+                flags |= UNSIGNED; /* >= sizeof(uintptr_t) */
+                base = 16;
+                break;
+            case 'n':
+                if(FLAGS & SUPRESS)
+                {
+                    continue; /* ??? */
+                }
+                if(flags & SHORTSHORT)
+                {
+                    *va_arg(ap, char *) = nread;
+                }
+                else if(flags & SHORT)
+                {
+                    *va_arg(ap, short *) = nread;
+                }
+                else if(flags & LONG)
+                {
+                    *va_arg(ap, long *) = nread;
+                }
+                else if(falgs & LONGLONG)
+                {
+                    *va_arg(ap, long long *) = nread;
+                }
+                else if(flags & INTMAXT)
+                {
+                    *va_arg(ap, intmax_t *) = nread;
+                }
+                else if(flags & SIZET)
+                {
+                    *va_arg(ap, size_t *) = nread;
+                }
+                else if(flags & PTRDIFFT)
+                {
+                    *va_arg(ap, ptrdiff_t *) = nread;
+                }
+                else
+                {
+                    *va_arg(ap, int *) = nread;
+                }
+            default: 
+                goto match_failure;
+            /* backwards compatibility hack. XXX */
+            case '\0':
+                return EOF;
+        }
+        
+        /*
+         * We have a conversion that requires input.
+         */
+        if(stream->_IO_read_ptr == IO_read_end
+           && pvfs_read_buf(stream))
+        {
+            goto input_failure;
+        }
+
+        /*
+         * Consume leading white space, except for formats
+         * that suppress this.
+         */
+        if((flags & NOSKIP) == 0)
+        {
+            while(isspace(*stream->_IO_read_ptr))
+            {
+                nread++;
+                if(stream->_IO_read_ptr != stream->_IO_read_end)
+                {
+                    stream->_IO_read_ptr++;
+                }
+                else if(pvfs_read_buf(stream))
+                {
+                    goto input_failure;
+                }
+            }
+            /*
+             * Note that there is at least one character in
+             * the buffer, so conversions that do no set NOSKIP
+             * can no longer result in an input failure
+             */
+        }
+        
+        /*
+         * Do the conversion
+         */
+        switch(c)
+        {
+            case CT_CHAR:
+                /* scan arbitrary characters (sets NOSKIP) */
+                if(width == 0)
+                {
+                    width = 1;
+                }
+                if(flags & LONG)
+                {
+                    nr = convert_wchar(stream, GETARG(wchar_t *),
+                         width, locale);
+                }
+                else
+                {
+                    nr = convert_char(fp, GETARG(char *), width);
+                }
+                if(nr < 0)
+                {
+                    goto input_failure;
+                }
+                break;
+            case CT_CCL:
+                /* scan a (nonempty) character class (sets NOSKIP) */
+                if(width == 0)
+                {
+                    width = (size_t)~0; /* `infinity' */
+                }
+                if(flags & LONG)
+                {
+                    nr = convert_wccl(stream, ....)
+                }
+                else
+                {
+                    nr = convert_ccl(stream, GETARG(char *), width, ccltab)
+                }
+                if(nr <= 0)
+                {
+                    if(nr < 0)
+                    {
+                        goto input_failure;
+                    }
+                    else /* nr == 0 */
+                    {
+                        goto match_failure;
+                    }
+                }
+                break;
+            case CT_STRING:
+                /* like CCL, but zero-length string OK, & no NOSKIP */
+                if(width == 0)
+                {
+                    width = (size_t)~0;
+                }
+                if(flags & LONG)
+                {
+                    nr = convert_wstring(stream, .....);
+                }
+                else
+                {
+                    nr = convert_string(stream, .....);
+                }
+                if(nr < 0)
+                {
+                    goto input_failure;
+                }
+                break;
+            case CT_INT:
+                /* scan an integer as if by the conversion function */
+                if(width == 0 || width > sizeof(buf) - 1)
+                {
+                    width = sizeof(buf) - 1;
+                }
+
+                nr = parseint(stream, buf, width, base, flags);
+                if(nr == 0)
+                {
+                    goto match_failure;
+                }
+                if((flags & SUPPRESS) == 0)
+                {
+                    uintmax_t res;
+                    buf[nr] = '\0';
+                    if((flags & UNSIGNED) == 0)
+                    {
+                        res = strtoimax(buf, (char **)NULL, base); /* defined in inttypes.h */
+                    }
+                    else
+                    {
+                        res = strtoumax(buf, (char **)NULL, base); /* defined in inttypes.h */
+                    }
+                    if(flags & POINTER)
+                    {
+                        *va_arg(ap, void **) = (void *)(uintptr_t)res;
+                    }
+                    else if(flags & SHORTSHORT)
+                    {
+                        *va_arg(ap, char *) = res;
+                    }
+                    else if(flags & SHORT)
+                    {
+                        *va_arg(ap, short *) = res;
+                    }
+                    else if(flags & LONG)
+                    {
+                        *va_arg(ap, long *) = res;
+                    }
+                    else if(flags & LONGLONG)
+                    {
+                        *va_arg(ap, long long *) = res;
+                    }
+                    else if(flags & INTMAXT)
+                    {
+                        *va_arg(ap, intmax_t *) = res;
+                    }
+                    else if(flags & PTRDIFFT)
+                    {
+                        *va_arg(ap, ptrdiff_t *) = res;
+                    }
+                    else if(falgs & SIZET)
+                    {
+                        *va_arg(ap, size_t *) = res;
+                    }
+                    else
+                    {
+                        *va_arg(ap, int *) = res;
+                    }
+                }
+                break;
+            case CT_FLOAT:
+               /* scan a floating point number as if by strtod */
+                if(width == 0 || width > sizeof(buf) - 1)
+                {
+                    width = sizeof(buf) - 1;
+                }
+                nr = parsefloat(stream, buf, buf + width, ...);
+                if(nr == 0)
+                {
+                    goto match_failure;
+                }
+                if((flags & SUPPRESS) == 0)
+                {
+                    if(flags & LONGDBL)
+                    {
+                        long double res = strtold(buf, NULL); /* defined in stdlib.h */
+                        *va_arg(ap, double *) = res;
+                    }
+                    else if(flags & LONG)
+                    {
+                        double res = strtod(buf, NULL);
+                        *va_arg(ap, double *) = res; /* defined in stdlib.h */
+                    }
+                    else
+                    {
+                        float res = strtof(buf, NULL); /* defined in stdlib.h */
+                        *va_arg(ap, float *) = res;
+                    }
+                }
+                break;
+        }
+        if(!(flags & SUPPESS))
+        {
+            nassigned++;
+            nread += nr;
+            nconversions++;
+        }
+    }
+input_failure:
+    return (nconversions != 0 ? nassigned : EOF);
+match_failure:
+    return nassigned;
+}
+
 
 /**
  * Stdio utilitie to clear error and eof for a stream
@@ -3357,6 +4437,7 @@ static void init_stdio_internal(void)
     stdio_ops.perror = dlsym(RTLD_NEXT, "perror" );
     stdio_ops.fscanf = dlsym(RTLD_NEXT, "fscanf" );
     stdio_ops.scanf = dlsym(RTLD_NEXT, "scanf" );
+    stdio_ops.vfscanf = dlsym(RTLD_NEXT, "vfscanf");
     stdio_ops.clearerr  = dlsym(RTLD_NEXT, "clearerr" );
     stdio_ops.clearerr_unlocked  = dlsym(RTLD_NEXT, "clearerr_unlocked" );
     stdio_ops.feof  = dlsym(RTLD_NEXT, "feof" );
