@@ -18,8 +18,8 @@
 #include "locks.h"
 #include <ctype.h>
 #include <inttypes.h>
-#include <wchar.h>
-#include <wctype.h>
+#include <locale.h>
+#include <stddef.h>
 
 #if 0
 #if defined _G_IO_IO_FILE_VERSION && _G_IO_IO_FILE_VERSION == 0x20001
@@ -68,6 +68,7 @@ int _IO_feof_unlocked (_IO_FILE *stream);
 #endif
 int _IO_ferror_unlocked (_IO_FILE *stream);
 
+
 /* fdopendir not present until glibc2.5 */
 #if __GLIBC_PREREQ (2,5)
 #else
@@ -84,52 +85,50 @@ extern char *gets(char *s);
 /*
  * Flags used during convresion with vfscanf
  */
-#define LONG      0x01    /* l: long or double */
-#define LONGDBL   0x02    /* L: long double */
-#define SHORT     0x04    /* h: short */
-#define SUPPRESS  0x08    /* *: suppress assignment */
-#define POINTER   0x10    /* p: void * (as hex) */
-#define NOSKIP    0x20    /* [ or c: do not skip blanks */
-#define LONGLONG  0x400   /* ll: long long (+ deprecated q: quad) */
-#define INTMAXT   0X800   /* j: intmax_t */
-#define PTRDIFFT  0x1000  /* t: ptrdiff_t */
-#define SIZET     0x2000  /* z: size_T */
-#define SHORTSHOT 0x4000  /* hh: char */
-#define UNSIGNED  0x8000  /* %[oupxX] conversions */
+#define LONG       0x01    /* l: long or double */
+#define LONGDBL    0x02    /* L: long double */
+#define SHORT      0x04    /* h: short */
+#define SUPPRESS   0x08    /* *: suppress assignment */
+#define POINTER    0x10    /* p: void * (as hex) */
+#define NOSKIP     0x20    /* [ or c: do not skip blanks */
+#define LONGLONG   0x400   /* ll: long long (+ deprecated q: quad) */
+#define INTMAXT    0X800   /* j: intmax_t */
+#define PTRDIFFT   0x1000  /* t: ptrdiff_t */
+#define SIZET      0x2000  /* z: size_T */
+#define SHORTSHORT 0x4000 /* hh: char */
+#define UNSIGNED   0x8000  /* %[oupxX] conversions */
 
 /*
  * The following are used in integral conversions only:
  * SIGNOK, NDIGITS, PFXOK, and NZDIGITS
  */
-#define SIGNOK    0X40    /* +/- is (still) legal) */
-#define NDIGITS   0x80    /* no digits detected */
-#define PFXOK     0X100   /* 0x prefix is (still) legal */
-#define NZDIGITS  0x200   /* no zero digits detected */
-#define HAVESIGN  0x10000 /* sign detected */
+#define SIGNOK     0X40    /* +/- is (still) legal) */
+#define NDIGITS    0x80    /* no digits detected */
+#define PFXOK      0X100   /* 0x prefix is (still) legal */
+#define NZDIGITS   0x200   /* no zero digits detected */
+#define HAVESIGN   0x10000 /* sign detected */
 
 /*
  * Conversion types
  */
-#define CT_CHAR   0       /* %c conversion */
-#define CT_CCL    1       /* %[...] conversion */
-#define CT_STRING 2       /* %s conversion */
-#define CT_INT    3       /* %[diopxX] conversion */
-#define CT_FLOAT  4       /* %[efgEFG] conversion */
+#define CT_CHAR   0        /* %c conversion */
+#define CT_CCL    1        /* %[...] conversion */
+#define CT_STRING 2        /* %s conversion */
+#define CT_INT    3        /* %[diopxX] conversion */
+#define CT_FLOAT  4        /* %[efgEFG] conversion */
 
 /*
  * The following functions are solely used by the vfscanf function
  */
-#define GETCHAR(type) ((flags & SUPPRESS) ? SUPPRESS_PTR : va_arg(ap, type))
-static const u_char *sccl(char *tab, cons u_char *fmt);
-static int parsefloat(FILE *stream, char *buf, char *end, locale_t locale);
-static inline int parseint(FILE *stream, char * __restrict buf, int width, int base, int flags);
-static inline int convert_char(FILE *stream, char *p, int width);
-static inline int convert_wchar(FILE *stream, wchar_t *wcp, int width, locale_t locale);
-static inline int convert_ccl(FILE *stream, char *p, int width, const char *ccltab);
-static inline int convert_wccl(FILE *stream, wchar_t *wcp, int width, const char *ccltab, locale_t locale);
-static inline int convert_string(FILE *stream, char *p, int width);
-static inline int convert_wstring(FILE *stream, wchar_t *wcp, int width, locale_t locale);
+#define GETARG(type) ((flags & SUPPRESS) ? SUPPRESS_PTR : va_arg(ap, type))
 
+static const u_char *sccl(char *tab, const u_char *fmt);
+static int parsefloat(FILE *stream, char *buf, char *end);
+static inline int parseint(FILE *stream, char * buf, int width, int base, int flags);
+static inline int convert_char(FILE *stream, char *p, int width);
+static inline int convert_ccl(FILE *stream, char *p, int width, const char *ccltab);
+static inline int convert_string(FILE *stream, char *p, int width);
+//static int svfscanf(FILE *stream, const char *format, va_list ap);
 
 /*
  * Conversion functions are passed a pointer to this object instead of
@@ -138,8 +137,6 @@ static inline int convert_wstring(FILE *stream, wchar_t *wcp, int width, locale_
  */
 static const int suppress;
 #define SUPPRESS_PTR ((void *)&suppress)
-
-static const mbstate_t initial_mbs;
 
 static inline void init_stdio(void); /* wrapper to check if init is done before
                                       * calling the real init function -
@@ -333,18 +330,98 @@ FILE *stderr = &pvfs_stderr_stream;
  * the implementation just follows what is in freeBSD
  * stdio vfscanf
  */
-static const u_char *sccl(char *tab, cons u_char *fmt)
+static const u_char *sccl(char *tab, const u_char *fmt)
 {
-    /* Still need to figure this out. It uses locale variables!*/
-    int c, n, v, i;
+    int c, n, v;
     
+    /* first `clear' the whole table */
+    c = *fmt++;
+    /* We will be ignoring the character set following ^ */
+    if(c == '^')
+    {
+        v = 1;      /* defualt => accept */
+        c = *fmt++; /* get new first char */
+    }
+    else
+    {
+        /* We will only accept strings from the character set */
+        v = 0; /* default => reject */
+    }
+    
+    /* Getting table ready */
+    memset(tab, v, 256);
+    
+    /*
+     * Now set the entries corresponding to the actual scanset
+     * to the opposite of the above.
+     *
+     * The first character may be ']' (or '-') without being special;
+     * the last character may be '-'.
+     */
+    v = 1 - v;
+    for(;;)
+    {
+        tab[c] = v; /* take character c */
+doswitch:
+        n = *fmt++; /* and examine the next */
+        
+        switch(n)
+        {
+            case 0: /* format ended too soon */
+                return (fmt - 1);
+            case '-':
+                /*
+                 * A scanset of the form
+                 * [01+-]
+                 * is defined as `the digit 0, the digit 1,
+                 * the character +, the character -', but the
+                 * effect of a scan set such as
+                 * [a-zA-Z0-9]
+                 * is implementation defined. The V7 Unix
+                 * scanf treats 'a-z' as `the letters a through
+                 * z`, but treats `a-a' as the letter a, the 
+                 * character -, and the letter a'.
+                 *
+                 * For compatibility, the `-; is not considered
+                 * to define a range if the character following
+                 * it is either a close bracket (required by ANSI)
+                 * of not numerically greater than the character
+                 * we just stored in the table (c).
+                 */
+                n = *fmt;
+                if(n == ']' || n < c)
+                {
+                    c = '-';
+                    break; /* resumt the for(;;) */
+                }
+                fmt++;
+                /* else fill in the range */
+                do{
+                    tab[++c] = v;
+                }while (c < n);
+                c = n;
+                /*
+                 * Alas, the V7 Unix scanf also treats formats
+                 * such as [a-c-e] as `the leters a through e'.
+                 * This too is premitted by the standard.
+                 */
+                goto doswitch;
+                break;
+            case ']': /* end of scanset */
+                return fmt;
+            default:
+                /* just another character */
+                c = n;
+                break;
+        }
+    }
 }
 
 /*
  * This function parses a floating point number from the
  * file stream. It is used by scanf, fscanf, and vfscanf.
  */
-static int parsefloat(FILE *stream, char *buf, char *end, locale_t locale)
+static int parsefloat(FILE *stream, char *buf, char *end)
 {
     char *commit, *p;
     int infnanpos = 0, decptpos = 0;
@@ -364,7 +441,8 @@ static int parsefloat(FILE *stream, char *buf, char *end, locale_t locale)
     } state = S_START;
     unsigned char c;
     /* Need to figure this out!!!! (local_t)*/
-    const char *decpt = localeconv_l(local)->decimale_point;
+    struct lconv *lc = localeconv();
+    const char *decpt = lc->decimal_point;
     int gotmantdig = 0, ishex = 0;
 
     /*
@@ -377,9 +455,9 @@ static int parsefloat(FILE *stream, char *buf, char *end, locale_t locale)
      * match; thus, we can't short-circuit "infinity" or "nan(...)"
      */
     commit = buf - 1;
+    c = *stream->_IO_read_ptr;
     for(p = buf; p < end;)
     {
-        c = *stream->_IO_read_ptr;
 reswitch:
         switch (state)
         {
@@ -465,7 +543,7 @@ reswitch:
                 break;
             case S_DONE:
                 goto parsedone;
-            case S_MAYBEHEX;
+            case S_MAYBEHEX:
                 state = S_DIGITS;
                 if(c == 'X' || c == 'x')
                 {
@@ -532,7 +610,7 @@ reswitch:
                 else if((ishex && isxdigit(c)) || isdigit(c))
                 {
                     commit = p;
-                    gotmantdig = 1'
+                    gotmantdig = 1;
                 }
                 else
                 {
@@ -565,9 +643,9 @@ reswitch:
         *p++ = c;
         if(stream->_IO_read_ptr != stream->_IO_read_end)
         {
-            stream->_IO_read_ptr++;
+            c = getc_unlocked(stream);
         }
-        else if(pvfs_read_buf(stream))
+        else if(stream->_flags & _IO_EOF_SEEN)
         {
             break; /* EOF */
         }
@@ -576,7 +654,7 @@ reswitch:
 parsedone:
     while(commit < --p)
     {
-        unget(*(u_char *)p, stream);
+        ungetc(*(u_char *)p, stream);
     }
     *++commit = '\0';
     return (commit - buf);
@@ -586,7 +664,7 @@ parsedone:
  * This function parses an integer from file stream buffer.
  * It is used for scanf, scanf, and vfscanf
  */
-static inline int parseint(FILE *stream, char * __restrict buf, int width, int base, int flags)
+static inline int parseint(FILE *stream, char * buf, int width, int base, int flags)
 {
     /* `basefix' is used to avoid `if' tests */
     static const short basefix[17] =
@@ -595,9 +673,9 @@ static inline int parseint(FILE *stream, char * __restrict buf, int width, int b
     int c;
 
     flags |= SIGNOK | NDIGITS | NZDIGITS;
+    c = *stream->_IO_read_ptr;
     for(p = buf; width; width--)
     {
-        c = *stream->_IO_read_ptr;
         /* 
          * Swith on the chacter; `goto ok' if we accept it
          * as a part of the number
@@ -618,7 +696,7 @@ static inline int parseint(FILE *stream, char * __restrict buf, int width, int b
                 if(base == 0)
                 {
                     base = 8;
-                    flas |= PFXOK;
+                    flags |= PFXOK;
                 }
                 if(flags & NZDIGITS)
                 {
@@ -626,7 +704,7 @@ static inline int parseint(FILE *stream, char * __restrict buf, int width, int b
                 }
                 else
                 {
-                    flags &= ~(SIGNOK | PFXOK | NDIGITS)
+                    flags &= ~(SIGNOK | PFXOK | NDIGITS);
                 }
                 goto ok;
 
@@ -697,9 +775,9 @@ ok:
         *p++ = c;
         if(stream->_IO_read_ptr != stream->_IO_read_end)
         {
-            stream->_IO_read_ptr++;
+            c = getc_unlocked(stream);
         }
-        else if(pvfs_read_buf(stream))
+        else if(stream->_flags & _IO_EOF_SEEN)
         {
             break; /* EOF */
         }
@@ -718,7 +796,7 @@ ok:
         }
         return 0;
     }
-    c = ((u_char *)pi)[-1];
+    c = ((u_char *)p)[-1];
     if(c == 'x' || c == 'X')
     {
         --p;
@@ -736,7 +814,7 @@ static inline int convert_char(FILE *stream, char *p, int width)
         size_t sum = 0;
         for(;;)
         {
-            if((n = (fp->_IO_read_end - fp->_IO_read_ptr)/sizeof(char))
+            if((n = (stream->_IO_read_end - stream->_IO_read_ptr))
                 < width)
             {
                 sum += n;
@@ -771,26 +849,25 @@ static inline int convert_char(FILE *stream, char *p, int width)
     }
 }
 
-static inline int convert_wchar(FILE *stream, wchar_t *wcp, int width, locale_t locale);
-
 static inline int convert_ccl(FILE *stream, char *p, int width, const char *ccltab)
 {
     char *p0;
     int n;
+    int c = *stream->_IO_read_ptr;
     
     if(p == SUPPRESS_PTR)
     {
         n = 0;
-        while(ccltab[*stream->_IO_read_ptr])
+        while(ccltab[c])
         {
             n++;
-            stream->_IO_read_ptr++;
+            c = getc_unlocked(stream);
             if(--width == 0)
             {
                 break;
             }
             if(stream->_IO_read_ptr == stream->_IO_read_end
-               && pvfs_read_buf(stream))
+               && (stream->_flags & _IO_EOF_SEEN))
             {
                 if(n == 0)
                 {
@@ -803,15 +880,16 @@ static inline int convert_ccl(FILE *stream, char *p, int width, const char *cclt
     else
     {
         p0 = p;
-        while(ccltab[*stream->_IO_read_ptr])
+        while(ccltab[c])
         {
-            *p++ = *stream->_IO_read_ptr;
+            c = getc_unlocked(stream);
+            *p++ = (char)c;
             if(--width == 0)
             {
                 break;
             }
             if(stream->_IO_read_ptr == stream->_IO_read_end
-               && pvfs_read_buf(stream))
+               && (stream->_flags & _IO_EOF_SEEN))
             {
                 if(p == p0)
                 {
@@ -830,26 +908,27 @@ static inline int convert_ccl(FILE *stream, char *p, int width, const char *cclt
     return n;
 }
 
-static inline int convert_wccl(FILE *stream, wchar_t *wcp, int width, const char *ccltab, locale_t locale);
-
 static inline int convert_string(FILE *stream, char *p, int width)
 {
     char *p0;
     int n;
+    int c;
+
+    c = *stream->_IO_read_ptr;
 
     if(p == SUPPRESS_PTR)
     {
         n = 0;
-        while(!isspace(*stream->_IO_read_ptr))
+        while(!isspace(c))
         {
             n++;
-            stream->_IO_read_ptr++;
+            c = getc_unlocked(stream);
             if(--width == 0)
             {
                 break;
             }
             if((stream->_IO_read_ptr == stream->_IO_read_end)
-               && pvfs_read_buf(stream))
+               && (stream->_flags & _IO_EOF_SEEN))
             {
                 break;
             }
@@ -858,15 +937,16 @@ static inline int convert_string(FILE *stream, char *p, int width)
     else
     {
         p0 = p;
-        while(!isspace(*stream->_IO_read_ptr))
+        while(!isspace(c))
         {
-            *p++ = stream->_IO_read_ptr++;
+            c = getc_unlocked(stream);
+            *p++ = (char)c;
             if(--width == 0)
             {
                 break;
             }
             if((stream->_IO_read_ptr == stream->_IO_read_end)
-               && pvfs_read_buf(stream))
+               && (stream->_flags & _IO_EOF_SEEN))
             {
                 break;
             } 
@@ -877,7 +957,6 @@ static inline int convert_string(FILE *stream, char *p, int width)
     return n;
 }
 
-static inline int convert_wstring(FILE *stream, wchar_t *wcp, int width, locale_t locale);
 
 /**************************************************************/
 
@@ -2614,6 +2693,11 @@ int fgetc_unlocked(FILE *stream)
     return (int)ch;
 }
 
+/************************************************************
+need to define fgetwc and getwc for 
+current implementation of scanf functions
+***********************************************************/
+
 /**
  * getc wrapper
  */
@@ -3015,16 +3099,16 @@ void perror(const char *s)
 
 /* TODO: These are not implemented yet */
 
-int scanf(char const *format, ...)
+/* Needed for glibc */
+int __isoc99_fscanf(FILE *stream, const char *format, ...)
 {
-    int len;
+    int done;
     va_list ap;
-
-    gossip_debug(GOSSIP_USRINT_DEBUG, "Calling scanf stdio.c\n");
+    
     va_start(ap, format);
-    len = vfscanf(stdin, format, ap);
+    done = vfscanf(stream, format, ap);
     va_end(ap);
-    return len;
+    return done;
 }
 
 int fscanf(FILE *stream, const char *format, ...)
@@ -3039,16 +3123,72 @@ int fscanf(FILE *stream, const char *format, ...)
     return len;
 }
 
-int vfscanf(FILE *stream, const char *format, va_list ap)
+/* Needed for glibc */
+int __isoc99_scanf(const char *format, ...)
+{
+    int done;
+    va_list ap;
+    
+    va_start(ap, format); 
+    done = vfscanf(stdin, format, ap);
+    va_end(ap);
+    return done;
+}
+
+int scanf(char const *format, ...)
+{
+    int len;
+    va_list ap;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "Calling scanf stdio.c\n");
+    va_start(ap, format);
+    len = vfscanf(stdin, format, ap);
+    va_end(ap);
+    return len;
+}
+
+
+/*int sscanf(const char *str, const char *fmt, ...)
 {
     int ret;
-    lock_stream(stream);
-    ret = svfscanf(stream, format, ap);
-    unlock_stream(stream);
+    va_list ap;
+
+    va_start(ap, fmt);
+    ret = vsscanf(str, fmt, ap);
+    va_end(ap);
     return ret;
 }
 
-int svfscanf(FILE *stream, const char *format, va_list ap)
+int vsscanf(const char *str, const char *fmt, va_list ap)
+{
+}
+*/
+
+/* Needed for glibc */
+int __isoc99_vscanf(const char *format, va_list ap)
+{
+    int done;
+    done = vfscanf(stdin, format, ap);
+    return done; 
+}
+
+int vscanf(const char *format, va_list ap)
+{
+    int ret;
+    gossip_debug(GOSSIP_USRINT_DEBUG, "Calling vscanf stdio.c\n");
+    ret = vfscanf(stdin, format, ap);
+    return ret;
+}
+
+/* Needed for glibc */
+int __isoc99_vfscanf(FILE *stream, const char *format, va_list ap)
+{
+    int done;
+    done  = vfscanf(stream, format, ap);
+    return done;
+}
+
+int vfscanf(FILE *stream, const char *format, va_list ap)
 {
     const u_char *fmt = (const u_char *)format;
     int c;            /* character from format, or conversion */
@@ -3063,9 +3203,8 @@ int svfscanf(FILE *stream, const char *format, va_list ap)
     char buf[513];    /* buffer for numeric conversions
                          Maximum length of numeric string 513 */
     
-    gossip_debug(GOSSIP_USRINT_DEBUG, "Calling vfscanf stdio.c\n");
-    
     PVFS_INIT(init_stdio);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "Calling vfscanf stdio.c\n");
 #if !PVFS_STDIO_REDEFSTREAM
     if(stream == stdin || stream == stdout || stream == stderr)
     {
@@ -3084,6 +3223,8 @@ int svfscanf(FILE *stream, const char *format, va_list ap)
         return 0;
     }
     
+    lock_stream(stream);
+    
     nassigned = 0;
     nconversions = 0;
     nread = 0;
@@ -3092,16 +3233,16 @@ int svfscanf(FILE *stream, const char *format, va_list ap)
         c = *fmt++;
         if(c == 0)
         {
+            unlock_stream(stream);
             return nassigned;
         }
         if(isspace(c))
         {
-            while((stream->_IO_read_ptr != stream->IO_read_end 
+            while((stream->_IO_read_ptr != stream->_IO_read_end 
                    || pvfs_read_buf(stream) == 0) 
                    && isspace(*stream->_IO_read_ptr))
             {
                 nread++;
-                //stream->_r --;
                 stream->_IO_read_ptr++;
             }
             continue;
@@ -3133,8 +3274,7 @@ literal:
                 {
                     goto match_failure;
                 }
-                //fp->_r--;
-                fp->_IO_read_ptr++;
+                stream->_IO_read_ptr++;
                 nread++;
                 continue;
             case '*':
@@ -3204,7 +3344,7 @@ literal:
                 break;
             case 'X':
             case 'x':
-                flags |= PFXOK /* enable 0x prefixing */
+                flags |= PFXOK; /* enable 0x prefixing */
                 c = CT_INT;
                 flags |= UNSIGNED;
                 base = 16;
@@ -3238,7 +3378,7 @@ literal:
                 base = 16;
                 break;
             case 'n':
-                if(FLAGS & SUPRESS)
+                if(flags & SUPPRESS)
                 {
                     continue; /* ??? */
                 }
@@ -3254,7 +3394,7 @@ literal:
                 {
                     *va_arg(ap, long *) = nread;
                 }
-                else if(falgs & LONGLONG)
+                else if(flags & LONGLONG)
                 {
                     *va_arg(ap, long long *) = nread;
                 }
@@ -3278,13 +3418,14 @@ literal:
                 goto match_failure;
             /* backwards compatibility hack. XXX */
             case '\0':
+                unlock_stream(stream);
                 return EOF;
         }
         
         /*
          * We have a conversion that requires input.
          */
-        if(stream->_IO_read_ptr == IO_read_end
+        if(stream->_IO_read_ptr == stream->_IO_read_end
            && pvfs_read_buf(stream))
         {
             goto input_failure;
@@ -3328,12 +3469,13 @@ literal:
                 }
                 if(flags & LONG)
                 {
-                    nr = convert_wchar(stream, GETARG(wchar_t *),
-                         width, locale);
+                    /* Currently not supporting wide characters */
+                    unlock_stream(stream);
+                    return nassigned;
                 }
                 else
                 {
-                    nr = convert_char(fp, GETARG(char *), width);
+                    nr = convert_char(stream, GETARG(char *), width);
                 }
                 if(nr < 0)
                 {
@@ -3348,11 +3490,13 @@ literal:
                 }
                 if(flags & LONG)
                 {
-                    nr = convert_wccl(stream, ....)
+                    /* Currently not supporting wide characters */
+                    unlock_stream(stream);
+                    return nassigned;
                 }
                 else
                 {
-                    nr = convert_ccl(stream, GETARG(char *), width, ccltab)
+                    nr = convert_ccl(stream, GETARG(char *), width, ccltab);
                 }
                 if(nr <= 0)
                 {
@@ -3370,15 +3514,17 @@ literal:
                 /* like CCL, but zero-length string OK, & no NOSKIP */
                 if(width == 0)
                 {
-                    width = (size_t)~0;
+                    width = (size_t)~0; /* `infinity ` */
                 }
                 if(flags & LONG)
                 {
-                    nr = convert_wstring(stream, .....);
+                    /* Currently not supoorting wide characters */
+                    unlock_stream(stream);
+                    return nassigned;
                 }
                 else
                 {
-                    nr = convert_string(stream, .....);
+                    nr = convert_string(stream, GETARG(char *), width);
                 }
                 if(nr < 0)
                 {
@@ -3437,7 +3583,7 @@ literal:
                     {
                         *va_arg(ap, ptrdiff_t *) = res;
                     }
-                    else if(falgs & SIZET)
+                    else if(flags & SIZET)
                     {
                         *va_arg(ap, size_t *) = res;
                     }
@@ -3453,7 +3599,7 @@ literal:
                 {
                     width = sizeof(buf) - 1;
                 }
-                nr = parsefloat(stream, buf, buf + width, ...);
+                nr = parsefloat(stream, buf, buf + width);
                 if(nr == 0)
                 {
                     goto match_failure;
@@ -3478,7 +3624,7 @@ literal:
                 }
                 break;
         }
-        if(!(flags & SUPPESS))
+        if(!(flags & SUPPRESS))
         {
             nassigned++;
             nread += nr;
@@ -3486,8 +3632,10 @@ literal:
         }
     }
 input_failure:
+    unlock_stream(stream);
     return (nconversions != 0 ? nassigned : EOF);
 match_failure:
+    unlock_stream(stream);
     return nassigned;
 }
 
@@ -4437,6 +4585,7 @@ static void init_stdio_internal(void)
     stdio_ops.perror = dlsym(RTLD_NEXT, "perror" );
     stdio_ops.fscanf = dlsym(RTLD_NEXT, "fscanf" );
     stdio_ops.scanf = dlsym(RTLD_NEXT, "scanf" );
+    stdio_ops.vscanf = dlsym(RTLD_NEXT, "vscanf");
     stdio_ops.vfscanf = dlsym(RTLD_NEXT, "vfscanf");
     stdio_ops.clearerr  = dlsym(RTLD_NEXT, "clearerr" );
     stdio_ops.clearerr_unlocked  = dlsym(RTLD_NEXT, "clearerr_unlocked" );

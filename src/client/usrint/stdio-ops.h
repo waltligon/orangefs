@@ -61,6 +61,7 @@ struct stdio_ops_s
     void (*perror)(const char *s);
     int (*fscanf)(FILE *stream, const char *format, ...);
     int (*scanf)(const char *format, ...);
+    int (*vscanf)(const char *format, va_list ap);
     int (*vfscanf)(FILE *stream, const char *format, va_list ap);
     void (*clearerr)(FILE *stream);
     void (*clearerr_unlocked)(FILE *stream);
