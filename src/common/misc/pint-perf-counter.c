@@ -334,7 +334,9 @@ void PINT_perf_rollover( struct PINT_perf_counter* pc)
         pc->sample = head->next;
         tail->next = head;
         head->next = NULL;
-        memcpy(pc->sample->value, head->value, sizeof(struct PINT_perf_sample));
+        memcpy(pc->sample->value,
+               head->value,
+               pc->key_count * sizeof *head->value);
     }
 
     /* reset times for next interval */
