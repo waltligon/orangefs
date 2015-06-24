@@ -455,7 +455,7 @@ static int parsefloat(FILE *stream, char *buf, char *end)
      * match; thus, we can't short-circuit "infinity" or "nan(...)"
      */
     commit = buf - 1;
-    c = *stream->_IO_read_ptr;
+    c = fgetc_unlocked(stream);
     for(p = buf; p < end;)
     {
 reswitch:
@@ -643,9 +643,9 @@ reswitch:
         *p++ = c;
         if(stream->_IO_read_ptr != stream->_IO_read_end)
         {
-            c = getc_unlocked(stream);
+            c = fgetc_unlocked(stream);
         }
-        else if(stream->_flags & _IO_EOF_SEEN)
+        else if(feof_unlocked(stream))
         {
             break; /* EOF */
         }
@@ -673,7 +673,7 @@ static inline int parseint(FILE *stream, char * buf, int width, int base, int fl
     int c;
 
     flags |= SIGNOK | NDIGITS | NZDIGITS;
-    c = *stream->_IO_read_ptr;
+    c = fgetc_unlocked(stream);
     for(p = buf; width; width--)
     {
         /* 
@@ -775,9 +775,9 @@ ok:
         *p++ = c;
         if(stream->_IO_read_ptr != stream->_IO_read_end)
         {
-            c = getc_unlocked(stream);
+            c = fgetc_unlocked(stream);
         }
-        else if(stream->_flags & _IO_EOF_SEEN)
+        else if(feof_unlocked(stream))
         {
             break; /* EOF */
         }
@@ -807,36 +807,30 @@ ok:
 
 static inline int convert_char(FILE *stream, char *p, int width)
 {
-    int n;
-
+    
     if(p == SUPPRESS_PTR)
     {
-        size_t sum = 0;
-        for(;;)
+        size_t read = 0;
+        char tmpbuff[width];
+        
+        /* Read width number of characters from the data
+         * stream, but just ignore them
+         */
+        read = fread(tmpbuff,1,width,stream);
+        if(read == 0)
         {
-            if((n = (stream->_IO_read_end - stream->_IO_read_ptr))
-                < width)
-            {
-                sum += n;
-                width -= n;
-                stream->_IO_read_ptr += n;
-                if(pvfs_read_buf(stream))
-                {
-                    if(sum == 0)
-                    {
-                        return -1;
-                    }
-                    break;
-                }
-            }
-            else
-            {
-                sum += width;
-                stream->_IO_read_ptr += width;
-                break;
-            }
+            /* Error has occured */
+            return -1;
         }
-        return sum;
+        else
+        {
+            /* We don't want to count EOF as a character read */
+            if(tmpbuff[read] == EOF)
+            {
+                read -= 1;
+            }
+        }       
+        return read;
     }
     else
     {
@@ -853,21 +847,22 @@ static inline int convert_ccl(FILE *stream, char *p, int width, const char *cclt
 {
     char *p0;
     int n;
-    int c = *stream->_IO_read_ptr;
+    int c;
     
     if(p == SUPPRESS_PTR)
     {
         n = 0;
+        c = fgetc_unlocked(stream);
         while(ccltab[c])
         {
             n++;
-            c = getc_unlocked(stream);
+            c = fgetc_unlocked(stream);
             if(--width == 0)
             {
                 break;
             }
             if(stream->_IO_read_ptr == stream->_IO_read_end
-               && (stream->_flags & _IO_EOF_SEEN))
+               && (feof_unlocked(stream)))
             {
                 if(n == 0)
                 {
@@ -875,27 +870,37 @@ static inline int convert_ccl(FILE *stream, char *p, int width, const char *cclt
                 }
                 break;
             }
+            else
+            {
+                /* Still more characters to grab from stream */
+                c = fgetc_unlocked(stream);
+            }
         }
     }
     else
     {
         p0 = p;
+        c = fgetc_unlocked(stream);
         while(ccltab[c])
         {
-            c = getc_unlocked(stream);
             *p++ = (char)c;
             if(--width == 0)
             {
                 break;
             }
             if(stream->_IO_read_ptr == stream->_IO_read_end
-               && (stream->_flags & _IO_EOF_SEEN))
+               && (feof_unlocked(stream)))
             {
                 if(p == p0)
                 {
                     return -1;
                 }
                 break;
+            }
+            else
+            {
+                /* Still more characters to grab from stream */
+                c = fgetc_unlocked(stream);
             }    
         }
         n = p - p0;
@@ -914,42 +919,48 @@ static inline int convert_string(FILE *stream, char *p, int width)
     int n;
     int c;
 
-    c = *stream->_IO_read_ptr;
-
     if(p == SUPPRESS_PTR)
     {
         n = 0;
+        c = fgetc_unlocked(stream);
         while(!isspace(c))
         {
             n++;
-            c = getc_unlocked(stream);
             if(--width == 0)
             {
                 break;
             }
             if((stream->_IO_read_ptr == stream->_IO_read_end)
-               && (stream->_flags & _IO_EOF_SEEN))
+               && (feof_unlocked(stream)))
             {
                 break;
+            }
+            else
+            {
+                c = fgetc_unlocked(stream);
             }
         }
     }
     else
     {
         p0 = p;
+        c = fgetc_unlocked(stream);
         while(!isspace(c))
         {
-            c = getc_unlocked(stream);
             *p++ = (char)c;
             if(--width == 0)
             {
                 break;
             }
             if((stream->_IO_read_ptr == stream->_IO_read_end)
-               && (stream->_flags & _IO_EOF_SEEN))
+               && (feof_unlocked(stream)))
             {
                 break;
             } 
+            else
+            {
+                c = fgetc_unlocked(stream);
+            }
         }
         *p = 0;
         n = p - p0;
@@ -3096,9 +3107,6 @@ void perror(const char *s)
 #endif
 }
 
-
-/* TODO: These are not implemented yet */
-
 /* Needed for glibc */
 int __isoc99_fscanf(FILE *stream, const char *format, ...)
 {
@@ -3111,6 +3119,9 @@ int __isoc99_fscanf(FILE *stream, const char *format, ...)
     return done;
 }
 
+/**
+ * fscanf wrapper
+ */
 int fscanf(FILE *stream, const char *format, ...)
 {
     int len;
@@ -3135,6 +3146,9 @@ int __isoc99_scanf(const char *format, ...)
     return done;
 }
 
+/**
+ * scanf wrapper
+ */
 int scanf(char const *format, ...)
 {
     int len;
@@ -3148,6 +3162,7 @@ int scanf(char const *format, ...)
 }
 
 
+/* TODO: These are not implemented yet */
 /*int sscanf(const char *str, const char *fmt, ...)
 {
     int ret;
@@ -3161,6 +3176,9 @@ int scanf(char const *format, ...)
 
 int vsscanf(const char *str, const char *fmt, va_list ap)
 {
+    FILE *newfile;
+    //Maybe do fopen, fwrite str to buffer, and then call vfscanf
+    //vfscanf(newfile, fmt, ap)
 }
 */
 
@@ -3172,6 +3190,9 @@ int __isoc99_vscanf(const char *format, va_list ap)
     return done; 
 }
 
+/**
+ * vscanf wrapper
+ */
 int vscanf(const char *format, va_list ap)
 {
     int ret;
@@ -3188,10 +3209,20 @@ int __isoc99_vfscanf(FILE *stream, const char *format, va_list ap)
     return done;
 }
 
+/**
+ * vfscanf wrapper
+ * Currently wide characters are not supported. So if the
+ * format specifies a long characters or strings, this
+ * function will immediately return the number of conversions
+ * done so far. This function is primarly all FreeBSD 10.1
+ * source code. Just simple modifications were added to work
+ * with the functions already implemented in this file.
+ */
 int vfscanf(FILE *stream, const char *format, va_list ap)
 {
     const u_char *fmt = (const u_char *)format;
     int c;            /* character from format, or conversion */
+    int cstream;      /* character from stream */
     size_t width;     /* field width, or 0 */
     int flags;        /* flags as defined above */
     int nassigned;    /* number of fields assigned */
@@ -3239,11 +3270,12 @@ int vfscanf(FILE *stream, const char *format, va_list ap)
         if(isspace(c))
         {
             while((stream->_IO_read_ptr != stream->_IO_read_end 
-                   || pvfs_read_buf(stream) == 0) 
+                   || !feof_unlocked(stream))
                    && isspace(*stream->_IO_read_ptr))
             {
                 nread++;
-                stream->_IO_read_ptr++;
+                /* Read white space, and ignore from input stream */
+                fgetc_unlocked(stream);
             }
             continue;
         }
@@ -3264,17 +3296,19 @@ again:
         {
             case '%':
 literal:
+                cstream = fgetc_unlocked(stream);
                 if(stream->_IO_read_ptr == stream->_IO_read_end 
                    //&& srefill(stream))
-                   && pvfs_read_buf(stream))
+                   && feof_unlocked(stream))
                 {
                     goto input_failure;
                 }
-                if(*stream->_IO_read_ptr != c)
+                if(cstream != c)
                 {
                     goto match_failure;
                 }
-                stream->_IO_read_ptr++;
+                cstream = fgetc_unlocked(stream);
+                //stream->_IO_read_ptr++;
                 nread++;
                 continue;
             case '*':
@@ -3414,6 +3448,7 @@ literal:
                 {
                     *va_arg(ap, int *) = nread;
                 }
+                continue;
             default: 
                 goto match_failure;
             /* backwards compatibility hack. XXX */
@@ -3426,7 +3461,7 @@ literal:
          * We have a conversion that requires input.
          */
         if(stream->_IO_read_ptr == stream->_IO_read_end
-           && pvfs_read_buf(stream))
+           && feof_unlocked(stream))
         {
             goto input_failure;
         }
@@ -3442,9 +3477,11 @@ literal:
                 nread++;
                 if(stream->_IO_read_ptr != stream->_IO_read_end)
                 {
-                    stream->_IO_read_ptr++;
+                    //Just comsuming from buffer but ignoring
+                    fgetc_unlocked(stream);
+                    //stream->_IO_read_ptr++;
                 }
-                else if(pvfs_read_buf(stream))
+                else if(feof_unlocked(stream))
                 {
                     goto input_failure;
                 }
