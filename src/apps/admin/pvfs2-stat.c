@@ -32,6 +32,7 @@ struct options
 {
     int     nVerbose;
     int     nFollowLink;
+    int     nDisplaySIDs;
     char ** pszFiles;
     int     nNumFiles;
 };
@@ -41,6 +42,7 @@ static void usage(int argc, char** argv);
 static int parse_args(int argc, char** argv, struct options * opts);
 static void enable_verbose(struct options * opts);
 static void enable_dereference(struct options * opts);
+static void enable_display_sids(struct options * opts);
 static int do_stat(const char             * pszFile,
                    const char             * pszRelativeFile, 
                    const PVFS_fs_id         fs_id, 
@@ -49,7 +51,8 @@ static int do_stat(const char             * pszFile,
 void print_stats(const PVFS_object_ref * ref,
                  const char            * pszName,
                  const char            * pszRelativeName,
-                 const PVFS_sys_attr   * attr);
+                 const PVFS_sys_attr   * attr,
+                 const struct options   * opts);
 
 int main(int argc, char **argv)
 {
@@ -264,7 +267,8 @@ static int do_stat(const char             * pszFile,
    print_stats(&ref,
                pszFile, 
                pszRelativeFile, 
-               &(getattr_response.attr));
+               &(getattr_response.attr),
+               opts);
    
    return(0);
 }
@@ -288,10 +292,11 @@ static int parse_args(int argc, char** argv, struct options * opts)
         {"version",0,0,0},
         {"verbose",0,0,0},
         {"dereference",0,0,0},
+        {"display-sids",0,0,0},
         {0,0,0,0}
     };
 
-   while((ret = getopt_long_only(argc, argv, "VL", long_opts, &option_index)) != -1)
+   while((ret = getopt_long_only(argc, argv, "sVL", long_opts, &option_index)) != -1)
    {
       switch (ret)
       {
@@ -316,6 +321,10 @@ static int parse_args(int argc, char** argv, struct options * opts)
                   printf("%s\n", PVFS2_VERSION);
                   exit(0);
                }
+               else if (strcmp("display-sids", cur_option) == 0)
+               {
+                  enable_display_sids(opts);
+               }
                else
                {
                   usage(argc, argv);
@@ -323,21 +332,25 @@ static int parse_args(int argc, char** argv, struct options * opts)
                }
                break;
 
+         case 's':
+               enable_display_sids(opts);
+               break;
+
          case 'V': /* --verbose     */ 
-                  enable_verbose(opts);
-                  break;
+               enable_verbose(opts);
+               break;
                    
          case 'L': /* --dereference */
-                  enable_dereference(opts);
-                  break;
+               enable_dereference(opts);
+               break;
          
          case '?': 
-                  usage(argc, argv);
-                  exit(0);
+               usage(argc, argv);
+               exit(0);
 
          default:
-                  usage(argc, argv);
-                  exit(0);
+               usage(argc, argv);
+               exit(0);
       }
    }
 
@@ -393,10 +406,16 @@ static void enable_dereference(struct options * opts)
    opts->nFollowLink = 1;  
 }
 
+static void enable_display_sids(struct options * opts)
+{
+   opts->nDisplaySIDs = 1;
+}
+
 void print_stats(const PVFS_object_ref * ref,
                  const char            * pszName,
                  const char            * pszRelativeName,
-                 const PVFS_sys_attr   * attr)
+                 const PVFS_sys_attr   * attr,
+                 const struct options  * opts)
 {
    char a_time[100] = ""; 
    char m_time[100] = "";  
@@ -404,12 +423,27 @@ void print_stats(const PVFS_object_ref * ref,
    char n_time[100] = "";
    struct passwd * user;
    struct group  * group;
+   int i;
 
    fprintf(stdout, "-------------------------------------------------------\n");
    fprintf(stdout, "  File Name     : %s\n",  pszName);
    fprintf(stdout, "  Relative Name : %s\n",  pszRelativeName);
    fprintf(stdout, "  fs ID         : %d\n",  ref->fs_id);
    fprintf(stdout, "  Handle        : %s\n",  PVFS_OID_str(&ref->handle));
+   /* display SIDs if option enabled */
+   if (opts->nDisplaySIDs)
+   {
+       fprintf(stdout, "  SID Count     : %d\n", ref->sid_count);
+   
+       for (i = 0; i < ref->sid_count; i++)
+       {
+           char str[16];
+
+           sprintf(str, "%d", i);
+           fprintf(stdout, "  SID[%d]%*s %s\n", i, (int) (10 - (strlen(str))),
+                   ":", PVFS_SID_str(&ref->sid_array[i]));
+       }
+   }
    fprintf(stdout, "  Mask          : %x\n",  attr->mask);
    if(attr->mask & PVFS_ATTR_SYS_PERM)
    {
@@ -567,6 +601,7 @@ static void usage(int argc, char** argv)
 {
     fprintf(stderr,"Usage: %s [OPTION]... [FILE]...\n", argv[0]); 
     fprintf(stderr,"Display FILE(s) status \n\n");
+    fprintf(stderr,"  -s, --display-sids  display SIDs\n");
     fprintf(stderr,"  -L, --dereference   follow links\n");
     fprintf(stderr,"  -V, --verbose       turns on verbose messages\n");
     fprintf(stderr,"      --help          display this help and exit\n");
