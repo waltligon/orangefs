@@ -40,7 +40,7 @@ int main (int argc, char *argv[])
 {
         MPI::Intracomm &world = MPI::COMM_WORLD;
         MPI::File fh;
-        MPI::Datatype &base = MPI::SHORT;
+        const MPI::Datatype &base = MPI::SHORT;
         MPI::Datatype view;
         int size, rank;
         int chunk_size, subchunk_size, subchunk_offset;
