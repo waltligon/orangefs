@@ -95,8 +95,9 @@ extern char *gets(char *s);
 #define INTMAXT    0X800   /* j: intmax_t */
 #define PTRDIFFT   0x1000  /* t: ptrdiff_t */
 #define SIZET      0x2000  /* z: size_T */
-#define SHORTSHORT 0x4000 /* hh: char */
+#define SHORTSHORT 0x4000  /* hh: char */
 #define UNSIGNED   0x8000  /* %[oupxX] conversions */
+#define MALLOC     0X20000 /* m: malloc either c, s, [ */
 
 /*
  * The following are used in integral conversions only:
@@ -125,9 +126,9 @@ extern char *gets(char *s);
 static const u_char *sccl(char *tab, const u_char *fmt);
 static int parsefloat(FILE *stream, char *buf, char *end);
 static inline int parseint(FILE *stream, char * buf, int width, int base, int flags);
-static inline int convert_char(FILE *stream, char *p, int width);
-static inline int convert_ccl(FILE *stream, char *p, int width, const char *ccltab);
-static inline int convert_string(FILE *stream, char *p, int width);
+static inline int convert_char(FILE *stream, char *p, char **m, int width);
+static inline int convert_ccl(FILE *stream, char *p, char **m, int width, const char *ccltab);
+static inline int convert_string(FILE *stream, char *p, char **m,int width);
 //static int svfscanf(FILE *stream, const char *format, va_list ap);
 
 /*
@@ -805,10 +806,29 @@ ok:
     return (p - buf);
 }
 
-static inline int convert_char(FILE *stream, char *p, int width)
+static inline int convert_char(FILE *stream, char *p, char **m, int width)
 {
-    
-    if(p == SUPPRESS_PTR)
+    if(p == NULL)
+    {
+        /* The malloc flag has been passed so we must malloc memory */
+        char mallbuff[width];      
+        size_t r = fread(mallbuff, 1, width, stream);
+        if(r == 0)
+        {
+            return -1;
+        }
+        *m = (char *)clean_malloc(r + 1);
+        if(!*m)
+        {
+            /* clean_malloc failed */
+            return -1;
+        }
+        memcpy(*m, mallbuff, r);
+        (*m)[r] = '\0';
+        return r;
+
+    }
+    else if(p == SUPPRESS_PTR)
     {
         size_t read = 0;
         char tmpbuff[width];
@@ -822,14 +842,6 @@ static inline int convert_char(FILE *stream, char *p, int width)
             /* Error has occured */
             return -1;
         }
-        else
-        {
-            /* We don't want to count EOF as a character read */
-            if(tmpbuff[read] == EOF)
-            {
-                read -= 1;
-            }
-        }       
         return read;
     }
     else
@@ -839,24 +851,84 @@ static inline int convert_char(FILE *stream, char *p, int width)
         {
             return -1;
         }
+        if(width != 1)
+        {
+            p[r] = '\0';
+        }
         return r;
     }
 }
 
-static inline int convert_ccl(FILE *stream, char *p, int width, const char *ccltab)
+static inline int convert_ccl(FILE *stream, char *p, char **m,int width, const char *ccltab)
 {
     char *p0;
     int n;
     int c;
-    
-    if(p == SUPPRESS_PTR)
+   
+    if(p == NULL)
+    {
+        int SIZE = 100;
+        int total = 0;
+        int increase = 0;
+        char tmpbuff[SIZE];
+        char *tmp = NULL;
+        
+        *m = (char *)clean_malloc(SIZE);
+        total = n = 0;
+        c = fgetc_unlocked(stream);
+        while(ccltab[c])
+        {
+            tmpbuff[n] = (char)c;
+            n++;
+            total++;
+            if(--width == 0)
+            {
+                break;
+            }
+            if(stream->_IO_read_ptr == stream->_IO_read_end
+               && (feof_unlocked(stream)))
+            {
+                break;
+            }
+            else if(!(n % SIZE))
+            {
+                memcpy(*m + (increase)*SIZE, tmpbuff, SIZE);
+                increase++;
+                tmp = (char *)clean_realloc(*m, (increase + 1)*SIZE);
+                if(!tmp)
+                {
+                    return -1;
+                }
+                *m = tmp;
+                n = 0;
+            }      
+            else
+            {
+                /* Still more characters to grab from stream */
+                c = fgetc_unlocked(stream);
+            }    
+        }   
+        memcpy(*m + (increase)*SIZE, tmpbuff, SIZE);
+        tmp = (char *)clean_realloc(*m, total + 1);
+        if(!tmp)
+        {
+            return -1;
+        }
+        if(!ccltab[c] && !feof_unlocked(stream))
+        {
+            ungetc(c, stream);
+        }
+        *m = tmp;
+        (*m)[total] = '\0';
+        n = total;
+    }
+    else if(p == SUPPRESS_PTR)
     {
         n = 0;
         c = fgetc_unlocked(stream);
         while(ccltab[c])
         {
             n++;
-            c = fgetc_unlocked(stream);
             if(--width == 0)
             {
                 break;
@@ -875,6 +947,10 @@ static inline int convert_ccl(FILE *stream, char *p, int width, const char *cclt
                 /* Still more characters to grab from stream */
                 c = fgetc_unlocked(stream);
             }
+        }
+        if(!ccltab[c] && !feof_unlocked(stream))
+        {
+            ungetc(c, stream);
         }
     }
     else
@@ -908,18 +984,78 @@ static inline int convert_ccl(FILE *stream, char *p, int width, const char *cclt
         {
             return 0;
         }
+        if(!ccltab[c] && !feof_unlocked(stream))
+        {
+            ungetc(c, stream);
+        }
         *p = 0;
     }
     return n;
 }
 
-static inline int convert_string(FILE *stream, char *p, int width)
+static inline int convert_string(FILE *stream, char *p, char **m, int width)
 {
     char *p0;
     int n;
     int c;
 
-    if(p == SUPPRESS_PTR)
+    if(p == NULL)
+    {
+        int SIZE = 100;
+        int total = 0;
+        int increase = 0;
+        char tmpbuff[SIZE];
+        char *tmp = NULL;
+        
+        *m = (char *)clean_malloc(SIZE);
+        total = n = 0;
+        c = fgetc_unlocked(stream);
+        while(!isspace(c))
+        {
+            tmpbuff[n] = (char)c;
+            total++;
+            n++;
+            if(--width == 0)
+            {
+                break;
+            }
+            if((stream->_IO_read_ptr == stream->_IO_read_end)
+               && (feof_unlocked(stream)))
+            {
+                break;
+            } 
+            else if(!(n % SIZE))
+            {
+                memcpy(*m + (increase)*SIZE, tmpbuff, SIZE);
+                increase++;
+                tmp = (char *)clean_realloc(*m, (increase + 1)*SIZE);
+                if(!tmp)
+                {
+                    return -1;
+                }
+                *m = tmp;
+                n = 0;
+            }      
+            else
+            {
+                c = fgetc_unlocked(stream);
+            }
+        }
+        memcpy(*m + (increase)*SIZE, tmpbuff, SIZE);
+        tmp = (char *)clean_realloc(*m, total + 1);
+        if(!tmp)
+        {
+            return -1;
+        }
+        *m = tmp;
+        (*m)[total] = '\0';
+        if(isspace(c))
+        {
+            ungetc(c, stream);
+        }
+        n = total;
+    }
+    else if(p == SUPPRESS_PTR)
     {
         n = 0;
         c = fgetc_unlocked(stream);
@@ -939,6 +1075,10 @@ static inline int convert_string(FILE *stream, char *p, int width)
             {
                 c = fgetc_unlocked(stream);
             }
+        }
+        if(isspace(c))
+        {
+            ungetc(c, stream);
         }
     }
     else
@@ -962,6 +1102,11 @@ static inline int convert_string(FILE *stream, char *p, int width)
                 c = fgetc_unlocked(stream);
             }
         }
+        if(isspace(c))
+        {
+            ungetc(c, stream);
+        }
+
         *p = 0;
         n = p - p0;
     }
@@ -3298,7 +3443,6 @@ again:
 literal:
                 cstream = fgetc_unlocked(stream);
                 if(stream->_IO_read_ptr == stream->_IO_read_end 
-                   //&& srefill(stream))
                    && feof_unlocked(stream))
                 {
                     goto input_failure;
@@ -3308,7 +3452,6 @@ literal:
                     goto match_failure;
                 }
                 cstream = fgetc_unlocked(stream);
-                //stream->_IO_read_ptr++;
                 nread++;
                 continue;
             case '*':
@@ -3449,6 +3592,9 @@ literal:
                     *va_arg(ap, int *) = nread;
                 }
                 continue;
+            case 'm':
+                flags |= MALLOC;
+                goto again;
             default: 
                 goto match_failure;
             /* backwards compatibility hack. XXX */
@@ -3479,7 +3625,6 @@ literal:
                 {
                     //Just comsuming from buffer but ignoring
                     fgetc_unlocked(stream);
-                    //stream->_IO_read_ptr++;
                 }
                 else if(feof_unlocked(stream))
                 {
@@ -3512,7 +3657,15 @@ literal:
                 }
                 else
                 {
-                    nr = convert_char(stream, GETARG(char *), width);
+                    if(!(flags & MALLOC))
+                    {
+                        nr = convert_char(stream, GETARG(char *), NULL, width);
+                    }
+                    else
+                    {
+                        nr = convert_char(stream, NULL, GETARG(char **), width);
+                    }
+
                 }
                 if(nr < 0)
                 {
@@ -3531,9 +3684,13 @@ literal:
                     unlock_stream(stream);
                     return nassigned;
                 }
+                else if(!(flags & MALLOC))
+                {
+                    nr = convert_ccl(stream, GETARG(char *), NULL, width, ccltab);
+                }
                 else
                 {
-                    nr = convert_ccl(stream, GETARG(char *), width, ccltab);
+                    nr = convert_ccl(stream, NULL, GETARG(char **), width, ccltab);
                 }
                 if(nr <= 0)
                 {
@@ -3561,7 +3718,14 @@ literal:
                 }
                 else
                 {
-                    nr = convert_string(stream, GETARG(char *), width);
+                    if(!(flags & MALLOC))
+                    {
+                        nr = convert_string(stream, GETARG(char *), NULL, width);
+                    }
+                    else
+                    {
+                        nr = convert_string(stream, NULL, GETARG(char **), width);
+                    }
                 }
                 if(nr < 0)
                 {
@@ -3664,9 +3828,9 @@ literal:
         if(!(flags & SUPPRESS))
         {
             nassigned++;
-            nread += nr;
-            nconversions++;
         }
+        nread += nr;
+        nconversions++;
     }
 input_failure:
     unlock_stream(stream);
@@ -4210,12 +4374,15 @@ int readdir_r(DIR *dir, struct dirent *entry, struct dirent **result)
     struct dirent *val;
     errno = 0;
     val = readdir(dir);
-    if(val){
+    if(val)
+    {
         *entry = *val;
         *result = entry;
     }
-    else{
-        if(errno != 0){
+    else
+    {
+        if(errno != 0)
+        {
             return errno;
         }
         *result = NULL;
@@ -4231,12 +4398,15 @@ int readdir64_r(DIR *dir, struct dirent64 *entry, struct dirent64 **result)
     struct dirent64 *val;
     errno = 0;
     val = readdir64(dir);
-    if(val){
+    if(val)
+    {
         *entry = *val;
         *result = entry;
     }
-    else{
-        if(errno != 0){
+    else
+    {
+        if(errno != 0)
+        {
             return errno;
         }
         *result = NULL;
