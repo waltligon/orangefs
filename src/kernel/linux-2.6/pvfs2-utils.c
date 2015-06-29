@@ -852,38 +852,15 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
          */
         if (ret == 0)
         {
-            ssize_t new_length=0;
             length = new_op->downcall.resp.getxattr.val_sz;
-/* NOTE - kernel/fs should never add or remove things from the value of
- * an xattr - this was a misguided approach
- */
-#if 0
-            /*
-             * if the xattr corresponding to name was not terminated with a \0
-             * then we return the entire response length
-             */
-            if (xattr_zero_terminated(name) == 0)
-            {
-                new_length = length;
-            }
-            /*
-             * if it was terminated by a \0 then we return 1 less for the getfattr
-             * programs to play nicely with displaying it
-             */
-            else {
-                new_length = length - 1;
-            }
-#endif
-            /* Just return the length of the queried attribute after
-             * subtracting the \0 thingie */
             if (size == 0)
             {
-                ret = new_length;
+                ret = length;
             }
             else
             {
                 /* check to see if key length is > provided buffer size */
-                if (new_length > size)
+                if (length > size)
                 {
                     ret = -ERANGE;
                 }
@@ -891,9 +868,8 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
                 {
                     /* No size problems */
                     memset(buffer, 0, size);
-                    memcpy(buffer, new_op->downcall.resp.getxattr.val, 
-                            new_length);
-                    ret = new_length;
+                    memcpy(buffer, new_op->downcall.resp.getxattr.val, length);
+                    ret = length;
                     s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
                     gossip_debug(GOSSIP_XATTR_DEBUG,
                         "pvfs2_inode_getxattr: inode %s key %s "
