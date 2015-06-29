@@ -9,6 +9,56 @@
  *
  *  PVFS2 user interface routines - implementation of stdio for pvfs
  */
+
+/*
+ * The family of scanf functions (scanf, fscanf, vfscanf, and vscanf)
+ * were implemented by using the contents of vfscanf.c from FreeBSD.
+ * Also, the helper functions sccl, parsefloat, parseint, convert_char,
+ * convert_ccl, and convert_string were implemented by using the contents
+ * of vfscanf.c from FreeBSD. Only slight modifications were done to make 
+ * sure that the FreeBSD implementations worked with the contents of this 
+ * file. Also, a flag for 'm' was added to allow a pointer argument to 
+ * be malloc'ed. In the case the 'm' flag is used, it is the users 
+ * responsibility to ensure the malloc'ed memory is freed. All copyright 
+ * information with regards to FreeBSD are below.
+ *
+ * -
+ * Copyright (c) 1990, 1993
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * Copyright (c) 2011 The FreeBSD Foundation
+ * All rights reserved.
+ * Portions of this software were developed by David Chisnall
+ * under sponsorship from the FreeBSD Foundation.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Chris Torek.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 /* this prevents headers from using inlines for 64 bit calls */
 #define USRINT_SOURCE 1
 
@@ -83,7 +133,7 @@ extern char *gets(char *s);
 #endif
 
 /*
- * Flags used during convresion with vfscanf
+ * Flags used during string format conversion with vfscanf
  */
 #define LONG       0x01    /* l: long or double */
 #define LONGDBL    0x02    /* L: long double */
@@ -97,7 +147,7 @@ extern char *gets(char *s);
 #define SIZET      0x2000  /* z: size_T */
 #define SHORTSHORT 0x4000  /* hh: char */
 #define UNSIGNED   0x8000  /* %[oupxX] conversions */
-#define MALLOC     0X20000 /* m: malloc either c, s, [ */
+#define MALLOC     0X20000 /* m: malloc works with c, s, [ flags */
 
 /*
  * The following are used in integral conversions only:
@@ -110,7 +160,8 @@ extern char *gets(char *s);
 #define HAVESIGN   0x10000 /* sign detected */
 
 /*
- * Conversion types
+ * Used for setting the values passed to scanf family functions
+ * in vfscanf
  */
 #define CT_CHAR   0        /* %c conversion */
 #define CT_CCL    1        /* %[...] conversion */
@@ -119,21 +170,21 @@ extern char *gets(char *s);
 #define CT_FLOAT  4        /* %[efgEFG] conversion */
 
 /*
- * The following functions are solely used by the vfscanf function
+ * Used for passing arguements to scanf family functions to the
+ * functions convert_char, convert_ccl, and convert_string below.
  */
 #define GETARG(type) ((flags & SUPPRESS) ? SUPPRESS_PTR : va_arg(ap, type))
 
 static const u_char *sccl(char *tab, const u_char *fmt);
 static int parsefloat(FILE *stream, char *buf, char *end);
 static inline int parseint(FILE *stream, char * buf, int width, int base, int flags);
-static inline int convert_char(FILE *stream, char *p, char **m, int width);
-static inline int convert_ccl(FILE *stream, char *p, char **m, int width, const char *ccltab);
-static inline int convert_string(FILE *stream, char *p, char **m,int width);
-//static int svfscanf(FILE *stream, const char *format, va_list ap);
+static inline int convert_char(FILE *stream, char *p, char **m, int width, int flags);
+static inline int convert_ccl(FILE *stream, char *p, char **m, int width, const char *ccltab, int flags);
+static inline int convert_string(FILE *stream, char *p, char **m,int width, int flags);
 
 /*
- * Conversion functions are passed a pointer to this object instead of
- * a real parameter to indicate that the assignment-suppression (*)
+ * Conversion functions for vfscanf are passed a pointer to this object 
+ * instead of a real parameter to indicate that the assignment-suppression (*)
  * flag was specified. 
  */
 static const int suppress;
@@ -326,15 +377,15 @@ FILE *stderr = &pvfs_stderr_stream;
 #endif
 #endif
 
-/*****************************************************************/
-/* This is used by vfscanf 
- * the implementation just follows what is in freeBSD
- * stdio vfscanf
+/*
+ * This function sets up an array of ascii chacters to either
+ * be rejected or accpeted by the scanf family functions that
+ * use the '[...]' string format specifier.
  */
 static const u_char *sccl(char *tab, const u_char *fmt)
 {
     int c, n, v;
-    
+     
     /* first `clear' the whole table */
     c = *fmt++;
     /* We will be ignoring the character set following ^ */
@@ -419,8 +470,9 @@ doswitch:
 }
 
 /*
- * This function parses a floating point number from the
- * file stream. It is used by scanf, fscanf, and vfscanf.
+ * This function parses a floating point number from the file
+ * stream. It is used by for floating point variable assignments
+ * with the scanf family functions.
  */
 static int parsefloat(FILE *stream, char *buf, char *end)
 {
@@ -441,8 +493,8 @@ static int parsefloat(FILE *stream, char *buf, char *end)
         S_EXPDIGITS
     } state = S_START;
     unsigned char c;
-    /* Need to figure this out!!!! (local_t)*/
     struct lconv *lc = localeconv();
+    /* Just simply getting the std C character for decimal point */
     const char *decpt = lc->decimal_point;
     int gotmantdig = 0, ishex = 0;
 
@@ -662,8 +714,9 @@ parsedone:
 }
 
 /*
- * This function parses an integer from file stream buffer.
- * It is used for scanf, scanf, and vfscanf
+ * This function parses an integer number from the file
+ * stream. It is used by for integer variable assignments
+ * with the scanf family functions.
  */
 static inline int parseint(FILE *stream, char * buf, int width, int base, int flags)
 {
@@ -806,15 +859,30 @@ ok:
     return (p - buf);
 }
 
-static inline int convert_char(FILE *stream, char *p, char **m, int width)
+/*
+ * This function intializes an arguement of '%c' sent to
+ * the scanf family functions. The width of character string 
+ * (EX: %10c) maybe greater than one. In that case, a string
+ * is arguement is initialized.
+ *
+ * WARNING!!! This function  potentially allocates memory if 
+ * the 'm' flags is used. If memory allocation is done, the user
+ * is incharge of free'ing the allocated memory. 
+ */
+static inline int convert_char(FILE *stream, 
+                               char *p, 
+                               char **m, 
+                               int width, 
+                               int flags)
 {
-    if(p == NULL)
+    if(flags & MALLOC)
     {
-        /* The malloc flag has been passed so we must malloc memory */
+        /* The malloc flag 'm' has been passed so we must malloc memory */
         char mallbuff[width];      
         size_t r = fread(mallbuff, 1, width, stream);
         if(r == 0)
         {
+            *m = NULL;
             return -1;
         }
         *m = (char *)clean_malloc(r + 1);
@@ -859,23 +927,47 @@ static inline int convert_char(FILE *stream, char *p, char **m, int width)
     }
 }
 
-static inline int convert_ccl(FILE *stream, char *p, char **m,int width, const char *ccltab)
+/*
+ * This function uses the ascii table from sccl to parse the
+ * read buffer of stream and initialize either p or m to
+ * the contents extracted from the read buffer. 
+ * 
+ * WARNING!!! This function  potentially allocates memory if 
+ * the 'm' flags is used. If memory allocation is done, the user
+ * is incharge of free'ing the allocated memory. 
+ */
+static inline int convert_ccl(FILE *stream, 
+                              char *p,            
+                              char **m,
+                              int width, 
+                              const char *ccltab,
+                              int flags)
 {
     char *p0;
     int n;
     int c;
    
-    if(p == NULL)
+    if(flags & MALLOC)
     {
-        int SIZE = 100;
-        int total = 0;
-        int increase = 0;
-        char tmpbuff[SIZE];
-        char *tmp = NULL;
+        /* The malloc flag 'm' has been passed so we must malloc memory */
+        int SIZE = 100;      /* Initially start with a buffer of 100 */
+        int total = 0;       /* Total number of characters read matching ccltab table */
+        int increase = 0;    /* Increase buffer size variable */
+        char tmpbuff[SIZE];  /* Static tmp buffer of 100 characters */
+        char *tmp = NULL;    /* Used for realloc */
         
-        *m = (char *)clean_malloc(SIZE);
-        total = n = 0;
         c = fgetc_unlocked(stream);
+        if(feof_unlocked(stream))
+        {
+            *m = NULL;
+            return 0;
+        }
+        else
+        {
+            *m = (char *)clean_malloc(SIZE);
+            total = n = 0;
+        }
+
         while(ccltab[c])
         {
             tmpbuff[n] = (char)c;
@@ -885,13 +977,9 @@ static inline int convert_ccl(FILE *stream, char *p, char **m,int width, const c
             {
                 break;
             }
-            if(stream->_IO_read_ptr == stream->_IO_read_end
-               && (feof_unlocked(stream)))
-            {
-                break;
-            }
             else if(!(n % SIZE))
             {
+                /* In this case we have to reallocate the buffer for more characters */
                 memcpy(*m + (increase)*SIZE, tmpbuff, SIZE);
                 increase++;
                 tmp = (char *)clean_realloc(*m, (increase + 1)*SIZE);
@@ -906,16 +994,27 @@ static inline int convert_ccl(FILE *stream, char *p, char **m,int width, const c
             {
                 /* Still more characters to grab from stream */
                 c = fgetc_unlocked(stream);
+                /* If EOF we are done */
+                if(feof_unlocked(stream))
+                {
+                    break;
+                }
             }    
         }   
         memcpy(*m + (increase)*SIZE, tmpbuff, SIZE);
+        /* Only using as much space as really necessary */
         tmp = (char *)clean_realloc(*m, total + 1);
         if(!tmp)
         {
             return -1;
         }
-        if(!ccltab[c] && !feof_unlocked(stream))
+        if(!feof_unlocked(stream) && width != 0)
         {
+            /* 
+             * Need to put back last character because next
+             * argument to scanf functions might read the input
+             * EX: whitespace character for '%c'
+             */
             ungetc(c, stream);
         }
         *m = tmp;
@@ -926,6 +1025,12 @@ static inline int convert_ccl(FILE *stream, char *p, char **m,int width, const c
     {
         n = 0;
         c = fgetc_unlocked(stream);
+        
+        if(feof_unlocked(stream))
+        {
+            return -1;
+        }
+
         while(ccltab[c])
         {
             n++;
@@ -933,30 +1038,36 @@ static inline int convert_ccl(FILE *stream, char *p, char **m,int width, const c
             {
                 break;
             }
-            if(stream->_IO_read_ptr == stream->_IO_read_end
-               && (feof_unlocked(stream)))
-            {
-                if(n == 0)
-                {
-                    return -1;
-                }
-                break;
-            }
             else
             {
                 /* Still more characters to grab from stream */
                 c = fgetc_unlocked(stream);
+                /* If EOF we are done */
+                if(feof_unlocked(stream))
+                {
+                    break;
+                }
             }
         }
-        if(!ccltab[c] && !feof_unlocked(stream))
+        if(!feof_unlocked(stream) && width != 0)
         {
+            /* 
+             * Need to put back last character because next
+             * argument to scanf functions might read the input
+             * EX: whitespace character for '%c'
+             */
             ungetc(c, stream);
         }
     }
     else
     {
-        p0 = p;
         c = fgetc_unlocked(stream);
+        if(p == NULL || feof_unlocked(stream))
+        {
+            return -1;
+        }
+
+        p0 = p;
         while(ccltab[c])
         {
             *p++ = (char)c;
@@ -964,19 +1075,15 @@ static inline int convert_ccl(FILE *stream, char *p, char **m,int width, const c
             {
                 break;
             }
-            if(stream->_IO_read_ptr == stream->_IO_read_end
-               && (feof_unlocked(stream)))
-            {
-                if(p == p0)
-                {
-                    return -1;
-                }
-                break;
-            }
             else
             {
                 /* Still more characters to grab from stream */
                 c = fgetc_unlocked(stream);
+                /* If EOF we are done */
+                if(feof_unlocked(stream))
+                {
+                    break;
+                }
             }    
         }
         n = p - p0;
@@ -984,8 +1091,13 @@ static inline int convert_ccl(FILE *stream, char *p, char **m,int width, const c
         {
             return 0;
         }
-        if(!ccltab[c] && !feof_unlocked(stream))
+        if(!feof_unlocked(stream) && width != 0)
         {
+            /* 
+             * Need to put back last character because next
+             * argument to scanf functions might read the input
+             * EX: whitespace character for '%c'
+             */
             ungetc(c, stream);
         }
         *p = 0;
@@ -993,22 +1105,44 @@ static inline int convert_ccl(FILE *stream, char *p, char **m,int width, const c
     return n;
 }
 
-static inline int convert_string(FILE *stream, char *p, char **m, int width)
+/*
+ * This function intializes an arguement of '%s' sent to
+ * the scanf family functions.
+ *
+ * WARNING!!! This function  potentially allocates memory if 
+ * the 'm' flags is used. If memory allocation is done, the user
+ * is incharge of free'ing the allocated memory. 
+ */
+static inline int convert_string(FILE *stream, 
+                                 char *p, 
+                                 char **m, 
+                                 int width, 
+                                 int flags)
 {
     char *p0;
     int n;
     int c;
 
-    if(p == NULL)
+    if(flags & MALLOC)
     {
-        int SIZE = 100;
-        int total = 0;
-        int increase = 0;
-        char tmpbuff[SIZE];
-        char *tmp = NULL;
+        int SIZE = 100;     /* Initially start with a buffer of 100 */
+        int total = 0;      /* Total number of characters read matching ccltab table */
+        int increase = 0;   /* Increase buffer size variable */
+        char tmpbuff[SIZE]; /* Static tmp buffer of 100 characters */ 
+        char *tmp = NULL;   /* Used for realloc */
         
-        *m = (char *)clean_malloc(SIZE);
-        total = n = 0;
+        c = fgetc_unlocked(stream);
+        if(feof_unlocked(stream))
+        {
+            *m = NULL;
+            return 0;
+        }
+        else
+        {
+            *m = (char *)clean_malloc(SIZE);
+            total = n = 0;
+        }
+        
         c = fgetc_unlocked(stream);
         while(!isspace(c))
         {
@@ -1026,6 +1160,7 @@ static inline int convert_string(FILE *stream, char *p, char **m, int width)
             } 
             else if(!(n % SIZE))
             {
+                /* In this case we have to reallocate the buffer for more characters */
                 memcpy(*m + (increase)*SIZE, tmpbuff, SIZE);
                 increase++;
                 tmp = (char *)clean_realloc(*m, (increase + 1)*SIZE);
@@ -1042,6 +1177,7 @@ static inline int convert_string(FILE *stream, char *p, char **m, int width)
             }
         }
         memcpy(*m + (increase)*SIZE, tmpbuff, SIZE);
+        /* Only using as much space as really necessary */
         tmp = (char *)clean_realloc(*m, total + 1);
         if(!tmp)
         {
@@ -1051,6 +1187,11 @@ static inline int convert_string(FILE *stream, char *p, char **m, int width)
         (*m)[total] = '\0';
         if(isspace(c))
         {
+            /* 
+             * Need to put back last character because next
+             * argument to scanf functions might read the input
+             * EX: whitespace character for '%c'
+             */
             ungetc(c, stream);
         }
         n = total;
@@ -1078,11 +1219,20 @@ static inline int convert_string(FILE *stream, char *p, char **m, int width)
         }
         if(isspace(c))
         {
+            /* 
+             * Need to put back last character because next
+             * argument to scanf functions might read the input
+             * EX: whitespace character for '%c'
+             */
             ungetc(c, stream);
         }
     }
     else
     {
+        if(p == NULL)
+        {
+            return -1;
+        }
         p0 = p;
         c = fgetc_unlocked(stream);
         while(!isspace(c))
@@ -1104,6 +1254,11 @@ static inline int convert_string(FILE *stream, char *p, char **m, int width)
         }
         if(isspace(c))
         {
+            /* 
+             * Need to put back last character because next
+             * argument to scanf functions might read the input
+             * EX: whitespace character for '%c'
+             */
             ungetc(c, stream);
         }
 
@@ -1112,9 +1267,6 @@ static inline int convert_string(FILE *stream, char *p, char **m, int width)
     }
     return n;
 }
-
-
-/**************************************************************/
 
 /* this gets called all over the place to make sure initialization is
  * done so we made is small and inlined it - if init not done call the
@@ -2849,11 +3001,6 @@ int fgetc_unlocked(FILE *stream)
     return (int)ch;
 }
 
-/************************************************************
-need to define fgetwc and getwc for 
-current implementation of scanf functions
-***********************************************************/
-
 /**
  * getc wrapper
  */
@@ -3252,7 +3399,10 @@ void perror(const char *s)
 #endif
 }
 
-/* Needed for glibc */
+/**
+ * fscanf wrapper
+ * glibc actually calls __isco99_fscanf
+ */
 int __isoc99_fscanf(FILE *stream, const char *format, ...)
 {
     int done;
@@ -3279,7 +3429,10 @@ int fscanf(FILE *stream, const char *format, ...)
     return len;
 }
 
-/* Needed for glibc */
+/**
+ * scanf wrapper
+ * glibc actually calls __isoc99_scanf
+ */
 int __isoc99_scanf(const char *format, ...)
 {
     int done;
@@ -3307,27 +3460,17 @@ int scanf(char const *format, ...)
 }
 
 
-/* TODO: These are not implemented yet */
-/*int sscanf(const char *str, const char *fmt, ...)
-{
-    int ret;
-    va_list ap;
+/* 
+ * sscanf and vsscanf wrappers are not implemented because
+ * they both parse a string argument and do not interact with 
+ * the filesystem. The regular library fuctions for sscanf and
+ * vsscanf will be called instead.
+ */
 
-    va_start(ap, fmt);
-    ret = vsscanf(str, fmt, ap);
-    va_end(ap);
-    return ret;
-}
-
-int vsscanf(const char *str, const char *fmt, va_list ap)
-{
-    FILE *newfile;
-    //Maybe do fopen, fwrite str to buffer, and then call vfscanf
-    //vfscanf(newfile, fmt, ap)
-}
-*/
-
-/* Needed for glibc */
+/**
+ * vsscanf wrapper
+ * glibc actually calls __isoc99_vscanf
+ */
 int __isoc99_vscanf(const char *format, va_list ap)
 {
     int done;
@@ -3341,12 +3484,15 @@ int __isoc99_vscanf(const char *format, va_list ap)
 int vscanf(const char *format, va_list ap)
 {
     int ret;
-    gossip_debug(GOSSIP_USRINT_DEBUG, "Calling vscanf stdio.c\n");
+    gossip_debug(gossip_usrint_debug, "calling vscanf stdio.c\n");
     ret = vfscanf(stdin, format, ap);
     return ret;
 }
 
-/* Needed for glibc */
+/**
+ * vfscanf wrapper
+ * glibc actually calls __isoc99_vfscanf
+ */
 int __isoc99_vfscanf(FILE *stream, const char *format, va_list ap)
 {
     int done;
@@ -3359,9 +3505,7 @@ int __isoc99_vfscanf(FILE *stream, const char *format, va_list ap)
  * Currently wide characters are not supported. So if the
  * format specifies a long characters or strings, this
  * function will immediately return the number of conversions
- * done so far. This function is primarly all FreeBSD 10.1
- * source code. Just simple modifications were added to work
- * with the functions already implemented in this file.
+ * done so far. 
  */
 int vfscanf(FILE *stream, const char *format, va_list ap)
 {
@@ -3424,7 +3568,8 @@ int vfscanf(FILE *stream, const char *format, va_list ap)
             }
             continue;
         }
-        if(c != '%'){
+        if(c != '%')
+        {
             goto literal;
         }
         
@@ -3439,7 +3584,7 @@ again:
         c = *fmt++;
         switch(c)
         {
-            case '%':
+            case '%': /* literal '%' character */
 literal:
                 cstream = fgetc_unlocked(stream);
                 if(stream->_IO_read_ptr == stream->_IO_read_end 
@@ -3454,13 +3599,13 @@ literal:
                 cstream = fgetc_unlocked(stream);
                 nread++;
                 continue;
-            case '*':
+            case '*': /* ignore characters specifier */
                 flags |= SUPPRESS;
                 goto again;
-            case 'j':
+            case 'j': /* same as h but the next pointer is a to intmax_t */
                 flags |= INTMAXT;
                 goto again;
-            case 'l':
+            case 'l': /* long specifier */
                 if(flags & LONG)
                 {
                     flags &= ~LONG;
@@ -3474,16 +3619,21 @@ literal:
             case 'q':
                 flags |= LONGLONG; /* note quite */
                 goto again;
-            case 't':
+            case 't': /* same as h, but next pointer is to a ptrdiff_t */
                 flags |= PTRDIFFT;
                 goto again;
-            case 'z':
+            case 'z': /* size_t specifer */
                 flags |= SIZET;
                 goto again;
-            case 'L':
+            case 'L': /* Conversion will be either e, f, or g and the
+                         next pointer  to long double
+                      */
                 flags |= LONGDBL;
                 goto again;
-            case 'h':
+            case 'h': /* Indicates conversion will be either d, i, o, u,
+                         x, X, or n and the next pointer is to a short int
+                         or unsgined short int 
+                      */
                 if(flags & SHORT)
                 {
                     flags &= ~SHORT;
@@ -3494,6 +3644,7 @@ literal:
                     flags |= SHORT;
                 }
                 goto again;
+            /* These are cases where the width is specified */
             case '0': case '1': case '2': case '3': case '4' :
             case '5': case '6': case '7': case '8': case '9' :
                 width = width * 10 + c - '0';
@@ -3501,31 +3652,32 @@ literal:
             /*
              * Conversions
              */
-            case 'd':
+            case 'd': /* signed integer */
                 c = CT_INT;
                 base = 10;
                 break;
-            case 'i':
+            case 'i': /* signed integer (hex/octal formats also accepted) */
                 c = CT_INT;
                 base = 0;
                 break;
-            case 'o':
+            case 'o': /* unsigned octal */
                 c = CT_INT;
                 flags |= UNSIGNED;
                 base = 8;
                 break;
-            case 'u':
+            case 'u': /* unsigned integer */
                 c = CT_INT;
                 flags |= UNSIGNED;
                 base = 10;
                 break;
-            case 'X':
+            case 'X': /* Both unsigned hexadecimal integer */
             case 'x':
                 flags |= PFXOK; /* enable 0x prefixing */
                 c = CT_INT;
                 flags |= UNSIGNED;
                 base = 16;
                 break;
+            /* All of these are floating point numbers */
             case 'A': case 'E': case 'F': case 'G':
             case 'a': case 'e': case 'f': case 'g':
                 c = CT_FLOAT;
@@ -3533,10 +3685,10 @@ literal:
             case 'S':
                 flags |= LONG;
                 /* FALLTHROUGH */
-            case 's':
+            case 's': /* string */
                 c = CT_STRING;
                 break;
-            case '[':
+            case '[': /* format inclusion/exclusion */
                 fmt = sccl(ccltab, fmt);
                 flags |= NOSKIP;
                 c = CT_CCL;
@@ -3544,7 +3696,7 @@ literal:
             case 'C':
                 flags |= LONG;
                 /* FALLTHOUGH */
-            case 'c':
+            case 'c': /* character */
                 flags |= NOSKIP;
                 c = CT_CHAR;
                 break;
@@ -3554,7 +3706,7 @@ literal:
                 flags |= UNSIGNED; /* >= sizeof(uintptr_t) */
                 base = 16;
                 break;
-            case 'n':
+            case 'n': /* number of characters consumed */
                 if(flags & SUPPRESS)
                 {
                     continue; /* ??? */
@@ -3592,7 +3744,7 @@ literal:
                     *va_arg(ap, int *) = nread;
                 }
                 continue;
-            case 'm':
+            case 'm': /* malloc memory from pointer passed */
                 flags |= MALLOC;
                 goto again;
             default: 
@@ -3659,11 +3811,11 @@ literal:
                 {
                     if(!(flags & MALLOC))
                     {
-                        nr = convert_char(stream, GETARG(char *), NULL, width);
+                        nr = convert_char(stream, GETARG(char *), NULL, width, flags);
                     }
                     else
                     {
-                        nr = convert_char(stream, NULL, GETARG(char **), width);
+                        nr = convert_char(stream, NULL, GETARG(char **), width, flags);
                     }
 
                 }
@@ -3686,11 +3838,11 @@ literal:
                 }
                 else if(!(flags & MALLOC))
                 {
-                    nr = convert_ccl(stream, GETARG(char *), NULL, width, ccltab);
+                    nr = convert_ccl(stream, GETARG(char *), NULL, width, ccltab, flags);
                 }
                 else
                 {
-                    nr = convert_ccl(stream, NULL, GETARG(char **), width, ccltab);
+                    nr = convert_ccl(stream, NULL, GETARG(char **), width, ccltab, flags);
                 }
                 if(nr <= 0)
                 {
@@ -3720,11 +3872,11 @@ literal:
                 {
                     if(!(flags & MALLOC))
                     {
-                        nr = convert_string(stream, GETARG(char *), NULL, width);
+                        nr = convert_string(stream, GETARG(char *), NULL, width, flags);
                     }
                     else
                     {
-                        nr = convert_string(stream, NULL, GETARG(char **), width);
+                        nr = convert_string(stream, NULL, GETARG(char **), width, flags);
                     }
                 }
                 if(nr < 0)
