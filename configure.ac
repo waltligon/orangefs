@@ -763,8 +763,10 @@ AC_ARG_WITH(kernel,
         vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
     elif test -r  $withval/include/generated/utsrelease.h && grep -qE UTS_RELEASE..3\\. $withval/include/generated/utsrelease.h; then
         vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
+    elif test -r  $withval/include/generated/utsrelease.h && grep -qE UTS_RELEASE..4\\. $withval/include/generated/utsrelease.h; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
     else
-        AC_MSG_ERROR(The kernel source tree does not appear to be 2.6 or 3.X)
+        AC_MSG_ERROR(The kernel source tree does not appear to be 2.6 or 3.X or 4.X)
         
     fi
 
