@@ -17,10 +17,10 @@
  * convert_ccl, and convert_string were implemented by using the contents
  * of vfscanf.c from FreeBSD. Only slight modifications were done to make 
  * sure that the FreeBSD implementations worked with the contents of this 
- * file. Also, a flag for 'm' was added to allow a pointer argument to 
- * be malloc'ed. In the case the 'm' flag is used, it is the users 
- * responsibility to ensure the malloc'ed memory is freed. All copyright 
- * information with regards to FreeBSD are below.
+ * file. Also, a flag for 'm' was added to the vfscanf function to allow 
+ * a pointer argument to be malloc'ed. In the case the 'm' flag is used, 
+ * it is the users responsibility to ensure the malloc'ed memory is freed.
+ * All copyright information with regards to FreeBSD are below.
  *
  * -
  * Copyright (c) 1990, 1993
@@ -160,8 +160,8 @@ extern char *gets(char *s);
 #define HAVESIGN   0x10000 /* sign detected */
 
 /*
- * Used for setting the values passed to scanf family functions
- * in vfscanf
+ * Used for setting the values of arguments passed to scanf family 
+ * functions in vfscanf
  */
 #define CT_CHAR   0        /* %c conversion */
 #define CT_CCL    1        /* %[...] conversion */
@@ -705,6 +705,17 @@ reswitch:
     }
 
 parsedone:
+    /* 
+     * If space encountered, it must be put back into
+     * the read buffer, because further parsing may
+     * be looking for this character. Also, if the
+     * buffer width has been completely filled, then
+     * the last chacter must be put back.
+     */
+    if(isspace(c) || p == end)
+    {
+        ungetc(c, stream);
+    }
     while(commit < --p)
     {
         ungetc(*(u_char *)p, stream);
@@ -739,7 +750,7 @@ static inline int parseint(FILE *stream, char * buf, int width, int base, int fl
             /*
              * The digit 0 is always legal, but is special. For
              * %i conversions, if no digits (zero or nonzero) have
-             * been scanned (only signs), we weill have base == 0.
+             * been scanned (only signs), we will have base == 0.
              * In that case, we should set it to 8 and enable 0x
              * prefixing. Also, if we have not scanned zero
              * digits before this, do not turn off prefixing
@@ -837,11 +848,23 @@ ok:
         }
     }
 
+    /* 
+     * If space encountered, it must be put back into
+     * the read buffer, because further parsing may
+     * be looking for this character. Also, if the
+     * width of the integer has been obtained without
+     * error, then the last input character must also
+     * be put back.
+     */
+    if(isspace(c) || width == 0)
+    {
+        ungetc(c, stream);
+    }
+
     /* If we had only a sign, it is no good; push back the sign.
      * If the number ends in `x', it was [sign] '0' 'x', so push
      * back the x adn treat it as a [sign] '0'.
      */
-
     if(flags & NDIGITS)
     {
         if(p > buf)
@@ -990,16 +1013,14 @@ static inline int convert_ccl(FILE *stream,
                 *m = tmp;
                 n = 0;
             }      
-            else
+            
+            /* Still more characters to grab from stream */
+            c = fgetc_unlocked(stream);
+            /* If EOF we are done */
+            if(feof_unlocked(stream))
             {
-                /* Still more characters to grab from stream */
-                c = fgetc_unlocked(stream);
-                /* If EOF we are done */
-                if(feof_unlocked(stream))
-                {
-                    break;
-                }
-            }    
+                break;
+            }
         }   
         memcpy(*m + (increase)*SIZE, tmpbuff, SIZE);
         /* Only using as much space as really necessary */
@@ -1143,7 +1164,6 @@ static inline int convert_string(FILE *stream,
             total = n = 0;
         }
         
-        c = fgetc_unlocked(stream);
         while(!isspace(c))
         {
             tmpbuff[n] = (char)c;
@@ -1153,11 +1173,6 @@ static inline int convert_string(FILE *stream,
             {
                 break;
             }
-            if((stream->_IO_read_ptr == stream->_IO_read_end)
-               && (feof_unlocked(stream)))
-            {
-                break;
-            } 
             else if(!(n % SIZE))
             {
                 /* In this case we have to reallocate the buffer for more characters */
@@ -1171,9 +1186,11 @@ static inline int convert_string(FILE *stream,
                 *m = tmp;
                 n = 0;
             }      
-            else
+            
+            c = fgetc_unlocked(stream);
+            if(feof_unlocked(stream))
             {
-                c = fgetc_unlocked(stream);
+                break;
             }
         }
         memcpy(*m + (increase)*SIZE, tmpbuff, SIZE);
@@ -1207,14 +1224,13 @@ static inline int convert_string(FILE *stream,
             {
                 break;
             }
-            if((stream->_IO_read_ptr == stream->_IO_read_end)
-               && (feof_unlocked(stream)))
-            {
-                break;
-            }
             else
             {
                 c = fgetc_unlocked(stream);
+                if(feof_unlocked(stream))
+                {
+                    break;
+                }
             }
         }
         if(isspace(c))
@@ -1242,14 +1258,13 @@ static inline int convert_string(FILE *stream,
             {
                 break;
             }
-            if((stream->_IO_read_ptr == stream->_IO_read_end)
-               && (feof_unlocked(stream)))
-            {
-                break;
-            } 
             else
             {
                 c = fgetc_unlocked(stream);
+                if(feof_unlocked(stream))
+                {
+                    break;
+                }
             }
         }
         if(isspace(c))
@@ -3587,8 +3602,7 @@ again:
             case '%': /* literal '%' character */
 literal:
                 cstream = fgetc_unlocked(stream);
-                if(stream->_IO_read_ptr == stream->_IO_read_end 
-                   && feof_unlocked(stream))
+                if(feof_unlocked(stream))
                 {
                     goto input_failure;
                 }
@@ -3596,7 +3610,6 @@ literal:
                 {
                     goto match_failure;
                 }
-                cstream = fgetc_unlocked(stream);
                 nread++;
                 continue;
             case '*': /* ignore characters specifier */
@@ -3758,8 +3771,7 @@ literal:
         /*
          * We have a conversion that requires input.
          */
-        if(stream->_IO_read_ptr == stream->_IO_read_end
-           && feof_unlocked(stream))
+        if(feof_unlocked(stream))
         {
             goto input_failure;
         }
