@@ -484,6 +484,26 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 		AC_DEFINE(HAVE_IGET4_LOCKED, 1, Define if kernel has iget4_locked),
 	)
 
+        AC_MSG_CHECKING(for backing_dev_info in struct address_space)
+	dnl backing_dev_info was removed from struct address_space
+	dnl around 4.1
+        AC_TRY_COMPILE([
+                #define __KERNEL__
+                #ifdef HAVE_KCONFIG
+                #include <linux/kconfig.h>
+                #endif
+                #include <linux/fs.h>
+                static struct address_space foo = {
+                         .backing_dev_info = NULL,
+                };
+        ], [],
+                AC_MSG_RESULT(yes)
+                AC_DEFINE(BACKING_DEV_IN_ADDR_SPACE,
+                          1,
+                          Define if struct  backing_dev_info is defined),
+                AC_MSG_RESULT(no)
+        )
+
 	AC_MSG_CHECKING(for iget5_locked function in kernel)
 	dnl if this test passes, the kernel does not have it
 	dnl if this test fails, the kernel already defined it
