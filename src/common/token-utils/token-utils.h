@@ -62,3 +62,4 @@ char ** get_tokens(const char *input,
 #endif /* TOKEN_ENABLE_HEAP_VERSION */
 
 #endif /* TOKEN_UTILS_H */
+

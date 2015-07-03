@@ -773,6 +773,7 @@ static PINT_sm_action lookup_segment_setup_parent_getattr(
 
     cur_seg = GET_CURRENT_SEGMENT(sm_p);
 
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         cur_seg->seg_starting_refn,

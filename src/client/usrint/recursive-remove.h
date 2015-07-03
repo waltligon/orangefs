@@ -68,3 +68,4 @@ int recursive_delete_dir(char *dir);
 int remove_files_in_dir(char *dir, DIR* dirp);
 
 #endif
+

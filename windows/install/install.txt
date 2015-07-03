@@ -1,0 +1,95 @@
+OrangeFS 2.9.2 * June 8, 2015
+
+Installing the OrangeFS Windows Client
+--------------------------------------
+
+Follow the instructions below to install the OrangeFS Windows Client.
+
+The Client connects to a running OrangeFS server. If you have not yet
+installed the OrangeFS server components, consult the documentation and
+install the server before installing the Windows Client.
+
+1. Download the ZIP file associated with your system type (64- or 32-bit):
+   * For 64-bit systems, download orangefs-windows-client-2.9.2-win64.zip.
+   * For 32-bit systems, download orangefs-windows-client-2.9.2-win32.zip.
+2. Extract the ZIP file to any directory. The OrangeFS and Dokan directories
+   will be created.
+
+Open a Command Prompt from Start | All Programs | Accessories to complete
+the following steps.
+
+3. Install the Dokan driver:
+
+   a. Change (cd) to the Dokan\DokanLibrary directory.
+   b. Copy dokan.dll to the System32 directory:
+      copy dokan.dll c:\windows\system32
+   c. Copy dokan.sys to the system Drivers directory:
+      copy dokan.sys c:\windows\system32\drivers
+   d. Install the driver using dokanctl.exe:
+      dokanctl /i d
+   e. Restart your system.
+
+4. Install the Dokan Mounter service:
+   
+   a. Change (cd) to the Dokan\DokanLibrary directory.
+   b. Install the service using dokanctl.exe:
+      dokanctl /i s
+
+5. Install the OrangeFS Client service:
+
+   a. Change (cd) to the OrangeFS\Client directory.
+   b. Install the service using orangefs-client.exe:
+      orangefs-client -installService
+
+6. Configure the OrangeFS Client by creating the orangefstab and orangefs.cfg 
+   files in OrangeFS\Client, following the instructions in the "General 
+   Configuration" section of the Windows Client documentation.
+
+7. Start the Dokan Mounter and OrangeFS Client services using the Services
+   Administrative Tool (Start | Control Panel | Administrative Tools | Services).
+
+Your OrangeFS file system should appear as a Removable Drive.
+
+For troubleshooting, open the Event Log Administrative Tool and consult the 
+Application Log. For additional help, consult the documentation.
+
+Uninstalling the OrangeFS Windows Client
+----------------------------------------
+
+Follow the instructions below to unstall the OrangeFS Windows Client.
+
+1. Stop the Dokan Mounter and OrangeFS Client services.
+
+2. Remove the OrangeFS Client service:
+
+   a. Change (cd) to the OrangeFS\Client directory.
+   b. Remove the service using orangefs-client.exe.
+      orangefs-client -removeService
+
+3. Remove the Dokan Mounter service:
+   
+   a. Change (cd) to the Dokan\DokanLibrary directory.
+   b. Remove the service using dokanctl.exe:
+      dokanctl /r s
+
+4. Remove the Dokan driver:
+
+   a. Change (cd) to the Dokan\DokanLibrary directory.
+   b. Remove the driver using dokanctl.exe:
+      dokanctl /r d
+   c. Restart your system
+
+5. Remove Dokan system files:
+
+   a. Remove dokan.dll:
+      del c:\windows\system32\dokan.dll
+   b. Remove dokan.sys:
+      del c:\windows\system32\drivers\dokan.sys
+
+6. Remove application files:
+   a. Remove the Dokan directory:
+      rd Dokan /s
+   b. Remove the OrangeFS directory:
+      rd OrangeFS /s
+
+

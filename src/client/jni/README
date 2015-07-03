@@ -1,4 +1,4 @@
-# (C) 2012 Clemson University
+# (C) 2015 Clemson University
 # See COPYING in top-level directory.
 ===============================================================================
 Brief Documentation - OrangeFS JNI and Hadoop Client
@@ -16,8 +16,7 @@ Step 1:
     make
     sudo make install
 
-  For comprehensive documentation on using Hadoop with OrangeFS, please see:
-    http://www.omnibond.com/orangefs/docs/v_2_8_8/index.htm#Hadoop_Client.htm
+  For comprehensive documentation on using Hadoop with OrangeFS, please visit docs.orangefs.com/.
 
 ===============================================================================
 Step 2:
@@ -51,5 +50,7 @@ Step 3:
 
   example of building and running Main.java:
 
-    javac -cp ".:/opt/orangefs/lib/orangefs-jni-2.9.0.jar" Main.java
-    java -cp ".:/opt/orangefs/lib/orangefs-jni-2.9.0.jar" Main
+    javac -cp ".:/opt/orangefs/lib/orangefs-jni-VERSION.jar" Main.java
+    java -cp ".:/opt/orangefs/lib/orangefs-jni-VERSION.jar" Main
+
+  Where 'VERSION' is the 3 digit OrangeFS release version in the format 'x.x.x'.

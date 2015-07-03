@@ -1,10 +1,327 @@
 -----------------------
 OrangeFS Release ChangeLog
 -----------------------
-SVN changes can be seen at
-http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/trunk
 
-Rev 10315
+
+
+
+
+* - Update pom.xml files to use the latest versions of our dependencies
+* - Add support for issueing -rf with the pvfs2-server program to indicate
+*   you want to have your data/metadata directories on that server wiped
+*   clean and reinitialized in one invocation of pvfs2-server
+* - Fixed problem that sometimes occurred when reaching the threshold for
+*   splitting distributed directory entries to another server
+* - Fix for attribute changes to directories not being stored
+* - Fix compile errors with pvfs2-client-core that occurred with certain
+*   --disable parameters specified at configure time
+* - Fix compile error experienced on ARM architectures
+* - Add support for new environment variable for use with Hadoop:
+*   ORANGEFS_STRIP_SIZE_AS_BLKSIZE
+* - Use "struct ctl_table" rather than relying on the typedef as it went
+*   away around kernel version 3.16.
+* - Get rid of the lazy mtime flag in the kernel module as the iattr already
+*   has the timestamp
+* - Fix configure test for O_DIRECT
+
+Up to Subserversion Rev 11536
+
+* - Implemented key-based and certificate-based security modes
+* - Implemented distributed directories
+* - Added support for Hadoop v2.x
+* - Updated kernel module for newer kernels
+* - Allowed root to create file with arbitrary owner and group
+* - Properly handled variadic arguments passed to open/open64 and
+*   openat/openat64
+* - Improved JNI debug flexibility
+* - Added support for -r and -f flags to pvfs2-rm
+* - Updated sys-create to populate acache for increased performance
+* - Fixed minor bugs in DAV module
+* - Made develtools no longer dependent on pvfs libraries
+
+Up to Subversion Rev 10730
+
+* - JNI Layer:  
+* -   Removed classes that are no longer used.
+* -   Minor bug fixes.
+* - USRINT libraries: 
+* -    Files created with a zero mode can now be truncated.
+* -    /dev/shm areas are automatically deleted.               
+* - Kernel Module:  
+* -    Linux dcache entries are automatically revalidated to prevent stale handles.
+* -    If interrupt occurs while issuing a pvfs2-getattr, EAGAIN is returned
+* -       instead of marking the inode bad.
+* - Admin Apps:
+* -    pvfs2-write: allows users to run I/O tests without reading from local
+* -                 disk.
+* - Admin Scripts:
+* -    pvfs2-start-all and pvfs2-stop-all:  
+* -       Starts and stops servers.
+* -       Located in the sbin install directory
+* - 
+* - Updated kernel module to work with kernel versions up to 3.11
+* - Updated pvfs2-touch to respect umask
+* - Improved multi-fabric BMI support
+* - Fixed problem with FUSE readdir code.
+
+
+Up to Subversion Rev 10349
+
+* - Fixed bug in iocommon_open where the variable directory 
+*   was used instead of the argument path before calling iocommon_expand_path
+* - Fixed bug in closedir where the fd was never getting closed thus
+*   leaving lots of fd's open in some cases
+* - Fixed bug in is_pvfs_path where argument path was referenced without
+*   a dereference (not sure how that ever worked)
+* - BMI_add_to_socket_collection and related macros were not checking
+*   for errors from epoll_ctl, some are expected but errno was not reset
+*   leaving to issues later on
+
+* - Made FUSE compile on MAC OSX 10.7.5
+* - Corrected a deadlock issue where the client-core was trying to get a 
+*   "write" semaphore at the same time the kernel was holding a "read" 
+*   semaphore while sleeping.
+* - Set PVFS2_DEFAULT_SLOT_TIMEOUT_SECS from 1800 to 900, which means that 
+*   when all the shared memory slots are busy, the process will sleep for 
+*   15 minutes (instead of 30 minutes) or until a slot becomes available.
+* - Made pvfs2-genconfig default the log file location to 
+*   /var/log/orangefs-server.log.
+* - In the OrangeFS extension to Hadoop's abstract FileSystem class,
+*   corrected scenario where an exception was being throw as a result of
+*   mkdirs failure. This error was thrown when client A checks to see if
+*   a parent directory exists, but client B successfully creates the parent
+*   directory prior to client A executing mkdirs. If mkdirs returns false,
+*   then client A should check to see if the directory actually had been
+*   created before throwing an exception.
+* - Allow mmap() calls with MAP_SHARED
+* - Fixed several Infiniband-related issues:
+*     - Fixed per connection memory leak.
+*     - Replaced asserts with error checking.
+*     - Changed error*() calls to not exit.  All calls to error*() now do
+*       error handeling.
+*     - Lowered QP timeout from 5 minutes to 17 seconds.
+* - Fixed problem in rewinddir
+* - Improved how we expose directory entries to Hadoop using
+*   java/util/ArrayList
+* - patched a problem in iocommon_lseek where dirs over 1024 entries can
+*   cause a problem - also avoided a slow loop when we can.
+* - Corrected bug related to recursive_delete when using Hadoop
+* - Added flags to javah javac and jar commands to limit the ammount of
+*   heap memory reserved for jvm. Before, running 'make' with the option
+*   '-j9' was causing multiple jvms to each acquire 1/4 of the machine's
+*   ram by default. Since 9 jvms cannot each obtain 1/4 of a machine's
+*   memory, errors were thrown. Setting a reasonable maximum heap reserved
+*   for jvm fixes this. 256MB works well for now.
+* - Added warnings for meta/data stored on a root device
+* - fix selinux issues within usrint
+* - Added shared descriptor tables, that work with fork and exec, and added
+*   some flags to the link line to improve interposition.
+* - Corrected issue with JNI layer and gcc not working well without -O0
+*   option.
+* - Significant improvements to JNI layer and Hadoop extensions.
+* - added enable option to build libofs-s.so with -Bsymbolic to force
+*   programs to call it and not another version of the libc routines.
+* - added an instance of each of two structs of pointers to methods for
+*   system calls and library calls respectively so that external code can
+*   force a call to our code.
+* - fixed bug in rename to return 0 if try to rename something to itself
+* - reworked IO locking to use the NPTL stuff
+* - added missing read of two funcs to stdio_ops
+* - changed variable named shmctl to shmctrl to avoid a name conflict
+* - fixed a problem in userint.h where a define was mis-named
+* - added error.c and error.h from glibc so they link with usrlib
+
+Rev 10182
+
+* Reworked usrint initialization to support fork/exec effectively,
+* particularly for shells (like bash).  File descriptors were moved to
+* a Posix shared memory object so that they can be passed from parent
+* to child in a fork and from one program to the next in an exec.  Fork
+* creates a new shm object and copies the parent's into it.  Exec takes
+* over the previous program's object but must modify internal pointers.
+* program loading OFS usrint for the first time creates and initializes
+* a new object.  File descriptor status structs can be shared from
+* parent to child on a fork.  Shared synchronization is used to manage
+* access to these objects.  Management of free space in the shared
+* objects is done in unshared user space memory using fairly simple
+* free lists.
+*
+* Added features to gen_locks to initialize recursive and shared mutexes
+* and shared conds for use in the new usrint features.
+
+* - Incorporated patch to fix a memory corruption issue
+* - Fixed client initialization issue resulting from an uninitalized
+*   ibv_wc struct.
+* - Added a thread for the TCP accept processing for the IB connection
+*   information exchange.
+* - Fixed the RTS_DONE missing errors
+* - Updates to JNI layer. Now using NIO OutputChannel for buffered output.
+* - Added distribution options to pvfs2-genconfig.
+* - Added pvfs2-start-all.sh convenience scripts that allow an administrator
+*   (with password-less ssh configured) to start or stop the pvfs2-server
+*   on nodes listed in the pvfs2 configuration file.
+*   Run with -h or --help to see available options.
+* - added cross platform client library, windows client GUI app, and
+*   VS 2012 projects
+* - Corrected bugs in the OrangeFS extension of Hadoop's abstract
+*   FileSystem class. There were issues with mkdir and delete.
+* - Changed the way reserved range params are interpreted in pvfs2-genconfig
+* - OrangeFS client JNI require --enable-jni and --with-jdk at configure
+*   time. OrangeFS extensions to Hadoop classes require --enable-jni,
+*   --with-jdk=<path_to_jdk>, --enable-hadoop, and
+*   --with-hadoop=<path_to_hadoop>. After the 'make install' step of
+*   OrangeFS installation: run 'make jni' and 'make jni_install' to build
+*   and install the client JNI. If building Hadoop extensions as well, then
+*   just run 'make hadoop' and 'make hadoop_install'.
+* - Changed default log file names to use "orangefs".
+* - Added --disable-opt option to ./configure to disable compiler optimization
+* - Updated Hadoop/JNI Makefile to reflect latest stable version of Hadoop (1.1.2) and OrangeFS installation path described in new documentation (/opt/orangefs). Also corrected a bug where function dup3 was being defined twice.
+
+Rev 10075
+
+* Added support for glob in usrint
+*
+* Fixed several bugs that involved using an uncleared buffer that becomes
+* corrupted.
+*
+* Added a malloc and associated functions wrapper that uses #defines to
+* replace malloc with PINT-malloc().  PINT-malloc() uses glibc malloc() (and not
+* a client program's replacement for malloc) to do memory management.  Inserts 
+* a magic number before each allocated buffer that is check on free to prevent
+* a number of common malloc related bugs.  Zeros newly allocarted buffer.
+* Zeros buffer being freed.  Can be adapted for other uses as well.  Includes
+* malloc debugging calls (currently controlled distinctly from gossip but
+* will be integrated into gossip).  Configure options can turn off some or
+* all of these features.  Also incAudes a set of functions clean-malloc() that
+* calls to the default version of malloc().  This makes pint-mem.c obsolete.
+*
+* Began migrating to a new initialization mechanism that uses a feature of
+* GCC __attrubute__((constructor)) that causes a routine to run before main.
+* This should enable us to remove the many calls to init routines currently in
+* the usrint code.  May not work on other compilers, but there may be an 
+* older alternative.  Worst case we replace the many calls with macros.  A
+* similar destructor attribute exists for shutdown
+*
+* Reworked implementation of stdin, stdout, stderr so that we can use them
+* effectively with freopen and OrangeFS files.  Reworked freopen to support
+* this.  Can still be disabled with configure.
+*
+* Made some changes to handling of locks in streams.
+
+* - Added OrangeFS Direct Client JNI layer and Hadoop related extensions.
+*   See 'src/client/jni/README' for more information.
+* - subtle bug when storing directory paths was getting garbage that later
+*   come back to hurt if just the right conditions existed. Went over all
+*   code that worked on pd->s->dpath to ensure everything wil be clean.
+* - changed nocache hint to cache hint and moved from create to open
+* - fixed problem with stat by clearing buffer before the sys call
+* - Minor changes to PINT_string_rm_extra_slashes_rts.
+* - added glob.c to libofs in case anyone needs it
+* - changed st_blocks to be size/512 as it should be leaving st_blksize alone
+* - Improved the output of pvfs2-ls when using the recursive option: 'R'.
+*   Extra slashes were appearing. Wrote a function to strip multiple slashes
+*   and optionally remove the final trailing slash.
+* - fixed problems found by Jim Kusnier
+*   iocommon_getdents clear buffer before reading dirents
+*   iocommon_getdents uses strncpy rather than memcpy
+*   iocommon_getdents always returns unknown d_type
+*   iocommon_open reworked so it is much easier to understand and less
+*        error prone
+*   reworked calls to expand_path so they get called when they should
+*        tweeked PVFS_sys_lookup to return propoer error codes
+*   fixed fcntl dup command to work correctly (not like dup2)
+* - fixed error code when xattr is not supported
+* - fixed some CPP code determining size of a pointer
+* - Modified the include directive for fuse from <fuse/fuse.h> to <fuse.h>.
+*   pkg-config will correctly identify where the include directory is
+*   located for fuse. (pkg-config --cflags fuse).
+
+
+
+
+orangefs-2.8.7 (Subversion Tag v2.8.7)
+
+Revs 9399 thru 9763
+
+* WARNINGS:
+*	- The pvfs kernel module is NOT compatible with linux kernel versions
+*	  3.4 and higher.  Work is currently underway.
+*	- A known linux kernel bug causing kernel panics when a PVFS
+*	  filesystem is unmounted was found in RHEL releases 2.6.18-308.1.1 thru
+*	  2.6.18-308.20.1.  The OrangeFS team recommends using 2.6.18-308 (RHEL 5.8) or
+*	  2.6.32-71 (RHEL 6,0) and up.  This kernel bug affects other
+*	  filesystems as well.
+
+* Corrected issues with the readdirplus operations effecting the dokan
+interface for Windows.
+
+* Corrected memory overwrite that resulted from using both readdir and
+readdirplus members of a union whenever the readdir state machine was called
+from the readdirplus state machine.
+
+* Starting in linux kernels 3.4, d_make_root is used instead of d_alloc_root.
+Configure changes were added to account for this change in the kernel module.
+
+* Fixed a bug in pvfs_readdir associated with the usrint library.
+
+* Modified kernel module to accommodate the RCU walk initiated by the system
+in pvfs2_d_validate.  This fixes a deadlock occurring in kernel versions
+2.6.38 and later.
+
+* Fixed bug in usrint library where a dir is opened and the fd is passed to
+fchdir but the path is missing.
+
+* Added support for fts interface in usrint library.
+
+* Fixed errors with invalid objects in the kernel module.
+
+* Performance improvements for Windows Client.
+
+* Defects corrected for ucache system.
+
+* Changes to Makefile:
+*   - Using glibtool instead of glib on MAC-Darwin OS when making libpvfs2.a
+*   - Ensure that sbin dir is creatd before moving ucache system into it.
+*   - Added lib/libpvfs2.so as a dependency when making libofs.so to allow
+*     make with the -j option to operate correctly.
+*   - Renamed liborange to liborangefs.
+
+* New Feature: added human readable times to pvfs2-db-display.
+
+* New Feature:  when setting the mode (admin or normal) of a filesystem 
+using pvfs2-set-mode, you can now do so for individual servers.  Prior
+to this change, the mode was set for all the servers within a particular 
+filesystem.
+
+
+
+orangefs-2.8.6 (Rev v2.8.6)
+
+* New Feature: users can now specify at configure time how they want the
+* kernel module to handle the file pointer when an error occurs.  The
+* default behavior is to leave the file pointer alone, i.e., the file
+* pointer will always represent the position of the last byte written,
+* even though the user's entire request is not totally satisfied. In 
+* this case, a the actual number of bytes written is returned to the user.
+* The new feature will change this default behavior such that the file pointer
+* is repositioned to the byte just prior to the user's write request, a
+* -1 is returned to the user's call, and errno is appropriately set.  To
+* enable this feature, add --enable-reset-file-pos on the configure
+* command line when your OrangeFS system is configured.
+
+* Bug fix:  modified pvfs2_readdir, which is executed by the kernel module
+* on behalf of an "ls", to properly retry or quit when pvfs2-client-core
+* aborts/restarts or when pvfs2-client terminates.  Prior to these
+* changes, pvfs2_readdir could possibly corrupt another process's "ls"
+* command by releasing access to a shared memory buffer index that may
+* be legitimately in use.
+
+* Bug fix:  modified the kernel code to re-post data to the shared memory
+* system (for I/O requests) whenever pvfs2-client-core aborts.  Because the 
+* data was not re-posted prior to these changes, the resulting file contained 
+* corrupted data.
+
+
 
 * New Feature: added hint support to pvfs_open() to allow user to
 * provide various things like the number of servers to use, the

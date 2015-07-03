@@ -200,17 +200,17 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fdopen(JNIEnv *env, jobject obj, jint fd,
         jstring mode)
 {
     JNI_PFI();
-    jlong ret = 0;
+    FILE * fp = NULL;
     char cmode[10];
     int cmode_len = (*env)->GetStringLength(env, mode);
     (*env)->GetStringUTFRegion(env, mode, 0, cmode_len, cmode);
     JNI_PRINT("fd = %d\n%s\n", (int) fd, cmode);
-    ret = (jlong) fdopen(fd, cmode);
-    if (ret == 0)
+    fp = fdopen(fd, cmode);
+    if (fp == NULL)
     {
         JNI_PERROR();
     }
-    return ret;
+    return (jlong) fp;
 }
 
 /* fdopendir */
@@ -305,7 +305,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fflush(JNIEnv *env, jobject obj,
 
 /*fflush_unlocked*/
 JNIEXPORT jint JNICALL
-Java_org_orangefs_usrint_PVFS2STDIOJNI_fflush_unlocked(JNIEnv *env, jobject obj,
+Java_org_orangefs_usrint_PVFS2STDIOJNI_fflushUnlocked(JNIEnv *env, jobject obj,
         jlong stream)
 {
     JNI_PFI();
@@ -504,7 +504,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fopen(JNIEnv *env, jobject obj,
         jstring path, jstring mode)
 {
     JNI_PFI();
-    jlong ret = -1;
+    FILE * fp = NULL;
     char cpath[256];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
@@ -512,13 +512,13 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_fopen(JNIEnv *env, jobject obj,
     int cmode_len = (*env)->GetStringLength(env, mode);
     (*env)->GetStringUTFRegion(env, mode, 0, cmode_len, cmode);
     JNI_PRINT("%s\n%s\n", cpath, cmode);
-    ret = (jlong) fopen(cpath, cmode);
-    JNI_PRINT("FILE * ret = %llu\n", (long long unsigned int ) ret);
-    if (ret == 0)
+    fp = fopen(cpath, cmode);
+    JNI_PRINT("(llu) fp = %llu\n", (long long unsigned int ) fp);
+    if (fp == NULL)
     {
         JNI_PERROR();
     }
-    return ret;
+    return (jlong) fp;
 }
 
 /*fputc*/
@@ -670,7 +670,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_freopen(JNIEnv *env, jobject obj,
         jstring path, jstring modes, jlong stream)
 {
     JNI_PFI();
-    jlong ret = -1;
+    FILE * fp = NULL;
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
@@ -679,16 +679,16 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_freopen(JNIEnv *env, jobject obj,
     (*env)->GetStringUTFRegion(env, modes, 0, cmodes_len, cmodes);
     JNI_PRINT("path = %s\nmodes = %s\nstream = %llu\n", cpath, cmodes,
             (long long unsigned int ) stream);
-    ret = (jlong) freopen(cpath, cmodes, (FILE *) stream);
-    if (ret == 0)
+    fp = freopen(cpath, cmodes, (FILE *) stream);
+    if (fp == NULL)
     {
         JNI_PERROR();
     }
     else
     {
-        JNI_PRINT("ret = %llu \n", (long long unsigned int ) ret);
+        JNI_PRINT("(llu) fp = %llu\n", (long long unsigned int ) fp);
     }
-    return ret;
+    return (jlong) fp;
 }
 
 /* fseek */
@@ -1256,10 +1256,10 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_readdir(JNIEnv *env, jobject obj,
 {
     JNI_PFI();
     JNI_PRINT("dirp = %llu\n", (long long unsigned int) dirp);
-    jlong direntp = 0;
+    struct dirent * direntp = NULL;
     int errno_before = errno;
-    direntp = (jlong) readdir((DIR *) dirp);
-    if (direntp == (jlong) NULL )
+    direntp = readdir((DIR *) dirp);
+    if (direntp == NULL )
     {
         if (errno_before != errno)
         {
@@ -1269,7 +1269,7 @@ Java_org_orangefs_usrint_PVFS2STDIOJNI_readdir(JNIEnv *env, jobject obj,
         JNI_PRINT(
                 "readdir returned NULL (no error), reached end of directory stream");
     }
-    return direntp;
+    return (jlong) direntp;
 }
 
 /* recursiveDeleteDir */

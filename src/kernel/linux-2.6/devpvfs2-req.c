@@ -713,6 +713,7 @@ static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
     struct PVFS_dev_map_desc user_desc;
     int ret;
     dev_mask_info_t mask_info = {0};
+    int upstream_kmod = 0;
 
     /* mtmoore: add locking here */
 
@@ -763,13 +764,15 @@ static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
                 pvfs2_sb = list_entry(tmp, pvfs2_sb_info_t, list);
                 if (pvfs2_sb && (pvfs2_sb->sb))
                 {
-                    gossip_debug(GOSSIP_DEV_DEBUG, "Remounting SB %p\n", pvfs2_sb);
+                    gossip_debug(GOSSIP_DEV_DEBUG,
+                                 "Remounting SB %p\n", pvfs2_sb);
 
                     ret = pvfs2_remount(pvfs2_sb->sb, NULL,
                                         pvfs2_sb->data);
                     if (ret)
                     {
-                        gossip_debug(GOSSIP_DEV_DEBUG, "Failed to remount SB %p\n", pvfs2_sb);
+                        gossip_debug(GOSSIP_DEV_DEBUG,
+                                     "Failed to remount SB %p\n", pvfs2_sb);
                         break;
                     }
                 }
@@ -779,6 +782,17 @@ static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
             up(&request_semaphore);
             return ret;
         }
+
+        case PVFS_DEV_UPSTREAM:
+                ret = copy_to_user((void __user *)arg,
+                                    &upstream_kmod,
+                                    sizeof(upstream_kmod));
+
+                if (ret != 0)
+                        return -EIO;
+                else
+                        return ret;
+
         case PVFS_DEV_DEBUG:
             ret = copy_from_user(&mask_info, (void __user *)arg
                                 ,sizeof(mask_info));
@@ -1005,6 +1019,9 @@ static struct ioctl_trans pvfs2_ioctl32_trans[] = {
     {PVFS_DEV_MAP,              pvfs2_translate_dev_map},
     {PVFS_DEV_REMOUNT_ALL,      NULL},
     {PVFS_DEV_DEBUG,            NULL},
+    {PVFS_DEV_MAXNR,            NULL},
+    {PVFS_DEV_DEBUG2,           NULL},
+    {PVFS_DEV_UPSTREAM,         NULL},
     /* Please add stuff above this line and retain the entry below */
     {0, },
 };

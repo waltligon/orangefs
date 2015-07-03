@@ -57,6 +57,12 @@ struct PINT_perf_key server_keys[] =
     {"bytes written by small_io", PINT_PERF_SMALL_WRITE, PINT_PERF_PRESERVE},
     {"bytes read by flow", PINT_PERF_FLOW_READ, PINT_PERF_PRESERVE},
     {"bytes written by flow", PINT_PERF_FLOW_WRITE, PINT_PERF_PRESERVE},
+    {"create requests called", PINT_PERF_CREATE, PINT_PERF_PRESERVE},
+    {"remove requests called", PINT_PERF_REMOVE, PINT_PERF_PRESERVE},
+    {"mkdir requests called", PINT_PERF_MKDIR, PINT_PERF_PRESERVE},
+    {"rmdir requests called", PINT_PERF_RMDIR, PINT_PERF_PRESERVE},
+    {"getattr requests called", PINT_PERF_GETATTR, PINT_PERF_PRESERVE},
+    {"setattr requests called", PINT_PERF_SETATTR, PINT_PERF_PRESERVE},
     {NULL, 0, 0},
 };
 
@@ -183,8 +189,7 @@ struct PINT_perf_counter *PINT_perf_initialize(struct PINT_perf_key *key_array)
  * resets all counters within a perf counter instance, except for those that
  * have the PRESERVE bit set
  */
-void PINT_perf_reset(
-    struct PINT_perf_counter* pc)
+void PINT_perf_reset(struct PINT_perf_counter* pc)
 {
     int i;
     struct PINT_perf_sample *s;
@@ -208,7 +213,8 @@ void PINT_perf_reset(
     }
 
     /* set initial timestamp */
-    s->start_time_ms = PINT_util_get_time_ms();
+    pc->sample->start_time_ms = PINT_util_get_time_ms();
+
     gen_mutex_unlock(&pc->mutex);
 
     return;
@@ -270,8 +276,11 @@ void __PINT_perf_count( struct PINT_perf_counter* pc,
 
 #if 0
 /* debug code shows counters being manipulated */
-gossip_err("COUNT %d %lld was %lld is now %lld\n", key, value,
-        tmp, pc->sample->value[key]);
+gossip_err("COUNT %d %lld was %lld is now %lld\n",
+key,
+(unsigned long long)value,
+(unsigned long long)tmp,
+(unsigned long long)pc->sample->value[key]);
 #endif
 
 errorout:
@@ -298,7 +307,25 @@ void PINT_perf_rollover( struct PINT_perf_counter* pc)
 
     gen_mutex_lock(&pc->mutex);
 
-    /* rotate newest sample to the back */
+    /*
+     * rotate newest sample to the back
+     *
+     * sample1 -> sample2 -> sample3 -> NULL
+     *
+     * head = sample1
+     *
+     * tail = sample3
+     *
+     * pc->sample = sample2
+     *
+     * sample3 -> sample1
+     * 
+     * sample1 -> NULL
+     *
+     * sample2 -> sample3 -> sample1 -> NULL
+     *
+     * associate the "current" values with the "current" sample.
+     */
     head = pc->sample;
     for(tail = head; tail && tail->next; tail = tail->next);
     if(head != tail)
@@ -307,7 +334,9 @@ void PINT_perf_rollover( struct PINT_perf_counter* pc)
         pc->sample = head->next;
         tail->next = head;
         head->next = NULL;
-        memcpy(pc->sample, tail->next, sizeof(struct PINT_perf_sample));
+        memcpy(pc->sample->value,
+               head->value,
+               pc->key_count * sizeof *head->value);
     }
 
     /* reset times for next interval */
@@ -390,9 +419,9 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
                     gen_mutex_unlock(&pc->mutex);
                     return(-PVFS_ENOMEM);
                 }
-                memset(s, 0, sizeof(sizeof(struct PINT_perf_sample)));
+                memset(s, 0, sizeof(struct PINT_perf_sample));
                 s->value = calloc(pc->key_count, sizeof *(s->value));
-                if(!s->value);
+                if(!s->value)
                 {
                     free(s);
                     gen_mutex_unlock(&pc->mutex);

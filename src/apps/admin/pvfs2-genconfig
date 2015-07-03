@@ -535,7 +535,8 @@ sub emit_filesystem
 
     my $meta_count = scalar(get_aliases($META_ENDPOINT));
     print $target "\tDistrDirServersInitial 1\n";
-    print $target "\tDistrDirServersMax $meta_count\n";
+#    print $target "\tDistrDirServersMax $meta_count\n";
+    print $target "\tDistrDirServersMax 1\n";
     print $target "\tDistrDirSplitSize 100\n";
 
     print $target "\t<MetaHandleRanges>\n";

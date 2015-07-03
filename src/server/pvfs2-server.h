@@ -407,6 +407,7 @@ struct PINT_server_crdirent_op
     split_msg_boundary *msg_boundaries;
     PVFS_ds_keyval *entries_key_a;
     PVFS_ds_keyval *entries_val_a;
+    PVFS_handle *remote_dirdata_handles;
 };
 
 struct PINT_server_rmdirent_op
@@ -905,6 +906,9 @@ extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_getattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
+
+extern void tree_getattr_free(PINT_server_op *s_op);
+extern void tree_remove_free(PINT_server_op *s_op);
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

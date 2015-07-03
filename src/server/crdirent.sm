@@ -23,7 +23,14 @@
 #include "security-util.h"
 #include "pint-uid-map.h"
 
-int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i);
+static int split_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int i);
+static int tree_setattr_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int index);
 
 enum
 {
@@ -290,6 +297,7 @@ static PINT_sm_action crdirent_setup_op(
     s_op->u.crdirent.dirent_handle = s_op->req->u.crdirent.dirent_handle;
     s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
     s_op->u.crdirent.dir_attr_update_required = 0;
+    s_op->u.crdirent.remote_dirdata_handles = NULL;
 
     memset(&(s_op->u.crdirent.dirdata_ds_attr), 0, sizeof(PVFS_ds_attributes));
     memset(&s_op->u.crdirent.capability, 0, sizeof(PVFS_capability));
@@ -502,7 +510,7 @@ static PINT_sm_action crdirent_validate(
     PVFS_object_attr *attr_p = NULL;
     
     attr_p = &s_op->attr;
-    
+
     /* gossip bitmap, since jump from get_bitmap_and_dirdata_handles*/
     gossip_debug(GOSSIP_SERVER_DEBUG, 
             "crdirent: dist_dir_bitmap as:\n");
@@ -948,6 +956,9 @@ static PINT_sm_action crdirent_update_dirdata_attrs(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr_p = NULL;
     int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = &s_op->msgarray_op.msgpair;
+
+    PINT_free_object_attr(&msg_p->req.u.setattr.attr);
 
     js_p->error_code = 0;
     attr_p = &s_op->attr;
@@ -1086,7 +1097,6 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_handle *remote_dirdata_handles = NULL;
     int num_remote_dirdata_handles = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_object_attr *attr_p = NULL;
@@ -1105,7 +1115,8 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
        Don't want to send to it. Also no need to send to the
        dirdata server that is the target of the split.      */
     attr_p = &s_op->attr;
-    remote_dirdata_handles = (PVFS_handle *) malloc(sizeof(PVFS_handle) *
+    s_op->u.crdirent.remote_dirdata_handles =
+        (PVFS_handle *) malloc(sizeof(PVFS_handle) *
         attr_p->dist_dir_attr.num_servers);
     for (i = 0; i < attr_p->dist_dir_attr.num_servers; i++)
     {
@@ -1119,7 +1130,7 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
         if (strcmp(server_config->host_id, server_name))
         {
             /* remote */
-            remote_dirdata_handles[num_remote_dirdata_handles] =
+            s_op->u.crdirent.remote_dirdata_handles[num_remote_dirdata_handles] =
                 attr_p->dirdata_handles[i];
             num_remote_dirdata_handles++;
         }
@@ -1138,14 +1149,15 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
             s_op->req->u.crdirent.fs_id,
             PVFS_TYPE_DIRDATA,
             s_op->attr,
+            0,
             num_remote_dirdata_handles,
-            remote_dirdata_handles,
+            s_op->u.crdirent.remote_dirdata_handles,
             NULL);
 
         msg_p->fs_id = s_op->req->u.crdirent.fs_id;
-        msg_p->handle = remote_dirdata_handles[0];
+        msg_p->handle = s_op->u.crdirent.remote_dirdata_handles[0];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-        msg_p->comp_fn = NULL;
+        msg_p->comp_fn = tree_setattr_comp_fn;
 
         ret = PINT_cached_config_map_to_server(
             &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
@@ -1164,6 +1176,19 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
         js_p->error_code = 0;
     }
     return SM_ACTION_COMPLETE;
+}
+
+static int tree_setattr_comp_fn(void *v_p,
+                                struct PVFS_server_resp *resp_p,
+                                int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = &mop->msgpair;;
+
+    assert(msg_p->req.op == PVFS_SERV_TREE_SETATTR);
+    PINT_free_object_attr(&(msg_p->req).u.tree_setattr.attr);
+    return 0;
 }
 
 static PINT_sm_action crdirent_retrieve_dir_entries(
@@ -1236,7 +1261,7 @@ static PINT_sm_action crdirent_retrieve_dir_entries(
     return ret;
 }
 
-int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
+static int split_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
 {
     /* This function executes AFTER each msgpair has completed and is under the
     * control of msgpairarray.sm.  Here, we will capture the response from the
@@ -1723,6 +1748,10 @@ static PINT_sm_action crdirent_cleanup(
     if (s_op->u.crdirent.dist)
     {
         PINT_dist_free(s_op->u.crdirent.dist);
+    }
+    if (s_op->u.crdirent.remote_dirdata_handles)
+    {
+        free(s_op->u.crdirent.remote_dirdata_handles);
     }
 
     PINT_cleanup_capability(&s_op->u.crdirent.capability);

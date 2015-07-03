@@ -96,10 +96,8 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_SPLIT_DIRENT = 47,
     PVFS_SERV_ATOMICEATTR = 48,
     PVFS_SERV_TREE_GETATTR = 49,
-#ifdef ENABLE_SECURITY_CERT
     PVFS_SERV_MGMT_GET_USER_CERT = 50,
     PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 51,
-#endif
 
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
@@ -459,16 +457,18 @@ struct PVFS_servreq_tree_setattr
     PVFS_credential credential;
     PVFS_ds_type objtype;
     PVFS_object_attr attr;      /* new attributes */
-    uint32_t num_servers;       /* # of servers to send setattr msg */
+    uint32_t caller_handle_index;
+    uint32_t handle_count;      /* # of servers to send setattr msg */
     PVFS_handle *handle_array;  /* handles indicating where to send msgs */
 };
-endecode_fields_4a_struct(
+endecode_fields_5a_struct(
     PVFS_servreq_tree_setattr,
     PVFS_fs_id, fs_id,
     PVFS_credential, credential,
     PVFS_ds_type, objtype,
     PVFS_object_attr, attr,
-    uint32_t, num_servers,
+    uint32_t, caller_handle_index,
+    uint32_t, handle_count,
     PVFS_handle, handle_array);
 #define extra_size_PVFS_servreq_tree_setattr \
   (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle) + extra_size_PVFS_object_attr)
@@ -479,7 +479,8 @@ endecode_fields_4a_struct(
                                  __fsid,                            \
                                  __objtype,                         \
                                  __attr,                            \
-                                 __num_servers,                     \
+                                 __caller_handle_index,             \
+                                 __handle_count,                    \
                                  __handle_array,                    \
                                  __hints)                           \
 do {                                                                \
@@ -491,9 +492,25 @@ do {                                                                \
     (__req).u.tree_setattr.fs_id = (__fsid);                        \
     (__req).u.tree_setattr.objtype = (__objtype);                   \
     PINT_copy_object_attr(&(__req).u.tree_setattr.attr, &(__attr)); \
-    (__req).u.tree_setattr.num_servers = (__num_servers);           \
+    (__req).u.tree_setattr.caller_handle_index = (__caller_handle_index);           \
+    (__req).u.tree_setattr.handle_count = (__handle_count);         \
     (__req).u.tree_setattr.handle_array = (__handle_array);         \
 } while (0)
+
+struct PVFS_servresp_tree_setattr
+{
+    uint32_t caller_handle_index;
+    uint32_t handle_count;
+    int32_t *status;
+};
+endecode_fields_2a_struct(
+    PVFS_servresp_tree_setattr,
+    skip4,,
+    uint32_t, caller_handle_index,
+    uint32_t, handle_count,
+    int32_t, status);
+#define extra_size_PVFS_servresp_tree_setattr \
+    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(int32_t))
 
 struct PVFS_servreq_tree_remove
 {
@@ -2397,7 +2414,6 @@ do {                                                                         \
     (__req).u.mgmt_split_dirent.entry_names   = (__entry_names);             \
 } while (0)
 
-#ifdef ENABLE_SECURITY_CERT
 /* get_user_cert ******************************************************/
 /* - retrieve user certificate/key from server given user id/password */
 
@@ -2508,8 +2524,6 @@ endecode_fields_1_struct(
 #define extra_size_PVFS_servresp_mgmt_get_user_cert_keyreq \
     PVFS_REQ_LIMIT_SECURITY_KEY
 
-#endif /* ENABLE_SECURITY_CERT */
-
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
@@ -2562,10 +2576,8 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_get_dirent mgmt_get_dirent;
         struct PVFS_servreq_mgmt_create_root_dir mgmt_create_root_dir;
         struct PVFS_servreq_mgmt_split_dirent mgmt_split_dirent;
-#ifdef ENABLE_SECURITY_CERT
         struct PVFS_servreq_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servreq_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
-#endif
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -2622,15 +2634,14 @@ struct PVFS_server_resp
         struct PVFS_servresp_listeattr listeattr;
         struct PVFS_servresp_small_io small_io;
         struct PVFS_servresp_listattr listattr;
+        struct PVFS_servresp_tree_remove tree_remove;
         struct PVFS_servresp_tree_get_file_size tree_get_file_size;
         struct PVFS_servresp_tree_getattr tree_getattr;
-        struct PVFS_servresp_tree_remove tree_remove;
         struct PVFS_servresp_mgmt_get_uid mgmt_get_uid;
+        struct PVFS_servresp_tree_setattr tree_setattr;
         struct PVFS_servresp_mgmt_get_dirent mgmt_get_dirent;
-#ifdef ENABLE_SECURITY_CERT
         struct PVFS_servresp_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servresp_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
-#endif
     } u;
 };
 endecode_fields_2_struct(

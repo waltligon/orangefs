@@ -188,15 +188,19 @@ PVFS_error PVFS_isys_create(
     }
 
 #ifndef ENABLE_SECURITY_CERT
-    /* do not use credential values in cert. mode */
-    if (attr.owner != credential->userid)
+    /* if owner/group differ from credential values, and credential is 
+       not for root, create with owner/group equal to credential values
+       (in cert. mode the credential fields aren't used) */
+    if (attr.owner != credential->userid &&
+        credential->userid != 0)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing owner uid %d with %d "
                      "on create\n", attr.owner, credential->userid);
         attr.owner = credential->userid;
     }
 
-    if (attr.group != credential->group_array[0])
+    if (attr.group != credential->group_array[0] && 
+        credential->group_array[0] != 0)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing group gid %d with %d "
                      "on create\n", attr.group, credential->group_array[0]);
@@ -519,6 +523,8 @@ static PINT_sm_action create_crdirent_setup_msgpair(
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index;
+    int i;
+    unsigned char *c;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: crdirent_setup_msgpair\n");
@@ -530,6 +536,16 @@ static PINT_sm_action create_crdirent_setup_msgpair(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create: encrypt dirent %s into hash value %llu.\n",                         
             sm_p->u.create.object_name,
             llu(dirdata_hash));
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "create: dist_dir_bitmap:\n");
+    for(i = sm_p->getattr.attr.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
+    {
+        c = (unsigned char *)(sm_p->getattr.attr.dist_dir_bitmap + i);
+        gossip_debug(GOSSIP_CLIENT_DEBUG," i=%d : %02x %02x %02x %02x\n"
+                                        , i, c[3], c[2], c[1], c[0]);
+    }
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "\n");
 
     dirdata_server_index = 
         PINT_find_dist_dir_bucket(dirdata_hash,
@@ -560,6 +576,8 @@ static PINT_sm_action create_crdirent_setup_msgpair(
         sm_p->object_ref.fs_id,
         sm_p->hints);
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG,"create: msg_p->req.op(%d)\n",msg_p->req.op);
+
     msg_p->fs_id = sm_p->object_ref.fs_id;
     /* send to dirdata server */
     msg_p->handle =
@@ -589,9 +607,14 @@ static PINT_sm_action create_crdirent_failure(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: crdirent_failure\n");
 
     /* if need to retry. clear the error_code and setup getattr. */
-    if(js_p->error_code == -PVFS_EAGAIN)
+    if(js_p->error_code == -PVFS_EAGAIN &&
+       sm_p->u.create.retry_count < sm_p->msgarray_op.params.retry_limit)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "create: received -PVFS_EAGAIN, will retry getattr and crdirent.\n");
+        sm_p->u.create.retry_count++;
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "create: received -PVFS_EAGAIN, will retry getattr and crdirent (attempt number %d).\n",
+                     sm_p->u.create.retry_count);
+        gossip_debug(GOSSIP_CLIENT_DEBUG,"%s:sm_p->getattr.attr.mask(0x%0x)\n",__func__,sm_p->getattr.attr.mask);
         
         /* clear attributes */
         PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
@@ -752,6 +775,8 @@ static PINT_sm_action create_parent_getattr_inspect(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "parent owner: %d, group: %d, perms: %o\n",
         (int)attr->owner, (int)attr->group, (int)attr->perms);
+
+    PINT_debug_capability(&sm_p->getattr.attr.capability,"create_parent_getattr_inspect");
 
     /* do we have a setgid bit? */
     if(attr->perms & PVFS_G_SGID)

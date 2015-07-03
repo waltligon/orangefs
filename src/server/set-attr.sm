@@ -28,6 +28,11 @@ enum
     STATE_DIRECTORY = 10
 };
 
+static int tree_setattr_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int index);
+
 %%
 
 nested machine pvfs2_set_dirdata_attr_work_sm
@@ -97,6 +102,7 @@ nested machine pvfs2_set_attr_work_sm
     state write_distr_dir_data_if_required
     {
         run setattr_write_distr_dir_data_if_required;
+        success => setobj_attrib;
         default => work_cleanup;
     }
 
@@ -382,9 +388,11 @@ static PINT_sm_action setattr_verify_attribs(
         /* copy the distributed directory attributes before writing this object */
         if (req_a_p->mask & PVFS_ATTR_DISTDIR_ATTR)
         {
+
             PINT_dist_dir_attr_copyto(a_p->dist_dir_attr,
                                       req_a_p->dist_dir_attr);
             a_p->dist_dir_attr = req_a_p->dist_dir_attr;
+
             if (a_p->dist_dir_bitmap)
             {
                 free(a_p->dist_dir_bitmap);
@@ -803,6 +811,7 @@ static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(struct PINT_smcb
         s_op->req->u.setattr.fs_id,
         PVFS_TYPE_DIRDATA,
         attr,
+        0,
         s_op->attr.dist_dir_attr.num_servers,
         s_op->attr.dirdata_handles,
         NULL);
@@ -810,7 +819,7 @@ static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(struct PINT_smcb
     msg_p->fs_id = s_op->req->u.setattr.fs_id;
     msg_p->handle = s_op->attr.dirdata_handles[0];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = NULL;
+    msg_p->comp_fn = tree_setattr_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
@@ -826,6 +835,18 @@ static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(struct PINT_smcb
     return SM_ACTION_COMPLETE;
 }
 
+static int tree_setattr_comp_fn(void *v_p,
+                                struct PVFS_server_resp *resp_p,
+                                int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = &mop->msgpair;;
+
+    assert(msg_p->req.op == PVFS_SERV_TREE_SETATTR);
+    PINT_free_object_attr(&(msg_p->req).u.tree_setattr.attr);
+    return 0;
+}
 
 static PINT_sm_action setattr_set_dirdata_attr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)

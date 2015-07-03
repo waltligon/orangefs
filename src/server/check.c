@@ -41,6 +41,7 @@ static int check_mode(enum access_type access, PVFS_uid userid,
 static int check_acls(void *acl_buf, size_t acl_size, 
     const PVFS_object_attr *attr, PVFS_uid uid, PVFS_gid *group_array, 
     uint32_t num_groups, int want);
+static int check_seteattr_dir_hint(struct PVFS_servreq_seteattr *seteattr);
 
 /* PINT_get_capabilities
  *
@@ -232,7 +233,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
             /* remove ops use parent handle from hint */
             case PVFS_SERV_REMOVE:
             case PVFS_SERV_TREE_REMOVE:
-            /* io ops use metafile handle from hint */
+            /* io ops use metafile handle from hint */            
             case PVFS_SERV_SMALL_IO:
             case PVFS_SERV_IO:
                 handle = PINT_HINT_GET_HANDLE(s_op->req->hints);
@@ -242,6 +243,24 @@ int PINT_perm_check(struct PINT_server_op *s_op)
                                "from hint\n", __func__);
                     ret = -PVFS_EINVAL;
                     goto PINT_perm_check_exit;
+                }
+                break;
+            /* seteattr uses parent handle for certain eattrs */
+            case PVFS_SERV_SETEATTR:
+                if (check_seteattr_dir_hint(&s_op->req->u.seteattr))
+                {
+                    handle = PINT_HINT_GET_HANDLE(s_op->req->hints);
+                    if (handle == PVFS_HANDLE_NULL)
+                    {
+                        gossip_err("%s: could not retrieve parent handle from "
+                                   "hint\n", __func__);
+                        ret = -PVFS_EINVAL;
+                        goto PINT_perm_check_exit;
+                    }
+                }
+                else
+                {
+                    handle = s_op->target_handle;
                 }
                 break;
             default:
@@ -536,6 +555,30 @@ check_perm:
     return -PVFS_EACCES;
 }
 
+/* Returns true if all the eattrs are dir hints (see 
+   mkdir_seteattr_setup_msgpair in sys-mkdir.sm). */
+static int check_seteattr_dir_hint(struct PVFS_servreq_seteattr *seteattr)
+{
+    int i;
+
+    if (seteattr->nkey == 0)
+    {
+        gossip_err("Warning: seteattr operation with no keys\n");
+        return 0;
+    }
+
+    for (i = 0; i < seteattr->nkey; i++)
+    {
+        if (strcmp((char *) seteattr->key[i].buffer, "user.pvfs2.num_dfiles") ||
+            strcmp((char *) seteattr->key[i].buffer, "user.pvfs2.dist_name") ||
+            strcmp((char *) seteattr->key[i].buffer, "user.pvfs2.dist_params"))
+        {
+            return 0;
+        }
+    }
+
+    return 1;
+}
 /*
  * Local variables:
  *  mode: c
