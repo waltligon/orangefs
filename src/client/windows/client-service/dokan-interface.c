@@ -398,7 +398,7 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
     else
     {
         /* not all operations have a requestor */
-        DbgPrint("   get_requestor_credential: no requestor\n");
+        DbgPrint("   get_requestor_credential: system request\n");
 
         if (goptions->user_mode == USER_MODE_SERVER)
         {
@@ -421,7 +421,19 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
     
     /* search user list for credential */
     cache_hit = get_cache_user(user_name, credential);
-    if (cache_hit == USER_CACHE_MISS)
+    if (cache_hit == USER_CACHE_HIT)
+    {
+        /* check timeout */
+        if (credential->timeout <= time(NULL))
+        {
+            ret = refresh_cache_user(user_name, credential);
+            if (ret != 0)
+            {
+                DbgPrint("   get_requestor_credential: could not refresh credential\n");
+            }
+        }
+    }
+    else
     {
         /* cache miss */
         if (goptions->user_mode == USER_MODE_LIST)
