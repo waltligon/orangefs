@@ -540,6 +540,7 @@ void WINAPI service_main(DWORD argc, char *argv[])
           _snprintf(env_debug_file, sizeof(env_debug_file), "PVFS2_DEBUGFILE=%s",
               options->debug_file);
           _putenv(env_debug_file);
+          gossip_set_logstamp(GOSSIP_LOGSTAMP_THREAD);
     }
 
     /* register our control handler routine */
