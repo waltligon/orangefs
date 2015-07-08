@@ -528,8 +528,7 @@ static PINT_sm_action getattr_verify_attribs(
                 "Error: got unknown type when verifying attributes for "
                 "handle %llu.\n", 
                 llu(s_op->u.getattr.handle));
-            js_p->error_code = -PVFS_ENXIO;
-js_p->error_code = -PVFS_ENOENT;
+            js_p->error_code = -PVFS_ENOENT;
             break;
     }
 

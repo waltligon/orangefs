@@ -105,17 +105,35 @@ struct PVFS_dev_map_desc
 #define DEV_MAP                 0x4
 #define DEV_REMOUNT_ALL         0x5
 #define DEV_DEBUG               0x6
-#define DEV_MAX_NR              0x7
+#define DEV_UPSTREAM            0x7
+#define DEV_CLIENT_MASK         0x8
+#define DEV_CLIENT_STRING       0x9
+#define DEV_MAX_NR              0xa
+
+/*
+ * parameter structure used in PVFS_DEV_CLIENT_MASK ioctl command
+ */
+typedef struct {
+  uint64_t mask1_value;
+  uint64_t mask2_value;
+} dev_mask2_info_t;
 
 /* supported ioctls, codes are with respect to user-space */
 enum {
-PVFS_DEV_GET_MAGIC          = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAGIC, int32_t),
-PVFS_DEV_GET_MAX_UPSIZE     = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAX_UPSIZE, int32_t),
-PVFS_DEV_GET_MAX_DOWNSIZE   = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAX_DOWNSIZE, int32_t),
-PVFS_DEV_MAP                =  _IO(PVFS_DEV_MAGIC , DEV_MAP),
-PVFS_DEV_REMOUNT_ALL        =  _IO(PVFS_DEV_MAGIC , DEV_REMOUNT_ALL),
-PVFS_DEV_DEBUG              =  _IOR(PVFS_DEV_MAGIC, DEV_DEBUG, int32_t),
-PVFS_DEV_MAXNR              =  DEV_MAX_NR,
+PVFS_DEV_GET_MAGIC        = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAGIC, int32_t),
+PVFS_DEV_GET_MAX_UPSIZE   = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAX_UPSIZE, int32_t),
+PVFS_DEV_GET_MAX_DOWNSIZE = _IOW(PVFS_DEV_MAGIC , DEV_GET_MAX_DOWNSIZE, int32_t),
+PVFS_DEV_MAP              = _IO(PVFS_DEV_MAGIC , DEV_MAP),
+PVFS_DEV_REMOUNT_ALL      = _IO(PVFS_DEV_MAGIC , DEV_REMOUNT_ALL),
+PVFS_DEV_DEBUG            = _IOR(PVFS_DEV_MAGIC, DEV_DEBUG, int32_t),
+PVFS_DEV_UPSTREAM         = _IOW(PVFS_DEV_MAGIC, DEV_UPSTREAM, int),
+PVFS_DEV_CLIENT_MASK      = _IOW(PVFS_DEV_MAGIC,
+                                 DEV_CLIENT_MASK,
+                                 dev_mask2_info_t),
+PVFS_DEV_CLIENT_STRING    = _IOW(PVFS_DEV_MAGIC,
+                                 DEV_CLIENT_STRING,
+                                 char *),
+PVFS_DEV_MAXNR            = DEV_MAX_NR,
 };
 
 #endif  /* WITH_LINUX_KMOD */

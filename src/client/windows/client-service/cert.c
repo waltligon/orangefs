@@ -438,6 +438,8 @@ int get_proxy_cert_credential(HANDLE huser,
     if (ret == 0)
     {        
         *expires = M_ASN1_UTCTIME_dup(X509_get_notAfter(cert));
+        /* TODO: cache revision */
+        credential->timeout = time(NULL) + PVFS2_SECURITY_TIMEOUT_MAX;
     }
 
 get_proxy_cert_credential_exit:
