@@ -858,7 +858,7 @@ int add_users(PORANGEFS_OPTIONS options,
                 break;
             }
 
-            /* add user to cache with default expiration */
+            /* add user to cache with no expiration */
             ret = add_cache_user(user_entry->user_name, &cred, NULL);
             if (ret != 0)
             {

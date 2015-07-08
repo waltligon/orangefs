@@ -56,10 +56,7 @@ int add_cache_user(char *user_name,
     if (link != NULL)
     {        
         DbgPrint("   add_cache_user: deleting user %s\n", user_name);
-        entry = qhash_entry(link, struct user_entry, hash_link);
         qhash_del(link);
-        PINT_cleanup_credential(&(entry->credential));
-        ASN1_UTCTIME_free(entry->expires);
         free(qhash_entry(link, struct user_entry, hash_link));
     }
     gen_mutex_unlock(&user_cache_mutex);
@@ -77,9 +74,11 @@ int add_cache_user(char *user_name,
     PINT_copy_credential(credential, &(entry->credential));
 
     /* set timeout of cache entry no greater than credential timeout */
-    if (expires == NULL ||
-        ASN1_UTCTIME_cmp_time_t(expires, credential->timeout) == 1)
+    entry->expires = expires;
+    if (entry->expires != NULL && 
+        ASN1_UTCTIME_cmp_time_t(entry->expires, credential->timeout) == 1)
     {
+        ASN1_UTCTIME_free(entry->expires);
         entry->expires = ASN1_UTCTIME_new();
         if (entry->expires == NULL)
         {
@@ -89,23 +88,19 @@ int add_cache_user(char *user_name,
         DbgPrint("   add_cache_user: setting timeout to %u\n", credential->timeout);
         ASN1_UTCTIME_set(entry->expires, credential->timeout);
     }
-    else
-    {
-        entry->expires = expires;
-    }
     
     gen_mutex_lock(&user_cache_mutex);
     qhash_add(user_cache, &entry->user_name, &entry->hash_link);
     if (goptions->user_mode != USER_MODE_SERVER)
     {
         DbgPrint("   add_cache_user: adding user %s (%u:%u) (expires %s)\n", 
-            user_name, credential->userid, credential->group_array[0], 
-            entry->expires->data);
+        user_name, credential->userid, credential->group_array[0], 
+        entry->expires != NULL ? entry->expires->data : "never");
     }
     else
     {
         DbgPrint("   add_cache_user: adding user %s (expires %s)\n", 
-            user_name, entry->expires->data);
+        user_name, entry->expires != NULL ? entry->expires->data : "never");
     }
     gen_mutex_unlock(&user_cache_mutex);
 
@@ -138,21 +133,13 @@ int get_cache_user(char *user_name,
 
         gen_mutex_unlock(&user_cache_mutex);
 
-        return USER_CACHE_HIT;
+        return 0;
     }
 
     gen_mutex_unlock(&user_cache_mutex);
 
     /* cache miss */
-    return USER_CACHE_MISS;
-}
-
-int refresh_cache_user(char *user_name,
-                       PVFS_credential *credential)
-{
-    /* note -- can only be used in list mode */
-
-
+    return 1;
 }
 
 /* remove user entry -- note user_cache_mutex 
@@ -195,7 +182,8 @@ unsigned int user_cache_thread(void *options)
             if (head != NULL)
             {    
                 entry = qhash_entry(head, struct user_entry, hash_link);
-                if (ASN1_UTCTIME_cmp_time_t(entry->expires, now) == -1)
+                if (entry->expires != NULL && 
+                    ASN1_UTCTIME_cmp_time_t(entry->expires, now) == -1)
                 {   
                     DbgPrint("user_cache_thread: removing %s\n", entry->user_name);
                     qhash_del(head);

@@ -16,8 +16,8 @@
 #include "pvfs2.h"
 #include "quickhash.h"
 
-#define USER_CACHE_HIT     0
-#define USER_CACHE_MISS    1
+#define USER_CACHE_HIT    0
+#define USER_CACHE_MISS   1
 
 struct user_entry
 {
@@ -36,9 +36,6 @@ int add_cache_user(char *user_name,
 
 int get_cache_user(char *user_name, 
                    PVFS_credential *credential);
-
-int refresh_cache_user(char *user_name,
-                       PVFS_credential *credential);
 
 int remove_user(char *user_name);
 
