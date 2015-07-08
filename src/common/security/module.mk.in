@@ -14,7 +14,8 @@ endif
 
 LIBSRC += $(DIR)/security-util.c \
           $(DIR)/getugroups.c \
-	  $(DIR)/client-capcache.c
+          $(DIR)/client-capcache.c \
+          $(DIR)/client-core-credcache.c
 
 ifdef ENABLE_SECURITY_KEY
 SERVERSRC += $(DIR)/pint-security.c \

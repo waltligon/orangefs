@@ -19,6 +19,7 @@
 #include "acache.h"
 #include "ncache.h"
 #include "rcache.h"
+#include "client-cache.h"
 #include "client-capcache.h"
 #include "pint-cached-config.h"
 #include "pvfs2-sysint.h"
@@ -65,7 +66,8 @@ typedef enum
     CLIENT_DIST_INIT         = (1 << 10),
     CLIENT_SECURITY_INIT     = (1 << 11),
     CLIENT_RCACHE_INIT       = (1 << 12),
-    CLIENT_CAPCACHE_INIT     = (1 << 13)
+    CLIENT_CAPCACHE_INIT     = (1 << 13),
+    CLIENT_CACHE_INIT        = (1 << 14)
 } PINT_client_status_flag;
 
 /* PVFS_sys_initialize()
@@ -326,6 +328,17 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
         goto error_exit;
     }
 
+#if PVFS_CLIENTCACHE_ENABLE
+    /* initialize the client (file data) cache */
+    ret = PINT_client_cache_initialize_defaults();
+    if (ret < 0)
+    {
+        gossip_lerr("Error initializing client (file data) cache\n");
+        goto error_exit;
+    }
+    client_status_flag |= CLIENT_CACHE_INIT;
+#endif
+
     /* start job timer */
     PINT_smcb_alloc(&smcb,
                     PVFS_CLIENT_JOB_TIMER,
@@ -354,6 +367,13 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 error_exit:
 
     id_gen_safe_finalize();
+
+#if PVFS_CLIENTCACHE_ENABLE
+    if (client_status_flag & CLIENT_CACHE_INIT)
+    {
+        PINT_client_cache_finalize();
+    }
+#endif
 
     if (client_status_flag & CLIENT_CAPCACHE_INIT)
     {

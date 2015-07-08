@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 #include <pthread.h>
+#include "pvfs2-types.h"
 
-#define PVFS2_SIZEOF_VOIDP 64
 #if (PVFS2_SIZEOF_VOIDP == 32)
 # define NILP NIL32
 #elif (PVFS2_SIZEOF_VOIDP == 64)
@@ -23,8 +23,16 @@
 #define NIL8  0XFF
 #define NIL16 0XFFFF
 
-//#define INLINE inline
+/* #define INLINE inline */
 #define INLINE
+
+typedef enum
+{
+    CLIENT_CACHE_NONE               =       0,
+    CLIENT_CACHE_ENABLED            = (1 << 0),
+    CLIENT_CACHE_DEFAULT_CACHE      = (1 << 1),
+    CLIENT_CACHE_FOR_CLIENT_CORE    = (1 << 2)
+} PINT_client_cache_flag;
 
 typedef struct cc_ment_s
 {
@@ -51,6 +59,7 @@ typedef struct cc_mtbl_s
     uint16_t lru;               /* index of last block on lru list */
     uint16_t dirty_first;       /* index of first dirty block */
     uint16_t ref_cnt;           /* number of client threads using this file */
+    uint16_t fent_index;        /* the fent this mtbl is associated with */
     //uint16_t ment_limit;      /* we could support custom limits per file */
     //uint16_t ment_ht_limit;   /* we could support custom limits per file */
 } cc_mtbl_t;
@@ -60,6 +69,8 @@ typedef struct cc_fent_s
     cc_mtbl_t mtbl;
     uint64_t file_handle;
     uint32_t fsid;
+    PVFS_uid uid;           /* uid copied from PVFS_credential */
+    PVFS_gid gid;           /* gid copied from PVFS_credential group_array */
     uint16_t prev;          /* prev fent in ht chain. */
     uint16_t next;          /* next fent in ht chain and free fents LL */
     uint16_t index;         /* this fent's index in ftbl.fents */
@@ -80,8 +91,9 @@ typedef struct client_cache_s
 {
     cc_ftbl_t ftbl;
     void *blks;
+    PINT_client_cache_flag status;
     uint16_t free_blk;
-    /* Maintain limits in cache struct */
+    /* Maintain limits/settings in cache struct */
     uint64_t cache_size;
     uint64_t blk_size;
     uint16_t num_blks;
@@ -98,14 +110,17 @@ typedef struct cc_free_block_s
     uint16_t next;  /* Index of next free block in LL */
 } cc_free_block_t;
 
-int client_cache_fini(void);
-int client_cache_init(
+void PINT_client_cache_debug_flags(PINT_client_cache_flag flags);
+int PINT_client_cache_finalize(void);
+int PINT_client_cache_initialize(
+    PINT_client_cache_flag flags,
     uint64_t cache_size,
     uint64_t block_size,
     uint16_t fent_limit,
     uint16_t fent_ht_limit,
     uint16_t ment_limit,
     uint16_t ment_ht_limit);
+int PINT_client_cache_initialize_defaults(void);
 
 extern client_cache_t cc;
 /* extern pthread_rwlock_t rwlock; */

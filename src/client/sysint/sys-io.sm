@@ -28,10 +28,22 @@
 #include "pvfs2-internal.h"
 #include "client-capcache.h"
 #include "init-vars.h"
+#include "security-util.h"
+#include "pint-security.h"
+#include "pint-hint.h"
+#include "client-cache.h"
 
 #define IO_MAX_SEGMENT_NUM 50 
 #define IO_ATTR_MASKS (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|\
                        PVFS_ATTR_CAPABILITY)
+
+/* TODO: How best to be assured if request is contiguous or not?
+ * (r)->ereq == NULL &&
+ */
+#define IS_REQUEST_CONTIGUOUS(r) (    \
+    (r)->num_contig_chunks == 1 &&    \
+    (r)->sreq == NULL                 \
+)
 
 extern job_context_id pint_client_sm_context;
 
@@ -330,6 +342,9 @@ PVFS_error PVFS_isys_io(PVFS_object_ref ref,
     PINT_client_sm *sm_p = NULL;
     struct filesystem_configuration_s* cur_fs = NULL;
     struct server_configuration_s *server_config = NULL;
+#if PVFS_CLIENTCACHE_ENABLE
+    int cache_flag = 0;
+#endif
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_io entered [%llu]\n",
                  llu(ref.handle));
@@ -367,6 +382,7 @@ PVFS_error PVFS_isys_io(PVFS_object_ref ref,
         return 1; 
     }
 
+#if PVFS_CLIENTCACHE_ENABLE
     gossip_err("\"PVFS_isys_io\": {\n"
                "    \"ref\": {\n"
                "        \"fsid\": %d,\n"
@@ -379,7 +395,14 @@ PVFS_error PVFS_isys_io(PVFS_object_ref ref,
                "        \"aggregate_size\": %lld,\n"
                "    },\n"
                "    \"file_req_offset\": %lld,\n"
-               "    \"uid\": %d,\n"
+               "    \"credential\": {\n"
+               "        \"userid\": %u,\n"
+               "        \"num_groups\": %u,\n"
+               "        \"group_array (first element)\": %u,\n"
+               "        \"issuer\": \"%s\",\n"
+               "        \"timeout\": %llu,\n"
+               "        \"sig_size\": %u,\n"
+               "    },\n"
                "    \"io_type\": %s,\n"
                "}\n",
                ref.fs_id,
@@ -387,8 +410,51 @@ PVFS_error PVFS_isys_io(PVFS_object_ref ref,
                (long long int) PINT_REQUEST_TOTAL_BYTES(file_req),
                (long long int) PINT_REQUEST_TOTAL_BYTES(mem_req),
                (long long int) file_req_offset,
-               (int) credential->userid,
+               (unsigned int) credential->userid,
+               (unsigned int) credential->num_groups,
+               (unsigned int) *credential->group_array,
+               credential->issuer,
+               (long long unsigned int) credential->timeout,
+               credential->sig_size,
                io_type == 1 ? "PVFS_IO_READ" : "PVFS_IO_WRITE");
+
+    gossip_err("%s: file_req contiguous = %c\n",
+               __func__,
+               IS_REQUEST_CONTIGUOUS(file_req) ? 'T' : 'F');
+
+    gossip_err("%s: mem_req contiguous = %c\n",
+               __func__,
+               IS_REQUEST_CONTIGUOUS(mem_req) ? 'T' : 'F');
+
+    if(cc.status & CLIENT_CACHE_ENABLED &&
+       IS_REQUEST_CONTIGUOUS(file_req) &&
+       IS_REQUEST_CONTIGUOUS(mem_req))
+    {
+        int *hint_value = (int *) PINT_hint_get_value_by_type(hints,
+                                                               PINT_HINT_CACHE,
+                                                               NULL);
+        if(hint_value)
+        {
+            gossip_err("%s: PINT_HINT_CACHE = %c\n",
+                       __func__,
+                       *(int *) hint_value ? 'T' : 'F');
+        }
+        else
+        {
+            gossip_err("%s: PINT_HINT_CACHE = NULL\n", __func__);
+        }
+        if((cc.status & CLIENT_CACHE_DEFAULT_CACHE && !hint_value) ||
+           (cc.status & CLIENT_CACHE_DEFAULT_CACHE && hint_value && *hint_value) ||
+           (!(cc.status & CLIENT_CACHE_DEFAULT_CACHE) && hint_value && *hint_value))
+        {
+            cache_flag = 1;
+        }
+    }
+
+    gossip_err("%s: ARE WE CACHING? ... %c!\n",
+               __func__,
+               cache_flag ? 'T' : 'F');
+#endif
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_IO,
@@ -573,6 +639,14 @@ static PINT_sm_action io_inspect_attr(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_EINVAL;
         return(SM_ACTION_COMPLETE);
     }
+
+#if PVFS_CLIENTCACHE_ENABLE
+    /* Output capability info */
+    gossip_err("sizeof(PVFS_capability) = %zu\n", sizeof(PVFS_capability));
+    gossip_err("READABLE? : %s\n", sm_p->getattr.attr.capability.op_mask & PINT_CAP_READ ? "TRUE" : "FALSE");
+    gossip_err("WRITEABLE? : %s\n", sm_p->getattr.attr.capability.op_mask & PINT_CAP_WRITE ? "TRUE" : "FALSE");
+    PINT_debug_capability(&sm_p->getattr.attr.capability, "Capability @ io_inspect_attr:");
+#endif
 
     /* Note: see initialize.c to see how relatime gets set.
      *   if relatime < 0,  then relatime feature disabled
@@ -1946,8 +2020,10 @@ static PINT_sm_action io_analyze_results(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_IO_DEBUG, "total bytes transferred is %lld\n",
                  lld(sm_p->u.io.total_size));
 
+#if PVFS_CLIENTCACHE_ENABLE
     gossip_err("total bytes transferred is %lld\n",
                lld(sm_p->u.io.total_size));
+#endif
 
     if(sm_p->u.io.io_type == PVFS_IO_WRITE)
     {
@@ -3647,3 +3723,4 @@ static int unstuff_comp_fn(void *v_p,
  *
  * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */
+

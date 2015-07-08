@@ -29,6 +29,7 @@
 #include "job.h"
 #include "acache.h"
 #include "ncache.h"
+#include "client-core-credcache.h"
 #include "client-capcache.h"
 #include "tcache.h"
 #include "pint-dev-shared.h"
@@ -88,8 +89,6 @@ typedef struct
     /* client side attribute cache timeout; 0 is effectively disabled */
     int acache_timeout;
     int ncache_timeout;
-    int ccache_timeout;
-    int ccache_timeout_set;
     int capcache_timeout;
     int capcache_timeout_set;
     char* logfile;
@@ -106,12 +105,6 @@ typedef struct
     int ncache_soft_limit_set;
     unsigned int ncache_reclaim_percentage;
     int ncache_reclaim_percentage_set;
-    unsigned int ccache_hard_limit;
-    int ccache_hard_limit_set;
-    unsigned int ccache_soft_limit;
-    int ccache_soft_limit_set;
-    unsigned int ccache_reclaim_percentage;
-    int ccache_reclaim_percentage_set;
     unsigned int capcache_hard_limit;
     int capcache_hard_limit_set;
     unsigned int capcache_soft_limit;
@@ -130,7 +123,6 @@ typedef struct
     unsigned int dev_buffer_size;
     int dev_buffer_size_set;
     char *events;
-    char *keypath;
 } options_t;
 
 /*
@@ -214,19 +206,6 @@ typedef struct
 
 } vfs_request_t;
 
-struct credential_key
-{
-    PVFS_uid uid;
-    PVFS_gid gid;
-};
-
-struct credential_payload
-{
-    PVFS_uid uid;
-    PVFS_gid gid;
-    PVFS_credential *credential;
-};
-
 static options_t s_opts;
 
 static job_context_id s_client_dev_context;
@@ -244,8 +223,6 @@ static struct PINT_dev_params s_desc_params[NUM_MAP_DESC];
 /* used only for deleting all allocated vfs_request objects */
 vfs_request_t *s_vfs_request_array[MAX_NUM_OPS] = {NULL};
 
-static struct PINT_tcache *credential_cache = NULL;
-
 /* this hashtable is used to keep track of operations in progress */
 #define DEFAULT_OPS_IN_PROGRESS_HTABLE_SIZE 67
 static int hash_key(const void *key, int table_size);
@@ -258,8 +235,8 @@ static void reset_acache_timeout(void);
 #ifndef GOSSIP_DISABLE_DEBUG
 static char *get_vfs_op_name_str(int op_type);
 #endif
-static int setup_credential_cache(options_t *s_opts);
-static int set_ccache_parameters(options_t *s_opts);
+static int setup_credential_cache(credcache_options_t *ccache_opts);
+static int set_ccache_parameters(credcache_options_t *ccache_opts);
 static int set_acache_parameters(options_t* s_opts);
 static void set_device_parameters(options_t *s_opts);
 static void reset_ncache_timeout(void);
@@ -267,14 +244,6 @@ static int set_ncache_parameters(options_t* s_opts);
 static int set_capcache_parameters(options_t* s_opts);
 static void finalize_perf_items(int n, ... );
 inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req);
-
-static PVFS_credential *lookup_credential(
-    PVFS_uid uid,
-    PVFS_gid gid);
-
-static void remove_credential(
-    PVFS_uid uid,
-    PVFS_gid gid);
 
 static PVFS_object_ref perform_lookup_on_create_error(
     PVFS_object_ref parent,
@@ -4144,7 +4113,7 @@ int main(int argc, char **argv)
     pvfs2_mmap_ra_cache_initialize();
 #endif
 
-    ret = setup_credential_cache(&s_opts);
+    ret = setup_credential_cache(&credcache_opts);
     if (ret < 0)
     {
         PVFS_perror("setup_credential_cache", ret);
@@ -4651,36 +4620,36 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 }
                 else if (strcmp("ccache-hard-limit", cur_option) == 0)
                 {
-                    ret = sscanf(optarg, "%u", &opts->ccache_hard_limit);
+                    ret = sscanf(optarg, "%u", &credcache_opts.ccache_hard_limit);
                     if (ret != 1)
                     {
                         gossip_err(
                             "Error: invalid ccache-hard-limit value.\n");
                         exit(EXIT_FAILURE);
                     }
-                    opts->ccache_hard_limit_set = 1;
+                    credcache_opts.ccache_hard_limit_set = 1;
                 }
                 else if (strcmp("ccache-soft-limit", cur_option) == 0)
                 {
-                    ret = sscanf(optarg, "%u", &opts->ccache_soft_limit);
+                    ret = sscanf(optarg, "%u", &credcache_opts.ccache_soft_limit);
                     if(ret != 1)
                     {
                         gossip_err(
                             "Error: invalid ccache-soft-limit value.\n");
                         exit(EXIT_FAILURE);
                     }
-                    opts->ccache_soft_limit_set = 1;
+                    credcache_opts.ccache_soft_limit_set = 1;
                 }
                 else if (strcmp("ccache-reclaim-percentage", cur_option) == 0)
                 {
-                    ret = sscanf(optarg, "%u", &opts->ccache_reclaim_percentage);
+                    ret = sscanf(optarg, "%u", &credcache_opts.ccache_reclaim_percentage);
                     if(ret != 1)
                     {
                         gossip_err(
                             "Error: invalid ccache-reclaim-percentage value.\n");
                         exit(EXIT_FAILURE);
                     }
-                    opts->ccache_reclaim_percentage_set = 1;
+                    credcache_opts.ccache_reclaim_percentage_set = 1;
                 }
                 else if (strcmp("capcache-hard-limit", cur_option) == 0)
                 {
@@ -4751,7 +4720,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 }
                 else if (strcmp("keypath", cur_option) == 0)
                 {
-                    opts->keypath = optarg;
+                    credcache_opts.keypath = optarg;
                 }
                 break;
             case 'h':
@@ -4786,14 +4755,14 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 break;
             case 'c':
           do_ccache:
-                opts->ccache_timeout = atoi(optarg);
-                opts->ccache_timeout_set = 1;
-                if (opts->ccache_timeout < 0)
+                credcache_opts.ccache_timeout = atoi(optarg);
+                credcache_opts.ccache_timeout_set = 1;
+                if (credcache_opts.ccache_timeout < 0)
                 {
                     gossip_err("Invalid ccache timeout value of %d s,"
                                "disabling the ccache.\n",
-                               opts->ccache_timeout);
-                    opts->ccache_timeout = 0;
+                               credcache_opts.ccache_timeout);
+                    credcache_opts.ccache_timeout = 0;
                 }                
                 break;
             case 'b':
@@ -4802,8 +4771,8 @@ static void parse_args(int argc, char **argv, options_t *opts)
               opts->capcache_timeout_set = 1;
               if (opts->capcache_timeout < 0)
               {
-                  gossip_err("Invalid ccache timeout value of %d s,"
-                             "disabling the ccache.\n",
+                  gossip_err("Invalid capcache timeout value of %d s,"
+                             "disabling the capcache.\n",
                              opts->capcache_timeout);
                   opts->capcache_timeout = 0;
               }                
@@ -5034,7 +5003,7 @@ static int credential_free_fn(void *payload)
     return 0;
 }
 
-static int setup_credential_cache(options_t *s_opts)
+static int setup_credential_cache(credcache_options_t *ccache_opts)
 {
     int ret;
 
@@ -5048,22 +5017,22 @@ static int setup_credential_cache(options_t *s_opts)
         return -PVFS_ENOMEM;
     }
 
-    ret = set_ccache_parameters(s_opts);
+    ret = set_ccache_parameters(ccache_opts);
 
     return ret;
 }
 
-static int set_ccache_parameters(options_t *s_opts)
+static int set_ccache_parameters(credcache_options_t *ccache_opts)
 {
     int ret = -1;
     unsigned int timeout;
 
     /* pass along credential cache settings if they were 
        specified on command line */
-    if(s_opts->ccache_reclaim_percentage_set)
+    if(ccache_opts->ccache_reclaim_percentage_set)
     {
         ret = PINT_tcache_set_info(credential_cache, TCACHE_RECLAIM_PERCENTAGE, 
-            s_opts->ccache_reclaim_percentage);
+            ccache_opts->ccache_reclaim_percentage);
         if(ret < 0)
         {
             PVFS_perror_gossip("set_ccache_parameters: PINT_tcache_set_info "
@@ -5071,10 +5040,10 @@ static int set_ccache_parameters(options_t *s_opts)
             return(ret);
         }
     }
-    if(s_opts->ccache_hard_limit_set)
+    if(ccache_opts->ccache_hard_limit_set)
     {
         ret = PINT_tcache_set_info(credential_cache, TCACHE_HARD_LIMIT, 
-            s_opts->ccache_hard_limit);
+            ccache_opts->ccache_hard_limit);
         if(ret < 0)
         {
             PVFS_perror_gossip("set_ccache_parameters: PINT_tcache_set_info "
@@ -5082,10 +5051,10 @@ static int set_ccache_parameters(options_t *s_opts)
             return(ret);
         }
     }
-    if(s_opts->ccache_soft_limit_set)
+    if(ccache_opts->ccache_soft_limit_set)
     {
         ret = PINT_tcache_set_info(credential_cache, TCACHE_SOFT_LIMIT, 
-            s_opts->ccache_soft_limit);
+            ccache_opts->ccache_soft_limit);
         if(ret < 0)
         {
             PVFS_perror_gossip("set_ccache_parameters: PINT_tcache_set_info "
@@ -5093,9 +5062,9 @@ static int set_ccache_parameters(options_t *s_opts)
             return(ret);
         }
     }
-    if (s_opts->ccache_timeout_set)
+    if (ccache_opts->ccache_timeout_set)
     {
-        timeout = s_opts->ccache_timeout * 1000;
+        timeout = ccache_opts->ccache_timeout * 1000;
     }
     else
     {
@@ -5339,185 +5308,6 @@ static int get_mac(void)
             return mac;
         }
     }
-}
-
-/* calls the pvfs2-gencred app to generate a credential */
-static PVFS_credential *generate_credential(
-    PVFS_uid uid,
-    PVFS_gid gid)
-{
-    char user[16], group[16];
-    int ret;
-    PVFS_credential *credential;
-    unsigned int timeout;
-
-    ret = snprintf(user, sizeof(user), "%u", uid);
-    if (ret < 0 || ret >= sizeof(user))
-    {
-        return NULL;
-    }
-
-    ret = snprintf(group, sizeof(group), "%u", gid);
-    if (ret < 0 || ret >= sizeof(group))
-    {
-        return NULL;
-    }
-
-    credential = calloc(1, sizeof(*credential));
-    if (!credential)
-    {
-        return NULL;
-    }
-
-    ret = PINT_tcache_get_info(credential_cache, TCACHE_TIMEOUT_MSECS,
-                               &timeout);
-
-    timeout = (ret != 0 || timeout == 0) ? PVFS2_DEFAULT_CREDENTIAL_TIMEOUT 
-                : timeout/1000;
-
-    ret = PVFS_util_gen_credential(
-        user,
-        group,
-        timeout,
-        s_opts.keypath,
-        NULL,
-        credential);
-    if (ret < 0)
-    {
-        gossip_err("generate_credential: unable to generate credential\n");
-        free(credential);
-        return NULL;
-    }
-
-    return credential;
-}
-
-#define CRED_TIMEOUT_BUFFER 5
-
-static PVFS_credential *lookup_credential(
-    PVFS_uid uid,
-    PVFS_gid gid)
-{
-    struct credential_key ckey;
-    struct credential_payload *cpayload;
-    struct PINT_tcache_entry *entry;
-    PVFS_credential *credential = NULL, *cache_cred = NULL;
-    struct timeval tval;
-    int status;
-    int ret;
-
-    ckey.uid = uid;
-    ckey.gid = gid;
-
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "credential cache lookup for (%u, %u)"
-                 " num_entries: %d\n", uid, gid, credential_cache->num_entries);
-    /* see if a fresh credential is in the cache */
-    ret = PINT_tcache_lookup(credential_cache, &ckey, &entry, &status);
-    if (ret == 0 && status == 0)
-    {
-        /* cache hit -- return copy of cached credential 
-           (cache operations may free credential) */
-        gossip_debug(GOSSIP_SECURITY_DEBUG,
-                     "credential cache HIT for (%u, %u)\n", uid, gid);
-        cpayload = (struct credential_payload*) entry->payload;
-        return (PVFS_credential*) PINT_dup_credential(cpayload->credential);
-    }
-    else if (ret == 0 && status == -PVFS_ETIME)
-    {
-        /* found expired cache entry -- remove */
-        gossip_debug(GOSSIP_SECURITY_DEBUG, 
-                     "deleting expired credential cache entry for (%u, %u)\n",
-                     uid, gid);
-        PINT_tcache_delete(credential_cache, entry);
-    }
-
-    /* request a new credential and store it in the cache */
-    gossip_debug(GOSSIP_SECURITY_DEBUG,
-                 "credential cache MISS for (%u, %u)\n", uid, gid);
-
-    credential = generate_credential(uid, gid);
-    if (credential == NULL)
-    {
-        gossip_err("unable to generate client credential for uid, gid "
-                   "(%u, %u)\n", uid, gid);
-        return NULL;
-    }
-
-#ifdef ENABLE_SECURITY_CERT
-    /* don't cache unsigned credential */
-    if (credential->sig_size != 0)
-    {
-#endif
-    cpayload = malloc(sizeof(struct credential_payload));
-    if (cpayload == NULL)
-    {
-        gossip_lerr("out of memory\n");
-        return NULL;
-    }
-    cpayload->uid = uid;
-    cpayload->gid = gid;
-    /* Make copy of credential */
-    cache_cred = PINT_dup_credential(credential);
-    cpayload->credential = cache_cred;
-
-    /* have cache entry expire before credential to avoid 
-       using credential that's about to expire */
-    tval.tv_sec = credential->timeout - CRED_TIMEOUT_BUFFER;
-    tval.tv_usec = 0;
-
-    ret = PINT_tcache_insert_entry_ex(
-        credential_cache,
-        &ckey,
-        cpayload,
-        &tval,
-        &status);
-
-    if (ret == 0)
-    {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "cached credential for (%u, %u)\n",
-                     uid, gid);
-    }
-    else
-    {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "cache insert returned %d\n", ret);
-    }
-
-#ifdef ENABLE_SECURITY_CERT
-    } /* if */
-#endif
-    return credential;
-}
-
-/* remove credential from cache */
-void remove_credential(
-    PVFS_uid uid,
-    PVFS_gid gid)
-{
-    struct credential_key ckey;
-    struct PINT_tcache_entry *entry;
-    int status, ret;
-
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "removing credential (%u, %u) from "
-                 "cache...\n", uid, gid);
-
-    ckey.uid = uid;
-    ckey.gid = gid;
-
-    /* lookup credential */
-    ret = PINT_tcache_lookup(credential_cache, &ckey, &entry, &status);
-
-    if (ret == 0)
-    {
-        ret = PINT_tcache_delete(credential_cache, entry);
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "... cache delete returned %d\n", 
-                     ret);
-    }
-    else
-    {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "... cache lookup returned %d\n", 
-                     ret);
-    }
-
 }
 
 /*

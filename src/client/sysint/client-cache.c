@@ -6,30 +6,43 @@
 #include <assert.h>
 
 #include "client-cache.h"
+#include <gossip.h>
 
 client_cache_t cc;
 
-static uint16_t blk_get_next_free();
+static uint16_t blk_get_next_free(void);
 static void * blk_getp_by_index(uint16_t index);
 static void blk_push_free(uint16_t index);
 static void blk_zero(void *voidp);
 
-static int fent_evict_mru();
-static int fent_evict_lru();
-static cc_fent_t *fent_get_next_free();
+static int fent_evict_mru(void);
+static int fent_evict_lru(void);
+static cc_fent_t *fent_get_next_free(void);
 static INLINE cc_fent_t *fent_getp_by_index(uint16_t index);
 static void fent_ht_remove(cc_fent_t *fentp);
 static void fent_ht_to_front(cc_fent_t *fentp);
-static cc_fent_t *fent_insert(uint64_t fhandle, uint32_t fsid);
-static cc_fent_t *fent_lookup(uint64_t fhandle, uint32_t fsid);
+static cc_fent_t *fent_insert(uint64_t fhandle,
+                              uint32_t fsid,
+                              PVFS_uid uid,
+                              PVFS_gid gid);
+static cc_fent_t *fent_lookup(uint64_t fhandle,
+                              uint32_t fsid,
+                              PVFS_uid uid,
+                              PVFS_gid gid);
 static void fent_lru_remove(cc_fent_t *fentp);
 static void fent_lru_to_front(cc_fent_t *fentp);
-static int fent_match_key(cc_fent_t *fentp, uint64_t fhandle, uint32_t fsid);
+static int fent_match_key(cc_fent_t *fentp,
+                          uint64_t fhandle,
+                          uint32_t fsid,
+                          PVFS_uid uid,
+                          PVFS_gid gid);
 static int fent_remove(cc_fent_t *fentp);
 static int fent_remove_all(void);
 static int fent_remove_by_index(uint16_t index);
-static int fent_remove_by_key(uint64_t fhandle, uint32_t fsid);
-
+static int fent_remove_by_key(uint64_t fhandle,
+                              uint32_t fsid,
+                              PVFS_uid uid,
+                              PVFS_gid gid);
 static int ment_dirty_flush(cc_mtbl_t *mtblp, cc_ment_t *mentp);
 static int ment_dirty_flush_all(cc_mtbl_t *mtblp);
 static int ment_dirty_flush_by_index(cc_mtbl_t *mtblp, uint16_t index);
@@ -54,9 +67,10 @@ static int ment_remove_by_key(cc_mtbl_t *mtblp, uint64_t tag);
 static int mtbl_fini(cc_mtbl_t *mtblp);
 static int mtbl_init(cc_mtbl_t *mtblp,
                      uint16_t ment_limit,
-                     uint16_t ment_ht_limit);
+                     uint16_t ment_ht_limit,
+                     uint16_t fent_index);
 
-static uint16_t blk_get_next_free()
+static uint16_t blk_get_next_free(void)
 {
     cc_free_block_t *free_blkp = NULL;
     uint16_t free_blk = NIL16;
@@ -114,21 +128,21 @@ static void blk_zero(void *voidp)
     memset(voidp, 0, cc.blk_size);
 }
 
-static int fent_evict_mru()
+static int fent_evict_mru(void)
 {
-    printf("%s: cc.ftbl.mru = %hu\n", __func__, cc.ftbl.mru);
+    gossip_err("%s: cc.ftbl.mru = %hu\n", __func__, cc.ftbl.mru);
     assert(cc.ftbl.mru != NIL16);
     return fent_remove_by_index(cc.ftbl.mru);
 }
 
-static int fent_evict_lru()
+static int fent_evict_lru(void)
 {
     //printf("%s: cc.ftbl.lru = %hu\n", __func__, cc.ftbl.lru);
     assert(cc.ftbl.lru != NIL16);
     return fent_remove_by_index(cc.ftbl.lru);
 }
 
-static cc_fent_t *fent_get_next_free()
+static cc_fent_t *fent_get_next_free(void)
 {
     cc_fent_t *fentp = NULL;
 
@@ -246,7 +260,10 @@ static void fent_ht_to_front(cc_fent_t *fentp)
     }
 }
 
-static cc_fent_t *fent_insert(uint64_t fhandle, uint32_t fsid)
+static cc_fent_t *fent_insert(uint64_t fhandle,
+                              uint32_t fsid,
+                              PVFS_uid uid,
+                              PVFS_gid gid)
 {
     cc_fent_t * new_fentp = NULL;
     int ret = 0;
@@ -260,10 +277,15 @@ static cc_fent_t *fent_insert(uint64_t fhandle, uint32_t fsid)
     /* Fill in fent values */
     new_fentp->file_handle = fhandle;
     new_fentp->fsid = fsid;
+    new_fentp->uid = uid;
+    new_fentp->gid = gid;
     /* Note: prev, next, ru_prev, and ru_next already initialized to NIL16 */
 
     /* Allocate and Initialize mtbl */
-    ret = mtbl_init(&new_fentp->mtbl, cc.ment_limit, cc.ment_ht_limit);
+    ret = mtbl_init(&new_fentp->mtbl,
+                    cc.ment_limit,
+                    cc.ment_ht_limit,
+                    new_fentp->index);
     if(ret < 0)
     {
         return NULL;
@@ -275,17 +297,20 @@ static cc_fent_t *fent_insert(uint64_t fhandle, uint32_t fsid)
     return new_fentp;
 }
 
-static cc_fent_t *fent_lookup(uint64_t fhandle, uint32_t fsid)
+static cc_fent_t *fent_lookup(uint64_t fhandle,
+                              uint32_t fsid,
+                              PVFS_uid uid,
+                              PVFS_gid gid)
 {
     uint16_t bucket = 0;
     cc_fent_t *fentp = NULL;
 
-    bucket = (fhandle + fsid) % cc.fent_ht_limit;
+    bucket = (fhandle + fsid + uid + gid) % cc.fent_ht_limit;
 
     fentp = fent_getp_by_index(cc.ftbl.fents_ht[bucket]);
     while(fentp != NULL)
     {
-        if(fent_match_key(fentp, fhandle, fsid))
+        if(fent_match_key(fentp, fhandle, fsid, uid, gid))
         {
             fent_ht_to_front(fentp);
             return fentp;
@@ -389,10 +414,15 @@ static void fent_lru_to_front(cc_fent_t *fentp)
     }
 }
 
-static int fent_match_key(cc_fent_t *fentp, uint64_t fhandle, uint32_t fsid)
+static int fent_match_key(cc_fent_t *fentp,
+                          uint64_t fhandle,
+                          uint32_t fsid,
+                          PVFS_uid uid,
+                          PVFS_gid gid)
 {
     assert(fentp);
-    if(fentp->file_handle == fhandle && fentp->fsid == fsid)
+    if(fentp->file_handle == fhandle && fentp->fsid == fsid &&
+       fentp->uid == uid && fentp->gid == gid)
     {
         return 1;
     }
@@ -444,9 +474,12 @@ static int fent_remove_by_index(uint16_t index)
     return fent_remove(fentp);
 }
 
-static int fent_remove_by_key(uint64_t fhandle, uint32_t fsid)
+static int fent_remove_by_key(uint64_t fhandle,
+                              uint32_t fsid,
+                              PVFS_uid uid,
+                              PVFS_gid gid)
 {
-    cc_fent_t *fentp = fent_lookup(fhandle, fsid);
+    cc_fent_t *fentp = fent_lookup(fhandle, fsid, uid, gid);
 
     if(fentp == NULL)
     {
@@ -594,7 +627,7 @@ static void ment_dirty_to_front(cc_mtbl_t *mtblp, cc_ment_t *mentp)
 
 static int ment_evict_mru(cc_mtbl_t *mtblp)
 {
-    printf("%s: mtblp->mru = %hu\n", __func__, mtblp->mru);
+    gossip_err("%s: mtblp->mru = %hu\n", __func__, mtblp->mru);
     assert(mtblp->mru != NIL16);
     return ment_remove_by_index(mtblp, mtblp->mru);
 }
@@ -965,7 +998,8 @@ static int mtbl_fini(cc_mtbl_t *mtblp)
 
 static int mtbl_init(cc_mtbl_t *mtblp,
                      uint16_t ment_limit,
-                     uint16_t ment_ht_limit)
+                     uint16_t ment_ht_limit,
+                     uint16_t fent_index)
 {
     cc_ment_t *mentp = NULL;
     unsigned int i = 0;
@@ -983,19 +1017,19 @@ static int mtbl_init(cc_mtbl_t *mtblp,
     mtblp->ments = malloc(ment_limit * sizeof(cc_ment_t));
     if(mtblp->ments == NULL)
     {
-        fprintf(stderr, "%s: ERROR allocating memory for ments!\n", __func__);
+        gossip_err("%s: ERROR allocating memory for ments!\n", __func__);
         return -1;
     }
 
 #if 0
-    printf("%s: ments bytes = %llu\n",
+    gossip_err("%s: ments bytes = %llu\n",
            __func__,
            (long long unsigned int) ment_limit * sizeof(cc_ment_t));
 #endif
 
     /* Setup free ments LL */
 #if 0
-    printf("%s: first ment address = %p\n", __func__, mtblp->ments);
+    gossip_err("%s: first ment address = %p\n", __func__, mtblp->ments);
 #endif
     mtblp->free_ment = 0;
     for(i = 0, mentp = mtblp->ments;
@@ -1003,7 +1037,7 @@ static int mtbl_init(cc_mtbl_t *mtblp,
         mentp++, i++)
     {
 #if 0
-        printf("%s: ment address = %p\n", __func__, mentp);
+        gossip_err("%s: ment address = %p\n", __func__, mentp);
 #endif
         mentp->index = i;
         mentp->next = i + 1;
@@ -1024,7 +1058,7 @@ static int mtbl_init(cc_mtbl_t *mtblp,
     /* Set all hash table buckets to NIL16 */
     memset(mtblp->ments_ht, NIL8, ment_ht_limit * sizeof(uint16_t));
 #if 0
-    printf("%s: ments_ht bytes = %llu\n",
+    gossip_err("%s: ments_ht bytes = %llu\n",
            __func__,
            (long long unsigned int) ment_ht_limit * sizeof(uint16_t));
 #endif
@@ -1035,15 +1069,27 @@ static int mtbl_init(cc_mtbl_t *mtblp,
     mtblp->lru = NIL16;
     mtblp->dirty_first = NIL16;
     mtblp->ref_cnt = 0;
+    mtblp->fent_index = fent_index;
 
     return 0;
 }
 
-int client_cache_fini(void)
+void PINT_client_cache_debug_flags(PINT_client_cache_flag flags)
+{
+    gossip_err("PINT_client_cache_flag:\n"
+               "\tCLIENT_CACHE_ENABLED = %c\n"
+               "\tCLIENT_CACHE_DEFAULT_CACHE = %c\n"
+               "\tCLIENT_CACHE_FOR_CLIENT_CORE = %c\n",
+               (cc.status & CLIENT_CACHE_ENABLED) ? 'T' : 'F',
+               (cc.status & CLIENT_CACHE_DEFAULT_CACHE) ? 'T' : 'F',
+               (cc.status & CLIENT_CACHE_FOR_CLIENT_CORE) ? 'T' : 'F');
+}
+
+int PINT_client_cache_finalize(void)
 {
     /* int ret = 0; */
 
-    printf("%s\n", __func__);
+    gossip_err("%s\n", __func__);
 
     while(cc.ftbl.mru != NIL16)
     {
@@ -1064,7 +1110,8 @@ int client_cache_fini(void)
     return 0;
 }
 
-int client_cache_init(
+int PINT_client_cache_initialize(
+    PINT_client_cache_flag flags,
     uint64_t cache_size,
     uint64_t block_size,
     uint16_t fent_limit,
@@ -1077,7 +1124,18 @@ int client_cache_init(
     /* int ret = 0; */
     int i = 0;
 
-    printf("%s\n", __func__);
+    gossip_err("%s\n", __func__);
+
+    if(flags == CLIENT_CACHE_NONE || !(flags & CLIENT_CACHE_ENABLED))
+    {
+        return 0;
+    }
+    else
+    {
+        cc.status = flags;
+    }
+
+    PINT_client_cache_debug_flags(cc.status);
 
     /* Store limits w/ cc */
     cc.blk_size = block_size;
@@ -1088,22 +1146,22 @@ int client_cache_init(
     cc.ment_ht_limit = ment_ht_limit;
     cc.ment_size = (uint16_t) sizeof(cc_ment_t);
 
-    printf("%s: block_size = %llu\n",
+    gossip_err("%s: block_size = %llu\n",
            __func__,
            (long long unsigned int) cc.blk_size);
-    printf("%s: fent_limit = %hu\n", __func__, cc.fent_limit);
-    printf("%s: fent_ht_limit = %hu\n", __func__, cc.fent_ht_limit);
-    printf("%s: fent_size = %hu\n", __func__, cc.fent_size);
-    printf("%s: ment_limit = %hu\n", __func__, cc.ment_limit);
-    printf("%s: ment_ht_limit = %hu\n", __func__, cc.ment_ht_limit);
-    printf("%s: ment_size = %hu\n", __func__, cc.ment_size);
+    gossip_err("%s: fent_limit = %hu\n", __func__, cc.fent_limit);
+    gossip_err("%s: fent_ht_limit = %hu\n", __func__, cc.fent_ht_limit);
+    gossip_err("%s: fent_size = %hu\n", __func__, cc.fent_size);
+    gossip_err("%s: ment_limit = %hu\n", __func__, cc.ment_limit);
+    gossip_err("%s: ment_ht_limit = %hu\n", __func__, cc.ment_ht_limit);
+    gossip_err("%s: ment_size = %hu\n", __func__, cc.ment_size);
 
     /* Allocate memory for blocks. */
     cc.num_blks = cache_size / block_size;
-    printf("%s: num_blocks = %d\n", __func__, cc.num_blks);
+    gossip_err("%s: num_blocks = %d\n", __func__, cc.num_blks);
     if(cc.num_blks == 0)
     {
-        fprintf(stderr, "%s: WARN num_blocks is ZERO!\n", __func__);
+        gossip_err("%s: WARN num_blocks is ZERO!\n", __func__);
         return 0;
     }
     else if(cc.num_blks < cc.ment_limit)
@@ -1118,12 +1176,12 @@ int client_cache_init(
     cc.blks = calloc(1, cc.num_blks * block_size);
     if(cc.blks == NULL)
     {
-        fprintf(stderr, "%s: ERROR allocating memory for blks!\n", __func__);
+        gossip_err("%s: ERROR allocating memory for blks!\n", __func__);
         return -1;
     }
 
     cc.cache_size = cc.num_blks * block_size;
-    printf("%s: cacheable bytes = %llu = %Lf MiB\n",
+    gossip_err("%s: cacheable bytes = %llu = %Lf MiB\n",
            __func__,
            (long long unsigned int) cc.cache_size,
            ((long double) (cc.cache_size) / (1024.0 * 1024.0)));
@@ -1135,7 +1193,7 @@ int client_cache_init(
         i < (cc.num_blks - 1);
         voidp += cc.blk_size, i++)
     {
-        /* printf("%s: block address = %p\n", __func__, voidp); */
+        /* gossip_err("%s: block address = %p\n", __func__, voidp); */
         ((cc_free_block_t *) voidp)->next = i + 1;
     }
     ((cc_free_block_t *) voidp)->next = NIL16;
@@ -1144,10 +1202,10 @@ int client_cache_init(
     cc.ftbl.fents = malloc(fent_limit * sizeof(cc_fent_t));
     if(cc.ftbl.fents == NULL)
     {
-        fprintf(stderr, "%s: ERROR allocating memory for fents!\n", __func__);
+        gossip_err("%s: ERROR allocating memory for fents!\n", __func__);
         return -1;
     }
-    printf("%s: fents bytes = %llu\n",
+    gossip_err("%s: fents bytes = %llu\n",
            __func__,
            (long long unsigned int) fent_limit * sizeof(cc_fent_t));
 
@@ -1177,7 +1235,7 @@ int client_cache_init(
 
     /* Set all hash table buckets to NIL16 */
     memset((void *) cc.ftbl.fents_ht, NIL8, fent_ht_limit * sizeof(uint16_t));
-    printf("%s: fents_ht bytes = %llu\n",
+    gossip_err("%s: fents_ht bytes = %llu\n",
            __func__,
            (long long unsigned int) fent_ht_limit * sizeof(uint16_t));
 
@@ -1188,118 +1246,15 @@ int client_cache_init(
     return 0;
 }
 
-int main(int argc, char** argv)
+int PINT_client_cache_initialize_defaults(void)
 {
-    int ret = 0;
-    int i = 0;
-    printf("%s\n", __func__);
-    printf("FYI: sizeof(pthread_rwlock_t) = %zu\n", sizeof(pthread_rwlock_t));
-    ret = client_cache_init(BYTE_LIMIT,
-                     BLOCK_SIZE_B,
-                     FENT_LIMIT,
-                     FENT_HT_LIMIT,
-                     MENT_LIMIT,
-                     MENT_HT_LIMIT);
-    if(ret != 0)
-    {
-        //fprintf(stderr, "%s: init_cache returned %d\n", __func__, ret);
-        client_cache_fini();
-        return EXIT_FAILURE;
-    }
-
-    /* Tests */
-
-#if 0
-    /* Test 1: Insert a few file entries. */
-    uint64_t fhandle = 0;
-    uint32_t fsid = 0;
-    cc_fent_t * fentp;
-    for(; fhandle < 1000; fhandle++)
-    {
-        fentp = fent_insert(fhandle, fsid);
-#if 0
-        printf("%s: fentp returned by fent_insert = %p, fhandle = %llu\n",
-               __func__,
-               fentp,
-               (long long unsigned int) fhandle);
-#endif
-        assert(fentp);
-    }
-
-#if 0
-    /* Test 2: Look them up*/
-    for(fhandle = 0, fsid = 0; fhandle < FENT_LIMIT * 2; fhandle++)
-    {
-        fentp = fent_lookup(fhandle, fsid);
-        //assert(fentp);
-        printf("%s: fentp returned by fent_lookup = %p, fhandle = %llu\n",
-               __func__,
-               fentp,
-               (long long unsigned int) fhandle);
-    }
-
-    for(i = 0; i < FENT_LIMIT; i++)
-    {
-        fent_evict_lru();
-        //fent_evict_mru();
-    }
-#endif
-
-#endif
-
-    /* Mtbl test */
-    uint64_t fhandle = 0;
-    uint32_t fsid = 0;
-    cc_ment_t *mentp = NULL;
-    cc_fent_t * fentp = fent_insert(fhandle, fsid);
-    printf("%s: fentp returned by fent_insert = %p, fhandle = %llu\n",
-           __func__,
-           fentp,
-           (long long unsigned int) fhandle);
-    assert(fentp);
-
-    /* Insert memory entries */
-    for(i = 0; i < cc.ment_limit * 1000; i++)
-    {
-        uint64_t tag = i * cc.blk_size;
-        mentp = ment_insert(&fentp->mtbl, tag);
-#if 0
-        printf("%s: mentp returned by ment_insert = %p, tag = %llu\n",
-               __func__,
-               mentp,
-               (long long unsigned int) tag);
-#endif
-        assert(mentp);
-
-        /* Test marking data dirty to simulate I/O */
-        ment_dirty_to_front(&fentp->mtbl, mentp);
-        ment_lru_to_front(&fentp->mtbl, mentp);
-        fent_lru_to_front(fentp);
-    }
-
-    for(i = 0; i < cc.ment_limit; i++)
-    {
-        uint64_t tag = i * cc.blk_size;
-        mentp = ment_lookup(&fentp->mtbl, tag);
-#if 0
-        printf("%s: mentp returned by ment_lookup = %p, tag = %llu\n",
-               __func__,
-               mentp,
-               (long long unsigned int) tag);
-#endif
-        //assert(mentp);
-    }
-
-#if 0
-    for(i = 0; i < MENT_LIMIT; i++)
-    {
-        //ment_evict_lru(&fentp->mtbl);
-        //ment_evict_mru(&fentp->mtbl);
-    }
-#endif
-
-    /* Done with tests. */
-
-    client_cache_fini();
-    return EXIT_SUCCESS;
+    return PINT_client_cache_initialize(CLIENT_CACHE_ENABLED |
+                                        CLIENT_CACHE_DEFAULT_CACHE |
+                                        CLIENT_CACHE_FOR_CLIENT_CORE,
+                                        BYTE_LIMIT,
+                                        BLOCK_SIZE_B,
+                                        FENT_LIMIT,
+                                        FENT_HT_LIMIT,
+                                        MENT_LIMIT,
+                                        MENT_HT_LIMIT);
 }

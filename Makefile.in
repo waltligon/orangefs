@@ -187,9 +187,9 @@ INCLUDES := \
     src/io/dev \
     src/proto \
     src/common/mgmt \
-	src/common/hash \
-	src/common/llist \
-	src/common/token-utils
+    src/common/hash \
+    src/common/llist \
+    src/common/token-utils
 GENINCLUDES := \
 	include
 endif
