@@ -843,16 +843,23 @@ static int tree_setattr_work_cleanup(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
-static int tree_setattr_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+void tree_setattr_free(PINT_server_op *s_op)
 {
-    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PVFS_servresp_tree_setattr *s_tree = &(s_op->resp.u.tree_setattr);
 
     /*cleanup response structure*/
     if (s_tree->status)
+    {
        free(s_tree->status);
+    }
+}
 
+static int tree_setattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    tree_setattr_free(s_op);
     return(server_state_machine_complete(smcb));
 }
 
