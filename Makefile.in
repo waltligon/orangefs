@@ -198,7 +198,7 @@ endif
 
 # These should all be self explanatory; they are standard flags
 # for compiling and linking unless otherwise noted
-CC = @CC@
+CC = @CC@ -std=gnu89
 LD = @CC@
 BUILD_CC = @BUILD_CC@
 BUILD_LD = @BUILD_CC@
@@ -999,7 +999,7 @@ lib/liborangefsposix.so: lib/libofs.so lib/liborangefs.so lib/libpvfs2.so
 # rules for building libtool libraries
 lib/liborangefs.la: lib/liborangefs.a lib/libpvfs2.a
 	$(Q) "  GLT		$@"
-	$(E)glibtool --mode=link --tag=CC gcc -o lib/liborangefs.la $^ -lcrypto -lssl -static
+	$(E)glibtool --mode=link --tag=CC $(CC) -o lib/liborangefs.la $^ -lcrypto -lssl -static
 #	mv lib/libpvfs2.la $@
 
 # rule for building the pvfs2 server library
@@ -1289,6 +1289,12 @@ distclean: cleaner docsclean
 	rm -rf lib
 	rm -f src/server/simple.conf
 	rm -f src/apps/admin/pvfs2-config
+	rm -f src/client/hadoop/orangefs-hadoop1/pom.xml \
+		src/client/hadoop/orangefs-hadoop1/src/main/resources/conf/hadoop-env.sh \
+		src/client/hadoop/orangefs-hadoop2/pom.xml \
+		src/client/hadoop/orangefs-hadoop2/src/main/resources/conf/hadoop-env.sh \
+		src/client/jni/pom.xml
+
 ifndef DIST_RELEASE
 	rm -f $(SMCGEN)
 endif

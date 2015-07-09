@@ -33,8 +33,6 @@
 #include "extent-utils.h"
 #include "security-util.h"
 
-#define	MAX_PARTITIONS	2
-
 enum
 {
     LOCAL_OPERATION = 2,
@@ -313,7 +311,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                     dummy_sys_attr,
                     0,
                     s_op->req->hints);
-                    
+
                 /* copy to req->u.setattr.attr because of calling pvfs2_set_attr_work_sm next */
                 PINT_copy_object_attr(&req->u.setattr.attr,
                     &this_req->u.tree_setattr.attr);
@@ -322,7 +320,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                 req->u.setattr.attr.mask |= PVFS_ATTR_COMMON_TYPE;
                 
                 tree_communicate_s_op->local_index = i;
-
+ 
                 break;
             }   
             
@@ -399,15 +397,17 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
 
     if (s_op->u.tree_communicate.handle_array_remote_count > 0) {
 
-        /* Decide how to divide the remote handles. If there are only a few
-           (MAX_PARTITIONS or fewer) then go ahead and send to each remaining
-           server individually. */
-        if (s_op->u.tree_communicate.handle_array_remote_count > MAX_PARTITIONS)
-        {
-            num_partitions = MAX_PARTITIONS;
-            num_files_per_server = s_op->u.tree_communicate.handle_array_remote_count /
-                                       MAX_PARTITIONS;
-            if (num_partitions * num_files_per_server <
+      /* Decide how to divide the remote handles. If there are only a few
+         (fewer than tree_threshhold from the config file) then go ahead and
+         send to each remaining server individually. */
+      if (s_op->u.tree_communicate.handle_array_remote_count >
+          server_config->tree_threshold)
+      {
+          num_partitions = server_config->tree_width;
+          num_files_per_server =
+                   s_op->u.tree_communicate.handle_array_remote_count /
+                   server_config->tree_width;
+          if (num_partitions * num_files_per_server <
                    s_op->u.tree_communicate.handle_array_remote_count) {
                 num_files_per_server++;
             }
@@ -644,7 +644,6 @@ static PINT_sm_action tree_setattr_setup(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-
 
     return (tree_communicate_partition_handles(smcb, js_p, s_op->req->u.tree_setattr.handle_count,
         s_op->req->u.tree_setattr.fs_id, PVFS_SERV_TREE_SETATTR,
@@ -1754,3 +1753,12 @@ struct PINT_server_req_params pvfs2_tree_getattr_params =
     .state_machine = &pvfs2_tree_getattr_sm
 };
 
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=9 sts=4 sw=4 expandtab
+ */

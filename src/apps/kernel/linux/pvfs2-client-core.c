@@ -1060,6 +1060,7 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.readdirplus.mask,
         &vfs_request->response.readdirplus,
         &vfs_request->op_id, (void *)vfs_request, hints);
+    vfs_request->hints = hints;
 
     if (credential)
     {
@@ -1708,7 +1709,7 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             }
             else
             {
-                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                strncpy(vfs_request->out_downcall.resp.perf_count.buffer,
                     tmp_str, PERF_COUNT_BUF_SIZE);
                 free(tmp_str);
                 vfs_request->out_downcall.status = 0;
@@ -1724,7 +1725,7 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             }
             else
             {
-                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                strncpy(vfs_request->out_downcall.resp.perf_count.buffer,
                     tmp_str, PERF_COUNT_BUF_SIZE);
                 free(tmp_str);
                 vfs_request->out_downcall.status = 0;
@@ -1740,7 +1741,7 @@ static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
             }
             else
             {
-                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                strncpy(vfs_request->out_downcall.resp.perf_count.buffer,
                     tmp_str, PERF_COUNT_BUF_SIZE);
                 free(tmp_str);
                 vfs_request->out_downcall.status = 0;
@@ -1770,6 +1771,8 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
     int tmp_subsystem = -1;
     unsigned int tmp_perf_val;
     uint64_t mask = 0;
+    uint64_t mask1 = 0;
+    uint64_t mask2 = 0;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a param request for op %d\n",
@@ -1847,18 +1850,44 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             break;
         /* These next few case statements return without falling through */
         case PVFS2_PARAM_REQUEST_OP_CLIENT_DEBUG:
-            gossip_debug(GOSSIP_PROC_DEBUG,"Got request to SET the client debug mask...\n");
-            gossip_debug(GOSSIP_PROC_DEBUG,"s_value is %s\n",vfs_request->in_upcall.req.param.s_value);
+            gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                         "Got request to SET the client debug mask...\n");
+            gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                         "s_value is %s\n",
+                         vfs_request->in_upcall.req.param.s_value);
 
             mask=PVFS_debug_eventlog_to_mask(vfs_request->in_upcall.req.param.s_value);
 
             ret=gossip_set_debug_mask(1,mask);
-            gossip_debug(GOSSIP_PROC_DEBUG,"Value of new debug mask is %0x.\n"
-                                          ,(unsigned int)gossip_debug_mask);
+            gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                         "Value of new debug mask is %0x.\n",
+                         (unsigned int)gossip_debug_mask);
 
             vfs_request->out_downcall.status = 0;
             vfs_request->out_downcall.resp.param.value=mask;
             return(0);
+
+	/*
+	 * This will have to be changed in 3.0 when there really are
+	 * two mask values associated with client debug. The upstream
+	 * version of the kernel module sends over two values. When
+	 * working with a 2.x client, mask1 is always 0. When working 
+	 * with 3.x either mask1 or mask2 may have values.
+	 */
+	case PVFS2_PARAM_REQUEST_OP_TWO_MASK_VALUES:
+		sscanf(vfs_request->in_upcall.req.param.s_value,
+		       "%llx %llx",
+			(unsigned long long *)&mask1,
+			(unsigned long long *)&mask2);
+		mask = mask2;
+		gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+			     "Got request to SET the client debug mask to "
+			     ":%llx:\n",
+			     (unsigned long long)mask2);
+		ret=gossip_set_debug_mask(1,mask);
+
+		return(0);
+		break;
 
         case PVFS2_PARAM_REQUEST_OP_PERF_TIME_INTERVAL_SECS:
             if(vfs_request->in_upcall.req.param.type ==
@@ -2308,6 +2337,7 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
         &vfs_request->op_id,
         hints,
         (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (credential)
     {
@@ -2529,6 +2559,7 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
             &vfs_request->op_ids[i],
             hints,
             (void *)vfs_request);
+        vfs_request->hints = hints;
 
         if (credential)
         {
@@ -4373,12 +4404,22 @@ int main(int argc, char **argv)
 
     job_close_context(s_client_dev_context);
 
+    PINT_tcache_finalize(credential_cache);
+    credential_cache = NULL;
+
 #ifdef USE_MMAP_RA_CACHE
     pvfs2_mmap_ra_cache_finalize();
 #endif
 
     PINT_dev_finalize();
     PINT_dev_put_mapped_regions(NUM_MAP_DESC, s_io_desc);
+
+    PVFS_hint_free(acache_timer_sm_p->hints);
+    PINT_smcb_free(acache_smcb);
+    PVFS_hint_free(ncache_timer_sm_p->hints);
+    PINT_smcb_free(ncache_smcb);
+    PVFS_hint_free(capcache_timer_sm_p->hints);
+    PINT_smcb_free(capcache_smcb);
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "calling PVFS_sys_finalize()\n");

@@ -519,7 +519,7 @@ static PINT_sm_action crdirent_validate(
     PVFS_object_attr *attr_p = NULL;
     
     attr_p = &s_op->attr;
-    
+
     /* gossip bitmap, since jump from get_bitmap_and_dirdata_handles*/
     gossip_debug(GOSSIP_SERVER_DEBUG, 
             "crdirent: dist_dir_bitmap as:\n");

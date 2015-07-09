@@ -13,6 +13,7 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
+#include "pint-perf-counter.h"
 #include "pint-security.h"
 #include "security-util.h"
 #include "pint-cached-config.h"
@@ -335,11 +336,23 @@ static PINT_sm_action remove_verify_object_metadata(
 
     if (a_p->objtype == PVFS_TYPE_DIRECTORY)
     {
+        /* This is the first point we know this is a rmdir so
+         * increment the counter for rmdir requests
+         */
+        PINT_perf_count(PINT_server_pc, PINT_PERF_RMDIR, 1, PINT_PERF_ADD);
+
 	js_p->error_code = STATE_TYPE_DIRECTORY;
 
 	gossip_debug(
             GOSSIP_SERVER_DEBUG, "  type is directory; removing "
             "dirdata object before removing directory itself.\n");
+    }
+    else
+    {
+        /* This is the first point we know this is a file rm so
+         * increment the counter for remove requests
+         */
+        PINT_perf_count(PINT_server_pc, PINT_PERF_REMOVE, 1, PINT_PERF_ADD);
     }
 
     return SM_ACTION_COMPLETE;

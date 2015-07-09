@@ -193,8 +193,8 @@ int init_credential(PVFS_uid uid,
     memcpy(cred->group_array, group_array, sizeof(PVFS_gid) * num_groups);
     cred->userid = uid;
 
-    /* default timeout */
-    cred->timeout = time(NULL) + PVFS2_DEFAULT_CREDENTIAL_TIMEOUT;
+    /* TODO: revise caching (use server timeout setting) */
+    cred->timeout = time(NULL) + PVFS2_SECURITY_TIMEOUT_MAX;
 
     /* append certificate if necessary */
     if (cert != NULL)

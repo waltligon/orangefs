@@ -113,9 +113,9 @@ static int parse_encoding_string(const char *cp,
 
 static int parse_num_dfiles_string(const char* cp, int* num_dfiles);
 
+#ifndef ENABLE_SECURITY_MODE
 static int PINT_is_idnum(const char *str);
 
-#ifndef ENABLE_SECURITY_MODE
 static int PINT_gen_unsigned_credential(const char *user, const char *group,
                                         unsigned int timeout, PVFS_credential *cred);
 #endif

@@ -105,7 +105,7 @@ int pvfs2_file_open(
 
     inode->i_mapping->host = inode;
     inode->i_mapping->a_ops = &pvfs2_address_operations;
-#ifndef PVFS2_LINUX_KERNEL_2_4
+#ifdef BACKING_DEV_IN_ADDR_SPACE
     inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 #endif
 
@@ -3308,8 +3308,9 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
     vma->vm_flags &= ~VM_MAYWRITE;
     return generic_file_mmap(file, vma);
 #else
-    /* backing_dev_info isn't present on 2.4.x */
+#ifdef BACKING_DEV_IN_ADDR_SPACE
     inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
+#endif
     return generic_file_mmap(file, vma);
 #endif
 }

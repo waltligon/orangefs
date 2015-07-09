@@ -376,9 +376,11 @@ static PINT_sm_action setattr_verify_attribs(
         /* copy the distributed directory attributes before writing this object */
         if (req_a_p->mask & PVFS_ATTR_DISTDIR_ATTR)
         {
+
             PINT_dist_dir_attr_copyto(a_p->dist_dir_attr,
                                       req_a_p->dist_dir_attr);
             a_p->dist_dir_attr = req_a_p->dist_dir_attr;
+
             if (a_p->dist_dir_bitmap)
             {
                 free(a_p->dist_dir_bitmap);
