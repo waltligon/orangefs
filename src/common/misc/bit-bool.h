@@ -19,16 +19,16 @@ typedef struct bit_bool_s
     uint64_t bool_count;
 } bit_bool_t;
 
-void bit_bool_dump_h2l(bit_bool_t *cb, FILE *out);
+void bit_bool_dump_h2l(bit_bool_t *bb, FILE *out);
 
-void bit_bool_dump_l2h(bit_bool_t *cb, FILE *out);
+void bit_bool_dump_l2h(bit_bool_t *bb, FILE *out);
 
-void bit_bool_fini(bit_bool_t *cb);
+void bit_bool_fini(bit_bool_t *bb);
 
-int bit_bool_get(bit_bool_t *cb, uint64_t bool_index);
+int bit_bool_get(bit_bool_t *bb, uint64_t bool_index);
 
-int bit_bool_init(bit_bool_t *cb, uint64_t bool_count, int value);
+int bit_bool_init(bit_bool_t *bb, uint64_t bool_count, int value);
 
-void bit_bool_set(bit_bool_t *cb, uint64_t bool_index, int value);
+void bit_bool_set(bit_bool_t *bb, uint64_t bool_index, int value);
 
 #endif

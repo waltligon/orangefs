@@ -28,6 +28,13 @@
 #include <unistd.h>
 #endif
 
+typedef enum
+{
+    LOCK_HINT_NONE       =       0,
+    LOCK_HINT_ACQUIRE    = (1 << 0),
+    LOCK_HINT_RELEASE    = (1 << 1),
+} gen_lock_hint_t;
+
 /* we will make posix locks the default unless turned off for now. */
 /* this is especially important for development in which case the locks
  * should really be enabled in order to verify proper operation 

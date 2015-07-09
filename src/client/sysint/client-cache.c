@@ -22,47 +22,48 @@ static INLINE cc_fent_t *fent_getp_by_index(uint16_t index);
 static void fent_ht_remove(cc_fent_t *fentp);
 static void fent_ht_to_front(cc_fent_t *fentp);
 static cc_fent_t *fent_insert(uint64_t fhandle,
-                              uint32_t fsid,
+                              int32_t fsid,
                               PVFS_uid uid,
                               PVFS_gid gid);
 static cc_fent_t *fent_lookup(uint64_t fhandle,
-                              uint32_t fsid,
+                              int32_t fsid,
                               PVFS_uid uid,
                               PVFS_gid gid);
 static void fent_lru_remove(cc_fent_t *fentp);
 static void fent_lru_to_front(cc_fent_t *fentp);
 static int fent_match_key(cc_fent_t *fentp,
                           uint64_t fhandle,
-                          uint32_t fsid,
+                          int32_t fsid,
                           PVFS_uid uid,
                           PVFS_gid gid);
 static int fent_remove(cc_fent_t *fentp);
 static int fent_remove_all(void);
 static int fent_remove_by_index(uint16_t index);
 static int fent_remove_by_key(uint64_t fhandle,
-                              uint32_t fsid,
+                              int32_t fsid,
                               PVFS_uid uid,
                               PVFS_gid gid);
 static int ment_dirty_flush(cc_mtbl_t *mtblp, cc_ment_t *mentp);
 static int ment_dirty_flush_all(cc_mtbl_t *mtblp);
 static int ment_dirty_flush_by_index(cc_mtbl_t *mtblp, uint16_t index);
-static int ment_dirty_flush_by_key(cc_mtbl_t *mtblp, uint64_t tag);
+static int ment_dirty_flush_by_key(cc_mtbl_t *mtblp, int64_t tag);
 static void ment_dirty_remove(cc_mtbl_t *mtblp, cc_ment_t *mentp);
 static void ment_dirty_to_front(cc_mtbl_t *mtblp, cc_ment_t *mentp);
 static int ment_evict_mru(cc_mtbl_t *mtblp);
 static int ment_evict_lru(cc_mtbl_t *mtblp);
 static cc_ment_t *ment_get_next_free(cc_mtbl_t *mtblp);
-static INLINE cc_ment_t *ment_getp_by_index(cc_mtbl_t *mtblp, uint16_t index);
+static INLINE cc_ment_t *ment_getp_by_index(const cc_mtbl_t *mtblp,
+                                            const uint16_t index);
 static void ment_ht_remove(cc_mtbl_t *mtblp, cc_ment_t *mentp);
 static void ment_ht_to_front(cc_mtbl_t *mtblp, cc_ment_t *mentp);
-static cc_ment_t *ment_insert(cc_mtbl_t *mtblp, uint64_t tag);
-static cc_ment_t *ment_lookup(cc_mtbl_t *mtblp, uint64_t tag);
+static cc_ment_t *ment_insert(cc_mtbl_t *mtblp, const int64_t tag);
+static cc_ment_t *ment_lookup(cc_mtbl_t *mtblp, const int64_t tag);
 static void ment_lru_remove(cc_mtbl_t *mtblp, cc_ment_t *mentp);
 static void ment_lru_to_front(cc_mtbl_t *mtblp, cc_ment_t *mentp);
-static int ment_match_key(cc_ment_t *mentp, uint64_t tag);
+static int ment_match_key(cc_ment_t *mentp, int64_t tag);
 static int ment_remove(cc_mtbl_t *mtblp, cc_ment_t *mentp);
 static int ment_remove_by_index(cc_mtbl_t *mtblp, uint16_t index);
-static int ment_remove_by_key(cc_mtbl_t *mtblp, uint64_t tag);
+static int ment_remove_by_key(cc_mtbl_t *mtblp, int64_t tag);
 
 static int mtbl_fini(cc_mtbl_t *mtblp);
 static int mtbl_init(cc_mtbl_t *mtblp,
@@ -184,7 +185,8 @@ static void fent_ht_remove(cc_fent_t *fentp)
 
     assert(fentp);
 
-    bucket = (fentp->file_handle + fentp->fsid) % cc.fent_ht_limit;
+    bucket = (fentp->file_handle + fentp->fsid + fentp->uid + fentp->gid) %
+            cc.fent_ht_limit;
 
     prev = fent_getp_by_index(fentp->prev);
     next = fent_getp_by_index(fentp->next);
@@ -241,7 +243,8 @@ static void fent_ht_to_front(cc_fent_t *fentp)
 
     fent_ht_remove(fentp);
 
-    bucket = (fentp->file_handle + fentp->fsid) % cc.fent_ht_limit;
+    bucket = (fentp->file_handle + fentp->fsid + fentp->uid + fentp->gid) %
+            cc.fent_ht_limit;
     old_head_fentp = fent_getp_by_index(cc.ftbl.fents_ht[bucket]);
 
     if(old_head_fentp == NULL)
@@ -261,7 +264,7 @@ static void fent_ht_to_front(cc_fent_t *fentp)
 }
 
 static cc_fent_t *fent_insert(uint64_t fhandle,
-                              uint32_t fsid,
+                              int32_t fsid,
                               PVFS_uid uid,
                               PVFS_gid gid)
 {
@@ -298,7 +301,7 @@ static cc_fent_t *fent_insert(uint64_t fhandle,
 }
 
 static cc_fent_t *fent_lookup(uint64_t fhandle,
-                              uint32_t fsid,
+                              int32_t fsid,
                               PVFS_uid uid,
                               PVFS_gid gid)
 {
@@ -416,7 +419,7 @@ static void fent_lru_to_front(cc_fent_t *fentp)
 
 static int fent_match_key(cc_fent_t *fentp,
                           uint64_t fhandle,
-                          uint32_t fsid,
+                          int32_t fsid,
                           PVFS_uid uid,
                           PVFS_gid gid)
 {
@@ -475,7 +478,7 @@ static int fent_remove_by_index(uint16_t index)
 }
 
 static int fent_remove_by_key(uint64_t fhandle,
-                              uint32_t fsid,
+                              int32_t fsid,
                               PVFS_uid uid,
                               PVFS_gid gid)
 {
@@ -528,7 +531,7 @@ static int ment_dirty_flush_by_index(cc_mtbl_t *mtblp, uint16_t index)
     return ment_dirty_flush(mtblp, ment_getp_by_index(mtblp, index));
 }
 
-static int ment_dirty_flush_by_key(cc_mtbl_t *mtblp, uint64_t tag)
+static int ment_dirty_flush_by_key(cc_mtbl_t *mtblp, int64_t tag)
 {
     cc_ment_t *mentp = NULL;
 
@@ -679,7 +682,8 @@ static cc_ment_t *ment_get_next_free(cc_mtbl_t *mtblp)
     return mentp;
 }
 
-static INLINE cc_ment_t *ment_getp_by_index(cc_mtbl_t *mtblp, uint16_t index)
+static INLINE cc_ment_t *ment_getp_by_index(const cc_mtbl_t *mtblp,
+                                            const uint16_t index)
 {
     if(index < cc.ment_limit)
     {
@@ -772,7 +776,7 @@ static void ment_ht_to_front(cc_mtbl_t *mtblp, cc_ment_t *mentp)
     }
 }
 
-static cc_ment_t *ment_insert(cc_mtbl_t *mtblp, uint64_t tag)
+static cc_ment_t *ment_insert(cc_mtbl_t *mtblp, const int64_t tag)
 {
     cc_ment_t * new_mentp = NULL;
     int ret = 0;
@@ -794,7 +798,7 @@ static cc_ment_t *ment_insert(cc_mtbl_t *mtblp, uint64_t tag)
     return new_mentp;
 }
 
-static cc_ment_t *ment_lookup(cc_mtbl_t *mtblp, uint64_t tag)
+static cc_ment_t *ment_lookup(cc_mtbl_t *mtblp, const int64_t tag)
 {
     uint16_t bucket = 0;
     cc_ment_t *mentp = NULL;
@@ -911,7 +915,7 @@ static void ment_lru_to_front(cc_mtbl_t *mtblp, cc_ment_t *mentp)
     }
 }
 
-static int ment_match_key(cc_ment_t *mentp, uint64_t tag)
+static int ment_match_key(cc_ment_t *mentp, int64_t tag)
 {
     assert(mentp);
     if(mentp->tag == tag)
@@ -962,7 +966,7 @@ static int ment_remove_by_index(cc_mtbl_t *mtblp, uint16_t index)
     return ment_remove(mtblp, mentp);
 }
 
-static int ment_remove_by_key(cc_mtbl_t *mtblp, uint64_t tag)
+static int ment_remove_by_key(cc_mtbl_t *mtblp, int64_t tag)
 {
     cc_ment_t *mentp = NULL;
 
@@ -1083,6 +1087,52 @@ void PINT_client_cache_debug_flags(PINT_client_cache_flag flags)
                (cc.status & CLIENT_CACHE_ENABLED) ? 'T' : 'F',
                (cc.status & CLIENT_CACHE_DEFAULT_CACHE) ? 'T' : 'F',
                (cc.status & CLIENT_CACHE_FOR_CLIENT_CORE) ? 'T' : 'F');
+}
+
+cc_fent_t *PINT_client_cache_fent_lookup(const uint64_t fhandle,
+                                         const int32_t fsid,
+                                         const PVFS_uid uid,
+                                         const PVFS_gid gid,
+                                         const gen_lock_hint_t lock_hint)
+{
+    cc_fent_t *fent_p = NULL;
+
+    if(lock_hint & LOCK_HINT_ACQUIRE)
+    {
+        gen_posix_mutex_lock(&cc.mutex);
+    }
+
+    fent_p = fent_lookup(fhandle, fsid, uid, gid);
+
+    if(lock_hint & LOCK_HINT_RELEASE)
+    {
+        gen_posix_mutex_unlock(&cc.mutex);
+    }
+
+    return fent_p;
+}
+
+cc_fent_t *PINT_client_cache_fent_insert(const uint64_t fhandle,
+                                         const int32_t fsid,
+                                         const PVFS_uid uid,
+                                         const PVFS_gid gid,
+                                         const gen_lock_hint_t lock_hint)
+{
+    cc_fent_t *fent_p = NULL;
+
+    if(lock_hint & LOCK_HINT_ACQUIRE)
+    {
+        gen_posix_mutex_lock(&cc.mutex);
+    }
+
+    fent_p = fent_insert(fhandle, fsid, uid, gid);
+
+    if(lock_hint & LOCK_HINT_RELEASE)
+    {
+        gen_posix_mutex_unlock(&cc.mutex);
+    }
+
+    return fent_p;
 }
 
 int PINT_client_cache_finalize(void)
@@ -1236,12 +1286,18 @@ int PINT_client_cache_initialize(
     /* Set all hash table buckets to NIL16 */
     memset((void *) cc.ftbl.fents_ht, NIL8, fent_ht_limit * sizeof(uint16_t));
     gossip_err("%s: fents_ht bytes = %llu\n",
-           __func__,
-           (long long unsigned int) fent_ht_limit * sizeof(uint16_t));
+               __func__,
+               (long long unsigned int) fent_ht_limit * sizeof(uint16_t));
 
     /* Set ftbl mru and lru */
     cc.ftbl.mru = NIL16;
     cc.ftbl.lru = NIL16;
+
+    if(gen_posix_mutex_init(&cc.mutex) != 0)
+    {
+        gossip_err("%s: Error initializing cc.mutex!\n", __func__);
+        return -1;
+    }
 
     return 0;
 }
@@ -1258,3 +1314,25 @@ int PINT_client_cache_initialize_defaults(void)
                                         MENT_LIMIT,
                                         MENT_HT_LIMIT);
 }
+
+cc_ment_t *PINT_client_cache_ment_lookup(cc_mtbl_t *mtblp,
+                                         const int64_t tag,
+                                         const gen_lock_hint_t lock_hint)
+{
+    cc_ment_t *ment_p = NULL;
+
+    if(lock_hint & LOCK_HINT_ACQUIRE)
+    {
+        gen_posix_mutex_lock(&cc.mutex);
+    }
+
+    ment_p = ment_lookup(mtblp, tag);
+
+    if(lock_hint & LOCK_HINT_RELEASE)
+    {
+        gen_posix_mutex_unlock(&cc.mutex);
+    }
+
+    return ment_p;
+}
+

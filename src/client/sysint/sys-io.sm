@@ -32,6 +32,7 @@
 #include "pint-security.h"
 #include "pint-hint.h"
 #include "client-cache.h"
+#include "bit-bool.h"
 
 #define IO_MAX_SEGMENT_NUM 50 
 #define IO_ATTR_MASKS (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|\
@@ -344,6 +345,7 @@ PVFS_error PVFS_isys_io(PVFS_object_ref ref,
     struct server_configuration_s *server_config = NULL;
 #if PVFS_CLIENTCACHE_ENABLE
     int cache_flag = 0;
+    cc_fent_t *fent_p = NULL;
 #endif
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_io entered [%llu]\n",
@@ -431,8 +433,8 @@ PVFS_error PVFS_isys_io(PVFS_object_ref ref,
        IS_REQUEST_CONTIGUOUS(mem_req))
     {
         int *hint_value = (int *) PINT_hint_get_value_by_type(hints,
-                                                               PINT_HINT_CACHE,
-                                                               NULL);
+                                                              PINT_HINT_CACHE,
+                                                              NULL);
         if(hint_value)
         {
             gossip_err("%s: PINT_HINT_CACHE = %c\n",
@@ -454,6 +456,86 @@ PVFS_error PVFS_isys_io(PVFS_object_ref ref,
     gossip_err("%s: ARE WE CACHING? ... %c!\n",
                __func__,
                cache_flag ? 'T' : 'F');
+
+    if(cache_flag)
+    {
+        PVFS_offset first_blk_off = file_req_offset % cc.blk_size == 0 ?
+            file_req_offset : (file_req_offset / cc.blk_size) * cc.blk_size;
+        PVFS_offset end_exclusive_off = file_req_offset +
+            PINT_REQUEST_TOTAL_BYTES(mem_req);
+        PVFS_offset last_blk_off = end_exclusive_off % cc.blk_size == 0 ?
+            (((end_exclusive_off / cc.blk_size) - 1) * cc.blk_size) :
+            ((end_exclusive_off / cc.blk_size) * cc.blk_size);
+        int num_blks = ((last_blk_off - first_blk_off) / cc.blk_size) + 1;
+        bit_bool_t bb;
+        ret = bit_bool_init(&bb, num_blks, 0);
+        assert(ret == 0); /* TODO check for error and fail gracefully. */
+        bit_bool_dump_l2h(&bb, stderr);
+
+        gossip_err("%s:\n"
+                   "\tfirst_blk_ofs = %lld\n"
+                   "\tend_exclusive_off = %lld\n"
+                   "\tlast_blk_off = %lld\n"
+                   "\tnum_blks = %d\n",
+                   __func__,
+                  lld(first_blk_off),
+                  lld(end_exclusive_off),
+                  lld(last_blk_off),
+                  num_blks);
+
+        if((fent_p = PINT_client_cache_fent_lookup(ref.handle,
+                                                   ref.fs_id,
+                                                   credential->userid,
+                                                   *credential->group_array,
+                                                   LOCK_HINT_ACQUIRE)) != NULL)
+        {
+            cc_ment_t *ment_p = NULL;
+            gossip_err("%s: fent HIT!\n", __func__);
+            PVFS_offset temp_off = first_blk_off;
+            uint64_t bit_bool_index = 0LL;
+            for(; temp_off <= last_blk_off; temp_off += cc.blk_size, bit_bool_index++)
+            {
+                ment_p = PINT_client_cache_ment_lookup(&fent_p->mtbl,
+                                                       temp_off,
+                                                       LOCK_HINT_NONE);
+                if(ment_p != NULL)
+                {
+                    gossip_err("%s: ment HIT!\n", __func__);
+                    bit_bool_set(&bb, bit_bool_index, 1);
+
+                    /* TODO copy data to/from cached block */
+
+                }
+                else
+                {
+                    gossip_err("%s: ment MISS!\n", __func__);
+                    bit_bool_set(&bb, bit_bool_index, 0);
+                }
+            }
+            bit_bool_dump_l2h(&bb, stderr);
+        }
+        else
+        {
+            gossip_err("%s: fent MISS!\n", __func__);
+            if((fent_p = PINT_client_cache_fent_insert(ref.handle,
+                                                       ref.fs_id,
+                                                       credential->userid,
+                                                       *credential->group_array,
+                                                       LOCK_HINT_NONE)) != NULL)
+            {
+                gossip_err("%s: Successfully inserted fent!\n", __func__);
+            }
+            else
+            {
+                gossip_err("%s: ERROR inserting fent!\n", __func__);
+            }
+        }
+
+
+        /* Done: Release cc.mutex */
+        gen_posix_mutex_unlock(&cc.mutex);
+    }
+
 #endif
 
     PINT_smcb_alloc(&smcb,

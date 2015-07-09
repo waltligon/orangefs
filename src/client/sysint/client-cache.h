@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <pthread.h>
 #include "pvfs2-types.h"
+#include "gen-locks.h"
 
 #if (PVFS2_SIZEOF_VOIDP == 32)
 # define NILP NIL32
@@ -68,7 +69,7 @@ typedef struct cc_fent_s
 {
     cc_mtbl_t mtbl;
     uint64_t file_handle;
-    uint32_t fsid;
+    int32_t fsid;
     PVFS_uid uid;           /* uid copied from PVFS_credential */
     PVFS_gid gid;           /* gid copied from PVFS_credential group_array */
     uint16_t prev;          /* prev fent in ht chain. */
@@ -91,6 +92,7 @@ typedef struct client_cache_s
 {
     cc_ftbl_t ftbl;
     void *blks;
+    gen_mutex_t mutex;
     PINT_client_cache_flag status;
     uint16_t free_blk;
     /* Maintain limits/settings in cache struct */
@@ -111,6 +113,16 @@ typedef struct cc_free_block_s
 } cc_free_block_t;
 
 void PINT_client_cache_debug_flags(PINT_client_cache_flag flags);
+cc_fent_t *PINT_client_cache_fent_insert(const uint64_t fhandle,
+                                         const int32_t fsid,
+                                         const PVFS_uid uid,
+                                         const PVFS_gid gid,
+                                         const gen_lock_hint_t lock_hint);
+cc_fent_t *PINT_client_cache_fent_lookup(const uint64_t fhandle,
+                                         const int32_t fsid,
+                                         const PVFS_uid uid,
+                                         const PVFS_gid gid,
+                                         const gen_lock_hint_t lock_hint);
 int PINT_client_cache_finalize(void);
 int PINT_client_cache_initialize(
     PINT_client_cache_flag flags,
@@ -121,7 +133,10 @@ int PINT_client_cache_initialize(
     uint16_t ment_limit,
     uint16_t ment_ht_limit);
 int PINT_client_cache_initialize_defaults(void);
+cc_ment_t *PINT_client_cache_ment_lookup(cc_mtbl_t *mtblp,
+                                         const int64_t tag,
+                                         const gen_lock_hint_t lock_hint);
 
 extern client_cache_t cc;
-/* extern pthread_rwlock_t rwlock; */
+
 #endif /* CLIENT_CACHE_H */
