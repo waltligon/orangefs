@@ -13,6 +13,8 @@
 BMI_addr_t bmi_method_addr_reg_callback(bmi_method_addr_p map);
 int bmi_method_addr_forget_callback(BMI_addr_t addr);
 void bmi_method_addr_drop_callback(char *method_name);
+int bmi_fill_cq_callback(bmi_context_id context_id,
+                         method_op_p completed_op);
 
 #endif /* __BMI_METHOD_CALLBACK_H */
 

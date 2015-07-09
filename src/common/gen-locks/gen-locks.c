@@ -98,7 +98,7 @@ int gen_posix_mutex_unlock(pthread_mutex_t *mutex)
 
 
 /*
- * pthread_mutex_trylock()
+ * gen_mutex_trylock()
  *
  * nonblocking attempt to acquire a lock.
  *
@@ -119,10 +119,9 @@ int gen_posix_mutex_trylock(pthread_mutex_t *mutex)
  */
 int gen_posix_mutex_destroy(pthread_mutex_t *mutex)
 {
-
     if (!mutex)
     {
-	return (-EINVAL);
+        return (-EINVAL);
     }
     pthread_mutex_destroy(mutex);
 
@@ -136,7 +135,7 @@ pthread_t gen_posix_thread_self(void)
 
 int gen_posix_cond_destroy(pthread_cond_t *cond)
 {
-    if(!cond)
+    if (!cond)
     {
         return -EINVAL;
     }
@@ -144,12 +143,14 @@ int gen_posix_cond_destroy(pthread_cond_t *cond)
     return 0;
 }
 
-int gen_posix_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mut)
+int gen_posix_cond_wait(pthread_cond_t *cond,
+                        pthread_mutex_t *mut)
 {
     return pthread_cond_wait(cond, mut);
 }
 
-int gen_posix_cond_timedwait(pthread_cond_t *cond, pthread_mutex_t *mut,
+int gen_posix_cond_timedwait(pthread_cond_t *cond,
+                             pthread_mutex_t *mut,
                              const struct timespec *abstime)
 {
     return pthread_cond_timedwait(cond, mut, abstime);
@@ -165,12 +166,14 @@ int gen_posix_cond_broadcast(pthread_cond_t *cond)
     return pthread_cond_broadcast(cond);
 }
 
-int gen_posix_cond_init(pthread_cond_t *cond, pthread_condattr_t *attr)
+int gen_posix_cond_init(pthread_cond_t *cond,
+                        pthread_condattr_t *attr)
 {
     return pthread_cond_init(cond, attr);
 }
 
-int gen_posix_shared_cond_init(pthread_cond_t *cond, pthread_condattr_t *attr)
+int gen_posix_shared_cond_init(pthread_cond_t *cond,
+                               pthread_condattr_t *attr)
 {
     int rc, destroy_attr = 0;
     pthread_condattr_t cattr;

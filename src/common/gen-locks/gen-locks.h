@@ -9,11 +9,11 @@
  * programmers should use the following interface for portability rather
  * than directly calling specific lock implementations:
  *
- * int gen_mutex_init(gen_mutex_t* mut);
- * int gen_mutex_lock(gen_mutex_t* mut);
- * int gen_mutex_unlock(gen_mutex_t* mut);
- * int gen_mutex_trylock(gen_mutex_t* mut);
- * int gen_mutex_destroy(gen_mutex_t* mut); 
+ * int gen_mutex_init(gen_mutex_t *mut);
+ * int gen_mutex_lock(gen_mutex_t *mut);
+ * int gen_mutex_unlock(gen_mutex_t *mut);
+ * int gen_mutex_trylock(gen_mutex_t *mut);
+ * int gen_mutex_destroy(gen_mutex_t *mut);
  *
  * See the examples directory for details.
  */
@@ -33,21 +33,21 @@
  * should really be enabled in order to verify proper operation 
  */
 #if !defined(__GEN_NULL_LOCKING__) 
-#ifdef WIN32
-#if !defined(__GEN_WIN_LOCKING__)
-#define __GEN_WIN_LOCKING__
-#endif
-#else
-#if !defined(__GEN_POSIX_LOCKING__)
-#define __GEN_POSIX_LOCKING__
-#endif
-#endif
+# ifdef WIN32
+#  if !defined(__GEN_WIN_LOCKING__)
+#   define __GEN_WIN_LOCKING__
+#  endif
+# else
+#  if !defined(__GEN_POSIX_LOCKING__)
+#   define __GEN_POSIX_LOCKING__
+#  endif
+# endif
 #endif
 
 #ifdef __GEN_POSIX_LOCKING__
 #include <pthread.h>
 
-	/* function prototypes for specific locking implementations */
+/* function prototypes for specific locking implementations */
 int gen_posix_mutex_lock(pthread_mutex_t *mutex);
 int gen_posix_mutex_unlock(pthread_mutex_t *mutex);
 int gen_posix_mutex_trylock(pthread_mutex_t *mutex);
@@ -58,10 +58,13 @@ int gen_posix_recursive_mutex_init(pthread_mutex_t *mutex);
 int gen_posix_shared_mutex_init(pthread_mutex_t *mutex);
 pthread_t gen_posix_thread_self(void);
 
-int gen_posix_cond_init(pthread_cond_t *cond, pthread_condattr_t *attr);
-int gen_posix_shared_cond_init(pthread_cond_t *cond, pthread_condattr_t *attr);
+int gen_posix_cond_init(pthread_cond_t *cond,
+                        pthread_condattr_t *attr);
+int gen_posix_shared_cond_init(pthread_cond_t *cond,
+                               pthread_condattr_t *attr);
 int gen_posix_cond_destroy(pthread_cond_t *cond);
-int gen_posix_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);
+int gen_posix_cond_wait(pthread_cond_t *cond,
+                        pthread_mutex_t *mutex);
 int gen_posix_cond_timedwait(pthread_cond_t *cond,
                              pthread_mutex_t *mutex,
                              const struct timespec *abstime);
@@ -139,9 +142,12 @@ struct gen_cond_t_
     long nWaitersBlocked;    /* Number of threads blocked */
     long nWaitersGone;       /* Number of threads timed out */
     long nWaitersToUnblock;  /* Number of threads to unblock */
-    HANDLE semBlockQueue;    /* Queue up threads waiting for the condition to become signalled */
-    HANDLE semBlockLock;     /* Semaphore that guards access to waiters blocked count/block queue */
-    HANDLE mtxUnblockLock;   /* Mutex that guards access to waiters (to)unblock(ed) counts */
+    HANDLE semBlockQueue;    /* Queue up threads waiting for the condition to
+                                become signaled */
+    HANDLE semBlockLock;     /* Semaphore that guards access to waiters blocked
+                                count/block queue */
+    HANDLE mtxUnblockLock;   /* Mutex that guards access to waiters
+                                (to)unblock(ed) counts */
     gen_cond_t next;         /* Doubly linked list */
     gen_cond_t prev;
 };
@@ -165,9 +171,11 @@ HANDLE gen_win_thread_self(void);
 
 int gen_win_cond_init(gen_cond_t *cond);
 int gen_win_cond_destroy(gen_cond_t *cond);
-int gen_win_cond_wait(gen_cond_t *cond, HANDLE *mutex);
-int gen_win_cond_timedwait(gen_cond_t *cond, HANDLE *mutex,
-                             const struct timespec *abstime);
+int gen_win_cond_wait(gen_cond_t *cond,
+                      HANDLE *mutex);
+int gen_win_cond_timedwait(gen_cond_t *cond,
+                           HANDLE *mutex,
+                           const struct timespec *abstime);
 int gen_win_cond_signal(gen_cond_t *cond);
 int gen_win_cond_broadcast(gen_cond_t *cond);
 
@@ -180,7 +188,7 @@ int gen_win_cond_broadcast(gen_cond_t *cond);
 #define gen_cond_broadcast(c) gen_win_cond_broadcast(c)
 
 #elif defined (__GEN_NULL_LOCKING__)
-	/* this stuff messes around just enough to prevent warnings */
+/* this stuff messes around just enough to prevent warnings */
 typedef int gen_mutex_t;
 typedef unsigned long gen_thread_t;
 typedef int gen_cond_t;
@@ -217,14 +225,15 @@ static inline gen_thread_t gen_thread_self(void)
 #define gen_shared_cond_init(c) do{}while(0)
 #define gen_cond_destroy(c) do{}while(0)
 
-static inline int gen_cond_wait(gen_cond_t *cond, gen_mutex_t *mut)
+static inline int gen_cond_wait(gen_cond_t *cond,
+                                gen_mutex_t *mut)
 {
     (void) cond;
     return 0;
 }
 
 static inline int gen_cond_timedwait(gen_cond_t *cond,
-                                     gen_mutex_t *mutex`,
+                                     gen_mutex_t *mutex,
                                      const struct timespec *abstime)
 {
     (void) cond;

@@ -1099,62 +1099,88 @@ BMI_ib_post_recv_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
  * Internal shared helper function.  Return 1 if found something
  * completed.
  */
-static int
-test_sq(struct ib_work *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
-  bmi_size_t *size, void **user_ptr, int complete)
+static int test_sq(struct ib_work *sq,
+                   bmi_op_id_t *outid,
+                   bmi_error_code_t *err,
+                   bmi_size_t *size,
+                   void **user_ptr,
+                   int complete)
 {
     ib_connection_t *c;
 
-    debug(9, "%s: sq %p outid %p err %p size %p user_ptr %p complete %d",
-      __func__, sq, outid, err, size, user_ptr, complete);
+    debug(9,
+          "%s: sq %p outid %p err %p size %p user_ptr %p complete %d",
+          __func__, sq, outid, err, size, user_ptr, complete);
 
-    if (sq->state.send == SQ_WAITING_USER_TEST) {
-	if (complete) {
-	    debug(2, "%s: sq %p completed %lld to %s", __func__,
-	      sq, lld(sq->buflist.tot_len), sq->c->peername);
-	    *outid = sq->mop->op_id;
-	    *err = 0;
-	    *size = sq->buflist.tot_len;
-	    if (user_ptr)
-		*user_ptr = sq->mop->user_ptr;
-	    qlist_del(&sq->list);
-	    id_gen_fast_unregister(sq->mop->op_id);
-	    c = sq->c;
-	    free(sq->mop);
-	    free(sq);
-	    --c->refcnt;
-	    if (c->closed || c->cancelled)
-		ib_close_connection(c);
-	    return 1;
-	}
-    /* this state needs help, push it (ideally would be triggered
-     * when the resource is freed... XXX */
-    } else if (sq->state.send == SQ_WAITING_BUFFER) {
-	debug(2, "%s: sq %p %s, encouraging", __func__, sq,
-	  sq_state_name(sq->state.send));
-	encourage_send_waiting_buffer(sq);
-    } else if (sq->state.send == SQ_WAITING_RTS_DONE_BUFFER) {
-	debug(2, "%s: sq %p %s, encouraging", __func__, sq,
-	  sq_state_name(sq->state.send));
-	encourage_rts_done_waiting_buffer(sq);
-    } else if (sq->state.send == SQ_CANCELLED && complete) {
-	debug(2, "%s: sq %p cancelled", __func__, sq);
-	*outid = sq->mop->op_id;
-	*err = -PVFS_ETIMEDOUT;
-	if (user_ptr)
-	    *user_ptr = sq->mop->user_ptr;
-	qlist_del(&sq->list);
-	id_gen_fast_unregister(sq->mop->op_id);
-	c = sq->c;
-	free(sq->mop);
-	free(sq);
-	--c->refcnt;
-	if (c->closed || c->cancelled)
-	    ib_close_connection(c);
-	return 1;
-    } else {
-	debug(9, "%s: sq %p found, not done, state %s", __func__,
-	  sq, sq_state_name(sq->state.send));
+    if (sq->state.send == SQ_WAITING_USER_TEST)
+    {
+        if (complete)
+        {
+            debug(2,
+                  "%s: sq %p completed %lld to %s",
+                  __func__, sq, lld(sq->buflist.tot_len), sq->c->peername);
+            *outid = sq->mop->op_id;
+            *err = 0;
+            *size = sq->buflist.tot_len;
+            if (user_ptr)
+            {
+                *user_ptr = sq->mop->user_ptr;
+            }
+            qlist_del(&sq->list);
+            id_gen_fast_unregister(sq->mop->op_id);
+            c = sq->c;
+            free(sq->mop);
+            free(sq);
+            --c->refcnt;
+            if (c->closed || c->cancelled)
+            {
+                ib_close_connection(c);
+            }
+            return 1;
+        }
+        /* this state needs help, push it (ideally would be triggered
+         * when the resource is freed... XXX */
+    }
+    else if (sq->state.send == SQ_WAITING_BUFFER)
+    {
+        debug(2,
+              "%s: sq %p %s, encouraging",
+              __func__, sq, sq_state_name(sq->state.send));
+        encourage_send_waiting_buffer(sq);
+    }
+    else if (sq->state.send == SQ_WAITING_RTS_DONE_BUFFER)
+    {
+        debug(2,
+              "%s: sq %p %s, encouraging",
+              __func__, sq, sq_state_name(sq->state.send));
+        encourage_rts_done_waiting_buffer(sq);
+    }
+    else if (sq->state.send == SQ_CANCELLED && complete)
+    {
+        debug(2, "%s: sq %p cancelled", __func__, sq);
+        *outid = sq->mop->op_id;
+        *err = -PVFS_ETIMEDOUT;
+        if (user_ptr)
+        {
+            *user_ptr = sq->mop->user_ptr;
+        }
+        qlist_del(&sq->list);
+        id_gen_fast_unregister(sq->mop->op_id);
+        c = sq->c;
+        free(sq->mop);
+        free(sq);
+        --c->refcnt;
+        if (c->closed || c->cancelled)
+        {
+            ib_close_connection(c);
+        }
+        return 1;
+    }
+    else
+    {
+        debug(9,
+              "%s: sq %p found, not done, state %s",
+              __func__, sq, sq_state_name(sq->state.send));
     }
     return 0;
 }
@@ -1164,68 +1190,97 @@ test_sq(struct ib_work *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
  * completed.  Note that rq->mop can be null for unexpected
  * messages.
  */
-static int
-test_rq(struct ib_work *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
-  bmi_size_t *size, void **user_ptr, int complete)
+static int test_rq(struct ib_work *rq,
+                   bmi_op_id_t *outid,
+                   bmi_error_code_t *err,
+                   bmi_size_t *size,
+                   void **user_ptr,
+                   int complete)
 {
     ib_connection_t *c;
 
-    debug(9, "%s: rq %p outid %p err %p size %p user_ptr %p complete %d",
-      __func__, rq, outid, err, size, user_ptr, complete);
+    debug(9,
+          "%s: rq %p outid %p err %p size %p user_ptr %p complete %d",
+          __func__, rq, outid, err, size, user_ptr, complete);
 
     if (rq->state.recv == RQ_EAGER_WAITING_USER_TEST 
-      || rq->state.recv == RQ_RTS_WAITING_USER_TEST) {
-	if (complete) {
-	    debug(2, "%s: rq %p completed %lld from %s", __func__,
-	      rq, lld(rq->actual_len), rq->c->peername);
-	    *err = 0;
-	    *size = rq->actual_len;
-	    if (rq->mop) {
-		*outid = rq->mop->op_id;
-		if (user_ptr)
-		    *user_ptr = rq->mop->user_ptr;
-		id_gen_fast_unregister(rq->mop->op_id);
-		free(rq->mop);
-	    }
-	    qlist_del(&rq->list);
-	    c = rq->c;
-	    free(rq);
-	    --c->refcnt;
-	    if (c->closed || c->cancelled)
-		ib_close_connection(c);
-	    return 1;
-	}
-    /* this state needs help, push it (ideally would be triggered
-     * when the resource is freed...) XXX */
-    } else if (rq->state.recv == RQ_RTS_WAITING_CTS_BUFFER) {
-	int ret;
-	debug(2, "%s: rq %p %s, encouraging", __func__, rq,
-	  rq_state_name(rq->state.recv));
-	ret = send_cts(rq);
-	if (ret == 0)
-	    rq->state.recv = RQ_RTS_WAITING_CTS_SEND_COMPLETION;
-	/* else keep waiting until we can send that cts */
-	debug(2, "%s: rq %p now %s", __func__, rq, rq_state_name(rq->state.recv));
-    } else if (rq->state.recv == RQ_CANCELLED && complete) {
-	debug(2, "%s: rq %p cancelled", __func__, rq);
-	*err = -PVFS_ETIMEDOUT;
-	if (rq->mop) {
-	    *outid = rq->mop->op_id;
-	    if (user_ptr)
-		*user_ptr = rq->mop->user_ptr;
-	    id_gen_fast_unregister(rq->mop->op_id);
-	    free(rq->mop);
-	}
-	qlist_del(&rq->list);
-	c = rq->c;
-	free(rq);
-	--c->refcnt;
-	if (c->closed || c->cancelled)
-	    ib_close_connection(c);
-	return 1;
-    } else {
-	debug(9, "%s: rq %p found, not done, state %s", __func__,
-	  rq, rq_state_name(rq->state.recv));
+            || rq->state.recv == RQ_RTS_WAITING_USER_TEST)
+    {
+        if (complete)
+        {
+            debug(2,
+                  "%s: rq %p completed %lld from %s",
+                  __func__, rq, lld(rq->actual_len), rq->c->peername);
+            *err = 0;
+            *size = rq->actual_len;
+            if (rq->mop)
+            {
+                *outid = rq->mop->op_id;
+                if (user_ptr)
+                {
+                    *user_ptr = rq->mop->user_ptr;
+                }
+                id_gen_fast_unregister(rq->mop->op_id);
+                free(rq->mop);
+            }
+            qlist_del(&rq->list);
+            c = rq->c;
+            free(rq);
+            --c->refcnt;
+            if (c->closed || c->cancelled)
+            {
+                ib_close_connection(c);
+            }
+            return 1;
+        }
+        /* this state needs help, push it (ideally would be triggered
+         * when the resource is freed...) XXX */
+    }
+    else if (rq->state.recv == RQ_RTS_WAITING_CTS_BUFFER)
+    {
+        int ret;
+        debug(2,
+              "%s: rq %p %s, encouraging",
+              __func__, rq, rq_state_name(rq->state.recv));
+        ret = send_cts(rq);
+        if (ret == 0)
+        {
+            rq->state.recv = RQ_RTS_WAITING_CTS_SEND_COMPLETION;
+        }
+        /* else keep waiting until we can send that cts */
+        debug(2,
+              "%s: rq %p now %s",
+              __func__, rq, rq_state_name(rq->state.recv));
+    }
+    else if (rq->state.recv == RQ_CANCELLED && complete)
+    {
+        debug(2, "%s: rq %p cancelled", __func__, rq);
+        *err = -PVFS_ETIMEDOUT;
+        if (rq->mop)
+        {
+            *outid = rq->mop->op_id;
+            if (user_ptr)
+            {
+                *user_ptr = rq->mop->user_ptr;
+            }
+            id_gen_fast_unregister(rq->mop->op_id);
+            free(rq->mop);
+        }
+        qlist_del(&rq->list);
+        c = rq->c;
+        free(rq);
+        --c->refcnt;
+        if (c->closed || c->cancelled)
+        {
+            ib_close_connection(c);
+        }
+        return 1;
+    }
+    else
+    {
+        debug(9,
+              "%s: rq %p found, not done, state %s",
+              __func__, rq, rq_state_name(rq->state.recv));
     }
     return 0;
 }
@@ -1311,10 +1366,14 @@ static int BMI_ib_testsome(int incount, bmi_op_id_t *ids, int *outcount,
  * Test for multiple completions matching a particular user context.
  * Return 0 if okay, >0 if want another poll soon, negative for error.
  */
-static int
-BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
-  bmi_error_code_t *errs, bmi_size_t *sizes, void **user_ptrs,
-  int max_idle_time, bmi_context_id context_id)
+static int BMI_ib_testcontext(int incount,
+                              bmi_op_id_t *outids,
+                              int *outcount,
+                              bmi_error_code_t *errs,
+                              bmi_size_t *sizes,
+                              void **user_ptrs,
+                              int max_idle_time,
+                              bmi_context_id context_id)
 {
     struct qlist_head *l, *lnext;
     int n = 0, complete, activity = 0;
@@ -1329,41 +1388,51 @@ restart:
      * Walk _all_ entries on sq, rq, marking them completed or
      * encouraging them as needed due to resource limitations.
      */
-    for (l=ib_device->sendq.next; l != &ib_device->sendq; l=lnext) {
-	struct ib_work *sq = qlist_upcast(l);
-	lnext = l->next;
-	/* test them all, even if can't reap them, just to encourage */
-	complete = (sq->mop->context_id == context_id) && (n < incount);
-	if (user_ptrs)
-	    up = &user_ptrs[n];
-	n += test_sq(sq, &outids[n], &errs[n], &sizes[n], up, complete);
+    for (l = ib_device->sendq.next; l != &ib_device->sendq; l = lnext)
+    {
+        struct ib_work *sq = qlist_upcast(l);
+        lnext = l->next;
+        /* test them all, even if can't reap them, just to encourage */
+        complete = (sq->mop->context_id == context_id) && (n < incount);
+        if (user_ptrs)
+        {
+            up = &user_ptrs[n];
+        }
+        n += test_sq(sq, &outids[n], &errs[n], &sizes[n], up, complete);
     }
 
-    for (l=ib_device->recvq.next; l != &ib_device->recvq; l=lnext) {
-	struct ib_work *rq = qlist_upcast(l);
-	lnext = l->next;
+    for (l = ib_device->recvq.next; l != &ib_device->recvq; l = lnext)
+    {
+        struct ib_work *rq = qlist_upcast(l);
+        lnext = l->next;
 
-	/* some receives have no mops:  unexpected */
-	complete = rq->mop &&
-	  (rq->mop->context_id == context_id) && (n < incount);
-	if (user_ptrs)
-	    up = &user_ptrs[n];
-	n += test_rq(rq, &outids[n], &errs[n], &sizes[n], up, complete);
+        /* some receives have no mops:  unexpected */
+        complete = rq->mop &&
+                   (rq->mop->context_id == context_id) &&
+                   (n < incount);
+        if (user_ptrs)
+        {
+            up = &user_ptrs[n];
+        }
+        n += test_rq(rq, &outids[n], &errs[n], &sizes[n], up, complete);
     }
 
     /* drop lock before blocking on new connections below */
     gen_mutex_unlock(&interface_mutex);
 
-    if (activity == 0 && n == 0 && max_idle_time > 0) {
-	/*
-	 * Block if told to from above.
-	 */
-	debug(8, "%s: last activity too long ago, blocking", __func__);
-	activity = ib_block_for_activity(max_idle_time);
-	if (activity == 1) {   /* IB action, go do it immediately */
-	    gen_mutex_lock(&interface_mutex);
-	    goto restart;
-	}
+    if (activity == 0 && n == 0 && max_idle_time > 0)
+    {
+        /*
+         * Block if told to from above.
+         */
+        debug(8, "%s: last activity too long ago, blocking", __func__);
+        activity = ib_block_for_activity(max_idle_time);
+        if (activity == 1)
+        {
+            /* IB action, go do it immediately */
+            gen_mutex_lock(&interface_mutex);
+            goto restart;
+        }
     }
 
     *outcount = n;

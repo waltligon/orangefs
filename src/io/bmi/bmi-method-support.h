@@ -15,6 +15,7 @@
 #include "quicklist.h"
 #include "bmi-types.h"
 #include "pint-event.h"
+#include "gen-locks.h"
 
 #define BMI_MAX_CONTEXTS 16
 
@@ -106,22 +107,10 @@ struct bmi_method_ops
                       void *,
                       bmi_context_id,
                       PVFS_hint hints);
-    int (*test) (bmi_op_id_t,
-                 int *,
-                 bmi_error_code_t *,
-                 bmi_size_t *,
-                 void **,
-                 int,
-                 bmi_context_id);
-    int (*testsome) (int,
-                     bmi_op_id_t *,
-                     int *,
-                     int *,
-                     bmi_error_code_t *,
-                     bmi_size_t *,
-                     void **,
-                     int,
-                     bmi_context_id);
+    int (*testunexpected) (int,
+                           int *,
+                           struct bmi_method_unexpected_info *,
+                           int);
     int (*testcontext) (int,
                         bmi_op_id_t*,
                         int *,
@@ -129,11 +118,14 @@ struct bmi_method_ops
                         bmi_size_t *,
                         void **,
                         int,
-                        bmi_context_id);
-    int (*testunexpected) (int,
-                           int *,
-                           struct bmi_method_unexpected_info *,
-                           int);
+                        gen_cond_t *);
+    int (*check_cq) (int,
+                     bmi_op_id_t *,
+                     int *,
+                     bmi_error_code_t *,
+                     bmi_size_t *,
+                     void **,
+                     bmi_context_id);
     bmi_method_addr_p (*method_addr_lookup) (const char *);
     int (*post_send_list) (bmi_op_id_t *,
                            bmi_method_addr_p,
@@ -222,6 +214,18 @@ struct method_drop_addr_query
     struct bmi_method_addr* addr;
     int response;
 };
+
+
+/* Used to pass a thread's method interface, mutex, and 
+ * condition variable to the thread when it is created
+ */
+struct proto_thread_params
+{
+    struct bmi_method_ops *meth;
+    gen_mutex_t *mutex;
+    gen_cond_t *cond_var;
+};
+typedef struct proto_thread_params proto_thread_params;
 
 /***********************************************************
  * utility functions provided for use by the network methods 
