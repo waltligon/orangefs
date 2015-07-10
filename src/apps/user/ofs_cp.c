@@ -8,6 +8,9 @@
  * 	copy a file from a unix or PVFS2 file system to a unix or PVFS2 file
  * 	system.  Should replace pvfs2-import and pvfs2-export.
  */
+
+#include "orange.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -16,13 +19,11 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <fts.h>
 #include <time.h>
 #include <libgen.h>
 #include <getopt.h>
 
-#include "orange.h"
 #include "pint-sysint-utils.h"
 
 #define PVFS_ATTR_SYS_CP (PVFS_ATTR_SYS_TYPE | \
@@ -46,6 +47,8 @@ struct options
     int copy_to_dir;
     int verbose;
     int recursive;
+    int preserve;
+    int mode;
     int total_written;
     char *srcfile;
     char *destfile;
@@ -256,7 +259,8 @@ int main (int argc, char **argv)
         case FTS_NSOK : /* no stat ok */
         case FTS_ERR :  /* error */
         default:
-            fprintf(stderr, "unexpected node type from fts_read\n");
+            fprintf(stderr, "%s: %s is unknown file type, not present, or not readable\n", argv[0], node->fts_path);
+            usage(argc, argv);
 	    ret = -1;
             break;
         }
@@ -399,8 +403,8 @@ static int copy_file(char *srcfile,
 	user_opts->total_written += write_size;
     }
 
-    /* preserve permissions */
-    if (pvfs_valid_fd(src) > 0)
+    /* preserve permissions and-or owner */
+    if ((user_opts->mode || user_opts->preserve) && pvfs_valid_fd(src) > 0)
     {
         ret = pvfs_fstat_mask(src, &sbuf, PVFS_ATTR_SYS_CP);
     }
@@ -414,11 +418,25 @@ static int copy_file(char *srcfile,
         goto err_out;
     }
 
-    ret = fchmod(dst, sbuf.st_mode);
-    if (ret < 0)
+    if (user_opts->mode)
     {
-        perror("fchmod");
-        goto err_out;
+        ret = fchmod(dst, sbuf.st_mode);
+        if (ret < 0)
+        {
+            perror("fchmod");
+            goto err_out;
+        }
+    }
+
+    if (user_opts->preserve)
+    {
+        ret = fchown(dst, sbuf.st_uid, sbuf.st_gid);
+        if (ret < 0)
+        {
+            /* note this should only work if root */
+            perror("fchown");
+            goto err_out;
+        }
     }
 
 err_out:
@@ -443,10 +461,12 @@ err_out:
  */
 static int parse_args(int argc, char *argv[], struct options *user_opts)
 {
-    char flags[] = "dtVvrs:n:b:";
+    char flags[] = "?mpdtVvrs:n:b:";
     int one_opt = 0;
     struct stat sbuf;
     int ret = -1;
+
+    opterr = 0;
 
     memset(user_opts, 0, sizeof(struct options));
 
@@ -468,6 +488,12 @@ static int parse_args(int argc, char *argv[], struct options *user_opts)
                 break;
             case('r'):
                 user_opts->recursive = 1;
+                break;
+            case('p'):
+                user_opts->preserve = 1;
+                break;
+            case('m'):
+                user_opts->mode = 1;
                 break;
 	    case('d'):
 		user_opts->debug = 1;
@@ -499,6 +525,7 @@ static int parse_args(int argc, char *argv[], struct options *user_opts)
 		}
 		break;
 	    case('?'):
+            default:
 		usage(argc, argv);
 		exit(EXIT_FAILURE);
 	}
@@ -585,10 +612,13 @@ static void usage(int argc, char **argv)
 	"\n-s <strip_size>\t\t\tsize of access to PVFS2 volume"
 	"\n-n <num_datafiles>\t\tnumber of PVFS2 datafiles to use"
 	"\n-b <buffer_size in bytes>\thow much data to read/write at once"
-        "\v-r\t\t\t\trecursively copy directories"
+        "\n-r\t\t\t\trecursively copy directories"
+        "\n-m\t\t\t\tpreserve mode of the files"
+        "\n-p\t\t\t\tpreserve owner of the files (requires root)"
         "\n-v\t\t\t\tverbose - print path of files as the are copied"
         "\n-d\t\t\t\tprint program debugging information"
 	"\n-t\t\t\t\tprint some timing information"
+	"\n-?\t\t\t\tprint this message"
 	"\n-V\t\t\t\tprint version number and exit\n");
     return;
 }
