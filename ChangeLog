@@ -2,6 +2,48 @@
 OrangeFS Release ChangeLog
 -----------------------
 
+
+orangefs-2.9.3 (Subversion Tag v.2.9.3)
+http://www.orangefs.org/svn/orangefs/tags/v.2.9.3
+
+* - USRINT libraries (libofs,liborangefs,liboranefsposix)
+	* - Minor bug fixes to ofs_cp and ofs_rm
+
+	* - Added long version of options to ofs_rm
+
+	* - Resolved compilation errors associated with ofs_cp
+
+
+* - Kernel Module
+	* - Modifications associated with upstream kernel module that future
+	proof the code.
+
+	* - Corrected an ACL issue.
+
+	* - Corrections to the /proc/sys/pvfs2 perf counters.
+
+	* - Modifications allowing Linux 4.0 to compile
+
+
+* - Configure
+	* - Modifications allowing for Linux 4.x
+
+
+* - Client/Server (Linux)
+	* - New functionality to admin app pvfs2-cp.  Will allow file to be
+	created without write permissions but can be written by the user who
+	created it.
+
+* - Windows Client
+	* - Corrected issue where a memory fault occurred during an I/O
+	operation.
+
+	* - Added a workaround for credential caching timeout, until a more
+	robust method can be designed.
+
+
+
+
 orangefs-2.9.2 (Subversion Tag v.2.9.2)
 http://www.orangefs.org/svn/orangefs/tags/v.2.9.2
 
