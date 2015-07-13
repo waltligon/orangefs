@@ -1,4 +1,4 @@
-OrangeFS 2.9.2 * June 8, 2015
+OrangeFS 2.9.3 * July 13, 2015
 
 Installing the OrangeFS Windows Client
 --------------------------------------
@@ -10,8 +10,8 @@ installed the OrangeFS server components, consult the documentation and
 install the server before installing the Windows Client.
 
 1. Download the ZIP file associated with your system type (64- or 32-bit):
-   * For 64-bit systems, download orangefs-windows-client-2.9.2-win64.zip.
-   * For 32-bit systems, download orangefs-windows-client-2.9.2-win32.zip.
+   * For 64-bit systems, download orangefs-windows-client-2.9.3-win64.zip.
+   * For 32-bit systems, download orangefs-windows-client-2.9.3-win32.zip.
 2. Extract the ZIP file to any directory. The OrangeFS and Dokan directories
    will be created.
 
