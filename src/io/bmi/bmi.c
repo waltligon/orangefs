@@ -147,8 +147,13 @@ static gen_thread_t *proto_thread_ids = NULL;
 static gen_mutex_t *proto_thread_mutexes = NULL;
 static gen_cond_t *proto_thread_cond_vars = NULL;
 
-static gen_mutex_t completed_mutex;
-static gen_cond_t completed_cond_var;
+static gen_mutex_t completed_mutex = GEN_MUTEX_INITIALIZER;
+static gen_cond_t completed_cond_var = GEN_COND_INITIALIZER;
+
+static gen_mutex_t cq_mutex = GEN_MUTEX_INITIALIZER;
+
+static gen_mutex_t unexp_mutex = GEN_MUTEX_INITIALIZER;
+static int unexpected_count = 0;
 #endif
 
 static int global_flags;
@@ -646,6 +651,49 @@ int BMI_open_context(bmi_context_id *context_id)
     int context_index;
     int i;
     int ret = 0;
+    
+    gen_mutex_lock(&context_mutex);
+    
+    for (context_index = 0; context_index < BMI_MAX_CONTEXTS; context_index++)
+    {
+        if (context_array[context_index] == 0)
+        {
+            break;
+        }
+    }
+    
+    if (context_index >= BMI_MAX_CONTEXTS)
+    {
+        /* we don't have any more available! */
+        gen_mutex_unlock(&context_mutex);
+        return bmi_errno_to_pvfs(-EBUSY);
+    }
+    
+    gen_mutex_lock(&cq_mutex);
+    
+    /* start a new queue for tracking completions in this context */
+    bmi_completion_array[context_index] = op_list_new();
+    if (!bmi_completion_array[context_index])
+    {
+        gen_mutex_unlock(&cq_mutex);
+        return bmi_errno_to_pvfs(-ENOMEM);
+    }
+    
+    gen_mutex_unlock(/* some_lock */);
+    
+    context_array[context_index] = 1;
+    *context_id = context_index;
+    
+    gen_mutex_unlock(&context_mutex);
+    return 0;
+}
+/* TODO: remove this when done */
+#if 0
+int BMI_open_context(bmi_context_id *context_id)
+{
+    int context_index;
+    int i;
+    int ret = 0;
 
     gen_mutex_lock(&context_mutex);
 
@@ -695,10 +743,37 @@ out:
     gen_mutex_unlock(&context_mutex);
     return (ret);
 }
+#endif /* 0 */
 
 
 /** Destroys a context previously generated with BMI_open_context().
  */
+void BMI_close_context(bmi_context_id context_id)
+{
+    int i;
+    
+    gen_mutex_lock(&context_mutex);
+    
+    if (!context_array[context_id])
+    {
+        gen_mutex_unlock(&context_mutex);
+        return;
+    }
+   
+    gen_mutex_lock(/* some_lock */);
+    
+    /* tear down completion queue for this context */
+    op_list_cleanup(bmi_completion_array[context_id]);
+    
+    gen_mutex_unlock(/* some_mutex */);
+    
+    context_array[context_id] = 0;
+    
+    gen_mutex_unlock(&context_mutex);
+    return;
+}
+/* TODO: remove this when done */
+#if 0
 void BMI_close_context(bmi_context_id context_id)
 {
     int i;
@@ -723,6 +798,7 @@ void BMI_close_context(bmi_context_id context_id)
     gen_mutex_unlock(&context_mutex);
     return;
 }
+#endif /* 0 */
 
 
 /** Submits receive operations for subsequent service.
@@ -1087,6 +1163,7 @@ int BMI_testcontext(int incount,
 start:
 
     /* TODO: locking? */
+    gen_mutex_lock(&cq_mutex);
     while ((*outcount < incount) &&
            (query_op = op_list_shownext(bmi_completion_array[context_id])))
     {
@@ -1115,6 +1192,7 @@ start:
         (*outcount)++;
         ret = 1;    /* something had completed */
     }
+    gen_mutex_unlock(&cq_mutex);
     
     if (ret == 1)
     {
@@ -1137,18 +1215,26 @@ start:
             /* don't need to check this one again */
             continue;
         }
-        else if (!op_list_empty(bmi_completion_array[i]))
+        
+        gen_mutex_lock(&cq_mutex);
+        if (!op_list_empty(bmi_completion_array[i]))
         {
             /* another context has completions waiting */
             /* TODO: locking? */
+            gen_mutex_unlock(&cq_mutex);
             return 0;
         }
-        else if (/* TODO: check_unexp_q */)
+        gen_mutex_unlock(&cq_mutex);
+        
+        gen_mutex_lock(&unexp_mutex);
+        if (unexpected_flag)
         {
             /* something in unexpected queue */
             /* TODO: locking */
+            gen_mutex_unlock(&unexp_mutex);
             return 0;
         }
+        gen_mutex_unlock(&unexp_mutex);
     }
     
     /* If we make it to this point, nothing is waiting in any queues. Wait on
@@ -2391,13 +2477,33 @@ void bmi_method_addr_drop_callback(char *method_name)
 int bmi_fill_cq_callback(bmi_context_id context_id,
                          method_op_p completed_op)
 {
+    /* TODO: do we need locking? */
+    gen_mutex_lock(&cq_mutex);
     op_list_add(bmi_completion_array[context_id], completed_op);
+    gen_mutex_unlock(&cq_mutex);
     
     /* TODO: signal condition variable?? */
+    gen_cond_signal(&completed_cond_var);
     
     return 0;
 }
 
+
+/* TODO: documentation
+ */
+void bmi_inc_unexp_count_callback()
+{
+    unexpected_count++;
+}
+
+
+/* TODO: documentation
+ */
+void bmi_dec_unexp_count_callback()
+{
+    assert(unexpected_count > 0);
+    unexpected_count--;
+}
 
 
 

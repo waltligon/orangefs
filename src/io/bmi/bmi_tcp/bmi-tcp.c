@@ -411,6 +411,7 @@ enum
 /* internal operation lists */
 static op_list_p op_list_array[6] = { NULL, NULL, NULL, NULL, NULL, NULL };
 
+/* TODO: remove */
 /* internal completion queues */
 static op_list_p completion_array[BMI_MAX_CONTEXTS] = { NULL };
 
@@ -1427,6 +1428,7 @@ int BMI_tcp_testunexpected(int incount,
         info[*outcount].tag = query_op->msg_tag;
         op_list_remove(query_op);
         dealloc_tcp_method_op(query_op);
+        bmi_dec_unexp_count_callback();  /* TODO */
         (*outcount)++;
     }
     gen_mutex_unlock(&interface_mutex);
@@ -1466,16 +1468,6 @@ int BMI_tcp_testcontext(int incount,
         /* TODO: do I need to unlock the interface_mutex here? */
         return ret;
     }
-    
-    /* TODO: signal condition variable that top-level function is waiting on.
-     *       This will probably need to be moved into tcp_do_work() or one of
-     *       its sub-routines (likely work_on_xxxx_op()), since we only need
-     *       to signal the condition variable when an operation is placed on
-     *       the completion queue. Or we could pass an additional parameter
-     *       to tcp_do_work() that is used to tell whether anything was added
-     *       to a queue upon return.
-     */
-    gen_cond_signal(cond_var);
     
     return 0;
 }
@@ -1559,7 +1551,8 @@ int BMI_tcp_testcontext(int incount,
 }
 #endif /* USE_PROTO_THREADS */
 
-
+/* TODO: remove this */
+#if 0
 /* BMI_tcp_check_cq()
  *
  * TODO: documentation
@@ -1651,6 +1644,7 @@ int BMI_tcp_check_cq(int incount,
     gen_mutex_unlock(&interface_mutex);
     return ret;
 }
+#endif /* 0 */
 
 
 /* BMI_tcp_post_send_list()
@@ -1928,7 +1922,9 @@ int BMI_tcp_cancel(bmi_op_id_t id,
     {
         tcp_forget_addr(query_op->addr, 0, -BMI_ECANCEL);
     }
-    op_list_add(completion_array[query_op->context_id], query_op);
+    /* TODO: remove when completion queues are solidified */
+    /* op_list_add(completion_array[query_op->context_id], query_op); */
+    bmi_fill_cq_callback(query_op->context_id, query_op);
     gen_mutex_unlock(&interface_mutex);
     return (0);
 }
@@ -3052,13 +3048,16 @@ static int tcp_cleanse_addr(bmi_method_addr_p map,
                 {
                     op_list_add(op_list_array[IND_COMPLETE_RECV_UNEXP],
                                 query_op);
+                    bmi_inc_unexp_count_callback();
                 }
                 else
                 {
                     ((struct tcp_op *)(query_op->method_data))->tcp_op_state =
                             BMI_TCP_COMPLETE;
-                    op_list_add(completion_array[query_op->context_id],
-                                query_op);
+                    /* TODO: remove when completion queues are solidified */
+                    /*op_list_add(completion_array[query_op->context_id],
+                                query_op);*/
+                    bmi_fill_cq_callback(query_op->context_id, query_op);
                 }
             }
         }
@@ -3734,9 +3733,8 @@ static int work_on_send_op(method_op_p my_method_op,
         op_list_remove(my_method_op);
         ((struct tcp_op *)(my_method_op->method_data))->tcp_op_state =
                 BMI_TCP_COMPLETE;
-        op_list_add(completion_array[my_method_op->context_id], my_method_op);
-        
-        /* TODO: add to top-level completion queue */
+        /* TODO: remove when completion queues are solidified */
+        /*op_list_add(completion_array[my_method_op->context_id], my_method_op);*/
         bmi_fill_cq_callback(my_method_op->context_id, my_method_op);
         
         *blocked_flag = 0;
@@ -3825,8 +3823,10 @@ static int work_on_recv_op(method_op_p my_method_op,
             {
                 ((struct tcp_op *)(my_method_op->method_data))->tcp_op_state =
                         BMI_TCP_COMPLETE;
-                op_list_add(completion_array[my_method_op->context_id],
-                            my_method_op);
+                /* TODO: remove when completion queues are solidified */
+                /*op_list_add(completion_array[my_method_op->context_id],
+                            my_method_op);*/
+                bmi_fill_cq_callback(my_method_op->context_id, my_method_op);
             }
         }
     }
