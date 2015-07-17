@@ -1185,7 +1185,7 @@ start:
             user_ptr_array[*outcount] = query_op->user_ptr;
         }
         
-        /* TODO: PINT_EVENT_END */
+        /* TODO: PINT_EVENT_END? */
         
         dealloc_tcp_method_op(query_op);
         query_op = NULL;
@@ -1227,7 +1227,7 @@ start:
         gen_mutex_unlock(&cq_mutex);
         
         gen_mutex_lock(&unexp_mutex);
-        if (unexpected_flag)
+        if (unexpected_count)
         {
             /* something in unexpected queue */
             /* TODO: locking */

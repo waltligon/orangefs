@@ -1386,7 +1386,20 @@ int BMI_tcp_post_recv(bmi_op_id_t *id,
 
 
 /* BMI_tcp_testunexpected()
- * 
+ *
+ * TODO: documentation
+ */
+int BMI_tcp_testunexpected(int max_idle_time)
+{
+    int ret = -1;
+    
+    /* TODO: do I need to lock the interface_mutex here? */
+    
+    
+}
+#if 0
+/* BMI_tcp_testunexpected()
+ *
  * Checks to see if any unexpected messages have completed.
  *
  * returns 0 on success, -errno on failure
@@ -1434,7 +1447,7 @@ int BMI_tcp_testunexpected(int incount,
     gen_mutex_unlock(&interface_mutex);
     return (0);
 }
-
+#endif /* 0 */
 
 /* USE_PROTO_THREADS */
 /*#ifdef USE_PROTO_THREADS */
@@ -3818,6 +3831,7 @@ static int work_on_recv_op(method_op_p my_method_op,
             {
                 op_list_add(op_list_array[IND_COMPLETE_RECV_UNEXP],
                             my_method_op);
+                bmi_inc_unexp_count_callback():
             }
             else
             {
