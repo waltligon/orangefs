@@ -14,6 +14,8 @@
 
 #ifndef WIN32
 /* pint-malloc.c is not used on Windows */
+#include <unistd.h>
+
 struct glibc_malloc_ops_s
 {
     void *(*malloc)(size_t size);
@@ -25,9 +27,15 @@ struct glibc_malloc_ops_s
     char *(*strdup)(const char *str);
     char *(*strndup)(const char *str, size_t size);
     void  (*free)(void *mem);
+    int   (*pipe)(int fds[2]);
+    size_t (*write)(int fd, const void *mem, size_t count);
+    void  (*close)(int fd);
 };
 
 extern void init_glibc_malloc(void) GCC_CONSTRUCTOR(INIT_PRIORITY_MALLOC);
+
+extern int PINT_check_address(void *ptr) GCC_UNUSED;
+extern int PINT_check_malloc(void *ptr) GCC_UNUSED;
 
 extern void *PINT_malloc_minimum(size_t size);
 extern void *PINT_malloc(size_t size);

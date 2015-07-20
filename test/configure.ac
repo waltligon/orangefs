@@ -271,6 +271,5 @@ kernel/linux-2.6/module.mk
 maint/mpi-depend.sh
 shared/module.mk
 perfbase/benchmarks/module.mk
-posix/module.mk
 )
 

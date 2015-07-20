@@ -18,10 +18,10 @@ dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=2
 PVFS2_VERSION_MINOR=9
-PVFS2_VERSION_SUB=1
-#PVFS2_VERSION_RELEASE="orangefs"
+PVFS2_VERSION_SUB=2
+PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
-PVFS2_VERSION_PRE="orangefs-$CONFIGURE_TIME"
+#PVFS2_VERSION_PRE="orangefs-$CONFIGURE_TIME"
 
 PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE$PVFS2_VERSION_PRE
 AC_SUBST(PVFS2_VERSION)
@@ -301,12 +301,14 @@ AC_ARG_ENABLE(capcache,
 else
     ENABLE_CAPCACHE=
 fi],
-[ENABLE_CAPCACHE=1
- AC_DEFINE(ENABLE_CAPCACHE, 1, Define if capability cache is enabled)]
+[if test "x$ENABLE_SECURITY_KEY" = "x1" -o "x$ENABLE_SECURITY_CERT" = "x1"; then
+    ENABLE_CAPCACHE=1
+    AC_DEFINE(ENABLE_CAPCACHE, 1, Define if capability cache is enabled)
+else
+    ENABLE_CAPCACHE=
+fi]
 )
 AC_SUBST(ENABLE_CAPCACHE)
-
-
 
 dnl check for credential cache
 AC_ARG_ENABLE(credcache,
@@ -751,8 +753,10 @@ AC_ARG_WITH(kernel,
         vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
     elif test -r  $withval/include/generated/utsrelease.h && grep -qE UTS_RELEASE..3\\. $withval/include/generated/utsrelease.h; then
         vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
+    elif test -r  $withval/include/generated/utsrelease.h && grep -qE UTS_RELEASE..4\\. $withval/include/generated/utsrelease.h; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
     else
-        AC_MSG_ERROR(The kernel source tree does not appear to be 2.6 or 3.X)
+        AC_MSG_ERROR(The kernel source tree does not appear to be 2.6 or 3.X or 4.X)
         
     fi
 

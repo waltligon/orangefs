@@ -15,6 +15,7 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 #include "pint-util.h"
+#include "pint-perf-counter.h"
 #include "pint-security.h"
 #include "pint-cached-config.h"
 #include "pvfs2-dist-basic.h"
@@ -794,6 +795,11 @@ static PINT_sm_action mkdir_prep_sm(
     PVFS_uid uid;
     uint32_t num_groups;
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
+
+    /* This is the first true state action of the create SM so
+     * increment the counter for mkdir requests
+     */
+    PINT_perf_count(PINT_server_pc, PINT_PERF_MKDIR, 1, PINT_PERF_ADD);
 
     s_op->attr.dirdata_handles = NULL;
     s_op->attr.dist_dir_bitmap = NULL;

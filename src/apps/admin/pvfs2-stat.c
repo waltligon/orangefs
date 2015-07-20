@@ -126,9 +126,14 @@ int main(int argc, char **argv)
 
       if (ret < 0)
       {
-         fprintf(stderr, "Error: could not find file system for %s\n", 
-                 user_opts.pszFiles[i]);
-         return(-1);
+          fprintf(stderr, "Error: could not find file system for %s\n", 
+                  user_opts.pszFiles[i]);
+          return(-1);
+      }
+
+      if (strlen(ppszPvfsPath[i]) == 0)
+      {
+          memcpy(ppszPvfsPath[i], "/", strlen("/"));
       }
    }
 

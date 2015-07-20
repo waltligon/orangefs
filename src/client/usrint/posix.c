@@ -1957,7 +1957,7 @@ int setxattr(const char *path, const char *name,
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path,0))
+    if(is_pvfs_path(&path, 0))
     { 
         rc = pvfs_setxattr(path, name, value, size, flags);
     }
@@ -2043,7 +2043,7 @@ int fsetxattr(int fd, const char *name,
 }
 
 ssize_t getxattr(const char *path, const char *name,
-             void *value, size_t size)
+                 void *value, size_t size)
 {
     int rc = 0;
     if (!path)
@@ -2051,7 +2051,7 @@ ssize_t getxattr(const char *path, const char *name,
         errno = EFAULT;
         return -1;
     }
-    if (is_pvfs_path(&path,0))
+    if (is_pvfs_path(&path, 0))
     { 
         rc = pvfs_getxattr(path, name, value, size);
     }
@@ -2076,7 +2076,7 @@ cleanup:
 }
 
 ssize_t lgetxattr(const char *path, const char *name,
-              void *value, size_t size)
+                  void *value, size_t size)
 {
     int rc = 0;
     if (!path)
@@ -2084,7 +2084,7 @@ ssize_t lgetxattr(const char *path, const char *name,
         errno = EFAULT;
         return -1;
     }
-    if(is_pvfs_path(&path,1))
+    if(is_pvfs_path(&path, 1))
     { 
         rc = pvfs_lgetxattr(path, name, value, size);
     }
@@ -2109,7 +2109,7 @@ cleanup:
 }
 
 ssize_t fgetxattr(int fd, const char *name, void *value,
-              size_t size)
+                  size_t size)
 {
     int rc = 0;
     pvfs_descriptor *pd;

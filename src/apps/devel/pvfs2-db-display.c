@@ -9,6 +9,7 @@
  *   */
 
 #include <stdlib.h>
+#include <ctype.h>
 #include <string.h>
 #include <getopt.h>
 #include <errno.h>
@@ -426,9 +427,42 @@ void print_keyval( struct dbpf_data key, struct dbpf_data val )
                 kh = *(uint64_t *)tmp;
                 printf("(%llu)(%zu) -> (%zu)\n", llu(kh), key.len, val.len);
             }
+            else if (strncmp(k->key, "user.", 5) == 0)
+            {
+                int i;
+                char *dat = (char *)val.data;
+                for(i = 0; i < val.size; i++)
+                {
+                    if (!isprint(dat[i]))
+                    {
+                        break;
+                    }
+                }
+                if (i == val.size - 1)
+                {
+                    /* string will drop out on the null terminator */
+                    printf("(%s)(%d) -> (%s)(%d)\n", k->key, key.size,
+                           dat, val.size);
+                }
+                else if (i == val.size)
+                {
+                    /* unterminated string  - we will zero the
+                     * last char and print what we can*/
+                    dat[val.size - 1] = 0;
+                    printf("(%s)(%d) -> (%s ...)(%d)\n", k->key, key.size,
+                           dat, val.size);
+                }
+                else
+                {
+                    /* not string */
+                    printf("(%s)(%d) -> (0x%x ...)(%d)\n", k->key, key.size,
+                           *(int *)dat, val.size);
+                }
+            }
             else
             {
-                printf("unrecognized attribute record type: %s\n", k->key);
+                printf("unrecognized attribute record type: %s val size %d\n",
+                       k->key, val.size);
             }
             break;
 

@@ -69,71 +69,35 @@ void create_subdir_cleanup(char *root_dir, char *path)
 
 }
 
-#define MAX_SIZE    254
+#define MAX_SIZE    248
+#define DIR_LEN       8
 
+/* Windows _mkdir (CreateDirectoryW) has a limit of 248 characters.
+   Create a number of subdirs up to the limit */
 int create_subdir_int(global_options *options, int fatal, int max_size)
 {
-    int rem_size = max_size, dir_size, i, 
-        code = 0, dir_num;
-    FILE *ftab;
-    char line[256], *token, *fs_root = NULL, 
-         path[MAX_SIZE*2], dir[9];
+    int i, dir_count, code = 0;
+    char path[MAX_SIZE*2], dir[9];
 
-    if (options->tab_file == NULL)
-    {
-        report_error(options, "create_subdir: missing -tabfile option");
-        return -87; /* invalid parameter */
-    }
-
-    ftab = fopen(options->tab_file, "r");
-    if (ftab == NULL)
-    {
-        report_error(options, "create_subdir: could not open tabfile");
-        return -87; /* file not found */
-    }
-
-    /* TODO: get line for specified file system, for now just read first line */
-    fgets(line, 256, ftab);
-    token = strtok(line, " ");
-    if (token)
-    {
-        fs_root = strtok(NULL, " ");
-    }
-    if (token == NULL || fs_root == NULL)
-    {
-        report_error(options, "create_subdir: could not parse tabfile");
-        fclose(ftab);
-        return 1;
-    }
-    
-    fclose(ftab);
-
-    /* remove the length of the root dir from the max path size */
-    rem_size -= strlen(fs_root);
+    /* number of dirs that will fit, accounting for size of root_dir */
+    dir_count = (max_size - (int) strlen(options->root_dir)) / DIR_LEN;
 
     /* copy root into path */
     strcpy(path, options->root_dir);
-    /* rem_size -= strlen(options->root_dir); */
-
-    /* note--local root dir is not included in the path size */
-    dir_num = 1;
-    while (rem_size > 0 && code == 0)
+    
+    for (i = 0; i < dir_count && code == 0; i++)
     {
-        /* generate subdir */
-        dir_size = rem_size > 8 ? 8 : rem_size;
-        for (i = 0; i < dir_size-1; i++)
-            dir[i] = randchar();
-        dir[dir_size-1] = SLASH_CHAR;
-        dir[dir_size] = '\0';
+        /* generate subdir */        
+        sprintf(dir, "dir%04d\\", i);
 
-        /* append the path */
+        /* append the dir name */
         strcat(path, dir);
 
         /* create the sub-directory */
-        _mkdir(path);
-        code = errno;
-
-        rem_size -= dir_size;
+        if (0 != _mkdir(path))
+        {
+            code = errno;
+        }
     }
 
     create_subdir_cleanup(options->root_dir, path);
@@ -162,7 +126,7 @@ int create_dir_toolong(global_options *options, int fatal)
 {
     int code;
     
-    code = create_subdir_int(options, fatal, MAX_SIZE+1);
+    code = create_subdir_int(options, fatal, MAX_SIZE*2);
     if (code >= 0)
     {
        report_result(options, "create-dir-toolong", "main", RESULT_FAILURE, 2, OPER_EQUAL, code);
@@ -259,7 +223,7 @@ int create_files(global_options *options, int fatal)
     return 0;    
 }
 
-#define MAX_FILE_NAME 257
+#define MAX_FILE_NAME 260
 
 int create_file_long_int(global_options *options, int max_size)
 {
@@ -297,11 +261,11 @@ int create_file_long_int(global_options *options, int max_size)
     
     fclose(ftab);
 
-    rem_size = max_size - strlen(fs_root);
+    rem_size = max_size - (int) strlen(fs_root);
 
     strcpy(path, options->root_dir);
 
-    for (i = strlen(path); i < rem_size; i++)
+    for (i = (int) strlen(path); i < rem_size; i++)
         path[i] = randchar();
     path[i] = '\0';
 
