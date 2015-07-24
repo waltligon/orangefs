@@ -975,8 +975,7 @@ static inline int convert_ccl(FILE *stream,
         /* The malloc flag 'm' has been passed so we must malloc memory */
         int SIZE = 100;      /* Initially start with a buffer of 100 */
         int total = 0;       /* Total number of characters read matching ccltab table */
-        int increase = 0;    /* Increase buffer size variable */
-        char tmpbuff[SIZE];  /* Static tmp buffer of 100 characters */
+        int increase = 2;    /* Increase buffer size variable */
         char *tmp = NULL;    /* Used for realloc */
         
         c = fgetc_unlocked(stream);
@@ -993,7 +992,7 @@ static inline int convert_ccl(FILE *stream,
 
         while(ccltab[c])
         {
-            tmpbuff[n] = (char)c;
+            (*m)[n] = (char)c;
             n++;
             total++;
             if(--width == 0)
@@ -1003,15 +1002,13 @@ static inline int convert_ccl(FILE *stream,
             else if(!(n % SIZE))
             {
                 /* In this case we have to reallocate the buffer for more characters */
-                memcpy(*m + (increase)*SIZE, tmpbuff, SIZE);
-                increase++;
-                tmp = (char *)clean_realloc(*m, (increase + 1)*SIZE);
+                tmp = (char *)clean_realloc(*m, (increase)*SIZE);
                 if(!tmp)
                 {
                     return -1;
                 }
                 *m = tmp;
-                n = 0;
+                increase++;
             }      
             
             /* Still more characters to grab from stream */
@@ -1022,7 +1019,7 @@ static inline int convert_ccl(FILE *stream,
                 break;
             }
         }   
-        memcpy(*m + (increase)*SIZE, tmpbuff, SIZE);
+        
         /* Only using as much space as really necessary */
         tmp = (char *)clean_realloc(*m, total + 1);
         if(!tmp)
@@ -1148,8 +1145,7 @@ static inline int convert_string(FILE *stream,
     {
         int SIZE = 100;     /* Initially start with a buffer of 100 */
         int total = 0;      /* Total number of characters read matching ccltab table */
-        int increase = 0;   /* Increase buffer size variable */
-        char tmpbuff[SIZE]; /* Static tmp buffer of 100 characters */ 
+        int increase = 2;   /* Increase buffer size variable */
         char *tmp = NULL;   /* Used for realloc */
         
         c = fgetc_unlocked(stream);
@@ -1166,7 +1162,7 @@ static inline int convert_string(FILE *stream,
         
         while(!isspace(c))
         {
-            tmpbuff[n] = (char)c;
+            (*m)[n] = (char)c;
             total++;
             n++;
             if(--width == 0)
@@ -1176,15 +1172,13 @@ static inline int convert_string(FILE *stream,
             else if(!(n % SIZE))
             {
                 /* In this case we have to reallocate the buffer for more characters */
-                memcpy(*m + (increase)*SIZE, tmpbuff, SIZE);
-                increase++;
-                tmp = (char *)clean_realloc(*m, (increase + 1)*SIZE);
+                tmp = (char *)clean_realloc(*m, (increase)*SIZE);
                 if(!tmp)
                 {
                     return -1;
                 }
                 *m = tmp;
-                n = 0;
+                increase++;
             }      
             
             c = fgetc_unlocked(stream);
@@ -1193,7 +1187,7 @@ static inline int convert_string(FILE *stream,
                 break;
             }
         }
-        memcpy(*m + (increase)*SIZE, tmpbuff, SIZE);
+        
         /* Only using as much space as really necessary */
         tmp = (char *)clean_realloc(*m, total + 1);
         if(!tmp)
@@ -3525,18 +3519,18 @@ int __isoc99_vfscanf(FILE *stream, const char *format, va_list ap)
 int vfscanf(FILE *stream, const char *format, va_list ap)
 {
     const u_char *fmt = (const u_char *)format;
-    int c;            /* character from format, or conversion */
-    int cstream;      /* character from stream */
-    size_t width;     /* field width, or 0 */
-    int flags;        /* flags as defined above */
-    int nassigned;    /* number of fields assigned */
-    int nconversions; /* number of conversions */
-    int nr;           /* characters read by current conversion */
-    int nread;        /* number of characters consumed by stream */
-    int base;         /* base argument to conversion function */
-    char ccltab[256]; /* character class table for %[...] */
-    char buf[513];    /* buffer for numeric conversions
-                         Maximum length of numeric string 513 */
+    int c;                /* character from format, or conversion */
+    int cstream;          /* character from stream */
+    size_t width = 0;     /* field width, or 0 */
+    int flags;            /* flags as defined above */
+    int nassigned = 0;    /* number of fields assigned */
+    int nconversions = 0; /* number of conversions */
+    int nr = 0;           /* characters read by current conversion */
+    int nread = 0;        /* number of characters consumed by stream */
+    int base = 0;         /* base argument to conversion function */
+    char ccltab[256];     /* character class table for %[...] */
+    char buf[513];        /* buffer for numeric conversions
+                             Maximum length of numeric string 513 */
     
     PVFS_INIT(init_stdio);
     gossip_debug(GOSSIP_USRINT_DEBUG, "Calling vfscanf stdio.c\n");
