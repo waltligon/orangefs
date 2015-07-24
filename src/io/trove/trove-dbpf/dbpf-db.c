@@ -41,7 +41,10 @@ static int db_error(int e)
     {
     case MDB_NOTFOUND:
         return TROVE_ENOENT;
+    case MDB_MAP_FULL:
+        return TROVE_ENOMEM;
     }
+    /* XXX: This is a dirty hack. */
     return DBPF_ERROR_UNKNOWN;
 }
 

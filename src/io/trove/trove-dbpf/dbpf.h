@@ -24,6 +24,7 @@ extern "C" {
 
 /* For unknown Berkeley DB errors, we return some large value
  */
+/* This will return 19, ENOENT, No such device due to the bits in 4243. */
 #define DBPF_ERROR_UNKNOWN 4243
 
 /* Incremental versions are backward compatible with previous releases
