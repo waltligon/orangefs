@@ -1288,6 +1288,7 @@ PVFS_Dokan_read_file(
                        &len64, &credential);
         if (ret == 0)
         {
+            io_type = PVFS_IO_READ;
             cache_ret = io_cache_add(DokanFileInfo->Context, &object_ref,
                 io_type, IO_CACHE_UPDATE);
             if (cache_ret != 0)
@@ -1407,6 +1408,7 @@ PVFS_Dokan_write_file(
                         Offset, &len64, &credential);
         if (ret == 0)
         {
+            io_type = PVFS_IO_WRITE;
             cache_ret = io_cache_add(DokanFileInfo->Context, &object_ref, 
                 io_type, IO_CACHE_UPDATE);
             if (cache_ret != 0)
