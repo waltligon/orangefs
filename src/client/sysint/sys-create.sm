@@ -887,7 +887,7 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
-    
+
     /* object ref will now refer to newly created metadata object */
     sm_p->object_ref.handle = *sm_p->u.create.metadata_handle;
     sm_p->object_ref.fs_id = sm_p->parent_ref.fs_id;
@@ -1016,6 +1016,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                 sm_p->u.create.object_name,   /* item inserted into dir */
                 sm_p->object_ref.handle,      /* item inserted into dir */
                 sm_p->object_ref.sid_array,   /* item inserted into dir */
+                sm_p->object_ref.sid_count, 
                 sm_p->parent_ref.handle,      /* back ptr to dir */
                 sm_p->parent_ref.sid_array,   /* back ptr to dir */
                 sm_p->hints);

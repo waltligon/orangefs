@@ -663,6 +663,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                sm_p->u.mkdir.object_name,
                sm_p->object_ref.handle,
                sm_p->object_ref.sid_array,
+               sm_p->object_ref.sid_count,
                sm_p->parent_ref.handle,
                sm_p->parent_ref.sid_array,
                sm_p->hints);

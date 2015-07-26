@@ -27,7 +27,6 @@
 #include <errno.h>
 #endif
 #include <pvfs3-handle.h>
-#include <pvfs2-mirror.h>
 
 #ifndef INT32_MAX
 /* definition taken from stdint.h */
@@ -412,6 +411,19 @@ do {                                                \
    (PVFS_IMMUTABLE_FL |        \
     PVFS_APPEND_FL    |        \
     PVFS_NOATIME_FL )
+
+/* controls how replicants are updated */
+enum PVFS_mirror_mode_e { 
+   BEGIN_MIRROR_MODE   = 100,
+   NO_MIRRORING        = 100,
+   MIRROR_ON_IMMUTABLE = 200,
+   END_MIRROR_MODE     = 200
+};
+
+#define USER_PVFS2_MIRROR_HANDLES "user.pvfs2.mirror.handles"
+#define USER_PVFS2_MIRROR_COPIES  "user.pvfs2.mirror.copies"
+#define USER_PVFS2_MIRROR_STATUS  "user.pvfs2.mirror.status"
+#define USER_PVFS2_MIRROR_MODE    "user.pvfs2.mirror.mode"
 
 /* Key/Value Pairs */
 /* Extended attributes are stored on objects with */

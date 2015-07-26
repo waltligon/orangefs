@@ -227,10 +227,40 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
      * by the config file.
      * NOTE:  sid_count should ALWAYS be 1 or more.  1 indicates no replication.  More than
      * one indicates (sid_count - 1) number of replicas.
+     * NOTE:  it is possible that the root has X # of replicas while the system default 
+     * has Y # of replicas.  So, if the s_op->target_handle is root, use the
+     * system default metasidcount and NOT the root's sid count.  
      */
-    if ( !(s_op->metasidcnt = s_op->attr.u.dir.dist_dir_attr.sid_count) )
+
+    gossip_err("%s:s_op->target_handle=(%s)\n",__func__,PVFS_OID_str(&s_op->target_handle));
+
+    PVFS_object_ref fs_root;
+    memset(&fs_root,0,sizeof(fs_root));
+    ret=PINT_cached_config_get_root_ref(s_op->target_fs_id,&fs_root);
+    if (ret)
     {
-       /* get the filesystem value representing the number of sids per metadata object. */
+       gossip_err("Root handle for filesystem(%d) not found\n",s_op->target_fs_id);
+    }
+    else
+    {
+       gossip_err("Root handle(%s)\n",PVFS_OID_str(&fs_root.handle));
+       if (!PVFS_OID_cmp(&s_op->target_handle,&fs_root.handle))
+       {
+          gossip_err("Target handle(%s) is root handle\n",PVFS_OID_str(&s_op->target_handle));
+       }
+       else
+       {
+          gossip_err("Target handle(%s) is NOT a root handle\n",PVFS_OID_str(&s_op->target_handle));
+       }
+    }
+
+    s_op->metasidcnt = s_op->attr.u.dir.dist_dir_attr.sid_count;
+
+    if ( !(PVFS_OID_cmp(&s_op->target_handle,&fs_root.handle)) )
+    {
+       /* get the filesystem value representing the number of sids per metadata object,
+        * resetting s_op->metasidcnt 
+        */
        ret = PINT_cached_config_get_metadata_sid_count(s_op->req->u.lookup_path.fs_id,
                                                        &(s_op->metasidcnt));
        if (ret)
@@ -354,6 +384,11 @@ static PINT_sm_action lookup_read_object_metadata(
 
     start_index = ((s_op->u.lookup.array_index) * (s_op->metasidcnt));
     end_index   = start_index + s_op->metasidcnt;
+    gossip_err("%s:start_index(%d) end_index(%d) lookup_path.sid_count(%d)\n"
+              ,__func__
+              ,start_index
+              ,end_index
+              ,s_op->resp.u.lookup_path.sid_count);
     for (i=start_index,j=1; i<end_index; i++,j++)
     {
         s_op->resp.u.lookup_path.sid_array[i] = s_op->u.lookup.keyval_temp_store[j].sid;
@@ -374,6 +409,10 @@ static PINT_sm_action lookup_read_object_metadata(
     {
        /* None of the sids identifies the local server */
        js_p->error_code = STATE_NOMORESEGS;
+
+       /* But, the handle is valid; it just lives on another server */
+       s_op->u.lookup.handle_ct++;
+
        return SM_ACTION_COMPLETE;
     }
 
@@ -1303,6 +1342,26 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
             s_op, GOSSIP_ACCESS_DEBUG, "path: %s, lookup failed\n", 
             s_op->req->u.lookup_path.path);
     }
+
+
+    gossip_err("%s:PVFS_servresp_lookup_path\n"
+               "\thandle_count(%d) handle(%s)\n"
+               "\tattr_count(%d)\n"
+               "\tsid_count(%d)\n"
+              ,__func__
+              ,s_op->resp.u.lookup_path.handle_count
+              ,s_op->resp.u.lookup_path.handle_count>0 ? PVFS_OID_str(&s_op->resp.u.lookup_path.handle_array[0]) : "none"
+              ,s_op->resp.u.lookup_path.attr_count
+              ,s_op->resp.u.lookup_path.sid_count);
+
+   int i;
+   for (i=0; i<s_op->resp.u.lookup_path.sid_count; i++)
+   {
+      gossip_err("%s:sid[%d]=(%s)\n"
+                ,__func__
+                ,i
+                ,PVFS_SID_str(&s_op->resp.u.lookup_path.sid_array[i]));
+   }
 
 
     return SM_ACTION_COMPLETE;

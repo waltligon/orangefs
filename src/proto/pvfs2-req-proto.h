@@ -298,7 +298,7 @@ endecode_fields_7a1a_struct(
     PVFS_SID, sid_array);
 #endif
 
-/* custom encode/decode macros */
+/* custom encode/decode macros to deal with OID/SID arrays cleanly */
 #if 0
 
     if ((x)->parent && !PVFS_OID_is_null((x)->parent))                     \
@@ -432,7 +432,7 @@ do {                                                                       \
     int mask;                                                              \
     memset(&(__req), 0, sizeof(__req));                                    \
     (__req).op = PVFS_SERV_CREATE;                                         \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;                                \
+    (__req).ctrl.mode = PVFS_REQ_REPLICATE;                                \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                                  \
     (__req).hints = (__hints);                                             \
     PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                            \
@@ -1493,11 +1493,12 @@ struct PVFS_servreq_crdirent
     PVFS_handle dirdata_handle;  /* handle of directory bucket */
     PVFS_fs_id fs_id;            /* file system */
     int32_t sid_count;           /* reflexive - of bucket */
+    int32_t new_sid_count;       /* # of sids in new_sid_array;could be different than parent. */
     PVFS_SID *new_sid_array;     /* stored with new entry */
     PVFS_SID *parent_sid_array;  /* stored with new entry */
     PVFS_SID *dirdata_sid_array; /* reflexive - of bucket */
 };
-endecode_fields_6aaa_struct(
+endecode_fields_6a2a_struct(
     PVFS_servreq_crdirent,
     PVFS_credential, credential,
     string, name,
@@ -1506,6 +1507,7 @@ endecode_fields_6aaa_struct(
     PVFS_handle, dirdata_handle,
     PVFS_fs_id, fs_id,
     int32_t, sid_count,
+    int32_t, new_sid_count,
     PVFS_SID, new_sid_array,
     PVFS_SID, parent_sid_array,
     PVFS_SID, dirdata_sid_array);
@@ -1523,15 +1525,16 @@ endecode_fields_6aaa_struct(
                                    __name,                        \
                                    __new_handle,                  \
                                    __new_sid_array,               \
+                                   __new_sid_count,               \
                                    __parent_handle,               \
                                    __parent_sid_array,            \
                                    __hints)                       \
 do {                                                              \
     memset(&(__req), 0, sizeof(__req));                           \
     (__req).op = PVFS_SERV_CRDIRENT;                              \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;                       \
+    (__req).ctrl.mode = PVFS_REQ_REPLICATE;                       \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                         \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));           \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                   \
     (__req).u.crdirent.credential = (__cred);                     \
     (__req).hints = (__hints);                                    \
     (__req).u.crdirent.name = (__name);                           \
@@ -1541,6 +1544,7 @@ do {                                                              \
     (__req).u.crdirent.fs_id = (__fs_id);                         \
     (__req).u.crdirent.sid_count = (__sid_count);                 \
     (__req).u.crdirent.new_sid_array = (__new_sid_array);         \
+    (__req).u.crdirent.new_sid_count = (__new_sid_count);         \
     (__req).u.crdirent.dirdata_sid_array = (__dirdata_sid_array); \
     (__req).u.crdirent.parent_sid_array = (__parent_sid_array);   \
 } while (0)
@@ -2663,7 +2667,7 @@ endecode_fields_2a1aa_struct(
 do {                                              \
     memset(&(__req), 0, sizeof(__req));           \
     (__req).op = PVFS_SERV_SETEATTR;              \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;       \
+    (__req).ctrl.mode = PVFS_REQ_REPLICATE;       \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;         \
     PVFS_REQ_COPY_CAPABILITY((__cap), (__req));   \
     (__req).hints = (__hints);                    \
@@ -2686,6 +2690,8 @@ struct PVFS_servreq_atomiceattr
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
+    int32_t sid_count;
+    PVFS_SID *sid_array;
     int32_t flags;
     int32_t opcode;
     int32_t nkey;
@@ -2693,10 +2699,12 @@ struct PVFS_servreq_atomiceattr
     PVFS_ds_keyval *val;    /* attribute value to set */
     PVFS_size *valsz;       /* array of value buffer sizes for recv */
 };
-endecode_fields_4aaa_struct(
+endecode_fields_2a2aaa_struct(
     PVFS_servreq_atomiceattr,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
+    int32_t, sid_count,
+    PVFS_SID, sid_array,     /* reflexive */
     int32_t, flags,
     int32_t, opcode,
     int32_t, nkey,
@@ -2708,32 +2716,36 @@ endecode_fields_4aaa_struct(
      PVFS_REQ_LIMIT_EATTR_LIST + sizeof(PVFS_size) * \
      PVFS_REQ_LIMIT_EATTR_LIST)
 
-#define PINT_SERVREQ_ATOMICEATTR_FILL(__req,      \
-                                  __cap,          \
-                                  __fsid,         \
-                                  __handle,       \
-                                  __flags,        \
-                                  __nkey,         \
-                                  __key_array,    \
-                                  __val_array,    \
-                                  __size_array,   \
-                                  __opcode,       \
-                                  __hints)        \
-do {                                              \
-    memset(&(__req), 0, sizeof(__req));           \
-    (__req).op = PVFS_SERV_ATOMICEATTR;           \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;       \
-    (__req).ctrl.type = PVFS_REQ_PRIMARY;         \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));   \
-    (__req).hints = (__hints);                    \
-    (__req).u.atomiceattr.fs_id = (__fsid);       \
-    (__req).u.atomiceattr.handle = (__handle);    \
-    (__req).u.atomiceattr.flags = (__flags);      \
-    (__req).u.atomiceattr.nkey = (__nkey);        \
-    (__req).u.atomiceattr.key = (__key_array);    \
-    (__req).u.atomiceattr.val = (__val_array);    \
-    (__req).u.atomiceattr.valsz = (__size_array); \
-    (__req).u.atomiceattr.opcode = (__opcode);    \
+#define PINT_SERVREQ_ATOMICEATTR_FILL(__req,         \
+                                  __cap,             \
+                                  __fsid,            \
+                                  __handle,          \
+                                  __sid_count,       \
+                                  __sid_array,       \
+                                  __flags,           \
+                                  __nkey,            \
+                                  __key_array,       \
+                                  __val_array,       \
+                                  __size_array,      \
+                                  __opcode,          \
+                                  __hints)           \
+do {                                                 \
+    memset(&(__req), 0, sizeof(__req));              \
+    (__req).op = PVFS_SERV_ATOMICEATTR;              \
+    (__req).ctrl.mode = PVFS_REQ_REPLICATE;          \
+    (__req).ctrl.type = PVFS_REQ_PRIMARY;            \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));      \
+    (__req).hints = (__hints);                       \
+    (__req).u.atomiceattr.fs_id = (__fsid);          \
+    (__req).u.atomiceattr.handle = (__handle);       \
+    (__req).u.atomiceattr.sid_count = (__sid_count); \
+    (__req).u.atomiceattr.sid_array = (__sid_array); \
+    (__req).u.atomiceattr.flags = (__flags);         \
+    (__req).u.atomiceattr.nkey = (__nkey);           \
+    (__req).u.atomiceattr.key = (__key_array);       \
+    (__req).u.atomiceattr.val = (__val_array);       \
+    (__req).u.atomiceattr.valsz = (__size_array);    \
+    (__req).u.atomiceattr.opcode = (__opcode);       \
 } while (0)
 
 

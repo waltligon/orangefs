@@ -21,7 +21,6 @@
 #include <ctype.h>
 
 #include "pvfs2.h"
-#include "pvfs2-mirror.h"
 
 struct options_t
 {

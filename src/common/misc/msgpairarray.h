@@ -131,7 +131,7 @@ typedef struct PINT_sm_msgpair_state_s
 } PINT_sm_msgpair_state;
 
 /* used to pass in parameters that apply to every entry in a msgpair array */
-typedef struct
+typedef struct PINT_sm_msgpair_params
 {   
     int job_timeout;
     int retry_delay;
@@ -148,7 +148,7 @@ typedef struct
 } PINT_sm_msgpair_params;
 
 /* flow parameters - not needed for SMALL_IO or METADATA */
-typedef struct
+typedef struct PINT_sm_msgpair_flow
 {
     enum PVFS_flowproto_type flowproto_type;
     enum PVFS_io_type io_type;
@@ -162,6 +162,13 @@ typedef struct
     PVFS_hint hints;
 } PINT_sm_msgpair_flow;
 
+typedef struct PINT_mpa_join
+{
+    gen_mutex_t mutex; /* protext cound and join_state */
+    int count;         /* how many messages have completed */
+    int join_state;    /* 0 = not complete, 1 = complete */
+} PINT_mpa_join;
+
 typedef struct PINT_sm_msgarray_op
 {
     PINT_sm_msgpair_params params;   /* these are shared */
@@ -171,6 +178,7 @@ typedef struct PINT_sm_msgarray_op
     PINT_sm_msgpair_state msgpair;   /* for single message pair jobs */
     int total_size;
     PINT_sm_msgpair_flow *flow_params;
+    PINT_mpa_join *join;
 } PINT_sm_msgarray_op;
 
 #define PINT_msgpair_init(op)                                     \

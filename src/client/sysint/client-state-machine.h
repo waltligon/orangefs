@@ -285,6 +285,7 @@ struct PINT_client_mgmt_create_dirent_sm
     char *entry;
     PVFS_handle entry_handle;
     PVFS_SID *sid_array;
+    int32_t sid_count;
 };
 
 struct PINT_client_mgmt_get_dirdata_handle_sm
