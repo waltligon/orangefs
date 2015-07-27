@@ -73,6 +73,7 @@ static int stop_directio_threads(void);
 static int trove_directio_threads_num = 30;
 static int trove_directio_ops_per_queue = 10;
 static int trove_directio_timeout = 1000;
+extern int TROVE_db_map_size;
 
 static int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
                                      int count,
@@ -941,7 +942,7 @@ int dbpf_collection_create(char *collname,
         }
     }
 
-    error = dbpf_db_open(path_name, 0, &db_p, 0);
+    error = dbpf_db_open(path_name, 0, &db_p, 0, TROVE_db_map_size);
     if (error)
     {
         gossip_err("dbpf_db_open failed on attrib db %s\n", path_name);
@@ -1504,7 +1505,7 @@ int dbpf_collection_lookup(char *collname,
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 my_storage_p->meta_path, coll_p->coll_id);
     
-    ret = dbpf_db_open(path_name, 0, &coll_p->coll_attr_db, 0);
+    ret = dbpf_db_open(path_name, 0, &coll_p->coll_attr_db, 0, TROVE_db_map_size);
     if (ret)
     {
         free(coll_p->meta_path);
@@ -1585,7 +1586,7 @@ int dbpf_collection_lookup(char *collname,
                               my_storage_p->meta_path, coll_p->coll_id);
 
     ret = dbpf_db_open(path_name, DBPF_DB_COMPARE_DS_ATTR, &coll_p->ds_db,
-        0);
+        0, TROVE_db_map_size);
     if (ret)
     {
         dbpf_db_close(coll_p->coll_attr_db);
@@ -1601,7 +1602,7 @@ int dbpf_collection_lookup(char *collname,
 
 
     ret = dbpf_db_open(path_name, DBPF_DB_COMPARE_KEYVAL, &coll_p->keyval_db,
-        0);
+        0, TROVE_db_map_size);
     if (ret)
     {
         dbpf_db_close(coll_p->coll_attr_db);
@@ -1733,7 +1734,7 @@ struct dbpf_storage *dbpf_storage_lookup(
         return NULL;
     }
 
-    ret = dbpf_db_open(path_name, 0, &sto_p->sto_attr_db, 0);
+    ret = dbpf_db_open(path_name, 0, &sto_p->sto_attr_db, 0, TROVE_db_map_size);
     if (ret)
     {
         *error_p = ret;
@@ -1748,7 +1749,7 @@ struct dbpf_storage *dbpf_storage_lookup(
 
     DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, meta_path);
 
-    ret = dbpf_db_open(path_name, 0, &sto_p->coll_db, 0);
+    ret = dbpf_db_open(path_name, 0, &sto_p->coll_db, 0, TROVE_db_map_size);
     if (ret)
     {
         *error_p = ret;
@@ -1840,7 +1841,7 @@ static int dbpf_db_create(char *dbname)
 {
     dbpf_db *db;
     int r;
-    r = dbpf_db_open(dbname, 0, &db, 1);
+    r = dbpf_db_open(dbname, 0, &db, 1, TROVE_db_map_size);
     if (r)
     {
         return -r;

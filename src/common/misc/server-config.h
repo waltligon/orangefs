@@ -193,9 +193,8 @@ typedef struct server_configuration_s
     PINT_llist *file_systems;       /* ptrs are type
                                        filesystem_configuration_s       */
     distribution_configuration default_dist_config;  /* distribution conf */
-    int db_cache_size_bytes;        /* cache size to use in berkeley db
-                                       if zero, use defaults */
-    char * db_cache_type;
+    int db_max_size;                /* size of database map
+                                     */
     int trove_alt_aio_mode;         /* enables experimental alternative AIO
                                      * implementation for some types of 
                                      * operations 

@@ -88,7 +88,8 @@ enum
     TROVE_COLLECTION_IMMEDIATE_COMPLETION,
     TROVE_DIRECTIO_THREADS_NUM,
     TROVE_DIRECTIO_OPS_PER_QUEUE,
-    TROVE_DIRECTIO_TIMEOUT
+    TROVE_DIRECTIO_TIMEOUT,
+    TROVE_DB_MAP_SIZE
 };
 
 /** Initializes the Trove layer.  Must be called before any other Trove

@@ -777,7 +777,6 @@ static int server_initialize_subsystems(
     PVFS_fs_id orig_fsid=0;
     PVFS_ds_flags init_flags = 0;
     int bmi_flags = BMI_INIT_SERVER;
-    int shm_key_hint;
     int server_index;
 
     if(server_config.enable_events)
@@ -874,6 +873,10 @@ static int server_initialize_subsystems(
 
     ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
                                    &server_config.trove_max_concurrent_io);
+    /* this should never fail */
+    assert(ret == 0);
+    ret = trove_collection_setinfo(0, 0, TROVE_DB_MAP_SIZE,
+                                   &server_config.db_max_size);
     /* this should never fail */
     assert(ret == 0);
 

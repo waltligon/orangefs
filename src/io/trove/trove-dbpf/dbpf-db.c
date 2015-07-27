@@ -101,7 +101,7 @@ static int keyval_compare(const MDB_val *a, const MDB_val *b)
 }
 
 int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
-    int create)
+    int create, size_t mapsize)
 {
     MDB_txn *txn;
     int r;
@@ -113,6 +113,15 @@ int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
     }
 
     r = mdb_env_create(&(*db)->env);
+    if (r)
+    {
+        mdb_env_close((*db)->env);
+        free(*db);
+        return db_error(r);
+    }
+
+    printf("XXX %d\n", (int)mapsize);
+    r = mdb_env_set_mapsize((*db)->env, mapsize);
     if (r)
     {
         mdb_env_close((*db)->env);
