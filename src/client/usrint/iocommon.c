@@ -16,6 +16,7 @@
 #include "openfile-util.h"
 #include "iocommon.h"
 #include "pvfs-path.h"
+#include "pvfs-sid.h"
 #if PVFS_UCACHE_ENABLE
 #include "ucache.h"
 #include "string.h"
@@ -384,6 +385,8 @@ static int iocommon_parse_serverlist(char *serverlist,
     int count;
     char *tok, *save_ptr;
     int i;
+    int ret;
+    struct SID_type_s stype = {SID_SERVER_DATA, fsid};
 
     /* expects slist->servers to be NULL */
     if (!slist || slist->servers)
@@ -398,7 +401,16 @@ static int iocommon_parse_serverlist(char *serverlist,
         return -1;
     }
     slist->count = atoi(tok);
+/* V3 cleanup */
+#if 0
     PINT_cached_config_count_servers(fsid, PINT_SERVER_TYPE_IO, &count);
+#endif
+    ret = PVFS_SID_count_io(fsid, &count);
+    if (ret < 0)
+    {
+        errno = EINVAL;
+        return -1;
+    }
     if (slist->count < 1 || slist->count > count)
     {
         errno = EINVAL;
@@ -419,10 +431,21 @@ static int iocommon_parse_serverlist(char *serverlist,
         errno = ENOMEM;
         return -1;
     }
+/* V3 cleanup */
+#if 0
     PINT_cached_config_get_server_array(fsid,
                                         PINT_SERVER_TYPE_IO,
                                         server_array,
                                         &count);
+#endif
+    ret = PVFS_SID_get_server_first_n(server_array, NULL, &count, stype);
+    if (ret < 0)
+    {
+        free(slist->servers);
+        free(server_array);
+        errno = EINVAL;
+        return ret;
+    }
     for (i = 0; i < slist->count; i++)
     {
         tok = strtok_r(NULL, ":", &save_ptr);
@@ -3689,8 +3712,10 @@ errorout:
  */
 int iocommon_atomiceattr(pvfs_descriptor *pd,
                          const char *key_p,
-                         void *val_p,
-                         int valsize,
+                         void *old_val_p,
+                         int old_valsize,
+                         void *new_val_p,
+                         int new_valsize,
                          void *response,
                          int respsize,
                          int flag,
@@ -3699,8 +3724,10 @@ int iocommon_atomiceattr(pvfs_descriptor *pd,
     int rc = 0;
     int pvfs_flag = 0;
     int orig_errno = errno;
+    int ret_err = 0;
     PVFS_credential *credential;
-    PVFS_ds_keyval key, val, resp;
+    PVFS_ds_keyval key, old_val, new_val, resp;
+    PVFS_sysresp_atomiceattr sys_resp;
 
     if (!pd || pd->is_in_use != PVFS_FS)
     {
@@ -3709,8 +3736,10 @@ int iocommon_atomiceattr(pvfs_descriptor *pd,
     }
     /* Initialize */
     memset(&key, 0, sizeof(key));
-    memset(&val, 0, sizeof(val));
+    memset(&old_val, 0, sizeof(old_val));
+    memset(&new_val, 0, sizeof(new_val));
     memset(&resp, 0, sizeof(resp));
+    memset(&sys_resp, 0, sizeof(sys_resp));
 
     /* check credential */
     rc = iocommon_cred(&credential);
@@ -3721,10 +3750,15 @@ int iocommon_atomiceattr(pvfs_descriptor *pd,
 
     key.buffer = (char *)key_p;
     key.buffer_sz = strlen(key_p) + 1;
-    val.buffer = (void *)val_p;
-    val.buffer_sz = valsize;
-    resp.buffer = (void *)response;
-    resp.buffer_sz = respsize;
+    old_val.buffer = (void *)old_val_p;
+    old_val.buffer_sz = old_valsize;
+    new_val.buffer = (void *)new_val_p;
+    new_val.buffer_sz = new_valsize;
+    sys_resp.nkey = 1;
+    sys_resp.val_array = &resp;
+    sys_resp.val_array->buffer = (void *)response;
+    sys_resp.val_array->buffer_sz = respsize;
+    sys_resp.err_array = &ret_err;
     
 
     /* now perform atomic operation on attributes */
@@ -3732,8 +3766,9 @@ int iocommon_atomiceattr(pvfs_descriptor *pd,
     rc = PVFS_sys_atomiceattr(pd->s->pvfs_ref,
                               credential,
                               &key,
-                              &val,
-                              &resp,
+                              &old_val,
+                              &new_val,
+                              &sys_resp,
                               pvfs_flag,
                               opcode,
                               NULL);
@@ -3752,7 +3787,7 @@ int iocommon_atomiceattr(pvfs_descriptor *pd,
         rc = -PVFS_ERANGE;
     }
     IOCOMMON_CHECK_ERR(rc);
-    rc = val.read_sz;
+    rc = ret_err;
     
 errorout:
     return rc;

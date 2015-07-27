@@ -214,13 +214,18 @@ static PINT_sm_action initialize_structures ( struct PINT_smcb *smcb,
    imm_p->fs_id = s_op->target_fs_id;
 
    /* Get the number of IO servers currently running for the given filesystem */
-   ret = PINT_cached_config_get_num_io(imm_p->fs_id, 
-                                       &(imm_p->io_servers_count));
+   ret = PVFS_SID_count_io(imm_p->fs_id, &(imm_p->io_servers_count));
    if (ret)
    {
       js_p->error_code = ret;
       return SM_ACTION_COMPLETE;
    }
+
+   /* V3 cleanup */
+   #if 0
+   ret = PINT_cached_config_get_num_io(imm_p->fs_id, 
+                                       &(imm_p->io_servers_count));
+   #endif
 
    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tdfile_count: %d\tmetadata_handle: %s"
                                      "\tfs_id: %u"

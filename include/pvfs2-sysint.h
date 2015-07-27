@@ -204,7 +204,7 @@ struct PVFS_sysresp_getparent_s
 };
 typedef struct PVFS_sysresp_getparent_s PVFS_sysresp_getparent;
 
-/** Holds results of geteattr_list and atomiceattr_list operations (attributes of object). */
+/** Holds results of geteattr_list operation (attributes of object). */
 struct PVFS_sysresp_geteattr_s
 {
     PVFS_ds_keyval *val_array;
@@ -216,7 +216,13 @@ typedef struct PVFS_sysresp_geteattr_s PVFS_sysresp_geteattr;
 /* no data returned in seteattr response */
 
 /* atomiceattr */
-/* currently uses the sysresp_geteattr */
+struct PVFS_sysresp_atomiceattr_s
+{
+    int nkey;
+    PVFS_error *err_array;
+    PVFS_ds_keyval *val_array;
+};
+typedef struct PVFS_sysresp_atomiceattr_s PVFS_sysresp_atomiceattr;
 
 /* deleattr */
 /* no data returned in deleattr response */
@@ -235,7 +241,7 @@ typedef struct PVFS_sysresp_listeattr_s PVFS_sysresp_listeattr;
 /* system interface function prototypes */
 /****************************************/
 
-int PVFS_sys_initialize(uint64_t default_debug_mask);
+int PVFS_sys_initialize(PVFS_debug_mask default_debug_mask);
 
 int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent);
 
@@ -634,8 +640,9 @@ PVFS_error PVFS_sys_atomiceattr(
         PVFS_object_ref ref,
         const PVFS_credential *credential,
         PVFS_ds_keyval *key_p,
-        PVFS_ds_keyval *val_p,
-        PVFS_ds_keyval *response,
+        PVFS_ds_keyval *old_val_p,
+        PVFS_ds_keyval *new_val_p,
+        PVFS_sysresp_atomiceattr *resp_p,
         int32_t flags,
         int32_t opcode,
         PVFS_hint hints);
@@ -645,8 +652,9 @@ PVFS_error PVFS_isys_atomiceattr_list(
         const PVFS_credential *credential,
         int32_t nkey,
         PVFS_ds_keyval *key_array,
-        PVFS_ds_keyval *val_array,
-        PVFS_sysresp_geteattr *resp_p,
+        PVFS_ds_keyval *old_val_array,
+        PVFS_ds_keyval *new_val_array,
+        PVFS_sysresp_atomiceattr *resp_p,
         int32_t flags,
         PVFS_sys_op_id *op_id,
         int32_t opcode,
@@ -658,8 +666,9 @@ PVFS_error PVFS_sys_atomiceattr_list(
         const PVFS_credential *credential,
         int32_t nkey,
         PVFS_ds_keyval *key_array,
-        PVFS_ds_keyval *val_array,
-        PVFS_sysresp_geteattr *resp_p,
+        PVFS_ds_keyval *old_val_array,
+        PVFS_ds_keyval *new_val_array,
+        PVFS_sysresp_atomiceattr *resp_p,
         int32_t flags,
         int32_t opcode,
         PVFS_hint hints);

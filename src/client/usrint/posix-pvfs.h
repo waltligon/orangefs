@@ -39,8 +39,10 @@ extern int pvfs_unlinkat (int dirfd, const char *path, int flags);
 
 extern int pvfs_rename(const char *oldpath, const char *newpath);
 
-extern int pvfs_renameat(int olddirfd, const char *oldpath,
-                  int newdirfd, const char *newpath);
+extern int pvfs_renameat(int olddirfd,
+                         const char *oldpath,
+                         int newdirfd,
+                         const char *newpath);
 
 /* pvfs_read */
 extern ssize_t pvfs_read( int fd, void *buf, size_t count );
@@ -163,8 +165,11 @@ extern int pvfs_symlinkat (const char *oldpath, int newdirfd, const char *newpat
 extern int pvfs_link (const char *oldpath, const char *newpath);
 
 /* PVFS does not have hard links */
-extern int pvfs_linkat (int olddirfd, const char *oldpath,
-                 int newdirfd, const char *newpath, int flags);
+extern int pvfs_linkat (int olddirfd,
+                        const char *oldpath,
+                        int newdirfd,
+                        const char *newpath,
+                        int flags);
 
 /* this reads exactly one dirent, count is ignored */
 extern int pvfs_readdir(unsigned int fd, struct dirent *dirp, unsigned int count);
@@ -215,35 +220,71 @@ extern ssize_t pvfs_sendfile(int outfd, int infd, off_t *offset, size_t count);
 
 extern ssize_t pvfs_sendfile64(int outfd, int infd, off64_t *offset, size_t count);
 
-extern int pvfs_setxattr(const char *path, const char *name,
-                          const void *value, size_t size, int flags);
+extern int pvfs_setxattr(const char *path,
+                         const char *name,
+                         const void *value,
+                         size_t size,
+                         int flags);
 
-extern int pvfs_lsetxattr(const char *path, const char *name,
-                          const void *value, size_t size, int flags);
+extern int pvfs_lsetxattr(const char *path,
+                          const char *name,
+                          const void *value,
+                          size_t size,
+                          int flags);
 
-extern int pvfs_fsetxattr(int fd, const char *name,
-                          const void *value, size_t size, int flags);
+extern int pvfs_fsetxattr(int fd,
+                          const char *name,
+                          const void *value,
+                          size_t size,
+                          int flags);
 
-extern ssize_t pvfs_getxattr(const char *path, const char *name,
-                             void *value, size_t size);
+extern ssize_t pvfs_getxattr(const char *path,
+                             const char *name,
+                             void *value,
+                             size_t size);
 
-extern ssize_t pvfs_lgetxattr(const char *path, const char *name,
-                              void *value, size_t size);
+extern ssize_t pvfs_lgetxattr(const char *path,
+                              const char *name,
+                              void *value,
+                              size_t size);
 
-extern ssize_t pvfs_fgetxattr(int fd, const char *name,
-                              void *value, size_t size);
+extern ssize_t pvfs_fgetxattr(int fd,
+                              const char *name,
+                              void *value,
+                              size_t size);
 
-extern ssize_t pvfs_atomicxattr(const char *path, const char *name,
-                                void *value, size_t valsize, void *response,
-                                size_t respsize, int flags, int opcode);
+extern ssize_t pvfs_atomicxattr(const char *path,
+                                int opcode,
+                                const char *name,
+                                void *old_value,
+                                size_t old_valsize,
+                                void *new_value,
+                                size_t new_valsize,
+                                void *response,
+                                size_t respsize,
+                                int flags);
 
-extern ssize_t pvfs_latomicxattr(const char *path, const char *name,
-                                void *value, size_t valsize, void *response,
-                                size_t respsize, int flags, int opcode);
+extern ssize_t pvfs_latomicxattr(const char *path,
+                                 int opcode,
+                                 const char *name,
+                                 void *old_value,
+                                 size_t old_valsize,
+                                 void *new_value,
+                                 size_t new_valsize,
+                                 void *response,
+                                 size_t respsize,
+                                 int flags);
 
-extern ssize_t pvfs_fatomicxattr(int fd, const char *name,
-                                void *value, size_t valsize, void *response,
-                                size_t respsize, int flags, int opcode);
+extern ssize_t pvfs_fatomicxattr(int fd,
+                                 int opcode,
+                                 const char *name,
+                                 void *old_value,
+                                 size_t old_valsize,
+                                 void *new_value,
+                                 size_t new_valsize,
+                                 void *response,
+                                 size_t respsize,
+                                 int flags);
 
 extern ssize_t pvfs_listxattr(const char *path, char *list, size_t size);
 
@@ -275,8 +316,12 @@ extern mode_t pvfs_getumask(void);
 
 extern int pvfs_getdtablesize(void);
 
-extern void *pvfs_mmap(void *start, size_t length, int prot, int flags,
-                int fd, off_t offset);
+extern void *pvfs_mmap(void *start,
+                       size_t length,
+                       int prot,
+                       int flags,
+                       int fd,
+                       off_t offset);
 
 extern int pvfs_munmap(void *start, size_t length);
 

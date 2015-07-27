@@ -29,15 +29,15 @@ struct glibc_malloc_ops_s
 
 extern void init_glibc_malloc(void) GCC_CONSTRUCTOR(INIT_PRIORITY_MALLOC);
 
-extern void *PINT_malloc_minimum(size_t size);
-extern void *PINT_malloc(size_t size);
-extern void *PINT_calloc(size_t nmemb, size_t size);
+extern void *PINT_malloc_minimum(size_t size) GCC_MALLOC;
+extern void *PINT_malloc(size_t size) GCC_MALLOC;
+extern void *PINT_calloc(size_t nmemb, size_t size) GCC_MALLOC;
 extern int   PINT_posix_memalign(void **mem, size_t alignment, size_t size);
-extern void *PINT_memalign(size_t alignment, size_t size);
-extern void *PINT_valloc(size_t size);
+extern void *PINT_memalign(size_t alignment, size_t size) GCC_MALLOC;
+extern void *PINT_valloc(size_t size) GCC_MALLOC;
 extern void *PINT_realloc(void *mem, size_t size);
-extern char *PINT_strdup(const char *str);
-extern char *PINT_strndup(const char *str, size_t size);
+extern char *PINT_strdup(const char *str) GCC_MALLOC;
+extern char *PINT_strndup(const char *str, size_t size) GCC_MALLOC;
 extern void  PINT_free(void *mem);
 
 #include "pint-clean-malloc.h"

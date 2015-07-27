@@ -83,7 +83,7 @@ int PINT_dev_initialize(
 #ifdef WITH_LINUX_KMOD
     int ret = -1;
     char *debug_string = getenv("PVFS2_KMODMASK");
-    uint64_t debug_mask = 0;
+    PVFS_debug_mask debug_mask = {0, 0};
     dev_mask_info_t mask_info;
 
     if (!debug_string)
@@ -155,8 +155,8 @@ int PINT_dev_initialize(
     if (ret < 0)
     {
         gossip_err("Error: ioctl() PVFS_DEV_DEBUG failure (kernel debug mask to"
-                   " %x)\n"
-                  ,(unsigned int)debug_mask);
+                   " %llx, %llx)\n"
+                  ,llu(debug_mask.mask1), llu(debug_mask.mask2));
         close(pdev_fd);
         return -(PVFS_ENODEV|PVFS_ERROR_DEV);
     }
@@ -170,8 +170,8 @@ int PINT_dev_initialize(
     if (ret < 0)
     {
         gossip_err("Error: ioctl() PVFS_DEV_DEBUG failure (client debug mask to"
-                   " %x)\n"
-                  ,(unsigned int)gossip_debug_mask);
+                   " %llx, %llx)\n"
+                  ,llu(gossip_debug_mask.mask1), llu(gossip_debug_mask.mask2));
         close(pdev_fd);
         return -(PVFS_ENODEV|PVFS_ERROR_DEV);
     }
@@ -214,7 +214,7 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
     void *ptr = NULL;
     int ioctl_cmd[2] = {PVFS_DEV_MAP, 0};
     int debug_on = 0;
-    uint64_t debug_mask = 0;
+    PVFS_debug_mask debug_mask = {0, 0};
 
     for (i = 0; i < ndesc; i++)
     {

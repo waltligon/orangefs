@@ -1210,8 +1210,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 
             case PVFS_SERV_ATOMICEATTR:
                 decode_free(req->u.atomiceattr.key);
-                decode_free(req->u.atomiceattr.val);
-                decode_free(req->u.atomiceattr.valsz);
+                decode_free(req->u.atomiceattr.old_val);
+                decode_free(req->u.atomiceattr.new_val);
                 break;
 
             case PVFS_SERV_UNSTUFF:
@@ -1423,12 +1423,17 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     break;
                 case PVFS_SERV_ATOMICEATTR:
                     /* need a loop here? */
-                    if (resp->u.geteattr.val)
+                    if (resp->u.atomiceattr.err)
                     {
-                        decode_free(resp->u.geteattr.val);
+                        decode_free(resp->u.atomiceattr.err);
+                    }
+                    if (resp->u.atomiceattr.ret_val)
+                    {
+                        decode_free(resp->u.atomiceattr.ret_val);
                     }
                     break;
                 case PVFS_SERV_LISTEATTR:
+                    /* need a loop here? */
                     if (resp->u.listeattr.key)
                     {
                         decode_free(resp->u.listeattr.key);

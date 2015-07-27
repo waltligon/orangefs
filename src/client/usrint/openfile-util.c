@@ -750,6 +750,11 @@ static void cleanup_usrint_internal(void)
     struct qlist_head *qh, *qh_next;
 
     init_debug("Running cleanup\n");
+    /* if we never ran init, don't run cleanup */
+    if (!pvfs_lib_init_flag)
+    {
+        return;
+    }
     /* cache cleanup */
 #if PVFS_UCACHE_ENABLE
     /* put code here to flush and/or close files */
@@ -900,13 +905,15 @@ static int init_usrint_internal(void)
     PINT_initrand();
 
     /* if this fails not much we can do about it */
-    /* atexit(usrint_cleanup); */
+#if GCC_USE_ATEXIT
+    atexit(cleanup_usrint_internal);
+#endif
 
     /* we assume if we are running this code this program was
      * just exec'd and the parent may or may not have been PVFS enabled
      *
      * first check for existing shm area - it should be on the magic fd
-     * PVFS_SHMOBJ, otherwise we assume the paretn was not PVFS enabled
+     * PVFS_SHMOBJ, otherwise we assume the parent was not PVFS enabled
      * and we will have to create a new one from scratch.
      */
 

@@ -52,7 +52,7 @@ endecode_fields_1a_struct(PINT_handle_array,
 /* extended attribute name spaces supported in PVFS2 */
 struct PINT_eattr_check
 {
-    const char * ns;
+    const char *ns; /* namespace */
     int ret;
     int (* check) (PVFS_ds_keyval *key, PVFS_ds_keyval *val);
 };
@@ -129,23 +129,22 @@ static struct PINT_eattr_check PINT_eattr_list[] =
     {NULL, 0, PINT_eattr_add_pvfs_prefix}
 };
 
-static int PINT_eattr_encode_datafile_handle_array(
-    PVFS_ds_keyval *key, PVFS_ds_keyval *val);
+static int PINT_eattr_encode_datafile_handle_array(PVFS_ds_keyval *key,
+                                                   PVFS_ds_keyval *val);
 
 static struct PINT_eattr_check PINT_eattr_encode_keyvals[] =
 {
-    {DATAFILE_HANDLES_KEYSTR, 0,
-     PINT_eattr_encode_datafile_handle_array},
+    {DATAFILE_HANDLES_KEYSTR, 0, PINT_eattr_encode_datafile_handle_array},
     {NULL, 0, NULL}
 };
 
-static int PINT_eattr_decode_datafile_handle_array(
-    PVFS_ds_keyval *key, PVFS_ds_keyval *val);
+static int PINT_eattr_decode_datafile_handle_array(PVFS_ds_keyval *key,
+                                                   PVFS_ds_keyval *val);
 
 static struct PINT_eattr_check PINT_eattr_decode_keyvals[] =
 {
     {PVFS_EATTR_SYSTEM_NS DATAFILE_HANDLES_KEYSTR, 0,
-     PINT_eattr_decode_datafile_handle_array},
+                               PINT_eattr_decode_datafile_handle_array},
     {NULL, 0, NULL}
 };
 
@@ -157,9 +156,9 @@ static struct PINT_eattr_check PINT_eattr_decode_keyvals[] =
  * If one matches, it uses the other fields in that checking structure
  * to verify the eattr.
  */
-static inline int PINT_eattr_verify(
-    struct PINT_eattr_check * eattr_array,
-    PVFS_ds_keyval *key, PVFS_ds_keyval *val);
+static inline int PINT_eattr_verify(struct PINT_eattr_check * eattr_array,
+                                    PVFS_ds_keyval *key,
+                                    PVFS_ds_keyval *val);
 
 /** Checks for any known name space including system.pvfs.
  *
@@ -202,8 +201,8 @@ static int PINT_eattr_strip_prefix(PVFS_ds_keyval *key, PVFS_ds_keyval *val)
     return 0;
 }
 
-static int PINT_eattr_encode_datafile_handle_array(
-    PVFS_ds_keyval *key, PVFS_ds_keyval *val)
+static int PINT_eattr_encode_datafile_handle_array(PVFS_ds_keyval *key,
+                                                   PVFS_ds_keyval *val)
 {
     char *tmp_buffer = NULL;
     char *ptr;
@@ -228,8 +227,8 @@ static int PINT_eattr_encode_datafile_handle_array(
     return 0;
 }
 
-static int PINT_eattr_decode_datafile_handle_array(
-    PVFS_ds_keyval *key, PVFS_ds_keyval *val)
+static int PINT_eattr_decode_datafile_handle_array(PVFS_ds_keyval *key,
+                                                   PVFS_ds_keyval *val)
 {
     char *ptr;
     struct PINT_handle_array harray;
@@ -249,12 +248,12 @@ static int PINT_eattr_decode_datafile_handle_array(
     return 0;
 }
 
-static inline int PINT_eattr_verify(
-    struct PINT_eattr_check * eattr_array,
-    PVFS_ds_keyval *key, PVFS_ds_keyval *val)
+static inline int PINT_eattr_verify(struct PINT_eattr_check *eattr_array,
+                                    PVFS_ds_keyval *key,
+                                    PVFS_ds_keyval *val)
 {
     int i = 0;
-    while(1)
+    for(i = 0; 1; i++)
     {
         /* if we get to the NULL ns at the end of the list, return
          * the error code
@@ -268,8 +267,9 @@ static inline int PINT_eattr_verify(
             return eattr_array[i].ret;
         }
 
-        if(strncmp(eattr_array[i].ns, key->buffer,
-            strlen(eattr_array[i].ns)) == 0)
+        if(strncmp(eattr_array[i].ns,
+                   key->buffer,
+                   strlen(eattr_array[i].ns)) == 0)
         {
             /* if the return value for this namespace is non-zero,
              * return that value
@@ -290,7 +290,6 @@ static inline int PINT_eattr_verify(
             /* looks like the namespace is otherwise acceptable */
             return 0;
         }
-        i++;
     }
 }
 
@@ -314,7 +313,8 @@ int PINT_eattr_namespace_verify(PVFS_ds_keyval *k, PVFS_ds_keyval *v)
     return PINT_eattr_verify(PINT_eattr_namespaces, k, v);
 }
 
-static int PINT_eattr_verify_acl_access(PVFS_ds_keyval *key, PVFS_ds_keyval *val)
+static int PINT_eattr_verify_acl_access(PVFS_ds_keyval *key,
+                                        PVFS_ds_keyval *val)
 {
     /* may verify one of these attrs */
     if ((strcmp(key->buffer, "system.posix_acl_access") != 0) &&

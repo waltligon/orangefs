@@ -68,12 +68,16 @@ void PINT_free_pc (struct PINT_perf_counter *pc)
 {
     struct PINT_perf_sample *tmp, *tmp2;
     if (!pc)
+    {
         return;
+    }
     tmp = pc->sample;
     while(tmp)
     {
         if (tmp->value)
+        {
             free (tmp->value);
+        }
         tmp2 = tmp;
         tmp = tmp->next;
         free (tmp2);
@@ -183,8 +187,7 @@ struct PINT_perf_counter *PINT_perf_initialize(struct PINT_perf_key *key_array)
  * resets all counters within a perf counter instance, except for those that
  * have the PRESERVE bit set
  */
-void PINT_perf_reset(
-    struct PINT_perf_counter* pc)
+void PINT_perf_reset(struct PINT_perf_counter* pc)
 {
     int i;
     struct PINT_perf_sample *s;
@@ -192,7 +195,9 @@ void PINT_perf_reset(
     gen_mutex_lock(&pc->mutex);
 
     if (!pc || !pc->sample || !pc->sample->value)
+    {
         return;
+    }
     for(s = pc->sample; s; s = s->next)
     {
         /* zero out all fields */
@@ -217,8 +222,7 @@ void PINT_perf_reset(
 /** 
  * destroys a perf counter instance
  */
-void PINT_perf_finalize(
-        struct PINT_perf_counter *pc)    /**< pointer to counter instance */
+void PINT_perf_finalize(struct PINT_perf_counter *pc)
 {
     PINT_free_pc(pc);
     return;
@@ -409,7 +413,9 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
         break;
     case PINT_PERF_UPDATE_INTERVAL:
         if (arg > 0)
+        {
             pc->interval = arg;
+        }
         break;
     default:
         gen_mutex_unlock(&pc->mutex);
@@ -503,8 +509,9 @@ void PINT_perf_retrieve(
 
     if(max_key > pc->key_count || max_history > pc->history_size)
     {
-        memset(value_array, 0,
-                (max_history * (max_key + 2) * sizeof(int64_t)));
+        memset(value_array,
+               0,
+               (max_history * (max_key + 2) * sizeof(int64_t)));
     }
 
     /* copy data out */
@@ -517,7 +524,8 @@ void PINT_perf_retrieve(
     for(i = 0, s = pc->sample; i < tmp_max_history && s; i++, s = s->next)
     {
         /* copy counters */
-        memcpy(&value_array[i * (max_key + 2)], s->value,
+        memcpy(&value_array[i * (max_key + 2)],
+                            s->value,
                             (tmp_max_key * sizeof(int64_t)));
         /* copy time codes */
         value_array[(i * (max_key + 2)) + max_key] = s->start_time_ms;

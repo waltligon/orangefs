@@ -75,8 +75,8 @@ machine pvfs2_list_eattr_sm
  * listeattr_setup_resp()
  * Set up the response - allocate needed resources
  */
-static PINT_sm_action listeattr_setup_resp(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action listeattr_setup_resp(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i, tsz;
@@ -137,9 +137,9 @@ static PINT_sm_action listeattr_setup_resp(
     for (i = 0, tsz = 0; i < s_op->req->u.listeattr.nkey; i++)
     {
         s_op->resp.u.listeattr.key[i].buffer_sz =
-            s_op->req->u.listeattr.keysz[i];
+                        s_op->req->u.listeattr.keysz[i];
         s_op->resp.u.listeattr.key[i].buffer =
-            (char *)s_op->u.eattr.buffer + tsz;
+                        (char *)s_op->u.eattr.buffer + tsz;
         tsz += s_op->req->u.listeattr.keysz[i];
     }
     return SM_ACTION_COMPLETE;
@@ -158,19 +158,19 @@ static PINT_sm_action listeattr_list_eattrib(
 
     js_p->error_code = 0;
 
-    ret = job_trove_keyval_iterate_keys(
-        s_op->req->u.listeattr.fs_id,
-        s_op->req->u.listeattr.handle,
-        s_op->req->u.listeattr.token,
-        s_op->resp.u.listeattr.key,
-        s_op->req->u.listeattr.nkey,
-        0,
-        NULL,
-        smcb,
-        0,
-        js_p,
-        &i,
-        server_job_context, s_op->req->hints);
+    ret = job_trove_keyval_iterate_keys(s_op->req->u.listeattr.fs_id,
+                                        s_op->req->u.listeattr.handle,
+                                        s_op->req->u.listeattr.token,
+                                        s_op->resp.u.listeattr.key,
+                                        s_op->req->u.listeattr.nkey,
+                                        0,
+                                        NULL,
+                                        smcb,
+                                        0,
+                                        js_p,
+                                        &i,
+                                        server_job_context,
+                                        s_op->req->hints);
 
     return ret;
 }
@@ -202,8 +202,8 @@ static void print_string(char *buffer, size_t length)
  * will translate it so that it appears in the "system.pvfs2." name
  * space on the client side.
  */
-static PINT_sm_action listeattr_check_resp(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action listeattr_check_resp(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int num_found = 0;

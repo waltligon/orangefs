@@ -105,53 +105,56 @@ int iocommon_lookup(char *path,
  * assumes an absoluate path
  */
 extern int iocommon_lookup_absolute(const char *abs_path,
-                             int follow_flag,
-                             PVFS_object_ref *ref,
-                             char *error_path,
-                             int error_path_size);
+                                    int follow_flag,
+                                    PVFS_object_ref *ref,
+                                    char *error_path,
+                                    int error_path_size);
 
 /*
  * Lookup a file via the PVFS system interface
  */
 extern int iocommon_lookup_relative(const char *rel_path,
-                             PVFS_object_ref parent_ref,
-                             int follow_links,
-                             PVFS_object_ref *ref,
-                             char *error_path,
-                             int error_path_size);
+                                    PVFS_object_ref parent_ref,
+                                    int follow_links,
+                                    PVFS_object_ref *ref,
+                                    char *error_path,
+                                    int error_path_size);
 
 /*
  * Create a file via the PVFS system interface
  */
 extern int iocommon_create_file(const char *filename,
-			 mode_t file_permission,
-			 PVFS_hint file_creation_param,
-                         PVFS_object_ref parent_ref,
-                         PVFS_object_ref *ref);
+			        mode_t file_permission,
+			        PVFS_hint file_creation_param,
+                                PVFS_object_ref parent_ref,
+                                PVFS_object_ref *ref);
 
 
 /* pvfs_open implementation, return file info in fd */
 /* assumes path is fully qualified */
 /* if pdir is not NULL, it is the parent directory */
-extern pvfs_descriptor *iocommon_open(const char *pathname, int flag,
-                               PVFS_hint file_creation_param,
-                               mode_t file_permission,
-                               pvfs_descriptor *pdir);
+extern pvfs_descriptor *iocommon_open(const char *pathname,
+                                      int flag,
+                                      PVFS_hint file_creation_param,
+                                      mode_t file_permission,
+                                      pvfs_descriptor *pdir);
 
 extern int iocommon_truncate(PVFS_object_ref file_ref,
-                      off64_t length);
+                             off64_t length);
 
 extern off64_t iocommon_lseek(pvfs_descriptor *pd,
-                       off64_t offset,
-                       PVFS_size unit_size,
-                       int whence);
+                              off64_t offset,
+                              PVFS_size unit_size,
+                              int whence);
 
 /*
  * pvfs_unlink implementation
  * need to verify this is a file or symlink
  * use rmdir for directory
  */
-extern int iocommon_remove (const char *pathname, PVFS_object_ref *pdir, int dirflag);
+extern int iocommon_remove (const char *pathname,
+                            PVFS_object_ref *pdir,
+                            int dirflag);
 
 extern int iocommon_unlink(const char *pathname, PVFS_object_ref *pdir);
 
@@ -217,7 +220,9 @@ extern int iocommon_ireadorwrite_nocache(enum PVFS_io_type which,
                           PVFS_sysresp_io *ret_resp,
                           PVFS_Request *ret_memory_req);
 
-extern int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr, uint32_t mask);
+extern int iocommon_getattr(PVFS_object_ref obj,
+                            PVFS_sys_attr *attr,
+                            uint32_t mask);
 
 extern int iocommon_setattr(PVFS_object_ref obj, PVFS_sys_attr *attr);
 
@@ -227,19 +232,40 @@ extern int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask);
  * The only difference here is that buf is stat64 which
  * means some of its fields are defined as different types
  */
-extern int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask);
+extern int iocommon_stat64(pvfs_descriptor *pd,
+                           struct stat64 *buf,
+                           uint32_t mask);
 
 extern int iocommon_statfs(pvfs_descriptor *pd, struct statfs *buf);
 
 extern int iocommon_statfs64(pvfs_descriptor *pd, struct statfs64 *buf);
 
-extern int iocommon_seteattr(pvfs_descriptor *pd, const char *key, const void *val, int size, int flag);
+extern int iocommon_seteattr(pvfs_descriptor *pd,
+                             const char *key,
+                             const void *val,
+                             int size,
+                             int flag);
 
-extern int iocommon_geteattr(pvfs_descriptor *pd, const char *key, void *val, int size);
+extern int iocommon_geteattr(pvfs_descriptor *pd,
+                             const char *key,
+                             void *val,
+                             int size);
 
-extern int iocommon_atomiceattr(pvfs_descriptor *pd, const char *key, void *val, int valsize, void *response, int respsize, int flag, int opcode);
+extern int iocommon_atomiceattr(pvfs_descriptor *pd,
+                                const char *key,
+                                void *old_val,
+                                int old_valsize,
+                                void *new_val,
+                                int new_valsize,
+                                void *response,
+                                int respsize,
+                                int flag,
+                                int opcode);
 
-extern int iocommon_listeattr(pvfs_descriptor *pd, char *list, int size, int *numkeys);
+extern int iocommon_listeattr(pvfs_descriptor *pd,
+                              char *list,
+                              int size,
+                              int *numkeys);
 
 extern int iocommon_deleattr(pvfs_descriptor *pd, const char * key);
 

@@ -756,7 +756,7 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
 			       int dot_fmt)
 {
     PVFS_handle handle;
-    int server_idx, tmp_type, flag = 1;
+    int server_idx, flag = 1;
 
     if (!dot_fmt) {
 	printf("remaining handles:\n");
@@ -810,9 +810,7 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
                 }
 
                 printf(fmt_string,
-                       PVFS_mgmt_map_addr(cur_fs,
-                                          addr_array[server_idx],
-                                          &tmp_type),
+                       BMI_addr_rev_lookup(addr_array[server_idx]),
                        PVFS_OID_str(&handle));
             }
         }

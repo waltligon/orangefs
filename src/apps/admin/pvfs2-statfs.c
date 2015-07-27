@@ -150,10 +150,14 @@ int main(int argc, char **argv)
     }
 
     outcount = resp_statfs.server_count;
-    ret = PVFS_mgmt_statfs_all(cur_fs, &creds, stat_array,
-                               &outcount, NULL, NULL);
+    ret = PVFS_mgmt_statfs_all(cur_fs,
+                               &creds,
+                               stat_array,
+                               &outcount,
+                               NULL,
+                               NULL);
 
-    for(j = 0; j<2; j++)
+    for(j = 0; j < 2; j++)
     {
         if (j == 0)
         {
@@ -170,20 +174,22 @@ int main(int argc, char **argv)
 
         for(i = 0; i < outcount; i++)
         {
-            if (stat_array[i].server_type & server_type)
+            if (1 /*stat_array[i].server_type & server_type*/)
             {
                 printf("server: %s\n", stat_array[i].bmi_address);
 
                 if (user_opts->human_readable)
                 {
                     PVFS_util_make_size_human_readable(
-                        (PVFS_size)stat_array[i].ram_total_bytes,
-                        scratch_size, SCRATCH_LEN,
-                        user_opts->use_si_units);
+                                  (PVFS_size)stat_array[i].ram_total_bytes,
+                                  scratch_size,
+                                  SCRATCH_LEN,
+                                  user_opts->use_si_units);
                     PVFS_util_make_size_human_readable(
-                        (PVFS_size)stat_array[i].ram_free_bytes,
-                        scratch_total, SCRATCH_LEN,
-                        user_opts->use_si_units);
+                                  (PVFS_size)stat_array[i].ram_free_bytes,
+                                  scratch_total,
+                                  SCRATCH_LEN,
+                                  user_opts->use_si_units);
 
                     printf("\tRAM total        : %s\n", scratch_size);
                     printf("\tRAM free         : %s\n", scratch_total);
@@ -213,13 +219,15 @@ int main(int argc, char **argv)
                 if (user_opts->human_readable)
                 {
                     PVFS_util_make_size_human_readable(
-                        (PVFS_size)stat_array[i].bytes_available,
-                        scratch_size, SCRATCH_LEN,
-                        user_opts->use_si_units);
+                                  (PVFS_size)stat_array[i].bytes_available,
+                                  scratch_size,
+                                  SCRATCH_LEN,
+                                  user_opts->use_si_units);
                     PVFS_util_make_size_human_readable(
-                        (PVFS_size)stat_array[i].bytes_total,
-                        scratch_total, SCRATCH_LEN,
-                        user_opts->use_si_units);
+                                  (PVFS_size)stat_array[i].bytes_total,
+                                  scratch_total,
+                                  SCRATCH_LEN,
+                                  user_opts->use_si_units);
 
                     printf("\tbytes available  : %s\n", scratch_size);
                     printf("\tbytes total      : %s\n", scratch_total);

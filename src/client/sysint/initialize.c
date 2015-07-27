@@ -84,7 +84,7 @@ typedef enum
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PVFS_sys_initialize(uint64_t default_debug_mask)
+int PVFS_sys_initialize(PVFS_debug_mask default_debug_mask)
 {
 #ifndef WIN32
     static int pvfs_sys_init_flag = 0; /* set to one when init is done */
@@ -96,7 +96,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     const char *debug_mask_str = NULL, *debug_file = NULL;
     PINT_client_status_flag client_status_flag = CLIENT_NO_INIT;
     PINT_smcb *smcb = NULL;
-    uint64_t debug_mask = 0;
+    PVFS_debug_mask debug_mask = {GOSSIP_NO_DEBUG_INIT};
     char *event_mask = NULL;
 
     if (pvfs_sys_init_flag)

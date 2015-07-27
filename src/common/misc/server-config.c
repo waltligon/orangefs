@@ -173,9 +173,12 @@ const char *contextchecker(command_t *cmd, unsigned long mask);
 static int is_valid_alias(PINT_llist * host_aliases, char *str);
 static int is_valid_host(host_alias_t *host);
 static void free_host_alias(void *ptr);
+static int compare_fs_id(void *a, void *b);
 static void free_filesystem(void *ptr);
+#if 0
 static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
                             struct filesystem_configuration_s *src_fs);
+#endif
 static int cache_config_files(struct server_configuration_s *config_s,
                               char *global_config_filename);
 static int is_populated_filesystem_configuration(
@@ -678,7 +681,7 @@ static const configoption_t options[] =
      * replication).
      */
     {"MetaReplicationFactor", ARG_INT, get_filesystem_replication, NULL,
-            CTX_FILESYSTEM, "1"},
+            CTX_FILESYSTEM, NULL},
 
     /* maximum number of AIO operations that Trove will allow to run
      * concurrently 
@@ -1110,7 +1113,7 @@ static const configoption_t options[] =
      * and it determines whether to use that value or not.
      */
     {"DefaultDFileReplication", ARG_INT, get_default_dfile_replication, NULL,
-        CTX_FILESYSTEM, "0"},
+        CTX_FILESYSTEM, NULL},
 
     {"ImmediateCompletion", ARG_STR, get_immediate_completion, NULL,
         CTX_STORAGEHINTS, "no"},
@@ -1557,7 +1560,7 @@ DOTCONF_CB(exit_defaults_context)
 DOTCONF_CB(enter_security_context)
 {
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                  (struct server_configuration_s *)cmd->context;
 
     config_s->prev_context = config_s->configuration_context;
     config_s->configuration_context = CTX_SECURITY;
@@ -1569,7 +1572,7 @@ DOTCONF_CB(enter_security_context)
 DOTCONF_CB(exit_security_context)
 {
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                  (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = config_s->prev_context;
     return NULL;
 }
@@ -1577,7 +1580,7 @@ DOTCONF_CB(exit_security_context)
 DOTCONF_CB(enter_server_context)
 {
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                  (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_SERVER;
     return NULL;
 }
@@ -1585,7 +1588,7 @@ DOTCONF_CB(enter_server_context)
 DOTCONF_CB(exit_server_context)
 {
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                  (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_GLOBAL;
     return NULL;
 }
@@ -1593,7 +1596,7 @@ DOTCONF_CB(exit_server_context)
 DOTCONF_CB(enter_serverdef_context)
 {
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                  (struct server_configuration_s *)cmd->context;
     /* begin defining a new server */
     if (config_s->new_host)
     {
@@ -1602,15 +1605,24 @@ DOTCONF_CB(enter_serverdef_context)
         free_host_alias(config_s->new_host);
     }
     config_s->new_host = (host_alias_t *)malloc(sizeof(host_alias_t));
+    config_s->new_host->server_type = PINT_llist_new();
     config_s->configuration_context = CTX_SERVERDEF;
     return NULL;
+}
+
+/* This only exists to match argument types for an llist doall below
+ */
+static int SID_update_type_2(void *item, void *arg);
+static int SID_update_type_2(void *item, void *arg)
+{
+    return SID_update_type((PVFS_SID *)arg, (struct SID_type_s *)item);
 }
 
 DOTCONF_CB(exit_serverdef_context)
 {
     int ret;
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                  (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_SERVER;
     /* end defining a new server */
     if (!config_s->new_host)
@@ -1647,6 +1659,7 @@ DOTCONF_CB(exit_serverdef_context)
      */
     if (!strcmp(config_s->server_alias, config_s->new_host->host_alias))
     {
+        struct SID_type_s *type_buf = NULL;
         /* This is our address - save the information */
         if (config_s->host_id != NULL)
         {
@@ -1656,12 +1669,21 @@ DOTCONF_CB(exit_serverdef_context)
         }
         config_s->host_sid = config_s->new_host->host_sid;
         config_s->host_id = strdup(config_s->new_host->bmi_address);
-        config_s->new_host->server_type |= SID_SERVER_ME;
+        type_buf = (struct SID_type_s *)malloc(sizeof(struct SID_type_s));
+        if (!type_buf)
+        {
+            return "Error: out of memory\n";
+        }
+        type_buf->server_type = SID_SERVER_ME;
+        type_buf->fsid = 0;
+        PINT_llist_add_to_tail(config_s->new_host->server_type,
+                               (void *)type_buf);
     }
 
     /* add type records to SID cache */
-    ret = SID_update_type(&config_s->new_host->host_sid,
-                          config_s->new_host->server_type);
+    ret = PINT_llist_doall_arg(config_s->new_host->server_type,
+                               SID_update_type_2,
+                               (void *)&config_s->new_host->host_sid);
     if (ret != 0)
     {
         return "Error: server type records not added to SID cache\n";
@@ -1674,8 +1696,7 @@ DOTCONF_CB(exit_serverdef_context)
         config_s->host_aliases = PINT_llist_new();
     }
 
-    PINT_llist_add_to_tail(config_s->host_aliases,
-                           (void *)config_s->new_host);
+    PINT_llist_add_to_tail(config_s->host_aliases, (void *)config_s->new_host);
 
     config_s->new_host = NULL;
     return NULL;
@@ -1694,9 +1715,9 @@ DOTCONF_CB(enter_filesystem_context)
     }
 
     fs_conf = (struct filesystem_configuration_s *)
-            malloc(sizeof(struct filesystem_configuration_s));
+                        malloc(sizeof(struct filesystem_configuration_s));
     assert(fs_conf); /* TODO: replace this with error handleing */
-    memset(fs_conf,0,sizeof(struct filesystem_configuration_s));
+    memset(fs_conf, 0, sizeof(struct filesystem_configuration_s));
 
     /* fill any fs defaults here */
     fs_conf->flowproto = FLOWPROTO_DEFAULT;
@@ -1706,12 +1727,14 @@ DOTCONF_CB(enter_filesystem_context)
     fs_conf->fp_buffer_size = -1;
     fs_conf->fp_buffers_per_flow = -1;
     fs_conf->file_stuffing = 1;
+    fs_conf->metadata_replication_factor = 0;
+    fs_conf->default_dfile_replication_factor = 0;
 
     if (!config_s->file_systems)
     {
         config_s->file_systems = PINT_llist_new();
     }
-    PINT_llist_add_to_head(config_s->file_systems,(void *)fs_conf);
+    PINT_llist_add_to_head(config_s->file_systems, (void *)fs_conf);
     assert(PINT_llist_head(config_s->file_systems) == (void *)fs_conf);
     config_s->configuration_context = CTX_FILESYSTEM;
 
@@ -1732,6 +1755,15 @@ DOTCONF_CB(exit_filesystem_context)
       make sure last fs config object is valid
       (i.e. has all required values filled in)
     */
+    if (fs_conf->metadata_replication_factor < 1)
+    {
+        /* This should mean it has not been set, so make it 1 */
+        fs_conf->metadata_replication_factor = 1;
+    }
+    if (fs_conf->default_dfile_replication_factor < 1)
+    {
+        fs_conf->default_dfile_replication_factor = 1;
+    }
     if (!is_populated_filesystem_configuration(fs_conf))
     {
         gossip_err("Error: File system configuration is invalid!\n");
@@ -2932,8 +2964,9 @@ DOTCONF_CB(get_rootsrv)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                        (struct server_configuration_s *)cmd->context;
     struct host_alias_s *root_alias = NULL;
+    struct SID_type_s type_buf = {0, 0};
 
     fs_conf = (struct filesystem_configuration_s *)
                             PINT_llist_head(config_s->file_systems);
@@ -2954,8 +2987,11 @@ DOTCONF_CB(get_rootsrv)
         return "Error: RootServer alias not found\n";
     }
     /* This doesn't tell us much - we have no way to id which root */
-    /* update server type n SIDcache */
-    SID_update_type(&root_alias->host_sid, SID_SERVER_ROOT);
+    /* update server type in SIDcache */
+    type_buf.server_type = SID_SERVER_ROOT;
+    type_buf.fsid = fs_conf->coll_id;
+    SID_update_type_single(&root_alias->host_sid,
+                           &type_buf);
 
     /* add to list of root servers for this fs */
     if (!fs_conf->root_servers)
@@ -3024,21 +3060,21 @@ DOTCONF_CB(get_name)
         struct filesystem_configuration_s *fs_conf = NULL;
 
         fs_conf = (struct filesystem_configuration_s *)
-                PINT_llist_head(config_s->file_systems);
+                              PINT_llist_head(config_s->file_systems);
         if (fs_conf->file_system_name)
         {
-            gossip_err("WARNING: Overwriting %s with %s\n",
+            gossip_err("WARNING: Overwriting Filesystem Name %s with %s\n",
                        fs_conf->file_system_name,cmd->data.str);
         }
         fs_conf->file_system_name =
-                (cmd->data.str ? strdup(cmd->data.str) : NULL);
+                      (cmd->data.str ? strdup(cmd->data.str) : NULL);
     }
     else if (config_s->configuration_context == CTX_DISTRIBUTION)
     {
         if (0 == config_s->default_dist_config.name)
         {
             config_s->default_dist_config.name =
-                    (cmd->data.str ? strdup(cmd->data.str) : NULL);
+                          (cmd->data.str ? strdup(cmd->data.str) : NULL);
             config_s->default_dist_config.param_list = PINT_llist_new();
         }
         else
@@ -3065,7 +3101,7 @@ DOTCONF_CB(get_filesystem_replication)
     }
     if (fs_conf->metadata_replication_factor)
     {
-        gossip_err("WARNING: Overwriting %d with %d\n",
+        gossip_err("WARNING: Overwriting Metadata Replication Factor %d with %d\n",
                    (int)fs_conf->metadata_replication_factor,
                    (int)cmd->data.value);
     }
@@ -3083,7 +3119,7 @@ DOTCONF_CB(get_filesystem_collid)
             PINT_llist_head(config_s->file_systems);
     if (fs_conf->coll_id)
     {
-        gossip_err("WARNING: Overwriting %d with %d\n",
+        gossip_err("WARNING: Overwriting Filesystem ID %d with %d\n",
                    (int)fs_conf->coll_id, (int)cmd->data.value);
     }
     fs_conf->coll_id = (PVFS_fs_id)cmd->data.value;
@@ -3102,7 +3138,7 @@ static int compare_aliases(void *vkey,
 DOTCONF_CB(get_alias)
 {
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                        (struct server_configuration_s *)cmd->context;
 
     if (cmd->arg_count != 1)
     {
@@ -3186,23 +3222,84 @@ DOTCONF_CB(get_address_list)
     return NULL;
 }
 
+/*
+ * First argument may be fs_id either numerical or name
+ * otherwise fs_id is 0 signifying ALL FS's
+ */
 DOTCONF_CB(get_type_list)
 {
     int i;
+    int ret;
+    int len;
+    struct SID_type_s *type_buf = NULL;
     struct server_configuration_s *config_s = 
-            (struct server_configuration_s *)cmd->context;
+                       (struct server_configuration_s *)cmd->context;
 
     if (cmd->arg_count < 1)
     {
         return "Error: Type must include at least one server type\n";
     }
 
-    /* convert type string into bit field */
-    for (i = 0; i < cmd->arg_count; i++)
+    type_buf = (struct SID_type_s *)malloc(sizeof(struct SID_type_s));
+    if (!type_buf)
     {
-        config_s->new_host->server_type |=
-                        SID_string_to_type(cmd->data.list[i]);
+        return "Error: out of memory\n";
     }
+    type_buf->server_type = 0;
+    type_buf->fsid = 0;
+
+    len = strlen(cmd->data.list[0]);
+
+    /* check to see if an fs_id is provided */
+    if (cmd->data.list[0][0] == '(' &&
+        cmd->data.list[0][len - 1] == ')')
+    {   
+        int j = 0, nondig = 0;
+        /* see if fsid is numeric */
+        for (j = 1; j < len - 1; j++)
+        {
+            if (isdigit(cmd->data.list[0][j]))
+            {
+                continue;
+            }
+            /* non-digit we will assume fs name */
+            nondig = 1;
+            break;
+        }
+        if (nondig)
+        {
+            cmd->data.list[0][len - 1] = 0;
+            type_buf->fsid = PINT_config_get_fs_id_by_fs_name(
+                                                   config_s,
+                                                   &cmd->data.list[0][1]);
+        }
+        else
+        {
+            type_buf->fsid = atoi(&cmd->data.list[0][1]);
+        }
+        i = 1;
+    }
+    else
+    {
+        type_buf->fsid = 0; /* applies to all FS */
+        i = 0;
+    }
+
+    /* convert type string into bit field */
+    for (; i < cmd->arg_count; i++)
+    {
+        ret = SID_string_to_type(cmd->data.list[i]);
+        if (ret < 0)
+        {
+            free(type_buf);
+            return "Error: Invalid type string provided\n";
+        }
+        type_buf->server_type |= ret;
+    }
+
+    /* add to list of type records to be added to sidcache later */
+    PINT_llist_add_to_tail(config_s->new_host->server_type, 
+                           (void *)type_buf);
 
     return NULL;
 }
@@ -4150,6 +4247,7 @@ static int is_valid_filesystem_configuration(
     int ret = 1;
     if (ret == 0)
     {
+        /* V3 get rid of this - no longer makes sense */
         gossip_err("RootHandle (%s) is NOT within the meta handle "
                    "ranges specified for this filesystem (%s).\n",
                    PVFS_OID_str(&fs->root_handle),fs->file_system_name);
@@ -4168,6 +4266,17 @@ static void free_host_alias(void *ptr)
         free(alias->attributes);
         free(alias);
     }
+}
+
+static int compare_fs_id(void *key, void *item)
+{
+    struct filesystem_configuration_s *fs = NULL;
+    int *k = NULL;
+
+    fs = (struct filesystem_configuration_s *)item;
+    k = (int *)key;
+
+    return *k - fs->coll_id;
 }
 
 static void free_filesystem(void *ptr)
@@ -4263,6 +4372,7 @@ static void free_filesystem(void *ptr)
  * FOr now this code still exists but should be removed as soon as
  * feasible!!!    WBL V3
  */
+#if 0
 static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
                             struct filesystem_configuration_s *src_fs)
 {
@@ -4403,7 +4513,7 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
                     (int *) calloc(src_fs->root_squash_count, sizeof(int));
             assert(dest_fs->root_squash_netmasks); /* TODO; replace with error handling */
             memcpy(dest_fs->root_squash_netmasks,
-                   src_fs->root_squash_netmasks,
+                   src_fs->root_squash_netmasksj,
                    src_fs->root_squash_count * sizeof(int));
         }
         if (src_fs->all_squash_count > 0 && src_fs->all_squash_hosts)
@@ -4435,6 +4545,7 @@ static void copy_filesystem(struct filesystem_configuration_s *dest_fs,
         dest_fs->fp_buffers_per_flow = src_fs->fp_buffers_per_flow;
     }
 }
+#endif
 
 /* V3 currently obsolete - seems like a useful func not sure why its
  * static
@@ -4918,8 +5029,12 @@ int PINT_config_trim_filesystems_except(struct server_configuration_s *config_s,
                                         PVFS_fs_id fs_id)
 {
     int ret = -PVFS_EINVAL;
-    PINT_llist *cur = NULL, *new_fs_list = NULL;
-    struct filesystem_configuration_s *cur_fs = NULL, *new_fs = NULL;
+/* V3
+    PINT_llist *cur = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
+*/
+    PINT_llist *new_fs_list = NULL;
+    void *new_fs = NULL;
 
     if (config_s)
     {
@@ -4929,6 +5044,14 @@ int PINT_config_trim_filesystems_except(struct server_configuration_s *config_s,
             return -PVFS_ENOMEM;
         }
 
+/* This seems kind of silly, we look for the FS with
+ * the right id, then we copy it, delete the old list
+ * and make this is the only FS.  Why not simply remove
+ * the one we want from the old list, delete the old
+ * list and add this to the new list?  Copying the FS
+ * record is error prone.  WBL V3
+ */
+#if 0
         cur = config_s->file_systems;
         while(cur)
         {
@@ -4954,8 +5077,14 @@ int PINT_config_trim_filesystems_except(struct server_configuration_s *config_s,
             }
             cur = PINT_llist_next(cur);
         }
+    #endif
 
-        PINT_llist_free(config_s->file_systems,free_filesystem);
+        new_fs = PINT_llist_rem(config_s->file_systems,
+                                &fs_id,
+                                compare_fs_id);
+        PINT_llist_add_to_head(new_fs_list, new_fs);
+
+        PINT_llist_free(config_s->file_systems, free_filesystem);
         config_s->file_systems = new_fs_list;
 
         if (PINT_llist_count(config_s->file_systems) == 1)

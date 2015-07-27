@@ -40,12 +40,12 @@ typedef struct phys_server_desc_s
 
 typedef struct host_alias_s
 {
-    char *host_alias;     /* this is a traditional host name */
-    char *host_sid_text;  /* this is a SID in text format */
-    PVFS_SID host_sid;    /* this is a SID in binary format */
-    char *bmi_address;    /* URI address */
-    uint32_t server_type; /* bit fields */
-    int *attributes;      /* array of integers */
+    char *host_alias;        /* this is a traditional host name */
+    char *host_sid_text;     /* this is a SID in text format */
+    PVFS_SID host_sid;       /* this is a SID in binary format */
+    char *bmi_address;       /* URI address */
+    PINT_llist *server_type; /* bit fields */
+    int *attributes;         /* array of integers */
 } host_alias_t;
 
 /* V3 obsolete */

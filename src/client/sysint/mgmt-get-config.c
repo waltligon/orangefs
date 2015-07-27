@@ -28,12 +28,11 @@ extern job_context_id pint_client_sm_context;
 
   returns 0 on success, -errno on error
 */
-int PVFS_mgmt_get_config(
-    const PVFS_fs_id * fsid,
-    PVFS_BMI_addr_t * addr,
-    char *fs_buf,
-    int fs_buf_size,
-    const PVFS_credential *credential)
+int PVFS_mgmt_get_config(const PVFS_fs_id *fsid,
+                         PVFS_BMI_addr_t *addr,
+                         char *fs_buf,
+                         int fs_buf_size,
+                         const PVFS_credential *credential)
 {
     int ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
@@ -43,11 +42,11 @@ int PVFS_mgmt_get_config(
     PVFS_sys_op_id op_id;
     struct server_configuration_s *config = NULL;
     struct PVFS_sys_mntent mntent;
-    int server_type = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_get_config entered\n");
 
-    PINT_smcb_alloc(&smcb, PVFS_SERVER_GET_CONFIG,
+    PINT_smcb_alloc(&smcb,
+                    PVFS_SERVER_GET_CONFIG,
                     sizeof(struct PINT_client_sm),
                     client_op_state_get_machine,
                     client_state_machine_terminate,
@@ -67,8 +66,12 @@ int PVFS_mgmt_get_config(
 
     config = PINT_get_server_config_struct(*fsid);
 
-    mntent.the_pvfs_config_server =
-        (char*)PINT_cached_config_map_addr(*fsid, *addr, &server_type);
+    mntent.the_pvfs_config_server = (char *)BMI_addr_rev_lookup(*addr);
+    if(!mntent.the_pvfs_config_server)
+    {
+        mntent.the_pvfs_config_server = "[UNKNOWN]";
+        gossip_err("UNKNOWN CONFIG SERVER\n");
+    }
 
     PINT_put_server_config_struct(config);
 

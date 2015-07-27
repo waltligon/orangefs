@@ -7,6 +7,7 @@
 #define __PINT_DEV_H
 
 #include "pvfs2-internal.h"
+#include "pvfs2-debug.h"
 #include "pvfs2-types.h"
 #include "pint-dev-shared.h"
 
@@ -19,7 +20,7 @@ typedef struct
      KERNEL_MASK,
      CLIENT_MASK,
   } mask_type;
-  uint64_t mask_value;
+  PVFS_debug_mask mask_value;
 } dev_mask_info_t;
 
 
