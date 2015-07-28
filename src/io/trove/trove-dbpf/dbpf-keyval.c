@@ -1444,7 +1444,7 @@ static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p)
     int ret = -TROVE_EINVAL;
 
     ret = dbpf_db_sync(op_p->coll_p->keyval_db);
-    if (ret == 0)
+    if (ret != 0)
     {
         ret = -ret;
         goto return_error;
