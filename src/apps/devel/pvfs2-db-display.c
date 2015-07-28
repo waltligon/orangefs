@@ -74,7 +74,7 @@ int main( int argc, char **argv )
 
     /* collection database */
     sprintf(path, "%s/%s", opts.dbpath, COLLECTION_FILE );
-    ret = dbpf_db_open(path, 0, &db_p, 0);
+    ret = dbpf_db_open(path, 0, &db_p, 0, 104857600);
     if (ret == 0) 
     {
         printf("Collection Database\n");
@@ -85,7 +85,7 @@ int main( int argc, char **argv )
     /* storage database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s", opts.dbpath, STORAGE_FILE );
-    ret = dbpf_db_open(path, 0, &db_p, 0);
+    ret = dbpf_db_open(path, 0, &db_p, 0, 104857600);
     if (ret == 0) 
     {
         printf("Storage Database\n");
@@ -96,7 +96,7 @@ int main( int argc, char **argv )
     /* dspace database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, DATASPACE_FILE );
-    ret = dbpf_db_open(path, DBPF_DB_COMPARE_DS_ATTR, &db_p, 0);
+    ret = dbpf_db_open(path, DBPF_DB_COMPARE_DS_ATTR, &db_p, 0, 104857600);
     if (ret == 0) 
     {
         printf("Dataspace Database\n");
@@ -107,7 +107,7 @@ int main( int argc, char **argv )
     /* keyval database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, KEYVAL_FILE );
-    ret = dbpf_db_open(path, DBPF_DB_COMPARE_KEYVAL, &db_p, 0);
+    ret = dbpf_db_open(path, DBPF_DB_COMPARE_KEYVAL, &db_p, 0, 104857600);
     if (ret == 0) 
     {
         printf("Keyval Database\n");
@@ -118,7 +118,7 @@ int main( int argc, char **argv )
     /* collection attribute database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, COLLECTION_ATTR_FILE );
-    ret = dbpf_db_open(path, 0, &db_p, 0);
+    ret = dbpf_db_open(path, 0, &db_p, 0, 104857600);
     if (ret == 0) 
     {
         printf("Collection Attributes Database\n");
@@ -431,38 +431,38 @@ void print_keyval( struct dbpf_data key, struct dbpf_data val )
             {
                 int i;
                 char *dat = (char *)val.data;
-                for(i = 0; i < val.size; i++)
+                for(i = 0; i < val.len; i++)
                 {
                     if (!isprint(dat[i]))
                     {
                         break;
                     }
                 }
-                if (i == val.size - 1)
+                if (i == val.len - 1)
                 {
                     /* string will drop out on the null terminator */
-                    printf("(%s)(%d) -> (%s)(%d)\n", k->key, key.size,
-                           dat, val.size);
+                    printf("(%s)(%d) -> (%s)(%d)\n", k->key, (int)key.len,
+                           dat, (int)val.len);
                 }
-                else if (i == val.size)
+                else if (i == val.len)
                 {
                     /* unterminated string  - we will zero the
                      * last char and print what we can*/
-                    dat[val.size - 1] = 0;
-                    printf("(%s)(%d) -> (%s ...)(%d)\n", k->key, key.size,
-                           dat, val.size);
+                    dat[val.len - 1] = 0;
+                    printf("(%s)(%d) -> (%s ...)(%d)\n", k->key, (int)key.len,
+                           dat, (int)val.len);
                 }
                 else
                 {
                     /* not string */
-                    printf("(%s)(%d) -> (0x%x ...)(%d)\n", k->key, key.size,
-                           *(int *)dat, val.size);
+                    printf("(%s)(%d) -> (0x%x ...)(%d)\n", k->key, (int)key.len,
+                           *(int *)dat, (int)val.len);
                 }
             }
             else
             {
                 printf("unrecognized attribute record type: %s val size %d\n",
-                       k->key, val.size);
+                       k->key, (int)val.len);
             }
             break;
 

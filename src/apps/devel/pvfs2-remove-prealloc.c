@@ -70,7 +70,7 @@ int main( int argc, char **argv )
     /* Open collection attribute database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, COLLECTION_ATTR_FILE );
-    ret = dbpf_db_open(path, 0, &db_p_coll_attr, 0);
+    ret = dbpf_db_open(path, 0, &db_p_coll_attr, 0, 104857600);
     if (ret != 0)
     {
         printf("Unable to open collection attributes database: %s\n",
@@ -81,7 +81,7 @@ int main( int argc, char **argv )
     /* Open keyval database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, KEYVAL_FILE );
-    ret = dbpf_db_open(path, DBPF_DB_COMPARE_KEYVAL, &db_p_keyval, 0);
+    ret = dbpf_db_open(path, DBPF_DB_COMPARE_KEYVAL, &db_p_keyval, 0, 104857600);
     if (ret != 0)
     {
         printf("Unable to open keyval database: %s\n", strerror(ret));
