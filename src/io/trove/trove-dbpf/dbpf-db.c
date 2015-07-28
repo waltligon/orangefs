@@ -120,7 +120,6 @@ int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
         return db_error(r);
     }
 
-    printf("XXX %d\n", (int)mapsize);
     r = mdb_env_set_mapsize((*db)->env, mapsize);
     if (r)
     {
