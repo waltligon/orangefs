@@ -231,6 +231,7 @@ int dbpf_db_get(struct dbpf_db *db, struct dbpf_data *key,
 
     if (db_data.mv_size > val->len)
     {
+    	val->len = db_data.mv_size;
         return db_error(ERANGE);
     }
     memcpy(val->data, db_data.mv_data, db_data.mv_size);
@@ -407,6 +408,7 @@ int dbpf_db_cursor_get(struct dbpf_cursor *dbc, struct dbpf_data *key,
     key->len = db_key.mv_size;
     if (db_data.mv_size > val->len)
     {
+    	val->len = db_data.mv_size;
         return db_error(ERANGE);
     }
     memcpy(val->data, db_data.mv_data, db_data.mv_size);
