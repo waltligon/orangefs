@@ -2377,26 +2377,6 @@ void bmi_method_addr_drop_callback(char *method_name)
 
 
 /* TODO: documentation
- *
- * TODO: is this in the right place? should its prototype be in
- *       bmi-method-callback.h? 
- */
-int bmi_fill_cq_callback(bmi_context_id context_id,
-                         method_op_p completed_op)
-{
-    /* TODO: do we need locking? */
-    gen_mutex_lock(&cq_mutex);
-    op_list_add(bmi_completion_array[context_id], completed_op);
-    gen_mutex_unlock(&cq_mutex);
-    
-    /* TODO: signal condition variable?? */
-    gen_cond_signal(&completed_cond_var);
-    
-    return 0;
-}
-
-
-/* TODO: documentation
  */
 void bmi_inc_unexp_count_callback()
 {
