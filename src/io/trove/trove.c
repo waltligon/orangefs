@@ -32,7 +32,7 @@ struct PINT_perf_counter* PINT_server_pc = NULL;
 
 int TROVE_shm_key_hint = 0;
 int TROVE_max_concurrent_io = 16;
-int TROVE_db_map_size = 104857600;
+int TROVE_db_map_size = 536870912;
 
 extern TROVE_method_callback global_trove_method_callback;
 

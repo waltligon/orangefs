@@ -1074,7 +1074,7 @@ static const configoption_t options[] =
     /* maximum size of database map
      */
     {"DBMaxSize", ARG_INT, get_db_max_size, NULL,
-        CTX_STORAGEHINTS,"104857600"},
+        CTX_STORAGEHINTS,"536870912"},
 
     /* This option specifies a parameter name to be passed to the 
      * distribution to be used.  This option should be immediately
@@ -1239,7 +1239,7 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
     config_s->client_retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
     config_s->client_retry_delay_ms = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
     config_s->trove_max_concurrent_io = 16;
-    config_s->db_max_size = 104857600;
+    config_s->db_max_size = 536870912;
 
     if (cache_config_files(config_s, global_config_filename))
     {
