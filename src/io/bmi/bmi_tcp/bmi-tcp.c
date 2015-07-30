@@ -411,7 +411,6 @@ enum
 /* internal operation lists */
 static op_list_p op_list_array[6] = { NULL, NULL, NULL, NULL, NULL, NULL };
 
-/* TODO: remove */
 /* internal completion queues */
 static op_list_p completion_array[BMI_MAX_CONTEXTS] = { NULL };
 
@@ -1564,8 +1563,7 @@ int BMI_tcp_testcontext(int incount,
 }
 #endif /* USE_PROTO_THREADS */
 
-/* TODO: remove this */
-#if 0
+
 /* BMI_tcp_check_cq()
  *
  * TODO: documentation
@@ -1622,7 +1620,13 @@ int BMI_tcp_check_cq(int incount,
     
     if (ret == 1)
     {
-        /* something was found, go ahead and return */
+        /* something had completed in specified context, return */
+        for (i = 0; i < *outcount; i++)
+        {
+            gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                         "BMI_testcontext completing: %llu\n",
+                         llu(out_id_array[i]));
+        }
         gen_mutex_unlock(&interface_mutex);
         return ret;
     }
@@ -1649,7 +1653,7 @@ int BMI_tcp_check_cq(int incount,
         }
         else
         {
-            /* nothing found anywhere */
+            /* nothing found in this context; keep looking */
             ret = 0;
         }
     }
@@ -1657,7 +1661,43 @@ int BMI_tcp_check_cq(int incount,
     gen_mutex_unlock(&interface_mutex);
     return ret;
 }
-#endif /* 0 */
+
+
+/* BMI_tcp_check_unexp_q()
+ *
+ * TODO: documentation
+ */
+int BMI_tcp_check_unexp_q(int incount,
+                          int *outcount,
+                          struct bmi_method_unexpected_info *info,
+                          int max_idle_time)
+{
+    int ret = -1;
+    int i;
+    method_op_p query_op = NULL;
+    
+    gen_mutex_lock(&interface_mutex);
+    
+    *outcount = 0;
+    
+    while ((*outcount < incount) &&
+           (query_op = op_list_shownext(
+                                        op_list_array[IND_COMPLETE_RECV_UNEXP])))
+    {
+        info[*outcount].error_code = query_op->error_code;
+        info[*outcount].addr = query_op->addr;
+        info[*outcount].buffer = query_op->buffer;
+        info[*outcount].size = query_op->actual_size;
+        info[*outcount].tag = query_op->msg_tag;
+        op_list_remove(query_op);
+        dealloc_tcp_method_op(query_op);
+        bmi_dec_unexp_count_callback();     /* TODO */
+        (*outcount)++;
+    }
+    
+    gen_mutex_unlock(&interface_mutex);
+    return 0;
+}
 
 
 /* BMI_tcp_post_send_list()
@@ -1935,9 +1975,7 @@ int BMI_tcp_cancel(bmi_op_id_t id,
     {
         tcp_forget_addr(query_op->addr, 0, -BMI_ECANCEL);
     }
-    /* TODO: remove when completion queues are solidified */
-    /* op_list_add(completion_array[query_op->context_id], query_op); */
-    bmi_fill_cq_callback(query_op->context_id, query_op);
+    op_list_add(completion_array[query_op->context_id], query_op);
     gen_mutex_unlock(&interface_mutex);
     return (0);
 }
@@ -3067,10 +3105,8 @@ static int tcp_cleanse_addr(bmi_method_addr_p map,
                 {
                     ((struct tcp_op *)(query_op->method_data))->tcp_op_state =
                             BMI_TCP_COMPLETE;
-                    /* TODO: remove when completion queues are solidified */
-                    /*op_list_add(completion_array[query_op->context_id],
-                                query_op);*/
-                    bmi_fill_cq_callback(query_op->context_id, query_op);
+                    op_list_add(completion_array[query_op->context_id],
+                                query_op);
                 }
             }
         }
@@ -3746,9 +3782,7 @@ static int work_on_send_op(method_op_p my_method_op,
         op_list_remove(my_method_op);
         ((struct tcp_op *)(my_method_op->method_data))->tcp_op_state =
                 BMI_TCP_COMPLETE;
-        /* TODO: remove when completion queues are solidified */
-        /*op_list_add(completion_array[my_method_op->context_id], my_method_op);*/
-        bmi_fill_cq_callback(my_method_op->context_id, my_method_op);
+        op_list_add(completion_array[my_method_op->context_id], my_method_op);
         
         *blocked_flag = 0;
     }
@@ -3837,10 +3871,8 @@ static int work_on_recv_op(method_op_p my_method_op,
             {
                 ((struct tcp_op *)(my_method_op->method_data))->tcp_op_state =
                         BMI_TCP_COMPLETE;
-                /* TODO: remove when completion queues are solidified */
-                /*op_list_add(completion_array[my_method_op->context_id],
-                            my_method_op);*/
-                bmi_fill_cq_callback(my_method_op->context_id, my_method_op);
+                op_list_add(completion_array[my_method_op->context_id],
+                            my_method_op);
             }
         }
     }

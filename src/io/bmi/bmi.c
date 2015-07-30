@@ -161,10 +161,8 @@ static int global_flags;
 static int activate_method(const char *name,
                            const char *listen_addr,
                            int flags);
-#ifdef USE_PROTO_THREADS
 static int bmi_create_proto_threads(void);
 static int bmi_shutdown_proto_threads(void);
-#endif
 static void bmi_addr_drop(ref_st_p tmp_ref);
 static void bmi_addr_force_drop(ref_st_p ref,
                                 ref_list_p ref_list);
@@ -1155,125 +1153,12 @@ int BMI_testcontext(int incount,
     int other_queues = 0;
     struct timespec timeout;
     struct timeval now;
+    void **user_ptr = NULL;
     
     method_op_p query_op = NULL;
     
     *outcount = 0;
     
-start:
-
-    /* TODO: locking? */
-    gen_mutex_lock(&cq_mutex);
-    while ((*outcount < incount) &&
-           (query_op = op_list_shownext(bmi_completion_array[context_id])))
-    {
-        assert(query_op);
-        assert(query_op->context_id == context_id);
-        
-        /* this one's done; pop it out */
-        /* TODO: need to remove it from method-specific completion queue
-         *       or has it already been removed?
-         *       NOTE: query_op->addr->method_type should get you to the
-         *             method it belongs to
-         */
-        op_list_remove(query_op);
-        error_code_array[*outcount] = query_op->error_code;
-        actual_size_array[*outcount] = query_op->actual_size;
-        out_id_array[*outcount] = query_op->op_id;
-        if (user_ptr_array != NULL)
-        {
-            user_ptr_array[*outcount] = query_op->user_ptr;
-        }
-        
-        /* TODO: PINT_EVENT_END? */
-        
-        dealloc_tcp_method_op(query_op);
-        query_op = NULL;
-        (*outcount)++;
-        ret = 1;    /* something had completed */
-    }
-    gen_mutex_unlock(&cq_mutex);
-    
-    if (ret == 1)
-    {
-        /* something had completed in specifid context, return */
-        /* TODO: locking? */
-        for (i = 0; i < *outcount; i++)
-        {
-            gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
-                         "BMI_testcontext completing: %llu\n",
-                         llu(out_id_array[i]));
-        }
-        return ret;
-    }
-    
-    /* nothing had completed in the specified context */
-    for (i = 0; i < BMI_MAX_CONTEXTS; i++)
-    {
-        if (i == context_id)
-        {
-            /* don't need to check this one again */
-            continue;
-        }
-        
-        gen_mutex_lock(&cq_mutex);
-        if (!op_list_empty(bmi_completion_array[i]))
-        {
-            /* another context has completions waiting */
-            /* TODO: locking? */
-            gen_mutex_unlock(&cq_mutex);
-            return 0;
-        }
-        gen_mutex_unlock(&cq_mutex);
-        
-        gen_mutex_lock(&unexp_mutex);
-        if (unexpected_count)
-        {
-            /* something in unexpected queue */
-            /* TODO: locking */
-            gen_mutex_unlock(&unexp_mutex);
-            return 0;
-        }
-        gen_mutex_unlock(&unexp_mutex);
-    }
-    
-    /* If we make it to this point, nothing is waiting in any queues. Wait on
-     * condition variable until something signals it (something completed)
-     * or max_idle_time_ms is reached 
-     */
-    /* TODO: what do I do here for Windows? */
-    gettimeofday(&now, NULL);
-    timeout.tv_sec = now.tv_sec + max_idle_time_ms / 1000; /* ms to sec */
-    timeout.tv_nsec = 0;
-    ret = gen_cond_timedwait(&completed_cond_var,
-                             &completed_mutex,
-                             &timeout);
-    if (ret == 0)
-    {
-        /* something signaled the condition variable, which means 
-         * something was added to a completion queue 
-         */
-        goto start;
-    }
-    else if (ret == ETIMEDOUT)
-    {
-        /* reached max_idle_time_ms without being signaled */
-        gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
-                     "BMI_testcontext: gen_cond_timedwait reached "
-                     "max_idle_time_ms without being signaled.\n");
-        return 0;
-    }
-    else
-    {
-        /* EINVAL */
-        gossip_lerr("Error: BMI_testcontext: gen_cond_timedwait "
-                    "returned EINVAL.\n");
-        return ret; /* TODO: should this be negative? */
-    }
-    
-    
-    
-#if 0
     /* TODO: change this from a goto statement to a while loop? */
 start:
     
@@ -1285,14 +1170,18 @@ start:
     /* TODO: call each method's queue checking function */
     while (position < incount && i < tmp_active_method_count)
     {
-        ret = active_method_table[i]->check_cq(
-                (incount - position),
-                &out_id_array[position],
-                &tmp_outcount,
-                &error_code_array[position],
-                &actual_size_array[position],
-                user_ptr_array ? &user_ptr_array[position] : NULL,
-                context_id);
+        if (user_ptr_array)
+        {
+            user_ptr = &user_ptr_array[position];
+        }
+        
+        ret = active_method_table[i]->check_cq((incount - position),
+                                               &out_id_array[position],
+                                               &tmp_outcount,
+                                               &error_code_array[position],
+                                               &actual_size_array[position],
+                                               user_ptr,
+                                               context_id);
         
         if (ret < 0)
         {
@@ -1311,9 +1200,8 @@ start:
         (*outcount) += tmp_outcount;
         i++;
     }
-#endif /* 0 */
     
-    if (ret == 1 || completed == 1)
+    if (completed == 1)
     {
         /* something had completed in specified context */
         /* TODO: return it/them */
@@ -1325,7 +1213,7 @@ start:
         }
         return 1;
     }
-    else if (ret == 2 || other_queues == 1)
+    else if (other_queues == 1)
     {
         /* something in another completion queue or unexpected queue */
         /* TODO: return immediately so they can be handled */
@@ -1337,26 +1225,45 @@ start:
     }
     else
     {
-        /* wait on condition variable until something signals the condition
-         * variable (something completed) or max_idle_time_ms is reached
+        /* wait until something signals the condition variable (something 
+         * completed) or max_idle_time_ms is reached
          */
         /* TODO: what do I do here for Windows? */
         gettimeofday(&now, NULL);
         timeout.tv_sec = now.tv_sec + max_idle_time_ms / 1000; /* ms to sec */
         timeout.tv_nsec = 0;
+        /* TODO: completed_mutex should be locked prior to 
+         *       gen_cond_timedwait() call */
+        gen_mutex_lock(&completed_mutex);
+        /* During the execution of gen_cond_timedwait, the mutex is unlocked */
         ret = gen_cond_timedwait(&completed_cond_var,
                                  &completed_mutex,
                                  &timeout);
         if (ret == 0)
         {
-            /* something signaled the condition variable, which means
-             * something was added to a completion queue
+            /* Something signaled the condition variable, which means
+             * something was added to a completion queue. The mutex is now 
+             * locked again by gen_cond_timedwait()
              */
+            gen_mutex_unlock(&completed_mutex);
             goto start;
+        }
+        else if (ret == ETIMEDOUT)
+        {
+            /* reached max_idle_time_ms without being signaled */
+            gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                         "BMI_testcontext: gen_cond_timedwait reached "
+                         "max_idle_time_ms without being signaled.\n");
+            gen_mutex_unlock(&completed_mutex);
+            return 0;
         }
         else
         {
-            
+            /* ret == EINVAL */
+            gossip_lerr("Error: BMI_testcontext: gen_cond_timedwait "
+                        "returned EINVAL.\n");
+            gen_mutex_unlock(&completed_mutex);
+            return -ret; /* TODO: should this be negative? */
         }
     }
     

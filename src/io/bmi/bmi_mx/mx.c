@@ -2403,7 +2403,8 @@ static void bmx_peer_post_queued_txs(struct bmx_peer *peer)
 
 
 static int bmx_post_unexpected_recv(mx_endpoint_addr_t source,
-                                    uint8_t type, uint32_t id,
+                                    uint8_t type,
+                                    uint32_t id,
                                     uint32_t tag,
                                     uint64_t match,
                                     uint32_t length)
