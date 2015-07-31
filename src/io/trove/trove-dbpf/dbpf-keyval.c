@@ -1843,7 +1843,7 @@ static int dbpf_keyval_iterate_cursor_get(
             return -TROVE_ENOMEM;
         }
 
-        ret = dbpf_db_cursor_get(dbc, &db_key, &db_data, db_flags,
+        ret = dbpf_db_cursor_get(dbc, &db_key, &db_data, DBPF_DB_CURSOR_CURRENT,
             DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(DBPF_MAX_KEY_LENGTH));
         if (ret == TROVE_ENOENT)
         {
