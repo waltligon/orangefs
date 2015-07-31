@@ -512,6 +512,7 @@ struct PINT_client_mgmt_perf_mon_list_sm
     int64_t **perf_matrix;
     uint64_t *end_time_ms_array;
     int server_count; 
+    int req_keys; 
     int *key_count; 
     int history_count; 
     PVFS_id_gen_t *addr_array;

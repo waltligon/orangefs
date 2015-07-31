@@ -157,8 +157,17 @@ void PINT_client_capcache_finalize(void)
 {
     gen_mutex_lock(&client_capcache_mutex);
 
-    PINT_tcache_finalize(client_capcache);
-    client_capcache = NULL;
+    if(client_capcache != NULL)
+    {
+        PINT_tcache_finalize(client_capcache);
+        client_capcache = NULL;
+    }
+
+    if(client_capcache_pc != NULL)
+    {
+        PINT_perf_finalize(client_capcache_pc);
+        client_capcache_pc = NULL;
+    }
 
     gen_mutex_unlock(&client_capcache_mutex);
 

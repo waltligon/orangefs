@@ -16,6 +16,11 @@
 /* define FD flags unique to PVFS here */
 #define PVFS_FD_NOCACHE 0x10000
 
+/* functions to check fd or path validity */
+extern int pvfs_valid_path(const char *path);
+
+extern int pvfs_valid_fd(int fd);
+
 /* pvfs_open */
 extern int pvfs_open(const char *path, int flags, ...);
 

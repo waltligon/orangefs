@@ -3,7 +3,7 @@ AM_CPPFLAGS=-DVERSION=\""${PACKAGE_VERSION}"\" \
             "-I`${WP_APXS} -q INCLUDEDIR`" \
             "-I`${WP_APXS} -q APR_INCLUDEDIR`" \
             "`${WP_PVFS2_CONFIG} --cflags`"
-AM_LDFLAGS="`${WP_PVFS2_CONFIG} --libs`"
+AM_LDFLAGS="`${WP_PVFS2_CONFIG} --libs`" -lpam
 lib_LTLIBRARIES = libmod_dav_orangefs.la
 libmod_dav_orangefs_la_SOURCES=mod_dav_orangefs.c
 

@@ -133,6 +133,13 @@ do {                                                    \
     (__dsa)->ntime = time(NULL);                        \
 } while (0)
 
+/* convenience and back compatibility */
+#define PVFS_object_attr_to_ds_attr(__oa, __dsa)        \
+        PVFS_ds_attr_from_PVFS_object_attr((__dsa), (__oa))
+
+#define PVFS_ds_attr_to_object_attr(__dsa, __oa)        \
+        PVFS_object_attr_from_ds_attr((__oa), (__dsa))
+
 #define PVFS_object_attr_from_ds_attr(__oa, __dsa)                     \
 do {                                                                   \
     (__oa)->owner = (__dsa)->uid;                                      \

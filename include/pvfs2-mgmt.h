@@ -72,6 +72,12 @@ enum PINT_server_perf_keys
     PINT_PERF_SMALL_WRITE = 9,          /* bytes written by small_io */
     PINT_PERF_FLOW_READ = 10,           /* bytes read by flow */
     PINT_PERF_FLOW_WRITE = 11,          /* bytes written by flow */
+    PINT_PERF_CREATE = 12,              /* create requests called */
+    PINT_PERF_REMOVE = 13,              /* remove requests called */
+    PINT_PERF_MKDIR = 14,               /* mkdir requests called */
+    PINT_PERF_RMDIR = 15,               /* rmdir requests called */
+    PINT_PERF_GETATTR = 16,             /* getattr requests called */
+    PINT_PERF_SETATTR = 17,             /* setattr requests called */
 };
 
 /* low level information about individual server level objects */

@@ -5,5 +5,6 @@ USERSRC := \
 	$(DIR)/setmattr.c  \
 	$(DIR)/pvfs2-rm.c  \
 	$(DIR)/ofs_xattr.c \
+	$(DIR)/ofs_rm.c \
 	$(DIR)/ofs_cp.c    
  

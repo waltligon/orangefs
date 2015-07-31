@@ -366,7 +366,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     {
         int ret;
         gossip_debug(GOSSIP_CLIENT_DEBUG, "*** "
-                     "getattr_comp_fn: Object type mismatch.\n Possibly "
+                     "object_getattr_comp_fn: Object type mismatch.\n Possibly "
                      "saving network roundtrip by returning an error\n");
 
         if (sm_p->getattr.ref_type == PVFS_TYPE_DIRECTORY)
@@ -703,9 +703,6 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     int ret = -1;
     int attr_status = -1;
     int size_status = -1;
-#if 0 /* Don't cache size_array. */
-    int size_array_status = -1;
-#endif
 
     js_p->error_code = 0;
 
@@ -775,15 +772,6 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-#if 0 /* Don't cache size_array. */
-    ret = PINT_acache_get_cached_entry(object_ref,
-                                       &sm_p->getattr.attr,
-                                       &attr_status,
-                                       &sm_p->getattr.size,
-                                       &size_status,
-                                       &sm_p->getattr.size_array,
-                                       &size_array_status);
-#endif
     ret = PINT_acache_get_cached_entry(object_ref,
                                        &sm_p->getattr.attr,
                                        &attr_status,
@@ -935,32 +923,15 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_ACACHE_DEBUG, 
                      "%s: TRULY MISSING attrs:\n",
                      __func__);
-        PINT_attrmask_print(GOSSIP_ACACHE_DEBUG,missing_attrs);
+        PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, missing_attrs);
 
         /* Was the size missing? */
         if(missing_attrs & PVFS_ATTR_DATA_SIZE)
         {
             gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: NOTE, PVFS_ATTR_DATA_SIZE --> ACACHE MISS.\n",
+                         "%s: NOTE, MISSING PVFS_ATTR_DATA_SIZE --> ACACHE MISS.\n",
                          __func__);
         }
-
-#if 0 /* Don't cache size_array. */
-        /* Was the size_array missing? */
-        if(missing_attrs & PVFS_ATTR_DIR_DIRENT_COUNT)
-        {
-            /* if the file size is requested but the distribution info
-             * isn't and it hasn't been cached, then we need to
-             * get that first.
-             */
-
-            js_p->error_code = GETATTR_NEED_DATAFILE_ATTRS;
-            gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "acache: acache hit, need sizes[%s]\n",
-                         PVFS_OID_str(&object_ref.handle));
-            return SM_ACTION_COMPLETE;
-        }
-#endif
     }
 
     /* MISS */
@@ -2093,32 +2064,7 @@ static PINT_sm_action getattr_cleanup(struct PINT_smcb *smcb,
     }
 
     /* cleanup getattr when an error occurs */
-    if (js_p->error_code)
-    {
-        if (getattr->attr.mask & PVFS_ATTR_META_DFILES)
-        {
-            if (getattr->attr.u.meta.dfile_array)
-            {
-                free(getattr->attr.u.meta.dfile_array);
-            }
-        }
-
-/* V3 remove */
-#if 0
-        if (getattr->attr.mask & PVFS_ATTR_META_MIRROR_DFILES)
-        {
-            if (getattr->attr.u.meta.mirror_dfile_array)
-            {
-                free(getattr->attr.u.meta.mirror_dfile_array);
-            }
-        }
-#endif
-
-        if (getattr->attr.mask & PVFS_ATTR_META_DIST)
-        {
-            PINT_dist_free(getattr->attr.u.meta.dist);
-        }
-    }/*end if error*/
+    PINT_free_object_attr(&getattr->attr);
 
     return SM_ACTION_COMPLETE;
 }

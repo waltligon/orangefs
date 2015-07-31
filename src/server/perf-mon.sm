@@ -101,8 +101,8 @@ static PINT_sm_action perf_mon_do_work(struct PINT_smcb *smcb,
     int valid_count = 0;
     uint32_t tmp_next_id;
     int ret = -1;
-    uint32_t key_count = 0;
-    uint32_t sample_count = 0;
+    uint32_t key_count = 0;    /* how many different counters */
+    uint32_t sample_count = 0; /* also called history count */
 
 #ifdef __PVFS2_DISABLE_PERF_COUNTERS__
     gossip_err("Error: perf_mon request received, but perf counters are disabled.\n");
@@ -111,7 +111,9 @@ static PINT_sm_action perf_mon_do_work(struct PINT_smcb *smcb,
 #endif
 
     /* how many keys do we have in the perf counter? */
-    ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_KEY_COUNT, &key_count);
+    ret = PINT_perf_get_info(PINT_server_pc,
+                             PINT_PERF_KEY_COUNT, 
+                             &key_count);
     if(ret < 0)
     {
         return SM_ACTION_COMPLETE;
@@ -162,12 +164,15 @@ static PINT_sm_action perf_mon_do_work(struct PINT_smcb *smcb,
 
     /* fill in some of the response */
     s_op->resp.u.mgmt_perf_mon.cur_time_ms = PINT_util_get_time_ms();
-    s_op->resp.u.mgmt_perf_mon.suggested_next_id 
-            = s_op->req->u.mgmt_perf_mon.next_id;
+
+    s_op->resp.u.mgmt_perf_mon.suggested_next_id =
+                                         s_op->req->u.mgmt_perf_mon.next_id;
+
 
     s_op->resp.u.mgmt_perf_mon.key_count = key_count;
-    s_op->resp.u.mgmt_perf_mon.perf_array_count =
-            (key_count + 2) * sample_count;
+
+    s_op->resp.u.mgmt_perf_mon.perf_array_count = (key_count + 2) *
+                                                  sample_count;
 
     /* make sure we have scratch memory to use as an intermediate
      * buffer for performance counters
@@ -181,10 +186,14 @@ static PINT_sm_action perf_mon_do_work(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    /* copy data from actual counter linked list format
+     * into a temporary array where we can then copy to
+     * response array
+     */
     PINT_perf_retrieve(PINT_server_pc,
-                        static_value_array,
-                        static_key_count,
-                        static_history_size);
+                       static_value_array,
+                       static_key_count,
+                       static_history_size);
 
     /* we are filling per_array in backwards, but this is the order
      * karma and other programs that collect data over multiple
@@ -206,8 +215,8 @@ static PINT_sm_action perf_mon_do_work(struct PINT_smcb *smcb,
          * 3) if the start time has rolled over within MAX_NEXT_ID
          */
         if(tmp_next_id != 0 &&
-                ((tmp_next_id >= s_op->req->u.mgmt_perf_mon.next_id) ||
-                ((s_op->req->u.mgmt_perf_mon.next_id - tmp_next_id) >
+           ((tmp_next_id >= s_op->req->u.mgmt_perf_mon.next_id) ||
+            ((s_op->req->u.mgmt_perf_mon.next_id - tmp_next_id) >
                  (MAX_NEXT_ID / 2))))
         {
             /* found oldest valid sample */
@@ -224,6 +233,8 @@ static PINT_sm_action perf_mon_do_work(struct PINT_smcb *smcb,
                    &STATIC_SAMP(i),
                    key_count * sizeof(int64_t));
 
+
+            /* timestamp */
             memcpy(&SOP_PERF_TIME(valid_count),
                    &STATIC_TIME(i),
                    2 * sizeof(int64_t));
@@ -241,6 +252,8 @@ static PINT_sm_action perf_mon_do_work(struct PINT_smcb *smcb,
                    &STATIC_SAMP(0),
                    key_count * sizeof(int64_t));
 
+
+            /* timestamp */
             memcpy(&SOP_PERF_TIME(valid_count),
                    &STATIC_TIME(0),
                    2 * sizeof(int64_t));
