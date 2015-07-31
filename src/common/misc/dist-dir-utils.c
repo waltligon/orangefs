@@ -13,6 +13,7 @@
 #include "pvfs2-internal.h"
 #include "dist-dir-utils.h"
 #include "md5.h"
+#include "bmi-byteswap.h"
 
 
 /****************************
@@ -305,7 +306,7 @@ PVFS_dist_dir_hash_type PINT_encrypt_dirdata(const char *const name)
 	md5_finish(&state, digest);
 
 	hash_val = (PVFS_dist_dir_hash_type *)(digest + 8);
-	return *hash_val;
+        return bmitoh64(*hash_val);
 }
 
 
@@ -319,6 +320,7 @@ int PINT_dist_dir_set_serverno(const int server_no,
 			ddbitmap != NULL &&
 			server_no >= -1 &&
 			server_no < ddattr->dirdata_count);
+
 
 	ddattr->server_no = server_no;
 	

@@ -143,6 +143,17 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     s_op->access_type = PINT_server_req_get_access_type(s_op->req);
     s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
 
+
+    /* add the user to the uid mgmt system */
+/* TODO: not currently supported w/new security system
+    ret = PINT_add_user_to_uid_mgmt(s_op->req->credentials.uid);
+    if (ret != 0)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "Unable to add user id to uid"
+                      "management interface\n");
+    }
+*/
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -460,6 +471,9 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     if (ret)
     {
         ret = PINT_perm_check(s_op);
+        gossip_debug(GOSSIP_SERVER_DEBUG,"%s:return from PINT_perm_check=%d\n"
+                                        ,__func__
+                                        ,ret);
     }
     else
     {
@@ -494,8 +508,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     js_p->error_code = ret;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "(%p) %s (prelude sm) state: perm_check (status = %d)\n",
-                 s_op, PINT_map_server_op_to_string(s_op->req->op),
+                 "(%p) %s (req=%d) (prelude sm) state: perm_check (status = %d)\n",
+                 s_op, PINT_map_server_op_to_string(s_op->req->op),s_op->req->op,
                  js_p->error_code);
 
 complete:

@@ -103,9 +103,11 @@ PVFS_error PVFS_imgmt_perf_mon_list(PVFS_fs_id fs_id,
     PINT_init_sysint_credential(sm_p->cred_p, credential);
 
     sm_p->u.perf_mon_list.fs_id = fs_id;
+    /* perf_matrix should be server_count * key_count * history count */
     sm_p->u.perf_mon_list.perf_matrix = perf_matrix;
     sm_p->u.perf_mon_list.server_count = server_count;
     sm_p->u.perf_mon_list.key_count = key_count;
+    sm_p->u.perf_mon_list.req_keys = *key_count;
     sm_p->u.perf_mon_list.history_count = history_count;
     sm_p->u.perf_mon_list.addr_array = addr_array;
     sm_p->u.perf_mon_list.next_id_array = next_id_array;
@@ -294,9 +296,7 @@ static PINT_sm_action mgmt_perf_mon_list_cleanup(struct PINT_smcb *smcb,
 		    errct++;
 		}
 		else
-		{
-		    sm_p->u.perf_mon_list.details->count_exceeded = 1;
-		}
+		{ sm_p->u.perf_mon_list.details->count_exceeded = 1; }
 	    }
 	}
 	sm_p->u.perf_mon_list.details->count_used = errct;

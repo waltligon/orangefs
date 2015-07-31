@@ -556,6 +556,9 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
                  "parent owner: %d, group: %d, perms: %d\n",
                  (int)attr->owner, (int)attr->group, (int)attr->perms);
 
+    PINT_debug_capability(&sm_p->getattr.attr.capability,
+                          "create_parent_getattr_inspect");
+
     /* do we have a setgid bit? */
     if(attr->perms & PVFS_G_SGID)
     {
@@ -980,6 +983,8 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index;
     int dirdata_sid_index;
+    int i;
+    unsigned char *c;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: crdirent_setup_msgpair\n");
@@ -993,6 +998,17 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                  "create: encrypt dirent %s into hash value %llu.\n", 
                  sm_p->u.create.object_name,
                  llu(dirdata_hash));
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create: dist_dir_bitmap:\n");
+    for(i = sm_p->getattr.attr.u.dir.dist_dir_attr.bitmap_size - 1;
+        i >= 0;
+        i--)
+    {
+        c = (unsigned char *)(sm_p->getattr.attr.u.dir.dist_dir_bitmap + i);
+        gossip_debug(GOSSIP_CLIENT_DEBUG," i=%d : %02x %02x %02x %02x\n"
+                                        , i, c[3], c[2], c[1], c[0]);
+    }
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "\n");
 
     dirdata_server_index = 
             PINT_find_dist_dir_bucket(dirdata_hash,
@@ -1031,6 +1047,8 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                 sm_p->parent_ref.handle,      /* back ptr to dir */
                 sm_p->parent_ref.sid_array,   /* back ptr to dir */
                 sm_p->hints);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,"create: msg_p->req.op(%d)\n",msg_p->req.op);
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
@@ -1077,6 +1095,11 @@ static PINT_sm_action create_crdirent_failure(struct PINT_smcb *smcb,
                      "create: received -PVFS_EAGAIN, "
                      "will retry getattr and crdirent (attempt number %d).\n",
                      sm_p->u.create.retry_count);
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "%s:sm_p->getattr.attr.mask(0x%0x)\n",
+                     __func__,
+                     sm_p->getattr.attr.mask);
         
         /* clear acache content */
         PINT_acache_invalidate(sm_p->object_ref);

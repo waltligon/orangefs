@@ -14,6 +14,13 @@
 #include <ctype.h>
 #include <time.h>
 
+/* pam enablement */
+#include <security/pam_appl.h>
+#include <syslog.h>
+
+/* apache auth */
+#include <mod_auth.h>
+
 #include <mod_dav.h>
 #include <http_config.h>
 #include <http_log.h>
@@ -29,6 +36,12 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <grp.h>
+
+/* pam enablement */
+static int auth_conv();
+struct pam_conv pc={auth_conv,NULL};
+pam_handle_t *ph;
+char pass[100];
 
 #define DEBUG_ORANGEFS_TRIGGER "/etc/orangeFSdebugTrigger"
 #define DEBUG_ORANGEFS access(DEBUG_ORANGEFS_TRIGGER, F_OK) == 0
@@ -1529,9 +1542,10 @@ static dav_error *dav_orangefs_walk(const dav_walk_params *params,
        no response is sent back to the client for the PROPFIND. The MacOS 
        client responds to the situation by continuously pumping out PROPFINDS 
        until the log file on the Apache server fills up (or the universe 
-       becomes unhinged some other undesirable way). The same thing happens 
+       becomes unhinged in some other undesirable way). The same thing happens 
        with the apr repository, the "fault" is in Apache's (understandable) 
-       inability to respond to these kinds of requests when they fail, and             mostly in the MacOS's insistence on retaliating by launching a 
+       inability to respond to these kinds of requests when they fail, and
+       mostly in the MacOS's insistence on retaliating by launching a 
        denial-of-service attack on the Apache server.
 
        I think this thread from dev.httpd.apache.org sums it up...
@@ -3765,11 +3779,85 @@ void dav_orangefs_insert_all_liveprops(request_rec *r,
   return;
 }
 
+/*
+ * This module can be an apache auth module if we configure it
+ * to be one in httpd.conf. When we are the auth module, we
+ * will check the user/password with PAM. When we get to this
+ * function we have the user and password entered into our http auth box.
+ */
+
+static authn_status check_password(request_rec *r,
+                                   const char *user,
+                                   const char *password)
+{
+  int rc;
+
+  if (debug_orangefs) {
+    DBG2("orangefs: user:%s: password:%s:",user,password);
+  }
+
+  strcpy(pass,password);
+
+  if ((rc = pam_start("httpd",user,&pc,&ph))) {
+    DBG1("pam_start failed, rc:%d:\n",rc);
+    rc = AUTH_DENIED;
+    goto out;
+  }
+
+  if ((rc = pam_authenticate(ph,0))) {
+    DBG1("pam_authenticate failed, rc:%d:",rc);
+    rc = AUTH_DENIED;
+    goto out;
+  }
+
+  pam_end(ph,rc);
+
+  rc = AUTH_GRANTED;
+
+out:
+
+  return rc;
+
+}
+
+static int auth_conv(int num_msg, struct pam_message **msg,
+                    struct pam_response **response, void *appdata_ptr)
+{
+  /*
+   * this memory gets freed way down in pam_end, it would
+   * hose things up if we got this memory from an apr pool.
+   */
+  *response =
+     (struct pam_response *) malloc(sizeof (struct pam_response));
+
+  if(*response == (struct pam_response *)0) {
+    DBG0("pam conv: malloc failed!");
+    return PAM_BUF_ERR;
+  }
+
+  (*response)->resp = strdup(pass);
+  (*response)->resp_retcode = 0;
+  return PAM_SUCCESS;
+}
+
+/*
+ * The DAV module, when used as an auth module, doesn't support digest mode,
+ * so we only have check_password here.
+ */
+static const authn_provider authn_this_module_provider =
+{
+  &check_password,
+};
+
 static void register_hooks(apr_pool_t *p) {
 
   if (debug_orangefs) {
     DBG0("orangefs: register_hooks");
   }
+
+  /* apache auth */
+  ap_register_provider(p, AUTHN_PROVIDER_GROUP, "this_module", "0",
+                         &authn_this_module_provider);
 
   ap_hook_post_config(dav_orangefs_init_handler,NULL,NULL,APR_HOOK_LAST);
 
@@ -3924,10 +4012,16 @@ int orangeAttrs(char *action, char *resource, apr_pool_t *pool,
       pw = getpwnam(drp->r->user);
       if (pw) {
         /* local auth */
-        if (credInit(&credential, pool, conf->certpath, drp->r->user, pw->pw_uid, pw->pw_gid))
+        if (credInit(&credential,
+                     pool,
+                     conf->certpath,
+                     drp->r->user,
+                     pw->pw_uid,
+                     pw->pw_gid))
           return EACCES;
         credCopy(credential, &(drp->credential), pool);
-      } else {
+      } else if (apr_table_get(drp->r->subprocess_env,
+                              "AUTHENTICATE_UIDNUMBER")) {
         /* ldap auth */
         uid = strtoimax((char *)apr_table_get(drp->r->subprocess_env,
                                               "AUTHENTICATE_UIDNUMBER"),
@@ -3935,6 +4029,19 @@ int orangeAttrs(char *action, char *resource, apr_pool_t *pool,
         gid = strtoimax((char *)apr_table_get(drp->r->subprocess_env,
                                               "AUTHENTICATE_GIDNUMBER"),
                         0, 0);
+        if (credInit(&credential, pool, conf->certpath, drp->r->user,
+                     uid, gid))
+          return EACCES;
+        credCopy(credential, &(drp->credential), pool);
+      } else {
+        /*
+         * Somehow this guy got authenticated and we can't
+         * find his uid/gid. Set him to "nobody", or whatever
+         * we ended up setting as the default in the server
+         * config...
+         */
+        uid = strtoimax(conf->uid, 0, 0);
+        gid = strtoimax(conf->gid, 0, 0);
         if (credInit(&credential, pool, conf->certpath, drp->r->user,
                      uid, gid))
           return EACCES;

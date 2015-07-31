@@ -48,6 +48,36 @@ static int my_glibc_getcwd(char *buf, unsigned long size)
 #endif
 
 /**
+ * functions to verify a valid PVFS file or path
+ */
+int pvfs_valid_path(const char *path)
+{
+    int ret;
+    ret = is_pvfs_path(&path, 0);
+    PVFS_free_expanded(path);
+    /* clear errors */
+    errno = 0;
+    return ret;
+}
+
+int pvfs_valid_fd(int fd)
+{
+    pvfs_descriptor *pd;  
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    if (pd->s->fsops == &glibc_ops)
+    {
+        /* This is not a PVFS file or dir */
+        return 0;
+    }
+    return 1;
+}
+
+/**
  *  pvfs_open
  */
 int pvfs_open(const char *path, int flags, ...)
@@ -1339,7 +1369,8 @@ int pvfs_futimesat(int dirfd,
         attr.atime = times[0].tv_sec;
         attr.mtime = times[1].tv_sec;
     }
-    attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_MTIME;
+    attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_ATIME_SET |
+                PVFS_ATTR_SYS_MTIME | PVFS_ATTR_SYS_MTIME_SET;
     rc = iocommon_setattr(pd2->s->pvfs_ref, &attr);
     if (path)
     {
@@ -1395,7 +1426,8 @@ int pvfs_futimes(int fd, const struct timeval times[2])
         attr.atime = times[0].tv_sec;
         attr.mtime = times[1].tv_sec;
     }
-    attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_MTIME;
+    attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_ATIME_SET |
+                PVFS_ATTR_SYS_MTIME | PVFS_ATTR_SYS_MTIME_SET;
     rc = iocommon_setattr(pd->s->pvfs_ref, &attr);
     pvfs_close(pd->fd);
     return rc;

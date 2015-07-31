@@ -14,6 +14,8 @@
 
 #ifndef WIN32
 /* pint-malloc.c is not used on Windows */
+#include <unistd.h>
+
 struct glibc_malloc_ops_s
 {
     void *(*malloc)(size_t size);
@@ -25,13 +27,19 @@ struct glibc_malloc_ops_s
     char *(*strdup)(const char *str);
     char *(*strndup)(const char *str, size_t size);
     void  (*free)(void *mem);
+    int   (*pipe)(int fds[2]);
+    size_t (*write)(int fd, const void *mem, size_t count);
+    void  (*close)(int fd);
 };
 
 extern void init_glibc_malloc(void) GCC_CONSTRUCTOR(INIT_PRIORITY_MALLOC);
 
-extern void *PINT_malloc_minimum(size_t size) GCC_MALLOC;
-extern void *PINT_malloc(size_t size) GCC_MALLOC;
-extern void *PINT_calloc(size_t nmemb, size_t size) GCC_MALLOC;
+extern int PINT_check_address(void *ptr) GCC_UNUSED;
+extern int PINT_check_malloc(void *ptr) GCC_UNUSED;
+
+extern void *PINT_malloc_minimum(size_t size);
+extern void *PINT_malloc(size_t size);
+extern void *PINT_calloc(size_t nmemb, size_t size);
 extern int   PINT_posix_memalign(void **mem, size_t alignment, size_t size);
 extern void *PINT_memalign(size_t alignment, size_t size) GCC_MALLOC;
 extern void *PINT_valloc(size_t size) GCC_MALLOC;
@@ -77,7 +85,8 @@ extern void  PINT_free(void *mem);
 # ifdef malloc
 #  undef malloc
 # endif
-# define malloc PINT_malloc
+/* Defining malloc with an arg avoids losing on __attribute__((malloc))  */
+# define malloc(x) PINT_malloc(x)
 
 # ifdef calloc
 #  undef calloc

@@ -103,6 +103,7 @@ nested machine pvfs2_set_attr_work_sm
     state write_distr_dir_data_if_required
     {
         run setattr_write_distr_dir_data_if_required;
+        success => setobj_attrib;
         default => work_cleanup;
     }
 
@@ -564,21 +565,31 @@ static PINT_sm_action setattr_setobj_attribs(struct PINT_smcb *smcb,
      * PVFS_object_attr_overwrite_setable
      * macro, since there are many more users of it, I think.
      */
-     if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
-     {
-         PVFS_time orig_mtime = a_p->mtime;
-         a_p->mtime = PINT_util_mktime_version(orig_mtime);
-         gossip_debug(GOSSIP_SETATTR_DEBUG, "setting version "
-                      "to %llu\n\tmtime is %llu\n",
-                      llu(a_p->mtime), llu(orig_mtime));
-     }
+    if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
+    {
+        PVFS_time orig_mtime = a_p->mtime;
+        a_p->mtime = PINT_util_mktime_version(orig_mtime);
+        gossip_debug(GOSSIP_SETATTR_DEBUG, "setting version "
+                     "to %llu\n\tmtime is %llu\n",
+                     llu(a_p->mtime), llu(orig_mtime));
+    }
 
-     /*
-      * Probably any time attributes are set we should update ctime
-      * Clients should be able to send in specific values for the 4
-      * times to be explicitly set, and we should handle that.  Need
-      * to work out details of that for the mask an so on - WBL
-      */
+    /*
+     * Probably any time attributes are set we should update ctime
+     * Clients should be able to send in specific values for the 4
+     * times to be explicitly set, and we should handle that.  Need
+     * to work out details of that for the mask an so on - WBL
+     */
+
+    /* setattr changes metadata, and thus inherently sets CTIME
+     * set the flag here and PVFS_object_attr_overwrite_setable will
+     * take care of the rest. 
+     */
+    if ((a_p->objtype == PVFS_TYPE_METAFILE) ||
+        (a_p->objtype == PVFS_TYPE_DIRECTORY))
+    {
+        a_p->mask |= PVFS_ATTR_COMMON_CTIME;
+    }
 
     /* if the object is a symbolic link, check to make sure that the request
      * is not attempting to change the permissions 

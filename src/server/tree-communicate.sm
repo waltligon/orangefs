@@ -34,8 +34,6 @@
 #include "security-util.h"
 #include "sid.h"
 
-#define	MAX_PARTITIONS	2
-
 enum
 {
     LOCAL_OPERATION = 2,
@@ -368,7 +366,7 @@ static PINT_sm_action tree_communicate_partition_handles(
                                    dummy_sys_attr,
                                    0,
                                    s_op->req->hints);
-                    
+
                     /* copy to req->u.setattr.attr because of calling
                     * pvfs2_set_attr_work_sm next
                     */
@@ -379,7 +377,7 @@ static PINT_sm_action tree_communicate_partition_handles(
                     req->u.setattr.attr.mask |= PVFS_ATTR_COMMON_TYPE;
                 }
                 tree_communicate_s_op->local_index = i;
-
+ 
                 break;
             
             case PVFS_SERV_TREE_REMOVE:
@@ -453,25 +451,27 @@ static PINT_sm_action tree_communicate_partition_handles(
     if (s_op->u.tree_communicate.handle_array_remote_count > 0)
     {
         /* Decide how to divide the remote handles.
-         * If there are only a few (MAX_PARTITIONS or
-         * fewer) then go ahead and send to each 
-         * remaining server individually.
+         * If there are only a few (fewer than tree_threshhold
+         * from the config file) then go ahead and
+         * send to each remaining server individually.
          */
-        if (s_op->u.tree_communicate.handle_array_remote_count > MAX_PARTITIONS)
+        if (s_op->u.tree_communicate.handle_array_remote_count >
+            config->tree_threshold)
         {
-            num_partitions = MAX_PARTITIONS;
+            num_partitions = config->tree_width;
             num_files_per_server =
-                     s_op->u.tree_communicate.handle_array_remote_count /
-                     MAX_PARTITIONS;
+                   s_op->u.tree_communicate.handle_array_remote_count /
+                   config->tree_width;
             if (num_partitions * num_files_per_server <
-                     s_op->u.tree_communicate.handle_array_remote_count)
+                   s_op->u.tree_communicate.handle_array_remote_count)
             {
                 num_files_per_server++;
             }
         }
         else
         {
-            num_partitions = s_op->u.tree_communicate.handle_array_remote_count;
+            num_partitions =
+                     s_op->u.tree_communicate.handle_array_remote_count;
             num_files_per_server = 1;
         }
 

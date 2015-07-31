@@ -338,7 +338,7 @@ static int PINT_eattr_verify_acl_access(PVFS_ds_keyval *key,
 #else
     /* New Posix compliant PVFS2 ACL format */
     if(val->buffer_sz == 0 || 
-            (val->buffer_sz - sizeof(pvfs2_acl_header) - 1) %
+            (val->buffer_sz - sizeof(pvfs2_acl_header)) %
                 sizeof(pvfs2_acl_entry) != 0)
     {
         return -PVFS_EINVAL;

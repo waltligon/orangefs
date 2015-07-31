@@ -828,6 +828,10 @@ static PINT_sm_action crdirent_cleanup(struct PINT_smcb *smcb,
     {
         PINT_dist_free(s_op->u.crdirent.dist);
     }
+    if (s_op->u.crdirent.remote_dirdata_handles)
+    {
+        free(s_op->u.crdirent.remote_dirdata_handles);
+    }
 
     PINT_cleanup_capability(&s_op->u.crdirent.capability);
 
