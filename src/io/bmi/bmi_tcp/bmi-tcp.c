@@ -132,6 +132,11 @@ int BMI_tcp_check_cq(int incount,
                      void **user_ptr_array,
                      bmi_context_id);
 
+int BMI_tcp_check_unexp_q(int incount,
+                          int *outcount,
+                          struct bmi_method_unexpected_info *info,
+                          int max_idle_time)
+
 bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string);
 
 const char *BMI_tcp_addr_rev_lookup_unexpected(bmi_method_addr_p map);
@@ -371,6 +376,7 @@ const struct bmi_method_ops bmi_tcp_ops = {
     .testunexpected = BMI_tcp_testunexpected,
     .testcontext = BMI_tcp_testcontext,
     .check_cq = BMI_tcp_check_cq,
+    .check_unexp_q = BMI_tcp_check_unexp_q,
     .method_addr_lookup = BMI_tcp_method_addr_lookup,
     .post_send_list = BMI_tcp_post_send_list,
     .post_recv_list = BMI_tcp_post_recv_list,
@@ -1440,7 +1446,6 @@ int BMI_tcp_testunexpected(int incount,
         info[*outcount].tag = query_op->msg_tag;
         op_list_remove(query_op);
         dealloc_tcp_method_op(query_op);
-        bmi_dec_unexp_count_callback();  /* TODO */
         (*outcount)++;
     }
     gen_mutex_unlock(&interface_mutex);
@@ -1682,7 +1687,7 @@ int BMI_tcp_check_unexp_q(int incount,
     
     while ((*outcount < incount) &&
            (query_op = op_list_shownext(
-                                        op_list_array[IND_COMPLETE_RECV_UNEXP])))
+                                    op_list_array[IND_COMPLETE_RECV_UNEXP])))
     {
         info[*outcount].error_code = query_op->error_code;
         info[*outcount].addr = query_op->addr;
@@ -1691,7 +1696,6 @@ int BMI_tcp_check_unexp_q(int incount,
         info[*outcount].tag = query_op->msg_tag;
         op_list_remove(query_op);
         dealloc_tcp_method_op(query_op);
-        bmi_dec_unexp_count_callback();     /* TODO */
         (*outcount)++;
     }
     
@@ -3099,7 +3103,6 @@ static int tcp_cleanse_addr(bmi_method_addr_p map,
                 {
                     op_list_add(op_list_array[IND_COMPLETE_RECV_UNEXP],
                                 query_op);
-                    bmi_inc_unexp_count_callback();
                 }
                 else
                 {
@@ -3865,7 +3868,6 @@ static int work_on_recv_op(method_op_p my_method_op,
             {
                 op_list_add(op_list_array[IND_COMPLETE_RECV_UNEXP],
                             my_method_op);
-                bmi_inc_unexp_count_callback():
             }
             else
             {

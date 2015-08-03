@@ -151,9 +151,6 @@ static gen_mutex_t completed_mutex = GEN_MUTEX_INITIALIZER;
 static gen_cond_t completed_cond_var = GEN_COND_INITIALIZER;
 
 static gen_mutex_t cq_mutex = GEN_MUTEX_INITIALIZER;
-
-static gen_mutex_t unexp_mutex = GEN_MUTEX_INITIALIZER;
-static int unexpected_count = 0;
 #endif
 
 static int global_flags;
@@ -168,9 +165,6 @@ static void bmi_addr_force_drop(ref_st_p ref,
                                 ref_list_p ref_list);
 static void bmi_check_forget_list(void);
 static void bmi_check_addr_force_drop(void);
-
-/* top-level completion queue for all of bmi */
-static op_list_p bmi_completion_array[BMI_MAX_CONTEXTS] = { NULL };
 
 
 /** Initializes the BMI layer.  Must be called before any other BMI
@@ -649,49 +643,6 @@ int BMI_open_context(bmi_context_id *context_id)
     int context_index;
     int i;
     int ret = 0;
-    
-    gen_mutex_lock(&context_mutex);
-    
-    for (context_index = 0; context_index < BMI_MAX_CONTEXTS; context_index++)
-    {
-        if (context_array[context_index] == 0)
-        {
-            break;
-        }
-    }
-    
-    if (context_index >= BMI_MAX_CONTEXTS)
-    {
-        /* we don't have any more available! */
-        gen_mutex_unlock(&context_mutex);
-        return bmi_errno_to_pvfs(-EBUSY);
-    }
-    
-    gen_mutex_lock(&cq_mutex);
-    
-    /* start a new queue for tracking completions in this context */
-    bmi_completion_array[context_index] = op_list_new();
-    if (!bmi_completion_array[context_index])
-    {
-        gen_mutex_unlock(&cq_mutex);
-        return bmi_errno_to_pvfs(-ENOMEM);
-    }
-    
-    gen_mutex_unlock(/* some_lock */);
-    
-    context_array[context_index] = 1;
-    *context_id = context_index;
-    
-    gen_mutex_unlock(&context_mutex);
-    return 0;
-}
-/* TODO: remove this when done */
-#if 0
-int BMI_open_context(bmi_context_id *context_id)
-{
-    int context_index;
-    int i;
-    int ret = 0;
 
     gen_mutex_lock(&context_mutex);
 
@@ -741,37 +692,10 @@ out:
     gen_mutex_unlock(&context_mutex);
     return (ret);
 }
-#endif /* 0 */
 
 
 /** Destroys a context previously generated with BMI_open_context().
  */
-void BMI_close_context(bmi_context_id context_id)
-{
-    int i;
-    
-    gen_mutex_lock(&context_mutex);
-    
-    if (!context_array[context_id])
-    {
-        gen_mutex_unlock(&context_mutex);
-        return;
-    }
-   
-    gen_mutex_lock(/* some_lock */);
-    
-    /* tear down completion queue for this context */
-    op_list_cleanup(bmi_completion_array[context_id]);
-    
-    gen_mutex_unlock(/* some_mutex */);
-    
-    context_array[context_id] = 0;
-    
-    gen_mutex_unlock(&context_mutex);
-    return;
-}
-/* TODO: remove this when done */
-#if 0
 void BMI_close_context(bmi_context_id context_id)
 {
     int i;
@@ -796,7 +720,6 @@ void BMI_close_context(bmi_context_id context_id)
     gen_mutex_unlock(&context_mutex);
     return;
 }
-#endif /* 0 */
 
 
 /** Submits receive operations for subsequent service.
@@ -1005,7 +928,6 @@ void *BMI_proto_thread_func(void *params)
 }
 
 /* USE_PROTO_THREADS */
-/*#ifdef USE_PROTO_THREADS*/
 /** Checks to see if any unexpected messages have completed.
  *
  *  \return 0 on success, -errno on failure.
@@ -1017,10 +939,92 @@ int BMI_testunexpected(int incount,
                        struct BMI_unexpected_info *info_array,
                        int max_idle_time_ms)
 {
+    int i = 0;
+    int ret = -1;
+    int position = 0;
+    int tmp_outcount = 0;
     
+#ifdef WIN32
+    struct bmi_method_unexpected_info *sub_info =
+            (struct bmi_method_unexpected_info *)
+            malloc(sizeof(struct bmi_method_unexpected_info) * incount);
+#else
+    bmi_method_unexpected_info sub_info[incount];
+#endif
+    
+    ref_st_p tmp_ref = NULL;
+    int tmp_active_method_count = 0;
+    
+    /* figure out if we need to drop any stale addresses */
+    bmi_check_forget_list();
+    bmi_check_addr_force_drop();
+    
+    gen_mutex_lock(&active_method_count_mutex);
+    tmp_active_method_count = active_method_count;
+    gen_mutex_unlock(&active_method_count_mutex);
+    
+    if (max_idle_time_ms < 0)
+    {
+#ifdef WIN32
+        free(sub_info);
+#endif
+        return (bmi_errno_to_pvfs(-EINVAL));
+    }
+    
+    *outcount = 0;
+    
+    while (position < incount && i < tmp_active_method_count)
+    {
+        ret = active_method_table[i]->check_unexp_q((incount - position),
+                                                    &tmp_outcount,
+                                                    (&(sub_info[position])),
+                                                    max_idle_time_ms);
+        /* TODO: error-handling */
+        
+        position += tmp_outcount;
+        (*outcount) += tmp_outcount;
+        i++;
+    }
+    
+    for (i = 0; i < (*outcount); i++)
+    {
+        info_array[i].error_code = sub_info[i].error_code;
+        info_array[i].buffer = sub_info[i].buffer;
+        info_array[i].size = sub_info[i].size;
+        info_array[i].tag = sub_info[i].tag;
+        gen_mutex_lock(&ref_mutex);
+        tmp_ref = ref_list_search_method_addr(cur_ref_list, sub_info[i].addr);
+        if (!tmp_ref)
+        {
+            /* yeah, right */
+#ifdef WIN32
+            free(sub_info);
+#endif
+            gossip_lerr("Error: critical BMI_testunexpected failure.\n");
+            gen_mutex_unlock(&ref_mutex);
+            return (bmi_errno_to_pvfs(-EPROTO));
+        }
+        
+        if (global_flags & BMI_AUTO_REF_COUNT)
+        {
+            tmp_ref->ref_count++;
+        }
+        gen_mutex_unlock(&ref_mutex);
+        info_array[i].addr = tmp_ref->bmi_addr;
+    }
+    
+#ifdef WIN32
+    free(sub_info);
+#endif
+    /* return 1 if anything completed */
+    if (ret == 0 && *outcount > 0)
+    {
+        return 1;
+    }
+    return 0;
 }
 #if 0
-/*#else*/
+/* keeping this as a reference for now */
 /** Checks to see if any unexpected messages have completed.
  *
  *  \return 0 on success, -errno on failure.
@@ -1122,7 +1126,7 @@ int BMI_testunexpected(int incount,
     }
     return (0);
 }
-#endif /* USE_PROTO_THREADS */
+#endif /* 0 */
 
 
 /* USE_PROTO_THREADS */
@@ -2374,24 +2378,6 @@ void bmi_method_addr_drop_callback(char *method_name)
 
     return;
 }
-
-
-/* TODO: documentation
- */
-void bmi_inc_unexp_count_callback()
-{
-    unexpected_count++;
-}
-
-
-/* TODO: documentation
- */
-void bmi_dec_unexp_count_callback()
-{
-    assert(unexpected_count > 0);
-    unexpected_count--;
-}
-
 
 
 /*
