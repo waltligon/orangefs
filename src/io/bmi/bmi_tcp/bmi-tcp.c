@@ -1398,9 +1398,18 @@ int BMI_tcp_testunexpected(int max_idle_time)
 {
     int ret = -1;
     
-    /* TODO: do I need to lock the interface_mutex here? */
+    gen_mutex_lock(&interface_mutex);
     
+    /* do some "real work" here */
+    ret = tcp_do_work(max_idle_time);
+    if (ret < 0)
+    {
+        gen_mutex_unlock(&interface_mutex);
+        return ret;
+    }
     
+    gen_mutex_unlock(&interface_mutex);
+    return 0;
 }
 #if 0
 /* BMI_tcp_testunexpected()
@@ -1475,17 +1484,18 @@ int BMI_tcp_testcontext(int incount,
 {
     int ret = -1;
     
-    /* TODO: do I need to lock the interface_mutex here? */
+    gen_mutex_lock(&interface_mutex);
     
     /* do some "real work" here */
     /* fills completion queue when things complete */
     ret = tcp_do_work(max_idle_time_ms);
     if (ret < 0)
     {
-        /* TODO: do I need to unlock the interface_mutex here? */
+        gen_mutex_unlock(&interface_mutex);
         return ret;
     }
     
+    gen_mutex_unlock(&interface_mutex);
     return 0;
 }
 #if 0
@@ -1678,7 +1688,6 @@ int BMI_tcp_check_unexp_q(int incount,
                           int max_idle_time)
 {
     int ret = -1;
-    int i;
     method_op_p query_op = NULL;
     
     gen_mutex_lock(&interface_mutex);
@@ -1687,7 +1696,7 @@ int BMI_tcp_check_unexp_q(int incount,
     
     while ((*outcount < incount) &&
            (query_op = op_list_shownext(
-                                    op_list_array[IND_COMPLETE_RECV_UNEXP])))
+                op_list_array[IND_COMPLETE_RECV_UNEXP])))
     {
         info[*outcount].error_code = query_op->error_code;
         info[*outcount].addr = query_op->addr;
