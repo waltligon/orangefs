@@ -76,8 +76,8 @@ struct stdio_ops_s
     void (*setbuffer)(FILE *stream, char *buf, size_t size);
     void (*setlinebuf)(FILE *stream);
     int (*setvbuf)(FILE *stream, char *buf, int mode, size_t size);
-    char *(*mkdtemp)(char *template);
-    int (*mkstemp)(char *template);
+    char *(*mkdtemp)(char *templatestr);
+    int (*mkstemp)(char *templatestr);
     FILE *(*tmpfile)(void);
     DIR *(*opendir)(const char *name);
     DIR *(*fdopendir)(int fd);

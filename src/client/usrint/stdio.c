@@ -4357,20 +4357,20 @@ void setlinebuf (FILE *stream)
 /**
  * mkdtemp makes a temp dir and returns an fd 
  */
-char *mkdtemp(char *template)
+char *mkdtemp(char *templatestr)
 {
     int fd;
     int len;
     int rnum;
     int try;
 
-    if (!template)
+    if (!templatestr)
     {
         errno = EINVAL;
         return NULL;
     }
-    len = strlen(template);
-    if (strncmp(&template[len-6],"XXXXXX",6) != 0)
+    len = strlen(templatestr);
+    if (strncmp(&templatestr[len-6],"XXXXXX",6) != 0)
     {
         errno = EINVAL;
         return NULL;
@@ -4378,8 +4378,8 @@ char *mkdtemp(char *template)
     for(try = 0; try < MAXTRIES; try++)
     {
         rnum = PINT_random() % 1000000;
-        sprintf(&template[len-6],"%06d", rnum);
-        fd = mkdir(template, 0700);
+        sprintf(&templatestr[len-6],"%06d", rnum);
+        fd = mkdir(templatestr, 0700);
         if (fd < 0)
         {
             if (errno != EEXIST)
@@ -4396,26 +4396,26 @@ char *mkdtemp(char *template)
     {
         return NULL;
     }
-    return template;
+    return templatestr;
 }
 
 /**
  * mkstemp makes a temp file and returns an fd 
  */
-int mkstemp(char *template)
+int mkstemp(char *templatestr)
 {
     int fd;
     int len;
     int rnum;
     int try;
 
-    if (!template)
+    if (!templatestr)
     {
         errno = EINVAL;
         return -1;
     }
-    len = strlen(template);
-    if (strncmp(&template[len-6],"XXXXXX",6) != 0)
+    len = strlen(templatestr);
+    if (strncmp(&templatestr[len-6],"XXXXXX",6) != 0)
     {
         errno = EINVAL;
         return -1;
@@ -4423,8 +4423,8 @@ int mkstemp(char *template)
     for(try = 0; try < MAXTRIES; try++)
     {
         rnum = PINT_random() % 1000000;
-        sprintf(&template[len-6],"%06d", rnum);
-        fd = open(template, O_RDWR|O_EXCL|O_CREAT, 0600);
+        sprintf(&templatestr[len-6],"%06d", rnum);
+        fd = open(templatestr, O_RDWR|O_EXCL|O_CREAT, 0600);
         if (fd < 0)
         {
             if (errno != EEXIST)
@@ -4449,9 +4449,9 @@ int mkstemp(char *template)
  */
 FILE *tmpfile(void)
 {
-    char *template = "/tmp/tmpfileXXXXXX";
+    char *templatestr = "/tmp/tmpfileXXXXXX";
     int fd;
-    fd = mkstemp(template);
+    fd = mkstemp(templatestr);
     if (fd < 0)
     {
         return NULL;
