@@ -109,6 +109,8 @@ int BMI_tcp_post_recv(bmi_op_id_t *id,
                       bmi_context_id context_id,
                       PVFS_hint hints);
 
+int BMI_tcp_push_work(int max_idle_time_ms);
+
 int BMI_tcp_testunexpected(int incount,
                            int *outcount,
                            struct bmi_method_unexpected_info *info,
@@ -373,6 +375,7 @@ const struct bmi_method_ops bmi_tcp_ops = {
     .post_send = BMI_tcp_post_send,
     .post_sendunexpected = BMI_tcp_post_sendunexpected,
     .post_recv = BMI_tcp_post_recv,
+    .push_work = BMI_tcp_push_work,
     .testunexpected = BMI_tcp_testunexpected,
     .testcontext = BMI_tcp_testcontext,
     .check_cq = BMI_tcp_check_cq,
@@ -1390,18 +1393,22 @@ int BMI_tcp_post_recv(bmi_op_id_t *id,
 }
 
 
-/* BMI_tcp_testunexpected()
+/* BMI_tcp_push_work()
  *
  * TODO: documentation
+ * Push work on pending operations by calling tcp_do_work()
+ * This used to be the initial step of BMI_tcp_testunexpected() and 
+ * BMI_tcp_testcontext(). TCP thread will continuously call this function.
  */
-int BMI_tcp_testunexpected(int max_idle_time)
+int BMI_tcp_push_work(int max_idle_time_ms)
 {
     int ret = -1;
     
     gen_mutex_lock(&interface_mutex);
     
     /* do some "real work" here */
-    ret = tcp_do_work(max_idle_time);
+    /* completed ops are added to completion queue */
+    ret = tcp_do_work(max_idle_time_ms);
     if (ret < 0)
     {
         gen_mutex_unlock(&interface_mutex);
@@ -1411,10 +1418,16 @@ int BMI_tcp_testunexpected(int max_idle_time)
     gen_mutex_unlock(&interface_mutex);
     return 0;
 }
+
+
 #if 0
 /* BMI_tcp_testunexpected()
  *
  * Checks to see if any unexpected messages have completed.
+ *
+ * NOTE: This has been split into BMI_tcp_push_work() and 
+ *       BMI_tcp_check_unexp_q(). Just keeping this around for 
+ *       reference for now.
  *
  * returns 0 on success, -errno on failure
  */
@@ -1462,47 +1475,14 @@ int BMI_tcp_testunexpected(int incount,
 }
 #endif /* 0 */
 
-/* USE_PROTO_THREADS */
-/*#ifdef USE_PROTO_THREADS */
-/* BMI_tcp_testcontext()
- *
- * Checks to see if any messages from the specified context have completed.
- *
- * TODO: documentation
- * TODO: change name and remove unused arguments?
- *
- * returns 0 on success, -errno on failure
- */
-int BMI_tcp_testcontext(int incount,
-                        bmi_op_id_t *out_id_array,
-                        int *outcount,
-                        bmi_error_code_t *error_code_array,
-                        bmi_size_t *actual_size_array,
-                        void **user_ptr_array,
-                        int max_idle_time_ms,
-                        gen_cond_t *cond_var)
-{
-    int ret = -1;
-    
-    gen_mutex_lock(&interface_mutex);
-    
-    /* do some "real work" here */
-    /* fills completion queue when things complete */
-    ret = tcp_do_work(max_idle_time_ms);
-    if (ret < 0)
-    {
-        gen_mutex_unlock(&interface_mutex);
-        return ret;
-    }
-    
-    gen_mutex_unlock(&interface_mutex);
-    return 0;
-}
+
 #if 0
-/*#else*/
 /* BMI_tcp_testcontext()
  * 
  * Checks to see if any messages from the specified context have completed.
+ *
+ * NOTE: This has been split into BMI_tcp_push_work() and BMI_tcp_check_cq().
+ *       Just keeping this around for reference for now.
  *
  * returns 0 on success, -errno on failure
  */
@@ -1576,7 +1556,7 @@ int BMI_tcp_testcontext(int incount,
     gen_mutex_unlock(&interface_mutex);
     return (0);
 }
-#endif /* USE_PROTO_THREADS */
+#endif /* 0 */
 
 
 /* BMI_tcp_check_cq()
