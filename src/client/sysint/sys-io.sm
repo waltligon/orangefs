@@ -667,8 +667,10 @@ static int io_atime_setattr_comp_fn(void *v_p,
     }
     else
     {
-        gossip_err("I/O atime setattr failed. "
-                   "Continuing so I/O is not impacted by this failure.\n");
+        gossip_err("I/O atime setattr failed with error code(%d) for metadata handle(%llu). "
+                   "Continuing so I/O is not impacted by this failure.\n"
+                  ,(int)resp_p->status
+                  ,llu(sm_p->object_ref.handle));
     }
 
     /* Always return success. */
