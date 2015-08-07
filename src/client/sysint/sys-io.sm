@@ -303,6 +303,7 @@ machine pvfs2_client_io_sm
     state io_cleanup
     {
         run io_cleanup;
+        IO_RENEW_CAPABILITY => io_renew_capability;
         default => terminate;
     }
 }
@@ -2204,6 +2205,13 @@ static PINT_sm_action io_cleanup(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_cleanup\n", sm_p);
+
+    /* capability most likely expired */
+    if (js_p->error_code == -PVFS_EAGAIN)
+    {
+        js_p->error_code = IO_RENEW_CAPABILITY;
+        return SM_ACTION_COMPLETE;
+    }
 
     io_contexts_destroy(sm_p);
 
