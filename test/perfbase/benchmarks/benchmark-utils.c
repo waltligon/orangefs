@@ -9,7 +9,20 @@
 #include <stdio.h>
 #include <math.h>
 
-static struct PVFS_mgmt_perf_stat ** perf_matrix;
+/* this struct is now only used by karma */
+/* perf numbers are returned as an array of int64_t */
+
+struct PVFS_mgmt_perf_stat
+{
+    int32_t valid_flag;
+    int64_t start_time_ms;
+    int64_t read;
+    int64_t write;
+    int64_t metadata_read;
+    int64_t metadata_write;
+};
+
+static int64_t ** perf_matrix;
 static uint32_t * next_id_array;
 static uint64_t * end_time_ms_array;
 static PVFS_BMI_addr_t * addr_array;
@@ -36,8 +49,8 @@ int test_util_init_perfs(
 
     count = *server_count;
     /* allocate a 2 dimensional array for statistics */
-    perf_matrix = (struct PVFS_mgmt_perf_stat**)malloc(
-	count*sizeof(struct PVFS_mgmt_perf_stat*));
+    perf_matrix = (int64_t **)malloc(
+	count*sizeof(int64_t*));
     if(!perf_matrix)
     {
 	PVFS_perror("malloc", -1);
@@ -45,8 +58,8 @@ int test_util_init_perfs(
     }
     for(i=0; i<count; i++)
     {
-	perf_matrix[i] = (struct PVFS_mgmt_perf_stat *)
-	    malloc(HISTORY * sizeof(struct PVFS_mgmt_perf_stat));
+	perf_matrix[i] = (int64_t *)
+	    malloc(HISTORY * sizeof(int64_t));
 	if (perf_matrix[i] == NULL)
 	{
 	    PVFS_perror("malloc", -1);
@@ -103,9 +116,16 @@ int test_util_get_io_perfs(
 {
     int ret, i, j;
     ret = PVFS_mgmt_perf_mon_list(
-	cur_fs, &creds, perf_matrix, 
-	end_time_ms_array, addr_array, next_id_array,
-	count, HISTORY, NULL, NULL);
+    		cur_fs,
+    		&creds,
+    		perf_matrix,
+    		end_time_ms_array,
+    		addr_array,
+    		next_id_array,
+    		count,
+    		HISTORY,
+    		NULL,
+    		NULL);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
@@ -116,19 +136,11 @@ int test_util_get_io_perfs(
     {
 	for(j = 0; j < HISTORY; ++j)
 	{
-	    if(!perf_matrix[i][j].valid_flag)
-	    {
-		break;
-	    }
-
-	    printf("%d\t%llu\t%lld\t%lld\n",
+	    printf("%d\t%lld\n",
 		   count,
-		   llu(perf_matrix[i][j].start_time_ms),
-		   lld(perf_matrix[i][j].write),
-		   lld(perf_matrix[i][j].read));
-	}
+		   lld(perf_matrix[i][j]));
     }
-
+    }
     return 0;
 }
 

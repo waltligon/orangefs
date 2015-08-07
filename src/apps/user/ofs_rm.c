@@ -13,15 +13,9 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include "orange.h"
-#if 0
-#include <pvfs2-types.h>
-#include <usrint.h>
-#include <posix-pvfs.h>
-#include <recursive-remove.h>
-#endif
 
 /* optional parameters, filled in by parse_args() */
-struct options
+struct rm_options
 {
     int force;
     int interactive;
@@ -32,7 +26,7 @@ struct options
     char **filenames;
 };
 
-static int parse_args(int argc, char **argv, struct options *opts);
+static int parse_args(int argc, char **argv, struct rm_options *opts);
 static void usage(int argc, char **argv);
 
 int main(int argc, char **argv)
@@ -41,7 +35,7 @@ int main(int argc, char **argv)
     FTS *fs;
     FTSENT *node;
     unsigned char error_seen = 0;
-    struct options user_opts = {0, 0, 0, 0, 0, 0, NULL};
+    struct rm_options user_opts = {0, 0, 0, 0, 0, 0, NULL};
     
     /* look at command line arguments */
     ret = parse_args(argc, argv, &user_opts);
@@ -209,16 +203,17 @@ main_out:
  *
  * Returns 0 on success and exits with EXIT_FAILURE on failure.
  */
-static int parse_args(int argc, char **argv, struct options *user_opts_p)
+static int parse_args(int argc, char **argv, struct rm_options *user_opts_p)
 {
     int one_opt = 0;
-    char flags[] = "vVdirf?";
-    opterr = 0;
+    char flags[] = "vVdirfh";
+    int index = 1; /* stand in for optind */
+
     static struct option lopt[] = {
         {"recursive", 0, NULL, 'r'},
         {"interactive", 0, NULL, 'i'},
         {"force", 0, NULL, 'f'},
-        {"help", 0, NULL, '?'},
+        {"help", 0, NULL, 'h'},
         {"Version", 0, NULL, 'V'},
         {"verbose", 0, NULL, 'v'},
         {"debug", 0, NULL, 'd'},
@@ -229,6 +224,7 @@ static int parse_args(int argc, char **argv, struct options *user_opts_p)
 
     while((one_opt = getopt_long(argc, argv, flags, lopt, NULL)) != -1)
     {
+        index++;
         switch(one_opt)
         {
             case('V'):
@@ -253,22 +249,25 @@ static int parse_args(int argc, char **argv, struct options *user_opts_p)
             case('r'):
                 user_opts_p->recursive = 1;
                 break;
-            case('?'):
+            case('h'):
             default:
                 usage(argc, argv);
                 exit(EXIT_FAILURE);
+                break;
         }
     }
 
-    if (optind < argc)
+    /* optind is broken, use index */
+    if (index < argc)
     {
+        /* there are arguments - file names - to process */
         int i = 0;
-        user_opts_p->num_files = argc - optind;
-        user_opts_p->filenames = malloc((argc - optind + 1) * sizeof(char *));
-        while (optind < argc)
+        user_opts_p->num_files = argc - index;
+        user_opts_p->filenames = malloc((argc - index + 1) * sizeof(char *));
+        while (index < argc)
         {
-            user_opts_p->filenames[i] = argv[optind];
-            optind++;
+            user_opts_p->filenames[i] = argv[index];
+            index++;
             i++;
         }
         user_opts_p->filenames[i] = NULL;
@@ -285,7 +284,7 @@ static int parse_args(int argc, char **argv, struct options *user_opts_p)
 static void usage(int argc, char **argv)
 {
     fprintf(stderr, "Usage: %s [-?vVidrf] pvfs2_filename[s]\n", argv[0]);
-    fprintf(stderr, "\t-?\thelp - print this message\n");
+    fprintf(stderr, "\t-h\thelp - print this message\n");
     fprintf(stderr, "\t-v\tverbose - print informative messages\n");
     fprintf(stderr, "\t-V\tVersion - print Version info\n");
     fprintf(stderr, "\t-i\tinteractive - ask before removing each item\n");
