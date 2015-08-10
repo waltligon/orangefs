@@ -496,7 +496,7 @@ void pvfs_rmtestdir(int rank, int* n_ops)
 
     *n_ops = 1;
 
-    ret = PVFS_sys_remove(test_dir, pvfs_basedir, &pvfs_creds);
+    ret = PVFS_sys_remove(test_dir, pvfs_basedir, &pvfs_creds,NULL);
     if(ret < 0)
     {
         handle_error(ret, "PVFS_sys_remove");
@@ -521,7 +521,7 @@ void pvfs_mktestdir(int rank, int* n_ops)
     attr.perms = PVFS_U_EXECUTE|PVFS_U_WRITE|PVFS_U_READ;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 
-    ret = PVFS_sys_mkdir(test_dir, pvfs_basedir, attr, &pvfs_creds, &resp_mkdir);
+    ret = PVFS_sys_mkdir(test_dir, pvfs_basedir, attr, &pvfs_creds, &resp_mkdir,NULL);
     if(ret < 0)
     {
         handle_error(ret, "PVFS_sys_mkdir");
@@ -566,7 +566,7 @@ void pvfs_write(int rank, int* n_ops)
     for(i=0; i<opt_nfiles; i++)
     {
         ret = PVFS_sys_write(pvfs_refs[i], file_req, 0, pvfs_buf, mem_req,
-            &pvfs_creds, &resp_io);
+            &pvfs_creds, &resp_io,NULL);
         if(ret < 0)
         {
             handle_error(ret, "PVFS_sys_read");
@@ -594,7 +594,7 @@ void pvfs_read(int rank, int* n_ops)
     for(i=0; i<opt_nfiles; i++)
     {
         ret = PVFS_sys_read(pvfs_refs[i], file_req, 0, pvfs_buf, mem_req,
-            &pvfs_creds, &resp_io);
+            &pvfs_creds, &resp_io,NULL);
         if(ret < 0)
         {
             handle_error(ret, "PVFS_sys_read");
@@ -668,7 +668,7 @@ void pvfs_create(int rank, int* n_ops)
         sprintf(test_file, "%d", i);
 
         ret = PVFS_sys_create(test_file, pvfs_testdir, attr, &pvfs_creds,
-            NULL, NULL, &resp_create);
+            NULL, NULL, &resp_create,NULL);
         if(ret < 0)
         {
             handle_error(ret, "PVFS_sys_create");
@@ -716,7 +716,7 @@ void pvfs_rm(int rank, int* n_ops)
     {
         sprintf(test_file, "%d", i);
 
-        ret = PVFS_sys_remove(test_file, pvfs_testdir, &pvfs_creds);
+        ret = PVFS_sys_remove(test_file, pvfs_testdir, &pvfs_creds,NULL);
         if(ret < 0)
         {
             handle_error(ret, "PVFS_sys_remove");
@@ -828,7 +828,7 @@ void pvfs_prep(int rank, int* n_ops)
     PVFS_util_gen_credential_defaults(&pvfs_creds);
 
     ret = PVFS_sys_lookup(fs_id, pvfs_path, &pvfs_creds, &resp_lookup, 
-        PVFS2_LOOKUP_LINK_FOLLOW);
+        PVFS2_LOOKUP_LINK_FOLLOW,NULL);
     if(ret < 0)
     {
         handle_error(ret, "PVFS_sys_lookup");

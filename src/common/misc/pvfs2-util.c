@@ -703,8 +703,7 @@ int PVFS_util_get_umask(void)
     return mask;
 }
 
-int PVFS_util_copy_sys_attr(
-    PVFS_sys_attr *dest_attr, PVFS_sys_attr *src_attr)
+int PVFS_util_copy_sys_attr(PVFS_sys_attr *dest_attr, PVFS_sys_attr *src_attr)
 {
     int ret = -PVFS_EINVAL;
 

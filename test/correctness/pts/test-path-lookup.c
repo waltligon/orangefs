@@ -55,7 +55,7 @@ static int build_nested_path(
         /* look up the root handle */
         ret = PVFS_sys_lookup(
             cur_fs_id, "/", &credentials, &lookup_resp,
-            PVFS2_LOOKUP_LINK_NO_FOLLOW);
+            PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
         if (ret < 0)
         {
             fprintf(stderr," *** lookup failed on root directory\n");
@@ -77,7 +77,7 @@ static int build_nested_path(
                 PATH_LOOKUP_BASE_DIR, llu(root_refn.handle),
                 root_refn.fs_id);
         ret = PVFS_sys_mkdir(PATH_LOOKUP_BASE_DIR, root_refn,
-                             attr, &credentials, &mkdir_resp);
+                             attr, &credentials, &mkdir_resp,NULL);
         if (ret < 0)
         {
             fprintf(stderr," PVFS_sys_mkdir failed to create "
@@ -108,7 +108,7 @@ static int build_nested_path(
                     parent_refn.fs_id);
 
             ret = PVFS_sys_mkdir(cur_filename, parent_refn, attr,
-                                 &credentials, &mkdir_resp);
+                                 &credentials, &mkdir_resp,NULL);
             if (ret < 0)
             {
                 fprintf(stderr," PVFS_sys_mkdir failed to create "
@@ -154,7 +154,7 @@ static int build_nested_path(
             ret = PVFS_sys_ref_lookup(
                 parent_refn.fs_id, cur_filename,
                 parent_refn, &credentials,
-                &lookup_resp, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                &lookup_resp, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
             if (ret < 0)
             {
                 fprintf(stderr,"\nPVFS_sys_ref_lookup failed\n");
@@ -176,7 +176,7 @@ static int build_nested_path(
 #endif
             ret = PVFS_sys_lookup(cur_fs_id, absolute_paths[i],
                                   &credentials, &lookup_resp,
-                                  PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                                  PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
             if (ret < 0)
             {
                 fprintf(stderr,"\nPVFS_sys_lookup failed\n");
@@ -231,7 +231,7 @@ static int build_nested_path(
                 parent_refn.fs_id, cur_filename);
         ret = PVFS_sys_symlink(
             RELATIVE_SYMLINK_NAME, parent_refn, cur_filename,
-            attr, &credentials, &symlink_resp);
+            attr, &credentials, &symlink_resp,NULL);
         if (ret < 0)
         {
             PVFS_perror("Failed to create symlink ", ret);
@@ -248,7 +248,7 @@ static int build_nested_path(
                 parent_refn.fs_id, absolute_paths[i]);
         ret = PVFS_sys_symlink(
             ABSOLUTE_SYMLINK_NAME, parent_refn, absolute_paths[i],
-            attr, &credentials, &symlink_resp);
+            attr, &credentials, &symlink_resp,NULL);
         if (ret < 0)
         {
             PVFS_perror("Failed to create symlink ", ret);
@@ -279,7 +279,7 @@ static int build_nested_path(
                     "\t\t... ", i);
             ret = PVFS_sys_lookup(cur_fs_id, tmp_buf,
                                   &credentials, &lookup_resp,
-                                  PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                                  PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
             if (ret < 0)
             {
                 fprintf(stderr,"\nPVFS_sys_lookup failed\n");
@@ -306,7 +306,7 @@ static int build_nested_path(
                     "\t\t... ", i);
             ret = PVFS_sys_lookup(cur_fs_id, tmp_buf,
                                   &credentials, &lookup_resp,
-                                  PVFS2_LOOKUP_LINK_FOLLOW);
+                                  PVFS2_LOOKUP_LINK_FOLLOW,NULL);
             if (ret < 0)
             {
                 fprintf(stderr,"\nPVFS_sys_lookup failed\n");
@@ -340,7 +340,7 @@ static int build_nested_path(
                     "\t\t... ", i);
             ret = PVFS_sys_lookup(cur_fs_id, tmp_buf,
                                   &credentials, &lookup_resp,
-                                  PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                                  PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
             if (ret < 0)
             {
                 fprintf(stderr,"\nPVFS_sys_lookup failed\n");
@@ -367,7 +367,7 @@ static int build_nested_path(
                     "\t\t... ", i);
             ret = PVFS_sys_lookup(cur_fs_id, tmp_buf,
                                   &credentials, &lookup_resp,
-                                  PVFS2_LOOKUP_LINK_FOLLOW);
+                                  PVFS2_LOOKUP_LINK_FOLLOW,NULL);
             if (ret < 0)
             {
                 fprintf(stderr,"\nPVFS_sys_lookup failed\n");
@@ -420,7 +420,7 @@ static int build_nested_path(
             fprintf(stderr,"Removing path %s under %llu,%d \t\t... ",
                     cur_filename, llu(parent_refn.handle),
                     parent_refn.fs_id);
-            ret = PVFS_sys_remove(cur_filename, parent_refn, &credentials);
+            ret = PVFS_sys_remove(cur_filename, parent_refn, &credentials,NULL);
             fprintf(stderr, "%s\n", ((ret < 0) ? "FAILED" : "DONE"));
             if (ret)
             {
@@ -433,7 +433,7 @@ static int build_nested_path(
                         RELATIVE_SYMLINK_NAME, llu(parent_refn.handle),
                         parent_refn.fs_id);
                 ret = PVFS_sys_remove(RELATIVE_SYMLINK_NAME,
-                                      parent_refn, &credentials);
+                                      parent_refn, &credentials, NULL);
                 fprintf(stderr, "%s\n", ((ret < 0) ? "FAILED" : "DONE"));
                 if (ret)
                 {
@@ -444,7 +444,7 @@ static int build_nested_path(
                         ABSOLUTE_SYMLINK_NAME, llu(parent_refn.handle),
                         parent_refn.fs_id);
                 ret = PVFS_sys_remove(ABSOLUTE_SYMLINK_NAME,
-                                      parent_refn, &credentials);
+                                      parent_refn, &credentials,NULL);
                 fprintf(stderr, "%s\n", ((ret < 0) ? "FAILED" : "DONE"));
                 if (ret)
                 {
@@ -454,7 +454,7 @@ static int build_nested_path(
         }
         free(absolute_paths);
     }
-    ret = PVFS_sys_remove(PATH_LOOKUP_BASE_DIR, root_refn, &credentials);
+    ret = PVFS_sys_remove(PATH_LOOKUP_BASE_DIR, root_refn, &credentials,NULL);
     if (ret)
     {
         PVFS_perror("Top-level Path removal error ", ret);

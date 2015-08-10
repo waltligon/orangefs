@@ -62,7 +62,7 @@ int get_root(PVFS_fs_id fs_id, PVFS_object_ref *pinode_refn)
 
         printf("looking up the root handle for fsid = %d\n", fs_id);
         ret = PVFS_sys_lookup(fs_id, root, &credentials,
-                              &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                              &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
         if (ret < 0)
         {
             printf("Lookup failed with errcode = %d\n", ret);
@@ -94,7 +94,7 @@ int create_dir(PVFS_object_ref parent_refn, char *name,
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
     ret = PVFS_sys_mkdir(name, parent_refn,
-                         attr, &credentials, &resp_mkdir);
+                         attr, &credentials, &resp_mkdir,NULL);
     if (ret < 0)
     {
         printf("mkdir failed\n");
@@ -122,7 +122,7 @@ int remove_file(PVFS_object_ref parent_refn, char *name)
 
     PVFS_util_gen_credential_defaults(&credentials);
 
-    ret = PVFS_sys_remove(name, parent_refn, &credentials);
+    ret = PVFS_sys_remove(name, parent_refn, &credentials,NULL);
     if (ret < 0)
     {
         printf("remove failed\n");
@@ -161,7 +161,7 @@ int lookup_name(PVFS_object_ref pinode_refn, char *name,
 
     ret = PVFS_sys_lookup(pinode_refn.fs_id, name,
                           &credentials, &resp_lookup,
-                          PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
     if (ret < 0)
     {
        printf("Lookup failed with errcode = %d\n", ret);

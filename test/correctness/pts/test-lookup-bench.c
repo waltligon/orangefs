@@ -33,7 +33,7 @@ static PVFS_handle simple_lookup_name(char *name,
     PVFS_util_gen_credential_defaults(&credentials);
 
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
-                          &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
     if (ret < 0)
     {
        printf("Lookup failed with errcode = %d\n", ret);

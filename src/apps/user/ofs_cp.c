@@ -4,9 +4,9 @@
  * See COPYING in top-level directory.
  */
 
-/* pvfs2-cp: 
- * 	copy a file from a unix or PVFS2 file system to a unix or PVFS2 file
- * 	system.  Should replace pvfs2-import and pvfs2-export.
+/* ofs_cp: 
+ *     copy a file from a unix or OFS file system to a unix or OFS file
+ *     system.
  */
 
 #include "orange.h"
@@ -22,7 +22,6 @@
 #include <fts.h>
 #include <time.h>
 #include <libgen.h>
-#include <getopt.h>
 
 #include "pint-sysint-utils.h"
 
@@ -36,8 +35,10 @@
                           PVFS_ATTR_SYS_UID | \
                           PVFS_ATTR_SYS_GID )
 
+#define OFS_COPY_BUFSIZE_DEFAULT (10 * 1024 * 1024 )
+
 /* optional parameters, filled in by parse_args() */
-struct options
+struct cp_options
 {
     int strip_size;
     int num_datafiles;
@@ -45,13 +46,16 @@ struct options
     int debug;
     int show_timings;
     int copy_to_dir;
+    int copy_1to1;
     int verbose;
     int recursive;
     int preserve;
     int mode;
+    int times;
     int total_written;
     char *srcfile;
     char *destfile;
+    char *created;
     char **srcv;
 };
 
@@ -59,45 +63,48 @@ static char dest_path_buffer[PATH_MAX];
 
 static PVFS_hint hints = NULL;
 
-static int parse_args(int argc, char *argv[], struct options *user_opts);
+static int parse_args(int argc, char *argv[], struct cp_options *user_opts);
 static void usage(int argc, char **argv);
 static double Wtime(void);
 static void print_timings(double time, int64_t total);
 static int copy_file(char *srcfile,
                      char *destfile,
                      void *buffer,
-                     struct options *user_opts);
-static int edit_dest_path(char *dst_name,
-                          char *src_path,
-                          int path_size,
-                          int level);
+                     struct cp_options *user_opts);
+static void edit_dest_path(char *dst_name,
+                           char *src_path,
+                           int path_size,
+                           int level,
+                           struct cp_options *user_opts);
 
 int main (int argc, char **argv)
 {
     int ret = 0;
-    struct options user_opts;
+    struct cp_options user_opts;
     double time1 = 0, time2 = 0;
     char link_buf[PATH_MAX];
-    char *dest_path = NULL;
-    char *dest_name = NULL;
+    char *dest_path = NULL; /* the path to the destination dir for all cp */
+    char *dest_name = NULL; /* the file name of a dest for a specific cp */
     struct stat sbuf;
     void *buffer = NULL;
     FTS *fs;
     FTSENT *node;
 
+    memset((void *)&user_opts, 0, sizeof(struct cp_options));
+
     ret = parse_args(argc, argv, &user_opts);
     if (ret < 0)
     {
-	fprintf(stderr, "Error, failed to parse command line arguments\n");
-	return(-1);
+        fprintf(stderr, "Error, failed to parse command line arguments\n");
+        return(-1);
     }
 
     buffer = malloc(user_opts.buf_size);
     if(!buffer)
     {
-	perror("malloc");
-	ret = -1;
-	goto main_out;
+        perror("malloc");
+        ret = -1;
+        goto main_out;
     }
 
     if (user_opts.copy_to_dir)
@@ -110,11 +117,11 @@ int main (int argc, char **argv)
         /* simple file copy */
         if (user_opts.verbose)
         {
-            printf("%s\n", user_opts.srcfile);
+            printf("copying %s ...\n", user_opts.srcfile);
         }
         if (user_opts.debug)
         {
-            printf("copy single file %s -> %s\n", 
+            fprintf(stderr, "copy single file %s -> %s\n", 
                    user_opts.srcfile,
                    user_opts.destfile);
             ret = 0;
@@ -135,9 +142,9 @@ int main (int argc, char **argv)
     fs = fts_open(user_opts.srcv, FTS_COMFOLLOW|FTS_PHYSICAL, NULL);
     if(fs == NULL)
     {
-	perror("fts_open");
-	ret = -1;
-	goto main_out;
+        perror("fts_open");
+        ret = -1;
+        goto main_out;
     }
     if (!user_opts.recursive)
     {
@@ -154,31 +161,47 @@ int main (int argc, char **argv)
     }
     while((node = fts_read(fs)) != NULL)
     {
+        int adj; /* level adjustment for various situations */
+
         if (user_opts.debug)
         {
-            printf("path = %s level = %d\n", node->fts_path, node->fts_level);
+            fprintf(stderr,
+                    "path = %s level = %d\n",
+                    node->fts_path,
+                    node->fts_level);
         }
+        /* corrects for dir copied to non-existing path */
+        adj = (user_opts.copy_1to1 && user_opts.created) ? -1 : 0;
+        /* corrects for slash on end of dir path */
+        adj += (node->fts_path[node->fts_pathlen - 1] == '/') ? 1 : 0;
+        /* This builds the complete destination path and file name */
         edit_dest_path(dest_name,
                        node->fts_path,
                        node->fts_pathlen,
-                       node->fts_level);
+                       node->fts_level + adj,
+                       &user_opts);
 
         switch(node->fts_info)
         {
         case FTS_D : /* preorder dir */
             if (user_opts.recursive)
             {
-                /* create the directory */
-                if (user_opts.debug)
+                if (!(user_opts.copy_1to1 && user_opts.created) ||
+                     node->fts_level > 0)
                 {
-                    char cwd[PATH_MAX];
-                    getcwd(cwd, PATH_MAX);
-                    printf("making directory %s\n", dest_path);
-                    ret = 0;
-                }
-                else
-                {
+                    /* create the directory */
+                    if (user_opts.debug || user_opts.verbose)
+                    {
+                        fprintf(stderr, "making directory %s ...\n", dest_path);
+                        ret = 0;
+                    }
                     ret = mkdir(dest_path, 0700);
+                    if (ret < 0)
+                    {
+                        fprintf(stderr,
+                                "Cannot create directory %s\n",
+                                dest_path);
+                    }
                 }
             }
             else
@@ -192,28 +215,68 @@ int main (int argc, char **argv)
             {
                 break;
             }
-            /* preserve permissions */
-            if (user_opts.debug)
+
+            if ((user_opts.mode || user_opts.preserve || user_opts.times) &&
+                (!user_opts.copy_1to1 || node->fts_level > 0))
             {
-                char cwd[PATH_MAX];
-                getcwd(cwd, PATH_MAX);
-                printf("chmoding directory %s\n", dest_path);
-                ret = 0;
-            }
-            else
-            {
-                ret = pvfs_stat_mask(dest_path, &sbuf, PVFS_ATTR_SYS_CP);
+                /* preserve permissions */
+                if (user_opts.debug)
+                {
+                    fprintf(stderr, "chmoding directory %s ...\n", dest_path);
+                    ret = 0;
+                }
+
+                if (!user_opts.times && 
+                    (pvfs_valid_path(node->fts_accpath) > 0))
+                {
+                    /* this is faster by skiping times and sizes */
+                    ret = pvfs_stat_mask(node->fts_accpath,
+                                         &sbuf,
+                                         PVFS_ATTR_SYS_CP);
+                }
+                else
+                {
+                    ret = stat(node->fts_accpath, &sbuf);
+                }
                 if (ret)
                 {
                     perror("stat");
                     goto main_out;
                 }
 
-                ret = chmod(dest_path, sbuf.st_mode);
-                if (ret)
+                if (user_opts.mode)
                 {
-                    perror("chmod");
-                    goto main_out;
+                    ret = chmod(dest_path, sbuf.st_mode);
+                    if (ret)
+                    {
+                        perror("chmod");
+                        goto main_out;
+                    }
+                }
+
+                if (user_opts.preserve)
+                {
+                    ret = chown(dest_path, sbuf.st_uid, sbuf.st_gid);
+                    if (ret)
+                    {
+                        perror("chown");
+                        goto main_out;
+                    }
+                }
+
+                if (user_opts.times)
+                {
+                    struct utimbuf times;
+             
+                    times.actime = sbuf.st_atime;
+                    times.modtime = sbuf.st_mtime;
+            
+                    ret = utime(dest_path, &times);
+                    if (ret < 0)
+                    {
+                        perror("utime");
+                        goto main_out;
+                    }
                 }
             }
             break;
@@ -221,24 +284,29 @@ int main (int argc, char **argv)
             /* copy the file */
             if (user_opts.verbose)
             {
-                printf("%s\n", node->fts_path);
+                fprintf(stderr, "copying %s ...\n", node->fts_path);
             }
             if (user_opts.debug)
             {
+                char *ret;
                 char cwd[PATH_MAX];
-                getcwd(cwd, PATH_MAX);
-                printf("copying file %s in %s to %s\n",
+                ret = getcwd(cwd, PATH_MAX);
+                if (!ret)
+                {
+                    cwd[0] = 0;
+                }
+                fprintf(stderr, "copying file %s in %s to %s\n",
                        node->fts_accpath,
                        cwd,
                        dest_path);
                 ret = 0;
             }
-            else
+            ret = copy_file(node->fts_accpath, dest_path, buffer, &user_opts);
+            if (ret < 0)
             {
-                ret = copy_file(node->fts_accpath,
-                                dest_path,
-                                buffer,
-                                &user_opts);
+                fprintf(stderr,
+                        "Error copying file %s\n",
+                        node->fts_accpath);
             }
             break;
         case FTS_SL : /* sym link */
@@ -261,7 +329,7 @@ int main (int argc, char **argv)
         default:
             fprintf(stderr, "%s: %s is unknown file type, not present, or not readable\n", argv[0], node->fts_path);
             usage(argc, argv);
-	    ret = -1;
+            ret = -1;
             break;
         }
         if (ret < 0)
@@ -276,7 +344,7 @@ int main (int argc, char **argv)
 
     if (user_opts.show_timings) 
     {
-	print_timings(time2 - time1, user_opts.total_written);
+        print_timings(time2 - time1, user_opts.total_written);
     }
     
     ret = 0;
@@ -289,19 +357,30 @@ main_out:
     return(ret);
 }
 
-/* thiis function takes src_path and removes the last n segments and
+/* this function takes src_path and removes the last n segments and
  * then copies them to dst_name (which already has the dest_dir).  n is
  * derived from level.  works a little differently for dirs and files at
  * level 0.
  */
-static int edit_dest_path(char *dst_name,
+static void edit_dest_path(char *dst_name,
                           char *src_path,
                           int path_len,
-                          int level)
+                          int level,
+                          struct cp_options *user_opts)
 {
     int slashcnt = 0;
     int pc = 0;
     int nc = 0;
+
+    if (user_opts->debug)
+    {
+        fprintf(stderr,
+                "edit_dest_path name:%s path:%s len:%d level:%d\n",
+                dst_name,
+                src_path,
+                path_len,
+                level);
+    }
 
     for (pc = path_len; pc; pc--)
     {
@@ -325,14 +404,18 @@ static int edit_dest_path(char *dst_name,
         dst_name[nc++] = src_path[pc++];
     }
     dst_name[nc] = 0;
-    return 0;
-    
+    if (user_opts->debug)
+    {
+        fprintf(stderr,
+                "        edit_dest_path dst_name:%s\n",
+                dst_name);
+    }
 }
 
 static int copy_file(char *srcfile,
                      char *destfile,
                      void *buffer,
-                     struct options *user_opts)
+                     struct cp_options *user_opts)
 {
     int ret = 0;
     int read_size = 0, write_size = 0;
@@ -344,11 +427,12 @@ static int copy_file(char *srcfile,
     /* PVFS_hint_import_env(&hints); */
     
     src = open(srcfile, O_RDONLY);
-    if (src < 0)
+    if (src == -1)
     {
-	fprintf(stderr, "Could not open source file %s\n", srcfile);
-	ret = -1;
-	goto err_out;
+        perror("open src");
+        /* fprintf(stderr, "Could not open source file %s\n", srcfile); */
+        ret = -1;
+        goto err_out;
     }
 
     if (user_opts->num_datafiles > 0)
@@ -376,66 +460,104 @@ static int copy_file(char *srcfile,
     }
 
     dst = open(destfile, open_flags, 0600, hints);
-    if (dst < 0)
+    if (dst == -1)
     {
-	fprintf(stderr, "Could not open dest file %s\n", destfile);
-	ret = -1;
-	goto err_out;
+        perror("open dst");
+        /* fprintf(stderr, "Could not open dest file %s\n", destfile); */
+        ret = -1;
+        goto err_out;
     }
 
     /* start moving data */
     while((read_size = read(src, buffer, user_opts->buf_size)) > 0)
     {
-	write_size = write(dst, buffer, read_size);
-	if (write_size != read_size)
-	{
-	    if (write_size == -1)
+        write_size = write(dst, buffer, read_size);
+        if (write_size != read_size)
+        {
+            if (write_size == -1)
             {
-		perror("write");
-	    }
+                perror("write");
+            }
             else
             {
-		fprintf(stderr, "Error in write\n");
-	    }
-	    ret = -1;
-	    goto err_out;
-	}
-	user_opts->total_written += write_size;
-    }
-
-    /* preserve permissions and-or owner */
-    if ((user_opts->mode || user_opts->preserve) && pvfs_valid_fd(src) > 0)
-    {
-        ret = pvfs_fstat_mask(src, &sbuf, PVFS_ATTR_SYS_CP);
-    }
-    else
-    {
-        ret = fstat(src, &sbuf);
-    }
-    if (ret < 0)
-    {
-        perror("fstat");
-        goto err_out;
-    }
-
-    if (user_opts->mode)
-    {
-        ret = fchmod(dst, sbuf.st_mode);
-        if (ret < 0)
-        {
-            perror("fchmod");
+                fprintf(stderr, "Error in write\n");
+            }
+            ret = -1;
             goto err_out;
         }
+        user_opts->total_written += write_size;
     }
 
-    if (user_opts->preserve)
+    /* preserve permissions and/or owner */
+    if (user_opts->mode || user_opts->preserve || user_opts->times)
     {
-        ret = fchown(dst, sbuf.st_uid, sbuf.st_gid);
+        if (user_opts->debug)
+        {
+            fprintf(stderr, "preserving file metadata\n");
+        }
+        if (!user_opts->times &&
+            (pvfs_valid_fd(src) > 0))
+        {
+            /* this is faster by skiping times and sizes */
+            ret = pvfs_fstat_mask(src, &sbuf, PVFS_ATTR_SYS_CP);
+        }
+        else
+        {
+            ret = fstat(src, &sbuf);
+        }
         if (ret < 0)
         {
-            /* note this should only work if root */
-            perror("fchown");
+            perror("fstat");
             goto err_out;
+        }
+
+        if (user_opts->mode) /* preserve permissions */
+        {
+            if (user_opts->debug)
+            {
+                fprintf(stderr, "         preserving file permissions\n");
+            }
+            ret = fchmod(dst, sbuf.st_mode);
+            if (ret < 0)
+            {
+                perror("fchmod");
+                goto err_out;
+            }
+        }
+
+        if (user_opts->preserve)
+        {
+            if (user_opts->debug)
+            {
+                fprintf(stderr, "         preserving file owner/group\n");
+            }
+            ret = fchown(dst, sbuf.st_uid, sbuf.st_gid);
+            if (ret < 0)
+            {
+                /* note this should only work if root */
+                perror("fchown");
+                goto err_out;
+            }
+        }
+
+        if (user_opts->times)
+        {
+            struct utimbuf times;
+
+            if (user_opts->debug)
+            {
+                fprintf(stderr, "         preserving file A/M times\n");
+            }
+
+            times.actime = sbuf.st_atime;
+            times.modtime = sbuf.st_mtime;
+
+            ret = utime(destfile, &times);
+            if (ret < 0)
+            {
+                perror("utime");
+                goto err_out;
+            }
         }
     }
 
@@ -459,26 +581,28 @@ err_out:
  *
  * returns pointer to options structure on success, NULL on failure
  */
-static int parse_args(int argc, char *argv[], struct options *user_opts)
+static int parse_args(int argc, char *argv[], struct cp_options *user_opts)
 {
-    char flags[] = "?mpdtVvrs:n:b:";
+    const char flags[] = "hmptDTVvrs:n:b:";
     int one_opt = 0;
-    struct stat sbuf;
-    int ret = -1;
+    struct stat s_sbuf, d_sbuf;
+    int ret = -1, s_ret = -1, d_ret = -1;
+    int index = 1; /* stand-in for optind */
 
     opterr = 0;
 
-    memset(user_opts, 0, sizeof(struct options));
+    memset(user_opts, 0, sizeof(struct cp_options));
 
-    /* fill in defaults (except for hostid) */
+    /* fill in defaults */
     user_opts->strip_size = -1;
     user_opts->num_datafiles = -1;
-    user_opts->buf_size = (10 * 1024 * 1024);
+    user_opts->buf_size = OFS_COPY_BUFSIZE_DEFAULT;
 
     /* look at command line arguments */
-    while((one_opt = getopt(argc, argv, flags)) != EOF)
+    while((one_opt = getopt(argc, argv, flags)) != -1)
     {
-	switch(one_opt)
+        index++;
+        switch(one_opt)
         {
             case('V'):
                 printf("%s\n", PVFS2_VERSION);
@@ -492,81 +616,186 @@ static int parse_args(int argc, char *argv[], struct options *user_opts)
             case('p'):
                 user_opts->preserve = 1;
                 break;
+            case('t'):
+                user_opts->times = 1;
+                break;
             case('m'):
                 user_opts->mode = 1;
                 break;
-	    case('d'):
-		user_opts->debug = 1;
-		break;
-	    case('t'):
-		user_opts->show_timings = 1;
-		break;
-	    case('s'):
-		ret = sscanf(optarg,
+            case('D'):
+                user_opts->debug = 1;
+                break;
+            case('T'):
+                user_opts->show_timings = 1;
+                break;
+            case('s'):
+                ret = sscanf(optarg,
                              SCANF_lld,
                              (SCANF_lld_type *)&user_opts->strip_size);
-		if(ret < 1)
+                if(ret < 1)
                 {
-		    return(-1);
-		}
-		break;
-	    case('n'):
-		ret = sscanf(optarg, "%d", &user_opts->num_datafiles);
-		if(ret < 1)
+                    return(-1);
+                }
+                index++;
+                break;
+            case('n'):
+                ret = sscanf(optarg, "%d", &user_opts->num_datafiles);
+                if(ret < 1)
                 {
-		    return(-1);
-		}
-		break;
-	    case('b'):
-		ret = sscanf(optarg, "%d", &user_opts->buf_size);
-		if(ret < 1)
+                    return(-1);
+                }
+                index++;
+                break;
+            case('b'):
+                ret = sscanf(optarg, "%d", &user_opts->buf_size);
+                if(ret < 1)
                 {
-		    return(-1);
-		}
-		break;
-	    case('?'):
+                    return(-1);
+                }
+                index++;
+                break;
+            case('h'):
             default:
-		usage(argc, argv);
-		exit(EXIT_FAILURE);
-	}
+                goto exit_err;
+                break;
+        }
     }
 
-    if(argc - optind < 2)
+    /* optind not working for some weird reason */
+
+    if(argc - index < 2)
     {
         /* need at least two items on command line */
-	usage(argc, argv);
-	exit(EXIT_FAILURE);
+        goto exit_err;
     }
 
+    /* stat the last argument (dest).
+     * if it exists and is a directory, then copy-to-dir
+     * if it exists and is a file, then copy-to-file
+     * if it does not exist, then  
+     *       if there are two arguments, check type of first
+     *             if it does not exist, error
+     *             if it exists then dest is type of source - create dest
+     *       if there are more then two arguments, copy-to-dir - create dest
+     */
+
+    /* Stat Destination File */
     if (pvfs_valid_path(argv[argc - 1]) > 0)
     {
-        ret = pvfs_stat_mask(argv[argc - 1], &sbuf, PVFS_ATTR_SYS_CP);
+        d_ret = pvfs_stat_mask(argv[argc - 1], &d_sbuf, PVFS_ATTR_SYS_CP);
     }
     else
     {
-        ret = stat(argv[argc - 1], &sbuf);
+        d_ret = stat(argv[argc - 1], &d_sbuf);
     }
-    /* could be file to file or file to dir */
-    if (!ret && S_ISDIR(sbuf.st_mode))
+    if (d_ret && (errno != ENOENT || argc - index > 2))
+    {
+        /* error: failed to find dest file or wrong type */
+        perror("stat dest");
+        goto exit_err;
+    }
+    /* clear errno */
+    errno = 0;
+
+    /* Stat Source File */
+    if (pvfs_valid_path(argv[argc - 2]) > 0)
+    {
+        s_ret = pvfs_stat_mask(argv[argc - 2], &s_sbuf, PVFS_ATTR_SYS_CP);
+    }
+    else
+    {
+        s_ret = stat(argv[argc - 2], &s_sbuf);
+    }
+    if (s_ret)
+    {
+        /* even ENOENT is a problem for the source */
+        /* error: failed to find source file or wrong type */
+        perror("stat src");
+        goto exit_err;
+    }
+    if (argc - index == 2)
+    {
+        user_opts->copy_1to1 = 1;
+    }
+    else
+    {
+        user_opts->copy_1to1 = 0;
+    }
+
+    /* could be file to file, dir to dir, or file to dir */
+    if (!d_ret && S_ISDIR(d_sbuf.st_mode))
     {
         user_opts->copy_to_dir = 1;
     }
-    else if (argc - optind == 2)
+    else if (!d_ret && S_ISREG(d_sbuf. st_mode))
     {
-        user_opts->copy_to_dir = 0;
+        user_opts->copy_to_dir = 0; /* copy to file */
+    }
+    else if (d_ret) /* assume errno was ENOENT */
+    {
+        /* dest dir or file does not exist */
+        if (!user_opts->copy_1to1)
+        {
+            /* many to one, ERROR */
+            errno = EBADF;
+            perror("cp");
+            goto exit_err;
+        }
+        else
+        {
+            /* make destination same as source */
+            /* we know s_ret is 0 from above */
+            if (S_ISDIR(s_sbuf.st_mode))
+            {
+                if (user_opts->recursive)
+                {
+                    user_opts->copy_to_dir = 1;
+                }
+                /* create dest dir */
+                s_ret = mkdir(argv[argc - 1], s_sbuf.st_mode);
+                user_opts->created = argv[argc - 1];
+                if (s_ret)
+                {
+                    perror("mkdir");
+                    goto exit_err;
+                }
+            }
+            else if (S_ISREG(s_sbuf.st_mode))
+            {
+                user_opts->copy_to_dir = 0;
+                /* create dest file */
+                s_ret = creat(argv[argc - 1], s_sbuf.st_mode);
+                user_opts->created = argv[argc - 1];
+                if (s_ret < 0)
+                {
+                    perror("creat");
+                    goto exit_err;
+                }
+                close(s_ret);
+            }
+            else
+            {
+                /* not a file or dir */
+                errno = EINVAL;
+                perror("cp");
+                goto exit_err;
+            }
+        }
     }
     else
     {
-        if (ret)
-        {
-            perror("stat");
-        }
-	usage(argc, argv);
-        exit(EXIT_FAILURE);
+        /* not a file or dir or an error on stat */
+        perror("stat dest");
+        goto exit_err;
     }
 
-    user_opts->srcv = argv + optind;
+    /* These are passed to FTS for copy_to_dir */
+    user_opts->srcv = argv + index;
 
+    /* for copy to dir we will set up the destination path in
+     * dest_path_buffer here and the target path is formed by adding the
+     * source path into it for each file in edit_dest_path()
+     */
     if (user_opts->copy_to_dir)
     {
         if (argv[argc - 1][0] == '/')
@@ -577,13 +806,14 @@ static int parse_args(int argc, char *argv[], struct options *user_opts)
         }
         else
         {
+            char *ret;
             int len;
             /* relative path */
-            getcwd(dest_path_buffer, PATH_MAX);
-            if (!user_opts->destfile)
+            ret = getcwd(dest_path_buffer, PATH_MAX);
+            if (!ret)
             {
-                perror("realpath");
-                exit(EXIT_FAILURE);
+                perror("getcwd");
+                goto exit_err;
             }
             strncat(dest_path_buffer, "/", 1);
             len = strnlen(argv[argc - 1], PATH_MAX);
@@ -595,31 +825,51 @@ static int parse_args(int argc, char *argv[], struct options *user_opts)
     }
     else
     {
+        /* This is for one-to-one file case just set up the arguments as
+         * provided on the command line
+         */
         user_opts->srcfile = strdup(argv[argc - 2]);
         user_opts->destfile = strdup(argv[argc - 1]);
     }
 
     return(0);
+
+exit_err:
+
+    if (user_opts->created)
+    {
+        if (user_opts->copy_to_dir)
+        {
+            rmdir(user_opts->created);
+        }
+        else
+        {
+            unlink(user_opts->created);
+        }
+    }
+    usage(argc, argv);
+    exit(EXIT_FAILURE);
 }
 
 static void usage(int argc, char **argv)
 {
     fprintf(stderr, 
-	"Usage: %s OPTS src_file dest_file\n", argv[0]);
+        "Usage: %s OPTS src_file dest_file\n", argv[0]);
     fprintf(stderr, 
-	"Or:    %s OPTS src_file(s) dest_dir\n", argv[0]);
+        "Or:    %s OPTS src_file(s) dest_dir\n", argv[0]);
     fprintf(stderr, "Where OPTS is one or more of:"
-	"\n-s <strip_size>\t\t\tsize of access to PVFS2 volume"
-	"\n-n <num_datafiles>\t\tnumber of PVFS2 datafiles to use"
-	"\n-b <buffer_size in bytes>\thow much data to read/write at once"
-        "\n-r\t\t\t\trecursively copy directories"
-        "\n-m\t\t\t\tpreserve mode of the files"
-        "\n-p\t\t\t\tpreserve owner of the files (requires root)"
-        "\n-v\t\t\t\tverbose - print path of files as the are copied"
-        "\n-d\t\t\t\tprint program debugging information"
-	"\n-t\t\t\t\tprint some timing information"
-	"\n-?\t\t\t\tprint this message"
-	"\n-V\t\t\t\tprint version number and exit\n");
+        "\n-s <strip_size>           size of access to PVFS2 volume"
+        "\n-n <num_datafiles>        number of PVFS2 datafiles to use"
+        "\n-b <buffer_size in bytes> how much data to read/write at once"
+        "\n-r                        recursively copy directories"
+        "\n-m                        preserve mode of the files"
+        "\n-p                        preserve owner of the files (requires root)"
+        "\n-t                        preserve atime/mtime of the files"
+        "\n-v                        verbose - print path of files as the are copied"
+        "\n-D                        print program debugging information"
+        "\n-T                        print some timing information"
+        "\n-?                        print this message"
+        "\n-V                        print version number and exit\n");
     return;
 }
 
@@ -633,7 +883,7 @@ static double Wtime(void)
 static void print_timings(double time, int64_t total)
 {
     printf("Wrote %lld bytes in %f seconds. %f MB/seconds\n",
-	    lld(total), time, (total / time) / (1024 * 1024));
+            lld(total), time, (total / time) / (1024 * 1024));
 }
 
 /*

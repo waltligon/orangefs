@@ -283,7 +283,7 @@ static int bmi_server(
 	error_code = 0;
 	ret = BMI_post_recv(&bmi_id, addr, recv_buffer,
 			    bmi_recv_bufs->size, &actual_size, buffer_type, 0,
-			    NULL, context);
+			    NULL, context,NULL);
 	if (ret == 0)
 	{
 	    do
@@ -301,7 +301,7 @@ static int bmi_server(
 	/* send a message */
 	error_code = 0;
 	ret = BMI_post_send(&bmi_id, addr, send_buffer,
-			    bmi_send_bufs->size, buffer_type, 0, NULL, context);
+			    bmi_send_bufs->size, buffer_type, 0, NULL, context,NULL);
 	if (ret == 0)
 	{
 	    do
@@ -362,7 +362,7 @@ static int bmi_client(
 	/* send a message */
 	error_code = 0;
 	ret = BMI_post_send(&bmi_id, addr, send_buffer,
-			    bmi_send_bufs->size, buffer_type, 0, NULL, context);
+			    bmi_send_bufs->size, buffer_type, 0, NULL, context,NULL);
 	if (ret == 0)
 	{
 	    do
@@ -381,7 +381,7 @@ static int bmi_client(
 	error_code = 0;
 	ret = BMI_post_recv(&bmi_id, addr, recv_buffer,
 			    bmi_recv_bufs->size, &actual_size, buffer_type, 0,
-			    NULL, context);
+			    NULL, context,NULL);
 	if (ret == 0)
 	{
 	    do
