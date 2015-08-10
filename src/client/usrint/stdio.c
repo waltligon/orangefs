@@ -527,7 +527,10 @@ static int init_stream (FILE *stream, int flags, int bufsize)
     /* set up default buffering here */
     if (!stream->_IO_buf_base)
     {
-        stream->_IO_buf_base   = (char *)malloc(bufsize);
+        /* stream->_IO_buf_base   = (char *)malloc(bufsize); */
+        /* should page align IO buffers */
+        stream->_IO_buf_base
+                        = (char *)memalign(sysconf(_SC_PAGESIZE), bufsize);
         if (!stream->_IO_buf_base)
         {
             return -1;
@@ -782,6 +785,11 @@ int pvfs_write_buf(FILE *stream)
     else
     {
         stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+        if (stream->_offset == (off_t)-1)
+        {
+            stream->_offset = _IO_pos_BAD;
+            errno = 0;
+        }
     }
 #endif
     /* reset buffer */
@@ -829,6 +837,11 @@ int pvfs_read_buf(FILE *stream)
     else
     {
          stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+         if (stream->_offset == (off_t)-1)
+         {
+             stream->_offset = _IO_pos_BAD;
+             errno = 0;
+         }
     }
 #endif
     /* indicate end of read area */
@@ -928,6 +941,11 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
             else
             {
                 stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+                if (stream->_offset == (off_t)-1)
+                {
+                    stream->_offset = _IO_pos_BAD;
+                    errno = 0;
+                }
             }
 #endif
             return rc / size;
@@ -1151,6 +1169,11 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
                     else
                     {
                         stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+                        if (stream->_offset == (off_t)-1)
+                        {
+                            stream->_offset = _IO_pos_BAD;
+                            errno = 0;
+                        }
                     }
 #endif
                 if (bytes_read == rsz_extra)
@@ -1345,6 +1368,10 @@ int fseek64(FILE *stream, const off64_t offset, int whence)
         int64_t filepos, fileend;
         struct stat64 sbuf;
         filepos = lseek64(stream->_fileno, 0, SEEK_CUR);
+        if (filepos == (off_t)-1)
+        {
+            return -1;
+        }
         /* should fileend include stuff in write buffer ??? */
         rc = fstat64(stream->_fileno, &sbuf);
         if (rc < 0)
@@ -1541,6 +1568,11 @@ off64_t ftell64(FILE* stream)
 #endif
     {
         filepos = lseek64(stream->_fileno, 0, SEEK_CUR);
+        if (filepos == (off_t)-1)
+        {
+            errno = EPIPE;
+            return -1;
+        }
     }
     if (ISFLAGSET(stream, _IO_CURRENTLY_PUTTING))
     {
@@ -1616,6 +1648,11 @@ int fflush_unlocked(FILE *stream)
         else
         {
             stream->_offset = lseek64(stream->_fileno, 0, SEEK_CUR);
+            if (stream->_offset == (off_t)-1)
+            {
+                stream->_offset = _IO_pos_BAD;
+                errno = 0;
+            }
         }
 #endif
         /* reset write pointer */
@@ -2761,6 +2798,12 @@ int setvbuf (FILE *stream, char *buf, int mode, size_t size)
         stream->_IO_write_ptr  = stream->_IO_buf_base;
         stream->_IO_write_end  = stream->_IO_buf_end;
     }
+    if (buf && size <= 0)
+    {
+        errno = EINVAL;
+        unlock_stream(stream);
+        return -1;
+    }
     /* Add logic here: if !buf size>0 malloc new buffer
      *                 if size=0 restore to default condition
      */
@@ -2934,7 +2977,8 @@ DIR *fdopendir (int fd)
     ZEROMEM(dstr, sizeof(DIR));
     SETMAGIC(dstr, DIRSTREAM_MAGIC);
     dstr->fileno = fd;
-    dstr->buf_base = (char *)malloc(DIRBUFSIZE);
+    /* dstr->buf_base = (char *)malloc(DIRBUFSIZE); */
+    dstr->buf_base = (char *)memalign(sysconf(_SC_PAGESIZE), DIRBUFSIZE);
     if (dstr->buf_base == NULL)
     {
         dstr->_flags = 0;
@@ -3073,6 +3117,11 @@ void seekdir (DIR *dir, off_t offset)
         return;
     }
     filepos = lseek64(dir->fileno, 0, SEEK_CUR);
+    if (filepos == -1)
+    {
+        /* no way to report an error here */
+        return;
+    }
     if ((filepos - (dir->buf_act - dir->buf_base)) <= offset &&
         filepos >= offset)
     {

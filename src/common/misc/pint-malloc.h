@@ -85,7 +85,8 @@ extern void  PINT_free(void *mem);
 # ifdef malloc
 #  undef malloc
 # endif
-# define malloc PINT_malloc
+/* Defining malloc with an arg avoids losing on __attribute__((malloc))  */
+# define malloc(x) PINT_malloc(x)
 
 # ifdef calloc
 #  undef calloc
