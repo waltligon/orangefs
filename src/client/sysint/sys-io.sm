@@ -33,6 +33,7 @@
 #include "pint-hint.h"
 #include "client-cache.h"
 #include "bit-bool.h"
+#include "gen-locks.h"
 
 #define IO_MAX_SEGMENT_NUM 50 
 #define IO_ATTR_MASKS (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|\
