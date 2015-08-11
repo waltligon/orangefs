@@ -3775,6 +3775,7 @@ static int work_on_send_op(method_op_p my_method_op,
         ((struct tcp_op *)(my_method_op->method_data))->tcp_op_state =
                 BMI_TCP_COMPLETE;
         op_list_add(completion_array[my_method_op->context_id], my_method_op);
+        /* TODO: signal condition variable for BMI_testcontext() */
         
         *blocked_flag = 0;
     }
@@ -3857,6 +3858,8 @@ static int work_on_recv_op(method_op_p my_method_op,
             {
                 op_list_add(op_list_array[IND_COMPLETE_RECV_UNEXP],
                             my_method_op);
+                /* TODO: signal condition variable for BMI_testunexpected()
+                 *       and BMI_testcontext() */
             }
             else
             {
@@ -3864,6 +3867,7 @@ static int work_on_recv_op(method_op_p my_method_op,
                         BMI_TCP_COMPLETE;
                 op_list_add(completion_array[my_method_op->context_id],
                             my_method_op);
+                /* TODO: signal condition variable for BMI_testcontext() */
             }
         }
     }

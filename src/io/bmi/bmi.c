@@ -859,71 +859,32 @@ int BMI_post_sendunexpected(bmi_op_id_t *id,
 }
 
 
-/* PROTO_THREADS */
 /* TODO: documentation */
+/* TODO: continuously call method-level push_work function
+ */
 void *BMI_proto_thread_func(void *params)
 {
-    /* TODO: continuously call method-level testunexpected function, and call
-     *       method-level testcontext function when a condition variable is
-     *       signaled (after an operation has completed)
-     *
-     * Should I test for server or client?
-     */
-    
     int ret = -1;
-    int outcount = 0;
-    bmi_op_id_t out_id;
-    bmi_error_code_t error_code;
-    bmi_size_t actual_size;
+    int max_idle_time_ms = 100; /* TODO: make this a configurable option? */
     
-    struct bmi_method_unexpected_info sub_info;
-    
+    /* TODO: are all the members of this struct still necessary? */
     proto_thread_params *thread_params = (proto_thread_params *)params;
     
-    /* figure out if we need to drop any stale addresses */
-    bmi_check_forget_list();
-    bmi_check_addr_force_drop();
-    
-    outcount = 0;
-    
-    /* TODO: make sure you reset outcount before you start the loop over */
     while (1)
     {
-        ret = thread_params->meth->testunexpected(1,      /* incount */
-                                                  &outcount,
-                                                  &sub_info,
-                                                  100);   /* max_idle_time */
+        /* figure out if we need to drop any stale addresses */
+        bmi_check_forget_list();
+        bmi_check_addr_force_drop();
+        
+        ret = thread_params->meth->push_work(max_idle_time_ms);
         if (ret < 0)
         {
-            /* can't recover from this */
-            gossip_lerr("Error: critical BMI_proto_thread_func failure.\n");
-            /* TODO: exit() */
+            /* TODO: error-handling */
         }
         
-        /* TODO: populate info array?? */
-        
-        /* TODO: populate info array address??
-         *       info array probably doesn't matter in this function anymore,
-         *       just when retreiving ops from the completion queue??
+        /* TODO: where do I need to signal condition variable for 
+         *       BMI_testcontext() and/or BMI_testunexpected()?? 
          */
-        
-        /* testcontext?? */
-        outcount = 0;
-        
-        ret = thread_params->meth->testcontext(1,       /* incount */
-                                               &out_id,
-                                               &outcount,
-                                               &error_code,
-                                               &actual_size,
-                                               NULL,    /* user_ptr */
-                                               100,     /* max_idle_time_ms */
-                                               thread_params->cond_var);
-        
-        
-        
-        
-        /* reset outcount before loop starts over */
-        outcount = 0;
     }
 }
 
@@ -1179,6 +1140,7 @@ start:
             user_ptr = &user_ptr_array[position];
         }
         
+        /* TODO: figure out a way to combine what all the methods find */
         ret = active_method_table[i]->check_cq((incount - position),
                                                &out_id_array[position],
                                                &tmp_outcount,
