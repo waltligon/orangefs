@@ -2435,6 +2435,8 @@ PVFS_Dokan_get_disk_free_space(
     if (err == ERROR_SUCCESS)
     {
         *TotalNumberOfFreeBytes = *FreeBytesAvailable;
+        DbgPrint("   FreeBytesAvailable: %llu\n", *FreeBytesAvailable);
+        DbgPrint("   TotalNumberofBytes: %llu\n", *TotalNumberOfBytes);
     }
 
     PINT_cleanup_credential(&credential);
