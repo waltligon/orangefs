@@ -11,7 +11,7 @@
 #include "pint-util.h"
 #include "openfile-util.h"
 #include "pvfs2-dist-simple-stripe.h"
-#include "usrint.h"
+//#include "usrint.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -598,7 +598,7 @@ PVFS_error PVFS_iaio_open(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_sysint_credentials(sm_p->cred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.aio_open.directory = directory;
     sm_p->u.aio_open.filename = filename;
     sm_p->u.aio_open.flags = flags;
@@ -753,7 +753,7 @@ static PINT_sm_action open_pdir_lookup(
         char *path = ((pvfs_path[0] == '/') ? &pvfs_path[1] : pvfs_path);
 
         PINT_init_msgarray_params(lookup_frame, lookup_fs_id);
-        PINT_init_sysint_credentials(lookup_frame->cred_p, sm_p->cred_p);
+        PINT_init_sysint_credential(lookup_frame->cred_p, sm_p->cred_p);
         lookup_frame->u.lookup.orig_pathname = path;
         lookup_frame->u.lookup.starting_refn = parent;
         lookup_frame->u.lookup.lookup_resp = &(sm_p->u.aio_open.lookup_resp);
@@ -861,7 +861,7 @@ static PINT_sm_action open_pdir_lookup_given(
 
         PINT_init_msgarray_params(lookup_frame, sm_p->u.aio_open.pdir->s->pvfs_ref.fs_id);
 
-        PINT_init_sysint_credentials(lookup_frame->cred_p, sm_p->cred_p);
+        PINT_init_sysint_credential(lookup_frame->cred_p, sm_p->cred_p);
         lookup_frame->u.lookup.orig_pathname = sm_p->u.aio_open.current_seg_path;
         lookup_frame->u.lookup.starting_refn = sm_p->u.aio_open.pdir->s->pvfs_ref;
         lookup_frame->u.lookup.lookup_resp = &(sm_p->u.aio_open.lookup_resp);
@@ -1098,7 +1098,7 @@ static PINT_sm_action open_resolve_fail_file_lookup_abs(
         char *path = ((pvfs_path[0] == '/') ? &pvfs_path[1] : pvfs_path);
 
         PINT_init_msgarray_params(lookup_frame, lookup_fs_id);
-        PINT_init_sysint_credentials(lookup_frame->cred_p, sm_p->cred_p);
+        PINT_init_sysint_credential(lookup_frame->cred_p, sm_p->cred_p);
         lookup_frame->u.lookup.orig_pathname = path;
         lookup_frame->u.lookup.starting_refn = file;
         lookup_frame->u.lookup.lookup_resp = &(sm_p->u.aio_open.lookup_resp);
@@ -1227,7 +1227,7 @@ static PINT_sm_action open_file_lookup_setup(
     memset(lookup_frame, 0, sizeof(PINT_client_sm));
 
     PINT_init_msgarray_params(lookup_frame, sm_p->u.aio_open.parent_ref.fs_id);
-    PINT_init_sysint_credentials(lookup_frame->cred_p, sm_p->cred_p);
+    PINT_init_sysint_credential(lookup_frame->cred_p, sm_p->cred_p);
     lookup_frame->u.lookup.orig_pathname = sm_p->u.aio_open.current_seg_path;
     lookup_frame->u.lookup.starting_refn = sm_p->u.aio_open.parent_ref;
     lookup_frame->u.lookup.lookup_resp = &(sm_p->u.aio_open.lookup_resp);
@@ -1467,18 +1467,26 @@ static PINT_sm_action open_file_ref_lookup_inspect(
             js_p->error_code = -PVFS_ENAMETOOLONG;
         }
 
-        if (attr.owner != sm_p->cred_p->uid)
+        if (attr.owner != sm_p->cred_p->userid)
         {
             gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing owner uid %d with %d "
                      "on create\n", attr.owner, sm_p->cred_p->uid);
-            attr.owner = sm_p->cred_p->uid;
+            attr.owner = sm_p->cred_p->userid;
         }
 
-        if (attr.group != sm_p->cred_p->gid)
+        /*if (attr.group != sm_p->cred_p->gid)
         {
             gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing group uid %d with %d "
                          "on create\n", attr.group, sm_p->cred_p->gid);
             attr.group = sm_p->cred_p->gid;
+        }*/
+        /* Just following example from /src/client/sysint/sys-create.sm */
+        if (attr.group != sm_p->cred_p->group_array[0] &&
+            sm_p->cred_p->group_array[0] != 0)
+        {
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing group gid %d with %d "
+                         "on create\n", attr.group, sm_p->cred_p->group_array[0]);
+            attr.group = sm_p->cred_p->group_array[0];
         }
 
         PINT_client_sm *create_frame = (PINT_client_sm *)malloc(sizeof(PINT_client_sm));
@@ -1489,7 +1497,7 @@ static PINT_sm_action open_file_ref_lookup_inspect(
         }
 
         PINT_init_msgarray_params(create_frame, sm_p->u.aio_open.parent_ref.fs_id);
-        PINT_init_sysint_credentials(create_frame->cred_p, sm_p->cred_p);
+        PINT_init_sysint_credential(create_frame->cred_p, sm_p->cred_p);
         create_frame->u.create.object_name = sm_p->u.aio_open.filename;
         create_frame->u.create.create_resp = &sm_p->u.aio_open.create_resp;
         PINT_CONVERT_ATTR(&create_frame->u.create.attr, &attr, PVFS_ATTR_META_ALL);
@@ -1598,7 +1606,7 @@ static PINT_sm_action open_setup_fildes(
     memset(getattr_frame, 0, sizeof(PINT_client_sm));
 
     PINT_init_msgarray_params(getattr_frame, fildes_out->s->pvfs_ref.fs_id);
-    PINT_init_sysint_credentials(getattr_frame->cred_p, sm_p->cred_p);
+    PINT_init_sysint_credential(getattr_frame->cred_p, sm_p->cred_p);
     getattr_frame->error_code = 0;
     getattr_frame->object_ref = fildes_out->s->pvfs_ref;
     getattr_frame->u.getattr.getattr_resp_p = &(sm_p->u.aio_open.getattr_resp);
@@ -1684,7 +1692,7 @@ static PINT_sm_action open_getattr_inspect(
         }
 
         PINT_init_msgarray_params(trunc_frame, sm_p->u.aio_open.file_ref.fs_id);
-        PINT_init_sysint_credentials(trunc_frame->cred_p, sm_p->cred_p);
+        PINT_init_sysint_credential(trunc_frame->cred_p, sm_p->cred_p);
         trunc_frame->u.truncate.size = 0;
         trunc_frame->object_ref = sm_p->u.aio_open.file_ref;
         PVFS_hint_copy(sm_p->hints, &(trunc_frame->hints));
@@ -1764,7 +1772,7 @@ static PINT_sm_action open_file_append_check(
         memset(getattr_frame, 0, sizeof(PINT_client_sm));
 
         PINT_init_msgarray_params(getattr_frame, fildes_out->s->pvfs_ref.fs_id);
-        PINT_init_sysint_credentials(getattr_frame->cred_p, sm_p->cred_p);
+        PINT_init_sysint_credential(getattr_frame->cred_p, sm_p->cred_p);
         getattr_frame->error_code = 0;
         getattr_frame->object_ref = fildes_out->s->pvfs_ref;
         getattr_frame->u.getattr.getattr_resp_p = &(sm_p->u.aio_open.getattr_resp);
@@ -1842,7 +1850,7 @@ static PINT_sm_action open_file_append_getattr_inspect(
             memset(readdir_frame, 0, sizeof(PINT_client_sm));
 
             PINT_init_msgarray_params(readdir_frame,fildes_out->s->pvfs_ref.fs_id);
-            PINT_init_sysint_credentials(readdir_frame->cred_p, sm_p->cred_p);
+            PINT_init_sysint_credential(readdir_frame->cred_p, sm_p->cred_p);
             readdir_frame->readdir.readdir_resp = &sm_p->u.aio_open.readdir_resp;
             readdir_frame->object_ref = fildes_out->s->pvfs_ref;
             PVFS_hint_copy(sm_p->hints, &readdir_frame->hints);

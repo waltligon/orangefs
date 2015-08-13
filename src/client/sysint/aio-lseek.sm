@@ -97,7 +97,7 @@ PVFS_error PVFS_iaio_lseek(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_sysint_credentials(sm_p->cred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     PVFS_hint_copy(hints, &(sm_p->hints));
     sm_p->u.aio_lseek.pd = pd;
     sm_p->u.aio_lseek.offset = offset;
@@ -176,7 +176,7 @@ static PINT_sm_action lseek_init(
 
             PINT_init_msgarray_params(getattr_frame,
                                       sm_p->u.aio_lseek.pd->s->pvfs_ref.fs_id);
-            PINT_init_sysint_credentials(getattr_frame->cred_p, sm_p->cred_p);
+            PINT_init_sysint_credential(getattr_frame->cred_p, sm_p->cred_p);
             getattr_frame->error_code = 0;
             getattr_frame->object_ref = sm_p->u.aio_lseek.pd->s->pvfs_ref;
             getattr_frame->u.getattr.getattr_resp_p = &(sm_p->u.aio_lseek.getattr_resp);
@@ -263,7 +263,7 @@ static PINT_sm_action lseek_dir_check(
 
             PINT_init_msgarray_params(readdir_frame,
                                       sm_p->u.aio_lseek.pd->s->pvfs_ref.fs_id);
-            PINT_init_sysint_credentials(readdir_frame->cred_p, sm_p->cred_p);
+            PINT_init_sysint_credential(readdir_frame->cred_p, sm_p->cred_p);
             readdir_frame->readdir.readdir_resp = &(sm_p->u.aio_lseek.readdir_resp);
             readdir_frame->object_ref = sm_p->u.aio_lseek.pd->s->pvfs_ref;
             PVFS_hint_copy(sm_p->hints, &readdir_frame->hints);

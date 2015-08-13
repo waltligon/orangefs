@@ -2,36 +2,42 @@ DIR := src/client/usrint
 
 ifeq ($(build_usrint),yes)
 
-OSRC := \
+#	these will be placed in libpvfs2, so usrint code
+#	can be used with the asynchronous IO call state
+#	machines in /src/client/sysint
+CSRC := \
 	$(DIR)/pvfs-path.c \
 	$(DIR)/mmap.c \
 	$(DIR)/openfile-util.c \
 	$(DIR)/iocommon.c \
 	$(DIR)/request.c \
 	$(DIR)/ucache.c \
-	$(DIR)/posix-pvfs.c  \
-	$(DIR)/env-vars.c
-
+	$(DIR)/posix-pvfs.c \
+	$(DIR)/env-vars.c \
+	$(DIR)/aiocommon.c \
+	$(DIR)/aio-pvfs.c \
+	$(DIR)/pxfs.c \
+	$(DIR)/recursive-remove.c 
+	
 #   these routines don't need pvfs implementation and will
 #   probably be removed
 #	$(DIR)/acl.c \
 
 USRC := \
-	$(DIR)/posix.c \
+	$(DIR)/posix.cpp \
 	$(DIR)/stdio.c \
 	$(DIR)/selinux.c \
 	$(DIR)/overunder.c \
 	$(DIR)/fts.c \
 	$(DIR)/glob.c \
-	$(DIR)/error.c \
-	$(DIR)/recursive-remove.c
+	$(DIR)/error.c 
 
 #   these routines do no need to use the pvfs descriptor
 #   and will probably be removed
 #	$(DIR)/socket.c \
 
 # list of all .c files (generated or otherwise) that belong in library
-OLIBSRC += $(OSRC)
+LIBSRC += $(CSRC) 
 ULIBSRC += $(USRC)
 
 endif # build_usrint

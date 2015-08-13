@@ -4012,7 +4012,6 @@ int main(int argc, char **argv)
 {
     int ret = 0, i = 0;
     time_t start_time;
-    struct tm *local_time = NULL;
     uint64_t debug_mask = GOSSIP_NO_DEBUG;
     PINT_client_sm *acache_timer_sm_p = NULL;
     PINT_smcb *acache_smcb = NULL;
@@ -4020,7 +4019,8 @@ int main(int argc, char **argv)
     PINT_smcb *ncache_smcb = NULL;
     PINT_client_sm *capcache_timer_sm_p = NULL;
     PINT_smcb *capcache_smcb = NULL;
-
+    struct tm *local_time = NULL;
+        
 #ifdef __PVFS2_SEGV_BACKTRACE__
     struct sigaction segv_action;
 

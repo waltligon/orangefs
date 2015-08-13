@@ -1462,7 +1462,7 @@ int posix_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
         return -1;
     }
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
+    if (pd && pd->is_in_use && static_cast<int>(fd) == pd->fd &&
         pd->s && pd->s->fsops)
     {
         rc = pd->s->fsops->readdir(pd->true_fd, dirp, count);
@@ -1492,7 +1492,7 @@ int getdents(unsigned int fd, struct dirent *dirp, unsigned int size)
         return -1;
     }
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
+    if (pd && pd->is_in_use && static_cast<int>(fd) == pd->fd &&
         pd->s && pd->s->fsops)
     {
         rc = pd->s->fsops->getdents(pd->true_fd, dirp, size);
@@ -1516,7 +1516,7 @@ int getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int size)
         return -1;
     }
     pd = pvfs_find_descriptor(fd);
-    if (pd && pd->is_in_use && fd == pd->fd &&
+    if (pd && pd->is_in_use && static_cast<int>(fd) == pd->fd &&
         pd->s && pd->s->fsops)
     {
         rc = pd->s->fsops->getdents64(pd->true_fd, dirp, size);

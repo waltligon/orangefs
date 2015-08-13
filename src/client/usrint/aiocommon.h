@@ -16,8 +16,8 @@
 #include "iocommon.h"
 #include "aio.h"
 #include "quicklist.h"
+#include "aio-pvfs.h"
 #include "gossip.h"
-// #include "pvfs2-aio.h"
 
 #define PVFS_AIO_MAX_RUNNING 10
 #define PVFS_AIO_LISTIO_MAX 10

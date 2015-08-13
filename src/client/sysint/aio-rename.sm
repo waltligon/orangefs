@@ -459,7 +459,7 @@ PVFS_error PVFS_iaio_rename(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_sysint_credentials(sm_p->cred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     PVFS_hint_copy(hints, &(sm_p->hints));
     sm_p->u.aio_rename.oldpdir = oldpdir;
     sm_p->u.aio_rename.olddir = olddir;
@@ -598,7 +598,7 @@ static PINT_sm_action rename_oldref_abs_lookup_setup(
         char *path = ((pvfs_path[0] == '/') ? &pvfs_path[1] : pvfs_path);
 
         PINT_init_msgarray_params(lookup_frame, lookup_fs_id);
-        PINT_init_sysint_credentials(lookup_frame->cred_p, sm_p->cred_p);
+        PINT_init_sysint_credential(lookup_frame->cred_p, sm_p->cred_p);
         lookup_frame->u.lookup.orig_pathname = path;
         lookup_frame->u.lookup.starting_refn = parent;
         lookup_frame->u.lookup.lookup_resp = &(sm_p->u.aio_rename.lookup_resp);
@@ -725,7 +725,7 @@ static PINT_sm_action rename_oldref_rel_lookup_setup(
     memset(lookup_frame, 0, sizeof(PINT_client_sm));
 
     PINT_init_msgarray_params(lookup_frame, sm_p->u.aio_rename.oldpdir->fs_id);
-    PINT_init_sysint_credentials(lookup_frame->cred_p, sm_p->cred_p);
+    PINT_init_sysint_credential(lookup_frame->cred_p, sm_p->cred_p);
     lookup_frame->u.lookup.orig_pathname = sm_p->u.aio_rename.current_seg_path;
     lookup_frame->u.lookup.starting_refn = *(sm_p->u.aio_rename.oldpdir);
     lookup_frame->u.lookup.lookup_resp = &(sm_p->u.aio_rename.lookup_resp);
@@ -957,7 +957,7 @@ static PINT_sm_action rename_newref_abs_lookup_setup(
         char *path = ((pvfs_path[0] == '/') ? &pvfs_path[1] : pvfs_path);
 
         PINT_init_msgarray_params(lookup_frame, lookup_fs_id);
-        PINT_init_sysint_credentials(lookup_frame->cred_p, sm_p->cred_p);
+        PINT_init_sysint_credential(lookup_frame->cred_p, sm_p->cred_p);
         lookup_frame->u.lookup.orig_pathname = path;
         lookup_frame->u.lookup.starting_refn = parent;
         lookup_frame->u.lookup.lookup_resp = &(sm_p->u.aio_rename.lookup_resp);
@@ -1084,7 +1084,7 @@ static PINT_sm_action rename_newref_rel_lookup_setup(
     memset(lookup_frame, 0, sizeof(PINT_client_sm));
 
     PINT_init_msgarray_params(lookup_frame, sm_p->u.aio_rename.newpdir->fs_id);
-    PINT_init_sysint_credentials(lookup_frame->cred_p, sm_p->cred_p);
+    PINT_init_sysint_credential(lookup_frame->cred_p, sm_p->cred_p);
     lookup_frame->u.lookup.orig_pathname = sm_p->u.aio_rename.current_seg_path;
     lookup_frame->u.lookup.starting_refn = *(sm_p->u.aio_rename.newpdir);
     lookup_frame->u.lookup.lookup_resp = &(sm_p->u.aio_rename.lookup_resp);
@@ -1277,7 +1277,7 @@ static PINT_sm_action rename_sm_setup(
     memset(rename_frame, 0, sizeof(PINT_client_sm));
 
     PINT_init_msgarray_params(rename_frame, sm_p->u.aio_rename.oldref.fs_id);
-    PINT_init_sysint_credentials(rename_frame->cred_p, sm_p->cred_p);
+    PINT_init_sysint_credential(rename_frame->cred_p, sm_p->cred_p);
     
     rename_frame->u.rename.entries[0] = (char *)sm_p->u.aio_rename.oldname;
     rename_frame->u.rename.entries[1] = (char *)sm_p->u.aio_rename.newname;

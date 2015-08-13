@@ -13,6 +13,8 @@
 #ifndef POSIX_OPS_H
 #define POSIX_OPS_H 1
 
+#include "usrint.h"
+
 /* POSIX functions */ 
 
 /** struct of pointers to methods for posix system calls */

@@ -13,7 +13,7 @@
 #include "pvfs2-internal.h"
 #include "pxfs.h"
 
-#define PVFS_ATTR_DEFAULT_MASK \
+#define PVFS_ATTR_DEFAULT_MASKING \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | PVFS_ATTR_SYS_BLKSIZE)
 
 static mode_t mask_val = 0022; /* implements umask for pvfs library */
@@ -144,7 +144,7 @@ extern int pxfs_open64(const char *path, int flags, int *fd,
     va_end(ap);
     flags |= O_LARGEFILE;
 
-    return pxfs_open(path, flags, fd, cb, cdat, mode);
+    return pxfs_open(path, flags, fd, cb, cdat, mode, hints);
 }
 
 /*
@@ -1001,7 +1001,7 @@ static int pxfs_stat_close_cb(void *cdat, int status)
 extern int pxfs_stat(const char *path, struct stat *buf,
                      pxfs_cb cb, void *cdat)
 {
-    return pxfs_stat_mask(path, buf, PVFS_ATTR_DEFAULT_MASK, cb, cdat);
+    return pxfs_stat_mask(path, buf, PVFS_ATTR_DEFAULT_MASKING, cb, cdat);
 }
 
 /**
@@ -1050,7 +1050,7 @@ extern int pxfs_stat_mask(const char *path, struct stat *buf,
  */
 extern int pxfs_fstat(int fd, struct stat *buf, pxfs_cb cb, void *cdat)
 {
-    return pxfs_fstat_mask(fd, buf, PVFS_ATTR_DEFAULT_MASK, cb, cdat);
+    return pxfs_fstat_mask(fd, buf, PVFS_ATTR_DEFAULT_MASKING, cb, cdat);
 }
 
 /**
@@ -1090,7 +1090,7 @@ extern int pxfs_fstat64(int fd, struct stat64 *buf, pxfs_cb cb, void *cdat)
     stat_acb->op_code = PVFS_AIO_STAT_OP;
     stat_acb->u.stat.pd = pd;
     stat_acb->u.stat.buf = (void *)buf;
-    stat_acb->u.stat.mask = PVFS_ATTR_DEFAULT_MASK;
+    stat_acb->u.stat.mask = PVFS_ATTR_DEFAULT_MASKING;
     stat_acb->u.stat.stat64 = 1;
     stat_acb->call_back_fn = cb;
     stat_acb->call_back_dat = cdat;
@@ -1146,7 +1146,7 @@ extern int pxfs_fstat_mask(int fd, struct stat *buf, uint32_t mask,
     stat_acb->op_code = PVFS_AIO_STAT_OP;
     stat_acb->u.stat.pd = pd;
     stat_acb->u.stat.buf = (void *)buf;
-    stat_acb->u.stat.mask = mask & PVFS_ATTR_DEFAULT_MASK;
+    stat_acb->u.stat.mask = mask & PVFS_ATTR_DEFAULT_MASKING;
     stat_acb->u.stat.stat64 = 0;
     stat_acb->call_back_fn = cb;
     stat_acb->call_back_dat = cdat;
@@ -1162,7 +1162,7 @@ extern int pxfs_fstat_mask(int fd, struct stat *buf, uint32_t mask,
 extern int pxfs_lstat(const char *path, struct stat *buf,
                       pxfs_cb cb, void *cdat)
 {
-    return pxfs_lstat_mask(path, buf, PVFS_ATTR_DEFAULT_MASK, cb, cdat);
+    return pxfs_lstat_mask(path, buf, PVFS_ATTR_DEFAULT_MASKING, cb, cdat);
 }
 
 /**

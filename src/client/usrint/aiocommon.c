@@ -15,7 +15,7 @@
 static void aiocommon_run_waiting_ops(void);
 static void aiocommon_run_op(struct pvfs_aiocb *p_cb);
 static void aiocommon_finish_op(struct pvfs_aiocb *p_cb);
-static void *aiocommon_progress(void *ptr);
+static void aiocommon_progress(void *ptr);
 
 /* linked list variables used to implement aio structures */
 static struct qlist_head *aio_waiting_list = NULL;
@@ -127,7 +127,7 @@ int aiocommon_init(void)
     }
     INIT_QLIST_HEAD(aio_running_list);
 
-    pthread_create(&aio_progress_thread, NULL, aiocommon_progress, NULL);
+    pthread_create(&aio_progress_thread, NULL, (void *)&aiocommon_progress, NULL);
 
     gossip_debug(GOSSIP_USRINT_DEBUG, "Successfully initalized PVFS AIO inteface\n");
 
@@ -249,10 +249,9 @@ static void aiocommon_finish_op(struct pvfs_aiocb *p_cb)
     return;
 }
 
-static void *aiocommon_progress(void *ptr)
+static void aiocommon_progress(void *ptr)
 {
     int i, j;
-    int ret = 0;
     int op_count = 0;
     PVFS_sys_op_id ret_op_ids[PVFS_AIO_MAX_RUNNING];
     PVFS_sys_op_id temp_running_ops[PVFS_AIO_MAX_RUNNING] = {0};
@@ -296,11 +295,11 @@ static void *aiocommon_progress(void *ptr)
         memcpy(ret_op_ids, aio_running_ops,
                (aio_num_ops_running * sizeof(PVFS_sys_op_id)));
         op_count = aio_num_ops_running;
-        ret = PVFS_sys_testsome(ret_op_ids,
-                                &op_count,
-                                (void *)pcb_array,
-                                err_code_array,
-                                PVFS_AIO_DEFAULT_TIMEOUT_MS);
+        PVFS_sys_testsome(ret_op_ids,
+                          &op_count,
+                          (void *)pcb_array,
+                          err_code_array,
+                          PVFS_AIO_DEFAULT_TIMEOUT_MS);
 
         /* for each op returned */
         for (i = 0; i < op_count; i++)

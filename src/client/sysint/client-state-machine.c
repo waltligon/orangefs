@@ -389,6 +389,16 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
 #endif
 };
 
+struct PINT_client_op_entry_s PINT_client_sm_aio_table[] =
+{
+    {&pvfs2_client_aio_open_sm},
+    {&pvfs2_client_aio_rename_sm},
+    {&pvfs2_client_aio_mkdir_sm},
+    {&pvfs2_client_aio_remove_sm},
+    {&pvfs2_client_aio_symlink_sm},
+    {&pvfs2_client_aio_lseek_sm},
+    {&pvfs2_client_aio_close_sm}
+};
 
 /* This function allows the generic state-machine-fns.c locate function
  * to access the appropriate sm struct based on the client operation index
@@ -429,6 +439,10 @@ struct PINT_state_machine_s *client_op_state_get_machine(int op)
             if (op <= PVFS_OP_MGMT_MAXVAL)
             {
                 return PINT_client_sm_mgmt_table[op-PVFS_OP_SYS_MAXVAL-1].sm;
+            }
+            else if (op <= PVFS_OP_AIO_MAXVAL)
+            {
+                return PINT_client_sm_aio_table[op-PVFS_OP_AIO_MINVAL].sm;
             }
             else
             {
@@ -1235,6 +1249,13 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_DEV_UNEXPECTED, "PVFS_DEV_UNEXPECTED" },
         { PVFS_SYS_FS_ADD, "PVFS_SYS_FS_ADD" },
         { PVFS_SYS_STATFS, "PVFS_SYS_STATFS" },
+        { PVFS_AIO_OPEN, "PVFS_AIO_OPEN" },
+        { PVFS_AIO_RENAME, "PVFS_AIO_RENAME" },
+        { PVFS_AIO_MKDIR, "PVFS_AIO_MKDIR" },
+        { PVFS_AIO_REMOVE, "PVFS_AIO_REMOVE" },
+        { PVFS_AIO_SYMLINK, "PVFS_AIO_SYMLINK" },
+        { PVFS_AIO_LSEEK, "PVFS_AIO_LSEEK" },
+        { PVFS_AIO_CLOSE, "PVFS_AIO_CLOSE" },
         { 0, "UNKNOWN" }
     };
 

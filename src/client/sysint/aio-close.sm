@@ -75,7 +75,7 @@ PVFS_error PVFS_iaio_close(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_init_sysint_credentials(sm_p->cred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     PVFS_hint_copy(hints, &(sm_p->hints));
     sm_p->u.aio_close.pd = pd;
 
@@ -143,7 +143,7 @@ static PINT_sm_action close_init(
 
         PINT_init_msgarray_params(close_frame,
                                   sm_p->u.aio_close.pd->s->pvfs_ref.fs_id);
-        PINT_init_sysint_credentials(close_frame->cred_p, sm_p->cred_p);
+        PINT_init_sysint_credential(close_frame->cred_p, sm_p->cred_p);
         close_frame->object_ref = sm_p->u.aio_close.pd->s->pvfs_ref;
         PVFS_hint_copy(sm_p->hints, &(close_frame->hints));
         PVFS_hint_add(&(close_frame->hints), PVFS_HINT_HANDLE_NAME,

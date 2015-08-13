@@ -13,9 +13,9 @@ extern job_context_id pint_client_sm_context;
 
 enum
 {
-    SYMLINK_PDIR_NULL = 675,
-    SYMLINK_REF_FOUND,
-    SYMLINK_LOOKUP_SM
+    MKDIR_PDIR_NULL = 675,
+    MKDIR_DIR_REF_FOUND,
+    MKDIR_LOOKUP_SM
 };
 
 /* helper function prototypes */
@@ -26,21 +26,21 @@ static int initialize_context(
 
 %%
 
-machine pvfs2_client_aio_symlink_sm
+machine pvfs2_client_aio_mkdir_sm
 {
     state init
     {
-        run symlink_init;
-        SYMLINK_PDIR_NULL => parent_ref_abs_lookup_setup;
-        SYMLINK_REF_FOUND => sm_setup;
+        run mkdir_init;
+        MKDIR_PDIR_NULL => parent_ref_abs_lookup_setup;
+        MKDIR_DIR_REF_FOUND => sm_setup;
         default => parent_ref_rel_lookup_setup;
     }
 
     state parent_ref_abs_lookup_setup
     {
-        run symlink_parent_ref_abs_lookup_setup;
-        SYMLINK_LOOKUP_SM => parent_ref_abs_lookup;
-        SYMLINK_REF_FOUND => sm_setup;
+        run mkdir_parent_ref_abs_lookup_setup;
+        MKDIR_LOOKUP_SM => parent_ref_abs_lookup;
+        MKDIR_DIR_REF_FOUND => sm_setup;
         default => cleanup;
     }
 
@@ -52,16 +52,16 @@ machine pvfs2_client_aio_symlink_sm
 
     state parent_ref_abs_lookup_inspect
     {
-        run symlink_parent_ref_abs_lookup_inspect;
+        run mkdir_parent_ref_abs_lookup_inspect;
         success => sm_setup;
         default => cleanup;
     }
 
     state parent_ref_rel_lookup_setup
     {
-        run symlink_parent_ref_rel_lookup_setup;
-        SYMLINK_REF_FOUND => sm_setup;
-        SYMLINK_LOOKUP_SM => parent_ref_rel_lookup;
+        run mkdir_parent_ref_rel_lookup_setup;
+        MKDIR_DIR_REF_FOUND => sm_setup;
+        MKDIR_LOOKUP_SM => parent_ref_rel_lookup;
         default => cleanup;
     }
 
@@ -73,34 +73,34 @@ machine pvfs2_client_aio_symlink_sm
 
     state parent_ref_rel_lookup_inspect
     {
-        run symlink_parent_ref_rel_lookup_inspect;
-        SYMLINK_LOOKUP_SM => parent_ref_rel_lookup;
-        SYMLINK_REF_FOUND => sm_setup;
+        run mkdir_parent_ref_rel_lookup_inspect;
+        MKDIR_LOOKUP_SM => parent_ref_rel_lookup;
+        MKDIR_DIR_REF_FOUND => sm_setup;
         default => cleanup;
     }
 
     state sm_setup
     {
-        run symlink_sm_setup;
+        run mkdir_sm_setup;
         success => sm_run;
         default => cleanup;
     }
 
     state sm_run
     {
-        jump pvfs2_client_symlink_sm;
+        jump pvfs2_client_mkdir_sm;
         default => sm_inspect;
     }
 
     state sm_inspect
     {
-        run symlink_sm_inspect;
+        run mkdir_sm_inspect;
         default => cleanup;
     }
 
     state cleanup
     {
-        run symlink_cleanup;
+        run mkdir_cleanup;
         default => terminate;
     }
 }
@@ -373,11 +373,11 @@ static int initialize_context(
 
 /*********************************************************/
 
-PVFS_error PVFS_iaio_symlink(
-    const char *new_dir,
-    const char *new_name,
-    const char *target,
+PVFS_error PVFS_iaio_mkdir(
+    const char *directory,
+    const char *filename,
     PVFS_object_ref *pdir,
+    mode_t mode,
     const PVFS_credential *credential,
     PVFS_sys_op_id *op_id,
     PVFS_hint hints,
@@ -387,15 +387,15 @@ PVFS_error PVFS_iaio_symlink(
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_iaio_symlink entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_iaio_mkdir entered\n");
 
-    if (!new_dir || !new_name || !target)
+    if (!directory || !filename)
     {
         gossip_err("invalid (NULL) required arguments\n");
         return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_AIO_SYMLINK, sizeof(struct PINT_client_sm),
+    PINT_smcb_alloc(&smcb, PVFS_AIO_MKDIR, sizeof(struct PINT_client_sm),
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
@@ -405,41 +405,41 @@ PVFS_error PVFS_iaio_symlink(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     
-    PINT_init_sysint_credentials(sm_p->cred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     PVFS_hint_copy(hints, &(sm_p->hints));
-    sm_p->u.aio_symlink.new_directory = new_dir;
-    sm_p->u.aio_symlink.new_filename = new_name;
-    sm_p->u.aio_symlink.link_target = target;
-    sm_p->u.aio_symlink.pdir = pdir;
+    sm_p->u.aio_mkdir.directory = directory;
+    sm_p->u.aio_mkdir.filename = filename;
+    sm_p->u.aio_mkdir.pdir = pdir;
+    sm_p->u.aio_mkdir.mode = mode;   
 
     return PINT_client_state_machine_post(
         smcb, op_id, user_ptr);
 }
 
-PVFS_error PVFS_aio_symlink(
-    const char *new_dir,
-    const char *new_name,
-    const char *target,
+PVFS_error PVFS_aio_mkdir(
+    const char *directory,
+    const char *filename,
     PVFS_object_ref *pdir,
+    mode_t mode,
     const PVFS_credential *credential,
     PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_aio_symlink entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_aio_mkdir entered\n");
 
-    ret = PVFS_iaio_symlink(new_dir, new_name, target, pdir, credential, &op_id,
+    ret = PVFS_iaio_mkdir(directory, filename, pdir, mode, credential, &op_id,
                           hints, NULL);
 
     if (ret)
     {
-        PVFS_perror_gossip("PVFS_iaio_symlink call", ret);
+        PVFS_perror_gossip("PVFS_iaio_mkdir call", ret);
         error = ret;
     }
     else
     {
-        ret = PVFS_sys_wait(op_id, "aio_symlink", &error);
+        ret = PVFS_sys_wait(op_id, "aio_mkdir", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
@@ -453,38 +453,38 @@ PVFS_error PVFS_aio_symlink(
 
 /*******************************************************************/
 
-static PINT_sm_action symlink_init(
+static PINT_sm_action mkdir_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink state: init\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_mkdir state: init\n");
     
-    memset(&sm_p->u.aio_symlink.parent_ref, 0, sizeof(PVFS_object_ref));
-    memset(&sm_p->u.aio_symlink.lookup_resp, 0, sizeof(PVFS_sysresp_lookup));
-    memset(&sm_p->u.aio_symlink.symlink_resp, 0, sizeof(PVFS_sysresp_symlink));
-
-    if (!(sm_p->u.aio_symlink.pdir))
+    memset(&sm_p->u.aio_mkdir.parent_ref, 0, sizeof(PVFS_object_ref));
+    memset(&sm_p->u.aio_mkdir.lookup_resp, 0, sizeof(PVFS_sysresp_lookup));
+    memset(&sm_p->u.aio_mkdir.mkdir_resp, 0, sizeof(PVFS_sysresp_mkdir));
+    
+    if (!(sm_p->u.aio_mkdir.pdir))
     {
-        js_p->error_code = SYMLINK_PDIR_NULL;
+        js_p->error_code = MKDIR_PDIR_NULL;
     }
     else
     {
-        if (sm_p->u.aio_symlink.new_directory)
+        if (sm_p->u.aio_mkdir.directory)
         {
             js_p->error_code = 0;
         }
         else
         {
-            sm_p->u.aio_symlink.parent_ref = *(sm_p->u.aio_symlink.pdir);
-            js_p->error_code = SYMLINK_REF_FOUND;
+            sm_p->u.aio_mkdir.parent_ref = *(sm_p->u.aio_mkdir.pdir);
+            js_p->error_code = MKDIR_DIR_REF_FOUND;
         }
     }
 
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action symlink_parent_ref_abs_lookup_setup(
+static PINT_sm_action mkdir_parent_ref_abs_lookup_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -494,12 +494,11 @@ static PINT_sm_action symlink_parent_ref_abs_lookup_setup(
     PVFS_object_ref parent;
     js_p->error_code = 0;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink state: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_mkdir state: "
                  "parent_ref_abs_lookup_setup\n");
 
-    ret = PVFS_util_resolve(sm_p->u.aio_symlink.new_directory, &lookup_fs_id,
+    ret = PVFS_util_resolve(sm_p->u.aio_mkdir.directory, &lookup_fs_id,
                             pvfs_path, PVFS_PATH_MAX);
-
 	if ((ret == 0) && (pvfs_path[0] == '\0'))
 	{
             strcpy(pvfs_path, "/");
@@ -523,9 +522,9 @@ static PINT_sm_action symlink_parent_ref_abs_lookup_setup(
 
     if (strcmp(pvfs_path, "/") == 0)
     {
-        sm_p->u.aio_symlink.parent_ref.handle = parent.handle;
-        sm_p->u.aio_symlink.parent_ref.fs_id = lookup_fs_id;
-        js_p->error_code = SYMLINK_REF_FOUND;
+        sm_p->u.aio_mkdir.parent_ref.handle = parent.handle;
+        sm_p->u.aio_mkdir.parent_ref.fs_id = lookup_fs_id;
+        js_p->error_code = MKDIR_DIR_REF_FOUND;
     }
     else
     {
@@ -540,10 +539,10 @@ static PINT_sm_action symlink_parent_ref_abs_lookup_setup(
         char *path = ((pvfs_path[0] == '/') ? &pvfs_path[1] : pvfs_path);
 
         PINT_init_msgarray_params(lookup_frame, lookup_fs_id);
-        PINT_init_sysint_credentials(lookup_frame->cred_p, sm_p->cred_p);
+        PINT_init_sysint_credential(lookup_frame->cred_p, sm_p->cred_p);
         lookup_frame->u.lookup.orig_pathname = path;
         lookup_frame->u.lookup.starting_refn = parent;
-        lookup_frame->u.lookup.lookup_resp = &(sm_p->u.aio_symlink.lookup_resp);
+        lookup_frame->u.lookup.lookup_resp = &(sm_p->u.aio_mkdir.lookup_resp);
         lookup_frame->u.lookup.follow_link = PVFS2_LOOKUP_LINK_FOLLOW;
         lookup_frame->u.lookup.current_context = 0;
         PVFS_hint_copy(sm_p->hints, &(lookup_frame->hints));
@@ -553,7 +552,7 @@ static PINT_sm_action symlink_parent_ref_abs_lookup_setup(
         ret = initialize_context(&lookup_frame->u.lookup, path, parent);
         if (ret != 0)
         {
-            gossip_err("aio-symlink: failed to init context (path = %s)\n", path);
+            gossip_err("aio-mkdir: failed to init context (path = %s)\n", path);
             js_p->error_code = ret;
             return SM_ACTION_COMPLETE;
         }
@@ -562,14 +561,14 @@ static PINT_sm_action symlink_parent_ref_abs_lookup_setup(
                 lookup_frame->u.lookup.contexts[0].total_segments == 0)
         {
             free(lookup_frame);
-            sm_p->u.aio_symlink.parent_ref.fs_id = lookup_fs_id;
-            sm_p->u.aio_symlink.parent_ref.handle = parent.handle;
-            js_p->error_code = SYMLINK_REF_FOUND;
+            sm_p->u.aio_mkdir.parent_ref.fs_id = lookup_fs_id;
+            sm_p->u.aio_mkdir.parent_ref.handle = parent.handle;
+            js_p->error_code = MKDIR_DIR_REF_FOUND;
         }
         else
         {
             PINT_sm_push_frame(smcb, 0, (void *)lookup_frame);
-            js_p->error_code = SYMLINK_LOOKUP_SM;
+            js_p->error_code = MKDIR_LOOKUP_SM;
 
             gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
                          path, llu(parent.handle));
@@ -579,13 +578,13 @@ static PINT_sm_action symlink_parent_ref_abs_lookup_setup(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action symlink_parent_ref_abs_lookup_inspect(
+static PINT_sm_action mkdir_parent_ref_abs_lookup_inspect(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int frame_id, frames_remaining;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink state: parent_ref_abs_lookup_inspect"                  "\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_mkdir state: parent_ref_abs_lookup_inspect"                  "\n");
 
     struct PINT_client_sm *lookup_frame = (PINT_client_sm *)PINT_sm_pop_frame(
                                  smcb, &frame_id, &js_p->error_code,
@@ -597,41 +596,41 @@ static PINT_sm_action symlink_parent_ref_abs_lookup_inspect(
         return SM_ACTION_COMPLETE;
     }
 
-    sm_p->u.aio_symlink.parent_ref = sm_p->u.aio_symlink.lookup_resp.ref;
+    sm_p->u.aio_mkdir.parent_ref = sm_p->u.aio_mkdir.lookup_resp.ref;
     free(lookup_frame);
 
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action symlink_parent_ref_rel_lookup_setup(
+static PINT_sm_action mkdir_parent_ref_rel_lookup_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink: parent_ref_rel_lookup_setup\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_mkdir: parent_ref_rel_lookup_setup\n");
 
-    sm_p->u.aio_symlink.cur = (char *)sm_p->u.aio_symlink.new_directory;
-    sm_p->u.aio_symlink.last = (char *)sm_p->u.aio_symlink.new_directory;
-    sm_p->u.aio_symlink.start = (char *)sm_p->u.aio_symlink.new_directory;
+    sm_p->u.aio_mkdir.cur = (char *)sm_p->u.aio_mkdir.directory;
+    sm_p->u.aio_mkdir.last = (char *)sm_p->u.aio_mkdir.directory;
+    sm_p->u.aio_mkdir.start = (char *)sm_p->u.aio_mkdir.directory;
 
     /* loop over chars to find a complete path segment */
     /* that is no longer than PVFS_NAME_MAX chars */
-    while (*(sm_p->u.aio_symlink.cur))
+    while (*(sm_p->u.aio_mkdir.cur))
     {
         /* find next path seperator / */
         /* cur either points to a slash */
         /* or the first char of the path */
         /* there must be at least one */
         /* so n either case increment it first */
-        for(sm_p->u.aio_symlink.cur++;
-            (*sm_p->u.aio_symlink.cur && *sm_p->u.aio_symlink.cur != '/');
-            sm_p->u.aio_symlink.cur++);
-        if (sm_p->u.aio_symlink.cur - sm_p->u.aio_symlink.start > PVFS_NAME_MAX-1)
+        for(sm_p->u.aio_mkdir.cur++;
+            (*sm_p->u.aio_mkdir.cur && *sm_p->u.aio_mkdir.cur != '/');
+            sm_p->u.aio_mkdir.cur++);
+        if (sm_p->u.aio_mkdir.cur - sm_p->u.aio_mkdir.start > PVFS_NAME_MAX-1)
         {
             /* we over-shot the limit go back to last */
-            sm_p->u.aio_symlink.cur = sm_p->u.aio_symlink.last;
-            if (sm_p->u.aio_symlink.cur == sm_p->u.aio_symlink.start)
+            sm_p->u.aio_mkdir.cur = sm_p->u.aio_mkdir.last;
+            if (sm_p->u.aio_mkdir.cur == sm_p->u.aio_mkdir.start)
             {
                 js_p->error_code = -PVFS_ENAMETOOLONG;
                 return SM_ACTION_COMPLETE;
@@ -641,22 +640,22 @@ static PINT_sm_action symlink_parent_ref_rel_lookup_setup(
         else
         {
             /* set up to add the next path segment */
-            sm_p->u.aio_symlink.last = sm_p->u.aio_symlink.cur;
+            sm_p->u.aio_mkdir.last = sm_p->u.aio_mkdir.cur;
         }
     }
 
-    sm_p->u.aio_symlink.current_seg_path = malloc(PVFS_NAME_MAX);
-    if (sm_p->u.aio_symlink.current_seg_path == NULL)
+    sm_p->u.aio_mkdir.current_seg_path = malloc(PVFS_NAME_MAX);
+    if (sm_p->u.aio_mkdir.current_seg_path == NULL)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
-    memset(sm_p->u.aio_symlink.current_seg_path, 0, PVFS_NAME_MAX);
-    strncpy(sm_p->u.aio_symlink.current_seg_path, sm_p->u.aio_symlink.start,
-            sm_p->u.aio_symlink.cur - sm_p->u.aio_symlink.start + 2);
-    sm_p->u.aio_symlink.start = sm_p->u.aio_symlink.cur;
-    sm_p->u.aio_symlink.last = sm_p->u.aio_symlink.cur;
+    memset(sm_p->u.aio_mkdir.current_seg_path, 0, PVFS_NAME_MAX);
+    strncpy(sm_p->u.aio_mkdir.current_seg_path, sm_p->u.aio_mkdir.start,
+            sm_p->u.aio_mkdir.cur - sm_p->u.aio_mkdir.start + 2);
+    sm_p->u.aio_mkdir.start = sm_p->u.aio_mkdir.cur;
+    sm_p->u.aio_mkdir.last = sm_p->u.aio_mkdir.cur;
 
     PINT_client_sm *lookup_frame = malloc(sizeof(PINT_client_sm));
     if (lookup_frame == NULL)
@@ -666,25 +665,25 @@ static PINT_sm_action symlink_parent_ref_rel_lookup_setup(
     }
     memset(lookup_frame, 0, sizeof(PINT_client_sm));
 
-    PINT_init_msgarray_params(lookup_frame, sm_p->u.aio_symlink.pdir->fs_id);
-    PINT_init_sysint_credentials(lookup_frame->cred_p, sm_p->cred_p);
-    lookup_frame->u.lookup.orig_pathname = sm_p->u.aio_symlink.current_seg_path;
-    lookup_frame->u.lookup.starting_refn = *(sm_p->u.aio_symlink.pdir);
-    lookup_frame->u.lookup.lookup_resp = &(sm_p->u.aio_symlink.lookup_resp);
+    PINT_init_msgarray_params(lookup_frame, sm_p->u.aio_mkdir.pdir->fs_id);
+    PINT_init_sysint_credential(lookup_frame->cred_p, sm_p->cred_p);
+    lookup_frame->u.lookup.orig_pathname = sm_p->u.aio_mkdir.current_seg_path;
+    lookup_frame->u.lookup.starting_refn = *(sm_p->u.aio_mkdir.pdir);
+    lookup_frame->u.lookup.lookup_resp = &(sm_p->u.aio_mkdir.lookup_resp);
     lookup_frame->u.lookup.follow_link = PVFS2_LOOKUP_LINK_FOLLOW;
     lookup_frame->u.lookup.current_context = 0;
     PVFS_hint_copy(sm_p->hints, &(lookup_frame->hints));
     PVFS_hint_add(&(lookup_frame->hints), PVFS_HINT_HANDLE_NAME,
                   sizeof(PVFS_handle),
-                  &(sm_p->u.aio_symlink.pdir->handle));
+                  &(sm_p->u.aio_mkdir.pdir->handle));
 
     ret = initialize_context(&(lookup_frame->u.lookup),
-                             sm_p->u.aio_symlink.current_seg_path,
-                             *(sm_p->u.aio_symlink.pdir));
+                             sm_p->u.aio_mkdir.current_seg_path,
+                             *(sm_p->u.aio_mkdir.pdir));
     if (ret != 0)
     {
-        gossip_err("aio-symlink: failed to init context (path = %s)\n",
-                   sm_p->u.aio_symlink.current_seg_path);
+        gossip_err("aio-mkdir: failed to init context (path = %s)\n",
+                   sm_p->u.aio_mkdir.current_seg_path);
         free(lookup_frame);
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
@@ -694,33 +693,32 @@ static PINT_sm_action symlink_parent_ref_rel_lookup_setup(
         lookup_frame->u.lookup.contexts[0].total_segments == 0)
     {
         free(lookup_frame);
-        free(sm_p->u.aio_symlink.current_seg_path);
-        sm_p->u.aio_symlink.current_seg_path = NULL;
-        sm_p->u.aio_symlink.parent_ref.fs_id = sm_p->u.aio_symlink.pdir->fs_id;
-        sm_p->u.aio_symlink.parent_ref.handle = sm_p->u.aio_symlink.pdir->handle;
-        js_p->error_code = SYMLINK_REF_FOUND;
+        free(sm_p->u.aio_mkdir.current_seg_path);
+        sm_p->u.aio_mkdir.parent_ref.fs_id = sm_p->u.aio_mkdir.pdir->fs_id;
+        sm_p->u.aio_mkdir.parent_ref.handle = sm_p->u.aio_mkdir.pdir->handle;
+        js_p->error_code = MKDIR_DIR_REF_FOUND;
     }
     else
     {
-        js_p->error_code = SYMLINK_LOOKUP_SM;
+        js_p->error_code = MKDIR_LOOKUP_SM;
         PINT_sm_push_frame(smcb, 0, (void *)lookup_frame);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
-                     sm_p->u.aio_symlink.current_seg_path,
-                     llu(sm_p->u.aio_symlink.pdir->handle));
+                     sm_p->u.aio_mkdir.current_seg_path,
+                     llu(sm_p->u.aio_mkdir.pdir->handle));
     }
 
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action symlink_parent_ref_rel_lookup_inspect(
+static PINT_sm_action mkdir_parent_ref_rel_lookup_inspect(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
     int frame_id, frames_remaining;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink: parent_ref_rel_lookup_inspect\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_mkdir: parent_ref_rel_lookup_inspect\n");
 
     struct PINT_client_sm *lookup_frame = (PINT_client_sm *)PINT_sm_pop_frame(
                                 smcb, &frame_id,
@@ -733,25 +731,25 @@ static PINT_sm_action symlink_parent_ref_rel_lookup_inspect(
         return SM_ACTION_COMPLETE;
     }
 
-    if (*(sm_p->u.aio_symlink.cur))
+    if (*(sm_p->u.aio_mkdir.cur))
     {
         /* loop over chars to find a complete path segment */
         /* that is no longer than PVFS_NAME_MAX chars */
-        while(*(sm_p->u.aio_symlink.cur))
+        while(*(sm_p->u.aio_mkdir.cur))
         {
             /* find next path seperator / */
             /* cur either points to a slash */
             /* or the first char of the path */
             /* there must be at least one */
             /* so n either case increment it first */
-            for(sm_p->u.aio_symlink.cur++;
-                (*sm_p->u.aio_symlink.cur && *sm_p->u.aio_symlink.cur != '/');
-                 sm_p->u.aio_symlink.cur++);
-            if (sm_p->u.aio_symlink.cur - sm_p->u.aio_symlink.start > PVFS_NAME_MAX-1)
+            for(sm_p->u.aio_mkdir.cur++;
+                (*sm_p->u.aio_mkdir.cur && *sm_p->u.aio_mkdir.cur != '/');
+                 sm_p->u.aio_mkdir.cur++);
+            if (sm_p->u.aio_mkdir.cur - sm_p->u.aio_mkdir.start > PVFS_NAME_MAX-1)
             {
                 /* we over-shot the limit go back to last */
-                sm_p->u.aio_symlink.cur = sm_p->u.aio_symlink.last;
-                if (sm_p->u.aio_symlink.cur == sm_p->u.aio_symlink.start)
+                sm_p->u.aio_mkdir.cur = sm_p->u.aio_mkdir.last;
+                if (sm_p->u.aio_mkdir.cur == sm_p->u.aio_mkdir.start)
                 {
                     free(lookup_frame);
                     js_p->error_code = -PVFS_ENAMETOOLONG;
@@ -762,28 +760,28 @@ static PINT_sm_action symlink_parent_ref_rel_lookup_inspect(
             else
             {
                 /* set up to add the next path segment */
-                sm_p->u.aio_symlink.last = sm_p->u.aio_symlink.cur;
+                sm_p->u.aio_mkdir.last = sm_p->u.aio_mkdir.cur;
             }
         }
 
-        memset(sm_p->u.aio_symlink.current_seg_path, 0, PVFS_NAME_MAX);
-        strncpy(sm_p->u.aio_symlink.current_seg_path, sm_p->u.aio_symlink.start,
-                sm_p->u.aio_symlink.cur - sm_p->u.aio_symlink.start + 1);
-        sm_p->u.aio_symlink.start = sm_p->u.aio_symlink.cur;
-        sm_p->u.aio_symlink.last = sm_p->u.aio_symlink.cur;
+        memset(sm_p->u.aio_mkdir.current_seg_path, 0, PVFS_NAME_MAX);
+        strncpy(sm_p->u.aio_mkdir.current_seg_path, sm_p->u.aio_mkdir.start,
+                sm_p->u.aio_mkdir.cur - sm_p->u.aio_mkdir.start + 1);
+        sm_p->u.aio_mkdir.start = sm_p->u.aio_mkdir.cur;
+        sm_p->u.aio_mkdir.last = sm_p->u.aio_mkdir.cur;
 
-        lookup_frame->u.lookup.orig_pathname = sm_p->u.aio_symlink.current_seg_path;
-        lookup_frame->u.lookup.starting_refn = sm_p->u.aio_symlink.lookup_resp.ref;
+        lookup_frame->u.lookup.orig_pathname = sm_p->u.aio_mkdir.current_seg_path;
+        lookup_frame->u.lookup.starting_refn = sm_p->u.aio_mkdir.lookup_resp.ref;
         lookup_frame->u.lookup.follow_link = PVFS2_LOOKUP_LINK_FOLLOW;
         lookup_frame->u.lookup.current_context = 0;
 
         ret = initialize_context(&(lookup_frame->u.lookup),
-                                 sm_p->u.aio_symlink.current_seg_path,
-                                 sm_p->u.aio_symlink.lookup_resp.ref);
+                                 sm_p->u.aio_mkdir.current_seg_path,
+                                 sm_p->u.aio_mkdir.lookup_resp.ref);
         if (ret != 0)
         {
-            gossip_err("aio-symlink: failed to init context (path = %s)\n",
-                       sm_p->u.aio_symlink.current_seg_path);
+            gossip_err("aio-mkdir: failed to init context (path = %s)\n",
+                       sm_p->u.aio_mkdir.current_seg_path);
             free(lookup_frame);
             js_p->error_code = ret;
             return SM_ACTION_COMPLETE;
@@ -793,120 +791,111 @@ static PINT_sm_action symlink_parent_ref_rel_lookup_inspect(
             lookup_frame->u.lookup.contexts[0].total_segments == 0)
         {
             free(lookup_frame);
-            free(sm_p->u.aio_symlink.current_seg_path);
-            sm_p->u.aio_symlink.current_seg_path = NULL;
-            js_p->error_code = SYMLINK_REF_FOUND;
-            sm_p->u.aio_symlink.parent_ref.handle = sm_p->u.aio_symlink.lookup_resp.ref.handle;
-            sm_p->u.aio_symlink.parent_ref.fs_id = sm_p->u.aio_symlink.pdir->fs_id;
+            free(sm_p->u.aio_mkdir.current_seg_path);
+            js_p->error_code = MKDIR_DIR_REF_FOUND;
+            sm_p->u.aio_mkdir.parent_ref.handle = sm_p->u.aio_mkdir.lookup_resp.ref.handle;
+            sm_p->u.aio_mkdir.parent_ref.fs_id = sm_p->u.aio_mkdir.pdir->fs_id;
         }
         else
         {
-            js_p->error_code = SYMLINK_LOOKUP_SM;
+            js_p->error_code = MKDIR_LOOKUP_SM;
             PINT_sm_push_frame(smcb, 0, (void *)lookup_frame);
 
             gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
-                         sm_p->u.aio_symlink.current_seg_path,
-                         llu(sm_p->u.aio_symlink.lookup_resp.ref.handle));
+                         sm_p->u.aio_mkdir.current_seg_path,
+                         llu(sm_p->u.aio_mkdir.lookup_resp.ref.handle));
         }
     }
     else
     {
-        js_p->error_code = SYMLINK_REF_FOUND;
-        sm_p->u.aio_symlink.parent_ref = lookup_frame->u.lookup.lookup_resp->ref;
+        js_p->error_code = MKDIR_DIR_REF_FOUND;
+        sm_p->u.aio_mkdir.parent_ref = lookup_frame->u.lookup.lookup_resp->ref;
         free(lookup_frame);
-        free(sm_p->u.aio_symlink.current_seg_path);
-        sm_p->u.aio_symlink.current_seg_path = NULL;
+        free(sm_p->u.aio_mkdir.current_seg_path);
     }
 
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action symlink_sm_setup(
+static PINT_sm_action mkdir_sm_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_sys_attr attr;
     js_p->error_code = 0;
+    PVFS_sys_attr attr;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink: sm_setup\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_mkdir: sm_setup\n");
 
     memset(&attr, 0, sizeof(PVFS_sys_attr));
-    attr.owner = getuid();
-    attr.group = getgid();
-    attr.perms = 0777;
+    attr.owner = geteuid();
+    attr.group = getegid();
+    attr.perms = sm_p->u.aio_mkdir.mode & 07777;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 
-    if ((sm_p->u.aio_symlink.parent_ref.handle == PVFS_HANDLE_NULL) ||
-        (sm_p->u.aio_symlink.parent_ref.fs_id == PVFS_FS_ID_NULL))
+    if ((sm_p->u.aio_mkdir.parent_ref.handle == PVFS_HANDLE_NULL) ||
+        (sm_p->u.aio_mkdir.parent_ref.fs_id == PVFS_FS_ID_NULL))
     {
-        gossip_err("invalid (NULL) required argument\n");
+        gossip_err("invalid (NULL) required arguments\n");
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
     }
 
-    if (((strlen(sm_p->u.aio_symlink.new_filename) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES) ||
-        ((strlen(sm_p->u.aio_symlink.link_target) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES))
+    if ((strlen(sm_p->u.aio_mkdir.filename) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES)
     {
         js_p->error_code = -PVFS_ENAMETOOLONG;
         return SM_ACTION_COMPLETE;
     }
 
-    PINT_client_sm *symlink_frame = malloc(sizeof(PINT_client_sm));
-    if (!symlink_frame)
+    PINT_client_sm *mkdir_frame = malloc(sizeof(PINT_client_sm));
+    if (!mkdir_frame)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    memset(symlink_frame, 0, sizeof(PINT_client_sm));
+    memset(mkdir_frame, 0, sizeof(PINT_client_sm));
 
-    PINT_init_msgarray_params(symlink_frame, sm_p->u.aio_symlink.parent_ref.fs_id);
-    PINT_init_sysint_credentials(symlink_frame->cred_p, sm_p->cred_p);
-    symlink_frame->u.sym.link_name = (char *)sm_p->u.aio_symlink.new_filename;
-    symlink_frame->u.sym.link_target = (char *)sm_p->u.aio_symlink.link_target;
-    symlink_frame->u.sym.sym_resp = &(sm_p->u.aio_symlink.symlink_resp);
-    PVFS_util_copy_sys_attr(&(symlink_frame->u.sym.sys_attr), &attr);
-    symlink_frame->u.sym.stored_error_code = 0;
-    symlink_frame->u.sym.retry_count = 0;
-    symlink_frame->object_ref = sm_p->u.aio_symlink.parent_ref;
-    PVFS_hint_copy(sm_p->hints, &(symlink_frame->hints));
+    PINT_init_msgarray_params(mkdir_frame, sm_p->u.aio_mkdir.parent_ref.fs_id);
+    PINT_init_sysint_credential(mkdir_frame->cred_p, sm_p->cred_p);
+    mkdir_frame->u.mkdir.object_name = (char *)sm_p->u.aio_mkdir.filename;
+    PVFS_util_copy_sys_attr(&mkdir_frame->u.mkdir.sys_attr, &attr);
+    mkdir_frame->u.mkdir.mkdir_resp = &(sm_p->u.aio_mkdir.mkdir_resp);
+    mkdir_frame->u.mkdir.stored_error_code = 0;
+    mkdir_frame->object_ref = sm_p->u.aio_mkdir.parent_ref;
+    PVFS_hint_copy(sm_p->hints, &mkdir_frame->hints);
+    PVFS_hint_add(&mkdir_frame->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), 
+                  &(sm_p->u.aio_mkdir.parent_ref.handle));
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "Symlink %s under parent handle %llu "
-                 "on fs %d to %s\n", sm_p->u.aio_symlink.new_filename, 
-                 llu(sm_p->u.aio_symlink.parent_ref.handle),
-                 sm_p->u.aio_symlink.parent_ref.fs_id,
-                 sm_p->u.aio_symlink.link_target);
+    PINT_sm_push_frame(smcb, 0, (void *)mkdir_frame);
 
-    PINT_sm_push_frame(smcb, 0, (void *)symlink_frame);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "Creating directory named %s under "
+                 "parent handle %llu on fs %d\n", sm_p->u.aio_mkdir.filename,
+                 llu(sm_p->u.aio_mkdir.parent_ref.handle),
+                 sm_p->u.aio_mkdir.parent_ref.fs_id);
 
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action symlink_sm_inspect(
+static PINT_sm_action mkdir_sm_inspect(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int frame_id, frames_remaining;
+    
+    struct PINT_client_sm *mkdir_frame = (PINT_client_sm *)PINT_sm_pop_frame(
+                            smcb, &frame_id, &js_p->error_code, &frames_remaining);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink: sm_inspect\n");
-
-    struct PINT_client_sm *symlink_frame = (PINT_client_sm *)PINT_sm_pop_frame(
-                                smcb, &frame_id,
-                                &js_p->error_code, &frames_remaining);
-
-    js_p->error_code = symlink_frame->error_code;
-    free(symlink_frame);
+    js_p->error_code = mkdir_frame->error_code;
+    free(mkdir_frame);
 
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action symlink_cleanup(
+static PINT_sm_action mkdir_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_symlink: cleanup\n");
-
-    if (sm_p->u.aio_symlink.current_seg_path)
-        free(sm_p->u.aio_symlink.current_seg_path);
+    if (sm_p->u.aio_mkdir.current_seg_path)
+        free(sm_p->u.aio_mkdir.current_seg_path);
 
     sm_p->error_code = js_p->error_code;
 
