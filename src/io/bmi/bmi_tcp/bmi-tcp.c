@@ -1400,9 +1400,12 @@ int BMI_tcp_post_recv(bmi_op_id_t *id,
  * This used to be the initial step of BMI_tcp_testunexpected() and 
  * BMI_tcp_testcontext(). TCP thread will continuously call this function.
  */
-int BMI_tcp_push_work(int max_idle_time_ms)
+int BMI_tcp_push_work(int max_idle_time_ms,,
+                      int *completed_op_count,
+                      gen_mutex_t *completed_mutex)
 {
     int ret = -1;
+    int i = 0;
     
     gen_mutex_lock(&interface_mutex);
     
@@ -1414,6 +1417,13 @@ int BMI_tcp_push_work(int max_idle_time_ms)
         gen_mutex_unlock(&interface_mutex);
         return ret;
     }
+    
+    gen_mutex_lock(completed_mutex);
+    for (i = 0; i < BMI_MAX_CONTEXTS; i++)
+    {
+        *completed_op_count += op_list_count(completion_array[i]);
+    }
+    gen_mutex_lock(completed_mutex);
     
     gen_mutex_unlock(&interface_mutex);
     return 0;

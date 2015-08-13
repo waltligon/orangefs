@@ -147,6 +147,7 @@ static gen_thread_t *proto_thread_ids = NULL;
 static gen_mutex_t *proto_thread_mutexes = NULL;
 static gen_cond_t *proto_thread_cond_vars = NULL;
 
+static int completed_op_count = 0;
 static gen_mutex_t completed_mutex = GEN_MUTEX_INITIALIZER;
 static gen_cond_t completed_cond_var = GEN_COND_INITIALIZER;
 
@@ -876,7 +877,9 @@ void *BMI_proto_thread_func(void *params)
         bmi_check_forget_list();
         bmi_check_addr_force_drop();
         
-        ret = thread_params->meth->push_work(max_idle_time_ms);
+        ret = thread_params->meth->push_work(max_idle_time_ms,
+                                             &completed_op_count,
+                                             &completed_mutex);
         if (ret < 0)
         {
             /* TODO: error-handling */
@@ -885,6 +888,8 @@ void *BMI_proto_thread_func(void *params)
         /* TODO: where do I need to signal condition variable for 
          *       BMI_testcontext() and/or BMI_testunexpected()?? 
          */
+        
+        /* TODO: implement cancel ability */
     }
 }
 
@@ -1164,6 +1169,8 @@ start:
         
         position += tmp_outcount;
         (*outcount) += tmp_outcount;
+        completed_op_count -= tmp_outcount;
+        assert(completed_op_count >= 0);
         i++;
     }
     
@@ -1198,38 +1205,51 @@ start:
         gettimeofday(&now, NULL);
         timeout.tv_sec = now.tv_sec + max_idle_time_ms / 1000; /* ms to sec */
         timeout.tv_nsec = 0;
-        /* TODO: completed_mutex should be locked prior to 
+        
+        /* TODO: completed_mutex should be locked prior to
          *       gen_cond_timedwait() call */
         gen_mutex_lock(&completed_mutex);
-        /* During the execution of gen_cond_timedwait, the mutex is unlocked */
-        ret = gen_cond_timedwait(&completed_cond_var,
-                                 &completed_mutex,
-                                 &timeout);
-        if (ret == 0)
+        
+        if (completed_op_count > 0)
         {
-            /* Something signaled the condition variable, which means
-             * something was added to a completion queue. The mutex is now 
-             * locked again by gen_cond_timedwait()
-             */
+            /* something has been added to a completion queue since the 
+             * call to check_cq() */
             gen_mutex_unlock(&completed_mutex);
             goto start;
         }
-        else if (ret == ETIMEDOUT)
-        {
-            /* reached max_idle_time_ms without being signaled */
-            gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
-                         "BMI_testcontext: gen_cond_timedwait reached "
-                         "max_idle_time_ms without being signaled.\n");
-            gen_mutex_unlock(&completed_mutex);
-            return 0;
-        }
         else
         {
-            /* ret == EINVAL */
-            gossip_lerr("Error: BMI_testcontext: gen_cond_timedwait "
-                        "returned EINVAL.\n");
-            gen_mutex_unlock(&completed_mutex);
-            return -ret; /* TODO: should this be negative? */
+            /* During the execution of gen_cond_timedwait, 
+             * the mutex is unlocked */
+            ret = gen_cond_timedwait(&completed_cond_var,
+                                     &completed_mutex,
+                                     &timeout);
+            if (ret == 0)
+            {
+                /* Something signaled the condition variable, which means
+                 * something was added to a completion queue. The mutex is now 
+                 * locked again by gen_cond_timedwait()
+                 */
+                gen_mutex_unlock(&completed_mutex);
+                goto start;
+            }
+            else if (ret == ETIMEDOUT)
+            {
+                /* reached max_idle_time_ms without being signaled */
+                gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                             "BMI_testcontext: gen_cond_timedwait reached "
+                             "max_idle_time_ms without being signaled.\n");
+                gen_mutex_unlock(&completed_mutex);
+                return 0;
+            }
+            else
+            {
+                /* ret == EINVAL */
+                gossip_lerr("Error: BMI_testcontext: gen_cond_timedwait "
+                            "returned EINVAL.\n");
+                gen_mutex_unlock(&completed_mutex);
+                return -ret; /* TODO: should this be negative? */
+            }
         }
     }
     
