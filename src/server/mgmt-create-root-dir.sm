@@ -53,8 +53,6 @@ static int delete_lost_and_found_handle_comp_fn(
         void *v_p,
         struct PVFS_server_resp *resp_p,
         int index);
-static int tree_setattr_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index);
 
 
 %%
@@ -71,7 +69,8 @@ machine pvfs2_mgmt_create_root_dir_sm
     state create_dist_dir_struct
     {
         run mgmt_create_root_dir_create_dist_dir_struct;
-        success => request_remote_dirdata_dspace;
+        REMOTE_OPERATION => request_remote_dirdata_dspace;
+        success => create_local_dirdata_dspace;
         default => cleanup_noreq;
     }
 
@@ -98,23 +97,30 @@ machine pvfs2_mgmt_create_root_dir_sm
     state fill_handles_to_dist_dir_struct
     {
         run mgmt_create_root_dir_fill_handles_to_dist_dir_struct;
-        default => remote_dirdata_attr_and_keyval_setup_msgpair;
-    }
-
-    state remote_dirdata_attr_and_keyval_setup_msgpair
-    {
-        run mgmt_create_root_dir_remote_dirdata_attr_and_keyval_setup_msgpair;
-        success => remote_dirdata_attr_and_keyval_xfer_msgpair;
+        success => dirdata_attr_and_keyval_setup;
         default => cleanup_noreq;
     }
 
-    state remote_dirdata_attr_and_keyval_xfer_msgpair
+    state dirdata_attr_and_keyval_setup
     {
-        jump pvfs2_msgpairarray_sm;
+        run mgmt_create_root_dir_dirdata_attr_and_keyval_setup;
+        success => run_tree_setattr;
+        default => cleanup_noreq;
+    }
+
+    state run_tree_setattr
+    {
+        jump pvfs2_tree_setattr_work_sm;
+        default => tree_setattr_cleanup;
+    }
+
+    state tree_setattr_cleanup
+    {
+        run mgmt_create_root_dir_tree_setattr_cleanup;
         success => write_keyval_to_meta_handle;
         default => cleanup_noreq;
     }
-    
+  
     state write_keyval_to_meta_handle
     {
         run mgmt_create_root_dir_write_keyval_to_meta_handle;
@@ -157,7 +163,6 @@ machine pvfs2_mgmt_create_root_dir_sm
         success => crdirent_lost_and_found_setup_msgpair;
         default => cleanup_noreq;
     }
-
 
     state crdirent_lost_and_found_setup_msgpair
     {
@@ -245,6 +250,7 @@ static PINT_sm_action mgmt_create_root_dir_check_for_request(
     X509 *xcert = NULL;
     PVFS_certificate *cert = NULL;
 #endif
+    int ret = -1;
 
     assert(s_op);
 
@@ -313,6 +319,17 @@ static PINT_sm_action mgmt_create_root_dir_check_for_request(
 #endif
 
     PINT_sign_credential(&s_op->u.mgmt_create_root_dir.credential);
+
+    ret = PINT_server_to_server_capability(&s_op->u.mgmt_create_root_dir.capability,
+            s_op->target_fs_id,
+            0,
+            NULL);
+    if (ret < 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
 
     return SM_ACTION_COMPLETE;
 }
@@ -417,6 +434,10 @@ static PINT_sm_action mgmt_create_root_dir_create_dist_dir_struct(
     s_op->u.mgmt_create_root_dir.handle_array_local_count = 1;
     s_op->u.mgmt_create_root_dir.handle_array_remote_count = 
         s_op->u.mgmt_create_root_dir.num_dirdata_servers - 1;
+    if (s_op->u.mgmt_create_root_dir.handle_array_remote_count > 0)
+    {
+        js_p->error_code = REMOTE_OPERATION;
+    }
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "creating %d local dirdata files\n", 
         s_op->u.mgmt_create_root_dir.handle_array_local_count);
@@ -558,7 +579,7 @@ static PINT_sm_action mgmt_create_root_dir_fill_handles_to_dist_dir_struct(
     attr->dirdata_handles[0] =
         s_op->u.mgmt_create_root_dir.handle_array_local[0];
 
-    for(i = 0; i < s_op->u.mgmt_create_root_dir.num_dirdata_servers - 1; i++)
+    for(i = 0; i < s_op->u.mgmt_create_root_dir.handle_array_remote_count; i++)
     {
         attr->dirdata_handles[i+1] =
             s_op->u.mgmt_create_root_dir.handle_array_remote[i];
@@ -578,14 +599,12 @@ static PINT_sm_action mgmt_create_root_dir_fill_handles_to_dist_dir_struct(
     return SM_ACTION_COMPLETE;
 }
 
-/* Send only to remote dirdata servers. Values will be stored for the local
- * dirdata handle in write_keyval_to_dirdata_handle */
-static PINT_sm_action mgmt_create_root_dir_remote_dirdata_attr_and_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mgmt_create_root_dir_dirdata_attr_and_keyval_setup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_sm_msgpair_state *msg_p = NULL;
+    struct PINT_server_op *tree_setattr_op = NULL;
+    struct PVFS_server_req *tree_setattr_req = NULL;
     PVFS_object_attr attr;
-    int ret;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "s_op->attr.objtype = %d\n", s_op->attr.objtype);
 
@@ -614,64 +633,56 @@ static PINT_sm_action mgmt_create_root_dir_remote_dirdata_attr_and_keyval_setup_
         attr.objtype, llu(attr.atime),
         llu(PINT_util_mkversion_time(attr.mtime)), llu(attr.ctime));
 
-
-    PINT_msgpair_init(&s_op->msgarray_op);
-    msg_p = &s_op->msgarray_op.msgpair;
-    PINT_serv_init_msgarray_params(s_op, s_op->target_fs_id);
-
-    ret = PINT_server_to_server_capability(&s_op->u.mgmt_create_root_dir.capability,
-            s_op->target_fs_id,
-            0,
-            NULL);
-    if (ret < 0)
+    tree_setattr_req = malloc(sizeof(struct PVFS_server_req));
+    if (! tree_setattr_req) 
     {
-        js_p->error_code = ret;
+        gossip_err("Unable to allocate tree_setattr_req\n");
+        js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
-    }
+    }   
+    memset(tree_setattr_req, 0, sizeof(*tree_setattr_req));
 
     PINT_SERVREQ_TREE_SETATTR_FILL(
-        msg_p->req,
+        *tree_setattr_req,
         s_op->u.mgmt_create_root_dir.capability,
         s_op->u.mgmt_create_root_dir.credential,
         s_op->target_fs_id,
         PVFS_TYPE_DIRDATA,
         attr,
         0,
-        s_op->u.mgmt_create_root_dir.handle_array_remote_count,
-        s_op->u.mgmt_create_root_dir.handle_array_remote,
+        s_op->attr.dist_dir_attr.num_servers,
+        s_op->attr.dirdata_handles,
         NULL);
 
-    msg_p->fs_id = s_op->target_fs_id;
-    msg_p->handle = s_op->attr.dirdata_handles[0];
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = tree_setattr_comp_fn;
-
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-
-    if (ret)
+    tree_setattr_op = malloc(sizeof(struct PINT_server_op));
+    if (! tree_setattr_op)
     {
-        gossip_err("Failed to map dirdata server address\n");
-        PINT_free_object_attr(&(msg_p->req).u.tree_setattr.attr);
-        js_p->error_code = ret;
+        gossip_err("Unable to allocate tree_setattr_op\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
     }
+    memset(tree_setattr_op, 0, sizeof(*tree_setattr_op));
+    tree_setattr_op->req = tree_setattr_req;
+    tree_setattr_op->op = PVFS_SERV_TREE_SETATTR;
 
-    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, tree_setattr_op);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
 
-static int tree_setattr_comp_fn(void *v_p,
-                                struct PVFS_server_resp *resp_p,
-                                int index)
+static PINT_sm_action mgmt_create_root_dir_tree_setattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    PINT_smcb *smcb = v_p;
-    PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_sm_msgpair_state *msg_p = &mop->msgpair;;
+    struct PINT_server_op *tree_setattr_op = NULL;
+    int task_id = 0;
+    int remaining = 0;
+    tree_setattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
 
-    assert(msg_p->req.op == PVFS_SERV_TREE_SETATTR);
-    PINT_free_object_attr(&(msg_p->req).u.tree_setattr.attr);
-    return 0;
+    PINT_free_object_attr(&tree_setattr_op->req->u.tree_setattr.attr);
+    free(tree_setattr_op->req);
+    free(tree_setattr_op);
+
+    return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action mgmt_create_root_dir_write_keyval_to_meta_handle(
@@ -1017,6 +1028,7 @@ static PINT_sm_action mgmt_create_root_dir_crdirent_lost_and_found_setup_msgpair
         memset(crdirent_op, 0, sizeof(*crdirent_op));
         crdirent_op->req = crdirent_req;
         crdirent_op->op = PVFS_SERV_CRDIRENT;
+        crdirent_op->target_fs_id = s_op->target_fs_id;
         PINT_sm_push_frame(smcb, LOCAL_OPERATION, crdirent_op);
         js_p->error_code = LOCAL_OPERATION;
     }
