@@ -33,7 +33,7 @@
         return(-PVFS_ENOMEM);                                          \
     memset(__tmp_ptr, 0, (__new_history * sizeof(__type)));            \
     memcpy(__tmp_ptr, __src_ptr,                                       \
-        (__pc->history_size * sizeof(__type)));                        \
+        (__pc->history * sizeof(__type)));                             \
     free(__src_ptr);                                                   \
     __src_ptr = __tmp_ptr;                                             \
 }
@@ -74,12 +74,16 @@ void PINT_free_pc (struct PINT_perf_counter *pc)
 {
     struct PINT_perf_sample *tmp, *tmp2;
     if (!pc)
+    {
         return;
+    }
     tmp = pc->sample;
     while(tmp)
     {
         if (tmp->value)
+        {
             free (tmp->value);
+        }
         tmp2 = tmp;
         tmp = tmp->next;
         free (tmp2);
@@ -93,7 +97,9 @@ void PINT_free_pc (struct PINT_perf_counter *pc)
  * PINT_perf_finalize()
  * \returns pointer to perf counter on success, NULL on failure
  */
-struct PINT_perf_counter *PINT_perf_initialize(struct PINT_perf_key *key_array)
+struct PINT_perf_counter *PINT_perf_initialize(
+                            struct PINT_perf_key *key_array,
+                            int (*start_rollover)(struct PINT_perf_counter *pc))
 {
     struct PINT_perf_counter *pc = NULL;
     struct PINT_perf_key *key = NULL;
@@ -133,9 +139,10 @@ struct PINT_perf_counter *PINT_perf_initialize(struct PINT_perf_key *key_array)
     }
 
     /* running will be used to decide if we should start an update process */
-    pc->history_size = PERF_DEFAULT_HISTORY_SIZE;
-    pc->running = (pc->history_size > 1);
+    pc->history = PERF_DEFAULT_HISTORY_SIZE;
+    pc->running = (pc->history > 1);
     pc->interval = PERF_DEFAULT_UPDATE_INTERVAL;
+    pc->start_rollover = start_rollover;
 
     /* create a simple linked list of samples, each with a value array */
     tmp = (struct PINT_perf_sample *)malloc(sizeof (struct PINT_perf_sample));
@@ -156,7 +163,7 @@ struct PINT_perf_counter *PINT_perf_initialize(struct PINT_perf_key *key_array)
     }
     memset(tmp->value, 0, pc->key_count * sizeof(int64_t));
     pc->sample = tmp;
-    for (i = pc->history_size - 1; i > 0 && tmp; i--)
+    for (i = pc->history - 1; i > 0 && tmp; i--)
     {
         tmp->next = (struct PINT_perf_sample *)
                         malloc(sizeof (struct PINT_perf_sample));
@@ -197,7 +204,9 @@ void PINT_perf_reset(struct PINT_perf_counter* pc)
     gen_mutex_lock(&pc->mutex);
 
     if (!pc || !pc->sample || !pc->sample->value)
+    {
         return;
+    }
     for(s = pc->sample; s; s = s->next)
     {
         /* zero out all fields */
@@ -223,8 +232,7 @@ void PINT_perf_reset(struct PINT_perf_counter* pc)
 /** 
  * destroys a perf counter instance
  */
-void PINT_perf_finalize(
-        struct PINT_perf_counter *pc)    /**< pointer to counter instance */
+void PINT_perf_finalize(struct PINT_perf_counter *pc)
 {
     PINT_free_pc(pc);
     return;
@@ -379,10 +387,10 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
     gen_mutex_lock(&pc->mutex);
     switch(option)
     {
-    case PINT_PERF_HISTORY_SIZE:
-        if(arg <= pc->history_size)
+    case PINT_PERF_UPDATE_HISTORY:
+        if(arg <= pc->history)
         {
-            while(arg < pc->history_size)
+            while(arg < pc->history)
             {
                 struct PINT_perf_sample *s;
                 /* remove one sample from list */
@@ -394,7 +402,7 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
                     s->next = NULL;
                     free(s->value);
                     free(s);
-                    pc->history_size--;
+                    pc->history--;
                 }
                 else
                 {
@@ -403,12 +411,10 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
                     return(-PVFS_EINVAL);
                 }
             }
-            /* if history_size is now 1 stop the rollover SM */
-            pc->running = (pc->history_size > 1);
         }
         else
         {
-            while(arg > pc->history_size)
+            while(arg > pc->history)
             {
                 struct PINT_perf_sample *s;
                 /* add one sample to list */
@@ -430,15 +436,17 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
                 /* adding just after first sample */
                 s->next = pc->sample->next;
                 pc->sample->next = s;
-                pc->history_size++;
+                pc->history++;
             }
-            /* if not running start rollover SM */
-            pc->running = (pc->history_size > 1);
         }
+        /* start or stop rollover as needed */
+        pc->running = (pc->history > 1);
         break;
     case PINT_PERF_UPDATE_INTERVAL:
         if (arg > 0)
+        {
             pc->interval = arg;
+        }
         break;
     default:
         gen_mutex_unlock(&pc->mutex);
@@ -453,9 +461,9 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
  * retrieves runtime tunable performance counter options 
  * \returns 0 on success, -PVFS_error on failure
  */
-int PINT_perf_get_info( struct PINT_perf_counter* pc,
+int PINT_perf_get_info( struct PINT_perf_counter *pc,
                         enum PINT_perf_option option,
-                        unsigned int* arg)
+                        unsigned int *arg)
 {
     if(!pc)
     {
@@ -466,8 +474,8 @@ int PINT_perf_get_info( struct PINT_perf_counter* pc,
     gen_mutex_lock(&pc->mutex);
     switch(option)
     {
-    case PINT_PERF_HISTORY_SIZE:
-        *arg = pc->history_size;
+    case PINT_PERF_UPDATE_HISTORY:
+        *arg = pc->history;
         break;
     case PINT_PERF_KEY_COUNT:
         *arg = pc->key_count;
@@ -484,13 +492,33 @@ int PINT_perf_get_info( struct PINT_perf_counter* pc,
     return(0);
 }
 
+/* moved to server/pvfs2-server.c and client/sysint/initialize.c
+ * as server/client specific functions
+ */
+#if 0
+int PINT_perf_start_rollover(void)
+{
+    int ret = 0;
+    struct PINT_smcb *tmp_op = NULL;
+
+    ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
+                                           &(tmp_op));
+    if (ret == 0)
+    {
+        ret = server_state_machine_start_noreq(tmp_op);
+    }
+
+    return ret;
+}
+#endif
+
 /**
  * retrieves measurement history
  *
  * This copies the data from the samples (stored in a linked list) into
  * a temporary array where they can be inspected without worry of update
  * this array will store up to max_key counters PLUS two time values, the
- * start time and intervale, both as ms counts.  The samples might have
+ * start time and interval, both as ms counts.  The samples might have
  * more or less keys in them, and the system might have more or less
  * samples than space in the array.
  *
@@ -528,9 +556,9 @@ void PINT_perf_retrieve(
     assert(max_key <= pc->key_count);
     
     tmp_max_key = PVFS_util_min(max_key, pc->key_count);
-    tmp_max_history = PVFS_util_min(max_history, pc->history_size);
+    tmp_max_history = PVFS_util_min(max_history, pc->history);
 
-    if(max_key > pc->key_count || max_history > pc->history_size)
+    if(max_key > pc->key_count || max_history > pc->history)
     {
         memset(value_array, 0,
                 (max_history * (max_key + 2) * sizeof(int64_t)));
@@ -600,7 +628,7 @@ char *PINT_perf_generate_text( struct PINT_perf_counter* pc,
 
     gen_mutex_lock(&pc->mutex);
     
-    line_size = 26 + (24 * pc->history_size); 
+    line_size = 26 + (24 * pc->history); 
     total_size = (pc->key_count + 2) * line_size + 1;
     
     actual_size = PVFS_util_min(total_size, max_size);
@@ -624,7 +652,7 @@ char *PINT_perf_generate_text( struct PINT_perf_counter* pc,
     /* start times */
     sprintf(position, "%-24.24s: ", "Start times (hr:min:sec)");
     position += 25;
-    for(i = 0, s = pc->sample; i < pc->history_size && s; i++, s = s->next)
+    for(i = 0, s = pc->sample; i < pc->history && s; i++, s = s->next)
     {
         PVFS_time start_i = (PVFS_time)s->start_time_ms;
         if(start_i)
@@ -660,7 +688,7 @@ char *PINT_perf_generate_text( struct PINT_perf_counter* pc,
     /* intervals */
     sprintf(position, "%-24.24s:", "Intervals (hr:min:sec)");
     position += 25;
-    for(i = 0, s = pc->sample; i < pc->history_size && s; i++, s = s->next)
+    for(i = 0, s = pc->sample; i < pc->history && s; i++, s = s->next)
     {
         PVFS_time interval_i = s->interval_ms;
         if(interval_i)
@@ -688,7 +716,7 @@ char *PINT_perf_generate_text( struct PINT_perf_counter* pc,
 
     sprintf(position, "-------------------------");
     position += 25;
-    for(i = 0; i < pc->history_size; i++)
+    for(i = 0; i < pc->history; i++)
     {
         sprintf(position, "--------------");
         position += 14;
@@ -701,7 +729,7 @@ char *PINT_perf_generate_text( struct PINT_perf_counter* pc,
     {
         sprintf(position, "%-24.24s:", pc->key_array[i].key_name);
         position += 25;
-        for(j = 0, s = pc->sample; j < pc->history_size && s; j++, s = s->next)
+        for(j = 0, s = pc->sample; j < pc->history && s; j++, s = s->next)
         {
 #ifdef WIN32
             ret = _snprintf(position, 15, " %13Ld", lld(s->value[i]));

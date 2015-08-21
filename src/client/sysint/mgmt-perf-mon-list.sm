@@ -24,10 +24,16 @@
 #include "PINT-reqproto-encode.h"
 #include "security-util.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
-static int perf_mon_list_comp_fn(
-    void* v_p, struct PVFS_server_resp *resp_p, int i);
+static int perf_mon_list_comp_fn(void* v_p,
+                                 struct PVFS_server_resp *resp_p,
+                                 int i);
 
 %%
 

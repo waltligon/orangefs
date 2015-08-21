@@ -55,6 +55,8 @@
 /* grab a new capability if the current one expires in 2 minutes or less */
 #define CAP_TIMEOUT_BUFFER 120
 
+extern job_context_id pint_client_sm_context;
+
 int PINT_client_state_machine_initialize(void);
 void PINT_client_state_machine_finalize(void);
 job_context_id PINT_client_get_sm_context(void);
@@ -888,7 +890,7 @@ do {                                                                \
 
 struct PINT_client_op_entry_s
 {
-    struct PINT_state_machine_s * sm;
+    struct PINT_state_machine_s *sm;
 };
 
 extern struct PINT_client_op_entry_s PINT_client_sm_sys_table[];

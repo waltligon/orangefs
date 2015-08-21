@@ -53,6 +53,7 @@
 
 int key_cnt; /* holds the Number of keys */
 
+/* s is a string that is printed, c is the counter value */
 #define PRINT_COUNTER(s, c) \
 do { \
     int j; \

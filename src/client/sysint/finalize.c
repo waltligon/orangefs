@@ -27,7 +27,12 @@
 #include "pint-util.h"
 #include "pint-event.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 extern PINT_smcb *g_smcb;
 

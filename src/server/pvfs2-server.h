@@ -35,6 +35,7 @@
 #include "pvfs2-mirror.h"
 #include "state-machine.h"
 #include "pint-event.h"
+#include "pint-perf-counter.h"
 
 
 extern job_context_id server_job_context;
@@ -603,7 +604,6 @@ struct PINT_server_mgmt_get_dirent_op
     PVFS_handle handle;
 };
 
-
 struct PINT_server_mgmt_create_root_dir_op
 {
     PVFS_handle lost_and_found_handle;
@@ -616,6 +616,11 @@ struct PINT_server_mgmt_create_root_dir_op
     int handle_array_remote_count;
     PVFS_error saved_error_code;
     int handle_index;
+};
+
+struct PINT_server_perf_update_op
+{
+    struct PINT_perf_counter *pc;
 };
 
 /* This structure is passed into the void *ptr 
@@ -716,6 +721,7 @@ typedef struct PINT_server_op
         struct PINT_server_tree_communicate_op tree_communicate;
         struct PINT_server_mgmt_get_dirent_op mgmt_get_dirent;
         struct PINT_server_mgmt_create_root_dir_op mgmt_create_root_dir;
+        struct PINT_server_perf_update_op perf_update;
     } u;
 
 } PINT_server_op;
@@ -912,6 +918,7 @@ extern void tree_remove_free(PINT_server_op *s_op);
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
+int server_perf_start_rollover(struct PINT_perf_counter *pc);
 
 /* exported state machine resource reclamation function */
 int server_post_unexpected_recv(void);

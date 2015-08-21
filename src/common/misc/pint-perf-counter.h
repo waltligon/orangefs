@@ -34,9 +34,9 @@ enum PINT_perf_ops
 /** enumeration of runtime options */
 enum PINT_perf_option
 {
-    PINT_PERF_HISTORY_SIZE = 1,   /**< sets/gets the history size */
-    PINT_PERF_KEY_COUNT = 2,      /**< gets the key count (cannot be set) */
-    PINT_PERF_UPDATE_INTERVAL = 3 /**< sets/gets the update interval */
+    PINT_PERF_UPDATE_HISTORY  = 1, /**< sets/gets the history size */
+    PINT_PERF_KEY_COUNT       = 2, /**< gets the key count (cannot be set) */
+    PINT_PERF_UPDATE_INTERVAL = 3  /**< sets/gets the update interval */
 };
 
 /** describes a single key to be stored in the perf counter interface */
@@ -62,10 +62,11 @@ struct PINT_perf_counter
     gen_mutex_t mutex;
     struct PINT_perf_key* key_array;     /**< keys (provided by initialize()) */
     int key_count;                       /**< number of keys */
-    int history_size;                    /**< number of history intervals */
+    int history;                         /**< number of history intervals */
     int running;                         /**< true if a rollover running */
     int interval;                        /**< milliseconds between rollovers */
     struct PINT_perf_sample *sample;     /**< list of samples for this counter */
+    int (*start_rollover)(struct PINT_perf_counter *pc);
 };
 
 
@@ -74,16 +75,18 @@ extern struct PINT_perf_key server_keys[];
 
 extern struct PINT_perf_counter *PINT_server_pc;
 
-struct PINT_perf_counter* PINT_perf_initialize(struct PINT_perf_key *key);
+struct PINT_perf_counter *PINT_perf_initialize(
+        struct PINT_perf_key *key,
+        int (*start_rollover)(struct PINT_perf_counter *pc));
 
 void PINT_perf_finalize(
-        struct PINT_perf_counter* pc);
+        struct PINT_perf_counter *pc);
 
 void PINT_perf_reset(
-        struct PINT_perf_counter* pc);
+        struct PINT_perf_counter *pc);
 
 void __PINT_perf_count(
-        struct PINT_perf_counter* pc,
+        struct PINT_perf_counter *pc,
         int key, 
         int64_t value,
         enum PINT_perf_ops op);
@@ -95,26 +98,30 @@ void __PINT_perf_count(
 #endif
 
 void PINT_perf_rollover(
-        struct PINT_perf_counter* pc);
+        struct PINT_perf_counter *pc);
 
 int PINT_perf_set_info(
-        struct PINT_perf_counter* pc,
+        struct PINT_perf_counter *pc,
         enum PINT_perf_option option,
         unsigned int arg);
 
 int PINT_perf_get_info(
-        struct PINT_perf_counter* pc,
+        struct PINT_perf_counter *pc,
         enum PINT_perf_option option,
         unsigned int* arg);
 
+#if 0
+int PINT_perf_start_rollover(void);
+#endif
+
 void PINT_perf_retrieve(
-        struct PINT_perf_counter* pc,        
+        struct PINT_perf_counter *pc,        
         int64_t* value_array,
         int max_key,                         
         int max_history);     
 
 char* PINT_perf_generate_text(
-        struct PINT_perf_counter* pc,
+        struct PINT_perf_counter *pc,
         int max_size);
 
 void PINT_free_pc (struct PINT_perf_counter *pc);

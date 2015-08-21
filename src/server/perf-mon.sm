@@ -126,7 +126,7 @@ static PINT_sm_action perf_mon_do_work(struct PINT_smcb *smcb,
 
     /* how many history intervals do we have in the perf counter? */
     ret = PINT_perf_get_info(PINT_server_pc,
-                             PINT_PERF_HISTORY_SIZE, 
+                             PINT_PERF_UPDATE_HISTORY, 
                              &sample_count);
     if(ret < 0)
     {
@@ -307,7 +307,7 @@ static int reallocate_static_arrays_if_needed(void)
 
     /* get server history size - this can change */
     ret = PINT_perf_get_info(PINT_server_pc,
-                             PINT_PERF_HISTORY_SIZE, 
+                             PINT_PERF_UPDATE_HISTORY, 
                              &history_size);
     if(ret < 0)
     {

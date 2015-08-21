@@ -57,8 +57,12 @@ int key_cnt; /* holds the Number of keys */
 do { \
     int64_t sample; \
     strcat(samplestr, s); \
-    sample = C(i, j) - C(i, j - 1) \
-    fprintf(pfile, "%s %d %d\n", samplestr, sample, START_TIME(i, j)); \
+    sample = C(i, j) - C(i, j - 1); \
+    fprintf(pfile, \
+            "%s %lld %lld\n", \
+            samplestr, \
+            (long long int)sample, \
+            (long long int)START_TIME(i, j)); \
 } while(0);
 
 
@@ -86,7 +90,7 @@ int main(int argc, char **argv)
     uint64_t *end_time_ms_array;
     uint32_t *next_id_array;
     PVFS_BMI_addr_t *addr_array;
-    char **serverstr;
+    const char **serverstr;
     FILE* pfile = stdout;
 
     /* look at command line arguments */
@@ -178,7 +182,7 @@ int main(int argc, char **argv)
 
     /* build a list of servers to talk to */
     addr_array = (PVFS_BMI_addr_t *)malloc(io_server_count *
-                 sizeof(PVFS_BMI_addr_t));
+                                           sizeof(PVFS_BMI_addr_t));
     if (addr_array == NULL)
     {
 	perror("malloc");
@@ -194,11 +198,13 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    serverstr = (char **)malloc(io_server_count * sizeof(char *));
+    serverstr = (const char **)malloc(io_server_count * sizeof(char *));
     for (i = 0; i < io_server_count; i++)
     {
-        serverstr[i] = (char *)malloc(50);
-        PVFS_mgmt_map_addr(cur_fs, addr_array[i], serverstr[i]);
+        int servertype;
+        serverstr[i] = PVFS_mgmt_map_addr(cur_fs,
+                                          addr_array[i],
+                                          &servertype);
     }
 
     /* loop for ever, grabbing stats at regular intervals */
@@ -228,16 +234,15 @@ int main(int argc, char **argv)
          */
 	for (i = 0; i < io_server_count; i++)
 	{
-            int64_t timestamp;
             char samplestr[256] = "palmetto.";
 
-            strcat(serverstr, serverstr[i]);
-            strcat(".orangefs.");
+            strcat(samplestr, serverstr[i]);
+            strcat(samplestr, ".orangefs.");
 
 	    for (j = 0; j < user_opts->history; j++)
 	    {
-                PRINT_COUNTER("\read", READ, i, j);
-                PRINT_COUNTER("\write", WRITE, i, j);
+                PRINT_COUNTER("\nread", READ, i, j);
+                PRINT_COUNTER("\nwrite", WRITE, i, j);
                 PRINT_COUNTER("\nmetaread", METADATA_READ, i, j);
                 PRINT_COUNTER("\nmetawrite ", METADATA_WRITE, i, j);
                 PRINT_COUNTER("\ndspaceops ", DSPACE_OPS, i, j);

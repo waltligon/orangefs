@@ -153,7 +153,7 @@ PVFS_error PVFS_mgmt_noop(
     PVFS_BMI_addr_t addr,
     PVFS_hint hints);
 
-const char* PVFS_mgmt_map_addr(
+const char *PVFS_mgmt_map_addr(
     PVFS_fs_id fs_id,
     PVFS_BMI_addr_t addr,
     int* server_type);
