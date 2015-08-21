@@ -188,17 +188,8 @@ void pvfs2_truncate(struct inode *inode)
                  (long) orig_size);
     kfree(s);
 
-    /* successful truncate when size changes also requires mtime updates 
-     * although the mtime updates are propagated lazily!
-     */
-    if (pvfs2_truncate_inode(inode, inode->i_size) == 0
-            && (orig_size != pvfs2_i_size_read(inode)))
-    {
-        pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
-        SetMtimeFlag(pvfs2_inode);
-        inode->i_mtime = CURRENT_TIME;
-        mark_inode_dirty_sync(inode);
-    }
+    pvfs2_truncate_inode(inode, inode->i_size);
+
 }
 
 /** Change attributes of an object referenced by dentry.
@@ -207,6 +198,7 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
 {
     int ret = -EINVAL;
     struct inode *inode = dentry->d_inode;
+    loff_t orig_size = i_size_read(inode);
 
     gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_setattr: called on %s\n", 
                  dentry->d_name.name);
@@ -235,9 +227,26 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
         }
 
         setattr_copy(inode, iattr);
+
         mark_inode_dirty(inode);
         ret = 0;
 #endif /* HAVE_INODE_SETATTR */
+
+/*
+* Only change the c/mtime if we are changing the size or we are
+* explicitly asked to change it.  This handles the semantic difference
+* between truncate() and ftruncate() as implemented in the VFS.
+*
+* The regular truncate() case without ATTR_CTIME and ATTR_MTIME is a
+* special case where we need to update the times despite not having
+* these flags set.  For all other operations the VFS set these flags
+* explicitly if it wants a timestamp update.
+*/
+        if (orig_size != i_size_read(inode) &&
+           !(iattr->ia_valid & (ATTR_CTIME | ATTR_MTIME))) {
+          iattr->ia_ctime = iattr->ia_mtime = current_fs_time(inode->i_sb);
+          iattr->ia_valid |= ATTR_CTIME | ATTR_MTIME;
+        }
     
         gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_setattr: inode_setattr returned %d\n", ret);
 
@@ -647,7 +656,7 @@ struct inode *pvfs2_get_custom_inode_common(
         inode->i_bdev = NULL;
         inode->i_cdev = NULL;
         inode->i_mapping->a_ops = &pvfs2_address_operations;
-#ifndef PVFS2_LINUX_KERNEL_2_4
+#ifdef BACKING_DEV_IN_ADDR_SPACE
         inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 #endif
 

@@ -47,8 +47,8 @@
 
 #ifdef _FORTIFY_SOURCE
 # undef _FORTIFY_SOURCE
-# define _FORTIFY_SOURCE 0
 #endif
+# define _FORTIFY_SOURCE 0
 
 # ifdef _FILE_OFFSET_BITS
 #  undef _FILE_OFFSET_BITS 
@@ -108,8 +108,8 @@
 
 # ifdef __USE_FORTIFY_LEVEL
 #  undef __USE_FORTIFY_LEVEL
-#  define __USE_FORTIFY_LEVEL 0
 # endif
+# define __USE_FORTIFY_LEVEL 0
 
 #endif /* USRINT SOURCE */
 
@@ -135,7 +135,7 @@
 
 # define _IO_MTSAFE_IO 1
 
-#endif /* 1 */
+#endif /* 0 */
 
 #include "pvfs2-internal.h"
 #include "gossip.h"

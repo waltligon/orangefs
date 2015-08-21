@@ -10,17 +10,15 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <pvfs2-types.h>
-#include <usrint.h>
-#include <posix-pvfs.h>
-#include <recursive-remove.h>
+#include "orange.h"
+#include "recursive-remove.h"
 
 /* optional parameters, filled in by parse_args() */
 struct options
 {
     int force;
     int recursive;
-    uint32_t num_files;
+    int num_files;
     char **filenames;
 };
 

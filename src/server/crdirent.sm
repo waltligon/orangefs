@@ -48,15 +48,8 @@ enum
 
 %%
 
-machine pvfs2_crdirent_sm
+nested machine pvfs2_crdirent_work_sm
 {
-    state prelude
-    {
-        jump pvfs2_prelude_sm;
-        success => setup_op;
-        default => final_response;
-    }
-
     state setup_op
     {
         run crdirent_setup_op;
@@ -67,14 +60,14 @@ machine pvfs2_crdirent_sm
     {
         run crdirent_get_dist_dir_attr;
         success => get_bitmap_and_dirdata_handles;
-        default => final_response;
+        default => return;
     }
 
     state get_bitmap_and_dirdata_handles
     {
         run crdirent_get_bitmap_and_dirdata_handles;
         success => validate;
-        default => final_response;
+        default => return;
     }
 
     state validate
@@ -83,47 +76,47 @@ machine pvfs2_crdirent_sm
         success => write_directory_entry;
         INVALID_OBJECT => validation_object_type_failure;
         INVALID_DIRDATA => validation_dirdata_mismatch;
-        default => final_response;
+        default => return;
     }
 
     state validation_object_type_failure
     {
         run validation_object_type_failure;
-        default => final_response;
+        default => return;
     }
 
     state validation_dirdata_mismatch
     {
         run validation_dirdata_mismatch;
-        default => final_response;
+        default => return;
     }
 
     state write_directory_entry
     {
         run crdirent_write_directory_entry;
         success => check_for_req_dir_update;
-        default => final_response;
+        default => return;
     }
 
     state check_for_req_dir_update
     {
         run crdirent_check_for_req_dir_update;
         UPDATE_DIR_ATTR_REQUIRED => update_directory_attr;
-        default => final_response;
+        default => return;
     }
 
     state update_directory_attr
     {
         run crdirent_update_directory_attr;
         success => get_dirent_count;
-        default => final_response;
+        default => return;
     }
 
     state get_dirent_count
     {
         run crdirent_get_dirent_count;
         success => check_for_split;
-        default => final_response;
+        default => return;
     }
 
     state check_for_split
@@ -131,21 +124,21 @@ machine pvfs2_crdirent_sm
         run crdirent_check_for_split;
 /*        SPLIT_REQUIRED => activate_server_setup; */
         SPLIT_REQUIRED => retrieve_dir_entries;
-        default => final_response;
+        default => return;
     }
 
     state retrieve_dir_entries
     {
         run crdirent_retrieve_dir_entries;
         success => find_split_entries;
-        default => final_response;
+        default => return;
     }
 
     state find_split_entries
     {
         run crdirent_find_split_entries;
         SPLIT_REQUIRED => split_xfer_msgpair;
-        default => final_response;
+        default => return;
     }
 
     state split_xfer_msgpair
@@ -174,7 +167,7 @@ machine pvfs2_crdirent_sm
     {
         run crdirent_deactivate_server_setup;
         success => deactivate_server;
-        default => final_response;
+        default => return;
     }
 
     state deactivate_server
@@ -229,13 +222,13 @@ machine pvfs2_crdirent_sm
     state remove_local_copies
     {
         run crdirent_remove_local_copies;
-        default => final_response;
+        default => return;
     }
 
     state split_cleanup_msgpairarray
     {
         run crdirent_split_cleanup_msgpairarray;
-        success => final_response;
+        success => return;
         default => split_remove_entries;
     }
 
@@ -243,7 +236,7 @@ machine pvfs2_crdirent_sm
     {
         run crdirent_split_remove_entries;
         REMOVE_ENTRIES_REQUIRED => split_remove_entries_xfer_msgpair;
-        default => final_response;
+        default => return;
     }
 
     state split_remove_entries_xfer_msgpair
@@ -255,6 +248,22 @@ machine pvfs2_crdirent_sm
     state remove_entries_cleanup
     {
         run crdirent_remove_entries_cleanup;
+        default => return;
+    }
+}
+
+machine pvfs2_crdirent_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => work;
+        default => final_response;
+    }
+
+    state work
+    {
+        jump pvfs2_crdirent_work_sm;
         default => final_response;
     }
 
@@ -297,6 +306,7 @@ static PINT_sm_action crdirent_setup_op(
     s_op->u.crdirent.dirent_handle = s_op->req->u.crdirent.dirent_handle;
     s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
     s_op->u.crdirent.dir_attr_update_required = 0;
+    s_op->u.crdirent.remote_dirdata_handles = NULL;
 
     memset(&(s_op->u.crdirent.dirdata_ds_attr), 0, sizeof(PVFS_ds_attributes));
     memset(&s_op->u.crdirent.capability, 0, sizeof(PVFS_capability));
@@ -509,7 +519,7 @@ static PINT_sm_action crdirent_validate(
     PVFS_object_attr *attr_p = NULL;
     
     attr_p = &s_op->attr;
-    
+
     /* gossip bitmap, since jump from get_bitmap_and_dirdata_handles*/
     gossip_debug(GOSSIP_SERVER_DEBUG, 
             "crdirent: dist_dir_bitmap as:\n");
@@ -1096,7 +1106,6 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_handle *remote_dirdata_handles = NULL;
     int num_remote_dirdata_handles = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_object_attr *attr_p = NULL;
@@ -1115,7 +1124,8 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
        Don't want to send to it. Also no need to send to the
        dirdata server that is the target of the split.      */
     attr_p = &s_op->attr;
-    remote_dirdata_handles = (PVFS_handle *) malloc(sizeof(PVFS_handle) *
+    s_op->u.crdirent.remote_dirdata_handles =
+        (PVFS_handle *) malloc(sizeof(PVFS_handle) *
         attr_p->dist_dir_attr.num_servers);
     for (i = 0; i < attr_p->dist_dir_attr.num_servers; i++)
     {
@@ -1129,7 +1139,7 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
         if (strcmp(server_config->host_id, server_name))
         {
             /* remote */
-            remote_dirdata_handles[num_remote_dirdata_handles] =
+            s_op->u.crdirent.remote_dirdata_handles[num_remote_dirdata_handles] =
                 attr_p->dirdata_handles[i];
             num_remote_dirdata_handles++;
         }
@@ -1150,11 +1160,11 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
             s_op->attr,
             0,
             num_remote_dirdata_handles,
-            remote_dirdata_handles,
+            s_op->u.crdirent.remote_dirdata_handles,
             NULL);
 
         msg_p->fs_id = s_op->req->u.crdirent.fs_id;
-        msg_p->handle = remote_dirdata_handles[0];
+        msg_p->handle = s_op->u.crdirent.remote_dirdata_handles[0];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = tree_setattr_comp_fn;
 
@@ -1173,10 +1183,6 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
     else
     {
         js_p->error_code = 0;
-    }
-    if (remote_dirdata_handles)
-    {
-        free(remote_dirdata_handles);
     }
     return SM_ACTION_COMPLETE;
 }
@@ -1751,6 +1757,10 @@ static PINT_sm_action crdirent_cleanup(
     if (s_op->u.crdirent.dist)
     {
         PINT_dist_free(s_op->u.crdirent.dist);
+    }
+    if (s_op->u.crdirent.remote_dirdata_handles)
+    {
+        free(s_op->u.crdirent.remote_dirdata_handles);
     }
 
     PINT_cleanup_capability(&s_op->u.crdirent.capability);

@@ -15,6 +15,7 @@ const char * env_var_str_names[] = {
     "ORANGEFS_LAYOUT",
     "ORANGEFS_LAYOUT_SERVER_LIST",
     "ORANGEFS_CACHE_FILE",
+    "ORANGEFS_STRIP_SIZE_AS_BLKSIZE"
 };
 
 void env_vars_struct_initialize(struct orangefs_user_env_vars_s *env_vars_p)
@@ -23,12 +24,9 @@ void env_vars_struct_initialize(struct orangefs_user_env_vars_s *env_vars_p)
     for(; i < ENV_VAR_ENUM_COUNT; i++)
     {
         env_vars_p->env_var_array[i].env_var_name = env_var_str_names[i];
-        env_vars_p->env_var_array[i].env_var_value = getenv(env_var_str_names[i]);
+        env_vars_p->env_var_array[i].env_var_value =
+                getenv(env_var_str_names[i]);
         env_vars_p->env_var_array[i].env_var_id = i;
-        if(env_vars_p->env_var_array[i].env_var_value != NULL)
-        {
-            env_vars_p->env_var_present = 1;
-        }
     }
 }
 

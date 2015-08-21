@@ -13,6 +13,7 @@
 #include "pvfs2-internal.h"
 #include "dist-dir-utils.h"
 #include "md5.h"
+#include "bmi-byteswap.h"
 
 
 /****************************
@@ -248,11 +249,13 @@ int PINT_update_dist_dir_bitmap_from_bitmap(
 	assert((to_dir_attr != NULL) && (from_dir_attr != NULL));
 	assert((to_dir_bitmap != NULL) && (from_dir_bitmap != NULL));
 
+#if 0
 	if( (to_dir_attr->num_servers != from_dir_attr->num_servers) ||
 		(to_dir_attr->server_no == from_dir_attr->server_no))
 	{
 		return -1; /* not in the same tree or update itself */
 	}
+#endif
 
 	/* bitmap is with a type of (uint32_t *)
 	 */
@@ -291,7 +294,7 @@ PVFS_dist_dir_hash_type PINT_encrypt_dirdata(const char *const name)
 	md5_finish(&state, digest);
 
 	hash_val = (PVFS_dist_dir_hash_type *)(digest + 8);
-	return *hash_val;
+        return bmitoh64(*hash_val);
 }
 
 
@@ -305,6 +308,7 @@ int PINT_dist_dir_set_serverno(const int server_no,
 			ddbitmap != NULL &&
 			server_no >= -1 &&
 			server_no < ddattr->num_servers);
+
 
 	ddattr->server_no = server_no;
 	

@@ -70,6 +70,13 @@ int _IO_ferror_unlocked (_IO_FILE *stream);
 extern DIR *fdopendir (int __fd);
 #endif
 
+/* gets - this is depricated and dangerous but here in case old programs
+ * still use it
+ */
+#ifndef HAVE_STDIO_GETS
+extern char *gets(char *s);
+#endif
+
 static inline void init_stdio(void); /* wrapper to check if init is done before
                                       * calling the real init function -
                                       * allows us to inline
@@ -135,6 +142,7 @@ struct __dirstream {
 
 /* turning off REDEFSTREAM forces stdin, stdout, stderr to use glibc */
 #if PVFS_STDIO_REDEFSTREAM
+/* This next feature is turned off as it doesn't actually work yet */
 #define PVFS_STDIO_ON_LIBC_STREAMS 0
 /* forces all stdio to use ofs routines */
 #if PVFS_STDIO_ON_LIBC_STREAMS
@@ -142,7 +150,7 @@ struct __dirstream {
 # define pvfs_stdin_stream  (*stdin)
 # define pvfs_stdout_stream (*stdout)
 # define pvfs_stderr_stream (*stderr)
-#else
+#else /* not PVFS STDIO on LIBC */
 /* use ofs defined stdin stdout and stderr and ofs calls */
 static _PVFS_lock_t pvfs_stdin_lock = _PVFS_lock_initializer;
 //static struct _IO_wide_data pvfs_stdin_wide;
@@ -253,8 +261,8 @@ static FILE pvfs_stderr_stream =
 #endif
 };
 FILE *stderr = &pvfs_stderr_stream;
-#endif
-#endif
+#endif /* not PVFS STDIO on LIBC */
+#endif /* STDIO REDEFSTREAM */
 
 /* this gets called all over the place to make sure initialization is
  * done so we made is small and inlined it - if init not done call the
@@ -2051,7 +2059,8 @@ int getw(FILE *stream)
 }
 
 /**
- * gets
+ * gets - this is depricated and dangerous but here in case old programs
+ * still use it
  */
 char *gets(char *s)
 {
@@ -2101,10 +2110,13 @@ char *__gets_chk(char *s, size_t n)
  * malloc and free.  Note PVFS defines its own versions of these as
  * well, and this must be carefully handled.
  */
+#define GETDELIMINC 256
+
 ssize_t __getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
 {
     int i = 0;
     char c, *p;
+    void *created_buf = NULL;
 
     PVFS_INIT(init_stdio);
     gossip_debug(GOSSIP_USRINT_DEBUG, "getdelim %p, %d, %d, %p\n", 
@@ -2115,43 +2127,69 @@ ssize_t __getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
         return stdio_ops.getdelim(lnptr, n, delim, stream);
     }
 #endif
-    if (!stream || !n)
+    if (!stream || !n || !lnptr)
     {
         errno = EINVAL;
         return -1;
     }
     if (!*lnptr)
     {
-        *n = 256;
+        *n = GETDELIMINC;
         *lnptr = (char *)clean_malloc(*n); /* returned by user */
         if (!*lnptr)
         {
             return -1;
         }
         ZEROMEM(*lnptr, *n);
+        created_buf = *lnptr;
     }
     p = *lnptr;
     do {
         if (i + 1 >= *n) /* need space for next char and null terminator */
         {
-            *n += 256; /* spec gives no guidance on fit of allocated space */
-            *lnptr = realloc(*lnptr, *n);
+            /* spec gives no guidance on fit of allocated space */
+            *n += GETDELIMINC;
+            if (PINT_check_malloc(*lnptr))
+            {
+                /* this buffer was passed in externally and used our
+                 * internal malloc code
+                 */
+                *lnptr = realloc(*lnptr, *n);
+            }
+            else
+            {
+                /* normal user level buffer */
+                *lnptr = clean_realloc(*lnptr, *n);
+            }
             if (!*lnptr)
             {
+                if (created_buf)
+                {
+                    clean_free(created_buf);
+                    *lnptr = NULL;
+                }
                 return -1;
             }
+            /* realloc may have completely moved the buffer */
             p = *lnptr + i;
+            memset(p, 0, GETDELIMINC);
         }
         *p++ = c = fgetc(stream);
         i++;
     } while (c != delim && !feof(stream) && !ferror(stream));
     if (ferror(stream) || feof(stream))
     {
+        if (created_buf)
+        {
+            clean_free(created_buf);
+            *lnptr = NULL;
+        }
         return -1;
     }
     *p = 0; /* null termintor */
     return i;
 }
+#undef GETDELIMINC
 
 ssize_t getline(char **lnptr, size_t *n, FILE *stream)
 {
@@ -2379,6 +2417,7 @@ void perror(const char *s)
     {
         fwrite(s, strlen(s), 1, stderr);
     }
+    fwrite(": ", 2, 1, stderr);
     msg = strerror(errno);
     fwrite(msg, strlen(msg), 1, stderr);
     fwrite("\n", 1, 1, stderr);
@@ -3124,15 +3163,15 @@ int scandir (const char *dir,
             {
                 struct dirent **darray;
                 /* ran out of space, realloc */
-                darray = (struct dirent **)realloc(*namelist, asz + ASIZE);
+                darray = (struct dirent **)clean_realloc(*namelist, asz + ASIZE);
                 if (!darray)
                 {
                     int j;
                     for (j = 0; j < i; j++)
                     {
-                        free(*namelist[j]);
+                        clean_free(*namelist[j]);
                     }
-                    free(*namelist);
+                    clean_free(*namelist);
                     return -1;
                 }
                 *namelist = darray;
@@ -3160,7 +3199,7 @@ int scandir (const char *dir,
  * 64 bit version of scandir
  *
  * TODO: Would prefer not to copy code - modify to a generic version
- * and then call from two wrapper versions would be beter
+ * and then call from two wrapper versions would be better
  * pass in a flag to control the copy of the dirent into the array
  */
 #ifdef PVFS_SCANDIR_VOID
@@ -3202,15 +3241,15 @@ int scandir64 (const char *dir,
             {
                 struct dirent64 **darray;
                 /* ran out of space, realloc */
-                darray = (struct dirent64 **)realloc(*namelist, asz + ASIZE);
+                darray = (struct dirent64 **)clean_realloc(*namelist, asz + ASIZE);
                 if (!darray)
                 {
                     int j;
                     for (j = 0; j < i; j++)
                     {
-                        free(*namelist[j]);
+                        clean_free(*namelist[j]);
                     }
-                    free(*namelist);
+                    clean_free(*namelist);
                     return -1;
                 }
                 *namelist = darray;

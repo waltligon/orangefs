@@ -280,6 +280,7 @@ static int server_parse_config(struct server_configuration_s *config,
         {
             server_alias = PINT_util_guess_alias();
             ret = PINT_parse_config(config, fs_template, server_alias, 0);
+            free(server_alias);
         }
         else
         {

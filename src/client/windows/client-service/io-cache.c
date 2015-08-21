@@ -9,6 +9,7 @@
  */
 
 #include "gen-locks.h"
+#include "gossip.h"
 
 #include "client-service.h"
 #include "io-cache.h"
@@ -30,7 +31,6 @@ int io_cache_compare(void *key,
 
 int io_cache_add(ULONG64 context, 
                  PVFS_object_ref *object_ref,
-                 PVFS_Request req,
                  enum PVFS_io_type io_type,
                  int update_flag)
 
@@ -38,13 +38,18 @@ int io_cache_add(ULONG64 context,
     struct qhash_head *link;
     struct io_cache_entry *entry;
 
+    if (object_ref == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
     /* look for existing context -- exit if found */
     gen_mutex_lock(&io_cache_mutex);
     link = qhash_search(io_cache, &context);
     gen_mutex_unlock(&io_cache_mutex);
     if (link != NULL)
     {
-        DbgPrint("   io_cache_add: context %llx already exists\n", context);
+        gossip_debug(GOSSIP_IO_DEBUG, "io_cache_add: context %llx already exists\n", context);
         return 0;
     }
 
@@ -58,7 +63,6 @@ int io_cache_add(ULONG64 context,
     /* copy fields */
     entry->context = context;
     memcpy(&entry->object_ref, object_ref, sizeof(PVFS_object_ref));
-    entry->req = req;
     entry->io_type = io_type;
     entry->update_flag = update_flag;
 
@@ -67,8 +71,8 @@ int io_cache_add(ULONG64 context,
     qhash_add(io_cache, &context, &entry->hash_link);
     gen_mutex_unlock(&io_cache_mutex);
 
-    DbgPrint("   io_cache_add: added context %llx handle %llu request %p\n",
-        entry->context, entry->object_ref.handle, entry->req);
+    gossip_debug(GOSSIP_IO_DEBUG, "io_cache_add: added context %llx handle %llu\n",
+        entry->context, entry->object_ref.handle);
 
     return 0;
 }
@@ -85,7 +89,8 @@ int io_cache_remove(ULONG64 context)
     if (link != NULL)
     {
         entry = qhash_entry(link, struct io_cache_entry, hash_link);
-        PVFS_Request_free(&entry->req);
+        gossip_debug(GOSSIP_IO_DEBUG, "io_cache_remove: removed context %llx\n",
+            entry->context);
         free(entry);
     }
 
@@ -94,15 +99,13 @@ int io_cache_remove(ULONG64 context)
 
 int io_cache_get(ULONG64 context, 
                  PVFS_object_ref *object_ref, 
-                 PVFS_Request *req,
                  enum PVFS_io_type *io_type,
                  int *update_flag)
 {
     struct qhash_head *link;
     struct io_cache_entry *entry;
 
-    if (object_ref == NULL || req == NULL || io_type == NULL ||
-        update_flag == NULL)
+    if (object_ref == NULL || io_type == NULL || update_flag == NULL)
     {
         return -PVFS_EINVAL;
     }
@@ -115,12 +118,17 @@ int io_cache_get(ULONG64 context,
     {
         entry = qhash_entry(link, struct io_cache_entry, hash_link);
         memcpy(object_ref, &entry->object_ref, sizeof(PVFS_object_ref));
-        *req = entry->req;
         *io_type = entry->io_type;
         *update_flag = entry->update_flag;
 
+        gossip_debug(GOSSIP_IO_DEBUG, "io_cache_get: got context %llx "
+            "handle %llu\n", context, object_ref->handle);
+
         return IO_CACHE_HIT;
     }
+
+    gossip_debug(GOSSIP_IO_DEBUG, "io_cache_get: miss for context %llx\n",
+        context);
 
     return IO_CACHE_MISS;
 }

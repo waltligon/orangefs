@@ -114,6 +114,8 @@ static int parse_encoding_string(const char *cp,
 static int parse_num_dfiles_string(const char* cp, int* num_dfiles);
 
 #ifndef ENABLE_SECURITY_MODE
+static int PINT_is_idnum(const char *str);
+
 int PINT_is_idnum(const char *str);
 static int PINT_gen_unsigned_credential(const char *user, const char *group,
                                         unsigned int timeout, PVFS_credential *cred);
@@ -444,7 +446,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
     } while (0)
 
 /* return 1 if string is a uid/gid number */
-int PINT_is_idnum(const char *str)
+static int PINT_is_idnum(const char *str)
 {
     char *pstr, *endptr;
     unsigned long id;
