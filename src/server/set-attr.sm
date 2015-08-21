@@ -502,12 +502,24 @@ static PINT_sm_action setattr_setobj_attribs(
                  llu(a_p->mtime), llu(orig_mtime));
      }
 
+    /* setattr changes metadata, and thus inherently sets CTIME
+     * set the flag here and PVFS_object_attr_overwrite_setable will
+     * take care of the rest. 
+     */
+    if ((a_p->objtype == PVFS_TYPE_METAFILE) ||
+        (a_p->objtype == PVFS_TYPE_DIRECTORY))
+    {
+        a_p->mask |= PVFS_ATTR_COMMON_CTIME;
+    }
+
     /* if the object is a symbolic link, check to make sure that the request
      * is not attempting to change the permissions 
      */
     if(dspace_a_p->objtype == PVFS_TYPE_SYMLINK)
     {
-        if (dspace_a_p->perms != 0 && ((a_p->mask & PVFS_ATTR_COMMON_PERM) && (dspace_a_p->perms != a_p->perms)))
+        if ((dspace_a_p->perms != 0) &&
+            ((a_p->mask & PVFS_ATTR_COMMON_PERM) && 
+             (dspace_a_p->perms != a_p->perms)))
         {
             gossip_debug(GOSSIP_SETATTR_DEBUG, "Cannot change perms of symlink: Permission denied\n");
             js_p->error_code = -PVFS_EACCES;
