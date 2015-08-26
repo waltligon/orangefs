@@ -15,6 +15,11 @@
 #include <time.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <time.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
@@ -60,6 +65,26 @@
 
 int key_cnt; /* holds the Number of keys */
 
+#define GRAPHITE_PRINT_COUNTER(str, c, s, h)                    \
+do {                                                   \
+    int64_t sample;                                    \
+    if (h == 0)                                        \
+    {                                                  \
+        sample = GETLAST(s, c);                        \
+    }                                                  \
+    else                                               \
+    {                                                  \
+        sample = GETSAMPLE(s, h - 1, c);               \
+    }                                                  \
+    sample += GETSAMPLE(s, h, c);                      \
+    fprintf(graphite_fp,                               \
+            "%s%s %lld %lld\n",                        \
+            samplestr,                                 \
+            str,                                       \
+            (unsigned long long int)sample,            \
+            (unsigned long long int)START_TIME(s, h)); \
+} while(0);
+
 #define PRINT_COUNTER(str, c, s, h)                    \
 do {                                                   \
     int64_t sample;                                    \
@@ -86,10 +111,13 @@ struct options
     int mnt_point_set;
     int history;
     int keys;
+    char* graphite_addr;
 };
 
 static struct options *parse_args(int argc, char *argv[]);
 static void usage(int argc, char **argv);
+int graphite_connect(char *);
+
 
 int main(int argc, char **argv)
 {
@@ -107,6 +135,8 @@ int main(int argc, char **argv)
     const char **serverstr;
     FILE* pfile = stdout;
     int64_t *last = NULL;
+    int graphite_fd = 0;
+    FILE* graphite_fp = 0;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -232,6 +262,14 @@ int main(int argc, char **argv)
     while (1)
     {
         PVFS_util_refresh_credential(&cred);
+        graphite_fd = graphite_connect(user_opts->graphite_addr);
+        if(graphite_fd <= 0){
+            return graphite_fd;
+        }
+        graphite_fp = fdopen(graphite_fd, "w+");
+        if(graphite_fp <= 0){
+            return -1;
+        }
         key_cnt = MAX_KEY_CNT;
 	ret = PVFS_mgmt_perf_mon_list(cur_fs,
 				      &cred,
@@ -288,6 +326,7 @@ int main(int argc, char **argv)
                    &(SAMPLE(s, h - 1)),
                    ((key_cnt + 2) * sizeof(uint64_t)));
 	}
+        close(graphite_fd);
 	fflush(stdout);
 	sleep(FREQUENCY);
     }
@@ -306,7 +345,7 @@ int main(int argc, char **argv)
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    char flags[] = "vm:h:k:";
+    char flags[] = "vm:h:k:g:";
     int one_opt = 0;
     int len = 0;
 
@@ -356,6 +395,9 @@ static struct options* parse_args(int argc, char* argv[])
 		strcat(tmp_opts->mnt_point, "/");
 		tmp_opts->mnt_point_set = 1;
 		break;
+            case('g'):
+                strcpy(tmp_opts->graphite_addr, optarg);
+                break;
 	    case('?'):
 		usage(argc, argv);
 		exit(EXIT_FAILURE);
@@ -378,6 +420,37 @@ static void usage(int argc, char **argv)
     fprintf(stderr, "Usage  : %s [-m fs_mount_point]\n", argv[0]);
     fprintf(stderr, "Example: %s -m /mnt/pvfs2\n", argv[0]);
     return;
+}
+
+
+int graphite_connect(char *graphite_addr){
+    int sockfd;
+                int portno = 2003;
+                struct sockaddr_in serv_addr;
+                struct hostent *server;
+                struct in_addr ipv4addr;
+          sockfd = socket(AF_INET, SOCK_STREAM, 0);
+                if(sockfd < 0){
+                        printf("Failed to open sock\n");
+                        return -1;
+                }
+                inet_pton(AF_INET, graphite_addr, &ipv4addr);
+                server = gethostbyaddr(&ipv4addr, sizeof(ipv4addr), AF_INET);
+    if(!server){
+                        printf("Failed to resolve host\n");
+                        return -2;
+                }
+                printf("h_name: %s\nh_addr: %s\n", server->h_name,server->h_addr);
+                serv_addr.sin_family = AF_INET;
+                bcopy(server->h_addr, (char *)&serv_addr.sin_addr.s_addr,
+                                server->h_length);
+                serv_addr.sin_port = htons(portno);
+                if(connect(sockfd, (struct sockaddr*) &serv_addr, sizeof(struct sockaddr)) < 0){
+                        printf("failed to connec to socket\n");
+                        return -3;
+                }
+
+    return sockfd;
 }
 
 /*
