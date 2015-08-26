@@ -21,50 +21,64 @@
 #include "pvfs2-internal.h"
 
 #define HISTORY 5
-#define FREQUENCY 3
+#define FREQUENCY 10
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
 #endif
 
 #define MAX_KEY_CNT 18
-/* macros for accessing data returned from server */
-#define VALID_FLAG(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + key_cnt] != 0.0)
-#define ID(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + key_cnt])
-#define START_TIME(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + key_cnt])
-#define READ(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 0])
-#define WRITE(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 1])
-#define METADATA_READ(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 2])
-#define METADATA_WRITE(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 3])
-#define DSPACE_OPS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 4])
-#define KEYVAL_OPS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 5])
-#define SCHEDULE(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 6])
-#define REQUESTS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 7])
-#define SMALL_READS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 8])
-#define SMALL_WRITES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 9])
-#define FLOW_READS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 10])
-#define FLOW_WRITES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 11])
-#define CREATES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 12])
-#define REMOVES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 13])
-#define MKDIRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 14])
-#define RMDIRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 15])
-#define GETATTRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 16])
-#define SETATTRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 17])
+/* macros for accessing data returned from server 
+ * s is server, h is history sample, c is counter number
+ */
+#define GETLAST(s,c) (last[(s * (key_cnt + 2)) + (c)])
+#define LAST(s) GETLAST((s), 0)
+#define GETSAMPLE(s,h,c) (perf_matrix[(s)][((h) * (key_cnt + 2)) + (c)])
+#define SAMPLE(s,h) GETSAMPLE((s), (h), 0)
+#define VALID_FLAG(s,h) (GETSAMPLE((s), (h), key_cnt) != 0.0)
+#define ID(s,h) GETSAMPLE((s), (h), key_cnt)
+#define START_TIME(s,h) GETSAMPLE((s), (h), key_cnt)
+
+#define READ 0
+#define WRITE 1
+#define METADATA_READ 2
+#define METADATA_WRITE 3
+#define DSPACE_OPS 4
+#define KEYVAL_OPS 5
+#define SCHEDULE 6
+#define REQUESTS 7
+#define SMALL_READS 8
+#define SMALL_WRITES 9
+#define FLOW_READS 10
+#define FLOW_WRITES 11
+#define CREATES 12
+#define REMOVES 13
+#define MKDIRS 14
+#define RMDIRS 15
+#define GETATTRS 16
+#define SETATTRS 17
 
 int key_cnt; /* holds the Number of keys */
 
-#define PRINT_COUNTER(s, C, i, j) \
-do { \
-    int64_t sample; \
-    strcat(samplestr, s); \
-    sample = C(i, j) - C(i, j - 1); \
-    fprintf(pfile, \
-            "%s %lld %lld\n", \
-            samplestr, \
-            (long long int)sample, \
-            (long long int)START_TIME(i, j)); \
+#define PRINT_COUNTER(str, c, s, h)                    \
+do {                                                   \
+    int64_t sample;                                    \
+    if (h == 0)                                        \
+    {                                                  \
+        sample = GETLAST(s, c);                        \
+    }                                                  \
+    else                                               \
+    {                                                  \
+        sample = GETSAMPLE(s, h - 1, c);               \
+    }                                                  \
+    sample += GETSAMPLE(s, h, c);                      \
+    fprintf(pfile,                                     \
+            "%s%s %lld %lld\n",                        \
+            samplestr,                                 \
+            str,                                       \
+            (unsigned long long int)sample,            \
+            (unsigned long long int)START_TIME(s, h)); \
 } while(0);
-
 
 struct options
 {
@@ -83,7 +97,7 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     struct options *user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    int i, j;
+    int s, h;
     PVFS_credential cred;
     int io_server_count;
     int64_t **perf_matrix;
@@ -92,6 +106,7 @@ int main(int argc, char **argv)
     PVFS_BMI_addr_t *addr_array;
     const char **serverstr;
     FILE* pfile = stdout;
+    int64_t *last = NULL;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -149,17 +164,23 @@ int main(int argc, char **argv)
 	perror("malloc");
 	return(-1);
     }
-    for(i = 0; i < io_server_count; i++)
+    for(s = 0; s < io_server_count; s++)
     {
-	perf_matrix[i] = (int64_t *)malloc((MAX_KEY_CNT + 2) * 
+	perf_matrix[s] = (int64_t *)malloc((MAX_KEY_CNT + 2) * 
                                            user_opts->history *
                                            sizeof(int64_t));
-	if (perf_matrix[i] == NULL)
+	if (perf_matrix[s] == NULL)
 	{
 	    perror("malloc");
 	    return -1;
 	}
     }
+
+    /* this array holds the last asmple from each server for continuity */
+    last = (int64_t *)malloc((MAX_KEY_CNT + 2) *
+                             io_server_count *
+                             sizeof(int64_t));
+    memset(last, 0, (MAX_KEY_CNT + 2) * io_server_count * sizeof(int64_t));
 
     /* allocate an array to keep up with what iteration of statistics
      * we need from each server 
@@ -199,11 +220,11 @@ int main(int argc, char **argv)
     }
 
     serverstr = (const char **)malloc(io_server_count * sizeof(char *));
-    for (i = 0; i < io_server_count; i++)
+    for (s = 0; s < io_server_count; s++)
     {
         int servertype;
-        serverstr[i] = PVFS_mgmt_map_addr(cur_fs,
-                                          addr_array[i],
+        serverstr[s] = PVFS_mgmt_map_addr(cur_fs,
+                                          addr_array[s],
                                           &servertype);
     }
 
@@ -232,34 +253,40 @@ int main(int argc, char **argv)
 	/* printf("\nPVFS2 I/O server counters\n"); 
 	 * printf("==================================================\n");
          */
-	for (i = 0; i < io_server_count; i++)
+	for (s = 0; s < io_server_count; s++)
 	{
             char samplestr[256] = "palmetto.";
 
-            strcat(samplestr, serverstr[i]);
+            strcat(samplestr, serverstr[s]);
             strcat(samplestr, ".orangefs.");
 
-	    for (j = 0; j < user_opts->history; j++)
+	    for (h = 0; h < user_opts->history; h++)
 	    {
-                PRINT_COUNTER("\nread", READ, i, j);
-                PRINT_COUNTER("\nwrite", WRITE, i, j);
-                PRINT_COUNTER("\nmetaread", METADATA_READ, i, j);
-                PRINT_COUNTER("\nmetawrite ", METADATA_WRITE, i, j);
-                PRINT_COUNTER("\ndspaceops ", DSPACE_OPS, i, j);
-                PRINT_COUNTER("\nkeyvalops ", KEYVAL_OPS, i, j);
-                PRINT_COUNTER("\nscheduled ", SCHEDULE, i, j);
-                PRINT_COUNTER("\nrequests ", REQUESTS, i, j);
-                PRINT_COUNTER("\nsmallreads ", SMALL_READS, i, j);
-                PRINT_COUNTER("\nsmallwrites ", SMALL_WRITES, i, j);
-                PRINT_COUNTER("\nflowreads ", FLOW_READS, i, j);
-                PRINT_COUNTER("\nflowwrites ", FLOW_WRITES, i, j);
-                PRINT_COUNTER("\ncreates ", CREATES, i, j);
-                PRINT_COUNTER("\nremoves ", REMOVES, i, j);
-                PRINT_COUNTER("\nmkdirs", MKDIRS, i, j);
-                PRINT_COUNTER("\nrmdir", RMDIRS, i, j);
-                PRINT_COUNTER("\ngetattrs", GETATTRS, i, j);
-                PRINT_COUNTER("\nsetattrs", SETATTRS, i, j);
+                if (VALID_FLAG(s, h))
+                {
+                    PRINT_COUNTER("read", READ, s, h);
+                    PRINT_COUNTER("write", WRITE, s, h);
+                    PRINT_COUNTER("metaread", METADATA_READ, s, h);
+                    PRINT_COUNTER("metawrite", METADATA_WRITE, s, h);
+                    PRINT_COUNTER("dspaceops", DSPACE_OPS, s, h);
+                    PRINT_COUNTER("keyvalops", KEYVAL_OPS, s, h);
+                    PRINT_COUNTER("scheduled", SCHEDULE, s, h);
+                    PRINT_COUNTER("requests", REQUESTS, s, h);
+                    PRINT_COUNTER("smallreads", SMALL_READS, s, h);
+                    PRINT_COUNTER("smallwrites", SMALL_WRITES, s, h);
+                    PRINT_COUNTER("flowreads", FLOW_READS, s, h);
+                    PRINT_COUNTER("flowwrites", FLOW_WRITES, s, h);
+                    PRINT_COUNTER("creates", CREATES, s, h);
+                    PRINT_COUNTER("removes", REMOVES, s, h);
+                    PRINT_COUNTER("mkdirs", MKDIRS, s, h);
+                    PRINT_COUNTER("rmdir", RMDIRS, s, h);
+                    PRINT_COUNTER("getattrs", GETATTRS, s, h);
+                    PRINT_COUNTER("setattrs", SETATTRS, s, h);
+                }
             }
+            memcpy(&LAST(s),
+                   &(SAMPLE(s, h - 1)),
+                   ((key_cnt + 2) * sizeof(uint64_t)));
 	}
 	fflush(stdout);
 	sleep(FREQUENCY);

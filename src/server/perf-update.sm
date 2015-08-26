@@ -17,6 +17,7 @@
 #include "server-config.h"
 #include "pint-security.h"
 
+enum{ STOP_TIMER=15 };
 %%
 
 machine pvfs2_perf_update_sm
@@ -25,7 +26,14 @@ machine pvfs2_perf_update_sm
 	{
 		run perf_update_do_work;
 		success => do_work;
+                STOP_TIMER => stop_timer;
 		default => error;
+	}
+
+	state stop_timer 
+	{
+		run perf_update_stop_timer;
+		default => terminate;
 	}
 
 	state error 
@@ -36,6 +44,21 @@ machine pvfs2_perf_update_sm
 }
 
 %%
+
+/** perf_update_stop_timer()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static PINT_sm_action perf_update_stop_timer(struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_perf_finalize(s_op->u.perf_update.pc);
+
+    return(server_state_machine_complete(smcb));
+}
 
 /** perf_update_error()
  *
@@ -93,6 +116,11 @@ static PINT_sm_action perf_update_do_work(struct PINT_smcb *smcb,
     
     /* roll over to next set of statistics */
     PINT_perf_rollover(s_op->u.perf_update.pc);
+
+    if (!s_op->u.perf_update.pc->running)
+    {
+        return STOP_TIMER;
+    }
 	
     /* post another timer */
     return(job_req_sched_post_timer(s_op->u.perf_update.pc->interval,

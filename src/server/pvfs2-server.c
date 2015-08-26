@@ -2708,9 +2708,6 @@ int server_perf_start_rollover(struct PINT_perf_counter *pc)
     struct PINT_smcb *tmp_op = NULL;
     struct PINT_server_op *s_op = NULL;
 
-    /* in case pc comes in NULL we will go ahead and just assume running
-     * is set correctlu
-     */
     if (!pc)
     {
         gossip_err("server_perf_start_rollover called with NULL pc\n");
@@ -2720,13 +2717,16 @@ int server_perf_start_rollover(struct PINT_perf_counter *pc)
 
     ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
                                            &(tmp_op));
-    if (ret == 0)
+    if (ret != 0)
     {
-        ret = server_state_machine_start_noreq(tmp_op);
+        gossip_err("server_perf_start_rollover failed to alloc SM\n");
+        return ret;
     }
 
     s_op = PINT_sm_frame(tmp_op, PINT_FRAME_CURRENT);
     s_op->u.perf_update.pc = pc;
+
+    ret = server_state_machine_start_noreq(tmp_op);
 
     return ret;
 }
