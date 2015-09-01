@@ -42,6 +42,7 @@ static int db_error(int e)
     case MDB_NOTFOUND:
         return TROVE_ENOENT;
     case MDB_MAP_FULL:
+        gossip_err("XXX lmdb map full\n");
         return TROVE_ENOMEM;
     }
     /* XXX: This is a dirty hack. */
