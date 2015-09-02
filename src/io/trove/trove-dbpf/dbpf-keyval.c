@@ -1335,7 +1335,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         ret = dbpf_db_put(op_p->coll_p->keyval_db, &key, &data);
         if (ret != 0)
         {
-            gossip_err("TROVE:DBPF:Berkeley DB keyval_db->put keyval write list");
+            gossip_err("TROVE:DBPF:Berkeley DB keyval_db->put keyval write list (ret %d)\n", ret);
             ret = -ret;
             goto return_error;
         }
