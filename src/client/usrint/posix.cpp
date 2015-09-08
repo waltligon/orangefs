@@ -14,6 +14,7 @@
 #define USRINT_SOURCE 1
 
 #ifdef __cplusplus
+#include <iostream>
 extern "C"
 {
 #endif
@@ -38,6 +39,7 @@ int fadvise64(int, off64_t, off64_t, int);
 #ifdef __cplusplus
 }
 #endif
+
 
 /*
  * SYSTEM CALLS

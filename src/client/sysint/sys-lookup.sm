@@ -75,8 +75,10 @@ machine pvfs2_client_lookup_sm
     {
         run lookup_segment_query_ncache;
         success => lookup_segment_verify_attr_present;
+        /*default => lookup_segment_setup_msgpair;*/
         default => lookup_segment_setup_parent_getattr;
     }
+
 
     state lookup_segment_setup_parent_getattr
     {
@@ -761,6 +763,7 @@ static int lookup_segment_query_ncache(struct PINT_smcb *smcb,
     }
     return SM_ACTION_COMPLETE;
 }
+ 
   
 static PINT_sm_action lookup_segment_setup_parent_getattr(
     struct PINT_smcb *smcb, job_status_s *js_p)
@@ -784,6 +787,7 @@ static PINT_sm_action lookup_segment_setup_parent_getattr(
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
+
    
 /*
  * This is called if the ncache lookup failed.  It builds the msgpair

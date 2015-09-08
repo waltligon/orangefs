@@ -199,9 +199,10 @@ endif
 # These should all be self explanatory; they are standard flags
 # for compiling and linking unless otherwise noted
 CC = @CC@ -std=gnu89
-LD = @CC@
+CPP = g++ -std=c++11
+LD = $(CPP)
 BUILD_CC = @BUILD_CC@
-BUILD_LD = @BUILD_CC@
+BUILD_LD = $(CPP)
 BUILD_CFLAGS = -I$(srcdir)/src/common/misc -I$(srcdir) @BUILD_CFLAGS@
 BUILD_LDFLAGS = @BUILD_LDFLAGS@
 # make sure the srcdir include gets included first
@@ -211,7 +212,7 @@ LDFLAGS += @LDFLAGS@
 SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@ @LDAP_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
-LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
+LDSHARED = $(CPP) -shared -L@BUILD_ABSOLUTE_TOP@/lib
 PICFLAGS = -fPIC
 # Libraries - rt libs tend to depend on other libs so they go first
 LIBS += -lpvfs2
@@ -249,29 +250,40 @@ SO_FULLVER = $(SO_VER).$(SO_MINOR).$(SO_RELEASE)
 #CFLAGS += -D__STATIC_FLOWPROTO_DUMP_OFFSETS__
   # enable new style Flow BMI/Trove protocol
 CFLAGS += -D__STATIC_FLOWPROTO_MULTIQUEUE__
+CPPFLAGS += -D__STATIC_FLOWPROTO_MULTIQUEUE__
   # turn on large file support by default
 CFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
+CPPFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
   # define __GNU_SOURCE in includes to replace incorrect usage of __USE_GNU
 CFLAGS += -D_GNU_SOURCE
+CPPFLAGS += -D_GNU_SOURCE
   # include current directory (for pvfs2-config.h)
 CFLAGS += -I .
+CPPFLAGS += -I .
   # include toplevel source dir
 CFLAGS += -I $(srcdir)
+CPPFLAGS += -I $(srcdir)
   # add selected include directories
 CFLAGS += $(patsubst %,-I$(srcdir)/%,$(INCLUDES))
+CPPFLAGS += $(patsubst %,-I$(srcdir)/%,$(INCLUDES))
 CFLAGS += $(patsubst %,-I$(builddir)/%,$(GENINCLUDES))
+CPPFLAGS += $(patsubst %,-I$(builddir)/%,$(GENINCLUDES))
 
   # add package version information
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
+CPPFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
 
   # make bindir and sysconfdir available to source files
 CFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
+CPPFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
 
   # OpenSLL support
 CFLAGS += @OPENSSL_CPPFLAGS@
+CPPFLAGS += @OPENSSL_CPPFLAGS@
 
 # always want these gcc flags
 GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes
+CPP_FLAGS := -pipe -g -Wall
 
 ifneq (,$(STRICT_CFLAGS))
     GCC_CFLAGS += -Wcast-align -Wbad-function-cast
@@ -405,6 +417,7 @@ LIBS_THREADED += @THREAD_LIB@ @OPENSSL_LIB@
 
 ifdef BUILD_BMI_TCP
 	CFLAGS += -D__STATIC_METHOD_BMI_TCP__
+	CPPFLAGS += -D__STATIC_METHOD_BMI_TCP__
 endif
 
 
@@ -414,6 +427,7 @@ endif
 ifdef BUILD_GM
     # other settings in bmi_gm/module.mk.in
     CFLAGS += -D__STATIC_METHOD_BMI_GM__
+    CPPFLAGS += -D__STATIC_METHOD_BMI_GM__
     GMLIBS := -L@GM_LIBDIR@ -lgm
     LIBS += $(GMLIBS)
     DEPLIBS += $(GMLIBS)
@@ -427,6 +441,7 @@ endif
 ifdef BUILD_MX
     # other settings in bmi_mx/module.mk.in
     CFLAGS += -D__STATIC_METHOD_BMI_MX__
+    CPPFLAGS += -D__STATIC_METHOD_BMI_MX__
     MXLIBS := -L@MX_LIBDIR@ -lmyriexpress -lpthread
     LIBS += $(MXLIBS)
     DEPLIBS += $(MXLIBS)
@@ -440,6 +455,7 @@ endif
 ifdef BUILD_IB
     # other settings in bmi_ib/module.mk.in
     CFLAGS += -D__STATIC_METHOD_BMI_IB__
+    CPPFLAGS += -D__STATIC_METHOD_BMI_IB__
     IBLIBS := -L@IB_LIBDIR@ \
 	      -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl
     LIBS += $(IBLIBS)
@@ -451,6 +467,7 @@ endif
 ifdef BUILD_OPENIB
 ifndef BUILD_IB
     CFLAGS += -D__STATIC_METHOD_BMI_IB__
+    CPPFLAGS += -D__STATIC_METHOD_BMI_IB__
 endif
     OPENIBLIBS := -L@OPENIB_LIBDIR@ -libverbs
     LIBS += $(OPENIBLIBS)
@@ -462,6 +479,7 @@ endif
 # Portals
 ifdef BUILD_PORTALS
     CFLAGS += -D__STATIC_METHOD_BMI_PORTALS__
+    CPPFLAGS += -D__STATIC_METHOD_BMI_PORTALS__
 ifneq (,@PORTALS_LIBS@)
     PORTALS_LIBS := @PORTALS_LIBS@
     LIBS += $(PORTALS_LIBS)
@@ -473,11 +491,13 @@ endif
 
 ifdef BUILD_ZOID
     CFLAGS += -D__STATIC_METHOD_BMI_ZOID__
+    CPPFLAGS += -D__STATIC_METHOD_BMI_ZOID__
 endif
 
 # enable mmap-readahead cache (unless disabled by configure)
 ifdef MMAP_RA_CACHE
 CFLAGS += @MMAP_RA_CACHE@
+CPPFLAGS += @MMAP_RA_CACHE@
 endif
 
 # reset the file position pointer when a write call encounters errors (kernel only)
@@ -485,24 +505,29 @@ endif
 # position pointer as bytes are written.
 ifdef RESET_FILE_POS
 CFLAGS += @RESET_FILE_POS@
+CPPFLAGS += @RESET_FILE_POS@
 endif
 
 # enable trusted connections (unless disabled by configure)
 ifdef TRUSTED_CONNECTIONS
 CFLAGS += @TRUSTED_CONNECTIONS@
+CPPFLAGS += @TRUSTED_CONNECTIONS@
 endif
 
 # enable redhat-release patches (if detected and if any)
 ifdef REDHAT_RELEASE
 CFLAGS += @REDHAT_RELEASE@
+CPPFLAGS += @REDHAT_RELEASE@
 endif
 
 # Add gcc-specific flags if we know it is a gnu compiler.
 ifdef GNUC
 CFLAGS += $(GCC_CFLAGS)
+CPPFLAGS += $(CPP_FLAGS)
 endif
 ifdef INTELC
 CFLAGS += $(INTEL_CFLAGS)
+CPPFLAGS += $(INTEL_CFLAGS)
 endif
 
 #################################################################
@@ -534,6 +559,7 @@ endif
 ifdef BUILD_JNI
 JAVA_HOME := @JAVA_HOME@
 CFLAGS += -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux
+CPPFLAGS += -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux
 JAVAH := $(JAVA_HOME)/bin/javah -J-Xmx256m
 MVN := mvn
 JNI_DIR := $(srcdir)/src/client/jni
@@ -680,12 +706,14 @@ LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
 OLIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(OLIBSRC)))
 # ULIBOBJS is a list of objects to put in the ofs lib
 ULIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ULIBSRC)))
+ULIBOBJS += $(patsubst %.cpp,%.o, $(filter %.cpp,$(ULIBSRC)))
 # LIBPICOBJS are the same, but compiled for use in a shared library
 LIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(LIBSRC)))
 # OLIBPICOBJS are the same, but compiled for use in a shared library
 OLIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(OLIBSRC)))
 # ULIBPICOBJS are the same, but compiled for use in a shared library
 ULIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(ULIBSRC)))
+ULIBPICOBJS += $(patsubst %.cpp,%.po, $(filter %.cpp,$(ULIBSRC)))
 # LIBDEPENDS is a list of dependency files for the client lib
 LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
 # OLIBDEPENDS is a list of dependency files for the client lib
@@ -1089,28 +1117,28 @@ endif # BUILD_JNI
 
 # c++ rule for building server objects
 %-server.o: %.cpp
-	$(Q) "  CC		$@"
-	$(E)$(CC) $(CFLAGS) $(SERVERCFLAGS) $(call modcflags,$<) $< -c -o $@
+	$(Q) "  CPP		$@"
+	$(E)$(CPP) $(CPPFLAGS) $(SERVERCFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # c++ default rule for building objects for threaded library
 %-threaded.o: %.cpp
-	$(Q) "  CC		$@"
-	$(E)$(CC) $(LIBTHREADEDCFLAGS) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+	$(Q) "  CPP		$@"
+	$(E)$(CPP) $(LIBTHREADEDCFLAGS) $(LIBCFLAGS) $(CPPFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # c++ rule for building shared objects for threaded library
 %-threaded.po: %.cpp
 	$(Q) "  CCPIC		$@"
-	$(E)$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
+	$(E)$(CPP) $(LIBTHREADEDCFLAGS) $(CPPFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # c++ default rule for building objects 
 %.o: %.cpp
-	$(Q) "  CC		$@"
-	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+	$(Q) "  CCP		$@"
+	$(E)$(CPP) $(LIBCFLAGS) $(CPPFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # c++ rule for building shared objects 
 %.po: %.cpp
 	$(Q) "  CCPIC		$@"
-	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
+	$(E)$(CPP) $(LIBCFLAGS) $(CPPFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # bison and yacc
 %.c: %.y
@@ -1391,6 +1419,7 @@ install:: all install_doc
 	install -m 644 $(srcdir)/include/pvfs2-hint.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-compat.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-mirror.h $(includedir)
+	install -m 644 $(srcdir)/include/pxfs.h $(includedir)
 
 	install -d $(libdir)
 ifneq (,$(LIBRARIES_STATIC))
