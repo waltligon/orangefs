@@ -396,7 +396,7 @@ static struct options* parse_args(int argc, char* argv[])
 		tmp_opts->mnt_point_set = 1;
 		break;
             case('g'):
-                if(strcmp(optarg, ""){
+                if(strcmp(optarg, "")){
                     tmp_opts->graphite_addr = NULL;
                 } else {
                     strcpy(tmp_opts->graphite_addr, optarg);
