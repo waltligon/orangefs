@@ -77,12 +77,30 @@ do {                                                   \
         sample = GETSAMPLE(s, h - 1, c);               \
     }                                                  \
     sample += GETSAMPLE(s, h, c);                      \
-    fprintf(graphite_fp,                               \
+    /* If graphite_addr not set, just print */         \
+    if(!!user_opts->graphite_addr[0]){                    \
+        graphite_fd = graphite_connect(                \
+                user_opts->graphite_addr);             \
+        if(graphite_fd <= 0){                          \
+            return graphite_fd;                        \
+        }                                              \
+        sprintf(graphite_message,                      \
             "%s%s %lld %lld\n",                        \
             samplestr,                                 \
             str,                                       \
             (unsigned long long int)sample,            \
-            (unsigned long long int)START_TIME(s, h)); \
+            (unsigned long long int)START_TIME(s, h)/1000); \
+        write(graphite_fd,                             \
+            graphite_message,                          \
+            strlen(graphite_message)+1);               \
+    }                                                  \
+    fprintf(pfile,                                     \
+            "%s%s %lld %lld\n",                        \
+            samplestr,                                 \
+            str,                                       \
+            (unsigned long long int)sample,            \
+            (unsigned long long int)START_TIME(s, h)/1000); \
+    close(graphite_fd);                                \
 } while(0);
 
 #define PRINT_COUNTER(str, c, s, h)                    \
@@ -111,7 +129,7 @@ struct options
     int mnt_point_set;
     int history;
     int keys;
-    char* graphite_addr;
+    char graphite_addr[36];
 };
 
 static struct options *parse_args(int argc, char *argv[]);
@@ -136,7 +154,6 @@ int main(int argc, char **argv)
     FILE* pfile = stdout;
     int64_t *last = NULL;
     int graphite_fd = 0;
-    FILE* graphite_fp = 0;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -234,6 +251,7 @@ int main(int argc, char **argv)
     /* build a list of servers to talk to */
     addr_array = (PVFS_BMI_addr_t *)malloc(io_server_count *
                                            sizeof(PVFS_BMI_addr_t));
+    printf("built list of servers to talk to\n");
     if (addr_array == NULL)
     {
 	perror("malloc");
@@ -262,14 +280,6 @@ int main(int argc, char **argv)
     while (1)
     {
         PVFS_util_refresh_credential(&cred);
-        graphite_fd = graphite_connect(user_opts->graphite_addr);
-        if(graphite_fd <= 0){
-            return graphite_fd;
-        }
-        graphite_fp = fdopen(graphite_fd, "w+");
-        if(graphite_fp <= 0){
-            return -1;
-        }
         key_cnt = MAX_KEY_CNT;
 	ret = PVFS_mgmt_perf_mon_list(cur_fs,
 				      &cred,
@@ -294,7 +304,7 @@ int main(int argc, char **argv)
 	for (s = 0; s < io_server_count; s++)
 	{
             char samplestr[256] = "palmetto.";
-
+            char graphite_message[512] = {0};
             strcat(samplestr, serverstr[s]);
             strcat(samplestr, ".orangefs.");
 
@@ -302,31 +312,30 @@ int main(int argc, char **argv)
 	    {
                 if (VALID_FLAG(s, h))
                 {
-                    PRINT_COUNTER("read", READ, s, h);
-                    PRINT_COUNTER("write", WRITE, s, h);
-                    PRINT_COUNTER("metaread", METADATA_READ, s, h);
-                    PRINT_COUNTER("metawrite", METADATA_WRITE, s, h);
-                    PRINT_COUNTER("dspaceops", DSPACE_OPS, s, h);
-                    PRINT_COUNTER("keyvalops", KEYVAL_OPS, s, h);
-                    PRINT_COUNTER("scheduled", SCHEDULE, s, h);
-                    PRINT_COUNTER("requests", REQUESTS, s, h);
-                    PRINT_COUNTER("smallreads", SMALL_READS, s, h);
-                    PRINT_COUNTER("smallwrites", SMALL_WRITES, s, h);
-                    PRINT_COUNTER("flowreads", FLOW_READS, s, h);
-                    PRINT_COUNTER("flowwrites", FLOW_WRITES, s, h);
-                    PRINT_COUNTER("creates", CREATES, s, h);
-                    PRINT_COUNTER("removes", REMOVES, s, h);
-                    PRINT_COUNTER("mkdirs", MKDIRS, s, h);
-                    PRINT_COUNTER("rmdir", RMDIRS, s, h);
-                    PRINT_COUNTER("getattrs", GETATTRS, s, h);
-                    PRINT_COUNTER("setattrs", SETATTRS, s, h);
+                    GRAPHITE_PRINT_COUNTER("read", READ, s, h);
+                    GRAPHITE_PRINT_COUNTER("write", WRITE, s, h);
+                    GRAPHITE_PRINT_COUNTER("metaread", METADATA_READ, s, h);
+                    GRAPHITE_PRINT_COUNTER("metawrite", METADATA_WRITE, s, h);
+                    GRAPHITE_PRINT_COUNTER("dspaceops", DSPACE_OPS, s, h);
+                    GRAPHITE_PRINT_COUNTER("keyvalops", KEYVAL_OPS, s, h);
+                    GRAPHITE_PRINT_COUNTER("scheduled", SCHEDULE, s, h);
+                    GRAPHITE_PRINT_COUNTER("requests", REQUESTS, s, h);
+                    GRAPHITE_PRINT_COUNTER("smallreads", SMALL_READS, s, h);
+                    GRAPHITE_PRINT_COUNTER("smallwrites", SMALL_WRITES, s, h);
+                    GRAPHITE_PRINT_COUNTER("flowreads", FLOW_READS, s, h);
+                    GRAPHITE_PRINT_COUNTER("flowwrites", FLOW_WRITES, s, h);
+                    GRAPHITE_PRINT_COUNTER("creates", CREATES, s, h);
+                    GRAPHITE_PRINT_COUNTER("removes", REMOVES, s, h);
+                    GRAPHITE_PRINT_COUNTER("mkdirs", MKDIRS, s, h);
+                    GRAPHITE_PRINT_COUNTER("rmdir", RMDIRS, s, h);
+                    GRAPHITE_PRINT_COUNTER("getattrs", GETATTRS, s, h);
+                    GRAPHITE_PRINT_COUNTER("setattrs", SETATTRS, s, h);
                 }
             }
             memcpy(&LAST(s),
                    &(SAMPLE(s, h - 1)),
                    ((key_cnt + 2) * sizeof(uint64_t)));
 	}
-        close(graphite_fd);
 	fflush(stdout);
 	sleep(FREQUENCY);
     }
@@ -396,8 +405,8 @@ static struct options* parse_args(int argc, char* argv[])
 		tmp_opts->mnt_point_set = 1;
 		break;
             case('g'):
-                if(strcmp(optarg, "")){
-                    tmp_opts->graphite_addr = NULL;
+                if(strlen(optarg) == 0){
+                    tmp_opts->graphite_addr[0] = '\0';
                 } else {
                     strcpy(tmp_opts->graphite_addr, optarg);
                 }
@@ -421,8 +430,8 @@ static struct options* parse_args(int argc, char* argv[])
 static void usage(int argc, char **argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s [-m fs_mount_point]\n", argv[0]);
-    fprintf(stderr, "Example: %s -m /mnt/pvfs2\n", argv[0]);
+    fprintf(stderr, "Usage  : %s [-m fs_mount_point] [-g hostname|ipaddr]\n", argv[0]);
+    fprintf(stderr, "Example: %s -m /mnt/pvfs2 -g [graphite.clemson.edu|130.127.148.159]\n", argv[0]);
     return;
 }
 
@@ -432,25 +441,22 @@ int graphite_connect(char *graphite_addr){
                 int portno = 2003;
                 struct sockaddr_in serv_addr;
                 struct hostent *server;
-                struct in_addr ipv4addr;
           sockfd = socket(AF_INET, SOCK_STREAM, 0);
                 if(sockfd < 0){
                         printf("Failed to open sock\n");
                         return -1;
                 }
-                inet_pton(AF_INET, graphite_addr, &ipv4addr);
-                server = gethostbyaddr(&ipv4addr, sizeof(ipv4addr), AF_INET);
-    if(!server){
-                        printf("Failed to resolve host\n");
+                server = gethostbyname(graphite_addr);
+                if(!server){
+                        herror(0);
                         return -2;
                 }
-                printf("h_name: %s\nh_addr: %s\n", server->h_name,server->h_addr);
                 serv_addr.sin_family = AF_INET;
                 bcopy(server->h_addr, (char *)&serv_addr.sin_addr.s_addr,
                                 server->h_length);
                 serv_addr.sin_port = htons(portno);
                 if(connect(sockfd, (struct sockaddr*) &serv_addr, sizeof(struct sockaddr)) < 0){
-                        printf("failed to connec to socket\n");
+                        printf("failed to connect to socket\n");
                         return -3;
                 }
 
