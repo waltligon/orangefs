@@ -66,7 +66,6 @@
 #define GETATTRS 16
 #define SETATTRS 17
 
-<<<<<<< .mine
 #define GRAPHITE_PRINT_COUNTER(str, c, s, h)                      \
 do {                                                              \
     int64_t sample;                                               \
