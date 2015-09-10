@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
@@ -25,6 +26,9 @@
 #include "pvfs2-mgmt.h"
 #include "pvfs2-internal.h"
 
+
+/* these defaults overridden by command line args */
+#define MAX_KEY_CNT 18
 #define HISTORY 5
 #define FREQUENCY 10
 
@@ -32,17 +36,16 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-#define MAX_KEY_CNT 18
 /* macros for accessing data returned from server 
  * s is server, h is history sample, c is counter number
  */
-#define GETLAST(s,c) (last[(s * (key_cnt + 2)) + (c)])
+#define GETLAST(s,c) (last[(s * (user_opts->keys + 2)) + (c)])
 #define LAST(s) GETLAST((s), 0)
-#define GETSAMPLE(s,h,c) (perf_matrix[(s)][((h) * (key_cnt + 2)) + (c)])
+#define GETSAMPLE(s,h,c) (perf_matrix[(s)][((h) * (user_opts->keys + 2)) + (c)])
 #define SAMPLE(s,h) GETSAMPLE((s), (h), 0)
-#define VALID_FLAG(s,h) (GETSAMPLE((s), (h), key_cnt) != 0.0)
-#define ID(s,h) GETSAMPLE((s), (h), key_cnt)
-#define START_TIME(s,h) GETSAMPLE((s), (h), key_cnt)
+#define VALID_FLAG(s,h) (GETSAMPLE((s), (h), user_opts->keys) != 0.0)
+#define ID(s,h) GETSAMPLE((s), (h), user_opts->keys)
+#define START_TIME(s,h) GETSAMPLE((s), (h), user_opts->keys)
 
 #define READ 0
 #define WRITE 1
@@ -63,56 +66,55 @@
 #define GETATTRS 16
 #define SETATTRS 17
 
-int key_cnt; /* holds the Number of keys */
-
-#define GRAPHITE_PRINT_COUNTER(str, c, s, h)                    \
-do {                                                   \
-    int64_t sample;                                    \
-    if (h == 0)                                        \
-    {                                                  \
-        sample = GETLAST(s, c);                        \
-    }                                                  \
-    else                                               \
-    {                                                  \
-        sample = GETSAMPLE(s, h - 1, c);               \
-    }                                                  \
-    sample += GETSAMPLE(s, h, c);                      \
-    /* If graphite_addr not set, just print */         \
-    if(!!user_opts->graphite_addr[0]){                    \
-        graphite_fd = graphite_connect(                \
-                user_opts->graphite_addr);             \
-        if(graphite_fd <= 0){                          \
-            return graphite_fd;                        \
-        }                                              \
-        sprintf(graphite_message,                      \
-            "%s%s %lld %lld\n",                        \
-            samplestr,                                 \
-            str,                                       \
-            (unsigned long long int)sample,            \
-            (unsigned long long int)START_TIME(s, h)/1000); \
-        write(graphite_fd,                             \
-            graphite_message,                          \
-            strlen(graphite_message)+1);               \
-    }                                                  \
-    fprintf(pfile,                                     \
-            "%s%s %lld %lld\n",                        \
-            samplestr,                                 \
-            str,                                       \
-            (unsigned long long int)sample,            \
-            (unsigned long long int)START_TIME(s, h)/1000); \
-    close(graphite_fd);                                \
+<<<<<<< .mine
+#define GRAPHITE_PRINT_COUNTER(str, c, s, h)                      \
+do {                                                              \
+    int64_t sample;                                               \
+    if (h == 0)                                                   \
+    {                                                             \
+        sample = -GETLAST(s, c);                                  \
+    }                                                             \
+    else                                                          \
+    {                                                             \
+        sample = -GETSAMPLE(s, h - 1, c);                         \
+    }                                                             \
+    sample += GETSAMPLE(s, h, c);                                 \
+    if (user_opts->graphite)                                      \
+    {                                                             \
+        sprintf(graphite_message,                                 \
+                "%s%s %lld %lld\n",                               \
+                samplestr,                                        \
+                str,                                              \
+                (unsigned long long int)sample,                   \
+                (unsigned long long int)START_TIME(s, h)/1000);   \
+        write(graphite_fd,                                        \
+                graphite_message,                                 \
+                strlen(graphite_message) + 1);                    \
+        close(graphite_fd);                                       \
+    }                                                             \
+    if (user_opts->print)                                         \
+    {                                                             \
+        fprintf(pfile,                                            \
+                "%s%s %lld %lld\n",                               \
+                samplestr,                                        \
+                str,                                              \
+                (unsigned long long int)sample,                   \
+                (unsigned long long int)START_TIME(s, h)/1000);   \
+    }                                                             \
 } while(0);
+
+#if 0
 
 #define PRINT_COUNTER(str, c, s, h)                    \
 do {                                                   \
     int64_t sample;                                    \
     if (h == 0)                                        \
     {                                                  \
-        sample = GETLAST(s, c);                        \
+        sample = -GETLAST(s, c);                       \
     }                                                  \
     else                                               \
     {                                                  \
-        sample = GETSAMPLE(s, h - 1, c);               \
+        sample = -GETSAMPLE(s, h - 1, c);              \
     }                                                  \
     sample += GETSAMPLE(s, h, c);                      \
     fprintf(pfile,                                     \
@@ -123,19 +125,23 @@ do {                                                   \
             (unsigned long long int)START_TIME(s, h)); \
 } while(0);
 
+#endif
+
 struct options
 {
-    char* mnt_point;
+    char *mnt_point;
+    char *graphite_addr;
     int mnt_point_set;
-    int history;
+    int graphite;
+    int print;
     int keys;
-    char graphite_addr[36];
+    int history;
+    int frequency;
 };
 
-static struct options *parse_args(int argc, char *argv[]);
+static struct options *parse_args(int argc, char **argv);
 static void usage(int argc, char **argv);
-int graphite_connect(char *);
-
+static int graphite_connect(char *);
 
 int main(int argc, char **argv)
 {
@@ -163,11 +169,43 @@ int main(int argc, char **argv)
 	usage(argc, argv);
 	return(-1);
     }
+
+    if (user_opts->keys == 0)
+    {
+        user_opts->keys = MAX_KEY_CNT;
+    }
+    printf("\nkeys: %d", user_opts->keys);
+
     if (user_opts->history == 0)
     {
         user_opts->history = HISTORY;
     }
-    printf("\nhistory: %d\n", user_opts->history);
+    printf("\nhistory: %d", user_opts->history);
+
+    if (user_opts->frequency == 0)
+    {
+        user_opts->frequency = HISTORY;
+    }
+    printf("\nfrequency: %d", user_opts->frequency);
+    printf("\n");
+
+    if (user_opts->graphite)
+    {
+        graphite_fd = graphite_connect(user_opts->graphite_addr);
+        if (graphite_fd < 0)
+        {
+            user_opts->graphite = 0;
+            fprintf(stderr,
+                    "Tried to open link to Graphite server and failed\n");
+        }
+    }
+
+    if (!user_opts->print && !user_opts->graphite)
+    {
+        fprintf(stderr,
+                "Neither printing nor sending to Graphite\n");
+        exit(-1);
+    }
 
     ret = PVFS_util_init_defaults();
     if(ret < 0)
@@ -280,7 +318,6 @@ int main(int argc, char **argv)
     while (1)
     {
         PVFS_util_refresh_credential(&cred);
-        key_cnt = MAX_KEY_CNT;
 	ret = PVFS_mgmt_perf_mon_list(cur_fs,
 				      &cred,
 				      perf_matrix, 
@@ -288,7 +325,7 @@ int main(int argc, char **argv)
 				      addr_array,
 				      next_id_array,
 				      io_server_count, 
-                                      &key_cnt,
+                                      &user_opts->keys,
 				      user_opts->history,
 				      NULL,
                                       NULL);
@@ -334,13 +371,18 @@ int main(int argc, char **argv)
             }
             memcpy(&LAST(s),
                    &(SAMPLE(s, h - 1)),
-                   ((key_cnt + 2) * sizeof(uint64_t)));
+                   ((user_opts->keys + 2) * sizeof(uint64_t)));
 	}
 	fflush(stdout);
-	sleep(FREQUENCY);
+	sleep(user_opts->frequency);
     }
 
     PVFS_sys_finalize();
+
+    if (user_opts->graphite)
+    {
+        close(graphite_fd);
+    }
 
     return(ret);
 }
@@ -352,14 +394,11 @@ int main(int argc, char **argv)
  *
  * returns pointer to options structure on success, NULL on failure
  */
-static struct options* parse_args(int argc, char* argv[])
+static struct options *parse_args(int argc, char **argv)
 {
-    char flags[] = "vm:h:k:g:";
+    char flags[] = "vm:h:f:k:g:p";
     int one_opt = 0;
-    int len = 0;
-
     struct options *tmp_opts = NULL;
-    int ret = -1;
 
     /* create storage for the command line options */
     tmp_opts = (struct options *) malloc(sizeof(struct options));
@@ -370,12 +409,16 @@ static struct options* parse_args(int argc, char* argv[])
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* look at command line arguments */
+    opterr = 0; /* getopts should not print error messages */
     while((one_opt = getopt(argc, argv, flags)) != EOF)
     {
 	switch(one_opt)
         {
             case('h'):
                 tmp_opts->history = atoi(optarg);
+                break;
+            case('f'):
+                tmp_opts->frequency = atoi(optarg);
                 break;
             case('k'):
                 tmp_opts->keys = atoi(optarg);
@@ -384,32 +427,31 @@ static struct options* parse_args(int argc, char* argv[])
                 printf("%s\n", PVFS2_VERSION);
                 exit(0);
 	    case('m'):
-		len = strlen(optarg) + 1;
-		tmp_opts->mnt_point = (char*)malloc(len + 1);
+		tmp_opts->mnt_point = strdup(optarg);
 		if(!tmp_opts->mnt_point)
 		{
-		    free(tmp_opts);
-		    return(NULL);
+		    usage(argc, argv);
+		    exit(EXIT_FAILURE);
 		}
-		memset(tmp_opts->mnt_point, 0, len + 1);
-		ret = sscanf(optarg, "%s", tmp_opts->mnt_point);
-		if(ret < 1){
-		    free(tmp_opts);
-		    return(NULL);
-		}
+		tmp_opts->mnt_point_set = 1;
 		/* TODO: dirty hack... fix later.  The remove_dir_prefix()
 		 * function expects some trailing segments or at least
 		 * a slash off of the mount point
 		 */
+                realloc(tmp_opts->mnt_point, strlen(tmp_opts->mnt_point) + 2);
 		strcat(tmp_opts->mnt_point, "/");
-		tmp_opts->mnt_point_set = 1;
 		break;
             case('g'):
-                if(strlen(optarg) == 0){
-                    tmp_opts->graphite_addr[0] = '\0';
-                } else {
-                    strcpy(tmp_opts->graphite_addr, optarg);
-                }
+                tmp_opts->graphite_addr = strdup(optarg);
+		if(!tmp_opts->graphite_addr)
+		{
+		    usage(argc, argv);
+		    exit(EXIT_FAILURE);
+		}
+                tmp_opts->graphite = 1;
+                break;
+            case('p'):
+                tmp_opts->print = 1;
                 break;
 	    case('?'):
 		usage(argc, argv);
@@ -430,35 +472,50 @@ static struct options* parse_args(int argc, char* argv[])
 static void usage(int argc, char **argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s [-m fs_mount_point] [-g hostname|ipaddr]\n", argv[0]);
-    fprintf(stderr, "Example: %s -m /mnt/pvfs2 -g [graphite.clemson.edu|130.127.148.159]\n", argv[0]);
+    fprintf(stderr,
+            "Usage  : %s [-m fs_mount_point] [-g hostname|ipaddr]\n",
+            argv[0]);
+    fprintf(stderr,
+            "Example: %s -m /mnt/pvfs2 -g graphite.clemson.edu\n",
+            argv[0]);
     return;
 }
 
 
-int graphite_connect(char *graphite_addr){
+static int graphite_connect(char *graphite_addr)
+{
     int sockfd;
-                int portno = 2003;
-                struct sockaddr_in serv_addr;
-                struct hostent *server;
-          sockfd = socket(AF_INET, SOCK_STREAM, 0);
-                if(sockfd < 0){
-                        printf("Failed to open sock\n");
-                        return -1;
-                }
-                server = gethostbyname(graphite_addr);
-                if(!server){
-                        herror(0);
-                        return -2;
-                }
-                serv_addr.sin_family = AF_INET;
-                bcopy(server->h_addr, (char *)&serv_addr.sin_addr.s_addr,
-                                server->h_length);
-                serv_addr.sin_port = htons(portno);
-                if(connect(sockfd, (struct sockaddr*) &serv_addr, sizeof(struct sockaddr)) < 0){
-                        printf("failed to connect to socket\n");
-                        return -3;
-                }
+    int portno = 2003;
+    struct sockaddr_in serv_addr;
+    struct hostent *server;
+
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if(sockfd < 0)
+    {
+         printf("Failed to open sock\n");
+         return -1;
+    }
+
+    server = gethostbyname(graphite_addr);
+    if(!server)
+    {
+         herror(0);
+         return -2;
+    }
+
+    serv_addr.sin_family = AF_INET;
+    memcpy (server->h_addr,
+            (char *)&serv_addr.sin_addr.s_addr,
+            server->h_length);
+    serv_addr.sin_port = htons(portno);
+
+    if (connect(sockfd,
+                (struct sockaddr*) &serv_addr,
+                sizeof(struct sockaddr)) < 0)
+    {
+         printf("failed to connect to socket\n");
+         return -3;
+    }
 
     return sockfd;
 }
