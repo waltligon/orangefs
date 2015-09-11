@@ -370,7 +370,8 @@ int main(int argc, char **argv)
             }
             memcpy(&LAST(s),
                    &(SAMPLE(s, h - 1)),
-                   ((user_opts->keys + 2) * sizeof(uint64_t)));
+                   ((MAX_KEY_CNT + 2) * sizeof(uint64_t)));
+                   //((user_opts->keys + 2) * sizeof(uint64_t)));
 	}
 	fflush(stdout);
 	sleep(user_opts->frequency);
