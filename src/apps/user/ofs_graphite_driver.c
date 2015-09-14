@@ -81,15 +81,17 @@ do {                                                              \
     if (user_opts->graphite)                                      \
     {                                                             \
         sprintf(graphite_message,                                 \
-                "%s%s %lld %lld\n",                               \
+                "\n%s%s %lld %lld\n",                               \
                 samplestr,                                        \
                 str,                                              \
                 (unsigned long long int)sample,                   \
                 (unsigned long long int)START_TIME(s, h)/1000);   \
-        write(graphite_fd,                                        \
+        bytes_written = write(graphite_fd,                        \
                 graphite_message,                                 \
                 strlen(graphite_message) + 1);                    \
-        close(graphite_fd);                                       \
+        if(bytes_written != strlen(graphite_message) + 1){        \
+            fprintf(stderr, "write failed\n");                             \
+        }                                                         \
     }                                                             \
     if (user_opts->print)                                         \
     {                                                             \
@@ -159,6 +161,7 @@ int main(int argc, char **argv)
     FILE* pfile = stdout;
     int64_t *last = NULL;
     int graphite_fd = 0;
+    int bytes_written = 0;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -481,13 +484,14 @@ static void usage(int argc, char **argv)
     return;
 }
 
-
 static int graphite_connect(char *graphite_addr)
 {
     int sockfd;
+    int ret;
     int portno = 2003;
     struct sockaddr_in serv_addr;
     struct hostent *server;
+
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if(sockfd < 0)
@@ -504,16 +508,16 @@ static int graphite_connect(char *graphite_addr)
     }
 
     serv_addr.sin_family = AF_INET;
-    memcpy (server->h_addr,
-            (char *)&serv_addr.sin_addr.s_addr,
+    memcpy((char *)&serv_addr.sin_addr.s_addr,
+            server->h_addr,
             server->h_length);
     serv_addr.sin_port = htons(portno);
 
-    if (connect(sockfd,
+    if ((ret = connect(sockfd,
                 (struct sockaddr*) &serv_addr,
-                sizeof(struct sockaddr)) < 0)
+                sizeof(struct sockaddr))) < 0)
     {
-         printf("failed to connect to socket\n");
+         printf("failed to connect to socket, connect returned: %s\n", strerror(errno));
          return -3;
     }
 

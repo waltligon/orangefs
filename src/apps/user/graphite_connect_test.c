@@ -52,7 +52,8 @@ int graphite_connect(char *graphite_addr){
 			return -1;
 		}
                 inet_pton(AF_INET, graphite_addr, &ipv4addr);
-		server = gethostbyaddr(&ipv4addr, sizeof(ipv4addr), AF_INET);
+    server = gethostbyname(graphite_addr);
+		//server = gethostbyaddr(&ipv4addr, sizeof(ipv4addr), AF_INET);
     if(!server){
                         printf("Failed to resolve host\n");
 			return -2;
