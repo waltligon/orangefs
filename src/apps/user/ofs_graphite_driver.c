@@ -67,30 +67,43 @@
 #define SETATTRS 17
 
 #define GRAPHITE_PRINT_COUNTER(str, c, s, h)                      \
+if (c >= user_opts->keys) break;                                  \
 do {                                                              \
     int64_t sample;                                               \
-    if (h == 0)                                                   \
+    if (user_opts->debug)                                         \
     {                                                             \
-        sample = -GETLAST(s, c);                                  \
+        fprintf(pfile,"DEBUG %s %lld %lld\n", str,                \
+        (long long int)GETSAMPLE(s, h, c), (long long int)GETLAST(s, c));  \
+    }                                                             \
+    if (user_opts->raw)                                           \
+    {                                                             \
+        sample = GETSAMPLE(s, h, c);                              \
     }                                                             \
     else                                                          \
     {                                                             \
-        sample = -GETSAMPLE(s, h - 1, c);                         \
+        if (h == 0)                                               \
+        {                                                         \
+            sample = -GETLAST(s, c);                              \
+        }                                                         \
+        else                                                      \
+        {                                                         \
+            sample = -GETSAMPLE(s, h - 1, c);                     \
+        }                                                         \
+        sample += GETSAMPLE(s, h, c);                             \
     }                                                             \
-    sample += GETSAMPLE(s, h, c);                                 \
     if (user_opts->graphite)                                      \
     {                                                             \
         sprintf(graphite_message,                                 \
-                "\n%s%s %lld %lld\n",                               \
+                "\n%s%s %lld %lld\n",                             \
                 samplestr,                                        \
                 str,                                              \
-                (unsigned long long int)sample,                   \
-                (unsigned long long int)START_TIME(s, h)/1000);   \
+                (long long int)sample,                            \
+                (long long int)START_TIME(s, h)/1000);            \
         bytes_written = write(graphite_fd,                        \
                 graphite_message,                                 \
                 strlen(graphite_message) + 1);                    \
         if(bytes_written != strlen(graphite_message) + 1){        \
-            fprintf(stderr, "write failed\n");                             \
+            fprintf(stderr, "write failed\n");                    \
         }                                                         \
     }                                                             \
     if (user_opts->print)                                         \
@@ -99,8 +112,8 @@ do {                                                              \
                 "%s%s %lld %lld\n",                               \
                 samplestr,                                        \
                 str,                                              \
-                (unsigned long long int)sample,                   \
-                (unsigned long long int)START_TIME(s, h)/1000);   \
+                (long long int)sample,                            \
+                (long long int)START_TIME(s, h)/1000);            \
     }                                                             \
 } while(0);
 
@@ -136,6 +149,8 @@ struct options
     int graphite;
     int print;
     int keys;
+    int raw;
+    int debug;
     int history;
     int frequency;
 };
@@ -143,6 +158,7 @@ struct options
 static struct options *parse_args(int argc, char **argv);
 static void usage(int argc, char **argv);
 static int graphite_connect(char *);
+static void print_sample(char *str, int64_t *samples, int size) GCC_UNUSED;
 
 int main(int argc, char **argv)
 {
@@ -150,15 +166,15 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     struct options *user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    int s, h;
+    int s = 0, h = 0;
     PVFS_credential cred;
-    int io_server_count;
-    int64_t **perf_matrix;
-    uint64_t *end_time_ms_array;
-    uint32_t *next_id_array;
-    PVFS_BMI_addr_t *addr_array;
-    const char **serverstr;
-    FILE* pfile = stdout;
+    int io_server_count = 0;
+    int64_t **perf_matrix = NULL;
+    uint64_t *end_time_ms_array = NULL;
+    uint32_t *next_id_array = NULL;
+    PVFS_BMI_addr_t *addr_array = NULL;
+    const char **serverstr = NULL;
+    FILE *pfile = stdout;
     int64_t *last = NULL;
     int graphite_fd = 0;
     int bytes_written = 0;
@@ -202,10 +218,12 @@ int main(int argc, char **argv)
         }
     }
 
-    if (!user_opts->print && !user_opts->graphite)
+    if (!user_opts->print &&
+        !user_opts->graphite &&
+        !user_opts->debug)
     {
         fprintf(stderr,
-                "Neither printing nor sending to Graphite\n");
+                "Neither printing, debugging, nor sending to Graphite\n");
         exit(-1);
     }
 
@@ -251,9 +269,10 @@ int main(int argc, char **argv)
 	perror("malloc");
 	return(-1);
     }
+    memset(perf_matrix, 0, io_server_count * sizeof(int64_t *));
     for(s = 0; s < io_server_count; s++)
     {
-	perf_matrix[s] = (int64_t *)malloc((MAX_KEY_CNT + 2) * 
+	perf_matrix[s] = (int64_t *)malloc((user_opts->keys + 2) * 
                                            user_opts->history *
                                            sizeof(int64_t));
 	if (perf_matrix[s] == NULL)
@@ -261,13 +280,16 @@ int main(int argc, char **argv)
 	    perror("malloc");
 	    return -1;
 	}
+        memset(perf_matrix[s], 0, (user_opts->keys + 2) * 
+                                  user_opts->history *
+                                  sizeof(int64_t));
     }
 
     /* this array holds the last asmple from each server for continuity */
-    last = (int64_t *)malloc((MAX_KEY_CNT + 2) *
+    last = (int64_t *)malloc((user_opts->keys + 2) *
                              io_server_count *
                              sizeof(int64_t));
-    memset(last, 0, (MAX_KEY_CNT + 2) * io_server_count * sizeof(int64_t));
+    memset(last, 0, (user_opts->keys + 2) * io_server_count * sizeof(int64_t));
 
     /* allocate an array to keep up with what iteration of statistics
      * we need from each server 
@@ -291,7 +313,6 @@ int main(int argc, char **argv)
     /* build a list of servers to talk to */
     addr_array = (PVFS_BMI_addr_t *)malloc(io_server_count *
                                            sizeof(PVFS_BMI_addr_t));
-    printf("built list of servers to talk to\n");
     if (addr_array == NULL)
     {
 	perror("malloc");
@@ -307,13 +328,34 @@ int main(int argc, char **argv)
 	return -1;
     }
 
+    /* edit a clean string that represents the server name */
     serverstr = (const char **)malloc(io_server_count * sizeof(char *));
     for (s = 0; s < io_server_count; s++)
     {
         int servertype;
-        serverstr[s] = PVFS_mgmt_map_addr(cur_fs,
-                                          addr_array[s],
-                                          &servertype);
+        int n;
+        const char *cp;
+        char *p, *p2;
+
+        cp = PVFS_mgmt_map_addr(cur_fs, addr_array[s], &servertype);
+        p = strdup(cp);
+
+        p2 = strstr(p, "://");
+        if (p2)
+        {
+            p2 += 2;
+            *p2 = 0;
+            p2++;
+        }
+        else
+        {
+            p2 = p;
+        }
+
+        n = strcspn(p2, "-,:/");
+        p2[n] = 0;
+
+        serverstr[s] = p2;
     }
 
     /* loop for ever, grabbing stats at regular intervals */
@@ -336,6 +378,8 @@ int main(int argc, char **argv)
 	    PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
 	    return -1;
 	}
+
+        //print_sample("sample", perf_matrix[0], user_opts->keys + 2);
 
 	/* printf("\nPVFS2 I/O server counters\n"); 
 	 * printf("==================================================\n");
@@ -371,10 +415,18 @@ int main(int argc, char **argv)
                     GRAPHITE_PRINT_COUNTER("setattrs", SETATTRS, s, h);
                 }
             }
+
+            memcpy(&last[(s * (user_opts->keys + 2))],
+                   &perf_matrix[(s)][((user_opts->history - 1) *
+                                      (user_opts->keys + 2))],
+                   ((user_opts->keys + 2) * sizeof(uint64_t)));
+
+/* does not seem to work for some reason */
+#if 0
             memcpy(&LAST(s),
                    &(SAMPLE(s, h - 1)),
-                   ((MAX_KEY_CNT + 2) * sizeof(uint64_t)));
-                   //((user_opts->keys + 2) * sizeof(uint64_t)));
+                   ((user_opts->keys + 2) * sizeof(uint64_t)));
+#endif
 	}
 	fflush(stdout);
 	sleep(user_opts->frequency);
@@ -399,7 +451,7 @@ int main(int argc, char **argv)
  */
 static struct options *parse_args(int argc, char **argv)
 {
-    char flags[] = "vm:h:f:k:g:p";
+    char flags[] = "vm:h:f:k:g:prd";
     int one_opt = 0;
     struct options *tmp_opts = NULL;
 
@@ -425,6 +477,12 @@ static struct options *parse_args(int argc, char **argv)
                 break;
             case('k'):
                 tmp_opts->keys = atoi(optarg);
+                break;
+            case('r'):
+                tmp_opts->raw = 1;
+                break;
+            case('d'):
+                tmp_opts->debug = 1;
                 break;
             case('v'):
                 printf("%s\n", PVFS2_VERSION);
@@ -523,6 +581,21 @@ static int graphite_connect(char *graphite_addr)
 
     return sockfd;
 }
+
+static void print_sample(char *str, int64_t *samples, int size)
+{
+    int s;
+    if (str)
+    {
+        printf("%s ", str);
+    }
+    for (s = 0; s < size; s++)
+    {
+        printf("%lld ", (long long int)samples[s]);
+    }
+    printf("\n");
+}
+
 
 /*
  * Local variables:
