@@ -105,6 +105,7 @@ do {                                                              \
         if(bytes_written != strlen(graphite_message) + 1){        \
             fprintf(stderr, "write failed\n");                    \
         }                                                         \
+        printf("sent graphite message\n");                        \
     }                                                             \
     if (user_opts->print)                                         \
     {                                                             \
@@ -145,7 +146,9 @@ struct options
 {
     char *mnt_point;
     char *graphite_addr;
+    char *precursor_string;
     int mnt_point_set;
+    int precursor;
     int graphite;
     int print;
     int keys;
@@ -386,7 +389,14 @@ int main(int argc, char **argv)
          */
 	for (s = 0; s < io_server_count; s++)
 	{
-            char samplestr[256] = "palmetto.";
+            char samplestr[256] = {0}; 
+            if(user_opts->precursor == 1){
+                strcat(samplestr, user_opts->precursor_string);
+           //     samplestr = strdup(user_opts->precursor_string);
+            } else {
+                strcat(samplestr, "palmetto.");
+         //       samplestr = strdup("palmetto.");
+            }
             char graphite_message[512] = {0};
             strcat(samplestr, serverstr[s]);
             strcat(samplestr, ".orangefs.");
@@ -451,7 +461,7 @@ int main(int argc, char **argv)
  */
 static struct options *parse_args(int argc, char **argv)
 {
-    char flags[] = "vm:h:f:k:g:prd";
+    char flags[] = "vm:h:f:k:g:prdn:";
     int one_opt = 0;
     struct options *tmp_opts = NULL;
 
@@ -502,6 +512,15 @@ static struct options *parse_args(int argc, char **argv)
                 realloc(tmp_opts->mnt_point, strlen(tmp_opts->mnt_point) + 2);
 		strcat(tmp_opts->mnt_point, "/");
 		break;
+            case('n'):
+                tmp_opts->precursor_string = strdup(optarg);
+		if(!tmp_opts->precursor_string)
+		{
+		    usage(argc, argv);
+		    exit(EXIT_FAILURE);
+		}
+                tmp_opts->precursor = 1;
+                break;
             case('g'):
                 tmp_opts->graphite_addr = strdup(optarg);
 		if(!tmp_opts->graphite_addr)
