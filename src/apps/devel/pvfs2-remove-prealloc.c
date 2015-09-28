@@ -68,9 +68,9 @@ int main( int argc, char **argv )
     DB_ENV dbe;
     DB_ENV *dbe_p = &dbe;
     char *path = NULL;
-    u_int32_t db_flags = DB_THREAD,
-              env_flags = DB_INIT_MPOOL,
-              type = DB_UNKNOWN;
+    uint32_t db_flags = DB_THREAD,
+             env_flags = DB_INIT_MPOOL,
+             type = DB_UNKNOWN;
     int ret, path_len; 
 
     if( (ret = process_args( argc, argv)) != 0 )

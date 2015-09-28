@@ -76,9 +76,9 @@ static const bmi_size_t reg_send_buflist_len = 256 * 1024;
 static const bmi_size_t reg_recv_buflist_len = 256 * 1024;
 #endif
 
-static void encourage_send_incoming_cts(struct buf_head *bh, u_int32_t byte_len);
+static void encourage_send_incoming_cts(struct buf_head *bh, uint32_t byte_len);
 static void encourage_recv_incoming(struct buf_head *bh, msg_type_t type,
-                                    u_int32_t byte_len);
+                                    uint32_t byte_len);
 static void encourage_rts_done_waiting_buffer(struct ib_work *sq);
 static int send_cts(struct ib_work *rq);
 static void ib_close_connection(ib_connection_t *c);
@@ -153,7 +153,7 @@ static int ib_check_cq(void)
 	    msg_header_common_t mh_common;
 	    struct buf_head *bh = ptr_from_int64(wc.id);
 	    char *ptr = bh->buf;
-	    u_int32_t byte_len = wc.byte_len;
+	    uint32_t byte_len = wc.byte_len;
 
 	    VALGRIND_MAKE_MEM_DEFINED(ptr, byte_len);
 	    decode_msg_header_common_t(&ptr, &mh_common);
@@ -341,7 +341,7 @@ static void encourage_send_waiting_buffer(struct ib_work *sq)
 	                    (msg_header_eager_t *) bh->buf + 1);
 
 	/* send the message */
-	post_sr(bh, (u_int32_t) (sizeof(mh_eager) + sq->buflist.tot_len));
+	post_sr(bh, (uint32_t) (sizeof(mh_eager) + sq->buflist.tot_len));
 
 	/* wait for ack saying remote has received and recycled his buf */
 	sq->state.send = SQ_WAITING_EAGER_SEND_COMPLETION;
@@ -382,11 +382,11 @@ static void encourage_send_waiting_buffer(struct ib_work *sq)
  * from us, and start the real data send.
  */
 static void
-encourage_send_incoming_cts(struct buf_head *bh, u_int32_t byte_len)
+encourage_send_incoming_cts(struct buf_head *bh, uint32_t byte_len)
 {
     msg_header_cts_t mh_cts;
     struct ib_work *sq, *sqt;
-    u_int32_t want;
+    uint32_t want;
     char *ptr = bh->buf;
 
     decode_msg_header_cts_t(&ptr, &mh_cts);
@@ -478,7 +478,7 @@ alloc_new_recv(ib_connection_t *c, struct buf_head *bh)
  * Unexpected receive, either no post or explicit sendunexpected.
  */
 static void
-encourage_recv_incoming(struct buf_head *bh, msg_type_t type, u_int32_t byte_len)
+encourage_recv_incoming(struct buf_head *bh, msg_type_t type, uint32_t byte_len)
 {
     ib_connection_t *c = bh->c;
     struct ib_work *rq;
@@ -717,10 +717,10 @@ send_cts(struct ib_work *rq)
     ib_connection_t *c = rq->c;
     struct buf_head *bh;
     msg_header_cts_t mh_cts;
-    u_int64_t *bufp;
-    u_int32_t *lenp;
-    u_int32_t *keyp;
-    u_int32_t post_len;
+    uint64_t *bufp;
+    uint32_t *lenp;
+    uint32_t *keyp;
+    uint32_t post_len;
     char *ptr;
     int i;
 
@@ -767,9 +767,9 @@ send_cts(struct ib_work *rq)
     encode_msg_header_cts_t(&ptr, &mh_cts);
 
     /* encode all the buflist entries */
-    bufp = (u_int64_t *)((msg_header_cts_t *) bh->buf + 1);
-    lenp = (u_int32_t *)(bufp + rq->buflist.num);
-    keyp = (u_int32_t *)(lenp + rq->buflist.num);
+    bufp = (uint64_t *)((msg_header_cts_t *) bh->buf + 1);
+    lenp = (uint32_t *)(bufp + rq->buflist.num);
+    keyp = (uint32_t *)(lenp + rq->buflist.num);
     post_len = (char *)(keyp + rq->buflist.num) - (char *)bh->buf;
     if (post_len > ib_device->eager_buf_size)
 	error("%s: too many (%d) recv buflist entries for buf", __func__,

@@ -212,7 +212,7 @@ AC_DEFUN([AX_BERKELEY_DB],
       int ret = 0;
       DB *db = db;
       int dummy = 0;
-      u_int32_t flags = 0;
+      uint32_t flags = 0;
         
       ret = db->stat(db, &dummy, malloc, flags);
       ], AC_MSG_RESULT(yes)
@@ -232,7 +232,7 @@ AC_DEFUN([AX_BERKELEY_DB],
        int ret = 0;
        DB *db = db;
        DB_TXN *txnid = txnid;
-       u_int32_t flags = 0;
+       uint32_t flags = 0;
     
         ret = db->stat(db, txnid, NULL, flags);
         ], AC_MSG_RESULT(yes)
@@ -255,7 +255,7 @@ AC_DEFUN([AX_BERKELEY_DB],
     char *file = NULL;
     char *database = NULL;
     DBTYPE type = 0;
-    u_int32_t flags = 0;
+    uint32_t flags = 0;
     int mode = 0;
     
     ret = db->open(db, txnid, file, database, type, flags, mode);
@@ -269,7 +269,7 @@ AC_DEFUN([AX_BERKELEY_DB],
     AC_TRY_COMPILE([
     #include <db.h>
     ], [
-    u_int32_t flags = DB_DIRTY_READ;
+    uint32_t flags = DB_DIRTY_READ;
     ], AC_MSG_RESULT(yes)
     AC_DEFINE(HAVE_DB_DIRTY_READ, 1, [Define if db library has DB_DIRTY_READ flag]),
     AC_MSG_RESULT(no))

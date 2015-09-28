@@ -14,10 +14,6 @@
 #include <pint-distribution.h>
 #include "pvfs2-internal.h"
 
-#ifdef WIN32
-typedef uint32_t u_int32_t;
-#endif
-
 static PVFS_offset PINT_request_disp(PINT_Request *request);
 
 /* this macro is only used in this file to add a segment to the
@@ -931,11 +927,11 @@ int PINT_request_decode(struct PINT_Request *req)
 	for (r = 0; r <= PINT_REQUEST_NEST_SIZE(req); r++)
 	{
 		/* type must match the encoding type in encode_PVFS_Request */
-		if ((u_int32_t)(intptr_t) req[r].ereq == (u_int32_t) -1)
+		if ((uint32_t)(intptr_t) req[r].ereq == (uint32_t) -1)
 			req[r].ereq = 0;
 		else
 			req[r].ereq = &req[0] + (unsigned long) req[r].ereq;
-		if ((u_int32_t)(intptr_t) req[r].sreq == (u_int32_t) -1)
+		if ((uint32_t)(intptr_t) req[r].sreq == (uint32_t) -1)
 			req[r].sreq = 0;
 		else
 			req[r].sreq = &req[0] + (unsigned long) req[r].sreq;

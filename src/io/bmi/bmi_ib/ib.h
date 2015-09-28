@@ -241,7 +241,7 @@ struct ib_work {
     } state;
 
     int is_unexpected;      /* send: if user posted an unexpected message */
-    u_int64_t rts_mop_id;    /* recv: return tag to give to rts sender */
+    uint64_t rts_mop_id;    /* recv: return tag to give to rts sender */
     bmi_size_t actual_len;   /* recv: could be shorter than posted */
 };
 
@@ -253,7 +253,7 @@ struct ib_work {
  */
 typedef struct {
     msg_type_t type;
-    u_int32_t credit;  /* return credits */
+    uint32_t credit;  /* return credits */
 } msg_header_common_t;
 endecode_fields_2(msg_header_common_t,
     enum, type,
@@ -265,7 +265,7 @@ endecode_fields_2(msg_header_common_t,
 typedef struct {
     msg_header_common_t c;
     bmi_msg_tag_t bmi_tag;
-    u_int32_t __pad;
+    uint32_t __pad;
 } msg_header_eager_t;
 endecode_fields_4(msg_header_eager_t,
     enum, c.type,
@@ -279,9 +279,9 @@ endecode_fields_4(msg_header_eager_t,
 typedef struct {
     msg_header_common_t c;
     bmi_msg_tag_t bmi_tag;
-    u_int32_t __pad;
-    u_int64_t mop_id;  /* handle to ease lookup when CTS is delivered */
-    u_int64_t tot_len;
+    uint32_t __pad;
+    uint64_t mop_id;  /* handle to ease lookup when CTS is delivered */
+    uint64_t tot_len;
 } msg_header_rts_t;
 endecode_fields_6(msg_header_rts_t,
     enum, c.type,
@@ -296,14 +296,14 @@ endecode_fields_6(msg_header_rts_t,
  */
 typedef struct {
     msg_header_common_t c;
-    u_int64_t rts_mop_id;  /* return id from the RTS */
-    u_int64_t buflist_tot_len;
-    u_int32_t buflist_num;  /* number of buffers, then lengths to follow */
-    u_int32_t __pad;
+    uint64_t rts_mop_id;  /* return id from the RTS */
+    uint64_t buflist_tot_len;
+    uint32_t buflist_num;  /* number of buffers, then lengths to follow */
+    uint32_t __pad;
     /* format:
-     *   u_int64_t buf[1..buflist_num]
-     *   u_int32_t len[1..buflist_num]
-     *   u_int32_t key[1..buflist_num]
+     *   uint64_t buf[1..buflist_num]
+     *   uint32_t len[1..buflist_num]
+     *   uint32_t key[1..buflist_num]
      */
 } msg_header_cts_t;
 #define MSG_HEADER_CTS_BUFLIST_ENTRY_SIZE (8 + 4 + 4)
@@ -320,7 +320,7 @@ endecode_fields_5(msg_header_cts_t,
  */
 typedef struct {
     msg_header_common_t c;
-    u_int64_t mop_id;
+    uint64_t mop_id;
 } msg_header_rts_done_t;
 endecode_fields_3(msg_header_rts_done_t,
     enum, c.type,
@@ -347,7 +347,7 @@ struct ib_device_func {
     void (*drain_qp)(ib_connection_t *c);
     int (*ib_initialize)(void);
     void (*ib_finalize)(void);
-    void (*post_sr)(const struct buf_head *bh, u_int32_t len);
+    void (*post_sr)(const struct buf_head *bh, uint32_t len);
     void (*post_rr)(const ib_connection_t *c, struct buf_head *bh);
     void (*post_sr_rdmaw)(struct ib_work *sq, msg_header_cts_t *mh_cts,
                           void *mh_cts_buf);
@@ -434,7 +434,7 @@ void memcache_cache_flush(void *md);
  * stuff it into a 32-bit pointer.
  */
 #define ptr_from_int64(p) (void *)(unsigned long)(p)
-#define int64_from_ptr(p) (u_int64_t)(unsigned long)(p)
+#define int64_from_ptr(p) (uint64_t)(unsigned long)(p)
 
 /* make cast from list entry to actual item explicit */
 #define qlist_upcast(l) ((void *)(l))

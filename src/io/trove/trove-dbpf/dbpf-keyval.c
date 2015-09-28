@@ -412,7 +412,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     DBT key, data;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
-    u_int32_t dbflags = 0;
+    uint32_t dbflags = 0;
     struct dbpf_keyval_db_entry key_entry;
 
     if(!(op_p->flags & TROVE_BINARY_KEY))

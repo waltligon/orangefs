@@ -79,9 +79,9 @@ int main( int argc, char **argv )
     DB *db_p = NULL;
     DB_ENV *dbe_p = NULL;
     char *path = NULL;
-    u_int32_t db_flags = DB_RDONLY|DB_THREAD, 
-              env_flags = DB_CREATE | DB_INIT_MPOOL,
-              type = DB_UNKNOWN;
+    uint32_t db_flags = DB_RDONLY|DB_THREAD, 
+             env_flags = DB_CREATE | DB_INIT_MPOOL,
+             type = DB_UNKNOWN;
     int ret, path_len; 
 
     if( (ret = process_args( argc, argv)) != 0 )

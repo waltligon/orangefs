@@ -398,7 +398,7 @@ static void openib_close_connection(ib_connection_t *c)
  * Simplify IB interface to post sends.  Not RDMA, just SEND.
  * Called for an eager send, rts send, or cts send.
  */
-static void openib_post_sr(const struct buf_head *bh, u_int32_t len)
+static void openib_post_sr(const struct buf_head *bh, uint32_t len)
 {
     ib_connection_t *c = bh->c;
     struct openib_connection_priv *oc = c->priv;
@@ -477,10 +477,10 @@ static void openib_post_sr_rdmaw(struct ib_work *sq, msg_header_cts_t *mh_cts,
 
     int send_index = 0, recv_index = 0; /* working entry in buflist */
     int send_offset = 0;        /* byte offset in working send entry */
-    u_int64_t *recv_bufp = (u_int64_t *) mh_cts_buf;
-    u_int32_t *recv_lenp = (u_int32_t *) (recv_bufp + mh_cts->buflist_num);
-    u_int32_t *recv_rkey = (u_int32_t *) (recv_lenp + mh_cts->buflist_num);
-    u_int32_t recv_bytes_needed = 0;
+    uint64_t *recv_bufp = (uint64_t *) mh_cts_buf;
+    uint32_t *recv_lenp = (uint32_t *) (recv_bufp + mh_cts->buflist_num);
+    uint32_t *recv_rkey = (uint32_t *) (recv_lenp + mh_cts->buflist_num);
+    uint32_t recv_bytes_needed = 0;
 
     debug(2, "%s: sq %p totlen %d", __func__, sq, (int) sq->buflist.tot_len);
 
@@ -540,9 +540,9 @@ static void openib_post_sr_rdmaw(struct ib_work *sq, msg_header_cts_t *mh_cts,
          */
         while (recv_bytes_needed > 0 && sr.num_sge < (int) od->sg_max_len) {
             /* consume from send buflist to fill this one receive */
-            u_int32_t send_bytes_offered
+            uint32_t send_bytes_offered
                 = sq->buflist.len[send_index] - send_offset;
-            u_int32_t this_bytes = send_bytes_offered;
+            uint32_t this_bytes = send_bytes_offered;
             if (this_bytes > recv_bytes_needed)
                 this_bytes = recv_bytes_needed;
 
