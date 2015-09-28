@@ -349,9 +349,6 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     int ret = -1;
     int attr_status = -1;
     int size_status = -1;
-#if 0 /* Don't cache size_array. */
-    int size_array_status = -1;
-#endif
 
     js_p->error_code = 0;
 
@@ -415,15 +412,6 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-#if 0 /* Don't cache size_array. */
-    ret = PINT_acache_get_cached_entry(object_ref,
-                                       &sm_p->getattr.attr,
-                                       &attr_status,
-                                       &sm_p->getattr.size,
-                                       &size_status,
-                                       &sm_p->getattr.size_array,
-                                       &size_array_status);
-#endif
     ret = PINT_acache_get_cached_entry(object_ref,
                                        &sm_p->getattr.attr,
                                        &attr_status,
@@ -561,26 +549,15 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_ACACHE_DEBUG, 
                      "%s: TRULY MISSING attrs:\n",
                      __func__);
-        PINT_attrmask_print(GOSSIP_ACACHE_DEBUG,missing_attrs);
+        PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, missing_attrs);
 
         /* Was the size missing? */
         if(missing_attrs & PVFS_ATTR_DATA_SIZE)
         {
             gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: NOTE, PVFS_ATTR_DATA_SIZE --> ACACHE MISS.\n",
+                         "%s: NOTE, MISSING PVFS_ATTR_DATA_SIZE --> ACACHE MISS.\n",
                          __func__);
         }
-
-#if 0 /* Don't cache size_array. */
-        /* Was the size_array missing? */
-        if(missing_attrs & PVFS_ATTR_DIR_DIRENT_COUNT)
-        {
-            gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: NOTE, PVFS_ATTR_DIR_DIRENT_COUNT --> "
-                         "ACACHE MISS.\n",
-                         __func__);
-        }
-#endif
     }
 
     /* MISS */
@@ -656,7 +633,7 @@ static PINT_sm_action getattr_client_capcache_lookup(struct PINT_smcb *smcb,
     if (local_uid == (PVFS_uid) -1)
     {
         local_uid = PINT_util_getuid();
-        
+
         PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
                       sizeof(PVFS_uid), &local_uid);
     }
@@ -805,7 +782,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     {
         int ret;
         gossip_debug(GOSSIP_CLIENT_DEBUG, "*** "
-                     "getattr_comp_fn: Object type mismatch.\n Possibly "
+                     "object_getattr_comp_fn: Object type mismatch.\n Possibly "
                      "saving network roundtrip by returning an error\n");
 
         if (sm_p->getattr.ref_type == PVFS_TYPE_DIRECTORY)
@@ -1167,8 +1144,9 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     return SM_ACTION_COMPLETE;
 }
 
-static int getattr_datafile_getattr_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index)
+static int getattr_datafile_getattr_comp_fn(void *v_p,
+                                            struct PVFS_server_resp *resp_p,
+                                            int index)
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
@@ -1196,7 +1174,7 @@ static int getattr_datafile_getattr_comp_fn(
     */
     if ( getattr->attr.mask & PVFS_ATTR_META_MIRROR_DFILES)  
     {
-       for (i=0; i<resp_p->u.tree_get_file_size.handle_count; i++)
+       for (i = 0; i < resp_p->u.tree_get_file_size.handle_count; i++)
        {
           if (resp_p->u.tree_get_file_size.error[i] != 0)
           {   /* error retrieving size for this handle..we will retry it. */
@@ -1327,7 +1305,7 @@ static PINT_sm_action getattr_datafile_getattr_retry(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    memset(tmp_server_nr,0,sizeof(uint32_t) * retry_msg_count);
+    memset(tmp_server_nr, 0, sizeof(uint32_t) * retry_msg_count);
 
     /*allocate temporary handle array*/
     tmp_handles = malloc(sizeof(PVFS_handle) * retry_msg_count);
@@ -1337,11 +1315,11 @@ static PINT_sm_action getattr_datafile_getattr_retry(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    memset(tmp_handles,0,sizeof(PVFS_handle) * retry_msg_count);
+    memset(tmp_handles, 0, sizeof(PVFS_handle) * retry_msg_count);
 
     /* okay. let's setup new handles to retry. 
     */
-    for (i=0,j=0; i<tree->num_data_files; i++)
+    for (i = 0,j = 0; i < tree->num_data_files; i++)
     {
         server_nr = getattr->index_to_server[i];
         ctx = &(getattr->mir_ctx_array[server_nr]);
@@ -1454,8 +1432,8 @@ static PINT_sm_action getattr_datafile_getattr_retry(struct PINT_smcb *smcb,
 } /*end datafile_getattr_retry*/
 
 
-static PINT_sm_action getattr_datafile_getattr_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_datafile_getattr_cleanup(struct PINT_smcb *smcb,
+                                                       job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);    
     PINT_sm_getattr_state *getattr = &(sm_p->getattr);
@@ -1479,7 +1457,8 @@ static PINT_sm_action getattr_datafile_getattr_cleanup(
 }
 
 static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+        struct PINT_smcb *smcb,
+        job_status_s *js_p)
 {           
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -1586,8 +1565,9 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
 }
 
 
-static int getattr_dirdata_getattr_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index)
+static int getattr_dirdata_getattr_comp_fn(void *v_p,
+                                           struct PVFS_server_resp *resp_p,
+                                           int index)
 {
     PINT_smcb *smcb = v_p; 
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
@@ -1659,8 +1639,8 @@ static int getattr_dirdata_getattr_comp_fn(
     return 0;
 }
 
-static PINT_sm_action getattr_dirdata_getattr_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_dirdata_getattr_cleanup(struct PINT_smcb *smcb,
+                                                      job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -1675,8 +1655,8 @@ static PINT_sm_action getattr_dirdata_getattr_cleanup(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action getattr_acache_insert(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_acache_insert(struct PINT_smcb *smcb,
+                                            job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_size* tmp_size = NULL;
@@ -1843,8 +1823,8 @@ static PINT_sm_action getattr_client_capcache_insert(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action getattr_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_cleanup(struct PINT_smcb *smcb,
+                                      job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_getattr_state *getattr = &(sm_p->getattr);
@@ -1874,29 +1854,14 @@ static PINT_sm_action getattr_cleanup(
     /* cleanup getattr when an error occurs */
     if (js_p->error_code)
     {
-      if (getattr->attr.mask & PVFS_ATTR_META_DFILES)
-      {
-         if (getattr->attr.u.meta.dfile_array)
-            free(getattr->attr.u.meta.dfile_array);
-      }
-
-      if (getattr->attr.mask & PVFS_ATTR_META_MIRROR_DFILES)
-      {
-         if (getattr->attr.u.meta.mirror_dfile_array)
-            free(getattr->attr.u.meta.mirror_dfile_array);
-      }
-
-      if (getattr->attr.mask & PVFS_ATTR_META_DIST)
-      {
-         PINT_dist_free(getattr->attr.u.meta.dist);
-      }
-    }/*end if error*/
+        PINT_free_object_attr(&getattr->attr);
+    }
 
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action getattr_set_sys_response(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
+                                               job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_sysresp_getattr * sysresp = NULL;
@@ -2070,8 +2035,8 @@ static PINT_sm_action getattr_set_sys_response(
     return SM_ACTION_TERMINATE;
 }
 
-static PINT_sm_action attr_mask_include_size(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action attr_mask_include_size(struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr_p = &sm_p->getattr.attr;

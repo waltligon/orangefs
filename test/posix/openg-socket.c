@@ -33,7 +33,11 @@
 #elif defined (x86_64) || defined (__x86_64__)
 #define __NR_openg  273 
 #define __NR_openfh 274
+#elif defined(__powerpc__) || defined(__ppc__) || defined(__PPC__)
+#define __NR_openg 299
+#define __NR_openfh 300
 #endif
+
 
 /* the _syscallXX apprroach is not portable. instead, we'll use syscall and
  * sadly forego any type checking.  For reference, here are the prototypes for

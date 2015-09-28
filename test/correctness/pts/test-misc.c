@@ -46,7 +46,7 @@ static int test_meta_fields(int testcase){
     PVFS_util_gen_credential_defaults(&credentials);
     if ((ret = PVFS_sys_lookup(
              fs_id, name, &credentials,
-             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
+             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL)) < 0)
     {
         fprintf(stderr, "lookup failed %d\n", ret);
         return ret;
@@ -63,31 +63,31 @@ static int test_meta_fields(int testcase){
     switch(testcase){
 	case 0:
 	    attr.owner = 555;
-	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials);
+	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials,NULL);
 	    break;
 	case 1:
 	    attr.group = 555;
-	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials);
+	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials,NULL);
 	    break;
 	case 2:
 	    attr.perms = 888;
-	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials);
+	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials,NULL);
 	    break;
 	case 3:
 	    attr.atime = 555;
-	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials);
+	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials,NULL);
 	    break;
 	case 4:
 	    attr.mtime = 555;
-	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials);
+	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials,NULL);
 	    break;
 	case 5:
 	    attr.ctime = 555;
-	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials);
+	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials,NULL);
 	    break;
 	case 6:
 	    attr.mask = 2003;
-	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials);
+	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials,NULL);
 	    break;
     }
 /*     finalize_sysint(); */
@@ -124,7 +124,7 @@ static int test_permissions(int testcase){
     fs_id = pvfs_helper.fs_id;
 
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
-                          &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
     if (ret < 0)
     {
         debug_printf("test_pvfs_datatype_hvector: lookup failed "
@@ -143,7 +143,7 @@ static int test_permissions(int testcase){
     case 2:
 	ret = PVFS_sys_lookup(
             fs_id, "invalid_perms", &credentials,
-            &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+            &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
 	if (ret < 0)
 	{
 	    debug_printf("test_pvfs_datatype_hvector: lookup failed "
@@ -152,7 +152,7 @@ static int test_permissions(int testcase){
 	break;
     }
     ret = PVFS_sys_read(resp_lk.ref, req_io, file_req_offset,io_buffer, req_mem,
-                          &credentials, &resp_io);
+                          &credentials, &resp_io,NULL);
 /*     finalize_sysint(); */
     return ret;
 
@@ -191,13 +191,13 @@ static int test_size_after_write(void){
     fs_id = pvfs_helper.fs_id;
 
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
-                          &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
     if (ret < 0)
     {
         debug_printf("test_pvfs_datatype_hvector: lookup failed "
                      "on %s\n", filename);
     }
-    if((ret = PVFS_sys_getattr(resp_lk.ref, attrmask, &credentials, &resp)) < 0)
+    if((ret = PVFS_sys_getattr(resp_lk.ref, attrmask, &credentials, &resp,NULL)) < 0)
 	return ret;
 
     oldsize = resp.attr.size;
@@ -208,12 +208,12 @@ static int test_size_after_write(void){
     }
 
     ret = PVFS_sys_write(resp_lk.ref, req_io, file_req_offset, io_buffer, req_mem,
-                           &credentials, &resp_io);
+                           &credentials, &resp_io,NULL);
     if(ret < 0){
         debug_printf("write failed on %s\n", filename);
     }
 
-    ret = PVFS_sys_getattr(resp_lk.ref, attrmask, &credentials, &resp);
+    ret = PVFS_sys_getattr(resp_lk.ref, attrmask, &credentials, &resp,NULL);
     if (ret < 0)
     {
         debug_printf("getattr failed on %s\n", filename);
@@ -259,13 +259,13 @@ static int test_sparse_files(void){
     fs_id = pvfs_helper.fs_id;
 
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
-                          &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
     if (ret < 0)
     {
         debug_printf("test_pvfs_datatype_hvector: lookup failed "
                      "on %s\n", filename);
     }
-    if((ret = PVFS_sys_getattr(resp_lk.ref, attrmask, &credentials, &resp)) < 0)
+    if((ret = PVFS_sys_getattr(resp_lk.ref, attrmask, &credentials, &resp,NULL)) < 0)
 	return ret;
 
     oldsize = resp.attr.size;
@@ -293,12 +293,12 @@ static int test_sparse_files(void){
     }
 
     ret = PVFS_sys_write(resp_lk.ref, req_io, file_req_offset, io_buffer, req_mem,
-                           &credentials, &resp_io);
+                           &credentials, &resp_io,NULL);
     if(ret < 0){
 	debug_printf("write failed on %s\n", filename);
     }
 
-    ret = PVFS_sys_getattr(resp_lk.ref, attrmask, &credentials, &resp);
+    ret = PVFS_sys_getattr(resp_lk.ref, attrmask, &credentials, &resp,NULL);
     if (ret < 0)
     {
         debug_printf("getattr failed on %s\n", filename);
@@ -343,13 +343,13 @@ static int test_read_sparse_files(void){
     fs_id = pvfs_helper.fs_id;
 
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
-                          &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
     if (ret < 0)
     {
         debug_printf("test_pvfs_datatype_hvector: lookup failed "
                      "on %s\n", filename);
     }
-    if((ret = PVFS_sys_getattr(resp_lk.ref, attrmask, &credentials, &resp)) < 0)
+    if((ret = PVFS_sys_getattr(resp_lk.ref, attrmask, &credentials, &resp,NULL)) < 0)
 	return ret;
 
     assert(0);
@@ -374,12 +374,12 @@ static int test_read_sparse_files(void){
 	io_buffer[i] = 'a';
     }
     ret = PVFS_sys_write(resp_lk.ref, req_io, file_req_offset, io_buffer, req_mem,
-                           &credentials, &resp_io);
+                           &credentials, &resp_io,NULL);
     if(ret < 0){
 	debug_printf("write failed on %s\n", filename);
     }
     ret = PVFS_sys_read(resp_lk.ref, req_io, file_req_offset, io_buffer, req_mem,
-                           &credentials, &resp_io);
+                           &credentials, &resp_io,NULL);
     if(ret < 0){
 	debug_printf("write failed on %s\n", filename);
     }
@@ -422,13 +422,13 @@ static int test_allcat(int testcase)
 
     /* get file */
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
-                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
     if (ret < 0)
     {
         printf("Lookup failed with errcode = %d\n", ret);
         return (-1);
     }
-    if((ret = PVFS_sys_getattr(resp_look.ref, attrmask, &credentials, &resp)) < 0)
+    if((ret = PVFS_sys_getattr(resp_look.ref, attrmask, &credentials, &resp,NULL)) < 0)
 	return ret;
 
     oldsize = resp.attr.size;
@@ -449,13 +449,13 @@ static int test_allcat(int testcase)
     }
     /* get file */
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
-                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
     if (ret < 0)
     {
         printf("Lookup failed with errcode = %d\n", ret);
         return (-1);
     }
-    ret = PVFS_sys_getattr(resp_look.ref, attrmask, &credentials, &resp);
+    ret = PVFS_sys_getattr(resp_look.ref, attrmask, &credentials, &resp,NULL);
     if (ret < 0)
     {
         debug_printf("getattr failed on %s\n", filename);
@@ -492,13 +492,13 @@ static int test_truncat(int testcase)
 
     /* get file */
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
-                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
     if (ret < 0)
     {
         printf("Lookup failed with errcode = %d\n", ret);
         return (-1);
     }
-    if((ret = PVFS_sys_getattr(resp_look.ref, attrmask, &credentials, &resp)) < 0)
+    if((ret = PVFS_sys_getattr(resp_look.ref, attrmask, &credentials, &resp,NULL)) < 0)
 	return ret;
 
     oldsize = resp.attr.size;
@@ -507,27 +507,27 @@ static int test_truncat(int testcase)
     {
     case 0:
 	size = 1000000;
-	ret = PVFS_sys_truncate(resp_look.ref, size, &credentials);
+	ret = PVFS_sys_truncate(resp_look.ref, size, &credentials,NULL);
 	break;
     case 1:
 	size = 100000;
-	ret = PVFS_sys_truncate(resp_look.ref, size, &credentials);
+	ret = PVFS_sys_truncate(resp_look.ref, size, &credentials,NULL);
 	break;
     case 2:
 	size = 5;
-	ret = PVFS_sys_truncate(resp_look.ref, size, &credentials);
+	ret = PVFS_sys_truncate(resp_look.ref, size, &credentials,NULL);
 	break;
     }
 
     /* get file */
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
-                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
     if (ret < 0)
     {
         printf("Lookup failed with errcode = %d\n", ret);
         return (-1);
     }
-    if((ret = PVFS_sys_getattr(resp_look.ref, attrmask, &credentials, &resp)) < 0)
+    if((ret = PVFS_sys_getattr(resp_look.ref, attrmask, &credentials, &resp,NULL)) < 0)
 	return ret;
 
     if(resp.attr.size != (oldsize - size))
@@ -571,17 +571,17 @@ static int test_read_beyond(void){
     fs_id = pvfs_helper.fs_id;
 
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
-                          &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
     if (ret < 0)
     {
         debug_printf("test_pvfs_datatype_hvector: lookup failed "
                      "on %s\n", filename);
     }
-    if((ret = PVFS_sys_getattr(resp_lk.ref, attrmask, &credentials, &resp)) < 0)
+    if((ret = PVFS_sys_getattr(resp_lk.ref, attrmask, &credentials, &resp,NULL)) < 0)
 	return ret;
     io_buffer = malloc(sizeof(char)*(size_t)resp.attr.size+100);
 
-    ret = PVFS_sys_read(resp_lk.ref, req_io, file_req_offset, io_buffer, req_mem, &credentials, &resp_io);
+    ret = PVFS_sys_read(resp_lk.ref, req_io, file_req_offset, io_buffer, req_mem, &credentials, &resp_io,NULL);
     if(ret < 0){
 	debug_printf("write failed on %s\n", filename);
     }
@@ -625,13 +625,13 @@ static int test_write_beyond(void){
     fs_id = pvfs_helper.fs_id;
 
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
-                          &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
     if (ret < 0)
     {
         debug_printf("test_pvfs_datatype_hvector: lookup failed "
                      "on %s\n", filename);
     }
-    if((ret = PVFS_sys_getattr(resp_lk.ref, attrmask, &credentials, &resp)) < 0)
+    if((ret = PVFS_sys_getattr(resp_lk.ref, attrmask, &credentials, &resp,NULL)) < 0)
 	return ret;
     io_buffer = malloc(sizeof(char)*(size_t)resp.attr.size+100);
 
@@ -642,7 +642,7 @@ static int test_write_beyond(void){
 	io_buffer[i] = 'a';
     }
     ret = PVFS_sys_write(resp_lk.ref, req_io, file_req_offset, io_buffer, req_mem,
-                           &credentials, &resp_io);
+                           &credentials, &resp_io,NULL);
     if(ret < 0){
 	debug_printf("write failed on %s\n", filename);
     }
@@ -683,7 +683,7 @@ static int test_files_as_dirs(int testcase)
     case 0:
 	/* get root */
 	ret = PVFS_sys_lookup(fs_id, "/", &credentials,
-                              &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                              &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
 	if (ret < 0)
 	{
 	    printf("Lookup failed with errcode = %d\n", ret);
@@ -691,10 +691,10 @@ static int test_files_as_dirs(int testcase)
 	}
 
 	ret = PVFS_sys_create("foo", resp_look.ref, attr, &credentials,
-                           NULL, NULL, &resp_create);
+                           NULL, NULL, &resp_create,NULL);
 	/* get root */
 	ret = PVFS_sys_lookup(fs_id, "/foo", &credentials,
-                              &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                              &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
 	if (ret < 0)
 	{
 	    printf("Lookup failed with errcode = %d\n", ret);
@@ -702,7 +702,7 @@ static int test_files_as_dirs(int testcase)
 	}
 
 	ret = PVFS_sys_create("bar", resp_look.ref, attr, &credentials,
-                           NULL, NULL, &resp_create);
+                           NULL, NULL, &resp_create,NULL);
 	break;
     case 1:
 	/* Need to add some more interesting cases */
@@ -737,7 +737,7 @@ static int test_get_set_attr_empty(int testcase)
     PVFS_util_gen_credential_defaults(&credentials);
     if ((ret = PVFS_sys_lookup(
              fs_id, name, &credentials,
-             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
+             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL)) < 0)
     {
         fprintf(stderr, "lookup failed which it should but keep going\n");
 	
@@ -756,10 +756,10 @@ static int test_get_set_attr_empty(int testcase)
 
     switch(testcase){
 	case 0:
-	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials);
+	    ret = PVFS_sys_setattr(pinode_refn, attr, &credentials,NULL);
 	    break;
 	case 1:
-	    ret = PVFS_sys_getattr(pinode_refn, attrmask, &credentials, &resp);
+	    ret = PVFS_sys_getattr(pinode_refn, attrmask, &credentials, &resp,NULL);
 	    break;
     }
 
@@ -786,7 +786,7 @@ static int test_lookup_empty(void)
 
     PVFS_util_gen_credential_defaults(&credentials);
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
-                          &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
 
     return ret;
 }
@@ -817,7 +817,7 @@ static int test_io_on_dir(int testcase)
     PVFS_util_gen_credential_defaults(&credentials);
     if((ret = PVFS_sys_lookup(
             fs_id, name, &credentials,
-            &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
+            &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL)) < 0)
     {
 	fprintf(stderr,"lookup failed\n");
 	return ret;
@@ -829,14 +829,14 @@ static int test_io_on_dir(int testcase)
     switch(testcase)
     {
 	case 0:
-	    ret = PVFS_sys_read(resp_lookup.ref, req_io, file_req_offset, io_buffer, req_mem, &credentials, &resp_io);
+	    ret = PVFS_sys_read(resp_lookup.ref, req_io, file_req_offset, io_buffer, req_mem, &credentials, &resp_io,NULL);
 	    break;
 	case 1:
 	    for(i = 0; i < 100; i++)
 	    {
 		io_buffer[i] = 'a';
 	    }
-	    ret = PVFS_sys_write(resp_lookup.ref, req_io, file_req_offset, io_buffer, req_mem, &credentials, &resp_io);
+	    ret = PVFS_sys_write(resp_lookup.ref, req_io, file_req_offset, io_buffer, req_mem, &credentials, &resp_io,NULL);
 	    break;
 
     }
@@ -867,7 +867,7 @@ static int test_remove_nonempty_dir(int testcase)
     fs_id = pvfs_helper.fs_id;
 
     ret = PVFS_sys_lookup(fs_id, filename, &credentials,
-                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
     if (ret < 0)
     {
         printf("Lookup failed with errcode = %d\n", ret);
@@ -876,7 +876,7 @@ static int test_remove_nonempty_dir(int testcase)
     switch (testcase)
     {
     case 0:
-        ret = PVFS_sys_remove(NULL, resp_look.ref, &credentials);
+        ret = PVFS_sys_remove(NULL, resp_look.ref, &credentials,NULL);
         break;
     default:
         fprintf(stderr, "Error: invalid case number \n");
@@ -913,7 +913,7 @@ static int init_files(void)
 
     /* get root */
     ret = PVFS_sys_lookup(fs_id, "/", &credentials,
-                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
     if (ret < 0)
     {
         printf("Lookup failed with errcode = %d\n", ret);
@@ -921,19 +921,19 @@ static int init_files(void)
     }
 
     ret = PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
-                           NULL, NULL, &resp_create);
+                           NULL, NULL, &resp_create,NULL);
 
     /* create sparse file */
     filename = strcpy(filename, "sparse");
 
     ret = PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
-                           NULL, NULL, &resp_create);
+                           NULL, NULL, &resp_create,NULL);
 
     /* create a file for testing alocate and truncate*/
     filename = strcpy(filename, "altrun");
 
     ret = PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
-                           NULL, NULL, &resp_create);
+                           NULL, NULL, &resp_create,NULL);
 
 
     filename = strcpy(filename, "invalid_perms");
@@ -950,7 +950,7 @@ static int init_files(void)
 
     /* get root */
     ret = PVFS_sys_lookup(fs_id, "/", &credentials,
-                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
     if (ret < 0)
     {
         printf("Lookup failed with errcode = %d\n", ret);
@@ -958,7 +958,7 @@ static int init_files(void)
     }
 
     return PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
-                           NULL, NULL, &resp_create);
+                           NULL, NULL, &resp_create,NULL);
 }   
 
 

@@ -27,6 +27,7 @@
 #define strdup(s)      _strdup(s)
 #define strcasecmp     stricmp
 #define strncasecmp    strnicmp
+#define strtoll(str, end, base)    _atoi64(str)
 
 /* types */
 typedef uint32_t u_int32_t;

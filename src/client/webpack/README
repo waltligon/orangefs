@@ -246,9 +246,40 @@
          Require valid-user
        </Location>
   
+  PAM authentication with the DAV module:
 
-    There are several other configurations directives for the DAV module
-    that are useful.
+    The DAV module is PAM enabled and can do BASIC apache auth.
+    BASIC auth means you need to enforce https, with http you'll
+    be sending cleartext over the wire.
+
+    Using pam_unix from apache is probably a dead-end since the uid
+    of the process doing the authentication (probably "daemon" or
+    "apache" or something) differs from the uid of the person being
+    authenticated. pam_unix on modern Linuxes uses the unix_chkpwd
+    helper binary as a security feature to disallow such a thing.
+
+    pam_exec (man pam_exec) can be used to drive a custom script
+    to do the authentication. Authenticated users need to
+    have uids and gids or else they'll be given the generic
+    "nobody" uid/gid. Listing users in /etc/passwd is the best
+    way to associate them with meaningful uid/gid pairs.
+
+    selinux is real picky about apache connecting to ports (such as
+    3334) and using pam, so you'll need to deal with that
+    if you're using selinux.
+
+    Here's an example httpd.conf for using PAM with the DAV module:
+
+       <Location /pvfsmnt>
+         DAV mod_dav_orangefs
+         AuthType Basic
+         AuthName "DAV mod auth"
+         AuthBasicProvider this_module
+         Require valid-user
+       </Location>
+
+
+  Miscellaneous other useful configuration directives:
 
     DAVpvfsDefaultPerms 10019 10020 000
 

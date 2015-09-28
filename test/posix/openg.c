@@ -30,6 +30,9 @@
 #elif defined (x86_64) || defined (__x86_64__)
 #define __NR_openg  273 
 #define __NR_openfh 274
+#elif defined(__powerpc__) || defined(__ppc__) || defined(__PPC__)
+#define __NR_openg 299
+#define __NR_openfh 300
 #endif
 
 #define MAX_LENGTH 128

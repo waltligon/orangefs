@@ -29,7 +29,6 @@
 #include "bmi.h"
 #include "gossip.h"
 #include "security-util.h"
-#include <src/common/misc/pvfs2-internal.h>  /* lld(), llu() */
 #include "pvfs2-req-proto.h"
 #include "dist-dir-utils.h"
 
@@ -310,7 +309,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 dest->u.meta.dfile_count = src->u.meta.dfile_count;
             }
 
-          if(src->mask & PVFS_ATTR_META_MIRROR_DFILES)
+            if(src->mask & PVFS_ATTR_META_MIRROR_DFILES)
             {
                 PVFS_size df_array_size = src->u.meta.dfile_count         *
                                           src->u.meta.mirror_copies_count *

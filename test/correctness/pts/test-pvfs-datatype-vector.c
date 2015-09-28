@@ -51,7 +51,7 @@ int test_pvfs_datatype_vector(
         memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
         ret = PVFS_sys_lookup(pvfs_helper.fs_id,
                               filename, &credentials, &resp_lk,
-                              PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                              PVFS2_LOOKUP_LINK_NO_FOLLOW,NULL);
         if (ret < 0)
         {
             debug_printf("test_pvfs_datatype_vector: lookup failed "
@@ -76,7 +76,7 @@ int test_pvfs_datatype_vector(
 	}
 
         ret = PVFS_sys_write(resp_lk.ref, req_io, 0, io_buffer,
-                             req_mem, &credentials, &resp_io);
+                             req_mem, &credentials, &resp_io,NULL);
         if(ret < 0)
         {
             debug_printf("Error: PVFS_sys_write() failure.\n");
@@ -89,7 +89,7 @@ int test_pvfs_datatype_vector(
         /* now try to read the data back */
         memset(io_buffer,0,TEST_PVFS_DATA_SIZE);
         ret = PVFS_sys_read(resp_lk.ref, req_io, 0, io_buffer,
-                            req_mem, &credentials, &resp_io);
+                            req_mem, &credentials, &resp_io,NULL);
         if(ret < 0)
         {
             debug_printf("Error: PVFS_sys_read() failure (2).\n");

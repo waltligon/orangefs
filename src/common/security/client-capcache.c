@@ -157,8 +157,17 @@ void PINT_client_capcache_finalize(void)
 {
     gen_mutex_lock(&client_capcache_mutex);
 
-    PINT_tcache_finalize(client_capcache);
-    client_capcache = NULL;
+    if(client_capcache != NULL)
+    {
+        PINT_tcache_finalize(client_capcache);
+        client_capcache = NULL;
+    }
+
+    if(client_capcache_pc != NULL)
+    {
+        PINT_perf_finalize(client_capcache_pc);
+        client_capcache_pc = NULL;
+    }
 
     gen_mutex_unlock(&client_capcache_mutex);
 
@@ -372,17 +381,43 @@ int PINT_client_capcache_update(
     gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: H=%llu "
                  "uid=%d\n", llu(refn.handle), uid);
 
-    /* don't cache expired cap */
+    gen_mutex_lock(&client_capcache_mutex);
+
+    /* don't cache cap that expires within timeout buffer--timeout buffer
+       is 1/100 of capcache timeout, with a minimum of 1 second */
+    PINT_tcache_get_info(client_capcache, TCACHE_TIMEOUT_MSECS, &timeout);
+    timeout_buffer = timeout / 1000 / 100;
+    if (timeout_buffer == 0)
+    {
+        timeout_buffer = 1;
+    }
     PINT_util_get_current_timeval(&now);
-    if (now.tv_sec > cap->timeout)
+    if (now.tv_sec > (cap->timeout - timeout_buffer))
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "client_capcache update: cap "
                      "expired (%llu > %llu)\n", llu(now.tv_sec),
-                     llu(cap->timeout));
+                     llu(cap->timeout - timeout_buffer));
+        gen_mutex_unlock(&client_capcache_mutex);
         return -PVFS_ETIME;
     }
+    /* set cache entry timeout (clock time) */
+    timev.tv_sec = now.tv_sec + (timeout / 1000) - timeout_buffer;
+    /* do not set cache entry timeout past cap timeout - timeout buffer */
+    if (timev.tv_sec > (cap->timeout - timeout_buffer))
+    {
+        timev.tv_sec = cap->timeout - timeout_buffer;
+    }
 
-    gen_mutex_lock(&client_capcache_mutex);
+    /* case where cache entry would be expired due to clock problems or 
+       very small cap timeouts */
+    if (now.tv_sec > timev.tv_sec)
+    {
+        gossip_err("client_capcache update: not caching cap because it is "
+                   "already expired; check clocks or increase cap/capcache "
+                   "timeouts\n");
+        gen_mutex_unlock(&client_capcache_mutex);
+        return -PVFS_ETIME;
+    }
 
     /* find out if the entry is already in the cache */
     key.refn = refn;
@@ -391,29 +426,6 @@ int PINT_client_capcache_update(
                              &key,
                              &tmp_entry,
                              &status);
-
-    /* compute timeout */
-    if (client_capcache_timeout_flag)
-    {
-        /* set entry timeout to current time plus cache timeout minus buffer 
-           (if timeout is greater than the buffer time) */
-        PINT_tcache_get_info(client_capcache, TCACHE_TIMEOUT_MSECS, &timeout);
-        timeout_buffer = (timeout / 1000) > CLIENT_CAPCACHE_TIMEOUT_BUFFER ?
-            CLIENT_CAPCACHE_TIMEOUT_BUFFER : 0;
-        timev.tv_sec = now.tv_sec + (timeout / 1000) - timeout_buffer;
-        
-        /* do not set timeout past cap timeout */
-        if (timev.tv_sec > cap->timeout)
-        {
-            timev.tv_sec = cap->timeout;
-        }
-    }
-    else
-    {
-        /* use cap timeout if specific timeout not set */
-        timev.tv_sec = cap->timeout;
-    }
-    timev.tv_usec = now.tv_usec;
 
     if (ret == 0)
     {

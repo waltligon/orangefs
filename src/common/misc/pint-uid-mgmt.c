@@ -151,7 +151,8 @@ int PINT_add_user_to_uid_mgmt(PVFS_uid userID)
         }
         tmp->info.count = 1;
         tmp->info.uid = userID;
-        PINT_util_get_current_timeval(&(tmp->info.tv));
+        PINT_util_get_current_timeval(&(tmp->info.tv0));
+        tmp->info.tv = tmp->info.tv0;
         qhash_add(uid_hash_table, &(tmp->info.uid), &(tmp->hash_link));
     }
 

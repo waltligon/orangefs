@@ -349,7 +349,7 @@ static char *get_fs_path(const wchar_t *local_path)
     return fs_path;
 }
 
-int cred_compare(void *key, 
+int cred_compare(const void *key, 
                  struct qhash_head *link)
 {
     struct context_entry *entry = qhash_entry(link, struct context_entry, hash_link);
@@ -1139,9 +1139,9 @@ PVFS_Dokan_cleanup(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-#ifdef USE_IO_CACHE
+/* TODO: delete */
+#if 0
     PVFS_object_ref object_ref;
-    PVFS_Request req;
     enum PVFS_io_type io_type;
     int update_flag;
     PVFS_credential credential;
@@ -1153,8 +1153,9 @@ PVFS_Dokan_cleanup(
     DbgPrint("Cleanup: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-#ifdef USE_IO_CACHE
-    cache_ret = io_cache_get(DokanFileInfo->Context, &object_ref, &req,
+/* TODO: delete */
+#if 0
+    cache_ret = io_cache_get(DokanFileInfo->Context, &object_ref,
         &io_type, &update_flag);
     if (cache_ret == IO_CACHE_HIT)
     {
@@ -1172,12 +1173,13 @@ PVFS_Dokan_cleanup(
             if (io_type == PVFS_IO_READ)
             {
                 /* update access time */
-                attr.mask = PVFS_ATTR_SYS_ATIME;
+                attr.mask = PVFS_ATTR_SYS_ATIME|PVFS_ATTR_SYS_ATIME_SET;
                 attr.atime = time(NULL);
             }
             else /* PVFS_IO_WRITE */
             {
-                attr.mask = PVFS_ATTR_SYS_ATIME|PVFS_ATTR_SYS_MTIME;
+                attr.mask = PVFS_ATTR_SYS_ATIME|PVFS_ATTR_SYS_ATIME_SET |
+                            PVFS_ATTR_SYS_MTIME|PVFS_ATTR_SYS_MTIME_SET;
                 attr.atime = attr.mtime = time(NULL);
             }
 
@@ -1192,7 +1194,7 @@ PVFS_Dokan_cleanup(
             PINT_cleanup_credential(&credential);
         }
         /* remove from cache */
-	    io_cache_remove(DokanFileInfo->Context);
+        io_cache_remove(DokanFileInfo->Context);
     }
     else if (cache_ret != IO_CACHE_MISS)
     {
@@ -1220,7 +1222,6 @@ PVFS_Dokan_read_file(
     PVFS_size len64;
 #ifdef USE_IO_CACHE
     PVFS_object_ref object_ref;
-    PVFS_Request req;
     enum PVFS_io_type io_type;
     int update_flag;
 #else
@@ -1245,12 +1246,13 @@ PVFS_Dokan_read_file(
 
     /* check IO cache */
 #ifdef USE_IO_CACHE
-    cache_ret = io_cache_get(DokanFileInfo->Context, &object_ref, &req, 
-                       &io_type, &update_flag);
+    cache_ret = io_cache_get(DokanFileInfo->Context, &object_ref, &io_type, 
+        &update_flag);
     if (cache_ret == IO_CACHE_HIT)
     {
+
         ret = fs_read2(object_ref, Buffer, BufferLength, Offset, 
-                        &len64, &credential, req);
+                        &len64, &credential);
 
     }
     else if (cache_ret != IO_CACHE_MISS)
@@ -1262,14 +1264,19 @@ PVFS_Dokan_read_file(
     }
 #endif
 
-    /* get file system path */
-    fs_path = get_fs_path(FileName);
-    if (fs_path == NULL)
-        return -1;
 
 #ifdef USE_IO_CACHE
     if (cache_ret == IO_CACHE_MISS)
     {
+        /* get file system path */
+        fs_path = get_fs_path(FileName);
+        if (fs_path == NULL)
+        {
+            ret = -1;
+            
+            goto read_file_exit;
+        }
+
         ret = fs_lookup(fs_path, &credential, &object_ref.handle);
         if (ret != 0)
         {
@@ -1280,20 +1287,13 @@ PVFS_Dokan_read_file(
 
         object_ref.fs_id = fs_get_id(0);
 
-        ret = PVFS_Request_contiguous((int32_t) BufferLength, PVFS_BYTE, &req);
-        if (ret != 0)
-        {
-            report_error("Read file: request error: ", ret);
-
-            goto read_file_exit;
-        }
-
         ret = fs_read2(object_ref, Buffer, BufferLength, Offset,
-                       &len64, &credential, req);
+                       &len64, &credential);
         if (ret == 0)
         {
-            cache_ret = io_cache_add(DokanFileInfo->Context, &object_ref, req, 
-                                PVFS_IO_READ, 1);
+            io_type = PVFS_IO_READ;
+            cache_ret = io_cache_add(DokanFileInfo->Context, &object_ref,
+                io_type, IO_CACHE_UPDATE);
             if (cache_ret != 0)
             {
                 report_error("Read file: error adding context to IO cache: ", cache_ret);
@@ -1301,6 +1301,14 @@ PVFS_Dokan_read_file(
         }
     }
 #else
+    /* get file system path */
+    fs_path = get_fs_path(FileName);
+    if (fs_path == NULL)
+    {
+        ret = -1;
+            
+        goto read_file_exit;
+    }
 
     /* perform the read operation */
     ret = fs_read(fs_path, Buffer, BufferLength, Offset, &len64, &credential);
@@ -1309,10 +1317,15 @@ PVFS_Dokan_read_file(
 
     *ReadLength = (DWORD) len64;
 
+    DbgPrint("   ReadLength: %u\n", *ReadLength);
+
 read_file_exit:
 
     if (fs_path != NULL)
+    {
         free(fs_path);
+    }
+    
     PINT_cleanup_credential(&credential);
 
     err = error_map(ret);
@@ -1337,17 +1350,16 @@ PVFS_Dokan_write_file(
     PVFS_credential credential;
 #ifdef USE_IO_CACHE
     PVFS_object_ref object_ref;
-    PVFS_Request req;
     enum PVFS_io_type io_type;
     int update_flag;
-#else
-    PVFS_sys_attr attr;
-#endif
-    
-    int ret, cache_ret, err;
+#endif    
+    int ret, ret2, cache_ret, err;
+    PVFS_sys_attr attr = {0};
 
     DbgPrint("WriteFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    DbgPrint("   NumberOfBytesToWrite: %u\n", NumberOfBytesToWrite);
+    DbgPrint("   Offset: %llu\n", Offset);
 
     /* load credential */
     err = get_credential(DokanFileInfo, &credential);
@@ -1355,12 +1367,12 @@ PVFS_Dokan_write_file(
 
     /* check IO cache */
 #ifdef USE_IO_CACHE
-    cache_ret = io_cache_get(DokanFileInfo->Context, &object_ref, &req, 
-                             &io_type, &update_flag);
+    cache_ret = io_cache_get(DokanFileInfo->Context, &object_ref, &io_type,
+        &update_flag);
     if (cache_ret == IO_CACHE_HIT)
     {
         ret = fs_write2(object_ref, (void *) Buffer, NumberOfBytesToWrite,
-                        Offset, &len64, &credential, req);
+                        Offset, &len64, &credential);
     }
     else if (cache_ret != IO_CACHE_MISS)
     {
@@ -1371,14 +1383,18 @@ PVFS_Dokan_write_file(
     }
 #endif
 
-    /* get file system path */
-    fs_path = get_fs_path(FileName);
-    if (fs_path == NULL)
-        return -1;
-
 #ifdef USE_IO_CACHE
     if (cache_ret == IO_CACHE_MISS)
     {
+        /* get file system path */
+        fs_path = get_fs_path(FileName);
+        if (fs_path == NULL)
+        {
+            ret = -1;
+            
+            goto write_file_exit;
+        }
+
         ret = fs_lookup(fs_path, &credential, &object_ref.handle);
         if (ret != 0)
         {
@@ -1389,20 +1405,13 @@ PVFS_Dokan_write_file(
 
         object_ref.fs_id = fs_get_id(0);
 
-        ret = PVFS_Request_contiguous((int32_t) NumberOfBytesToWrite, PVFS_BYTE, &req);
-        if (ret != 0)
-        {
-            report_error("Read file: request error: ", ret);
-
-            goto write_file_exit;
-        }
-    
         ret = fs_write2(object_ref, (void *) Buffer, NumberOfBytesToWrite,
-                        Offset, &len64, &credential, req);
+                        Offset, &len64, &credential);
         if (ret == 0)
         {
-            cache_ret = io_cache_add(DokanFileInfo->Context, &object_ref, req,
-                                     PVFS_IO_WRITE, 1);
+            io_type = PVFS_IO_WRITE;
+            cache_ret = io_cache_add(DokanFileInfo->Context, &object_ref, 
+                io_type, IO_CACHE_UPDATE);
             if (cache_ret != 0)
             {
                 report_error("Read File: error adding context to IO cache: ", cache_ret);
@@ -1410,24 +1419,44 @@ PVFS_Dokan_write_file(
         }
     }
 #else
+    /* get file system path */
+    fs_path = get_fs_path(FileName);
+    if (fs_path == NULL)
+    {
+        ret = -1;
+            
+        goto write_file_exit;
+    }
+
     /* perform the write operation */
     ret = fs_write(fs_path, (void *) Buffer, NumberOfBytesToWrite, Offset, 
                    &len64, &credential);
 
-    /* set the modify and access times */
-    if (ret == 0)
-    {
-        attr.mask = PVFS_ATTR_SYS_ATIME|PVFS_ATTR_SYS_MTIME;
-        attr.atime = attr.mtime = time(NULL);
-        ret2 = fs_setattr(fs_path, &attr, &credential);
-        if (ret2 != 0)
-            DbgPrint("   fs_setattr returned %d\n", ret2);
-    }
 #endif
 
     *NumberOfBytesWritten = (DWORD) len64;
 
+    DbgPrint("   NumberOfBytesWritten: %u\n", *NumberOfBytesWritten);
+
 write_file_exit:
+    /* set the modify and access times */
+    if (ret == 0 && !goptions->disable_update_write_time)
+    {
+        if (fs_path == NULL)
+        {
+            fs_path = get_fs_path(FileName);
+        }
+        if (fs_path != NULL)
+        {
+            attr.mask = PVFS_ATTR_SYS_ATIME|PVFS_ATTR_SYS_ATIME_SET|
+                PVFS_ATTR_SYS_MTIME|PVFS_ATTR_SYS_MTIME_SET;
+            attr.atime = attr.mtime = time(NULL);
+            if((ret2 = fs_setattr(fs_path, &attr, &credential)) != 0)
+            {
+                DbgPrint("   fs_setattr (atime/mtime) returned %d\n", ret2);
+            }
+        }
+    }
 
     if (fs_path != NULL)
     {
@@ -2052,7 +2081,7 @@ PVFS_Dokan_set_allocation_size(
 
     /* load credential */
     err = get_credential(DokanFileInfo, &credential);
-    CRED_CHECK("SetFileTime", err);
+    CRED_CHECK("SetAllocationSize", err);
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
@@ -2097,26 +2126,29 @@ PVFS_Dokan_set_file_time(
     fs_path = get_fs_path(FileName);
     if (fs_path == NULL)
         return -1;
-
+        
     /* convert and set the file times */
     memset(&attr, 0, sizeof(PVFS_sys_attr));
     if (CreationTime != NULL && !(CreationTime->dwLowDateTime == 0 &&
         CreationTime->dwHighDateTime == 0))
     {
         convert_filetime((LPFILETIME) CreationTime, &attr.ctime);
+        DbgPrint("   Setting CreationTime to %llu\n", attr.ctime);
         attr.mask |= PVFS_ATTR_SYS_CTIME;
     }
     if (LastAccessTime != NULL && !(LastAccessTime->dwLowDateTime == 0 &&
         LastAccessTime->dwHighDateTime == 0))
     {
         convert_filetime((LPFILETIME) LastAccessTime, &attr.atime);
-        attr.mask |= PVFS_ATTR_SYS_ATIME;
+        DbgPrint("   Setting LastAccessTime to %llu\n", attr.atime);
+        attr.mask |= PVFS_ATTR_SYS_ATIME|PVFS_ATTR_SYS_ATIME_SET;
     }
     if (LastWriteTime != NULL && !(LastWriteTime->dwLowDateTime == 0 &&
         LastWriteTime->dwHighDateTime == 0))
     {
         convert_filetime((LPFILETIME) LastWriteTime, &attr.mtime);
-        attr.mask |= PVFS_ATTR_SYS_MTIME;
+        DbgPrint("   Setting LastWriteTime to %llu\n", attr.mtime);
+        attr.mask |= PVFS_ATTR_SYS_MTIME|PVFS_ATTR_SYS_MTIME_SET;
     }
     
     if (attr.mask != 0)
@@ -2403,6 +2435,8 @@ PVFS_Dokan_get_disk_free_space(
     if (err == ERROR_SUCCESS)
     {
         *TotalNumberOfFreeBytes = *FreeBytesAvailable;
+        DbgPrint("   FreeBytesAvailable: %llu\n", *FreeBytesAvailable);
+        DbgPrint("   TotalNumberofBytes: %llu\n", *TotalNumberOfBytes);
     }
 
     PINT_cleanup_credential(&credential);

@@ -274,6 +274,7 @@ char *PVFS_expand_path(const char *path, int skip_last_lookup)
                 {
                     /* an error so we bail out */
                     Ppath->rc = -errno;
+                    errno = 0;
                     goto err;
                 }
                 /* else not a sym link 

@@ -14,6 +14,7 @@
 #define PINT_MALLOC_H
 
 #include <stdlib.h>
+#include <ctype.h>
 #include <string.h>
 #include <getopt.h>
 #include <errno.h>
@@ -238,7 +239,7 @@ void iterate_database(DB *db_p, void (*print)(DBT key, DBT val) )
     memset(&val, 0, sizeof(val));
  
     printf("-------- Start database --------\n");
-    while ((ret = dbc_p->c_get(dbc_p, &key, &val, DB_NEXT)) == 0)
+    while ((ret = dbc_p->get(dbc_p, &key, &val, DB_NEXT)) == 0)
     {
         print( key, val );
         memset(key.data, 0, key.size);
@@ -405,7 +406,7 @@ void print_keyval( DBT key, DBT val )
                int s = 0;
                while (s < val.size)
                {
-                   vh = *(uint64_t *)(val.data + s);
+                   vh = *(uint64_t *)((unsigned char *)val.data + s);
                    printf("(%llu) ", llu(vh));
                    s += sizeof(TROVE_handle);
                }
@@ -417,7 +418,7 @@ void print_keyval( DBT key, DBT val )
                 * the PINT_dist struct is packed/encoded before writing to db. that
                 * means the first uint32_t bytes are the length of the string, skip
                 * it. */
-               char *dname = val.data + sizeof(uint32_t);
+               char *dname = (char *)val.data + sizeof(uint32_t);
                printf("(md)(%d) -> (%s)(%d)\n", key.size, dname, val.size );
             }
             else if( strncmp(k->key, "st", 3) == 0 ) /* symlink target */
@@ -482,7 +483,7 @@ void print_keyval( DBT key, DBT val )
                 PVFS_handle *handle = val.data;
 
                 printf("(/ddh)(%d) -> ", key.size);
-                while ((void *) handle - val.data < val.size)
+                while ( (unsigned char *)handle - (unsigned char *)val.data < val.size)
                 {
                     printf("(%llu)", llu(*handle));
                     handle++;
@@ -497,7 +498,7 @@ void print_keyval( DBT key, DBT val )
                 printf("(/ddb)(%d) -> ", key.size);
                 for(i = val.size - 1; i >= 0 ; i--)
                 {
-                    c = (unsigned char *)(val.data + i);
+                    c = (unsigned char *)((unsigned char *)val.data + i);
                     printf(" %02x %02x %02x %02x", c[3], c[2], c[1], c[0]);
                 }
                 printf("\n");
@@ -509,9 +510,42 @@ void print_keyval( DBT key, DBT val )
                 kh = *(uint64_t *)tmp;
                 printf("(%llu)(%d) -> (%d)\n", llu(kh), key.size, val.size);
             }
+            else if (strncmp(k->key, "user.", 5) == 0)
+            {
+                int i;
+                char *dat = (char *)val.data;
+                for(i = 0; i < val.size; i++)
+                {
+                    if (!isprint(dat[i]))
+                    {
+                        break;
+                    }
+                }
+                if (i == val.size - 1)
+                {
+                    /* string will drop out on the null terminator */
+                    printf("(%s)(%d) -> (%s)(%d)\n", k->key, key.size,
+                           dat, val.size);
+                }
+                else if (i == val.size)
+                {
+                    /* unterminated string  - we will zero the
+                     * last char and print what we can*/
+                    dat[val.size - 1] = 0;
+                    printf("(%s)(%d) -> (%s ...)(%d)\n", k->key, key.size,
+                           dat, val.size);
+                }
+                else
+                {
+                    /* not string */
+                    printf("(%s)(%d) -> (0x%x ...)(%d)\n", k->key, key.size,
+                           *(int *)dat, val.size);
+                }
+            }
             else
             {
-                printf("unrecognized attribute record type: %s\n", k->key);
+                printf("unrecognized attribute record type: %s val size %d\n",
+                       k->key, val.size);
             }
             break;
 

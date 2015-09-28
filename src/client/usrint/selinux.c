@@ -54,49 +54,103 @@
  * the real version of this for regular files
  */
 
-int getfscreatecon(security_context_t *con)
+int getfscreatecon(char **con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int getfilecon(const char *path, security_context_t *con)
+int getfscreatecon_raw(char **con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int lgetfilecon(const char *path, security_context_t *con)
+int getfilecon(const char *path, char **con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int fgetfilecon(int fd, security_context_t *con)
+int getfilecon_raw(const char *path, char **con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int setfscreatecon(security_context_t con)
+int lgetfilecon(const char *path, char **con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int setfilecon(const char *path, security_context_t con)
+int lgetfilecon_raw(const char *path, char **con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int lsetfilecon(const char *path, security_context_t con)
+int fgetfilecon(int fd, char **con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int fsetfilecon(int fd, security_context_t con)
+int fgetfilecon_raw(int fd, char **con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+#ifdef HAVE_CONST_SECURITY_CONTEXT 
+#define CONST const
+#else
+#define CONST 
+#endif
+
+int setfscreatecon(CONST char *con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int setfscreatecon_raw(CONST char *con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int setfilecon(const char *path, CONST char *con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int setfilecon_raw(const char *path, CONST char *con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int lsetfilecon(const char *path, CONST char *con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int lsetfilecon_raw(const char *path, CONST char *con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int fsetfilecon(int fd, CONST char *con)
+{
+    errno = ENOTSUP;
+    return -1;
+}
+
+int fsetfilecon_raw(int fd, CONST char *con)
 {
     errno = ENOTSUP;
     return -1;

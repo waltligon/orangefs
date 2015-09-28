@@ -445,7 +445,7 @@ int client_handle_next(struct svr_xfer_state* state, bmi_context_id context)
             /* post recv for response */
             ret = BMI_post_recv(&tmp_id, state->addr, state->resp,
                 sizeof(struct response), &actual_size, BMI_PRE_ALLOC,
-                state->tag, state, context);
+                state->tag, state, context,NULL);
             if(ret < 0)
             {
                 PVFS_perror("BMI_post_recv", ret);
@@ -455,7 +455,7 @@ int client_handle_next(struct svr_xfer_state* state, bmi_context_id context)
             /* send request */
             ret = BMI_post_sendunexpected(&tmp_id, state->addr, state->req,
                 sizeof(struct request), BMI_PRE_ALLOC, state->tag,
-                state, context);
+                state, context,NULL);
             assert(ret >= 0);        
             state->step++;
             if(ret == 1)
@@ -488,7 +488,7 @@ int client_handle_next(struct svr_xfer_state* state, bmi_context_id context)
             ret = BMI_post_recv_list(&tmp_id, state->addr,
                 state->buffer_list, state->size_list, state->list_factor,
                 MSG_SIZE, &actual_size, BMI_PRE_ALLOC,
-                state->tag, state, context);
+                state->tag, state, context,NULL);
             assert(ret >= 0);
             if(ret == 1)
                 return(client_handle_next(state, context));
@@ -515,7 +515,7 @@ int svr_handle_next(struct svr_xfer_state* state, bmi_context_id context)
             /* post a response send */
             ret = BMI_post_send(&tmp_id, state->addr, state->resp,
                 sizeof(struct response), BMI_PRE_ALLOC, state->tag,
-                state, context);
+                state, context,NULL);
             assert(ret >= 0);
             state->step++;
             if(ret == 1)
@@ -533,7 +533,7 @@ int svr_handle_next(struct svr_xfer_state* state, bmi_context_id context)
             {
                 ret = BMI_post_send(&tmp_id, state->addr,
                     state->buffer_array[i], MSG_SIZE, BMI_PRE_ALLOC,
-                    state->tag, state, context);
+                    state->tag, state, context,NULL);
                 assert(ret >= 0);
                 if(ret == 1)
                     state->step++;
