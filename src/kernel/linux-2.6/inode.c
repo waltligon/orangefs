@@ -656,7 +656,7 @@ struct inode *pvfs2_get_custom_inode_common(
         inode->i_bdev = NULL;
         inode->i_cdev = NULL;
         inode->i_mapping->a_ops = &pvfs2_address_operations;
-#ifndef PVFS2_LINUX_KERNEL_2_4
+#ifdef BACKING_DEV_IN_ADDR_SPACE
         inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 #endif
 

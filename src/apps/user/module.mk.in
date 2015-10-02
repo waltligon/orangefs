@@ -1,7 +1,10 @@
 DIR := src/apps/user
 
 USERSRC := \
-	$(DIR)/getmattr.c \
-	$(DIR)/pvfs2-rm.c \
-	$(DIR)/setmattr.c
+	$(DIR)/getmattr.c  \
+	$(DIR)/setmattr.c  \
+	$(DIR)/pvfs2-rm.c  \
+	$(DIR)/ofs_xattr.c \
+	$(DIR)/ofs_rm.c \
+	$(DIR)/ofs_cp.c    
  

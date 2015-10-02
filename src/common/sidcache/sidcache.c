@@ -60,10 +60,13 @@ static int SID_cache_parse_header(FILE *inpfile,
                                   int *attrs_in_file,
                                   int **attr_positions);
 static int SID_create_type_table(void);
-static char *SID_type_to_string(const uint32_t typeval);
+static char *SID_type_to_string(char *buf, struct SID_type_s typeval, int n);
 static int SID_type_store(PVFS_SID *sid, FILE *outpfile);
 static int SID_cache_update_type(const PVFS_SID *sid_server,
-                                 uint32_t new_type_val);
+                                 struct SID_type_s *new_type_val);
+static int SID_cache_update_type_single(const PVFS_SID *sid_server,
+                                        uint32_t new_type_val,
+                                        PVFS_fs_id fsid);
 static int SID_cache_update_attrs(DB *dbp,
                                   const PVFS_SID *sid_server,
                                   int new_attr[]);
@@ -148,7 +151,8 @@ struct type_conv
     {SID_SERVER_LOCAL       , "LOCAL"} ,
     {SID_SERVER_META        , "META"} ,
     {SID_SERVER_DATA        , "DATA"} ,
-    {SID_SERVER_DIRDATA     , "DIRDATA"} ,
+    {SID_SERVER_DIRM        , "DIR"} ,
+    {SID_SERVER_DIRD        , "DIRDATA"} ,
     {SID_SERVER_SECURITY    , "SECURITY"} ,
     /* these should always be last */
     {SID_SERVER_ME          , "ME"} ,
@@ -158,33 +162,63 @@ struct type_conv
 /* This must be defined as the size of the longest typestring */
 #define MAX_TYPE_STR 8
     
-static char *SID_type_to_string(const uint32_t typeval)
+static char *SID_type_to_string(char *buf, struct SID_type_s typeval, int n)
 {
     int i;
     for (i = 0;
-         type_conv_table[i].typeval != typeval &&
+         type_conv_table[i].typeval != typeval.server_type &&
          type_conv_table[i].typeval != SID_SERVER_NULL;
          i++);
-    return type_conv_table[i].typestring;
+    strcpy(buf, type_conv_table[i].typestring);
+    if (typeval.fsid != 0)
+    {
+        if (n < MAX_TYPE_STR + 12)
+        {
+            return NULL;
+        }
+        sprintf(buf,
+                "%s(%8d) ",
+                type_conv_table[i].typestring,
+                typeval.fsid);
+    }
+    else
+    {
+        if (n < MAX_TYPE_STR + 2)
+        {
+            return NULL;
+        }
+        sprintf(buf, "%s ", type_conv_table[i].typestring);
+    }
+    return buf;
 }
  
-/* This function is exported for parsing the config file */
-uint32_t SID_string_to_type(const char *typestring)
+/* This function is exported for parsing the config file 
+ * Looks for predefined strings that represent types
+ * returns positive numerical* representation of type
+ * or 0 if type not found or negative on error
+ */
+int SID_string_to_type(const char *typestring)
 {
     int i;
     char *mytype;
     int len;
+    int server_type = 0;
 
     if(!typestring)
     {
-        return SID_SERVER_NULL;
+        return -PVFS_EINVAL;
     }
 
-    len = strnlen(typestring, MAX_TYPE_STR) + 1;
-
-    if (len > MAX_TYPE_STR + 1)
+    len = 0;
+    while(typestring[len] != 0 &&
+          len < MAX_TYPE_STR + 1)
     {
-        return SID_SERVER_NULL;
+        len++;
+    }
+
+    if (len > MAX_TYPE_STR)
+    {
+        return -PVFS_EINVAL;
     }
 
     mytype = (char *)malloc(len);
@@ -200,9 +234,18 @@ uint32_t SID_string_to_type(const char *typestring)
          type_conv_table[i].typeval != SID_SERVER_NULL;
          i++);
 
+    if (type_conv_table[i].typeval == SID_SERVER_NULL)
+    {
+        server_type = SID_SERVER_NULL;
+        free(mytype);
+        return -PVFS_EINVAL;
+    }
+
+    server_type = type_conv_table[i].typeval;
+
     free(mytype);
 
-    return type_conv_table[i].typeval;
+    return server_type;
 }
 
 /* We are expecting a string of the form "someattr=val" where val is an
@@ -507,10 +550,10 @@ static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
     DBT index_val;
     char linebuff[TYPELINELEN];
     char *lineptr = linebuff;
-    char *saveptr = NULL;
+    char *saveptr = linebuff;
     char *typeword;
     PVFS_SID sid_buf;
-    uint32_t type_buf;
+    struct SID_type_s type_buf;
 
     sid_buf = *sid;
 
@@ -518,8 +561,8 @@ static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
     SID_zero_dbt(&index_key, &index_val, NULL);
 
     type_key.data = &type_buf;
-    type_key.size = sizeof(type_buf);
-    type_key.ulen = sizeof(type_buf);
+    type_key.size = sizeof(struct SID_type_s);
+    type_key.ulen = sizeof(struct SID_type_s);
     type_key.flags = DB_DBT_USERMEM;
 
     type_val.data = &sid_buf;
@@ -533,8 +576,8 @@ static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
     index_key.flags = DB_DBT_USERMEM;
 
     index_val.data = &type_buf;
-    index_val.size = sizeof(type_buf);
-    index_val.ulen = sizeof(type_buf);
+    index_val.size = sizeof(struct SID_type_s);
+    index_val.ulen = sizeof(struct SID_type_s);
     index_val.flags = DB_DBT_USERMEM;
 
     /* read a line */
@@ -545,10 +588,11 @@ static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
     {
         /* read next word */
         memset(typeword, 0, 50);
-#if 1
+
         /* strtok is not reentrant, strtok_r is not standard (gcc
          * extension) need to add config support to select the right
          * approach - V3
+         * NOTE: strtok_r is POSIX 2001
          */
 # if 1
         typeword = strtok_r(lineptr, " \t\n", &saveptr);
@@ -560,23 +604,15 @@ static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
             return 0; /* no more type tokens */
         }
         lineptr = NULL; /* subsequent calls from saved string pointer */
-#else
-        /* This is incomplete code using sscanf - has problems that must
-         * be fixed to be usable, namely, the lineptr has to be moved by
-         * the number of chars consumed in the sscanf, which is not
-         * generally possible to determine without lots of effort
-         */
-        ret = sscanf(lineptr, " %49s", typeword);
-        if(ret <= 0)
-        {
-            break; /* scanf error or end of string tokens */
-        }
-        /* move lineptr */
-#endif
+
+        /* V3 NEEDS TO BE DONE */
+        /* check for an fs_id and set in buffer */
+        type_buf.fsid = 0; /* applies to all fs */
 
         /* a zero return is an invalid typeval */
-        if ((type_buf = SID_string_to_type(typeword)))
+        if (0 < (ret = SID_string_to_type(typeword)))
         {
+            type_buf.server_type = ret; /* numerical type value */
             /* insert into type database */
             ret = SID_type_db->put(SID_type_db,
                                    NULL,
@@ -600,8 +636,7 @@ static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
         }
         else
         {
-            ret = -PVFS_EINVAL;
-            break; /* invalid type string */
+            break; /* invalid type string or error in string-to-type */
         }
     }
     return(ret);    
@@ -911,7 +946,7 @@ int SID_cache_lookup_bmi(DB *dbp, const PVFS_SID *search_sid, char **bmi_url)
 int SID_cache_update_server(DB *dbp,
                             const PVFS_SID *sid_server,
                             SID_cacheval_t *new_attrs,
-                            uint32_t sid_types)
+                            struct SID_type_s *sid_types)
 {
     int ret = 0;                   /* Function return value */
     SID_cacheval_t *current_attrs; /* Temp SID_cacheval_t used to get current 
@@ -1059,16 +1094,17 @@ int SID_cache_copy_attrs(SID_cacheval_t *current_attrs,
  * record, not just the same key) which could happen here.  We still get
  * an error code but we can test for that.
  */
-int SID_cache_update_type(const PVFS_SID *sid_server, uint32_t new_type_val)
+int SID_cache_update_type_single(const PVFS_SID *sid_server,
+                                 uint32_t new_type_val,
+                                 PVFS_fs_id new_fsid)
 {
     int ret = 0;
     DBT type_key;
     DBT type_val;
     DBT index_key;
     DBT index_val;
-    uint32_t mask = 0;
     PVFS_SID sid_buf;
-    uint32_t type_buf;
+    struct SID_type_s type_buf;
 
     sid_buf = *sid_server;
 
@@ -1095,50 +1131,68 @@ int SID_cache_update_type(const PVFS_SID *sid_server, uint32_t new_type_val)
     index_val.ulen = sizeof(type_buf);
     index_val.flags = DB_DBT_USERMEM;
 
-    for(mask = 1; mask != 0 && new_type_val != 0; mask <<= 1)
+    if ((new_type_val & SID_SERVER_VALID_TYPES))
     {
-        if (new_type_val & mask)
+        type_buf.server_type = new_type_val;
+        type_buf.fsid = new_fsid;
+
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                     "Adding a type record SID %s Type %o\n",
+                     PVFS_SID_str(sid_server), type_buf.server_type);
+
+        ret = SID_type_db->put(SID_type_db,
+                               NULL,
+                               &type_key,
+                               &type_val,
+                               0);
+        /* if KEYEXIST it was just a duplicate - keep going */
+        if (ret && ret != DB_KEYEXIST)
         {
-            if ((mask & SID_SERVER_VALID_TYPES))
-            {
-                type_buf = mask;
-
-                gossip_debug(GOSSIP_SIDCACHE_DEBUG,
-                             "Adding a type record SID %s Type %o\n",
-                             PVFS_SID_str(sid_server), type_buf);
-
-                ret = SID_type_db->put(SID_type_db,
-                                       NULL,
-                                       &type_key,
-                                       &type_val,
-                                       0);
-                /* if KEYEXIST it was just a duplicate - keep going */
-                if (ret && ret != DB_KEYEXIST)
-                {
-                    gossip_debug(GOSSIP_SIDCACHE_DEBUG,
-                                 "Error inserting a SID type record:%s\n",
-                                 db_strerror(ret));
-                    break;
-                }
-                ret = SID_type_index->put(SID_type_index,
-                                          NULL,
-                                          &index_key,
-                                          &index_val,
-                                          0);
-                /* if KEYEXIST it was just a duplicate - keep going */
-                if (ret && ret != DB_KEYEXIST)
-                {
-                    gossip_debug(GOSSIP_SIDCACHE_DEBUG,
-                                 "Error inserting a SID index record:%s\n",
-                                 db_strerror(ret));
-                    break;
-                }
-            }
-            new_type_val &= ~mask;
+            gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                         "Error inserting a SID type record:%s\n",
+                         db_strerror(ret));
+            return ret;
+        }
+        ret = SID_type_index->put(SID_type_index,
+                                  NULL,
+                                  &index_key,
+                                  &index_val,
+                                  0);
+        /* if KEYEXIST it was just a duplicate - keep going */
+        if (ret && ret != DB_KEYEXIST)
+        {
+            gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                         "Error inserting a SID index record:%s\n",
+                         db_strerror(ret));
+            return ret;;
         }
     }
  
-    return(ret);    
+    return ret;    
+}
+
+int SID_cache_update_type(const PVFS_SID *sid_server,
+                          struct SID_type_s *new_type_val)
+{
+    int ret = 0;
+    uint32_t mask = 0;
+    uint32_t type_val = new_type_val->server_type;
+
+    for(mask = 1; mask != 0 && type_val != 0; mask <<= 1)
+    {
+        if (type_val & mask)
+        {
+            if ((mask & SID_SERVER_VALID_TYPES))
+            {
+                ret = SID_cache_update_type_single(sid_server,
+                                                   mask,
+                                                   new_type_val->fsid);
+            }
+            /* allows loop to exit when all present types are coded */
+            type_val &= ~mask;
+        }
+    }
+    return ret;
 }
 
 /*
@@ -1332,9 +1386,11 @@ int SID_cache_delete_server(DB *dbp,
 {
     int ret = 0; /* Function return value */
     DBT key;     /* Primary sid key  */
+    DBT data;    /* Primary sid key  */
+    struct SID_type_s sidtype = {0, 0};
 
     /* Initializing the DBT key value */
-    SID_zero_dbt(&key, NULL, NULL);
+    SID_zero_dbt(&key, &data, NULL);
     
     /* Setting the values of DBT key to point to the sid to 
      * delete from the sid cache 
@@ -1344,9 +1400,14 @@ int SID_cache_delete_server(DB *dbp,
     key.ulen = sizeof(PVFS_SID);
     key.flags = DB_DBT_USERMEM;
 
+    data.data = &sidtype;
+    data.size = sizeof(struct SID_type_s);
+    data.ulen = sizeof(struct SID_type_s);
+    data.flags = DB_DBT_USERMEM;
+
     ret = (dbp)->del(dbp,  /* Primary database (sid cache) pointer */
                      NULL, /* Transaction Handle */
-                     &key, /* SID_cacheval_t key */
+                     &key, /* SID key */
                      0);   /* Delete flag */
     if(ret)
     {
@@ -1354,6 +1415,60 @@ int SID_cache_delete_server(DB *dbp,
                      "Error deleting record from sid cache : %s\n",
                      db_strerror(ret));
         return(ret);
+    }
+
+    /* remove all associated records from the type/index dbs */
+
+    /* get first index record */
+    ret = SID_index_cursor->get(SID_index_cursor,
+                                &key, /* SID key */
+                                &data,/* TYPE data */
+                                DB_FIRST);   /* Get flag */
+    if(ret)
+    {
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                     "Error getting record from sid index : %s\n",
+                     db_strerror(ret));
+        return(ret);
+    }
+
+    while(ret != DB_NOTFOUND)
+    {
+        /* delete index record */
+        ret = SID_index_cursor->del(SID_index_cursor, 0);
+        if(ret)
+        {
+            gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                        "Error deleting record from sid index : %s\n",
+                        db_strerror(ret));
+            return(ret);
+        }
+        /* get type record */
+        ret = SID_type_cursor->get(SID_type_cursor,
+                                   &data, /* TYPE key - these are backwards */
+                                   &key,  /* SID data - these are backwards */
+                                   DB_GET_BOTH);   /* Get flag */
+        if (ret != DB_NOTFOUND)
+        {
+            /* delete type reccord */
+            ret = SID_type_cursor->del(SID_index_cursor, 0);
+            gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                         "mirror record not found int type/index\n");
+        }                           
+        /* get next index record */
+        sidtype.server_type = 0;
+        sidtype.fsid = 0;
+        ret = SID_index_cursor->get(SID_type_cursor,
+                                    &key, /* SID key */
+                                    &data,/* TYPE data */
+                                    DB_NEXT_DUP);   /* Get flag */
+        if(ret)
+        {
+            gossip_debug(GOSSIP_SIDCACHE_DEBUG,
+                         "Error getting record from sid index : %s\n",
+                         db_strerror(ret));
+            return(ret);
+        }
     }
   
     if(db_records != NULL)
@@ -1370,9 +1485,9 @@ int SID_type_store(PVFS_SID *sid, FILE *outpfile)
     int ret = 0;
     DBT type_sid_key;
     DBT type_sid_val;
-    char *buff;
+    char buff[20];
     PVFS_SID kbuf;
-    uint32_t tbuf;
+    struct SID_type_s tbuf = {0, 0};
 
     kbuf = *sid;
 
@@ -1384,8 +1499,8 @@ int SID_type_store(PVFS_SID *sid, FILE *outpfile)
     type_sid_key.flags = DB_DBT_USERMEM;
 
     type_sid_val.data = &tbuf;
-    type_sid_val.size = sizeof(uint32_t);
-    type_sid_val.ulen = sizeof(uint32_t);
+    type_sid_val.size = sizeof(struct SID_type_s);
+    type_sid_val.ulen = sizeof(struct SID_type_s);
     type_sid_val.flags = DB_DBT_USERMEM;
 
     ret = SID_index_cursor->get(SID_index_cursor,
@@ -1401,8 +1516,10 @@ int SID_type_store(PVFS_SID *sid, FILE *outpfile)
     while(ret == 0)
     {
         /* write type to file */
-        buff = SID_type_to_string(tbuf);
+        SID_type_to_string(buff, tbuf, 20);
         fprintf(outpfile, "%s ", buff);
+        tbuf.server_type = 0;
+        tbuf.fsid = 0;
         /* should have been reset by get */
         ret = SID_index_cursor->get(SID_index_cursor,
                                     &type_sid_key,
@@ -1964,7 +2081,7 @@ int SID_get_type(PVFS_SID *sid, uint32_t *typeval)
     DBT type_sid_key;
     DBT type_sid_val;
     PVFS_SID kbuf;
-    uint32_t vbuf;
+    struct SID_type_s vbuf;
 
     SID_zero_dbt(&type_sid_key, &type_sid_val, NULL);
 
@@ -1974,8 +2091,8 @@ int SID_get_type(PVFS_SID *sid, uint32_t *typeval)
     type_sid_key.flags = DB_DBT_USERMEM;
 
     type_sid_val.data = &vbuf;
-    type_sid_val.size = sizeof(uint32_t);
-    type_sid_val.ulen = sizeof(uint32_t);
+    type_sid_val.size = sizeof(struct SID_type_s);
+    type_sid_val.ulen = sizeof(struct SID_type_s);
     type_sid_val.flags = DB_DBT_USERMEM;
 
     /* type_sid_val is filled in by DB */
@@ -1992,7 +2109,7 @@ int SID_get_type(PVFS_SID *sid, uint32_t *typeval)
     /* halt on error or DB_NOTFOUND */
     while(ret == 0)
     {
-        *typeval |= vbuf;
+        *typeval |= vbuf.server_type;
         ret = SID_index_cursor->get(SID_index_cursor,
                                        &type_sid_key,
                                        &type_sid_val,
@@ -2713,10 +2830,20 @@ int SID_finalize(void)
     return ret;
 }
 
-int SID_update_type(const PVFS_SID *sid, int new_server_type)
+int SID_update_type(const PVFS_SID *sid, struct SID_type_s *new_server_type)
 {
     int ret = 0;
     ret = SID_cache_update_type(sid, new_server_type);
+    return ret;
+}
+
+int SID_update_type_single(const PVFS_SID *sid,
+                           struct SID_type_s *new_server_type)
+{
+    int ret = 0;
+    ret = SID_cache_update_type_single(sid,
+                                       new_server_type->server_type,
+                                       new_server_type->fsid);
     return ret;
 }
 

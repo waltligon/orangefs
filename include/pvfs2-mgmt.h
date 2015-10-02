@@ -72,6 +72,12 @@ enum PINT_server_perf_keys
     PINT_PERF_SMALL_WRITE = 9,          /* bytes written by small_io */
     PINT_PERF_FLOW_READ = 10,           /* bytes read by flow */
     PINT_PERF_FLOW_WRITE = 11,          /* bytes written by flow */
+    PINT_PERF_CREATE = 12,              /* create requests called */
+    PINT_PERF_REMOVE = 13,              /* remove requests called */
+    PINT_PERF_MKDIR = 14,               /* mkdir requests called */
+    PINT_PERF_RMDIR = 15,               /* rmdir requests called */
+    PINT_PERF_GETATTR = 16,             /* getattr requests called */
+    PINT_PERF_SETATTR = 17,             /* setattr requests called */
 };
 
 /* low level information about individual server level objects */
@@ -147,10 +153,13 @@ PVFS_error PVFS_mgmt_noop(
     PVFS_BMI_addr_t addr,
     PVFS_hint hints);
 
+/* V3 cleanup */
+#if 0
 const char* PVFS_mgmt_map_addr(
     PVFS_fs_id fs_id,
     PVFS_BMI_addr_t addr,
     int* server_type);
+#endif
 
 PVFS_error PVFS_imgmt_setparam_list(
     PVFS_fs_id fs_id,

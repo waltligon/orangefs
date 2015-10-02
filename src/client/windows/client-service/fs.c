@@ -679,7 +679,7 @@ int fs_io(enum PVFS_io_type io_type,
     /* get memory buffer */
     file_req = PVFS_BYTE;
 
-    ret = PVFS_Request_contiguous((int32_t) buffer_len, PVFS_BYTE, &(mem_req));
+    ret = PVFS_Request_contiguous((int32_t) buffer_len, PVFS_BYTE, &mem_req);
     if (ret != 0)
         goto fs_io_exit;
 
@@ -705,25 +705,32 @@ int fs_io2(enum PVFS_io_type io_type,
            size_t buffer_len,
            uint64_t offset,
            PVFS_size *op_len,
-           PVFS_credential *credential,
-           PVFS_Request req)
+           PVFS_credential *credential)
 {
-    PVFS_Request file_req;    
+    PVFS_Request file_req, mem_req;
     PVFS_sysresp_io resp_io;
     int ret;
 
-    if (buffer == NULL || credential == NULL || req == NULL)
+    if (buffer == NULL || credential == NULL)
         return -PVFS_EINVAL;
 
     file_req = PVFS_BYTE;
-    
-    ret = PVFS_sys_io(object_ref, file_req, offset, buffer, req, credential, 
+
+    ret = PVFS_Request_contiguous((int32_t) buffer_len, PVFS_BYTE, &mem_req);
+    if (ret != 0)
+        goto fs_io2_exit;
+
+    ret = PVFS_sys_io(object_ref, file_req, offset, buffer, mem_req, credential, 
         &resp_io, io_type, NULL);
 
     if (ret == 0 && op_len != NULL)
     {
         *op_len = resp_io.total_completed;
     }
+
+fs_io2_exit:
+
+    PVFS_Request_free(&mem_req);
 
     return ret;
 }

@@ -21,39 +21,7 @@
 #  define PVFS_MALLOC_REDEF 0
 #endif
 
-/* some compiler portability macros - used by gcc maybe not others */
-#if __GNUC__ 
-#  if __GNUC__ >= 4 && __GNUC_MINOR__ >= 4
-#    define GCC_CONSTRUCTOR(priority) __attribute__((constructor(priority)))
-#    define GCC_DESTRUCTOR(priority)  __attribute__((destructor(priority)))
-#    define GCC_UNUSED  __attribute__((unused))
-#    define PVFS_INIT(f) 
-#  else
-#    define GCC_CONSTRUCTOR(priority) __attribute__((constructor))
-#    define GCC_DESTRUCTOR(priority)  __attribute__((destructor))
-#    define GCC_UNUSED  __attribute__((unused))
-#    define PVFS_INIT(f) 
-#  endif
-#else
-#  define GCC_CONSTRUCTOR(priority) 
-#  define GCC_DESTRUCTOR(priority)
-#  define GCC_UNUSED  __attribute__((unused))
-#  define PVFS_INIT(f) f()
-#endif
-
-/* Init priorities define the order of initialization - defined here so
- * it is in one place - each init module should have one of these
- * Init runs from low to high
- */
-#define INIT_PRIORITY_MALLOC        1001
-#define INIT_PRIORITY_STDIO         1002
-#define INIT_PRIORITY_PVFSLIB       1003
-
-/* Cleanup runs from high to low
- * run cleanup stdio before pvfslib
- */
-#define CLEANUP_PRIORITY_STDIO      1003
-#define CLEANUP_PRIORITY_PVFSLIB    1002
+#include "pint-gccdefs.h"
 
 /* Temporarily turn PVFS_INIT on
  * This macro is placed in various entry point routines in the library

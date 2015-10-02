@@ -27,7 +27,7 @@ struct options
 {
     char *mnt_point;
     int mnt_point_set;
-    uint64_t debug_mask;
+    PVFS_debug_mask debug_mask;
     int debug_mask_set;
     char *single_server;
 };
@@ -82,29 +82,35 @@ int main(int argc, char **argv)
         printf("Setting debugmask on server %s\n",
                user_opts->single_server);
 
-        param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
-        param_value.u.value = (uint64_t)user_opts->debug_mask;
-        ret = PVFS_mgmt_setparam_single(
-            cur_fs, &creds, PVFS_SERV_PARAM_GOSSIP_MASK,
-            &param_value, user_opts->single_server,
-            NULL, NULL);
+        param_value.type = PVFS_MGMT_PARAM_TYPE_MASK;
+        param_value.u.mask_value = user_opts->debug_mask;
+        ret = PVFS_mgmt_setparam_single(cur_fs,
+                                        &creds,
+                                        PVFS_SERV_PARAM_GOSSIP_MASK,
+                                        &param_value,
+                                        user_opts->single_server,
+                                        NULL,
+                                        NULL);
     }
     else
     {
         printf("Setting debugmask on all servers\n");
 
-        param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
-        param_value.u.value = user_opts->debug_mask;
-        ret = PVFS_mgmt_setparam_all(
-            cur_fs, &creds, PVFS_SERV_PARAM_GOSSIP_MASK,
-            &param_value, NULL, NULL);
+        param_value.type = PVFS_MGMT_PARAM_TYPE_MASK;
+        param_value.u.mask_value = user_opts->debug_mask;
+        ret = PVFS_mgmt_setparam_all(cur_fs,
+                                     &creds,
+                                     PVFS_SERV_PARAM_GOSSIP_MASK,
+                                     &param_value,
+                                     NULL,
+                                     NULL);
     }
 
     if (ret)
     {
         char buf[64] = {0};
         PVFS_strerror_r(ret, buf, 64);
-        fprintf(stderr, "Setparam failure: %s\n", buf);
+        fprintf(stderr, "Setparam failure: %s (%d)\n", buf, ret);
     }
     return PVFS_sys_finalize();
 }
@@ -138,7 +144,7 @@ static struct options *parse_args(int argc, char **argv)
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* fill in defaults (except for hostid) */
-    tmp_opts->debug_mask = 0;
+    tmp_opts->debug_mask = GOSSIP_NO_DEBUG;
 
     while((ret = getopt_long(argc, argv, "hvm:s:",
                              long_opts, &option_index)) != -1)

@@ -48,6 +48,36 @@ static int my_glibc_getcwd(char *buf, unsigned long size)
 #endif
 
 /**
+ * functions to verify a valid PVFS file or path
+ */
+int pvfs_valid_path(const char *path)
+{
+    int ret;
+    ret = is_pvfs_path(&path, 0);
+    PVFS_free_expanded(path);
+    /* clear errors */
+    errno = 0;
+    return ret;
+}
+
+int pvfs_valid_fd(int fd)
+{
+    pvfs_descriptor *pd;  
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    if (pd->s->fsops == &glibc_ops)
+    {
+        /* This is not a PVFS file or dir */
+        return 0;
+    }
+    return 1;
+}
+
+/**
  *  pvfs_open
  */
 int pvfs_open(const char *path, int flags, ...)
@@ -1339,7 +1369,8 @@ int pvfs_futimesat(int dirfd,
         attr.atime = times[0].tv_sec;
         attr.mtime = times[1].tv_sec;
     }
-    attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_MTIME;
+    attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_ATIME_SET |
+                PVFS_ATTR_SYS_MTIME | PVFS_ATTR_SYS_MTIME_SET;
     rc = iocommon_setattr(pd2->s->pvfs_ref, &attr);
     if (path)
     {
@@ -1395,7 +1426,8 @@ int pvfs_futimes(int fd, const struct timeval times[2])
         attr.atime = times[0].tv_sec;
         attr.mtime = times[1].tv_sec;
     }
-    attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_MTIME;
+    attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_ATIME_SET |
+                PVFS_ATTR_SYS_MTIME | PVFS_ATTR_SYS_MTIME_SET;
     rc = iocommon_setattr(pd->s->pvfs_ref, &attr);
     pvfs_close(pd->fd);
     return rc;
@@ -2559,13 +2591,15 @@ ssize_t pvfs_fgetxattr(int fd,
 }
 
 ssize_t pvfs_atomicxattr(const char *path,
-                          const char *name,
-                          void *value,
-                          size_t valsize,
-                          void *response,
-                          size_t respsize,
-                          int flags,
-                          int opcode)
+                         int opcode,
+                         const char *name,
+                         void *old_value,
+                         size_t old_valsize,
+                         void *new_value,
+                         size_t new_valsize,
+                         void *response,
+                         size_t respsize,
+                         int flags)
 {
     int fd, rc = 0;
 
@@ -2574,20 +2608,30 @@ ssize_t pvfs_atomicxattr(const char *path,
     {
         return fd;
     }
-    rc = pvfs_fatomicxattr(fd, name, value, valsize, response,
-                           respsize, flags, opcode);
+    rc = pvfs_fatomicxattr(fd,
+                           opcode,
+                           name,
+                           old_value,
+                           old_valsize,
+                           new_value,
+                           new_valsize,
+                           response,
+                           respsize,
+                           flags);
     pvfs_close(fd);
     return rc;
 }
 
 ssize_t pvfs_latomicxattr(const char *path,
+                          int opcode,
                           const char *name,
-                          void *value,
-                          size_t valsize,
+                          void *old_value,
+                          size_t old_valsize,
+                          void *new_value,
+                          size_t new_valsize,
                           void *response,
                           size_t respsize,
-                          int flags,
-                          int opcode)
+                          int flags)
 {
     int fd, rc = 0;
 
@@ -2596,20 +2640,30 @@ ssize_t pvfs_latomicxattr(const char *path,
     {
         return fd;
     }
-    rc = pvfs_fatomicxattr(fd, name, value, valsize, response,
-                           respsize, flags, opcode);
+    rc = pvfs_fatomicxattr(fd,
+                           opcode,
+                           name,
+                           old_value,
+                           old_valsize,
+                           new_value,
+                           new_valsize,
+                           response,
+                           respsize,
+                           flags);
     pvfs_close(fd);
     return rc;
 }
 
 ssize_t pvfs_fatomicxattr(int fd,
+                          int opcode,
                           const char *name,
-                          void *value,
-                          size_t valsize,
+                          void *old_value,
+                          size_t old_valsize,
+                          void *new_value,
+                          size_t new_valsize,
                           void *response,
                           size_t respsize,
-                          int flags,
-                          int opcode)
+                          int flags)
 {
     pvfs_descriptor *pd;
 
@@ -2619,8 +2673,16 @@ ssize_t pvfs_fatomicxattr(int fd,
         errno = EBADF;
         return -1;
     }
-    return iocommon_atomiceattr(pd, name, value, valsize, response,
-                                respsize, flags, opcode);
+    return iocommon_atomiceattr(pd,
+                                name,
+                                old_value,
+                                old_valsize,
+                                new_value,
+                                new_valsize,
+                                response,
+                                respsize,
+                                flags,
+                                opcode);
 }
 
 ssize_t pvfs_listxattr(const char *path,

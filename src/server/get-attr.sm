@@ -633,8 +633,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                 "Error: got unknown type when verifying attributes for "
                 "handle %s.\n", 
                 PVFS_OID_str(&s_op->u.getattr.handle));
-            js_p->error_code = -PVFS_ENXIO;
-js_p->error_code = -PVFS_ENOENT;
+            js_p->error_code = -PVFS_ENOENT;
             break;
     }/*end switch on object type */
 
@@ -1538,7 +1537,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     ret = PINT_init_capability(&respattr->capability);
     if (ret < 0)
     {
-        gossip_debug((GOSSIP_GETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
+        gossip_debug((GOSSIP_GETATTR_SECURITY_DEBUG),
                      "getattr: capability init failed\n");
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
@@ -1657,7 +1656,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
 
     if (ret < 0)
     {
-        gossip_debug((GOSSIP_GETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
+        gossip_debug((GOSSIP_GETATTR_SECURITY_DEBUG),
                      "getattr: failed to sign capability\n");
         PINT_cleanup_capability(&respattr->capability);
         js_p->error_code = -PVFS_EINVAL;

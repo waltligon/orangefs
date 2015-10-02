@@ -12,10 +12,11 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-debug.h"
 
-static uint64_t debug_to_mask(__keyword_mask_t *mask_map, 
-        int num_mask_map, const char *event_logging)
+static PVFS_debug_mask debug_to_mask(const __keyword_mask_t *mask_map, 
+                                     int num_mask_map,
+                                     const char *event_logging)
 {
-    uint64_t mask = 0;
+    PVFS_debug_mask mask = {GOSSIP_NO_DEBUG_INIT};
     char *s = NULL, *t = NULL;
     const char *toks = ", ";
     int i = 0, negate = 0;
@@ -39,11 +40,11 @@ static uint64_t debug_to_mask(__keyword_mask_t *mask_map,
                 {
                     if (negate)
                     {
-                        mask &= ~mask_map[i].mask_val;
+                        mask = DBG_AND(2, mask, DBG_NOT(mask_map[i].mask));
                     }
                     else
                     {
-                        mask |= mask_map[i].mask_val;
+                        mask = DBG_OR(2, mask, mask_map[i].mask);
                     }
                     break;
                 }
@@ -64,31 +65,30 @@ static uint64_t debug_to_mask(__keyword_mask_t *mask_map,
  * Prefix a keyword with "-" to turn it off.  All keywords
  * processed in specified order.
  */
-uint64_t PVFS_debug_eventlog_to_mask(const char *event_logging)
+PVFS_debug_mask PVFS_debug_eventlog_to_mask(const char *event_logging)
 {
     return debug_to_mask(s_keyword_mask_map, 
-            num_keyword_mask_map, event_logging);
+                         num_keyword_mask_map, 
+                         event_logging);
 }
 
-uint64_t PVFS_kmod_eventlog_to_mask(const char *event_logging)
+PVFS_debug_mask PVFS_kmod_eventlog_to_mask(const char *event_logging)
 {
     return debug_to_mask(s_kmod_keyword_mask_map, 
-            num_kmod_keyword_mask_map, event_logging);
+                         num_kmod_keyword_mask_map, 
+                         event_logging);
 }
 
 /*
-  returns the keyword matching the specified position.
-  returns NULL when an invlalid position is requested.
-  
-  to simply iterate all keywords, position should start at 0
-  and be incremented repeatedly until this method returns NULL.
-*/
+ * returns the keyword matching the specified position.
+ * returns NULL when an invlalid position is requested.
+ * 
+ * to simply iterate all keywords, position should start at 0
+ * and be incremented repeatedly until this method returns NULL.
+ */
 const char *PVFS_debug_get_next_debug_keyword(int position)
 {
-    int num_entries = (int)(sizeof(s_keyword_mask_map) /
-                            sizeof(__keyword_mask_t));
-
-    return (((position > -1) && (position < num_entries)) ?
+    return (((position > -1) && (position < num_keyword_mask_map)) ?
             s_keyword_mask_map[position].keyword : NULL);
 }
 /*

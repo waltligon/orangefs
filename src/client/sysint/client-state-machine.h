@@ -512,6 +512,7 @@ struct PINT_client_mgmt_perf_mon_list_sm
     int64_t **perf_matrix;
     uint64_t *end_time_ms_array;
     int server_count; 
+    int req_keys; 
     int *key_count; 
     int history_count; 
     PVFS_id_gen_t *addr_array;
@@ -602,9 +603,9 @@ struct PINT_client_atomiceattr_sm
                       if they should exist (XATTR_REPLACE) or neither */
     int32_t opcode;
     PVFS_ds_keyval *key_array;
-    PVFS_size *size_array;
-    PVFS_sysresp_geteattr *resp_p;
-    PVFS_ds_keyval *val_array;    
+    PVFS_ds_keyval *old_val_array;    
+    PVFS_ds_keyval *new_val_array;    
+    PVFS_sysresp_atomiceattr *resp_p;
 };
 
 struct PINT_client_deleattr_sm

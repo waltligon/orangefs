@@ -6,7 +6,19 @@
 #ifndef __PINT_DEV_H
 #define __PINT_DEV_H
 
+/*
+ * parameter structure used in PVFS_DEV_CLIENT_MASK ioctl command
+ *
+ * dev_mask2_info_t is used in pint-dev-shared.h
+typedef struct
+{
+  uint64_t mask1_value;
+  uint64_t mask2_value;
+} dev_mask2_info_t;
+ */
+
 #include "pvfs2-internal.h"
+#include "pvfs2-debug.h"
 #include "pvfs2-types.h"
 #include "pint-dev-shared.h"
 
@@ -19,10 +31,8 @@ typedef struct
      KERNEL_MASK,
      CLIENT_MASK,
   } mask_type;
-  uint64_t mask_value;
+  PVFS_debug_mask mask_value;
 } dev_mask_info_t;
-
-
 
 enum pvfs_bufmap_type {
     BM_IO = 0,

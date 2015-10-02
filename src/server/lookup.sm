@@ -232,25 +232,34 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
      * system default metasidcount and NOT the root's sid count.  
      */
 
-    gossip_err("%s:s_op->target_handle=(%s)\n",__func__,PVFS_OID_str(&s_op->target_handle));
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "%s:s_op->target_handle=(%s)\n", __func__,
+                 PVFS_OID_str(&s_op->target_handle));
 
     PVFS_object_ref fs_root;
-    memset(&fs_root,0,sizeof(fs_root));
-    ret=PINT_cached_config_get_root_ref(s_op->target_fs_id,&fs_root);
+    memset(&fs_root, 0, sizeof(fs_root));
+    ret = PINT_cached_config_get_root_ref(s_op->target_fs_id, &fs_root);
     if (ret)
     {
-       gossip_err("Root handle for filesystem(%d) not found\n",s_op->target_fs_id);
+       gossip_err("%s: Root handle for filesystem(%d) not found\n", __func__,
+                  s_op->target_fs_id);
     }
     else
     {
-       gossip_err("Root handle(%s)\n",PVFS_OID_str(&fs_root.handle));
-       if (!PVFS_OID_cmp(&s_op->target_handle,&fs_root.handle))
+       gossip_debug(GOSSIP_SERVER_DEBUG,
+                    "%s: Root handle(%s)\n", __func__,
+                    PVFS_OID_str(&fs_root.handle));
+       if (!PVFS_OID_cmp(&s_op->target_handle, &fs_root.handle))
        {
-          gossip_err("Target handle(%s) is root handle\n",PVFS_OID_str(&s_op->target_handle));
+          gossip_debug(GOSSIP_SERVER_DEBUG,
+                       "%s: Target handle(%s) is root handle\n", __func__,
+                       PVFS_OID_str(&s_op->target_handle));
        }
        else
        {
-          gossip_err("Target handle(%s) is NOT a root handle\n",PVFS_OID_str(&s_op->target_handle));
+          gossip_debug(GOSSIP_SERVER_DEBUG,
+                       "%s: Target handle(%s) is NOT a root handle\n", __func__,
+                       PVFS_OID_str(&s_op->target_handle));
        }
     }
 

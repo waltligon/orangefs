@@ -289,7 +289,11 @@ static int my_glibc_getdents64(u_int fd, struct dirent64 *dirp, u_int count)
 
 static int my_glibc_fadvise64(int fd, off64_t offset, off64_t len, int advice)
 {
+#ifdef __arm__
+    return syscall(__NR_arm_fadvise64_64, fd, advice, offset, len);
+#else
     return syscall(SYS_fadvise64, fd, offset, len, advice);
+#endif
 }
 
 static int my_glibc_fadvise(int fd, off_t offset, off_t len, int advice)
@@ -750,6 +754,11 @@ static void cleanup_usrint_internal(void)
     struct qlist_head *qh, *qh_next;
 
     init_debug("Running cleanup\n");
+    /* if we never ran init, don't run cleanup */
+    if (!pvfs_lib_init_flag)
+    {
+        return;
+    }
     /* cache cleanup */
 #if PVFS_UCACHE_ENABLE
     /* put code here to flush and/or close files */
@@ -900,13 +909,15 @@ static int init_usrint_internal(void)
     PINT_initrand();
 
     /* if this fails not much we can do about it */
-    /* atexit(usrint_cleanup); */
+#if GCC_USE_ATEXIT
+    atexit(cleanup_usrint_internal);
+#endif
 
     /* we assume if we are running this code this program was
      * just exec'd and the parent may or may not have been PVFS enabled
      *
      * first check for existing shm area - it should be on the magic fd
-     * PVFS_SHMOBJ, otherwise we assume the paretn was not PVFS enabled
+     * PVFS_SHMOBJ, otherwise we assume the parent was not PVFS enabled
      * and we will have to create a new one from scratch.
      */
 

@@ -24,19 +24,28 @@
 /* Must have LARGEFILE and LARGEFILE64 for PVFS usrint */
 #ifdef _LARGEFILE_SOURCE
 #undef _LARGEFILE_SOURCE
-#define _LARGEFILE_SOURCE 1
 #endif
+#define _LARGEFILE_SOURCE 1
 #ifdef _LARGEFILE64_SOURCE
 #undef _LARGEFILE64_SOURCE
-#define _LARGEFILE64_SOURCE 1
 #endif
+#define _LARGEFILE64_SOURCE 1
 /* If programmer didn't specify this, force it to 64bit */
 /* This only affects the default interface */
 #ifndef _FILE_OFFSET_BITS
 #define _FILE_OFFSET_BITS 64
 #endif
+#ifdef _FORTIFY_SOURCE
+#undef _FORTIFY_SOURCE
+#endif
+#define _FORTIFY_SOURCE 0
 
 #include <features.h>
+
+#ifdef __USE_FORTIFY_LEVEL
+#undef __USE_FORTIFY_LEVEL
+#endif
+#define __USE_FORTIFY_LEVEL 0
 
 #include <fcntl.h>
 #include <utime.h>
@@ -87,6 +96,10 @@ enum
     PVFS_FETCH_AND_ADD = 0xADD
 };
 
+/* functions to check fd or path validity */
+extern int pvfs_valid_path(const char *path);
+
+extern int pvfs_valid_fd(int fd);
 
 /* pvfs_open */
 extern int pvfs_open(const char *path, int flags, ...);
@@ -293,6 +306,39 @@ extern ssize_t pvfs_lgetxattr(const char *path, const char *name,
 
 extern ssize_t pvfs_fgetxattr(int fd, const char *name,
                               void *value, size_t size);
+
+extern ssize_t pvfs_atomicxattr(const char *path,
+                                int opcode,
+                                const char *name,
+                                void *old_value,
+                                size_t old_valsize,
+                                void *new_value,
+                                size_t new_valsize,
+                                void *response,
+                                size_t respsize,
+                                int flags);
+
+extern ssize_t pvfs_latomicxattr(const char *path,
+                                 int opcode,
+                                 const char *name,
+                                 void *old_value,
+                                 size_t old_valsize,
+                                 void *new_value,
+                                 size_t new_valsize,
+                                 void *response,
+                                 size_t respsize,
+                                 int flags);
+
+extern ssize_t pvfs_fatomicxattr(int fd,
+                                 int opcode,
+                                 const char *name,
+                                 void *old_value,
+                                 size_t old_valsize,
+                                 void *new_value,
+                                 size_t new_valsize,
+                                 void *response,
+                                 size_t respsize,
+                                 int flags);
 
 extern ssize_t pvfs_listxattr(const char *path, char *list, size_t size);
 

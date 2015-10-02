@@ -103,6 +103,7 @@ nested machine pvfs2_set_attr_work_sm
     state write_distr_dir_data_if_required
     {
         run setattr_write_distr_dir_data_if_required;
+        success => setobj_attrib;
         default => work_cleanup;
     }
 
@@ -564,21 +565,31 @@ static PINT_sm_action setattr_setobj_attribs(struct PINT_smcb *smcb,
      * PVFS_object_attr_overwrite_setable
      * macro, since there are many more users of it, I think.
      */
-     if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
-     {
-         PVFS_time orig_mtime = a_p->mtime;
-         a_p->mtime = PINT_util_mktime_version(orig_mtime);
-         gossip_debug(GOSSIP_SETATTR_DEBUG, "setting version "
-                      "to %llu\n\tmtime is %llu\n",
-                      llu(a_p->mtime), llu(orig_mtime));
-     }
+    if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
+    {
+        PVFS_time orig_mtime = a_p->mtime;
+        a_p->mtime = PINT_util_mktime_version(orig_mtime);
+        gossip_debug(GOSSIP_SETATTR_DEBUG, "setting version "
+                     "to %llu\n\tmtime is %llu\n",
+                     llu(a_p->mtime), llu(orig_mtime));
+    }
 
-     /*
-      * Probably any time attributes are set we should update ctime
-      * Clients should be able to send in specific values for the 4
-      * times to be explicitly set, and we should handle that.  Need
-      * to work out details of that for the mask an so on - WBL
-      */
+    /*
+     * Probably any time attributes are set we should update ctime
+     * Clients should be able to send in specific values for the 4
+     * times to be explicitly set, and we should handle that.  Need
+     * to work out details of that for the mask an so on - WBL
+     */
+
+    /* setattr changes metadata, and thus inherently sets CTIME
+     * set the flag here and PVFS_object_attr_overwrite_setable will
+     * take care of the rest. 
+     */
+    if ((a_p->objtype == PVFS_TYPE_METAFILE) ||
+        (a_p->objtype == PVFS_TYPE_DIRECTORY))
+    {
+        a_p->mask |= PVFS_ATTR_COMMON_CTIME;
+    }
 
     /* if the object is a symbolic link, check to make sure that the request
      * is not attempting to change the permissions 
@@ -1150,7 +1161,7 @@ static int perm_setattr(PINT_server_op *s_op)
             }
             else if (!(s_op->req->capability.op_mask & perm_table[i][PERM_TABLE_PERM]))
             {
-                gossip_debug((GOSSIP_SETATTR_DEBUG|GOSSIP_SECURITY_DEBUG), 
+                gossip_debug((GOSSIP_SETATTR_SECURITY_DEBUG), 
                              "%s: no permissions to set attr 0x%x\n", __func__, 
                              perm_table[i][PERM_TABLE_ATTR]);
                 return -PVFS_EACCES;
@@ -1176,7 +1187,7 @@ static int perm_setattr(PINT_server_op *s_op)
         /* check current owner */
         if (attr->owner != uid)
         {
-            gossip_debug((GOSSIP_SETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
+            gossip_debug((GOSSIP_SETATTR_SECURITY_DEBUG),
                          "%s: only owner of a file can change its "
                          "ownership\n", __func__);
             return -PVFS_EPERM;
@@ -1186,7 +1197,7 @@ static int perm_setattr(PINT_server_op *s_op)
         if (req_attr->mask & PVFS_ATTR_COMMON_UID &&
             uid != req_attr->owner)
         {
-            gossip_debug((GOSSIP_SETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
+            gossip_debug((GOSSIP_SETATTR_SECURITY_DEBUG),
                          "%s: non-admin may only change owner to self\n",
                          __func__);
             return -PVFS_EPERM;
@@ -1209,7 +1220,7 @@ static int perm_setattr(PINT_server_op *s_op)
             /* no group matches */
             if (i >= num_groups)
             {
-                gossip_debug((GOSSIP_SETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
+                gossip_debug((GOSSIP_SETATTR_SECURITY_DEBUG),
                              "%s: only members of a group may change ownership "
                              "to that group\n", __func__);
                 return -PVFS_EPERM;

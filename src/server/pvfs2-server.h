@@ -436,6 +436,7 @@ struct PINT_server_crdirent_op
     split_msg_boundary *msg_boundaries;
     PVFS_ds_keyval *entries_key_a;
     PVFS_ds_keyval *entries_val_a;
+    PVFS_handle *remote_dirdata_handles;
 };
 
 struct PINT_server_rmdirent_op
@@ -974,12 +975,12 @@ const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
 #ifndef GOSSIP_DISABLE_DEBUG
 #ifdef WIN32
 void PINT_server_access_debug(PINT_server_op * s_op,
-                              int64_t debug_mask,
+                              PVFS_debug_mask debug_mask,
                               const char * format,
                               ...);
 #else
 void PINT_server_access_debug(PINT_server_op * s_op,
-                              int64_t debug_mask,
+                              PVFS_debug_mask debug_mask,
                               const char * format,
                               ...) __attribute__((format(printf, 3, 4)));
 #endif

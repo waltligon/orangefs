@@ -167,7 +167,7 @@ extern int SID_cache_lookup_bmi(DB *dbp,
 extern int SID_cache_update_server(DB *dbp,
                                    const PVFS_SID *sid_server,
                                    SID_cacheval_t *new_attrs,
-                                   uint32_t sid_types);
+                                   struct SID_type_s *sid_types);
 
 /*
  * This function updates the attributes for a sid in the database if a sid
