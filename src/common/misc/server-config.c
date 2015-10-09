@@ -837,7 +837,7 @@ static const configoption_t options[] =
       *
       */
      {"PrecreateBatchSize",ARG_LIST, get_precreate_batch_size,NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "0, 1024, 1024, 32, 32, 32, 0" },
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "0, 1024, 1024, 1024, 32, 1024, 0" },
 
      /* Precreate pools will be "topped off" if they fall below this value. 
       * One value is specified for each DS handle type. This parameter operates
@@ -845,7 +845,7 @@ static const configoption_t options[] =
       * one DS handle type. The order of types is identical to the 
       * <c>PrecreateBatchSize</c> defined above.  */
      {"PrecreateLowThreshold",ARG_LIST, get_precreate_low_threshold,NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "0, 256, 256, 16, 16, 16, 0"},
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "0, 256, 256, 256, 16, 256, 0"},
 
     /* Specifies if file stuffing should be enabled or not. File stuffing
      * allows the data for a small file to be stored on the same server
