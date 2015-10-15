@@ -644,10 +644,14 @@ static int io_atime_setattr_comp_fn(void *v_p,
     PINT_client_sm *sm_p;
     PVFS_object_ref tmp_ref;
 
+    static unsigned int counter=0;
+    static unsigned int counter_max=10000;
+
     sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     tmp_ref.handle = sm_p->object_ref.handle;
     tmp_ref.fs_id = sm_p->object_ref.fs_id;
+
 
     if(resp_p->status == 0)
     {
@@ -667,10 +671,22 @@ static int io_atime_setattr_comp_fn(void *v_p,
     }
     else
     {
-        gossip_err("I/O atime setattr failed with error code(%d) for metadata handle(%llu). "
-                   "Continuing so I/O is not impacted by this failure.\n"
-                  ,(int)resp_p->status
-                  ,llu(sm_p->object_ref.handle));
+        /* display error message every 10th time it happens. This is only temporary until we
+         * find the problem.
+         */
+        if (counter%10 == 0)
+        {
+           gossip_err("%s:count(%d):Error returned from setattr:%d\n",__func__,counter,resp_p->status);
+           counter++;
+           if (counter==counter_max)
+           {
+              counter=0;
+           }
+           
+        }
+     
+        //gossip_err("I/O atime setattr failed. "
+        //           "Continuing so I/O is not impacted by this failure.\n");
     }
 
     /* Always return success. */
