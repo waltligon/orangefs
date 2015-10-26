@@ -645,6 +645,16 @@ struct PVFS_mgmt_setparam_value
     } u;
 };
 
+struct PVFS_mgmt_getparam_value
+{
+    enum PVFS_mgmt_param_type type;
+    union
+    {
+        uint64_t value;
+        char *string_value;
+    } u;
+};
+
 encode_enum_union_2_struct(
     PVFS_mgmt_setparam_value,
     type, u,
