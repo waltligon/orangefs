@@ -368,15 +368,10 @@ static void encourage_send_waiting_buffer(struct ib_work *sq)
 	/*
 	 * Eager send.
 	 */
-/** dreynol **/
-#if 0   /* old */
 	msg_header_eager_t mh_eager;
-#endif 
-#if 1   /* new */
-	msg_header_eager_t mh_eager = { { 0, 0 }, 0, 0 };
-#endif
-/* dreynol */
-	char *ptr = bh->buf;
+    memset(&mh_eager, 0, sizeof(mh_eager));
+	
+    char *ptr = bh->buf;
 
 	msg_header_init(&mh_eager.c, c, sq->is_unexpected
 	                ? MSG_EAGER_SENDUNEXPECTED : MSG_EAGER_SEND);
@@ -399,14 +394,9 @@ static void encourage_send_waiting_buffer(struct ib_work *sq)
 	 * Request to send, rendez-vous.  Include the mop id in the message
 	 * which will be returned to us in the CTS so we can look it up.
 	 */
-/** dreynol **/
-#if 0	/* old */
 	msg_header_rts_t mh_rts;
-#endif
-#if 1	/* new */
-	msg_header_rts_t mh_rts = { { 0, 0 }, 0, 0, 0, 0 };
-#endif
-/* dreynol */ 
+    memset(&mh_rts, 0, sizeof(mh_rts));
+ 
 	char *ptr = bh->buf;
 
 	msg_header_init(&mh_rts.c, c, MSG_RTS);
