@@ -268,6 +268,11 @@ static PINT_sm_action setup_fn(
         return SM_ACTION_COMPLETE;
     }
         
+    /* set the capability timeout to the maximum allowed (10 years), since the
+     * pool refiller is an internal OrangeFS function.
+     */
+    cap->timeout = PINT_util_get_current_time() + PVFS2_SECURITY_TIMEOUT_MAX;
+
     s_op->u.precreate_pool_refiller.precreate_handle_array = 
         malloc(user_opts->precreate_batch_size[index] * sizeof(PVFS_handle));
     if(!s_op->u.precreate_pool_refiller.precreate_handle_array)
