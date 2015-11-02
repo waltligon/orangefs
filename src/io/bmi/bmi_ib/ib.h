@@ -25,9 +25,12 @@
 #  define __unused
 #endif
 
-/* 20 8kB buffers allocated to each connection for unexpected messages */
+/* 20 16kB buffers allocated to each connection for unexpected messages */
 #define DEFAULT_EAGER_BUF_NUM  (20)
-#define DEFAULT_EAGER_BUF_SIZE (8 << 10)
+#define DEFAULT_EAGER_BUF_SIZE (16 << 10)
+/* TODO: decide if 16kB is the best size for this. Used to be 8kB, but 
+ *       that prevented it from ever using small-io.
+ */ 
 
 struct buf_head;
 
