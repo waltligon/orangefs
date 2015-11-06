@@ -22,7 +22,8 @@
 /* What we do in this function is to walk the list of operations that are present 
  * in the request queue and mark them as purged.
  * NOTE: This is called from the device close after client-core has guaranteed that no new
- * operations could appear on the list since the client-core is anyway going to exit.
+ * operations could appear on the list since the client-core is about to exit.
+ * When the client-core aborts, there's no guarantees!!!!
  */
 void purge_waiting_ops(void)
 {
@@ -32,6 +33,13 @@ void purge_waiting_ops(void)
     {
         gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2-client-core: purging op tag %llu %s\n", llu(op->tag), get_opname_string(op));
         spin_lock(&op->lock);
+        if ( !op_state_waiting(op) )
+        {
+           /* if this op is not in the "waiting" state but is still on this list, then */
+           /* this op is being handled by pvfs2_clean_up_interrupted_operation.        */
+           spin_unlock(&op->lock);
+           continue; /* check next op */
+        }
         set_op_state_purged(op);
         spin_unlock(&op->lock);
         wake_up_interruptible(&op->waitq);
