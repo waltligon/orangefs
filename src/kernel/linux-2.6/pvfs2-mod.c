@@ -365,6 +365,8 @@ static int hash_compare(const void *key, struct qhash_head *link)
 
 /* What we do in this function is to walk the list of operations that are in progress
  * in the hash table and mark them as purged as well.
+ * This function is only called when /dev/pvfs2-req file is closed, which can happen when
+ * the client is shutdown OR when the client aborts.
  */
 void purge_inprogress_ops(void)
 {

@@ -23,7 +23,7 @@
  * in the request queue and mark them as purged.
  * NOTE: This is called from the device close after client-core has guaranteed that no new
  * operations could appear on the list since the client-core is about to exit.
- * When the client-core aborts, there's no guarantees!!!!
+ * When the client-core aborts, there are no guarantees!!!!
  */
 void purge_waiting_ops(void)
 {
@@ -293,7 +293,7 @@ void pvfs2_clean_up_interrupted_operation(
     else if (!op_state_serviced(op))
     {
         spin_unlock(&op->lock);
-        gossip_err("interrupted operation is in a weird state 0x%x\n",
+        gossip_err("interrupted operation is in a weird state (%d)\n",
                     op->op_state);
     }
 }

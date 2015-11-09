@@ -119,11 +119,16 @@ static ssize_t pvfs2_devreq_read(
         spin_lock(&pvfs2_request_list_lock);
         list_for_each_entry_safe (op, temp, &pvfs2_request_list, list)
         {
+            spin_lock(&op->lock);
+
             tag = 0;
+            cur_op = NULL;
+
             fs_id = fsid_of_op(op);
             /* Check if this op's fsid is known and needs remounting */
             if (fs_id != PVFS_FS_ID_NULL && fs_mount_pending(fs_id) == 1)
             {
+                spin_unlock(&op->lock);
                 gossip_debug(GOSSIP_DEV_DEBUG, "Skipping op tag %llu %s\n", llu(op->tag), get_opname_string(op));
                 continue;
             }
@@ -132,28 +137,29 @@ static ssize_t pvfs2_devreq_read(
              */
             else {
                 cur_op = op;
-                spin_lock(&cur_op->lock);
-                if ( !op_state_waiting(cur_op) )
+                if ( !op_state_waiting(op) )
                 {
-                   spin_unlock(&cur_op->lock);
-                   cur_op = NULL;
+                   spin_unlock(&op->lock);
                    continue; /*check next op*/
                 }
-                tag = cur_op->tag;
-                list_del(&cur_op->list);
-                cur_op->op_linger_tmp--;
+                tag = op->tag;
+                list_del(&op->list);
+                op->op_linger_tmp--;
                 /* if there is a trailer, re-add it to the request list */
-                if (cur_op->op_linger == 2 && cur_op->op_linger_tmp == 1)
+                if (op->op_linger == 2 && op->op_linger_tmp == 1)
                 {
-                    if (cur_op->upcall.trailer_size <= 0 || cur_op->upcall.trailer_buf == NULL) 
+                    /* re-add it to the head of the list */
+                    list_add(&op->list, &pvfs2_request_list);
+
+                    if (op->upcall.trailer_size <= 0 || op->upcall.trailer_buf == NULL)
                     {
-                        gossip_err("BUG:trailer_size is %ld and trailer buf is %p\n",
-                                (long) cur_op->upcall.trailer_size, cur_op->upcall.trailer_buf);
+                       spin_unlock(&op->lock);
+                       gossip_err("BUG:trailer_size is %ld and trailer buf is %p\n",
+                               (long) cur_op->upcall.trailer_size, cur_op->upcall.trailer_buf);
+                       break;
                     }
-                    /* readd it to the head of the list */
-                    list_add(&cur_op->list, &pvfs2_request_list);
                 }
-                spin_unlock(&cur_op->lock);
+                spin_unlock(&op->lock);
                 break;
             }
         }
@@ -162,11 +168,12 @@ static ssize_t pvfs2_devreq_read(
 
     if (cur_op)
     {
-        gossip_debug(GOSSIP_DEV_DEBUG, "%s : client-core: reading op tag %llu %s\n", __func__, llu(cur_op->tag), get_opname_string(cur_op));
+        gossip_debug(GOSSIP_DEV_DEBUG, "%s : client-core: reading op tag %llu %s\n"
+                                     , __func__, llu(cur_op->tag), get_opname_string(cur_op));
 
         spin_lock(&cur_op->lock);
 
-        if ( !(op_state_waiting(cur_op) && cur_op->tag == tag) )
+        if ( ! (op_state_waiting(cur_op) && cur_op->tag == tag) )
         {
            spin_unlock(&cur_op->lock);
            gossip_err("%s : WARNING : Op is not in WAITING state but in state(%d); tag (%llu) should be (%llu)\n"
@@ -176,14 +183,13 @@ static ssize_t pvfs2_devreq_read(
         }
 
 
-        if (cur_op->op_linger == 1 
-                || (cur_op->op_linger == 2 && cur_op->op_linger_tmp == 0)) 
+        if ( cur_op->op_linger == 1 ||
+           ( cur_op->op_linger == 2 && cur_op->op_linger_tmp == 0 ) ) 
         {
             set_op_state_inprogress(cur_op);
 
             /* atomically move the operation to the htable_ops_in_progress */
-            qhash_add(htable_ops_in_progress,
-                      (void *) &(cur_op->tag), &cur_op->list);
+            qhash_add(htable_ops_in_progress, (void *) &(cur_op->tag), &cur_op->list);
         }
 
         spin_unlock(&cur_op->lock);
