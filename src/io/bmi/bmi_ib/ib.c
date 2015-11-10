@@ -369,7 +369,7 @@ static void encourage_send_waiting_buffer(struct ib_work *sq)
 	 * Eager send.
 	 */
 	msg_header_eager_t mh_eager;
-    memset(&mh_eager, 0, sizeof(mh_eager));
+    memset(&mh_eager, 0, sizeof(msg_header_eager_t));
 	
     char *ptr = bh->buf;
 
@@ -395,7 +395,7 @@ static void encourage_send_waiting_buffer(struct ib_work *sq)
 	 * which will be returned to us in the CTS so we can look it up.
 	 */
 	msg_header_rts_t mh_rts;
-    memset(&mh_rts, 0, sizeof(mh_rts));
+    memset(&mh_rts, 0, sizeof(msg_header_rts_t));
  
 	char *ptr = bh->buf;
 
