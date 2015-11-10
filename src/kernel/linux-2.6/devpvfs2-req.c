@@ -566,7 +566,16 @@ static ssize_t pvfs2_devreq_writev(
     return total_returned_size;
 }
 
-#ifdef HAVE_COMBINED_AIO_AND_VECTOR
+static ssize_t pvfs2_devreq_write_iter(struct kiocb *iocb,
+                                      struct iov_iter *iter)
+{
+        return pvfs2_devreq_writev(iocb->ki_filp,
+                                   iter->iov,
+                                   iter->nr_segs,
+                                   &iocb->ki_pos);
+}
+
+#if defined(HAVE_COMBINED_AIO_AND_VECTOR) && !defined(HAVE_WRITE_ITER)
 /*
  * Kernels >= 2.6.19 have no writev, use this instead with SYNC_KEY.
  */
@@ -1164,7 +1173,9 @@ struct file_operations pvfs2_devreq_file_operations =
     poll : pvfs2_devreq_poll
 #else
     .read = pvfs2_devreq_read,
-#ifdef HAVE_COMBINED_AIO_AND_VECTOR
+#ifdef HAVE_WRITE_ITER
+    .write_iter = pvfs2_devreq_write_iter,
+#elif HAVE_COMBINED_AIO_AND_VECTOR
     .aio_write = pvfs2_devreq_aio_write,
 #else
     .writev = pvfs2_devreq_writev,

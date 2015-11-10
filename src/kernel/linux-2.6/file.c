@@ -1326,6 +1326,8 @@ static ssize_t do_readv_writev(struct rw_options *rw)
     struct iovec *iovecptr = NULL, *ptr = NULL;
     loff_t *offset;
     char *s = kmalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+    struct kiocb iocb;
+    struct iov_iter iter;
 
     total_count = 0;
     ret = -EINVAL;
@@ -1398,14 +1400,30 @@ static ssize_t do_readv_writev(struct rw_options *rw)
 #ifdef PVFS2_LINUX_KERNEL_2_4
         ret = pvfs2_precheck_file_write(file, inode, &count, offset);
 #else
+#ifdef GWC_USES_KIOCB
+	init_sync_kiocb(&iocb, file);
+	iov_iter_init(&iter,
+		      WRITE,
+		      rw->dest.address.iov,
+		      rw->dest.address.nr_segs,
+		      pvfs_bufmap_size_query());
+	ret = generic_write_checks(&iocb, &iter);
+        if (ret <= 0)
+        {
+            gossip_err("%s: failed generic argument checks.\n", rw->fnstr);
+            goto out;
+        }
+
+#else
         ret = generic_write_checks(file, offset, &count, S_ISBLK(inode->i_mode));
-#endif
         if (ret != 0)
         {
             gossip_err("%s: failed generic argument checks.\n", rw->fnstr);
             goto out;
         }
 
+#endif
+#endif
         memset(s,0,HANDLESTRINGSIZE);
         gossip_debug(GOSSIP_FILE_DEBUG,
                      "%s/%s(%s): proceeding with offset : %llu, size %d\n",
