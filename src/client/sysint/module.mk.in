@@ -44,6 +44,7 @@ CLIENT_SMCGEN := \
 	$(DIR)/fs-add.c \
 	$(DIR)/mgmt-noop.c \
 	$(DIR)/mgmt-setparam-list.c \
+	$(DIR)/mgmt-getparam-list.c \
 	$(DIR)/mgmt-statfs-list.c \
 	$(DIR)/mgmt-perf-mon-list.c \
 	$(DIR)/mgmt-event-mon-list.c \

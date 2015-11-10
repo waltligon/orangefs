@@ -72,7 +72,27 @@ static PINT_sm_action getparam_work(
     char buf[16] = {0};
     ret = PINT_perf_get_info(PINT_server_pc,
                                  PINT_PERF_KEY_COUNT,
-                                 &key_count);
+    struct server_configuration_s *user_opts = NULL;
+		uint64_t hist, interval;
+		int ret = -1;
+		ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_HISTORY_SIZE, &hist);
+		if(ret != 0) /* Verify return value */;
+		ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_KEY_COUNT, &key_count);
+		if(ret != 0) /* Verify return value */;
+		ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_UPDATE_INTERVAL, &interval);
+		if(ret != 0) /* Verify return value */;
+		user_opts = get_server_config_struct();
+		if(user_opts->perf_update_interval != interval){
+			/* handle the case where whats in server config conflicts with current perf setting */
+		}
+		if(user_opts->perf_hist != hist){
+			/* handle the case where whats in server config conflicts with current perf setting */
+		}
+		s_op->resp->u.mgmt_get_param->hist = hist;
+		s_op->resp->u.mgmt_get_param->interval = interval;
+
+    return(server_state_machine_complete(smcb));
+}                                &key_count);
 
     /*switch(s_op->req->u.mgmt_getparam.param)
     {
