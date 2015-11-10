@@ -1326,8 +1326,10 @@ static ssize_t do_readv_writev(struct rw_options *rw)
     struct iovec *iovecptr = NULL, *ptr = NULL;
     loff_t *offset;
     char *s = kmalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+#ifdef GWC_USES_KIOCB
     struct kiocb iocb;
     struct iov_iter iter;
+#endif
 
     total_count = 0;
     ret = -EINVAL;

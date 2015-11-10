@@ -566,6 +566,7 @@ static ssize_t pvfs2_devreq_writev(
     return total_returned_size;
 }
 
+#ifdef HAVE_WRITE_ITER
 static ssize_t pvfs2_devreq_write_iter(struct kiocb *iocb,
                                       struct iov_iter *iter)
 {
@@ -574,6 +575,7 @@ static ssize_t pvfs2_devreq_write_iter(struct kiocb *iocb,
                                    iter->nr_segs,
                                    &iocb->ki_pos);
 }
+#endif
 
 #if defined(HAVE_COMBINED_AIO_AND_VECTOR) && !defined(HAVE_WRITE_ITER)
 /*
