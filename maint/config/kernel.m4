@@ -2011,6 +2011,7 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 			#include <linux/kconfig.h>
 		#endif
 		#include <linux/fs.h>
+		#include <linux/namei.h>
 		], [
 		struct nameidata *nd;
 		char *target;
