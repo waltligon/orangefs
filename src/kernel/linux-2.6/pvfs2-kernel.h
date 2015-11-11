@@ -208,17 +208,20 @@ enum pvfs2_vfs_op_states {
     OP_VFS_STATE_INPROGR = 2,
     OP_VFS_STATE_SERVICED = 4,
     OP_VFS_STATE_PURGED  = 8,
+    OP_VFS_STATE_INTERRUPTED = 16,
 };
 
 #define set_op_state_waiting(op)     ((op)->op_state = OP_VFS_STATE_WAITING)
 #define set_op_state_inprogress(op)  ((op)->op_state = OP_VFS_STATE_INPROGR)
 #define set_op_state_serviced(op)    ((op)->op_state = OP_VFS_STATE_SERVICED)
 #define set_op_state_purged(op)      ((op)->op_state |= OP_VFS_STATE_PURGED)
+#define set_op_state_interrupted(op) ((op)->op_state = OP_VFS_STATE_INTERRUPTED)
 
 #define op_state_waiting(op)     ((op)->op_state & OP_VFS_STATE_WAITING)
 #define op_state_in_progress(op) ((op)->op_state & OP_VFS_STATE_INPROGR)
 #define op_state_serviced(op)    ((op)->op_state & OP_VFS_STATE_SERVICED)
 #define op_state_purged(op)      ((op)->op_state & OP_VFS_STATE_PURGED)
+#define op_state_interrupted(op) ((op)->op_state & OP_VFS_STATE_INTERRUPTED)
 
 /* Defines for incrementing aio_ref_count */
 #ifndef HAVE_AIO_VFS_SUPPORT
