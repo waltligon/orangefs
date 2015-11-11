@@ -2003,6 +2003,25 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 		AC_MSG_RESULT(no)
 		)
 
+	dnl Check for nd_set_link
+	AC_MSG_CHECKING(for nd_set_link)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+			#include <linux/kconfig.h>
+		#endif
+		#include <linux/fs.h>
+		], [
+		struct nameidata *nd;
+		char *target;
+
+		nd_set_link(nd, target);
+		],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_ND_SET_LINK, 1, nd_set_link is a function),
+		AC_MSG_RESULT(no)
+		)
+
 	dnl Check for generic_write_checks flavor
 	AC_MSG_CHECKING(for generic_write_checks version)
 	AC_TRY_COMPILE([
