@@ -98,12 +98,10 @@ int PINT_verify_capability(const PVFS_capability *cap)
         return 1;
     }
 
-    /* TODO: temp - do not check timeout
     if (PINT_util_get_current_time() > cap->timeout)
     {
         return 0;
     }
-    */
 
     return 1;
 }
@@ -144,12 +142,10 @@ int PINT_verify_credential(const PVFS_credential *cred)
         return 0;
     }
 
-    /* TODO: temp - do not check timeout
     if (PINT_util_get_current_time() > cred->timeout)
     {
         return 0;
     }
-    */
 
     return 1;
 }
