@@ -169,8 +169,7 @@ machine pvfs2_client_io_sm
     state io_getattr
     {
         jump pvfs2_client_getattr_sm;
-        success => inspect_attr;
-        default => io_cleanup;
+        default => inspect_attr;        
     }
 
     state inspect_attr
@@ -474,10 +473,6 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_init\n", sm_p);
 
-    assert((js_p->error_code == 0) ||
-           (js_p->error_code == IO_RETRY) ||
-           (js_p->error_code == IO_RENEW_CAPABILITY));
-
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->object_ref,
@@ -486,8 +481,8 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
                                0);
        
     if (js_p->error_code == IO_RETRY ||
-        (js_p->error_code == IO_RETRY_NODELAY) ||
-        (js_p->error_code == IO_RENEW_CAPABILITY))
+        js_p->error_code == IO_RETRY_NODELAY ||
+        js_p->error_code == IO_RENEW_CAPABILITY)
     {
 
         io_datafile_index_array_destroy(sm_p);
@@ -505,12 +500,13 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
             js_p->error_code = 0;
             return SM_ACTION_COMPLETE;
         }
-        if(js_p->error_code == IO_RETRY_NODELAY)
+        if (js_p->error_code == IO_RETRY_NODELAY)
         {
             gossip_debug(GOSSIP_IO_DEBUG, "  sys-io retrying without delay.\n");
             js_p->error_code = 0;
             return SM_ACTION_COMPLETE;
         }
+
         gossip_debug(GOSSIP_IO_DEBUG, "  sys-io retrying with delay.\n");
         js_p->error_code = 0;
         return job_req_sched_post_timer(sm_p->msgarray_op.params.retry_delay,
@@ -520,6 +516,7 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
                                         &tmp_id,
                                         pint_client_sm_context);
     }
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -530,14 +527,28 @@ static PINT_sm_action io_inspect_attr(struct PINT_smcb *smcb,
     PVFS_time curtime;
     int ret;
 
-    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    js_p->error_code = 0;
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);    
 
-    if (PINT_smcb_cancelled(smcb))
+    if (js_p->error_code == -PVFS_ECANCEL || PINT_smcb_cancelled(smcb))
     {
         js_p->error_code = -PVFS_ECANCEL;
         return SM_ACTION_COMPLETE;
     }
+
+    /* error from getattr */
+    if (js_p->error_code != 0)
+    {
+
+        if (js_p->error_code == -PVFS_EAGAIN)
+        {
+            
+            return SM_ACTION_COMPLETE;
+        }
+
+
+    }
+
+    js_p->error_code = 0;
 
     /* first make sure this is an appropriate object */
     if (sm_p->getattr.attr.objtype == PVFS_TYPE_DIRECTORY)
@@ -2224,11 +2235,18 @@ static PINT_sm_action io_cleanup(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_cleanup\n", sm_p);
 
-    /* capability most likely expired */
+    /* PVFS_EAGAIN usually means the capability expired */
     if (js_p->error_code == -PVFS_EAGAIN)
     {
-        js_p->error_code = IO_RENEW_CAPABILITY;
-        return SM_ACTION_COMPLETE;
+        struct server_configuration_s *server_config = 
+            PINT_get_server_config_struct(sm_p->object_ref.fs_id);
+
+        /* increment the retry count and potentially try again */
+        if (sm_p->u.io.retry_count++ < server_config->client_retry_limit)
+        {
+            js_p->error_code = IO_RENEW_CAPABILITY;
+            return SM_ACTION_COMPLETE;
+        }
     }
 
     io_contexts_destroy(sm_p);
@@ -2424,7 +2442,7 @@ static inline int io_post_flow(PINT_smcb *smcb,
 
     status_user_tag = ((4 * cur_ctx->index) + IO_SM_PHASE_FLOW);
 
-    server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);    
+    server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
 
     fs_config = PINT_config_find_fs_id(server_config, cur_ctx->msg.fs_id);
     if(fs_config)
