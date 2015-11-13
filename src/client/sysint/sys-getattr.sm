@@ -27,6 +27,7 @@
 #include "security-util.h"
 #include "dist-dir-utils.h"
 #include "client-capcache.h"
+#include "client-credcache.h"
 
 /* pvfs2_client_getattr_sm
  *
@@ -47,10 +48,11 @@ extern job_context_id pint_client_sm_context;
 
 enum
 {
-    GETATTR_CACHE_MISS = 1,
+    GETATTR_CACHE_MISS          = 1,
     GETATTR_NEED_DATAFILE_SIZES = 2,
-    GETATTR_IO_RETRY = 3,
-    GETATTR_NEED_DIRDATA_ATTRS = 4
+    GETATTR_IO_RETRY            = 3,
+    GETATTR_NEED_DIRDATA_ATTRS  = 4,
+    GETATTR_RENEW_CREDENTIAL    = 5
 };
 
 /* completion function prototypes */
@@ -125,8 +127,16 @@ nested machine pvfs2_client_getattr_sm
     state client_capcache_lookup
     {
         run getattr_client_capcache_lookup;
+        GETATTR_RENEW_CREDENTIAL => getattr_renew_credential; 
         GETATTR_CACHE_MISS => object_getattr_setup_msgpair;
         default => cleanup;
+    }
+
+    state getattr_renew_credential
+    {
+       run getattr_renew_credential;
+       success => object_getattr_setup_msgpair;
+       default => cleanup;
     }
 
     state object_getattr_setup_msgpair
@@ -638,6 +648,23 @@ static PINT_sm_action getattr_client_capcache_lookup(struct PINT_smcb *smcb,
                       sizeof(PVFS_uid), &local_uid);
     }
 
+    /* Make sure the credential has not timed out.  For a capability to be
+     * to be valid, the credential upon which it is created must also be 
+     * valid.
+    */
+    if ( ! PINT_verify_credential(sm_p->cred_p) )
+    {
+       /* remove from ccache, regenerate cred, and insert new cred 
+        * into ccache.
+        */
+       js_p->error_code = GETATTR_RENEW_CREDENTIAL;
+
+       /* remove capability from the capcache */
+       PINT_client_capcache_invalidate(sm_p->getattr.object_ref, local_uid);
+
+       return SM_ACTION_COMPLETE;
+    }
+
     /* lookup capability */
     ret = PINT_client_capcache_get_cached_entry(sm_p->getattr.object_ref, 
               local_uid, &sm_p->getattr.attr.capability);
@@ -674,6 +701,49 @@ static PINT_sm_action getattr_client_capcache_lookup(struct PINT_smcb *smcb,
 
     return SM_ACTION_COMPLETE;
 }
+static PINT_sm_action getattr_renew_credential(
+                                    struct PINT_smcb *smcb,
+                                    job_status_s *js_p)
+{
+   struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   PVFS_uid local_uid;
+   PVFS_gid local_gid;
+
+   js_p->error_code = 0;
+
+   /* retrieve the uid */
+   local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+   if ( local_uid == -1 )
+   {
+      js_p->error_code = -PVFS_EACCES;
+      gossip_err("%s:unable to get uid from hints\n",__func__);
+      return SM_ACTION_COMPLETE;
+   }
+
+   /* retrieve the gid */
+   local_gid = PINT_HINT_GET_OWNER_GID(sm_p->hints);
+   if ( local_gid == -1 )
+   {
+      js_p->error_code = -PVFS_EACCES;
+      gossip_err("%s:unable to get gid from hints\n",__func__);
+      return SM_ACTION_COMPLETE;
+   }
+
+   /* lookup_credential will recognize that the cred has timed out and then regenerate 
+    * a new credential and insert into the cred cache.
+    */
+   sm_p->cred_p = NULL;
+   sm_p->cred_p = lookup_credential(local_uid,local_gid);
+
+   if ( !sm_p->cred_p )
+   {
+      js_p->error_code = -PVFS_EACCES;
+      gossip_err("%s:unable to create new credentials for uid(%llu) and gid(%llu)\n"
+                ,__func__,llu(local_uid),llu(local_gid));
+   }
+
+   return SM_ACTION_COMPLETE;
+}/* end getattr_renew_credential */
 
 static PINT_sm_action getattr_object_getattr_setup_msgpair(
                                              struct PINT_smcb *smcb,
