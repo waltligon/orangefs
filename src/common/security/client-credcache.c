@@ -9,6 +9,15 @@
 
 #define CRED_TIMEOUT_BUFFER 5
 
+#define __PINT_REQPROTO_ENCODE_FUNCS_C
+#include <stddef.h>
+#include "pvfs2-types.h"
+#include "gossip.h"
+#include "pvfs2-debug.h"
+#include "tcache.h"
+#include "security-util.h"
+#include "pvfs2-util.c"
+#include "pvfs2-encode-stubs.h"
 #include "client-credcache.h"
 
 
@@ -56,7 +65,7 @@ PVFS_credential *lookup_credential(
     gossip_debug(GOSSIP_SECURITY_DEBUG,
                  "credential cache MISS for (%u, %u)\n", uid, gid);
 
-    credential = generate_credential(uid, gid);
+    credential = generate_credential(uid, gid, NULL);
     if (credential == NULL)
     {
         gossip_err("unable to generate client credential for uid, gid "
@@ -146,7 +155,8 @@ void remove_credential(
 /* calls the pvfs2-gencred app to generate a credential */
 PVFS_credential *generate_credential(
     PVFS_uid uid,
-    PVFS_gid gid)
+    PVFS_gid gid,
+    char *keypath)
 {
     char user[16], group[16];
     int ret;
@@ -181,7 +191,7 @@ PVFS_credential *generate_credential(
         user,
         group,
         timeout,
-        s_opts.keypath,
+        keypath,
         NULL,
         credential);
     if (ret < 0)

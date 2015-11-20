@@ -5368,7 +5368,8 @@ static int get_mac(void)
 /* calls the pvfs2-gencred app to generate a credential */
 static PVFS_credential *generate_credential(
     PVFS_uid uid,
-    PVFS_gid gid)
+    PVFS_gid gid,
+    char * keypath)
 {
     char user[16], group[16];
     int ret;
@@ -5403,7 +5404,7 @@ static PVFS_credential *generate_credential(
         user,
         group,
         timeout,
-        s_opts.keypath,
+        keypath,
         NULL,
         credential);
     if (ret < 0)
@@ -5459,7 +5460,7 @@ static PVFS_credential *lookup_credential(
     gossip_debug(GOSSIP_SECURITY_DEBUG,
                  "credential cache MISS for (%u, %u)\n", uid, gid);
 
-    credential = generate_credential(uid, gid);
+    credential = generate_credential(uid, gid, s_opts.keypath);
     if (credential == NULL)
     {
         gossip_err("unable to generate client credential for uid, gid "

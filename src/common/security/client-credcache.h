@@ -14,12 +14,7 @@
 #define __CLIENT_CREDCACHE_H
 
 #include "pvfs2-types.h"
-#include <stddef.h>
-#include "gossip.h"
-#include "pvfs2-debug.h"
-#include "tcache.h"
-#include "security-util.h"
-#include "pvfs2-util.c"
+
 
 PVFS_credential *lookup_credential(
     PVFS_uid uid,
@@ -31,7 +26,8 @@ void remove_credential(
 
 PVFS_credential *generate_credential(
     PVFS_uid uid,
-    PVFS_gid gid);
+    PVFS_gid gid,
+    char * keypath);
 
 struct credential_key
 {
