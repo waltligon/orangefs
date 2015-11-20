@@ -183,6 +183,9 @@ static PINT_sm_action setattr_verify_attribs(
                  "[owner = %d, group = %d, perms = %o, type = %d]\n",
                  a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
+    PINT_perf_count(PINT_server_pc, PINT_PERF_SETATTR, 1, PINT_PERF_ADD);
+    PINT_perf_timer_start(&s_op->start_time);
+
     /* debug request attrs */
     if (req_a_p->mask & PVFS_ATTR_COMMON_UID)
     {
@@ -966,6 +969,8 @@ static PINT_sm_action setattr_work_cleanup(
 static PINT_sm_action setattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TSETATTR, &s_op->start_time);
     return(server_state_machine_complete(smcb));
 }
 

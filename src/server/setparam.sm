@@ -123,6 +123,10 @@ static PINT_sm_action setparam_work(struct PINT_smcb *smcb, job_status_s *js_p)
                                          PINT_PERF_UPDATE_HISTORY,
                                          val);
                 js_p->error_code = ret;
+                ret = PINT_perf_set_info(PINT_server_tpc,
+                                         PINT_PERF_UPDATE_HISTORY,
+                                         val);
+                js_p->error_code = ret;
             }
             return SM_ACTION_COMPLETE;
         }
@@ -143,6 +147,10 @@ static PINT_sm_action setparam_work(struct PINT_smcb *smcb, job_status_s *js_p)
             if (val > 0)
             {
                 ret = PINT_perf_set_info(PINT_server_pc,
+                                         PINT_PERF_UPDATE_INTERVAL,
+                                         val);
+                js_p->error_code = ret;
+                ret = PINT_perf_set_info(PINT_server_tpc,
                                          PINT_PERF_UPDATE_INTERVAL,
                                          val);
                 js_p->error_code = ret;

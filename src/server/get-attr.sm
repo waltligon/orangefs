@@ -1760,6 +1760,7 @@ static PINT_sm_action getattr_cleanup(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TGETATTR, &s_op->start_time);
     free_keyval_buffers(s_op);
 
     PINT_free_object_attr(&s_op->resp.u.getattr.attr);
@@ -1769,6 +1770,11 @@ static PINT_sm_action getattr_cleanup(
 static PINT_sm_action getattr_with_prelude_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_GETATTR, 1, PINT_PERF_ADD);
+    PINT_perf_timer_start(&s_op->start_time);
+
     js_p->error_code = 0;    
     return SM_ACTION_COMPLETE;
 }

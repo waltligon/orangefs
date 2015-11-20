@@ -26,6 +26,8 @@
 #include "pint-util.h"
 #include "gossip.h"
 
+static struct timespec timediff(struct timespec start, struct timespec end);
+
 #define PINT_PERF_REALLOC_ARRAY(__pc, __tmp_ptr, __src_ptr, __new_history, __type) \
 {                                                                      \
     __tmp_ptr = (__type *)malloc(__new_history * sizeof(__type));      \
@@ -53,6 +55,8 @@ struct PINT_perf_key server_keys[] =
     {"metadata keyval ops", PINT_PERF_METADATA_KEYVAL_OPS, PINT_PERF_PRESERVE},
     {"request scheduler", PINT_PERF_REQSCHED, PINT_PERF_PRESERVE},
     {"requests received ", PINT_PERF_REQUESTS, PINT_PERF_PRESERVE},
+    {"bytes read by io", PINT_PERF_IOREAD, PINT_PERF_PRESERVE},
+    {"bytes written io", PINT_PERF_IOWRITE, PINT_PERF_PRESERVE},
     {"bytes read by small_io", PINT_PERF_SMALL_READ, PINT_PERF_PRESERVE},
     {"bytes written by small_io", PINT_PERF_SMALL_WRITE, PINT_PERF_PRESERVE},
     {"bytes read by flow", PINT_PERF_FLOW_READ, PINT_PERF_PRESERVE},
@@ -63,6 +67,29 @@ struct PINT_perf_key server_keys[] =
     {"rmdir requests called", PINT_PERF_RMDIR, PINT_PERF_PRESERVE},
     {"getattr requests called", PINT_PERF_GETATTR, PINT_PERF_PRESERVE},
     {"setattr requests called", PINT_PERF_SETATTR, PINT_PERF_PRESERVE},
+    {"io requests called", PINT_PERF_IO, PINT_PERF_PRESERVE},
+    {"small_io requests called", PINT_PERF_SMALL_IO, PINT_PERF_PRESERVE},
+    {"readdir requests called", PINT_PERF_READDIR, PINT_PERF_PRESERVE},
+    {NULL, 0, 0},
+};
+
+/**
+ * track performance timers for the server 
+ * keys must be defined here in order based on the 
+ * enumeration in include/pvfs2-mgmt.h
+ */
+struct PINT_perf_key server_tkeys[] =
+{
+    {"lookup timer", PINT_PERF_TLOOKUP, PINT_PERF_PRESERVE},
+    {"create timer", PINT_PERF_TCREATE, PINT_PERF_PRESERVE},
+    {"remove timer", PINT_PERF_TREMOVE, PINT_PERF_PRESERVE},
+    {"mkdir timer", PINT_PERF_TMKDIR, PINT_PERF_PRESERVE},
+    {"rmdir timer", PINT_PERF_TRMDIR, PINT_PERF_PRESERVE},
+    {"getattr timer", PINT_PERF_TGETATTR, PINT_PERF_PRESERVE},
+    {"setattr timer", PINT_PERF_TSETATTR, PINT_PERF_PRESERVE},
+    {"io timer", PINT_PERF_TIO, PINT_PERF_PRESERVE},
+    {"small_io timer", PINT_PERF_TSMALL_IO, PINT_PERF_PRESERVE},
+    {"readdir timer", PINT_PERF_TREADDIR, PINT_PERF_PRESERVE},
     {NULL, 0, 0},
 };
 
@@ -80,9 +107,9 @@ void PINT_free_pc (struct PINT_perf_counter *pc)
     tmp = pc->sample;
     while(tmp)
     {
-        if (tmp->value)
+        if (tmp->value.v)
         {
-            free (tmp->value);
+            free (tmp->value.v);
         }
         tmp2 = tmp;
         tmp = tmp->next;
@@ -98,8 +125,10 @@ void PINT_free_pc (struct PINT_perf_counter *pc)
  * \returns pointer to perf counter on success, NULL on failure
  */
 struct PINT_perf_counter *PINT_perf_initialize(
+                            enum PINT_perf_type cnt_type,
                             struct PINT_perf_key *key_array,
-                            int (*start_rollover)(struct PINT_perf_counter *pc))
+                            int (*start_rollover)(struct PINT_perf_counter *pc,
+                                                  struct PINT_perf_counter *tpc))
 {
     struct PINT_perf_counter *pc = NULL;
     struct PINT_perf_key *key = NULL;
@@ -113,6 +142,7 @@ struct PINT_perf_counter *PINT_perf_initialize(
     }
     memset(pc, 0, sizeof(struct PINT_perf_counter));
     gen_mutex_init(&pc->mutex);
+    pc->cnt_type = cnt_type;
     pc->key_array = key_array;
 
     key = &key_array[pc->key_count]; /* key count is zero */
@@ -138,6 +168,15 @@ struct PINT_perf_counter *PINT_perf_initialize(
         return(NULL);
     }
 
+    if (cnt_type == PINT_PERF_TIMER)
+    {
+        pc->perf_counter_size = sizeof(struct PINT_perf_timer);
+    }
+    else
+    {
+        pc->perf_counter_size = sizeof(int64_t);
+    }
+
     /* running will be used to decide if we should start an update process */
     pc->history = PERF_DEFAULT_HISTORY_SIZE;
     pc->running = (pc->history > 1);
@@ -154,14 +193,14 @@ struct PINT_perf_counter *PINT_perf_initialize(
     }
     memset(tmp, 0, sizeof(struct PINT_perf_sample));
     tmp->next = NULL;
-    tmp->value = (int64_t *)malloc(pc->key_count * sizeof(int64_t));
-    if(!tmp->value)
+    tmp->value.v = (void *)malloc(pc->key_count * pc->perf_counter_size);
+    if(!tmp->value.v)
     {
         gen_mutex_destroy(&pc->mutex);
         PINT_free_pc(pc);
         return(NULL);
     }
-    memset(tmp->value, 0, pc->key_count * sizeof(int64_t));
+    memset(tmp->value.v, 0, pc->key_count * pc->perf_counter_size);
     pc->sample = tmp;
     for (i = pc->history - 1; i > 0 && tmp; i--)
     {
@@ -175,14 +214,15 @@ struct PINT_perf_counter *PINT_perf_initialize(
         }
         memset(tmp->next, 0, sizeof(struct PINT_perf_sample));
         tmp->next->next = NULL;
-        tmp->next->value = (int64_t *)malloc(pc->key_count * sizeof(int64_t));
-        if(!tmp->value)
+        tmp->next->value.v = (void *)malloc(pc->key_count *
+                                            pc->perf_counter_size);
+        if(!tmp->value.v)
         {
             gen_mutex_destroy(&pc->mutex);
             PINT_free_pc(pc);
             return(NULL);
         }
-        memset(tmp->next->value, 0, pc->key_count * sizeof(int64_t));
+        memset(tmp->next->value.v, 0, pc->perf_counter_size);
         tmp = tmp->next;
     }
 
@@ -198,12 +238,12 @@ struct PINT_perf_counter *PINT_perf_initialize(
  */
 void PINT_perf_reset(struct PINT_perf_counter* pc)
 {
-    int i;
+    // int i;
     struct PINT_perf_sample *s;
 
     gen_mutex_lock(&pc->mutex);
 
-    if (!pc || !pc->sample || !pc->sample->value)
+    if (!pc || !pc->sample || !pc->sample->value.v)
     {
         return;
     }
@@ -212,13 +252,24 @@ void PINT_perf_reset(struct PINT_perf_counter* pc)
         /* zero out all fields */
         memset(&s->start_time_ms, 0, sizeof(uint64_t));
         memset(&s->interval_ms, 0, sizeof(uint64_t));
+        memset(&s->value.v, 0, pc->key_count * pc->perf_counter_size);
+        /* on a reset should we not zero them all ??? */
+#if 0
         for(i = 0; i < pc->key_count; i++)
         {
             if(!(pc->key_array[i].flag & PINT_PERF_PRESERVE))
             {
-                memset(&s->value[i], 0, sizeof(int64_t));
+                if (pc->cnt_type == PINT_PERF_TIMER)
+                {
+                    memset(s->value.t[i], 0, pc->perf_counter_size);
+                }
+                else
+                {
+                    memset(&s->value.c[i], 0, pc->perf_counter_size);
+                }
             }
         }
+#endif
     }
 
     /* set initial timestamp */
@@ -247,11 +298,12 @@ void __PINT_perf_count( struct PINT_perf_counter* pc,
                         int64_t value,
                         enum PINT_perf_ops op)
 {
+    struct PINT_perf_timer *pt;
 #if 0
     int64_t tmp; /* this is for debugging purposes */
 #endif
 
-    if(!pc || !pc->sample || !pc->sample->value)
+    if(!pc || !pc->sample || !pc->sample->value.v)
     {
         /* do nothing if perf counter is not initialized */
         return;
@@ -260,7 +312,7 @@ void __PINT_perf_count( struct PINT_perf_counter* pc,
     gen_mutex_lock(&pc->mutex);
 
 #if 0
-    tmp = pc->sample->value[key];
+    tmp = pc->sample->value.c[key];
 #endif
 
     if(key >= pc->key_count)
@@ -272,28 +324,139 @@ void __PINT_perf_count( struct PINT_perf_counter* pc,
     switch(op)
     {
         case PINT_PERF_ADD:
-            pc->sample->value[key] += value;
+            pc->sample->value.c[key] += value;
+            if (pc->cnt_type != PINT_PERF_COUNTER)
+            {
+                gossip_err("Error: PINT_perf_count(): invalid op for timer.\n");
+                goto errorout;
+            }
             break;
         case PINT_PERF_SUB:
-            pc->sample->value[key] -= value;
+            if (pc->cnt_type != PINT_PERF_COUNTER)
+            {
+                gossip_err("Error: PINT_perf_count(): invalid op for timer.\n");
+                goto errorout;
+            }
+            pc->sample->value.c[key] -= value;
             break;
         case PINT_PERF_SET:
-            pc->sample->value[key] = value;
+            if (pc->cnt_type != PINT_PERF_COUNTER)
+            {
+                gossip_err("Error: PINT_perf_count(): invalid op for timer.\n");
+                goto errorout;
+            }
+            pc->sample->value.c[key] = value;
+            break;
+
+        case PINT_PERF_START: /* This is probably going away */
+            break;
+
+        case PINT_PERF_END:
+            if (pc->cnt_type != PINT_PERF_TIMER)
+            {
+                gossip_err("Error: PINT_perf_count(): invalid op for non-timer.\n");
+                goto errorout;
+            }
+            pt = &pc->sample->value.t[key];
+            if (value < 0)
+            {
+                /* rollover - throw away this sample */
+                gossip_err("Error: PINT_perf_count(): sample rolled over.\n");
+            }
+            else
+            {
+                pt->sum += value;
+                pt->count++;
+                if (value > pt->max)
+                {
+                    pt->max = value;
+                }
+                if (pt->min == 0 || value < pt->min)
+                {
+                    pt->min = value;
+                }
+            }
+            break;
+        default:
+            gossip_err("Error: PINT_perf_count(): invalid op.\n");
             break;
     }
 
 #if 0
-/* debug code shows counters being manipulated */
-gossip_err("COUNT %d %lld was %lld is now %lld\n",
-key,
-(unsigned long long)value,
-(unsigned long long)tmp,
-(unsigned long long)pc->sample->value[key]);
+    /* debug code shows counters being manipulated */
+    gossip_err("COUNT %d %lld was %lld is now %lld\n",
+               key,
+               (unsigned long long)value.v,
+               (unsigned long long)tmp,
+               (unsigned long long)pc->sample->value.c[key]);
 #endif
 
 errorout:
     gen_mutex_unlock(&pc->mutex);
     return;
+}
+
+/**
+ * Standard algorithm to compute the diff between two timespecs 
+ */
+static struct timespec timediff(struct timespec start, struct timespec end)
+{
+    struct timespec diff;
+    if ((end.tv_nsec - start.tv_nsec) < 0)
+    {
+         diff.tv_sec = end.tv_sec - start.tv_sec - 1;
+         diff.tv_nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
+    }
+    else
+    {
+         diff.tv_sec = end.tv_sec - start.tv_sec;
+         diff.tv_nsec = end.tv_nsec - start.tv_nsec;
+    }
+    return diff;
+}
+static void *st;
+/**
+ * Starts a timer
+ */
+void __PINT_perf_timer_start(struct timespec *start_time)
+{
+    st = start_time;
+    if (start_time->tv_sec != 0 || start_time->tv_nsec != 0)
+    {
+        gossip_err("Perf Timer start_time not clean\n");
+        start_time->tv_sec = 0;
+        start_time->tv_nsec = 0;
+    }
+    clock_gettime(CLOCK_MONOTONIC_RAW, start_time);
+}
+
+/**
+ * Ends a timer
+ */
+void __PINT_perf_timer_end(struct PINT_perf_counter* pc,
+                           int key, 
+                           struct timespec *start_time)
+{
+    int64_t time_diff = 0;
+    struct timespec end_time; /* ending time */
+    struct timespec td; /* time difference */
+
+    if (st != start_time)
+    {
+        gossip_err("start time address mismatch\n");
+    }
+
+    clock_gettime(CLOCK_MONOTONIC_RAW, &end_time);
+    td = timediff(*start_time, end_time);
+
+    /* convert to nanoseconds */
+    time_diff = (td.tv_sec * 1000000000) + td.tv_nsec;
+
+    __PINT_perf_count(pc, key, time_diff, PINT_PERF_END);
+
+    /* clear start_time for next measurement */
+    start_time->tv_sec = 0;
+    start_time->tv_nsec = 0;
 }
 
 /** 
@@ -305,7 +468,7 @@ void PINT_perf_rollover( struct PINT_perf_counter* pc)
     uint64_t int_time;
     struct PINT_perf_sample *head, *tail;
 
-    if(!pc || !pc->sample || !pc->sample->value)
+    if(!pc || !pc->sample || !pc->sample->value.v)
     {
         /* do nothing if perf counter is not initialized */
         return;
@@ -319,21 +482,16 @@ void PINT_perf_rollover( struct PINT_perf_counter* pc)
      * rotate newest sample to the back
      *
      * sample1 -> sample2 -> sample3 -> NULL
-     *
      * head = sample1
-     *
      * tail = sample3
-     *
      * pc->sample = sample2
-     *
      * sample3 -> sample1
-     * 
      * sample1 -> NULL
-     *
      * sample2 -> sample3 -> sample1 -> NULL
      *
      * associate the "current" values with the "current" sample.
      */
+    pc->sample->interval_ms = int_time - pc->sample->start_time_ms;
     head = pc->sample;
     for(tail = head; tail && tail->next; tail = tail->next);
     if(head != tail)
@@ -342,9 +500,9 @@ void PINT_perf_rollover( struct PINT_perf_counter* pc)
         pc->sample = head->next;
         tail->next = head;
         head->next = NULL;
-        memcpy(pc->sample->value,
-               head->value,
-               pc->key_count * sizeof *head->value);
+        memcpy(pc->sample->value.v,
+               head->value.v,
+               pc->key_count * pc->perf_counter_size);
     }
 
     /* reset times for next interval */
@@ -355,7 +513,14 @@ void PINT_perf_rollover( struct PINT_perf_counter* pc)
     {
         if(!(pc->key_array[i].flag & PINT_PERF_PRESERVE))
         {
-            memset(&pc->sample->value[i], 0, sizeof(int64_t));
+            if (pc->cnt_type == PINT_PERF_TIMER)
+            {
+                memset(&pc->sample->value.t[i], 0, pc->perf_counter_size);
+            }
+            else
+            {
+                memset(&pc->sample->value.c[i], 0, pc->perf_counter_size);
+            }
         }
     }
 
@@ -372,7 +537,7 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
                          enum PINT_perf_option option,
                          unsigned int arg)
 {
-    if(!pc || !pc->sample || !pc->sample->value)
+    if(!pc || !pc->sample || !pc->sample->value.v)
     {
         /* do nothing if perf counter is not initialized */
         return 0;
@@ -400,7 +565,7 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
                     /* removing just behind first sample */
                     pc->sample->next = s->next;
                     s->next = NULL;
-                    free(s->value);
+                    free(s->value.v);
                     free(s);
                     pc->history--;
                 }
@@ -426,8 +591,8 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
                     return(-PVFS_ENOMEM);
                 }
                 memset(s, 0, sizeof(struct PINT_perf_sample));
-                s->value = calloc(pc->key_count, sizeof *(s->value));
-                if(!s->value)
+                s->value.v = calloc(pc->key_count, pc->perf_counter_size);
+                if(!s->value.v)
                 {
                     free(s);
                     gen_mutex_unlock(&pc->mutex);
@@ -530,18 +695,24 @@ int PINT_perf_start_rollover(void)
  * of the time stampls is generally index max_key, and max_key+1
  */
 void PINT_perf_retrieve(
-        struct PINT_perf_counter* pc,    /* performance counter */
+        struct PINT_perf_counter *pc,    /* performance counter */
         int64_t *value_array,            /* array of output measurements */
+        int array_size)                  /* size of the value array in bytes */
+#if 0
         int max_key,                     /* max key value (1st dimension) */
         int max_history)                 /* max history (2nd dimension) */
+#endif
 {
     int i;
+#if 0
     int tmp_max_key;
     int tmp_max_history;
+#endif
+    int pc_sample_size;  /* number of int64_t's in a pc counter */
     uint64_t int_time;
     struct PINT_perf_sample *s;
 
-    if(!pc || !pc->sample || !pc->sample->value)
+    if(!pc || !pc->sample || !pc->sample->value.v)
     {
         /* do nothing if perf counter is not initialized */
         return;
@@ -549,20 +720,42 @@ void PINT_perf_retrieve(
 
     gen_mutex_lock(&pc->mutex);
 
+    /* New model:  We assume that this function is always called with
+     * enough space in the array to hold ALL of the pc's data.  It can be
+     * larger but never smaller.  If it is it can return an error an
+     * assert since this routine should OLD be called by OFS code and
+     * never by a user.  The calling routine makes sure whatever the user
+     * does this is not violated.
+     */
+ #if 0
     /* it isn't very safe to allow the caller to ask for more keys than are
      * available, because they will probably overrun key array bounds when
      * interpretting results
+     *
+     * Even worse to crash the server simply because the user sent in a
+     * stupid number!  Don't we have error codes and stuff?
+     *
+     * And, we actually return the key count, so isn't it up to the user
+     * to heed the response and do the right thing?
      */
-    assert(max_key <= pc->key_count);
+    /* assert(max_key <= pc->key_count); */
     
     tmp_max_key = PVFS_util_min(max_key, pc->key_count);
     tmp_max_history = PVFS_util_min(max_history, pc->history);
+ #endif
 
-    if(max_key > pc->key_count || max_history > pc->history)
-    {
-        memset(value_array, 0,
-                (max_history * (max_key + 2) * sizeof(int64_t)));
-    }
+    /* the number of int64_t elements in a sample */
+    pc_sample_size = (pc->key_count *
+                      (pc->perf_counter_size / sizeof(int64_t))) + 2;
+
+    /* this must always be true or caller is incorrect */
+    assert (pc->history * pc_sample_size <= array_size);
+
+    /* clear the needed space - could clear all the space, but we will
+     * opt for the faster approach
+     */
+    memset(value_array, 0,
+           (pc->history * pc_sample_size * sizeof(int64_t)));
 
     /* copy data out */
     /* running sample list, and counting at the same time */
@@ -571,29 +764,31 @@ void PINT_perf_retrieve(
     /* but we will only copy tmp_max_key and the time stamps - which */
     /* should be less than or equal to the space available */
     /* normally, max_key == tmp_max_key */
-    for(i = 0, s = pc->sample; i < tmp_max_history && s; i++, s = s->next)
+    for(i = 0, s = pc->sample; i < pc->history && s; i++, s = s->next)
     {
-        /* copy counters */
-        memcpy(&value_array[i * (max_key + 2)], s->value,
-                            (tmp_max_key * sizeof(int64_t)));
-        /* copy time codes */
-        value_array[(i * (max_key + 2)) + max_key] = s->start_time_ms;
-        value_array[(i * (max_key + 2)) + max_key + 1] = s->interval_ms;
+        /* copy one sample */
+        memcpy(&(value_array[i * pc_sample_size]),
+               s->value.v,
+               (pc->key_count * pc->perf_counter_size));
+        /* copy time codes for that sample */
+        value_array[((i + 1) * pc_sample_size) - 2] = s->start_time_ms;
+        value_array[((i + 1) * pc_sample_size) - 1] = s->interval_ms;
     }
 
 #if 0
 /* debug code prints first sample to log */
 {int k; for(k=0;k<max_key;k++)
-gossip_err("sample value[%d] = %lld\n",k,pc->sample->value[k]);}
+gossip_err("sample value[%d] = %lld\n",k,pc->sample->value.c[k]);}
 #endif
     
     gen_mutex_unlock(&pc->mutex);
 
     /* fill in interval length for newest interval */
     int_time = PINT_util_get_time_ms();
-    if(int_time > value_array[max_key])
+    if(int_time > value_array[pc_sample_size - 2])
     {
-        value_array[max_key + 1] = int_time - value_array[max_key];
+        value_array[pc_sample_size - 1] = int_time -
+                                          value_array[pc_sample_size - 2];
     }
 
     /* auto-rollover when data is retrieved */
@@ -621,7 +816,7 @@ char *PINT_perf_generate_text( struct PINT_perf_counter* pc,
     int ret;
     struct PINT_perf_sample *s = NULL;
 
-    if (!pc || !pc->sample || !pc->sample->value)
+    if (!pc || !pc->sample || !pc->sample->value.v)
     {
         return NULL;
     }
@@ -732,9 +927,9 @@ char *PINT_perf_generate_text( struct PINT_perf_counter* pc,
         for(j = 0, s = pc->sample; j < pc->history && s; j++, s = s->next)
         {
 #ifdef WIN32
-            ret = _snprintf(position, 15, " %13Ld", lld(s->value[i]));
+            ret = _snprintf(position, 15, " %13Ld", lld(s->value.c[i]));
 #else
-            ret = snprintf(position, 15, " %13Ld", lld(s->value[i]));
+            ret = snprintf(position, 15, " %13Ld", lld(s->value.c[i]));
 #endif
             if(ret >= 15)
             {

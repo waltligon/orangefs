@@ -73,6 +73,8 @@ static PINT_sm_action small_io_start_job(
     struct filesystem_configuration_s * fs_config;
     struct server_configuration_s * server_config;
 
+    PINT_perf_timer_start(&s_op->start_time);
+
     memset(&s_op->resp.u.small_io, 0, sizeof(struct PVFS_servresp_small_io));
 
     /* set io type in response to io type in request.  This is
@@ -264,6 +266,8 @@ static PINT_sm_action small_io_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TSMALL_IO, &s_op->start_time);
+
     if(s_op->req->u.small_io.io_type == PVFS_IO_READ &&
        s_op->resp.u.small_io.buffer)
     {

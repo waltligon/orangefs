@@ -4263,9 +4263,9 @@ int main(int argc, char **argv)
     }
 
     /* original code made into a function */
-    client_perf_start_rollover(PINT_acache_get_pc());
-    client_perf_start_rollover(PINT_ncache_get_pc());
-    client_perf_start_rollover(PINT_client_capcache_get_pc());
+    client_perf_start_rollover(PINT_acache_get_pc(), NULL);
+    client_perf_start_rollover(PINT_ncache_get_pc(), NULL);
+    client_perf_start_rollover(PINT_client_capcache_get_pc(), NULL);
 #if 0
     /* start a timer to roll over performance counters (acache) */
     PINT_smcb_alloc(&acache_smcb,

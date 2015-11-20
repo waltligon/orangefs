@@ -129,7 +129,12 @@ static PINT_sm_action perf_count_timer_do_work(struct PINT_smcb *smcb,
         }
     }
  
+    /* NOTE: tpc is not used in the client yet, but this function does
+     * nothing if passed a NULL pointer so this should be perfectly safe
+     * to do.
+     */
     PINT_perf_rollover(sm_p->u.perf_count_timer.pc);
+    PINT_perf_rollover(sm_p->u.perf_count_timer.tpc);
 
     if (!sm_p->u.perf_count_timer.pc->running)
     {

@@ -137,6 +137,7 @@ machine pvfs2_create_sm
 static int setup_final_response(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TCREATE, &s_op->start_time);
 
     /* retrieve original error code if present */
     if(s_op->u.create.saved_error_code)
@@ -161,6 +162,7 @@ static int create_metafile(struct PINT_smcb *smcb, job_status_s *js_p)
      * the counter for create requests
      */
     PINT_perf_count(PINT_server_pc, PINT_PERF_CREATE, 1, PINT_PERF_ADD);
+    PINT_perf_timer_start(&s_op->start_time);
 
     /* first state to check in, make sure the attr mask contains the dist bit. 
      * it's required later (not sure if we have to require it) but if we don't

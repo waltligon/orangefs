@@ -115,7 +115,9 @@ static PINT_sm_action perf_update_do_work(struct PINT_smcb *smcb,
     }
     
     /* roll over to next set of statistics */
+    /* These do nothing if passed NULL */
     PINT_perf_rollover(s_op->u.perf_update.pc);
+    PINT_perf_rollover(s_op->u.perf_update.tpc);
 
     if (!s_op->u.perf_update.pc->running)
     {

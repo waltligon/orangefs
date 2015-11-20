@@ -51,7 +51,8 @@ int PINT_client_security_initialize(void);
 int PINT_client_security_finalize(void);
 
 /* client only function to start update timer for perf counted */
-int client_perf_start_rollover(struct PINT_perf_counter *pc);
+int client_perf_start_rollover(struct PINT_perf_counter *pc,
+                               struct PINT_perf_counter *tpc);
 
 /*
  * Local variables:

@@ -739,12 +739,11 @@ static PINT_sm_action mkdir_dirdata_keyval_setattr(
     return ret;
 }
 
-
-
 static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     s_op->resp.u.mkdir.handle = 0;
+
 
     /* clean up objects */
     PINT_free_object_attr(s_op->u.mkdir.saved_attr);
@@ -772,6 +771,9 @@ static PINT_sm_action mkdir_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TMKDIR, &s_op->start_time);
+
     free(s_op->attr.dirdata_handles);
     free(s_op->attr.dist_dir_bitmap);
     free(s_op->u.mkdir.handle_array_local);
@@ -800,6 +802,7 @@ static PINT_sm_action mkdir_prep_sm(
      * increment the counter for mkdir requests
      */
     PINT_perf_count(PINT_server_pc, PINT_PERF_MKDIR, 1, PINT_PERF_ADD);
+    PINT_perf_timer_start(&s_op->start_time);
 
     s_op->attr.dirdata_handles = NULL;
     s_op->attr.dist_dir_bitmap = NULL;

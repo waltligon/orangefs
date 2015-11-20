@@ -621,6 +621,7 @@ struct PINT_server_mgmt_create_root_dir_op
 struct PINT_server_perf_update_op
 {
     struct PINT_perf_counter *pc;
+    struct PINT_perf_counter *tpc;
 };
 
 /* This structure is passed into the void *ptr 
@@ -635,7 +636,9 @@ typedef struct PINT_server_op
 
     enum PVFS_server_op op;  /* type of operation that we are servicing */
 
+    /* variables used for monitoring and timing requests */
     PINT_event_id event_id;
+    struct timespec start_time;     /* start time of a timer in ns */
 
     /* holds id from request scheduler so we can release it later */
     job_id_t scheduled_id; 
@@ -918,7 +921,8 @@ extern void tree_remove_free(PINT_server_op *s_op);
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
-int server_perf_start_rollover(struct PINT_perf_counter *pc);
+int server_perf_start_rollover(struct PINT_perf_counter *pc,
+                               struct PINT_perf_counter *tpc);
 
 /* exported state machine resource reclamation function */
 int server_post_unexpected_recv(void);

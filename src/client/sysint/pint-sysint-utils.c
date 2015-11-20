@@ -362,7 +362,8 @@ int PINT_client_security_finalize(void)
 #endif /* HAVE_OPENSSL */
    
 /* client only routine to start a timer for perf counters */
-int client_perf_start_rollover(struct PINT_perf_counter *pc)
+int client_perf_start_rollover(struct PINT_perf_counter *pc,
+                               struct PINT_perf_counter *tpc)
 {
     int ret = 0;
     PINT_smcb *tmpsmcb = NULL;
@@ -384,6 +385,7 @@ int client_perf_start_rollover(struct PINT_perf_counter *pc)
 
     tmptimer_sm_p = PINT_sm_frame(tmpsmcb, PINT_FRAME_CURRENT);
     tmptimer_sm_p->u.perf_count_timer.pc = pc;
+    tmptimer_sm_p->u.perf_count_timer.tpc = tpc;
     pc->running = 1;
 
     ret = PINT_client_state_machine_post(tmpsmcb, NULL, NULL);

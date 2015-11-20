@@ -26,10 +26,24 @@
 #include "pvfs2-mgmt.h"
 #include "pvfs2-internal.h"
 
+#define DEBUG 1
+/* debugging */
+#if defined(DEBUG) && DEBUG != 0
+#define dbgprintf printf
+#define dbgprintf1 printf
+#define dbgprintf2 printf
+#define dbgprintf3 printf
+#else
+#define dbgprintf(s) do{}while(0)
+#define dbgprintf1(s,a1) do{}while(0)
+#define dbgprintf2(s,a1,a2) do{}while(0)
+#define dbgprintf3(s,a1,a2,a3) do{}while(0)
+#endif
 
 /* these defaults overridden by command line args */
-#define MAX_KEY_CNT 18
-#define HISTORY 5
+#define MAX_KEY_COUNTER 23
+#define MAX_KEY_TIMER 10
+#define HISTORY 10
 #define FREQUENCY 10
 
 #ifndef PVFS2_VERSION
@@ -37,47 +51,42 @@
 #endif
 
 /* macros for accessing data returned from server 
- * s is server, h is history sample, c is counter number
+ * s is server, h is history sample,
+ * c is counter number, f is field in counter
+ * sample_size is defined at runtime below
  */
-#define GETLAST(s,c) (last[(s * (user_opts->keys + 2)) + (c)])
+#define GETLAST(s,c) (last[(s * sample_size) + (c)])
 #define LAST(s) GETLAST((s), 0)
-#define GETSAMPLE(s,h,c) (perf_matrix[(s)][((h) * (user_opts->keys + 2)) + (c)])
-#define SAMPLE(s,h) GETSAMPLE((s), (h), 0)
-#define VALID_FLAG(s,h) (GETSAMPLE((s), (h), user_opts->keys) != 0.0)
-#define ID(s,h) GETSAMPLE((s), (h), user_opts->keys)
-#define START_TIME(s,h) GETSAMPLE((s), (h), user_opts->keys)
 
-#define READ 0
-#define WRITE 1
-#define METADATA_READ 2
-#define METADATA_WRITE 3
-#define DSPACE_OPS 4
-#define KEYVAL_OPS 5
-#define SCHEDULE 6
-#define REQUESTS 7
-#define SMALL_READS 8
-#define SMALL_WRITES 9
-#define FLOW_READS 10
-#define FLOW_WRITES 11
-#define CREATES 12
-#define REMOVES 13
-#define MKDIRS 14
-#define RMDIRS 15
-#define GETATTRS 16
-#define SETATTRS 17
+#define GETSAMPLE(s,h,c,f) (perf_matrix[(s)][((h) * sample_size) +  \
+                                             ((c) * counter_size) + (f)])
+#define SAMPLE(s,h) GETSAMPLE((s), (h), 0, 0)
+//#define VALID_FLAG(s,h) (GETSAMPLE((s), (h), user_opts->keys, 0) != 0.0)
+#define VALID_FLAG(s,h) 1
+#define ID(s,h) GETSAMPLE((s), (h), user_opts->keys, 0)
+#define START_TIME(s,h) GETSAMPLE((s), (h), user_opts->keys, 0)
 
-#define GRAPHITE_PRINT_COUNTER(str, c, s, h)                      \
+enum PINT_perf_timer_fields
+{
+    TIMER_SUM = 0,
+    TIMER_COUNT = 1,
+    TIMER_MINIMUM = 2,
+    TIMER_MAXIMUM = 3,
+};
+
+#define GRAPHITE_CNT(str, c, s, h)                                \
 if (c >= user_opts->keys) break;                                  \
 do {                                                              \
-    int64_t sample;                                               \
+    int64_t sample = 0;                                           \
     if (user_opts->debug)                                         \
     {                                                             \
-        fprintf(pfile,"DEBUG %s %lld %lld\n", str,                \
-        (long long int)GETSAMPLE(s, h, c), (long long int)GETLAST(s, c));  \
+        dbgprintf3("DEBUG %s %lld %lld\n", str,                   \
+              (long long int)GETSAMPLE(s, h, c, 0),               \
+              (long long int)GETLAST(s, c));                      \
     }                                                             \
     if (user_opts->raw)                                           \
     {                                                             \
-        sample = GETSAMPLE(s, h, c);                              \
+        sample = GETSAMPLE(s, h, c, 0);                           \
     }                                                             \
     else                                                          \
     {                                                             \
@@ -87,9 +96,9 @@ do {                                                              \
         }                                                         \
         else                                                      \
         {                                                         \
-            sample = -GETSAMPLE(s, h - 1, c);                     \
+            sample = -GETSAMPLE(s, h - 1, c, 0);                  \
         }                                                         \
-        sample += GETSAMPLE(s, h, c);                             \
+        sample += GETSAMPLE(s, h, c, 0);                          \
     }                                                             \
     if (user_opts->graphite)                                      \
     {                                                             \
@@ -118,29 +127,71 @@ do {                                                              \
     }                                                             \
 } while(0);
 
-#if 0
-
-#define PRINT_COUNTER(str, c, s, h)                    \
-do {                                                   \
-    int64_t sample;                                    \
-    if (h == 0)                                        \
-    {                                                  \
-        sample = -GETLAST(s, c);                       \
-    }                                                  \
-    else                                               \
-    {                                                  \
-        sample = -GETSAMPLE(s, h - 1, c);              \
-    }                                                  \
-    sample += GETSAMPLE(s, h, c);                      \
-    fprintf(pfile,                                     \
-            "%s%s %lld %lld\n",                        \
-            samplestr,                                 \
-            str,                                       \
-            (unsigned long long int)sample,            \
-            (unsigned long long int)START_TIME(s, h)); \
+#define GRAPHITE_TIMER(str, c, s, h)                              \
+if (c >= user_opts->keys) break;                                  \
+do {                                                              \
+    double  avg = 0.0;                                            \
+    int64_t sum = 0;                                              \
+    int64_t cnt = 0;                                              \
+    int64_t min = 0;                                              \
+    int64_t max = 0;                                              \
+    sum = GETSAMPLE(s, h, c, TIMER_SUM);                          \
+    cnt = GETSAMPLE(s, h, c, TIMER_COUNT);                        \
+    min = GETSAMPLE(s, h, c, TIMER_MINIMUM);                      \
+    max = GETSAMPLE(s, h, c, TIMER_MAXIMUM);                      \
+    if (cnt != 0)                                                 \
+    {                                                             \
+        avg = (double)sum / cnt;                                  \
+    }                                                             \
+    if (user_opts->print)                                         \
+    {                                                             \
+        if (user_opts->raw)                                       \
+        {                                                         \
+            fprintf(pfile,                                        \
+                    "%s%s-sum %lld %lld\n",                       \
+                    samplestr,                                    \
+                    str,                                          \
+                    (long long int)sum,                           \
+                    (long long int)START_TIME(s, h)/1000);        \
+        }                                                         \
+        else                                                      \
+        {                                                         \
+            fprintf(pfile,                                        \
+                    "%s%s-avg %.f %lld\n",                        \
+                    samplestr,                                    \
+                    str,                                          \
+                    avg,                                          \
+                    (long long int)START_TIME(s, h)/1000);        \
+        }                                                         \
+    }                                                             \
+    if (user_opts->print)                                         \
+    {                                                             \
+        fprintf(pfile,                                            \
+                "%s%s-cnt %lld %lld\n",                           \
+                samplestr,                                        \
+                str,                                              \
+                (long long int)cnt,                               \
+                (long long int)START_TIME(s, h)/1000);            \
+    }                                                             \
+    if (user_opts->print)                                         \
+    {                                                             \
+        fprintf(pfile,                                            \
+                "%s%s-min %lld %lld\n",                           \
+                samplestr,                                        \
+                str,                                              \
+                (long long int)min,                               \
+                (long long int)START_TIME(s, h)/1000);            \
+    }                                                             \
+    if (user_opts->print)                                         \
+    {                                                             \
+        fprintf(pfile,                                            \
+                "%s%s-max %lld %lld\n",                           \
+                samplestr,                                        \
+                str,                                              \
+                (long long int)max,                               \
+                (long long int)START_TIME(s, h)/1000);            \
+    }                                                             \
 } while(0);
-
-#endif
 
 struct options
 {
@@ -148,9 +199,11 @@ struct options
     char *graphite_addr;
     char *precursor_string;
     int mnt_point_set;
+    int single_srv;
     int precursor;
     int graphite;
     int print;
+    int ctype; /* counter or timer */
     int keys;
     int raw;
     int debug;
@@ -181,6 +234,9 @@ int main(int argc, char **argv)
     int64_t *last = NULL;
     int graphite_fd = 0;
     int bytes_written = 0;
+    int sample_size = 0;  /* size (in int64_t) of nkeys coounters plus two */
+    int counter_size = 0;  /* size (in int64_t) of 1 coounters */
+    int srv_index = 0;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -191,24 +247,53 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
+    /* compute the number of int64_t in a full sample - all of the keys
+     * plus the time stamps.
+     */
     if (user_opts->keys == 0)
     {
-        user_opts->keys = MAX_KEY_CNT;
+        if (user_opts->ctype == PINT_PERF_COUNTER)
+        {
+            user_opts->keys = MAX_KEY_COUNTER;
+        }
+        else
+        {
+            user_opts->keys = MAX_KEY_TIMER;
+        }
     }
-    printf("\nkeys: %d", user_opts->keys);
+    /* sample_size is number of int64_t sized words (8 bytes per word) */
+    if (user_opts->ctype == PINT_PERF_COUNTER)
+    {
+        counter_size = 1;
+    }
+    else if (user_opts->ctype == PINT_PERF_TIMER)
+    {
+        counter_size = sizeof(struct PINT_perf_timer)/sizeof(int64_t);;
+    }
+    sample_size = (counter_size * user_opts->keys) + 2;
+    if (user_opts->print)
+    {
+        printf("\nkeys: %d", user_opts->keys);
+    }
 
     if (user_opts->history == 0)
     {
         user_opts->history = HISTORY;
     }
-    printf("\nhistory: %d", user_opts->history);
+    if (user_opts->print)
+    {
+        printf("\nhistory: %d", user_opts->history);
+    }
 
     if (user_opts->frequency == 0)
     {
-        user_opts->frequency = HISTORY;
+        user_opts->frequency = FREQUENCY;
     }
-    printf("\nfrequency: %d", user_opts->frequency);
-    printf("\n");
+    if (user_opts->print)
+    {
+        printf("\nfrequency: %d", user_opts->frequency);
+        printf("\n");
+    }
 
     if (user_opts->graphite)
     {
@@ -265,6 +350,40 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
+    /* build a list of servers to talk to */
+    addr_array = (PVFS_BMI_addr_t *)malloc(io_server_count *
+                                           sizeof(PVFS_BMI_addr_t));
+    if (addr_array == NULL)
+    {
+	perror("malloc");
+	return -1;
+    }
+    ret = PVFS_mgmt_get_server_array(cur_fs,
+				     PVFS_MGMT_IO_SERVER,
+				     addr_array,
+				     &io_server_count);
+    if (ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_get_server_array", ret);
+	return -1;
+    }
+
+    /* check for single server mode */
+    if (user_opts->single_srv != -1)
+    {
+        if (user_opts->single_srv >= 0 && 
+            user_opts->single_srv < io_server_count)
+        {
+            io_server_count = 1;
+            srv_index = user_opts->single_srv;
+        }
+        else
+        {
+            fprintf(stderr, "Single server requested is out of range for this file system\n");
+            exit(-1);
+        }
+    }
+
     /* allocate a 2 dimensional array for statistics */
     perf_matrix = (int64_t **)malloc(io_server_count * sizeof(int64_t *));
     if(!perf_matrix)
@@ -275,24 +394,21 @@ int main(int argc, char **argv)
     memset(perf_matrix, 0, io_server_count * sizeof(int64_t *));
     for(s = 0; s < io_server_count; s++)
     {
-	perf_matrix[s] = (int64_t *)malloc((user_opts->keys + 2) * 
-                                           user_opts->history *
-                                           sizeof(int64_t));
+        int server_data_size = (sample_size * user_opts->history) *
+                               sizeof(int64_t);
+
+	perf_matrix[s] = (int64_t *)malloc(server_data_size);
 	if (perf_matrix[s] == NULL)
 	{
 	    perror("malloc");
 	    return -1;
 	}
-        memset(perf_matrix[s], 0, (user_opts->keys + 2) * 
-                                  user_opts->history *
-                                  sizeof(int64_t));
+        memset(perf_matrix[s], 0, server_data_size);
     }
 
-    /* this array holds the last asmple from each server for continuity */
-    last = (int64_t *)malloc((user_opts->keys + 2) *
-                             io_server_count *
-                             sizeof(int64_t));
-    memset(last, 0, (user_opts->keys + 2) * io_server_count * sizeof(int64_t));
+    /* this array holds the last sample from each server for continuity */
+    last = (int64_t *)malloc(sample_size * io_server_count * sizeof(int64_t));
+    memset(last, 0, (sample_size * io_server_count * sizeof(int64_t)));
 
     /* allocate an array to keep up with what iteration of statistics
      * we need from each server 
@@ -313,27 +429,9 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    /* build a list of servers to talk to */
-    addr_array = (PVFS_BMI_addr_t *)malloc(io_server_count *
-                                           sizeof(PVFS_BMI_addr_t));
-    if (addr_array == NULL)
-    {
-	perror("malloc");
-	return -1;
-    }
-    ret = PVFS_mgmt_get_server_array(cur_fs,
-				     PVFS_MGMT_IO_SERVER,
-				     addr_array,
-				     &io_server_count);
-    if (ret < 0)
-    {
-	PVFS_perror("PVFS_mgmt_get_server_array", ret);
-	return -1;
-    }
-
     /* edit a clean string that represents the server name */
     serverstr = (const char **)malloc(io_server_count * sizeof(char *));
-    for (s = 0; s < io_server_count; s++)
+    for (s = srv_index; s < io_server_count; s++)
     {
         int servertype;
         int n;
@@ -364,72 +462,119 @@ int main(int argc, char **argv)
     /* loop for ever, grabbing stats at regular intervals */
     while (1)
     {
+        /* flag to keep us from reporting wild numbers on very first
+         * pass */
+        static int not_first_pass = 0;
+
         PVFS_util_refresh_credential(&cred);
+        dbgprintf("starting read\n");
 	ret = PVFS_mgmt_perf_mon_list(cur_fs,
 				      &cred,
+				      user_opts->ctype, 
 				      perf_matrix, 
 				      end_time_ms_array,
-				      addr_array,
+				      &addr_array[srv_index],
 				      next_id_array,
 				      io_server_count, 
-                                      &user_opts->keys,
-				      user_opts->history,
+                                      &user_opts->keys,   /* in/out */
+				      &user_opts->history, /* in/out */
 				      NULL,
                                       NULL);
+        dbgprintf("read finished\n");
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
 	    return -1;
 	}
 
-        //print_sample("sample", perf_matrix[0], user_opts->keys + 2);
-
-	/* printf("\nPVFS2 I/O server counters\n"); 
-	 * printf("==================================================\n");
-         */
 	for (s = 0; s < io_server_count; s++)
 	{
-            char samplestr[256] = {0}; 
-            if(user_opts->precursor == 1){
-                strcat(samplestr, user_opts->precursor_string);
-           //     samplestr = strdup(user_opts->precursor_string);
-            } else {
-                strcat(samplestr, "palmetto.");
-         //       samplestr = strdup("palmetto.");
-            }
             char graphite_message[512] = {0};
+            char samplestr[256] = {0}; 
+	    dbgprintf("================================================\n");
+            dbgprintf("next server\n");
+
+            /* set up first level name of measurements */
+            if(user_opts->precursor == 1)
+            {
+                strcat(samplestr, user_opts->precursor_string);
+            }
+            else
+            {
+                strcat(samplestr, "palmetto.");
+            }
+            /* add server name */
             strcat(samplestr, serverstr[s]);
+            /* next indicate OFS measuremnts */
             strcat(samplestr, ".orangefs.");
 
+            /* now step through data */
 	    for (h = 0; h < user_opts->history; h++)
 	    {
-                if (VALID_FLAG(s, h))
+                dbgprintf("next sample\n");
+                if (not_first_pass == 0 && h == 0)
                 {
-                    GRAPHITE_PRINT_COUNTER("read", READ, s, h);
-                    GRAPHITE_PRINT_COUNTER("write", WRITE, s, h);
-                    GRAPHITE_PRINT_COUNTER("metaread", METADATA_READ, s, h);
-                    GRAPHITE_PRINT_COUNTER("metawrite", METADATA_WRITE, s, h);
-                    GRAPHITE_PRINT_COUNTER("dspaceops", DSPACE_OPS, s, h);
-                    GRAPHITE_PRINT_COUNTER("keyvalops", KEYVAL_OPS, s, h);
-                    GRAPHITE_PRINT_COUNTER("scheduled", SCHEDULE, s, h);
-                    GRAPHITE_PRINT_COUNTER("requests", REQUESTS, s, h);
-                    GRAPHITE_PRINT_COUNTER("smallreads", SMALL_READS, s, h);
-                    GRAPHITE_PRINT_COUNTER("smallwrites", SMALL_WRITES, s, h);
-                    GRAPHITE_PRINT_COUNTER("flowreads", FLOW_READS, s, h);
-                    GRAPHITE_PRINT_COUNTER("flowwrites", FLOW_WRITES, s, h);
-                    GRAPHITE_PRINT_COUNTER("creates", CREATES, s, h);
-                    GRAPHITE_PRINT_COUNTER("removes", REMOVES, s, h);
-                    GRAPHITE_PRINT_COUNTER("mkdirs", MKDIRS, s, h);
-                    GRAPHITE_PRINT_COUNTER("rmdir", RMDIRS, s, h);
-                    GRAPHITE_PRINT_COUNTER("getattrs", GETATTRS, s, h);
-                    GRAPHITE_PRINT_COUNTER("setattrs", SETATTRS, s, h);
+                    dbgprintf("skipping first sample\n");
+                    /* skip very first sample of each server because it
+                     * will create weird discontinuities in the output
+                     */
+                    continue;
+                }
+                if (user_opts->ctype == PINT_PERF_COUNTER)
+                {
+                    dbgprintf1("counter time-stamp %lld\n",
+                               (long long int)START_TIME(s, h));
+                    if (VALID_FLAG(s, h))
+                    {
+                        GRAPHITE_CNT("read", PINT_PERF_READ, s, h);
+                        GRAPHITE_CNT("write", PINT_PERF_WRITE, s, h);
+                        GRAPHITE_CNT("metaread", PINT_PERF_METADATA_READ, s, h);
+                        GRAPHITE_CNT("metawrite", PINT_PERF_METADATA_WRITE, s, h);
+                        GRAPHITE_CNT("dspaceops", PINT_PERF_METADATA_DSPACE_OPS, s, h);
+                        GRAPHITE_CNT("keyvalops", PINT_PERF_METADATA_KEYVAL_OPS, s, h);
+                        GRAPHITE_CNT("scheduled", PINT_PERF_REQSCHED, s, h);
+                        GRAPHITE_CNT("requests", PINT_PERF_REQUESTS, s, h);
+                        GRAPHITE_CNT("ioreads", PINT_PERF_IOREAD, s, h);
+                        GRAPHITE_CNT("iowrites", PINT_PERF_IOWRITE, s, h);
+                        GRAPHITE_CNT("smallreads", PINT_PERF_SMALL_READ, s, h);
+                        GRAPHITE_CNT("smallwrites", PINT_PERF_SMALL_WRITE, s, h);
+                        GRAPHITE_CNT("flowreads", PINT_PERF_FLOW_READ, s, h);
+                        GRAPHITE_CNT("flowwrites", PINT_PERF_FLOW_WRITE, s, h);
+                        GRAPHITE_CNT("creates", PINT_PERF_CREATE, s, h);
+                        GRAPHITE_CNT("removes", PINT_PERF_REMOVE, s, h);
+                        GRAPHITE_CNT("mkdirs", PINT_PERF_MKDIR, s, h);
+                        GRAPHITE_CNT("rmdir", PINT_PERF_RMDIR, s, h);
+                        GRAPHITE_CNT("getattrs", PINT_PERF_GETATTR, s, h);
+                        GRAPHITE_CNT("setattrs", PINT_PERF_SETATTR, s, h);
+                        GRAPHITE_CNT("io", PINT_PERF_IO, s, h);
+                        GRAPHITE_CNT("smallio", PINT_PERF_SMALL_IO, s, h);
+                        GRAPHITE_CNT("readdir", PINT_PERF_READDIR, s, h);
+                    }
+                }
+                else if (user_opts->ctype == PINT_PERF_TIMER)
+                {
+                    dbgprintf1("timer time-stamp %lld\n", 
+                               (long long int)START_TIME(s, h));
+                    if (VALID_FLAG(s, h))
+                    {
+                        GRAPHITE_TIMER("lookup-time", PINT_PERF_TLOOKUP, s, h);
+                        GRAPHITE_TIMER("create-time", PINT_PERF_TCREATE, s, h);
+                        GRAPHITE_TIMER("remove-time", PINT_PERF_TREMOVE, s, h);
+                        GRAPHITE_TIMER("mkdir-time", PINT_PERF_TMKDIR, s, h);
+                        GRAPHITE_TIMER("rmdir-time", PINT_PERF_TRMDIR, s, h);
+                        GRAPHITE_TIMER("getattr-time", PINT_PERF_TGETATTR, s, h);
+                        GRAPHITE_TIMER("setattr-time", PINT_PERF_TSETATTR, s, h);
+                        GRAPHITE_TIMER("io-time", PINT_PERF_TIO, s, h);
+                        GRAPHITE_TIMER("small_io-time", PINT_PERF_TSMALL_IO, s, h);
+                        GRAPHITE_TIMER("readdir-time", PINT_PERF_TREADDIR, s, h);
+                    }
                 }
             }
+            dbgprintf("save last sample\n");
 
-            memcpy(&last[(s * (user_opts->keys + 2))],
-                   &perf_matrix[(s)][((user_opts->history - 1) *
-                                      (user_opts->keys + 2))],
-                   ((user_opts->keys + 2) * sizeof(uint64_t)));
+            memcpy(&last[s * sample_size],
+                   &perf_matrix[s][sample_size * (user_opts->history - 1)],
+                   sample_size * sizeof(int64_t));
 
 /* does not seem to work for some reason */
 #if 0
@@ -439,7 +584,14 @@ int main(int argc, char **argv)
 #endif
 	}
 	fflush(stdout);
-	sleep(user_opts->frequency);
+        if (!(not_first_pass == 0 && h == 1))
+        {
+            /* don't sleep if first pass and there is only 1 sample */
+            dbgprintf("going to sleep\n");
+	    sleep(user_opts->frequency);
+            dbgprintf("waking up\n");
+        }
+        not_first_pass = 1;
     }
 
     PVFS_sys_finalize();
@@ -461,7 +613,7 @@ int main(int argc, char **argv)
  */
 static struct options *parse_args(int argc, char **argv)
 {
-    char flags[] = "vm:h:f:k:g:prdn:";
+    char flags[] = "vm:s:N:h:f:k:g:prdct";
     int one_opt = 0;
     struct options *tmp_opts = NULL;
 
@@ -472,6 +624,7 @@ static struct options *parse_args(int argc, char **argv)
 	return(NULL);
     }
     memset(tmp_opts, 0, sizeof(struct options));
+    tmp_opts->single_srv = -1;
 
     /* look at command line arguments */
     opterr = 0; /* getopts should not print error messages */
@@ -487,6 +640,12 @@ static struct options *parse_args(int argc, char **argv)
                 break;
             case('k'):
                 tmp_opts->keys = atoi(optarg);
+                break;
+            case('c'):
+                tmp_opts->ctype = PINT_PERF_COUNTER;
+                break;
+            case('t'):
+                tmp_opts->ctype = PINT_PERF_TIMER;
                 break;
             case('r'):
                 tmp_opts->raw = 1;
@@ -509,10 +668,14 @@ static struct options *parse_args(int argc, char **argv)
 		 * function expects some trailing segments or at least
 		 * a slash off of the mount point
 		 */
-                realloc(tmp_opts->mnt_point, strlen(tmp_opts->mnt_point) + 2);
+                tmp_opts->mnt_point = realloc(tmp_opts->mnt_point,
+                                              strlen(tmp_opts->mnt_point) + 2);
 		strcat(tmp_opts->mnt_point, "/");
 		break;
-            case('n'):
+            case('s'):
+                tmp_opts->single_srv = atoi(optarg);
+                break;
+            case('N'):
                 tmp_opts->precursor_string = strdup(optarg);
 		if(!tmp_opts->precursor_string)
 		{
