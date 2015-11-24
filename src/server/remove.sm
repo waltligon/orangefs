@@ -103,7 +103,7 @@ nested machine pvfs2_remove_dirdata_handles_work_sm
     {
         run remove_get_dirent_count_setup_tree_getattr;
         success => get_dirent_count_call_tree_getattr;
-        default => remove_dirdata_handles_cleanup;
+        default => get_dirent_count_cleanup_tree_getattr;
     }   
     
     state get_dirent_count_call_tree_getattr
@@ -112,12 +112,18 @@ nested machine pvfs2_remove_dirdata_handles_work_sm
         success => remove_dirdata_handles_setup_tree_remove;
         default => remove_dirdata_handles_cleanup;
     }   
+
+    state get_dirent_count_cleanup_tree_getattr
+    {
+        run remove_get_dirent_count_cleanup_tree_getattr;
+        default => remove_dirdata_handles_cleanup;
+    }
  
     state remove_dirdata_handles_setup_tree_remove
     {
         run remove_dirdata_handles_setup_tree_remove;
         success => remove_dirdata_handles_call_tree_remove;
-        default => remove_dirdata_handles_cleanup;
+        default => remove_dirdata_handles_cleanup_tree_remove;
     }   
     
     state remove_dirdata_handles_call_tree_remove
@@ -132,6 +138,12 @@ nested machine pvfs2_remove_dirdata_handles_work_sm
         run remove_dirdata_handles_check_remove_success;
         success => remove_dirdata_handles_cleanup;
         default => rebuild_dirdata_handle_local;
+    }
+
+    state remove_dirdata_handles_cleanup_tree_remove
+    {
+        run remove_dirdata_handles_cleanup_tree_remove;
+        default => remove_dirdata_handles_cleanup;
     }
     
     state rebuild_dirdata_handle_local
@@ -640,6 +652,19 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action remove_get_dirent_count_cleanup_tree_getattr(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *getattr_op = NULL;
+    int task_id = 0, error_code = 0;
+
+    /* Clean up the frame that was created for tree_getattr. */
+    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    tree_getattr_free(getattr_op);
+    PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(getattr_op);
+    return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -713,6 +738,19 @@ static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action remove_dirdata_handles_cleanup_tree_remove(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *remove_op = NULL;
+    int task_id = 0, error_code = 0;
+
+    /* Clean up the frame that was created for tree_remove. */
+    remove_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    tree_remove_free(remove_op);
+    PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(remove_op);
+    return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action remove_dirdata_handles_check_remove_success(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -727,6 +765,8 @@ static PINT_sm_action remove_dirdata_handles_check_remove_success(
     if (error_code != 0)
     {
         js_p->error_code = error_code;
+        tree_remove_free(remove_op);
+        PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(remove_op);
         return SM_ACTION_COMPLETE;
     }
     attr_p = &s_op->attr;
