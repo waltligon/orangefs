@@ -802,7 +802,6 @@ static PINT_sm_action mkdir_prep_sm(
      * increment the counter for mkdir requests
      */
     PINT_perf_count(PINT_server_pc, PINT_PERF_MKDIR, 1, PINT_PERF_ADD);
-    //PINT_perf_timer_start(&s_op->start_time);
 
     s_op->attr.dirdata_handles = NULL;
     s_op->attr.dist_dir_bitmap = NULL;

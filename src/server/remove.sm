@@ -282,9 +282,6 @@ static PINT_sm_action remove_check_object_type(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    /* start timer */
-    //PINT_perf_timer_start(&s_op->start_time);
-
     if(s_op->attr.objtype == PVFS_TYPE_DATAFILE)
     {
 	/* it must be a datafile, transition to try reading datafile 

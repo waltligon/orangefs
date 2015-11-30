@@ -414,13 +414,20 @@ static struct timespec timediff(struct timespec start, struct timespec end)
     }
     return diff;
 }
+
+/* This is used for debugging the function below */
+#if 0
 static void *st;
+#endif
+
 /**
  * Starts a timer
  */
 void __PINT_perf_timer_start(struct timespec *start_time)
 {
+#if 0
     st = start_time;
+#endif
     if (start_time->tv_sec != 0 || start_time->tv_nsec != 0)
     {
         gossip_err("Perf Timer start_time not clean\n");
@@ -441,10 +448,12 @@ void __PINT_perf_timer_end(struct PINT_perf_counter* pc,
     struct timespec end_time; /* ending time */
     struct timespec td; /* time difference */
 
+#if 0
     if (st != start_time)
     {
         gossip_err("start time address mismatch key %d\n", key);
     }
+#endif
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &end_time);
     td = timediff(*start_time, end_time);
