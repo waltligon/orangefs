@@ -443,7 +443,7 @@ void __PINT_perf_timer_end(struct PINT_perf_counter* pc,
 
     if (st != start_time)
     {
-        gossip_err("start time address mismatch\n");
+        gossip_err("start time address mismatch key %d\n", key);
     }
 
     clock_gettime(CLOCK_MONOTONIC_RAW, &end_time);

@@ -1773,7 +1773,7 @@ static PINT_sm_action getattr_with_prelude_init(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_GETATTR, 1, PINT_PERF_ADD);
-    PINT_perf_timer_start(&s_op->start_time);
+    //PINT_perf_timer_start(&s_op->start_time);
 
     js_p->error_code = 0;    
     return SM_ACTION_COMPLETE;

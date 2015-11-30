@@ -73,7 +73,7 @@ static PINT_sm_action small_io_start_job(
     struct filesystem_configuration_s * fs_config;
     struct server_configuration_s * server_config;
 
-    PINT_perf_timer_start(&s_op->start_time);
+    //PINT_perf_timer_start(&s_op->start_time);
 
     memset(&s_op->resp.u.small_io, 0, sizeof(struct PVFS_servresp_small_io));
 

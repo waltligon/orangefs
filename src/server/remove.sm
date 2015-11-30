@@ -283,7 +283,7 @@ static PINT_sm_action remove_check_object_type(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* start timer */
-    PINT_perf_timer_start(&s_op->start_time);
+    //PINT_perf_timer_start(&s_op->start_time);
 
     if(s_op->attr.objtype == PVFS_TYPE_DATAFILE)
     {
@@ -343,20 +343,12 @@ static PINT_sm_action remove_verify_object_metadata(
         /* This is the first point we know this is a rmdir so
          * increment the counter for rmdir requests
          */
-        PINT_perf_count(PINT_server_pc, PINT_PERF_RMDIR, 1, PINT_PERF_ADD);
 
 	js_p->error_code = STATE_TYPE_DIRECTORY;
 
 	gossip_debug(
             GOSSIP_SERVER_DEBUG, "  type is directory; removing "
             "dirdata object before removing directory itself.\n");
-    }
-    else
-    {
-        /* This is the first point we know this is a file rm so
-         * increment the counter for remove requests
-         */
-        PINT_perf_count(PINT_server_pc, PINT_PERF_REMOVE, 1, PINT_PERF_ADD);
     }
 
     return SM_ACTION_COMPLETE;
@@ -1095,7 +1087,20 @@ static PINT_sm_action remove_cleanup(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TREMOVE, &s_op->start_time);
+    if (s_op->attr.objtype == PVFS_TYPE_DIRECTORY)
+    {
+        PINT_perf_count(PINT_server_pc, PINT_PERF_RMDIR, 1, PINT_PERF_ADD);
+        PINT_perf_timer_end(PINT_server_tpc,
+                            PINT_PERF_TRMDIR,
+                            &s_op->start_time);
+    }
+    else if (s_op->attr.objtype == PVFS_TYPE_METAFILE)
+    {
+        PINT_perf_count(PINT_server_pc, PINT_PERF_REMOVE, 1, PINT_PERF_ADD);
+        PINT_perf_timer_end(PINT_server_tpc,
+                            PINT_PERF_TREMOVE,
+                            &s_op->start_time);
+    }
 
     PINT_free_object_attr(&s_op->attr);
     return(server_state_machine_complete(smcb));

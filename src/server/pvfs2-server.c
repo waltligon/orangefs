@@ -2385,6 +2385,13 @@ int server_state_machine_start(
                          PINT_HINT_GET_HANDLE(s_op->req->hints),
                          s_op->req->op);
         s_op->resp.op = s_op->req->op;
+
+        /* start request timer 
+         * if we are not tracking this request we will never call end
+         * this is not a problem so pretty much call this for all
+         * normal requests
+         */
+        PINT_perf_timer_start(&s_op->start_time);
     }
 
     s_op->addr = s_op->unexp_bmi_buff.addr;

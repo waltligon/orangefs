@@ -111,7 +111,8 @@ do {                                                              \
         bytes_written = write(graphite_fd,                        \
                 graphite_message,                                 \
                 strlen(graphite_message) + 1);                    \
-        if(bytes_written != strlen(graphite_message) + 1){        \
+        if(bytes_written != strlen(graphite_message) + 1)         \
+        {                                                         \
             fprintf(stderr, "write failed\n");                    \
         }                                                         \
         printf("sent graphite message\n");                        \
@@ -164,6 +165,23 @@ do {                                                              \
                     (long long int)START_TIME(s, h)/1000);        \
         }                                                         \
     }                                                             \
+    if (user_opts->graphite)                                      \
+    {                                                             \
+        sprintf(graphite_message,                                 \
+                "%s%s-avg %.f %lld\n",                            \
+                samplestr,                                        \
+                str,                                              \
+                avg,                                              \
+                (long long int)START_TIME(s, h)/1000);            \
+        bytes_written = write(graphite_fd,                        \
+                graphite_message,                                 \
+                strlen(graphite_message) + 1);                    \
+        if(bytes_written != strlen(graphite_message) + 1)         \
+        {                                                         \
+            fprintf(stderr, "write failed\n");                    \
+        }                                                         \
+        printf("sent graphite message\n");                        \
+    }                                                             \
     if (user_opts->print)                                         \
     {                                                             \
         fprintf(pfile,                                            \
@@ -172,6 +190,23 @@ do {                                                              \
                 str,                                              \
                 (long long int)cnt,                               \
                 (long long int)START_TIME(s, h)/1000);            \
+    }                                                             \
+    if (user_opts->graphite)                                      \
+    {                                                             \
+        sprintf(graphite_message,                                 \
+                "%s%s-cnt %lld %lld\n",                           \
+                samplestr,                                        \
+                str,                                              \
+                (long long int)cnt,                               \
+                (long long int)START_TIME(s, h)/1000);            \
+        bytes_written = write(graphite_fd,                        \
+                graphite_message,                                 \
+                strlen(graphite_message) + 1);                    \
+        if(bytes_written != strlen(graphite_message) + 1)         \
+        {                                                         \
+            fprintf(stderr, "write failed\n");                    \
+        }                                                         \
+        printf("sent graphite message\n");                        \
     }                                                             \
     if (user_opts->print)                                         \
     {                                                             \
@@ -182,6 +217,23 @@ do {                                                              \
                 (long long int)min,                               \
                 (long long int)START_TIME(s, h)/1000);            \
     }                                                             \
+    if (user_opts->graphite)                                      \
+    {                                                             \
+        sprintf(graphite_message,                                 \
+                "%s%s-min %lld %lld\n",                           \
+                samplestr,                                        \
+                str,                                              \
+                (long long int)min,                               \
+                (long long int)START_TIME(s, h)/1000);            \
+        bytes_written = write(graphite_fd,                        \
+                graphite_message,                                 \
+                strlen(graphite_message) + 1);                    \
+        if(bytes_written != strlen(graphite_message) + 1)         \
+        {                                                         \
+            fprintf(stderr, "write failed\n");                    \
+        }                                                         \
+        printf("sent graphite message\n");                        \
+    }                                                             \
     if (user_opts->print)                                         \
     {                                                             \
         fprintf(pfile,                                            \
@@ -190,6 +242,23 @@ do {                                                              \
                 str,                                              \
                 (long long int)max,                               \
                 (long long int)START_TIME(s, h)/1000);            \
+    }                                                             \
+    if (user_opts->graphite)                                      \
+    {                                                             \
+        sprintf(graphite_message,                                 \
+                "%s%s-max %lld %lld\n",                           \
+                samplestr,                                        \
+                str,                                              \
+                (long long int)max,                               \
+                (long long int)START_TIME(s, h)/1000);            \
+        bytes_written = write(graphite_fd,                        \
+                graphite_message,                                 \
+                strlen(graphite_message) + 1);                    \
+        if(bytes_written != strlen(graphite_message) + 1)         \
+        {                                                         \
+            fprintf(stderr, "write failed\n");                    \
+        }                                                         \
+        printf("sent graphite message\n");                        \
     }                                                             \
 } while(0);
 
@@ -462,8 +531,7 @@ int main(int argc, char **argv)
     /* loop for ever, grabbing stats at regular intervals */
     while (1)
     {
-        /* flag to keep us from reporting wild numbers on very first
-         * pass */
+        /* flag to keep us from reporting wild numbers on very first pass */
         static int not_first_pass = 0;
 
         PVFS_util_refresh_credential(&cred);

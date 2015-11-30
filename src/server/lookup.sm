@@ -185,7 +185,7 @@ static PINT_sm_action lookup_init(
     char *ptr = NULL;
 
     /* start timer */
-    PINT_perf_timer_start(&s_op->start_time);
+    //PINT_perf_timer_start(&s_op->start_time);
 
     s_op->u.lookup.attr.dist_dir_bitmap = NULL;
     s_op->u.lookup.attr.dirdata_handles = NULL;

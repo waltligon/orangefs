@@ -162,7 +162,7 @@ static int create_metafile(struct PINT_smcb *smcb, job_status_s *js_p)
      * the counter for create requests
      */
     PINT_perf_count(PINT_server_pc, PINT_PERF_CREATE, 1, PINT_PERF_ADD);
-    PINT_perf_timer_start(&s_op->start_time);
+    //PINT_perf_timer_start(&s_op->start_time);
 
     /* first state to check in, make sure the attr mask contains the dist bit. 
      * it's required later (not sure if we have to require it) but if we don't
