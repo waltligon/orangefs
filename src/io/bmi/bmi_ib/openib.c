@@ -306,15 +306,6 @@ static void init_connection_modify_qp(struct ibv_qp *qp, uint32_t remote_qp_num,
     attr.max_dest_rd_atomic = 1;
     attr.ah_attr.dlid = remote_lid;
     attr.ah_attr.port_num = od->nic_port;
-    /*
-    if (od->max_mtu > IBV_MTU) {
-        attr.path_mtu = od->max_mtu;
-        //attr.path_mtu = 4;
-    }
-    else {
-        attr.path_mtu = IBV_MTU;
-    }
-    */
     if (od->active_mtu > IBV_MTU) 
     {
         attr.path_mtu = od->active_mtu;
