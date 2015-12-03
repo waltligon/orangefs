@@ -418,6 +418,25 @@ void PINT_debug_credential(const PVFS_credential *cred,
 
 }
 
+/* PINT_verify_credential_timeout
+ *
+ * The function determines if the user's credential has timed out
+ */
+int PINT_verify_credential_timeout(const PVFS_credential *cred)
+{
+    if (!cred)
+    {
+       return 0;
+    }
+
+    if (PINT_util_get_current_time() > cred->timeout)
+    {
+       return 0;
+    }
+
+    return 1;
+}
+
 /* PINT_cleanup_credential
  *
  * Destructs a credential object by freeing its internal structures.

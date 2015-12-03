@@ -16,7 +16,7 @@
 #include "pvfs2-debug.h"
 #include "tcache.h"
 #include "security-util.h"
-#include "pvfs2-util.c"
+#include "pvfs2-util.h"
 #include "pvfs2-encode-stubs.h"
 #include "client-credcache.h"
 
@@ -46,7 +46,8 @@ PVFS_credential *lookup_credential(
     if (ret == 0 && status == 0)
     {
         /* cache hit -- return copy of cached credential 
- *            (cache operations may free credential) */
+         *    (cache operations may free credential) 
+         */
         gossip_debug(GOSSIP_SECURITY_DEBUG,
                      "credential cache HIT for (%u, %u)\n", uid, gid);
         cpayload = (struct credential_payload*) entry->payload;
@@ -78,39 +79,40 @@ PVFS_credential *lookup_credential(
     if (credential->sig_size != 0)
     {
 #endif
-    cpayload = malloc(sizeof(struct credential_payload));
-    if (cpayload == NULL)
-    {
-        gossip_lerr("out of memory\n");
-        return NULL;
-    }
-    cpayload->uid = uid;
-    cpayload->gid = gid;
-    /* Make copy of credential */
-    cache_cred = PINT_dup_credential(credential);
-    cpayload->credential = cache_cred;
+      cpayload = malloc(sizeof(struct credential_payload));
+      if (cpayload == NULL)
+      {
+          gossip_lerr("out of memory\n");
+          return NULL;
+      }
+      cpayload->uid = uid;
+      cpayload->gid = gid;
+      /* Make copy of credential */
+      cache_cred = PINT_dup_credential(credential);
+      cpayload->credential = cache_cred;
 
-    /* have cache entry expire before credential to avoid 
- *        using credential that's about to expire */
-    tval.tv_sec = credential->timeout - CRED_TIMEOUT_BUFFER;
-    tval.tv_usec = 0;
+      /* have cache entry expire before credential to avoid 
+       *  using credential that's about to expire 
+       */
+      tval.tv_sec = credential->timeout - CRED_TIMEOUT_BUFFER;
+      tval.tv_usec = 0;
 
-    ret = PINT_tcache_insert_entry_ex(
-        credential_cache,
-        &ckey,
-        cpayload,
-        &tval,
-        &status);
+      ret = PINT_tcache_insert_entry_ex(
+          credential_cache,
+          &ckey,
+          cpayload,
+          &tval,
+          &status);
 
-    if (ret == 0)
-    {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "cached credential for (%u, %u)\n",
-                     uid, gid);
-    }
-    else
-    {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "cache insert returned %d\n", ret);
-    }
+      if (ret == 0)
+      {
+          gossip_debug(GOSSIP_SECURITY_DEBUG, "cached credential for (%u, %u)\n",
+                       uid, gid);
+      }
+      else
+      {
+          gossip_debug(GOSSIP_SECURITY_DEBUG, "cache insert returned %d\n", ret);
+      }
 
 #ifdef ENABLE_SECURITY_CERT
     } /* if */

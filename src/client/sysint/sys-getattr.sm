@@ -648,11 +648,29 @@ static PINT_sm_action getattr_client_capcache_lookup(struct PINT_smcb *smcb,
                       sizeof(PVFS_uid), &local_uid);
     }
 
+    /* TODO: Get the local_gid from the hints.  If not found, then we will
+     *       will have to lookup the credential by searching the credcache,
+     *       because a user can be a member of many groups and we don't
+     *       know which one was used to generate the credential.  We don't want 
+     *       to do this very often!
+     */
+
+
+
+    /* TODO:  Should we just issue a lookup_credential(), which will create
+     *        a new one if the credential is about to expire?
+     */
+
+    /*  Should we have a way to lookup the credential using an existing 
+     *  credential?
+     */ 
+
+
     /* Make sure the credential has not timed out.  For a capability to be
      * to be valid, the credential upon which it is created must also be 
      * valid.
     */
-    if ( ! PINT_verify_credential(sm_p->cred_p) )
+    if ( ! PINT_verify_credential_timeout(sm_p->cred_p) )
     {
        /* remove from ccache, regenerate cred, and insert new cred 
         * into ccache.
@@ -720,6 +738,7 @@ static PINT_sm_action getattr_renew_credential(
       return SM_ACTION_COMPLETE;
    }
 
+/* TODO: generate gid if not found in the hints */
    /* retrieve the gid */
    local_gid = PINT_HINT_GET_OWNER_GID(sm_p->hints);
    if ( local_gid == -1 )
