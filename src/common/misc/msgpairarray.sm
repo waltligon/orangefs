@@ -66,6 +66,19 @@ nested machine pvfs2_msgpairarray_sm
         default => post;
     }
 
+    state credential_timeout
+    {
+       run msgpairarray_credential_timeout;
+       default => capability_timeout;
+    }
+
+    state capability_timeout
+    {
+       run msgpairarray_capability_timeout;
+       CAPABILITY_TIMEOUT => done;
+       default => post;
+    }
+
     state post
     {
         run msgpairarray_post;
@@ -139,6 +152,40 @@ static PINT_sm_action msgpairarray_init(
     }
     return SM_ACTION_COMPLETE;
 }
+
+
+
+static PINT_sm_action msgpairarray_credential_timeout(
+        struct PINT_smcb *smcb, jobs_status_s *js_p)
+{
+   PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+   return SM_ACTION_COMPLETE;
+}/*end msgpairarray_credential_timeout*/
+
+
+
+static PINT_sm_action msgpairarray_capability_timeout(
+        struct PINT_smcb *smcb, jobs_status_s *js_p)
+{
+   PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   PINT_sm_msgpair_state *msgpair = &mop->msgpair;
+
+   js_p->error_code = 0;
+
+   /* CHECK: Do I need to check every msgpair? */ 
+
+   /* Has the capability expired or is soon to expire? */
+   if ( !PINT_verify_capability(&msgpair->req.capability) )
+   {
+      js_p->error_code = ;
+      
+   }
+
+
+   return SM_ACTION_COMPLETE;
+}/*end msgpairarray_capability_timeout*/
+
 
 /* msgpairarray_post()
  *
