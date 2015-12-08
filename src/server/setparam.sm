@@ -18,7 +18,7 @@
 #include "gossip.h"
 #include "request-scheduler/request-scheduler.h"
 #include "pint-security.h"
-
+#include "pint-perf-counter.h"
 static int check_fs_id(PVFS_fs_id fs_id);
 static int drop_caches(void);
 
@@ -154,17 +154,17 @@ static PINT_sm_action setparam_work(
         case PVFS_SERV_PARAM_DROP_CACHES:
             js_p->error_code = drop_caches();
             return SM_ACTION_COMPLETE;
-				case PVFS_SERV_PARAM_SET_PERF_MON:
+        case PVFS_SERV_PARAM_SET_PERF_MON:
 						/* Quick and dirty just to make sure it works.  Add error handling */
-						ret = PINT_perf_set_info(PINT_server_pc, PINT_PERF_HISTORY_SIZE, s_op->req->u.mgmt_setparam.value.u.hist);
-						if(ret != 0) 
+						ret = PINT_perf_set_info(PINT_server_pc, PINT_PERF_HISTORY_SIZE, s_op->req->u.mgmt_setparam.value.u.perf.hist);
+			      if(ret != 0) 
 							js_p->error_code = ret;
-						ret = PINT_perf_set_info(PINT_server_pc, PINT_PERF_UPDATE_INTERVAL, s_op->req->u.mgmt_setparam.value.u.interval);
+						ret = PINT_perf_set_info(PINT_server_pc, PINT_PERF_UPDATE_INTERVAL, s_op->req->u.mgmt_setparam.value.u.perf.interval);
 						if(ret != 0)
 							js_p->error_code = ret;
             user_opts = get_server_config_struct();
-						user_opts->perf_update_interval = s_op->req->u.mgmt_setparam.value.u.interval;
-						user_opts->perf_update_interval = s_op->req->u.mgmt_setparam.value.u.hist;
+						user_opts->perf_update_interval = s_op->req->u.mgmt_setparam.value.u.perf.interval;
+						user_opts->perf_update_interval = s_op->req->u.mgmt_setparam.value.u.perf.hist;
 						return SM_ACTION_COMPLETE;
 
     }

@@ -27,10 +27,10 @@
 
 extern job_context_id pint_client_sm_context;
 
-//static int root_check_comp_fn(
+static int root_check_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
-//static int collect_old_values_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int i);
+static int collect_old_values_comp_fn(
+  void *v_p, struct PVFS_server_resp *resp_p, int i);
 
 %%
 
@@ -39,16 +39,8 @@ machine pvfs2_client_mgmt_getparam_list_sm
     state init
     {
         run mgmt_getparam_list_init;
-        //default => getparam_list_get_capability;
         default => setup_msgpair;
     }
-    
-    /*state getparam_list_get_capability
-    {
-        jump pvfs2_client_getattr_sm;
-        success => setup_msgpair;
-        default => cleanup;
-    }*/
     
     state setup_msgpair
     {
@@ -78,7 +70,7 @@ PVFS_error PVFS_imgmt_getparam_list(
     PVFS_fs_id fs_id,
     const PVFS_credential *credential,
     enum PVFS_server_param param,
-    struct PVFS_mgmt_getparam_value *value,
+    struct PVFS_mgmt_setparam_value *value,
     PVFS_BMI_addr_t *addr_array,
     int count,
     PVFS_error_details *details,
@@ -172,7 +164,7 @@ PVFS_error PVFS_mgmt_getparam_list(
     return error;
 }
 
-/*static int mgmt_getparam_list_init(
+static int mgmt_getparam_list_init(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {    
     struct PINT_client_sm *sm_p;
@@ -218,7 +210,6 @@ static PINT_sm_action mgmt_getparam_list_setup_msgpair(
         return SM_ACTION_COMPLETE;
     }
 
-    /* setup msgpair array */
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
         PINT_SERVREQ_MGMT_SETPARAM_FILL(
@@ -228,13 +219,12 @@ static PINT_sm_action mgmt_getparam_list_setup_msgpair(
             sm_p->u.getparam_list.param,
             sm_p->u.getparam_list.value,
             sm_p->hints);
-        //param and value not needed
 
         msg_p->fs_id = sm_p->u.getparam_list.fs_id;
         msg_p->handle = PVFS_HANDLE_NULL;
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
 
-        /*switch(sm_p->u.getparam_list.param)
+        switch(sm_p->u.getparam_list.param)
         {
             case PVFS_SERV_PARAM_ROOT_CHECK:
                 msg_p->comp_fn = root_check_comp_fn;
@@ -247,11 +237,11 @@ static PINT_sm_action mgmt_getparam_list_setup_msgpair(
             default:
                 msg_p->comp_fn = collect_old_values_comp_fn;
                 break;
-        }*/
+        }
         msg_p->svr_addr = sm_p->u.getparam_list.addr_array[i];
     }
 
-    /* immediate return: next state jumps to msgpairarray machine */
+    /*immediate return: next state jumps to msgpairarray machine i*/
     js_p->error_code = 0;
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
@@ -265,7 +255,7 @@ static PINT_sm_action mgmt_getparam_list_cleanup(
     int i = 0, errct = 0;
     PVFS_error error = js_p->error_code;
 
-    /* store server-specific errors if requested and present */
+     /*store server-specific errors if requested and present */
     if ((error != 0) && (sm_p->u.getparam_list.details != NULL))
     {
         sm_p->u.getparam_list.details->count_exceeded = 0;
@@ -315,20 +305,20 @@ static PINT_sm_action mgmt_getparam_list_cleanup(
 }
 
 /* collect_old_values_comp_fn()
- *
+*
  * completion function that assembles old values for parameters
  * when appropriate
  *
- * returns 0 on success, -PVFS_error on failure
+ * returns 0 on success, -PVFS_error on failure*/
 static int collect_old_values_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int i) //not needed
+    void *v_p, struct PVFS_server_resp *resp_p, int i)
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     int j;
 
-     if this is the last response, check all of the status values
-     and return error code if any requests failed
+     /*if this is the last response, check all of the status values
+     and return error code if any requests failed*/
      
     if (i == (sm_p->msgarray_op.count -1))
     {
@@ -341,7 +331,7 @@ static int collect_old_values_comp_fn(
         }
     }
     return 0;
-}*/
+}
 
 /* root_check_comp_fn()
  *
@@ -350,25 +340,25 @@ static int collect_old_values_comp_fn(
  * server to return success and all others to return -PVFS_ENOENT.
  *
  * returns 0 if exactly one server claims ownership of root handle,
- * -PVFS_error on failure
+ * -PVFS_error on failure*/
 
 static int root_check_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int i) //not needed
+    void *v_p, struct PVFS_server_resp *resp_p, int i)
 {
     int j = 0;
     int owners = 0;
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
-      store the op_status before it's overwritten with the return
-      value of this comp_fn by the msgpairarray code
+      /*store the op_status before it's overwritten with the return
+      value of this comp_fn by the msgpairarray code*/
     
     sm_p->u.setparam_list.root_check_status_array[i] =
         sm_p->msgarray_op.msgarray[i].op_status;
 
-     need to return non-zero status at the end if any of the statuses
+     /*need to return non-zero status at the end if any of the statuses
      are nonzero
-     
+     */
     if(i == (sm_p->u.setparam_list.count - 1))
     {
         for(; j < sm_p->u.setparam_list.count; ++j)
@@ -391,7 +381,7 @@ static int root_check_comp_fn(
     }
 
     return 0;
-}*/
+}
 
 /*
  * Local variables:

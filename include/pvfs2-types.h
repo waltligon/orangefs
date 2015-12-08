@@ -626,7 +626,8 @@ enum PVFS_server_param
     PVFS_SERV_PARAM_EVENT_DISABLE = 6, /* event disable */
     PVFS_SERV_PARAM_SYNC_META = 7,   /* metadata sync flags */
     PVFS_SERV_PARAM_SYNC_DATA = 8,   /* file data sync flags */
-    PVFS_SERV_PARAM_DROP_CACHES = 9
+    PVFS_SERV_PARAM_DROP_CACHES = 9,
+    PVFS_SERV_PARAM_SET_PERF_MON = 10 /* Set perf mon params */
 };
 
 enum PVFS_mgmt_param_type
@@ -642,6 +643,11 @@ struct PVFS_mgmt_setparam_value
     {
         uint64_t value;
         char *string_value;
+        struct {
+            uint64_t hist;
+            uint64_t interval;
+            uint64_t count;
+        } perf;
     } u;
 };
 

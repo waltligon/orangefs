@@ -1797,13 +1797,8 @@ struct PVFS_servreq_mgmt_getparam
 {
     PVFS_fs_id fs_id;             /* file system */
     enum PVFS_server_param param; /* parameter to set */
-    struct PVFS_mgmt_getparam_value value;
+    struct PVFS_mgmt_setparam_value value;
 };
-endecode_fields_3_struct(
-    PVFS_servreq_mgmt_getparam,
-    PVFS_fs_id, fs_id,
-    enum, param,
-    PVFS_mgmt_getparam_value, value);
 
 #define PINT_SERVREQ_MGMT_GETPARAM_FILL(__req,                      \
                                         __cap,                      \
@@ -1822,19 +1817,45 @@ do {                                                                \
         (__req).u.mgmt_getparam.value.type = (__value)->type;       \
         (__req).u.mgmt_getparam.value.u.value = (__value)->u.value; \
     }                                                               \
-} while (0)
+} while (0)                                                   
+
+endecode_fields_3_struct(
+    PVFS_servreq_mgmt_getparam,
+    PVFS_fs_id, fs_id,
+    enum, param,
+    PVFS_mgmt_setparam_value, value);
 
 struct PVFS_servresp_mgmt_getparam
 {
     uint32_t key_count;             /* number of keys in each sample */
     uint64_t interval;           /* current time according to svr */
-		uint64_t history;
+    uint64_t history;
 };
 endecode_fields_3_struct(
     PVFS_servresp_mgmt_getparam,
     uint32_t, key_count,
     uint64_t, interval,
-		uint64_t, history);
+    uint64_t, history);
+#define PINT_SERVRESP_MGMT_GETPARAM_FILL(__req,                      \
+                                        __cap,                      \
+                                        __fsid,                     \
+                                        __param,                    \
+                                        __value,                    \
+                                        __hints)                    \
+do {                                                                \
+    memset(&(__req), 0, sizeof(__req));                             \
+    (__req).op = PVFS_SERV_MGMT_GETPARAM;                           \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                     \
+    (__req).hints = (__hints);                                      \
+    (__req).u.mgmt_getparam.fs_id = (__fsid);                       \
+    (__req).u.mgmt_getparam.param = (__param);                      \
+    if(__value){                                                    \
+        (__req).u.mgmt_getparam.value.type = (__value)->type;       \
+        (__req).u.mgmt_getparam.value.u.value = (__value)->u.value; \
+    }                                                               \
+} while (0)
+
+
 #define extra_size_PVFS_servresp_mgmt_perf_mon \
     (PVFS_REQ_LIMIT_IOREQ_BYTES)
 
@@ -2693,7 +2714,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_mgmt_get_dirent mgmt_get_dirent;
         struct PVFS_servresp_mgmt_get_user_cert mgmt_get_user_cert;
         struct PVFS_servresp_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
-				struct PVFS_servresp_mgmt_getparam mgmt_getparam;
+        struct PVFS_servresp_mgmt_getparam mgmt_getparam;
     } u;
 };
 endecode_fields_2_struct(

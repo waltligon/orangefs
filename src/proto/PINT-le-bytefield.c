@@ -231,6 +231,9 @@ static void lebf_initialize(void)
             case PVFS_SERV_MGMT_SETPARAM:
                 /* nothing special */
                 break;
+            case PVFS_SERV_MGMT_GETPARAM:
+                /* nothing special */
+                break;
             case PVFS_SERV_MGMT_NOOP:
                 /* nothing special */
                 break;
@@ -661,6 +664,7 @@ static int lebf_encode_resp(
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_IMM_COPIES:
         case PVFS_SERV_MGMT_SETPARAM:
+        case PVFS_SERV_MGMT_GETPARAM:
         case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
         case PVFS_SERV_MGMT_SPLIT_DIRENT:
             /* nothing else */
@@ -880,6 +884,7 @@ static int lebf_decode_resp(
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_IMM_COPIES:
         case PVFS_SERV_MGMT_SETPARAM:
+        case PVFS_SERV_MGMT_GETPARAM:
         case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
         case PVFS_SERV_MGMT_SPLIT_DIRENT:
             /* nothing else */
@@ -1142,6 +1147,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_READDIR:
             case PVFS_SERV_FLUSH:
             case PVFS_SERV_MGMT_SETPARAM:
+            case PVFS_SERV_MGMT_GETPARAM:
             case PVFS_SERV_MGMT_NOOP:
             case PVFS_SERV_STATFS:
             case PVFS_SERV_MGMT_ITERATE_HANDLES:
@@ -1370,6 +1376,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_MKDIR:
                 case PVFS_SERV_FLUSH:
                 case PVFS_SERV_MGMT_SETPARAM:
+                case PVFS_SERV_MGMT_GETPARAM:
                 case PVFS_SERV_MGMT_NOOP:
                 case PVFS_SERV_STATFS:
                 case PVFS_SERV_WRITE_COMPLETION:

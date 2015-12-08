@@ -8,6 +8,7 @@ ifdef BUILD_SERVER
         SERVER_SMCGEN := \
 		$(DIR)/pjmp-machines.c \
 		$(DIR)/setparam.c \
+		$(DIR)/getparam.c \
 		$(DIR)/lookup.c \
 		$(DIR)/create.c \
 		$(DIR)/mirror.c \

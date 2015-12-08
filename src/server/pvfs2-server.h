@@ -906,6 +906,7 @@ extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_getattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
+extern struct PINT_state_machine_s pvfs2_mgmt_getparam_sm;
 
 extern void tree_getattr_free(PINT_server_op *s_op);
 extern void tree_remove_free(PINT_server_op *s_op);
