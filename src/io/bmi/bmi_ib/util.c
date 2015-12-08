@@ -94,7 +94,8 @@ warning_xerrno(int errnum, const char *fmt, ...)
     gossip_err("Warning: %s: %s.\n", s, strerror(errnum));
 }
 
-void * __attribute__((malloc)) __hidden
+/* removed "malloc" attribute */
+void *__hidden
 bmi_ib_malloc(unsigned long n)
 {
     char *x;
