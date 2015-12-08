@@ -49,7 +49,17 @@ int io_cache_add(ULONG64 context,
     gen_mutex_unlock(&io_cache_mutex);
     if (link != NULL)
     {
-        gossip_debug(GOSSIP_IO_DEBUG, "io_cache_add: context %llx already exists\n", context);
+        entry = qhash_entry(link, struct io_cache_entry, hash_link);
+        if (io_type != entry->io_type)
+        {
+            gossip_debug(GOSSIP_IO_DEBUG, "io_cache_add: updating io_type to %s for context %llx\n",
+                (io_type == PVFS_IO_READ) ? "READ" : "WRITE", context);
+            entry->io_type = io_type;
+        }
+        else
+        {
+            gossip_debug(GOSSIP_IO_DEBUG, "io_cache_add: context %llx already exists\n", context);
+        }
         return 0;
     }
 
