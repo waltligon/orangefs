@@ -749,6 +749,11 @@ static const char *async_event_type_string(enum ibv_event_type event_type)
 	CASE(IBV_EVENT_CLIENT_REREGISTER);
 #endif
 	CASE(IBV_EVENT_GID_CHANGE);
+
+    /* Experimental event types */
+    CASE(IBV_EXP_EVENT_DCT_KEY_VIOLATION);
+    CASE(IBV_EXP_EVENT_DCT_ACCESS_ERR);
+    CASE(IBV_EXP_EVENT_DCT_REQ_ERR);
     }
     return s;
 }
