@@ -249,11 +249,13 @@ int PINT_update_dist_dir_bitmap_from_bitmap(
 	assert((to_dir_attr != NULL) && (from_dir_attr != NULL));
 	assert((to_dir_bitmap != NULL) && (from_dir_bitmap != NULL));
 
+#if 0
 	if( (to_dir_attr->num_servers != from_dir_attr->num_servers) ||
 		(to_dir_attr->server_no == from_dir_attr->server_no))
 	{
 		return -1; /* not in the same tree or update itself */
 	}
+#endif
 
 	/* bitmap is with a type of (uint32_t *)
 	 */

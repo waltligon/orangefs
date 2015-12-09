@@ -22,7 +22,8 @@
 /* What we do in this function is to walk the list of operations that are present 
  * in the request queue and mark them as purged.
  * NOTE: This is called from the device close after client-core has guaranteed that no new
- * operations could appear on the list since the client-core is anyway going to exit.
+ * operations could appear on the list since the client-core is about to exit.
+ * When the client-core aborts, there are no guarantees!!!!
  */
 void purge_waiting_ops(void)
 {
@@ -32,6 +33,13 @@ void purge_waiting_ops(void)
     {
         gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2-client-core: purging op tag %llu %s\n", llu(op->tag), get_opname_string(op));
         spin_lock(&op->lock);
+        if ( !op_state_waiting(op) )
+        {
+           /* if this op is not in the "waiting" state but is still on this list, then */
+           /* this op is being handled by pvfs2_clean_up_interrupted_operation.        */
+           spin_unlock(&op->lock);
+           continue; /* check next op */
+        }
         set_op_state_purged(op);
         spin_unlock(&op->lock);
         wake_up_interruptible(&op->waitq);
@@ -59,7 +67,6 @@ int service_operation(
     int ret = 0;
 
     /* irqflags and wait_entry are only used IF the client-core aborts */
-    unsigned long irqflags;
     DECLARE_WAITQUEUE(wait_entry, current);
 
 
@@ -192,12 +199,13 @@ retry_servicing:
             gossip_debug(GOSSIP_WAIT_DEBUG,"uses_shared_memory is true.\n");
             gossip_debug(GOSSIP_WAIT_DEBUG,"Client core in-service status(%d).\n",is_daemon_in_service());
             gossip_debug(GOSSIP_WAIT_DEBUG,"bufmap_init:%d.\n",get_bufmap_init());
-            gossip_debug(GOSSIP_WAIT_DEBUG,"operation's status is 0x%0x.\n",op->op_state);
+            gossip_debug(GOSSIP_WAIT_DEBUG,"operation's state is 0x%0x.\n",op->op_state);
 
             /* let process sleep for a few seconds so shared memory system can be initialized. */
-            spin_lock_irqsave(&op->lock,irqflags);
+            /* ligon: removed irqsave and irqrestore from the spinlocks. it is okay if a hardware interrupt occurs.*/
+            spin_lock(&op->lock);
             add_wait_queue(&pvfs2_bufmap_init_waitq, &wait_entry);
-            spin_unlock_irqrestore(&op->lock,irqflags);
+            spin_unlock(&op->lock);
 
             set_current_state(TASK_INTERRUPTIBLE);
 
@@ -207,9 +215,10 @@ retry_servicing:
             gossip_debug(GOSSIP_WAIT_DEBUG,"Value returned from schedule_timeout:%d.\n",ret);
             gossip_debug(GOSSIP_WAIT_DEBUG,"Is shared memory available? (%d).\n",get_bufmap_init());
 
-            spin_lock_irqsave(&op->lock,irqflags);
+            /* ligon: removing irqsave and irqrestore from spinlocks.  it is okay if a hardware interrupt occurs. */
+            spin_lock(&op->lock);
             remove_wait_queue(&pvfs2_bufmap_init_waitq, &wait_entry);
-            spin_unlock_irqrestore(&op->lock,irqflags);
+            spin_unlock(&op->lock);
 
             if (get_bufmap_init() == 0)
             {
@@ -254,7 +263,7 @@ void pvfs2_clean_up_interrupted_operation(
     if( ! (op_state_waiting(op) || op_state_in_progress(op) || 
            op_state_serviced(op) || op_state_purged(op)) )
     {
-        gossip_debug(GOSSIP_WAIT_DEBUG, "%s: op %p not in a valid state (%0x), "
+        gossip_debug(GOSSIP_WAIT_DEBUG, "%s: op %p NOT in a valid state (%0x), "
                      "ignoring\n", __func__, op, op->op_state);
         return;
     }
@@ -267,6 +276,7 @@ void pvfs2_clean_up_interrupted_operation(
           upcall hasn't been read; remove op from upcall request
           list.
         */
+        set_op_state_interrupted(op);
         spin_unlock(&op->lock);
         remove_op_from_request_list(op);
         gossip_debug(GOSSIP_WAIT_DEBUG, "Interrupted: Removed op %p from request_list\n", op);
@@ -274,6 +284,7 @@ void pvfs2_clean_up_interrupted_operation(
     else if (op_state_in_progress(op))
     {
         /* op must be removed from the in progress htable */
+        set_op_state_interrupted(op);
         spin_unlock(&op->lock);
         remove_op_from_htable_ops_in_progress(op);
         gossip_debug(GOSSIP_WAIT_DEBUG, "Interrupted: Removed op %p from "
@@ -282,7 +293,7 @@ void pvfs2_clean_up_interrupted_operation(
     else if (!op_state_serviced(op))
     {
         spin_unlock(&op->lock);
-        gossip_err("interrupted operation is in a weird state 0x%x\n",
+        gossip_err("interrupted operation is in a weird state (%d)\n",
                     op->op_state);
     }
 }

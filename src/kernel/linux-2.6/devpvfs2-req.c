@@ -101,8 +101,11 @@ static ssize_t pvfs2_devreq_read(
     int ret = 0;
     ssize_t len = 0;
     pvfs2_kernel_op_t *cur_op = NULL;
+    uint64_t tag;
     static int32_t magic = PVFS2_DEVREQ_MAGIC;
     int32_t proto_ver = PVFS_KERNEL_PROTO_VERSION;
+    PVFS_fs_id fs_id;
+    pvfs2_kernel_op_t *op=NULL, *temp=NULL;
 
     if (!(file->f_flags & O_NONBLOCK))
     {
@@ -112,15 +115,20 @@ static ssize_t pvfs2_devreq_read(
     }
     else
     {
-        pvfs2_kernel_op_t *op = NULL, *temp = NULL;
         /* get next op (if any) from top of list */
         spin_lock(&pvfs2_request_list_lock);
         list_for_each_entry_safe (op, temp, &pvfs2_request_list, list)
         {
-            PVFS_fs_id fsid = fsid_of_op(op);
+            spin_lock(&op->lock);
+
+            tag = 0;
+            cur_op = NULL;
+
+            fs_id = fsid_of_op(op);
             /* Check if this op's fsid is known and needs remounting */
-            if (fsid != PVFS_FS_ID_NULL && fs_mount_pending(fsid) == 1)
+            if (fs_id != PVFS_FS_ID_NULL && fs_mount_pending(fs_id) == 1)
             {
+                spin_unlock(&op->lock);
                 gossip_debug(GOSSIP_DEV_DEBUG, "Skipping op tag %llu %s\n", llu(op->tag), get_opname_string(op));
                 continue;
             }
@@ -129,21 +137,29 @@ static ssize_t pvfs2_devreq_read(
              */
             else {
                 cur_op = op;
-                spin_lock(&cur_op->lock);
-                list_del(&cur_op->list);
-                cur_op->op_linger_tmp--;
-                /* if there is a trailer, re-add it to the request list */
-                if (cur_op->op_linger == 2 && cur_op->op_linger_tmp == 1)
+                if ( !op_state_waiting(op) )
                 {
-                    if (cur_op->upcall.trailer_size <= 0 || cur_op->upcall.trailer_buf == NULL) 
-                    {
-                        gossip_err("BUG:trailer_size is %ld and trailer buf is %p\n",
-                                (long) cur_op->upcall.trailer_size, cur_op->upcall.trailer_buf);
-                    }
-                    /* readd it to the head of the list */
-                    list_add(&cur_op->list, &pvfs2_request_list);
+                   spin_unlock(&op->lock);
+                   continue; /*check next op*/
                 }
-                spin_unlock(&cur_op->lock);
+                tag = op->tag;
+                list_del(&op->list);
+                op->op_linger_tmp--;
+                /* if there is a trailer, re-add it to the request list */
+                if (op->op_linger == 2 && op->op_linger_tmp == 1)
+                {
+                    /* re-add it to the head of the list */
+                    list_add(&op->list, &pvfs2_request_list);
+
+                    if (op->upcall.trailer_size <= 0 || op->upcall.trailer_buf == NULL)
+                    {
+                       spin_unlock(&op->lock);
+                       gossip_err("BUG:trailer_size is %ld and trailer buf is %p\n",
+                               (long) cur_op->upcall.trailer_size, cur_op->upcall.trailer_buf);
+                       break;
+                    }
+                }
+                spin_unlock(&op->lock);
                 break;
             }
         }
@@ -152,22 +168,28 @@ static ssize_t pvfs2_devreq_read(
 
     if (cur_op)
     {
+        gossip_debug(GOSSIP_DEV_DEBUG, "%s : client-core: reading op tag %llu %s\n"
+                                     , __func__, llu(cur_op->tag), get_opname_string(cur_op));
+
         spin_lock(&cur_op->lock);
 
-        gossip_debug(GOSSIP_DEV_DEBUG, "client-core: reading op tag %llu %s\n", llu(cur_op->tag), get_opname_string(cur_op));
-        if (op_state_in_progress(cur_op) || op_state_serviced(cur_op))
+        if ( ! (op_state_waiting(cur_op) && cur_op->tag == tag) )
         {
-            if (cur_op->op_linger == 1)
-                gossip_err("WARNING: Current op already queued...skipping\n");
+           spin_unlock(&cur_op->lock);
+           gossip_err("%s : WARNING : Op is not in WAITING state but in state(%d); tag (%llu) should be (%llu)\n"
+                     ,__func__,cur_op->op_state,llu(cur_op->tag),llu(tag));
+           len = -EAGAIN;
+           goto exit_pvfs2_devreq_read;
         }
-        else if (cur_op->op_linger == 1 
-                || (cur_op->op_linger == 2 && cur_op->op_linger_tmp == 0)) 
+
+
+        if ( cur_op->op_linger == 1 ||
+           ( cur_op->op_linger == 2 && cur_op->op_linger_tmp == 0 ) ) 
         {
             set_op_state_inprogress(cur_op);
 
             /* atomically move the operation to the htable_ops_in_progress */
-            qhash_add(htable_ops_in_progress,
-                      (void *) &(cur_op->tag), &cur_op->list);
+            qhash_add(htable_ops_in_progress, (void *) &(cur_op->tag), &cur_op->list);
         }
 
         spin_unlock(&cur_op->lock);
@@ -247,6 +269,9 @@ static ssize_t pvfs2_devreq_read(
         */
         len = -EAGAIN;
     }
+
+exit_pvfs2_devreq_read:
+
     return len;
 }
 
