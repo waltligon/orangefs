@@ -139,7 +139,7 @@ int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
             return db_error(errno);
         }
     }
-    r = mdb_env_open((*db)->env, name, MDB_MAPASYNC|MAP_WRITEMAP,
+    r = mdb_env_open((*db)->env, name, MDB_MAPASYNC|MDB_WRITEMAP,
             TROVE_DB_MODE);
     if (r)
     {
