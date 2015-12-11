@@ -260,6 +260,25 @@ fi],
     BUILD_SERVER=1)
 AC_SUBST(BUILD_SERVER)
 
+AC_ARG_WITH(db-backend,
+[  --with-db-backend        Use specified database (bdb or lmdb).],
+if test "${withval}" = "bdb"
+then
+    DATABASE_BACKEND=bdb
+    NEED_BERKELEY_DB=yes
+elif test "${withval}" = "lmdb"
+then
+    DATABASE_BACKEND=lmdb
+else
+    AC_MSG_ERROR(database backend ${withval} invalid)
+fi
+AC_SUBST(DATABASE_BACKEND)
+AC_SUBST(NEED_BERKELEY_DB),
+DATABASE_BACKEND=bdb
+NEED_BERKELEY_DB=yes
+AC_SUBST(DATABASE_BACKEND)
+AC_SUBST(NEED_BERKELEY_DB))
+
 dnl locate OpenSSL libraries
 AX_OPENSSL
 
@@ -1415,6 +1434,18 @@ AC_ARG_WITH(valgrind,
     fi
 ])
 
+if test "x$NEED_BERKELEY_DB" = "xyes" ; then
+    dnl
+    dnl make sure that required db development package is installed
+    dnl and valid; path can be specified at configure time
+    dnl
+    AC_ARG_WITH(db,
+           [  --with-db=<dir>         Location of installed DB package (default=/usr)],
+    	   [AX_BERKELEY_DB(${withval})],
+	   [AX_BERKELEY_DB("")])
+fi
+dnl end of NEED_BERKELEY_DB section
+
 if test "x$BUILD_SERVER" = "x1"; then
 	dnl check if -lrt is required
 	AX_CHECK_NEEDS_LIBRT
@@ -2085,6 +2116,13 @@ if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
 		    times on the fast interface.  Suggest you configure with
 		    "--without-bmi-tcp" for the best performance.])
     fi
+fi
+
+if test x$HAVE_DB_OLD = x1; then
+    AC_MSG_WARN([The detected version of Berkeley DB is not at least 4.8.30.
+                    Metadata corruption has been documented in versions prior 
+                    to 4.8.30. It is highly recommended that you update the 
+                    version of Berkeley DB you are building against.])
 fi
 
 AC_MSG_RESULT()

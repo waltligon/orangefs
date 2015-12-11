@@ -51,43 +51,48 @@ static int db_error(int e)
 
 static int ds_attr_compare(const MDB_val *a, const MDB_val *b)
 {
-    TROVE_handle handle_a, handle_b;
-    if (a->mv_size < sizeof handle_a ||
-        b->mv_size < sizeof handle_b)
+    TROVE_handle *handle_a = (TROVE_handle *)a->mv_data;
+    TROVE_handle *handle_b = (TROVE_handle *)b->mv_data;
+    if (a->mv_size < sizeof(TROVE_handle) || b->mv_size < sizeof(TROVE_handle))
     {
-        gossip_err("inconsistency in ds_attr_compare: size too small\n");
+        gossip_err("DBPF dspace collection corrupt\n");
         abort();
     }
-    memcpy(&handle_a, a->mv_data, sizeof handle_a);
-    memcpy(&handle_b, b->mv_data, sizeof handle_b);
-
-    if (handle_a == handle_b)
+    if (*handle_a == *handle_b)
     {
         return 0;
     }
-    return (handle_a > handle_b) ? -1 : 1;
+    return (*handle_a > *handle_b) ? -1 : 1;
 }
 
 static int keyval_compare(const MDB_val *a, const MDB_val *b)
 {
-    struct dbpf_keyval_db_entry db_entry_a, db_entry_b;
-    if (sizeof db_entry_a < a->mv_size ||
-        sizeof db_entry_b < b->mv_size)
+    struct dbpf_keyval_db_entry *db_entry_a;
+    struct dbpf_keyval_db_entry *db_entry_b;
+    db_entry_a = (struct dbpf_keyval_db_entry *)a->mv_data;
+    db_entry_b = (struct dbpf_keyval_db_entry *)b->mv_data;
+
+    /* If the key is so small that it cannot contain the struct, our database
+     * is corrupt. Then compare the handle, type, and size. Finally if only the
+     * key data itself differs, compare it. */
+
+    if (a->mv_size < DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0) ||
+            b->mv_size < DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0))
     {
-        gossip_err("inconsistency in keyval_compare: size too small\n");
+        gossip_err("DBPF keyval collection corrupt\n");
         abort();
     }
-    memcpy(&db_entry_a, a->mv_data, a->mv_size);
-    memcpy(&db_entry_b, b->mv_data, b->mv_size);
 
-    if (db_entry_a.handle != db_entry_b.handle)
+    if (db_entry_a->handle != db_entry_b->handle)
     {
-        return (db_entry_a.handle < db_entry_b.handle) ? -1 : 1;
+        return (db_entry_a->handle < db_entry_b->handle) ? -1 : 1;
     }
-    if (db_entry_a.type != db_entry_b.type)
+
+    if (db_entry_a->type != db_entry_b->type)
     {
-        return (db_entry_a.type < db_entry_b.type) ? -1 : 1;
+        return (db_entry_a->type < db_entry_b->type) ? -1 : 1;
     }
+
     if (a->mv_size > b->mv_size)
     {
         return 1;
@@ -96,9 +101,9 @@ static int keyval_compare(const MDB_val *a, const MDB_val *b)
     {
         return -1;
     }
-    /* else must be equal */
-    return (memcmp(db_entry_a.key, db_entry_b.key,
-        DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->mv_size)));
+
+    return memcmp(db_entry_a->key, db_entry_b->key,
+            DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->mv_size));
 }
 
 int dbpf_db_open(char *name, int compare, struct dbpf_db **db,

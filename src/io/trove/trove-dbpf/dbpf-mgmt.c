@@ -1090,7 +1090,7 @@ int dbpf_collection_remove(char *collname,
     ret = dbpf_db_get(sto_p->coll_db, &key, &data);
     if (ret != 0)
     {
-        gossip_err("TROVE:DBPF:Berkeley DB DB->get collection");
+        gossip_err("TROVE:DBPF:Berkeley DB DB->get collection\n");
         return -ret;
     }
 
@@ -1441,7 +1441,7 @@ int dbpf_collection_lookup(char *collname,
     {
         if (ret != TROVE_ENOENT)
         {
-            gossip_err("TROVE:DBPF:Berkeley DB DB->get collection");
+            gossip_err("TROVE:DBPF:Berkeley DB DB->get collection\n");
             gossip_debug(GOSSIP_TROVE_DEBUG, "lookup got error (%d)\n", ret);
         }
         return -ret;
