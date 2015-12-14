@@ -22,6 +22,7 @@
 #include <src/io/bmi/bmi-method-callback.h>  /* bmi_method_addr_reg_callback */
 #include <src/common/gen-locks/gen-locks.h>  /* gen_mutex_t ... */
 #include <src/common/misc/pvfs2-internal.h>
+#include <pthread.h>
 #include "pint-hint.h"
 
 #ifdef HAVE_VALGRIND_H
@@ -43,6 +44,15 @@ static int bmi_ib_method_id;
 /* alloc space for the single device structure pointer; one for
  * vapi and one for openib */
 ib_device_t *ib_device __hidden = NULL;
+
+/* TCP listen backlog */
+static int listen_backlog = 16384;
+
+/* accept thread variables */
+static gen_mutex_t accept_thread_mutex = GEN_MUTEX_INITIALIZER;
+int accept_thread_shutdown = 0;
+gen_thread_t accept_thread_id;
+int accept_timeout_ms = 2000;
 
 /* these all vector through the ib_device */
 #define new_connection ib_device->func.new_connection
@@ -84,8 +94,20 @@ static int send_cts(struct ib_work *rq);
 static void ib_close_connection(ib_connection_t *c);
 static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
                                  struct bmi_method_addr *remote_map);
-static int ib_tcp_server_check_new_connections(void);
 static int ib_block_for_activity(int timeout_ms);
+
+void *ib_tcp_server_accept_thread(void *arg);
+void *ib_tcp_server_process_client_thread(void *arg);
+
+
+/* structure to hold TCP info passed to the accept thread */
+struct tcp_conn {
+    int port;
+    char *hostname;
+    char peername[2048];
+    int s;
+};
+
 
 /*
  * Return string form of work completion opcode field.
@@ -111,23 +133,29 @@ static const char *wc_opcode_string(int opcode)
 static int ib_check_cq(void)
 {
     int ret = 0;
+    struct buf_head *bh = NULL;
+    struct ib_work *sq = NULL;
 
     for (;;) 
     {
         struct bmi_ib_wc wc;
         int vret;
 
+        bh = NULL;
+        sq = NULL;
+
         vret = check_cq(&wc);
-        if (vret == 0)
+        if (vret == 0 || wc.id == 0)
         {
             break;  /* empty */
         }
 
         debug(4, "%s: found something", __func__);
-        ++ret;
+
         if (wc.status != 0) 
         {
-            struct buf_head *bh = ptr_from_int64(wc.id);
+            bh = ptr_from_int64(wc.id);
+
             /* opcode is not necessarily valid; only wr_id, status, qp_num,
              * and vendor_err can be relied upon */
             if (wc.opcode == BMI_IB_OP_SEND) 
@@ -151,8 +179,8 @@ static int ib_check_cq(void)
                   __func__,
                   llu(wc.id), wc_opcode_string(wc.opcode),
                   wc_status_string(wc.status), bh->c->peername);
-                continue;
             }
+            continue;
         }
 
         if (wc.opcode == BMI_IB_OP_RECV) 
@@ -161,9 +189,15 @@ static int ib_check_cq(void)
              * Remote side did a send to us.
              */
             msg_header_common_t mh_common;
-            struct buf_head *bh = ptr_from_int64(wc.id);
-            char *ptr = bh->buf;
             u_int32_t byte_len = wc.byte_len;
+            char *ptr = NULL;
+
+            bh = ptr_from_int64(wc.id);
+            if (!bh)
+            {
+                continue;
+            }
+            ptr = bh->buf;
 
             VALGRIND_MAKE_MEM_DEFINED(ptr, byte_len);
             decode_msg_header_common_t(&ptr, &mh_common);
@@ -188,14 +222,7 @@ static int ib_check_cq(void)
         {
             /* completion event for the rdma write we initiated, used
              * to signal memory unpin etc. */
-            struct ib_work *sq = ptr_from_int64(wc.id);
-
-            debug(3, "%s: sq %p %s", __func__, sq,
-                  sq_state_name(sq->state.send));
-
-            bmi_ib_assert(sq->state.send == SQ_WAITING_DATA_SEND_COMPLETION,
-                  "%s: wrong send state %s", __func__,
-                  sq_state_name(sq->state.send));
+            sq = ptr_from_int64(wc.id);
 
             sq->state.send = SQ_WAITING_RTS_DONE_BUFFER;
 
@@ -210,8 +237,12 @@ static int ib_check_cq(void)
         } 
         else if (wc.opcode == BMI_IB_OP_SEND) 
         {
-            struct buf_head *bh = ptr_from_int64(wc.id);
-            struct ib_work *sq = bh->sq;
+            bh = ptr_from_int64(wc.id);
+            if (!bh)
+            {
+                continue;
+            }
+            sq = bh->sq;
 
             if (sq == NULL) 
             {
@@ -245,9 +276,10 @@ static int ib_check_cq(void)
                 }
                 else
                 {
-                    bmi_ib_assert(0, "%s: unknown send state %s (%d) of sq %p",
+                    warning("%s: unknown send state %s (%d) of sq %p",
                           __func__, sq_state_name(sq->state.send),
                           sq->state.send, sq);
+                    continue;
                 }
                 debug(2, "%s: send to %s completed locally: sq %p -> %s",
                       __func__, bh->c->peername, sq,
@@ -268,20 +300,20 @@ static int ib_check_cq(void)
                 }
                 else
                 {
-                    bmi_ib_assert(0, "%s: unknown recv state %s of rq %p",
+                    warning("%s: unknown recv state %s of rq %p",
                           __func__, rq_state_name(rq->state.recv), rq);
+                    continue;
                 }
                 debug(2, "%s: send to %s completed locally: rq %p -> %s",
                       __func__, bh->c->peername, rq,
                       rq_state_name(rq->state.recv));
             }
-
+            ++ret;
             qlist_add_tail(&bh->list, &bh->c->eager_send_buf_free);
-
         } 
         else 
         {
-            error("%s: cq entry id 0x%llx opcode %d unexpected", __func__,
+            warning("%s: cq entry id 0x%llx opcode %d unexpected", __func__,
               llu(wc.id), wc.opcode);
         }
     }
@@ -369,10 +401,9 @@ static void encourage_send_waiting_buffer(struct ib_work *sq)
 	 * Eager send.
 	 */
 	msg_header_eager_t mh_eager;
-    memset(&mh_eager, 0, sizeof(msg_header_eager_t));
-	
     char *ptr = bh->buf;
 
+    memset(&mh_eager, 0, sizeof(msg_header_eager_t));
 	msg_header_init(&mh_eager.c, c, sq->is_unexpected
 	                ? MSG_EAGER_SENDUNEXPECTED : MSG_EAGER_SEND);
 	mh_eager.bmi_tag = sq->bmi_tag;
@@ -395,10 +426,9 @@ static void encourage_send_waiting_buffer(struct ib_work *sq)
 	 * which will be returned to us in the CTS so we can look it up.
 	 */
 	msg_header_rts_t mh_rts;
-    memset(&mh_rts, 0, sizeof(msg_header_rts_t));
- 
 	char *ptr = bh->buf;
 
+    memset(&mh_rts, 0, sizeof(msg_header_rts_t));
 	msg_header_init(&mh_rts.c, c, MSG_RTS);
 	mh_rts.bmi_tag = sq->bmi_tag;
 	mh_rts.mop_id = sq->mop->op_id;
@@ -463,8 +493,10 @@ encourage_send_incoming_cts(struct buf_head *bh, u_int32_t byte_len)
     want = sizeof(mh_cts)
          + mh_cts.buflist_num * MSG_HEADER_CTS_BUFLIST_ENTRY_SIZE;
     if (bmi_ib_unlikely(byte_len != want))
-	error("%s: wrong message size for CTS, got %u, want %u", __func__,
+    {
+	    error("%s: wrong message size for CTS, got %u, want %u", __func__,
               byte_len, want);
+    }
 
     /* start the big tranfser */
     post_sr_rdmaw(sq, &mh_cts, (msg_header_cts_t *) bh->buf + 1);
@@ -473,10 +505,14 @@ encourage_send_incoming_cts(struct buf_head *bh, u_int32_t byte_len)
     post_rr(sq->c, bh);
 
     if (sq->state.send == SQ_WAITING_CTS)
-	sq->state.send = SQ_WAITING_DATA_SEND_COMPLETION;
+    {
+	    sq->state.send = SQ_WAITING_DATA_SEND_COMPLETION;
+    }
     else
-	sq->state.send = SQ_WAITING_RTS_SEND_COMPLETION_GOT_CTS;
-    debug(3, "%s: sq %p now %s", __func__, sq, sq_state_name(sq->state.send));
+    {
+	    sq->state.send = SQ_WAITING_RTS_SEND_COMPLETION_GOT_CTS;
+    }
+    debug(0, "%s: sq %p now %s", __func__, sq, sq_state_name(sq->state.send));
 }
 
 
@@ -814,8 +850,10 @@ send_cts(struct ib_work *rq)
 	memcache_register(ib_device->memcache, &reg_recv_buflist);
     }
     if (rq->buflist.tot_len > reg_recv_buflist_len)
-	error("%s: recv prereg buflist too small, need %lld", __func__,
-	  lld(rq->buflist.tot_len));
+    {
+	    error("%s: recv prereg buflist too small, need %lld", 
+              __func__, lld(rq->buflist.tot_len));
+    }
 
     ib_buflist_t save_buflist = rq->buflist;
     rq->buflist = reg_recv_buflist;
@@ -839,8 +877,10 @@ send_cts(struct ib_work *rq)
     keyp = (u_int32_t *)(lenp + rq->buflist.num);
     post_len = (char *)(keyp + rq->buflist.num) - (char *)bh->buf;
     if (post_len > ib_device->eager_buf_size)
-	error("%s: too many (%d) recv buflist entries for buf", __func__,
-	  rq->buflist.num);
+    {
+	    error("%s: too many (%d) recv buflist entries for buf", 
+              __func__, rq->buflist.num);
+    }
     for (i=0; i<rq->buflist.num; i++) {
 	bufp[i] = htobmi64(int64_from_ptr(rq->buflist.buf.recv[i]));
 	lenp[i] = htobmi32(rq->buflist.len[i]);
@@ -867,11 +907,17 @@ ensure_connected(struct bmi_method_addr *remote_map)
     ib_method_addr_t *ibmap = remote_map->method_data;
 
     if (!ibmap->c && ibmap->reconnect_flag)
-	ret = ib_tcp_client_connect(ibmap, remote_map);
+    {
+	    ret = ib_tcp_client_connect(ibmap, remote_map);
+    }
     else if(!ibmap->c && !ibmap->reconnect_flag)
-	ret = 1; /* cannot actively connect */
+    {
+	    ret = 1; /* cannot actively connect */
+    }
     else
+    {
         ret = 0;
+    }
 
     return ret;
 }
@@ -893,8 +939,10 @@ post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 
     gen_mutex_lock(&interface_mutex);
     ret = ensure_connected(remote_map);
-    if (ret)
+    if (ret) 
+    {
     	goto out;
+    }
     ibmap = remote_map->method_data;
 
     /* alloc and build new sendq structure */
@@ -911,29 +959,36 @@ post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
      * function.  This case is indicated by the non-_list functions by
      * a zero in numbufs.
      */
-    if (numbufs == 0) {
-	sq->buflist_one_buf.send = *buffers;
-	sq->buflist_one_len = *sizes;
-	sq->buflist.num = 1;
-	sq->buflist.buf.send = &sq->buflist_one_buf.send;
-	sq->buflist.len = &sq->buflist_one_len;
-    } else {
-	sq->buflist.num = numbufs;
-	sq->buflist.buf.send = buffers;
-	sq->buflist.len = sizes;
+    if (numbufs == 0) 
+    {
+	    sq->buflist_one_buf.send = *buffers;
+	    sq->buflist_one_len = *sizes;
+	    sq->buflist.num = 1;
+	    sq->buflist.buf.send = &sq->buflist_one_buf.send;
+	    sq->buflist.len = &sq->buflist_one_len;
+    } 
+    else 
+    {
+	    sq->buflist.num = numbufs;
+	    sq->buflist.buf.send = buffers;
+	    sq->buflist.len = sizes;
     }
     sq->buflist.tot_len = 0;
     for (i=0; i<sq->buflist.num; i++)
-	sq->buflist.tot_len += sizes[i];
+    {
+	    sq->buflist.tot_len += sizes[i];
+    }
 
     /*
      * This passed-in total length field does not make much sense
      * to me, but I'll at least check it for accuracy.
      */
     if (sq->buflist.tot_len != total_size)
-	error("%s: user-provided tot len %lld"
-	  " does not match buffer list tot len %lld",
-	  __func__, lld(total_size), lld(sq->buflist.tot_len));
+    {
+	    error("%s: user-provided tot len %lld"
+	          " does not match buffer list tot len %lld",
+	          __func__, lld(total_size), lld(sq->buflist.tot_len));
+    }
 
     /* unexpected messages must fit inside an eager message */
     if (is_unexpected && sq->buflist.tot_len > ib_device->eager_buf_payload) {
@@ -1375,14 +1430,21 @@ BMI_ib_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
     mop = id_gen_fast_lookup(id);
     sq = mop->method_data;
     n = 0;
-    if (sq->type == BMI_SEND) {
-	if (test_sq(sq, &id, err, size, user_ptr, 1))
-	    n = 1;
-    } else {
-	/* actually a recv */
-	struct ib_work *rq = mop->method_data;
-	if (test_rq(rq, &id, err, size, user_ptr, 1))
-	    n = 1;
+    if (sq->type == BMI_SEND) 
+    {
+	    if (test_sq(sq, &id, err, size, user_ptr, 1))
+        {
+	        n = 1;
+        }
+    } 
+    else 
+    {
+	    /* actually a recv */
+	    struct ib_work *rq = mop->method_data;
+	    if (test_rq(rq, &id, err, size, user_ptr, 1))
+        {
+	        n = 1;
+        }
     }
     *outcount = n;
     gen_mutex_unlock(&interface_mutex);
@@ -1406,25 +1468,33 @@ static int BMI_ib_testsome(int incount, bmi_op_id_t *ids, int *outcount,
     ib_check_cq();
 
     n = 0;
-    for (i=0; i<incount; i++) {
-	if (!ids[i])
-	    continue;
-	mop = id_gen_fast_lookup(ids[i]);
-	sq = mop->method_data;
+    for (i=0; i<incount; i++) 
+    {
+	    if (!ids[i])
+        {
+	        continue;
+        }
+	    mop = id_gen_fast_lookup(ids[i]);
+	    sq = mop->method_data;
 
-	if (sq->type == BMI_SEND) {
-	    if (test_sq(sq, &tid, &errs[n], &sizes[n], &user_ptrs[n], 1)) {
-		index_array[n] = i;
-		++n;
+	    if (sq->type == BMI_SEND) 
+        {
+	        if (test_sq(sq, &tid, &errs[n], &sizes[n], &user_ptrs[n], 1)) 
+            {
+		        index_array[n] = i;
+		        ++n;
+	        }
+	    } 
+        else 
+        {
+	        /* actually a recv */
+	        struct ib_work *rq = mop->method_data;
+	        if (test_rq(rq, &tid, &errs[n], &sizes[n], &user_ptrs[n], 1)) 
+            {
+		        index_array[n] = i;
+		        ++n;
+	        }
 	    }
-	} else {
-	    /* actually a recv */
-	    struct ib_work *rq = mop->method_data;
-	    if (test_rq(rq, &tid, &errs[n], &sizes[n], &user_ptrs[n], 1)) {
-		index_array[n] = i;
-		++n;
-	    }
-	}
     }
 
     gen_mutex_unlock(&interface_mutex);
@@ -1461,7 +1531,9 @@ restart:
 	/* test them all, even if can't reap them, just to encourage */
 	complete = (sq->mop->context_id == context_id) && (n < incount);
 	if (user_ptrs)
+    {
 	    up = &user_ptrs[n];
+    }
 	n += test_sq(sq, &outids[n], &errs[n], &sizes[n], up, complete);
     }
 
@@ -1473,7 +1545,9 @@ restart:
 	complete = rq->mop &&
 	  (rq->mop->context_id == context_id) && (n < incount);
 	if (user_ptrs)
+    {
 	    up = &user_ptrs[n];
+    }
 	n += test_rq(rq, &outids[n], &errs[n], &sizes[n], up, complete);
     }
 
@@ -1538,6 +1612,7 @@ restart:
                    (size_t) ui->size);
             ui->tag = rq->bmi_tag;
             /* re-post the buffer in which it was sitting, just unexpecteds */
+            debug(2, "%s: calling post_rr", __func__);
             post_rr(c, rq->bh);
             n = 1;
             qlist_del(&rq->list);
@@ -1567,8 +1642,6 @@ restart:
             goto restart;
         }
     }
-
-    ib_tcp_server_check_new_connections();
 
     *outcount = n;
     return activity + n;
@@ -1703,9 +1776,13 @@ BMI_ib_rev_lookup(struct bmi_method_addr *meth)
 {
     ib_method_addr_t *ibmap = meth->method_data;
     if (!ibmap->c)
-    return "(unconnected)";
+    {
+        return "(unconnected)";
+    }
     else
-	return ibmap->c->peername;
+    {
+	    return ibmap->c->peername;
+    }
 }
 
 /*
@@ -1746,10 +1823,14 @@ static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
     /* parse hostname */
     s = string_key("ib", id);  /* allocs a string */
     if (!s)
-	return 0;
+    {
+	    return 0;
+    }
     cp = strchr(s, ':');
     if (!cp)
-	error("%s: no ':' found", __func__);
+    {
+	    error("%s: no ':' found", __func__);
+    }
 
     /* copy to permanent storage */
     hostname = bmi_ib_malloc((unsigned long) (cp - s + 1));
@@ -1760,12 +1841,18 @@ static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
     ++cp;
     cq = strchr(cp, '/');
     if (cq)
-	*cq = 0;
+    {
+	    *cq = 0;
+    }
     port = strtoul(cp, &cq, 10);
     if (cq == cp)
-	error("%s: invalid port number", __func__);
+    {
+	    error("%s: invalid port number", __func__);
+    }
     if (*cq != '\0')
-	error("%s: extra characters after port number", __func__);
+    {
+	    error("%s: extra characters after port number", __func__);
+    }
     free(s);
 
     /* lookup in known connections, if there are any */
@@ -1785,7 +1872,9 @@ static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
     gen_mutex_unlock(&interface_mutex);
 
     if (map)
-	free(hostname);  /* found it */
+    {
+	    free(hostname);  /* found it */
+    }
     else
     {
         /* set reconnect flag on this addr; we will be acting as a client
@@ -1804,6 +1893,15 @@ static ib_connection_t *ib_new_connection(int sock, const char *peername,
 {
     ib_connection_t *c;
     int i, ret;
+
+    if (is_server)
+    {
+        debug(4, "%s: [SERVER] starting, peername=%s", __func__, peername);
+    }
+    else
+    {
+        debug(4, "%s: [CLIENT] starting, peername=%s", __func__, peername);
+    }
 
     c = bmi_ib_malloc(sizeof(*c));
     c->peername = strdup(peername);
@@ -1848,6 +1946,17 @@ static ib_connection_t *ib_new_connection(int sock, const char *peername,
     /* save one credit back for emergency credit refill */
     c->send_credit = ib_device->eager_buf_num - 1;
     c->return_credit = 0;
+
+    if (is_server)
+    {
+        debug(4, "%s: [SERVER SIDE] calling new_connection, sock=%d",
+              __func__, sock);
+    }
+    else
+    {
+        debug(4, "%s: [CLIENT SIDE] calling new_connection, sock=%d",
+              __func__, sock);
+    }
 
     ret = new_connection(c, sock, is_server);
     if (ret) {
@@ -1900,38 +2009,58 @@ static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
     struct hostent *hp;
     struct sockaddr_in skin;
     
+    debug(4, "%s: starting", __func__);
     s = socket(AF_INET, SOCK_STREAM, 0);
-    if (s < 0) {
-	warning("%s: create tcp socket: %m", __func__);
-	return bmi_errno_to_pvfs(-errno);
+    if (s < 0) 
+    {
+	    warning("%s: create tcp socket: %m", __func__);
+	    return bmi_errno_to_pvfs(-errno);
     }
     hp = gethostbyname(ibmap->hostname);
-    if (!hp) {
-	warning("%s: cannot resolve server %s", __func__, ibmap->hostname);
-	return -1;
+    if (!hp) 
+    {
+	    warning("%s: cannot resolve server %s", __func__, ibmap->hostname);
+        close(s);
+	    return -1;
     }
     memset(&skin, 0, sizeof(skin));
     skin.sin_family = hp->h_addrtype;
     memcpy(&skin.sin_addr, hp->h_addr_list[0], (size_t) hp->h_length);
     skin.sin_port = htons(ibmap->port);
-    sprintf(peername, "%s:%d", ibmap->hostname, ibmap->port);
+    sprintf(peername, "%s:%d", inet_ntoa(skin.sin_addr), ibmap->port);
+
+    debug(4, "%s: connecting to peername=%s, s=%d", __func__, peername, s);
+
   retry:
-    if (connect(s, (struct sockaddr *) &skin, sizeof(skin)) < 0) {
-	if (errno == EINTR)
-	    goto retry;
-	else {
-	    warning("%s: connect to server %s: %m", __func__, peername);
-	    return bmi_errno_to_pvfs(-errno);
-	}
+    if (connect(s, (struct sockaddr *) &skin, sizeof(skin)) < 0) 
+    {
+	    if (errno == EINTR)
+        {
+	        goto retry;
+        }
+	    else 
+        {
+	        warning("%s: connect to server %s: %m", __func__, peername);
+	        return bmi_errno_to_pvfs(-errno);
+	    }
     }
+
+    debug(4, "%s: connected, now calling ib_new_connection for peername=%s, "
+          "s=%d", __func__, peername, s);
     ibmap->c = ib_new_connection(s, peername, 0);
     if (!ibmap->c)
-	error("%s: ib_new_connection failed", __func__);
+    {
+        close(s);
+	    error("%s: ib_new_connection failed", __func__);
+    }
     ibmap->c->remote_map = remote_map;
 
-    if (close(s) < 0) {
-	warning("%s: close sock: %m", __func__);
-	return bmi_errno_to_pvfs(-errno);
+    debug(4, "%s: connection complete", __func__);
+
+    if (close(s) < 0) 
+    {
+	    warning("%s: close sock: %m", __func__);
+	    return bmi_errno_to_pvfs(-errno);
     }
     return 0;
 }
@@ -1944,86 +2073,213 @@ static void ib_tcp_server_init_listen_socket(struct bmi_method_addr *addr)
     int flags;
     struct sockaddr_in skin;
     ib_method_addr_t *ibc = addr->method_data;
+    int *timeout_ms;
 
     ib_device->listen_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (ib_device->listen_sock < 0)
-	error_errno("%s: create tcp socket", __func__);
+    {
+	    error_errno("%s: create tcp socket", __func__);
+    }
     flags = 1;
     if (setsockopt(ib_device->listen_sock, SOL_SOCKET, SO_REUSEADDR, &flags,
       sizeof(flags)) < 0)
-	error_errno("%s: setsockopt REUSEADDR", __func__);
+    {
+	    error_errno("%s: setsockopt REUSEADDR", __func__);
+    }
     memset(&skin, 0, sizeof(skin));
     skin.sin_family = AF_INET;
     skin.sin_port = htons(ibc->port);
+
   retry:
-    if (bind(ib_device->listen_sock, (struct sockaddr *) &skin, sizeof(skin)) < 0) {
-	if (errno == EINTR)
-	    goto retry;
-	else
-	    error_errno("%s: bind tcp socket", __func__);
+    if (bind(ib_device->listen_sock, (struct sockaddr *) &skin, 
+            sizeof(skin)) < 0) 
+    {
+	    if (errno == EINTR)
+        {
+	        goto retry;
+        }
+	    else
+        {
+	        error_errno("%s: bind tcp socket", __func__);
+        }
     }
-    if (listen(ib_device->listen_sock, 1024) < 0)
-	error_errno("%s: listen tcp socket", __func__);
+    debug(4, "%s: binding on tcp port %d", __func__, ibc->port);
+
+    if (listen(ib_device->listen_sock, listen_backlog) < 0)
+    {
+	    error_errno("%s: listen tcp socket", __func__);
+    }
+
     flags = fcntl(ib_device->listen_sock, F_GETFL);
     if (flags < 0)
-	error_errno("%s: fcntl getfl listen sock", __func__);
+    {
+	    error_errno("%s: fcntl getfl listen sock", __func__);
+    }
     flags |= O_NONBLOCK;
     if (fcntl(ib_device->listen_sock, F_SETFL, flags) < 0)
-	error_errno("%s: fcntl setfl nonblock listen sock", __func__);
+    {
+	    error_errno("%s: fcntl setfl nonblock listen sock", __func__);
+    }  
+
+    timeout_ms = (int *) bmi_ib_malloc(sizeof(int));
+    if (timeout_ms)
+    {
+        *timeout_ms = accept_timeout_ms;
+        /* start the accept thread */
+        debug(0, "%s: starting ib_tcp_server_accept_thread", __func__);
+        if (pthread_create(&accept_thread_id,
+                           NULL,
+                           &ib_tcp_server_accept_thread,
+                           timeout_ms))
+        {
+            error("%s: unable to to start accept thread, errno=%d",
+                  __func__, errno);
+        }
+    }
+    else
+    {
+        error("%s: unable to malloc memory for timeout_ms, errno=%d",
+              __func__, errno);
+    }
 }
 
-/*
- * Check for new connections.  The listening socket is left nonblocking
- * so this test can be quick; but accept is not really that quick compared
- * to polling an IB interface, for instance.  Returns >0 if an accept worked.
- */
-static int ib_tcp_server_check_new_connections(void)
+
+void *ib_tcp_server_accept_thread(void *arg)
 {
+    struct pollfd pfd;
     struct sockaddr_in ssin;
     socklen_t len;
-    int s, ret = 0;
+    int ret = 0;
+    int timeout_ms = 10000;
+    struct tcp_conn *tc;
+    gen_thread_t thread;
 
-    len = sizeof(ssin);
-    s = accept(ib_device->listen_sock, (struct sockaddr *) &ssin, &len);
-    if (s < 0) {
-	if (!(errno == EAGAIN))
-	    error_errno("%s: accept listen sock", __func__);
-    } else {
-	char peername[2048];
+    if (arg)
+    {
+        timeout_ms = *(int *) arg;
+        free(arg);
+    }
+
+    debug(0, "%s: starting, timeout_ms=%d", __func__, timeout_ms);
+
+    for (;;)
+    {
+        /* check for shutdown */
+        gen_mutex_lock(&accept_thread_mutex);
+        if (accept_thread_shutdown)
+        {
+            gen_mutex_unlock(&accept_thread_mutex);
+            break;
+        }
+        gen_mutex_unlock(&accept_thread_mutex);
+
+        /* poll for activity on the listen socket */
+        pfd.fd = ib_device->listen_sock;
+        pfd.events = POLLIN;
+        ret = poll(&pfd, 1, timeout_ms);
+        if (ret < 0)
+        {
+            warning("%s: poll error, errno=%d", __func__, errno);
+            continue;
+        }
+        else if (ret == 0)
+        {
+            continue;
+        }
+
+        debug(4, "%s: poll ret %d rev0 %x", __func__, ret, pfd.revents);
+
+        len = sizeof(ssin);
+        tc = (struct tcp_conn *) bmi_ib_malloc(sizeof(struct tcp_conn));
+        if (!tc)
+        {
+            warning("%s: unable to malloc tc, errno=%d", __func__, errno);
+            sleep(30);
+            continue;
+        }
+
+        /* accept a client connection */
+        tc->s = accept(ib_device->listen_sock,
+                       (struct sockaddr *) &ssin, 
+                       &len);
+        if (tc->s < 0)
+        {
+            warning("%s: accept listen sock, errno=%d", __func__, errno);
+            free(tc);
+            continue;
+        }
+        tc->hostname = strdup(inet_ntoa(ssin.sin_addr));
+        tc->port = ntohs(ssin.sin_port);
+        sprintf(tc->peername, "%s:%d", tc->hostname, tc->port);
+
+        debug(0, "%s: starting ib_tcp_server_process_client_thread "
+              "for socket=%d", __func__, tc->s);
+
+        /* start the client thread */
+        if (pthread_create(&thread,
+                           NULL,
+                           &ib_tcp_server_process_client_thread,
+                           tc))
+        {
+            warning("%s: unable to create accept_client thread, errno=%d",
+                    __func__, errno);
+            free(tc);
+        }
+    }
+
+    pthread_exit(0);
+}
+
+
+void *ib_tcp_server_process_client_thread(void *arg)
+{
 	ib_connection_t *c;
+    struct tcp_conn *tc;
+    int ret;
 
-	char *hostname = strdup(inet_ntoa(ssin.sin_addr));
-	int port = ntohs(ssin.sin_port);
-	sprintf(peername, "%s:%d", hostname, port);
+    debug(0, "%s: starting", __func__);
+    if (!arg)
+    {
+        error("%s: no socket passed", __func__);
+    }
+    tc = (struct tcp_conn *) arg;
 
-	gen_mutex_lock(&interface_mutex);
+    gen_mutex_lock(&interface_mutex);
 
-	c = ib_new_connection(s, peername, 1);
-	if (!c) {
-	    free(hostname);
-	    goto out_unlock;
-	}
+    debug(0, "%s: calling ib_new_connection for peername=%s on socket=%d",
+          __func__, tc->peername, tc->s);
+    c = ib_new_connection(tc->s, tc->peername, 1);
+    if (!c)
+    {
+        free(tc->hostname);
+        goto out;
+    }
+    debug(0, "%s: returned from ib_new_connection", __func__);
 
-        /* don't set reconnect flag on this addr; we are a server in this
-         * case and the peer will be responsible for maintaining the
-         * connection
-         */
-	c->remote_map = ib_alloc_method_addr(c, hostname, port, 0);
+    /* don't set reconnect flag on this addr; we are a server in this
+    * case and the peer will be responsible for maintaining the
+    * connection
+    */
+	c->remote_map = ib_alloc_method_addr(c, tc->hostname, tc->port, 0);
 	/* register this address with the method control layer */
 	c->bmi_addr = bmi_method_addr_reg_callback(c->remote_map);
 	if (c->bmi_addr == 0)
+    {
 	    error_xerrno(ENOMEM, "%s: bmi_method_addr_reg_callback", __func__);
+    }
 
-	debug(2, "%s: accepted new connection %s at server", __func__,
-	  c->peername);
+	debug(0, "%s: accepted new connection %s at server", 
+          __func__, c->peername);
 	ret = 1;
 
-out_unlock:
+  out:
 	gen_mutex_unlock(&interface_mutex);
-	if (close(s) < 0)
+	if (close(tc->s) < 0)
+    {
 	    error_errno("%s: close new sock", __func__);
     }
-    return ret;
+
+    return NULL;
 }
 
 /*
@@ -2037,37 +2293,39 @@ static int ib_block_for_activity(int timeout_ms)
 {
     struct pollfd pfd[3];  /* cq fd, async fd, accept socket */
     int numfd;
-    int ret;
+    int ret = 0;
 
     prepare_cq_block(&pfd[0].fd, &pfd[1].fd);
     pfd[0].events = POLLIN;
     pfd[1].events = POLLIN;
     numfd = 2;
-    if (ib_device->listen_sock >= 0) {
-	pfd[2].fd = ib_device->listen_sock;
-	pfd[2].events = POLLIN;
-	numfd = 3;
-    }
 
     ret = poll(pfd, numfd, timeout_ms);
-    debug(4, "%s: ret %d rev0 %x rev1 %x", __func__, ret,
-          pfd[0].revents, pfd[1].revents);
-    if (ret > 0) {
-	if (pfd[0].revents == POLLIN) {
-	    ack_cq_completion_event();
-	    return 1;
-	}
-	/* check others only if CQ was empty */
-	ret = 2;
-	if (pfd[1].revents == POLLIN)
-	    check_async_events();
-	if (pfd[2].revents == POLLIN)
-	    ib_tcp_server_check_new_connections();
-    } else if (ret < 0) {
-	if (errno == EINTR)  /* normal, ignore but break */
-	    ret = 0;
-	else
-	    error_errno("%s: poll listen sock", __func__);
+    if (ret > 0) 
+    {
+	    if (pfd[0].revents == POLLIN) 
+        {
+	        ack_cq_completion_event();
+	        return 1;
+	    }
+	    /* check others only if CQ was empty */
+	    ret = 2;
+	    if (pfd[1].revents == POLLIN)
+        {
+	        check_async_events();
+        }
+    } 
+    else if (ret < 0) 
+    {
+	    if (errno == EINTR)  
+        {
+            /* normal, ignore but break */
+	        ret = 0;
+        }
+	    else
+        {
+	        error_errno("%s: poll listen sock", __func__);
+        }
     }
     return ret;
 }
@@ -2159,14 +2417,16 @@ static int BMI_ib_initialize(struct bmi_method_addr *listen_addr, int method_id,
 {
     int ret;
 
-    debug(0, "%s: init", __func__);
+    debug(0, "Initializing IB module");
 
     gen_mutex_lock(&interface_mutex);
 
     /* check params */
     if (!!listen_addr ^ (init_flags & BMI_INIT_SERVER))
-	error("%s: error: BMI_INIT_SERVER requires non-null listen_addr"
-	  " and v.v", __func__);
+    {
+	    error("%s: error: BMI_INIT_SERVER requires non-null listen_addr"
+	          " and v.v", __func__);
+    }
 
     bmi_ib_method_id = method_id;
 
@@ -2179,10 +2439,15 @@ static int BMI_ib_initialize(struct bmi_method_addr *listen_addr, int method_id,
 #endif
 #ifdef VAPI
     if (ret)
-	ret = vapi_ib_initialize();
+    {
+	    ret = vapi_ib_initialize();
+    }
 #endif
     if (ret)
-	return -ENODEV;  /* neither found */
+    {
+        gen_mutex_unlock(&interface_mutex);
+	    return -ENODEV;  /* neither found */
+    }
 
     /* initialize memcache */
     ib_device->memcache = memcache_init(mem_register, mem_deregister);
@@ -2201,12 +2466,15 @@ static int BMI_ib_initialize(struct bmi_method_addr *listen_addr, int method_id,
      * The hostname is currently ignored; the port number is used to bind
      * the listening TCP socket which accepts new connections.
      */
-    if (init_flags & BMI_INIT_SERVER) {
-	ib_tcp_server_init_listen_socket(listen_addr);
-	ib_device->listen_addr = listen_addr;
-    } else {
-	ib_device->listen_sock = -1;
-	ib_device->listen_addr = NULL;
+    if (init_flags & BMI_INIT_SERVER) 
+    {
+	    ib_tcp_server_init_listen_socket(listen_addr);
+	    ib_device->listen_addr = listen_addr;
+    } 
+    else 
+    {
+	    ib_device->listen_sock = -1;
+	    ib_device->listen_addr = NULL;
     }
 
     /*
@@ -2222,7 +2490,7 @@ static int BMI_ib_initialize(struct bmi_method_addr *listen_addr, int method_id,
 
     gen_mutex_unlock(&interface_mutex);
 
-    debug(0, "%s: done", __func__);
+    debug(0, "IB module successfully initialized");
     return ret;
 }
 
@@ -2234,23 +2502,35 @@ static int BMI_ib_finalize(void)
     gen_mutex_lock(&interface_mutex);
 
     /* if client, send BYE to each connection and bring down the QP */
-    if (ib_device->listen_sock < 0) {
-	struct qlist_head *l;
-	qlist_for_each(l, &ib_device->connection) {
-	    ib_connection_t *c = qlist_upcast(l);
-	    if (c->cancelled)
-		continue;  /* already closed */
-	    /* Send BYE message to servers, transition QP to drain state */
-	    send_bye(c);
-	    drain_qp(c);
-	}
+    if (ib_device->listen_sock < 0) 
+    {
+	    struct qlist_head *l;
+	    qlist_for_each(l, &ib_device->connection) 
+        {
+	        ib_connection_t *c = qlist_upcast(l);
+	        if (c->cancelled)
+            {
+		        continue;  /* already closed */
+            }
+	        /* Send BYE message to servers, transition QP to drain state */
+	        send_bye(c);
+	        drain_qp(c);
+	    }
     }
+
     /* if server, stop listening */
-    if (ib_device->listen_sock >= 0) {
-	ib_method_addr_t *ibmap = ib_device->listen_addr->method_data;
-	close(ib_device->listen_sock);
-	free(ibmap->hostname);
-	free(ib_device->listen_addr);
+    if (ib_device->listen_sock >= 0) 
+    {
+	    ib_method_addr_t *ibmap = ib_device->listen_addr->method_data;
+        /* tell the accept thread to terminate */
+        gen_mutex_lock(&accept_thread_mutex);
+        accept_thread_shutdown = 1;
+        gen_mutex_unlock(&accept_thread_mutex);
+        /* wait for the accept thread to end */
+        pthread_join(accept_thread_id, NULL);
+	    close(ib_device->listen_sock);
+	    free(ibmap->hostname);
+	    free(ib_device->listen_addr);
     }
 
     /* destroy QPs and other connection structures */
@@ -2280,6 +2560,7 @@ static int BMI_ib_finalize(void)
     ib_device = NULL;
 
     gen_mutex_unlock(&interface_mutex);
+    debug(0, "BMI_tcp_finalize: IB module finalized.");
     return 0;
 }
 
@@ -2311,4 +2592,13 @@ const struct bmi_method_ops bmi_ib_ops =
     .rev_lookup_unexpected = BMI_ib_rev_lookup,
     .query_addr_range = NULL,
 };
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */
 
