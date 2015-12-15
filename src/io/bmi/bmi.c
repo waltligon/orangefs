@@ -12,7 +12,6 @@
 
 #include <errno.h>
 #include <string.h>
-#include <assert.h>
 #include <time.h>
 #ifndef WIN32
 #include <sys/time.h>
@@ -832,7 +831,9 @@ int BMI_test(bmi_op_id_t id,
     int ret = -1;
 
     if (max_idle_time_ms < 0)
+    {
         return (bmi_errno_to_pvfs(-EINVAL));
+    }
 
     *outcount = 0;
 
@@ -934,7 +935,21 @@ int BMI_testsome(int incount,
             {
                 query_op = (struct method_op*)
                     id_gen_fast_lookup(id_array[j]);
-		assert(query_op->op_id == id_array[j]);
+                if (!query_op)
+                {
+                    gossip_err("%s: null query_op\n", __func__);
+                    continue;
+                }
+                else if (query_op->op_id != id_array[j])
+                {
+                    gossip_err("%s: query_op->op_id (%llu) != "
+                               "id_array[%d] (%llu)\n",
+                               __func__,
+                               llu(query_op->op_id),
+                               j,
+                               llu(id_array[j]));
+                    continue;
+                }
                 if(query_op->addr->method_type == i)
                 {
                     tmp_id_array[j] = id_array[j];
@@ -1460,7 +1475,12 @@ int BMI_set_info(BMI_addr_t addr,
         gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
                      "[BMI CONTROL]: %s: decremented ref %llu to: %d\n",
                      __func__, llu(addr), tmp_ref->ref_count);
-	assert(tmp_ref->ref_count >= 0);
+        if (tmp_ref->ref_count < 0)
+        {
+            gossip_err("%s: tmp_ref->ref_count < 0", __func__);
+            gen_mutex_unlock(&ref_mutex);
+            return (bmi_errno_to_pvfs(-EINVAL));
+        }
 
         if(tmp_ref->ref_count == 0)
         {
