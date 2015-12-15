@@ -108,6 +108,15 @@ static int openib_new_connection(ib_connection_t *c, int sock, int is_server)
     size_t len;
     struct ibv_qp_init_attr att;
 
+    if (is_server)
+    {
+        debug(0, "%s: [SERVER] starting, sock=%d", __func__, sock);
+    }
+    else
+    {
+        debug(0, "%s: [CLIENT] starting, sock=%d", __func__, sock);
+    }
+
     /*
      * Values passed through TCP to permit IB connection.  These
      * are transformed to appear in network byte order (big endian)
@@ -126,27 +135,35 @@ static int openib_new_connection(ib_connection_t *c, int sock, int is_server)
     /* register memory region, Recv side */
     len = ib_device->eager_buf_num * ib_device->eager_buf_size;
 
+    debug(0, "%s: calling ibv_reg_mr recv side", __func__);
     oc->eager_recv_mr = ibv_reg_mr(od->nic_pd, c->eager_recv_buf_contig, len,
         IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE
 	| IBV_ACCESS_REMOTE_READ);
     if (!oc->eager_recv_mr)
-	error("%s: register_mr eager recv", __func__);
-
+    {
+	    error("%s: register_mr eager recv", __func__);
+    }
 
     /* register memory region, Send side */
+    debug(0, "%s: calling ibv_reg_mr send side", __func__);
     oc->eager_send_mr = ibv_reg_mr(od->nic_pd, c->eager_send_buf_contig, len,
 	IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE
 	| IBV_ACCESS_REMOTE_READ);
     if (!oc->eager_send_mr)
-	error("%s: register_mr eager send", __func__);
+    {
+        error("%s: register_mr eager send", __func__);
+    }
 
     /* create the main queue pair */
+    debug(0, "%s: creating main queue pair", __func__);
     memset(&att, 0, sizeof(att));
     att.send_cq = od->nic_cq;
     att.recv_cq = od->nic_cq;
     num_wr = ib_device->eager_buf_num + 50;  /* plus some rdmaw */
     if (num_wr > od->nic_max_wr)
-	num_wr = od->nic_max_wr;
+    {
+	    num_wr = od->nic_max_wr;
+    }
     att.cap.max_recv_wr = num_wr;
     att.cap.max_send_wr = num_wr;
     att.cap.max_recv_sge = 16;
@@ -157,9 +174,12 @@ static int openib_new_connection(ib_connection_t *c, int sock, int is_server)
 	att.cap.max_send_sge = od->nic_max_sge - 1;
     }
     att.qp_type = IBV_QPT_RC;
+    debug(0, "%s: calling ibv_create_qp", __func__);
     oc->qp = ibv_create_qp(od->nic_pd, &att);
     if (!oc->qp)
-	error("%s: create QP", __func__);
+    {
+	    error("%s: create QP", __func__);
+    }
     VALGRIND_MAKE_MEM_DEFINED(&att, sizeof(att));
     VALGRIND_MAKE_MEM_DEFINED(&oc->qp->qp_num, sizeof(oc->qp->qp_num));
 
@@ -167,53 +187,80 @@ static int openib_new_connection(ib_connection_t *c, int sock, int is_server)
     if (od->sg_max_len == 0) {
 	od->sg_max_len = att.cap.max_send_sge;
 	if (att.cap.max_recv_sge < od->sg_max_len)
+    {
 	    od->sg_max_len = att.cap.max_recv_sge;
+    }
 	od->sg_tmp_array = bmi_ib_malloc(od->sg_max_len *
 					 sizeof(*od->sg_tmp_array));
     } else {
 	if (att.cap.max_send_sge < od->sg_max_len)
+    {
 	    error("%s: new conn has smaller send SG array size %d vs %d",
-		  __func__, att.cap.max_send_sge, od->sg_max_len);
+		    __func__, att.cap.max_send_sge, od->sg_max_len);
+    }
 	if (att.cap.max_recv_sge < od->sg_max_len)
+    {
 	    error("%s: new conn has smaller recv SG array size %d vs %d",
-		  __func__, att.cap.max_recv_sge, od->sg_max_len);
+		    __func__, att.cap.max_recv_sge, od->sg_max_len);
+    }
     }
 
     if (od->max_unsignaled_sends == 0)
-	od->max_unsignaled_sends = att.cap.max_send_wr;
+    {
+	    od->max_unsignaled_sends = att.cap.max_send_wr;
+    }
     else
-	if (att.cap.max_send_wr < od->max_unsignaled_sends)
-	    error("%s: new connection has smaller max_send_wr, %d vs %d",
+    {
+	    if (att.cap.max_send_wr < od->max_unsignaled_sends)
+        {
+	        error("%s: new connection has smaller max_send_wr, %d vs %d",
 	          __func__, att.cap.max_send_wr, od->max_unsignaled_sends);
+        }
+    }
 
     /* verify we got what we asked for */
     if ((int) att.cap.max_recv_wr < num_wr)
-	error("%s: asked for %d recv WRs on QP, got %d", __func__, num_wr,
-	      att.cap.max_recv_wr);
+    {
+	    error("%s: asked for %d recv WRs on QP, got %d", __func__, num_wr,
+	        att.cap.max_recv_wr);
+    }
     if ((int) att.cap.max_send_wr < num_wr)
-	error("%s: asked for %d send WRs on QP, got %d", __func__, num_wr,
-	      att.cap.max_send_wr);
+    {
+	    error("%s: asked for %d send WRs on QP, got %d", __func__, num_wr,
+	        att.cap.max_send_wr);
+    }
 
     /* exchange data, converting info to network order and back */
     ch_out.lid = htobmi32(od->nic_lid);
     ch_out.qp_num = htobmi32(oc->qp->qp_num);
 
+    debug(0, "%s: calling exchange data", __func__);
     ret = exchange_data(sock, is_server, &ch_in, &ch_out, sizeof(ch_in));
+    debug(0, "%s: returning from exchange data, ret=%d", __func__, ret);
     if (ret)
-	goto out;
+    {
+	    goto out;
+    }
 
     oc->remote_lid = bmitoh32(ch_in.lid);
     oc->remote_qp_num = bmitoh32(ch_in.qp_num);
 
     /* bring the two QPs up to RTR */
+    debug(0, "%s: calling init_connection_modify_qp", __func__);
     init_connection_modify_qp(oc->qp, oc->remote_qp_num, oc->remote_lid);
 
     /* post initial RRs and RRs for acks */
+    debug(0, "%s: entering for loop for openib_post_rr", __func__);
     for (i=0; i<ib_device->eager_buf_num; i++)
-	openib_post_rr(c, &c->eager_recv_buf_head_contig[i]);
+    {
+	    openib_post_rr(c, &c->eager_recv_buf_head_contig[i]);
+    }
 
     /* final sychronization to ensure both sides have posted RRs */
+    debug(0, "%s: calling exchange data (final sync)", __func__);
     ret = exchange_data(sock, is_server, &ret, &ret, sizeof(ret));
+    debug(0, "%s: returning from exchange data (final sync), ret=%d", 
+          __func__, ret);
 
   out:
     return ret;
@@ -225,30 +272,52 @@ static int openib_new_connection(ib_connection_t *c, int sock, int is_server)
 static int exchange_data(int sock, int is_server, void *xin, void *xout,
                          size_t len)
 {
-    int i;
     int ret;
 
-    for (i=0; i<2; i++) {
-	if (i ^ is_server) {
+    /* server reads then writes */
+    if (is_server) 
+    {
 	    ret = read_full(sock, xin, len);
 	    if (ret < 0) {
-		warning_errno("%s: read", __func__);
-		goto out;
+		    warning_errno("%s: read", __func__);
+		    goto out;
 	    }
 	    if (ret != (int) len) {
-		ret = 1;
-		warning("%s: partial read, %d/%d bytes", __func__, ret,
+		    ret = 1;
+		    warning("%s: partial read, %d/%d bytes", __func__, ret,
 		                                        (int) len);
-		goto out;
+		    goto out;
 	    }
-	} else {
+
 	    ret = write_full(sock, xout, len);
 	    if (ret < 0) {
-		warning_errno("%s: write", __func__);
-		goto out;
+		    warning_errno("%s: write", __func__);
+		    goto out;
 	    }
-	}
     }
+    /* client writes then reads */
+    else
+    {
+        ret = write_full(sock, xout, len);
+        if (ret < 0)
+        {
+            warning_errno("%s: write", __func__);
+            goto out;
+        }
+        ret = read_full(sock, xin, len);
+        if (ret < 0)
+        {
+            warning_errno("%s: read", __func__);
+            goto out;
+        }
+        if (ret != (int) len)
+        {
+            ret = 1; 
+            warning("%s: partial read, %d/%d bytes", __func__, ret, (int) len);
+            goto out;
+        }
+	}
+
 
     ret = 0;
 
@@ -290,7 +359,9 @@ static void init_connection_modify_qp(struct ibv_qp *qp, uint32_t remote_qp_num,
     attr.port_num = od->nic_port;
     ret = ibv_modify_qp(qp, &attr, mask);
     if (ret)
-	error_xerrno(ret, "%s: ibv_modify_qp -> INIT", __func__);
+    {
+	    error_xerrno(ret, "%s: ibv_modify_qp -> INIT", __func__);
+    }
 
     /* Transition QP to Ready-to-Receive (RTR) */
     mask =
@@ -341,7 +412,9 @@ static void init_connection_modify_qp(struct ibv_qp *qp, uint32_t remote_qp_num,
 	__func__, attr.timeout, attr.retry_cnt, attr.rnr_retry);
     ret = ibv_modify_qp(qp, &attr, mask);
     if (ret)
-	error_xerrno(ret, "%s: ibv_modify_qp RTR -> RTS", __func__);
+    {
+	    error_xerrno(ret, "%s: ibv_modify_qp RTR -> RTS", __func__);
+    }
 
 }
 
@@ -362,7 +435,9 @@ static void openib_drain_qp(ib_connection_t *c)
     attr.qp_state = IBV_QPS_SQD;
     ret = ibv_modify_qp(qp, &attr, mask);
     if (ret < 0)
-	error_xerrno(ret, "%s: ibv_modify_qp RTS -> SQD", __func__);
+    {
+	    error_xerrno(ret, "%s: ibv_modify_qp RTS -> SQD", __func__);
+    }
 }
 
 /*
@@ -377,21 +452,27 @@ static void openib_close_connection(ib_connection_t *c)
 
     /* destroy the queue pair */
     if (oc->qp) {
-	ret = ibv_destroy_qp(oc->qp);
-	if (ret < 0)
-	    error_xerrno(ret, "%s: ibv_destroy_qp", __func__);
+	    ret = ibv_destroy_qp(oc->qp);
+	    if (ret < 0)
+        {
+	        error_xerrno(ret, "%s: ibv_destroy_qp", __func__);
+        }
     }
 
     /* destroy the memory regions */
     if (oc->eager_send_mr) {
-	ret = ibv_dereg_mr(oc->eager_send_mr);
-	if (ret < 0)
-	    error_xerrno(ret, "%s: ibv_deregister_mr eager send", __func__);
+	    ret = ibv_dereg_mr(oc->eager_send_mr);
+	    if (ret < 0)
+        {
+	        error_xerrno(ret, "%s: ibv_deregister_mr eager send", __func__);
+        }
     }
     if (oc->eager_recv_mr) {
-	ret = ibv_dereg_mr(oc->eager_recv_mr);
-	if (ret < 0)
-	    error_xerrno(ret, "%s: ibv_deregister_mr eager recv", __func__);
+	    ret = ibv_dereg_mr(oc->eager_recv_mr);
+	    if (ret < 0)
+        {
+	        error_xerrno(ret, "%s: ibv_deregister_mr eager recv", __func__);
+        }
     }
 
     free(oc);
@@ -426,13 +507,19 @@ static void openib_post_sr(const struct buf_head *bh, u_int32_t len)
           len, od->num_unsignaled_sends, od->max_unsignaled_sends);
 
     if (od->num_unsignaled_sends + 10 == od->max_unsignaled_sends)
+    {
         od->num_unsignaled_sends = 0;
+    }
     else
+    {
         ++od->num_unsignaled_sends;
+    }
 
     ret = ibv_post_send(oc->qp, &sr, &bad_wr);
     if (ret < 0)
+    {
         error("%s: ibv_post_send (%d)", __func__, ret);
+    }
 }
 
 /*
@@ -458,7 +545,9 @@ static void openib_post_rr(const ib_connection_t *c, struct buf_head *bh)
     debug(4, "%s: %s bh %d", __func__, c->peername, bh->num);
     ret = ibv_post_recv(oc->qp, &rr, &bad_wr);
     if (ret)
+    {
         error("%s: ibv_post_recv", __func__);
+    }
 }
 
 /*
@@ -493,12 +582,14 @@ static void openib_post_sr_rdmaw(struct ib_work *sq, msg_header_cts_t *mh_cts,
         reg_send_buflist.buf.recv = &reg_send_buflist_buf;
         reg_send_buflist.len = &reg_send_buflist_len;
         reg_send_buflist.tot_len = reg_send_buflist_len;
-	reg_send_buflist_buf = bmi_ib_malloc(reg_send_buflist_len);
+	    reg_send_buflist_buf = bmi_ib_malloc(reg_send_buflist_len);
         memcache_register(ib_device->memcache, &reg_send_buflist, BMI_SEND);
     }
     if (sq->buflist.tot_len > reg_send_buflist_len)
+    {
         error("%s: send prereg buflist too small, need %lld", __func__,
               lld(sq->buflist.tot_len));
+    }
     memcpy_from_buflist(&sq->buflist, reg_send_buflist_buf);
 
     ib_buflist_t save_buflist = sq->buflist;
@@ -525,7 +616,9 @@ static void openib_post_sr_rdmaw(struct ib_work *sq, msg_header_cts_t *mh_cts,
             /* new one, fresh numbers */
             sr.wr.rdma.remote_addr = bmitoh64(recv_bufp[recv_index]);
             recv_bytes_needed = bmitoh32(recv_lenp[recv_index]);
-        } else {
+        } 
+        else 
+        {
             /* continuing into unfinished remote receive index */
             sr.wr.rdma.remote_addr +=
                 bmitoh32(recv_lenp[recv_index]) - recv_bytes_needed;
@@ -534,7 +627,7 @@ static void openib_post_sr_rdmaw(struct ib_work *sq, msg_header_cts_t *mh_cts,
         sr.wr.rdma.rkey = bmitoh32(recv_rkey[recv_index]);
         sr.num_sge = 0;
 
-        debug(4, "%s: chunk to %s remote addr %llx rkey %x",
+        debug(0, "%s: chunk to %s remote addr %llx rkey %x",
               __func__, c->peername, llu(sr.wr.rdma.remote_addr),
               sr.wr.rdma.rkey);
 
@@ -547,7 +640,9 @@ static void openib_post_sr_rdmaw(struct ib_work *sq, msg_header_cts_t *mh_cts,
                 = sq->buflist.len[send_index] - send_offset;
             u_int32_t this_bytes = send_bytes_offered;
             if (this_bytes > recv_bytes_needed)
+            {
                 this_bytes = recv_bytes_needed;
+            }
 
             od->sg_tmp_array[sr.num_sge].addr =
                 int64_from_ptr(sq->buflist.buf.send[send_index]) + send_offset;
@@ -555,7 +650,7 @@ static void openib_post_sr_rdmaw(struct ib_work *sq, msg_header_cts_t *mh_cts,
             od->sg_tmp_array[sr.num_sge].lkey =
                 sq->buflist.memcache[send_index]->memkeys.lkey;
 
-            debug(4, "%s: chunk %d local addr %llx len %d lkey %x",
+            debug(0, "%s: chunk %d local addr %llx len %d lkey %x",
                   __func__, sr.num_sge,
                   (unsigned long long) od->sg_tmp_array[sr.num_sge].
                   addr, od->sg_tmp_array[sr.num_sge].length,
@@ -578,21 +673,27 @@ static void openib_post_sr_rdmaw(struct ib_work *sq, msg_header_cts_t *mh_cts,
         if (recv_bytes_needed == 0) {
             ++recv_index;
             if (recv_index == (int) mh_cts->buflist_num)
+            {
                 done = 1;
+            }
         }
 
         /* either filled the recv or exhausted the send */
         if (done) {
             sr.wr_id = int64_from_ptr(sq);     /* used to match in completion */
             sr.send_flags = IBV_SEND_SIGNALED; /* completion drives the unpin */
-        } else {
+        } 
+        else 
+        {
             sr.wr_id = 0;
             sr.send_flags = 0;
         }
 
         ret = ibv_post_send(oc->qp, &sr, &bad_wr);
         if (ret < 0)
+        {
             error("%s: ibv_post_send (%d)", __func__, ret);
+        }
     }
 
 #if MEMCACHE_BOUNCEBUF
@@ -606,34 +707,152 @@ static int openib_check_cq(struct bmi_ib_wc *wc)
     struct ibv_wc desc;
     int ret;
 
+    memset(&desc, 0, sizeof(struct ibv_wc));
+
     ret = ibv_poll_cq(od->nic_cq, 1, &desc);
     if (ret < 0)
-	error("%s: ibv_poll_cq (%d)", __func__, ret);
-    if (ret == 0) {  /* empty */
-	return 0;
+    {
+	    error("%s: ibv_poll_cq (%d)", __func__, ret);
+    }
+    else if (ret == 0) 
+    {  
+        /* empty */
+	    return 0;
     }
 
     /* convert to generic form */
     wc->id = desc.wr_id;
     wc->status = desc.status;
     wc->byte_len = desc.byte_len;
-    if (desc.opcode == IBV_WC_SEND)
-	wc->opcode = BMI_IB_OP_SEND;
-    else if (desc.opcode == (IBV_WC_SEND | IBV_WC_RECV))
-	wc->opcode = BMI_IB_OP_RECV;
-    else if (desc.opcode == IBV_WC_RDMA_WRITE)
-	wc->opcode = BMI_IB_OP_RDMA_WRITE;
-    else {
-	debug(0, "%s: unknown opcode, id %llx status %d opcode %d",
-	      __func__, llu(desc.wr_id), desc.status, desc.opcode);
-	debug(0, "%s: vendor_err %d byte_len %d imm_data %d qp_num %d",
-	      __func__, desc.vendor_err, desc.byte_len, desc.imm_data,
-	      desc.qp_num);
-	debug(0, "%s: src_qp %d wc_flags %d pkey_index %d slid %d",
-	      __func__, desc.src_qp, desc.wc_flags, desc.pkey_index, desc.slid);
-	debug(0, "%s: sl %d dlid_path_bits %d",
-	      __func__, desc.sl, desc.dlid_path_bits);
-	error("%s: unknown opcode %d", __func__, desc.opcode);
+    switch (desc.opcode)
+    {
+        case IBV_WC_SEND:
+	        wc->opcode = BMI_IB_OP_SEND;
+            break;
+        case IBV_WC_RECV:
+	        wc->opcode = BMI_IB_OP_RECV;
+            break;
+        case IBV_WC_RDMA_WRITE:
+	        wc->opcode = BMI_IB_OP_RDMA_WRITE;
+            break;
+        case IBV_WC_RDMA_READ:
+            warning("%s: unhandled IBV_WC_RDMA_READ opcode, id %llx status %d \
+                    opcode %d",
+                    __func__, 
+                    llu(desc.wr_id),
+                    desc.status,
+                    desc.opcode);
+            warning("%s: vender_err %d byte_len %d imm_data %d qp_num %d",
+                    __func__,
+                    desc.vendor_err,
+                    desc.byte_len,
+                    desc.imm_data,
+                    desc.qp_num);
+            warning("%s: src_qp %d wc_flags %d pkey_index %d slid %d",
+	                __func__, 
+                    desc.src_qp, 
+                    desc.wc_flags, 
+                    desc.pkey_index, 
+                    desc.slid);
+	        warning("%s: sl %d dlid_path_bits %d",
+	                __func__, 
+                    desc.sl, 
+                    desc.dlid_path_bits);
+            return 0;
+        case IBV_WC_COMP_SWAP:
+            warning("%s: unhandled IBV_WC_COMP_SWAP opcode, id %llx status %d \
+                    opcode %d",
+                    __func__,
+                    llu(desc.wr_id),
+                    desc.status,
+                    desc.opcode);
+            warning("%s: vendor_err %d byte_len %d imm_data %d qp_num %d",
+                    __func__,
+                    desc.vendor_err,
+                    desc.byte_len,
+                    desc.imm_data,
+                    desc.qp_num);
+            warning("%s: src_qp %d wc_flags %d pkey_index %d slid %d",
+                    __func__,
+                    desc.src_qp,
+                    desc.wc_flags,
+                    desc.pkey_index,
+                    desc.slid);
+            warning("%s: sl %d dlid_path %d",
+                    __func__,
+                    desc.sl,
+                    desc.dlid_path_bits);
+            return 0;
+        case IBV_WC_FETCH_ADD:
+            warning("%s: unhandled IBV_WC_FETCH_ADD opcode, id %llx status %d \
+                    opcode %d", 
+                    __func__,
+                    llu(desc.wr_id),
+                    desc.status,
+                    desc.opcode);
+            warning("%s: vendor_err %d byte_len %d imm_data %d qp_num %d",
+                    __func__,
+                    desc.vendor_err,
+                    desc.byte_len,
+                    desc.imm_data,
+                    desc.qp_num);
+            warning("%s: src_qp %d wc_flags %d pkey_index %d slid %d",
+                    __func__,
+                    desc.src_qp,
+                    desc.wc_flags,
+                    desc.pkey_index,
+                    desc.slid);
+            warning("%s: sl %d dlid_path_bits %d",
+                    __func__,
+                    desc.sl,
+                    desc.dlid_path_bits);
+            return 0;
+        case IBV_WC_BIND_MW:
+            warning("%s: unhandled IBV_WC_BIND_MW opcode, id %llx status %d \
+                    opcode %d",
+                    __func__,
+                    llu(desc.wr_id),
+                    desc.status,
+                    desc.opcode);
+            warning("%s: vendor_err %d byte_len %d imm_data %d qp_num %d",
+                    __func__,
+                    desc.vendor_err,
+                    desc.byte_len,
+                    desc.imm_data,
+                    desc.qp_num);
+            warning("%s: src_qp %d wc_flags %d pkey_index %d slid %d",
+                    __func__,
+                    desc.src_qp,
+                    desc.wc_flags,
+                    desc.pkey_index,
+                    desc.slid);
+            warning("%s: sl %d dlid_path_bits %d",
+                    __func__,
+                    desc.sl,
+                    desc.dlid_path_bits);
+            return 0;
+        default: 
+            warning("%s: unknown wc opcode, id %llx status %d opcode %d",
+                    __func__, llu(desc.wr_id),
+                    desc.status,
+                    desc.opcode);
+            warning("%s: vendor_err %d byte_len %d imm_data %d qp_num %d",
+                    __func__,
+                    desc.vendor_err,
+                    desc.byte_len,
+                    desc.imm_data,
+                    desc.qp_num);
+            warning("%s: src_qp %d wc_flags %d pkey_index %d slid %d",
+                    __func__,
+                    desc.src_qp,
+                    desc.wc_flags,
+                    desc.pkey_index,
+                    desc.slid);
+            warning("%s: sl %d dlid_path_bits %d",
+                    __func__,
+                    desc.sl,
+                    desc.dlid_path_bits);
+            return 0;
     }
     VALGRIND_MAKE_MEM_DEFINED(wc, sizeof(*wc));
 
@@ -648,7 +867,9 @@ static void openib_prepare_cq_block(int *cq_fd, int *async_fd)
     /* ask for the next notfication */
     ret = ibv_req_notify_cq(od->nic_cq, 0);
     if (ret < 0)
-	error_xerrno(ret, "%s: ibv_req_notify_cq", __func__);
+    {
+	    error_xerrno(ret, "%s: ibv_req_notify_cq", __func__);
+    }
 
     /* return the fd that can be fed to poll() */
     *cq_fd = od->channel->fd;
@@ -669,7 +890,10 @@ static void openib_ack_cq_completion_event(void)
 
     ret = ibv_get_cq_event(od->channel, &cq, &cq_context);
     if (ret == 0)
-	ibv_ack_cq_events(cq, 1);
+    {
+	    ibv_ack_cq_events(cq, 1);
+    }
+    debug(0, "%s: ibv_get_cq_event ret=%d", __func__, ret);
 }
 
 /*
@@ -701,6 +925,7 @@ static const char *openib_wc_status_string(int status)
 	CASE(IBV_WC_INV_EECN_ERR);
 	CASE(IBV_WC_INV_EEC_STATE_ERR);
 	CASE(IBV_WC_FATAL_ERR);
+    CASE(IBV_WC_RESP_TIMEOUT_ERR);
 	CASE(IBV_WC_GENERAL_ERR);
     }
     return s;
@@ -745,9 +970,7 @@ static const char *async_event_type_string(enum ibv_event_type event_type)
 	CASE(IBV_EVENT_SRQ_ERR);
 	CASE(IBV_EVENT_SRQ_LIMIT_REACHED);
 	CASE(IBV_EVENT_QP_LAST_WQE_REACHED);
-#ifdef HAVE_IBV_EVENT_CLIENT_REREGISTER
 	CASE(IBV_EVENT_CLIENT_REREGISTER);
-#endif
 	CASE(IBV_EVENT_GID_CHANGE);
 
     /* Experimental event types */
@@ -814,7 +1037,9 @@ static void openib_mem_deregister(memcache_entry_t *c)
     mrh = ptr_from_int64(c->memkeys.mrh);  /* convert 64-bit int to pointer */
     ret = ibv_dereg_mr(mrh);
     if (ret)
-	error_xerrno(ret, "%s: ibv_dereg_mr", __func__);
+    {
+	    error_xerrno(ret, "%s: ibv_dereg_mr", __func__);
+    }
     debug(4, "%s: buf %p len %lld lkey %x rkey %x", __func__,
       c->buf, lld(c->len), c->memkeys.lkey, c->memkeys.rkey);
 }
@@ -830,13 +1055,17 @@ static struct ibv_device *get_nic_handle(void)
 
     dev_list = ibv_get_devices();
     if (!dev_list)
-	return NULL;
+    {
+	    return NULL;
+    }
 
     /* just pick first nic */
     dlist_start(dev_list);
     nic_handle = dlist_next(dev_list);
     if (!nic_handle)
-	return NULL;
+    {
+	    return NULL;
+    }
     if (dlist_next(dev_list) != NULL)
 	warning("%s: found multiple HCAs, choosing the first", __func__);
 #else
@@ -845,9 +1074,13 @@ static struct ibv_device *get_nic_handle(void)
 
     hca_list = ibv_get_device_list(&num_devs);
     if (num_devs == 0)
-	return NULL;
+    {
+	    return NULL;
+    }
     if (num_devs > 1)
-	warning("%s: found %d HCAs, choosing the first", __func__, num_devs);
+    {
+	    warning("%s: found %d HCAs, choosing the first", __func__, num_devs);
+    }
     nic_handle = hca_list[0];
     ibv_free_device_list(hca_list);
 #endif
@@ -865,10 +1098,12 @@ static int openib_check_async_events(void)
     ret = ibv_get_async_event(od->ctx, &ev);
     if (ret < 0) {
 	if (errno == EAGAIN)
+    {
 	    return 0;
+    }
 	error_errno("%s: ibv_get_async_event", __func__);
     }
-    warning("%s: %s", __func__, async_event_type_string(ev.event_type));
+    debug(0, "%s: %s", __func__, async_event_type_string(ev.event_type));
     ibv_ack_async_event(&ev);
     return 1;
 }
@@ -905,16 +1140,17 @@ static int return_active_nic_handle (struct openib_device_priv* od, struct ibv_p
 	
 	hca_list = ibv_get_device_list(&num_devs);
 	
-	if(num_devs <= 0)   			// FATAL!!
+	if(num_devs <= 0)   			/* FATAL!! */
 	{
 	  error("%s : NO IB DEVICES FOUND ", __func__);
 	}
 	else 
-	{	// return a device which is active
+	{	
+      /* return a device which is active */
 	  for(i=0;i<num_devs;i++)
 	  { 
 	    nic_handle = hca_list[i]; 
-		// test the device to see if active
+		/* test the device to see if active */
 	    ctx = NULL;
 	    ctx = ibv_open_device(nic_handle);
 	    od->ctx=ctx;
@@ -924,40 +1160,41 @@ static int return_active_nic_handle (struct openib_device_priv* od, struct ibv_p
             }
  	    ret = ibv_query_port(ctx, od->nic_port, hca_port );
  
-//	    ret = ibv_query_port(od->ctx, od->nic_port, hca_port );
 	    if(ret)
 		error_xerrno(ret, "%s: ibv_query_port", __func__);
 
 	    if(hca_port->state != IBV_PORT_ACTIVE)
 	    {	
-		// in this case, continue, delete old hca_port info
-		ret = ibv_close_device(od->ctx);  // not sure if this breaks
-		if(ret)
-		   error_xerrno(ret,"%s: couldnt close device",__func__);
+		    /* in this case, continue, delete old hca_port info */
+		    ret = ibv_close_device(od->ctx);  /* not sure if this breaks */
+		    if(ret)
+		    error_xerrno(ret,"%s: couldnt close device",__func__);
 		
-		memset(hca_port,0,sizeof(struct ibv_port_attr));
-		warning("%s: found an inactive device/port",__func__);
+		    memset(hca_port,0,sizeof(struct ibv_port_attr));
+		    warning("%s: found an inactive device/port",__func__);
 		
-		// if we get to num_devs, no valid devices found
-		if(i == (num_devs-1))		// FATAL
-		{
-		  warning("%s: No Active IB ports/devices found", __func__);
-		  return -ENOSYS;
-		}
+		    /* if we get to num_devs, no valid devices found */
+		    if(i == (num_devs-1))		/*  FATAL */
+		    {
+		        warning("%s: No Active IB ports/devices found", __func__);
+		        return -ENOSYS;
+		    }
 		
-		continue;
+		    continue;
 	    }
-            // if we get here, we had a valid device found, done searching
-            else {
-		od->max_mtu = hca_port->max_mtu;
+        /* if we get here, we had a valid device found, done searching */
+        else 
+        {
+		    od->max_mtu = hca_port->max_mtu;
+            od->active_mtu = hca_port->active_mtu;
 	    	break; 	
-            }
+        }
 	  }
 
 	}
 
    	VALGRIND_MAKE_MEM_DEFINED(ctx, sizeof(*ctx));
-	// cleanup
+	/* cleanup */
 	ibv_free_device_list(hca_list);
 	return 0;
 }
@@ -976,8 +1213,6 @@ int openib_ib_initialize(void)
     struct openib_device_priv *od;
     struct ibv_port_attr hca_port;
     struct ibv_device_attr hca_cap;
-
-    debug(1, "%s: init", __func__);
 
     od = bmi_ib_malloc(sizeof(*od));
     ib_device->priv = od;
@@ -999,38 +1234,50 @@ int openib_ib_initialize(void)
     od->ctx = ctx;
     od->nic_port = IBV_PORT;  /* maybe let this be configurable */
 
-    if(!od->ctx) warning("%s: CTX=0",__func__);
+    if (!od->ctx) 
+    {
+        warning("%s: CTX=0", __func__);
+    }
 
     /* get the lid and verify port state */
     ret = ibv_query_port(od->ctx, od->nic_port, &hca_port);
     if (ret)
-	error_xerrno(ret, "%s: ibv_query_port", __func__);
+    {
+	    error_xerrno(ret, "%s: ibv_query_port", __func__);
+    }
     VALGRIND_MAKE_MEM_DEFINED(&hca_port, sizeof(hca_port));
 
     od->nic_lid = hca_port.lid;
 
     if (hca_port.state != IBV_PORT_ACTIVE)
-	error("%s: port state is %s but should be ACTIVE; check subnet manager",
-	      __func__, openib_port_state_string(hca_port.state));
+    {
+	    error("%s: port state is %s but should be ACTIVE; check subnet manager",
+	          __func__, openib_port_state_string(hca_port.state));
+    }
 
     /* Query the device for the max_ requests and such */
     ret = ibv_query_device(od->ctx, &hca_cap);
     if (ret)
-	error_xerrno(ret, "%s: ibv_query_device", __func__);
+    {
+	    error_xerrno(ret, "%s: ibv_query_device", __func__);
+    }
     VALGRIND_MAKE_MEM_DEFINED(&hca_cap, sizeof(hca_cap));
 #else
     ret = return_active_nic_handle(od, &hca_port);
-    if(ret)
-	return -ENOSYS;
+    if (ret)
+    {
+	    return -ENOSYS;
+    }
 #endif
 
-    //od->ctx = ctx;
     od->nic_lid = hca_port.lid;
 
    /* Query the device for the max_ requests and such */
     ret = ibv_query_device(od->ctx, &hca_cap);
     if (ret)
-	error_xerrno(ret, "%s: ibv_query_device", __func__);
+    {
+	    error_xerrno(ret, "%s: ibv_query_device", __func__);
+    }
     VALGRIND_MAKE_MEM_DEFINED(&hca_cap, sizeof(hca_cap));
 
 
@@ -1067,30 +1314,44 @@ int openib_ib_initialize(void)
     /* Allocate a Protection Domain (global) */
     od->nic_pd = ibv_alloc_pd(od->ctx);
     if (!od->nic_pd)
-	error("%s: ibv_alloc_pd", __func__);
+    {
+	    error("%s: ibv_alloc_pd", __func__);
+    }
 
     /* create completion channel for blocking on CQ events */
     od->channel = ibv_create_comp_channel(od->ctx);
     if (!od->channel)
-	error("%s: ibv_create_comp_channel failed", __func__);
+    {
+	    error("%s: ibv_create_comp_channel failed", __func__);
+    }
 
     /* build a CQ (global), connected to this channel */
     od->nic_cq = ibv_create_cq(od->ctx, cqe_num, NULL, od->channel, 0);
     if (!od->nic_cq)
-	error("%s: ibv_create_cq failed", __func__);
+    {
+	    error("%s: ibv_create_cq failed", __func__);
+    }
 
     /* use non-blocking IO on the async fd and completion fd */
     flags = fcntl(od->ctx->async_fd, F_GETFL);
     if (flags < 0)
-	error_errno("%s: get async fd flags", __func__);
+    {
+	    error_errno("%s: get async fd flags", __func__);
+    }
     if (fcntl(od->ctx->async_fd, F_SETFL, flags | O_NONBLOCK) < 0)
-	error_errno("%s: set async fd nonblocking", __func__);
+    {
+	    error_errno("%s: set async fd nonblocking", __func__);
+    }
 
     flags = fcntl(od->channel->fd, F_GETFL);
     if (flags < 0)
-	error_errno("%s: get completion fd flags", __func__);
+    {
+	    error_errno("%s: get completion fd flags", __func__);
+    }
     if (fcntl(od->channel->fd, F_SETFL, flags | O_NONBLOCK) < 0)
-	error_errno("%s: set completion fd nonblocking", __func__);
+    {
+	    error_errno("%s: set completion fd nonblocking", __func__);
+    }
 
     /* will be set on first connection */
     od->sg_tmp_array = 0;
@@ -1110,24 +1371,39 @@ static void openib_ib_finalize(void)
     int ret;
 
     if (od->sg_tmp_array)
-	free(od->sg_tmp_array);
+    {
+	    free(od->sg_tmp_array);
+    }
     ret = ibv_destroy_cq(od->nic_cq);
     if (ret)
-	error_xerrno(ret, "%s: ibv_destroy_cq", __func__);
+    {
+	    error_xerrno(ret, "%s: ibv_destroy_cq", __func__);
+    }
     ret = ibv_destroy_comp_channel(od->channel);
     if (ret)
-	error_xerrno(ret, "%s: ibv_destroy_comp_channel", __func__);
+    {
+	    error_xerrno(ret, "%s: ibv_destroy_comp_channel", __func__);
+    }
     ret = ibv_dealloc_pd(od->nic_pd);
     if (ret)
-	error_xerrno(ret, "%s: ibv_dealloc_pd", __func__);
+    {
+	    error_xerrno(ret, "%s: ibv_dealloc_pd", __func__);
+    }
     ret = ibv_close_device(od->ctx);
     if (ret)
-	error_xerrno(ret, "%s: ibv_close_device", __func__);
+    {
+	    error_xerrno(ret, "%s: ibv_close_device", __func__);
+    }
 
     free(od);
     ib_device->priv = NULL;
 }
 
-
-
-
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */
