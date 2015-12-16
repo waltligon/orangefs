@@ -2217,38 +2217,45 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
     return 0;
 }
 
-int PINT_trove_dbpf_keyval_compare(
-    DB * dbp, const DBT * a, const DBT * b)
+int PINT_trove_dbpf_keyval_compare(DB *dbp, const DBT *a, const DBT *b)
 {
-    struct dbpf_keyval_db_entry db_entry_a;
-    struct dbpf_keyval_db_entry db_entry_b;
+    struct dbpf_keyval_db_entry *db_entry_a;
+    struct dbpf_keyval_db_entry *db_entry_b;
+    db_entry_a = (struct dbpf_keyval_db_entry *)a->data;
+    db_entry_b = (struct dbpf_keyval_db_entry *)b->data;
 
-    memcpy(&db_entry_a, a->data, sizeof(struct dbpf_keyval_db_entry));
-    memcpy(&db_entry_b, b->data, sizeof(struct dbpf_keyval_db_entry));
+    /* If the key is so small that it cannot contain the struct, our database
+     * is corrupt. Then compare the handle, type, and size. Finally if only the
+     * key data itself differs, compare it. */
 
-    if(db_entry_a.handle != db_entry_b.handle)
+    if (a->size < DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0) ||
+            b->size < DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0))
     {
-        return (db_entry_a.handle < db_entry_b.handle) ? -1 : 1;
+        gossip_err("DBPF keyval collection corrupt\n");
+        abort();
     }
 
-    if(db_entry_a.type != db_entry_b.type)
+    if (db_entry_a->handle != db_entry_b->handle)
     {
-        return (db_entry_a.type < db_entry_b.type) ? -1 : 1;
+        return (db_entry_a->handle < db_entry_b->handle) ? -1 : 1;
     }
 
-    if(a->size > b->size)
+    if (db_entry_a->type != db_entry_b->type)
+    {
+        return (db_entry_a->type < db_entry_b->type) ? -1 : 1;
+    }
+
+    if (a->size > b->size)
     {
         return 1;
     }
-
-    if(a->size < b->size)
+    else if (a->size < b->size)
     {
         return -1;
     }
 
-    /* must be equal */
-    return (memcmp(db_entry_a.key, db_entry_b.key,
-                    DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->size)));
+    return memcmp(db_entry_a->key, db_entry_b->key,
+            DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->size));
 }
 
 struct TROVE_keyval_ops dbpf_keyval_ops =
