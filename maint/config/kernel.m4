@@ -1342,6 +1342,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 		 ] )
 	AC_CHECK_HEADERS([linux/exportfs.h], [],[],
 		[#define __KERNEL__
+		 #ifdef HAVE_KCONFIG
+		 #include <linux/kconfig.h>
+		 #endif
 		 #include <linux/exportfs.h>
 		])
 

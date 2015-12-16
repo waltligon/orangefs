@@ -610,7 +610,7 @@ static ssize_t pvfs2_devreq_aio_write(struct kiocb *kiocb,
                                       const struct iovec *iov,
                                       unsigned long count, loff_t offset)
 {
-    return pvfs2_devreq_writev(kiocb->ki_filp, iov, count, &kiocb->ki_pos);
+    return pvfs2_devreq_writev(NULL, iov, count, NULL);
 }
 #endif
 
