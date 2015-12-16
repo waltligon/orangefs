@@ -1840,6 +1840,7 @@ static int server_shutdown(
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         security "
                      "module           [ stopped ]\n");
     }
+
 #ifdef ENABLE_CERTCACHE    
     if (status & SERVER_CERTCACHE_INIT)
     {
@@ -1862,7 +1863,7 @@ static int server_shutdown(
     }
 #endif /* ENABLE_CREDCACHE */
 
-#ifdef ENABLE_CAPCACHE    
+#ifdef ENABLE_CAPCACHE
     if (status & SERVER_CAPCACHE_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting capability "
