@@ -42,6 +42,8 @@
 #include "pint-util.h"
 #include "dbpf-sync.h"
 
+#include "server-config.h"
+
 PINT_event_group trove_dbpf_event_group;
 
 PINT_event_type trove_dbpf_read_event_id;
@@ -73,7 +75,6 @@ static int stop_directio_threads(void);
 static int trove_directio_threads_num = 30;
 static int trove_directio_ops_per_queue = 10;
 static int trove_directio_timeout = 1000;
-extern int TROVE_db_map_size;
 
 static int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
                                      int count,
@@ -84,6 +85,7 @@ static int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
 static int dbpf_db_create(char *dbname);
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
+static struct server_configuration_s *server_cfg;
 
 int dbpf_collection_getinfo(TROVE_coll_id coll_id,
                             TROVE_context_id context_id,
@@ -259,6 +261,13 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
             break;
     }
     return ret;
+}
+
+static int dbpf_collection_set_fs_config(TROVE_method_id method_id,
+        TROVE_coll_id coll_id, struct server_configuration_s *cfg)
+{
+    server_cfg = cfg;
+    return 0;
 }
 
 int dbpf_collection_seteattr(TROVE_coll_id coll_id,
@@ -942,7 +951,7 @@ int dbpf_collection_create(char *collname,
         }
     }
 
-    error = dbpf_db_open(path_name, 0, &db_p, 0, TROVE_db_map_size);
+    error = dbpf_db_open(path_name, 0, &db_p, 0, server_cfg);
     if (error)
     {
         gossip_err("dbpf_db_open failed on attrib db %s\n", path_name);
@@ -1505,7 +1514,7 @@ int dbpf_collection_lookup(char *collname,
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 my_storage_p->meta_path, coll_p->coll_id);
     
-    ret = dbpf_db_open(path_name, 0, &coll_p->coll_attr_db, 0, TROVE_db_map_size);
+    ret = dbpf_db_open(path_name, 0, &coll_p->coll_attr_db, 0, server_cfg);
     if (ret)
     {
         free(coll_p->meta_path);
@@ -1586,7 +1595,7 @@ int dbpf_collection_lookup(char *collname,
                               my_storage_p->meta_path, coll_p->coll_id);
 
     ret = dbpf_db_open(path_name, DBPF_DB_COMPARE_DS_ATTR, &coll_p->ds_db,
-        0, TROVE_db_map_size);
+        0, server_cfg);
     if (ret)
     {
         dbpf_db_close(coll_p->coll_attr_db);
@@ -1602,7 +1611,7 @@ int dbpf_collection_lookup(char *collname,
 
 
     ret = dbpf_db_open(path_name, DBPF_DB_COMPARE_KEYVAL, &coll_p->keyval_db,
-        0, TROVE_db_map_size);
+        0, server_cfg);
     if (ret)
     {
         dbpf_db_close(coll_p->coll_attr_db);
@@ -1734,7 +1743,7 @@ struct dbpf_storage *dbpf_storage_lookup(
         return NULL;
     }
 
-    ret = dbpf_db_open(path_name, 0, &sto_p->sto_attr_db, 0, TROVE_db_map_size);
+    ret = dbpf_db_open(path_name, 0, &sto_p->sto_attr_db, 0, server_cfg);
     if (ret)
     {
         *error_p = ret;
@@ -1749,7 +1758,7 @@ struct dbpf_storage *dbpf_storage_lookup(
 
     DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, meta_path);
 
-    ret = dbpf_db_open(path_name, 0, &sto_p->coll_db, 0, TROVE_db_map_size);
+    ret = dbpf_db_open(path_name, 0, &sto_p->coll_db, 0, server_cfg);
     if (ret)
     {
         *error_p = ret;
@@ -1841,7 +1850,7 @@ static int dbpf_db_create(char *dbname)
 {
     dbpf_db *db;
     int r;
-    r = dbpf_db_open(dbname, 0, &db, 1, TROVE_db_map_size);
+    r = dbpf_db_open(dbname, 0, &db, 1, server_cfg);
     if (r)
     {
         return -r;
@@ -1874,7 +1883,8 @@ struct TROVE_mgmt_ops dbpf_mgmt_direct_ops =
     dbpf_collection_getinfo,
     dbpf_collection_seteattr,
     dbpf_collection_geteattr,
-    dbpf_collection_deleattr
+    dbpf_collection_deleattr,
+    dbpf_collection_set_fs_config
 };
 
 /* dbpf_mgmt_ops
@@ -1897,7 +1907,8 @@ struct TROVE_mgmt_ops dbpf_mgmt_ops =
     dbpf_collection_getinfo,
     dbpf_collection_seteattr,
     dbpf_collection_geteattr,
-    dbpf_collection_deleattr
+    dbpf_collection_deleattr,
+    dbpf_collection_set_fs_config
 };
 
 typedef struct

@@ -88,8 +88,7 @@ enum
     TROVE_COLLECTION_IMMEDIATE_COMPLETION,
     TROVE_DIRECTIO_THREADS_NUM,
     TROVE_DIRECTIO_OPS_PER_QUEUE,
-    TROVE_DIRECTIO_TIMEOUT,
-    TROVE_DB_MAP_SIZE
+    TROVE_DIRECTIO_TIMEOUT
 };
 
 /** Initializes the Trove layer.  Must be called before any other Trove
@@ -538,6 +537,11 @@ int trove_collection_setinfo(
 			     TROVE_context_id context_id,
 			     int option,
 			     void *parameter);
+
+struct server_configuration_s;
+int trove_collection_set_fs_config(
+        TROVE_coll_id coll_id,
+        struct server_configuration_s *cfg);
 
 #endif
 

@@ -32,7 +32,6 @@ struct PINT_perf_counter* PINT_server_pc = NULL;
 
 int TROVE_shm_key_hint = 0;
 int TROVE_max_concurrent_io = 16;
-int TROVE_db_map_size = 536870912;
 
 extern TROVE_method_callback global_trove_method_callback;
 
@@ -1050,11 +1049,6 @@ int trove_collection_setinfo(
         TROVE_max_concurrent_io = *((int*)parameter);
         return(0);
     }
-    if(option == TROVE_DB_MAP_SIZE)
-    {
-        TROVE_db_map_size = *((int*)parameter);
-        return(0);
-    }
     method_id = global_trove_method_callback(coll_id);
     return mgmt_method_table[method_id]->collection_setinfo(
            method_id,
@@ -1062,6 +1056,18 @@ int trove_collection_setinfo(
            context_id,
            option,
            parameter);
+}
+
+int trove_collection_set_fs_config(
+    TROVE_coll_id coll_id,
+    struct server_configuration_s *cfg)
+{
+    TROVE_method_id method_id;
+    method_id = global_trove_method_callback(coll_id);
+    return mgmt_method_table[method_id]->collection_set_fs_config(
+            method_id,
+            coll_id,
+            cfg);
 }
 
 /*

@@ -875,10 +875,6 @@ static int server_initialize_subsystems(
                                    &server_config.trove_max_concurrent_io);
     /* this should never fail */
     assert(ret == 0);
-    ret = trove_collection_setinfo(0, 0, TROVE_DB_MAP_SIZE,
-                                   &server_config.db_max_size);
-    /* this should never fail */
-    assert(ret == 0);
 
     generate_shm_key_hint(&server_index);
 
@@ -935,6 +931,13 @@ static int server_initialize_subsystems(
         {
             PVFS_perror("Error: PINT_handle_load_mapping", ret);
             return(ret);
+        }
+
+        /* XXX: This is really the same for all collections, yet is specified
+         * separately. */
+        ret = trove_collection_set_fs_config(cur_fs->coll_id, &server_config);
+        if (ret < 0) {
+            gossip_err("Error setting filesystem configuration in Trove\n");
         }
 
         /*

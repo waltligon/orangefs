@@ -14,6 +14,8 @@
 
 #include "dbpf.h"
 
+#include "server-config.h"
+
 struct dbpf_db {
     MDB_env *env;
     MDB_dbi dbi;
@@ -107,7 +109,7 @@ static int keyval_compare(const MDB_val *a, const MDB_val *b)
 }
 
 int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
-    int create, size_t mapsize)
+    int create, struct server_configuration_s *cfg)
 {
     MDB_txn *txn;
     int r;
@@ -126,7 +128,14 @@ int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
         return db_error(r);
     }
 
-    r = mdb_env_set_mapsize((*db)->env, mapsize);
+    if (cfg)
+    {
+        r = mdb_env_set_mapsize((*db)->env, cfg->db_max_size);
+    }
+    else
+    {
+        r = mdb_env_set_mapsize((*db)->env, 10485760);
+    }
     if (r)
     {
         mdb_env_close((*db)->env);
