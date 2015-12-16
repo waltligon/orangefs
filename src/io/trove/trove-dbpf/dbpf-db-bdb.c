@@ -14,6 +14,8 @@
 
 #include "dbpf.h"
 
+#include "server-config.h"
+
 struct dbpf_db {
     DB *db;
 };
@@ -140,8 +142,22 @@ int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
     {
         (*db)->db->set_bt_compare((*db)->db, keyval_compare);
     }
-    r = (*db)->db->open((*db)->db, NULL, name, NULL, DB_BTREE,
-        create ? DB_CREATE : 0, DB_DIRTY_READ|DB_THREAD);
+
+    if (cfg)
+    {
+        (*db)->db->set_cachesize((*db)->db, 0, cfg->db_cache_size_bytes, 1);
+    }
+
+    if (cfg && strcmp(cfg->db_cache_type, "mmap") == 0)
+    {
+        r = (*db)->db->open((*db)->db, NULL, name, NULL, DB_BTREE,
+            create ? DB_CREATE : 0, DB_DIRTY_READ|DB_THREAD);
+    }
+    else
+    {
+        r = (*db)->db->open((*db)->db, NULL, name, NULL, DB_BTREE,
+            create ? DB_CREATE : 0, DB_DIRTY_READ|DB_THREAD|DB_NOMMAP);
+    }
     if (r)
     {
         gossip_err("TROVE:DBPF:Berkeley DB %s failed to open", name);
