@@ -392,7 +392,7 @@ static ssize_t pvfs2_devreq_writev(
                     put_op(op);
                     return -EPROTO;
                 }
-                if (iov[notrailer_count].iov_len > op->downcall.trailer_size)
+                if (iov[notrailer_count].iov_len != op->downcall.trailer_size)
                 {
                     gossip_err("writev error: trailer size (%ld) != iov_len (%ld)\n",
                             (unsigned long) op->downcall.trailer_size, 
@@ -401,6 +401,9 @@ static ssize_t pvfs2_devreq_writev(
                     put_op(op);
                     return -EMSGSIZE;
                 }
+
+                total_returned_size += iov[notrailer_count].iov_len;
+
                 /* Allocate a buffer large enough to hold the trailer bytes */
                 op->downcall.trailer_buf = (void *) vmalloc(op->downcall.trailer_size);
                 if (op->downcall.trailer_buf != NULL) 
