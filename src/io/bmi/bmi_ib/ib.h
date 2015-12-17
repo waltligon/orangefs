@@ -396,11 +396,9 @@ extern ib_device_t *ib_device;
 /*
  * Internal functions in util.c.
  */
-void error(const char *fmt, ...) __attribute__((noreturn,format(printf,1,2)));
-void error_errno(const char *fmt, ...)
-  __attribute__((noreturn,format(printf,1,2)));
-void error_xerrno(int errnum, const char *fmt, ...)
-  __attribute__((noreturn,format(printf,2,3)));
+void error(const char *fmt, ...);
+void error_errno(const char *fmt, ...);
+void error_xerrno(int errnum, const char *fmt, ...);
 void warning(const char *fmt, ...) __attribute__((format(printf,1,2)));
 void warning_errno(const char *fmt, ...) __attribute__((format(printf,1,2)));
 void warning_xerrno(int errnum, const char *fmt, ...)

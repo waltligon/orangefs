@@ -367,8 +367,13 @@ static struct buf_head *get_eager_buf(ib_connection_t *c)
     {
         --c->send_credit;
         bh = qlist_try_del_head(&c->eager_send_buf_free);
-        bmi_ib_assert(bh, "%s: empty eager_send_buf_free list, peer %s",
-                      __func__, c->peername);
+        if (!bh)
+        {
+            error("%s: empty eager_send_buf_free list, peer %s",
+                  __func__, c->peername);
+            c->send_credit++;
+            return NULL;
+        }
     }
     return bh;
 }
@@ -391,7 +396,12 @@ static void post_rr(ib_connection_t *c,
         /* one credit saved back for just this situation, do not check */
         --c->send_credit;
         bh = qlist_try_del_head(&c->eager_send_buf_free);
-        bmi_ib_assert(bh, "%s: empty eager_send_buf_free list", __func__);
+        if (!bh)
+        {
+            error("%s: empty eager_send_buf_free list", __func__);
+            c->send_credit++;
+            return;
+        }
         bh->sq = NULL;
         debug(2, "%s: return %d credits to %s", 
               __func__, c->return_credit, c->peername);
@@ -410,11 +420,21 @@ static void encourage_send_waiting_buffer(struct ib_work *sq)
     struct buf_head *bh;
     ib_connection_t *c = sq->c;
 
-    debug(3, "%s: sq %p", __func__, sq);
-    bmi_ib_assert(sq->state.send == SQ_WAITING_BUFFER,
-                  "%s: wrong send state %s", __func__,
-                  sq_state_name(sq->state.send));
+    if (!sq)
+    {
+        error("%s: no sq", __func__);
+        return;
+    }
 
+    debug(3, "%s: sq %p", __func__, sq);
+    
+    if (sq->state.send != SQ_WAITING_BUFFER)
+    {
+        error("%s: wrong send state %s", 
+              __func__, sq_state_name(sq->state.send));
+        return;
+    }
+    
     bh = get_eager_buf(c);
     if (!bh) 
     {
@@ -524,6 +544,7 @@ static void encourage_send_incoming_cts(struct buf_head *bh,
     {
         error("%s: mop_id %llx in CTS message not found", 
               __func__, llu(mh_cts.rts_mop_id));
+        return;
     }
 
     debug(2, "%s: sq %p %s mopid %llx len %u", 
@@ -533,12 +554,14 @@ static void encourage_send_incoming_cts(struct buf_head *bh,
           llu(mh_cts.rts_mop_id), 
           byte_len);
 
-    bmi_ib_assert(sq->state.send == SQ_WAITING_CTS ||
-	            sq->state.send == SQ_WAITING_RTS_SEND_COMPLETION,
-		  "%s: wrong send state %s", 
-                  __func__,
-		  sq_state_name(sq->state.send));
-
+    if (sq->state.send != SQ_WAITING_CTS && 
+        sq->state.send != SQ_WAITING_RTS_SEND_COMPLETION)
+    {
+        error("%s: wrong send state %s", 
+              __func__, sq_state_name(sq->state.send));
+        return;
+    }
+    
     /* message; cts content; list of buffers, lengths, and keys */
     want = sizeof(mh_cts) + 
            mh_cts.buflist_num * 
@@ -548,6 +571,7 @@ static void encourage_send_incoming_cts(struct buf_head *bh,
     {
         error("%s: wrong message size for CTS, got %u, want %u", 
               __func__, byte_len, want);
+        return;
     }
 
     /* start the big tranfser */
@@ -642,6 +666,7 @@ static void encourage_recv_incoming(struct buf_head *bh,
                       __func__, 
                       lld(len), 
                       lld(rq->buflist.tot_len));
+                return;
             }
 
             memcpy_to_buflist(&rq->buflist,
@@ -729,6 +754,7 @@ static void encourage_recv_incoming(struct buf_head *bh,
                       __func__, 
                       llu(mh_rts.tot_len), 
                       llu(rq->buflist.tot_len));
+                return;
             }
             rq->state.recv = RQ_RTS_WAITING_CTS_BUFFER;
             debug(2, "%s: matched rq %p MSG_RTS now %s", 
@@ -830,6 +856,7 @@ static void encourage_recv_incoming(struct buf_head *bh,
     {
         error("%s: unknown message header type %d len %u", 
               __func__, type, byte_len);
+        return;
     }
 }
 
@@ -937,6 +964,7 @@ static int send_cts(struct ib_work *rq)
     {
         error("%s: recv prereg buflist too small, need %lld", 
               __func__, lld(rq->buflist.tot_len));
+        return 1;
     }
 
     ib_buflist_t save_buflist = rq->buflist;
@@ -964,6 +992,7 @@ static int send_cts(struct ib_work *rq)
     {
         error("%s: too many (%d) recv buflist entries for buf", 
               __func__, rq->buflist.num);
+        return 1;
     }
     for (i = 0; i < rq->buflist.num; i++) 
     {
@@ -1082,6 +1111,8 @@ static int post_send(bmi_op_id_t *id,
 	      __func__, 
               lld(total_size), 
               lld(sq->buflist.tot_len));
+        ret = -EINVAL;
+        goto out;
     }
 
     /* unexpected messages must fit inside an eager message */
@@ -1295,6 +1326,8 @@ static int post_recv(bmi_op_id_t *id,
               __func__, 
               lld(tot_expected_len), 
               lld(rq->buflist.tot_len));
+        ret = -EINVAL;
+        goto out;
     }
 
     /* generate identifier used by caller to test for message later */
@@ -1326,6 +1359,8 @@ static int post_recv(bmi_op_id_t *id,
                   __func__, 
                   lld(rq->actual_len), 
                   lld(rq->buflist.tot_len));
+            ret = -EINVAL;
+            goto out;
         }
 
         memcpy_to_buflist(&rq->buflist,
@@ -2085,6 +2120,8 @@ static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
     if (!cp)
     {
         error("%s: no ':' found", __func__);
+        free(s);
+        return NULL;
     }
 
     /* copy to permanent storage */
@@ -2103,10 +2140,14 @@ static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
     if (cq == cp)
     {
         error("%s: invalid port number", __func__);
+        free(s);
+        return NULL;
     }
     if (*cq != '\0')
     {
         error("%s: extra characters after port number", __func__);
+        free(s);
+        return NULL;
     }
     free(s);
 
@@ -2322,6 +2363,7 @@ static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
     {
         close(s);
         error("%s: ib_new_connection failed", __func__);
+        return -EINVAL;
     }
     ibmap->c->remote_map = remote_map;
 
@@ -2349,6 +2391,7 @@ static void ib_tcp_server_init_listen_socket(struct bmi_method_addr *addr)
     if (ib_device->listen_sock < 0)
     {
         error_errno("%s: create tcp socket", __func__);
+        exit(1);
     }
     flags = 1;
     if (setsockopt(ib_device->listen_sock, 
@@ -2358,6 +2401,7 @@ static void ib_tcp_server_init_listen_socket(struct bmi_method_addr *addr)
                    sizeof(flags)) < 0)
     {
         error_errno("%s: setsockopt REUSEADDR", __func__);
+        exit(1);
     }
     memset(&skin, 0, sizeof(skin));
     skin.sin_family = AF_INET;
@@ -2375,6 +2419,7 @@ static void ib_tcp_server_init_listen_socket(struct bmi_method_addr *addr)
         else
         {
             error_errno("%s: bind tcp socket", __func__);
+            exit(1);
         }
     }
 
@@ -2383,17 +2428,20 @@ static void ib_tcp_server_init_listen_socket(struct bmi_method_addr *addr)
     if (listen(ib_device->listen_sock, listen_backlog) < 0)
     {
         error_errno("%s: listen tcp socket", __func__);
+        exit(1);
     }
 
     flags = fcntl(ib_device->listen_sock, F_GETFL);
     if (flags < 0)
     {
         error_errno("%s: fcntl getfl listen sock", __func__);
+        exit(1);
     }
     flags |= O_NONBLOCK;
     if (fcntl(ib_device->listen_sock, F_SETFL, flags) < 0)
     {
         error_errno("%s: fcntl setfl nonblock listen sock", __func__);
+        exit(1);
     }  
 
     timeout_ms = (int *) bmi_ib_malloc(sizeof(int));
@@ -2409,12 +2457,14 @@ static void ib_tcp_server_init_listen_socket(struct bmi_method_addr *addr)
         {
             error("%s: unable to to start accept thread, errno=%d",
                   __func__, errno);
+            exit(1);
         }
     }
     else
     {
         error("%s: unable to malloc memory for timeout_ms, errno=%d",
               __func__, errno);
+        exit(1);
     }
 }
 
@@ -2516,6 +2566,7 @@ void *ib_tcp_server_process_client_thread(void *arg)
     if (!arg)
     {
         error("%s: no socket passed", __func__);
+        return NULL;
     }
     tc = (struct tcp_conn *) arg;
 
@@ -2526,7 +2577,7 @@ void *ib_tcp_server_process_client_thread(void *arg)
     c = ib_new_connection(tc->s, tc->peername, 1);
     if (!c)
     {
-        free(tc->hostname);
+        error_xerrno(EINVAL, "%s: new ib connection failed", __func__);
         goto out;
     }
     debug(0, "%s: returned from ib_new_connection", __func__);
@@ -2542,6 +2593,7 @@ void *ib_tcp_server_process_client_thread(void *arg)
     if (c->bmi_addr == 0)
     {
         error_xerrno(ENOMEM, "%s: bmi_method_addr_reg_callback", __func__);
+        goto out;
     }
 
     debug(0, "%s: accepted new connection %s at server", 
@@ -2553,6 +2605,14 @@ void *ib_tcp_server_process_client_thread(void *arg)
     if (close(tc->s) < 0)
     {
         error_errno("%s: close new sock", __func__);
+    }
+    if (tc)
+    {
+        if (tc->hostname)
+        {
+            free(tc->hostname);
+        }
+        free(tc);
     }
 
     return NULL;
@@ -2602,6 +2662,7 @@ static int ib_block_for_activity(int timeout_ms)
         else
         {
             error_errno("%s: poll listen sock", __func__);
+            return -EINVAL;
         }
     }
     return ret;
@@ -2717,6 +2778,7 @@ static int BMI_ib_initialize(struct bmi_method_addr *listen_addr,
     {
         error("%s: error: BMI_INIT_SERVER requires non-null "
               "listen_addr and v.v", __func__);
+        exit(1);
     }
 
     bmi_ib_method_id = method_id;
