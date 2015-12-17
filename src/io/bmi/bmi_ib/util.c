@@ -102,13 +102,13 @@ bmi_ib_malloc(unsigned long n)
 
     if (n == 0)
     {
-	    error("%s: alloc 0 bytes", __func__);
+        error("%s: alloc 0 bytes", __func__);
         return NULL;
     }
     x = malloc(n);
     if (!x)
     {
-	    error("%s: malloc %ld bytes failed", __func__, n);
+        error("%s: malloc %ld bytes failed", __func__, n);
     }
     return x;
 }
@@ -135,7 +135,10 @@ void * __hidden
 qlist_try_del_head(struct qlist_head *list)
 {
     struct qlist_head *h;
-    if (qlist_empty(list)) return 0;
+    if (qlist_empty(list)) 
+    {
+        return 0;
+    }
     h = list->next;
     qlist_del(h);
     return h;
@@ -203,9 +206,10 @@ memcpy_from_buflist(ib_buflist_t *buflist, void *buf)
     int i;
     char *cp = buf;
 
-    for (i=0; i<buflist->num; i++) {
-	memcpy(cp, buflist->buf.send[i], (size_t) buflist->len[i]);
-	cp += buflist->len[i];
+    for (i = 0; i < buflist->num; i++) 
+    {
+        memcpy(cp, buflist->buf.send[i], (size_t) buflist->len[i]);
+        cp += buflist->len[i];
     }
 }
 
@@ -220,8 +224,8 @@ read_full(int fd, void *buf, size_t num)
 
     while (num > 0) 
     {
-	    i = read(fd, (char *)buf + offset, num);
-	    if (i < 0)
+        i = read(fd, (char *)buf + offset, num);
+        if (i < 0)
         {
             return i;
         }
@@ -229,8 +233,8 @@ read_full(int fd, void *buf, size_t num)
         {
             break;
         }
-	    num -= i;
-	    offset += i;
+        num -= i;
+        offset += i;
     }
     return offset;
 }
