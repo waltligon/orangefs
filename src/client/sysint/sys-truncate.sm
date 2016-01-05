@@ -206,7 +206,7 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     js_p->error_code = 0;
 
     attr = &sm_p->getattr.attr;
-    assert(attr)
+    assert(attr);
     capability = PVFS_ATTR_CAPABILITY;
     assert(attr->mask & capability);
 
