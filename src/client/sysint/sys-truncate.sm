@@ -206,7 +206,8 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
 
     attr = &sm_p->getattr.attr;
     assert(attr);
-    
+    assert(attr->mask & PVFS_ATTR_CAPABILITY);
+
     assert(attr->mask & PVFS_ATTR_META_DFILES);
     assert(attr->mask & PVFS_ATTR_META_DIST);
     assert(attr->u.meta.dfile_count > 0);
