@@ -197,6 +197,7 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
+    unsigned long long capability = 0;
     PVFS_object_attr *attr = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_size new_dfile_size = 0;
@@ -205,8 +206,9 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     js_p->error_code = 0;
 
     attr = &sm_p->getattr.attr;
-    assert(attr);
-    /* assert(attr->mask & PVFS_ATTR_CAPABILITY);*/
+    assert(attr)
+    capability = PVFS_ATTR_CAPABILITY;
+    assert(attr->mask & capability);
 
     assert(attr->mask & PVFS_ATTR_META_DFILES);
     assert(attr->mask & PVFS_ATTR_META_DIST);
