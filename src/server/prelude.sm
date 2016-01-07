@@ -198,6 +198,10 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
     if (s_op->target_handle == PVFS_HANDLE_NULL)
     {
         js_p->error_code = 0;
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "(%p) %s (prelude sm) state: target handle is null... "
+                     "skipping.\n", s_op,
+                     PINT_map_server_op_to_string(s_op->req->op));
         return SM_ACTION_COMPLETE;
     }
 
@@ -581,10 +585,14 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cap cache %s!\n", __func__,
                      (capcache_hit) ? "hit" : "miss");
     }
-#endif
+
 
     /* do not verify cap on cache hit */
     ret = (capcache_hit) ? 1 : PINT_verify_capability(&s_op->req->capability);
+#else
+    /* always verify cap */
+    ret = PINT_verify_capability(&s_op->req->capability);
+#endif
 
     /* check operation permissions */
     if (ret)
