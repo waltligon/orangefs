@@ -585,6 +585,10 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cap cache %s!\n", __func__,
                      (capcache_hit) ? "hit" : "miss");
     }
+    else
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cap cache: Capability is null!\n", __func__);
+    }
 
 
     /* do not verify cap on cache hit */
