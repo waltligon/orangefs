@@ -578,7 +578,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 
     /* check capability cache for non-null capabilities */
 #ifdef ENABLE_CAPCACHE
-    capcache_hit = 1;
+
     if (!PINT_capability_is_null(&s_op->req->capability))
     {        
         capcache_hit = (PINT_capcache_lookup(&s_op->req->capability) != NULL);        
