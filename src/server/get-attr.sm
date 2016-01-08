@@ -4,7 +4,7 @@
  * See COPYING in top-level directory.
  *
  * Changes by Acxiom Corporation to add dirent_count field to attributes
- * Copyright © Acxiom Corporation, 2005.
+ * Copyright  Acxiom Corporation, 2005.
  */
 
 /* pvfs2_get_attr_sm
@@ -217,8 +217,7 @@ nested machine pvfs2_get_attr_work_sm
     state check_if_capability_required
     {
         run getattr_check_if_capability_required;
-        STATE_CAPABILITY => read_acl;
-        default => setup_resp;
+        default=> read_acl;
     }
 
     state read_acl
