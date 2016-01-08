@@ -598,6 +598,10 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     ret = PINT_verify_capability(&s_op->req->capability);
 #endif
 
+    gossip_debug(GOSSIP_SERVER_DEBUG,"%s:return from PINT_verify_capability=%d for capability %d\n"
+                                    ,__func__
+                                    ,ret,s_op->req->capability);
+
     /* check operation permissions */
     if (ret)
     {
