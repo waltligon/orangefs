@@ -890,6 +890,21 @@ static int setup_resp(
        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_META_UNSTUFFED;
     }
 
+    if (s_op->resp.u.create.metafile_attrs.capability)
+    {
+    	s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_CAPABILITY;
+    	 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
+    	                          "create: new metadata handle: %llu has capability!\n",
+    	                          llu(s_op->resp.u.create.metafile_handle));
+
+    }
+    else
+    {
+   	 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
+   	                          "create: new metadata handle: %llu does not have capability!\n",
+   	                          llu(s_op->resp.u.create.metafile_handle));
+    }
+
     if (js_p->error_code == 0)
     {
         PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
