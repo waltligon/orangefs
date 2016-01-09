@@ -890,7 +890,7 @@ static int setup_resp(
        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_META_UNSTUFFED;
     }
 
-    if (s_op->resp.u.create.metafile_attrs.capability)
+    if (s_op->resp.u.create.metafile_attrs.capability.op_mask & PINT_CAP_CREATE)
     {
     	s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_CAPABILITY;
     	 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
@@ -901,8 +901,9 @@ static int setup_resp(
     else
     {
    	 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
-   	                          "create: new metadata handle: %llu does not have capability!\n",
-   	                          llu(s_op->resp.u.create.metafile_handle));
+   	                          "create: new metadata handle: %llu does not have capability. Mask is %llu!\n",
+   	                          llu(s_op->resp.u.create.metafile_handle),
+   	                          llu(s_op->resp.u.create.metafile_attrs.capability.op_mask));
     }
 
     if (js_p->error_code == 0)
