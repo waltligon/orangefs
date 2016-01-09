@@ -890,17 +890,19 @@ static int setup_resp(
        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_META_UNSTUFFED;
     }
 
-    if (s_op->resp.u.create.metafile_attrs.capability.op_mask & PINT_CAP_CREATE)
+    if (s_op->resp.u.create.metafile_attrs.capability.op_mask)
     {
-    	s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_CAPABILITY;
-    	 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
-    	                          "create: new metadata handle: %llu has capability!\n",
-    	                          llu(s_op->resp.u.create.metafile_handle));
+
+    	 PINT_ACCESS_DEBUG(s_op, GOSSIP_SERVER_DEBUG,
+    	                          "create: new metadata handle: %llu has capability! Mask is %llu\n",
+       	                          llu(s_op->resp.u.create.metafile_handle),
+       	                          llu(s_op->resp.u.create.metafile_attrs.capability.op_mask));
+    	 s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_CAPABILITY;
 
     }
     else
     {
-   	 PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
+   	 PINT_ACCESS_DEBUG(s_op, GOSSIP_SERVER_DEBUG,
    	                          "create: new metadata handle: %llu does not have capability. Mask is %llu!\n",
    	                          llu(s_op->resp.u.create.metafile_handle),
    	                          llu(s_op->resp.u.create.metafile_attrs.capability.op_mask));
@@ -908,7 +910,7 @@ static int setup_resp(
 
     if (js_p->error_code == 0)
     {
-        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
+        PINT_ACCESS_DEBUG(s_op, GOSSIP_SERVER_DEBUG,
                           "create: new metadata handle: %llu.\n",
                           llu(s_op->resp.u.create.metafile_handle));
     }
