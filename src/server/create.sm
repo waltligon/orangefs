@@ -890,6 +890,8 @@ static int setup_resp(
        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_META_UNSTUFFED;
     }
 
+    s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_CAPABILITY;
+/*
     if (s_op->resp.u.create.metafile_attrs.capability.op_mask)
     {
 
@@ -907,6 +909,7 @@ static int setup_resp(
    	                          llu(s_op->resp.u.create.metafile_handle),
    	                          llu(s_op->resp.u.create.metafile_attrs.capability.op_mask));
     }
+    */
 
     if (js_p->error_code == 0)
     {
