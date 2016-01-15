@@ -198,10 +198,6 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
     if (s_op->target_handle == PVFS_HANDLE_NULL)
     {
         js_p->error_code = 0;
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "(%p) %s (prelude sm) state: target handle is null... "
-                     "skipping.\n", s_op,
-                     PINT_map_server_op_to_string(s_op->req->op));
         return SM_ACTION_COMPLETE;
     }
 
@@ -578,29 +574,17 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 
     /* check capability cache for non-null capabilities */
 #ifdef ENABLE_CAPCACHE
-
+    capcache_hit = 1;
     if (!PINT_capability_is_null(&s_op->req->capability))
     {        
         capcache_hit = (PINT_capcache_lookup(&s_op->req->capability) != NULL);        
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cap cache %s!\n", __func__,
                      (capcache_hit) ? "hit" : "miss");
     }
-    else
-    {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: cap cache: Capability is null!\n", __func__);
-    }
-
+#endif
 
     /* do not verify cap on cache hit */
     ret = (capcache_hit) ? 1 : PINT_verify_capability(&s_op->req->capability);
-#else
-    /* always verify cap */
-    ret = PINT_verify_capability(&s_op->req->capability);
-#endif
-
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s:return from PINT_verify_capability=%d for capability %d\n"
-                                    ,__func__
-                                    ,ret,s_op->req->capability);
 
     /* check operation permissions */
     if (ret)
