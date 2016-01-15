@@ -1157,35 +1157,6 @@ static PINT_sm_action get_capability_cleanup(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    if(s_op->u.unstuff.layout.server_list.servers)
-    {
-        free(s_op->u.unstuff.layout.server_list.servers);
-    }
-    if(s_op->u.unstuff.encoded_layout)
-    {
-        free(s_op->u.unstuff.encoded_layout);
-    }
-    if(s_op->val_a)
-    {
-        free(s_op->val_a);
-    }
-    if(s_op->key_a)
-    {
-        free(s_op->key_a);
-    }
-    if(s_op->error_a)
-    {
-        free(s_op->error_a);
-    }
-
-    PINT_free_object_attr(&s_op->resp.u.getattr.attr);
-    return (server_state_machine_complete(smcb));
-}
 
 
 struct PINT_server_req_params pvfs2_create_params =
