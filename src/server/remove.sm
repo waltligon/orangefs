@@ -66,6 +66,9 @@
  * would be no dirdata dspace.
  */
 
+/* static helper function prototypes */
+static void free_syncer_keyval_buffers(struct PINT_server_op *s_op);
+
 enum
 {
     STATE_TYPE_DIRECTORY = 1,
@@ -422,7 +425,7 @@ static PINT_sm_action remove_verify_object_metadata(
     return SM_ACTION_COMPLETE;
 }
 
-void free_syncer_keyval_buffers(struct PINT_server_op *s_op)
+static void free_syncer_keyval_buffers(struct PINT_server_op *s_op)
 {
     int i = 0;
 
@@ -430,7 +433,7 @@ void free_syncer_keyval_buffers(struct PINT_server_op *s_op)
     {
         if (s_op->val_a)
         {
-            for (i=0; i<s_op->keyval_count; i++)
+            for (i = 0; i < s_op->keyval_count; i++)
             {
                 if (s_op->val_a[i].buffer)
                 {

@@ -2066,12 +2066,12 @@ if test "x$MALLOC_REDEF" = "x1" ; then
    AC_MSG_RESULT([Malloc will be redefined                          : yes])
 else
    AC_MSG_RESULT([Malloc will be redefined                          :  no])
+fi
 
 if test "x$ENABLE_TWOTIER" = "x1" ; then
-   AC_MSG_RESULT([EMC TwoTier code anabled                          : yes])
+   AC_MSG_RESULT([EMC TwoTier code enabled                          : yes])
 else
-   AC_MSG_RESULT([EMC TwoTier code anabled                          :  no])
-fi
+   AC_MSG_RESULT([EMC TwoTier code enabled                          :  no])
 fi
 
 if test "x$BUILD_JNI" = "x1" ; then
