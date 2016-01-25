@@ -47,6 +47,7 @@ ifdef BUILD_SERVER
 		$(DIR)/list-eattr.c \
 		$(DIR)/unexpected.c \
 		$(DIR)/precreate-pool-refiller.c \
+		$(DIR)/ofs-syncer.c \
 		$(DIR)/unstuff.c \
                 $(DIR)/tree-communicate.c \
 		$(DIR)/mgmt-get-uid.c \

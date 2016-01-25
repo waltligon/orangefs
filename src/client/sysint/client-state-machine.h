@@ -551,6 +551,7 @@ struct PINT_server_fetch_config_sm_state
 struct PINT_client_geteattr_sm
 {
     int32_t nkey;
+    int32_t flags;
     PVFS_ds_keyval *key_array;
     PVFS_size *size_array;
     PVFS_sysresp_geteattr *resp_p;

@@ -221,6 +221,7 @@ PVFS_error PVFS_isys_getattr(PVFS_object_ref ref,
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
+    int flag = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_getattr entered\n");
 
@@ -256,12 +257,13 @@ PVFS_error PVFS_isys_getattr(PVFS_object_ref ref,
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle)
                  ,&ref.handle);
-
+    if (attrmask & PVFS_ATTR_SYS_FT_VERSION)
+        flag = PINT_SM_GETATTR_BYPASS_CACHE;
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                ref,
                                PVFS_util_sys_to_object_attr_mask(attrmask),
                                PVFS_TYPE_NONE,
-                               0);
+                               flag);
 
     return PINT_client_state_machine_post(smcb,
                                           op_id,
@@ -349,6 +351,9 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     int ret = -1;
     int attr_status = -1;
     int size_status = -1;
+    int needPromote = (sm_p->getattr.req_attrmask & PVFS_ATTR_PROMOTE) ? 1 : 0;
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: needPromote = %d\n",
+                 __func__, needPromote);
 
     js_p->error_code = 0;
 
@@ -427,7 +432,30 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         js_p->error_code = GETATTR_CACHE_MISS;
         return SM_ACTION_COMPLETE;
     }
+    /* The following code snippet means that OFSC find the 
+     * attribute in cache, however, the cached attribute 
+     * indicate that the target file is a hyperstub 
+     * (mask & PVFS_ATTR_SYS_HYPERSTUB), so we must 
+     * ignore the cached attribute and ask for attribute 
+     * from MDS again since we may need to promote the 
+     * hyperstub. When MDS receive the get attribute request, 
+     * MDS will promote the file and then return 
+     * the attribute again. 
+     * */
+    if ((sm_p->getattr.attr.mask & PVFS_ATTR_SYS_HYPERSTUB) &&
+        needPromote == 1) {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "%s: acache hit: [%llu], but we need to "
+                     "promote the file since it may be a hyperstub\n",
+                     __func__,
+                     llu(object_ref.handle));
+        if (sm_p->getattr.flags & PINT_SM_GETATTR_CAPCACHE_HIT)
+            sm_p->getattr.flags ^= PINT_SM_GETATTR_CAPCACHE_HIT;
 
+        js_p->error_code = GETATTR_CACHE_MISS;
+        return SM_ACTION_COMPLETE;
+    
+    }
     /* acache hit, check results */
 
     /* The sys attr mask request is converted to object

@@ -570,13 +570,25 @@ PVFS_time PINT_util_mktime_version(PVFS_time time)
     PVFS_time version = (time << 32);
 
     gettimeofday(&t, NULL);
+#ifdef TWOTIER
+    /* change usec to second for FT internal version */
+    version |= (PVFS_time)t.tv_sec;
+#else
     version |= (PVFS_time)t.tv_usec;
+#endif
     return version;
 }
 
 PVFS_time PINT_util_mkversion_time(PVFS_time version)
 {
     return (PVFS_time)(version >> 32);
+}
+
+PVFS_time PINT_util_get_ft_version(PVFS_time version)
+{
+    /*  get the lower 32 bit of attribute mtime  */
+    const uint64_t ft_version_mask = 0x00000000ffffffff;
+    return (PVFS_time)(version & ft_version_mask);
 }
 
 struct timespec PINT_util_get_abs_timespec(int microsecs)

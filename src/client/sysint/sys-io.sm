@@ -466,22 +466,28 @@ PVFS_error PVFS_sys_io(PVFS_object_ref ref,
 
 /*******************************************************************/
 
+extern int client_for_syncer;
 static PINT_sm_action io_init(struct PINT_smcb *smcb,
                               job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
-
+    uint32_t mask_val = IO_ATTR_MASKS;
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_init\n", sm_p);
 
     assert((js_p->error_code == 0) ||
            (js_p->error_code == IO_RETRY) ||
            (js_p->error_code == IO_RENEW_CAPABILITY));
+    
+    if (client_for_syncer == 0)
+    {    
+        mask_val |= PVFS_ATTR_PROMOTE;
+    }
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->object_ref,
-                               IO_ATTR_MASKS, 
+                               mask_val, 
                                PVFS_TYPE_METAFILE,
                                0);
        

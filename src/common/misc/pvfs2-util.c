@@ -39,6 +39,7 @@
 #include "pint-util.h"
 #include "security-util.h"
 #include "pvfs-path.h"
+#include "ncache.h"
 
 #if defined(ENABLE_SECURITY_CERT) || defined(ENABLE_SECURITY_KEY)
 #define ENABLE_SECURITY_MODE
@@ -2320,6 +2321,10 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_COMMON_ATIME_SET;
     if(sys_attrmask & PVFS_ATTR_SYS_MTIME_SET)
         attrmask |= PVFS_ATTR_COMMON_MTIME_SET;
+    if (sys_attrmask & PVFS_ATTR_SYS_PROMOTE)
+        attrmask |= PVFS_ATTR_PROMOTE;
+    if (sys_attrmask & PVFS_ATTR_SYS_FT_VERSION)
+        attrmask |= PVFS_ATTR_FT_VERSION;
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "attrmask being passed to server: \n");
@@ -2396,6 +2401,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     if (obj_mask & PVFS_ATTR_DISTDIR_ATTR)
     {
         sys_mask |= PVFS_ATTR_SYS_DISTDIR_ATTR;
+    }
+    if (obj_mask & PVFS_ATTR_HYPERSTUB)
+    {
+        sys_mask |= PVFS_ATTR_SYS_HYPERSTUB;
     }
 
     /* NOTE: the PVFS_ATTR_META_UNSTUFFED is intentionally not exposed
@@ -2540,6 +2549,67 @@ int PVFS_util_resolve_absolute(const char* local_path)
 
     gen_mutex_unlock(&s_stat_tab_mutex);
     return(-PVFS_ENOENT);
+}
+
+/*  
+ *  During DLN unload, an existing stale ncache entry may cause 
+ *  SYNCer fail to get the correct file information 
+ *  (fs_id:handle:ft_ver)
+ *
+ *  In this case, we can simply invalidate the ncache entry.
+ *  @fs_id:      the target file system ID
+ *  @pvfs_path:  path of the target file
+ */
+void PVFS_util_ncache_invalidate(PVFS_fs_id fs_id,
+                                 char* pvfs_path)                  
+{
+    PVFS_object_ref parent;
+    PVFS_object_ref entry_ref;
+    char segbuf[PVFS_NAME_MAX]  = {0};
+    int  ret;
+    int index = 0;
+
+    parent.fs_id = fs_id;
+    parent.handle = 0;
+
+    if (pvfs_path == NULL)
+    {
+        return;
+    }
+
+    ret = PINT_cached_config_get_root_handle(parent.fs_id, 
+                                             &parent.handle);
+    if (ret < 0)
+    {
+        return;
+    }
+
+    ret = PINT_get_path_element(pvfs_path + 1, index, segbuf, PVFS_NAME_MAX);
+    if (ret < 0)
+    {
+        return;
+    }
+
+    index++;
+    while (ret >= 0)
+    {
+        ret = PINT_ncache_get_cached_entry(segbuf, &entry_ref, &parent);
+        PINT_ncache_invalidate(segbuf, &parent);
+        if (ret < 0)
+        {
+            return;
+        }
+        
+        /* Why is this statement here? the value isn't used? WBL */
+        parent = entry_ref;
+        ret = PINT_get_path_element(pvfs_path + 1, index, segbuf, PVFS_NAME_MAX);
+        if (ret < 0) 
+        {
+            return;
+        }
+
+        index++;
+    }
 }
 
 #ifdef DEFINE_MY_GET_NEXT_FSENT

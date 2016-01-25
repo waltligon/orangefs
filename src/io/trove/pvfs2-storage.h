@@ -84,7 +84,8 @@ struct PVFS_ds_attributes_s
     PVFS_uid uid;
     PVFS_gid gid;
     PVFS_permissions mode;
-    int32_t   __pad1;
+    /* used by hyperstub flag */
+    uint32_t   flag;
 
     PVFS_time ctime;
     PVFS_time mtime;
@@ -114,6 +115,7 @@ do {                                                               \
     (__oa)->ctime = (__dsa)->ctime;                                \
     (__oa)->mtime = (__dsa)->mtime;                                \
     (__oa)->atime = (__dsa)->atime;                                \
+    (__oa)->flag  = (__dsa)->flag;                                 \
     (__oa)->objtype = (__dsa)->type;                               \
     (__oa)->u.meta.dfile_count = (__dsa)->u.metafile.dfile_count;  \
     (__oa)->u.meta.dist_size = (__dsa)->u.metafile.dist_size;      \
@@ -128,6 +130,7 @@ do {                                                               \
         (__dsa)->mtime = (__oa)->mtime;                               \
         (__dsa)->atime = (__oa)->atime;                               \
         (__dsa)->type = (__oa)->objtype;                              \
+        (__dsa)->flag = (__oa)->flag;                                 \
         (__dsa)->u.metafile.dfile_count = (__oa)->u.meta.dfile_count; \
         (__dsa)->u.metafile.dist_size = (__oa)->u.meta.dist_size;     \
 } while(0)
@@ -175,6 +178,10 @@ do {                                                           \
         if (((src)->objtype == PVFS_TYPE_METAFILE) &&          \
             ((src)->mask & PVFS_ATTR_META_DFILES))             \
             (dest)->u.meta.dfile_count = (src)->u.meta.dfile_count;\
+    }                                                          \
+    if ((src)->mask & PVFS_ATTR_HYPERSTUB)             \
+    {                                                          \
+        (dest)->flag = (src)->flag;                            \
     }                                                          \
 } while(0)
 

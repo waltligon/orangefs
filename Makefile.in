@@ -106,6 +106,8 @@ TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
 GNUC = @GNUC@
 INTELC = @INTELC@
+TWOTIER_LIB = @TWOTIER_LIB@
+
 # configure default is silent, unless --enable-verbose-build in
 # which case QUIET_COMPILE will _not_ be defined.  Further allow
 # silence to be overriden with "make V=1".
@@ -889,7 +891,7 @@ modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
 # SHORT_NAME and the object
 
 # rule for building the pvfs2 server
-$(SERVER): $(SERVERBINOBJS) lib/libpvfs2-server.a 
+$(SERVER): $(SERVERBINOBJS) lib/libpvfs2-server.a $(TWOTIER_LIB)
 	$(Q) "  LD		$@"
 	$(E)$(LD) $^ -o $@ $(SERVER_LDFLAGS) $(SERVERLIBS)
 
@@ -1003,7 +1005,7 @@ lib/liborangefs.la: lib/liborangefs.a lib/libpvfs2.a
 #	mv lib/libpvfs2.la $@
 
 # rule for building the pvfs2 server library
-lib/libpvfs2-server.a: $(SERVEROBJS)
+lib/libpvfs2-server.a: $(SERVEROBJS) $(TWOTIER_LIB)
 	$(Q) "  RANLIB	$@"
 	$(E)$(INSTALL) -d lib
 	$(E)ar rcs $@ $(SERVEROBJS)

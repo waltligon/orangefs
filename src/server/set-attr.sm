@@ -19,6 +19,8 @@
 #include "pint-uid-map.h"
 #include "pint-cached-config.h"
 #include "dist-dir-utils.h"
+#include "syncer-lru-cache.h"
+#include "ofs-syncer.h"
 
 enum
 {
@@ -465,6 +467,11 @@ static PINT_sm_action setattr_verify_attribs(
     return SM_ACTION_COMPLETE;
 }
 
+/* This needs to be exported from someplace - not a SM file - and
+ * an appropriate header provided - WBL
+ */
+extern struct lru_cache* pcache;
+
 static PINT_sm_action setattr_setobj_attribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -487,6 +494,57 @@ static PINT_sm_action setattr_setobj_attribs(
 
         gossip_debug(GOSSIP_SETATTR_DEBUG, " writing count of %d to "
                      "disk\n", dspace_a_p->u.meta.dfile_count);
+    }
+    
+    if (isStub(dspace_a_p))
+    {
+        /* we don't want to change ft_ver when the file is hyperstub */
+        gossip_debug(GOSSIP_SETATTR_DEBUG, "File %llu is "
+                     " hyperstub and don't update ft_ver\n", 
+                     llu(s_op->req->u.setattr.handle));
+        a_p->mask &= (~PVFS_ATTR_COMMON_MTIME);
+        a_p->mask &= (~PVFS_ATTR_COMMON_MTIME_SET);
+    }
+
+    /* some assertion should be added here */
+    if (a_p->mask & PVFS_ATTR_HYPERSTUB)
+    {
+        if (a_p->objtype != PVFS_TYPE_METAFILE)
+        {
+            gossip_err("Cannot change file type %d to "
+                       "hyperstub\n",
+                        a_p->objtype);
+        } else {
+            gossip_debug(GOSSIP_SETATTR_DEBUG, "File %llu is set "
+                         "to hyperstub\n", 
+                          llu(s_op->req->u.setattr.handle));
+            if (isStub(dspace_a_p))
+            {
+                gossip_debug(GOSSIP_SETATTR_DEBUG, "File %llu has "
+                             "been set to hyperstub\n", 
+                              llu(s_op->req->u.setattr.handle));
+            } else {
+                setStub(a_p);
+                /* when load DLN / untar a tarball, we re-generate
+                 * FT files with new FT version, since the FT version is
+                 * based on timestamp (the unit is second), if users write
+                 * the file within 1 second after DLN load, we may not be
+                 * able to distinguish whether write operation is performed 
+                 * , so we minus the FT version by one second when setting a
+                 * file to hyperstub.
+                 */
+                PVFS_time prev_mtime = dspace_a_p->mtime;
+                dspace_a_p->mtime = dspace_a_p->mtime - 1;
+                gossip_debug(GOSSIP_SETATTR_DEBUG, 
+                            "File %llu, old ft "
+                            "version is %llu, new ft_version is %llu,"
+                            " mask is %u\n", 
+                            llu(s_op->req->u.setattr.handle),
+                            llu(prev_mtime), llu(dspace_a_p->mtime),
+                            a_p->mask);
+
+            }
+        }
     }
     /* 
      * Remember that mtime is versioned on disk! so convert it here..
@@ -534,19 +592,38 @@ static PINT_sm_action setattr_setobj_attribs(
       pvfs2-storage.h
     */
     PVFS_object_attr_overwrite_setable(dspace_a_p, a_p);
+    /* We update LRU list here since we can guarantee ft_ver
+     * has been updated correctly, SYNCer will persist the file
+     * in the future.
+     *
+     * Note: We don't want to promote a hyperstub since it may corrupt
+     * the file.
+     */
+    if ((a_p->mask & PVFS_ATTR_COMMON_MTIME) && 
+        (a_p->objtype == PVFS_TYPE_METAFILE) && 
+        !isStub(dspace_a_p))
+    {
+            gossip_debug(GOSSIP_SETATTR_DEBUG, "File %llu is changed "
+                         "and must be persisted\n", 
+                          llu(s_op->req->u.setattr.handle));
+            PVFS_ft_ver ft_ver = PINT_util_get_ft_version(dspace_a_p->mtime);
+            issue_syncer_abort_request(s_op->req->u.setattr.fs_id,
+                                       s_op->req->u.setattr.handle,
+                                       ft_ver);
+    }
 
     gossip_debug(
         GOSSIP_SETATTR_DEBUG,
         "  WRITING attrs: [owner = %d, group = %d\n\t"
         "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
         "ctime = %llu | dfile_count = %d | dist_size = %d\n\t"
-        "handle = %llu | S = %p | mask = %d]\n",
+        "handle = %llu | S = %p | flag = %d | mask = %d]\n",
         dspace_a_p->owner, dspace_a_p->group, dspace_a_p->perms,
         dspace_a_p->objtype, llu(dspace_a_p->atime),
         llu(PINT_util_mkversion_time(dspace_a_p->mtime)), llu(dspace_a_p->ctime),
         (int)dspace_a_p->u.meta.dfile_count,
         (int)dspace_a_p->u.meta.dist_size,
-        llu(s_op->req->u.setattr.handle), s_op, a_p->mask);
+        llu(s_op->req->u.setattr.handle), s_op, dspace_a_p->flag, a_p->mask);
 
     /* translate attrs to storage attr format */
     ds_attr = &(s_op->ds_attr);

@@ -112,6 +112,8 @@ static int seteattr_verify_eattribs(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i; 
+    static const char* two_tiers_str = "user.two_tiers.";
+    int two_tier_str_len = strlen(two_tiers_str);
 
     gossip_debug(GOSSIP_MIRROR_DEBUG,"Current Frame Pointer in set-eattr.sm "
                                      "is %p.\n",s_op);       
@@ -177,7 +179,17 @@ static int seteattr_verify_eattribs(
         {
             return SM_ACTION_COMPLETE;
         }
-
+        
+        if (strncmp((char*)s_op->req->u.seteattr.key[i].buffer,
+                    two_tiers_str, two_tier_str_len) == 0 && 
+            (s_op->req->u.seteattr.flags & PVFS_XATTR_2TIER) == 0) {
+            gossip_debug(GOSSIP_MIRROR_DEBUG
+                    ,"\tkey:%s, two tiers attribute can only be"
+                    " set by MDS\n"
+                    ,(char *)s_op->req->u.seteattr.key[i].buffer);
+            js_p->error_code = -PVFS_EINVAL;
+            return SM_ACTION_COMPLETE;
+        }
     } /*end for*/
 
 

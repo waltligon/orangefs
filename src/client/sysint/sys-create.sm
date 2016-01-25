@@ -137,6 +137,7 @@ machine pvfs2_client_create_sm
 
 %%
 
+extern int client_for_syncer;
 /** Initiate creation of a file with a specified distribution.
  */
 PVFS_error PVFS_isys_create(
@@ -225,6 +226,13 @@ PVFS_error PVFS_isys_create(
     sm_p->u.create.object_name = object_name;
     sm_p->u.create.create_resp = resp;
     PINT_CONVERT_ATTR(&sm_p->u.create.attr, &attr, PVFS_ATTR_META_ALL);
+    /* When DLN is load and we untar the tarball, we will create 
+     * hyperstub for all files, in this case, MDS don't want to 
+     * re-generate OID by calling abort operation to SYNCer.
+     */
+    if (client_for_syncer == 1) {
+        sm_p->u.create.attr.mask |= PVFS_ATTR_HYPERSTUB;
+    }
 
     /* save the original attribute passed in. since create does it's own
      * retries we need the original attribute available on retries */

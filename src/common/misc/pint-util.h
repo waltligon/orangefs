@@ -59,6 +59,14 @@ do{                                                     \
         (dest)->objtype = (src)->objtype;               \
         (dest)->mask |= PVFS_ATTR_COMMON_TYPE;          \
     }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_HYPERSTUB)          \
+    {                                                   \
+        (dest)->mask |= PVFS_ATTR_HYPERSTUB;            \
+    }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_FT_VERSION)         \
+    {                                                   \
+        (dest)->mask |= PVFS_ATTR_FT_VERSION;           \
+    }                                                   \
     (dest)->mask |= (extra_amask);                      \
 }while(0)
 
@@ -150,6 +158,7 @@ void PINT_util_get_current_timeval(struct timeval *tv);
 int PINT_util_get_timeval_diff(struct timeval *tv_start, struct timeval *tv_end);
 void PINT_util_parse_timeval(struct timeval tv, char *str);
 
+PVFS_time PINT_util_get_ft_version(PVFS_time version);
 PVFS_time PINT_util_mktime_version(PVFS_time time);
 PVFS_time PINT_util_mkversion_time(PVFS_time version);
 

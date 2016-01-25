@@ -222,6 +222,12 @@ void job_desc_q_dump(job_desc_q_p jdqp)
 	case JOB_PRECREATE_POOL:
 	    gossip_err("    type: JOB_PRECREATE_POOL.\n");
 	    break;
+	case JOB_SYNCER_PROMOTE:
+	    gossip_err("    type: JOB_SYNCER promotion.\n");
+	    break;
+	case JOB_SYNCER_DELETE:
+	    gossip_err("    type: JOB_SYNCER delete.\n");
+	    break;
 	}
     }
 

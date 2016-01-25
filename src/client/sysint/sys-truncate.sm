@@ -101,6 +101,7 @@ machine pvfs2_client_truncate_sm
 
 %%
 
+extern int client_for_syncer;
 /** Initiate resizing of a file.
  */
 PVFS_error PVFS_isys_truncate(
@@ -148,10 +149,32 @@ PVFS_error PVFS_isys_truncate(
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
 
+    uint32_t property = (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_CAPABILITY);
+    
+    if (client_for_syncer == 0) {
+        /* if we want to truncate the file size to 0, 
+         * we don't need to promote hyperstub
+         */
+        if (size > 0)
+            property |= PVFS_ATTR_PROMOTE;
+        else if (size == 0) 
+            property |= PVFS_ATTR_CLEAR_HYPERSTUB;
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "SYNCer not enabled PVFS_sys_truncate "
+                 "entered with %lld, property %u\n", 
+                 lld(size), property);
+    } else {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "SYNCer enabled !!! PVFS_sys_truncate "
+                 "entered with %lld, property %u\n", 
+                 lld(size), property);
+    }
+
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_CAPABILITY,
+        property,
         PVFS_TYPE_METAFILE,
         PINT_SM_GETATTR_BYPASS_CACHE);
 

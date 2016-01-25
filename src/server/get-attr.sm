@@ -35,6 +35,7 @@
 #include "pint-uid-map.h"
 #include "check.h"
 #include "capcache.h"
+#include "ofs-syncer.h"
 
 #if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
 #define ENABLE_SECURITY_MODE
@@ -69,6 +70,7 @@ enum
     SKIP_NEXT_STATE  = 13,
     STATE_CAPABILITY = 14,
     STATE_DIRDATA    = 15,
+    STATE_HYPERSTUB  = 16,
 };
 
 static void free_nested_getattr_data(struct PINT_server_op *s_op);
@@ -103,7 +105,22 @@ nested machine pvfs2_get_attr_work_sm
     state interpret_metafile_hint
     {
         run getattr_interpret_metafile_hint;
-        STATE_METAFILE => read_metafile_datafile_handles_if_required;
+        STATE_HYPERSTUB => convert_hyperstub_to_normal_if_required;
+        STATE_METAFILE  => read_metafile_datafile_handles_if_required;
+        default => check_if_capability_required;
+    }
+    
+    state convert_hyperstub_to_normal_if_required
+    {
+        run getattr_convert_hyperstub_to_normal_if_required;
+        success => clear_hyperstub_flag;
+        default => check_if_capability_required;
+    }
+
+    state clear_hyperstub_flag
+    {
+        run getattr_clear_hyperstub_flag;
+        success => read_metafile_datafile_handles_if_required;
         default => check_if_capability_required;
     }
 
@@ -342,9 +359,28 @@ static PINT_sm_action getattr_verify_attribs(
             llu(s_op->attr.mtime), llu(resp_attr->mtime));
     }
 
-    resp_attr->ctime = s_op->attr.ctime;
+    /* When unload DLN, MDS need to tell SYNCer|tar daemon the real file 
+     * FT version, the following snippet is used to return the ft_ver. 
+     */
+    if (s_op->req->u.getattr.attrmask & PVFS_ATTR_FT_VERSION) {
+        gossip_debug(
+            GOSSIP_GETATTR_DEBUG, "The ft_ver is %llu, mtime is %llu\n",
+                        llu(PINT_util_get_ft_version(s_op->attr.mtime)), 
+                        llu(resp_attr->mtime));
+        resp_attr->ctime = PINT_util_get_ft_version(s_op->attr.mtime);
+    } else {
+        resp_attr->ctime = s_op->attr.ctime;
+    }
+
     resp_attr->mask = s_op->attr.mask;
     resp_attr->objtype = s_op->attr.objtype;
+    resp_attr->flag = s_op->attr.flag;
+    if (isStub(&s_op->attr)) {
+        gossip_debug(
+        GOSSIP_GETATTR_DEBUG, " zhangs7 found a hyperstub file\n");
+        resp_attr->mask |= PVFS_ATTR_HYPERSTUB;
+    }
+
     if (s_op->attr.objtype == PVFS_TYPE_METAFILE)
     {
        resp_attr->u.meta.dfile_count = s_op->attr.u.meta.dfile_count;
@@ -608,7 +644,21 @@ static PINT_sm_action getattr_interpret_metafile_hint(
         {
             gossip_debug(GOSSIP_GETATTR_DEBUG, " * client wants extra "
                          "meta info, about to retrieve it now\n");
-            js_p->error_code = STATE_METAFILE;
+            /* For hyperstub, we need to convert it to normal file */
+            if (!isStub(&s_op->attr))
+                gossip_debug(GOSSIP_GETATTR_DEBUG, "not a hyperstub\n");
+            if (!(s_op->u.getattr.attrmask & PVFS_ATTR_PROMOTE))
+                gossip_debug(GOSSIP_GETATTR_DEBUG, "don't need to promote\n");
+
+            if (isStub(&s_op->attr) && 
+                ((s_op->req->u.getattr.attrmask & PVFS_ATTR_CLEAR_HYPERSTUB) ||
+                (s_op->req->u.getattr.attrmask & PVFS_ATTR_PROMOTE))) {
+                gossip_debug(GOSSIP_GETATTR_DEBUG, " zhangs7 should promote cur file\n");
+                js_p->error_code = STATE_HYPERSTUB;
+            } else {
+                js_p->error_code = STATE_METAFILE;
+            }
+
             if ( (resp_attr->mask  & PVFS_ATTR_META_MIRROR_DFILES) && 
                 !(meta->hint.flags & PVFS_MIRROR_FL) ) 
                   resp_attr->mask &= ~(PVFS_ATTR_META_MIRROR_DFILES);
@@ -673,6 +723,105 @@ static PINT_sm_action getattr_read_metafile_hint(
         0, 
         NULL, smcb, 0, js_p,
         &i, server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+static PINT_sm_action getattr_convert_hyperstub_to_normal_if_required(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = 0;
+
+    assert(s_op->attr.objtype == PVFS_TYPE_METAFILE);
+    assert(isStub(&s_op->resp.u.getattr.attr) && ( 
+           (s_op->u.getattr.attrmask & PVFS_ATTR_PROMOTE) || 
+           (s_op->u.getattr.attrmask & PVFS_ATTR_CLEAR_HYPERSTUB)));
+
+
+    js_p->error_code = 0;
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     "enter getattr_convert_hyperstub_to_normal_if_required %llu\n",
+                     llu(s_op->u.getattr.handle));
+    /* if we don't need to fill in the dfiles, skip them */
+    if (!(s_op->u.getattr.attrmask & PVFS_ATTR_META_DFILES))
+    {
+        gossip_debug(GOSSIP_GETATTR_DEBUG, "skipping data handle read\n");
+        return SM_ACTION_COMPLETE;
+    }
+    
+    if (isStub(&s_op->attr) && 
+        (s_op->req->u.getattr.attrmask & PVFS_ATTR_CLEAR_HYPERSTUB)) {
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     "Need to clear hyperstub flag for file %llu\n",
+                     llu(s_op->u.getattr.handle));
+        return SM_ACTION_COMPLETE;
+    }
+        
+    /* We're trying to operate a hyperstub file, should ask
+     * SYNCer to promote it before returning the file attribute
+     */
+    if (isStub(&s_op->resp.u.getattr.attr) && 
+        (s_op->u.getattr.attrmask & PVFS_ATTR_PROMOTE)) {
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     "Need to promote file %llu\n",
+                     llu(s_op->u.getattr.handle));
+        /* Call SYNCer to promote the file here */
+        ret = job_syncer_promote_file(s_op->req->u.getattr.fs_id,
+                                      s_op->u.getattr.handle,
+                                      smcb, js_p, server_job_context,
+                                      syncer_promote_file_async,
+                                      syncer_query);
+        if (ret != 0) {
+            gossip_err("Failed to promote file ("
+                       "fsid(%d) handle(%llu) error(%d)\n",
+                        s_op->req->u.getattr.fs_id, 
+                        llu(s_op->u.getattr.handle), 
+                        ret);
+            /* If we cannot promote the file, we cannot proceed
+             * any IO operation
+             */
+            js_p->error_code = -PVFS_EIO;
+            return SM_ACTION_COMPLETE;
+        } else {
+            return 0;
+        }
+    } else {
+        return SM_ACTION_COMPLETE;
+    }
+}
+
+static PINT_sm_action getattr_clear_hyperstub_flag(
+                      struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t i;
+    int      ret;
+
+    /* After SYNCer promote the file, we should eliminate the
+     * hyperstub flag but we shouldn't update the version here 
+     */
+    // Not sure I must retrive the version here
+    clearStub(&s_op->ds_attr);
+    clearStub(&s_op->resp.u.getattr.attr);
+    s_op->resp.u.getattr.attr.mask &= 0xFFFFFFFE;
+
+    ret = job_trove_dspace_setattr(
+        s_op->req->u.getattr.fs_id, s_op->u.getattr.handle,
+        &s_op->ds_attr, 
+        TROVE_SYNC,
+        smcb, 0, js_p, &i, server_job_context, s_op->req->hints);
+    if (ret != 0) {
+        gossip_err("Failed to convert hyperstub to "
+                   "normal fsid(%d) file(%llu) error(%d)\n",
+                    s_op->req->u.getattr.fs_id, llu(s_op->u.getattr.handle), ret);
+    
+    } else {
+        gossip_debug(GOSSIP_GETATTR_DEBUG, "Succeed to convert hyperstub to "
+                                           "normal fsid(%d) file(%llu)\n",
+                                           s_op->req->u.getattr.fs_id, 
+                                           llu(s_op->u.getattr.handle));
+    }
 
     return ret;
 }
@@ -1465,6 +1614,16 @@ static PINT_sm_action getattr_create_capability(
     if ((resp_attr->objtype == PVFS_TYPE_METAFILE) &&
         (resp_attr->mask & PVFS_ATTR_META_DFILES))
     {
+        if (resp_attr->u.meta.dfile_array == NULL) {
+            gossip_err("getattr create capability, data file array is NULL"
+                       "normal fsid(%d) file(%llu) \n",
+                       s_op->req->u.getattr.fs_id, llu(s_op->u.getattr.handle));
+            resp_attr->mask &= ~PVFS_ATTR_META_DIST;
+            resp_attr->mask &= ~PVFS_ATTR_META_DFILES;
+            resp_attr->mask &= ~PVFS_ATTR_META_MIRROR_DFILES;
+            return SM_ACTION_COMPLETE;
+        }
+
         /* copy datafile handles after the metafile handle */
         memcpy((resp_attr->capability.handle_array + 1),
                resp_attr->u.meta.dfile_array,

@@ -18,6 +18,7 @@
 #include "pint-perf-counter.h"
 #include "pint-security.h"
 #include "pint-uid-map.h"
+#include "syncer-lru-cache.h"
 
 #define REPLACE_DONE 100
 
@@ -812,6 +813,23 @@ static PINT_sm_action setattr_setobj_attribs(
     /* translate attrs to storage attr format */
     ds_attr = &(s_op->ds_attr);
     PVFS_object_attr_to_ds_attr(dspace_a_p, ds_attr);
+    /* 
+     * When normal client (rather than SYNCer) create a new file, 
+     * we need to notify SYNCer to generate the CT OID.
+     * If the create request is sent by tar, we don't need to call
+     * abort operation.
+     */
+
+    if (dspace_a_p->objtype == PVFS_TYPE_METAFILE && 
+        (s_op->req->u.create.attr.mask & PVFS_ATTR_HYPERSTUB) == 0) { 
+        gossip_debug(GOSSIP_SERVER_DEBUG, "file %llu is created"
+                                       "and must be persisted\n", 
+                             llu(s_op->resp.u.create.metafile_handle));
+        PVFS_ft_ver ft_ver = PINT_util_get_ft_version(dspace_a_p->mtime);
+        issue_syncer_abort_request(s_op->req->u.create.fs_id,
+                                   s_op->resp.u.create.metafile_handle,
+                                   ft_ver);
+    }
 
     ret = job_trove_dspace_setattr(
         s_op->req->u.create.fs_id, s_op->resp.u.create.metafile_handle,

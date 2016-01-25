@@ -108,6 +108,8 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
 
 int32_t PVFS_util_translate_mode(int mode, int suid);
 
+void PVFS_util_ncache_invalidate(PVFS_fs_id fs_id,
+                                 char* pvfs_path);
 #endif /* __PVFS2_UTIL_H */
 
 /*

@@ -918,6 +918,20 @@ test_for_fuse()
   fi
 }
 
+dnl option to include 2tier specific code and link the 2tier libs
+AC_ARG_ENABLE(twotier,
+[  --enable-twotier=<path> enables EMC 2tier code and indicates the lib path],
+[
+if test "xenableval" != "xyes" ; then
+    dnl check for presence of library
+    ENABLE_TWOTIER=1
+    AC_DEFINE(TWOTIER, 1, [Should we include code for twotier.])
+    TWOTIER_LIB="$enableval"
+    AC_SUBST(TWOTIER_LIB)
+fi
+],
+)
+
 dnl FUSE component
 AC_ARG_ENABLE(fuse,
 [  --enable-fuse           **EXPERIMENTAL** Enables FUSE component],
@@ -2052,6 +2066,12 @@ if test "x$MALLOC_REDEF" = "x1" ; then
    AC_MSG_RESULT([Malloc will be redefined                          : yes])
 else
    AC_MSG_RESULT([Malloc will be redefined                          :  no])
+
+if test "x$ENABLE_TWOTIER" = "x1" ; then
+   AC_MSG_RESULT([EMC TwoTier code anabled                          : yes])
+else
+   AC_MSG_RESULT([EMC TwoTier code anabled                          :  no])
+fi
 fi
 
 if test "x$BUILD_JNI" = "x1" ; then

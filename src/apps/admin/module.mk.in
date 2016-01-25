@@ -28,6 +28,9 @@ ADMINSRC := \
 	$(DIR)/pvfs2-perror.c \
 	$(DIR)/pvfs2-check-server.c \
 	$(DIR)/pvfs2-drop-caches.c \
+	$(DIR)/pvfs2-io.c \
+	$(DIR)/pvfs2-sethyperstub.c \
+	$(DIR)/pvfs2-get-ft-version.c \
 	$(DIR)/pvfs2-get-uid.c
 
 ifdef ENABLE_SECURITY_KEY

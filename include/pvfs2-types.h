@@ -153,6 +153,8 @@ typedef int32_t PVFS_fs_id;
 typedef uint64_t PVFS_ds_position;
 typedef int32_t PVFS_ds_flags;
 
+/* 2T system file ft version */
+typedef uint32_t PVFS_ft_ver;
 
 #define encode_PVFS_handle encode_uint64_t
 #define decode_PVFS_handle decode_uint64_t
@@ -412,6 +414,9 @@ typedef struct
 } PVFS_ds_keyval_handle_info;
 
 /* attribute masks used by system interface callers */
+#define PVFS_ATTR_SYS_FT_VERSION            (1 << 17)
+#define PVFS_ATTR_SYS_HYPERSTUB             (1 << 18)
+#define PVFS_ATTR_SYS_PROMOTE               (1 << 19)
 #define PVFS_ATTR_SYS_SIZE                  (1 << 20)
 #define PVFS_ATTR_SYS_DISTDIR_ATTR          (1 << 21)
 #define PVFS_ATTR_SYS_LNK_TARGET            (1 << 24)
@@ -435,13 +440,14 @@ typedef struct
  PVFS_ATTR_SYS_PERM  | PVFS_ATTR_SYS_ATIME | \
  PVFS_ATTR_SYS_CTIME | PVFS_ATTR_SYS_MTIME | \
  PVFS_ATTR_SYS_TYPE)
-
+/* add hyperstub flag here for getting version */
 #define PVFS_ATTR_SYS_ALL                    \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
  PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
  PVFS_ATTR_SYS_DISTDIR_ATTR | \
- PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
+ PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE| \
+ PVFS_ATTR_SYS_HYPERSTUB|PVFS_ATTR_SYS_PROMOTE|PVFS_ATTR_SYS_FT_VERSION)
 #define PVFS_ATTR_SYS_ALL_NOHINT                \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
@@ -457,11 +463,13 @@ typedef struct
 #define PVFS_ATTR_SYS_ALL_SETABLE \
 (PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
 #define PVFS_ATTR_SYS_ALL_TIMES \
-((PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) | PVFS_ATTR_SYS_ATIME_SET | PVFS_ATTR_SYS_MTIME_SET)
+((PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) | PVFS_ATTR_SYS_ATIME_SET | \
+  PVFS_ATTR_SYS_MTIME_SET | PVFS_ATTR_SYS_HYPERSTUB)
 
 /* Extended attribute flags */
 #define PVFS_XATTR_CREATE  0x1
 #define PVFS_XATTR_REPLACE 0x2
+#define PVFS_XATTR_2TIER   0x4
 
 /** statfs and misc. server statistic information. */
 typedef struct

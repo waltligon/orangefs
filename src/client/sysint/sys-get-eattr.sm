@@ -58,6 +58,7 @@ machine pvfs2_client_get_eattr_sm
 
 %%
 
+extern int client_for_syncer;
 PVFS_error PVFS_isys_geteattr_list(
         PVFS_object_ref ref,
         const PVFS_credential *credential,
@@ -98,6 +99,13 @@ PVFS_error PVFS_isys_geteattr_list(
     sm_p->u.geteattr.nkey = nkey;
     sm_p->u.geteattr.key_array = key_array;
     sm_p->u.geteattr.resp_p = resp_p;
+    /* only MDS can update the two tiers related attributes */
+    if (client_for_syncer == 1) {
+        sm_p->u.geteattr.flags = PVFS_XATTR_2TIER;
+    } else {
+        sm_p->u.geteattr.flags = 0;
+    }
+
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
@@ -187,6 +195,7 @@ static PINT_sm_action get_eattr_setup_msgpair(
         capability,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
+        sm_p->u.geteattr.flags,
         sm_p->u.geteattr.nkey,
         sm_p->u.geteattr.key_array,
         sm_p->u.geteattr.size_array,

@@ -27,6 +27,7 @@
 #include "id-generator.h"
 #include "job-time-mgr.h"
 #include "pvfs2-internal.h"
+#include "ncac-list.h"
 
 /* contexts for use within the job interface */
 static bmi_context_id global_bmi_context = -1;
@@ -5101,6 +5102,12 @@ static void fill_status(struct job_desc *jd,
         status->position = jd->u.precreate_pool.pool_index << 32;
         status->position |= jd->u.precreate_pool.position;
         break;
+    case JOB_SYNCER_DELETE:
+        status->error_code = jd->u.syncer.error_code;
+        break;
+    case JOB_SYNCER_PROMOTE:
+        status->error_code = jd->u.syncer.error_code;
+        break;
     }
 
     return;
@@ -6336,6 +6343,441 @@ static struct fs_pool* find_fs(PVFS_fs_id fsid)
     return(NULL);
 }
 
+typedef struct {
+    PVFS_fs_id         fs_id;
+    PVFS_handle        handle;
+    void*              user_ptr; /* point the syncer job */
+    char*              oid;      /* point to CT oid */
+    struct qlist_head  link;
+} syncer_queued_op_t;
+
+/* list and spin lock for storing the syncer cookies */
+pthread_spinlock_t           spin_cookie_lock;
+struct qlist_head            cookie_queue;
+
+typedef struct {
+    struct job_desc*  pJob;
+    char*      cookie;
+    /* update after we send out a query to syncer */
+    struct timeval timestamp;
+    /* a list syncer which syncer is serving the promotion */
+    struct qlist_head link;
+} syncer_cookie;
+
+typedef struct {
+    /* should be initialize by syncer thread */
+    struct qlist_head            queue;  /* syncer request queue */
+    gen_mutex_t                  lock;
+}syncer_context;
+
+syncer_context global_syncer_context;
+pthread_cond_t syncer_op_incoming_cond = PTHREAD_COND_INITIALIZER;
+pthread_t      syncer_promotion_thread;
+pthread_t      syncer_query_thread;
+
+void syncer_queue(syncer_queued_op_t* pRequest) {
+    gen_mutex_lock(&global_syncer_context.lock);
+    qlist_add_tail(&pRequest->link, &global_syncer_context.queue);
+
+    /*
+     * wake up our operation thread if it's sleeping to let
+     * it know that a new op is available for servicing
+     */
+    pthread_cond_signal(&syncer_op_incoming_cond);
+    gen_mutex_unlock(&global_syncer_context.lock);
+}
+
+ /* 
+ * alloc a syncer queued request for hyperstub
+ * promotion.
+ * returns valid request pointer on success, 
+ * and NULL on failure (due to no memory)
+ */
+syncer_queued_op_t* 
+syncer_queued_op_alloc(PVFS_fs_id     fs_id,
+                       PVFS_handle    handle,
+                       void*          user_ptr,
+                       const char*    oid)
+{
+    syncer_queued_op_t* pRequest = (syncer_queued_op_t*)
+                                    malloc(sizeof(syncer_queued_op_t));
+    if (pRequest == NULL) {
+        return NULL;
+    }
+
+    INIT_QLIST_HEAD(&pRequest->link);
+    pRequest->fs_id = fs_id;
+    pRequest->handle = handle;
+    pRequest->user_ptr = user_ptr;
+    if (oid == NULL) {
+        pRequest->oid = NULL;
+    } else {
+        pRequest->oid = strdup((char*)oid);
+        if (pRequest->oid == NULL) {
+            free(pRequest);
+            pRequest = NULL;
+        }
+    }
+
+    return pRequest;
+}
+
+int syncer_issue_delete(PVFS_fs_id fs_id,
+                        PVFS_handle handle,
+                        const char* oid,
+                        struct job_desc *jd) {
+    syncer_queued_op_t* pRequest = NULL;
+
+    pRequest = syncer_queued_op_alloc(fs_id, handle, 
+                                      jd, oid);
+
+    if (pRequest == NULL)
+        return -1;
+    
+    syncer_queue(pRequest);
+    return 0;                                  
+}
+
+int syncer_issue_promotion(PVFS_fs_id fs_id,
+                           PVFS_handle handle,
+                           struct job_desc *jd) {
+    syncer_queued_op_t* pRequest = NULL;
+
+    pRequest = syncer_queued_op_alloc(fs_id, handle, jd, NULL);
+
+    if (pRequest == NULL)
+        return -1;
+    
+    syncer_queue(pRequest);
+    return 0;                                  
+}
+
+/* job_syncer_delete_file()
+ *
+ * issue a request to syncer which will delete the CT file
+ * according to the fs_id/handle/oid
+ *
+ * returns 0 on success, and -errno on failure
+ */
+int job_syncer_delete_file (PVFS_fs_id     fs_id,
+                            PVFS_handle    handle,
+                            const char*    oid,
+                            void*          user_ptr,
+                            job_context_id context_id,
+                            job_status_s*  out_status_p,
+                            delete_func    fn)
+{
+    /* post a sync promotion request. We need to  queue
+     * up a job desc structure.
+     */
+
+    int ret = -1;
+    struct job_desc *jd = NULL;
+    /* TODO  not needed? */
+    // void* user_ptr_internal GCC_UNUSED;
+
+    /* create the job desc first */
+    jd = alloc_job_desc(JOB_SYNCER_DELETE);
+    if (!jd)
+    {
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+
+    jd->u.syncer.delete_func = fn;
+    jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
+    ret = syncer_issue_delete(fs_id, handle, oid, jd);
+
+    if (ret < 0)
+    {
+        /* error posting syncer operation */
+        dealloc_job_desc(jd);
+        jd = NULL;
+        out_status_p->error_code = ret;
+        return 1;
+    }
+    
+    /* TODO need some counter for debugging */
+    return 0;
+}
+/* job_syncer_promote_file()
+ *
+ * issue a request to syncer which will promote the hyperstub
+ *
+ * returns 0 on success, and -errno on failure
+ */
+int job_syncer_promote_file (PVFS_fs_id  fs_id,
+                             PVFS_handle handle,
+                             void*       user_ptr,
+                             job_status_s* out_status_p,
+                             job_context_id context_id,
+                             svc_func    fn,
+                             query_func  query_fn)
+{
+    /* post a sync promotion request. We need to  queue
+     * up a job desc structure.
+     */
+
+    int ret = -1;
+    struct job_desc *jd = NULL;
+    /* TODO  not needed? */
+    // void* user_ptr_internal GCC_UNUSED;
+
+    /* create the job desc first */
+    jd = alloc_job_desc(JOB_SYNCER_PROMOTE);
+    if (!jd)
+    {
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+
+    jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
+    jd->u.syncer.svc_func = fn;
+    jd->u.syncer.query_func = query_fn;
+    ret = syncer_issue_promotion(fs_id, handle, jd);
+
+    if (ret < 0)
+    {
+        /* error posting syncer operation */
+        dealloc_job_desc(jd);
+        jd = NULL;
+        out_status_p->error_code = ret;
+        return 1;
+    }
+    
+    /* TODO need some counter for debugging */
+    return 0;
+}
+
+int syncer_thread_running = 0;
+int need_query(struct timeval now, struct timeval prev) {
+    time_t diff = now.tv_sec - prev.tv_sec;
+    const  int step = 1e6;
+    const  int interval = 1e5; /* 100 ms */
+
+    if (diff > 1 || (diff >= 0 &&  
+        diff * step + now.tv_usec - prev.tv_usec >= interval)) {
+        return 1;
+    }
+
+    return 0;
+}
+
+void* syncer_promotion_query_function(void *ptr) {
+    syncer_cookie* pCookie = NULL;
+    int ret = 0;
+    struct timeval now;
+    struct job_desc* jd = NULL;
+    int    issue_query  = 0;
+    const  int sleep_interval = 15000; /* 15 ms */
+
+    while(syncer_thread_running == 1) {
+        if (qlist_empty(&cookie_queue)) {
+            usleep(sleep_interval);
+            continue;
+        }
+        
+        issue_query = 0;
+        qlist_for_each_entry(pCookie, &cookie_queue, link)
+        {
+            gettimeofday(&now, NULL);
+            jd = pCookie->pJob;
+
+            if (need_query(now, pCookie->timestamp)) {
+                issue_query++;
+                ret = jd->u.syncer.query_func(pCookie->cookie);
+                gossip_debug(GOSSIP_SERVER_DEBUG, "Syncer promotion "
+                                                  "status , "
+                                                  "ret %d, cookies %s.\n", 
+                                                  ret, pCookie->cookie);
+            } else
+                continue;
+
+            if (ret == 1 || ret == 2) {
+                pCookie->timestamp = now;
+            } else {
+                jd->completed_flag = 1;
+                if (ret == 0)
+                    jd->u.syncer.error_code = 0;  
+                else 
+                    jd->u.syncer.error_code = SM_ERROR;
+                if (ret != 0) {
+                    gossip_err("Syncer promotion failed, "
+                               "ret %d.\n", ret);
+                }
+
+                gen_mutex_lock(&completion_mutex);
+                job_desc_q_add(completion_queue_array[jd->context_id], jd);
+                gen_mutex_unlock(&completion_mutex);
+                
+                pthread_spin_lock(&spin_cookie_lock);
+                qlist_del(&pCookie->link);
+                pthread_spin_unlock(&spin_cookie_lock);
+
+                free(pCookie->cookie);
+                free(pCookie);
+                break;
+            }
+        }
+
+        if (issue_query == 0)
+            usleep(sleep_interval);
+    }
+
+    return ptr;
+}
+
+void* syncer_promotion_thread_function(void *ptr)
+{
+    /*struct timeval base;
+    struct timespec wait_time;*/
+    int    op_queued_empty;
+    int    ret = 0;
+    int    tmpcount = 0;
+    gossip_debug(GOSSIP_SERVER_DEBUG, "syncer_promotion_thread started\n");
+
+    while(syncer_thread_running == 1)
+    {
+        /* check if we any have ops to service in our work queue */
+        gen_mutex_lock(&global_syncer_context.lock);
+        op_queued_empty = qlist_empty(&global_syncer_context.queue);
+
+        if (!op_queued_empty)
+        {
+            struct qhash_head* tmplink = global_syncer_context.queue.next;
+            qlist_del(tmplink);
+
+            syncer_queued_op_t* pRequest = list_entry(tmplink, 
+                                               syncer_queued_op_t, link);
+            gen_mutex_unlock(&global_syncer_context.lock);
+            struct job_desc *jd = (struct job_desc*)pRequest->user_ptr;
+            if (jd->type == JOB_SYNCER_PROMOTE) {
+                syncer_cookie* pCookie = (syncer_cookie*)malloc(sizeof(syncer_cookie));
+                /* no memory case */
+                if (pCookie == NULL) {
+                    ret = -2;
+                    goto complete;
+                }
+    
+                memset(pCookie, 0, sizeof(syncer_cookie));
+                pCookie->pJob = jd;
+                gettimeofday(&pCookie->timestamp, NULL);
+                INIT_QLIST_HEAD(&pCookie->link);
+    
+                /* need to open promote here */
+                ret = jd->u.syncer.svc_func(pRequest->fs_id, 
+                                            pRequest->handle, 
+                                            &pCookie->cookie);
+                gossip_debug(GOSSIP_SERVER_DEBUG, "zhangs7 want to promote "
+                                                  "(fsid %u: handle %llu)\n", 
+                                                  pRequest->fs_id, llu(pRequest->handle));
+                if (ret == 0) {
+                    free(pRequest);
+                    pthread_spin_lock(&spin_cookie_lock);
+                    qlist_add_tail(&pCookie->link, &cookie_queue);
+                    pthread_spin_unlock(&spin_cookie_lock);
+                    continue;
+                }
+    complete:
+                free(pCookie);
+                jd->completed_flag = 1;
+                jd->u.syncer.error_code = ret;
+                gen_mutex_lock(&completion_mutex);
+                job_desc_q_add(completion_queue_array[jd->context_id], jd);
+                gen_mutex_unlock(&completion_mutex);
+                free(pRequest);
+            } else if (jd->type == JOB_SYNCER_DELETE) {
+                /* need to delete ct file here */
+                if (pRequest->oid != NULL) {
+                    ret = jd->u.syncer.delete_func(pRequest->fs_id, 
+                                                   pRequest->handle, 
+                                                   pRequest->oid);
+                }
+
+                gossip_debug(GOSSIP_SERVER_DEBUG, "Syncer should delete file "
+                                                  "(fsid %u: handle %llu: oid %s)\n", 
+                                                  pRequest->fs_id, 
+                                                  llu(pRequest->handle), 
+                                                  (char*)pRequest->oid);
+                if (ret != 0) {
+                    gossip_err("Syncer delete failed, "
+                               "ret %d.\n", ret);
+                }
+
+                jd->completed_flag = 1;
+                jd->u.syncer.error_code = 0; /* must succeed */
+                gen_mutex_lock(&completion_mutex);
+                job_desc_q_add(completion_queue_array[jd->context_id], jd);
+                gen_mutex_unlock(&completion_mutex);
+                free(pRequest->oid);
+                free(pRequest);
+            } else {
+                gossip_err("Invalid syncer request type %d\n", ret);
+                free(pRequest);
+            }
+        }
+        else
+        {
+            pthread_cond_wait(&syncer_op_incoming_cond, 
+                              &global_syncer_context.lock);
+            gen_mutex_unlock(&global_syncer_context.lock);
+            tmpcount++;
+            if (tmpcount % 10 == 0) {
+                gossip_debug(GOSSIP_SERVER_DEBUG, "syncer_promotion_thread_function sleep\n");
+            }
+        }
+    }
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "syncer_promotion_thread_function ending\n");
+    return ptr;
+}
+
+int syncer_promotion_thread_initialize(void)
+{
+    int ret = 0;
+
+    gen_mutex_init(&global_syncer_context.lock);
+    INIT_QLIST_HEAD(&global_syncer_context.queue);
+    
+    pthread_spin_init(&spin_cookie_lock,
+                      PTHREAD_PROCESS_SHARED);
+    INIT_QLIST_HEAD(&cookie_queue);
+    syncer_thread_running = 1;
+
+    ret = pthread_create(&syncer_promotion_thread, NULL,
+                         syncer_promotion_thread_function, NULL);
+    if (ret == 0)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "syncer_promotion_thread_initialize: initialized\n");
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+                     "syncer_promotion_thread_initialize: failed (1)\n");
+        syncer_thread_running = 0;
+        return -1;
+    }
+
+    ret = pthread_create(&syncer_query_thread, NULL,
+                         syncer_promotion_query_function, NULL);
+    if (ret == 0)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "syncer_promotion_query_function: initialized\n");
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+                     "syncer_promotion_query_function: failed (1)\n");
+        syncer_thread_running = 0;
+        return -1;
+    }
+
+    return 0;
+}
 
 #endif /* __PVFS2_TROVE_SUPPORT__ */
 

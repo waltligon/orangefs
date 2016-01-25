@@ -179,6 +179,8 @@
 #define SPECIAL_MIRROR_HANDLES_KEYLEN   26
 #define SPECIAL_MIRROR_STATUS_KEYSTR    "mirror.status\0"
 #define SPECIAL_MIRROR_STATUS_KEYLEN    25
+#define SPECIAL_SEALED_KEYLEN           22
+#define SPECIAL_OID_KEYLEN              19
 
 
 #define IO_MAX_REGIONS 64

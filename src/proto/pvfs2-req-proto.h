@@ -1993,13 +1993,16 @@ struct PVFS_servreq_geteattr
     PVFS_handle handle;  /* handle of target object */
     PVFS_fs_id fs_id;    /* file system */
     int32_t nkey;        /* number of keys to read */
+    int32_t flags;       /* flags */
     PVFS_ds_keyval *key; /* array of keys to read */
     PVFS_size *valsz;    /* array of value buffer sizes */
 };
-endecode_fields_2aa_struct(
+endecode_fields_4aa_struct(
     PVFS_servreq_geteattr,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
+    int32_t, flags,
+    skip4,,
     int32_t, nkey,
     PVFS_ds_keyval, key,
     PVFS_size, valsz);
@@ -2011,6 +2014,7 @@ endecode_fields_2aa_struct(
                                   __cap,        \
                                   __fsid,       \
                                   __handle,     \
+                                  __flags,      \
                                   __nkey,       \
                                   __key_array,  \
                                   __size_array, \
@@ -2022,6 +2026,7 @@ do {                                            \
     (__req).hints = (__hints);                  \
     (__req).u.geteattr.fs_id = (__fsid);        \
     (__req).u.geteattr.handle = (__handle);     \
+    (__req).u.geteattr.flags = (__flags);       \
     (__req).u.geteattr.nkey = (__nkey);         \
     (__req).u.geteattr.key = (__key_array);     \
     (__req).u.geteattr.valsz = (__size_array);  \

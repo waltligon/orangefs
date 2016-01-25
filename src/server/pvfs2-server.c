@@ -46,10 +46,13 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-event.h"
 #include "pint-util.h"
+#include "syncer-lru-cache.h"
 #include "pint-malloc.h"
 #include "pint-uid-mgmt.h"
 #include "pint-security.h"
 #include "security-util.h"
+#include "ofs-syncer.h"
+
 #ifdef ENABLE_CAPCACHE
 #include "capcache.h"
 #endif
@@ -673,6 +676,31 @@ static int server_initialize(
     ret = server_setup_signal_handlers();
 
     *server_status_flag |= SERVER_SIGNAL_HANDLER_INIT;
+    /* initialize file LRU list */
+    init_file_lru_list();
+    
+    ret = syncer_initialize();
+    if (ret < 0) {
+        gossip_err("Failed to initialize syncer, status (%d)\n",
+                   ret);
+        return ret;
+    }
+
+    ret = syncer_promotion_thread_initialize();
+    if (ret < 0) {
+        gossip_err("Failed to initialize syncer "
+                   "promotion thread, status (%d)\n",
+                   ret);
+        return ret;
+    }
+    
+    ret = initialize_syncer_abort_thread();
+    if (ret < 0) {
+        gossip_err("Failed to initialize syncer "
+                   "abort thread, status (%d)\n",
+                   ret);
+        return ret;
+    }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "Initialization completed successfully.\n");
@@ -1929,7 +1957,9 @@ static int server_shutdown(
         free(server_completed_job_p_array);
         free(server_job_status_array);
     }
-
+    
+    /* release resources occupied by syncer */
+    syncer_finalize();
     if(siglevel == 0 && ret != 0)
     {
         exit(EXIT_FAILURE);

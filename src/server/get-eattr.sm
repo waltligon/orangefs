@@ -81,6 +81,8 @@ static PINT_sm_action geteattr_setup_resp(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i;
+    static char* two_tiers_str = "user.two_tiers.";
+    int two_tier_str_len = strlen(two_tiers_str);
 
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr requesting %d keys\n",
             s_op->req->u.geteattr.nkey);
@@ -114,6 +116,19 @@ static PINT_sm_action geteattr_setup_resp(
         {
             /* not prefixed: treat this as if the key does not exist */
             js_p->error_code = -PVFS_ENOENT;
+            return SM_ACTION_COMPLETE;
+        }
+
+        if (strncmp((char*)s_op->req->u.geteattr.key[i].buffer,
+                    two_tiers_str, two_tier_str_len) == 0 && 
+            (s_op->req->u.geteattr.flags & PVFS_XATTR_2TIER) == 0) {
+            gossip_debug(GOSSIP_GETEATTR_DEBUG
+                    ,"\tkey:%s, two tiers attribute can only be"
+                    " get by MDS, flags %d\n"
+                    ,(char *)s_op->req->u.geteattr.key[i].buffer,
+                    s_op->req->u.geteattr.flags);
+            js_p->error_code = -PVFS_ENOENT;
+            
             return SM_ACTION_COMPLETE;
         }
     }

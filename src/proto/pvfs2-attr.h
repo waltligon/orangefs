@@ -66,6 +66,23 @@
 /* internal attribute mask for capability objects */
 #define PVFS_ATTR_CAPABILITY               (1 << 22)
 
+/* internal attribute mask. When set, MDS should return the 
+ * ft_version (included in attr.ctime)
+ */
+#define PVFS_ATTR_FT_VERSION           (1 << 27)
+/* internal attribute mask. We will set it when we want to truncate a 
+ * hyperstub to 0, in this case, MDS should clear the hyperstub flag
+ */
+#define PVFS_ATTR_CLEAR_HYPERSTUB      (1 << 28)
+
+/* internal attribute mask for hyperstub set
+ * called by SYNCer */
+#define PVFS_ATTR_HYPERSTUB            (1 << 29)
+
+/* internal attribute mask for lazy promotion 
+ * Set when client want to remove a file */
+#define PVFS_ATTR_PROMOTE                 (1 << 30)
+
 /* attributes that do not change once set */
 #define PVFS_STATIC_ATTR_MASK \
 (PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_META_DIST|PVFS_ATTR_META_DFILES|PVFS_ATTR_META_MIRROR_DFILES|PVFS_ATTR_META_UNSTUFFED)
@@ -231,6 +248,7 @@ struct PVFS_object_attr
     uint32_t mask;     /* indicates which fields are currently valid */
     PVFS_ds_type objtype; /* defined in pvfs2-types.h */
     PVFS_capability capability;
+    uint32_t flag;    /* used by hyperstub */
 
     /* distributed directory parameters */
     PVFS_dist_dir_attr dist_dir_attr;
@@ -246,6 +264,11 @@ struct PVFS_object_attr
     }
     u;
 };
+
+#define isStub(pAttr) (((pAttr)->flag & 1) == 1)
+#define setStub(pAttr) ((pAttr)->flag |= 1)
+#define clearStub(pAttr) ((pAttr)->flag ^= 1)
+
 typedef struct PVFS_object_attr PVFS_object_attr;
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_object_attr(pptr,x) do { \

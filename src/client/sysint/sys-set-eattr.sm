@@ -196,7 +196,7 @@ PVFS_error PVFS_sys_seteattr(
     return PVFS_sys_seteattr_list(ref, credential, 1, key_p, val_p, flags, hints);
 }
 
-
+extern int client_for_syncer;
 static PINT_sm_action set_eattr_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -208,6 +208,10 @@ static PINT_sm_action set_eattr_setup_msgpair(
    
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
+
+    if (client_for_syncer == 1) {
+        sm_p->u.seteattr.flags |= PVFS_XATTR_2TIER;
+    }
 
     PINT_SERVREQ_SETEATTR_FILL(
             msg_p->req,

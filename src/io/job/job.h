@@ -721,6 +721,30 @@ int job_precreate_pool_lookup_server(
 void job_precreate_pool_set_index(
     int server_index);
 
+typedef int (*svc_func)(PVFS_fs_id fs_id, 
+                        PVFS_handle handle,
+                        char **cookie);
+typedef int (*query_func)(const char* cookie); 
+typedef int (*delete_func)(PVFS_fs_id fs_id, 
+                           PVFS_handle handle,
+                           const char * oid);
+int job_syncer_promote_file (PVFS_fs_id     fs_id,
+                             PVFS_handle    handle,
+                             void*          user_ptr,
+                             job_status_s*  out_status_p,
+                             job_context_id context_id,
+                             svc_func       fn,
+                             query_func     query_fn);
+
+int job_syncer_delete_file (PVFS_fs_id     fs_id,
+                            PVFS_handle    handle,
+                            const char*    oid,
+                            void*          user_ptr,
+                            job_context_id context_id,
+                            job_status_s*  out_status_p,
+                            delete_func    fn);
+
+int syncer_promotion_thread_initialize(void);
 /******************************************************************
  * job test/wait for completion functions
  */

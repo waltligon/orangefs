@@ -26,7 +26,18 @@ struct bmi_desc
     bmi_error_code_t error_code;
     bmi_size_t actual_size;
 };
-
+/* describes syncer promotion */
+struct syncer_desc
+{
+    PVFS_error error_code;
+    int (*svc_func)(PVFS_fs_id fs_id, 
+                    PVFS_handle handle,
+                    char**     cookies);
+    int (*query_func)(const char* cookie); 
+    int (*delete_func)(PVFS_fs_id  fs_id, 
+                       PVFS_handle handle,
+                       const char* oid);
+};
 /* describes trove operations */
 struct trove_desc
 {
@@ -111,6 +122,8 @@ enum job_type
     JOB_DEV_UNEXP,
     JOB_REQ_SCHED_TIMER,
     JOB_PRECREATE_POOL,
+    JOB_SYNCER_PROMOTE,
+    JOB_SYNCER_DELETE,
     JOB_NULL
 };
 
@@ -138,6 +151,7 @@ struct job_desc
 	struct dev_unexp_desc dev_unexp;
 	struct null_info_desc null_info;
         struct precreate_pool_desc precreate_pool;
+        struct syncer_desc syncer;
     }
     u;
 

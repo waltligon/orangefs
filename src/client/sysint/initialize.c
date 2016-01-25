@@ -49,6 +49,9 @@ int pint_client_pid;
 int pvfs_sys_init_flag = 0;
 #endif 
 
+/* set to nonzero if SYNCer is running on this machine */
+int client_for_syncer = 0;
+
 typedef enum
 {
     CLIENT_NO_INIT           =       0,
@@ -93,6 +96,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 
     int ret = -PVFS_EINVAL;
     const char *debug_mask_str = NULL, *debug_file = NULL;
+    const char *client_for_syncer_str = NULL;
     PINT_client_status_flag client_status_flag = CLIENT_NO_INIT;
     PINT_smcb *smcb = NULL;
     uint64_t debug_mask = 0;
@@ -135,6 +139,13 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     if (debug_file)
     {
         gossip_enable_file(debug_file, "w");
+    }
+    
+    /* Check whether OFS client is called by SYNCer */
+    client_for_syncer_str = getenv("PVFS2_CLIENT_FOR_SYNCER");
+    if (client_for_syncer_str)
+    {
+        client_for_syncer = atoi(client_for_syncer_str);;
     }
 
     /* Gather preferrred relatime_timeout:

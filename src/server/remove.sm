@@ -18,6 +18,8 @@
 #include "security-util.h"
 #include "pint-cached-config.h"
 #include "pint-util.h"
+#include "syncer-lru-cache.h"
+#include "ofs-syncer.h"
 
 /* Implementation notes
  *
@@ -71,6 +73,7 @@ enum
     STATE_TYPE_DIRDATA = 3,
     LOCAL_OPERATION = 4,
     REMOTE_OPERATION = 5,
+    STATE_TYPE_METAFILE = 6,
     REBUILD_DONE
 };
 
@@ -210,6 +213,7 @@ nested machine pvfs2_remove_work_sm
     {
         run remove_verify_object_metadata;
         STATE_TYPE_DIRECTORY => remove_dirdata_handles;
+        STATE_TYPE_METAFILE  => get_ct_file_oid;
         success => remove_dspace;
         default => return;
     }
@@ -218,6 +222,20 @@ nested machine pvfs2_remove_work_sm
     {
         run remove_remove_dspace;
         default => return;
+    }
+    
+    state get_ct_file_oid
+    {
+        run remove_get_oid;
+        success => remove_ct_file;
+        default => remove_ct_file;
+    }
+
+    state remove_ct_file
+    {
+        run remove_remove_ct_file;
+        success => remove_dspace;
+        default => remove_dspace;
     }
 
     state getattr_of_dirdata_handle
@@ -316,6 +334,24 @@ static PINT_sm_action remove_check_object_type(
     return SM_ACTION_COMPLETE;
 }
 
+/* This should be in a header - WBL */
+extern struct lru_cache* pcache;
+
+/* This should appear in an appropriate file - problably
+ * not here - other trove key tables are defined somewhere
+ * WBL
+ */
+PINT_server_trove_keys_s Trove_ct_Keys[] =
+{
+    {"user.two_tiers.sealed",     SPECIAL_SEALED_KEYLEN},
+    {"user.two_tiers.oid" ,       SPECIAL_OID_KEYLEN},
+};
+
+enum {
+    TWO_TIERS_SEAL = 0,
+    TWO_TIERS_OID  = 1,
+};
+
 /*
  * Function: remove_verify_object_metadata
  *
@@ -367,7 +403,196 @@ static PINT_sm_action remove_verify_object_metadata(
         PINT_perf_count(PINT_server_pc, PINT_PERF_REMOVE, 1, PINT_PERF_ADD);
     }
 
+    /* need to remove the entry from file LRU list */
+    if (a_p->objtype == PVFS_TYPE_METAFILE) 
+    {
+        lru_remove(pcache,
+                   s_op->req->u.remove.fs_id, 
+                   s_op->req->u.remove.handle);
+        js_p->error_code = STATE_TYPE_METAFILE;    
+	gossip_debug(
+            GOSSIP_SERVER_DEBUG, "file(fs_id %u : handle %llu) "
+                                 "type is metafile; removing "
+                                 "CT object before removing"
+                                 "file itself.\n",
+                                 s_op->req->u.remove.fs_id,
+                                llu( s_op->req->u.remove.handle));
+    }
+
     return SM_ACTION_COMPLETE;
+}
+
+void free_syncer_keyval_buffers(struct PINT_server_op *s_op)
+{
+    int i = 0;
+
+    if (s_op->free_val)
+    {
+        if (s_op->val_a)
+        {
+            for (i=0; i<s_op->keyval_count; i++)
+            {
+                if (s_op->val_a[i].buffer)
+                {
+                    free(s_op->val_a[i].buffer);
+                    s_op->val_a[i].buffer = NULL;
+                }
+            }
+        }
+        s_op->free_val = 0;
+        s_op->keyval_count = 0;
+    }
+
+    if (s_op->val_a)
+    {
+        free(s_op->val_a);
+        s_op->val_a = NULL;
+    }
+    if (s_op->key_a)
+    {
+        free(s_op->key_a);
+        s_op->key_a = NULL;
+    }
+    if (s_op->error_a)
+    {
+        free(s_op->error_a);
+        s_op->error_a = NULL;
+    }
+}
+
+static PINT_sm_action remove_get_oid(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    const int buffer_size = 128;
+    job_id_t i;
+
+    js_p->error_code = 0;
+    
+    /* allocate space for keys and values */
+    s_op->keyval_count = 2;
+    s_op->free_val = 1;
+    s_op->key_a = s_op->val_a = NULL;
+    s_op->error_a = NULL;
+    
+    s_op->key_a   = malloc(sizeof(*s_op->key_a)   * s_op->keyval_count);
+    s_op->val_a   = malloc(sizeof(*s_op->val_a)   * s_op->keyval_count);
+    s_op->error_a = malloc(sizeof(*s_op->error_a) * s_op->keyval_count);
+    if (!s_op->key_a || !s_op->val_a || !s_op->error_a)
+    {
+       gossip_lerr("Cannot allocate memory for key/val/error.\n");
+       js_p->error_code = -PVFS_ENOMEM;
+       goto error_exit;
+    }
+    memset(s_op->key_a,0,sizeof(*s_op->key_a));
+    memset(s_op->val_a,0,sizeof(*s_op->val_a));
+    memset(s_op->error_a,0,sizeof(*s_op->error_a));
+ 
+    /* set key = user.two_tiers.sealed */
+    s_op->key_a[0].buffer    = Trove_ct_Keys[TWO_TIERS_SEAL].key;
+    s_op->key_a[0].buffer_sz = Trove_ct_Keys[TWO_TIERS_SEAL].size;
+ 
+    /* setup buffer space for extended attr sealed*/
+    s_op->val_a[0].buffer = malloc(buffer_size); 
+    if (!s_op->val_a[0].buffer)
+    {
+       gossip_lerr("Cannot allocate memory for OID_SEALED.\n");
+       js_p->error_code = -PVFS_ENOMEM;
+       goto error_exit;
+    }
+
+    memset(s_op->val_a[0].buffer, 0, buffer_size);
+    s_op->val_a[0].buffer_sz = buffer_size;
+ 
+    /* set key = user.two_tiers.oid*/
+    s_op->key_a[1].buffer    = Trove_ct_Keys[TWO_TIERS_OID].key;
+    s_op->key_a[1].buffer_sz = Trove_ct_Keys[TWO_TIERS_OID].size;
+ 
+    /* setup buffer space for handle statuses */
+    s_op->val_a[1].buffer = malloc(buffer_size);
+    if (!s_op->val_a[1].buffer)
+    {
+        gossip_lerr("Cannot allocate memory for OID.\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        goto error_exit;
+    }
+ 
+    memset(s_op->val_a[1].buffer, 0, buffer_size);
+    s_op->val_a[1].buffer_sz = buffer_size;
+    gossip_debug(
+            GOSSIP_SERVER_DEBUG,
+            "key 0 = %s, key 1 = %s\n",
+            (char*)s_op->key_a[0].buffer,
+            (char*)s_op->key_a[1].buffer);
+
+    ret = job_trove_keyval_read_list(
+          s_op->req->u.remove.fs_id,
+          s_op->req->u.remove.handle,
+          s_op->key_a,
+          s_op->val_a,
+          s_op->error_a,
+          s_op->keyval_count,
+          0,
+          NULL,
+          smcb,
+          0,
+          js_p,
+          &i,
+          server_job_context, s_op->req->hints);
+
+    return ret;
+    
+error_exit:
+    free_syncer_keyval_buffers(s_op);
+    return SM_ACTION_COMPLETE;
+}
+#define OFS_XATTR_VAL_SEALED "--sealed--"
+
+/*
+ * Function: remove_remove_ct_file
+ *
+ * get the oid from eattr and send (fs_id:handle:oid) to syncer 
+ * server, if sealed is set, only send "" instead of oid to 
+ * syncer.
+ */
+static PINT_sm_action remove_remove_ct_file(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    const char* oid = (const char*)s_op->val_a[1].buffer;
+
+    // if we get user.two_tiers.sealed successfully
+    if (s_op->error_a[1] != 0 || 
+        (s_op->error_a[0] == 0 && 
+        strcmp(s_op->val_a[0].buffer, OFS_XATTR_VAL_SEALED) == 0))
+    {
+        oid = "";
+    }
+
+    gossip_debug(
+            GOSSIP_SERVER_DEBUG,
+            "status = (%d:%d), seal value = %s, oid value = %s\n",
+            s_op->error_a[0], s_op->error_a[1], 
+            (char*)s_op->val_a[0].buffer,
+            (char*)s_op->val_a[1].buffer);
+    
+    int status = job_syncer_delete_file(s_op->req->u.remove.fs_id,
+                                        s_op->req->u.remove.handle,
+                                        oid,
+                                        smcb,
+                                        server_job_context,
+                                        js_p,
+                                        syncer_delete_file);
+    if (status != 0)
+    {
+        gossip_err("Failed to call "
+                   "syncer_delete_file(status : %d)\n",
+                   status);
+    }
+
+    free_syncer_keyval_buffers(s_op);
+    return 0;
 }
 
 static PINT_sm_action remove_get_dirent_count(
@@ -504,7 +729,8 @@ static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
 
     if(js_p->error_code == -TROVE_ENOENT)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "remove: no DIST_DIR_ATTR key present in directory meta handle!!\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+           "remove: no DIST_DIR_ATTR key present in directory meta handle!!\n");
         attr_p->dist_dir_bitmap = NULL;
         attr_p->dirdata_handles = NULL;
         return SM_ACTION_COMPLETE;
