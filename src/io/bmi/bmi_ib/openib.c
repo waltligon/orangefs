@@ -38,8 +38,9 @@ struct openib_device_priv {
     int nic_max_sge;
     int nic_max_wr;
 
-    /* max MTU reported by NIC port */
+    /* MTU values reported by NIC port */
     int max_mtu;
+    int active_mtu;
 
     /*
      * Temp array for filling scatter/gather lists to pass to IB functions,
@@ -305,10 +306,12 @@ static void init_connection_modify_qp(struct ibv_qp *qp, uint32_t remote_qp_num,
     attr.max_dest_rd_atomic = 1;
     attr.ah_attr.dlid = remote_lid;
     attr.ah_attr.port_num = od->nic_port;
-    if (od->max_mtu > IBV_MTU) {
-        attr.path_mtu = od->max_mtu;
+    if (od->active_mtu > IBV_MTU) 
+    {
+        attr.path_mtu = od->active_mtu;
     }
-    else {
+    else
+    {
         attr.path_mtu = IBV_MTU;
     }
     attr.rq_psn = 0;
@@ -746,6 +749,11 @@ static const char *async_event_type_string(enum ibv_event_type event_type)
 	CASE(IBV_EVENT_CLIENT_REREGISTER);
 #endif
 	CASE(IBV_EVENT_GID_CHANGE);
+
+    /* Experimental event types */
+    CASE(IBV_EXP_EVENT_DCT_KEY_VIOLATION);
+    CASE(IBV_EXP_EVENT_DCT_ACCESS_ERR);
+    CASE(IBV_EXP_EVENT_DCT_REQ_ERR);
     }
     return s;
 }

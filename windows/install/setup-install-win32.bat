@@ -51,7 +51,7 @@ rem Grid utility
 copy ..\..\..\cert-utils\pvfs2-grid-proxy-init.sh OrangeFS\Client\Tools /y
 
 rem Create zip
-del ..\orangefs-windows-client-2.9.3-win32.zip
-winrar a ..\orangefs-windows-client-2.9.3-win32.zip Dokan OrangeFS
+del ..\orangefs-windows-client-2.9.2-win32.zip
+winrar a ..\orangefs-windows-client-2.9.2-win32.zip Dokan OrangeFS
 
 cd ..
