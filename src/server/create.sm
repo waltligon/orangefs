@@ -253,6 +253,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
      * file when the current environment only has one server.
      * This prevents unstuffing from being called by the client sys-io machine.
     */
+#if 0
     if((server_type & PINT_SERVER_TYPE_IO) &&
         fs_conf->file_stuffing &&
         layout->algorithm == PVFS_SYS_LAYOUT_ROUND_ROBIN &&
@@ -274,7 +275,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
-
+#endif
     /* file will not be stuffed; need to allocate all datafiles */
     s_op->u.create.num_io_servers = s_op->req->u.create.num_dfiles_req;
     s_op->resp.u.create.metafile_attrs.u.meta.dfile_array = malloc(
