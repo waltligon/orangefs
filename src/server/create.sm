@@ -277,6 +277,9 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
     }
 #endif
     /* file will not be stuffed; need to allocate all datafiles */
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "file will not be stuffed; need to allocate all datafiles\n"
+                 );
     s_op->u.create.num_io_servers = s_op->req->u.create.num_dfiles_req;
     s_op->resp.u.create.metafile_attrs.u.meta.dfile_array = malloc(
                     sizeof(*s_op->resp.u.create.metafile_attrs.u.meta.dfile_array) *
