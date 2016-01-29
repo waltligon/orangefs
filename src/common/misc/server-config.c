@@ -2738,6 +2738,8 @@ DOTCONF_CB(get_file_stuffing)
     {
         return("FileStuffing value must be 'yes' or 'no'.\n");
     }
+    // turning filestuffing off.
+    fs_conf->file_stuffing = 0;
 
     return NULL;
 }
