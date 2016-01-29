@@ -20,8 +20,6 @@
 #include "pint-uid-map.h"
 
 #define REPLACE_DONE 100
-#define STATE_CAPABILITY 34
-
 
 %%
 
@@ -79,29 +77,9 @@ machine pvfs2_create_sm
     state setobj_attribs
     {
         run setattr_setobj_attribs;
-        success => get_capability_setup;
+        success => setup_resp;
         default => remove_keyvals;
     }
-
-    state get_capability_setup
-    {
-        run get_capability_setup;
-        STATE_CAPABILITY => get_capability;
-        default => setup_resp;
-    }
-
-    state get_capability
-    {
-        jump pvfs2_get_attr_work_sm;
-        default => get_capability_cleanup;
-    }
-
-    state get_capability_cleanup
-    {
-        run get_capability_cleanup;
-        default => setup_resp;
-    }
-
 
     state setup_resp
     {
@@ -912,29 +890,9 @@ static int setup_resp(
        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_META_UNSTUFFED;
     }
 
-
-    if (s_op->resp.u.create.metafile_attrs.capability.op_mask)
-    {
-
-    	 PINT_ACCESS_DEBUG(s_op, GOSSIP_SERVER_DEBUG,
-    	                          "create: new metadata handle: %llu has capability! Mask is %llu\n",
-       	                          llu(s_op->resp.u.create.metafile_handle),
-       	                          llu(s_op->resp.u.create.metafile_attrs.capability.op_mask));
-    	 s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_CAPABILITY;
-
-    }
-    else
-    {
-   	 PINT_ACCESS_DEBUG(s_op, GOSSIP_SERVER_DEBUG,
-   	                          "create: new metadata handle: %llu does not have capability. Mask is %llu!\n",
-   	                          llu(s_op->resp.u.create.metafile_handle),
-   	                          llu(s_op->resp.u.create.metafile_attrs.capability.op_mask));
-    }
-
-
     if (js_p->error_code == 0)
     {
-        PINT_ACCESS_DEBUG(s_op, GOSSIP_SERVER_DEBUG,
+        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
                           "create: new metadata handle: %llu.\n",
                           llu(s_op->resp.u.create.metafile_handle));
     }
@@ -1079,85 +1037,6 @@ static int perm_create(PINT_server_op *s_op)
 
     return 0;
 }
-
-/* get_capability_setup
- *
- * Sets up a getattr nested op if a capability is requested.
- */
-static PINT_sm_action get_capability_setup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret;
-
-    if (s_op->req->u.unstuff.attrmask & PVFS_ATTR_CAPABILITY)
-    {
-        struct PINT_server_op *getattr_op;
-
-        getattr_op = malloc(sizeof(*getattr_op));
-        if (getattr_op == NULL)
-        {
-            js_p->error_code = -PVFS_ENOMEM;
-            return SM_ACTION_COMPLETE;
-        }
-        memset(getattr_op, 0, sizeof(*getattr_op));
-
-        getattr_op->req = s_op->req;
-        getattr_op->attr = s_op->resp.u.unstuff.attr;
-        getattr_op->u.getattr.fs_id = s_op->req->u.unstuff.fs_id;
-        getattr_op->u.getattr.handle = s_op->req->u.unstuff.handle;
-        getattr_op->u.getattr.attrmask = s_op->req->u.unstuff.attrmask;
-        getattr_op->u.getattr.credential = s_op->req->u.unstuff.credential;
-
-        ret = PINT_sm_push_frame(smcb, 0, getattr_op);
-        if (ret < 0)
-        {
-            js_p->error_code = ret;
-        }
-        else
-        {
-            js_p->error_code = STATE_CAPABILITY;
-        }
-    }
-    else
-    {
-        js_p->error_code = 0;
-    }
-
-    return SM_ACTION_COMPLETE;
-}
-
-/* get_capability_cleanup
- *
- * Cleans up after the call to getattr nested state machine.
- */
-static PINT_sm_action get_capability_cleanup(
-    struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *getattr_op;
-    struct PINT_server_op *s_op;
-    int task_id, remaining;
-
-    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code,
-                                   &remaining);
-    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    /* free outdated attrs set in getattr_interpret */
-    PINT_free_object_attr(&s_op->resp.u.unstuff.attr);
-    s_op->resp.u.unstuff.attr = getattr_op->resp.u.getattr.attr;
-
-    free(getattr_op);
-
-    if(js_p->error_code)
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-            "unstuff failed to retrieve new attrs.\n");
-    }
-
-    return SM_ACTION_COMPLETE;
-}
-
-
 
 struct PINT_server_req_params pvfs2_create_params =
 {
