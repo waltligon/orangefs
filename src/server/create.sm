@@ -271,7 +271,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
         }
-#elif 0
+#else
         /* using logic from non-stuffed, but with only 1 server and datafile. */
         s_op->u.create.num_io_servers = 1;
         s_op->resp.u.create.metafile_attrs.u.meta.dfile_array = malloc(
@@ -332,13 +332,9 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
         return SM_ACTION_COMPLETE;
 
 #endif
-        s_op->resp.u.create.stuffed = 1;
 
     }
-    else
-    {
-    	s_op->resp.u.create.stuffed = 0;
-    }
+
 
     /* file will not be stuffed; need to allocate all datafiles */
     s_op->u.create.num_io_servers = s_op->req->u.create.num_dfiles_req;
@@ -387,10 +383,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
         gossip_debug(GOSSIP_SERVER_DEBUG, "io_server %d: %s\n", 
                      i, s_op->u.create.io_servers[i]); 
     }
-    if (s_op->u.create.num_io_servers > 1)
-    {
-    	s_op->resp.u.create.stuffed = 0;
-    }
+    s_op->resp.u.create.stuffed = 0;
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
