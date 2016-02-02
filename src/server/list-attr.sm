@@ -243,10 +243,11 @@ static PINT_sm_action listattr_interpret_getattrs(struct PINT_smcb *smcb,
                 PINT_copy_object_attr(&s_op->u.listattr.attr_a[j],
                                     &getattr_op->resp.u.getattr.attr);
                 s_op->u.listattr.errors[j] = tmp_err;
-                free(getattr_op);
                 break;
             }
         }
+        getattr_free(getattr_op);
+        free(getattr_op);
     }
 
     /* if we reached this point, then we have a successful ack to send back;
