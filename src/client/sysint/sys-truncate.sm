@@ -391,12 +391,6 @@ static int unstuff_needed(
         gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate will unstuff the file.\n");
         return(1);
     }
-    else if (size == 0)
-    {
-
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "file size is 0. sys-truncate will unstuff the file.\n");
-        return(1);
-    }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate will not unstuff the file.\n");
     return(0);
@@ -424,7 +418,7 @@ static PINT_sm_action truncate_unstuff_setup_msgpair(
             *sm_p->cred_p,
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
-            PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE);
+            PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_CAPABILITY);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
