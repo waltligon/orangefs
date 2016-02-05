@@ -528,11 +528,6 @@ static PINT_sm_action getattr_setup(
     getattr_op->u.getattr.fs_id = s_op->req->u.unstuff.fs_id;
     getattr_op->u.getattr.handle = s_op->req->u.unstuff.handle;
     getattr_op->u.getattr.attrmask = s_op->req->u.unstuff.attrmask;
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-        "Attr mask is %x. Will add PVFS_ATTR_CAPABILITY.\n",s_op->req->u.unstuff.attrmask);
-
-    getattr_op->u.getattr.attrmask |= PVFS_ATTR_CAPABILITY;
-
     getattr_op->u.getattr.credential = s_op->req->u.unstuff.credential;
 
     ret = PINT_sm_push_frame(smcb, 0, getattr_op);
