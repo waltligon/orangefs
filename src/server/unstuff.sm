@@ -531,7 +531,7 @@ static PINT_sm_action getattr_setup(
     gossip_debug(GOSSIP_SERVER_DEBUG,
         "Attr mask is %x. Will add PVFS_ATTR_CAPABILITY.\n",s_op->req->u.unstuff.attrmask);
 
-    getattr_op->u.getattr.attrmask &= PVFS_ATTR_CAPABILITY;
+    getattr_op->u.getattr.attrmask |= PVFS_ATTR_CAPABILITY;
 
     getattr_op->u.getattr.credential = s_op->req->u.unstuff.credential;
 
