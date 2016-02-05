@@ -207,7 +207,7 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     attr = &sm_p->getattr.attr;
     assert(attr);
 
-    //assert(attr->mask & PVFS_ATTR_CAPABILITY);
+    assert(attr->mask & PVFS_ATTR_CAPABILITY);
 
     assert(attr->mask & PVFS_ATTR_META_DFILES);
     assert(attr->mask & PVFS_ATTR_META_DIST);
@@ -320,16 +320,19 @@ static PINT_sm_action truncate_inspect_attr(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+
     /* determine if we need to unstuff or not to service this request */
     if(unstuff_needed(
         sm_p->u.truncate.size,
         sm_p->getattr.attr.u.meta.dist,
         sm_p->getattr.attr.mask))
     {
-        js_p->error_code = TRUNCATE_UNSTUFF;
+    	gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate needs to unstuff the file.\n");
+    	js_p->error_code = TRUNCATE_UNSTUFF;
         return SM_ACTION_COMPLETE;
     }
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate does not need to unstuff the file.\n");
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -379,12 +382,19 @@ static int unstuff_needed(
         &fake_file_data,
         0);
     
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate calculated first unstuffed offset as %lld.\n", lld(first_unstuffed_offset));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate calculated size as %lld and first unstuffed offset as %lld.\n", lld(size), lld(first_unstuffed_offset));
 
     /* compare to see if the file needs to be unstuffed yet */
     if(size > first_unstuffed_offset)
     {
+
         gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate will unstuff the file.\n");
+        return(1);
+    }
+    else if (size == 0)
+    {
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "file size is 0. sys-truncate will unstuff the file.\n");
         return(1);
     }
 
