@@ -402,16 +402,6 @@ static PINT_sm_action get_capability_setup(
 
     if (s_op->req->u.unstuff.attrmask & PVFS_ATTR_CAPABILITY)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-            "a capability was requested attrmask: %x!\n",s_op->req->u.unstuff.attrmask);
-    }
-    else
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-        		"a capability was NOT requested attrmask: %x!\n",s_op->req->u.unstuff.attrmask);
-    }
-    if (1)
-    {
         struct PINT_server_op *getattr_op;
 
         getattr_op = malloc(sizeof(*getattr_op));
