@@ -916,7 +916,8 @@ extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 extern void tree_getattr_free(PINT_server_op *s_op);
 extern void tree_setattr_free(PINT_server_op *s_op);
 extern void tree_remove_free(PINT_server_op *s_op);
-void mkdir_free(struct PINT_server_op *s_op);
+extern void mkdir_free(struct PINT_server_op *s_op);
+extern void getattr_free(struct PINT_server_op *s_op);
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
