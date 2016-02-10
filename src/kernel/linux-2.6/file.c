@@ -122,13 +122,15 @@ int pvfs2_file_open(
         */
         if (file->f_flags & O_APPEND)
         {
+            /* This tells 2tier to load the file from the storage facility */
+            uint32_t mask = PVFS_ATTR_SYS_PROMOTE;           
             /* 
              * When we do a getattr in response to an open with O_APPEND,
              * all we are interested in is the file size. Hence we will
              * set the mask to only the size and nothing else
              * Hopefully, this will help us in reducing the number of getattr's
              */
-            ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_SIZE);
+            ret = pvfs2_inode_getattr(inode, mask | PVFS_ATTR_SYS_SIZE);
             if (ret == 0)
             {
                 file->f_pos = pvfs2_i_size_read(inode);
@@ -142,6 +144,10 @@ int pvfs2_file_open(
                 goto out;
             }
         }
+        else
+        {
+            ret = pvfs2_inode_getattr(inode, mask);
+        }
 
         /*
           fs/open.c: returns 0 after enforcing large file support if
@@ -149,8 +155,7 @@ int pvfs2_file_open(
         */
         ret = generic_file_open(inode, file);
     }
-
-    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open returning normally: %d\n", ret);
+gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open returning normally: %d\n", ret);
 
 out:
     kfree(s);

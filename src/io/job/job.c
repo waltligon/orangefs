@@ -6343,6 +6343,14 @@ static struct fs_pool* find_fs(PVFS_fs_id fsid)
     return(NULL);
 }
 
+/*************************************
+ * Syncer stuff
+ * Need to move all but the job_ functions out of this file
+ * and create a new file with syncer specific stuff - including a .h for
+ * structs typedefs, decls, etc.
+ * any functions used exclusively inside that file should be static
+ */
+
 typedef struct {
     PVFS_fs_id         fs_id;
     PVFS_handle        handle;
@@ -6629,6 +6637,10 @@ void* syncer_promotion_query_function(void *ptr) {
     return ptr;
 }
 
+/* might be cleaner to create a function for each job type and call
+ * our to those inside a tight switch rather than cram it all in one
+ * rather long function
+ */
 void* syncer_promotion_thread_function(void *ptr)
 {
     /*struct timeval base;
@@ -6653,6 +6665,7 @@ void* syncer_promotion_thread_function(void *ptr)
                                                syncer_queued_op_t, link);
             gen_mutex_unlock(&global_syncer_context.lock);
             struct job_desc *jd = (struct job_desc*)pRequest->user_ptr;
+            /* use a switch rather than an elseif structure */
             if (jd->type == JOB_SYNCER_PROMOTE) {
                 syncer_cookie* pCookie = (syncer_cookie*)malloc(sizeof(syncer_cookie));
                 /* no memory case */
@@ -6680,6 +6693,10 @@ void* syncer_promotion_thread_function(void *ptr)
                     pthread_spin_unlock(&spin_cookie_lock);
                     continue;
                 }
+    /* this needs to move to the end of the function WBL */
+    /* also rename label as "error_out" or something that indicates
+     * this is an error condition
+     */
     complete:
                 free(pCookie);
                 jd->completed_flag = 1;
