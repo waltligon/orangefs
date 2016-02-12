@@ -4,7 +4,7 @@
  * See COPYING in top-level directory.
  *
  * Changes by Acxiom Corporation to add dirent_count field to attributes
- * Copyright Acxiom Corporation, 2005.
+ * Copyright © Acxiom Corporation, 2005.
  */
 
 #include <string.h>

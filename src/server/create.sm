@@ -257,7 +257,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
         fs_conf->file_stuffing &&
         layout->algorithm == PVFS_SYS_LAYOUT_ROUND_ROBIN &&
         s_op->req->u.create.num_dfiles_req > 1 )
-    {
+    {    
         /* we can do a stuffed create here, only one datafile */
         s_op->req->u.create.attr.u.meta.dfile_count = 1;
         s_op->resp.u.create.metafile_attrs.u.meta.dfile_count = 1;
@@ -290,7 +290,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
                     sizeof(char*) *
                     s_op->u.create.num_io_servers);
 
-    if(!s_op->resp.u.create.metafile_attrs.u.meta.dfile_array ||
+    if(!s_op->resp.u.create.metafile_attrs.u.meta.dfile_array || 
         !s_op->u.create.handle_array_local ||
         !s_op->u.create.handle_array_remote ||
         !s_op->u.create.remote_io_servers)
@@ -315,12 +315,12 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
     /* layout may have adjusted number of datafiles */
     s_op->req->u.create.attr.u.meta.dfile_count
                     = s_op->u.create.num_io_servers;
-    s_op->resp.u.create.metafile_attrs.u.meta.dfile_count
+    s_op->resp.u.create.metafile_attrs.u.meta.dfile_count 
                     = s_op->u.create.num_io_servers;
     for(i=0; i<s_op->u.create.num_io_servers; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "io_server %d: %s\n",
-                     i, s_op->u.create.io_servers[i]);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "io_server %d: %s\n", 
+                     i, s_op->u.create.io_servers[i]); 
     }
 
     s_op->resp.u.create.stuffed = 0;

@@ -24,6 +24,7 @@
 #include "PINT-reqproto-encode.h"
 #include "acache.h"
 #include "pvfs2-internal.h"
+#include "client-capcache.h"
 
 #define TRUNCATE_UNSTUFF 100
 
@@ -206,19 +207,11 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
 
     attr = &sm_p->getattr.attr;
     assert(attr);
-
-    //assert(attr->mask & PVFS_ATTR_CAPABILITY);
-
+    
     assert(attr->mask & PVFS_ATTR_META_DFILES);
     assert(attr->mask & PVFS_ATTR_META_DIST);
     assert(attr->u.meta.dfile_count > 0);
     assert(attr->u.meta.dist_size > 0);
-
-        gossip_debug(GOSSIP_CLIENT_DEBUG,                                                                                                                                  
-                    "  %s: client attr->mask %llu attr->u.meta.hint.flags %llu\n",
-                                __func__, llu(attr->mask),
-                                            llu(attr->u.meta.hint.flags));
-
     /* cannot truncate an append-only or immutable file */
     if ((attr->u.meta.hint.flags & PVFS_IMMUTABLE_FL)
         || (attr->u.meta.hint.flags & PVFS_APPEND_FL))
@@ -320,19 +313,16 @@ static PINT_sm_action truncate_inspect_attr(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-
     /* determine if we need to unstuff or not to service this request */
     if(unstuff_needed(
         sm_p->u.truncate.size,
         sm_p->getattr.attr.u.meta.dist,
         sm_p->getattr.attr.mask))
     {
-    	gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate needs to unstuff the file.\n");
-    	js_p->error_code = TRUNCATE_UNSTUFF;
+        js_p->error_code = TRUNCATE_UNSTUFF;
         return SM_ACTION_COMPLETE;
     }
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate does not need to unstuff the file.\n");
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -382,12 +372,11 @@ static int unstuff_needed(
         &fake_file_data,
         0);
     
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate calculated size as %lld and first unstuffed offset as %lld.\n", lld(size), lld(first_unstuffed_offset));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate calculated first unstuffed offset as %lld.\n", lld(first_unstuffed_offset));
 
     /* compare to see if the file needs to be unstuffed yet */
     if(size > first_unstuffed_offset)
     {
-
         gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate will unstuff the file.\n");
         return(1);
     }
@@ -450,6 +439,7 @@ static int unstuff_comp_fn(
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int local_uid, ret;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"unstuff completion fn: unstuff_comp_fn\n");
@@ -480,6 +470,20 @@ static int unstuff_comp_fn(
     /* replace attrs found by getattr */
     /* PINT_copy_object_attr() takes care of releasing old memory */
     PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.unstuff.attr);
+
+    /* update client capcache with returned cap */
+    local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+    if (local_uid == (PVFS_uid) -1) {
+        local_uid = PINT_util_getuid();
+    }
+    PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+    ret = PINT_client_capcache_update(sm_p->object_ref, local_uid,
+                                      &resp_p->u.unstuff.attr.capability);
+    if (ret < 0)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: capcache update returned "
+                     "%d\n", __func__, ret);
+    }
 
     return(0);
 }

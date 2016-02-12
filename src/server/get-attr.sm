@@ -4,7 +4,7 @@
  * See COPYING in top-level directory.
  *
  * Changes by Acxiom Corporation to add dirent_count field to attributes
- * Copyright ? Acxiom Corporation, 2005.
+ * Copyright © Acxiom Corporation, 2005.
  */
 
 /* pvfs2_get_attr_sm
@@ -1755,14 +1755,30 @@ static void free_nested_getattr_data(struct PINT_server_op *s_op)
     return;
 }
 
+/*
+ * Function: getattr_free
+ *
+ * Params:   server_op *s_op,
+ *
+ * Returns:  N/A
+ *
+ * Synopsis: free memory - can be called from outside this source file.
+ *
+ */
+void getattr_free(
+        struct PINT_server_op *s_op)
+{
+    free_keyval_buffers(s_op);
+
+    PINT_free_object_attr(&s_op->resp.u.getattr.attr);
+}
+
 static PINT_sm_action getattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    free_keyval_buffers(s_op);
-
-    PINT_free_object_attr(&s_op->resp.u.getattr.attr);
+    getattr_free(s_op);
     return(server_state_machine_complete(smcb));
 }
 
