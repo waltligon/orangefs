@@ -1,19 +1,4 @@
-/* pvfs2-test-config.h.in.  Generated from configure.in by autoheader.  */
-
-/* Define if third param (message) to DB error callback function is const */
-#undef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
-
-/* Define if DB error callback function takes dbenv parameter */
-#undef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
-
-/* Define if db library has DB_BUFFER_SMALL error */
-#undef HAVE_DB_BUFFER_SMALL
-
-/* Define if db library has DB_DIRTY_READ flag */
-#undef HAVE_DB_DIRTY_READ
-
-/* Define if DB has get_pagesize function */
-#undef HAVE_DB_GET_PAGESIZE
+/* pvfs2-test-config.h.in.  Generated from configure.ac by autoheader.  */
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
@@ -32,6 +17,9 @@
 
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
+
+/* Define to 1 if OpenSSL is available */
+#undef HAVE_OPENSSL
 
 /* Define to 1 if you have the <openssl/crypto.h> header file. */
 #undef HAVE_OPENSSL_CRYPTO_H
@@ -57,17 +45,8 @@
 /* Define to 1 if you have the <sys/types.h> header file. */
 #undef HAVE_SYS_TYPES_H
 
-/* Define if DB open function takes a txnid parameter */
-#undef HAVE_TXNID_PARAMETER_TO_DB_OPEN
-
-/* Define if DB stat function takes txnid parameter */
-#undef HAVE_TXNID_PARAMETER_TO_DB_STAT
-
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
-
-/* Define if DB stat function takes malloc function ptr */
-#undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
 
 /* Define to 1 if you have the <zlib.h> header file. */
 #undef HAVE_ZLIB_H
@@ -92,6 +71,3 @@
 
 /* Define if libaio exists */
 #undef WITH_AIO
-
-/* Define if openssl exists */
-#undef WITH_OPENSSL
