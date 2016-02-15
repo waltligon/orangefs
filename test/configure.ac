@@ -223,11 +223,6 @@ fi
 AC_SUBST(MPI_INTELC)
 AC_SUBST(MPI_GNUC)
 
-AC_ARG_WITH(db,
-	[  --with-db=<dir>         Location of installed DB package (default=/usr)],
-	[AX_BERKELEY_DB(${withval})],
-	[AX_BERKELEY_DB("")])
-
 AC_ARG_WITH(openssl,
 		 [  --with-openssl=<dir>  Location of installed openssl package (default=/usr)
 		 	 --without-openssl     Don't build with openssl.

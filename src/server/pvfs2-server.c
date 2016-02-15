@@ -777,7 +777,6 @@ static int server_initialize_subsystems(
     PVFS_fs_id orig_fsid=0;
     PVFS_ds_flags init_flags = 0;
     int bmi_flags = BMI_INIT_SERVER;
-    int shm_key_hint;
     int server_index;
 
     if(server_config.enable_events)
@@ -872,28 +871,12 @@ static int server_initialize_subsystems(
 
     /*********** START OF TROVE INITIALIZATION ************/
 
-    ret = trove_collection_setinfo(0, 0, TROVE_DB_CACHE_SIZE_BYTES,
-                                   &server_config.db_cache_size_bytes);
-    /* this should never fail */
-    assert(ret == 0);
     ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
                                    &server_config.trove_max_concurrent_io);
     /* this should never fail */
     assert(ret == 0);
 
-    /* help trove chose a differentiating shm key if needed for Berkeley DB */
-    shm_key_hint = generate_shm_key_hint(&server_index);
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "Server using shm key hint: %d\n", shm_key_hint);
-    ret = trove_collection_setinfo(0, 0, TROVE_SHM_KEY_HINT, &shm_key_hint);
-    assert(ret == 0);
-
-    if(server_config.db_cache_type && (!strcmp(server_config.db_cache_type,
-                                               "mmap")))
-    {
-        /* set db cache type to mmap rather than sys */
-        init_flags |= TROVE_DB_CACHE_MMAP;
-    }
+    generate_shm_key_hint(&server_index);
 
 /********/
 
@@ -948,6 +931,13 @@ static int server_initialize_subsystems(
         {
             PVFS_perror("Error: PINT_handle_load_mapping", ret);
             return(ret);
+        }
+
+        /* XXX: This is really the same for all collections, yet is specified
+         * separately. */
+        ret = trove_collection_set_fs_config(cur_fs->coll_id, &server_config);
+        if (ret < 0) {
+            gossip_err("Error setting filesystem configuration in Trove\n");
         }
 
         /*
@@ -1206,18 +1196,6 @@ static int server_initialize_subsystems(
                  "Storage Init Complete (%s)\n", SERVER_STORAGE_MODE);
     gossip_debug(GOSSIP_SERVER_DEBUG, "%d filesystem(s) initialized\n",
                  PINT_llist_count(server_config.file_systems));
-
-    /*
-     * Migrate database if needed
-     */
-    ret = trove_migrate(server_config.trove_method,
-			server_config.data_path,
-			server_config.meta_path);
-    if (ret < 0)
-    {
-        gossip_err("trove_migrate failed: ret=%d\n", ret);
-        return(ret);
-    }
 
     *server_status_flag |= SERVER_TROVE_INIT;
 
@@ -1840,6 +1818,7 @@ static int server_shutdown(
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         security "
                      "module           [ stopped ]\n");
     }
+
 #ifdef ENABLE_CERTCACHE    
     if (status & SERVER_CERTCACHE_INIT)
     {
@@ -1862,7 +1841,7 @@ static int server_shutdown(
     }
 #endif /* ENABLE_CREDCACHE */
 
-#ifdef ENABLE_CAPCACHE    
+#ifdef ENABLE_CAPCACHE
     if (status & SERVER_CAPCACHE_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting capability "

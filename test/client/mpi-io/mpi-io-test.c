@@ -196,8 +196,11 @@ int main(int argc, char **argv)
 			my_correct = 0;
 		   fprintf(stderr, "short write");
 		}
+
+      printf("Calling MPI_File_sync...\n");
       if (opt_sync) sync_err = MPI_File_sync(fh);
       if (sync_err) {
+         printf("Error calling MPI_File_sync...\n");
 			handle_error(err, "MPI_File_sync");
       }
 

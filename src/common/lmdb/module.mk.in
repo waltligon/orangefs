@@ -1,0 +1,11 @@
+DIR := src/common/lmdb
+
+SRC := \
+	$(DIR)/mdb.c \
+	$(DIR)/midl.c 
+
+SERVERSRC += $(SRC)
+LIBSRC += $(SRC)
+
+MODCFLAGS_$(DIR)/mdb.c := -std=c99
+MODCFLAGS_$(DIR)/midl.c.c := -std=c99
