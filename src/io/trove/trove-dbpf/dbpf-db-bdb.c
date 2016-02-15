@@ -276,7 +276,7 @@ int dbpf_db_cursor_get(struct dbpf_cursor *dbc, struct dbpf_data *key,
     struct dbpf_data *val, int op, size_t maxkeylen)
 {
     DBT db_key, db_data;
-    int r, flags;
+    int r, flags=0;
     db_key.data = key->data;
     db_key.size = key->len;
     db_key.ulen = maxkeylen;
