@@ -151,12 +151,12 @@ int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
     if (cfg && strcmp(cfg->db_cache_type, "mmap") == 0)
     {
         r = (*db)->db->open((*db)->db, NULL, name, NULL, DB_BTREE,
-            create ? DB_CREATE : 0, DB_DIRTY_READ|DB_THREAD);
+            (create ? DB_CREATE : 0)|DB_DIRTY_READ|DB_THREAD, 0600);
     }
     else
     {
         r = (*db)->db->open((*db)->db, NULL, name, NULL, DB_BTREE,
-            create ? DB_CREATE : 0, DB_DIRTY_READ|DB_THREAD|DB_NOMMAP);
+            (create ? DB_CREATE : 0)|DB_DIRTY_READ|DB_THREAD|DB_NOMMAP, 0600);
     }
     if (r)
     {
@@ -276,7 +276,7 @@ int dbpf_db_cursor_get(struct dbpf_cursor *dbc, struct dbpf_data *key,
     struct dbpf_data *val, int op, size_t maxkeylen)
 {
     DBT db_key, db_data;
-    int r, flags;
+    int r, flags=0;
     db_key.data = key->data;
     db_key.size = key->len;
     db_key.ulen = maxkeylen;
