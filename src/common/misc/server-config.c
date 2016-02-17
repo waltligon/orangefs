@@ -105,9 +105,12 @@ static DOTCONF_CB(get_attr_cache_max_num_elems);
 static DOTCONF_CB(get_trove_sync_meta);
 static DOTCONF_CB(get_trove_sync_data);
 static DOTCONF_CB(get_file_stuffing);
-static DOTCONF_CB(get_db_cache_size_bytes);
 static DOTCONF_CB(get_trove_max_concurrent_io);
+/* Berkeley DB */
+static DOTCONF_CB(get_db_cache_size_bytes);
 static DOTCONF_CB(get_db_cache_type);
+/* LMDB */
+static DOTCONF_CB(get_db_max_size);
 static DOTCONF_CB(get_param);
 static DOTCONF_CB(get_value);
 static DOTCONF_CB(get_default_num_dfiles);
@@ -1072,19 +1075,24 @@ static const configoption_t options[] =
     {"TroveSyncData",ARG_STR, get_trove_sync_data, NULL, 
         CTX_STORAGEHINTS,"yes"},
 
-    /* The DBCacheSizeBytes option allows users to set the size of the
-     * shared memory buffer pool (i.e., cache) for Berkeley DB. The size is
+    /* Berkeley DB: The DBCacheSizeBytes option allows users to set the size of
+     * the shared memory buffer pool (i.e., cache) for Berkeley DB. The size is
      * specified in bytes.
      * See BDB documentation for <c>set_cachesize()</c> for more info.
      */
     {"DBCacheSizeBytes", ARG_INT, get_db_cache_size_bytes, NULL,
         CTX_STORAGEHINTS,"0"},
 
-    /* cache type for berkeley db environment.  <c>sys</c> and <c>mmap</c> are valid
-     * values for this option
+    /* Berkeley DB: cache type for berkeley db environment. <c>sys</c> and
+     * <c>mmap</c> are valid values for this option
      */
     {"DBCacheType", ARG_STR, get_db_cache_type, NULL,
         CTX_STORAGEHINTS, "sys"},
+
+    /* LMDB: maximum size of database map
+     */
+    {"DBMaxSize", ARG_INT, get_db_max_size, NULL,
+        CTX_STORAGEHINTS,"536870912"},
 
     /* This option specifies a parameter name to be passed to the 
      * distribution to be used.  This option should be immediately
@@ -1249,6 +1257,7 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
     config_s->client_retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
     config_s->client_retry_delay_ms = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
     config_s->trove_max_concurrent_io = 16;
+    config_s->db_max_size = 536870912;
 
     if (cache_config_files(config_s, global_config_filename))
     {
@@ -2805,14 +2814,6 @@ DOTCONF_CB(get_trove_sync_data)
     return NULL;
 }
 
-DOTCONF_CB(get_db_cache_size_bytes)
-{
-    struct server_configuration_s *config_s = 
-                    (struct server_configuration_s *)cmd->context;
-    config_s->db_cache_size_bytes = cmd->data.value;
-    return NULL;
-}
-
 DOTCONF_CB(get_trove_max_concurrent_io)
 {
     struct server_configuration_s *config_s = 
@@ -2827,11 +2828,20 @@ DOTCONF_CB(get_trove_max_concurrent_io)
     return NULL;
 }
 
+DOTCONF_CB(get_db_cache_size_bytes)
+{
+    struct server_configuration_s *config_s = 
+                    (struct server_configuration_s *)cmd->context;
+    config_s->db_cache_size_bytes = cmd->data.value;
+    return NULL;
+}
+
 DOTCONF_CB(get_db_cache_type)
 {
     struct server_configuration_s *config_s =
                     (struct server_configuration_s *)cmd->context;
-    
+
+
     if(strcmp(cmd->data.str, "sys") && strcmp(cmd->data.str, "mmap"))
     {
         return "Unsupported parameter supplied to DBCacheType option, must "
@@ -2847,7 +2857,20 @@ DOTCONF_CB(get_db_cache_type)
     {
         return "strdup() failure";
     }
+    return NULL;
+}
 
+DOTCONF_CB(get_db_max_size)
+{
+    struct server_configuration_s *config_s = 
+                    (struct server_configuration_s *)cmd->context;
+
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    config_s->db_max_size = cmd->data.value;
     return NULL;
 }
 

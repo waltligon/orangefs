@@ -30,7 +30,6 @@ extern struct TROVE_mgmt_ops    *mgmt_method_table[];
 
 struct PINT_perf_counter* PINT_server_pc = NULL;
 
-int TROVE_db_cache_size_bytes = 0;
 int TROVE_shm_key_hint = 0;
 int TROVE_max_concurrent_io = 16;
 
@@ -1045,16 +1044,6 @@ int trove_collection_setinfo(
     void* parameter)
 {
     TROVE_method_id method_id;
-    if(option == TROVE_DB_CACHE_SIZE_BYTES)
-    {
-        TROVE_db_cache_size_bytes = *((int *)parameter);
-        return 0;
-    }
-    if(option == TROVE_SHM_KEY_HINT)
-    {
-        TROVE_shm_key_hint = *((int*)parameter);
-        return(0);
-    }
     if(option == TROVE_MAX_CONCURRENT_IO)
     {
         TROVE_max_concurrent_io = *((int*)parameter);
@@ -1067,6 +1056,18 @@ int trove_collection_setinfo(
            context_id,
            option,
            parameter);
+}
+
+int trove_collection_set_fs_config(
+    TROVE_coll_id coll_id,
+    struct server_configuration_s *cfg)
+{
+    TROVE_method_id method_id;
+    method_id = global_trove_method_callback(coll_id);
+    return mgmt_method_table[method_id]->collection_set_fs_config(
+            method_id,
+            coll_id,
+            cfg);
 }
 
 /*
