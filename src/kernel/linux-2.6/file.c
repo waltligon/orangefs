@@ -3342,7 +3342,9 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
 /** Called to notify the module that there are no more references to
  *  this file (i.e. no processes have it open).
  *
- *  \note Not called when each file is closed.
+ *  This function is called when the LAST instance of a given file is
+ *  closed but NOT on every close (unless every file is opened once
+ *  and then cloased).
  */
 int pvfs2_file_release(
     struct inode *inode,

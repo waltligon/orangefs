@@ -2044,8 +2044,8 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
 
     gossip_debug(GOSSIP_UTILS_DEBUG,
                  "pvfs2_flush_mmap_racache %s: Handle is %s | fs_id %d\n",
-                 k2s(get_khandle_from_ino(inode),s),
-                 k2s(&(pvfs2_inode->refn.khandle),s),
+                 k2s(get_khandle_from_ino(inode),s1),
+                 k2s(&(pvfs2_inode->refn.khandle),s2),
                  pvfs2_inode->refn.fs_id);
 
     kfree(s1);

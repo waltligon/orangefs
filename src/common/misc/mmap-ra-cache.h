@@ -15,8 +15,9 @@ typedef struct
     struct qlist_head hash_link;
 
     PVFS_object_ref refn;
-    void *data;
-    PVFS_size data_sz;
+    PVFS_size       file_offset;
+    void            *data;
+    PVFS_size       data_sz;
 
 } mmap_ra_cache_elem_t;
 
@@ -35,7 +36,9 @@ typedef struct
 int pvfs2_mmap_ra_cache_initialize(void);
 
 int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
-                                 void *data, int data_len);
+                                 PVFS_size file_offset,
+                                 void *data,
+                                 int data_len);
 
 /*
   returns 0 on cache hit

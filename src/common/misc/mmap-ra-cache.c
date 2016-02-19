@@ -4,6 +4,11 @@
  * See COPYING in top-level directory.
  */
 
+/* This file defines a hash table based cache for the MMAP_RA_CACHE
+ * which does readaheads.  It is only used in the client-core and
+ * really this file should be in that directory.
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -38,9 +43,9 @@ int pvfs2_mmap_ra_cache_initialize(void)
 
     if (!MMAP_RA_CACHE_INITIALIZED())
     {
-        s_key_to_data_table = qhash_init(
-            hash_key_compare, hash_key,
-            DEFAULT_MMAP_RA_CACHE_HTABLE_SIZE);
+        s_key_to_data_table = qhash_init(hash_key_compare,
+                                         hash_key,
+                                         DEFAULT_MMAP_RA_CACHE_HTABLE_SIZE);
         if (!s_key_to_data_table)
         {
             goto return_error;
@@ -62,7 +67,9 @@ int pvfs2_mmap_ra_cache_initialize(void)
 }
 
 int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
-                                 void *data, int data_len)
+                                 PVFS_size file_offset,
+                                 void *data,
+                                 int data_len)
 {
     int ret = -1;
     mmap_ra_cache_elem_t *cache_elem = NULL;
@@ -72,13 +79,14 @@ int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
         pvfs2_mmap_ra_cache_flush(refn);
 
         cache_elem = (mmap_ra_cache_elem_t *)
-            malloc(sizeof(mmap_ra_cache_elem_t));
+                        malloc(sizeof(mmap_ra_cache_elem_t));
         if (!cache_elem)
         {
             goto return_exit;
         }
         memset(cache_elem, 0, sizeof(mmap_ra_cache_elem_t));
         cache_elem->refn = refn;
+        cache_elem->file_offset = file_offset;
         cache_elem->data = malloc(data_len);
         if (!cache_elem->data)
         {
@@ -89,7 +97,8 @@ int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
 
         gen_mutex_lock(&s_mmap_ra_cache_mutex);
         qhash_add(s_key_to_data_table,
-                  &refn, &cache_elem->hash_link);
+                  &refn,
+                  &cache_elem->hash_link);
         gen_mutex_unlock(&s_mmap_ra_cache_mutex);
 
         gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "Inserted mmap ra cache "
@@ -120,18 +129,23 @@ int pvfs2_mmap_ra_cache_get_block(
         hash_link = qhash_search(s_key_to_data_table, &refn);
         if (hash_link)
         {
-            cache_elem = qhash_entry(
-                hash_link, mmap_ra_cache_elem_t, hash_link);
+            cache_elem = qhash_entry(hash_link,
+                                     mmap_ra_cache_elem_t,
+                                     hash_link);
             assert(cache_elem);
 
-            if (cache_elem->data_sz > (offset + len))
+            if (offset > cache_elem->file_offset &&
+                (offset + len) <= cache_elem->file_offset + cache_elem->data_sz)
             {
+                /* cache hit must have all of the requested data */
                 gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
                              "mmap_ra_cache_get_block got block at "
                              "offset %llu, len %llu\n",  llu(offset),
                              llu(len));
 
-                ptr = (void *)(((char *)cache_elem->data + offset));
+                ptr = (void *)(((char *)cache_elem->data +
+                                (offset - cache_elem->file_offset)));
+                /* copy data out */
                 memcpy(dest, ptr, len);
 
                 if (amt_returned)
@@ -142,35 +156,15 @@ int pvfs2_mmap_ra_cache_get_block(
             }
             else
             {
-                int actual_len = (int)
-                    ((offset + len) - cache_elem->data_sz);
-
+                /* miss - whole request not found in buffer */
                 gossip_debug(
                     GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_get_block "
-                    "found invalid block [%llu/%llu]\n",
-                    llu(offset), llu(len));
-
-                if (actual_len > 0)
-                {
-                    gossip_debug(
-                        GOSSIP_MMAP_RCACHE_DEBUG, " data_sz is %llu, "
-                        "offset is %llu len is %llu\n\t(filling partial %d "
-                        "bytes)\n", llu(cache_elem->data_sz), llu(offset),
-                        llu(len), actual_len);
-
-                    ptr = (void *)(((char *)cache_elem->data + offset));
-                    memcpy(dest, ptr, actual_len);
-
-                    if (amt_returned)
-                    {
-                        *amt_returned = actual_len;
-                    }
-                    ret = 0;
-                }
+                    "short cache miss (nothing here)\n");
             }
         }
         else
         {
+            /* miss - no buffer found */
             gossip_debug(
                 GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_get_block "
                 "clean cache miss (nothing here)\n");
@@ -192,8 +186,9 @@ int pvfs2_mmap_ra_cache_flush(PVFS_object_ref refn)
         hash_link = qhash_search_and_remove(s_key_to_data_table, &refn);
         if (hash_link)
         {
-            cache_elem = qhash_entry(
-                hash_link, mmap_ra_cache_elem_t, hash_link);
+            cache_elem = qhash_entry(hash_link,
+                                     mmap_ra_cache_elem_t,
+                                     hash_link);
             assert(cache_elem);
             assert(cache_elem->data);
 
@@ -227,11 +222,12 @@ int pvfs2_mmap_ra_cache_finalize(void)
             do
             {
                 hash_link = qhash_search_and_remove_at_index(
-                    s_key_to_data_table,i);
+                                s_key_to_data_table,i);
                 if (hash_link)
                 {
-                    cache_elem = qhash_entry(
-                        hash_link, mmap_ra_cache_elem_t, hash_link);
+                    cache_elem = qhash_entry(hash_link,
+                                             mmap_ra_cache_elem_t,
+                                             hash_link);
 
                     assert(cache_elem);
                     assert(cache_elem->data);
