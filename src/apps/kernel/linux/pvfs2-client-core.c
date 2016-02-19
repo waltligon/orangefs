@@ -2310,6 +2310,27 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
             }
         }
     }
+    else /* Write operation - flush cache for consistency */
+    {
+        /* later version could check to see if this written
+         * data actually overlaps the data that might be in
+         * the cache and then only flushes if it is
+         * this is quick and dirty
+         */
+
+        s = calloc(1,HANDLESTRINGSIZE);
+        gossip_debug(
+            GOSSIP_MMAP_RCACHE_DEBUG, "Flushing mmap-racache elem %s, %d\n",
+            k2s(&(vfs_request->in_upcall.req.io.refn.khandle),s),
+            vfs_request->in_upcall.req.io.refn.fs_id);
+        free(s);
+
+        refn.handle = pvfs2_khandle_to_ino(
+                      &(vfs_request->in_upcall.req.io.refn.khandle));
+        refn.fs_id = vfs_request->in_upcall.req.io.refn.fs_id;
+
+        pvfs2_mmap_ra_cache_flush(refn);
+    }
 #endif /* USE_MMAP_RA_CACHE */
 
     /* Posting a regular non-readahead related IO - read or write */
