@@ -115,6 +115,9 @@ int pvfs2_file_open(
     }
     else
     {
+        /* This tells 2tier to load the file from the storage facility */
+        uint32_t mask = PVFS_ATTR_SYS_PROMOTE;           
+
         /*
           if the file's being opened for append mode, set the file pos
           to the end of the file when we retrieve the size (which we
@@ -122,8 +125,6 @@ int pvfs2_file_open(
         */
         if (file->f_flags & O_APPEND)
         {
-            /* This tells 2tier to load the file from the storage facility */
-            uint32_t mask = PVFS_ATTR_SYS_PROMOTE;           
             /* 
              * When we do a getattr in response to an open with O_APPEND,
              * all we are interested in is the file size. Hence we will
@@ -155,7 +156,8 @@ int pvfs2_file_open(
         */
         ret = generic_file_open(inode, file);
     }
-gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open returning normally: %d\n", ret);
+
+    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open returning normally: %d\n", ret);
 
 out:
     kfree(s);
@@ -1331,6 +1333,10 @@ static ssize_t do_readv_writev(struct rw_options *rw)
     struct iovec *iovecptr = NULL, *ptr = NULL;
     loff_t *offset;
     char *s = kmalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+#ifdef GWC_USES_KIOCB
+    struct kiocb iocb;
+    struct iov_iter iter;
+#endif
 
     total_count = 0;
     ret = -EINVAL;
@@ -1403,14 +1409,30 @@ static ssize_t do_readv_writev(struct rw_options *rw)
 #ifdef PVFS2_LINUX_KERNEL_2_4
         ret = pvfs2_precheck_file_write(file, inode, &count, offset);
 #else
+#ifdef GWC_USES_KIOCB
+	init_sync_kiocb(&iocb, file);
+	iov_iter_init(&iter,
+		      WRITE,
+		      rw->dest.address.iov,
+		      rw->dest.address.nr_segs,
+		      pvfs_bufmap_size_query());
+	ret = generic_write_checks(&iocb, &iter);
+        if (ret <= 0)
+        {
+            gossip_err("%s: failed generic argument checks.\n", rw->fnstr);
+            goto out;
+        }
+
+#else
         ret = generic_write_checks(file, offset, &count, S_ISBLK(inode->i_mode));
-#endif
         if (ret != 0)
         {
             gossip_err("%s: failed generic argument checks.\n", rw->fnstr);
             goto out;
         }
 
+#endif
+#endif
         memset(s,0,HANDLESTRINGSIZE);
         gossip_debug(GOSSIP_FILE_DEBUG,
                      "%s/%s(%s): proceeding with offset : %llu, size %d\n",
