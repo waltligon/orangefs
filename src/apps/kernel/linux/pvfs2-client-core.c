@@ -2141,6 +2141,7 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
            (vfs_request->in_upcall.req.io.buf_index <
             s_desc_params[BM_IO].dev_buffer_count));
 
+    /* make sure that there isn't an old buffer hanging around */
     vfs_request->io_tmp_buf = malloc(
                     vfs_request->in_upcall.req.io.readahead_size);
     if (!vfs_request->io_tmp_buf)
@@ -2219,6 +2220,14 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
 
     if (vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ)
     {
+        s = calloc(1, HANDLESTRINGSIZE);
+        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "[%s,%d] checking"
+                    " req: %d bytes and readahead %d\n",
+                    k2s(&(vfs_request->in_upcall.req.io.refn.khandle),s),
+                    vfs_request->in_upcall.req.io.refn.fs_id,
+                    (int)vfs_request->in_upcall.req.io.count,
+                    (int)vfs_request->in_upcall.req.io.readahead_size);
+        free(s);
         /*
           if a non-zero readahead size and count are specified, check
           the readahead cache for the read data being requested --
@@ -2229,6 +2238,10 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
         if ((vfs_request->in_upcall.req.io.count > 0) &&
             (vfs_request->in_upcall.req.io.readahead_size > 0))
         {
+            /* This buffer is for copying
+             * out of the cash - the same pointer is used in
+             * post_io_readahead_request for reading from server
+             */
             vfs_request->io_tmp_buf = (char *)
                 ((vfs_request->in_upcall.req.io.count <=
                   MMAP_RA_SMALL_BUF_SIZE) ?
@@ -2247,9 +2260,9 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
                         vfs_request->io_tmp_buf);
                 }
 
-                s = calloc(1,HANDLESTRINGSIZE);
+                s = calloc(1, HANDLESTRINGSIZE);
                 gossip_debug(
-                    GOSSIP_MMAP_RCACHE_DEBUG, "[%s,%d] checking"
+                    GOSSIP_MMAP_RCACHE_DEBUG, "[%s,%d] checking racache"
                     " for %d bytes at offset %lu\n",
                     k2s(&(vfs_request->in_upcall.req.io.refn.khandle),s),
                     vfs_request->in_upcall.req.io.refn.fs_id,
@@ -2291,10 +2304,20 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
         }
 
         /* don't post a readahead req if the size is too big or small */
+        /* do not understand this logic - this is keeping us from
+         * doing any readahead
+         */
+#if 0
         if ((vfs_request->in_upcall.req.io.readahead_size <
              MMAP_RA_MAX_THRESHOLD) &&
             (vfs_request->in_upcall.req.io.readahead_size >
              MMAP_RA_MIN_THRESHOLD))
+#endif
+        /* if the original request is already large just read it
+         * but otherwise post a readahead
+         */
+        if (vfs_request->in_upcall.req.io.count <
+            (vfs_request->in_upcall.req.io.readahead_size * 0.5))
         {
             /* otherwise, check if we can post a readahead request here */
             ret = post_io_readahead_request(vfs_request);
@@ -2318,7 +2341,7 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
          * this is quick and dirty
          */
 
-        s = calloc(1,HANDLESTRINGSIZE);
+        s = calloc(1, HANDLESTRINGSIZE);
         gossip_debug(
             GOSSIP_MMAP_RCACHE_DEBUG, "Flushing mmap-racache elem %s, %d\n",
             k2s(&(vfs_request->in_upcall.req.io.refn.khandle),s),
@@ -2400,6 +2423,9 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
 #ifdef USE_MMAP_RA_CACHE
     /* on cache hits, we return immediately with the cached data */
   mmap_ra_cache_hit:
+
+    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                     "--- Readahead cache hit!\n");
 
     vfs_request->out_downcall.type = PVFS2_VFS_OP_FILE_IO;
     vfs_request->out_downcall.status = 0;
