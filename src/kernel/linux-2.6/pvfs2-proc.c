@@ -447,6 +447,13 @@ static struct pvfs2_param_extra perf_reset_extra = {
     .min = 0,
     .max = 1,
 };
+#ifdef USE_MMAP_RA_CACHE
+static struct pvfs2_param_extra perf_readahead_size_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_READAHEAD_SIZE,
+    .min = 4096,
+    .max = INT_MAX,
+};
+#endif
 
 static int min_op_timeout_secs[] = {0}, max_op_timeout_secs[] = {INT_MAX};
 static int min_slot_timeout_secs[] = {0}, max_slot_timeout_secs[] = {INT_MAX};
@@ -832,6 +839,17 @@ static struct ctl_table pvfs2_table[] = {
         .mode = 0555,
         .child = pvfs2_capcache_table
     },
+#ifdef USE_MMAP_RA_CACHE
+    /* parameter for readahead cache size */
+    {
+        CTL_NAME(15)
+        .procname = "readahead-size",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &perf_readahead_size_extra
+    },
+#endif
     { CTL_NAME(CTL_NONE) }
 };
 static struct ctl_table fs_table[] = {
