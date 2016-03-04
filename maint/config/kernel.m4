@@ -1342,6 +1342,9 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 		 ] )
 	AC_CHECK_HEADERS([linux/exportfs.h], [],[],
 		[#define __KERNEL__
+		 #ifdef HAVE_KCONFIG
+		 #include <linux/kconfig.h>
+		 #endif
 		 #include <linux/exportfs.h>
 		])
 
@@ -1984,6 +1987,64 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	    AC_MSG_RESULT(yes)
 	    AC_DEFINE(HAVE_COMBINED_AIO_AND_VECTOR, 1, Define if struct file_operations has combined aio_read and readv functions),
 	    )
+
+	dnl Check for write_iter
+	AC_MSG_CHECKING(for write_iter in file_operations)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+			#include <linux/kconfig.h>
+		#endif
+		#include <linux/fs.h>
+		], [
+		struct file_operations filop = {
+			.write_iter = NULL
+		};
+		],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_WRITE_ITER, 1, file_operations has write_iter),
+		AC_MSG_RESULT(no)
+		)
+
+	dnl Check for nd_set_link
+	AC_MSG_CHECKING(for nd_set_link)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+			#include <linux/kconfig.h>
+		#endif
+		#include <linux/fs.h>
+		#include <linux/namei.h>
+		], [
+		struct nameidata *nd;
+		char *target;
+
+		nd_set_link(nd, target);
+		],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_ND_SET_LINK, 1, nd_set_link is a function),
+		AC_MSG_RESULT(no)
+		)
+
+	dnl Check for generic_write_checks flavor
+	AC_MSG_CHECKING(for generic_write_checks version)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+			#include <linux/kconfig.h>
+		#endif
+		#include <linux/fs.h>
+		], [
+		struct kiocb *iocb;
+		struct iov_iter *iter;
+
+		generic_write_checks(iocb, iter);
+		],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(GWC_USES_KIOCB, 1, generic_write_checks with kiocb),
+		AC_MSG_RESULT(no)
+		)
+
 
 	dnl Check for kzalloc
 	AC_MSG_CHECKING(for kzalloc)

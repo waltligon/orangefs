@@ -1,0 +1,7 @@
+DIR := src/apps/admin/lmdb
+
+ADMINSRC += \
+	$(DIR)/mdb_copy.c \
+	$(DIR)/mdb_dump.c \
+	$(DIR)/mdb_load.c \
+	$(DIR)/mdb_stat.c 
