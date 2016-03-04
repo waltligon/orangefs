@@ -47,13 +47,18 @@
 
 #ifdef USE_MMAP_RA_CACHE
 #include "mmap-ra-cache.h"
+/* These are not used currently */
+#if 0
 #define MMAP_RA_MIN_THRESHOLD     76800
 #define MMAP_RA_MAX_THRESHOLD  16777216
+#endif
+/* this reduced mallocs when user does small reads */
 #define MMAP_RA_SMALL_BUF_SIZE    16384
+#define PVFS2_DEFAULT_READAHEAD_SIZE (16 * 1024 * 1024) /* in bytes - 16MB */
+#define PVFS2_MAX_READAHEAD_SIZE (64 * 1024) /* in pages - 256MB */
 #endif
 
 /* only relevant if USE_MMAP_RA_CACHE is on */
-#define PVFS2_DEFAULT_READAHEAD_SIZE (16 * 1024 * 1024)
 
 /*
   an arbitrary limit to the max number of operations we'll support in
@@ -1914,11 +1919,20 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             if(vfs_request->in_upcall.req.param.type ==
                 PVFS2_PARAM_REQUEST_SET)
             {
+                /* readahead size parameter is in pages */
+                if (vfs_request->in_upcall.req.param.value >
+                    PVFS2_MAX_READAHEAD_SIZE)
+                {
+                    vfs_request->in_upcall.req.param.value =
+                            PVFS2_MAX_READAHEAD_SIZE;
+                }
+                /* pages converted to bytes here */
                 s_opts.readahead_size =
-                        vfs_request->in_upcall.req.param.value;
+                        vfs_request->in_upcall.req.param.value * 4096;
             }
             else
             {
+                /* readahead size reported in bytes */
                 vfs_request->out_downcall.resp.param.value =
                         s_opts.readahead_size;
             }
@@ -4256,7 +4270,7 @@ int main(int argc, char **argv)
 #ifdef USE_MMAP_RA_CACHE
     if (s_opts.readahead_size == 0)
     {
-        s_opts.readahead_size = PVFS2_DEFAULT_READAHEAD_SIZE;
+        s_opts.readahead_size = PVFS2_DEFAULT_READAHEAD_SIZE; /* in bytes */
     }
 #endif
 

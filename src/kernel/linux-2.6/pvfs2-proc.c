@@ -450,7 +450,7 @@ static struct pvfs2_param_extra perf_reset_extra = {
 #ifdef USE_MMAP_RA_CACHE
 static struct pvfs2_param_extra perf_readahead_size_extra = {
     .op = PVFS2_PARAM_REQUEST_OP_READAHEAD_SIZE,
-    .min = 4096,
+    .min = 0,
     .max = INT_MAX,
 };
 #endif
