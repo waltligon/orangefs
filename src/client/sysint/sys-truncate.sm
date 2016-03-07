@@ -24,6 +24,7 @@
 #include "PINT-reqproto-encode.h"
 #include "acache.h"
 #include "pvfs2-internal.h"
+#include "client-capcache.h"
 
 #define TRUNCATE_UNSTUFF 100
 
@@ -411,7 +412,7 @@ static PINT_sm_action truncate_unstuff_setup_msgpair(
             *sm_p->cred_p,
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
-            PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE);
+            PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_CAPABILITY);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
@@ -443,6 +444,7 @@ static int unstuff_comp_fn(
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int local_uid, ret;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"unstuff completion fn: unstuff_comp_fn\n");
@@ -473,6 +475,20 @@ static int unstuff_comp_fn(
     /* replace attrs found by getattr */
     /* PINT_copy_object_attr() takes care of releasing old memory */
     PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.unstuff.attr);
+
+    /* update client capcache with returned cap */
+    local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+    if (local_uid == (PVFS_uid) -1) {
+        local_uid = PINT_util_getuid();
+    }
+    PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+    ret = PINT_client_capcache_update(sm_p->object_ref, local_uid,
+                                      &resp_p->u.unstuff.attr.capability);
+    if (ret < 0)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: capcache update returned "
+                     "%d\n", __func__, ret);
+    }
 
     return(0);
 }

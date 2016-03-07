@@ -392,7 +392,7 @@ static ssize_t pvfs2_devreq_writev(
                     put_op(op);
                     return -EPROTO;
                 }
-                if (iov[notrailer_count].iov_len > op->downcall.trailer_size)
+                if (iov[notrailer_count].iov_len != op->downcall.trailer_size)
                 {
                     gossip_err("writev error: trailer size (%ld) != iov_len (%ld)\n",
                             (unsigned long) op->downcall.trailer_size, 
@@ -401,6 +401,9 @@ static ssize_t pvfs2_devreq_writev(
                     put_op(op);
                     return -EMSGSIZE;
                 }
+
+                total_returned_size += iov[notrailer_count].iov_len;
+
                 /* Allocate a buffer large enough to hold the trailer bytes */
                 op->downcall.trailer_buf = (void *) vmalloc(op->downcall.trailer_size);
                 if (op->downcall.trailer_buf != NULL) 
@@ -591,7 +594,18 @@ static ssize_t pvfs2_devreq_writev(
     return total_returned_size;
 }
 
-#ifdef HAVE_COMBINED_AIO_AND_VECTOR
+#ifdef HAVE_WRITE_ITER
+static ssize_t pvfs2_devreq_write_iter(struct kiocb *iocb,
+                                      struct iov_iter *iter)
+{
+        return pvfs2_devreq_writev(iocb->ki_filp,
+                                   iter->iov,
+                                   iter->nr_segs,
+                                   &iocb->ki_pos);
+}
+#endif
+
+#if defined(HAVE_COMBINED_AIO_AND_VECTOR) && !defined(HAVE_WRITE_ITER)
 /*
  * Kernels >= 2.6.19 have no writev, use this instead with SYNC_KEY.
  */
@@ -599,7 +613,7 @@ static ssize_t pvfs2_devreq_aio_write(struct kiocb *kiocb,
                                       const struct iovec *iov,
                                       unsigned long count, loff_t offset)
 {
-    return pvfs2_devreq_writev(kiocb->ki_filp, iov, count, &kiocb->ki_pos);
+    return pvfs2_devreq_writev(NULL, iov, count, NULL);
 }
 #endif
 
@@ -1189,7 +1203,9 @@ struct file_operations pvfs2_devreq_file_operations =
     poll : pvfs2_devreq_poll
 #else
     .read = pvfs2_devreq_read,
-#ifdef HAVE_COMBINED_AIO_AND_VECTOR
+#ifdef HAVE_WRITE_ITER
+    .write_iter = pvfs2_devreq_write_iter,
+#elif HAVE_COMBINED_AIO_AND_VECTOR
     .aio_write = pvfs2_devreq_aio_write,
 #else
     .writev = pvfs2_devreq_writev,

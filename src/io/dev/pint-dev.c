@@ -696,6 +696,7 @@ int PINT_dev_write_list(
     int i;
     int ret = -1;
     int32_t proto_ver = PVFS_KERNEL_PROTO_VERSION;
+    int bytes_to_write = 0;
 #ifdef WIN32
     char *buffer, *b;
     size_t bsize = 0;
@@ -724,15 +725,19 @@ int PINT_dev_write_list(
 
     io_array[0].iov_base = &proto_ver;
     io_array[0].iov_len = sizeof(int32_t);
+    bytes_to_write += io_array[0].iov_len;
     io_array[1].iov_base = &pdev_magic;
     io_array[1].iov_len = sizeof(int32_t);
+    bytes_to_write += io_array[1].iov_len;
     io_array[2].iov_base = &tag;
     io_array[2].iov_len = sizeof(uint64_t);
+    bytes_to_write += io_array[2].iov_len;
 
     for (i=0; i<list_count; i++)
     {
         io_array[i+3].iov_base = buffer_list[i];
         io_array[i+3].iov_len = size_list[i];
+        bytes_to_write += io_array[i + 3].iov_len;
         io_count++;
     }
 
@@ -765,7 +770,11 @@ int PINT_dev_write_list(
 #else
     ret = writev(pdev_fd, io_array, io_count);
 #endif
-    return ((ret < 0) ? -(PVFS_EIO|PVFS_ERROR_DEV) : 0);
+
+    if (ret == bytes_to_write)
+      return(0);
+    else
+      return(-(PVFS_EIO|PVFS_ERROR_DEV));   
 }
 
 /* PINT_dev_remount()

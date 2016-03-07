@@ -259,45 +259,38 @@ static PINT_sm_action setparam_cleanup(
  */
 static int check_fs_id(PVFS_fs_id fs_id)
 {
-    int ret = -PVFS_ENOENT, count = 1;
-    TROVE_ds_position pos = TROVE_ITERATE_START;
-    TROVE_keyval_s name;
-    TROVE_coll_id tmp_coll;
+    int ret, count = 1;
+    TROVE_keyval_s name[32];
+    TROVE_coll_id tmp_coll[32];
     TROVE_op_id tmp_id;
     struct server_configuration_s * server_config;
+    int i;
 
-    name.buffer = malloc(PVFS_NAME_MAX);
-    if (!name.buffer)
-    {
-        ret = -PVFS_ENOMEM;
-        goto check_failed;
+    for (i = 0; i < 32; i++) {
+        name[i].buffer = malloc(PVFS_NAME_MAX);
+        if (!name[i].buffer)
+        {
+            ret = -PVFS_ENOMEM;
+            goto check_failed;
+        }
+        name[i].buffer_sz = PVFS_NAME_MAX;
     }
-    name.buffer_sz = PVFS_NAME_MAX;
 
     server_config = get_server_config_struct();
 
-    while(count == 1)
+    ret = trove_collection_iterate(server_config->trove_method, name, tmp_coll,
+        &count, 0, 0, NULL, &tmp_id);
+    if (ret < 0)
     {
-        ret = trove_collection_iterate(
-            server_config->trove_method,
-            &pos, &name, &tmp_coll, &count, 0, 0, NULL, &tmp_id);
+        goto free_name_buffer;
+    }
 
-        if (ret == 0)
-        {
-            gossip_lerr("Error: unexpected trove behavior.\n");
-            ret = -PVFS_EINVAL;
-            goto free_name_buffer;
-        }
-        
-        if (ret < 0)
-        {
-            goto free_name_buffer;
-        }
-
+    ret = -PVFS_ENOENT;
+    for (i = 0; i < count; i++)
+    {
         gossip_debug(GOSSIP_SERVER_DEBUG, "looking for fs_id: %d, "
-                     "found %d.\n", (int)fs_id, (int)tmp_coll);
-
-        if ((count > 0) && (tmp_coll == fs_id))
+                     "found %d.\n", (int)fs_id, (int)tmp_coll[i]);
+        if (tmp_coll[i] == fs_id)
         {
             /* we found a matching collection */
             ret = 0;
@@ -306,9 +299,11 @@ static int check_fs_id(PVFS_fs_id fs_id)
     }
 
 free_name_buffer:
-    free(name.buffer);
+    for (i = 0; i < 32; i++)
+    {
+        free(name[i].buffer);
+    }
 check_failed:
-
     return ret;
 }
 

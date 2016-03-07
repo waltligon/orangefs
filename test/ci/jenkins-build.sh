@@ -39,23 +39,6 @@ CVS_BRANCH=${CVS_BRANCH:="main"}
 # common flags
 flags=" --prefix=${INSTALL_PATH} --enable-shared" 
 
-# make sure we have our local db4 version available
-if [ -d /opt/db4 ]
-then
-    flags="${flags} --with-db=/opt/db4"
-else
-    # see if standard location works (ubuntu with db4.8)
-    maj=`cat /usr/include/db.h | grep DB_VERSION_MAJOR | awk '{ print $3 }'`
-    min=`cat /usr/include/db.h | grep DB_VERSION_MINOR | awk '{ print $3 }'`
-    if [ "${maj}" -eq 4 -a "${min}" -ge 8 ]
-    then
-        echo "Using default system db library"
-    else
-        echo "No /opt/db4 directory"
-        exit 1
-    fi
-fi
-
 # find kernel sources and set appropriate flags taking 2.4/2.6 into account
 # centos 3.9 has a 2.4 kernel, and has the same changes as redhat24
 if [ "${VFS:0:6}" = "kernel" ]

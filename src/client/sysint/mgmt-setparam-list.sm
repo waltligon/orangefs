@@ -282,7 +282,12 @@ static PINT_sm_action mgmt_setparam_list_cleanup(
         for(i = 0; i < sm_p->u.setparam_list.count; i++)
         {
             int status;
-            if (sm_p->u.setparam_list.param == PVFS_SERV_PARAM_ROOT_CHECK)
+
+            /* Skip if failure occurs before allocating memory for the root
+             * check status array, usually after calling a get_attr.
+             */
+            if (sm_p->u.setparam_list.param == PVFS_SERV_PARAM_ROOT_CHECK &&
+                sm_p->u.setparam_list.root_check_status_array != NULL)
             {
                 status = sm_p->u.setparam_list.root_check_status_array[i];
             }
