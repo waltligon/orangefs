@@ -1,0 +1,97 @@
+diff --git a/check b/check
+index 135a9fb..901913b 100755
+--- a/check
++++ b/check
+@@ -64,6 +64,7 @@ check options
+     -nfs                test NFS
+     -cifs               test CIFS
+     -overlay		test overlay
++    -pvfs2          test PVFS2
+     -tmpfs              test TMPFS
+     -l			line mode diff
+     -udiff		show unified diff (default)
+@@ -204,7 +205,8 @@ while [ $# -gt 0 ]; do
+ 	-nfs)		FSTYP=nfs ;;
+ 	-cifs)		FSTYP=cifs ;;
+ 	-overlay)	FSTYP=overlay ;;
+-	-tmpfs)		FSTYP=tmpfs ;;
++    -pvfs2)      FSTYP=pvfs2 ;;
++    -tmpfs)		FSTYP=tmpfs ;;
+ 
+ 	-g)	group=$2 ; shift ;
+ 		GROUP_LIST="$GROUP_LIST ${group//,/ }"
+diff --git a/common/rc b/common/rc
+index 5135260..53aa60e 100644
+--- a/common/rc
++++ b/common/rc
+@@ -152,6 +152,8 @@ case "$FSTYP" in
+     reiser4)
+ 	 [ "$MKFS_REISER4_PROG" = "" ] && _fatal "mkfs.reiser4 not found"
+ 	 ;;
++    pvfs2)
++	;;
+ esac
+ 
+ # make sure we have a standard umask
+@@ -647,6 +649,8 @@ _test_mkfs()
+     overlay)
+ 	# do nothing for overlay
+ 	;;
++    pvfs2)
++	;;
+     udf)
+         $MKFS_UDF_PROG $MKFS_OPTIONS $* $TEST_DEV > /dev/null
+ 	;;
+@@ -727,6 +731,8 @@ _scratch_mkfs()
+ 	# avoid EEXIST caused by the leftover files created in previous runs
+         _scratch_cleanup_files
+ 	;;
++    pvfs2)
++	;;
+     udf)
+         $MKFS_UDF_PROG $MKFS_OPTIONS $* $SCRATCH_DEV > /dev/null
+ 	;;
+@@ -1241,6 +1247,9 @@ _require_scratch_nocheck()
+ 			_notrun "this test requires a valid \$SCRATCH_MNT"
+ 		fi
+ 		;;
++	pvfs2)
++		_notrun "requires a scratch device"
++		;;
+ 	tmpfs)
+ 		if [ -z "$SCRATCH_DEV" -o ! -d "$SCRATCH_MNT" ];
+ 		then
+@@ -1323,6 +1332,15 @@ _require_test()
+ 			_notrun "this test requires a valid \$TEST_DIR"
+ 		fi
+ 		;;
++	pvfs2)
++		echo $TEST_DEV | grep -q "://" > /dev/null 2>&1
++		if [ -z "$TEST_DEV" -o "$?" != "0" ]; then
++			_notrun "this test requires a valid \$TEST_DIR"
++		fi
++		if [ ! -d "$TEST_DIR" ]; then
++			_notrun "this test requires a valid \$TEST_DIR"
++		fi
++		;;
+ 	tmpfs)
+ 		if [ -z "$TEST_DEV" -o ! -d "$TEST_DIR" ];
+ 		then
+@@ -2242,6 +2260,8 @@ _check_test_fs()
+     overlay)
+ 	# no way to check consistency for overlay
+ 	;;
++    pvfs2)
++	;;
+     udf)
+ 	# do nothing for now
+ 	;;
+@@ -2286,6 +2306,8 @@ _check_scratch_fs()
+     overlay)
+ 	# no way to check consistency for overlay
+ 	;;
++    pvfs2)
++	;;
+     btrfs)
+ 	_check_btrfs_filesystem $device
+ 	;;
