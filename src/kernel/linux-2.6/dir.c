@@ -15,6 +15,8 @@
 #include "pvfs2-sysint.h"
 #include "pvfs2-internal.h"
 
+#define PVFS_ITERATE_NEXT     (INT32_MAX - 3)
+
 typedef struct 
 {
     int buffer_index;
@@ -91,6 +93,9 @@ static void readdir_handle_dtor(readdir_handle_t *rhandle)
     }
     if (rhandle->buffer_index >= 0)
     {
+        gossip_debug(GOSSIP_BUFMAP_DEBUG, "%s: put index:%d:\n",
+               __func__,
+               rhandle->buffer_index);
         readdir_index_put(rhandle->buffer_index);
         rhandle->buffer_index = -1;
     }
@@ -139,13 +144,17 @@ static int pvfs2_readdir(
     char *s = kmalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
 #ifdef HAVE_READDIR_FILE_OPERATIONS
-    gossip_ldebug(GOSSIP_DIR_DEBUG,
-        "%s: file->f_pos:%lld, token = %llu\n",
-        __func__,lld(file->f_pos), llu(*ptoken));
+    gossip_debug(GOSSIP_DIR_DEBUG,
+        "%s: file->f_pos:%lld, ptoken = %llu\n",
+        __func__,
+        lld(file->f_pos),
+        llu(*ptoken));
 #else
-    gossip_ldebug(GOSSIP_DIR_DEBUG,
-        "%s: ctx->pos:%lld, token = %llu\n",
-        __func__,lld(ctx->pos), llu(*ptoken));
+    gossip_debug(GOSSIP_DIR_DEBUG,
+        "%s: ctx->pos:%lld, ptoken = %llu\n",
+        __func__,
+        lld(ctx->pos),
+        llu(*ptoken));
 #endif
 
 #ifdef HAVE_READDIR_FILE_OPERATIONS
@@ -163,8 +172,10 @@ static int pvfs2_readdir(
         goto out;
     }
 
-    gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdir called on %s (pos=%llu)\n",
-                 dentry->d_name.name, llu(pos));
+    gossip_debug(GOSSIP_DIR_DEBUG, "%s: called on %s (pos=%llu)\n",
+                 __func__,
+                 dentry->d_name.name,
+                 llu(pos));
 
     rhandle.buffer_index = -1;
     rhandle.dents_buf = NULL;
@@ -238,24 +249,24 @@ get_new_buffer_index:
                              "pvfs2_readdir", 
                              get_interruptible_flag(dentry->d_inode));
 
-    gossip_debug(GOSSIP_DIR_DEBUG, "Readdir downcall status is %d.  ret:%d\n",
-                                   new_op->downcall.status,ret);
+    gossip_debug(GOSSIP_DIR_DEBUG,
+                 "%s: Readdir downcall status is %d.  ret:%d\n",
+                  __func__,
+                  new_op->downcall.status,
+                  ret);
 
     if ( ret == -EAGAIN && op_state_purged(new_op) )
     {
-       /* readdir shared memory aread has been wiped due to pvfs2-client-core restarting, so
-        * we must get a new index into the shared memory.
-        */
-       gossip_debug(GOSSIP_DIR_DEBUG,"%s: Getting new buffer_index for retry of readdir..\n",__func__);
+       gossip_debug(GOSSIP_DIR_DEBUG,
+                    "%s: Getting new buffer_index for retry of readdir.\n",
+                    __func__);
        goto get_new_buffer_index;
     }
 
     if ( ret == -EIO && op_state_purged(new_op) )
     {
-        /* pvfs2-client is down.  Readdir shared memory area has been wiped clean.  No need to "put"
-         * back the buffer_index.
-         */
-        gossip_err("%s: Client is down.  Aborting readdir call. \n",__func__);
+        /* pvfs2-client is down, aborting readdir.  */
+        gossip_err("%s: Client is down.  Aborting readdir call. \n", __func__);
         op_release(new_op);
         goto out;
     }
@@ -267,16 +278,15 @@ get_new_buffer_index:
                       new_op->downcall.status);
          readdir_index_put(buffer_index);
          op_release(new_op);
-         ret = ( (ret < 0 ? ret : new_op->downcall.status) );
+         ret = ((ret < 0 ? ret : new_op->downcall.status));
          goto out;
     }
 
-    if ( (bytes_decoded = readdir_handle_ctor(&rhandle, 
-                                              new_op->downcall.trailer_buf,
-                                              buffer_index))  <  0 )
-    { 
-       gossip_err("pvfs2_readdir: Could not decode trailer buffer "
-                  " into a readdir response %d\n", ret);
+    bytes_decoded = readdir_handle_ctor(&rhandle, 
+                                        new_op->downcall.trailer_buf,
+                                        buffer_index);
+    if (bytes_decoded < 0) { 
+       gossip_err("%s: could not decode trailer buffer.\n", __func__);
        ret = bytes_decoded;
        readdir_index_put(buffer_index);
        op_release(new_op);
@@ -285,9 +295,10 @@ get_new_buffer_index:
 
     if (bytes_decoded != new_op->downcall.trailer_size)
     {
-        gossip_err("pvfs2_readdir: # bytes "
-                   "decoded (%ld) != trailer size (%ld)\n",
-                    bytes_decoded, (long) new_op->downcall.trailer_size);
+        gossip_err("%s: # bytes decoded (%ld) != trailer size (%ld)\n",
+                   __func__,
+                   bytes_decoded,
+                   (long) new_op->downcall.trailer_size);
         ret = -EINVAL;
         readdir_handle_dtor(&rhandle);
         op_release(new_op);
@@ -297,64 +308,72 @@ get_new_buffer_index:
     if (pos == 0)
     {
        ino = get_ino_from_khandle(dentry->d_inode);
-       gossip_debug(GOSSIP_DIR_DEBUG,"%s: calling filldir of \".\" with pos = %llu\n"
-                                    ,__func__
-                                    ,llu(pos));
+
 #ifdef HAVE_READDIR_FILE_OPERATIONS
-       if ( (ret=filldir(dirent,".",1,pos,ino,DT_DIR)) < 0)
+       if ( (ret=filldir(dirent, ".", 1, 0, ino, DT_DIR)) < 0)
 #else
-       if ( (ret=dir_emit(ctx,".",1,ino,DT_DIR)) < 0)
+       if ( (ret=dir_emit(ctx, ".", 1, ino, DT_DIR)) < 0)
 #endif
        {
           readdir_handle_dtor(&rhandle);
           op_release(new_op);
           goto out;
        }
-#ifdef HAVE_READDIR_FILE_OPERATIONS
-       file->f_pos++;
-       gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: file->f_pos:%lld\n",__func__,lld(file->f_pos));
-#else
-       ctx->pos++;
-       gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: ctx->pos:%lld\n",__func__,lld(ctx->pos));
-#endif
+       gossip_ldebug(GOSSIP_DIR_DEBUG,
+                     "%s: dot pos:%lld\n",
+                     __func__,
+                     lld(pos));
        pos++;
     }
 
     if (pos == 1)
     {
        ino = get_parent_ino_from_dentry(dentry);
+
 #ifdef HAVE_READDIR_FILE_OPERATIONS
-       gossip_debug(GOSSIP_DIR_DEBUG,
-                    "%s: calling filldir of \"..\" with pos = %llu\n",
-                    __func__,
-                    llu(pos));
+       if ( (ret=filldir(dirent, "..", 2, 0, ino, DT_DIR)) < 0)
 #else
-       gossip_debug(GOSSIP_DIR_DEBUG,
-                    "%s: calling dir_emit of \"..\" with pos = %llu\n",
-                    __func__,
-                    llu(pos));
-#endif
-#ifdef HAVE_READDIR_FILE_OPERATIONS
-       if ( (ret=filldir(dirent,"..",2,pos,ino,DT_DIR)) < 0)
-#else
-       if ( (ret=dir_emit(ctx,"..",2,ino,DT_DIR)) < 0)
+       if ( (ret=dir_emit(ctx, "..", 2, ino, DT_DIR)) < 0)
 #endif
        {
           readdir_handle_dtor(&rhandle);
           op_release(new_op);
           goto out;
        }
-#ifdef HAVE_READDIR_FILE_OPERATIONS
-       file->f_pos++;
-       gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: file->f_pos:%lld\n",__func__,lld(file->f_pos));
-#else
-       ctx->pos++;
-       gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: ctx->pos:%lld\n",__func__,lld(ctx->pos));
-#endif
+       gossip_ldebug(GOSSIP_DIR_DEBUG,
+                     "%s: dot dot pos:%lld\n",
+                     __func__,
+                     lld(pos));
        pos++;
     }
 
-    for (i = 0; i < rhandle.readdir_response.pvfs_dirent_outcount; i++)
+    /*
+     * we stored PVFS_ITERATE_NEXT in ctx->pos last time around
+     * to prevent "finding" dot and dot-dot on any iteration
+     * other than the first.
+     */
+#ifdef HAVE_READDIR_FILE_OPERATIONS
+    if (file->f_pos == PVFS_ITERATE_NEXT) {
+      file->f_pos = 0;
+      pos = 0;
+    }
+#else
+    if (ctx->pos == PVFS_ITERATE_NEXT)
+      ctx->pos = 0;
+#endif
+
+     gossip_debug(GOSSIP_DIR_DEBUG,
+                  "%s: dirent_outcount:%d:\n",
+                   __func__,
+                   rhandle.readdir_response.pvfs_dirent_outcount);
+
+#ifdef HAVE_READDIR_FILE_OPERATIONS
+    for (i = file->f_pos;
+#else
+    for (i = ctx->pos;
+#endif
+         i < rhandle.readdir_response.pvfs_dirent_outcount;
+         i++)
     {
         len = rhandle.readdir_response.dirent_array[i].d_length;
         current_entry = rhandle.readdir_response.dirent_array[i].d_name;
@@ -362,108 +381,89 @@ get_new_buffer_index:
           pvfs2_khandle_to_ino(
             &(rhandle.readdir_response.dirent_array[i].khandle));
 
-        gossip_debug(GOSSIP_DIR_DEBUG, 
-                    "calling filldir for %s with len %d, pos %ld\n",
-                     current_entry, len, (unsigned long) pos);
 #ifdef HAVE_READDIR_FILE_OPERATIONS
-        if ( (ret=filldir(dirent, current_entry, len, pos, current_ino, DT_UNKNOWN)) < 0)
+        gossip_debug(GOSSIP_DIR_DEBUG, 
+                    "%s: calling filldir for %s, len %d, file->f_pos:%lld:\n",
+                     __func__,
+                     current_entry,
+                     len,
+                     lld(file->f_pos));
 #else
-        if ( (ret=dir_emit(ctx,current_entry,len,current_ino,DT_UNKNOWN)) < 0)
+        gossip_debug(GOSSIP_DIR_DEBUG, 
+                    "%s: calling dir_emit for %s, len %d, ctx->pos:%lld:\n",
+                     __func__,
+                     current_entry,
+                     len,
+                     lld(ctx->pos));
 #endif
-        {
-           gossip_debug(GOSSIP_DIR_DEBUG, "filldir() failed. ret:%d\n",ret);
-           if (i < 2)
-           {
-              gossip_err("Filldir failed on one of the first two true PVFS directory entries.\n");
-              gossip_err("Duplicate entries may appear.\n");
-           }
+#ifdef HAVE_READDIR_FILE_OPERATIONS
+	ret = filldir(dirent,
+		      current_entry,
+		      len,
+		      file->f_pos,
+		      current_ino,
+		      DT_UNKNOWN);
+#else
+	ret = dir_emit(ctx, current_entry, len, current_ino, DT_UNKNOWN);
+#endif
+        if (ret < 0) {
+           gossip_debug(GOSSIP_DIR_DEBUG,
+                        "%s: iterator failed. ret:%d\n",
+                        __func__,
+                        ret);
            buffer_full = 1;
            break;
         }
+
+#ifndef HAVE_READDIR_FILE_OPERATIONS
+        /*
+         * dir_emit returns 1 on success, and starts returning 0s on
+         * success when it is time to break, filldir always returns
+         * 0s on success.
+         */
+	if (!ret)
+		break;
+#endif
+
 #ifdef HAVE_READDIR_FILE_OPERATIONS
         file->f_pos++;
-        gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: file->f_pos:%lld\n",__func__,lld(file->f_pos));
+        pos++; 
+	gossip_debug(GOSSIP_DIR_DEBUG,
+                     "%s: file->f_pos:%lld:\n",
+                     __func__,
+                     lld(file->f_pos));
 #else
         ctx->pos++;
-        gossip_ldebug(GOSSIP_DIR_DEBUG,"%s: ctx->pos:%lld\n",__func__,lld(ctx->pos));
+	gossip_debug(GOSSIP_DIR_DEBUG,
+                     "%s: ctx->pos:%lld:\n",
+                     __func__,
+                     lld(ctx->pos));
 #endif
-        
-        pos++;
     }
     
-    /* this means that all of the filldir calls succeeded */
-    if (i == rhandle.readdir_response.pvfs_dirent_outcount)
-    {
-        /* update token */
+    /*
+     * we ran all the way through the last batch, set up for
+     * getting another batch...
+     */
+    if (ret) {
         *ptoken = rhandle.readdir_response.token;
-    }
-    else 
-    {
-        /* this means a filldir call failed */
-        if(rhandle.readdir_response.token == PVFS_READDIR_END)
-        {
-          /* If PVFS hit end of directory, then there is no
-           * way to do math on the token that it returned.
-           * Instead we go by f_pos (or ctx->pos) but back up to account for
-           * the artificial . and .. entries.  The fact that
-           * "token_set" is non zero indicates that we are on
-           * the first iteration of getdents(). 
-           */
 #ifdef HAVE_READDIR_FILE_OPERATIONS
-           file->f_pos -= 3;
+        file->f_pos = PVFS_ITERATE_NEXT;
 #else
-           ctx->pos -= 3;
-#endif
-        }
-        else
-        {
-            /* this means a filldir (or dir_emit) call failed */
-            /* !!! need to set back to previous pos, no middle value allowed */
-            pos -= (i - 1);
-#ifdef HAVE_READDIR_FILE_OPERATIONS
-            file->f_pos -= (i - 1);
-#else
-            ctx->pos -= (i - 1);
-#endif
-        }
-#ifdef HAVE_READDIR_FILE_OPERATIONS
-        gossip_debug(GOSSIP_DIR_DEBUG, "at least one filldir call failed.  "
-                                       "Setting f_pos to: %lld\n"
-                                      , lld(file->f_pos));
-#else
-        gossip_debug(GOSSIP_DIR_DEBUG, "at least one dir_emit call failed.  "
-                                       "Setting ctx->pos to: %lld\n"
-                                      , lld(ctx->pos));
+        ctx->pos = PVFS_ITERATE_NEXT;
 #endif
     }
             
     /* did we hit the end of the directory? */
     if(rhandle.readdir_response.token == PVFS_READDIR_END && !buffer_full)
     {
+       gossip_debug(GOSSIP_DIR_DEBUG, "%s: trigger readdir end.\n", __func__);
 #ifdef HAVE_READDIR_FILE_OPERATIONS
-       gossip_debug(GOSSIP_DIR_DEBUG,
-                    "End of dir detected; setting f_pos to PVFS_READDIR_END.\n");
        file->f_pos = PVFS_READDIR_END;
 #else
-       gossip_debug(GOSSIP_DIR_DEBUG,
-          "End of dir detected; setting ctx->pos to PVFS_READDIR_END.\n");
        ctx->pos = PVFS_READDIR_END;
 #endif
     }
-
-#ifdef HAVE_READDIR_FILE_OPERATIONS
-    gossip_debug(GOSSIP_DIR_DEBUG,
-                "pos = %llu, token = %llu, file->f_pos should have been %lld\n",
-                llu(pos),
-                llu(*ptoken),
-                lld(file->f_pos));
-#else
-    gossip_debug(GOSSIP_DIR_DEBUG,
-                 "pos = %llu, token = %llu, ctx->pos should have been %lld\n",
-                 llu(pos),
-                 llu(*ptoken),
-                 lld(ctx->pos));
-#endif
 
     if (ret == 0)
     {
@@ -479,7 +479,7 @@ get_new_buffer_index:
     readdir_handle_dtor(&rhandle);
     op_release(new_op);
 
-    gossip_debug(GOSSIP_DIR_DEBUG, "pvfs2_readdir returning %d\n",ret);
+    gossip_debug(GOSSIP_DIR_DEBUG, "%s: returning %d\n", __func__, ret);
 
 out:
     kfree(s);
@@ -1113,8 +1113,38 @@ static int pvfs2_readdirplus_lite(
 }
 #endif
 
+static int pvfs2_dir_open(struct inode *inode, struct file *file)
+{
+        __u64 *ptoken;
+
+        gossip_debug(GOSSIP_FILE_DEBUG,
+                     "%s: called on %s\n",
+                     __func__,
+                     file->f_dentry->d_name.name);
+
+        file->private_data = kmalloc(sizeof(__u64), GFP_KERNEL);
+        if (!file->private_data)
+                return -ENOMEM;
+
+        ptoken = file->private_data;
+        *ptoken = PVFS_READDIR_START;
+        return 0;
+}
+
+static int pvfs2_dir_release(struct inode *inode, struct file *file)
+{
+        gossip_debug(GOSSIP_FILE_DEBUG,
+                     "%s: called on %s\n",
+                     __func__,
+                     file->f_dentry->d_name.name);
+
+        pvfs2_flush_inode(inode);
+        kfree(file->private_data);
+        return 0;
+}
+
 /** PVFS2 implementation of VFS directory operations */
-struct file_operations pvfs2_dir_operations =
+const struct file_operations pvfs2_dir_operations =
 {
 #ifdef PVFS2_LINUX_KERNEL_2_4
     read : generic_read_dir,
@@ -1134,8 +1164,8 @@ struct file_operations pvfs2_dir_operations =
 #ifdef HAVE_READDIRPLUSLITE_FILE_OPERATIONS
     .readdirplus_lite = pvfs2_readdirplus_lite,
 #endif
-    .open = pvfs2_file_open,
-    .release = pvfs2_file_release,
+    .open = pvfs2_dir_open,
+    .release = pvfs2_dir_release,
 #endif
 };
 
