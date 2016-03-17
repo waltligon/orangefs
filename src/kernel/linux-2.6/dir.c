@@ -166,8 +166,7 @@ static int pvfs2_readdir(
     /* are we done? */
     if (pos == PVFS_READDIR_END)
     {
-        gossip_debug(GOSSIP_DIR_DEBUG, 
-                     "Skipping to graceful termination path since we are done\n");
+        gossip_debug(GOSSIP_DIR_DEBUG, "%s: done\n", __func__);
         ret = 0;
         goto out;
     }
@@ -406,24 +405,22 @@ get_new_buffer_index:
 #else
 	ret = dir_emit(ctx, current_entry, len, current_ino, DT_UNKNOWN);
 #endif
-        if (ret < 0) {
-           gossip_debug(GOSSIP_DIR_DEBUG,
-                        "%s: iterator failed. ret:%d\n",
-                        __func__,
-                        ret);
-           buffer_full = 1;
-           break;
-        }
 
-#ifndef HAVE_READDIR_FILE_OPERATIONS
-        /*
-         * dir_emit returns 1 on success, and starts returning 0s on
-         * success when it is time to break, filldir always returns
-         * 0s on success.
-         */
-	if (!ret)
-		break;
+/*
+ * The getdents buffer might fill up before the orangefs buffer.
+ */
+#ifdef HAVE_READDIR_FILE_OPERATIONS
+        if (ret < 0) {
+#else
+        if (!ret) {
 #endif
+          gossip_debug(GOSSIP_DIR_DEBUG,
+                       "%s: iterator returned:%d\n",
+                       __func__,
+                       ret);
+          buffer_full = 1;
+          break;
+        }
 
 #ifdef HAVE_READDIR_FILE_OPERATIONS
         file->f_pos++;
@@ -445,7 +442,7 @@ get_new_buffer_index:
      * we ran all the way through the last batch, set up for
      * getting another batch...
      */
-    if (ret) {
+    if (i == rhandle.readdir_response.pvfs_dirent_outcount) {
         *ptoken = rhandle.readdir_response.token;
 #ifdef HAVE_READDIR_FILE_OPERATIONS
         file->f_pos = PVFS_ITERATE_NEXT;
@@ -453,9 +450,9 @@ get_new_buffer_index:
         ctx->pos = PVFS_ITERATE_NEXT;
 #endif
     }
-            
+
     /* did we hit the end of the directory? */
-    if(rhandle.readdir_response.token == PVFS_READDIR_END && !buffer_full)
+    if(rhandle.readdir_response.token == PVFS_READDIR_END)
     {
        gossip_debug(GOSSIP_DIR_DEBUG, "%s: trigger readdir end.\n", __func__);
 #ifdef HAVE_READDIR_FILE_OPERATIONS
@@ -463,17 +460,13 @@ get_new_buffer_index:
 #else
        ctx->pos = PVFS_READDIR_END;
 #endif
-    }
+       gossip_debug(GOSSIP_DIR_DEBUG, 
+                    "pvfs2_readdir about to update_atime %p\n", 
+                    dentry->d_inode);
 
-    if (ret == 0)
-    {
-        gossip_debug(GOSSIP_DIR_DEBUG, 
-                     "pvfs2_readdir about to update_atime %p\n", 
-                     dentry->d_inode);
-
-        SetAtimeFlag(pvfs2_inode);
-        dentry->d_inode->i_atime = CURRENT_TIME;
-        mark_inode_dirty_sync(dentry->d_inode);
+       SetAtimeFlag(pvfs2_inode);
+       dentry->d_inode->i_atime = CURRENT_TIME;
+       mark_inode_dirty_sync(dentry->d_inode);
     }
 
     readdir_handle_dtor(&rhandle);
@@ -484,7 +477,7 @@ get_new_buffer_index:
 out:
     kfree(s);
     return (ret);
-}/*end pvfs2_readdir*/
+}
 
 #ifdef HAVE_READDIRPLUS_FILE_OPERATIONS
 
