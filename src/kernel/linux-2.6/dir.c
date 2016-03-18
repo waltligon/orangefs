@@ -1110,7 +1110,7 @@ static int pvfs2_dir_open(struct inode *inode, struct file *file)
 {
         __u64 *ptoken;
 
-        gossip_debug(GOSSIP_FILE_DEBUG,
+        gossip_debug(GOSSIP_DIR_DEBUG,
                      "%s: called on %s\n",
                      __func__,
                      file->f_dentry->d_name.name);
@@ -1126,7 +1126,7 @@ static int pvfs2_dir_open(struct inode *inode, struct file *file)
 
 static int pvfs2_dir_release(struct inode *inode, struct file *file)
 {
-        gossip_debug(GOSSIP_FILE_DEBUG,
+        gossip_debug(GOSSIP_DIR_DEBUG,
                      "%s: called on %s\n",
                      __func__,
                      file->f_dentry->d_name.name);

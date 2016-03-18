@@ -66,28 +66,6 @@ do {                                              \
 #define do_sync_read generic_file_read
 #endif
 
-int pvfs2_dir_open(struct inode *inode, struct file *file)
-{
-    PVFS_ds_position *ptoken;
-
-    file->private_data = kmalloc(sizeof(PVFS_ds_position), GFP_KERNEL);
-    if (! file->private_data)
-    {
-        return -ENOMEM;
-    }
-
-    ptoken = file->private_data;
-    *ptoken = PVFS_READDIR_START;
-
-    return 0;
-}
-
-int pvfs2_dir_close(struct inode *inode, struct file *file)
-{
-        kfree(file->private_data);
-        return 0;
-}
-
 /** Called when a process requests to open a file.
  */
 int pvfs2_file_open(
@@ -109,48 +87,49 @@ int pvfs2_file_open(
     inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 #endif
 
-    if (S_ISDIR(inode->i_mode))
+    /*
+      if the file's being opened for append mode, set the file pos
+      to the end of the file when we retrieve the size (which we
+      must forcefully do here in this case, afaict atm)
+    */
+    if (file->f_flags & O_APPEND)
     {
-        ret = pvfs2_dir_open(inode, file);
-    }
-    else
-    {
-        /*
-          if the file's being opened for append mode, set the file pos
-          to the end of the file when we retrieve the size (which we
-          must forcefully do here in this case, afaict atm)
-        */
-        if (file->f_flags & O_APPEND)
+        /* 
+         * When we do a getattr in response to an open with O_APPEND,
+         * all we are interested in is the file size. Hence we will
+         * set the mask to only the size and nothing else
+         * Hopefully, this will help us in reducing the number of getattr's
+         */
+        ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_SIZE);
+        if (ret == 0)
         {
-            /* 
-             * When we do a getattr in response to an open with O_APPEND,
-             * all we are interested in is the file size. Hence we will
-             * set the mask to only the size and nothing else
-             * Hopefully, this will help us in reducing the number of getattr's
-             */
-            ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_SIZE);
-            if (ret == 0)
-            {
-                file->f_pos = pvfs2_i_size_read(inode);
-                gossip_debug(GOSSIP_FILE_DEBUG, "f_pos = %ld\n", (unsigned long)file->f_pos);
-            }
-            else
-            {
-                gossip_debug(GOSSIP_FILE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
-                pvfs2_make_bad_inode(inode);
-                gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open returning error: %d\n", ret);
-                goto out;
-            }
+            file->f_pos = pvfs2_i_size_read(inode);
+            gossip_debug(GOSSIP_FILE_DEBUG,
+                         "%s: f_pos = %ld\n",
+                         __func__,
+                         (unsigned long)file->f_pos);
+        } else {
+            gossip_debug(GOSSIP_FILE_DEBUG,
+                         "%s: calling make bad inode\n",
+                          __func__);
+            pvfs2_make_bad_inode(inode);
+            gossip_debug(GOSSIP_FILE_DEBUG,
+                         "%s: returning error: %d\n",
+                         __func__,
+                         ret);
+            goto out;
         }
-
-        /*
-          fs/open.c: returns 0 after enforcing large file support if
-          running on a 32 bit system w/o O_LARGFILE flag
-        */
-        ret = generic_file_open(inode, file);
     }
 
-    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open returning normally: %d\n", ret);
+    /*
+      fs/open.c: returns 0 after enforcing large file support if
+      running on a 32 bit system w/o O_LARGFILE flag
+    */
+    ret = generic_file_open(inode, file);
+
+    gossip_debug(GOSSIP_FILE_DEBUG,
+                 "pvfs2_file_open returning normally: %d\n",
+                 ret);
 
 out:
     kfree(s);
@@ -3352,10 +3331,6 @@ int pvfs2_file_release(
                 file->f_dentry->d_name.name);
 
     pvfs2_flush_inode(inode);
-    if (S_ISDIR(inode->i_mode))
-    {
-        return pvfs2_dir_close(inode, file);
-    }
 
     /*
       remove all associated inode pages from the page cache and mmap
