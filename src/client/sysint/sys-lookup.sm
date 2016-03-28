@@ -45,6 +45,7 @@ enum
     LOOKUP_TYPE_RELATIVE_LN = 5,
     LOOKUP_TYPE_ABSOLUTE_LN = 6,
     LOOKUP_TYPE_LN_NO_FOLLOW = 7,
+    LOOKUP_RENEW_CAPABILITY = 8,
 };
 
 static int lookup_segment_lookup_comp_fn(
@@ -591,6 +592,8 @@ PVFS_error PVFS_isys_ref_lookup(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
                  relative_pathname, llu(parent.handle));
+    gossip_err("lookup got: %s (parent %llu)\n",
+                 relative_pathname, llu(parent.handle));
 
     return PINT_client_state_machine_post(smcb, op_id, user_ptr);
 }
@@ -868,6 +871,21 @@ static PINT_sm_action lookup_segment_lookup_failure(
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_lookup_failure\n");
+
+    /* Capability has timed out.  Renew capability.  Since we are going to this
+     * segment's parent metadata server, renew the attributes as well.
+     */
+    if ( js_p->error_code == -PVFS_TIMEOUT_CAP )
+    {
+       //js_p->error_code = RENEW_CAPABILITY;
+    
+       /*capability should have been invalidated in msgpairarray.  since we have to
+        *generate a new capability, go ahead and renew the attributes as well.
+       */
+       gossip_err("%s:lookup got (%d) error code.\n",__func__,js_p->error_code);
+         
+    }
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -1342,6 +1360,7 @@ static int lookup_segment_lookup_comp_fn(
         */
         if (i < resp_p->u.lookup_path.attr_count)
         {
+            gossip_debug(GOSSIP_LOOKUP_DEBUG,"Attributes available for acache.\n");
             PINT_free_object_attr(&(cur_seg->seg_attr));
             PINT_copy_object_attr(
                 &(cur_seg->seg_attr),

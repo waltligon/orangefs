@@ -495,7 +495,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             /* have client try again on timeout */
             if (PINT_util_get_current_time() > cred->timeout)
             {
-                js_p->error_code = -PVFS_EAGAIN;
+                js_p->error_code = -PVFS_TIMEOUT_CRED;
             }
             else
             {
@@ -607,7 +607,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         /* have client try again on timeout */
         if (PINT_util_get_current_time() > s_op->req->capability.timeout)
         {
-            js_p->error_code = -PVFS_EAGAIN;
+            js_p->error_code = -PVFS_TIMEOUT_CAP;
         }
         else
         {
@@ -621,6 +621,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     if (js_p->error_code)
     {
         js_p->error_code = -PVFS_ERROR_CODE(-js_p->error_code);
+        gossip_err("%s:js_p->error_code(%d)\n",__func__,js_p->error_code);
         return SM_ACTION_COMPLETE;
     }
 
