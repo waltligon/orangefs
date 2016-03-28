@@ -872,6 +872,9 @@ static PINT_sm_action lookup_segment_lookup_failure(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_lookup_failure\n");
 
+    gossip_err("%s:lookup got (%d) error code.\n",__func__,js_p->error_code);
+    
+
     /* Capability has timed out.  Renew capability.  Since we are going to this
      * segment's parent metadata server, renew the attributes as well.
      */
@@ -882,7 +885,6 @@ static PINT_sm_action lookup_segment_lookup_failure(
        /*capability should have been invalidated in msgpairarray.  since we have to
         *generate a new capability, go ahead and renew the attributes as well.
        */
-       gossip_err("%s:lookup got (%d) error code.\n",__func__,js_p->error_code);
          
     }
 

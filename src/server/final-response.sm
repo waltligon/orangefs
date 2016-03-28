@@ -78,9 +78,26 @@ static PINT_sm_action final_response_release(
      * are going to use it
      */
     /* NOTE: we filter out any subsystem mask and make sure that this
-     * shows up as a generic pvfs error on the client side
+     * shows up as a generic pvfs error on the client side.  this is
+     * true for generic pvfs errors but for non-pvfs errors that we want
+     * to send to the client to interpret, we must first identify them
+     * and send them along without any translation.  Specifically, we
+     * want to send back PVFS_TIMEOUT_CAP and PVFS_TIMEOUT_CRED instead
+     * of the generic PVFS_EAGAIN message.
      */
-    s_op->resp.status = -PVFS_ERROR_CODE(-js_p->error_code);
+
+    if ( js_p->error_code == -PVFS_TIMEOUT_CAP )
+    {
+       gossip_err("%s:js_p->error_code(%d)\n",__func__,js_p->error_code);
+    }
+    if ( -(PVFS_NON_ERRNO_ERROR_CODE(-js_p->error_code)) == js_p->error_code )
+    {
+       s_op->resp.status = js_p->error_code;
+    }
+    else
+    {
+       s_op->resp.status = -PVFS_ERROR_CODE(-js_p->error_code);
+    }
 
     /* catch cases in which the operation has not been scheduled */
     if (!s_op->scheduled_id)

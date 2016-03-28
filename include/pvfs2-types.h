@@ -941,18 +941,22 @@ const char *PINT_non_errno_strerror_mapping[] = {     \
     "Host name lookup failure",                       \
     "Path contains non-PVFS elements",                \
     "Security error",                                 \
+    "Capability has timed out",                       \
+    "Credential has timed out",                       \
 };                                                    \
 PVFS_error PINT_non_errno_mapping[] = {               \
     0,     /* leave this one empty */                 \
-    PVFS_ECANCEL,   /* 1 */                           \
-    PVFS_EDEVINIT,  /* 2 */                           \
-    PVFS_EDETAIL,   /* 3 */                           \
-    PVFS_EHOSTNTFD, /* 4 */                           \
-    PVFS_EADDRNTFD, /* 5 */                           \
-    PVFS_ENORECVR,  /* 6 */                           \
-    PVFS_ETRYAGAIN, /* 7 */                           \
-    PVFS_ENOTPVFS,  /* 8 */                           \
-    PVFS_ESECURITY, /* 9 */                           \
+    PVFS_ECANCEL,      /* 1 */                        \
+    PVFS_EDEVINIT,     /* 2 */                        \
+    PVFS_EDETAIL,      /* 3 */                        \
+    PVFS_EHOSTNTFD,    /* 4 */                        \
+    PVFS_EADDRNTFD,    /* 5 */                        \
+    PVFS_ENORECVR,     /* 6 */                        \
+    PVFS_ETRYAGAIN,    /* 7 */                        \
+    PVFS_ENOTPVFS,     /* 8 */                        \
+    PVFS_ESECURITY,    /* 9 */                        \
+    PVFS_TIMEOUT_CAP,  /* 10 */                       \
+    PVFS_TIMEOUT_CRED, /* 11 */                       \
 }
 
 /*
