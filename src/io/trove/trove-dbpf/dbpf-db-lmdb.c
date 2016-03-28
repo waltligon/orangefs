@@ -416,12 +416,13 @@ int dbpf_db_cursor_get(struct dbpf_cursor *dbc, struct dbpf_data *key,
         return db_error(r);
     }
 
+    key->len = db_key.mv_size;
     if (db_key.mv_size > maxkeylen)
     {
+        val->len = db_data.mv_size;
         return db_error(ERANGE);
     }
     memcpy(key->data, db_key.mv_data, db_key.mv_size);
-    key->len = db_key.mv_size;
     if (db_data.mv_size > val->len)
     {
     	val->len = db_data.mv_size;
