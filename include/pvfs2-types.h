@@ -729,17 +729,18 @@ PVFS_error PVFS_errno_to_error(int err);
 #define PVFS_NON_ERRNO_ERROR_CODE(__error) \
 ((__error) & (PVFS_error)(127|PVFS_ERROR_BIT|PVFS_NON_ERRNO_ERROR_BIT))
 
-#define PVFS_ERROR_BMI    (1 << 7) /* BMI-specific error */
-#define PVFS_ERROR_TROVE  (2 << 7) /* Trove-specific error */
-#define PVFS_ERROR_FLOW   (3 << 7)
-#define PVFS_ERROR_SM     (4 << 7) /* state machine specific error */
-#define PVFS_ERROR_SCHED  (5 << 7)
-#define PVFS_ERROR_CLIENT (6 << 7)
-#define PVFS_ERROR_DEV    (7 << 7) /* device file interaction */
+#define PVFS_ERROR_BMI      (1 << 7) /* BMI-specific error */
+#define PVFS_ERROR_TROVE    (2 << 7) /* Trove-specific error */
+#define PVFS_ERROR_FLOW     (3 << 7)
+#define PVFS_ERROR_SM       (4 << 7) /* state machine specific error */
+#define PVFS_ERROR_SCHED    (5 << 7)
+#define PVFS_ERROR_CLIENT   (6 << 7)
+#define PVFS_ERROR_DEV      (7 << 7) /* device file interaction */
+#define PVFS_ERROR_SECURITY (8 << 7) /* security related */
 
-#define PVFS_ERROR_CLASS_BITS                                          \
-(PVFS_ERROR_BMI | PVFS_ERROR_TROVE | PVFS_ERROR_FLOW | PVFS_ERROR_SM | \
- PVFS_ERROR_SCHED | PVFS_ERROR_CLIENT | PVFS_ERROR_DEV)
+#define PVFS_ERROR_CLASS_BITS                                             \
+(PVFS_ERROR_BMI   | PVFS_ERROR_TROVE  | PVFS_ERROR_FLOW | PVFS_ERROR_SM | \
+ PVFS_ERROR_SCHED | PVFS_ERROR_CLIENT | PVFS_ERROR_DEV  | PVFS_ERROR_SECURITY)
 
 /* a shorthand to make the error code definitions more readable */
 #define E(num) (num|PVFS_ERROR_BIT)
@@ -816,8 +817,8 @@ PVFS_error PVFS_errno_to_error(int err);
 #define PVFS_ETRYAGAIN        (7|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ENOTPVFS         (8|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ESECURITY        (9|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
-#define PVFS_TIMEOUT_CAP     (10|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
-#define PVFS_TIMEOUT_CRED    (11|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
+#define PVFS_TIMEOUT_CAP     (10|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT|PVFS_ERROR_SECURITY))
+#define PVFS_TIMEOUT_CRED    (11|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT|PVFS_ERROR_SECURITY))
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERRNO ERROR CODES!
  *
