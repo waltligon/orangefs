@@ -90,14 +90,21 @@ static PINT_sm_action final_response_release(
     {
        gossip_err("%s:js_p->error_code(%d)\n",__func__,js_p->error_code);
     }
-    if ( -(PVFS_NON_ERRNO_ERROR_CODE(-js_p->error_code)) == js_p->error_code )
+
+    switch(js_p->error_code)
     {
-       s_op->resp.status = js_p->error_code;
-    }
-    else
-    {
-       s_op->resp.status = -PVFS_ERROR_CODE(-js_p->error_code);
-    }
+        case -PVFS_TIMEOUT_CAP:
+        case -PVFS_TIMEOUT_CRED:
+        {
+           s_op->resp.status = js_p->error_code;
+           break;
+        }
+        default:
+        {
+           s_op->resp.status = -PVFS_ERROR_CODE(-js_p->error_code);
+        }
+    }/*end switch*/
+
 
     /* catch cases in which the operation has not been scheduled */
     if (!s_op->scheduled_id)
