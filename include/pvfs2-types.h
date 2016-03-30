@@ -729,14 +729,14 @@ PVFS_error PVFS_errno_to_error(int err);
 #define PVFS_NON_ERRNO_ERROR_CODE(__error) \
 ((__error) & (PVFS_error)(127|PVFS_ERROR_BIT|PVFS_NON_ERRNO_ERROR_BIT))
 
-#define PVFS_ERROR_BMI      (1 << 7) /* BMI-specific error */
-#define PVFS_ERROR_TROVE    (2 << 7) /* Trove-specific error */
-#define PVFS_ERROR_FLOW     (3 << 7)
-#define PVFS_ERROR_SM       (4 << 7) /* state machine specific error */
-#define PVFS_ERROR_SCHED    (5 << 7)
-#define PVFS_ERROR_CLIENT   (6 << 7)
-#define PVFS_ERROR_DEV      (7 << 7) /* device file interaction */
-#define PVFS_ERROR_SECURITY (8 << 7) /* security related */
+#define PVFS_ERROR_BMI      (1 << 7) /* BMI-specific error:           value 128 */
+#define PVFS_ERROR_TROVE    (2 << 7) /* Trove-specific error:         value 256 */
+#define PVFS_ERROR_FLOW     (3 << 7) /* flow error:                   value 384 */
+#define PVFS_ERROR_SM       (4 << 7) /* state machine specific error: value 512 */
+#define PVFS_ERROR_SCHED    (5 << 7) /* scheduler error:              value 640 */
+#define PVFS_ERROR_CLIENT   (6 << 7) /* client error:                 value 768 */
+#define PVFS_ERROR_DEV      (7 << 7) /* device file interaction:      value 896 */
+#define PVFS_ERROR_SECURITY (8 << 7) /* security related:             value 1024 */
 
 #define PVFS_ERROR_CLASS_BITS                                             \
 (PVFS_ERROR_BMI   | PVFS_ERROR_TROVE  | PVFS_ERROR_FLOW | PVFS_ERROR_SM | \
