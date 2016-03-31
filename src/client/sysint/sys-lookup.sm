@@ -39,13 +39,13 @@ extern job_context_id pint_client_sm_context;
 
 enum
 {
-    LOOKUP_CONTINUE = 2,
-    LOOKUP_TYPE_DIRECTORY = 3,
-    LOOKUP_TYPE_METAFILE = 4,
-    LOOKUP_TYPE_RELATIVE_LN = 5,
-    LOOKUP_TYPE_ABSOLUTE_LN = 6,
+    LOOKUP_CONTINUE          = 2,
+    LOOKUP_TYPE_DIRECTORY    = 3,
+    LOOKUP_TYPE_METAFILE     = 4,
+    LOOKUP_TYPE_RELATIVE_LN  = 5,
+    LOOKUP_TYPE_ABSOLUTE_LN  = 6,
     LOOKUP_TYPE_LN_NO_FOLLOW = 7,
-    LOOKUP_RENEW_CAPABILITY = 8,
+    LOOKUP_RENEW_CAPABILITY  = 8,
 };
 
 static int lookup_segment_lookup_comp_fn(
@@ -109,6 +109,7 @@ machine pvfs2_client_lookup_sm
     state lookup_segment_lookup_failure
     {
         run lookup_segment_lookup_failure;
+        LOOKUP_RENEW_CAPABILITY => lookup_segment_setup_parent_getattr;
         default => lookup_cleanup;
     }
 
@@ -871,8 +872,6 @@ static PINT_sm_action lookup_segment_lookup_failure(
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_lookup_failure\n");
-    gossip_err("%s: error code is %d.\n",__func__,js_p->error_code);
-
     gossip_err("%s:lookup got (%d) error code.\n",__func__,js_p->error_code);
     
 
@@ -881,12 +880,11 @@ static PINT_sm_action lookup_segment_lookup_failure(
      */
     if ( js_p->error_code == -PVFS_TIMEOUT_CAP )
     {
-       //js_p->error_code = RENEW_CAPABILITY;
+       js_p->error_code = LOOKUP_RENEW_CAPABILITY;
     
        /*capability should have been invalidated in msgpairarray.  since we have to
         *generate a new capability, go ahead and renew the attributes as well.
        */
-         
     }
 
     return SM_ACTION_COMPLETE;
