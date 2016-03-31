@@ -26,6 +26,10 @@
 #include "server-config-mgr.h"
 #include "state-machine.h"
 
+#ifdef __PVFS2_CLIENT__
+  #include "client-capcache.h"
+#endif
+
 #ifdef WIN32
 #define gossip_err_unless_quiet(format, ...) \
 do {\
@@ -508,6 +512,11 @@ static PINT_sm_action msgpairarray_completion_fn(
     const char* server_string = NULL;
     int server_type;
 
+#ifdef __PVFS2_CLIENT__
+    PVFS_uid        local_uid = 0;
+    PVFS_object_ref msg_objref={0}; 
+#endif
+
     /* response structure (decoded) */
     struct PVFS_server_resp *resp_p = NULL;
 
@@ -563,6 +572,19 @@ static PINT_sm_action msgpairarray_completion_fn(
              * meaningful, so we save it.
              */
             msg_p->op_status = resp_p->status;
+            switch(msg_p->op_status)
+            {
+               case -PVFS_TIMEOUT_CAP:
+               case -PVFS_TIMEOUT_CRED:
+               {
+                  js_p->error_code = msg_p->op_status;
+                  goto cleanup;
+               }
+               default:
+               {
+                  break;
+               }
+            }/*end switch*/
         }
 
         /* NOTE: we call the function associated with each message,
@@ -618,6 +640,7 @@ static PINT_sm_action msgpairarray_completion_fn(
             }
         }
 
+cleanup:
         /* free all the resources that we used to send and receive. */
         ret = PINT_serv_free_msgpair_resources(
             &msg_p->encoded_req, msg_p->encoded_resp_p, &decoded_resp,
@@ -632,6 +655,39 @@ static PINT_sm_action msgpairarray_completion_fn(
         memset(&msg_p->encoded_req,0,sizeof(msg_p->encoded_req));
         msg_p->encoded_resp_p = NULL;
         msg_p->max_resp_sz = 0;
+
+/*invalidate client-side cache entries*/
+#ifdef __PVFS2_CLIENT__ 
+        switch(js_p->error_code)
+        {
+           /*invalidate capcache entry*/
+           case -PVFS_TIMEOUT_CAP:
+           {
+              local_uid = PINT_HINT_GET_LOCAL_UID(msg_p->req.hints);
+              gossip_err("%s:local_uid(%d)\n",__func__,local_uid);
+              if ( local_uid == -1 )
+              {
+                 local_uid = PINT_util_getuid();
+              }
+
+              msg_objref.fs_id  = msg_p->fs_id;
+              msg_objref.handle = msg_p->handle;
+              gossip_err("%s:msg_objref.fsid(%d) handle(%llu)\n"
+                        ,__func__
+                        ,msg_objref.fs_id
+                        ,llu(msg_objref.handle));
+
+              PINT_client_capcache_invalidate(msg_objref,local_uid);
+              break;
+           }
+
+           /*invalidate credcache entry*/
+           case -PVFS_TIMEOUT_CRED:
+           {
+              break;
+           }
+        }/*end switch*/
+#endif
 
         /* cleanup capability */
         PINT_cleanup_capability(&msg_p->req.capability);
