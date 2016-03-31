@@ -608,6 +608,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         if (PINT_util_get_current_time() > s_op->req->capability.timeout)
         {
             js_p->error_code = -PVFS_TIMEOUT_CAP;
+            gossip_err("%s:returning with error (%d)\n",__func__,js_p->error_code);
         }
         else
         {
@@ -621,7 +622,6 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     if (js_p->error_code)
     {
         js_p->error_code = -PVFS_ERROR_CODE(-js_p->error_code);
-        gossip_err("%s:js_p->error_code(%d)\n",__func__,js_p->error_code);
         return SM_ACTION_COMPLETE;
     }
 
