@@ -245,12 +245,7 @@ int dbpf_db_get(struct dbpf_db *db, struct dbpf_data *key,
         return db_error(r);
     }
 
-    if (db_data.mv_size > val->len)
-    {
-    	val->len = db_data.mv_size;
-        return db_error(ERANGE);
-    }
-    memcpy(val->data, db_data.mv_data, db_data.mv_size);
+    memcpy(val->data, db_data.mv_data, val->len);
     val->len = db_data.mv_size;
     return 0;
 }
@@ -416,18 +411,9 @@ int dbpf_db_cursor_get(struct dbpf_cursor *dbc, struct dbpf_data *key,
         return db_error(r);
     }
 
-    if (db_key.mv_size > maxkeylen)
-    {
-        return db_error(ERANGE);
-    }
-    memcpy(key->data, db_key.mv_data, db_key.mv_size);
+    memcpy(key->data, db_key.mv_data, key->len);
+    memcpy(val->data, db_data.mv_data, val->len);
     key->len = db_key.mv_size;
-    if (db_data.mv_size > val->len)
-    {
-    	val->len = db_data.mv_size;
-        return db_error(ERANGE);
-    }
-    memcpy(val->data, db_data.mv_data, db_data.mv_size);
     val->len = db_data.mv_size;
     return 0;
 }
