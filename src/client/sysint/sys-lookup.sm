@@ -870,6 +870,9 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
 static PINT_sm_action lookup_segment_lookup_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    PINT_client_lookup_sm_segment *cur_seg = NULL;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_lookup_failure\n");
     gossip_err("%s:lookup got (%d) error code.\n",__func__,js_p->error_code);
@@ -882,9 +885,14 @@ static PINT_sm_action lookup_segment_lookup_failure(
     {
        js_p->error_code = LOOKUP_RENEW_CAPABILITY;
     
-       /*capability should have been invalidated in msgpairarray.  since we have to
-        *generate a new capability, go ahead and renew the attributes as well.
+       /*capability was invalidated in msgpairarray.  since we have to
+        *generate a new capability from the same metadata server, go ahead and 
+        *renew the attributes as well.
        */
+
+       cur_seg = GET_CURRENT_SEGMENT(sm_p);
+
+       PINT_acache_invalidate(cur_seg->seg_starting_refn);
     }
 
     return SM_ACTION_COMPLETE;
