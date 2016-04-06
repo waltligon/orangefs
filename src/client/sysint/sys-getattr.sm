@@ -119,7 +119,15 @@ nested machine pvfs2_client_getattr_sm
     state acache_lookup
     {
         run getattr_acache_lookup;
+        GETATTR_CACHE_MISS => client_generate_capability;
         default => client_capcache_lookup;
+    }
+
+    state client_generate_capability
+    {
+       run getattr_client_generate_capability;
+       success => object_getattr_setup_msgpair;
+       default => cleanup;
     }
 
     state client_capcache_lookup
@@ -579,6 +587,38 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action getattr_client_generate_capability (struct PINT_smcb *smcb,
+                                                          job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* This function is executing because we got an acache miss.  So, since
+     * we have to go to the metadata server anyway, generate a capability for this
+     * user against this object.  This will prevent a capability capcache miss when
+     * this object is subsequently accessed.
+     */
+
+    if ( js_p->error_code != GETATTR_CACHE_MISS )
+    {
+       /* then, we got here and shouldn't have! */
+       js_p->error_code = -PVFS_EINVAL;
+       return SM_ACTION_COMPLETE;
+    }
+
+    js_p->error_code = 0;
+
+    sm_p->getattr.req_attrmask |= PVFS_ATTR_CAPABILITY;
+
+    /* If a capcache entry exists for this object, then this getattr
+     * request will simply UPDATE the cached entry.  otherwise, a new
+     * entry will be inserted.
+     */
+
+    return SM_ACTION_COMPLETE;
+}/*end getattr_client_generate_capability*/
+
+
+
 /**
  * getattr_client_capcache_lookup
  * @ingroup client_sm_getattr
@@ -708,6 +748,9 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
                               sm_p->getattr.req_attrmask,
                               sm_p->hints);
 
+    gossip_err("%s:attribute mask sent to server (%0x)\n",__func__
+                                                         ,sm_p->getattr.req_attrmask);
+
     PINT_cleanup_capability(&capability);
 
     msg_p->fs_id = object_ref.fs_id;
@@ -755,6 +798,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
      */
     PINT_copy_object_attr(&sm_p->getattr.attr,
                           &resp_p->u.getattr.attr);
+    gossip_err("%s:resp->u.getattr.attr.mask(%x)\n",__func__,resp_p->u.getattr.attr.mask);
 
     attr = &sm_p->getattr.attr;
 
