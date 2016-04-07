@@ -493,6 +493,12 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
         io_datafile_index_array_destroy(sm_p);
         io_contexts_destroy(sm_p);
 
+        if (sm_p->u.io.dfile_size_array)
+        {
+           /* added this to avoid memory leak during retries and/or capability renewals */
+           PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->u.io.dfile_size_array);
+        }
+
         if (PINT_smcb_cancelled(smcb))
         {
             js_p->error_code = -PVFS_ECANCEL;
