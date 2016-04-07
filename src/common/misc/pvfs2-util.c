@@ -1652,6 +1652,7 @@ int PVFS_util_resolve(
         if (ppath_local)
         {
             PVFS_free_path(Ppath);
+            ppath_local=0;
         }
         return(0);
     }
@@ -1715,11 +1716,17 @@ int PVFS_util_resolve(
             if (ppath_local)
             {
                 PVFS_free_path(Ppath);
+                ppath_local=0;
             }
         }
         free(tmp_path);
 
         /* fall through and preserve "ret" to be returned */
+    }
+
+    if (ppath_local)
+    {
+       free(Ppath);
     }
 
     return(ret);
