@@ -527,6 +527,7 @@ int do_list(
     PVFS_credential credentials;
     PVFS_object_ref ref;
     PVFS_ds_position token;
+    PVFS_hint hints = NULL;
     uint64_t dir_version = 0;
     double begin = 0., end;
     subdir *current, *head = NULL, *tail = NULL;
@@ -541,6 +542,9 @@ int do_list(
         return -1;
     }
 
+    /*add uid to hints, so the uid is passed to the PVFS interface call*/
+    PVFS_hint_add(&hints,PVFS_HINT_LOCAL_UID_NAME,sizeof(PVFS_uid),&credentials.userid);
+
     if (opts->list_recursive || opts->num_starts > 1)
     {
         if(*start == '/' && *(start + 1) == '\0')
@@ -554,7 +558,7 @@ int do_list(
     }
 
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
-                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
+                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW, hints);
     if(ret < 0)
     {
         PVFS_perror("PVFS_sys_lookup", ret);
@@ -566,7 +570,7 @@ int do_list(
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
     if (PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
-                         &credentials, &getattr_response, NULL) == 0)
+                         &credentials, &getattr_response, hints) == 0)
     {
         if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
             (getattr_response.attr.objtype == PVFS_TYPE_SYMLINK) ||
