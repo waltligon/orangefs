@@ -553,7 +553,6 @@ int do_list(
         }
     }
 
-    printf("Calling PVFS_sys_lookup: line(%d)\n",__LINE__);
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
                         &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     if(ret < 0)
@@ -564,8 +563,6 @@ int do_list(
 
     ref.handle = lk_response.ref.handle;
     ref.fs_id = fs_id;
-
-    printf("handle returned from PVFS_sys_lookup(%llu)\n",llu(ref.handle));
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
     if (PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
@@ -586,7 +583,6 @@ int do_list(
 
             if (getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY)
             {
-                printf("Calling PVFS_sys_getparent: name(%s)\n",name);
                 if (PVFS_sys_getparent(ref.fs_id, name, &credentials,
                                        &getparent_resp, NULL) == 0)
                 {

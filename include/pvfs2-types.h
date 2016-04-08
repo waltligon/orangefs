@@ -443,6 +443,11 @@ typedef struct
  PVFS_ATTR_SYS_DISTDIR_ATTR | \
  PVFS_ATTR_SYS_CAPABILITY | \
  PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
+
+/* Effectively, removed the use of PVFS_ATTR_SYS_ALL_NOHINT by redefining
+ * it to be PVFS_ATTR_SYS_ALL.  This change prevented many changes all
+ * over the code.  Now, we want to always get the dir-hint.
+ */
 #define PVFS_ATTR_SYS_ALL_NOHINT PVFS_ATTR_SYS_ALL
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
