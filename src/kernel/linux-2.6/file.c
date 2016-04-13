@@ -549,6 +549,8 @@ populate_shared_memory:
     }
 
 
+    gossip_debug(GOSSIP_FILE_DEBUG,"%s:service_operation return code(%d)\n",__func__,(int)ret);
+
     if (ret < 0)
     {
           /* this macro is defined in pvfs2-kernel.h */
@@ -2075,19 +2077,13 @@ static ssize_t wait_for_iox(struct rw_options *rw,
           else
           {
               memset(s,0,HANDLESTRINGSIZE);
-              gossip_err(
-                "%s: error in %s handle %s, FILE: %s\n  -- returning %ld\n",
-                rw->fnstr, 
-                rw->type == IO_READX ?
-                  "noncontig read from" :
-                  "noncontig write to",
-                k2s(get_khandle_from_ino(rw->inode),s),
-                (rw->file &&
-                 rw->file->f_dentry &&
-                 rw->file->f_dentry->d_name.name ?
-                   (char *) rw->file->f_dentry->d_name.name :
-                   "UNKNOWN"),
-                (long) ret);
+              gossip_err("%s: error in %s handle %s, FILE: %s\n  -- returning %ld\n",
+                          rw->fnstr, 
+                          rw->type == IO_READX ? "noncontig read from" : "noncontig write to",
+                          k2s(get_khandle_from_ino(rw->inode),s),
+                          (rw->file && rw->file->f_dentry && rw->file->f_dentry->d_name.name ?
+                          (char *) rw->file->f_dentry->d_name.name : "UNKNOWN"),
+                          (long) ret);
           }
           goto out;
     }
