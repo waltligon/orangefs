@@ -1230,7 +1230,7 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
         return -PVFS_ENOMEM;
     }
     vfs_request->response.geteattr.val_array[0].buffer = 
-        (void *) malloc(PVFS_REQ_LIMIT_VAL_LEN);
+        (void *) malloc(PVFS_MAX_XATTR_VALUELEN);
     if (vfs_request->response.geteattr.val_array[0].buffer == NULL)
     {
         free(vfs_request->response.geteattr.val_array);
@@ -1238,7 +1238,7 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
         return -PVFS_ENOMEM;
     }
     vfs_request->response.geteattr.val_array[0].buffer_sz = 
-        PVFS_REQ_LIMIT_VAL_LEN;
+        PVFS_MAX_XATTR_VALUELEN;
 
     fill_hints(&hints, vfs_request);
 
