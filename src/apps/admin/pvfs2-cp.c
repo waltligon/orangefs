@@ -213,6 +213,7 @@ int main (int argc, char ** argv)
 main_out:
     generic_cleanup(&src, &dest, &credentials);
     PVFS_sys_finalize();
+    PINT_cleanup_credential(&credentials);
     free(user_opts);
     free(buffer);
 

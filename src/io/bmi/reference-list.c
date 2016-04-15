@@ -14,7 +14,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <assert.h>
 
 #include "pvfs2-internal.h"
 #include "reference-list.h"
@@ -47,7 +46,10 @@ ref_list_p ref_list_new(void)
      * ever have a need for more, then this hash table should be moved from
      * a static global to actually be part of the ref_list_p.
      */
-    assert(str_table == NULL);
+    if (str_table != NULL)
+    {
+        return NULL;
+    }
 
     str_table = qhash_init(
         ref_list_compare_key_entry,
@@ -260,7 +262,10 @@ static int ref_list_compare_key_entry(const void* key, struct qhash_head* link)
     ref_st_p tmp_entry = NULL;
 
     tmp_entry = qhash_entry(link, ref_st, hash_link);
-    assert(tmp_entry);
+    if (tmp_entry == NULL)
+    {
+        return 0;
+    }
 
     if(strcmp(tmp_entry->id_string, key_string) == 0)
     {
