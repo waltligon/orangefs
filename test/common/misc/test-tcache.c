@@ -12,8 +12,8 @@
 #include "tcache.h"
 
 static void usage(int argc, char** argv);
-static int foo_compare_key_entry(void* key, struct qhash_head* link);
-static int foo_hash_key(void* key, int table_size);
+static int foo_compare_key_entry(const void* key, struct qhash_head* link);
+static int foo_hash_key(const void* key, int table_size);
 static int foo_free_payload(void* payload);
 static void check_param(char *parameter_name, int param, int expected_value);
 
@@ -472,7 +472,7 @@ static void usage(int argc, char** argv)
     return;
 }
 
-static int foo_compare_key_entry(void* key, struct qhash_head* link)
+static int foo_compare_key_entry(const void* key, struct qhash_head* link)
 {
     int* real_key = (int*)key;
     struct foo_payload* tmp_payload = NULL;
@@ -490,7 +490,7 @@ static int foo_compare_key_entry(void* key, struct qhash_head* link)
     return(0);
 }
 
-static int foo_hash_key(void* key, int table_size)
+static int foo_hash_key(const void* key, int table_size)
 {
     int* real_key = (int*)key;
     int tmp_ret = 0;

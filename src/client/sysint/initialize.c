@@ -38,7 +38,12 @@
 
 PINT_smcb *g_smcb = NULL; 
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 PINT_event_id PINT_client_sys_event_id;
 

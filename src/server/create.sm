@@ -137,6 +137,7 @@ machine pvfs2_create_sm
 static int setup_final_response(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TCREATE, &s_op->start_time);
 
     /* retrieve original error code if present */
     if(s_op->u.create.saved_error_code)
