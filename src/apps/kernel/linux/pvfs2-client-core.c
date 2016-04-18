@@ -3001,7 +3001,7 @@ static inline void package_downcall_members(
                         vfs_request->in_upcall.uid,
                         vfs_request->in_upcall.gid);
 
-                    /* compat */
+                    /* Turn the parent khandle in the upcall into a handle. */
                     refn1.handle =
                      pvfs2_khandle_to_ino(
                       &(vfs_request->in_upcall.req.create.parent_refn.khandle));
@@ -3010,17 +3010,25 @@ static inline void package_downcall_members(
                     refn1.__pad1 = 
                       vfs_request->in_upcall.req.create.parent_refn.__pad1;
 
-
-//hubcap            vfs_request->out_downcall.resp.create.refn =
+                    /* Obtain the handle of the target object. */
                     refn2 =
                       perform_lookup_on_create_error(
                         refn1,
-//hubcap                vfs_request->in_upcall.req.create.parent_refn,
                         vfs_request->in_upcall.req.create.d_name,
                         credential,
                         1,
                         hints);
                     vfs_request->hints = hints;
+
+                    /*
+                     * Convert the target handle into a khandle and
+                     * put it into the downcall response.
+                     */
+                    pvfs2_khandle_from_handle(
+                      &(refn2.handle),
+                      &(vfs_request->out_downcall.resp.create.refn.khandle));
+		    vfs_request->out_downcall.resp.create.refn.fs_id =
+                      refn2.fs_id;
 
                     if (credential)
                     {
@@ -3028,7 +3036,6 @@ static inline void package_downcall_members(
                         free(credential);
                     }
 
-//hubcap            if (vfs_request->out_downcall.resp.create.refn.handle ==
                     if (refn2.handle ==
                         PVFS_HANDLE_NULL)
                     {
@@ -3060,10 +3067,10 @@ static inline void package_downcall_members(
             }
             else
             {
-//hubcap                vfs_request->out_downcall.resp.create.refn =
-//hubcap                    vfs_request->response.create.ref;
-
-                /* compat 2 */
+                /*
+                 * The object was successfully created, convert its
+                 * handle into a khandle for the downcall response.
+                 */
                 pvfs2_khandle_from_handle(
                   &(vfs_request->response.create.ref.handle),
                   &(vfs_request->out_downcall.resp.create.refn.khandle));
