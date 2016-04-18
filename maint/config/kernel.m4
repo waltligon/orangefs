@@ -2006,6 +2006,29 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 		AC_MSG_RESULT(no)
 		)
 
+	dnl Check for copy_from_iter
+	AC_MSG_CHECKING(for iov_iter interface support)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/uio.h>
+		#ifdef HAVE_KCONFIG
+			#include <linux/kconfig.h>
+		#endif
+		#include <linux/fs.h>
+		],
+		[
+			void *addr;
+			size_t bytes;
+			struct iov_iter i;
+			size_t rc;
+
+			rc = copy_from_iter(addr, bytes, &i);
+		],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_IOV_ITER, 1, iov_iter interface is supported),
+		AC_MSG_RESULT(no)
+		)
+
 	dnl Check for nd_set_link
 	AC_MSG_CHECKING(for nd_set_link)
 	AC_TRY_COMPILE([

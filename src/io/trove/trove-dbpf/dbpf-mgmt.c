@@ -1099,21 +1099,21 @@ int dbpf_collection_remove(char *collname,
     ret = dbpf_db_get(sto_p->coll_db, &key, &data);
     if (ret != 0)
     {
-        gossip_err("TROVE:DBPF:Berkeley DB DB->get collection\n");
+        gossip_err("TROVE:DBPF: dbpf_db_get collection\n");
         return -ret;
     }
 
     ret = dbpf_db_del(sto_p->coll_db, &key);
     if (ret != 0)
     {
-        gossip_err("TROVE:DBPF:Berkeley DB DB->del");
+        gossip_err("TROVE:DBPF: dbpf_db_del");
         return -ret;
     }
 
     ret = dbpf_db_sync(sto_p->coll_db);
     if (ret != 0)
     {
-        gossip_err("TROVE:DBPF:Berkeley DB DB->sync");
+        gossip_err("TROVE:DBPF: dbpf_db_sync");
         return -ret;
     }
 
@@ -1450,7 +1450,7 @@ int dbpf_collection_lookup(char *collname,
     {
         if (ret != TROVE_ENOENT)
         {
-            gossip_err("TROVE:DBPF:Berkeley DB DB->get collection\n");
+            gossip_err("TROVE:DBPF: dbpf_db_get collection\n");
             gossip_debug(GOSSIP_TROVE_DEBUG, "lookup got error (%d)\n", ret);
         }
         return -ret;
