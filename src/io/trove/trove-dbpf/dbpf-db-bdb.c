@@ -206,8 +206,8 @@ int dbpf_db_get(struct dbpf_db *db, struct dbpf_data *key,
         if (r == 0 && val)
         {
             memcpy(val->data, db_data.data, val->len);
-            free(db_data.data);
         }
+        free(db_data.data);
     }
     else if (r)
     {
