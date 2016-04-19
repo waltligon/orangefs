@@ -10,7 +10,7 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <hadoop-common.version>2.7.1</hadoop-common.version>
+    <hadoop-common.version>2.7.2</hadoop-common.version>
     <orangefs-jni.version>@PVFS2_VERSION_MAJOR@.@PVFS2_VERSION_MINOR@.@PVFS2_VERSION_SUB@</orangefs-jni.version>
     <log4j.version>1.2.17</log4j.version>
     <junit.version>4.12</junit.version>
