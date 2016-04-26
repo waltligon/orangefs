@@ -19,7 +19,12 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 /*
   given mount information, retrieve the server's configuration by

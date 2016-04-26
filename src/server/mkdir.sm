@@ -739,12 +739,11 @@ static PINT_sm_action mkdir_dirdata_keyval_setattr(
     return ret;
 }
 
-
-
 static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     s_op->resp.u.mkdir.handle = 0;
+
 
     /* clean up objects */
     PINT_free_object_attr(s_op->u.mkdir.saved_attr);
@@ -816,7 +815,13 @@ static PINT_sm_action mkdir_cleanup(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TMKDIR, &s_op->start_time);
     mkdir_free(s_op);
+
+    if (s_op->msgarray_op.count > 0)
+    {
+        PINT_free_object_attr(&s_op->req->u.tree_setattr.attr);
+    }
     return(server_state_machine_complete(smcb));
 }
 

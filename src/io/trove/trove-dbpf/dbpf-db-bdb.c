@@ -191,7 +191,25 @@ int dbpf_db_get(struct dbpf_db *db, struct dbpf_data *key,
     db_data.ulen = val->len;
     db_data.flags = DB_DBT_USERMEM;
     r = db->db->get(db->db, NULL, &db_key, &db_data, 0);
-    if (r && r != DB_BUFFER_SMALL)
+    if (r == DB_BUFFER_SMALL)
+    {
+        db_data.data = malloc(db_data.size);
+        if (! db_data.data)
+        {
+            return -TROVE_ENOMEM;
+        }
+
+        db_data.ulen = db_data.size;
+
+        r = db->db->get(db->db, NULL, &db_key, &db_data, 0);
+
+        if (r == 0 && val)
+        {
+            memcpy(val->data, db_data.data, val->len);
+        }
+        free(db_data.data);
+    }
+    else if (r)
     {
         return db_error(r);
     }
@@ -293,7 +311,25 @@ int dbpf_db_cursor_get(struct dbpf_cursor *dbc, struct dbpf_data *key,
         flags = DB_FIRST;
     }
     r = dbc->dbc->c_get(dbc->dbc, &db_key, &db_data, flags);
-    if (r && r != DB_BUFFER_SMALL)
+    if (r == DB_BUFFER_SMALL)
+    {
+        db_data.data = malloc(db_data.size);
+        if (! db_data.data)
+        {
+            return -TROVE_ENOMEM;
+        }
+
+        db_data.ulen = db_data.size;
+
+        r = dbc->dbc->c_get(dbc->dbc, &db_key, &db_data, flags);
+
+        if (r == 0 && val)
+        { 
+            memcpy(val->data, db_data.data, val->len);
+        }
+        free(db_data.data);
+    }
+    if (r)
     {
         return db_error(r);
     }

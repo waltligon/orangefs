@@ -15,6 +15,7 @@
 #include "pvfs2-debug.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
+#include "pint-sysint-utils.h"
 
 #include "client-capcache.h"
   
@@ -128,7 +129,9 @@ int PINT_client_capcache_initialize(void)
  */
 static int PINT_client_capcache_initialize_perf_counter(void)
 {
-    client_capcache_pc = PINT_perf_initialize(client_capcache_keys);
+    client_capcache_pc = PINT_perf_initialize(PINT_PERF_COUNTER,
+                                              client_capcache_keys,
+                                              client_perf_start_rollover);
     if (client_capcache_pc == NULL)
     {
         gossip_err("%s: Error: PINT_perf_initialize failure.\n", __func__);

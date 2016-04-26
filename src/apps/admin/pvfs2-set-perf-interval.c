@@ -26,21 +26,21 @@
 
 struct options
 {
-    char* mnt_point;
+    char *mnt_point;
     int mnt_point_set;
-    enum PVFS_server_mode mode;
-    int mode_set;
+    int interval;
+    int interval_set;
     char *server;
 };
 
-static struct options* parse_args(int argc, char* argv[]);
-static void usage(int argc, char** argv);
+static struct options* parse_args(int argc, char *argv[]);
+static void usage(int argc, char **argv);
 
 int main(int argc, char **argv)
 {
     int ret = -1;
     PVFS_fs_id cur_fs;
-    struct options* user_opts = NULL;
+    struct options *user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_credential creds;
     struct PVFS_mgmt_setparam_value param_value;
@@ -83,7 +83,7 @@ int main(int argc, char **argv)
     }
 
     param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
-    param_value.u.value = user_opts->mode;
+    param_value.u.value = user_opts->interval;
 
     if (user_opts->server)
     {
@@ -100,7 +100,7 @@ int main(int argc, char **argv)
        }
        ret = PVFS_mgmt_setparam_single(cur_fs,
                                        &creds,
-                                       PVFS_SERV_PARAM_MODE,
+                                       PVFS_SERV_PARAM_PERF_INTERVAL,
                                        &param_value,
                                        user_opts->server,    /*server string*/
                                        NULL,                 /*details*/
@@ -108,7 +108,7 @@ int main(int argc, char **argv)
        if (ret)
        {
           fprintf(stderr,
-                  "Error(%d) setting mode on server(%s)\n",
+                  "Error(%d) setting interval on server(%s)\n",
                   ret,
                   user_opts->server);
           goto out;
@@ -116,8 +116,8 @@ int main(int argc, char **argv)
        else
        {
           fprintf(stderr,
-                  "Successfully set mode(%s) on server (%s)\n",
-                  user_opts->mode==PVFS_SERVER_ADMIN_MODE ? "admin" : "normal",
+                  "Successfully set interval(%d) on server (%s)\n",
+                  user_opts->interval,
                   user_opts->server);
        }
     }
@@ -125,14 +125,14 @@ int main(int argc, char **argv)
     {
         ret = PVFS_mgmt_setparam_all(cur_fs,
 	                             &creds,
-				     PVFS_SERV_PARAM_MODE,
+				     PVFS_SERV_PARAM_PERF_INTERVAL,
                                      &param_value,
 				     NULL,/* details */
 				     NULL /* hints */);
         if (ret)
         {
            fprintf(stderr,
-                   "Error(%d) setting mode for mount point(%s)\n",
+                   "Error(%d) setting interval for mount point(%s)\n",
                    ret,
                    user_opts->mnt_point);
            goto out;
@@ -140,8 +140,8 @@ int main(int argc, char **argv)
         else
         {
            fprintf(stderr,
-                   "Successfully set mode (%s) for mount point(%s)\n",
-                   user_opts->mode==PVFS_SERVER_ADMIN_MODE ? "admin" : "normal",
+                   "Successfully set interval (%d) for mount point(%s)\n",
+                   user_opts->interval,
                    user_opts->mnt_point);
         }
     }
@@ -159,7 +159,7 @@ out:
  *
  * returns pointer to options structure on success, NULL on failure
  */
-static struct options* parse_args(int argc, char* argv[])
+static struct options *parse_args(int argc, char* argv[])
 {
     char flags[] = "vm:s:";
     int one_opt = 0;
@@ -169,7 +169,7 @@ static struct options* parse_args(int argc, char* argv[])
     int ret = -1;
 
     /* create storage for the command line options */
-    tmp_opts = (struct options*)malloc(sizeof(struct options));
+    tmp_opts = (struct options *)malloc(sizeof(struct options));
     if(!tmp_opts)
     {
 	return(NULL);
@@ -185,16 +185,17 @@ static struct options* parse_args(int argc, char* argv[])
                 printf("%s\n", PVFS2_VERSION);
                 exit(0);
 	    case('m'):
-		len = strlen(optarg)+1;
-		tmp_opts->mnt_point = (char*)malloc(len+1);
+		len = strlen(optarg) + 1;
+		tmp_opts->mnt_point = (char*)malloc(len + 1);
 		if(!tmp_opts->mnt_point)
 		{
 		    free(tmp_opts);
 		    return(NULL);
 		}
-		memset(tmp_opts->mnt_point, 0, len+1);
+		memset(tmp_opts->mnt_point, 0, len + 1);
 		ret = sscanf(optarg, "%s", tmp_opts->mnt_point);
-		if(ret < 1){
+		if(ret < 1)
+                {
 		    free(tmp_opts);
 		    return(NULL);
 		}
@@ -220,26 +221,21 @@ static struct options* parse_args(int argc, char* argv[])
 	exit(EXIT_FAILURE);
     }
 
-    if(!(strcmp(argv[argc-1], "normal")))
-    {
-	tmp_opts->mode = PVFS_SERVER_NORMAL_MODE;
-	tmp_opts->mode_set = 1;
-    }
-    if(!(strcmp(argv[argc-1], "admin")))
-    {
-	tmp_opts->mode = PVFS_SERVER_ADMIN_MODE;
-	tmp_opts->mode_set = 1;
-    }
-
-    if(!tmp_opts->mnt_point_set || !tmp_opts->mode_set)
+    tmp_opts->interval = atoi(argv[argc - 1]);
+    tmp_opts->interval_set = 1;
+    if(!tmp_opts->mnt_point_set || !tmp_opts->interval >= 1)
     {
         if(!tmp_opts->mnt_point_set)
         {
             fprintf(stderr,"Error: Mount point is required.\n");
         }
-        if(!tmp_opts->mode_set)
+        if(!tmp_opts->interval_set)
         {
-            fprintf(stderr,"Error: Mode is required.\n");
+            fprintf(stderr,"Error: Interval is required.\n");
+        }
+        if(!tmp_opts->interval <= 0)
+        {
+            fprintf(stderr,"Error: Interval is must be greater than 0.\n");
         }
 	if(tmp_opts->mnt_point)
         {
@@ -257,19 +253,19 @@ static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
     fprintf(stderr,
-            "Usage  : %s [-s server] -m <filesystem mount point>  <mode>\n\n",
+            "Usage  : %s [-s server] -m <filesystem mount point>  <interval>\n\n",
 	    argv[0]);
     fprintf(stderr,
-            "Mount point and mode are required. "
-            "If server is given, then mode will be set only on that server; "
-            "otherwise, mode is set on "
+            "Mount point and interval are required. "
+            "If server is given, then interval will be set only on that server; "
+            "otherwise, interval is set on "
             "all servers for the given mount point.\n\n");
     fprintf(stderr,
-            "Example:All-Severs: %s -m /mnt/pvfs2 normal\n\n",
+            "Example:All-Severs: %s -m /mnt/pvfs2 6000\n\n",
 	    argv[0]);
     fprintf(stderr,
-            "Example:One-Server: %s -s tcp://localhost:3334/pvfs2-fs -m /mnt/pvfs2 admin\n\n",argv[0]);
-    fprintf(stderr, "Available modes include: admin,normal\n");
+            "Example:One-Server: %s -s tcp://localhost:3334/pvfs2-fs -m /mnt/pvfs2 10000\n\n",argv[0]);
+    fprintf(stderr, "Interval is an integer greater than 0 in milliseconds\n");
 
     return;
 }

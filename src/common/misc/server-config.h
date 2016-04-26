@@ -145,7 +145,7 @@ typedef struct server_configuration_s
 {
     char *host_id;                  /* bmi_address of this server */
     int host_index;
-    char *server_alias;             /* the command line server-alias parameter */
+    char *server_alias;             /* command line server-alias parameter */
     int my_server_options;
     char *data_path;                /* path to data storage directory */
     char *meta_path;                /* path to metadata storage directory */
@@ -159,6 +159,7 @@ typedef struct server_configuration_s
     int  client_job_flow_timeout;
     int  client_retry_limit;        /* how many times to retry client operations */
     int  client_retry_delay_ms;     /* delay between retries */
+    int  perf_update_history;       /* how many perf samples to keep */
     int  perf_update_interval;      /* how quickly (in msecs) to
                                        update perf monitor              */
     uint32_t  *precreate_batch_size;    /* batch size for each ds type */

@@ -30,7 +30,10 @@
 
 #include "pvfs2-mirror.h"
 
+#if 0
 #define VALBUFSZ 1024
+#endif
+#define VALBUFSZ PVFS_MAX_XATTR_VALUELEN
 
 /* extended attribute name spaces supported in PVFS2 */
 const char *PINT_eattr_namespaces[] =
