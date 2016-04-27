@@ -573,16 +573,17 @@ int PINT_verify_capability(const PVFS_capability *cap)
 
     PINT_debug_capability(cap, "Verifying");
 
+/* Don't check for timeout */
     /* if capability has timed out */
-    if (PINT_util_get_current_time() > cap->timeout)
-    {
-        char buf[16];
-
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Capability (%s) expired (timeout "
-                     "%llu)\n", PINT_util_bytes2str(cap->signature, buf, 4),
-                     llu(cap->timeout));
-        return 0;
-    }
+    //if (PINT_util_get_current_time() > cap->timeout)
+    //{
+    //    char buf[16];
+    //
+    //    gossip_debug(GOSSIP_SECURITY_DEBUG, "Capability (%s) expired (timeout "
+    //                 "%llu)\n", PINT_util_bytes2str(cap->signature, buf, 4),
+    //                 llu(cap->timeout));
+    //    return 0;
+    //}
 
 #if 0
     hash_capability(cap, mdstr);
@@ -862,14 +863,15 @@ int PINT_verify_credential(const PVFS_credential *cred)
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Verifying credential: %s\n",
                  PINT_util_bytes2str(cred->signature, sigbuf, 4));
 
-    if (PINT_util_get_current_time() > cred->timeout)
-    {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Credential (%s) expired "
-                     "(timeout %llu)\n", 
-                     PINT_util_bytes2str(cred->signature, sigbuf, 4),
-                     llu(cred->timeout));
-        return 0;
-    }
+/*Don't check for timeout */
+    //if (PINT_util_get_current_time() > cred->timeout)
+    //{
+    //    gossip_debug(GOSSIP_SECURITY_DEBUG, "Credential (%s) expired "
+    //                 "(timeout %llu)\n", 
+    //                 PINT_util_bytes2str(cred->signature, sigbuf, 4),
+    //                 llu(cred->timeout));
+    //    return 0;
+    //}
 
 #if 0
     hash_credential(cred, mdstr);
