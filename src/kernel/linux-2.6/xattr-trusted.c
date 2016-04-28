@@ -25,7 +25,7 @@ int pvfs2_xattr_set_trusted(
                             const void *buffer,
                             size_t size,
                             int flags)
-#elif defined (HAVE_XATTR_HANDLER_SET_2.6.33)
+#elif defined (HAVE_XATTR_HANDLER_SET_2_6_33)
                             struct dentry *dentry,
                             const char *name,
                             const void *buffer,
@@ -78,7 +78,7 @@ int pvfs2_xattr_get_trusted(
                             const char *name,
                             void *buffer,
                             size_t size)
-#elif defined (HAVE_XATTR_HANDLER_GET_2.6.33)
+#elif defined(HAVE_XATTR_HANDLER_GET_2_6_33)
                             struct dentry *dentry,
                             const char *name,
                             void *buffer,
