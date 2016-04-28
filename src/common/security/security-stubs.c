@@ -88,6 +88,8 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
 
 int PINT_verify_capability(const PVFS_capability *cap)
 {
+    struct server_configuration_s *config = PINT_get_server_config();
+
     if (!cap)
     {
         return 0;
@@ -98,13 +100,15 @@ int PINT_verify_capability(const PVFS_capability *cap)
         return 1;
     }
 
-
-    /* Don't check for timeout */
-    /* if capability has timed out */
-    //if (PINT_util_get_current_time() > cap->timeout)
-    //{
-    //    return 0;
-    //}
+    /* Are we suppose to check for timeouts? */
+    if ( !config->bypass_timeout_check )
+    {
+       /* check capability timeout */
+       if (PINT_util_get_current_time() > cap->timeout)
+       {
+           return 0;
+       }
+    }
 
     
     return 1;
@@ -141,16 +145,22 @@ int PINT_sign_credential(PVFS_credential *cred)
 
 int PINT_verify_credential(const PVFS_credential *cred)
 {
+    struct server_configuration_s *config = PINT_get_server_config();
+
     if (!cred)
     {
         return 0;
     }
 
-/*Don't check for timeout*/
-    //if (PINT_util_get_current_time() > cred->timeout)
-    //{
-    //    return 0;
-    //}
+    /* Are we suppose to check for timeouts? */
+    if ( !config->bypass_timeout_check )
+    {
+       /* Check credential timeout */
+       if (PINT_util_get_current_time() > cred->timeout)
+       {
+           return 0;
+       }
+    }
 
     return 1;
 }
