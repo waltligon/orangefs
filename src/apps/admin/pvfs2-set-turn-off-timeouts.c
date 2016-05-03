@@ -19,6 +19,7 @@
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
 #include "pint-cached-config.h"
+#include "pvfs2-config.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -43,6 +44,13 @@ int main(int argc, char **argv)
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_credential creds;
     struct PVFS_mgmt_setparam_value param_value;
+
+
+#if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
+    fprintf(stderr,"\nIf either key or certificate security is configured, then you "
+                   "cannot modify the TurnOffTimeouts config option.\n\n");
+    exit(0);
+#endif
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -83,12 +91,13 @@ int main(int argc, char **argv)
 
     printf("%s:param_value.u.string_value(%s)\n",__func__,param_value.u.string_value);
 
-//    ret = PVFS_mgmt_setparam_all(cur_fs,
-//                                 &creds,
-//     		                 PVFS_SERV_PARAM_TURN_OFF_TIMEOUTS,
-//                                 &param_value,
-//	                         NULL,/* details */
-//	                         NULL /* hints */);
+    ret = PVFS_mgmt_setparam_all(cur_fs,
+                                 &creds,
+     		                 PVFS_SERV_PARAM_TURN_OFF_TIMEOUTS,
+                                 &param_value,
+  	                         NULL,/* details */
+                                 NULL /* hints */);
+
     if (ret)
     {
         fprintf(stderr,
@@ -125,6 +134,7 @@ static struct options *parse_args(int argc, char* argv[])
     int mflag=0,tflag=0;
 
     struct options* tmp_opts = NULL;
+
 
     /* create storage for the command line options */
     tmp_opts = (struct options *)calloc(1,sizeof(struct options));
