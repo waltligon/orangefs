@@ -69,12 +69,17 @@ static PINT_sm_action setparam_work(struct PINT_smcb *smcb, job_status_s *js_p)
     struct filesystem_configuration_s *fs_conf;
     char buf[16] = {0};
 
+    js_p->error_code = 0;
+
     switch(s_op->req->u.mgmt_setparam.param)
     {
         case PVFS_SERV_PARAM_TURN_OFF_TIMEOUTS:
         {
              user_opts = get_server_config_struct();
-             char *value = s_op->req->u.mgmt_setparam.value.string_value;
+             char *value = s_op->req->u.mgmt_setparam.value.u.string_value;
+             gossip_err("%s: current server value(%d) requested value(%s)\n"
+                       ,__func__,user_opts->bypass_timeout_check
+                       ,value);
              if ( !strcasecmp(value,"yes") )
              {
                 user_opts->bypass_timeout_check = 1;
@@ -87,6 +92,9 @@ static PINT_sm_action setparam_work(struct PINT_smcb *smcb, job_status_s *js_p)
              {
                 js_p->error_code = -PVFS_EINVAL;
              }
+
+             gossip_err("%s: Modified bypass_timeout_check(%d)\n"
+                       ,__func__,user_opts->bypass_timeout_check);
 
              return SM_ACTION_COMPLETE;
         }

@@ -89,13 +89,11 @@ int main(int argc, char **argv)
     param_value.type = PVFS_MGMT_PARAM_TYPE_STRING;
     param_value.u.string_value = user_opts->turn_off_timeouts;
 
-    printf("%s:param_value.u.string_value(%s)\n",__func__,param_value.u.string_value);
-
     ret = PVFS_mgmt_setparam_all(cur_fs,
                                  &creds,
      		                 PVFS_SERV_PARAM_TURN_OFF_TIMEOUTS,
                                  &param_value,
-  	                         NULL,/* details */
+  	                         NULL,/* status details */
                                  NULL /* hints */);
 
     if (ret)
