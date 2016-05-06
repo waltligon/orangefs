@@ -197,7 +197,7 @@ int PINT_security_initialize(void)
         host_aliases = PINT_llist_next(host_aliases);
     }
 
-#elif ENABLE_SECURITY_CERT
+#elif defined(ENABLE_SECURITY_CERT)
 
     /* load the CA cert */
     ret = PINT_init_trust_store();
@@ -830,7 +830,7 @@ int PINT_sign_credential(PVFS_credential *cred)
  */
 int PINT_verify_credential(const PVFS_credential *cred)
 {
-    struct server_configurations_s *config = PINT_get_server_config();
+    struct server_configuration_s *config = PINT_get_server_config();
 
 #if 0
     char mdstr[2*SHA_DIGEST_LENGTH+1];
