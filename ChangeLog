@@ -5,6 +5,12 @@ OrangeFS Release ChangeLog
 orangefs-2.9.5 (Subversion Tag v.2.9.5)
 http://www.orangefs.org/svn/orangefs/tags/v.2.9.5
 
+This version of OrangeFS includes many bug fixes and some new functionality.
+	1.  We now have full support for Infiniband with our 2.9 system.
+	2.  We now have a version of the kernel module in Linux upstream,
+	    beginning with version 4.6.
+	3.  We now have support for LMDB as a metadata store.
+
 * - Software Infrastructure
 	* - Enhancements to redefined malloc functionality
 	* - Added helper function to free attr objects
@@ -32,7 +38,7 @@ http://www.orangefs.org/svn/orangefs/tags/v.2.9.5
 	            the size of a file
 		* - Handle extended attribute values up to 8K in length
 	* - HADOOP: 
-		* - default Hadoop version is 2.7.2.
+		* - default Hadoop version is now 2.7.2.
 
 
 
@@ -52,10 +58,10 @@ http://www.orangefs.org/svn/orangefs/tags/v.2.9.5
 	* - Added ifdef for HAVE_KCONFIG
 	* - Modified pvfs2_follow_link due to changes in Fedora 23
 	* - Added write-iter support for the newer kernels.
-	* - Strengthen sanity checksin PINT_dev_write_LIST
+	* - Strengthen sanity checks in PINT_dev_write_LIST
 	* - Fix getdents for both filldir and dir_emit
 	* - Client Core:  Fix khandle related problem with EEXIST CREATE case.
-
+	* - Added support for the 4.4 kernel.
 
 * - BMI 
 	* - Native IB: Now available
