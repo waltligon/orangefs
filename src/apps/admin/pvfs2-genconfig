@@ -320,7 +320,6 @@ sub emit_security
         die "\n*** error: no server key specified\n*** use --serverkey option"
             if (!defined($serverkey));
 
-        print $target "\t\tTurnOffTimeouts no\n";
         print $target "\t\tServerKey $serverkey\n";
 
         if (defined($opt_security_timeout))
