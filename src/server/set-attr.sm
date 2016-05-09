@@ -834,12 +834,10 @@ static PINT_sm_action setattr_set_dirdata_attr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *tree_setattr_op = NULL;
-    struct PINT_server_op *s_op = NULL;
     int task_id = 0;
     int remaining;
 
     tree_setattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
-    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_free_object_attr(&tree_setattr_op->req->u.tree_setattr.attr);
     free(tree_setattr_op->req);
