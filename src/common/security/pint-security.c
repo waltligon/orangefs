@@ -197,7 +197,7 @@ int PINT_security_initialize(void)
         host_aliases = PINT_llist_next(host_aliases);
     }
 
-#elif ENABLE_SECURITY_CERT
+#elif defined(ENABLE_SECURITY_CERT)
 
     /* load the CA cert */
     ret = PINT_init_trust_store();

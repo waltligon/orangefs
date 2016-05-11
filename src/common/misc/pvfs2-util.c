@@ -44,6 +44,11 @@
 #define ENABLE_SECURITY_MODE
 #endif
 
+
+#ifdef ENABLE_SECURITY_MODE
+void debug_gencred(char *args[]);
+#endif
+
 #ifndef ENABLE_SECURITY_MODE
 #include <pwd.h>
 #include <grp.h>
