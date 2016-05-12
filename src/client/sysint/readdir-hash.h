@@ -11,10 +11,11 @@
 int readdir_hash_initialize(void);
 void readdir_hash_finalize(void);
 
-int readdir_add_token(int hash_key, PVFS_object_ref ref,
-                      PVFS_ds_position token, int32_t dirdata_index);
-int readdir_lookup_token(int hash_key);
-
+int readdir_add_token(PVFS_object_ref ref,
+                      PVFS_ds_position token,
+                      int32_t dirdata_index);
+int readdir_lookup_token(PVFS_object_ref ref,
+                      PVFS_ds_position token);
 
 #endif /* _READDIR_HASH_H_ */
 

@@ -21,14 +21,6 @@
  *  are preferred. */
 #define DEFAULT_READDIR_TABLE_SIZE 1009
 
-/* data to be stored in an entry */
-typedef struct readdir_payload
-{
-    PVFS_object_ref ref;
-    PVFS_ds_position token;
-    int32_t dirdata_index;
-} readdir_payload_t;
-
 typedef struct readdir_key
 {
     PVFS_object_ref ref;
@@ -38,7 +30,8 @@ typedef struct readdir_key
 typedef struct readdir_entry_s {
     struct qlist_head hash_link;  /* holds prev/next pointers */
     int hash_key;                 /* hash key */
-    readdir_payload_t *readdir_payload; /* public key for above hash_key */
+    readdir_key_t *key_data;      /* data for above hash_key */
+    int32_t dirdata_index;
 } readdir_entry_t;
 
 
@@ -116,7 +109,7 @@ void readdir_hash_finalize(void)
  *  returns PVFS_ENOMEM if memory cannot be allocated
  *  returns 0 on success
  */
-int readdir_add_token(int hash_key, PVFS_object_ref ref,
+int readdir_add_token(PVFS_object_ref ref,
                       PVFS_ds_position token, int32_t dirdata_index)
 {    
     readdir_entry_t *entry;
@@ -128,21 +121,23 @@ int readdir_add_token(int hash_key, PVFS_object_ref ref,
         return -PVFS_ENOMEM;
     }
 
-    entry->readdir_payload = (readdir_payload_t *)malloc(sizeof(readdir_payload_t));
-    if (entry->readdir_payload == NULL)
+    entry->key_data = (readdir_key_t *)malloc(sizeof(readdir_key_t));
+    if (entry->key_data == NULL)
     {
         free(entry);
         return -PVFS_ENOMEM;
     }
 
-    entry->readdir_payload->ref = ref;
-    entry->readdir_payload->token = token;
-    entry->readdir_payload->dirdata_index = dirdata_index;
+    entry->key_data->ref = ref;
+    entry->key_data->token = token;
+    entry->dirdata_index = dirdata_index;
     
+    entry->hash_key = readdir_hash_key(entry->key_data, DEFAULT_READDIR_TABLE_SIZE);
+
     gen_mutex_lock(&hash_mutex);
     
     /* remove prior key linked to the hash key if it exists */
-    temp = qhash_search_and_remove(readdir_table, &hash_key);
+    temp = qhash_search_and_remove(readdir_table, &entry->hash_key);
     if (temp != NULL) 
     {
     	gossip_debug(GOSSIP_READDIR_DEBUG, 
@@ -161,10 +156,16 @@ int readdir_add_token(int hash_key, PVFS_object_ref ref,
  *
  *  returns NULL if no matching key is found
  */
-int32_t readdir_lookup_token(int hash_key)
+int32_t readdir_lookup_token(PVFS_object_ref ref, PVFS_ds_position token)
 {
     struct qhash_head *temp;
+    readdir_key_t key;
+    int hash_key;
     readdir_entry_t *entry;
+
+    key.ref = ref;
+    key.token = token;
+    hash_key = readdir_hash_key(&key, DEFAULT_READDIR_TABLE_SIZE);
 
     temp = qhash_search(readdir_table, &hash_key);
     if (temp == NULL)
@@ -174,7 +175,7 @@ int32_t readdir_lookup_token(int hash_key)
 
     entry = qlist_entry(temp, readdir_entry_t, hash_link);
 
-    return entry->readdir_payload->dirdata_index;
+    return entry->dirdata_index;
 }
 
 /* hash from http://burtleburtle.net/bob/hash/evahash.html */
@@ -194,7 +195,7 @@ do { \
 
 /* readdir_hash_key()
  *
- * hash function for character pointers
+ * internal hash function
  *
  * returns hash index
  */
@@ -220,21 +221,19 @@ static int readdir_hash_key(const void* key, int table_size)
 static int readdir_compare(const void* key, struct qhash_head* link)
 {
     const readdir_key_t * real_key = (const readdir_key_t *)key;
-    readdir_payload_t * tmp_payload = NULL;
     readdir_entry_t * tmp_entry = NULL;
 
     tmp_entry = qhash_entry(link, readdir_entry_t, hash_link);
     assert(tmp_entry);
 
-    tmp_payload = (readdir_payload_t *)tmp_entry->readdir_payload;
      /* If the following aren't equal, we know we don't have a match
       *   - ref.handle
       *   - ref.fs_id
       *   - token
       */
-    if( real_key->ref.handle  != tmp_payload->ref.handle ||
-        real_key->ref.fs_id   != tmp_payload->ref.fs_id  ||
-        real_key->token != tmp_payload->token )
+    if( real_key->ref.handle  != tmp_entry->key_data->ref.handle ||
+        real_key->ref.fs_id   != tmp_entry->key_data->ref.fs_id  ||
+        real_key->token != tmp_entry->key_data->token )
     {
         /* One of the above cases failed, so we know these aren't a match */
         return(0);
@@ -256,7 +255,7 @@ static void free_readdir_entry(void *to_free)
     readdir_entry_t *temp = (readdir_entry_t *)to_free;
     if (temp != NULL)
     {
-        free(temp->readdir_payload);
+        free(temp->key_data);
         free(temp);
     }
 }
