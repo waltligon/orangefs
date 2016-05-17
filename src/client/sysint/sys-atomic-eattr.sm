@@ -26,7 +26,12 @@
 #include "pint-eattr.h"
 #include "security-util.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 static int atomic_eattr_comp_fn(
     void *v_p,

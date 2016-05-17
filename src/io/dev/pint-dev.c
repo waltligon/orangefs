@@ -63,9 +63,8 @@ static int pdev_fd = -1;
 static int32_t pdev_magic;
 #ifdef WITH_LINUX_KMOD
 static int32_t pdev_max_upsize;
-
-#endif  /* WITH_LINUX_KMOD */
 static int32_t pdev_max_downsize;
+#endif  /* WITH_LINUX_KMOD */
 
 int32_t pvfs2_bufmap_total_size, pvfs2_bufmap_desc_size;
 int32_t pvfs2_bufmap_desc_count, pvfs2_bufmap_desc_shift;

@@ -18,12 +18,13 @@ dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=2
 PVFS2_VERSION_MINOR=9
-PVFS2_VERSION_SUB=4
+PVFS2_VERSION_SUB=5
 PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
-PVFS2_VERSION_PRE="RC-$CONFIGURE_TIME"
+#PVFS2_VERSION_PRE="RC-$CONFIGURE_TIME"
+PVFS2_VERSION_PRE="Rev-12393"
 
-PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE$PVFS2_VERSION_PRE
+PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE-$PVFS2_VERSION_PRE
 AC_SUBST(PVFS2_VERSION)
 AC_DEFINE_UNQUOTED(PVFS2_VERSION_MAJOR, $PVFS2_VERSION_MAJOR, major version number)
 AC_DEFINE_UNQUOTED(PVFS2_VERSION_MINOR, $PVFS2_VERSION_MINOR, minor version number)
@@ -1045,9 +1046,9 @@ fi
 dnl shared or static client library
 AC_ARG_ENABLE(threaded,
     [  --disable-threaded      Do not build threaded client library],
-    [if "x$THREADED_KMOD_HELPER = xyes" ; then
+    [if test "x$THREADED_KMOD_HELPER" = "xyes" ; then
          build_threaded=yes
-         AC_MSG_WARN([Ignoring --disable-threaded in favor of --enable-threaded-kmod-heaper.])
+         AC_MSG_WARN([Ignoring --disable-threaded in favor of --enable-threaded-kmod-helper.])
      else
          build_threaded=$enableval
      fi
