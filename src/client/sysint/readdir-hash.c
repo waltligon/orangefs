@@ -132,23 +132,47 @@ int readdir_add_token(PVFS_object_ref ref,
     entry->key_data->token = token;
     entry->dirdata_index = dirdata_index;
     
-    entry->hash_key = readdir_hash_key(entry->key_data, DEFAULT_READDIR_TABLE_SIZE);
+    entry->hash_key = readdir_hash_key(entry->key_data, readdir_table->table_size);
+    gossip_debug(GOSSIP_READDIR_DEBUG, "%s: hash_key = %d\n", __func__, entry->hash_key);
 
     gen_mutex_lock(&hash_mutex);
     
     /* remove prior key linked to the hash key if it exists */
-    temp = qhash_search_and_remove(readdir_table, &entry->hash_key);
+    temp = qhash_search_and_remove(readdir_table, entry->key_data);
     if (temp != NULL) 
     {
     	gossip_debug(GOSSIP_READDIR_DEBUG, 
     	             "Removed duplicate key from table.\n");
     	free_readdir_entry(temp);
     }
-    qhash_add(readdir_table, &entry->hash_key, &entry->hash_link);
+    qhash_add(readdir_table, entry->key_data, &entry->hash_link);
     
     gen_mutex_unlock(&hash_mutex);
     return 0;
 }
+
+void readdir_print_hash_table(void)
+{
+    int i;
+    struct qhash_head *tmp_link;
+    readdir_entry_t  *temp_entry;
+
+    gossip_debug(GOSSIP_READDIR_DEBUG, "READDIR HASH TABLE CONTENTS:\n");
+    for (i = 0; i < readdir_table->table_size; i++)
+    {
+        qhash_for_each(tmp_link, &readdir_table->array[i])
+        {
+            temp_entry = (readdir_entry_t *) tmp_link;
+            gossip_debug(GOSSIP_READDIR_DEBUG,
+                     "readdir_table[%i]    handle: %llu token: %llu dirdata_index: %d\n",
+                     i,
+                     llu(temp_entry->key_data->ref.handle),
+                     llu(temp_entry->key_data->token),
+                     temp_entry->dirdata_index);
+        }
+    }
+}
+
 
 /*  readdir_lookup_token
  *
@@ -160,14 +184,14 @@ int32_t readdir_lookup_token(PVFS_object_ref ref, PVFS_ds_position token)
 {
     struct qhash_head *temp;
     readdir_key_t key;
-    int hash_key;
+//    int hash_key;
     readdir_entry_t *entry;
 
     key.ref = ref;
     key.token = token;
-    hash_key = readdir_hash_key(&key, DEFAULT_READDIR_TABLE_SIZE);
+//    hash_key = readdir_hash_key(&key, readdir_table->table_size);
 
-    temp = qhash_search(readdir_table, &hash_key);
+    temp = qhash_search(readdir_table, &key);
     if (temp == NULL)
     {
     	return -1;
@@ -208,7 +232,8 @@ static int readdir_hash_key(const void* key, int table_size)
     uint32_t c = (uint32_t)(key_entry->token);
 
     mix(a,b,c);
-    return (int)(c & (DEFAULT_READDIR_TABLE_SIZE-1));
+gossip_debug(GOSSIP_READDIR_DEBUG, "%s: hash = %d\n", __func__, (int)(c & (table_size-1)));
+    return (int)(c & (table_size-1));
 }
 
 /* readdir_compare()

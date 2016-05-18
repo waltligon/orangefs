@@ -14,6 +14,7 @@ void readdir_hash_finalize(void);
 int readdir_add_token(PVFS_object_ref ref,
                       PVFS_ds_position token,
                       int32_t dirdata_index);
+void readdir_print_hash_table(void);
 int readdir_lookup_token(PVFS_object_ref ref,
                       PVFS_ds_position token);
 
