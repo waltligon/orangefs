@@ -209,7 +209,11 @@ enum pvfs2_param_request_op
     PVFS2_PARAM_REQUEST_OP_CAPCACHE_SOFT_LIMIT = 23,
     PVFS2_PARAM_REQUEST_OP_CAPCACHE_RECLAIM_PERCENTAGE = 24,
     PVFS2_PARAM_REQUEST_OP_TWO_MASK_VALUES = 25,
+#ifdef USE_MMAP_RA_CACHE
     PVFS2_PARAM_REQUEST_OP_READAHEAD_SIZE = 26,
+    PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT = 27,
+    PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT_SIZE = 28,
+#endif
 };
 
 typedef struct
@@ -217,6 +221,7 @@ typedef struct
     enum pvfs2_param_request_type type;
     enum pvfs2_param_request_op op;
     int64_t value;
+    int64_t value2[2];
     char s_value[PVFS2_MAX_DEBUG_STRING_LEN]; 
 } pvfs2_param_request_t;
 

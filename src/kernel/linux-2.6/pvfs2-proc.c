@@ -189,12 +189,12 @@ static int pvfs2_param_proc_handler(
 {       
     pvfs2_kernel_op_t *new_op = NULL;
     struct pvfs2_param_extra* extra = ctl->extra1;
-    int val = 0;
+    int val[2] = {0, 0};
     int ret = 0;
     struct ctl_table tmp_ctl = *ctl;
 
     /* override fields in control structure for call to generic proc handler */
-    tmp_ctl.data = &val;
+    tmp_ctl.data = val;
     tmp_ctl.extra1 = &extra->min;
     tmp_ctl.extra2 = &extra->max;
 
@@ -220,8 +220,17 @@ static int pvfs2_param_proc_handler(
             op_release(new_op);
             return(ret);
         }
-        gossip_debug(GOSSIP_PROC_DEBUG, "pvfs2: proc write %d\n", val);
-        new_op->upcall.req.param.value = val;
+        gossip_debug(GOSSIP_PROC_DEBUG, "pvfs2: proc write %d\n", val[0]);
+        /* should this be based on lenp rather than op? */
+        if (extra->op == PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT_SIZE)
+        {
+            new_op->upcall.req.param.value2[0] = val[0];
+            new_op->upcall.req.param.value2[1] = val[1];
+        }
+        else
+        {
+            new_op->upcall.req.param.value = val[0];
+        }
         new_op->upcall.req.param.type = PVFS2_PARAM_REQUEST_SET;
     }
     else
@@ -239,8 +248,16 @@ static int pvfs2_param_proc_handler(
     if(ret == 0 && !write)
     {
         /* use generic proc handling function to output value */
-        val = (int)new_op->downcall.resp.param.value;
-        gossip_debug(GOSSIP_PROC_DEBUG, "pvfs2: proc read %d\n", val);
+        if (extra->op == PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT_SIZE)
+        {
+            val[0] = (int)new_op->downcall.resp.param.value2[0];
+            val[1] = (int)new_op->downcall.resp.param.value2[1];
+        }
+        else
+        {
+            val[0] = (int)new_op->downcall.resp.param.value;
+        }
+        gossip_debug(GOSSIP_PROC_DEBUG, "pvfs2: proc read %d\n", val[0]);
 #if defined(HAVE_PROC_HANDLER_FILE_ARG)
         ret = proc_dointvec_minmax(&tmp_ctl, write, filp, buffer, lenp, ppos);
 #elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
@@ -450,6 +467,16 @@ static struct pvfs2_param_extra perf_reset_extra = {
 #ifdef USE_MMAP_RA_CACHE
 static struct pvfs2_param_extra perf_readahead_size_extra = {
     .op = PVFS2_PARAM_REQUEST_OP_READAHEAD_SIZE,
+    .min = 0,
+    .max = INT_MAX,
+};
+static struct pvfs2_param_extra perf_readahead_count_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT,
+    .min = 0,
+    .max = INT_MAX,
+};
+static struct pvfs2_param_extra perf_readahead_count_size_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT_SIZE,
     .min = 0,
     .max = INT_MAX,
 };
@@ -840,7 +867,7 @@ static struct ctl_table pvfs2_table[] = {
         .child = pvfs2_capcache_table
     },
 #ifdef USE_MMAP_RA_CACHE
-    /* parameter for readahead cache size */
+    /* parameter for readahead cache buffer size */
     {
         CTL_NAME(15)
         .procname = "readahead-size",
@@ -848,6 +875,24 @@ static struct ctl_table pvfs2_table[] = {
         .mode = 0644,
         .proc_handler = &pvfs2_param_proc_handler,
         .extra1 = &perf_readahead_size_extra
+    },
+    /* parameter for readahead cache buffer count */
+    {
+        CTL_NAME(15)
+        .procname = "readahead-count",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &perf_readahead_count_extra
+    },
+    /* parameter for readahead cache buffer count */
+    {
+        CTL_NAME(15)
+        .procname = "readahead-count-size",
+        .maxlen = 2 * sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &perf_readahead_count_size_extra
     },
 #endif
     { CTL_NAME(CTL_NONE) }

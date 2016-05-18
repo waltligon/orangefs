@@ -10,9 +10,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#if 0
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>
 #endif
+#endif
+#include "pvfs2-internal.h"
 
 
 #define PINT_llist_add(__llist_p, __void_p) \

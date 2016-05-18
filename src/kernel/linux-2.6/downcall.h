@@ -170,6 +170,7 @@ typedef struct
 typedef struct
 {
     int64_t value;
+    int64_t value2[2];
 } pvfs2_param_response_t;
 
 #define PERF_COUNT_BUF_SIZE 4096
