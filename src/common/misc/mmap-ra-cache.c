@@ -76,37 +76,70 @@ int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
 
     if (MMAP_RA_CACHE_INITIALIZED())
     {
-        pvfs2_mmap_ra_cache_flush(refn);
-
-        cache_elem = (mmap_ra_cache_elem_t *)
-                        malloc(sizeof(mmap_ra_cache_elem_t));
-        if (!cache_elem)
-        {
-            goto return_exit;
-        }
-        memset(cache_elem, 0, sizeof(mmap_ra_cache_elem_t));
-        cache_elem->refn = refn;
-        cache_elem->file_offset = file_offset;
-        cache_elem->data = malloc(data_len);
-        if (!cache_elem->data)
-        {
-            goto return_exit;
-        }
-        memcpy(cache_elem->data, data, data_len);
-        cache_elem->data_sz = data_len;
+        /* original implementation flushed all entries for this
+         * refn and then creates a new entry for this refn which
+         * may be slow and wasteful so instead we will search for
+         * a matching entry and if there is one, convert it into
+         * our new one
+         */
+        /* pvfs2_mmap_ra_cache_flush(refn); */
 
         gen_mutex_lock(&s_mmap_ra_cache_mutex);
-        qhash_add(s_key_to_data_table,
-                  &refn,
-                  &cache_elem->hash_link);
+        hash_link = qhash_search(s_key_to_data_table, &refn);
+        if (hash_link)
+        {
+            cache_elem = qhash_entry(hash_link,
+                                     mmap_ra_cache_elem_t,
+                                     hash_link);
+            if (!cache_elem)
+            {
+                gen_mutex_unlock(&s_mmap_ra_cache_mutex);
+                goto return_exit;
+            }
+
+            /* refn and data should stay the same */
+            cache_elem->file_offset = file_offset;
+            assert(refn == cache_elem->refn);
+            assert(data_sz == cache_elem->data_sz);
+
+            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "Recycle mmap ra cache "
+                         "element %llu, %d of size %llu\n",
+                         llu(cache_elem->refn.handle),
+                         cache_elem->refn.fs_id,
+                         llu(cache_elem->data_sz));
+        }
+        else
+        {
+            cache_elem = (mmap_ra_cache_elem_t *)
+                            malloc(sizeof(mmap_ra_cache_elem_t));
+            if (!cache_elem)
+            {
+                gen_mutex_unlock(&s_mmap_ra_cache_mutex);
+                goto return_exit;
+            }
+            memset(cache_elem, 0, sizeof(mmap_ra_cache_elem_t));
+            cache_elem->refn = refn;
+            cache_elem->file_offset = file_offset;
+            cache_elem->data = malloc(data_len);
+            if (!cache_elem->data)
+            {
+                gen_mutex_unlock(&s_mmap_ra_cache_mutex);
+                goto return_exit;
+            }
+            cache_elem->data_sz = data_len;
+
+            qhash_add(s_key_to_data_table,
+                      &refn,
+                      &cache_elem->hash_link);
+
+            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "Inserted mmap ra cache "
+                         "element %llu, %d of size %llu\n",
+                         llu(cache_elem->refn.handle),
+                         cache_elem->refn.fs_id,
+                         llu(cache_elem->data_sz));
+        }
+        memcpy(cache_elem->data, data, data_len);
         gen_mutex_unlock(&s_mmap_ra_cache_mutex);
-
-        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "Inserted mmap ra cache "
-                     "element %llu, %d of size %llu\n",
-                     llu(cache_elem->refn.handle),
-                     cache_elem->refn.fs_id,
-                     llu(cache_elem->data_sz));
-
         ret = 0;
     }
 
@@ -114,9 +147,11 @@ int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
     return ret;
 }
 
-int pvfs2_mmap_ra_cache_get_block(
-    PVFS_object_ref refn, PVFS_size offset,
-    PVFS_size len, void *dest, int *amt_returned)
+int pvfs2_mmap_ra_cache_get_block(PVFS_object_ref refn,
+                                  PVFS_size offset,
+                                  PVFS_size len,
+                                  void *dest,
+                                  int *amt_returned)
 {
     int ret = -1;
     void *ptr = NULL;

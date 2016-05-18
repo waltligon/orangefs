@@ -2336,11 +2336,11 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
             }
         }
 
-        /* don't post a readahead req if the size is too big or small */
+#if 0
         /* do not understand this logic - this is keeping us from
          * doing any readahead
          */
-#if 0
+        /* don't post a readahead req if the size is too big or small */
         if ((vfs_request->in_upcall.req.io.readahead_size <
              MMAP_RA_MAX_THRESHOLD) &&
             (vfs_request->in_upcall.req.io.readahead_size >
