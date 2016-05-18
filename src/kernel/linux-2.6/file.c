@@ -3208,19 +3208,26 @@ int pvfs2_ioctl(
     if(cmd == FS_IOC_GETFLAGS)
     {
         val = 0;
-        ret = pvfs2_xattr_get_default(
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-                file->f_dentry,
-#else
-                file->f_dentry->d_inode,
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-                "user.pvfs2.meta_hint",
-                &val, 
-                sizeof(val)
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-                , 0
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-                );
+
+#ifdef HAVE_XATTR_HANDLER_GET_4_4
+        ret = pvfs2_inode_getxattr(file_inode(file),
+                                   "", 
+                                   "user.pvfs2.meta_hint",
+                                   &val,
+                                   sizeof(val));
+#elif defined (HAVE_XATTR_HANDLER_GET_2_6_33)
+        ret = pvfs2_xattr_get_default(file->f_dentry,
+                                      "user.pvfs2.meta_hint",
+                                      &val, 
+                                      sizeof(val),
+                                      0);
+#else /* pre 2.6.33 */
+        ret = pvfs2_xattr_get_default(file->f_dentry->d_inode,
+                                      "user.pvfs2.meta_hint",
+                                      &val,
+                                      sizeof(val));
+#endif
+
         if(ret < 0 && ret != -ENODATA)
         {
             return ret;
@@ -3257,20 +3264,28 @@ int pvfs2_ioctl(
         val = uval;
         gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_ioctl: FS_IOC_SETFLAGS: %llu\n",
                      (unsigned long long)val);
-        ret = pvfs2_xattr_set_default(
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM 
-                file->f_dentry,
-#else
-                file->f_dentry->d_inode,
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-                "user.pvfs2.meta_hint",
-                &val, 
-                sizeof(val), 
-                0
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM 
-                , 0                                      
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-                );
+
+#ifdef HAVE_XATTR_HANDLER_SET_4_4
+        ret = pvfs2_inode_setxattr(file_inode(file),
+                                      "",
+                                      "user.pvfs2.meta_hint",
+                                      &val,
+                                      sizeof(val),
+                                      0);
+#elif defined (HAVE_XATTR_HANDLER_SET_2_6_33)
+        ret = pvfs2_xattr_set_default(file->f_dentry,
+                                      "user.pvfs2.meta_hint",
+                                      &val, 
+                                      sizeof(val), 
+                                      0,
+                                      0);                                     
+#else /* pre 2.6.33 */
+        ret = pvfs2_xattr_set_default(file->f_dentry->d_inode,
+                                      "user.pvfs2.meta_hint",
+                                      &val,
+                                      sizeof(val),
+                                      0);
+#endif
     }
 
     return ret;

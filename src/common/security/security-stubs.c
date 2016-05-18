@@ -38,12 +38,24 @@ int PINT_init_capability(PVFS_capability *cap)
     return 0;
 }
 
-int PINT_sign_capability(PVFS_capability *cap)
+int PINT_sign_capability(PVFS_capability *cap, PVFS_time *force_timeout)
 {
     const struct server_configuration_s *config = PINT_get_server_config();
 
-    cap->timeout = PINT_util_get_current_time() + config->capability_timeout;
-
+    
+    /* if we want to set a particular timeout, send in a value for
+     * force_timeout.  We do this for batch-create, the internal server
+     * process that gathers handles from other servers.  Otherwise, use
+     * the default timeout set in the config file.
+     */ 
+    if ( force_timeout )
+    {
+       cap->timeout = PINT_util_get_current_time() + *force_timeout;
+    }
+    else
+    {
+       cap->timeout = PINT_util_get_current_time() + config->capability_timeout;
+    }
     cap->sig_size = 0;
     cap->signature = NULL;
 
@@ -78,7 +90,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
     capability->op_mask = ~((uint32_t)0);
     capability->num_handles = num_handles;
     capability->handle_array = handle_array;
-    ret = PINT_sign_capability(capability);
+    ret = PINT_sign_capability(capability,NULL);
     if (ret < 0)
     {
         return -PVFS_EINVAL;
