@@ -1564,7 +1564,7 @@ static void reload_config(void)
                  fs_conf);
     /* We received a SIGHUP. Update configuration in place */
     if (PINT_parse_config(&sighup_server_config, fs_conf,
-                          s_server_options.server_alias, 1) < 0)
+                          s_server_options.server_alias, 1) == 1)
     {
         gossip_err("Error: Please check your config files.\n");
         gossip_err("Error: SIGHUP unable to update configuration.\n");
@@ -1585,7 +1585,16 @@ static void reload_config(void)
         /* Reset the debug mask */
         gossip_set_debug_mask(1, PVFS_debug_eventlog_to_mask(orig_server_config->event_logging));
 
-        orig_filesystems = server_config.file_systems;
+        /* Modify the TurnOffTimeouts feature */
+        gossip_err("%s:Changing original bypass_timeout_check(%d) to (%d)\n"
+                  ,__func__
+                  ,orig_server_config->bypass_timeout_check
+                  ,sighup_server_config.bypass_timeout_check);
+        orig_server_config->bypass_timeout_check = sighup_server_config.bypass_timeout_check;
+     
+
+        orig_filesystems = orig_server_config->file_systems;
+
         /* Loop and update all stored file systems */
         while(orig_filesystems)
         {
@@ -1615,7 +1624,7 @@ static void reload_config(void)
             }
             if(!found_matching_config)
             {
-                gossip_err("Error: SIGHUP unable to update configuration"
+                gossip_err("Error: SIGHUP unable to update configuration. "
                            "Matching configuration not found.\n");
                 break;
             }

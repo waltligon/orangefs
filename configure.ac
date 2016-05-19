@@ -456,8 +456,9 @@ RESET_FILE_POS=""
 AC_ARG_ENABLE(reset-file-pos,
 [  --enable-reset-file-pos Resets file position pointer in kernel interface upon error],
 [if test "x$enableval" = "xyes" ; then
-RESET_FILE_POS="-DRESET_FILE_POS"
-fi]
+    RESET_FILE_POS="-DRESET_FILE_POS"
+ fi
+]
 ,)
 AC_SUBST(RESET_FILE_POS)
 
@@ -498,13 +499,11 @@ test_for_karma()
 
 dnl optionally disable building the karma gui
 AC_ARG_ENABLE(karma,
-[  --disable-karma         Disables optional gui.  (Enabled by default)],
+[  --enable-karma          Enables optional gui.  (Disabled by default)],
 [ if test "x$enableval" = "xyes" ; then
       test_for_karma
-   fi
-],
-[test_for_karma]
-)
+  fi
+])
 
 dnl shared or static client library (see --enable-shared below)
 AC_ARG_ENABLE(static,

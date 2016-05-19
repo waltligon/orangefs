@@ -8,6 +8,7 @@ ADMINSRC := \
 	$(DIR)/pvfs2-set-perf-interval.c \
 	$(DIR)/pvfs2-set-eventmask.c \
 	$(DIR)/pvfs2-set-sync.c \
+	$(DIR)/pvfs2-set-turn-off-timeouts.c \
 	$(DIR)/pvfs2-ls.c \
 	$(DIR)/pvfs2-ping.c \
 	$(DIR)/pvfs2-stat.c \
