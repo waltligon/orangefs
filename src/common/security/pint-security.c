@@ -560,6 +560,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
  */
 int PINT_verify_capability(const PVFS_capability *cap)
 {
+    struct server_configuration_s *config = PINT_get_server_config();
 #if 0
     char mdstr[2*SHA_DIGEST_LENGTH+1];
 #endif
@@ -585,15 +586,19 @@ int PINT_verify_capability(const PVFS_capability *cap)
 
     PINT_debug_capability(cap, "Verifying");
 
-    /* if capability has timed out */
-    if (PINT_util_get_current_time() > cap->timeout)
+    /* Are we suppose to check for timeouts? */
+    if ( !config->bypass_timeout_check )
     {
-        char buf[16];
-
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Capability (%s) expired (timeout "
-                     "%llu)\n", PINT_util_bytes2str(cap->signature, buf, 4),
-                     llu(cap->timeout));
-        return 0;
+       /* Check capability timeout */
+       if (PINT_util_get_current_time() > cap->timeout)
+       {
+           char buf[16];
+           gossip_debug(GOSSIP_SECURITY_DEBUG, "Capability (%s) expired "
+                                               "(timeout %llu)\n"
+                      ,PINT_util_bytes2str(cap->signature, buf, 4)
+                      ,llu(cap->timeout));
+           return 0;
+       }
     }
 
 #if 0
@@ -837,9 +842,12 @@ int PINT_sign_credential(PVFS_credential *cred)
  */
 int PINT_verify_credential(const PVFS_credential *cred)
 {
+    struct server_configuration_s *config = PINT_get_server_config();
+
 #if 0
     char mdstr[2*SHA_DIGEST_LENGTH+1];
 #endif
+
     EVP_MD_CTX mdctx;
     const EVP_MD *md = NULL;
     EVP_PKEY *pubkey;
@@ -874,13 +882,18 @@ int PINT_verify_credential(const PVFS_credential *cred)
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Verifying credential: %s\n",
                  PINT_util_bytes2str(cred->signature, sigbuf, 4));
 
-    if (PINT_util_get_current_time() > cred->timeout)
+    /* Are we suppose to check for timeouts? */
+    if ( !config->bypass_timeout_check )
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Credential (%s) expired "
-                     "(timeout %llu)\n", 
-                     PINT_util_bytes2str(cred->signature, sigbuf, 4),
-                     llu(cred->timeout));
-        return 0;
+       /* check credential for a timeout */
+       if (PINT_util_get_current_time() > cred->timeout)
+       {
+           gossip_debug(GOSSIP_SECURITY_DEBUG, "Credential (%s) expired "
+                        "(timeout %llu)\n", 
+                        PINT_util_bytes2str(cred->signature, sigbuf, 4),
+                        llu(cred->timeout));
+           return 0;
+       }
     }
 
 #if 0
