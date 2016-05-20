@@ -23,7 +23,12 @@
 #include "PINT-reqproto-encode.h"
 #include "security-util.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 /* completion function prototypes */
 static int event_mon_list_comp_fn(

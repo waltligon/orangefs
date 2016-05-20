@@ -25,12 +25,19 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
-static int root_check_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int i);
-static int collect_old_values_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int i);
+static int root_check_comp_fn(void *v_p,
+                              struct PVFS_server_resp *resp_p,
+                              int i);
+static int collect_old_values_comp_fn(void *v_p,
+                                      struct PVFS_server_resp *resp_p,
+                                      int i);
 
 %%
 
@@ -73,17 +80,16 @@ machine pvfs2_client_mgmt_setparam_list_sm
 
 /** Initiate setting of a run-time server parameter on a list of servers.
  */
-PVFS_error PVFS_imgmt_setparam_list(
-    PVFS_fs_id fs_id,
-    const PVFS_credential *credential,
-    enum PVFS_server_param param,
-    struct PVFS_mgmt_setparam_value *value,
-    PVFS_BMI_addr_t *addr_array,
-    int count,
-    PVFS_error_details *details,
-    PVFS_hint hints,
-    PVFS_mgmt_op_id *op_id,
-    void *user_ptr)
+PVFS_error PVFS_imgmt_setparam_list(PVFS_fs_id fs_id,
+                                    const PVFS_credential *credential,
+                                    enum PVFS_server_param param,
+                                    struct PVFS_mgmt_setparam_value *value,
+                                    PVFS_BMI_addr_t *addr_array,
+                                    int count,
+                                    PVFS_error_details *details,
+                                    PVFS_hint hints,
+                                    PVFS_mgmt_op_id *op_id,
+                                    void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
@@ -97,11 +103,12 @@ PVFS_error PVFS_imgmt_setparam_list(
         return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_MGMT_SETPARAM_LIST,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
+    PINT_smcb_alloc(&smcb,
+                    PVFS_MGMT_SETPARAM_LIST,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
     if (smcb == NULL)
     {
         return -PVFS_ENOMEM;
@@ -123,30 +130,35 @@ PVFS_error PVFS_imgmt_setparam_list(
         sm_p->u.setparam_list.root_check_status_array = NULL;
     }
 
-    return PINT_client_state_machine_post(
-        smcb,  op_id, user_ptr);
+    return PINT_client_state_machine_post(smcb, op_id, user_ptr);
 }
 
 /** Set a run-time parameter on a list of servers.
  */
-PVFS_error PVFS_mgmt_setparam_list(
-    PVFS_fs_id fs_id,
-    const PVFS_credential *credential,
-    enum PVFS_server_param param,
-    struct PVFS_mgmt_setparam_value *value,
-    PVFS_BMI_addr_t *addr_array,
-    int count,
-    PVFS_error_details *details,
-    PVFS_hint hints)
+PVFS_error PVFS_mgmt_setparam_list(PVFS_fs_id fs_id,
+                                   const PVFS_credential *credential,
+                                   enum PVFS_server_param param,
+                                   struct PVFS_mgmt_setparam_value *value,
+                                   PVFS_BMI_addr_t *addr_array,
+                                   int count,
+                                   PVFS_error_details *details,
+                                   PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s entered\n", __func__);
 
-    ret = PVFS_imgmt_setparam_list(
-        fs_id, credential, param, value, addr_array,
-        count, details, hints, &op_id, NULL);
+    ret = PVFS_imgmt_setparam_list(fs_id,
+                                   credential,
+                                   param,
+                                   value,
+                                   addr_array,
+                                   count,
+                                   details,
+                                   hints,
+                                   &op_id,
+                                   NULL);
 
     if (ret)
     {
@@ -169,8 +181,8 @@ PVFS_error PVFS_mgmt_setparam_list(
     return error;
 }
 
-static int mgmt_setparam_list_init(
-    struct PINT_smcb *smcb, job_status_s *js_p)
+static int mgmt_setparam_list_init(struct PINT_smcb *smcb,
+                                   job_status_s *js_p)
 {    
     struct PINT_client_sm *sm_p;
     PVFS_object_ref temp_ref;
@@ -189,7 +201,7 @@ static int mgmt_setparam_list_init(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         temp_ref,
-        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
+        PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_HINT | PVFS_ATTR_CAPABILITY, 
         PVFS_TYPE_NONE,
         0);
         
@@ -218,13 +230,12 @@ static PINT_sm_action mgmt_setparam_list_setup_msgpair(
     /* setup msgpair array */
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
-        PINT_SERVREQ_MGMT_SETPARAM_FILL(
-            msg_p->req,
-            sm_p->getattr.attr.capability,
-            sm_p->u.setparam_list.fs_id,
-            sm_p->u.setparam_list.param,
-            sm_p->u.setparam_list.value,
-            sm_p->hints);
+        PINT_SERVREQ_MGMT_SETPARAM_FILL(msg_p->req,
+                                        sm_p->getattr.attr.capability,
+                                        sm_p->u.setparam_list.fs_id,
+                                        sm_p->u.setparam_list.param,
+                                        sm_p->u.setparam_list.value,
+                                        sm_p->hints);
 
         msg_p->fs_id = sm_p->u.setparam_list.fs_id;
         msg_p->handle = PVFS_HANDLE_NULL;
@@ -234,8 +245,10 @@ static PINT_sm_action mgmt_setparam_list_setup_msgpair(
         {
             case PVFS_SERV_PARAM_ROOT_CHECK:
                 msg_p->comp_fn = root_check_comp_fn;
+
                 sm_p->u.setparam_list.root_check_status_array = (int *)
-                    malloc(sm_p->u.setparam_list.count * sizeof(int));
+                       malloc(sm_p->u.setparam_list.count * sizeof(int));
+
                 memset(sm_p->u.setparam_list.root_check_status_array, -1,
                        (sm_p->u.setparam_list.count * sizeof(int)));
                 break;
@@ -287,7 +300,7 @@ static PINT_sm_action mgmt_setparam_list_cleanup(
             {
                 sm_p->u.setparam_list.details->error[errct].error = status;
                 sm_p->u.setparam_list.details->error[errct].addr =
-                    sm_p->msgarray_op.msgarray[i].svr_addr;
+                                sm_p->msgarray_op.msgarray[i].svr_addr;
                 errct++;
             }
             else
@@ -329,6 +342,9 @@ static int collect_old_values_comp_fn(
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     int j;
 
+    gossip_err("%s:status of response(%d)\n",__func__,resp_p->status);
+
+
     /* if this is the last response, check all of the status values
      * and return error code if any requests failed
      */
@@ -367,7 +383,7 @@ static int root_check_comp_fn(
       value of this comp_fn by the msgpairarray code
     */
     sm_p->u.setparam_list.root_check_status_array[i] =
-        sm_p->msgarray_op.msgarray[i].op_status;
+                    sm_p->msgarray_op.msgarray[i].op_status;
 
     /* need to return non-zero status at the end if any of the statuses
      * are nonzero

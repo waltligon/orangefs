@@ -220,12 +220,14 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
                      strerror(ret));
 
         /* if data buffer is too small returns ERANGE error */
-        if (ret == TROVE_ERANGE)
+        if (data.len > op_p->u.k_read.val->buffer_sz)
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                         "warning: Value buffer too small\n");
+                         "warning: Value buffer too small %d < %lu\n",
+                         op_p->u.k_read.val->buffer_sz, data.len);
             /* let the user know */
             op_p->u.k_read.val->read_sz = data.len;
+            ret = ERANGE;
         }
 
         ret = -ret;
@@ -376,7 +378,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
         {
             /* The only case where we are ok is val buffer
              *  is too small */
-            if (ret == TROVE_ERANGE)
+            if (tmpdata.len > op_p->u.k_write.val.buffer_sz)
             {
                 ret = 0;
             }
@@ -384,10 +386,11 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
             {
                 if(ret != TROVE_ENOENT)
                 {
-                    gossip_err("TROVE:DBPF:Berkeley DB keyval_db->get");
+                    gossip_err("TROVE:DBPF: keyval dbpf_db_get");
                 }
                 ret = -ret;
             }
+
         }
         free(tmpdata.data);
         /* If there was an error, we need to return right here */
@@ -422,11 +425,8 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     if (ret != 0)
     {
 	gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-		     "keyval_db->put failed. ret=%d\n", ret);
+		     "dbpf_db_put keyval failed. ret=%d\n", ret);
 
-        /*
-        gossip_err("TROVE:DBPF:Berkeley DB keyval_db->put keyval write");
-	*/
         ret = -ret;
         goto return_error;
     }
@@ -682,7 +682,7 @@ static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
         }
         else if(ret != 0)
         {
-            gossip_err("TROVE:DBPF:Berkeley DB DB->get");
+            gossip_err("TROVE:DBPF: keyval dbpf_db_get");
             return -ret;
         }
 
@@ -695,7 +695,7 @@ static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
         ret = dbpf_db_put(op_p->coll_p->keyval_db, &key, &data);
         if(ret != 0)
         {
-            gossip_err("TROVE:DBPF:Berkeley DB keyval_db->put keyval handle info ops");
+            gossip_err("TROVE:DBPF: dbpf_db_put keyval handle info ops");
             return -ret;
         }
     }
@@ -1150,14 +1150,11 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
                          "keyval read list (get) %s failed with error %s\n",
                          key_entry.key, strerror(ret));
             /* if data buffer is too small returns ERANGE error */
-            /* we could check fpr DB_BUFFER_SMALL rather than */
-            /* compare these, but this seems to work */
-            if (ret == TROVE_ERANGE)
+            if (data.len > op_p->u.k_read_list.val_array[i].buffer_sz)
             {
                 gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                         "warning: Value buffer too small %d < %zu\n",
-                         op_p->u.k_read_list.val_array[i].buffer_sz,
-                         data.len);
+                         "warning: Value buffer too small %d < %lu\n",
+                         op_p->u.k_read_list.val_array[i].buffer_sz, data.len);
                 /* let the user know */
                 op_p->u.k_read_list.val_array[i].read_sz = data.len;
                 /* this is still a success */
@@ -1167,6 +1164,7 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
             {
                 op_p->u.k_read_list.val_array[i].read_sz = 0;
             }
+
             op_p->u.k_read_list.err_array[i] = -ret;
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                     "Trove error set to %d\n",
@@ -1280,13 +1278,14 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         data.len = PVFS_NAME_MAX;
 
         ret = dbpf_db_get(op_p->coll_p->keyval_db, &key, &data);
-        /* check for DB_BUFFER_SMALL in case the key is there but the data
+
+        /* Do not worry about the case where the key is there but the data
          * is simply too big for the temporary data buffer used
          */
-        if (ret != 0 && ret != TROVE_ERANGE)
+        if (ret != 0)
         {
             if(ret == TROVE_ENOENT && ((op_p->flags & TROVE_NOOVERWRITE) ||
-                                 (!(op_p->flags & TROVE_ONLYOVERWRITE))))
+                                      (!(op_p->flags & TROVE_ONLYOVERWRITE))))
             {
                 /* this means key is not in DB, which is what we
                  * want for the no-overwrite case - so go to the next key
@@ -1294,7 +1293,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
                 continue;
             }
 
-            gossip_err("TROVE:DBPF:Berkeley DB DB->get");
+            gossip_err("TROVE:DBPF: keyval dbpf_db_get");
             ret = -ret;
             goto return_error;
         }
@@ -1335,7 +1334,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         ret = dbpf_db_put(op_p->coll_p->keyval_db, &key, &data);
         if (ret != 0)
         {
-            gossip_err("TROVE:DBPF:Berkeley DB keyval_db->put keyval write list (ret %d)\n", ret);
+            gossip_err("TROVE:DBPF: dbpf_db_put keyval write list (ret %d)\n", ret);
             ret = -ret;
             goto return_error;
         }
@@ -1488,7 +1487,7 @@ int PINT_dbpf_keyval_iterate(
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                      "Exited: PINT_dpbf_keyval_iterate\n");
 
-        gossip_lerr("db_p->cursor failed: db error %s\n", strerror(ret));
+        gossip_lerr("dbpf_db_cursor failed: db error %s\n", strerror(ret));
         *count = 0;
         return -ret;
     }
@@ -1835,28 +1834,6 @@ static int dbpf_keyval_iterate_cursor_get(
     {
         return -TROVE_ENOENT;
     }
-    else if(ret == TROVE_ERANGE)
-    {
-        db_data.data = malloc(db_data.len);
-        if (!db_data.data)
-        {
-            return -TROVE_ENOMEM;
-        }
-
-        ret = dbpf_db_cursor_get(dbc, &db_key, &db_data, DBPF_DB_CURSOR_CURRENT,
-            DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(DBPF_MAX_KEY_LENGTH));
-        if (ret == TROVE_ENOENT)
-        {
-            return -TROVE_ENOENT;
-        }
-            
-        if(data)
-        {
-            memcpy(data->buffer, db_data.data, data->buffer_sz);
-            free(db_data.data);
-            data->read_sz = data->buffer_sz;
-        }
-    }
 
     if (ret != 0)
     {
@@ -1961,7 +1938,7 @@ static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op * op_p)
     {
         if(ret != TROVE_ENOENT)
         {
-            gossip_err("TROVE:DBPF:Berkeley DB keyval_db->get (handle info)");
+            gossip_err("TROVE:DBPF: keyval dbpf_db_get (handle info)");
         }
 
         return -ret;
@@ -2005,7 +1982,7 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
         }
         else if(ret != 0)
         {
-            gossip_err("TROVE:DBPF:Berkeley DB DB->get");
+            gossip_err("TROVE:DBPF: keyval dbpf_db_get");
             return -ret;
         }
        
@@ -2045,7 +2022,7 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
                 ret = dbpf_db_del(op_p->coll_p->keyval_db, &key);
                 if(ret != 0)
                 {
-                    gossip_err("TROVE:DBPF:Berkeley DB DB->del");
+                    gossip_err("TROVE:DBPF: keyval dbpf_db_del");
                     return -ret;
                 }
 
@@ -2056,7 +2033,7 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
         ret = dbpf_db_put(op_p->coll_p->keyval_db, &key, &data);
         if (ret != 0)
         {
-            gossip_err("TROVE:DBPF:Berkeley DB keyval_db->put keyval handle info ops");
+            gossip_err("TROVE:DBPF: dbpf_db_put keyval handle info ops");
             return -ret;
         }
     }

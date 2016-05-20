@@ -215,6 +215,8 @@ static PINT_sm_action setup_batch_create_fn(
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = batch_create_comp_fn;
 
+    PINT_debug_capability(&s_op->u.precreate_pool_refiller.capability,"in setup_batch_create_fn");
+
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
     js_p->error_code = 0;
     return(SM_ACTION_COMPLETE);
@@ -234,6 +236,7 @@ static PINT_sm_action setup_fn(
     PVFS_capability *cap = &s_op->u.precreate_pool_refiller.capability;
     int index = 0;
     int ret;
+    PVFS_time force_timeout = PVFS2_SECURITY_TIMEOUT_MAX;
 
     PVFS_ds_type_to_int( s_op->u.precreate_pool_refiller.type, &index);
 
@@ -260,7 +263,7 @@ static PINT_sm_action setup_fn(
     strcpy(cap->issuer, "S:");
     strcat(cap->issuer, user_opts->server_alias);
 
-    ret = PINT_sign_capability(cap);
+    ret = PINT_sign_capability(cap,&force_timeout);
     if (ret < 0)
     {
         PINT_cleanup_capability(cap);
@@ -268,11 +271,6 @@ static PINT_sm_action setup_fn(
         return SM_ACTION_COMPLETE;
     }
         
-    /* set the capability timeout to the maximum allowed (10 years), since the
-     * pool refiller is an internal OrangeFS function.
-     */
-    cap->timeout = PINT_util_get_current_time() + PVFS2_SECURITY_TIMEOUT_MAX;
-
     s_op->u.precreate_pool_refiller.precreate_handle_array = 
         malloc(user_opts->precreate_batch_size[index] * sizeof(PVFS_handle));
     if(!s_op->u.precreate_pool_refiller.precreate_handle_array)

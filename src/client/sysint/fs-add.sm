@@ -45,7 +45,13 @@ enum {
 };
 
 gen_mutex_t mt_config = GEN_MUTEX_INITIALIZER;
+
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 static int server_fetch_config_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);

@@ -72,6 +72,7 @@ static DOTCONF_CB(get_tcp_buffer_send);
 static DOTCONF_CB(get_tcp_buffer_receive);
 static DOTCONF_CB(get_tcp_bind_specific);
 static DOTCONF_CB(get_perf_update_interval);
+static DOTCONF_CB(get_perf_update_history);
 static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_name);
 static DOTCONF_CB(get_logfile);
@@ -136,6 +137,7 @@ static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
 static DOTCONF_CB(get_credential_timeout);
 static DOTCONF_CB(get_capability_timeout);
+static DOTCONF_CB(get_turn_off_timeouts);
 static DOTCONF_CB(get_credcache_timeout);
 static DOTCONF_CB(get_capcache_timeout);
 static DOTCONF_CB(get_certcache_timeout);
@@ -339,15 +341,23 @@ static const configoption_t options[] =
     {"CapabilityTimeoutSecs", ARG_INT, get_capability_timeout, NULL,
         CTX_SECURITY, "600"},
 
-    /* Credential cache timeout in seconds */
+    /* Prevent the server from issuing an error whenever a capability or 
+     * credential expires.  In this case, the client provides the only 
+     * mechanism determining when a capability or credential needs to be 
+     * regenerated.  
+     */
+    {"TurnOffTimeouts", ARG_STR, get_turn_off_timeouts, NULL,
+        CTX_SECURITY, "yes"}, 
+
+    /* Server-side Credential cache timeout in seconds */
     {"CredentialCacheTimeoutSecs", ARG_INT, get_credcache_timeout, NULL,
         CTX_SECURITY, "3600"},
 
-    /* Capability cache timeout in seconds */
+    /* Server-side Capability cache timeout in seconds */
     {"CapabilityCacheTimeoutSecs", ARG_INT, get_capcache_timeout, NULL,
         CTX_SECURITY, "600"},
 
-    /* Certificate cache timeout in seconds */
+    /* Server-side Certificate cache timeout in seconds */
     {"CertificateCacheTimeoutSecs", ARG_INT, get_certcache_timeout, NULL,
         CTX_SECURITY, "3600"},
 
@@ -857,14 +867,21 @@ static const configoption_t options[] =
     {"FileStuffing",ARG_STR, get_file_stuffing, NULL, 
         CTX_FILESYSTEM,"yes"},
 
-     /* This specifies the frequency (in milliseconds) 
-      * that performance monitor should be updated
-      * when the OrangeFS server is running in admin mode.
+     /* This specifies the number of samples
+      * that performance monitor should keep
       *
       * Can be set in either Default or ServerOptions contexts.
       */
-    {"PerfUpdateInterval",ARG_INT, get_perf_update_interval,NULL,
-        CTX_DEFAULTS,"1000"},
+    {"PerfUpdateHistory", ARG_INT, get_perf_update_history, NULL,
+        CTX_DEFAULTS, "10"},
+
+     /* This specifies the frequency (in milliseconds) 
+      * that performance monitor should be updated
+      *
+      * Can be set in either Default or ServerOptions contexts.
+      */
+    {"PerfUpdateInterval", ARG_INT, get_perf_update_interval, NULL,
+        CTX_DEFAULTS, "1000"},
 
     /* List the BMI modules to load when the server is started.  At present,
      * only tcp, infiniband, and myrinet are valid BMI modules.  
@@ -1342,6 +1359,15 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
         return 1;
     }
     
+    /* Users don't need to learn about this unless they want to
+    */
+    if (!config_s->perf_update_history)
+    {
+        gossip_err("Configuration file error.  "
+                   "No PerfUpdateHistory specified.\n");
+        return 1;
+    }
+
     /* Users don't need to learn about this unless they want to
     */
     if (!config_s->perf_update_interval)
@@ -1982,6 +2008,14 @@ DOTCONF_CB(get_client_retry_delay)
     struct server_configuration_s *config_s = 
                     (struct server_configuration_s *)cmd->context;
     config_s->client_retry_delay_ms = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_perf_update_history)
+{
+    struct server_configuration_s *config_s = 
+                    (struct server_configuration_s *)cmd->context;
+    config_s->perf_update_history = cmd->data.value;
     return NULL;
 }
 
@@ -3381,6 +3415,44 @@ DOTCONF_CB(get_capability_timeout)
                    "using default (%d)\n", cmd->data.value,
                    config_s->capability_timeout);
     }
+
+    return NULL;
+}
+
+DOTCONF_CB(get_turn_off_timeouts)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    gossip_err("%s:cmd->data.str(%s)\n",__func__,cmd->data.str);
+
+#if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
+    /* You cannot turn off timeouts if using enhanced security */
+    config_s->bypass_timeout_check = 0;
+
+    /* Give a warning */
+    gossip_err("%s:When using enhanced security, timeout checks "
+               "on the server cannot be disabled.  Setting "
+               "bypass_timeout_check to 0.\n",__func__);
+
+    return NULL;  
+#endif
+
+    if ( !strcasecmp(cmd->data.str, "yes") )
+    {
+         config_s->bypass_timeout_check = 1;
+    }
+    else if ( !strcasecmp(cmd->data.str, "no") )
+    {
+         config_s->bypass_timeout_check = 0;
+    }
+    else
+    {
+        return("TurnOffTimeouts must be 'yes' or 'no'.\n");
+    }
+
+    gossip_err("%s:config_s->bypass_timeout_check(%d)\n",__func__
+                                            ,config_s->bypass_timeout_check);
 
     return NULL;
 }

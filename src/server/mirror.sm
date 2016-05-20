@@ -18,7 +18,12 @@
 #include "client-state-machine.h"
 #include "security-util.h"
 
+/*
+ * now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 #define WRITE_ACK_RCV 0
 #define SRC_FLOW_POST 1

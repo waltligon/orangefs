@@ -66,28 +66,6 @@ do {                                              \
 #define do_sync_read generic_file_read
 #endif
 
-int pvfs2_dir_open(struct inode *inode, struct file *file)
-{
-    PVFS_ds_position *ptoken;
-
-    file->private_data = kmalloc(sizeof(PVFS_ds_position), GFP_KERNEL);
-    if (! file->private_data)
-    {
-        return -ENOMEM;
-    }
-
-    ptoken = file->private_data;
-    *ptoken = PVFS_READDIR_START;
-
-    return 0;
-}
-
-int pvfs2_dir_close(struct inode *inode, struct file *file)
-{
-        kfree(file->private_data);
-        return 0;
-}
-
 /** Called when a process requests to open a file.
  */
 int pvfs2_file_open(
@@ -109,48 +87,49 @@ int pvfs2_file_open(
     inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 #endif
 
-    if (S_ISDIR(inode->i_mode))
+    /*
+      if the file's being opened for append mode, set the file pos
+      to the end of the file when we retrieve the size (which we
+      must forcefully do here in this case, afaict atm)
+    */
+    if (file->f_flags & O_APPEND)
     {
-        ret = pvfs2_dir_open(inode, file);
-    }
-    else
-    {
-        /*
-          if the file's being opened for append mode, set the file pos
-          to the end of the file when we retrieve the size (which we
-          must forcefully do here in this case, afaict atm)
-        */
-        if (file->f_flags & O_APPEND)
+        /* 
+         * When we do a getattr in response to an open with O_APPEND,
+         * all we are interested in is the file size. Hence we will
+         * set the mask to only the size and nothing else
+         * Hopefully, this will help us in reducing the number of getattr's
+         */
+        ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_SIZE);
+        if (ret == 0)
         {
-            /* 
-             * When we do a getattr in response to an open with O_APPEND,
-             * all we are interested in is the file size. Hence we will
-             * set the mask to only the size and nothing else
-             * Hopefully, this will help us in reducing the number of getattr's
-             */
-            ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_SIZE);
-            if (ret == 0)
-            {
-                file->f_pos = pvfs2_i_size_read(inode);
-                gossip_debug(GOSSIP_FILE_DEBUG, "f_pos = %ld\n", (unsigned long)file->f_pos);
-            }
-            else
-            {
-                gossip_debug(GOSSIP_FILE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
-                pvfs2_make_bad_inode(inode);
-                gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open returning error: %d\n", ret);
-                goto out;
-            }
+            file->f_pos = pvfs2_i_size_read(inode);
+            gossip_debug(GOSSIP_FILE_DEBUG,
+                         "%s: f_pos = %ld\n",
+                         __func__,
+                         (unsigned long)file->f_pos);
+        } else {
+            gossip_debug(GOSSIP_FILE_DEBUG,
+                         "%s: calling make bad inode\n",
+                          __func__);
+            pvfs2_make_bad_inode(inode);
+            gossip_debug(GOSSIP_FILE_DEBUG,
+                         "%s: returning error: %d\n",
+                         __func__,
+                         ret);
+            goto out;
         }
-
-        /*
-          fs/open.c: returns 0 after enforcing large file support if
-          running on a 32 bit system w/o O_LARGFILE flag
-        */
-        ret = generic_file_open(inode, file);
     }
 
-    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open returning normally: %d\n", ret);
+    /*
+      fs/open.c: returns 0 after enforcing large file support if
+      running on a 32 bit system w/o O_LARGFILE flag
+    */
+    ret = generic_file_open(inode, file);
+
+    gossip_debug(GOSSIP_FILE_DEBUG,
+                 "pvfs2_file_open returning normally: %d\n",
+                 ret);
 
 out:
     kfree(s);
@@ -569,6 +548,8 @@ populate_shared_memory:
        goto populate_shared_memory;
     }
 
+
+    gossip_debug(GOSSIP_FILE_DEBUG,"%s:service_operation return code(%d)\n",__func__,(int)ret);
 
     if (ret < 0)
     {
@@ -2096,19 +2077,13 @@ static ssize_t wait_for_iox(struct rw_options *rw,
           else
           {
               memset(s,0,HANDLESTRINGSIZE);
-              gossip_err(
-                "%s: error in %s handle %s, FILE: %s\n  -- returning %ld\n",
-                rw->fnstr, 
-                rw->type == IO_READX ?
-                  "noncontig read from" :
-                  "noncontig write to",
-                k2s(get_khandle_from_ino(rw->inode),s),
-                (rw->file &&
-                 rw->file->f_dentry &&
-                 rw->file->f_dentry->d_name.name ?
-                   (char *) rw->file->f_dentry->d_name.name :
-                   "UNKNOWN"),
-                (long) ret);
+              gossip_err("%s: error in %s handle %s, FILE: %s\n  -- returning %ld\n",
+                          rw->fnstr, 
+                          rw->type == IO_READX ? "noncontig read from" : "noncontig write to",
+                          k2s(get_khandle_from_ino(rw->inode),s),
+                          (rw->file && rw->file->f_dentry && rw->file->f_dentry->d_name.name ?
+                          (char *) rw->file->f_dentry->d_name.name : "UNKNOWN"),
+                          (long) ret);
           }
           goto out;
     }
@@ -3233,19 +3208,26 @@ int pvfs2_ioctl(
     if(cmd == FS_IOC_GETFLAGS)
     {
         val = 0;
-        ret = pvfs2_xattr_get_default(
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-                file->f_dentry,
-#else
-                file->f_dentry->d_inode,
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-                "user.pvfs2.meta_hint",
-                &val, 
-                sizeof(val)
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-                , 0
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-                );
+
+#ifdef HAVE_XATTR_HANDLER_GET_4_4
+        ret = pvfs2_inode_getxattr(file_inode(file),
+                                   "", 
+                                   "user.pvfs2.meta_hint",
+                                   &val,
+                                   sizeof(val));
+#elif defined (HAVE_XATTR_HANDLER_GET_2_6_33)
+        ret = pvfs2_xattr_get_default(file->f_dentry,
+                                      "user.pvfs2.meta_hint",
+                                      &val, 
+                                      sizeof(val),
+                                      0);
+#else /* pre 2.6.33 */
+        ret = pvfs2_xattr_get_default(file->f_dentry->d_inode,
+                                      "user.pvfs2.meta_hint",
+                                      &val,
+                                      sizeof(val));
+#endif
+
         if(ret < 0 && ret != -ENODATA)
         {
             return ret;
@@ -3282,20 +3264,28 @@ int pvfs2_ioctl(
         val = uval;
         gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_ioctl: FS_IOC_SETFLAGS: %llu\n",
                      (unsigned long long)val);
-        ret = pvfs2_xattr_set_default(
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM 
-                file->f_dentry,
-#else
-                file->f_dentry->d_inode,
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-                "user.pvfs2.meta_hint",
-                &val, 
-                sizeof(val), 
-                0
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM 
-                , 0                                      
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-                );
+
+#ifdef HAVE_XATTR_HANDLER_SET_4_4
+        ret = pvfs2_inode_setxattr(file_inode(file),
+                                      "",
+                                      "user.pvfs2.meta_hint",
+                                      &val,
+                                      sizeof(val),
+                                      0);
+#elif defined (HAVE_XATTR_HANDLER_SET_2_6_33)
+        ret = pvfs2_xattr_set_default(file->f_dentry,
+                                      "user.pvfs2.meta_hint",
+                                      &val, 
+                                      sizeof(val), 
+                                      0,
+                                      0);                                     
+#else /* pre 2.6.33 */
+        ret = pvfs2_xattr_set_default(file->f_dentry->d_inode,
+                                      "user.pvfs2.meta_hint",
+                                      &val,
+                                      sizeof(val),
+                                      0);
+#endif
     }
 
     return ret;
@@ -3354,10 +3344,6 @@ int pvfs2_file_release(
                 file->f_dentry->d_name.name);
 
     pvfs2_flush_inode(inode);
-    if (S_ISDIR(inode->i_mode))
-    {
-        return pvfs2_dir_close(inode, file);
-    }
 
     /*
       remove all associated inode pages from the page cache and mmap

@@ -245,12 +245,7 @@ int dbpf_db_get(struct dbpf_db *db, struct dbpf_data *key,
         return db_error(r);
     }
 
-    if (db_data.mv_size > val->len)
-    {
-    	val->len = db_data.mv_size;
-        return db_error(ERANGE);
-    }
-    memcpy(val->data, db_data.mv_data, db_data.mv_size);
+    memcpy(val->data, db_data.mv_data, val->len);
     val->len = db_data.mv_size;
     return 0;
 }
@@ -388,7 +383,9 @@ int dbpf_db_cursor_get(struct dbpf_cursor *dbc, struct dbpf_data *key,
     struct dbpf_data *val, int op, size_t maxkeylen)
 {
     MDB_val db_key, db_data;
-    int db_op, r;
+    /* The variable db_op is set to 0 to silence a compiler warning claming
+     * that we never set it even though we do for all possible values of op. */
+    int db_op = 0, r;
     switch (op) {
     case DBPF_DB_CURSOR_NEXT:
         db_op = MDB_NEXT;
@@ -416,18 +413,9 @@ int dbpf_db_cursor_get(struct dbpf_cursor *dbc, struct dbpf_data *key,
         return db_error(r);
     }
 
-    if (db_key.mv_size > maxkeylen)
-    {
-        return db_error(ERANGE);
-    }
-    memcpy(key->data, db_key.mv_data, db_key.mv_size);
+    memcpy(key->data, db_key.mv_data, key->len);
+    memcpy(val->data, db_data.mv_data, val->len);
     key->len = db_key.mv_size;
-    if (db_data.mv_size > val->len)
-    {
-    	val->len = db_data.mv_size;
-        return db_error(ERANGE);
-    }
-    memcpy(val->data, db_data.mv_data, db_data.mv_size);
     val->len = db_data.mv_size;
     return 0;
 }
