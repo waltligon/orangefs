@@ -497,13 +497,21 @@ test_for_karma()
 }
 
 dnl optionally disable building the karma gui
+dnl AC_ARG_ENABLE(karma,
+dnl [  --disable-karma         Disables optional gui.  (Enabled by default)],
+dnl [ if test "x$enableval" = "xyes" ; then
+dnl       test_for_karma
+dnl    fi
+dnl ],
+dnl [test_for_karma]
+dnl )
+
 AC_ARG_ENABLE(karma,
-[  --disable-karma         Disables optional gui.  (Enabled by default)],
+[  --enable-karma         Enables optional gui.  (Disabled by default)],
 [ if test "x$enableval" = "xyes" ; then
       test_for_karma
    fi
 ],
-[test_for_karma]
 )
 
 dnl shared or static client library (see --enable-shared below)

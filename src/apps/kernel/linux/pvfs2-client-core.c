@@ -463,7 +463,9 @@ static PVFS_error add_op_to_ops_in_progress_table(
 static PVFS_error cancel_op_in_progress(PVFS_id_gen_t tag)
 {
     PVFS_error ret = -PVFS_EINVAL;
+#ifdef USE_MMAP_RA_CACHE
     PVFS_error ret2 = -PVFS_EINVAL;
+#endif
     struct qlist_head *hash_link = NULL;
     vfs_request_t *vfs_request = NULL;
 
@@ -493,11 +495,13 @@ static PVFS_error cancel_op_in_progress(PVFS_id_gen_t tag)
           the kernel since it will be ignored anyway
         */
         vfs_request->was_cancelled_io = 1;
+#ifdef USE_MMAP_RA_CACHE
         ret2 = cancel_readahead_request(vfs_request);
         if (ret2 < 0)
         {
             PVFS_perror_gossip("cancel_readahead_request failed", ret2);
         }
+#endif
     }
     else
     {
@@ -3745,7 +3749,7 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                              lld(vfs_request->info.tag));
 #endif
             }
-#if USE_MMAP_RA_CACHE
+#ifdef USE_MMAP_RA_CACHE
             if ((*error_code != 0) &&
                 (vfs_request->racache_status == RACACHE_POSTED))
             {
@@ -3931,11 +3935,13 @@ static inline PVFS_error repost_unexp_vfs_request(
 
     assert(vfs_request);
     
+#ifdef USE_MMAP_RA_CACHE
     if (vfs_request->is_readahead_speculative)
     {
         /* do not repost a speculative read */
         return 0;
     }
+#endif
 
     if (is_op_in_progress(vfs_request))
     {
