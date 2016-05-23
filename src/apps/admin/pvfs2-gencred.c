@@ -40,6 +40,7 @@
 
 #include "pvfs2-config.h"
 
+
 /* avoid using PINT_malloc etc. */
 #define PVFS_MALLOC_REDEF_OVERRIDE
 #include "pvfs2-types.h"
@@ -124,6 +125,15 @@ char cert_keypath[PATH_MAX];
 #define WARNING(fmt, f...)      WARNING_NULL(NULL, fmt, ##f)
 
 #define FATAL(label, fmt, f...) CHECK_NULL(NULL, label, fmt, ##f)
+
+
+
+/*prototypes*/
+int is_idnum(const char *str);
+int allowed(PVFS_uid curr_uid, PVFS_gid curr_gid, 
+            PVFS_uid cred_uid, PVFS_gid cred_gid);
+
+
 
 /* return 1 if string is a uid/gid number */
 int is_idnum(const char *str)
@@ -553,7 +563,7 @@ int allowed(PVFS_uid curr_uid, PVFS_gid curr_gid,
     struct stat st;
     FILE *f;
     size_t len, bufsize = 8192;
-    char user[128], *service_data_buf;
+    char user[128], *service_data_buf=NULL;
     struct passwd service_pwd, *result;
     /* get user information */
     int retry = 0, ret = 0;
