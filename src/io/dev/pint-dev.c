@@ -31,11 +31,16 @@
 #ifdef WIN32
 #include <io.h>
 
+/* a downsize call approximation */
+#define WIN32_DOWNCALL_SIZE    8200
+
 /* define our own iovec */
 struct iovec {
     void   *iov_base;
     size_t iov_len;
 };
+
+
 #endif
 
 #include "pvfs2-internal.h"
@@ -696,11 +701,14 @@ int PINT_dev_write_list(
     int ret = -1;
     int32_t proto_ver = PVFS_KERNEL_PROTO_VERSION;
     int bytes_to_write = 0;
+#ifndef WIN32
     int sizeof_downcall = sizeof(pvfs2_downcall_t);
-#ifdef WIN32
+#else
     char *buffer, *b;
     size_t bsize = 0;
+    int sizeof_downcall = WIN32_DOWNCALL_SIZE;
 #endif
+    
     
     /* There will be a downcall iovec, and maybe a trailer iovec. */
     if (list_count > 2)
