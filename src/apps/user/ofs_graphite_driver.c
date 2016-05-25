@@ -803,7 +803,6 @@ static void usage(int argc, char **argv)
                 "\t\t-t <timers>          Get timers from server\n"
                 "\t\t-d                   Print debug messages\n"
                 "\t\t ?                   Print usage\n");
-
     return;
 }
 
