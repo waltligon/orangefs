@@ -75,6 +75,7 @@ static PINT_sm_action readdir_verify_directory_metadata(
     PVFS_object_attr *attr = &s_op->attr;
 
     js_p->error_code = 0;
+    PINT_perf_count(PINT_server_pc, PINT_PERF_READDIR, 1, PINT_PERF_ADD);
 
     gossip_debug(GOSSIP_READDIR_DEBUG, " - attrs: owner=%d, group=%d, "
                  "perms=%d\n\ttype=%d, mtime=%llu\n", attr->owner,
@@ -170,6 +171,8 @@ static PINT_sm_action readdir_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TREADDIR, &s_op->start_time);
     if (js_p->error_code == STATE_ENOTDIR)
     {
 	gossip_debug(GOSSIP_READDIR_DEBUG,

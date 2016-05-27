@@ -707,6 +707,7 @@ int iocommon_expand_path (PVFS_path_t *Ppath,
         /* create a usrint file descriptor for it */
         gossip_debug(GOSSIP_USRINT_DEBUG,
                "iocommon_expand_path calls pvfs_alloc_descriptor %d\n", rc);
+        /* returnes mutex LOCK on pd and pd->s */
         pd = pvfs_alloc_descriptor(&glibc_ops, rc, NULL, 0);
         pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
         pd->true_fd = rc;
@@ -1294,7 +1295,7 @@ finish:
     {
         cache_flag = *(int *)value;
     }
-    /* now allocate file descriptor */
+    /* now allocate file descriptor - mutex LOCK pd and pd->s */
     pd = pvfs_alloc_descriptor(&pvfs_ops, -1, &file_ref, cache_flag);
     if (!pd)
     {
@@ -1306,6 +1307,7 @@ finish:
 
     /* Get the file's type information from its attributes */
     errno = 0;
+    /* descriptor and state mutex remains locked */
     rc = PVFS_sys_getattr(pd->s->pvfs_ref,
                           PVFS_ATTR_SYS_ALL_NOHINT,
                           credential,
@@ -1463,6 +1465,7 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
             }
             /* Get the file's size in bytes as the ending offset */
             errno = 0;
+            /* descriptor state mutex remains locked */
             rc = PVFS_sys_getattr(pd->s->pvfs_ref,
                                   PVFS_ATTR_SYS_SIZE,
                                   credential,
@@ -1526,6 +1529,7 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
                 {
                     goto errorout;
                 }
+                /* descriptor state mutex remains locked */
                 rc = PVFS_sys_readdir(pd->s->pvfs_ref,
                                       pd->s->token,
                                       dirent_read_count,
@@ -3127,6 +3131,7 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
         count = PVFS_REQ_LIMIT_DIRENT_COUNT;
     }
     errno = 0;
+    /* descrpitor state mutex remains locked */
     rc = PVFS_sys_readdir(pd->s->pvfs_ref,
                           token,
                           count,
@@ -3217,6 +3222,7 @@ int iocommon_getdents64(pvfs_descriptor *pd,
         count = PVFS_REQ_LIMIT_DIRENT_COUNT;
     }
     errno = 0;
+    /* descrpitor state mutex remains locked */
     rc = PVFS_sys_readdir(pd->s->pvfs_ref,
                           token,
                           count,

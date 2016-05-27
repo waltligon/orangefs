@@ -197,7 +197,7 @@ int PINT_security_initialize(void)
         host_aliases = PINT_llist_next(host_aliases);
     }
 
-#elif ENABLE_SECURITY_CERT
+#elif defined(ENABLE_SECURITY_CERT)
 
     /* load the CA cert */
     ret = PINT_init_trust_store();
@@ -407,7 +407,7 @@ static void hash_capability(const PVFS_capability *cap, char *mdstr)
  *  returns 0 on success
  *  returns negative on error
  */
-int PINT_sign_capability(PVFS_capability *cap)
+int PINT_sign_capability(PVFS_capability *cap, PVFS_time *force_timeout)
 {
     const struct server_configuration_s *config;
     EVP_MD_CTX mdctx;
@@ -430,7 +430,19 @@ int PINT_sign_capability(PVFS_capability *cap)
 
     /* cap->issuer is set in get-attr.sm in the server. */
 
-    cap->timeout = PINT_util_get_current_time() + config->capability_timeout;
+    /* if we want to set a particular timeout, send in a value for
+     * force_timeout.  We do this for batch-create, the internal server
+     * process that gathers handles from other servers.  Otherwise, use
+     * the default timeout set in the config file.
+     */ 
+    if ( force_timeout )
+    {
+       cap->timeout = PINT_util_get_current_time() + *force_timeout;
+    }
+    else
+    {
+       cap->timeout = PINT_util_get_current_time() + config->capability_timeout;
+    }
 
     if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_RSA)
     {
@@ -528,7 +540,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
     capability->num_handles = num_handles;
     capability->handle_array = handle_array;
 
-    ret = PINT_sign_capability(capability);
+    ret = PINT_sign_capability(capability,NULL);
     if (ret < 0)
     {
         PINT_cleanup_capability(capability);
@@ -548,6 +560,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
  */
 int PINT_verify_capability(const PVFS_capability *cap)
 {
+    struct server_configuration_s *config = PINT_get_server_config();
 #if 0
     char mdstr[2*SHA_DIGEST_LENGTH+1];
 #endif
@@ -573,15 +586,19 @@ int PINT_verify_capability(const PVFS_capability *cap)
 
     PINT_debug_capability(cap, "Verifying");
 
-    /* if capability has timed out */
-    if (PINT_util_get_current_time() > cap->timeout)
+    /* Are we suppose to check for timeouts? */
+    if ( !config->bypass_timeout_check )
     {
-        char buf[16];
-
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Capability (%s) expired (timeout "
-                     "%llu)\n", PINT_util_bytes2str(cap->signature, buf, 4),
-                     llu(cap->timeout));
-        return 0;
+       /* Check capability timeout */
+       if (PINT_util_get_current_time() > cap->timeout)
+       {
+           char buf[16];
+           gossip_debug(GOSSIP_SECURITY_DEBUG, "Capability (%s) expired "
+                                               "(timeout %llu)\n"
+                      ,PINT_util_bytes2str(cap->signature, buf, 4)
+                      ,llu(cap->timeout));
+           return 0;
+       }
     }
 
 #if 0
@@ -825,9 +842,12 @@ int PINT_sign_credential(PVFS_credential *cred)
  */
 int PINT_verify_credential(const PVFS_credential *cred)
 {
+    struct server_configuration_s *config = PINT_get_server_config();
+
 #if 0
     char mdstr[2*SHA_DIGEST_LENGTH+1];
 #endif
+
     EVP_MD_CTX mdctx;
     const EVP_MD *md = NULL;
     EVP_PKEY *pubkey;
@@ -862,13 +882,18 @@ int PINT_verify_credential(const PVFS_credential *cred)
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Verifying credential: %s\n",
                  PINT_util_bytes2str(cred->signature, sigbuf, 4));
 
-    if (PINT_util_get_current_time() > cred->timeout)
+    /* Are we suppose to check for timeouts? */
+    if ( !config->bypass_timeout_check )
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Credential (%s) expired "
-                     "(timeout %llu)\n", 
-                     PINT_util_bytes2str(cred->signature, sigbuf, 4),
-                     llu(cred->timeout));
-        return 0;
+       /* check credential for a timeout */
+       if (PINT_util_get_current_time() > cred->timeout)
+       {
+           gossip_debug(GOSSIP_SECURITY_DEBUG, "Credential (%s) expired "
+                        "(timeout %llu)\n", 
+                        PINT_util_bytes2str(cred->signature, sigbuf, 4),
+                        llu(cred->timeout));
+           return 0;
+       }
     }
 
 #if 0

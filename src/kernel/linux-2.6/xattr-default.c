@@ -19,27 +19,37 @@
 
 #include <linux/xattr.h>
 
+
 int pvfs2_xattr_set_default(
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
-    struct dentry *dentry,
-#else
-    struct inode *inode, 
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-    const char *name, 
-    const void *buffer, 
-    size_t size, 
-    int flags
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
-    , int handler_flags
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-    )
+#ifdef HAVE_XATTR_HANDLER_SET_4_4
+                            const struct xattr_handler *handler,
+                            struct dentry *dentry,
+                            const char *name,
+                            const void *buffer,
+                            size_t size,
+                            int flags)
+#elif defined (HAVE_XATTR_HANDLER_SET_2_6_33)
+                            struct dentry *dentry,
+                            const char *name,
+                            const void *buffer,
+                            size_t size,
+                            int flags,
+                            int handler_flags)
+#else /* pre 2.6.33 */
+                            struct inode *inode,
+                            const char *name,
+                            const void *buffer,
+                            size_t size,
+                            int flags)
+#endif
 {
     int internal_flag = 0;
 
     if (strcmp(name, "") == 0)
         return -EINVAL;
 
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+#if defined(HAVE_XATTR_HANDLER_SET_4_4) || \
+    defined(HAVE_XATTR_HANDLER_SET_2_6_33)
     if (!S_ISREG(dentry->d_inode->i_mode) &&
        (!S_ISDIR(dentry->d_inode->i_mode) || 
         dentry->d_inode->i_mode & S_ISVTX))
@@ -48,7 +58,7 @@ int pvfs2_xattr_set_default(
                     dentry->d_inode);
         return -EPERM;
     }
-#else
+#else /* pre 2.6.33 */
     if (!S_ISREG(inode->i_mode) &&
        (!S_ISDIR(inode->i_mode) || inode->i_mode & S_ISVTX))
     {
@@ -56,49 +66,65 @@ int pvfs2_xattr_set_default(
                   inode);
         return -EPERM;
     }
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+#endif
 
     gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_setxattr_default %s\n", name);
     internal_flag = convert_to_internal_xattr_flags(flags);
 
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+#if defined(HAVE_XATTR_HANDLER_SET_4_4) || \
+    defined(HAVE_XATTR_HANDLER_SET_2_6_33)
     return pvfs2_inode_setxattr(dentry->d_inode, 
-        PVFS2_XATTR_NAME_DEFAULT_PREFIX, name, buffer, size, internal_flag);
+                                PVFS2_XATTR_NAME_DEFAULT_PREFIX,
+                                name,
+                                buffer,
+                                size,
+                                internal_flag);
 #else
-    return pvfs2_inode_setxattr(inode, PVFS2_XATTR_NAME_DEFAULT_PREFIX,
-        name, buffer, size, internal_flag);
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+    return pvfs2_inode_setxattr(inode,
+                                PVFS2_XATTR_NAME_DEFAULT_PREFIX,
+                                name,
+                                buffer,
+                                size,
+                                internal_flag);
+#endif
 }
 
 int pvfs2_xattr_get_default(
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-    struct dentry *dentry,
-#else
-    struct inode *inode,
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-    const char *name, 
-    void *buffer, 
-    size_t size
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-    , int handler_flags
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-
-    )
+#ifdef HAVE_XATTR_HANDLER_GET_4_4
+                            const struct xattr_handler *handler,
+                            struct dentry *dentry,
+                            const char *name,
+                            void *buffer,
+                            size_t size)
+#elif defined (HAVE_XATTR_HANDLER_GET_2_6_33)
+                            struct dentry *dentry,
+                            const char *name,
+                            void *buffer,
+                            size_t size,
+                            int handler_flags)
+#else /* pre 2.6.33 */
+                            struct inode *inode,
+                            const char *name,
+                            void *buffer,
+                            size_t size)
+#endif
 {
     if (strcmp(name, "") == 0)
         return -EINVAL;
     gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_getxattr_default %s\n", name);
 
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+#if defined(HAVE_XATTR_HANDLER_GET_4_4) || \
+    defined(HAVE_XATTR_HANDLER_GET_2_6_33)
     return pvfs2_inode_getxattr(dentry->d_inode, 
         PVFS2_XATTR_NAME_DEFAULT_PREFIX, name, buffer, size);
 #else
     return pvfs2_inode_getxattr(inode, PVFS2_XATTR_NAME_DEFAULT_PREFIX,
         name, buffer, size);
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+#endif
 
 }
-#endif
+
+#endif /* practically the whole file is wrapped in this */
 
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
 
