@@ -3424,8 +3424,6 @@ DOTCONF_CB(get_turn_off_timeouts)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
 
-    gossip_err("%s:cmd->data.str(%s)\n",__func__,cmd->data.str);
-
 #if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
     /* You cannot turn off timeouts if using enhanced security */
     config_s->bypass_timeout_check = 0;
@@ -3450,9 +3448,6 @@ DOTCONF_CB(get_turn_off_timeouts)
     {
         return("TurnOffTimeouts must be 'yes' or 'no'.\n");
     }
-
-    gossip_err("%s:config_s->bypass_timeout_check(%d)\n",__func__
-                                            ,config_s->bypass_timeout_check);
 
     return NULL;
 }

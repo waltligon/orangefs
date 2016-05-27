@@ -7,19 +7,22 @@ orangefs-2.9.5 (Subversion Tag v.2.9.5)
 http://www.orangefs.org/svn/orangefs/tags/v.2.9.5
 
 This version of OrangeFS includes many bug fixes and some new functionality.
-	1.  We now have full support for Infiniband with our 2.9 system.
-	2.  We now have a version of the kernel module in Linux upstream,
-	    beginning with version 4.6.
-	3.  We now have support for LMDB as a metadata store.
+	1.  Full support for Infiniband with our 2.9 system.
+	2.  The 2.9 kernel module is now part of  Linux upstream,
+	    beginning with kernel 4.6.
+	3.  Support for LMDB as a metadata store.
+	4.  Replaced karma a Graphana solution.
 
 * - Software Infrastructure
-	* - Enhancements to redefined malloc functionality
-	* - Added helper function to free attr objects
+	* - Enhancements to redefined malloc functionality.
+	* - Added helper function to free attr objects.
+	* - Comments and small format changes designed to improve
+	    understandability of locks in the client code.
 
 * - USRINT libraries (libofs,liborangefs,liborangefsposix)
-	* - Enhancements to ofs_rm and ofs_cp
-	* - Enhancements to stdio.c
-	* - Minor bug fixes
+	* - Enhancements to ofs_rm and ofs_cp.
+	* - Enhancements to stdio.c.
+	* - Minor bug fixes.
 
 * - Security
 	* - Modified how a client determines expiration of a capability, 
@@ -35,9 +38,9 @@ This version of OrangeFS includes many bug fixes and some new functionality.
 	            renew a capability when it has expired.
 		* - Corrected a memory leak found in the remove state
 	            machine.
-		* - Prevent permission errors when using truncate to extend
-	            the size of a file
-		* - Handle extended attribute values up to 8K in length
+		* - Prevent permission errors when using truncate to extend 
+		    the size of a file.
+		* - Handle extended attribute values up to 8K in length.
 	* - HADOOP: 
 		* - default Hadoop version is now 2.7.2.
 
@@ -56,27 +59,30 @@ This version of OrangeFS includes many bug fixes and some new functionality.
 	* - Corrected a list-add corruption error seen in the kernel logs when
 	    the OrangeFS request-list and in-progress tables are accessed.
 	* - Returns the correct number of bytes received after a readdir call.
-	* - Added ifdef for HAVE_KCONFIG
-	* - Modified pvfs2_follow_link due to changes in Fedora 23
+	* - Added ifdef for HAVE_KCONFIG.
+	* - Modified pvfs2_follow_link due to changes in Fedora 23.
 	* - Added write-iter support for the newer kernels.
-	* - Strengthen sanity checks in PINT_dev_write_LIST
-	* - Fix getdents for both filldir and dir_emit
+	* - Strengthen sanity checks in PINT_dev_write_LIST.
+	* - Fix getdents for both filldir and dir_emit.
 	* - Client Core:  Fix khandle related problem with EEXIST CREATE case.
 	* - Added support for the 4.4 kernel.
+	* - Removed deprecated sys/kdaemon.h header from bdflush01.c in LTP
+	    per http://lists.linux.it/pipermail/ltp/2016-January/000704.html.
+	    This is necessary for LTP to compile on Ubuntu 16.04.
 
 * - BMI 
-	* - Native IB: Now available
+	* - Native IB: Now available.
 	* - Native IB: check for existence of experimental DCT event types and
-	    compile around them.
+	               compile around them.
 	* - ALL METHODS: Corrected a segmentation fault that can occur when encoding a
-	    listattr response for network transfer.
+	                 listattr response for network transfer.
 
 * - Trove
-	* - Added support for LMDB 0.9.18
+	* - Added support for LMDB 0.9.18.
 	* - Added configure option for LMDB:  --with-db-backend=lmdb
-	    Default is still Berkeley DB
-	* - Handle DB_BUFFER_SMALL errors in Berkeley DB
-	* - Changed error messages that referred specifically to Berkeley DB
+	    Default is still Berkeley DB.
+	* - Handle DB_BUFFER_SMALL errors in Berkeley DB.
+	* - Changed error messages that referred specifically to Berkeley DB.
 	    that were in modules that are used with any DB.
 	* - Fix memory leak found in Berkeley DB code.
 
