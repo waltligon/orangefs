@@ -2063,6 +2063,9 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             vfs_request->out_downcall.status = 0;
             return(0);
             break;
+        default:
+            /* ignore an unexpected param msg */
+            break;
     }
 
     if(tmp_param == -1)
@@ -4393,7 +4396,13 @@ static PVFS_error process_vfs_requests(void)
                              vfs_request,
                              llu(vfs_request->info.tag));
                 ret = handle_unexp_vfs_request(vfs_request);
-                assert(ret == 0);
+                if (ret != 0)
+                {
+                    /* assert(ret == 0); */
+                    gossip_err("error returned from handle_enexp_vfs_request "
+                               "probably unknown request code = %d\n", ret);
+                    vfs_request->jstat.error_code = ret;
+                }
 
                 /* We've handled this unexpected request (posted the
                  * client isys call), we can move

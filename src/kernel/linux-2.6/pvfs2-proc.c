@@ -221,6 +221,7 @@ static int pvfs2_param_proc_handler(
             return(ret);
         }
         gossip_debug(GOSSIP_PROC_DEBUG, "pvfs2: proc write %d\n", val[0]);
+#if defined(USE_MMAP_RA_CACHE)
         /* should this be based on lenp rather than op? */
         if (extra->op == PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT_SIZE)
         {
@@ -228,6 +229,7 @@ static int pvfs2_param_proc_handler(
             new_op->upcall.req.param.value2[1] = val[1];
         }
         else
+#endif
         {
             new_op->upcall.req.param.value = val[0];
         }
@@ -248,12 +250,14 @@ static int pvfs2_param_proc_handler(
     if(ret == 0 && !write)
     {
         /* use generic proc handling function to output value */
+#if defined(USE_MMAP_RA_CACHE)
         if (extra->op == PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT_SIZE)
         {
             val[0] = (int)new_op->downcall.resp.param.value2[0];
             val[1] = (int)new_op->downcall.resp.param.value2[1];
         }
         else
+#endif
         {
             val[0] = (int)new_op->downcall.resp.param.value;
         }
