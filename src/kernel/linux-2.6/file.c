@@ -1385,23 +1385,29 @@ static ssize_t do_readv_writev(struct rw_options *rw)
 #else
 #ifdef GWC_USES_KIOCB
 	init_sync_kiocb(&iocb, file);
+	iocb.ki_pos = file->f_pos;
+	if (file->f_flags & O_APPEND)
+		iocb.ki_flags = IOCB_APPEND;
 	iov_iter_init(&iter,
 		      WRITE,
 		      rw->dest.address.iov,
 		      rw->dest.address.nr_segs,
-		      pvfs_bufmap_size_query());
+		      rw->dest.address.iov->iov_len);
 	ret = generic_write_checks(&iocb, &iter);
         if (ret <= 0)
         {
-            gossip_err("%s: failed generic argument checks.\n", rw->fnstr);
+            gossip_err("%s: failed generic argument checks 1.\n", rw->fnstr);
             goto out;
         }
-
+	if (file->f_flags & O_APPEND)
+		*offset = i_size_read(inode);
 #else
-        ret = generic_write_checks(file, offset, &count, S_ISBLK(inode->i_mode));
+        ret =
+            generic_write_checks(file, offset, &count, S_ISBLK(inode->i_mode));
+
         if (ret != 0)
         {
-            gossip_err("%s: failed generic argument checks.\n", rw->fnstr);
+            gossip_err("%s: failed generic argument checks 2.\n", rw->fnstr);
             goto out;
         }
 

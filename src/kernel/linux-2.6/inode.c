@@ -14,6 +14,7 @@
 #include "pvfs2-bufmap.h"
 #include "pvfs2-types.h"
 #include "pvfs2-internal.h"
+#include <linux/aio.h>
 
 static int read_one_page(struct page *page)
 {
@@ -104,6 +105,25 @@ static int pvfs2_readpages(
     return 0;
 }
 
+/*
+ * Having a direct_IO entry point in the address_space_operations
+ * struct causes the kernel to allows us to use O_DIRECT on
+ * open.
+ */
+static ssize_t pvfs2_direct_IO(int rw,
+                     struct kiocb *iocb,
+                     const struct iovec *iov,
+                     loff_t pos,
+                     unsigned long nr_segs)
+{
+
+     gossip_debug(GOSSIP_INODE_DEBUG,
+                  "pvfs2_direct_IO: %s\n",
+                  iocb->ki_filp->f_path.dentry->d_name.name);
+
+     return -EINVAL;
+}
+
 #ifdef HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE
 static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
 #else
@@ -168,7 +188,8 @@ struct address_space_operations pvfs2_address_operations =
     .readpage = pvfs2_readpage,
     .readpages = pvfs2_readpages,
     .invalidatepage = pvfs2_invalidatepage,
-    .releasepage = pvfs2_releasepage
+    .releasepage = pvfs2_releasepage,
+    .direct_IO = pvfs2_direct_IO
 #endif
 };
 
