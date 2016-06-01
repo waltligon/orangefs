@@ -12,6 +12,7 @@ This version of OrangeFS includes many bug fixes and some new functionality.
 	    beginning with kernel 4.6.
 	3.  Support for LMDB as a metadata store.
 	4.  Replaced karma a Graphana solution.
+	5.  Kernel module allows O_DIRECT in open.
 
 * - Software Infrastructure
 	* - Enhancements to redefined malloc functionality.
@@ -69,6 +70,7 @@ This version of OrangeFS includes many bug fixes and some new functionality.
 	* - Removed deprecated sys/kdaemon.h header from bdflush01.c in LTP
 	    per http://lists.linux.it/pipermail/ltp/2016-January/000704.html.
 	    This is necessary for LTP to compile on Ubuntu 16.04.
+	* - Added support for O_DIRECT in the open call.
 
 * - BMI 
 	* - Native IB: Now available.
