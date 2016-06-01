@@ -599,6 +599,7 @@ int pint_racache_flush(PVFS_object_ref refn)
     int ret = 0;
     struct qlist_head *hash_link = NULL;
     racache_file_t *racache_file = NULL;
+    struct qlist_head *blink = NULL;
     racache_buffer_t *buff = NULL;
 
     if (RACACHE_INITIALIZED())
@@ -613,15 +614,15 @@ int pint_racache_flush(PVFS_object_ref refn)
 
             assert(racache_file);
 
-            /* found the file, now search for a buffer */
-            qlist_for_each_entry(buff, &racache_file->buff_list, buff_link)
+            /* found the file, now pop all buffers */
+            while ((blink = qlist_pop(&racache_file->buff_list)))
             {
                 gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
                              "racache_flush removing buffer\n");
+                /* get a pointer to the buffer */
+                buff = qhash_entry(blink, racache_buffer_t, buff_link);
                 /* remove buffer from the lru list */
                 qlist_del(&buff->buff_lru);
-                /* remove buffer from file's buffer list */
-                qlist_del(&buff->buff_link);
                 /* clear reference to file record */
                 buff->file = NULL;
                 /* check for active requests */
