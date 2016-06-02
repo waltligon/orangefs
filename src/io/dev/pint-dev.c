@@ -48,7 +48,7 @@ struct iovec {
 #include "pvfs2-dev-proto.h"
 #endif
 
-#ifdef WITH_LINUX_KMOD
+#ifdef __linux__
 static int setup_dev_entry(
     const char *dev_name);
 
@@ -56,15 +56,15 @@ static int parse_devices(
     const char *targetfile,
     const char *devname, 
     int *majornum);
-#endif  /* WITH_LINUX_KMOD */
+#endif  /* __linux__ */
 
 
 static int pdev_fd = -1;
 static int32_t pdev_magic;
-#ifdef WITH_LINUX_KMOD
+#ifdef __linux__
 static int32_t pdev_max_upsize;
 static int32_t pdev_max_downsize;
-#endif  /* WITH_LINUX_KMOD */
+#endif  /* __linux__ */
 
 int32_t pvfs2_bufmap_total_size, pvfs2_bufmap_desc_size;
 int32_t pvfs2_bufmap_desc_count, pvfs2_bufmap_desc_shift;
@@ -79,7 +79,7 @@ int PINT_dev_initialize(
     const char *dev_name,
     int flags)
 {
-#ifdef WITH_LINUX_KMOD
+#ifdef __linux__
     int ret = -1;
     char *debug_string = getenv("PVFS2_KMODMASK");
     uint64_t debug_mask = 0;
@@ -251,7 +251,7 @@ out:
         close(pdev_fd);
         return -(PVFS_ENODEV|PVFS_ERROR_DEV);
     }
-#endif  /* WITH_LINUX_KMOD */
+#endif  /* __linux__ */
     return 0;
 }
 
@@ -284,7 +284,7 @@ void PINT_dev_finalize(void)
 int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
                                 struct PINT_dev_params *params)
 {
-#ifdef WITH_LINUX_KMOD
+#ifdef __linux__
     int i, ret = -1;
     uint64_t page_size = sysconf(_SC_PAGE_SIZE), total_size;
     void *ptr = NULL;
@@ -372,7 +372,7 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
         }
         return -(PVFS_ENOMEM|PVFS_ERROR_DEV);
     }
-#endif  /* WITH_LINUX_KMOD */
+#endif  /* __linux__ */
     return 0;
 }
 
@@ -459,7 +459,7 @@ int PINT_dev_test_unexpected(
         int max_idle_time)
 {
     int ret = -1;
-#ifdef WITH_LINUX_KMOD
+#ifdef __linux__
     int avail = -1, i = 0;
     struct pollfd pfd;
     int32_t *magic = NULL;
@@ -672,7 +672,7 @@ dev_test_unexp_error:
     }
 
     *outcount = 0;
-#endif  /* WITH_LINUX_KMOD */
+#endif  /* __linux__ */
     return ret;
 }
 
@@ -823,7 +823,7 @@ int PINT_dev_remount(void)
 {
     int ret = -PVFS_EINVAL;
 
-#ifdef WITH_LINUX_KMOD
+#ifdef __linux__
     if (pdev_fd > -1)
     {
         ret = ((ioctl(pdev_fd, PVFS_DEV_REMOUNT_ALL, NULL) < 0) ?
@@ -833,7 +833,7 @@ int PINT_dev_remount(void)
             gossip_err("Error: ioctl PVFS_DEV_REMOUNT_ALL failure\n");
         }
     }
-#endif  /* WITH_LINUX_KMOD */
+#endif  /* __linux__ */
     return ret;
 }
 
@@ -875,7 +875,7 @@ void PINT_dev_memfree(void *buffer, int size)
     free(buffer);
 }
 
-#ifdef WITH_LINUX_KMOD
+#ifdef __linux__
 /* setup_dev_entry()
  *
  * sets up the device file
@@ -1003,7 +1003,7 @@ static int parse_devices(
     fclose(devfile);
     return 0;
 }
-#endif  /* WITH_LINUX_KMOD */
+#endif  /* __linux__ */
 
 /*
  * Local variables:

@@ -2933,10 +2933,14 @@ static PVFS_error service_mmap_ra_flush_request(vfs_request_t *vfs_request)
 
     pint_racache_flush(refn);
 
-    /* we need to send a blank success response */
-    vfs_request->out_downcall.type = PVFS2_VFS_OP_MMAP_RA_FLUSH;
-    vfs_request->out_downcall.status = 0;
-    vfs_request->op_id = -1;
+    if (vfs_request->in_upcall.type == PVFS2_VFS_OP_MMAP_RA_FLUSH)
+    {
+        /* we need to send a blank success response */
+        vfs_request->out_downcall.type = PVFS2_VFS_OP_MMAP_RA_FLUSH;
+        vfs_request->out_downcall.status = 0;
+        vfs_request->op_id = -1;
+    }
+    /* otherwise there is another primary request that will return */
 
     return 0;
 }
@@ -4081,6 +4085,9 @@ static inline PVFS_error handle_unexp_vfs_request(
             break;
         case PVFS2_VFS_OP_REMOVE:
             ret = post_remove_request(vfs_request);
+#ifdef USE_MMAP_RA_CACHE
+            ret = service_mmap_ra_flush_request(vfs_request);
+#endif
             break;
         case PVFS2_VFS_OP_MKDIR:
             ret = post_mkdir_request(vfs_request);
@@ -4096,6 +4103,9 @@ static inline PVFS_error handle_unexp_vfs_request(
             break;
         case PVFS2_VFS_OP_TRUNCATE:
             ret = post_truncate_request(vfs_request);
+#ifdef USE_MMAP_RA_CACHE
+            ret = service_mmap_ra_flush_request(vfs_request);
+#endif
             break;
         case PVFS2_VFS_OP_GETXATTR:
             ret = post_getxattr_request(vfs_request);
@@ -4121,6 +4131,9 @@ static inline PVFS_error handle_unexp_vfs_request(
             */
         case PVFS2_VFS_OP_FS_UMOUNT:
             ret = service_fs_umount_request(vfs_request);
+#ifdef USE_MMAP_RA_CACHE
+            ret = service_mmap_ra_flush_request(vfs_request);
+#endif
             break;
         case PVFS2_VFS_OP_PERF_COUNT:
             ret = service_perf_count_request(vfs_request);
@@ -4141,6 +4154,9 @@ static inline PVFS_error handle_unexp_vfs_request(
             gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
                          "io request setting readahead to %d bytes\n",
                          s_opts.readahead_size);
+            /* this is temporary - eventually we want a means
+             * for open file instances to control readahead
+             */
             /* for now readahead is fixed to this const */
             vfs_request->in_upcall.req.io.readahead_size =
                                          s_opts.readahead_size;
@@ -4164,6 +4180,9 @@ static inline PVFS_error handle_unexp_vfs_request(
             break;
         case PVFS2_VFS_OP_FSYNC:
             ret = post_fsync_request(vfs_request);
+#ifdef USE_MMAP_RA_CACHE
+            ret = service_mmap_ra_flush_request(vfs_request);
+#endif
             break;
         case PVFS2_VFS_OP_INVALID:
         default:
