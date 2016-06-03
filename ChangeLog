@@ -13,6 +13,7 @@ This version of OrangeFS includes many bug fixes and some new functionality.
 	3.  Support for LMDB as a metadata store.
 	4.  Replaced karma a Graphana solution.
 	5.  Kernel module allows O_DIRECT in open.
+	6.  Kernel module is compatible up to Linux Kernel 4.4
 
 * - Software Infrastructure
 	* - Enhancements to redefined malloc functionality.
