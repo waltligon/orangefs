@@ -789,6 +789,20 @@ static void usage(int argc, char **argv)
     fprintf(stderr,
             "Example: %s -m /mnt/pvfs2 -g graphite.clemson.edu\n",
             argv[0]);
+    fprintf(stderr,
+            "\toptions:\n"
+                "\t\t-v                   Print version number\n"
+                "\t\t-m <fs_mount_point>  Query all servers\n"
+                "\t\t-s <single_host>     Query one server\n"
+                "\t\t-g <graphite_host>   Output to graphite host\n"
+                "\t\t-p <print_data>      Print data to screen\n"
+                "\t\t-r <raw_data>        Ouput raw data\n"
+                "\t\t-h <history_size>    Read only given number of samples\n"
+                "\t\t-k <num_keys>        Read only given number of keys\n"
+                "\t\t-c <simple_counters> Get simple counters from server\n"
+                "\t\t-t <timers>          Get timers from server\n"
+                "\t\t-d                   Print debug messages\n"
+                "\t\t ?                   Print usage\n");
     return;
 }
 
