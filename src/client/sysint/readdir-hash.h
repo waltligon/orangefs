@@ -8,15 +8,18 @@
 #define _READDIR_HASH_H_
 
 
-int readdir_hash_initialize(void);
-void readdir_hash_finalize(void);
+int readdir_token_hash_initialize(void);
+void readdir_token_hash_finalize(void);
 
-int readdir_add_token(PVFS_object_ref ref,
+int readdir_token_add(PVFS_object_ref ref,
                       PVFS_ds_position token,
                       int32_t dirdata_index);
-void readdir_print_hash_table(void);
-int readdir_lookup_token(PVFS_object_ref ref,
-                      PVFS_ds_position token);
+int readdir_token_remove(PVFS_object_ref ref,
+                         PVFS_ds_position token);
+void readdir_token_print_table(void);
+int readdir_token_count(void);
+int readdir_token_lookup(PVFS_object_ref ref,
+                        PVFS_ds_position token);
 
 #endif /* _READDIR_HASH_H_ */
 

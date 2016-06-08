@@ -45,7 +45,7 @@ static int readdir_compare(const void*, struct qhash_head*);
 static void free_readdir_entry(void*);
 
 
-/*  readdir_hash_initialize
+/*  readdir_token_hash_initialize
  *
  *  Initializes the hash table for use
  *
@@ -53,7 +53,7 @@ static void free_readdir_entry(void*);
  *  returns PVFS_ENOMEM if memory cannot be allocated
  *  returns 0 on success
  */
-int readdir_hash_initialize(void)
+int readdir_token_hash_initialize(void)
 {
     gen_mutex_lock(&hash_mutex);
     if (hash_init_status)
@@ -76,12 +76,12 @@ int readdir_hash_initialize(void)
     return 0;
 }
 
-/*  readdir_hash_finalize
+/*  readdir_token_hash_finalize
  *
  *  Frees everything allocated within the table
  *  and anything used to set it up
  */
-void readdir_hash_finalize(void)
+void readdir_token_hash_finalize(void)
 {
     gen_mutex_lock(&hash_mutex);
     if (!hash_init_status)
@@ -97,7 +97,7 @@ void readdir_hash_finalize(void)
     gen_mutex_unlock(&hash_mutex);
 }
 
-/*  readdir_add_token
+/*  readdir_token_add
  *
  *  Takes an readdir token and inserts it into the hash table
  *  based on the hash key.  If the hash key already
@@ -109,9 +109,9 @@ void readdir_hash_finalize(void)
  *  returns PVFS_ENOMEM if memory cannot be allocated
  *  returns 0 on success
  */
-int readdir_add_token(PVFS_object_ref ref,
+int readdir_token_add(PVFS_object_ref ref,
                       PVFS_ds_position token, int32_t dirdata_index)
-{    
+{
     readdir_entry_t *entry;
     struct qhash_head *temp;
 
@@ -151,7 +151,57 @@ int readdir_add_token(PVFS_object_ref ref,
     return 0;
 }
 
-void readdir_print_hash_table(void)
+/*  readdir_token_remove
+ *
+ *  Removes a readdir token from the hash table
+ *
+ *  The token will be freed upon removal from the table.
+ *
+ *  returns 0 on success
+ */
+int readdir_token_remove(PVFS_object_ref ref,
+                      PVFS_ds_position token)
+{
+    readdir_entry_t *entry;
+    struct qhash_head *temp;
+
+    entry = (readdir_entry_t *)malloc(sizeof(readdir_entry_t));
+    if (entry == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    entry->key_data = (readdir_key_t *)malloc(sizeof(readdir_key_t));
+    if (entry->key_data == NULL)
+    {
+        free(entry);
+        return -PVFS_ENOMEM;
+    }
+
+    entry->key_data->ref = ref;
+    entry->key_data->token = token;
+    
+    entry->hash_key = readdir_hash_key(entry->key_data, readdir_table->table_size);
+    gossip_debug(GOSSIP_READDIR_DEBUG, "%s: hash_key = %d, token = %llu\n", __func__, entry->hash_key, llu(token));
+
+    gen_mutex_lock(&hash_mutex);
+    
+    /* remove prior key linked to the hash key if it exists */
+    temp = qhash_search_and_remove(readdir_table, entry->key_data);
+    gen_mutex_unlock(&hash_mutex);
+
+    if (temp != NULL) 
+    {
+    	gossip_debug(GOSSIP_READDIR_DEBUG, 
+    	             "Removed key from table.\n");
+        free_readdir_entry(temp);
+    }
+    free_readdir_entry(entry);
+    
+    return 0;
+}
+
+void readdir_token_print_table(void)
 {
     int i;
     struct qhash_head *tmp_link;
@@ -173,23 +223,36 @@ void readdir_print_hash_table(void)
     }
 }
 
+int readdir_token_count(void)
+{
+    int i = 0, count = 0;
+    struct qhash_head *tmp_link;
 
-/*  readdir_lookup_token
+    gossip_debug(GOSSIP_READDIR_DEBUG, "READDIR HASH TABLE CONTENTS:\n");
+    for (i = 0; i < readdir_table->table_size; i++)
+    {
+        qhash_for_each(tmp_link, &readdir_table->array[i])
+        {
+            count++;
+        }
+    }
+    return(count);
+}
+
+/*  readdir_token_lookup
  *
  *  Takes a readdir token and returns the matching dirdata index
  *
  *  returns NULL if no matching key is found
  */
-int32_t readdir_lookup_token(PVFS_object_ref ref, PVFS_ds_position token)
+int32_t readdir_token_lookup(PVFS_object_ref ref, PVFS_ds_position token)
 {
     struct qhash_head *temp;
     readdir_key_t key;
-//    int hash_key;
     readdir_entry_t *entry;
 
     key.ref = ref;
     key.token = token;
-//    hash_key = readdir_hash_key(&key, readdir_table->table_size);
 
     temp = qhash_search(readdir_table, &key);
     if (temp == NULL)

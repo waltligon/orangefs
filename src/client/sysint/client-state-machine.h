@@ -647,6 +647,7 @@ typedef struct
     PVFS_dirent **dirent_array;
     uint32_t      *dirent_outcount;
     PVFS_ds_position *token;
+    PVFS_ds_position saved_token;
     uint64_t         *directory_version;
     PVFS_ds_position pos_token;     /* input/output parameter */
     int32_t      dirent_limit;      /* input parameter */
