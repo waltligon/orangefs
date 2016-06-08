@@ -5,15 +5,17 @@ OrangeFS Release ChangeLog
 
 orangefs-2.9.5 (Subversion Branch v.2.9.5)
 http://dev.orangefs.org/svn/orangefs/branches/v.2.9.5
+http://dev.orangefs.org/svn/orangefs/tags/v.2.9.5
 
 This version of OrangeFS includes many bug fixes and some new functionality.
 	1.  Full support for Infiniband with our 2.9 system.
 	2.  The 2.9 kernel module is now part of  Linux upstream,
-	    beginning with kernel 4.6.
+	    beginning with kernel 4.6.  Available at kernel.org.
 	3.  Support for LMDB as a metadata store.
-	4.  Replaced karma a Graphana solution.
-	5.  Kernel module allows O_DIRECT in open.
-	6.  Kernel module is compatible up to Linux Kernel 4.4
+	4.  Replaced karma with a Grafana solution.
+	5.  Kernel module delivered with OrangeFS allows O_DIRECT in open.
+	6.  Kernel module delivered with OrangeFS is compatible up to Linux 
+	    Kernel 4.4.
 
 * - Software Infrastructure
 	* - Enhancements to redefined malloc functionality.
@@ -83,7 +85,8 @@ This version of OrangeFS includes many bug fixes and some new functionality.
 * - Trove
 	* - Added support for LMDB 0.9.18.
 	* - Added configure option for LMDB:  --with-db-backend=lmdb
-	    Default is still Berkeley DB.
+	    Default is still Berkeley DB.  Must create a new storage area.  A
+	    migration path from BDB to LMDB is not provided.
 	* - Handle DB_BUFFER_SMALL errors in Berkeley DB.
 	* - Changed error messages that referred specifically to Berkeley DB.
 	    that were in modules that are used with any DB.
@@ -92,7 +95,7 @@ This version of OrangeFS includes many bug fixes and some new functionality.
 
 
 orangefs-2.9.3 (Subversion Tag v.2.9.3)
-http://www.orangefs.org/svn/orangefs/tags/v.2.9.3
+http://dev.orangefs.org/svn/orangefs/tags/v.2.9.3
 
 * - USRINT libraries (libofs,liborangefs,liborangefsposix)
 	* - Minor bug fixes to ofs_cp and ofs_rm
@@ -134,7 +137,7 @@ http://www.orangefs.org/svn/orangefs/tags/v.2.9.3
 
 
 orangefs-2.9.2 (Subversion Tag v.2.9.2)
-http://www.orangefs.org/svn/orangefs/tags/v.2.9.2
+http://dev.orangefs.org/svn/orangefs/tags/v.2.9.2
 
 * - Client/Server (Linux)
 	* - Automatically disabled capability caching, server side, when
@@ -207,7 +210,7 @@ http://www.orangefs.org/svn/orangefs/tags/v.2.9.2
 	xattr's value will be correct, not length + 1.
 
 orangefs-2.9.1 (Subversion Tag v.2.9.1)
-http://www.orangefs.org/svn/orangefs/tags/v.2.9.1
+http://dev.orangefs.org/svn/orangefs/tags/v.2.9.1
 
 * - Update pom.xml files to use the latest versions of our dependencies
 * - Add support for issueing -rf with the pvfs2-server program to indicate
