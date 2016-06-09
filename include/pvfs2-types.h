@@ -436,6 +436,10 @@ typedef struct
  PVFS_ATTR_SYS_CTIME | PVFS_ATTR_SYS_MTIME | \
  PVFS_ATTR_SYS_TYPE)
 
+/* Removed PVFS_ATTR_SYS_DIRENT_COUNT from PVFS_ATTR_SYS_ALL.  This will
+ * prevent needless dirdata accesses to retrieve dirent-count.  If this
+ * count is needed, then add it into the getattr call.
+ */
 #define PVFS_ATTR_SYS_ALL                    \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
@@ -449,6 +453,7 @@ typedef struct
  * over the code.  Now, we want to always get the dir-hint.
  */
 #define PVFS_ATTR_SYS_ALL_NOHINT PVFS_ATTR_SYS_ALL
+
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
  PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT | \
