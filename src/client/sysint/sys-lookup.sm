@@ -942,7 +942,7 @@ static PINT_sm_action lookup_segment_verify_attr_present(
         PINT_SM_GETATTR_STATE_FILL(
             sm_p->getattr,  
             cur_seg->seg_resolved_refn,
-            (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYMLNK_ALL),
+            (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYMLNK_ALL | PVFS_ATTR_DIR_HINT | PVFS_ATTR_CAPABILITY),
             PVFS_TYPE_NONE,
             0);
 
