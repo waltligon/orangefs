@@ -438,15 +438,18 @@ typedef struct
 
 /* Removed PVFS_ATTR_SYS_DIRENT_COUNT from PVFS_ATTR_SYS_ALL.  This will
  * prevent needless dirdata accesses to retrieve dirent-count.  If this
- * count is needed, then add it into the getattr call.
+ * count is needed, then add it into the mask to the getattr call.
  */
-#define PVFS_ATTR_SYS_ALL                    \
-(PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
- PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
+#define PVFS_ATTR_SYS_ALL            \
+(PVFS_ATTR_SYS_COMMON_ALL |          \
+ PVFS_ATTR_SYS_SIZE |                \
+ PVFS_ATTR_SYS_LNK_TARGET |          \
+ PVFS_ATTR_SYS_DFILE_COUNT |         \
  PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
- PVFS_ATTR_SYS_DISTDIR_ATTR | \
- PVFS_ATTR_SYS_CAPABILITY | \
- PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
+ PVFS_ATTR_SYS_DISTDIR_ATTR |        \
+ PVFS_ATTR_SYS_CAPABILITY |          \
+ PVFS_ATTR_SYS_DIR_HINT |            \
+ PVFS_ATTR_SYS_BLKSIZE)
 
 /* Effectively, removed the use of PVFS_ATTR_SYS_ALL_NOHINT by redefining
  * it to be PVFS_ATTR_SYS_ALL.  This change prevented many changes all
@@ -454,14 +457,18 @@ typedef struct
  */
 #define PVFS_ATTR_SYS_ALL_NOHINT PVFS_ATTR_SYS_ALL
 
-#define PVFS_ATTR_SYS_ALL_NOSIZE                   \
-(PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
- PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT | \
+#define PVFS_ATTR_SYS_ALL_NOSIZE     \
+(PVFS_ATTR_SYS_COMMON_ALL |          \
+ PVFS_ATTR_SYS_LNK_TARGET |          \
+ PVFS_ATTR_SYS_DFILE_COUNT |         \
  PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
- PVFS_ATTR_SYS_DISTDIR_ATTR | \
- PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
+ PVFS_ATTR_SYS_DISTDIR_ATTR |        \
+ PVFS_ATTR_SYS_DIR_HINT |            \
+ PVFS_ATTR_SYS_BLKSIZE)
+
 #define PVFS_ATTR_SYS_ALL_SETABLE \
 (PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
+
 #define PVFS_ATTR_SYS_ALL_TIMES \
 ((PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) | PVFS_ATTR_SYS_ATIME_SET | PVFS_ATTR_SYS_MTIME_SET)
 
