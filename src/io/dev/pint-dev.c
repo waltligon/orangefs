@@ -852,6 +852,13 @@ int PINT_dev_write(void *buffer,
         &buffer, &size, 1, size, buffer_type, tag);
 }
 
+/******************************************
+ * I believe this is dead code
+ * I cannot fine anywhere these are called
+ * Do not introduce them into new code
+ * I intend to remove them
+ */
+
 /* PINT_dev_memalloc()
  *
  * allocates a memory buffer optimized for transfer into the device
@@ -874,6 +881,8 @@ void PINT_dev_memfree(void *buffer, int size)
 {
     free(buffer);
 }
+
+/*****************************************/
 
 #ifdef __linux__
 /* setup_dev_entry()

@@ -178,8 +178,8 @@ static int racache_buf_init(racache_t *racache)
         racache->buffarray[i].buffer = vp;
         racache->buffarray[i].buff_id = i;
 
-        qlist_add(&racache->buffarray[i].buff_link,
-                  &racache->buff_free);
+        qlist_add_tail(&racache->buffarray[i].buff_link,
+                       &racache->buff_free);
     }
     return 0;
 }
@@ -457,9 +457,9 @@ int pint_racache_get_block(PVFS_object_ref refn,
                             buff->vfs_cnt++;
                             gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
                                          "racache_get_block "
-                                         "adding request to buffer "
+                                         "adding request %p to buffer "
                                          "%d vfs list #%d \n",
-                                         buff->buff_id, buff->vfs_cnt);
+                                         vfs_req, buff->buff_id, buff->vfs_cnt);
                         }
                         else
                         {
@@ -496,19 +496,16 @@ int pint_racache_get_block(PVFS_object_ref refn,
                              llu(offset), llu(buff->file_offset),
                              llu(buff->buff_sz));
 
-                if (!readahead_speculative)
-                {
-                    /* add request to waiting list */
-                    glink = (gen_link_t *)malloc(sizeof(gen_link_t));
-                    INIT_QLIST_HEAD(&glink->link);
-                    glink->payload = vfs_req;
-                    /* makes list FIFO */
-                    qlist_add_tail(&glink->link, &buff->vfs_link);
-                    buff->vfs_cnt++;
-                    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "racache_get_block "
-                                "adding request to buffer %d vfs list #%d \n",
-                                buff->buff_id, buff->vfs_cnt);
-                }
+                /* add request to waiting list */
+                glink = (gen_link_t *)malloc(sizeof(gen_link_t));
+                INIT_QLIST_HEAD(&glink->link);
+                glink->payload = vfs_req;
+                /* makes list FIFO */
+                qlist_add_tail(&glink->link, &buff->vfs_link);
+                buff->vfs_cnt++;
+                gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "racache_get_block "
+                             "adding request %p to buffer %d vfs list #%d \n",
+                             vfs_req, buff->buff_id, buff->vfs_cnt);
             }
             else
             {
@@ -562,20 +559,16 @@ int pint_racache_get_block(PVFS_object_ref refn,
             buff->file_offset = pint_racache_buff_offset(offset);
             buff->data_sz = 0;
 
-            if (!readahead_speculative)
-            {
-
-                /* add request to waiting list */
-                glink = (gen_link_t *)malloc(sizeof(gen_link_t));
-                INIT_QLIST_HEAD(&glink->link);
-                glink->payload = vfs_req;
-                /* makes lists FIFO */
-                qlist_add_tail(&glink->link, &buff->vfs_link);
-                buff->vfs_cnt++;
-                gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "racache_get_block "
-                            "adding request to buffer %d vfs list #%d \n",
-                            buff->buff_id, buff->vfs_cnt);
-            }
+            /* add request to waiting list */
+            glink = (gen_link_t *)malloc(sizeof(gen_link_t));
+            INIT_QLIST_HEAD(&glink->link);
+            glink->payload = vfs_req;
+            /* makes lists FIFO */
+            qlist_add_tail(&glink->link, &buff->vfs_link);
+            buff->vfs_cnt++;
+            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "racache_get_block "
+                         "adding request %p to buffer %d vfs list #%d \n",
+                         vfs_req, buff->buff_id, buff->vfs_cnt);
 
             /* return new buffer */
             if (rbuf)
@@ -617,25 +610,23 @@ int pint_racache_flush(PVFS_object_ref refn)
             /* found the file, now pop all buffers */
             while ((blink = qlist_pop(&racache_file->buff_list)))
             {
-                gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                             "racache_flush removing buffer\n");
                 /* get a pointer to the buffer */
                 buff = qhash_entry(blink, racache_buffer_t, buff_link);
+                gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                             "racache_flush removing buffer %d\n",
+                             buff->buff_id);
                 /* remove buffer from the lru list */
                 qlist_del(&buff->buff_lru);
                 /* clear reference to file record */
                 buff->file = NULL;
                 /* check for active requests */
-                if (!qlist_empty(&buff->vfs_link))
+                if (!buff->valid ||
+                    !qlist_empty(&buff->vfs_link))
                 {
-                    /* should not happen, but we need
-                     * to handle this case anyway
-                     */
                     gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                                 "Flushed racache - wait for buffer"
-                                 "element %llu, %d of size %llu\n",
-                                 llu(racache_file->refn.handle),
-                                 racache_file->refn.fs_id,
+                                 "--- Flushed racache - wait for buffer "
+                                 "id %d of size %llu\n",
+                                 buff->buff_id,
                                  llu(buff->buff_sz));
                     /* make sure vfs list is clean */
                     buff->being_freed = 1;
@@ -643,10 +634,9 @@ int pint_racache_flush(PVFS_object_ref refn)
                 else
                 {
                     gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                                 "Flushed racache - free buffer"
-                                 "element %llu, %d of size %llu\n",
-                                 llu(racache_file->refn.handle),
-                                 racache_file->refn.fs_id,
+                                 "--- Flushed racache - free buffer "
+                                 "id %d of size %llu\n",
+                                 buff->buff_id,
                                  llu(buff->buff_sz));
                     /* add buffer to free list */
                     pint_racache_make_free(buff);
@@ -671,11 +661,11 @@ int pint_racache_flush(PVFS_object_ref refn)
 void pint_racache_make_free(racache_buffer_t *buff)
 {
     gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                 "Makeing buffer %d with %d waiters free\n",
+                 "Making buffer %d with %d waiters free\n",
                   buff->buff_id, buff->vfs_cnt);
     /* add buffer to free list */
     racache_init_buff(buff);
-    qlist_add(&buff->buff_link, &racache.buff_free);
+    qlist_add_tail(&buff->buff_link, &racache.buff_free);
 }
 
 int pint_racache_finalize(void)

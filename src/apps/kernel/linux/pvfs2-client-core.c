@@ -157,6 +157,11 @@ static pthread_t remount_thread;
 static pthread_mutex_t remount_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int remount_complete = REMOUNT_NOTCOMPLETED;
 
+/* these are used for debug printing and otherwise have no effect
+ */
+static char ior[] = "(read)\n";
+static char iow[] = "(write)\n";
+char *iotype = NULL;
 
 /* used for generating unique dynamic mount point names */
 static int dynamic_mount_id = 1;
@@ -281,8 +286,8 @@ inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req);
 static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request,
                                             racache_buffer_t *buff);
 
-static PVFS_error check_for_readahead(vfs_request_t *vfs_request,
-                                      racache_buffer_t *buff);
+static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
+                                        racache_buffer_t *buff);
 
 static PVFS_error cancel_readahead_request(vfs_request_t *vfs_request);
 #endif
@@ -2260,8 +2265,8 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request,
     /* this buffer is already on the buff list for the file
      * and ihis vfs_request is already on the list for this buff */
     gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                 "post_io_readahead_request called (%lu bytes)\n",
-                 (unsigned long)buffer_size);
+                 "post_io_readahead_request called vfs_request %p buff %d (%lu bytes)\n",
+                 vfs_request, buff->buff_id, (unsigned long)buffer_size);
 
     /* make the full-blown readahead sized request */
     ret = PVFS_Request_contiguous(buffer_size,
@@ -2322,7 +2327,7 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request,
  * by seeing if there is already a buffer beyond the current one
  * for this file
  */
-static PVFS_error check_for_readahead(vfs_request_t *vfs_request,
+static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
                                       racache_buffer_t *prev_buff)
 {
     PVFS_error ret = -1;
@@ -2332,7 +2337,7 @@ static PVFS_error check_for_readahead(vfs_request_t *vfs_request,
     int amt_returned;
 
     gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                 "check_for_readahead called\n");
+                 "check_for_speculative called\n");
 
     /* buff is the readahead buffer we just finished reading 
      * don't start a speculative on a speculative or if we are
@@ -2341,7 +2346,7 @@ static PVFS_error check_for_readahead(vfs_request_t *vfs_request,
     {
         /* don't double up on speculative */
         gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                     "check_for_readahead SPEC\n");
+                     "--- check_for_speculative negative:SPEC\n");
         return 0;
     }
 
@@ -2349,7 +2354,7 @@ static PVFS_error check_for_readahead(vfs_request_t *vfs_request,
     {
         /* we hit eof so don't readahead */
         gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                     "check_for_readahead EOF\n");
+                     "--- check_for_speculative negative:EOF\n");
         return 0;
     }
 
@@ -2362,7 +2367,7 @@ static PVFS_error check_for_readahead(vfs_request_t *vfs_request,
     if (!rareq)
     {
         gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                     "check_for_readahead malloc failed\n");
+                     "--- check_for_speculative malloc failed\n");
         return ret;
     }
     /* NOTE: this request has no tag and is not added to the
@@ -2376,7 +2381,7 @@ static PVFS_error check_for_readahead(vfs_request_t *vfs_request,
     /* copy the fields from the original request */
     gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
                  "memcpy from %p to %p create a spec op\n",
-                 rareq, (((char *)rareq) + sizeof(vfs_request_t)));
+                 vfs_request, rareq);
     memcpy(rareq, vfs_request, sizeof(vfs_request_t));
     rareq->hints = NULL; /* start with a clean slate */
     PVFS_hint_copy(vfs_request->hints, &rareq->hints);
@@ -2420,13 +2425,15 @@ static PVFS_error check_for_readahead(vfs_request_t *vfs_request,
         /* found the buffer, so no more readahead for now */
         /* we do not wait for speculative reads */
         gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                     "check_for_readahead found buffer - spec req freed\n");
+                     "--- check_for_speculative found buffer - spec req freed\n");
+        PVFS_hint_free(rareq->hints);
         free (rareq);
         return 0;
     case RACACHE_NONE:
         /* no buffers available so no readahead */
         gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                     "check_for_readahead buffer NA\n");
+                     "--- check_for_speculative buffer NA\n");
+        PVFS_hint_free(rareq->hints);
         free (rareq);
         return 0;
     default:
@@ -2435,13 +2442,13 @@ static PVFS_error check_for_readahead(vfs_request_t *vfs_request,
     #endif
 
     gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                 "check_for_readahead post a speculative block read\n");
+                 "--- check_for_speculative post a speculative block read\n");
     /* set up to post a readahead */
     ret = post_io_readahead_request(rareq, rabuff);
     if (!ret)
     {
         gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                     "check_for_readahead post successful\n");
+                     "--- check_for_speculative post successful\n");
     }
     return ret;
 }
@@ -2460,6 +2467,8 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
     racache_buffer_t *buff;
 
     vfs_request->racache_status = RACACHE_NONE;
+    vfs_request->racache_buff = NULL;
+    vfs_request->is_readahead_speculative = 0;
     if (vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ)
     {
         s = calloc(1, HANDLESTRINGSIZE);
@@ -2469,6 +2478,8 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
                     vfs_request->in_upcall.req.io.refn.fs_id,
                     (int)vfs_request->in_upcall.req.io.count,
                     (int)vfs_request->in_upcall.req.io.readahead_size);
+        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                     "vfs_request = %p\n", vfs_request);
         free(s);
         /*
           if a non-zero readahead size and count are specified, check
@@ -2550,7 +2561,7 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
 
                 /* see if there is a buffer following this one and
                  * start a readahead if not */
-                ret = check_for_readahead(vfs_request, buff);
+                ret = check_for_speculative(vfs_request, buff);
 
                 buff = NULL; /* just being safe */
                 vfs_request->op_id = -1;
@@ -2594,6 +2605,8 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
                 gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
                              "--- Readahead cache none!\n");
             default:
+                gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                             "--- Readahead default rule!\n");
                 /* just use a regular read */
                 break;
             } /* switch */
@@ -2609,9 +2622,12 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
 
         s = calloc(1, HANDLESTRINGSIZE);
         gossip_debug(
-            GOSSIP_MMAP_RCACHE_DEBUG, "Flushing mmap-racache elem %s, %d\n",
+            GOSSIP_MMAP_RCACHE_DEBUG,
+            "Flushing on write mmap-racache elem %s, %d\n",
             k2s(&(vfs_request->in_upcall.req.io.refn.khandle),s),
             vfs_request->in_upcall.req.io.refn.fs_id);
+        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                     "vfs_request = %p\n", vfs_request);
         free(s);
 
         refn.handle = pvfs2_khandle_to_ino(
@@ -2663,6 +2679,10 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
                   &(vfs_request->in_upcall.req.io.refn.khandle));
     refn.fs_id = vfs_request->in_upcall.req.io.refn.fs_id;
 
+    iotype = (vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ) ?
+             ior : iow;
+    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                 "Posting regular IO vfs_request = %p%s", vfs_request, iotype);
     ret = PVFS_isys_io(refn,
                        vfs_request->file_req,
                        vfs_request->in_upcall.req.io.offset, 
@@ -3677,22 +3697,42 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                     buff->valid = 1;
                     buff->data_sz = vfs_request->response.io.total_completed;
 
-                    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                                 "--- Posted Readahead Completed"
-                                 " %d bytes into buffer %d\n",
-                                 (int)buff->data_sz, (int)buff->buff_id);
+                    if (vfs_request->is_readahead_speculative != 0)
+                    {
+                        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                                     "Posted Spec Read Completed"
+                                     " %d bytes into buffer %d\n",
+                                     (int)buff->data_sz, (int)buff->buff_id);
+                    }
+                    else
+                    {
+                        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                                     "Posted Readahead Completed"
+                                     " %d bytes into buffer %d\n",
+                                     (int)buff->data_sz, (int)buff->buff_id);
+                    }
 
                     PVFS_Request_free(&vfs_request->mem_req);
                     PVFS_Request_free(&vfs_request->file_req);
                     /* loop over waiting requests */
+                    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                                 "vfs_request = %p waiters = %d\n",
+                                 vfs_request, buff->vfs_cnt);
                     qlist_for_each_entry(gen_link, &buff->vfs_link, link)
                     {
                         vl = gen_link->payload;
-                        /* get a shared kernel/userspace buffer for the I/O
-                         * transfer
+                        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                                     "vl = %p\n", vl);
+                        /* speculative data was read directly into
+                         * the desire buffer so no copy needed.
+                         * Non-spec waiters need data copied into
+                         * the shared buffer pool
                          */
                         if (!vl->is_readahead_speculative)
                         {
+                            /* get a shared kernel/userspace buffer
+                             * for the I/O transfer
+                             */
                             kbuf = PINT_dev_get_mapped_buffer(
                                             BM_IO,
                                             s_io_desc, 
@@ -3726,13 +3766,14 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                                 vl->out_downcall.resp.io.amt_complete = 0;
                             }
                         }
+                        else
+                        {
+                            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                                         "... skip spec\n");
+                        }
                     }
-                    /* if this is speculative AND there is more than
-                     * one waiting request we might want to go ahead
-                     * and initiate the next spec read
-                     */
                     /* see if we need to start a new readahead */
-                    check_for_readahead(vfs_request, buff);
+                    check_for_speculative(vfs_request, buff);
                 }
                 else /* readahead_posted is not set */
                 {
@@ -3740,12 +3781,16 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                     if (vfs_request->racache_status == RACACHE_HIT)
                     {
                         gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                                     "--- Completing cache hit\n");
+                                  "--- Completing cache hit vfs_request %p\n",
+                                  vfs_request);
                     }
                     else /* plain old IO */
                     {
+                        iotype = (vfs_request->in_upcall.req.io.io_type ==
+                                         PVFS_IO_READ) ? ior : iow;
                         gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                                     "--- Regular IO Posted\n");
+                                  "--- Completing Regular IO vfs_request %p%s",
+                                  vfs_request, iotype);
                         PVFS_Request_free(&vfs_request->mem_req);
                         PVFS_Request_free(&vfs_request->file_req);
                     }
@@ -3989,8 +4034,7 @@ static inline PVFS_error repost_unexp_vfs_request(
     return ret;
 }
 
-static inline PVFS_error handle_unexp_vfs_request(
-    vfs_request_t *vfs_request)
+static inline PVFS_error handle_unexp_vfs_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
 
@@ -4534,6 +4578,8 @@ static PVFS_error process_vfs_requests(void)
                      * the vfs_request.
                      * disassemble the waiter list as we go.
                      */
+                    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                                 "Downcalls on waiter req list\n");
                     buff = vfs_request->racache_buff;
                     while((link = qlist_pop(&buff->vfs_link)))
                     {
@@ -4546,35 +4592,40 @@ static PVFS_error process_vfs_requests(void)
                         }
                         free(glink);
     
-                        /* These should never be speculative because
-                         * speculatives are always issued on a fresh
-                         * buffer.  Remember the primary (vfs_request)
-                         * is also a waiter so we handle it here if
-                         * it is not spec
-                         */
                         if (!vl->is_readahead_speculative)
                         {
                             gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                                        "--- Racache downcall write\n");
+                                        "--- Racache downcall write %p \n", vl);
                             ret = write_downcall(vl);
                             if (ret < 0)
                             {
                                 gossip_err(
-                                    "write_downcall failed "
+                                    "--- write_downcall failed "
                                     "(tag=%lld)\n", lld(vl->info.tag));
                             }
+                            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                                        "--- Repost unexp %p\n", vl);
                             ret = repost_unexp_vfs_request(vl,
                                                        "waiting_completion");
                             if (ret < 0)
                             {
                                 gossip_err(
-                                    "repost_unexp_vfs_request failed "
+                                    "--- repost_unexp_vfs_request failed "
                                     "(tag=%lld)\n", lld(vl->info.tag));
                             }
+                        }
+                        else
+                        {
+                            gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                                         "--- Free speculative vfs_request\n");
+                            free(vfs_request);
                         }
                         /* clean up */
                         vl->racache_buff = NULL;
                     }
+                    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                                 "--- List Processing Complete\n");
+#if 0
                     /* spec requests are not part of the main pool
                      * they are malloced so we need to free them
                      * here and not repost them
@@ -4585,6 +4636,7 @@ static PVFS_error process_vfs_requests(void)
                                      "--- Free speculative vfs_request\n");
                         free(vfs_request);
                     }
+#endif
                     /* see if this buffer is a remainder from a resize
                      * and if so deal with it directly
                      */
@@ -4604,7 +4656,8 @@ static PVFS_error process_vfs_requests(void)
                     if (buff->being_freed)
                     {
                         gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                                     "--- Buffer made free\n");
+                                     "--- Buffer %d made free\n",
+                                     buff->buff_id);
                         pint_racache_make_free(buff);
                         vfs_request->racache_buff = NULL;
                     }
@@ -4612,6 +4665,9 @@ static PVFS_error process_vfs_requests(void)
                      * downcall and repost on it above as the primary
                      * is also considered a waiter.
                      */
+                    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                                 "--- Racache transaction %p complete\n",
+                                 vfs_request);
                     continue;
                 }
 #endif
