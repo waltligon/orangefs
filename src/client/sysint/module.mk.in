@@ -5,7 +5,6 @@ CSRC := \
 	$(DIR)/initialize.c \
 	$(DIR)/acache.c \
 	$(DIR)/ncache.c \
-	$(DIR)/rcache.c \
 	$(DIR)/readdir-hash.c \
 	$(DIR)/pint-sysint-utils.c \
 	$(DIR)/getparent.c \

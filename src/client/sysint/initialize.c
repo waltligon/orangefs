@@ -18,7 +18,6 @@
 #include "pvfs2-internal.h"
 #include "acache.h"
 #include "ncache.h"
-#include "rcache.h"
 #include "readdir-hash.h"
 #include "client-capcache.h"
 #include "pint-cached-config.h"
@@ -307,7 +306,6 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     client_status_flag |= CLIENT_NCACHE_INIT;
 
     /* initialize the readdir cache and set the default timeout */
-    ret = PINT_rcache_initialize();
     ret = readdir_token_hash_initialize();
     if (ret < 0)
     {

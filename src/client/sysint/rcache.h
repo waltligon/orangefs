@@ -109,6 +109,8 @@ void PINT_rcache_invalidate(
     const PVFS_object_ref* ref,
     const PVFS_ds_position token);
 
+int PINT_rcache_count(void);
+
 #endif /* __RCACHE_H */
 
 /* @} */

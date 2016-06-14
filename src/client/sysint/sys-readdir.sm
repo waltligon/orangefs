@@ -20,7 +20,6 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "ncache.h"
-#include "rcache.h"
 #include "readdir-hash.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
@@ -242,34 +241,23 @@ static PINT_sm_action readdir_init(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int dirdata_index = 0;
-    int test_dirdata_index = 0;
-    int ret = -1;
     
     gossip_debug(GOSSIP_READDIR_DEBUG, "readdir state: init\n");
 
     *(sm_p->readdir_state.dirent_outcount) = 0;
     sm_p->readdir.num_dirdata_needed = 0;
                     
-    if(sm_p->readdir_state.pos_token != PVFS_READDIR_START) /* get dirdata_index from rcache */
+    if(sm_p->readdir_state.pos_token != PVFS_READDIR_START) /* get dirdata_index from token hash table */
     {
-        ret = PINT_rcache_get_cached_index(&sm_p->object_ref,
-                sm_p->readdir_state.pos_token, &dirdata_index);
-        if(ret < 0)
-        {    
-            gossip_err("invalid readdir cache content!! \n");
-            return ret;
-        }
+        dirdata_index = readdir_token_lookup(sm_p->object_ref,
+                sm_p->readdir_state.pos_token);
         gossip_debug(GOSSIP_READDIR_DEBUG,
-                "*** get cached index from rcache, "
+                "*** get stored index from token hash table, "
                 "[handle %llu, token %llu, dirdata_index %d]\n",
                 llu(sm_p->object_ref.handle),
                 llu(sm_p->readdir_state.pos_token),
                 dirdata_index);
-        test_dirdata_index = readdir_token_lookup(sm_p->object_ref, sm_p->readdir_state.pos_token);
-        gossip_debug(GOSSIP_READDIR_DEBUG,
-                "rcache returned %d, readdir hash returned %d\n", dirdata_index, test_dirdata_index);
         sm_p->readdir_state.saved_token = sm_p->readdir_state.pos_token;
-        assert(dirdata_index == test_dirdata_index);
     }
     else
     {
@@ -630,22 +618,15 @@ static PINT_sm_action readdir_msg_done(
 
     gossip_debug(GOSSIP_READDIR_DEBUG,
                  "readdir state: readdir_msg_done\n");
-    /* main reason for this state is to clear error_code
-     * otherwise cleanup will return with error 2 (READDIR_DONE)
-     */
-    gossip_debug(GOSSIP_READDIR_DEBUG, "number of rcache entries: %d\n",
-                 PINT_rcache_count());
-    readdir_token_print_table();
+    /* remove the token that was just used from the readdir hash table. */
+
+    /* readdir_token_print_table(); */
     if (sm_p->readdir_state.saved_token != PVFS_READDIR_START)
     {
-        PINT_rcache_invalidate(&sm_p->object_ref,
-                               sm_p->readdir_state.saved_token);
         ret = readdir_token_remove(sm_p->object_ref,
                                    sm_p->readdir_state.saved_token);
     }
-    gossip_debug(GOSSIP_READDIR_DEBUG, "number of rcache entries: %d\n",
-                 PINT_rcache_count());
-    readdir_token_print_table();
+    /* readdir_token_print_table(); */
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
@@ -680,36 +661,26 @@ static PINT_sm_action readdir_cleanup(
                 (const PVFS_object_ref *) &(sm_p->object_ref));
         }
 
-
-        /* update rcache if necessary */
+        /* update token hash table if necessary */
         if(sm_p->readdir_state.dirent_limit == *(sm_p->readdir_state.dirent_outcount))
         {
-            ret = PINT_rcache_insert(&sm_p->object_ref, 
-                    *(sm_p->readdir_state.token), sm_p->readdir_state.dirdata_index);
-            assert(ret == 0);
-
+            if (sm_p->readdir_state.saved_token != PVFS_READDIR_START)
+            {
+                /* remove old token from hash table */
+                ret = readdir_token_remove(sm_p->object_ref,
+                                           sm_p->readdir_state.saved_token);
+            }
+            ret = readdir_token_add(sm_p->object_ref, *(sm_p->readdir_state.token),
+                    sm_p->readdir_state.dirdata_index);
             gossip_debug(GOSSIP_READDIR_DEBUG, 
-                    "*** insert entry into rcache, "
+                    "*** insert entry into hash table, "
                     "[handle %llu, token %llu, dirdata_index %d]\n",
                     llu(sm_p->object_ref.handle),
                     llu(*(sm_p->readdir_state.token)),
                     sm_p->readdir.dirdata_index);
-            ret = readdir_token_add(sm_p->object_ref, *(sm_p->readdir_state.token),
-                    sm_p->readdir_state.dirdata_index);
-    gossip_debug(GOSSIP_READDIR_DEBUG, "number of rcache entries: %d\n",
-                 PINT_rcache_count());
-            readdir_token_print_table();
             assert(ret == 0);
-            if (sm_p->readdir_state.saved_token != PVFS_READDIR_START)
-            {
-                PINT_rcache_invalidate(&sm_p->object_ref,
-                                       sm_p->readdir_state.saved_token);
-                ret = readdir_token_remove(sm_p->object_ref,
-                                           sm_p->readdir_state.saved_token);
-            }
-    gossip_debug(GOSSIP_READDIR_DEBUG, "number of rcache entries: %d\n",
-                 PINT_rcache_count());
-            readdir_token_print_table();
+            /* readdir_token_print_table(); */
+            /* readdir_token_print_table(); */
         }
 
     }

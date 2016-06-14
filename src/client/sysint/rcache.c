@@ -32,6 +32,15 @@ RCACHE_DEFAULT_HARD_LIMIT     = 10240,
 RCACHE_DEFAULT_RECLAIM_PERCENTAGE = 25,
 RCACHE_DEFAULT_REPLACE_ALGORITHM = LEAST_RECENTLY_USED,
 };
+#if 0
+enum {
+RCACHE_DEFAULT_TIMEOUT_MSECS  =  1,
+RCACHE_DEFAULT_SOFT_LIMIT     =  1,
+RCACHE_DEFAULT_HARD_LIMIT     = 1,
+RCACHE_DEFAULT_RECLAIM_PERCENTAGE = 25,
+RCACHE_DEFAULT_REPLACE_ALGORITHM = LEAST_RECENTLY_USED,
+};
+#endif
 
 struct PINT_perf_key rcache_keys[] = 
 {
@@ -74,7 +83,7 @@ static struct PINT_perf_counter* rcache_pc = NULL;
  * Enables perf counter instrumentation of the rcache
  */
 void PINT_rcache_enable_perf_counter(
-        struct PINT_perf_counter* pc)     /**< perf counter instance to use */
+    struct PINT_perf_counter* pc)     /**< perf counter instance to use */
 {
     gen_mutex_lock(&rcache_mutex);
 
@@ -117,8 +126,7 @@ int PINT_rcache_initialize(void)
   
   /* turn off the cache expiration, refer to src/io/trove/trove-dbpf/dbpf-keyval-pcache.c */
     ret = PINT_tcache_set_info(rcache,
-                               TCACHE_ENABLE_EXPIRATION,
-                               0);
+            TCACHE_ENABLE_EXPIRATION, 0);
     if(ret < 0)
     {
         PINT_tcache_finalize(rcache);
@@ -154,6 +162,12 @@ int PINT_rcache_initialize(void)
     gen_mutex_unlock(&rcache_mutex);
     return(0);
 }
+
+int PINT_rcache_count(void)
+{
+    return(rcache->num_entries);
+}
+
   
 /** Finalizes and destroys the rcache, frees all cached entries */
 void PINT_rcache_finalize(void)
@@ -298,13 +312,12 @@ void PINT_rcache_invalidate(
     if(ret == 0)
     {
         PINT_tcache_delete(rcache, tmp_entry);
-        PINT_perf_count(rcache_pc, PERF_RCACHE_DELETIONS, 1, PINT_PERF_ADD);
+        PINT_perf_count(rcache_pc, PERF_RCACHE_DELETIONS, 1,
+                        PINT_PERF_ADD);
     }
 
-    PINT_perf_count(rcache_pc,
-                    PERF_RCACHE_NUM_ENTRIES,
-                    rcache->num_entries,
-                    PINT_PERF_SET);
+    PINT_perf_count(rcache_pc, PERF_RCACHE_NUM_ENTRIES,
+                    rcache->num_entries, PINT_PERF_SET);
 
     gen_mutex_unlock(&rcache_mutex);
     return;
@@ -315,9 +328,10 @@ void PINT_rcache_invalidate(
  *
  * \return 0 on success, -PVFS_error on failure
  */
-int PINT_rcache_insert(const PVFS_object_ref* ref,     
-                       const PVFS_ds_position token,
-                       const int32_t dirdata_index) 
+int PINT_rcache_insert(
+    const PVFS_object_ref* ref,     
+    const PVFS_ds_position token,
+    const int32_t dirdata_index) 
 {
     int ret = -1;
     struct PINT_tcache_entry* tmp_entry;
@@ -409,10 +423,8 @@ assert(enabled == 1);
             /* since only one item was purged, we count this as one item being
              * replaced rather than as a purge and an insert
              */
-            PINT_perf_count(rcache_pc,
-                            PERF_RCACHE_REPLACEMENTS,
-                            purged,
-                            PINT_PERF_ADD);
+            PINT_perf_count(rcache_pc, PERF_RCACHE_REPLACEMENTS,purged,
+                PINT_PERF_ADD);
         }
         else
         {
@@ -420,17 +432,13 @@ assert(enabled == 1);
             /* if we didn't purge anything, then the "purged" variable will
              * be zero and this counter call won't do anything.
              */
-            PINT_perf_count(rcache_pc,
-                            PERF_RCACHE_PURGES,
-                            purged,
-                            PINT_PERF_ADD);
+            PINT_perf_count(rcache_pc, PERF_RCACHE_PURGES, purged,
+                PINT_PERF_ADD);
         }
     }
     
-    PINT_perf_count(rcache_pc,
-                    PERF_RCACHE_NUM_ENTRIES,
-                    rcache->num_entries,
-                    PINT_PERF_SET);
+    PINT_perf_count(rcache_pc, PERF_RCACHE_NUM_ENTRIES,
+        rcache->num_entries, PINT_PERF_SET);
 
     gen_mutex_unlock(&rcache_mutex);
   

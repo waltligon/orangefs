@@ -13,7 +13,6 @@
 #include "pint-sysint-utils.h"
 #include "acache.h"
 #include "ncache.h"
-#include "rcache.h"
 #include "readdir-hash.h"
 #include "client-capcache.h"
 #include "gen-locks.h"
@@ -97,7 +96,6 @@ int PVFS_sys_finalize()
     }
 
     PINT_client_capcache_finalize();
-    PINT_rcache_finalize();
     readdir_token_hash_finalize();
     PINT_ncache_finalize();
     PINT_acache_finalize();
