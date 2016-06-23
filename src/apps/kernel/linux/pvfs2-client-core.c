@@ -1068,7 +1068,7 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
     char *s;
     PVFS_object_ref refn;
 
-    s = calloc(1,HANDLESTRINGSIZE);
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Got a readdirplus request "
                  "for %s,%d (token %llu)\n",
                  k2s(&(vfs_request->in_upcall.req.readdirplus.refn.khandle),s),
@@ -1122,8 +1122,8 @@ static PVFS_error post_rename_request(vfs_request_t *vfs_request)
     PVFS_object_ref refn1;
     PVFS_object_ref refn2;
 
-    s1 = calloc(1,HANDLESTRINGSIZE);
-    s2 = calloc(1,HANDLESTRINGSIZE);
+    s1 = calloc(1, HANDLESTRINGSIZE);
+    s2 = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "Got a rename request for %s under fsid %d and "
@@ -1186,7 +1186,7 @@ static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
     char *s;
     PVFS_object_ref refn;
     
-    s = calloc(1,HANDLESTRINGSIZE);
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a truncate request for %s under "
         "fsid %d to be size %lld\n",
@@ -1236,7 +1236,7 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
     char *s;
     PVFS_object_ref refn;
     
-    s = calloc(1,HANDLESTRINGSIZE);
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "got a getxattr request for fsid %d | handle %s\n",
@@ -1323,7 +1323,7 @@ static PVFS_error post_setxattr_request(vfs_request_t *vfs_request)
     char *s;
     PVFS_object_ref refn;
 
-    s = calloc(1,HANDLESTRINGSIZE);
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "got a setxattr request for fsid %d | handle %s\n",
@@ -1389,7 +1389,7 @@ static PVFS_error post_removexattr_request(vfs_request_t *vfs_request)
     char *s;
     PVFS_object_ref refn;
 
-    s = calloc(1,HANDLESTRINGSIZE);
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "got a removexattr request for fsid %d | handle %s\n",
@@ -1448,7 +1448,7 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
     char *s;
     PVFS_object_ref refn;
     
-    s = calloc(1,HANDLESTRINGSIZE);
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "got a listxattr request for fsid %d | handle %s\n",
@@ -2941,10 +2941,12 @@ static PVFS_error service_mmap_ra_flush_request(vfs_request_t *vfs_request)
     PVFS_object_ref refn;
     char *s = NULL;
 
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_MMAP_RCACHE_DEBUG, "Flushing mmap-racache elem %s, %d\n",
         k2s(&(vfs_request->in_upcall.req.ra_cache_flush.refn.khandle),s),
         vfs_request->in_upcall.req.ra_cache_flush.refn.fs_id);
+    free(s);
 
     /* compat */
     refn.handle = pvfs2_khandle_to_ino(
@@ -2998,7 +3000,7 @@ static PVFS_error post_fsync_request(vfs_request_t *vfs_request)
     char *s;
     PVFS_object_ref refn;
     
-    s = calloc(1,HANDLESTRINGSIZE);
+    s = calloc(1, HANDLESTRINGSIZE);
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a flush request for %s,%d\n",
         k2s(&(vfs_request->in_upcall.req.fsync.refn.khandle),s),
@@ -3302,41 +3304,46 @@ static PVFS_error cancel_readahead_request(vfs_request_t *vfs_request)
             }
             while((link = qlist_pop(&buff->vfs_link)))
             {
+                /* get a waiter vfs_request */
                 glink = qlist_entry(link, gen_link_t, link);
-                if (glink)
-                {
-                    vl = (vfs_request_t *)glink->payload;
-                }
+                assert (glink)
+                vl = (vfs_request_t *)glink->payload;
                 free(glink);
+                buff->vfs_cnt --; /* this should decrement to 0 */
 
-                if (!vl->is_readahead_speculative)
+                /* clean up buffer */
+                vl->racache_buff = NULL;
+
+                /* clean up vfs_request struct */
+                if (vl->is_readahead_speculative)
                 {
                     gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                                 "--- REPOST cancelled vfs_request\n");
-                    repost_unexp_vfs_request(vfs_request, "cancellation");
+                             "--- Free cancelled speculative vfs_request\n");
+                    free(vl);
                 }
                 else
                 {
                     gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                             "--- Free cancelled speculative vfs_request\n");
-                    free(vfs_request);
+                                 "--- REPOST cancelled vfs_request\n");
+                    repost_unexp_vfs_request(vl, "cancellation");
                 }
-                /* clean up */
-                vl->racache_buff = NULL;
             }
             gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
                          "--- Buffer made free\n");
             pint_racache_make_free(buff);
         }
     }
+    /* do not free vfs_request.  caller expects it to be there
+     * after this function.
+     */
     return 0;
 }
 #endif
 
 /* 
-   this method has the ability to overwrite/scrub the error code
-   passed down to the vfs
-*/
+ * this method has the ability to overwrite/scrub the error code
+ * passed down to the vfs
+ */
 static inline void package_downcall_members(vfs_request_t *vfs_request,
                                             int *error_code)
 {
@@ -3765,6 +3772,15 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                             {
                                 vl->out_downcall.resp.io.amt_complete = 0;
                             }
+                            /* transfer error code and request type to
+                             * waiter request. Errors are checked below
+                             * for all requests, but not for waiters.
+                             * We assume any error on the overall
+                             * request should be sent to all waiting
+                             * processes
+                             */
+                            vl->out_downcall.status = *error_code;
+                            vl->out_downcall.type = vfs_request->in_upcall.type;
                         }
                         else
                         {
@@ -3808,7 +3824,7 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                              "completed I/O on tag %Ld\n",
                              lld(vfs_request->info.tag));
 #endif
-            }
+            } /* if error_code == 0 */
 #ifdef USE_MMAP_RA_CACHE
             if ((*error_code != 0) &&
                 (vfs_request->racache_status == RACACHE_POSTED))
@@ -4583,16 +4599,20 @@ static PVFS_error process_vfs_requests(void)
                     buff = vfs_request->racache_buff;
                     while((link = qlist_pop(&buff->vfs_link)))
                     {
-                        buff->vfs_cnt --; /* this should decrement to 0 */
                         /* remove waiting req from list */
                         glink = qlist_entry(link, gen_link_t, link);
-                        if (glink)
-                        {
-                            vl = (vfs_request_t *)glink->payload;
-                        }
+                        assert(glink)
+                        vl = (vfs_request_t *)glink->payload;
                         free(glink);
+                        buff->vfs_cnt --; /* this should decrement to 0 */
     
-                        if (!vl->is_readahead_speculative)
+                        if (vl->is_readahead_speculative)
+                        {
+                            gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                                         "--- Free speculative vfs_request\n");
+                            free(vfs_request);
+                        }
+                        else
                         {
                             gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
                                         "--- Racache downcall write %p \n", vl);
@@ -4613,12 +4633,6 @@ static PVFS_error process_vfs_requests(void)
                                     "--- repost_unexp_vfs_request failed "
                                     "(tag=%lld)\n", lld(vl->info.tag));
                             }
-                        }
-                        else
-                        {
-                            gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-                                         "--- Free speculative vfs_request\n");
-                            free(vfs_request);
                         }
                         /* clean up */
                         vl->racache_buff = NULL;
