@@ -496,17 +496,20 @@ static PVFS_error cancel_op_in_progress(PVFS_id_gen_t tag)
         {
             PVFS_perror_gossip("PINT_client_io_cancel failed", ret);
         }
-        /*
-          set this flag so we can avoid writing the downcall to
-          the kernel since it will be ignored anyway
-        */
-        vfs_request->was_cancelled_io = 1;
+
 #ifdef USE_MMAP_RA_CACHE
+        /* This sets was_cancelled_io flag */
         ret2 = cancel_readahead_request(vfs_request);
         if (ret2 < 0)
         {
             PVFS_perror_gossip("cancel_readahead_request failed", ret2);
         }
+#else
+        /*
+         * set this flag so we can avoid writing the downcall to
+         * the kernel since it will be ignored anyway
+         */
+        vfs_request->was_cancelled_io = 1;
 #endif
     }
     else
@@ -3281,6 +3284,7 @@ err:
 #ifdef USE_MMAP_RA_CACHE
 static PVFS_error cancel_readahead_request(vfs_request_t *vfs_request)
 {
+    /* prevents this routine from running more than once */
     if (!vfs_request->was_cancelled_io)
     {
         struct qlist_head *link = NULL;
@@ -3290,11 +3294,13 @@ static PVFS_error cancel_readahead_request(vfs_request_t *vfs_request)
 
         gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
                      "cancel_readahead_request\n");
-        if (vfs_request->racache_status == RACACHE_POSTED)
+        switch (vfs_request->racache_status)
         {
+        case RACACHE_POSTED :
             /* by definition all requests on this list are
              * waiting for the same buffer, referenced from
-             * the vfs_request.
+             * the vfs_request.  We only process the waiters
+             * not the main request.
              */
             buff = vfs_request->racache_buff;
             if (!buff)
@@ -3306,7 +3312,7 @@ static PVFS_error cancel_readahead_request(vfs_request_t *vfs_request)
             {
                 /* get a waiter vfs_request */
                 glink = qlist_entry(link, gen_link_t, link);
-                assert (glink)
+                assert (glink);
                 vl = (vfs_request_t *)glink->payload;
                 free(glink);
                 buff->vfs_cnt --; /* this should decrement to 0 */
@@ -3331,7 +3337,31 @@ static PVFS_error cancel_readahead_request(vfs_request_t *vfs_request)
             gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
                          "--- Buffer made free\n");
             pint_racache_make_free(buff);
+        case RACACHE_WAIT :
+            /* just remove this waiter from the list */
+            {
+                /* work back to the buffer we are waiting on */
+                struct gen_link_s *waiter;
+                qlist_for_each_entry (waiter,
+                                      &vfs_request->racache_buff->vfs_link,
+                                      link)
+                {
+                    if (waiter->payload == vfs_request)
+                    {
+                        qlist_del(&waiter->link);
+                        break;
+                    }
+                }
+                gossip_err("tried to cancel waiting request not on wait list\n");
+            }
+            if (!vfs_request->is_readahead_speculative)
+            {
+                gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                             "--- REPOST cancelled vfs_request waiter\n");
+                repost_unexp_vfs_request(vfs_request, "cancellation");
+            }
         }
+        vfs_request->was_cancelled_io = 1;
     }
     /* do not free vfs_request.  caller expects it to be there
      * after this function.
@@ -3825,20 +3855,6 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                              lld(vfs_request->info.tag));
 #endif
             } /* if error_code == 0 */
-#ifdef USE_MMAP_RA_CACHE
-            if ((*error_code != 0) &&
-                (vfs_request->racache_status == RACACHE_POSTED))
-            {
-                /* need to get rid of racache blocks that were waiting
-                 * on this request to prevent losing memory
-                 */
-                ret = cancel_readahead_request(vfs_request);
-                if (ret < 0)
-                {
-                    gossip_err("cancel_readahead_request failed\n");
-                }
-            }
-#endif
             /* replace non-errno error code to avoid passing to kernel */
             if (*error_code == -PVFS_ECANCEL)
             {
@@ -4601,7 +4617,7 @@ static PVFS_error process_vfs_requests(void)
                     {
                         /* remove waiting req from list */
                         glink = qlist_entry(link, gen_link_t, link);
-                        assert(glink)
+                        assert(glink);
                         vl = (vfs_request_t *)glink->payload;
                         free(glink);
                         buff->vfs_cnt --; /* this should decrement to 0 */
@@ -4616,6 +4632,11 @@ static PVFS_error process_vfs_requests(void)
                         {
                             gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
                                         "--- Racache downcall write %p \n", vl);
+                            vl->out_downcall.status =
+                                             vfs_request->out_downcall.status;
+                            vl->out_downcall.type =
+                                             vfs_request->out_downcall.type;
+
                             ret = write_downcall(vl);
                             if (ret < 0)
                             {
@@ -4623,6 +4644,7 @@ static PVFS_error process_vfs_requests(void)
                                     "--- write_downcall failed "
                                     "(tag=%lld)\n", lld(vl->info.tag));
                             }
+
                             gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
                                         "--- Repost unexp %p\n", vl);
                             ret = repost_unexp_vfs_request(vl,
@@ -4697,11 +4719,16 @@ static PVFS_error process_vfs_requests(void)
             }
             else
             {
-                /* this handles cancelled requests */
+                /* this handles cancelled requests 
+                 * we cannot cancel a speculative request because
+                 * the kernel and user don't know it exists - we just
+                 * let them run and free resources later if they are
+                 * nolonger needed.
+                 */
                 gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "skipping "
                              "downcall write due to previous "
                              "cancellation\n");
-
+                /* normal request just repost */
                 ret = repost_unexp_vfs_request(vfs_request, "cancellation");
                 assert(ret == 0);
             }
