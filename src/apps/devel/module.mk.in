@@ -3,3 +3,19 @@ DIR := src/apps/devel
 DEVELSRC := \
 	$(DIR)/pvfs2-db-display.c \
 	$(DIR)/pvfs2-remove-prealloc.c 
+
+MEMANALYSIS := $(DIR)/mem-anlysis
+MEMANALYSISSRC := \
+    $(DIR)/mem-analysis-parser.c \
+    $(DIR)/mem-analysis-scanner.c
+
+MEMANALYSISGEN := \
+    $(DIR)/mem-analysis-scanner.c \
+    $(DIR)/mem-analysis-parser.c \
+    $(DIR)/mem-analysis-parser.h \
+
+# shut up warnings for problems from flex-2.5.33
+MODCFLAGS_$(DIR)/mem-analysis-scanner.c := -D__STDC_VERSION__=0
+
+.SECONDARY: $(MEMANALYSISGEN)
+

@@ -3939,14 +3939,14 @@ void PINT_config_release(struct server_configuration_s *config_s)
         /* free all filesystem objects */
         if (config_s->file_systems)
         {
-            PINT_llist_free(config_s->file_systems,free_filesystem);
+            PINT_llist_free(config_s->file_systems, free_filesystem);
             config_s->file_systems = NULL;
         }
 
         /* free all host alias objects */
         if (config_s->host_aliases)
         {
-            PINT_llist_free(config_s->host_aliases,free_host_alias);
+            PINT_llist_free(config_s->host_aliases, free_host_alias);
             config_s->host_aliases = NULL;
         }
 
@@ -4084,16 +4084,14 @@ static int root_handle_in_meta_range(struct server_configuration_s *config,
                 break;
             }
 
-            extent_list = PINT_create_extent_list(
-                cur_h_mapping->handle_range);
+            extent_list = PINT_create_extent_list(cur_h_mapping->handle_range);
             if (!extent_list)
             {
                 gossip_err("Failed to create extent list.\n");
                 break;
             }
 
-            ret = PINT_handle_in_extent_list(
-                extent_list,fs->root_handle);
+            ret = PINT_handle_in_extent_list(extent_list, fs->root_handle);
             PINT_release_extent_list(extent_list);
             if (ret == 1)
             {
@@ -4171,8 +4169,8 @@ static void free_filesystem(void *ptr)
         fs->file_system_name = NULL;
 
         /* free all handle ranges */
-        PINT_llist_free(fs->meta_handle_ranges,free_host_handle_mapping);
-        PINT_llist_free(fs->data_handle_ranges,free_host_handle_mapping);
+        PINT_llist_free(fs->meta_handle_ranges, free_host_handle_mapping);
+        PINT_llist_free(fs->data_handle_ranges, free_host_handle_mapping);
 
         /* if the optional hints are used, free them */
         if (fs->attr_cache_keywords)
@@ -5221,7 +5219,7 @@ int PINT_config_trim_filesystems_except(
             cur = PINT_llist_next(cur);
         }
 
-        PINT_llist_free(config_s->file_systems,free_filesystem);
+        PINT_llist_free(config_s->file_systems, free_filesystem);
         config_s->file_systems = new_fs_list;
 
         if (PINT_llist_count(config_s->file_systems) == 1)
@@ -5348,8 +5346,7 @@ static int is_root_handle_in_my_range(struct server_configuration_s *config,
                     break;
                 }
 
-                ret = PINT_handle_in_extent_list(
-                    extent_list,fs->root_handle);
+                ret = PINT_handle_in_extent_list(extent_list, fs->root_handle);
                 PINT_release_extent_list(extent_list);
                 if (ret == 1)
                 {
