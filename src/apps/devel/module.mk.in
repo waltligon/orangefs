@@ -1,13 +1,14 @@
 DIR := src/apps/devel
 
 DEVELSRC := \
-	$(DIR)/pvfs2-db-display.c \
-	$(DIR)/pvfs2-remove-prealloc.c 
+    $(DIR)/pvfs2-db-display.c \
+    $(DIR)/pvfs2-remove-prealloc.c
 
 MEMANALYSIS := $(DIR)/mem-anlysis
 MEMANALYSISSRC := \
     $(DIR)/mem-analysis-parser.c \
-    $(DIR)/mem-analysis-scanner.c
+    $(DIR)/mem-analysis-scanner.c \
+    $(DIR)/mem-analysis.c
 
 MEMANALYSISGEN := \
     $(DIR)/mem-analysis-scanner.c \

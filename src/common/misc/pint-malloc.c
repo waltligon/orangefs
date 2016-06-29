@@ -590,7 +590,7 @@ char *PINT_strndup(const char *str, size_t size, char *file, int line)
 
 void PINT_free2(void *mem)
 {
-    static char unk[] = "unknown";
+    static char unk[] = "src/unknown.c"; /* format satisfies analysis parser */
     PINT_free(mem, unk, -1);
 }
 
@@ -608,7 +608,7 @@ void PINT_free(void *mem, char *file, int line)
     extra = (void *)((ptrint_t)mem - EXTRA_SIZE);
     orig_mem = extra->mem;
 
-    memdebug(dbfp, "%s line %d FREE addr %p real addr %p",
+    memdebug(dbfp, "%s line %d FREE addr %p realaddr %p",
              file, line, mem, orig_mem);
     memdebug(dbfp, " size %d", (int)extra->size);
 #if PVFS_MALLOC_CHECK_ALIGN
@@ -643,7 +643,9 @@ void init_glibc_malloc(void)
     static gen_mutex_t init_mutex = 
                        (gen_mutex_t)GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
     void *libc_handle = NULL;
+#if PVFS_MALLOC_DEBUG
     char *dbgfile = NULL;
+#endif
 
     /* prevent multiple threads from running this */
     if (init_flag)
@@ -666,17 +668,17 @@ void init_glibc_malloc(void)
     dbgfile = getenv("OFS_MALLOC_DEBUG");
     if (dbgfile)
     {
-        memdebugflag = 1;
         dbfp = fopen(dbgfile, "w");
         if (!dbfp)
         {
-            perror("init_glibc_malloc");
+            perror("init_glibc_malloc:fopen malloc debug file");
             exit(-1);
         }
+        memdebugflag = 1;
     }
 #endif
 
-    memdebug(dbfp, "init_glibc_malloc running\n");
+    memdebug(dbfp, "init_glibc_malloc:running\n");
 
     libc_handle = dlopen("libc.so.6", RTLD_LAZY|RTLD_GLOBAL);
     if (!libc_handle)
