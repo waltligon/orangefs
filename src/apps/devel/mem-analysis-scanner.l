@@ -18,7 +18,7 @@
 #include <string.h>
 
 #include "mem-analysis.h"
-#include "parser.h"
+#include "mem-analysis-parser.h"
 
 /*
   we're never interactive, so avoid isatty call that sometimes

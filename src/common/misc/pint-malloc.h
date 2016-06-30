@@ -41,7 +41,11 @@ extern void *PINT_malloc_minimum(size_t size);
 
 extern void *PINT_malloc(size_t size, char *file, int line);
 extern void *PINT_calloc(size_t nmemb, size_t size, char *file, int line);
-extern int   PINT_posix_memalign(void **mem, size_t alignment, size_t size, char *file, int line);
+extern int   PINT_posix_memalign(void **mem,
+                                 size_t alignment,
+                                 size_t size,
+                                 char *file,
+                                 int line);
 extern void *PINT_memalign(size_t alignment, size_t size, char *file, int line);
 extern void *PINT_valloc(size_t size, char *file, int line);
 extern void *PINT_realloc(void *mem, size_t size, char *file, int line);
@@ -87,7 +91,6 @@ extern void  PINT_free2(void *mem);
 # ifdef malloc
 #  undef malloc
 # endif
-/* Defining malloc with an arg avoids losing on __attribute__((malloc))  */
 # define malloc(x) PINT_malloc((x), __FILE__, __LINE__)
 
 # ifdef calloc

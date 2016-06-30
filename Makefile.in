@@ -829,7 +829,7 @@ DEPENDS := $(sort $(LIBDEPENDS) $(ULIBDEPENDS) $(SERVERDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) \
     $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS) \
     $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) \
-	$(OLIBDEPENDS)) $(MEMANALYSISDEPS)
+	$(OLIBDEPENDS))
 endif
 
 ####################################################################
@@ -1178,7 +1178,7 @@ $(STATECOMP): $(STATECOMPOBJS)
 	$(Q) "  BUILD_LD	$@"
 	$(E)$(BUILD_LD) -o $@ $(BUILD_LDFLAGS) $(STATECOMPOBJS) $(call modldflags,$<)
 
-# special rules to build state machine compiler using build host compiler
+# special rules to malloc analysis tool using build host compiler
 $(MEMANALYSISOBJS): %.o: %.c
 	$(Q) "  BUILD_CC	$@"
 	$(E)$(BUILD_CC) $(BUILD_CFLAGS) $< -c -o $@ $(call modcflags,$<)
