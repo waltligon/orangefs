@@ -704,6 +704,20 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     assert(object_ref.fs_id != PVFS_FS_ID_NULL);
     assert(object_ref.handle != PVFS_HANDLE_NULL);
 
+    /* Since we are going to the metadata server for this object, return all
+     * attributes stored on this server.  While you're at it, go ahead and
+     * regenerate a new capability.  NOTE:  We may not know the object's type,
+     * so we ask for everything under the sun; however, getattr on the server
+     * will know the object's type, once prelude runs and retrieves this
+     * handle's dspace entry.  No worries.
+     */
+     sm_p->getattr.req_attrmask |= PVFS_ATTR_COMMON_ALL
+                                | PVFS_ATTR_META_ALL
+                                | PVFS_ATTR_DISTDIR_ATTR
+                                | PVFS_ATTR_DIR_ALL
+                                | PVFS_ATTR_SYMLNK_ALL
+                                | PVFS_ATTR_CAPABILITY;
+
     /* setup the msgpair to do a getattr operation */
     PINT_SERVREQ_GETATTR_FILL(msg_p->req,
                               capability,
