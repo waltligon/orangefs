@@ -1247,7 +1247,7 @@ clean::
                 $(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) \
                 $(BMILIBRARIES) $(FUSEOBJS) \
                 $(VISMISCDEPENDS) $(KARMAOBJS) \
-                $(MEMANALYSIS) $(MEMANALYSISOBJS) \
+                $(MEMANALYSIS) $(MEMANALYSISOBJS) $(MEMANALYSISDEPS) \
                 src/server/pvfs2-server-server.o \
                 src/apps/karma/karma src/apps/fuse/pvfs2fuse \
                 src/server/simple.conf examples/fs.conf

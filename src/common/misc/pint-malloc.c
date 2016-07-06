@@ -20,14 +20,6 @@
 #include <malloc.h>
 #endif
 
-/* locally configured options - must be edited here before compile */
-#if PVFS_MALLOC_DEBUG
-#define memdebug if(memdebugflag)fprintf
-static FILE *dbfp = NULL;
-static int memdebugflag = 0;
-#else
-#define memdebug(stream, format, ...)
-#endif
 
 /*
  * These functions call the default version of the various
@@ -114,6 +106,16 @@ void clean_free(void *ptr)
 #include "pint-malloc.h"
 #include "gen-locks.h"
 #include "gossip.h"
+
+#if PVFS_MALLOC_DEBUG
+#define memdebug if(memdebugflag)fprintf
+static FILE *dbfp = NULL;
+static int memdebugflag = 0;
+#define __PMDBGPASS ,file,line
+#else
+#define memdebug(stream, format, ...)
+#define __PMDBGPASS 
+#endif
 
 #if PVFS2_SIZEOF_VOIDP == 64
     typedef uint64_t ptrint_t;
@@ -368,7 +370,7 @@ void *PINT_malloc_minimum(size_t size)
     return mem;
 }
 
-void *PINT_malloc(size_t size, char *file, int line)
+void *PINT_malloc (size_t size __PMDBG)
 {
     void *mem;
     size_t sizeplus;
@@ -403,19 +405,15 @@ void *PINT_malloc(size_t size, char *file, int line)
     return (void *)((ptrint_t)mem + EXTRA_SIZE);
 }
 
-void *PINT_calloc(size_t nmemb, size_t size, char *file, int line)
+void *PINT_calloc(size_t nmemb, size_t size __PMDBG)
 {
-    return PINT_malloc(nmemb * size, file, line);
+    return PINT_malloc(nmemb * size __PMDBGPASS);
 #if !PVFS_MALLOC_ZERO
     memset(mem, 0, nmemb * size);
 #endif
 }
 
-int PINT_posix_memalign(void **mem,
-                        size_t alignment,
-                        size_t size,
-                        char *file,
-                        int line)
+int PINT_posix_memalign (void **mem, size_t alignment, size_t size __PMDBG)
 {
     size_t sizeplus;
     size_t alignplus;
@@ -470,12 +468,12 @@ int PINT_posix_memalign(void **mem,
     return 0;
 }
 
-void *PINT_memalign(size_t alignment, size_t size, char *file, int line)
+void *PINT_memalign (size_t alignment, size_t size __PMDBG)
 {
     int rc = 0;
     void *mem = NULL;
 
-    rc = PINT_posix_memalign(&mem, alignment, size, file, line);
+    rc = PINT_posix_memalign(&mem, alignment, size __PMDBGPASS);
     if (rc)
     {
         errno = rc;
@@ -484,7 +482,7 @@ void *PINT_memalign(size_t alignment, size_t size, char *file, int line)
     return mem;
 }
 
-void *PINT_valloc(size_t size, char *file, int line)
+void *PINT_valloc (size_t size __PMDBG)
 {
     size_t align;
     align = sysconf(_SC_PAGESIZE);
@@ -497,10 +495,10 @@ void *PINT_valloc(size_t size, char *file, int line)
             align = 4096;
         }
     }
-    return PINT_memalign(align, size, file, line);
+    return PINT_memalign(align, size __PMDBGPASS);
 }
 
-void *PINT_realloc(void *mem, size_t size, char *file, int line)
+void *PINT_realloc (void *mem, size_t size __PMDBG)
 {
     void *ptr = NULL;
     size_t newsize = 0;
@@ -509,12 +507,12 @@ void *PINT_realloc(void *mem, size_t size, char *file, int line)
 
     if (mem == NULL)
     {
-        return PINT_malloc(size, file, line);
+        return PINT_malloc(size __PMDBGPASS);
     }
 
     if (size == 0)
     {
-        PINT_free(mem, file, line);
+        PINT_free(mem __PMDBGPASS);
         return NULL;
     }
 
@@ -548,7 +546,7 @@ void *PINT_realloc(void *mem, size_t size, char *file, int line)
     return (void *)((ptrint_t)ptr + region_offset);
 }
 
-char *PINT_strdup(const char *str, char *file, int line)
+char *PINT_strdup (const char *str __PMDBG)
 {
     int str_size = strlen(str);
     char *new_str = NULL;
@@ -556,7 +554,7 @@ char *PINT_strdup(const char *str, char *file, int line)
     {
         return NULL;
     }
-    new_str = (char *)PINT_malloc(str_size + 1, file, line);
+    new_str = (char *)PINT_malloc(str_size + 1 __PMDBGPASS);
     if (!new_str)
     {
         return NULL;
@@ -566,7 +564,7 @@ char *PINT_strdup(const char *str, char *file, int line)
     return new_str;
 }
 
-char *PINT_strndup(const char *str, size_t size, char *file, int line)
+char *PINT_strndup (const char *str, size_t size __PMDBG)
 {
     int str_size = strlen(str);
     char *new_str = NULL;
@@ -578,7 +576,7 @@ char *PINT_strndup(const char *str, size_t size, char *file, int line)
     {
         return NULL;
     }
-    new_str = (char *)PINT_malloc(str_size + 1, file, line);
+    new_str = (char *)PINT_malloc(str_size + 1 __PMDBGPASS);
     if (!new_str)
     {
         return NULL;
@@ -590,11 +588,15 @@ char *PINT_strndup(const char *str, size_t size, char *file, int line)
 
 void PINT_free2(void *mem)
 {
+#if PVFS_MALLOC_DEBUG
     static char unk[] = "src/unknown.c"; /* format satisfies analysis parser */
     PINT_free(mem, unk, -1);
+#else
+    PINT_free(mem);
+#endif
 }
 
-void PINT_free(void *mem, char *file, int line)
+void PINT_free (void *mem __PMDBG)
 {
     extra_t *extra;
     void *orig_mem; /* so we can zero the mem before free */
@@ -619,8 +621,12 @@ void PINT_free(void *mem, char *file, int line)
 #if PVFS_MALLOC_MAGIC
     if (extra->magic != PVFS_MALLOC_MAGIC_NUM)
     {
+#if PVFS_MALLOC_DEBUG
         gossip_lerr("PINT_free: free fails magic number test (%s line %d)\n",
                     file, line);
+#else
+        gossip_lerr("PINT_free: free fails magic number test\n");
+#endif
         return;
     }
 #endif

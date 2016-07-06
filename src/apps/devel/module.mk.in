@@ -4,20 +4,20 @@ DEVELSRC := \
     $(DIR)/pvfs2-db-display.c \
     $(DIR)/pvfs2-remove-prealloc.c
 
-MEMANALYSIS := $(DIR)/mem-anlysis
+MEMANALYSIS := $(DIR)/mem_analysis
 
 MEMANALYSISSRC := \
-    $(DIR)/mem-analysis.c \
-    $(DIR)/mem-analysis-parser.c \
-    $(DIR)/mem-analysis-scanner.c
+    $(DIR)/mem_analysis.c \
+    $(DIR)/mem_analysis_parser.c \
+    $(DIR)/mem_analysis_scanner.c
 
 MEMANALYSISGEN := \
-    $(DIR)/mem-analysis-scanner.c \
-    $(DIR)/mem-analysis-parser.c \
-    $(DIR)/mem-analysis-parser.h
+    $(DIR)/mem_analysis_scanner.c \
+    $(DIR)/mem_analysis_parser.c \
+    $(DIR)/mem_analysis_parser.h
 
 # shut up warnings for problems from flex-2.5.33
-MODCFLAGS_$(DIR)/mem-analysis-scanner.c := -D__STDC_VERSION__=0
+MODCFLAGS_$(DIR)/mem_analysis_scanner.c := -D__STDC_VERSION__=0
 
 .SECONDARY: $(MEMANALYSISGEN)
 

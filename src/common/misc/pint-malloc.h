@@ -12,6 +12,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* pint-malloc.h should not be included before malloc.h
+ * so we'll just go ahead and include it here
+ */
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
+
 #ifndef WIN32
 /* pint-malloc.c is not used on Windows */
 #include <unistd.h>
@@ -32,6 +39,16 @@ struct glibc_malloc_ops_s
     void  (*close)(int fd);
 };
 
+#ifndef PVFS_MALLOC_DEBUG
+# define PVFS_MALLOC_DEBUG 0
+#endif
+
+#if PVFS_MALLOC_DEBUG
+#define __PMDBG   ,char *file,int line
+#else
+#define __PMDBG
+#endif
+
 extern void init_glibc_malloc(void) GCC_CONSTRUCTOR(INIT_PRIORITY_MALLOC);
 
 extern int PINT_check_address(void *ptr) GCC_UNUSED;
@@ -39,19 +56,17 @@ extern int PINT_check_malloc(void *ptr) GCC_UNUSED;
 
 extern void *PINT_malloc_minimum(size_t size);
 
-extern void *PINT_malloc(size_t size, char *file, int line);
-extern void *PINT_calloc(size_t nmemb, size_t size, char *file, int line);
-extern int   PINT_posix_memalign(void **mem,
-                                 size_t alignment,
-                                 size_t size,
-                                 char *file,
-                                 int line);
-extern void *PINT_memalign(size_t alignment, size_t size, char *file, int line);
-extern void *PINT_valloc(size_t size, char *file, int line);
-extern void *PINT_realloc(void *mem, size_t size, char *file, int line);
-extern char *PINT_strdup(const char *str, char *file, int line);
-extern char *PINT_strndup(const char *str, size_t size, char *file, int line);
-extern void  PINT_free(void *mem, char *file, int line);
+extern void *PINT_malloc (size_t size __PMDBG);
+extern void *PINT_calloc (size_t nmemb, size_t size __PMDBG);
+extern int   PINT_posix_memalign (void **mem,
+                                       size_t alignment,
+                                       size_t size __PMDBG);
+extern void *PINT_memalign (size_t alignment, size_t size __PMDBG);
+extern void *PINT_valloc (size_t size __PMDBG);
+extern void *PINT_realloc (void *mem, size_t size __PMDBG);
+extern char *PINT_strdup (const char *str __PMDBG);
+extern char *PINT_strndup (const char *str, size_t size __PMDBG);
+extern void  PINT_free (void *mem __PMDBG);
 extern void  PINT_free2(void *mem);
 
 #include "pint-clean-malloc.h"
@@ -88,56 +103,62 @@ extern void  PINT_free2(void *mem);
 
 /* Make sure code that calls default malloc gets our version */
 
+# if PVFS_MALLOC_DEBUG
+#  define __PMDBGARGS ,__FILE__,__LINE__
+# else
+#  define __PMDBGARGS
+# endif 
+
 # ifdef malloc
 #  undef malloc
 # endif
-# define malloc(x) PINT_malloc((x), __FILE__, __LINE__)
+# define malloc(x) PINT_malloc((x) __PMDBGARGS)
 
 # ifdef calloc
 #  undef calloc
 # endif
-# define calloc(x, y) PINT_calloc((x), (y), __FILE__, __LINE__)
+# define calloc(x, y) PINT_calloc((x), (y) __PMDBGARGS)
 
 # ifdef posix_memalign
 #  undef posix_memalign
 # endif
 # define posix_memalign(x, y, z) \
-                 PINT_posix_memalign((x), (y), (z), __FILE__, __LINE__)
+                 PINT_posix_memalign((x), (y), (z) __PMDBGARGS)
 
 # ifdef memalign
 #  undef memalign
 # endif
-# define memalign(x, y) PINT_memalign((x), (y), __FILE__, __LINE__)
+# define memalign(x, y) PINT_memalign((x), (y) __PMDBGARGS)
 
 # ifdef valloc
 #  undef valloc
 # endif
-# define valloc(x) PINT_valloc((x), __FILE__, __LINE__)
+# define valloc(x) PINT_valloc((x) __PMDBGARGS)
 
 # ifdef realloc
 #  undef realloc
 # endif
-# define realloc(x, y) PINT_realloc((x), (y), __FILE__, __LINE__)
+# define realloc(x, y) PINT_realloc((x), (y) __PMDBGARGS)
 
 # ifdef strdup
 #  undef strdup
 # endif
-# define strdup(x) PINT_strdup((x), __FILE__, __LINE__)
+# define strdup(x) PINT_strdup((x) __PMDBGARGS)
 
 # ifdef strndup
 #  undef strndup
 # endif
-# define strndup(x, y) PINT_strndup((x), (y), __FILE__, __LINE__)
+# define strndup(x, y) PINT_strndup((x), (y) __PMDBGARGS)
 
 # ifdef free
 #  undef free
 # endif
-# define free(x) PINT_free((x), __FILE__, __LINE__)
+# define free(x) PINT_free((x) __PMDBGARGS)
 
 # ifdef cfree
 #  undef cfree
 # endif
-# define cfree(x) PINT_free((x), __FILE__, __LINE__)
+# define cfree(x) PINT_free((x) __PMDBGARGS)
 
 #else /* not PVFS_MALLOC_REDEF */
 
