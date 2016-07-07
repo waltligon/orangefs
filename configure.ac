@@ -1176,17 +1176,17 @@ MALLOC_REDEF=1
 
 dnl Method to disable malloc debug
 AC_ARG_ENABLE(malloc-debug,
-[  --disable-malloc-debug  Do not compile in malloc debug],
+[  --disable-malloc-debug  Do not compile in malloc debug tracing],
 [if test "x$enableval" = "xyes" ; then
    AC_DEFINE(PVFS_MALLOC_DEBUG, 1,
-      [Should we compile in malloc debug.])
+      [Should we compile in malloc debug tracing.])
    MALLOC_DEBUG=1
 else
    AC_DEFINE(PVFS_MALLOC_DEBUG, 0,
-      [Should we compile in malloc debug.])
+      [Should we compile in malloc debug tracing.])
 fi],
 [AC_DEFINE(PVFS_MALLOC_DEBUG, 1,
-      [Should we compile in malloc debug.])
+      [Should we compile in malloc debug tracing.])
 MALLOC_DEBUG=1
 ])
 
