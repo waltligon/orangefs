@@ -124,7 +124,7 @@ typedef struct
 typedef struct
 {
     PVFS_object_kref refn;
-} pvfs2_mmap_ra_cache_flush_request_t;
+} pvfs2_ra_cache_flush_request_t;
 
 typedef struct
 {
@@ -209,7 +209,7 @@ enum pvfs2_param_request_op
     PVFS2_PARAM_REQUEST_OP_CAPCACHE_SOFT_LIMIT = 23,
     PVFS2_PARAM_REQUEST_OP_CAPCACHE_RECLAIM_PERCENTAGE = 24,
     PVFS2_PARAM_REQUEST_OP_TWO_MASK_VALUES = 25,
-#ifdef USE_MMAP_RA_CACHE
+#ifdef USE_RA_CACHE
     PVFS2_PARAM_REQUEST_OP_READAHEAD_SIZE = 26,
     PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT = 27,
     PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT_SIZE = 28,
@@ -273,7 +273,7 @@ typedef struct
         pvfs2_rename_request_t rename;
         pvfs2_statfs_request_t statfs;
         pvfs2_truncate_request_t truncate;
-        pvfs2_mmap_ra_cache_flush_request_t ra_cache_flush;
+        pvfs2_ra_cache_flush_request_t ra_cache_flush;
         pvfs2_fs_mount_request_t fs_mount;
         pvfs2_fs_umount_request_t fs_umount;
         pvfs2_getxattr_request_t getxattr;

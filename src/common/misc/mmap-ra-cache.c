@@ -4,7 +4,7 @@
  * See COPYING in top-level directory.
  */
 
-/* This file defines a hash table based cache for the MMAP_RA_CACHE
+/* This file defines a hash table based cache for the RA_CACHE
  * which does readaheads.  It is only used in the client-core and
  * really this file should be in that directory.
  */
@@ -104,13 +104,13 @@ int pint_racache_initialize(void)
             return -1;
         }
 
-        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                     "mmap_ra_cache_initialized\n");
+        gossip_debug(GOSSIP_RACACHE_DEBUG,
+                     "ra_cache_initialized\n");
         ret = 0;
     }
     else
     {
-        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "mmap readahead cache already "
+        gossip_debug(GOSSIP_RACACHE_DEBUG, "readahead cache already "
                      "initalized.  returning success\n");
         ret = 0;
     }
@@ -321,7 +321,7 @@ static racache_buffer_t *racache_buf_get(racache_file_t *racache_file)
     {
         /* there is a free buffer so use it */
         buff = qlist_entry(link, racache_buffer_t, buff_link);
-        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "racache_buff_get "
+        gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_buff_get "
                      "found free buff %d - adding to lists\n",
                      buff->buff_id);
     }
@@ -330,14 +330,14 @@ static racache_buffer_t *racache_buf_get(racache_file_t *racache_file)
     {
         /* take a buff from the lru chain */
         buff = qlist_entry(link, racache_buffer_t, buff_lru);
-        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "racache_buff_get "
+        gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_buff_get "
                      "got buff %d from lru - adding to lists\n",
                      buff->buff_id);
         /* make sure buffer is not busy */
         if (!qlist_empty(&buff->vfs_link))
         {
             /* outstanding requests */
-            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "racache_buff_get "
+            gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_buff_get "
                          "this buff is busy with %d waiters - skip ra\n",
                          buff->vfs_cnt);
             /* should wait until they are all done */
@@ -351,7 +351,7 @@ static racache_buffer_t *racache_buf_get(racache_file_t *racache_file)
     }
     else /* can't find a usable buffer */
     {
-        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "racache_buff_get "
+        gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_buff_get "
                     "no buffer - this is probably not right\n");
         /* something wrong - order a regular read */
         return NULL;
@@ -388,7 +388,7 @@ int pint_racache_get_block(PVFS_object_ref refn,
     racache_file_t *racache_file = NULL;
     racache_buffer_t *buff = NULL;
 
-    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "Checking racache"
+    gossip_debug(GOSSIP_RACACHE_DEBUG, "Checking racache"
                  " for %d bytes at offset %lu\n",
                  (int)len, (unsigned long)offset);
 
@@ -399,7 +399,7 @@ int pint_racache_get_block(PVFS_object_ref refn,
         hash_link = qhash_search(racache.hash_table, &refn);
         if (hash_link)
         {
-            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "found file rec\n");
+            gossip_debug(GOSSIP_RACACHE_DEBUG, "found file rec\n");
             racache_file = qhash_entry(hash_link,
                                        racache_file_t,
                                        hash_link);
@@ -417,7 +417,7 @@ int pint_racache_get_block(PVFS_object_ref refn,
                     /* found a matching buffer */
                     if (buff->valid)
                     {
-                        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                        gossip_debug(GOSSIP_RACACHE_DEBUG,
                                      "racache_get_block got buffer %d at "
                                      "file_offset %llu, data_sz %llu\n",  
                                      buff->buff_id,
@@ -444,7 +444,7 @@ int pint_racache_get_block(PVFS_object_ref refn,
                     {
                         if (!readahead_speculative)
                         {
-                            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                            gossip_debug(GOSSIP_RACACHE_DEBUG,
                                          "racache_get_block "
                                          "found invalid buffer %d "
                                          "- will wait\n",
@@ -455,7 +455,7 @@ int pint_racache_get_block(PVFS_object_ref refn,
                             /* makes list FIFO */
                             qlist_add_tail(&glink->link, &buff->vfs_link);
                             buff->vfs_cnt++;
-                            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                            gossip_debug(GOSSIP_RACACHE_DEBUG,
                                          "racache_get_block "
                                          "adding request %p to buffer "
                                          "%d vfs list #%d \n",
@@ -463,7 +463,7 @@ int pint_racache_get_block(PVFS_object_ref refn,
                         }
                         else
                         {
-                            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                            gossip_debug(GOSSIP_RACACHE_DEBUG,
                                          "racache_get_block "
                                          "found invalid buffer %d\n",
                                          buff->buff_id);
@@ -483,7 +483,7 @@ int pint_racache_get_block(PVFS_object_ref refn,
                 }
             } /* end of for loop */
             /* No matching buffer for this file found */
-            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "racache_get_block "
+            gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_get_block "
                          "short cache miss (no buffer)\n");
 
             buff = racache_buf_get(racache_file);
@@ -491,7 +491,7 @@ int pint_racache_get_block(PVFS_object_ref refn,
             {
                 buff->file = racache_file;
                 buff->file_offset = pint_racache_buff_offset(offset);
-                gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                gossip_debug(GOSSIP_RACACHE_DEBUG,
                              "racache_get_block offset %llu(%llu) size %llu\n",
                              llu(offset), llu(buff->file_offset),
                              llu(buff->buff_sz));
@@ -503,7 +503,7 @@ int pint_racache_get_block(PVFS_object_ref refn,
                 /* makes list FIFO */
                 qlist_add_tail(&glink->link, &buff->vfs_link);
                 buff->vfs_cnt++;
-                gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "racache_get_block "
+                gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_get_block "
                              "adding request %p to buffer %d vfs list #%d \n",
                              vfs_req, buff->buff_id, buff->vfs_cnt);
             }
@@ -530,7 +530,7 @@ int pint_racache_get_block(PVFS_object_ref refn,
             racache_file_t *rcfile;
 
             /* cache miss  - no file rec found */
-            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "racache_get_block "
+            gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_get_block "
                          "clean cache miss (nothing here)\n");
             /* try to get a buffer, if we can set up a file
              * rec and indicate a new readahead */
@@ -542,12 +542,12 @@ int pint_racache_get_block(PVFS_object_ref refn,
             }
             racache_init_file(rcfile);
             rcfile->refn = refn;
-            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "racache_get_block "
+            gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_get_block "
                          "adding new file rec to hash table\n");
             qhash_add(racache.hash_table, &refn, &rcfile->hash_link);
 
             buff = racache_buf_get(rcfile);
-            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "racache_get_block "
+            gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_get_block "
                          "getting a buffer %d\n", buff->buff_id);
             if (!buff)
             {
@@ -566,7 +566,7 @@ int pint_racache_get_block(PVFS_object_ref refn,
             /* makes lists FIFO */
             qlist_add_tail(&glink->link, &buff->vfs_link);
             buff->vfs_cnt++;
-            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "racache_get_block "
+            gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_get_block "
                          "adding request %p to buffer %d vfs list #%d \n",
                          vfs_req, buff->buff_id, buff->vfs_cnt);
 
@@ -583,7 +583,7 @@ int pint_racache_get_block(PVFS_object_ref refn,
             return RACACHE_READ;
         }
     }
-    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "racache_get_block error \n");
+    gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_get_block error \n");
     return -1;
 }
 
@@ -601,7 +601,7 @@ int pint_racache_flush(PVFS_object_ref refn)
         hash_link = qhash_search_and_remove(racache.hash_table, &refn);
         if (hash_link)
         {
-            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+            gossip_debug(GOSSIP_RACACHE_DEBUG,
                          "racache_flush found file\n");
             racache_file = qhash_entry(hash_link, racache_file_t, hash_link);
 
@@ -612,7 +612,7 @@ int pint_racache_flush(PVFS_object_ref refn)
             {
                 /* get a pointer to the buffer */
                 buff = qhash_entry(blink, racache_buffer_t, buff_link);
-                gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                gossip_debug(GOSSIP_RACACHE_DEBUG,
                              "racache_flush removing buffer %d\n",
                              buff->buff_id);
                 /* remove buffer from the lru list */
@@ -623,7 +623,7 @@ int pint_racache_flush(PVFS_object_ref refn)
                 if (!buff->valid ||
                     !qlist_empty(&buff->vfs_link))
                 {
-                    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                    gossip_debug(GOSSIP_RACACHE_DEBUG,
                                  "--- Flushed racache - wait for buffer "
                                  "id %d of size %llu\n",
                                  buff->buff_id,
@@ -633,7 +633,7 @@ int pint_racache_flush(PVFS_object_ref refn)
                 }
                 else
                 {
-                    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                    gossip_debug(GOSSIP_RACACHE_DEBUG,
                                  "--- Flushed racache - free buffer "
                                  "id %d of size %llu\n",
                                  buff->buff_id,
@@ -643,7 +643,7 @@ int pint_racache_flush(PVFS_object_ref refn)
                 }
             }
             /* remove file from hash table */
-            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+            gossip_debug(GOSSIP_RACACHE_DEBUG,
                          "racache_flush removing file\n");
             qlist_del(&racache_file->hash_link);
             free(racache_file);
@@ -660,7 +660,7 @@ int pint_racache_flush(PVFS_object_ref refn)
  */
 void pint_racache_make_free(racache_buffer_t *buff)
 {
-    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+    gossip_debug(GOSSIP_RACACHE_DEBUG,
                  "Making buffer %d with %d waiters free\n",
                   buff->buff_id, buff->vfs_cnt);
     /* add buffer to free list */
@@ -696,7 +696,7 @@ int pint_racache_finalize(void)
                     racache_buffer = qlist_entry(buff_link,
                                                  racache_buffer_t,
                                                  buff_link);
-                    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                    gossip_debug(GOSSIP_RACACHE_DEBUG,
                                  "Freeing buffer %d with %d waiters\n",
                                  racache_buffer->buff_id,
                                  racache_buffer->vfs_cnt);
@@ -720,7 +720,7 @@ int pint_racache_finalize(void)
 
         /* FIXME: race condition here */
         gen_mutex_destroy(&racache.mutex);
-        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_finalized\n");
+        gossip_debug(GOSSIP_RACACHE_DEBUG, "ra_cache_finalized\n");
     }
     return ret;
 }

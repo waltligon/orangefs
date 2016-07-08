@@ -221,7 +221,7 @@ static int pvfs2_param_proc_handler(
             return(ret);
         }
         gossip_debug(GOSSIP_PROC_DEBUG, "pvfs2: proc write %d\n", val[0]);
-#if defined(USE_MMAP_RA_CACHE)
+#if defined(USE_RA_CACHE)
         /* should this be based on lenp rather than op? */
         if (extra->op == PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT_SIZE)
         {
@@ -250,7 +250,7 @@ static int pvfs2_param_proc_handler(
     if(ret == 0 && !write)
     {
         /* use generic proc handling function to output value */
-#if defined(USE_MMAP_RA_CACHE)
+#if defined(USE_RA_CACHE)
         if (extra->op == PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT_SIZE)
         {
             val[0] = (int)new_op->downcall.resp.param.value2[0];
@@ -468,7 +468,7 @@ static struct pvfs2_param_extra perf_reset_extra = {
     .min = 0,
     .max = 1,
 };
-#ifdef USE_MMAP_RA_CACHE
+#ifdef USE_RA_CACHE
 static struct pvfs2_param_extra perf_readahead_size_extra = {
     .op = PVFS2_PARAM_REQUEST_OP_READAHEAD_SIZE,
     .min = 0,
@@ -870,7 +870,7 @@ static struct ctl_table pvfs2_table[] = {
         .mode = 0555,
         .child = pvfs2_capcache_table
     },
-#ifdef USE_MMAP_RA_CACHE
+#ifdef USE_RA_CACHE
     /* parameter for readahead cache buffer size */
     {
         CTL_NAME(15)
