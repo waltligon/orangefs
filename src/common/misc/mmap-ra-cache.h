@@ -68,6 +68,7 @@ typedef struct racache_s
     struct racache_buffer_s *oldarray; /* temp storage of buffs after resize */
     int    oldarray_cnt;               /* number of original bufs in oldarray */
     int    oldarray_rem;               /* number of busy bufs in oldarray */
+    int    oldarray_sz;                /* size of busy bufs in oldarray */
 } racache_t;
 
 

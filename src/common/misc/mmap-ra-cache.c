@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <errno.h>
 #ifndef WIN32
+#include <sys/mman.h>
 #include <sys/resource.h>
 #include <unistd.h>
 #endif
@@ -29,6 +30,7 @@
 
 static int racache_buf_init(racache_t *racache);
 static racache_buffer_t *racache_buf_get(racache_file_t *racache_file);
+static int lock_mem = 1; /* should we try to lock memory */
 
 static int hash_key(const void *key, int table_size);
 static int hash_key_compare(const void *key, struct qlist_head *link);
@@ -173,6 +175,20 @@ static int racache_buf_init(racache_t *racache)
             free(racache->buffarray);
             return -1;
         }
+        if (lock_mem)
+        {
+            int ret = 0;
+            int cnt = 0;
+            
+            do {
+                ret = mlock(vp, racache->bufsz);
+            } while (ret && errno == EAGAIN && cnt++ < 10);
+            if (ret == -1)
+            {
+                gossip_err("locking memory failed, proceeding without it\n");
+                lock_mem = 0; /* don't try to lock memory any more */
+            }
+        }
 
         racache->buffarray[i].buff_sz = racache->bufsz;
         racache->buffarray[i].buffer = vp;
@@ -222,6 +238,14 @@ static void racache_buf_cull(racache_t *racache)
         else
         {
             /* this buffer is finished so close it up */
+            if (lock_mem)
+            {
+                int ret = 0;
+                int cnt = 0;
+                do {
+                    munlock(racache->buffarray[i].buffer, racache->bufsz);
+                } while (ret && errno == EAGAIN && cnt++ < 10);
+            }
             free(racache->buffarray[i].buffer);
             memset(&racache->buffarray[i], 0, sizeof(racache_buffer_t));
         }
@@ -234,6 +258,7 @@ static void racache_buf_cull(racache_t *racache)
         racache->oldarray = racache->buffarray;
         racache->oldarray_rem = remaining;
         racache->oldarray_cnt = racache->bufcnt;
+        racache->oldarray_sz = racache->bufsz;
     }
     else
     {
@@ -265,6 +290,14 @@ int pint_racache_finish_resize(racache_buffer_t *buff)
         return -1;
     }
 
+    if (lock_mem)
+    {
+        int ret = 0;
+        int cnt = 0;
+        do {
+            munlock(racache.oldarray[i].buffer, racache.oldarray_sz);
+        } while (ret && errno == EAGAIN && cnt++ < 10);
+    }
     free(racache.oldarray[i].buffer);
     memset(&racache.buffarray[i], 0, sizeof(racache_buffer_t));
     racache.oldarray_rem--;
