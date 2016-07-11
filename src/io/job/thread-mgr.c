@@ -48,7 +48,9 @@ static int bmi_thread_ref_count = 0;
 static int trove_thread_ref_count = 0;
 static int dev_thread_ref_count = 0;
 static PVFS_fs_id HACK_fs_id = 9; /* TODO: fix later */
+#ifdef __PVFS2_CLIENT__
 static struct PINT_dev_unexp_info stat_dev_unexp_array[THREAD_MGR_TEST_COUNT];
+#endif
 #ifdef __PVFS2_JOB_THREADED__
 static pthread_t bmi_thread_id;
 static pthread_t trove_thread_id;
@@ -312,6 +314,7 @@ static void *bmi_thread_function(void *ptr)
  */
 static void *dev_thread_function(void *ptr)
 {
+#ifdef __PVFS2_CLIENT__
     int ret = -1;
     int incount, outcount;
     int i=0;
@@ -363,6 +366,7 @@ static void *dev_thread_function(void *ptr)
 	}
 	gen_mutex_unlock(&dev_mutex);
     }
+#endif  /* __PVFS2_CLIENT__ */
 
     return (NULL);
 }
