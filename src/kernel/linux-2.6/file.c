@@ -3352,7 +3352,7 @@ int pvfs2_file_release(
     pvfs2_flush_inode(inode);
 
     /*
-      remove all associated inode pages from the page cache and mmap
+      remove all associated inode pages from the page cache and 
       readahead cache (if any); this forces an expensive refresh of
       data for the next caller of mmap (or 'get_block' accesses)
     */
@@ -3360,7 +3360,7 @@ int pvfs2_file_release(
         file->f_dentry->d_inode->i_mapping &&
         mapping_nrpages(&file->f_dentry->d_inode->i_data))
     {
-        clear_inode_mmap_ra_cache(file->f_dentry->d_inode);
+        clear_inode_ra_cache(file->f_dentry->d_inode);
         truncate_inode_pages(file->f_dentry->d_inode->i_mapping, 0);
     }
     return 0;

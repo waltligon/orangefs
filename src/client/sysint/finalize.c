@@ -6,7 +6,7 @@
 
 /* System Interface Finalize Implementation */
 #ifdef HAVE_MALLOC_H
-#include <malloc.h>
+/* #include <malloc.h> */
 #endif
 
 #include "pvfs2-internal.h"
