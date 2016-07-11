@@ -874,6 +874,11 @@ void *BMI_tcp_memalloc(bmi_size_t size,
 
     /* return (calloc(1,(size_t) size)); */
     /* return PINT_mem_aligned_alloc(size, 4096); */
+    /* all malloc related calls go through src/common/misc/pint-malloc.c
+     * these are redefined as neede to stadard calls - posix_memalign
+     * is implemented in terms of malloc thus it should work on all
+     * platforms
+     */
     posix_memalign(&ptr, 4096, size);
     return ptr;
 }
