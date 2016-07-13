@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
 #define PINT_llist_add(__llist_p, __void_p) \
 	PINT_llist_add_to_head((__llist_p), (__void_p))
 
