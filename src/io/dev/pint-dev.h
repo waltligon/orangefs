@@ -25,15 +25,16 @@ typedef struct
 /* parameter structure used in PVFS_DEV_DEBUG ioctl command */
 typedef struct
 {
-  enum 
-  {
-     KERNEL_MASK,
-     CLIENT_MASK,
-  } mask_type;
-  uint64_t mask_value;
+    enum 
+    {
+        KERNEL_MASK,
+        CLIENT_MASK,
+    } mask_type;
+    uint64_t mask_value;
 } dev_mask_info_t;
 
-enum pvfs_bufmap_type {
+enum pvfs_bufmap_type
+{
     BM_IO = 0,
     BM_READDIR = 1,
 };
