@@ -50,6 +50,8 @@ int main(
     char* buf;
     int ret;
     int current_deleter = 0;
+    int delete_tries=0;
+    unsigned int DELETE_MAX=5;
 
     /* startup MPI and determine the rank of this process */
     MPI_Init(&argc, &argv);
@@ -75,21 +77,39 @@ int main(
             current_deleter++;
             current_deleter = current_deleter % nprocs;
             if(current_deleter == 0)
-                current_deleter ++;
-
-            sleep(SLEEP_TIME);
-            sprintf(file, "%s/%d", opt_dir, current_deleter);
-            fprintf(stderr, "Deleting: %s\n", file);
-
-            ret = unlink(file);
-            if(ret < 0)
             {
-                sprintf(error_msg,"unlink %s",file);
-            	perror(error_msg);
-                MPI_Abort(MPI_COMM_WORLD, 1);
+                current_deleter ++;
             }
+            sprintf(file, "%s/%d", opt_dir, current_deleter);
+            delete_tries=0;
+            while (1)
+            {
+               delete_tries++;
+               sleep(SLEEP_TIME);
+               fprintf(stderr, "Deleting: %s: try #%d\n", file, delete_tries);
 
-        }
+               ret = unlink(file);
+               if(ret < 0)
+               {
+                  if (delete_tries > DELETE_MAX || errno != ENOENT)
+                  {
+                     sprintf(error_msg,"unlink %s",file);
+            	     perror(error_msg);
+                     MPI_Abort(MPI_COMM_WORLD, 1);
+                     break;
+                  }
+                  else 
+                  {
+                    /* retry the unlink.  It is possible that the other process
+                     * on this same machine hasn't been given the opportunity to 
+                     * create its file.  So, lets try it again!
+                     */
+                    continue;
+                  }
+               }
+               break;
+            }/*end while*/
+        }/*end for*/
 
     	fprintf(stderr, "Successfully completed %d of %d iterations.\n", i,iterations);
     	fprintf(stderr, "Calling MPI_Abort and returning success (0). Ugly, but effective.\n");
