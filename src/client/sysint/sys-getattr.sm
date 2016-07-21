@@ -1832,21 +1832,23 @@ static PINT_sm_action getattr_client_capcache_insert(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    /* get local uid for indexing */
+    /* If the LOCAL_UID hint is not set, which can happen when the sysint interface
+     * is called by an app like pvfs2-ls, then we set local uid to the process uid
+     * running this code.  Otherwise, we assume the hint contains the proper uid,
+     * as is the case for the client core.
+     */
     local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
-    if (local_uid != (PVFS_uid) -1)
+    if (local_uid == (PVFS_uid) -1)
     {
-        ret = PINT_client_capcache_update(sm_p->getattr.object_ref, 
-                  local_uid, &sm_p->getattr.attr.capability);
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: "
-                     "PINT_client_capcache_update returned %d\n",
+        local_uid = PINT_util_getuid();
+    }
+
+    ret = PINT_client_capcache_update(sm_p->getattr.object_ref, 
+                                      local_uid, 
+                                      &sm_p->getattr.attr.capability);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: "
+                 "PINT_client_capcache_update returned %d\n",
                      __func__, ret);
-    }
-    else
-    {
-        gossip_err("%s: could not get local uid for client capcache\n",
-                   __func__);
-    }
 
     return SM_ACTION_COMPLETE;
 }
