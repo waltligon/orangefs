@@ -289,8 +289,9 @@ static PINT_sm_action setattr_cleanup(
 
     sm_p->error_code = js_p->error_code;
 
-    /* Since we just updated the timestamps for this object, we must invalidate
-     * it's acache entry.  We do not do partial updates anymore.
+    /* Since we just updated attributes (most of the time we are updating timestamps) 
+     * for this object, we must invalidate it's acache entry.  We do not do partial 
+     * updates anymore.
      */
     if(sm_p->error_code == 0)
     {
