@@ -40,7 +40,7 @@
 #define GOSSIP_DIST_DEBUG              ((uint64_t)1 << 18)
 #define GOSSIP_BMI_DEBUG_IB            ((uint64_t)1 << 19)
 #define GOSSIP_DBPF_ATTRCACHE_DEBUG    ((uint64_t)1 << 20)
-#define GOSSIP_MMAP_RCACHE_DEBUG       ((uint64_t)1 << 21)
+#define GOSSIP_RACACHE_DEBUG           ((uint64_t)1 << 21)
 #define GOSSIP_LOOKUP_DEBUG            ((uint64_t)1 << 22)
 #define GOSSIP_REMOVE_DEBUG            ((uint64_t)1 << 23)
 #define GOSSIP_GETATTR_DEBUG           ((uint64_t)1 << 24)
@@ -155,7 +155,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     /* Debug the client name cache.  Only useful on the client. */
     { "ncache", GOSSIP_NCACHE_DEBUG },
     /* Debug read-ahead cache events.  Only useful on the client. */
-    { "mmaprcache", GOSSIP_MMAP_RCACHE_DEBUG },
+    { "racache", GOSSIP_RACACHE_DEBUG },
     /* Debug the attribute cache.  Only useful on the client. */
     { "acache", GOSSIP_ACACHE_DEBUG },
     /* Log/Debug distribution calls */
