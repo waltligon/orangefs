@@ -382,6 +382,7 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
     {&pvfs2_client_mgmt_get_dirdata_handle_sm},
     {&pvfs2_client_mgmt_get_uid_list_sm},
     {&pvfs2_client_mgmt_get_dirdata_array_sm},
+    {&pvfs2_client_mgmt_getparam_list_sm},
 #ifdef ENABLE_SECURITY_CERT
     {&pvfs2_client_mgmt_get_user_cert_sm}
 #else
@@ -1208,6 +1209,7 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_SYS_FLUSH, "PVFS_SYS_FLUSH" },
         { PVFS_SYS_READDIRPLUS, "PVFS_SYS_READDIR_PLUS" },
         { PVFS_MGMT_SETPARAM_LIST, "PVFS_MGMT_SETPARAM_LIST" },
+        { PVFS_MGMT_GETPARAM_LIST, "PVFS_MGMT_GETPARAM_LIST" },
         { PVFS_MGMT_NOOP, "PVFS_MGMT_NOOP" },
         { PVFS_SYS_TRUNCATE, "PVFS_SYS_TRUNCATE" },
         { PVFS_MGMT_STATFS_LIST, "PVFS_MGMT_STATFS_LIST" },

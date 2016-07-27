@@ -3,6 +3,9 @@
  *
  * See COPYING in top-level directory.
  */
+
+/*Serverside getparam.sm*/
+
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
@@ -18,12 +21,11 @@
 #include "gossip.h"
 #include "request-scheduler/request-scheduler.h"
 #include "pint-security.h"
-#include "pint-perf-counter.h"
-#include "pint-util.h"
-#include "pvfs2-types.h"
+#include "pint-perf-counter.h" //Added this
+#include "pint-util.h"         //Added this
+#include "pvfs2-types.h"       //Added this
 
-static int check_fs_id(PVFS_fs_id fs_id);
-static int drop_caches(void);
+//static int drop_caches(void);
 
 %%
 
@@ -65,9 +67,11 @@ static PINT_sm_action getparam_work(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -1;
-    unsigned int key_count, interval, hist;
+    int ret = -1; //Removed tmp_on = 0
+    unsigned int key_count, interval, hist;  //added this line
     struct server_configuration_s *user_opts;
+
+    //retreiving the various parameters
     ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_HISTORY_SIZE, &hist);
     if(ret != 0) /* Verify return value */;
     ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_KEY_COUNT, &key_count);
@@ -75,6 +79,7 @@ static PINT_sm_action getparam_work(
     ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_UPDATE_INTERVAL, &interval);
     if(ret != 0) /* Verify return value */;
     user_opts = get_server_config_struct();
+
     if(user_opts->perf_update_interval != interval){
     /* handle the case where whats in server config conflicts with current perf setting */
     }
@@ -83,11 +88,12 @@ static PINT_sm_action getparam_work(
     }
     s_op->resp.u.mgmt_getparam.history = hist;
     s_op->resp.u.mgmt_getparam.interval = interval;
-    s_op->resp.u.mgmt_getparam.key_count = key_count;;
+    s_op->resp.u.mgmt_getparam.key_count = key_count;
     /*gossip_lerr("Error: mgmt_getparam for unknown parameter %d.\n",
                 (int)s_op->req->u.mgmt_getparam.param);
     */
-    return(server_state_machine_complete(smcb));
+
+    return SM_ACTION_COMPLETE;
 }
 
 
@@ -104,13 +110,6 @@ static PINT_sm_action getparam_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
-/* check_fs_id()
- *
- * checks to see if a given fs id is valid
- *
- * returns 0 on success, -PVFS_error on failure
- */
-
 static inline int PINT_get_object_ref_getparam(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
@@ -123,7 +122,8 @@ static int perm_getparam(PINT_server_op *s_op)
 {
     int ret;
 
-    ret = 0;
+    /*Requires no permission*/
+   ret = 0;
 
     return ret;
 }
@@ -145,15 +145,15 @@ struct PINT_server_req_params pvfs2_getparam_params =
  * caches that it may have.  Applies globally to all file systems on the
  * server, not just the PVFS storage space.
  */
-static int drop_caches(void)
+/*static int drop_caches(void)
 {
     int fd;
     int ret;
 
-    /* try to commit buffer cache first */
+    // try to commit buffer cache first 
     sync();
 
-    /* open Linux specific control file if present */
+    // open Linux specific control file if present
     fd = open("/proc/sys/vm/drop_caches", O_WRONLY);
     if(fd < 0)
     {
@@ -162,7 +162,7 @@ static int drop_caches(void)
         return(-PVFS_EOPNOTSUPP);
     }
 
-    /* free page cache, dentries, and inodes */
+    // free page cache, dentries, and inodes
     ret = write(fd, "3", 2);
     if(ret < 0)
     {
@@ -174,7 +174,7 @@ static int drop_caches(void)
    
     close(fd);
     return(0);
-}
+}*/
 
 /*
  * Local variables:

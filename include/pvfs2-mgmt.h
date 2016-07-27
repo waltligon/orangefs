@@ -128,6 +128,14 @@ enum
     PVFS_MGMT_META_SERVER = 2
 };
 
+/* server performance statistic conatiners for client*/
+struct PVFS_mgmtresp_getparam
+{
+    uint32_t key_count;
+    uint64_t interval;
+    uint64_t history;
+};
+
 PVFS_error PVFS_mgmt_count_servers(
     PVFS_fs_id fs_id,
     int server_type,
@@ -170,6 +178,17 @@ PVFS_error PVFS_imgmt_setparam_list(
     PVFS_mgmt_op_id *op_id,
     void *user_ptr);
 
+PVFS_error PVFS_imgmt_getparam_list(
+    PVFS_fs_id fs_id,
+    const PVFS_credential *credential,
+    PVFS_BMI_addr_t *addr_array,
+    int count,
+    struct PVFS_mgmtresp_getparam *getparam_out,
+    PVFS_error_details *details,
+    PVFS_hint hints,
+    PVFS_mgmt_op_id *op_id,
+    void *user_ptr);
+
 PVFS_error PVFS_mgmt_setparam_list(
     PVFS_fs_id fs_id,
     const PVFS_credential *credential,
@@ -177,6 +196,15 @@ PVFS_error PVFS_mgmt_setparam_list(
     struct PVFS_mgmt_setparam_value *value,
     PVFS_BMI_addr_t *addr_array,
     int count,
+    PVFS_error_details *details,
+    PVFS_hint hints);
+
+PVFS_error PVFS_mgmt_getparam_list(
+    PVFS_fs_id fs_id,
+    const PVFS_credential *credential,
+    PVFS_BMI_addr_t *addr_array,
+    int count,
+    struct PVFS_mgmtresp_getparam *getparam_out,
     PVFS_error_details *details,
     PVFS_hint hints);
 

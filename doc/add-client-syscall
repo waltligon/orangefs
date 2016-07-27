@@ -33,4 +33,4 @@ Step in adding a syscall to the client:
 		src/client/sysint/client-state-machine.c
 		PINT_client_state_machine_post()
 		PINT_client_get_name_str()
-		 
+		add the reference to the state machine to PINT_client_op_entry_sto the appropriate type of client call it is. eg sys/mgmt. 		 

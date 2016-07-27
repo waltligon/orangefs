@@ -14,6 +14,8 @@
  *  underway.
  */
 
+/*Clientside mgmt-setparam-list.sm*/
+
 #include <string.h>
 #include <assert.h>
 

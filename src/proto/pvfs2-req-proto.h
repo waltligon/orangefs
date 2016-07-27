@@ -1799,12 +1799,15 @@ struct PVFS_servreq_mgmt_getparam
     enum PVFS_server_param param; /* parameter to set */
     struct PVFS_mgmt_setparam_value value;
 };
+endecode_fields_3_struct(
+    PVFS_servreq_mgmt_getparam,
+    PVFS_fs_id, fs_id,
+    enum, param,
+    PVFS_mgmt_setparam_value, value);
 
 #define PINT_SERVREQ_MGMT_GETPARAM_FILL(__req,                      \
                                         __cap,                      \
                                         __fsid,                     \
-                                        __param,                    \
-                                        __value,                    \
                                         __hints)                    \
 do {                                                                \
     memset(&(__req), 0, sizeof(__req));                             \
@@ -1812,18 +1815,7 @@ do {                                                                \
     PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                     \
     (__req).hints = (__hints);                                      \
     (__req).u.mgmt_getparam.fs_id = (__fsid);                       \
-    (__req).u.mgmt_getparam.param = (__param);                      \
-    if(__value){                                                    \
-        (__req).u.mgmt_getparam.value.type = (__value)->type;       \
-        (__req).u.mgmt_getparam.value.u.value = (__value)->u.value; \
-    }                                                               \
 } while (0)                                                   
-
-endecode_fields_3_struct(
-    PVFS_servreq_mgmt_getparam,
-    PVFS_fs_id, fs_id,
-    enum, param,
-    PVFS_mgmt_setparam_value, value);
 
 struct PVFS_servresp_mgmt_getparam
 {
