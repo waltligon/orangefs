@@ -76,10 +76,10 @@ static PINT_sm_action final_response_release(
     /* this seems a little odd, but since this is the first state of the
      * nested machine, now is the time to grab the error code if we
      * are going to use it
-     */
-    /* NOTE: we filter out any subsystem mask and make sure that this
+     *
+     * NOTE: we filter out any subsystem mask and make sure that this
      * shows up as a generic pvfs error on the client side.  this is
-     * true for generic pvfs errors but for non-pvfs errors that we want
+     * true for generic pvfs errors but for pvfs errors that we want
      * to send to the client to interpret, we must first identify them
      * and send them along without any translation.  Specifically, we
      * want to send back PVFS_TIMEOUT_CAP and PVFS_TIMEOUT_CRED instead
