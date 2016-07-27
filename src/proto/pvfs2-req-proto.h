@@ -1828,25 +1828,6 @@ endecode_fields_3_struct(
     uint32_t, key_count,
     uint64_t, interval,
     uint64_t, history);
-#define PINT_SERVRESP_MGMT_GETPARAM_FILL(__req,                      \
-                                        __cap,                      \
-                                        __fsid,                     \
-                                        __param,                    \
-                                        __value,                    \
-                                        __hints)                    \
-do {                                                                \
-    memset(&(__req), 0, sizeof(__req));                             \
-    (__req).op = PVFS_SERV_MGMT_GETPARAM;                           \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                     \
-    (__req).hints = (__hints);                                      \
-    (__req).u.mgmt_getparam.fs_id = (__fsid);                       \
-    (__req).u.mgmt_getparam.param = (__param);                      \
-    if(__value){                                                    \
-        (__req).u.mgmt_getparam.value.type = (__value)->type;       \
-        (__req).u.mgmt_getparam.value.u.value = (__value)->u.value; \
-    }                                                               \
-} while (0)
-
 
 #define extra_size_PVFS_servresp_mgmt_perf_mon \
     (PVFS_REQ_LIMIT_IOREQ_BYTES)
