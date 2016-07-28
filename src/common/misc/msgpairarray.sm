@@ -640,8 +640,14 @@ cleanup:
                  local_uid = PINT_util_getuid();
               }
 
-              msg_objref.fs_id  = msg_p->fs_id;
-              msg_objref.handle = msg_p->handle;
+              /* Datafile handles and dirdata handles do not have their own capability, i.e.,
+               * they are part of a metafile or directory capability.  So, to ensure that
+               * we invalidate the correct capability, we must use the first element in the
+               * capability's handle array, which is always the handle for the metafile or 
+               * directory object.
+               */
+              msg_objref.fs_id  = msg_p->req.capability.fsid;
+              msg_objref.handle = msg_p->req.capability.handle_array[0];
               gossip_err("%s:msg_objref.fsid(%d) handle(%llu)\n"
                         ,__func__
                         ,msg_objref.fs_id
