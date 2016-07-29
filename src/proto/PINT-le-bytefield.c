@@ -544,7 +544,7 @@ static int lebf_encode_req(
         CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
-        CASE(PVFS_SERV_MGMT_GETPARAM, mgmt_getparam);
+        case PVFS_SERV_MGMT_GETPARAM:
         case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_PROTO_ERROR:
@@ -650,6 +650,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
+        CASE(PVFS_SERV_MGMT_GETPARAM, mgmt_getparam);
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
@@ -664,7 +665,6 @@ static int lebf_encode_resp(
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_IMM_COPIES:
         case PVFS_SERV_MGMT_SETPARAM:
-        case PVFS_SERV_MGMT_GETPARAM:
         case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
         case PVFS_SERV_MGMT_SPLIT_DIRENT:
             /* nothing else */
@@ -774,7 +774,7 @@ static int lebf_decode_req(
         CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
-        CASE(PVFS_SERV_MGMT_GETPARAM, mgmt_getparam);
+        case PVFS_SERV_MGMT_GETPARAM:
         case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_IMM_COPIES:
@@ -870,6 +870,7 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
+        CASE(PVFS_SERV_MGMT_GETPARAM, mgmt_getparam);
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_BATCH_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -884,7 +885,6 @@ static int lebf_decode_resp(
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_IMM_COPIES:
         case PVFS_SERV_MGMT_SETPARAM:
-        case PVFS_SERV_MGMT_GETPARAM:
         case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
         case PVFS_SERV_MGMT_SPLIT_DIRENT:
             /* nothing else */

@@ -178,17 +178,6 @@ PVFS_error PVFS_imgmt_setparam_list(
     PVFS_mgmt_op_id *op_id,
     void *user_ptr);
 
-PVFS_error PVFS_imgmt_getparam_list(
-    PVFS_fs_id fs_id,
-    const PVFS_credential *credential,
-    PVFS_BMI_addr_t *addr_array,
-    int count,
-    struct PVFS_mgmtresp_getparam *getparam_out,
-    PVFS_error_details *details,
-    PVFS_hint hints,
-    PVFS_mgmt_op_id *op_id,
-    void *user_ptr);
-
 PVFS_error PVFS_mgmt_setparam_list(
     PVFS_fs_id fs_id,
     const PVFS_credential *credential,
@@ -199,13 +188,22 @@ PVFS_error PVFS_mgmt_setparam_list(
     PVFS_error_details *details,
     PVFS_hint hints);
 
-PVFS_error PVFS_mgmt_getparam_list(
+PVFS_error PVFS_imgmt_getparam(
     PVFS_fs_id fs_id,
     const PVFS_credential *credential,
     PVFS_BMI_addr_t *addr_array,
     int count,
     struct PVFS_mgmtresp_getparam *getparam_out,
-    PVFS_error_details *details,
+    PVFS_hint hints,
+    PVFS_mgmt_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_mgmt_getparam(
+    PVFS_fs_id fs_id,
+    const PVFS_credential *credential,
+    PVFS_BMI_addr_t *addr_array,
+    int count,
+    struct PVFS_mgmtresp_getparam *getparam_out,
     PVFS_hint hints);
 
 PVFS_error PVFS_mgmt_setparam_all(

@@ -465,15 +465,12 @@ struct PINT_client_mgmt_setparam_list_sm
     PVFS_error_details *details;
 };
 
-struct PINT_client_mgmt_getparam_list_sm 
+struct PINT_client_mgmt_getparam_sm 
 {
     PVFS_fs_id fs_id;
-    enum PVFS_server_param param;
-    //struct PVFS_mgmt_getparam_value *value;
     struct PVFS_mgmtresp_getparam *stats;    /*out*/
     PVFS_id_gen_t *addr_array;
     int count;
-    PVFS_error_details *details;
 };
 
 struct PINT_client_mgmt_statfs_list_sm
@@ -712,7 +709,7 @@ typedef struct PINT_client_sm
         struct PINT_client_lookup_sm lookup;
         struct PINT_client_rename_sm rename;
         struct PINT_client_mgmt_setparam_list_sm setparam_list;
-        struct PINT_client_mgmt_getparam_list_sm getparam_list;
+        struct PINT_client_mgmt_getparam_sm getparam;
         struct PINT_client_truncate_sm  truncate;
         struct PINT_client_mgmt_statfs_list_sm statfs_list;
         struct PINT_client_mgmt_perf_mon_list_sm perf_mon_list;
@@ -931,7 +928,7 @@ extern struct PINT_state_machine_s pvfs2_client_perf_count_timer_sm;
 extern struct PINT_state_machine_s pvfs2_server_get_config_sm;
 extern struct PINT_state_machine_s pvfs2_server_fetch_config_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_list_sm;
-extern struct PINT_state_machine_s pvfs2_client_mgmt_getparam_list_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_getparam_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_perf_mon_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_event_mon_list_sm;
