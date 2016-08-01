@@ -580,13 +580,20 @@ static PINT_sm_action msgpairarray_completion_fn(
                case 0:
                {
                   msg_p->op_status = 0;
-                  break; /*go on to check for comp fn*/
+                  if ( msg_p->comp_fn )
+                  {
+                     break; /*execute comp fn*/
+                  }
+                  else
+                  {
+                     goto cleanup; /*bypass comp fn*/
+                  }
                }
                case -PVFS_TIMEOUT_CAP:
                case -PVFS_TIMEOUT_CRED:
                {
                   js_p->error_code = msg_p->op_status = resp_p->status;
-                  goto cleanup; /*cleanup this msgpair...let other msgpairs finish*/
+                  goto cleanup; /*cleanup this msgpair and bypass comp fn*/
                }
                default:
                {
@@ -596,14 +603,24 @@ static PINT_sm_action msgpairarray_completion_fn(
                    * function to execute, just in case the non-zero status has
                    * a special meaning to the particular request being processed.
                    */ 
-                  js_p->error_code = msg_p->op_status = resp_p->status;
-                  gossip_debug(GOSSIP_MSGPAIR_DEBUG,"notice: msgpairarray_complete: error %d "
-                                                    "from server %d\n"
+                  if ( msg_p->comp_fn )
+                  {
+                     msg_p->op_status = resp_p->status;
+                     break; /*execute comp fn*/
+                  }
+                  else
+                  {
+                     js_p->error_code = msg_p->op_status = resp_p->status;
+                     gossip_debug(GOSSIP_MSGPAIR_DEBUG,"notice: msgpairarray_complete: error %d "
+                                                       "from server %d\n"
                                                    ,resp_p->status, i);
-                  break;
-               }
+                     goto cleanup; /*bypass comp fn*/
+                  }
+               }/*end default*/
             }/*end switch*/
-        }
+        }/*end if decode error*/
+
+
 
         /* NOTE: we call the function associated with each message,
          *       not just the one from the first array element.  so
@@ -611,19 +628,18 @@ static PINT_sm_action msgpairarray_completion_fn(
          *       message (to handle different types of messages all in
          *       the same array).
          */
-        if (msg_p->comp_fn != NULL)
-        {
-            gossip_debug(GOSSIP_MIRROR_DEBUG,"\texecuting msg_p->comp_fn..\n");
-            /* If we call the completion function, store the result on
-             * a per message pair basis.  Also store some non-zero
-             * (failure) value in js_p->error_code if we see one.
-             */
-            msg_p->op_status = msg_p->comp_fn(smcb, resp_p, i);
-            if (msg_p->op_status != 0)
-            {
-                js_p->error_code = msg_p->op_status;
-            }
-        }
+         gossip_debug(GOSSIP_MIRROR_DEBUG,"\texecuting msg_p->comp_fn..\n");
+         /* If we call the completion function, store the result on
+          * a per message pair basis.  Also store some non-zero
+          * (failure) value in js_p->error_code if we see one.
+          */
+         msg_p->op_status = msg_p->comp_fn(smcb, resp_p, i);
+         if (msg_p->op_status != 0)
+         {
+             js_p->error_code = msg_p->op_status;
+         }
+
+
 
 cleanup:
 /*invalidate client-side cache entries*/

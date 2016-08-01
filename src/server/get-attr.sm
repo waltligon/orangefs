@@ -1461,6 +1461,10 @@ static PINT_sm_action getattr_create_capability(
         return SM_ACTION_COMPLETE;
     }
 
+    /* NOTE:  msgpairarray relies on the fact that the first element
+     * of the handle_array is the handle of the primary object, i.e.,
+     * like the metafile or directory object.
+     */ 
     resp_attr->capability.handle_array[0] = s_op->u.getattr.handle;
     if ((resp_attr->objtype == PVFS_TYPE_METAFILE) &&
         (resp_attr->mask & PVFS_ATTR_META_DFILES))
