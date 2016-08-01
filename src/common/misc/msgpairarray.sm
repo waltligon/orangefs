@@ -624,6 +624,7 @@ static PINT_sm_action msgpairarray_completion_fn(
             js_p->error_code = msg_p->op_status;
         }
 
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG,"op_status(%d) msgpair(%d)\n",msg_p->op_status,i);
 
 
 cleanup:
