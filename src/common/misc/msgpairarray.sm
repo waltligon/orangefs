@@ -652,7 +652,7 @@ cleanup:
 
         gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair %d "
                      "marked complete\n", __func__, smcb, i);
-    }/*end for*/
+    }/*end for each msgpair*/
 
     if (need_retry) {
         /*
