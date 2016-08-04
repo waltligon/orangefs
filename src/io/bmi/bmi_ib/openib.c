@@ -1421,7 +1421,7 @@ int openib_ib_initialize(void)
     {
         cqe_num = hca_cap.max_cq;
         warning("%s: hardly enough completion queue entries %d, hoping for %d",
-                __func__, hca_cap.max_cq, cqe_num);
+                __func__, hca_cap.max_cq, IBV_NUM_CQ_ENTRIES);
     }
 
     /* Allocate a Protection Domain (global) */
