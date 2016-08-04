@@ -220,8 +220,10 @@ typedef struct
 {
     enum pvfs2_param_request_type type;
     enum pvfs2_param_request_op op;
-    int64_t value;
-    int64_t value2[2];
+    union {
+        int64_t value64;
+        int64_t value32[2];
+    } u;
     char s_value[PVFS2_MAX_DEBUG_STRING_LEN]; 
 } pvfs2_param_request_t;
 
