@@ -222,7 +222,7 @@ typedef struct
     enum pvfs2_param_request_op op;
     union {
         int64_t value64;
-        int64_t value32[2];
+        int32_t value32[2];
     } u;
     char s_value[PVFS2_MAX_DEBUG_STRING_LEN]; 
 } pvfs2_param_request_t;
