@@ -605,7 +605,6 @@ static PINT_sm_action msgpairarray_completion_fn(
                    */ 
                   if ( msg_p->comp_fn )
                   {
-                     msg_p->op_status = resp_p->status;
                      break; /*execute comp fn*/
                   }
                   else
@@ -716,7 +715,6 @@ cleanup:
          * retry, just return one of the error codes.
          */
         mop->params.comp_ct = 0;
-        //js_p->error_code = 0;
         for (i=0; i < mop->count; i++)  
         {
             PINT_sm_msgpair_state *msg_p = &mop->msgarray[i];
