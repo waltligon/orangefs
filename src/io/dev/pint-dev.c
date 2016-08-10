@@ -31,11 +31,16 @@
 #ifdef WIN32
 #include <io.h>
 
+/* a downsize call approximation */
+#define WIN32_DOWNCALL_SIZE    8200
+
 /* define our own iovec */
 struct iovec {
     void   *iov_base;
     size_t iov_len;
 };
+
+
 #endif
 
 #include "pvfs2-internal.h"
@@ -168,60 +173,81 @@ int PINT_dev_initialize(
 
     /* Figure out whether or not we're using the upstream kernel module. */
     ret = ioctl(pdev_fd, PVFS_DEV_UPSTREAM, &upstream_kmod);
-    if (ret < 0) {
-      gossip_err("%s: ioctl() PVFS_DEV_UPSTREAM failure :%d:\n", __func__, ret);
-      return (-(PVFS_ENODEV|PVFS_ERROR_DEV));
+    if (ret < 0)
+    {
+        gossip_err("%s: ioctl() PVFS_DEV_UPSTREAM failure :%d:\n",
+                   __func__, ret);
+        return (-(PVFS_ENODEV|PVFS_ERROR_DEV));
     }
 
     /* push the client debug mask into the kernel and initialize the client 
      * debug string.
      */
-    if (!upstream_kmod) {
-      mask_info.mask_type  = CLIENT_MASK;
-      mask_info.mask_value = gossip_debug_mask;
-      ret = ioctl(pdev_fd, PVFS_DEV_DEBUG, &mask_info);
-      if (ret < 0)
-        gossip_err("%s: ioctl() PVFS_DEV_DEBUG failure.\n", __func__);
-    } else {
-      mask2_info.mask1_value = 0;
-      mask2_info.mask2_value = gossip_debug_mask;
-      ret = ioctl(pdev_fd, PVFS_DEV_CLIENT_MASK, &mask2_info);
-      if (ret < 0) {
-        gossip_err("%s: ioctl() PVFS_DEV_CLIENT_MASK failure.\n", __func__);
-        goto out;
-      }
-
-      /*
-       * Scrape a representation of s_keyword_mask_map into the buffer to
-       * send back to the kernel module.
-       *
-       * There's an extra "column", the 0, in each "line", to make the
-       * upstream version of the kmod agnostic WRT orangefs versions 2 and 3.
-       *
-       * This code will have to change in V3 when there really is
-       * two "columns" of mask values.
-       */
-      memset(client_debug_array_string, 0, PVFS2_MAX_DEBUG_ARRAY_LEN);
-      for (i = 0; i < num_keyword_mask_map; i++) {
-        bytes = snprintf(client_debug_array_string + offset,
-                         PVFS2_MAX_DEBUG_ARRAY_LEN - offset,
-                         "%s 0 %llx\n",
-                         s_keyword_mask_map[i].keyword,
-                         (unsigned long long)s_keyword_mask_map[i].
-                         mask_val);
-        if ((bytes + offset) < PVFS2_MAX_DEBUG_ARRAY_LEN) {
-          offset = strlen(client_debug_array_string);
-        } else {
-          gossip_err("%s: overflow!\n", __func__);
-          ret = -1;
-          goto out;
+    if (!upstream_kmod)
+    {
+        mask_info.mask_type  = CLIENT_MASK;
+        mask_info.mask_value = gossip_debug_mask;
+        ret = ioctl(pdev_fd, PVFS_DEV_DEBUG, &mask_info);
+        if (ret < 0)
+        {
+            gossip_err("%s: ioctl() PVFS_DEV_DEBUG failure.\n", __func__);
         }
-      }
-      ret = ioctl(pdev_fd, PVFS_DEV_CLIENT_STRING, &client_debug_array_string);
-      if (ret < 0) {
-        gossip_err("%s: ioctl() PVFS_DEV_CLIENT_STRING failure.\n", __func__);
-        goto out;
-      }
+    }
+    else
+    {
+        mask2_info.mask1_value = 0;
+        mask2_info.mask2_value = gossip_debug_mask;
+        ret = ioctl(pdev_fd, PVFS_DEV_CLIENT_MASK, &mask2_info);
+        if (ret < 0)
+        {
+            gossip_err("%s: ioctl() PVFS_DEV_CLIENT_MASK failure.\n",
+                       __func__);
+            goto out;
+        }
+
+        /*
+         * Scrape a representation of s_keyword_mask_map into the buffer to
+         * send back to the kernel module.
+         *
+         * There's an extra "column", the 0, in each "line", to make the
+         * upstream version of the kmod agnostic WRT orangefs versions 2 and 3.
+         *
+         * This code will have to change in V3 when there really is
+         * two "columns" of mask values.
+         */
+        memset(client_debug_array_string, 0, PVFS2_MAX_DEBUG_ARRAY_LEN);
+
+        for (i = 0; i < num_keyword_mask_map; i++)
+        {
+            bytes = snprintf(client_debug_array_string + offset,
+                             PVFS2_MAX_DEBUG_ARRAY_LEN - offset,
+                             "%s 0 %llx\n",
+                             s_keyword_mask_map[i].keyword,
+                             (unsigned long long)s_keyword_mask_map[i].
+                             mask_val);
+
+            if ((bytes + offset) < PVFS2_MAX_DEBUG_ARRAY_LEN)
+            {
+                offset = strlen(client_debug_array_string);
+            }
+            else
+            {
+                gossip_err("%s: overflow!\n", __func__);
+                ret = -1;
+                goto out;
+            }
+        }
+  
+        ret = ioctl(pdev_fd,
+                    PVFS_DEV_CLIENT_STRING,
+                    &client_debug_array_string);
+
+        if (ret < 0)
+        {
+            gossip_err("%s: ioctl() PVFS_DEV_CLIENT_STRING failure.\n",
+                       __func__);
+            goto out;
+        }
     }
 
 out:
@@ -403,15 +429,20 @@ void *PINT_dev_get_mapped_buffer(
     int desc_count, desc_size;
 
     if (bm_type != BM_IO && bm_type != BM_READDIR)
+    {
         return NULL;
+    }
 
     desc_count = (bm_type == BM_IO) ? 
-                pvfs2_bufmap_desc_count :
-                PVFS2_READDIR_DEFAULT_DESC_COUNT;
+                 pvfs2_bufmap_desc_count :
+                 PVFS2_READDIR_DEFAULT_DESC_COUNT;
+
     desc_size  = (bm_type == BM_IO) ? 
-                pvfs2_bufmap_desc_size : 
-                PVFS2_READDIR_DEFAULT_DESC_SIZE;
+                 pvfs2_bufmap_desc_size : 
+                 PVFS2_READDIR_DEFAULT_DESC_SIZE;
+
     ptr =  (char *) desc[bm_type].ptr;
+
     return ((desc && ptr &&
              ((buffer_index > -1) &&
               (buffer_index < desc_count))) ?
@@ -480,13 +511,13 @@ int PINT_dev_test_unexpected(
                 switch(errno)
                 {
                     case EBADF:
-                        ret = -(PVFS_EBADF|PVFS_ERROR_DEV);
+                        ret = -(PVFS_EBADF | PVFS_ERROR_DEV);
                     case ENOMEM:
-                        ret = -(PVFS_ENOMEM|PVFS_ERROR_DEV);
+                        ret = -(PVFS_ENOMEM | PVFS_ERROR_DEV);
                     case EFAULT:
-                        ret = -(PVFS_EFAULT|PVFS_ERROR_DEV);
+                        ret = -(PVFS_EFAULT | PVFS_ERROR_DEV);
                     default:
-                        ret = -(PVFS_EIO|PVFS_ERROR_DEV);
+                        ret = -(PVFS_EIO | PVFS_ERROR_DEV);
                 }
                 goto dev_test_unexp_error;
             }
@@ -504,7 +535,7 @@ int PINT_dev_test_unexpected(
             {
                 if (pfd.revents & POLLNVAL)
                 {
-                    return -(PVFS_EBADF|PVFS_ERROR_DEV);
+                    return -(PVFS_EBADF | PVFS_ERROR_DEV);
                 }
                 continue;
             }
@@ -520,7 +551,7 @@ int PINT_dev_test_unexpected(
         buffer = malloc(read_size);
         if (buffer == NULL)
         {
-            ret = -(PVFS_ENOMEM|PVFS_ERROR_DEV);
+            ret = -(PVFS_ENOMEM | PVFS_ERROR_DEV);
             goto dev_test_unexp_error;
         }
 
@@ -535,14 +566,14 @@ int PINT_dev_test_unexpected(
             {
                 goto safe_exit;
             }
-            ret = -(PVFS_EIO|PVFS_ERROR_DEV);
+            ret = -(PVFS_EIO | PVFS_ERROR_DEV);
             goto dev_test_unexp_error;
         }
 
         if (ret == 0)
         {   
             /* assume we are done and return */
-          safe_exit:
+        safe_exit:
             free(buffer);
             gossip_debug(GOSSIP_USER_DEV_DEBUG,
                          "[DEV]: %s Exit: "
@@ -558,13 +589,13 @@ int PINT_dev_test_unexpected(
             gossip_err("Error: short message from device "
                        "(got %d bytes).\n", ret);
 
-            ret = -(PVFS_EIO|PVFS_ERROR_DEV);
+            ret = -(PVFS_EIO | PVFS_ERROR_DEV);
             goto dev_test_unexp_error;
         }
 
         proto_ver = (int32_t*)buffer;
-        magic = (int32_t*)((unsigned long)buffer + sizeof(int32_t));
-        tag = (uint64_t*)((unsigned long)buffer + 2*sizeof(int32_t));
+        magic = (int32_t *)((unsigned long)buffer + sizeof(int32_t));
+        tag = (uint64_t *)((unsigned long)buffer + 2 * sizeof(int32_t));
 
         if(*magic != pdev_magic)
         {
@@ -583,16 +614,16 @@ int PINT_dev_test_unexpected(
             gossip_err("Error: protocol versions do not match.\n");
             gossip_err("Please check that your pvfs2 module "
                        "and pvfs2-client versions are consistent.\n");
-            ret = -(PVFS_EPROTO|PVFS_ERROR_DEV);
+            ret = -(PVFS_EPROTO | PVFS_ERROR_DEV);
             goto dev_test_unexp_error;
         }
 
         info_array[*outcount].size =
-            (ret - 2*sizeof(int32_t) - sizeof(uint64_t));
+            (ret - 2 * sizeof(int32_t) - sizeof(uint64_t));
 
         /* shift buffer up so caller doesn't see header info */
-        info_array[*outcount].buffer = (void*)
-            ((unsigned long)buffer + 2*sizeof(int32_t) + sizeof(uint64_t));
+        info_array[*outcount].buffer = (void *)
+            ((unsigned long)buffer + 2 * sizeof(int32_t) + sizeof(uint64_t));
         info_array[*outcount].tag = *tag;
 
         upc = (pvfs2_upcall_t *) info_array[*outcount].buffer;
@@ -665,7 +696,7 @@ int PINT_dev_release_unexpected(
     if (info && info->buffer)
     {
         /* index backwards header size off of the buffer before freeing */
-        buffer = (void*)((unsigned long)info->buffer - 2*sizeof(int32_t) - 
+        buffer = (void *)((unsigned long)info->buffer - 2 * sizeof(int32_t) - 
                          sizeof(uint64_t));
         free(buffer);
 
@@ -696,11 +727,14 @@ int PINT_dev_write_list(
     int ret = -1;
     int32_t proto_ver = PVFS_KERNEL_PROTO_VERSION;
     int bytes_to_write = 0;
+#ifndef WIN32
     int sizeof_downcall = sizeof(pvfs2_downcall_t);
-#ifdef WIN32
+#else
     char *buffer, *b;
     size_t bsize = 0;
+    int sizeof_downcall = WIN32_DOWNCALL_SIZE;
 #endif
+    
     
     /* There will be a downcall iovec, and maybe a trailer iovec. */
     if (list_count > 2)
@@ -826,6 +860,13 @@ int PINT_dev_write(void *buffer,
         &buffer, &size, 1, size, buffer_type, tag);
 }
 
+/******************************************
+ * I believe this is dead code
+ * I cannot fine anywhere these are called
+ * Do not introduce them into new code
+ * I intend to remove them
+ */
+
 /* PINT_dev_memalloc()
  *
  * allocates a memory buffer optimized for transfer into the device
@@ -848,6 +889,8 @@ void PINT_dev_memfree(void *buffer, int size)
 {
     free(buffer);
 }
+
+/*****************************************/
 
 #ifdef __linux__
 /* setup_dev_entry()
