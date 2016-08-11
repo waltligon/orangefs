@@ -376,11 +376,13 @@ static int root_check_comp_fn(
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     /*
-      store the op_status before it's overwritten with the return
+      store the resp status before it's overwritten with the return
       value of this comp_fn by the msgpairarray code
     */
-    sm_p->u.setparam_list.root_check_status_array[i] =
-                    sm_p->msgarray_op.msgarray[i].op_status;
+    sm_p->u.setparam_list.root_check_status_array[i] = resp_p->status;
+
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG,"msgpair(%d) resp_p->status(%d)\n"
+                                     ,i,resp_p->status);
 
     /* need to return non-zero status at the end if any of the statuses
      * are nonzero
@@ -406,6 +408,9 @@ static int root_check_comp_fn(
         }
     }
 
+    /*msg_p->op_status will be zero unless more than one handle says that it
+     *owns the root handle.
+     */ 
     return 0;
 }
 

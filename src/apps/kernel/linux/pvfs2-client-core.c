@@ -1904,7 +1904,7 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                          (unsigned int)gossip_debug_mask);
 
             vfs_request->out_downcall.status = 0;
-            vfs_request->out_downcall.resp.param.value=mask;
+            vfs_request->out_downcall.resp.param.u.value64=mask;
             return(0);
 
 	/*
@@ -1933,13 +1933,13 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             if(vfs_request->in_upcall.req.param.type ==
                 PVFS2_PARAM_REQUEST_GET)
             {
-                vfs_request->out_downcall.resp.param.value =
+                vfs_request->out_downcall.resp.param.u.value64 =
                     s_opts.perf_time_interval_secs;
             }
             else
             {
                 s_opts.perf_time_interval_secs = 
-                    vfs_request->in_upcall.req.param.value;
+                    vfs_request->in_upcall.req.param.u.value64;
             }    
             vfs_request->out_downcall.status = 0;
             return(0);
@@ -1952,20 +1952,20 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                 PVFS2_PARAM_REQUEST_SET)
             {
                 /* readahead size parameter is in pages */
-                if (vfs_request->in_upcall.req.param.value >
+                if (vfs_request->in_upcall.req.param.u.value64 >
                     PVFS2_MAX_RACACHE_BUFSZ)
                 {
-                    vfs_request->in_upcall.req.param.value =
+                    vfs_request->in_upcall.req.param.u.value64 =
                             PVFS2_MAX_RACACHE_BUFSZ;
                 }
                 s_opts.readahead_size =
-                        vfs_request->in_upcall.req.param.value;
+                        vfs_request->in_upcall.req.param.u.value64;
                 pint_racache_set_buff_size(s_opts.readahead_size);
             }
             else
             {
                 /* readahead size reported in bytes */
-                vfs_request->out_downcall.resp.param.value =
+                vfs_request->out_downcall.resp.param.u.value64 =
                         s_opts.readahead_size;
             }
             return(0);
@@ -1977,20 +1977,20 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                 PVFS2_PARAM_REQUEST_SET)
             {
                 /* readahead count parameter is in num buffers */
-                if (vfs_request->in_upcall.req.param.value >
+                if (vfs_request->in_upcall.req.param.u.value64 >
                     PVFS2_MAX_RACACHE_BUFCNT)
                 {
-                    vfs_request->in_upcall.req.param.value =
+                    vfs_request->in_upcall.req.param.u.value64 =
                             PVFS2_MAX_RACACHE_BUFCNT;
                 }
                 s_opts.readahead_count =
-                        vfs_request->in_upcall.req.param.value;
+                        vfs_request->in_upcall.req.param.u.value64;
                 pint_racache_set_buff_count(s_opts.readahead_count);
             }
             else
             {
                 /* readahead count reported as num buffers */
-                vfs_request->out_downcall.resp.param.value =
+                vfs_request->out_downcall.resp.param.u.value64 =
                         s_opts.readahead_count;
             }
             return(0);
@@ -2002,33 +2002,33 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                 PVFS2_PARAM_REQUEST_SET)
             {
                 /* readahead count parameter is in num buffers */
-                if (vfs_request->in_upcall.req.param.value2[0] >
+                if (vfs_request->in_upcall.req.param.u.value32[0] >
                     PVFS2_MAX_RACACHE_BUFCNT)
                 {
-                    vfs_request->in_upcall.req.param.value2[0] =
+                    vfs_request->in_upcall.req.param.u.value32[0] =
                             PVFS2_MAX_RACACHE_BUFCNT;
                 }
                 s_opts.readahead_count =
-                        vfs_request->in_upcall.req.param.value2[0];
+                        vfs_request->in_upcall.req.param.u.value32[0];
                 /* readahead size parameter is in pages */
-                if (vfs_request->in_upcall.req.param.value2[1] >
+                if (vfs_request->in_upcall.req.param.u.value32[1] >
                     PVFS2_MAX_RACACHE_BUFSZ)
                 {
-                    vfs_request->in_upcall.req.param.value2[1] =
+                    vfs_request->in_upcall.req.param.u.value32[1] =
                             PVFS2_MAX_RACACHE_BUFSZ;
                 }
                 s_opts.readahead_size =
-                        vfs_request->in_upcall.req.param.value2[1];
+                        vfs_request->in_upcall.req.param.u.value32[1];
                 pint_racache_set_buff_count_size(s_opts.readahead_count,
                                                  s_opts.readahead_size);
             }
             else
             {
                 /* readahead count reported as num buffers */
-                vfs_request->out_downcall.resp.param.value2[0] =
+                vfs_request->out_downcall.resp.param.u.value32[0] =
                         s_opts.readahead_count;
                 /* readahead size reported in bytes */
-                vfs_request->out_downcall.resp.param.value2[1] =
+                vfs_request->out_downcall.resp.param.u.value32[1] =
                         s_opts.readahead_size;
             }
             return(0);
@@ -2041,11 +2041,11 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                 ret = PINT_perf_get_info(PINT_acache_get_pc(),
                                          PINT_PERF_UPDATE_HISTORY,
                                          &tmp_perf_val);
-                vfs_request->out_downcall.resp.param.value = tmp_perf_val;
+                vfs_request->out_downcall.resp.param.u.value64 = tmp_perf_val;
             }
             else
             {
-                tmp_perf_val = vfs_request->in_upcall.req.param.value;
+                tmp_perf_val = vfs_request->in_upcall.req.param.u.value64;
                 ret = PINT_perf_set_info(PINT_acache_get_pc(),
                                          PINT_PERF_UPDATE_HISTORY,
                                          tmp_perf_val);
@@ -2067,7 +2067,7 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                 PINT_perf_reset(PINT_ncache_get_pc());
                 PINT_perf_reset(PINT_client_capcache_get_pc());
             }    
-            vfs_request->out_downcall.resp.param.value = 0;
+            vfs_request->out_downcall.resp.param.u.value64 = 0;
             vfs_request->out_downcall.status = 0;
             return(0);
             break;
@@ -2118,12 +2118,12 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             }
         }
 
-        vfs_request->out_downcall.resp.param.value = val;
+        vfs_request->out_downcall.resp.param.u.value64 = val;
     }
     else
     {
-        val = vfs_request->in_upcall.req.param.value;
-        vfs_request->out_downcall.resp.param.value = 0;
+        val = vfs_request->in_upcall.req.param.u.value64;
+        vfs_request->out_downcall.resp.param.u.value64 = 0;
         if (tmp_subsystem == ACACHE)
         {
             vfs_request->out_downcall.status = 
