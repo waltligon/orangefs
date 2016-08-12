@@ -592,6 +592,7 @@ static PINT_sm_action msgpairarray_completion_fn(
                case -PVFS_TIMEOUT_CAP:
                case -PVFS_TIMEOUT_CRED:
                {
+                  gossip_err("%s:resp_p->status(%d)\n",__func__,resp_p->status);
                   js_p->error_code = msg_p->op_status = resp_p->status;
                   goto cleanup; /*cleanup this msgpair and bypass comp fn*/
                }
