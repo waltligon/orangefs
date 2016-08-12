@@ -306,7 +306,13 @@ static PINT_sm_action remove_helper_cleanup(
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
+    /* invalidates metafile object, directory object, or symlink object */
     PINT_acache_invalidate(sm_p->object_ref);
+
+
+    /* Need to invalidate parent object (parent directory), since
+     * removing an object changes the timestamps for that directory.
+     */ 
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
