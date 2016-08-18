@@ -384,6 +384,8 @@ static ssize_t pvfs2_devreq_aio_write(struct kiocb *kiocb,
       total = total + iov[i].iov_len;
     }
 
+    ret = total;
+
     if (total < MAX_DEV_REQ_DOWNSIZE) {
       gossip_err("%s: total:%d: must be at least:%u:\n",
                  __func__,
