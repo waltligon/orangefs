@@ -410,8 +410,7 @@ static ssize_t pvfs2_devreq_aio_write(struct kiocb *kiocb,
 
     hash_link = qhash_search_and_remove(htable_ops_in_progress, &(head.tag));
     if (!hash_link) {
-      gossip_err("WARNING: No one's waiting for tag %llu\n",
-      llu(head.tag));
+      gossip_err("WARNING: No one's waiting for tag %llu\n", llu(head.tag));
       goto out;
     }
 
@@ -511,7 +510,7 @@ wakeup:
      */
     if (op->downcall.type == PVFS2_VFS_OP_FILE_IO) {
       int timed_out = 0;
-      DEFINE_WAIT(wait_entry);
+      DECLARE_WAITQUEUE(wait_entry, current);
     
       /*
        * tell the vfs op waiting on a waitqueue
@@ -521,13 +520,13 @@ wakeup:
       set_op_state_serviced(op);
       spin_unlock(&op->lock);
     
+      add_wait_queue_exclusive(&op->io_completion_waitq, &wait_entry);
       wake_up_interruptible(&op->waitq);
     
       while (1) {
+        set_current_state(TASK_INTERRUPTIBLE);
+
         spin_lock(&op->lock);
-        prepare_to_wait_exclusive(&op->io_completion_waitq,
-                                  &wait_entry,
-                                  TASK_INTERRUPTIBLE);
         if (op->io_completed) {
           spin_unlock(&op->lock);
           break;
@@ -549,10 +548,9 @@ wakeup:
                      __func__);
         break;
       }
-   
-      spin_lock(&op->lock);
-      finish_wait(&op->io_completion_waitq, &wait_entry);
-      spin_unlock(&op->lock);
+
+      set_current_state(TASK_RUNNING);
+      remove_wait_queue(&op->io_completion_waitq, &wait_entry);
     
       /* NOTE: for I/O operations we handle releasing the op
        * object except in the case of timeout.  the reason we
