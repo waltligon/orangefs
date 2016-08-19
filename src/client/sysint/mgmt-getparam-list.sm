@@ -151,30 +151,12 @@ static int mgmt_getparam_init(struct PINT_smcb *smcb,
 {    
     int ret = 0;
     struct PINT_client_sm *sm_p;
-    /* PVFS_object_ref temp_ref; */
     PVFS_capability capability;
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_getparam_init called\n");
 
     PINT_null_capability(&capability);
-
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT); 
-
-/* REMOVE THIS - WBL
-    temp_ref.fs_id = sm_p->u.getparam.fs_id;
-    js_p->error_code = PINT_cached_config_get_root_handle(
-                                                sm_p->u.getparam.fs_id, 
-                                                &temp_ref.handle);
-        
-    assert(js_p->error_code == 0);
-
-    PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
-                               temp_ref,
-                               PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT, 
-                               PVFS_TYPE_NONE,
-                               0);
-*/
- 
     PINT_sm_msgpair_state *msg_p = NULL;
 
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op,
@@ -218,7 +200,6 @@ static int getparam_comp_fn(void* v_p,
 
     if(resp_p->status == 0)
     {
-        //some code required to check if request was successful,
         sm_p->u.getparam.stats->history = resp_p->u.mgmt_getparam.history;
         sm_p->u.getparam.stats->interval = resp_p->u.mgmt_getparam.interval;
         sm_p->u.getparam.stats->key_count = resp_p->u.mgmt_getparam.key_count;

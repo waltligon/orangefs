@@ -31,7 +31,6 @@ int main(int argc, char *argv[])
     PVFS_credential creds;
     PVFS_fs_id cur_fs;
     PVFS_BMI_addr_t *addr_array, server_addr;
-    PVFS_error_details *details = NULL;
     struct PVFS_mgmtresp_getparam *perf_counter = (struct PVFS_mgmtresp_getparam*)malloc(sizeof(struct PVFS_mgmtresp_getparam));
     struct options *prog_opts = NULL;
     int ret = 0;
@@ -137,13 +136,12 @@ int main(int argc, char *argv[])
     }
 
     /* retrieve the parameters from the servers, checking for any errors */
-    ret = PVFS_mgmt_getparam_list(cur_fs,
-				  &creds, 
-                                  addr_array,
-                                  prog_opts->server_count,
-				  perf_counter,
-				  details,
-				  NULL);
+    ret = PVFS_mgmt_getparam(cur_fs,
+			     &creds, 
+                             addr_array,
+                             prog_opts->server_count,
+			     perf_counter,
+			     NULL);
     if (ret < 0)
     {
         PVFS_perror("PVFS_mgmt_getparam_list", ret);
@@ -293,5 +291,4 @@ static void cleanup(struct options *opts, PVFS_BMI_addr_t *addr_array)
  * End:
  *
  * vim: ts=4 sts=4 sw=4 expandtab
- */
-
+*/
