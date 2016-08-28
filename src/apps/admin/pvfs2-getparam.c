@@ -26,8 +26,8 @@ static void cleanup(struct options *ptr, PVFS_BMI_addr_t *addr_array);
 
 int main(int argc, char *argv[])
 {
-    //need to make sure that server->counts is 1 for the first trial run
-    //if 1 is provided with an s flag as command line option then should work
+    /*need to make sure that server->counts is 1 for the first trial run
+    if 1 is provided with an s flag as command line option then should work*/
     PVFS_credential creds;
     PVFS_fs_id cur_fs;
     PVFS_BMI_addr_t *addr_array, server_addr;
@@ -74,11 +74,11 @@ int main(int argc, char *argv[])
         cur_fs = prog_opts->fs_id;
     }
 
-    //if user specifies servers, allocate memory for the BMI addrs and
-    //then translate the server strings to BMI addrs
+    /*if user specifies servers, allocate memory for the BMI addrs and
+    then translate the server strings to BMI addrs*/
     if (prog_opts->server_count)
     {
-        // allocate memory for our BMI addresses and fill them in
+        /*allocate memory for our BMI addresses and fill them in*/
         addr_array = (PVFS_BMI_addr_t *)malloc(prog_opts->server_count *
                                            sizeof(PVFS_BMI_addr_t));
         if (!addr_array)
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        //else, user specified no servers, so a list will be built
+        /*else, user specified no servers, so a list will be built*/
         ret = PVFS_mgmt_count_servers(cur_fs, PINT_SERVER_TYPE_ALL,
                                       &(prog_opts->server_count));
         if (ret < 0)
@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
             return (-1);
         }
 
-        //allocate memory for the number of BMI addrs found
+        /*allocate memory for the number of BMI addrs found*/
         addr_array = (PVFS_BMI_addr_t *)malloc(prog_opts->server_count *
                                            sizeof(PVFS_BMI_addr_t));
         if (!addr_array)
@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
 
-        //retrieve the list of BMI addrs for the list of servers
+        /*retrieve the list of BMI addrs for the list of servers*/
         ret = PVFS_mgmt_get_server_array(cur_fs, PINT_SERVER_TYPE_ALL,
 					addr_array,
 					&(prog_opts->server_count));
@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
             return (-1);
         }
 
-        //use reverse lookups so the server URI's can be displayed to the user */
+        /*use reverse lookups so the server URI's can be displayed to the user */
         for (i = 0; i < prog_opts->server_count; i++)
         {
             prog_opts->server_list[i] = strdup(BMI_addr_rev_lookup(addr_array[i]));
@@ -144,13 +144,13 @@ int main(int argc, char *argv[])
 			     NULL);
     if (ret < 0)
     {
-        PVFS_perror("PVFS_mgmt_getparam_list", ret);
+        PVFS_perror("PVFS_mgmt_getparam", ret);
         return (-1);
     }
 
     printf("\nFSID: %d\n", cur_fs);
 
-    //display the uid statistics for each server to the user
+    /*display the counter statistics for each server to the user*/
     for (i = 0; i < prog_opts->server_count; i++)
     {
         printf("Server: %s\n", prog_opts->server_list[i]);

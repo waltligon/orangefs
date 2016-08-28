@@ -29,6 +29,7 @@ ADMINSRC := \
 	$(DIR)/pvfs2-check-server.c \
 	$(DIR)/pvfs2-drop-caches.c \
 	$(DIR)/pvfs2-get-uid.c \
+	$(DIR)/pvfs2-setparam.c \
 	$(DIR)/pvfs2-getparam.c
 	
 
