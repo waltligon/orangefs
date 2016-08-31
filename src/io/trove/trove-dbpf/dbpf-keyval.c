@@ -849,7 +849,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
             *op_p->u.k_iterate.position_p = count-1;
             /* store a session identifier in the second 16 bits */
             tmp_pos += readdir_session;
-            *op_p->u.k_iterate.position_p += (tmp_pos << 16);
+            *op_p->u.k_iterate.position_p += (tmp_pos << 32);
             readdir_session++;
         }
         else
