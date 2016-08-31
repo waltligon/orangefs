@@ -491,6 +491,8 @@ static ssize_t pvfs2_devreq_aio_write(struct kiocb *kiocb,
                        (char __user *)(iov[trailer_iovec].iov_base),
                        iov[trailer_iovec].iov_len)) {
       gossip_err("%s: failed to copy trailer.\n", __func__);
+      vfree(op->downcall.trailer_buf);
+      put_op(op);
       ret = -EFAULT;
       goto out;
     }
