@@ -753,6 +753,9 @@ static inline int is_root_handle(struct inode *inode)
                k2s(&(PVFS2_SB(inode->i_sb)->root_khandle),s1),
                k2s(get_khandle_from_ino(inode),s2));
 
+  kfree(s1);
+  kfree(s2);
+
   if (PVFS_khandle_cmp(&(PVFS2_SB(inode->i_sb)->root_khandle),
                        get_khandle_from_ino(inode)))
     return 0;
@@ -770,6 +773,9 @@ static inline int match_handle(PVFS_khandle resp_handle, struct inode *inode)
                __func__,
                k2s(&resp_handle,s1),
                k2s(get_khandle_from_ino(inode),s2));
+
+  kfree(s1);
+  kfree(s2);
 
   if (PVFS_khandle_cmp(&resp_handle, get_khandle_from_ino(inode)))
     return 0;
