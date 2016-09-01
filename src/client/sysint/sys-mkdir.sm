@@ -329,10 +329,18 @@ static int mkdir_msg_comp_fn(void *v_p,
 
     /* also insert entry into attr cache */
     PINT_CONVERT_ATTR(&attr, &sm_p->u.mkdir.sys_attr, 0);
+
+
 #if 0 /* Don't cache size_array. */
     PINT_acache_update(sm_p->object_ref, &attr, NULL, NULL);
 #endif
-    PINT_acache_update(sm_p->object_ref, &attr, NULL);
+
+
+    /* invalidate the acache entry for the parent object, since a successful
+     * mkdir has now changed the timestamps on the parent's dirdata handle, 
+     * invalidating the timestamps stored with the parent.
+     */
+    PINT_acache_invalidate(sm_p->object_ref);
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "*** Got newly created dir handle %llu\n",
