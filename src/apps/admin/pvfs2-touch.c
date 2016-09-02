@@ -91,6 +91,7 @@ int main(int argc, char **argv)
         PVFS_sys_attr attr;
 
 
+        printf("working_file(%s)\n",working_file);
         /* Translate the working file into a pvfs2 relative path*/
         rc = PVFS_util_resolve(working_file, &cur_fs, pvfs_path, PVFS_NAME_MAX);
         if (rc)
@@ -102,6 +103,7 @@ int main(int argc, char **argv)
 
         /* Get the parent directory of the working file */
         rc = PINT_get_base_dir(pvfs_path, directory, PVFS_NAME_MAX);
+        printf("pvfs_path(%s)\n",pvfs_path);
 
         /* Determine the filename from the working */
         num_segs = PINT_string_count_segments(working_file);
@@ -123,6 +125,7 @@ int main(int argc, char **argv)
         }
 
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
+        printf("directory(%s)\n",directory);
         rc = PVFS_sys_lookup(cur_fs, directory, &credentials,
                              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
         if (rc)

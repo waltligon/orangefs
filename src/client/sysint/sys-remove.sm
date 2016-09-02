@@ -25,6 +25,7 @@
 #include "ncache.h"
 #include "pvfs2-internal.h"
 #include "dist-dir-utils.h"
+#include "client-capcache.h"
 
 /*
   PVFS_{i}sys_remove takes the following steps:
@@ -373,9 +374,15 @@ static PINT_sm_action remove_getattr_setup(
     
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: getattr_setup\n");
-    
-    sm_p->u.remove.stored_error_code = js_p->error_code;
-    js_p->error_code = 0;
+    if ( js_p->error_code == RMDIRENT_RETRY_NEED_GETATTR )
+    {
+       js_p->error_code = 0;
+    }    
+    else
+    {
+       sm_p->u.remove.stored_error_code = js_p->error_code;
+       js_p->error_code = 0;
+    }
      
     /* clear getattr */
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
@@ -487,8 +494,14 @@ static int remove_rmdirent_comp_fn(
 
         gossip_debug(
             GOSSIP_CLIENT_DEBUG,
-            "  remove_rmdirent_comp_fn: metafile handle = %llu\n",
+            "  remove_rmdirent_comp_fn: handle = %llu\n",
             llu(sm_p->object_ref.handle));
+
+        /* Since we just successfully removed an object from a parent, we must also
+         * invalidate the acache entry for the parent, because the timestamps will
+         * have changed.
+         */
+        PINT_acache_invalidate(sm_p->parent_ref); 
     }
     return resp_p->status;
 }
@@ -640,20 +653,36 @@ static PINT_sm_action remove_rmdirent_retry_or_fail(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_uid local_uid;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: rmdirent_retry_or_fail\n");
 
-    /* try again if we get a dirdata mismatch. */
-    if (js_p->error_code == -PVFS_EAGAIN &&
+    /* try again if we get a dirdata mismatch. until this is changed, PVFS_EAGAIN refers
+     * to a dirdata mismatch.  Since we are adding specific checks for capability 
+     * timeout, we must also retry if PVFS_TIMEOUT_CAP.
+     */
+    if ((js_p->error_code == -PVFS_EAGAIN || js_p->error_code == -PVFS_TIMEOUT_CAP) &&
         sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit)
     {
         sm_p->u.remove.retry_count++;
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "  received -PVFS_EAGAIN, wrong dirdata server, will do getattr and retry rmdirent!\n");
+                "  received %s, will do getattr and retry rmdirent!\n",
+                   js_p->error_code == -PVFS_EAGAIN ? "-PVFS_EAGAIN, wrong dirdata server" : 
+                                                      "-PVFS_TIMEOUT_CAP, capability timeout");
 
         /* clear acache content */
         PINT_acache_invalidate(sm_p->parent_ref);
+
+        /* clear capcache content */
+        local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+        if (local_uid == -1)
+        {
+           local_uid = PINT_util_getuid();
+           PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME, sizeof(PVFS_uid), &local_uid);
+        }
+        PINT_client_capcache_invalidate(sm_p->parent_ref,local_uid);
 
         js_p->error_code = RMDIRENT_RETRY_NEED_GETATTR;
         return SM_ACTION_COMPLETE;
