@@ -520,30 +520,28 @@ int pint_racache_get_block(PVFS_object_ref refn,
                          "short cache miss (no buffer)\n");
 
             buff = racache_buf_get(racache_file);
-            if (buff)
+            if (!buff)
             {
-                buff->file = racache_file;
-                buff->file_offset = pint_racache_buff_offset(offset);
-                gossip_debug(GOSSIP_RACACHE_DEBUG,
-                             "racache_get_block offset %llu(%llu) size %llu\n",
-                             llu(offset), llu(buff->file_offset),
-                             llu(buff->buff_sz));
+                gen_mutex_unlock(&racache.mutex);
+                return RACACHE_NONE;
+            }
+            buff->file = racache_file;
+            buff->file_offset = pint_racache_buff_offset(offset);
+            gossip_debug(GOSSIP_RACACHE_DEBUG,
+                         "racache_get_block offset %llu(%llu) size %llu\n",
+                         llu(offset), llu(buff->file_offset),
+                         llu(buff->buff_sz));
 
-                /* add request to waiting list */
-                glink = (gen_link_t *)malloc(sizeof(gen_link_t));
-                INIT_QLIST_HEAD(&glink->link);
-                glink->payload = vfs_req;
-                /* makes list FIFO */
-                qlist_add_tail(&glink->link, &buff->vfs_link);
-                buff->vfs_cnt++;
-                gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_get_block "
-                             "adding request %p to buffer %d vfs list #%d \n",
-                             vfs_req, buff->buff_id, buff->vfs_cnt);
-            }
-            else
-            {
-                buff = NULL;
-            }
+            /* add request to waiting list */
+            glink = (gen_link_t *)malloc(sizeof(gen_link_t));
+            INIT_QLIST_HEAD(&glink->link);
+            glink->payload = vfs_req;
+            /* makes list FIFO */
+            qlist_add_tail(&glink->link, &buff->vfs_link);
+            buff->vfs_cnt++;
+            gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_get_block "
+                         "adding request %p to buffer %d vfs list #%d \n",
+                         vfs_req, buff->buff_id, buff->vfs_cnt);
             /* return new buffer */
             if (rbuf)
             {
