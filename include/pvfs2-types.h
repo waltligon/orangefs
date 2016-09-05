@@ -223,6 +223,9 @@ enum PVFS_sys_layout_algorithm
     /* order the datafiles based on the list specified */
     PVFS_SYS_LAYOUT_LOCAL = 5
 };
+#define PVFS_SYS_LAYOUT_NULL 0
+#define PVFS_SYS_LAYOUT_MAX 5
+#define PVFS_SYS_LAYOUT_DEFAULT_ALGORITHM PVFS_SYS_LAYOUT_ROUND_ROBIN
 #define PVFS_SYS_LAYOUT_DEFAULT NULL
 
 /* The list of datafile servers that can be passed into PVFS_sys_create

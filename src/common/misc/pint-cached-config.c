@@ -307,7 +307,7 @@ int PINT_cached_config_handle_load_mapping(
         cur_config_fs_cache->data_server_cursor =
                         cur_config_fs_cache->fs->data_handle_ranges;
         cur_config_fs_cache->data_local_alias =
-                        config->host_id;
+                        config->host_id; /* the URL-like string bmi_address */
         /* find handle mapping of local host */
         if (cur_config_fs_cache->data_local_alias)
         {

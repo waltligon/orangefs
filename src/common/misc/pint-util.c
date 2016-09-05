@@ -691,7 +691,7 @@ void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
     /* figure out how big this encoding will be first */
 
     tmp_size = 16; /* enumeration and list count */
-    for(i=0 ; i<x->server_list.count; i++)
+    for(i = 0; i < x->server_list.count; i++)
     {
         /* room for each server encoding */
         tmp_size += encode_PVFS_BMI_addr_t_size_check(&(x)->server_list.servers[i]);
@@ -712,7 +712,7 @@ void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
     encode_skip4(pptr, NULL);
     encode_int32_t(pptr, &x->server_list.count);
     encode_skip4(pptr, NULL);
-    for(i=0 ; i<x->server_list.count; i++)
+    for(i = 0; i < x->server_list.count; i++)
     {
         encode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
     }
@@ -731,10 +731,11 @@ void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x)
     decode_skip4(pptr, NULL);
     if(x->server_list.count)
     {
-        x->server_list.servers = malloc(x->server_list.count*sizeof(*(x->server_list.servers)));
+        x->server_list.servers = malloc(x->server_list.count *
+                                        sizeof(*(x->server_list.servers)));
         assert(x->server_list.servers);
     }
-    for(i=0 ; i<x->server_list.count; i++)
+    for(i = 0 ; i < x->server_list.count; i++)
     {
         decode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
     }
