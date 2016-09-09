@@ -4274,6 +4274,18 @@ static inline PVFS_error handle_unexp_vfs_request(vfs_request_t *vfs_request)
             ret = service_mmap_ra_flush_request(vfs_request);
 #endif
             break;
+        case PVFS2_VFS_OP_FEATURES:
+#ifdef USE_RA_CACHE
+            vfs_request->out_downcall.resp.features.features =
+                PVFS2_FEATURE_READAHEAD;
+#else
+            vfs_request->out_downcall.resp.features.features = 0;
+#endif
+            vfs_request->out_downcall.status = ret;
+            vfs_request->out_downcall.type = vfs_request->in_upcall.type;
+            vfs_request->op_id = -1;
+            ret = 0;
+            break;
         case PVFS2_VFS_OP_INVALID:
         default:
             gossip_err(
@@ -5815,6 +5827,7 @@ static char *get_vfs_op_name_str(int op_type)
         { PVFS2_VFS_OP_PERF_COUNT, "PVFS2_VFS_OP_PERF_COUNT" },
         { PVFS2_VFS_OP_FSKEY,  "PVFS2_VFS_OP_FSKEY" },
         { PVFS2_VFS_OP_FILE_IOX, "PVFS2_VFS_OP_FILE_IOX" },
+        { PVFS2_VFS_OP_FEATURES, "PVFS2_VFS_OP_FEATURES" },
         { 0, "UNKNOWN" }
     };
 
