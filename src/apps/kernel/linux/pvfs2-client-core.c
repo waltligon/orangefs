@@ -2265,6 +2265,11 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request,
     PVFS_object_ref refn;
     PVFS_size buffer_size = pint_racache_buff_size();
 
+    /* sanity check */
+    if (!buff)
+    {
+        return ret;
+    }
     /* this buffer is already on the buff list for the file
      * and ihis vfs_request is already on the list for this buff */
     gossip_debug(GOSSIP_RACACHE_DEBUG,
@@ -2414,6 +2419,13 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
                                         rareq,
                                         &rabuff,
                                         &amt_returned);
+    /* check for valid return buffer */
+    if (!rabuff)
+    {
+        PVFS_hint_free(rareq->hints);
+        free(rareq);
+        return 0;
+    }
     /* check return status */
     switch(rareq->racache_status)
     {
@@ -2440,6 +2452,8 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
         free (rareq);
         return 0;
     default:
+        PVFS_hint_free(rareq->hints);
+        free (rareq);
         return ret;
     }
     #endif
