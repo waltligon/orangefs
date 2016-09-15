@@ -157,19 +157,25 @@ static PINT_sm_action setparam_work(
         case PVFS_SERV_PARAM_DROP_CACHES:
             js_p->error_code = drop_caches();
             return SM_ACTION_COMPLETE;
-        case PVFS_SERV_PARAM_SET_PERF_MON:
-						/* Quick and dirty just to make sure it works.  Add error handling */
-						ret = PINT_perf_set_info(PINT_server_pc, PINT_PERF_HISTORY_SIZE, s_op->req->u.mgmt_setparam.value.u.perf.hist);
-			      if(ret != 0) 
-							js_p->error_code = ret;
-						ret = PINT_perf_set_info(PINT_server_pc, PINT_PERF_UPDATE_INTERVAL, s_op->req->u.mgmt_setparam.value.u.perf.interval);
-						if(ret != 0)
-							js_p->error_code = ret;
+	case PVFS_SERV_PARAM_SET_HISTORY:
+	    ret = PINT_perf_set_info(PINT_server_pc, PINT_PERF_HISTORY_SIZE, s_op->req->u.mgmt_setparam.value.u.value);
+	    if(ret != 0) 
+	      js_p->error_code = ret;
             user_opts = get_server_config_struct();
-						user_opts->perf_update_interval = s_op->req->u.mgmt_setparam.value.u.perf.interval;
-						user_opts->perf_update_interval = s_op->req->u.mgmt_setparam.value.u.perf.hist;
-						return SM_ACTION_COMPLETE;
-
+	    user_opts->perf_hist = s_op->req->u.mgmt_setparam.value.u.value;
+	    return SM_ACTION_COMPLETE;
+	case PVFS_SERV_PARAM_SET_INTERVAL:
+	    ret = PINT_perf_set_info(PINT_server_pc, PINT_PERF_UPDATE_INTERVAL, s_op->req->u.mgmt_setparam.value.u.value);
+	    if(ret != 0) 
+	      js_p->error_code = ret;
+            user_opts = get_server_config_struct();
+	    user_opts->perf_update_interval = s_op->req->u.mgmt_setparam.value.u.value;
+	    return SM_ACTION_COMPLETE;
+	case PVFS_SERV_PARAM_SET_KEY_COUNT:
+	    ret = PINT_perf_set_info(PINT_server_pc, PINT_PERF_KEY_COUNT, s_op->req->u.mgmt_setparam.value.u.value);
+	    if(ret != 0) 
+	      js_p->error_code = ret;
+	    return SM_ACTION_COMPLETE;
     }
 
     gossip_lerr("Error: mgmt_setparam for unknown parameter %d.\n",

@@ -26,8 +26,6 @@ static void cleanup(struct options *ptr, PVFS_BMI_addr_t *addr_array);
 
 int main(int argc, char *argv[])
 {
-    /*need to make sure that server->counts is 1 for the first trial run
-    if 1 is provided with an s flag as command line option then should work*/
     PVFS_credential creds;
     PVFS_fs_id cur_fs;
     PVFS_BMI_addr_t *addr_array, server_addr;
@@ -57,7 +55,6 @@ int main(int argc, char *argv[])
     }
 
     PVFS_util_gen_credential_defaults(&creds);
-
     
     /* get a default fsid or use the one given by the user*/
     if (prog_opts->fs_id == -1)
@@ -78,29 +75,28 @@ int main(int argc, char *argv[])
     then translate the server strings to BMI addrs*/
     if (prog_opts->server_count)
     {
-        /*allocate memory for our BMI addresses and fill them in*/
-        addr_array = (PVFS_BMI_addr_t *)malloc(prog_opts->server_count *
-                                           sizeof(PVFS_BMI_addr_t));
+        /*allocate memory for the BMI address and filling the value in*/
+        addr_array = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t));
         if (!addr_array)
         {
             fprintf(stderr, "Unable to allocate memory for BMI addrs\n");
             exit(EXIT_FAILURE);
         }
 
-        for (i = 0; i < prog_opts->server_count; i ++)
+	/*entering this condition means that server name was specified and 
+        so there can only be one server in the server_list*/
+        ret = BMI_addr_lookup(&server_addr, prog_opts->server_list[0]);
+        if (ret < 0)
         {
-            ret = BMI_addr_lookup(&server_addr, prog_opts->server_list[i]);
-            if (ret < 0)
-            {
-                PVFS_perror("BMI_addr_lookup", ret);
-                return (-1);
-            }
-            addr_array[i] = server_addr;
+            PVFS_perror("BMI_addr_lookup", ret);
+            return (-1);
         }
+        addr_array[0] = server_addr;
     }
     else
     {
-        /*else, user specified no servers, so a list will be built*/
+        /*else, user specified no servers, so a list will be built 
+	and the first server of that list will have it's parameters extracted*/
         ret = PVFS_mgmt_count_servers(cur_fs, PINT_SERVER_TYPE_ALL,
                                       &(prog_opts->server_count));
         if (ret < 0)
@@ -128,7 +124,7 @@ int main(int argc, char *argv[])
             return (-1);
         }
 
-        /*use reverse lookups so the server URI's can be displayed to the user */
+        /*use reverse lookups so the server URI's can be displayed to the user*/
         for (i = 0; i < prog_opts->server_count; i++)
         {
             prog_opts->server_list[i] = strdup(BMI_addr_rev_lookup(addr_array[i]));
@@ -150,13 +146,10 @@ int main(int argc, char *argv[])
 
     printf("\nFSID: %d\n", cur_fs);
 
-    /*display the counter statistics for each server to the user*/
-    for (i = 0; i < prog_opts->server_count; i++)
-    {
-        printf("Server: %s\n", prog_opts->server_list[i]);
-	printf("Key Count: %d Interval: %llu History: %llu", perf_counter->key_count, (long long unsigned int)perf_counter->interval, (long long unsigned int)perf_counter->history);
-        printf("\n");
-    }
+    /*display counter statistics for the server requested or the first one
+     in the general list formed*/
+    printf("Server: %s\n", prog_opts->server_list[0]);
+    printf("Key Count: %d Interval: %llu History: %llu\n", perf_counter->key_count, (long long unsigned int)perf_counter->interval, (long long unsigned int)perf_counter->history);
 
     /* memory cleanup */
     cleanup(prog_opts, addr_array);

@@ -177,7 +177,6 @@ static int mgmt_getparam_init(struct PINT_smcb *smcb,
     msg_p->handle = PVFS_HANDLE_NULL;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = getparam_comp_fn;
-    //for single server using 0, else i to be used below
     msg_p->svr_addr = sm_p->u.getparam.addr_array[0];
 
     PINT_cleanup_capability(&capability);
