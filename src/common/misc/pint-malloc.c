@@ -204,6 +204,10 @@ static int memdebugflag = 0;
 #undef PINT_free
 #endif
 
+#ifdef PINT_free2
+#undef PINT_free2
+#endif
+
 /* Struct to handle PVFS malloc features is allocated just before the
  * returned memory
  */

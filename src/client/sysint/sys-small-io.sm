@@ -358,7 +358,7 @@ static int small_io_completion_fn(void * user_args,
             if(resp_p->u.small_io.result_size != bytes_processed)
             {
                 gossip_err("size of bytes copied to user buffer "
-                           "(%llu) do not match size of response (%llu)\n", 
+                           "(%llu) does not match size of response (%llu)\n", 
                            llu(bytes_processed),
                            llu(resp_p->u.small_io.result_size));
                 return -PVFS_EINVAL;
@@ -372,6 +372,7 @@ static int small_io_completion_fn(void * user_args,
     //sm_p->u.io.dfile_size_array[index] = resp_p->u.small_io.bstream_size;
 
     sm_p->u.io.total_size += resp_p->u.small_io.result_size;
+    gossip_debug(GOSSIP_IO_DEBUG,"sm_p->u.io.total_size(%llu)\n",llu(sm_p->u.io.total_size));
 
     /* Let's SMALL-IO know that the msg completed. */
     ctx->msg_completed = 1;

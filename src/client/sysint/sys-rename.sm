@@ -969,8 +969,7 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(
         sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index],
         sm_p->hints);
 
-    msg_p->fs_id = sm_p->u.rename.parent_refns[
-        sm_p->u.rename.rmdirent_index].fs_id;
+    msg_p->fs_id = sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].fs_id;
     /* send to dirdata handle */
     msg_p->handle = 
         sm_p->u.rename.dirent_handle[sm_p->u.rename.rmdirent_index];
@@ -1190,6 +1189,8 @@ static PINT_sm_action rename_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_ref replaced_ref = {0};
+
     sm_p->error_code = (sm_p->u.rename.stored_error_code ?
                         sm_p->u.rename.stored_error_code :
                         js_p->error_code);
@@ -1211,6 +1212,26 @@ static PINT_sm_action rename_cleanup(
             (const PVFS_object_ref*) &(sm_p->u.rename.refns[0]),
             (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[1]));
     }
+
+
+    /* invalidate the acache entries for the parent references because their 
+     * timestamps have changed.  NOTE: the parent references COULD be the same.
+     */
+    PINT_acache_invalidate(sm_p->u.rename.parent_refns[0]);
+    PINT_acache_invalidate(sm_p->u.rename.parent_refns[1]);
+
+
+    /* if the destination object required a  replacement, then we need to invalidate the 
+     * acache entry for the object that was removed.
+     */
+    if ( sm_p->u.rename.target_dirent_exists )
+    {
+       replaced_ref.handle = sm_p->u.rename.old_dirent_handle;
+       replaced_ref.fs_id  = sm_p->u.rename.parent_refns[1].fs_id;
+       PINT_acache_invalidate(replaced_ref);
+    }
+
+
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
