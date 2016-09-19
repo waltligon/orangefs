@@ -80,11 +80,11 @@ typedef uint64_t u_int64_t;
 } while (0)
 
 #define encode_int32_t(pptr,x) do { \
-    *(int32_t*) *(pptr) = htobmi32(*(x)); \
+    *(int32_t *) *(pptr) = htobmi32(*(x)); \
     *(pptr) += 4; \
 } while (0)
 #define decode_int32_t(pptr,x) do { \
-    *(x) = bmitoh32(*(int32_t*) *(pptr)); \
+    *(x) = bmitoh32(*(int32_t *) *(pptr)); \
     *(pptr) += 4; \
 } while (0)
 
@@ -180,8 +180,8 @@ typedef uint64_t u_int64_t;
  * Please remember when changing a fundamental type, e.g. PVFS_size, to update
  * also the set of #defines that tell the encoder what its type really is.
  */
-#define encode_enum encode_int32_t
-#define decode_enum decode_int32_t
+#define encode_enum(pptr,pbuf) encode_int32_t(pptr,pbuf)
+#define decode_enum(pptr,pbuf) decode_int32_t(pptr,pbuf)
 
 /* memory alloc and free, just for decoding */
 #if 0

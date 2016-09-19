@@ -190,7 +190,7 @@ typedef struct PVFS_dirhint_layout_s PVFS_dirhint_layout;
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 endecode_fields_2(PVFS_dirhint_layout,
-        enum PVFS_sys_layout_algorithm, algorithm,
+        uint32_t, algorithm,
         PVFS_dirhint_server_list, server_list);
 #endif
 

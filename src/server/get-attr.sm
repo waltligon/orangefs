@@ -2144,7 +2144,7 @@ static PINT_sm_action getattr_get_dir_hint(
     }
 
     /* NOTE: memory allocations are released in the getattr_cleanup()
-     * state getattr_cleanup->getattr_free->free_keyval_buffers
+     * function 
      */
    
     if (!(s_op->u.getattr.attrmask & PVFS_ATTR_DIR_HINT))
@@ -2194,6 +2194,7 @@ static PINT_sm_action getattr_get_dir_hint(
     }
     s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize =
             PVFS_REQ_LIMIT_LAYOUT;
+    s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count = 0;
 
     free_keyval_buffers(s_op);
         
@@ -2253,17 +2254,20 @@ static PINT_sm_action getattr_get_dir_hint(
         }
         else if (i == LAYOUT_KEY)
         {
-            s_op->val_a[i].buffer =
-                s_op->val_a[i].buffer = (char *) calloc(1, sizeof(int32_t));
-            s_op->val_a[i].buffer_sz = sizeof(int32_t);
+            s_op->val_a[i].buffer = (char *) calloc(1, 16);
+            if (s_op->val_a[i].buffer == NULL)
+            {
+                js_p->error_code = -PVFS_ENOMEM;
+                return SM_ACTION_COMPLETE;
+            }
+            s_op->val_a[i].buffer_sz = 16;
         }
         else if (i == SERVER_LIST_KEY)
         {
             s_op->val_a[i].buffer =
-               s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers;
-            s_op->val_a[i].count = 0
+                s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers;
             s_op->val_a[i].buffer_sz =
-               s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize;
+                s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize;
         }
     }
 
@@ -2291,6 +2295,8 @@ static PINT_sm_action getattr_interpret_dir_hint(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    long int dfile_count = 0;
+
     if (js_p->error_code != 0 && js_p->error_code != -TROVE_ENOENT)
     {
         /* if we failed to get any of the keys, and the error code is due to
@@ -2304,7 +2310,6 @@ static PINT_sm_action getattr_interpret_dir_hint(
         "getattr: job status code = %d\n", js_p->error_code);
     if (s_op->val_a && s_op->key_a)
     {
-        long int dfile_count = 0;
 
         if (s_op->error_a[DIST_NAME_KEY] == 0)
         {
@@ -2348,12 +2353,15 @@ static PINT_sm_action getattr_interpret_dir_hint(
                                               "read_sz = %d\n", 
                 s_op->val_a[NUM_DFILES_KEY].buffer, 
                 s_op->val_a[NUM_DFILES_KEY].read_sz);
-            dfile_count = strtol(s_op->val_a[NUM_DFILES_KEY].buffer
-                                , &endptr, 10);
+            dfile_count = strtol(s_op->val_a[NUM_DFILES_KEY].buffer,
+                                 &endptr,
+                                 10);
+
             if (*endptr != '\0' || dfile_count < 0)
             {
                 dfile_count = 0;
             }
+            s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = dfile_count;
         }
 /*
         if (s_op->val_a[NUM_DFILES_KEY].buffer)
@@ -2369,12 +2377,23 @@ static PINT_sm_action getattr_interpret_dir_hint(
 */
         if (s_op->error_a[LAYOUT_KEY] == 0)
         {
-            s_op->resp.u.getattr.attr.u.dir.hint.layout.algorithm =
-                    *(int32_t *)s_op->val_a[LAYOUT_KEY].buffer;
+            long int layout;
+            char *endptr = NULL;
+
+            layout = strtol(s_op->val_a[LAYOUT_KEY].buffer,
+                            &endptr, 
+                            10);
+
+            if (*endptr != '\0' ||
+                layout < PVFS_SYS_LAYOUT_NULL ||
+                layout > PVFS_SYS_LAYOUT_MAX)
+            {
+                layout = PVFS_SYS_LAYOUT_NULL;
+            }
+            s_op->resp.u.getattr.attr.u.dir.hint.layout.algorithm = layout;
         }
         else
         {
-            /* there was an error, so set no layout */
             s_op->resp.u.getattr.attr.u.dir.hint.layout.algorithm =
                     PVFS_SYS_LAYOUT_NULL;
         }
@@ -2384,21 +2403,21 @@ static PINT_sm_action getattr_interpret_dir_hint(
         {
             /* no error, so set the count from the list */
             /* list should be in the buffer of the k/v read */
-            s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize = 
-                    s_op->val_a[SERVER_LIST_KEY].read_sz;
             s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count = 
                     atoi(s_op->val_a[SERVER_LIST_KEY].buffer);
+            s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize = 
+                    strlen(s_op->val_a[SERVER_LIST_KEY].buffer);
+            /* force the dfile_count */
+            s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = 
+                  s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count;
         }
         else
         {
             s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count = 0;
             s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize = 0;
-            s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers[0] = 0;
         }            
 
         free_keyval_buffers(s_op);
-
-        s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = dfile_count;
 
         gossip_debug(GOSSIP_SERVER_DEBUG, "getattr: dir hint dfile_count: %d\n",
             s_op->resp.u.getattr.attr.u.dir.hint.dfile_count);

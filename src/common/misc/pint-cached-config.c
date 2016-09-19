@@ -588,7 +588,7 @@ int PINT_cached_config_map_servers(
 
     assert(inout_num_datafiles);
 
-    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
+    hash_link = qhash_search(PINT_fsid_config_cache_table, &(fsid));
     if(!hash_link)
     {
         gossip_err("Failed to find a file system matching fsid: %d\n", fsid);

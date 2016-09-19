@@ -228,9 +228,9 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
         if (src->mask & PVFS_ATTR_DIR_HINT)
         {
             dest->u.dir.hint.dfile_count = 
-                src->u.dir.hint.dfile_count;
+                    src->u.dir.hint.dfile_count;
             dest->u.dir.hint.dist_name_len =
-                src->u.dir.hint.dist_name_len;
+                    src->u.dir.hint.dist_name_len;
             if (dest->u.dir.hint.dist_name_len > 0)
             {
                 dest->u.dir.hint.dist_name = strdup(src->u.dir.hint.dist_name);
@@ -240,14 +240,29 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 }
             }
             dest->u.dir.hint.dist_params_len =
-                src->u.dir.hint.dist_params_len;
+                    src->u.dir.hint.dist_params_len;
             if (dest->u.dir.hint.dist_params_len > 0)
             {
-                dest->u.dir.hint.dist_params 
-                        = strdup(src->u.dir.hint.dist_params);
+                dest->u.dir.hint.dist_params =
+                        strdup(src->u.dir.hint.dist_params);
                 if (dest->u.dir.hint.dist_params == NULL)
                 {
                     free(dest->u.dir.hint.dist_name);
+                    return ret;
+                }
+            }
+            dest->u.dir.hint.layout.algorithm =
+                    src->u.dir.hint.layout.algorithm;
+            dest->u.dir.hint.layout.server_list.count =
+                    src->u.dir.hint.layout.server_list.count;
+            dest->u.dir.hint.layout.server_list.bufsize =
+                    src->u.dir.hint.layout.server_list.bufsize;
+            if (dest->u.dir.hint.layout.server_list.bufsize)
+            {
+                dest->u.dir.hint.layout.server_list.servers =
+                        strdup(src->u.dir.hint.layout.server_list.servers);
+                if (dest->u.dir.hint.layout.server_list.servers == NULL)
+                {
                     return ret;
                 }
             }
