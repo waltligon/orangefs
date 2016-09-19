@@ -402,7 +402,8 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
             {
                 free(attr->capability.handle_array);
             }            
-            if (attr->capability.issuer)
+            if (attr->capability.issuer &&
+                (attr->capability.issuer != PVFS2_BLANK_ISSUER))
             {
                 free(attr->capability.issuer);
             }
