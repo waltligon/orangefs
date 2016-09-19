@@ -3,6 +3,56 @@
 OrangeFS Release ChangeLog
 -----------------------
 
+orangefs-2.9.6 (Subversion Branch v.2.9.6)
+http://dev.orangefs.org/svn/orangefs/branches/v.2.9.6
+http://dev.orangefs.org/svn/orangefs/tags/v.2.9.6
+
+* - Software Infrastructure
+	* - Added malloc tracing feature.
+
+* - Testing
+	* - Excluded test 360 from xfstests.
+	* - Modified mpi-active-delete.c to handle FILE-NOT-FOUND on an
+	    unlink, increasing sleep time for the rank 0 process whenever a
+	    FILE-NOT-FOUND situation presents itself, and increased the number
+	    of delete tries from 5 to 10.
+	
+
+* - Client
+	* - ALL CLIENTS:
+		* - Modified pvfs2-cp so we don't try to change the number of
+		    dfiles on an existing file.
+		* - Improved acache processing by getting all attributes when
+		    only asked for a few, including capability.
+		* - Invalidated acache attributes for a directory when objects are created or
+		    removed.
+		* - Changed logic in the msgpairarray completion function in
+		    anticipation of a future change where a capability is
+		    invalidated from the capcache when the server says the
+		    capability has timed out.
+		* - Change the implementation of the token returned by
+		    readdir, negating the need for an rcache.
+		* - Removed memory leaks.
+	* - CLIENT CORE:
+		* - Handle mount command error when URL doesn't have a port number.
+		* - Added readahead caching feature.
+		* - Changed readahead parameter into union so as not to change
+		    kernel protocol.
+
+
+* - Kernel Module
+	* - Changed two-parameter kernel op from int64_t to int32_t to
+	    match one-parameter kernel op.
+	* - To make the kernel compile with Fedora with Linux version
+	    4.1.6-201, added support for iter vs iov/nr-segs. 
+	* - Cleanup of iov code in pvfs2_devreq_writev, uses
+	    copy_from_iter instead of copy_from_user on kernels that
+	    support iter.
+	* - Corrected khandle-related memory leak.
+	* - Fixed lock inversions in remount code.
+
+
+
 orangefs-2.9.5 (Subversion Branch v.2.9.5)
 http://dev.orangefs.org/svn/orangefs/branches/v.2.9.5
 http://dev.orangefs.org/svn/orangefs/tags/v.2.9.5
