@@ -124,6 +124,7 @@ nested machine pvfs2_client_getattr_sm
     state acache_lookup
     {
         run getattr_acache_lookup;
+        GETATTR_CACHE_MISS => object_getattr_setup_msgpair;
         default => client_capcache_lookup;
     }
 
