@@ -4011,6 +4011,7 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
         case PVFS2_VFS_OP_PARAM:
         case PVFS2_VFS_OP_FSKEY:
         case PVFS2_VFS_OP_CANCEL:
+        case PVFS2_VFS_OP_FEATURES:
             break;
         default:
             gossip_err("Completed upcall of unknown type %x!\n",
