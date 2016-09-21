@@ -97,15 +97,15 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 /* Reserved keys */
 enum 
 {
-    ROOT_HANDLE_KEY      = 0,
-    DIR_ENT_KEY          = 1,
-    METAFILE_HANDLES_KEY = 2,
-    METAFILE_DIST_KEY    = 3,
-    SYMLINK_TARGET_KEY   = 4,
-    METAFILE_LAYOUT_KEY  = 5,
-    NUM_DFILES_REQ_KEY   = 6,       
-    DIST_DIR_ATTR_KEY    = 7,
-    DIST_DIRDATA_BITMAP_KEY      = 8,
+    ROOT_HANDLE_KEY          = 0,
+    DIR_ENT_KEY              = 1,
+    METAFILE_HANDLES_KEY     = 2,
+    METAFILE_DIST_KEY        = 3,
+    SYMLINK_TARGET_KEY       = 4,
+    METAFILE_LAYOUT_KEY      = 5,
+    NUM_DFILES_REQ_KEY       = 6,       
+    DIST_DIR_ATTR_KEY        = 7,
+    DIST_DIRDATA_BITMAP_KEY  = 8,
     DIST_DIRDATA_HANDLES_KEY = 9
 
 };
@@ -124,11 +124,13 @@ enum
     DIST_NAME_KEY        = 0,
     DIST_PARAMS_KEY      = 1,
     NUM_DFILES_KEY       = 2,
-    NUM_SPECIAL_KEYS     = 3, /* not an index */
-    METAFILE_HINT_KEY    = 3,
-    MIRROR_COPIES_KEY    = 4,
-    MIRROR_HANDLES_KEY   = 5,
-    MIRROR_STATUS_KEY    = 6,
+    LAYOUT_KEY           = 3,
+    SERVER_LIST_KEY      = 4,
+    NUM_SPECIAL_KEYS     = 5, /* not an index */
+    METAFILE_HINT_KEY    = 5,
+    MIRROR_COPIES_KEY    = 6,
+    MIRROR_HANDLES_KEY   = 7,
+    MIRROR_STATUS_KEY    = 8,
 };
 
 typedef enum

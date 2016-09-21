@@ -216,7 +216,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
 
     if(layout->algorithm == PVFS_SYS_LAYOUT_LIST)
     {
-        for(i=0; i<layout->server_list.count; i++)
+        for(i = 0; i < layout->server_list.count; i++)
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, "layout list server %d: %lld\n", 
                 i, lld(layout->server_list.servers[i])); 
@@ -262,8 +262,10 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
         /* we can do a stuffed create here, only one datafile */
         s_op->req->u.create.attr.u.meta.dfile_count = 1;
         s_op->resp.u.create.metafile_attrs.u.meta.dfile_count = 1;
-        s_op->resp.u.create.metafile_attrs.u.meta.dfile_array = malloc(sizeof(PVFS_handle));
+        s_op->resp.u.create.metafile_attrs.u.meta.dfile_array =
+                                            malloc(sizeof(PVFS_handle));
         s_op->u.create.handle_array_local = malloc(sizeof(PVFS_handle));
+
         if(!s_op->resp.u.create.metafile_attrs.u.meta.dfile_array ||
            !s_op->u.create.handle_array_local)
         {
@@ -288,8 +290,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
                     sizeof(*s_op->u.create.handle_array_remote) *
                     s_op->u.create.num_io_servers);
     s_op->u.create.remote_io_servers = malloc(
-                    sizeof(char*) *
-                    s_op->u.create.num_io_servers);
+                    sizeof(char*) * s_op->u.create.num_io_servers);
 
     if(!s_op->resp.u.create.metafile_attrs.u.meta.dfile_array || 
         !s_op->u.create.handle_array_local ||
