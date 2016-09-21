@@ -112,7 +112,8 @@ enum PVFS_server_op
   || (x) == PVFS_SERV_MGMT_REMOVE_DIRENT)
 
 #define PVFS_REQ_COPY_CAPABILITY(__cap, __req) \
-    assert(PINT_copy_capability(&(__cap), &((__req).capability)) == 0)
+    { int rc = PINT_copy_capability(&(__cap), &((__req).capability)); \
+    assert(rc == 0); }
 
 /******************************************************************/
 /* these values define limits on the maximum size of variable length
