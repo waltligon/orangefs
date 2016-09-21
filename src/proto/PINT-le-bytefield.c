@@ -1228,8 +1228,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         decode_free(resp->u.getattr.attr.capability.handle_array);
                         decode_free(resp->u.getattr.attr.capability.signature);
                     }
-                    if (resp->u.getattr.attr.mask
-                         & PVFS_ATTR_DISTDIR_ATTR)
+                    if (resp->u.getattr.attr.mask & PVFS_ATTR_DISTDIR_ATTR)
                     {
                        decode_free
                         (resp->u.getattr.attr.dist_dir_bitmap);
