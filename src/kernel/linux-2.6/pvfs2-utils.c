@@ -687,7 +687,8 @@ int pvfs2_flush_inode(struct inode *inode)
     {
         gossip_debug(GOSSIP_UTILS_DEBUG,
                      "pvfs2_flush_inode skipping setattr()\n");
-        return 0;
+        ret = 0;
+        goto skip;
     }
         
     memset(s,0,HANDLESTRINGSIZE);
@@ -697,6 +698,8 @@ int pvfs2_flush_inode(struct inode *inode)
                  inode->i_mode);
 
     ret = pvfs2_inode_setattr(inode, &wbattr);
+
+skip:
     kfree(s);
     return ret;
 }
