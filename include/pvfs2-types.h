@@ -1133,7 +1133,7 @@ struct profiler
 #define PVFS2_SECURITY_TIMEOUT_MIN   5
 #define PVFS2_SECURITY_TIMEOUT_MAX   (10*365*24*60*60)   /* ten years */
 
-extern const char PVFS2_BLANK_ISSUER[];
+extern char PVFS2_BLANK_ISSUER[];
 
 typedef unsigned char *PVFS_cert_data;
 
