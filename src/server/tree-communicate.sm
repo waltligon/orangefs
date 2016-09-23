@@ -1042,6 +1042,8 @@ static int tree_remove_work_cleanup(struct PINT_smcb *smcb,
                                      old_frame->local_index];
             s_op->resp.u.tree_remove.status[status_array_index] = error_code;
 
+            gossip_err("%s:error_code(%d) from local operation\n",__func__,error_code);
+
             PINT_cleanup_capability(&old_frame->req->capability);
         }
         free(old_frame);

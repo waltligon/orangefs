@@ -266,6 +266,27 @@ static PINT_sm_action pjmp_remove_work_schedule_job(struct PINT_smcb *smcb, job_
    int ret;
    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+   /*Do we have a capability?*/
+   if ( PINT_capability_is_null(&s_op->req->capability) )
+   {
+      gossip_err("%s:tree remove passed in a NULL capability\n",__func__);
+      s_op->u.remove.saved_error_code = js_p->error_code = -PVFS_EINVAL;
+      return SM_ACTION_COMPLETE;
+   }
+
+   /*check capability before scheduling the job*/
+   PINT_debug_capability(&s_op->req->capability, "pjmp_remove_work_schedule_job Received");
+
+   ret = PINT_verify_capability(&s_op->req->capability);
+   if ( !ret )
+   {
+      /* capability timed out */
+      gossip_err("%s:Capability timed out\n",__func__);
+      s_op->u.remove.saved_error_code = js_p->error_code = -PVFS_TIMEOUT_CAP;
+      return SM_ACTION_COMPLETE;
+   }
+
+
    ret = PINT_server_req_get_object_ref(s_op->req
                                        ,&s_op->target_fs_id
                                        ,&s_op->target_handle);
