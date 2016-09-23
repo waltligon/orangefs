@@ -27,6 +27,7 @@ extern job_context_id pint_client_sm_context;
 enum
 {
     REMOVE_MUST_REMOVE_DATAFILES = 1,
+    SECURITY_RETRY_REMOVE = 2,
 };
 
 #define HANDLE_REMOVE_ERROR(state)                                     \
@@ -40,6 +41,12 @@ do {                                                                   \
     sm_p->u.remove.stored_error_code = js_p->error_code;               \
     js_p->error_code = 0;                                              \
 } while(0)
+
+/* function prototypes */
+static int remove_datafiles_comp_fn(void *v_p,
+                                    struct PVFS_server_resp *resp_p,
+                                    int index);
+
 
 %%
 
@@ -83,6 +90,8 @@ nested machine pvfs2_client_remove_helper_sm
     state datafile_remove_failure
     {
         run remove_datafile_remove_failure;
+        SECURITY_RETRY_REMOVE => getattr_init;
+        success => object_remove_setup_msgpair;
         default => remove_helper_cleanup;
     }
     
@@ -119,11 +128,16 @@ static PINT_sm_action remove_getattr_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    js_p->error_code = 0;
+
+    gossip_err("%s:sm_p->object_ref.handle(%llu)\n",__func__,llu(sm_p->object_ref.handle));
+
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE,
+        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_CAPABILITY,
         PVFS_TYPE_NONE,
         0);
     return SM_ACTION_COMPLETE;
@@ -179,6 +193,8 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
     PVFS_object_attr *attr = NULL;
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    unsigned int uret;
+    static unsigned int sleep_count = 0;
 
    /*
     * NOTE: it's easier to clean up from a metafile with no datafiles
@@ -199,7 +215,7 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
 
     PINT_SERVREQ_TREE_REMOVE_FILL(
         msg_p->req,
-        sm_p->parent_capability,
+        attr->capability, 
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         0,
@@ -210,7 +226,7 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = attr->u.meta.dfile_array[0];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;     /* TODO: Do we want retry? */
-    msg_p->comp_fn = NULL;
+    msg_p->comp_fn = remove_datafiles_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
@@ -219,6 +235,19 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
+    }
+
+    if ( sleep_count == 0 )
+    {
+       sleep_count++;
+       gossip_err("%s: waiting for 35 seconds before sending request to remove datafile handles\n",
+                 __func__);
+       uret=sleep(35);
+       if (uret)
+       {
+          gossip_err("%s:sleep failed(%u)\n"
+                    ,__func__,uret);
+       }
     }
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
@@ -242,7 +271,7 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
 
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
-        sm_p->parent_capability,
+        sm_p->getattr.attr.capability,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
@@ -270,8 +299,29 @@ static PINT_sm_action remove_datafile_remove_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_err("Error: failed removing one or more datafiles associated with the meta handle %llu\n", llu(sm_p->object_ref.handle));
-    HANDLE_REMOVE_ERROR("datafile_remove_failure");
+
+    /* if any of the datafiles were not removed due to a capability timeout, then we must
+     * regenerate a capability and retry the datafile removes.  To accomplish this, all we
+     * need to do is rerun getattr to regen the capability and retry the datafile removes.
+     */
+
+    gossip_err("%s:js_p->error_code(%d)\n",__func__,js_p->error_code);
+
+    switch(js_p->error_code)
+    {
+       case -PVFS_TIMEOUT_CAP:
+       case -PVFS_TIMEOUT_CRED:
+       {
+           js_p->error_code=SECURITY_RETRY_REMOVE;
+           break;
+       }
+       default:
+       {
+          HANDLE_REMOVE_ERROR("datafile_remove_failure");
+          break;
+       }
+    }
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -325,6 +375,48 @@ static PINT_sm_action remove_helper_cleanup(
     }
     return SM_ACTION_COMPLETE;
 }
+
+
+static int remove_datafiles_comp_fn(void *v_p,
+                                    struct PVFS_server_resp *resp_p,
+                                    int index)
+{
+    //PINT_smcb *smcb = v_p;
+    //PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int resp_status = resp_p->status;
+    int i;
+
+
+    assert(resp_p->op == PVFS_SERV_TREE_REMOVE);
+
+    if (resp_status != 0)
+    {
+       return (resp_status);
+    }
+
+    gossip_err("%s:resp_status(%d)\n",__func__,resp_status);
+
+    for (i=0; i<resp_p->u.tree_remove.handle_count; i++)
+    {
+       gossip_err("%s:handle(%d)\tstatus(%d)\n",
+                  __func__,
+                  i,
+                  resp_p->u.tree_remove.status[i]);
+       if ( resp_p->u.tree_remove.status[i] == -PVFS_TIMEOUT_CAP )
+       {
+          /* if there was a failure deleting a datafile, then ignore it and let
+           * fsck or some other process clean up orphaned datafiles.  However, if
+           * the delete failed due to a timeout, regenerate the capability and try
+           * again.  Because we are retrying, some of the datafiles may have already 
+           * been removed, so we can ignore those errors as well.
+           */
+          resp_status = -PVFS_TIMEOUT_CAP;
+       }
+               
+    }
+
+    return (resp_status);
+}/*end function remove_datafiles_comp_fn*/
 
 /*
  * Local variables:
