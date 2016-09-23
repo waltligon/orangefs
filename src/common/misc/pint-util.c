@@ -470,6 +470,11 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                 free(attr->u.dir.hint.dist_params);
                 attr->u.dir.hint.dist_params = NULL;
             }
+            if (attr->u.dir.hint.layout.server_list.servers)
+            {
+                free(attr->u.dir.hint.layout.server_list.servers);
+                attr->u.dir.hint.layout.server_list.servers = NULL;
+            }
         }
         if (attr->mask & PVFS_ATTR_DISTDIR_ATTR)
         {   
