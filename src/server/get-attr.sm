@@ -1102,7 +1102,7 @@ static PINT_sm_action getattr_mirrored_handles_safety_check(
     {
         for (col = 0; col < meta->dfile_count; col++)
         {
-            index = (row*meta->dfile_count) + col;
+            index = (row * meta->dfile_count) + col;
             if ( s_op->u.getattr.mirror_dfile_status_array[index] == UINT64_HIGH )
             {
                  meta->mirror_dfile_array[index] = 0;
@@ -2291,11 +2291,33 @@ static PINT_sm_action getattr_get_dir_hint(
     return ret;
 }
 
+/* I am testing a new idea for dealing with keyval buffers.
+ * Old system has a function free_keyval_buffers that looks at
+ * a global variable s_op->free_val and if it is true it will
+ * free all buffers, then free buffer structures.  If it is
+ * false it will only free buffer structures and not buffers
+ * assuming the buffers are referenced elsewhere.  New approach
+ * it to zero keyval buffers you do not want to automatically
+ * free, eliminating the variable.  This will use a new macro
+ * called KEEP_BUF
+ */
+
+#define KEEP_BUFFER(buf)                      \
+    do {                                      \
+        if ((buf) == -1)                      \
+        {                                     \
+            s_op->val.buffer = NULL;          \
+        }                                     \
+        else                                  \
+        {                                     \
+            s_op->val_a[(buf)].buffer = NULL; \
+        }                                     \
+    } while (0)
+
 static PINT_sm_action getattr_interpret_dir_hint(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    long int dfile_count = 0;
 
     if (js_p->error_code != 0 && js_p->error_code != -TROVE_ENOENT)
     {
@@ -2320,10 +2342,12 @@ static PINT_sm_action getattr_interpret_dir_hint(
                 (char *)s_op->val_a[DIST_NAME_KEY].buffer);
             s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len = 
                     s_op->val_a[DIST_NAME_KEY].read_sz;
+            KEEP_BUFFER(DIST_NAME_KEY);
         }
         else
         {
             s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len = 0;
+            s_op->resp.u.getattr.attr.u.dir.hint.dist_name = NULL;
         }            
 /*        s_op->val_a[DIST_NAME_KEY].buffer = NULL; */
 
@@ -2336,18 +2360,23 @@ static PINT_sm_action getattr_interpret_dir_hint(
                 (char *)s_op->val_a[DIST_PARAMS_KEY].buffer);
             s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len = 
                     s_op->val_a[DIST_PARAMS_KEY].read_sz;
+            KEEP_BUFFER(DIST_PARAMS_KEY);
         }
         else
         {
             s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len = 0;
+            s_op->resp.u.getattr.attr.u.dir.hint.dist_params = NULL;
         }
+/*
         if (s_op->val_a[DIST_PARAMS_KEY].buffer)
         {
-/*           s_op->val_a[DIST_PARAMS_KEY].buffer = NULL; */
+            s_op->val_a[DIST_PARAMS_KEY].buffer = NULL; 
         }
+*/
 
         if (s_op->error_a[NUM_DFILES_KEY] == 0)
         {
+            long int dfile_count = 0;
             char *endptr = NULL;
             gossip_debug(GOSSIP_SERVER_DEBUG, "val_a[NUM_DFILES_KEY] %p "
                                               "read_sz = %d\n", 
@@ -2410,13 +2439,16 @@ static PINT_sm_action getattr_interpret_dir_hint(
             /* force the dfile_count */
             s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = 
                   s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count;
+            KEEP_BUFFER(SERVER_LIST_KEY);
         }
         else
         {
             s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count = 0;
             s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize = 0;
+            s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers = NULL;
         }            
 
+        s_op->free_val = 1; /* free everything that is not KEEP_BUF */
         free_keyval_buffers(s_op);
 
         gossip_debug(GOSSIP_SERVER_DEBUG, "getattr: dir hint dfile_count: %d\n",
