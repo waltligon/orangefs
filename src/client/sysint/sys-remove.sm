@@ -488,7 +488,7 @@ static int remove_rmdirent_comp_fn(
         assert(resp_p->u.rmdirent.entry_handle != PVFS_HANDLE_NULL);
         assert(sm_p->parent_ref.fs_id != PVFS_FS_ID_NULL);
 
-        /* pull handle out of response, also copy in fs_id from before */
+        /* pull handle out of response, also copy in fs_id from parent */
         sm_p->object_ref.handle = resp_p->u.rmdirent.entry_handle;
         sm_p->object_ref.fs_id  = sm_p->parent_ref.fs_id;
 
@@ -502,6 +502,12 @@ static int remove_rmdirent_comp_fn(
          * have changed.
          */
         PINT_acache_invalidate(sm_p->parent_ref); 
+
+        /* We will also remove this object from the name cache, since we just
+         * successfully removed the entry from its parent.
+         */ 
+        PINT_ncache_invalidate(           (const char*) sm_p->u.remove.object_name,
+                               (const PVFS_object_ref*) &(sm_p->parent_ref));
     }
     return resp_p->status;
 }
@@ -511,12 +517,32 @@ static int remove_crdirent_comp_fn(
     struct PVFS_server_resp *resp_p,
     int index)
 {
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int ret = 0;
+
     assert(resp_p->op == PVFS_SERV_CRDIRENT);
 
     if (resp_p->status == 0)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "  remove_crdirent_comp_fn: OK\n");
+
+        /* We just recreated a directory entry, which is done when an error occurs 
+         * while removing this object, so lets re-add it to the name cache, if it was
+         * removed in remove_rmdirent_comp_fn.
+         */
+        if ( sm_p->object_ref.handle )
+        {
+           ret = PINT_ncache_update(sm_p->u.remove.object_name,
+                                    &sm_p->object_ref,
+                                    &sm_p->parent_ref);
+           if (ret)
+           {
+              /*give error message but don't let this update prevent further processing*/ 
+              gossip_err("%s:Error updating ncache(%d)\n",__func__,ret);
+           }
+        }
     }
     return resp_p->status;
 }
@@ -564,14 +590,6 @@ static PINT_sm_action remove_cleanup(
 
 
     PINT_cleanup_capability(&sm_p->parent_capability);
-
-    /* NOTE: acache is invalidated by remove_helper now */
-    
-    /* The ncache invalidate must be done from this function, because the 
-     * remove_helper may not  have all the information needed
-     */
-    PINT_ncache_invalidate((const char*) sm_p->u.remove.object_name,
-                           (const PVFS_object_ref*) &(sm_p->parent_ref));
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);

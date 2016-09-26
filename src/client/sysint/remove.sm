@@ -194,7 +194,7 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     unsigned int uret;
-    static unsigned int sleep_count = 0;
+    static unsigned int sleep_count = 1;
 
    /*
     * NOTE: it's easier to clean up from a metafile with no datafiles
@@ -215,7 +215,8 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
 
     PINT_SERVREQ_TREE_REMOVE_FILL(
         msg_p->req,
-        attr->capability, 
+        sm_p->parent_capability,
+        //attr->capability, 
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         0,
@@ -269,9 +270,14 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
+    gossip_err("%s:handle(%llu) to remove.\n",__func__,llu(sm_p->object_ref.handle));
+    //PINT_debug_capability(&sm_p->getattr.attr.capability,"Remove metafile object");
+    PINT_debug_capability(&sm_p->parent_capability,"Parent capability");
+
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
-        sm_p->getattr.attr.capability,
+        sm_p->parent_capability,
+        //sm_p->getattr.attr.capability,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
@@ -359,10 +365,9 @@ static PINT_sm_action remove_helper_cleanup(
     /* invalidates metafile object, directory object, or symlink object */
     PINT_acache_invalidate(sm_p->object_ref);
 
-
-    /* Need to invalidate parent object (parent directory), since
-     * removing an object changes the timestamps for that directory.
-     */ 
+    /* invalidate the capcache entry as well */
+    PINT_client_capcache_invalidate(sm_p->object_ref,
+                                    local_uid);
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
