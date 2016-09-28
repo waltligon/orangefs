@@ -5891,8 +5891,10 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
     /* check pool list, go back to sleep if any are empty */
     qlist_for_each(iterator, &fs->precreate_pool_list)
     {
-        pool = qlist_entry(iterator, struct precreate_pool,
-            list_link);
+        pool = qlist_entry(iterator,
+                           struct precreate_pool,
+                           list_link);
+
         /* only queue up for the type the call is looking for. no reason to
          * to wait on a type we don't need. it should get filled later */
         if((pool->pool_count < 1) && 
@@ -5911,7 +5913,7 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
      * operations needed to service job
      */
     tmp_trove_array = malloc(jd->u.precreate_pool.precreate_handle_count *
-        sizeof(struct precreate_pool_get_trove));
+                             sizeof(struct precreate_pool_get_trove));
     if(!tmp_trove_array)
     {
         gen_mutex_unlock(&precreate_pool_mutex);
@@ -5932,7 +5934,7 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
     /* translate reqested servers and set up necessary fields to post 
      * trove operations
      */
-    for(i=0; i<jd->u.precreate_pool.precreate_handle_count; i++)
+    for(i = 0; i < jd->u.precreate_pool.precreate_handle_count; i++)
     {
         if(jd->u.precreate_pool.servers)
         {
@@ -5943,7 +5945,7 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             qlist_for_each(iterator, &fs->precreate_pool_list)
             {
                 pool = qlist_entry(iterator, struct precreate_pool,
-                    list_link);
+                                   list_link);
                 /* in addition to matching host name, now we also make
                  * sure it's the correct type of pool for the specified
                  * server */
@@ -5981,22 +5983,25 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
              * to either start the process or move to the next. afterwards,
              * we cycle until we get to the right type */
             if(jd->u.precreate_pool.current_pool == NULL ||
-                jd->u.precreate_pool.current_pool->next == &fs->precreate_pool_list)
+                jd->u.precreate_pool.current_pool->next ==
+                                                 &fs->precreate_pool_list)
             {
                 /* either we are just starting, or we have wrapped around */
-                jd->u.precreate_pool.current_pool = fs->precreate_pool_list.next;
+                jd->u.precreate_pool.current_pool =
+                                 fs->precreate_pool_list.next;
             }
             else
             {
                 /* normal case; cycle to next pool */
                 jd->u.precreate_pool.current_pool =
-                    jd->u.precreate_pool.current_pool->next;
+                        jd->u.precreate_pool.current_pool->next;
             }
 
             /* ensure we don't loop forever, we want to look through at most
              * total_pool_count pools no matter the place in the list we start
              * at. if we don't find a pool, then there isn't a pool with the
-             * requested type. we'll call that einval below.*/
+             * requested type. we'll call that einval below.
+             */
             j = 0;
             total_pool_count = qlist_count( &fs->precreate_pool_list );
             gossip_debug( GOSSIP_SERVER_DEBUG, "%s: total pool count %d\n",
@@ -6004,17 +6009,18 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
 
             /* maybe too succinct? get the pool entry from the qlist, then
              * if we haven't looked through too many items and we actually
-             * got a pool item, see if it matches types. if not, assign the next
-             * pool and do it again. */
+             * got a pool item, see if it matches types.
+             * if not, assign the next pool and do it again.
+             */
             do
             {
                 pool = qlist_entry(jd->u.precreate_pool.current_pool, 
                                    struct precreate_pool, list_link);
-            }
-            while( ( j++ < total_pool_count ) && ( pool != NULL ) && 
-                   ( pool->pool_type != jd->u.precreate_pool.type ) && 
-                   ( jd->u.precreate_pool.current_pool = 
-                     jd->u.precreate_pool.current_pool->next) );
+
+            } while( ( j++ < total_pool_count ) && ( pool != NULL ) && 
+                     ( pool->pool_type != jd->u.precreate_pool.type ) && 
+                     ( jd->u.precreate_pool.current_pool = 
+                       jd->u.precreate_pool.current_pool->next) );
 
             /* either we got something null, we iterated through pool count 
              * items or, hopefully, we found a pool of the correct type!
@@ -6040,23 +6046,24 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             }
         }
 
-        tmp_trove_array[i].pool = qlist_entry(jd->u.precreate_pool.current_pool,
-            struct precreate_pool, list_link);
+        tmp_trove_array[i].pool =
+                qlist_entry(jd->u.precreate_pool.current_pool,
+                            struct precreate_pool, list_link);
 
         tmp_trove_array[i].jd = jd;
         tmp_trove_array[i].pos = PVFS_ITERATE_START;
         tmp_trove_array[i].count = 1;
         tmp_trove_array[i].key.buffer 
-            = &jd->u.precreate_pool.precreate_handle_array[i];
+                = &jd->u.precreate_pool.precreate_handle_array[i];
         tmp_trove_array[i].key.buffer_sz = sizeof(PVFS_handle);
         tmp_trove_array[i].trove_callback.fn 
-            = precreate_pool_get_thread_mgr_callback;
+                = precreate_pool_get_thread_mgr_callback;
         tmp_trove_array[i].trove_callback.data 
-            = &tmp_trove_array[i];
+                = &tmp_trove_array[i];
     }
 
     /* post all trove operations at once */
-    for(i=0; i<jd->u.precreate_pool.precreate_handle_count; i++)
+    for(i = 0; i < jd->u.precreate_pool.precreate_handle_count; i++)
     { 
         /* go ahead and decrement count to avoid races with other consumers */
         tmp_trove_array[i].pool->pool_count--;
@@ -6072,8 +6079,10 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             qlist_for_each_safe(iterator, scratch, 
                 &precreate_pool_check_level_list)
             {
-                jd_checker = qlist_entry(iterator, struct job_desc,
-                    job_desc_q_link);
+                jd_checker = qlist_entry(iterator,
+                                         struct job_desc,
+                                         job_desc_q_link);
+
                 if(jd_checker->u.precreate_pool.precreate_pool == 
                     tmp_trove_array[i].pool->pool_handle &&
                     tmp_trove_array[i].pool->pool_count < 
@@ -6085,7 +6094,8 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
 
                     /* move waiting job to completion queue */
                     gen_mutex_lock(&completion_mutex);        
-                    job_desc_q_add(completion_queue_array[jd->context_id], jd_checker);
+                    job_desc_q_add(completion_queue_array[jd->context_id],
+                                   jd_checker);
                     jd->completed_flag = 1;
 #ifdef __PVFS2_JOB_THREADED__
                     /* wake up anyone waiting for completion */
@@ -6098,29 +6108,29 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
 
         /* post trove operation to pull out a handle */
         ret = trove_keyval_iterate_keys(
-            fs->fsid, 
-            tmp_trove_array[i].pool->pool_handle,
-            &tmp_trove_array[i].pos,
-            &tmp_trove_array[i].key,
-            &tmp_trove_array[i].count,
-            tmp_trove_array[i].jd->u.precreate_pool.flags|
-            TROVE_BINARY_KEY|
-            TROVE_KEYVAL_HANDLE_COUNT|
-            TROVE_KEYVAL_ITERATE_REMOVE,
-            NULL, 
-            &tmp_trove_array[i].trove_callback, 
-            global_trove_context,
-            &tmp_id,
-            jd->hints);
+                fs->fsid, 
+                tmp_trove_array[i].pool->pool_handle,
+                &tmp_trove_array[i].pos,
+                &tmp_trove_array[i].key,
+                &tmp_trove_array[i].count,
+                tmp_trove_array[i].jd->u.precreate_pool.flags|
+                        TROVE_BINARY_KEY| TROVE_KEYVAL_HANDLE_COUNT|
+                        TROVE_KEYVAL_ITERATE_REMOVE,
+                NULL, 
+                &tmp_trove_array[i].trove_callback, 
+                global_trove_context,
+                &tmp_id,
+                jd->hints);
+
         if(ret < 0)
         {
             precreate_pool_get_thread_mgr_callback_unlocked(
-                &tmp_trove_array[i], ret);
+                    &tmp_trove_array[i], ret);
         }
         else if(ret == 1)
         {
             precreate_pool_get_thread_mgr_callback_unlocked(
-                &tmp_trove_array[i], 0);
+                    &tmp_trove_array[i], 0);
         }
         else
         {
@@ -6139,19 +6149,18 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
  * themselves.
  * mtmoore: need to expose types through this interface
  */
-int job_precreate_pool_iterate_handles(
-    PVFS_fs_id fsid,
-    PVFS_ds_position position,
-    PVFS_handle* handle_array,
-    int count,
-    PVFS_ds_flags flags,
-    PVFS_vtag* vtag,
-    void* user_ptr,
-    job_aint status_user_tag,
-    job_status_s* out_status_p,
-    job_id_t* id,
-    job_context_id context_id,
-    PVFS_hint hints)
+int job_precreate_pool_iterate_handles(PVFS_fs_id fsid,
+                                       PVFS_ds_position position,
+                                       PVFS_handle* handle_array,
+                                       int count,
+                                       PVFS_ds_flags flags,
+                                       PVFS_vtag* vtag,
+                                       void* user_ptr,
+                                       job_aint status_user_tag,
+                                       job_status_s* out_status_p,
+                                       job_id_t* id,
+                                       job_context_id context_id,
+                                       PVFS_hint hints)
 {
     PVFS_ds_position local_position;
     PVFS_ds_position pool_index;
@@ -6206,8 +6215,9 @@ int job_precreate_pool_iterate_handles(
     {
         if(tmp_index == pool_index)
         {
-            pool = qlist_entry(iterator, struct precreate_pool,
-                list_link);
+            pool = qlist_entry(iterator,
+                               struct precreate_pool,
+                               list_link);
             break;
         }
         tmp_index++;
@@ -6246,7 +6256,9 @@ int job_precreate_pool_iterate_handles(
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
-    jd->u.precreate_pool.key_array = malloc(count * sizeof(*jd->u.precreate_pool.key_array));
+    jd->u.precreate_pool.key_array = 
+                 malloc(count * sizeof(*jd->u.precreate_pool.key_array));
+
     if(!jd->u.precreate_pool.key_array)
     {
         gen_mutex_unlock(&precreate_pool_mutex);
@@ -6254,11 +6266,13 @@ int job_precreate_pool_iterate_handles(
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+
     for(i=0; i<count; i++)
     {
         jd->u.precreate_pool.key_array[i].buffer = &handle_array[i];
         jd->u.precreate_pool.key_array[i].buffer_sz = sizeof(handle_array[i]);
     }
+
     jd->job_user_ptr = user_ptr;
     jd->hints = hints;
     jd->u.precreate_pool.position = local_position;
@@ -6272,12 +6286,17 @@ int job_precreate_pool_iterate_handles(
     user_ptr_internal = &jd->trove_callback;
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_keyval_iterate_keys(fsid, pool->pool_handle,
-                               &(jd->u.precreate_pool.position), 
-                               jd->u.precreate_pool.key_array, 
-                               &(jd->u.precreate_pool.count), flags, NULL,
-                               user_ptr_internal, 
-                               global_trove_context, &tmp_id, jd->hints);
+    ret = trove_keyval_iterate_keys(fsid,
+                                    pool->pool_handle,
+                                    &(jd->u.precreate_pool.position), 
+                                    jd->u.precreate_pool.key_array, 
+                                    &(jd->u.precreate_pool.count),
+                                    flags,
+                                    NULL,
+                                    user_ptr_internal, 
+                                    global_trove_context,
+                                    &tmp_id,
+                                    jd->hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -6323,7 +6342,7 @@ int job_precreate_pool_iterate_handles(
 static struct fs_pool* find_fs(PVFS_fs_id fsid)
 {
     struct fs_pool* fs;
-    struct qlist_head* iterator;
+    struct qlist_head *iterator;
 
     qlist_for_each(iterator, &precreate_pool_fs_list)
     {

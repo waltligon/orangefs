@@ -4435,7 +4435,10 @@ static host_alias_s *find_host_alias_ptr_by_alias(
             cur = PINT_llist_next(cur);
         }
     }
-    if(index) *index = ind - 1;
+    if(index)
+    {
+        *index = ind - 1;
+    }
     return ret;
 }
 
@@ -4751,8 +4754,8 @@ int PINT_config_get_meta_handle_extent_array(
 
         if (cur_fs)
         {
-            my_alias = PINT_config_get_host_alias_ptr(
-                config_s, config_s->host_id);
+            my_alias = PINT_config_get_host_alias_ptr(config_s,
+                                                      config_s->host_id);
             if (my_alias)
             {
                 cur = cur_fs->meta_handle_ranges;
@@ -4983,8 +4986,7 @@ static char *get_handle_range_str(struct server_configuration_s *config_s,
 
     if (config_s && config_s->host_id && fs)
     {
-        my_alias = PINT_config_get_host_alias_ptr(
-            config_s,config_s->host_id);
+        my_alias = PINT_config_get_host_alias_ptr(config_s, config_s->host_id);
         if (my_alias)
         {
             cur = (meta_handle_range ? fs->meta_handle_ranges :
