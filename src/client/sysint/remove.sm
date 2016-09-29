@@ -16,6 +16,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "client-capcache.h"
 
 /*
  * Now included from client-state-machine.h
@@ -52,9 +53,9 @@ static int remove_datafiles_comp_fn(void *v_p,
 
 nested machine pvfs2_client_remove_helper_sm
 {
-    state getattr_init
+    state remove_helper_init
     {
-        run remove_getattr_init;
+        run remove_helper_init;
         default => getattr;
     }
 
@@ -90,11 +91,17 @@ nested machine pvfs2_client_remove_helper_sm
     state datafile_remove_failure
     {
         run remove_datafile_remove_failure;
-        SECURITY_RETRY_REMOVE => getattr_init;
+        SECURITY_RETRY_REMOVE => parent_init;
         success => object_remove_setup_msgpair;
         default => remove_helper_cleanup;
     }
-    
+
+    state parent_init
+    {
+        run remove_parent_init;
+        default => getattr;
+    }
+
     state object_remove_setup_msgpair
     {
         run remove_object_remove_setup_msgpair;
@@ -124,22 +131,64 @@ nested machine pvfs2_client_remove_helper_sm
 
 %%
 
-static PINT_sm_action remove_getattr_init(
+static PINT_sm_action remove_helper_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    js_p->error_code = 0;
-
     gossip_err("%s:sm_p->object_ref.handle(%llu)\n",__func__,llu(sm_p->object_ref.handle));
 
+
+    /* save the parent capability for this object, given to us in sys-remove.sm */
+    sm_p->u.remove.parent_capability = &sm_p->parent_capability;
+
+    /* initialize the parent_getattr structure.  note:  this initialization sets 
+     * object type to PVFS_TYPE_NONE; important later.
+    */
+    PINT_SM_GETATTR_STATE_CLEAR((*sm_p->u.remove.parent_getattr));
+
+    /* setup getattr structure to gather information about the object we are about to remove from dspace.
+     * Could be a metafile, symlink, or a directory.
+     */
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_CAPABILITY,
+        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE,
         PVFS_TYPE_NONE,
         0);
+
+    js_p->error_code = 0;
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action remove_parent_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_err("%s:sm_p->parent_ref.handle(%llu)\n",__func__,llu(sm_p->parent_ref.handle));
+
+    js_p->error_code = 0;
+
+    /* cleanup a capability that may have been requested by this state machine in an earlier retry. */
+    //PINT_cleanup_capability(&sm_p->u.remove.parent_getattr.capability);
+
+    /* initialize the parent_getattr structure 
+     * todo:  see if capability is released
+     */
+    PINT_SM_GETATTR_STATE_CLEAR(*sm_p->u.remove.parent_getattr);
+
+    /* call getattr using the parent_getattr structure */
+    PINT_SM_GETATTR_STATE_FILL(
+        *sm_p->u.remove.parent_getattr,
+         sm_p->parent_ref,
+         PVFS_ATTR_CAPABILITY|PVFS_ATTR_COMMON_TYPE,
+         PVFS_TYPE_NONE,
+         0);
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -147,10 +196,18 @@ static PINT_sm_action remove_getattr_analyze_results(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *attr = NULL;
-    attr = &sm_p->getattr.attr;
-    assert(attr);
+    PVFS_object_attr *parent_attr = &(sm_p->u.remove.parent_getattr->attr); /*attrs for parent object*/
+    PVFS_object_attr *attr        = &sm_p->getattr.attr;                   /*attrs for object being removed*/
 
+    /* NOTE:  When we come into this state, either a getattr was run on the object to be removed OR
+     *        the object's parent.  We always have to get the object's attrs, only once, so we know
+     *        what type of object we are removing.  These values are stored in sm_p->getattr.  We only
+     *        get the object's parent's attrs when we need to regenerate its capability.  In either case,
+     *        we need to proceed to the next state based on the object's type, not the parent's type.
+     */
+
+
+    /* checking object's attrs */
     switch(attr->objtype)
     {
 	case PVFS_TYPE_METAFILE:
@@ -183,6 +240,26 @@ static PINT_sm_action remove_getattr_analyze_results(
 	    gossip_err("%s: unhandled object type (%x)\n", __func__,
                        attr->objtype);
     }
+
+
+    /* checking object's parent's attrs */
+    switch(parent_attr->objtype)
+    {
+       case PVFS_TYPE_NONE:
+       {
+            /* we did not process a parent getattr; nothing left to do */
+            break;
+       }
+       default:
+       {
+            /* we retrieved the parent's getattr info for
+             * this object in order to update its capability's timeout.
+             */
+            sm_p->u.remove.parent_capability = &parent_attr->capability;
+            break;
+       }
+    }/*end switch*/
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -215,8 +292,8 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
 
     PINT_SERVREQ_TREE_REMOVE_FILL(
         msg_p->req,
-        sm_p->parent_capability,
-        //attr->capability, 
+        *sm_p->u.remove.parent_capability,
+        //sm_p->parent_capability,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         0,
@@ -272,11 +349,11 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
 
     gossip_err("%s:handle(%llu) to remove.\n",__func__,llu(sm_p->object_ref.handle));
     //PINT_debug_capability(&sm_p->getattr.attr.capability,"Remove metafile object");
-    PINT_debug_capability(&sm_p->parent_capability,"Parent capability");
+    PINT_debug_capability(sm_p->u.remove.parent_capability,"Parent capability");
 
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
-        sm_p->parent_capability,
+        *sm_p->u.remove.parent_capability,
         //sm_p->getattr.attr.capability,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
@@ -358,16 +435,27 @@ static PINT_sm_action remove_helper_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_uid local_uid;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: helper cleanup\n");
 
+    /* cleanup allocations made for getattr operations 
+     * todo: check to see if capability is deallocated
+     */
+    PINT_SM_GETATTR_STATE_CLEAR(*sm_p->u.remove.parent_getattr);
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     /* invalidates metafile object, directory object, or symlink object */
     PINT_acache_invalidate(sm_p->object_ref);
 
     /* invalidate the capcache entry as well */
-    PINT_client_capcache_invalidate(sm_p->object_ref,
-                                    local_uid);
+    local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+    if ( local_uid == (PVFS_uid) -1 )
+    {
+       local_uid = PINT_util_getuid();
+       PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME, sizeof(PVFS_uid), &local_uid);
+    }
+    PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
