@@ -180,8 +180,8 @@ struct PINT_client_remove_sm
     char                  *object_name;   /* input parameter */
     int                    stored_error_code;
     int                    retry_count;
-    PVFS_capability       *parent_capability;
-    PINT_sm_getattr_state *parent_getattr;
+    PVFS_object_attr       parent_attr;
+    PVFS_object_attr       object_attr; 
 };
 
 struct PINT_client_create_sm
