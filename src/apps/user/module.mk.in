@@ -5,6 +5,7 @@ USERSRC := \
 	$(DIR)/ofs_rm.c \
 	$(DIR)/ofs_cp.c \
 	$(DIR)/ofs_graphite_driver.c \
+	$(DIR)/ofs_setdirhint.c \
 	$(DIR)/pvfs2-rm.c \
 	$(DIR)/setmattr.c
  
