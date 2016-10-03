@@ -22,7 +22,7 @@ PVFS2_VERSION_SUB=6
 PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
 #PVFS2_VERSION_PRE="RC-$CONFIGURE_TIME"
-PVFS2_VERSION_PRE="REV-12602"
+PVFS2_VERSION_PRE="REV-12642"
 
 PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE-$PVFS2_VERSION_PRE
 AC_SUBST(PVFS2_VERSION)
@@ -443,7 +443,7 @@ fi]
 dnl a mechanism to turn on readahead caching (for kernel interface)
 RA_CACHE=""
 AC_ARG_ENABLE(racache,
-[  --enable-racache   **EXPERIMENTAL** Enables readahead in kernel interface],
+[  --enable-racache        Enables readahead in the Client Core ],
 [if test "x$enableval" = "xyes" ; then
 RA_CACHE="-DUSE_RA_CACHE"
 fi]

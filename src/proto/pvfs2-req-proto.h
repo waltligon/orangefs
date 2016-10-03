@@ -112,14 +112,15 @@ enum PVFS_server_op
   || (x) == PVFS_SERV_MGMT_REMOVE_DIRENT)
 
 #define PVFS_REQ_COPY_CAPABILITY(__cap, __req) \
-    assert(PINT_copy_capability(&(__cap), &((__req).capability)) == 0)
+    { int rc = PINT_copy_capability(&(__cap), &((__req).capability)); \
+    assert(rc == 0); }
 
 /******************************************************************/
 /* these values define limits on the maximum size of variable length
  * parameters used within the request protocol
  */
 
-/* max size of layout information (may include explicit server list */
+/* max size of layout information - may include explicit server list */
 #define PVFS_REQ_LIMIT_LAYOUT             4096
 /* max size of opaque distribution parameters */
 #define PVFS_REQ_LIMIT_DIST_BYTES         1024

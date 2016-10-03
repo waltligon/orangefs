@@ -163,12 +163,16 @@
 #define DIST_DIRDATA_BITMAP_KEYLEN   5
 
 /* Optional xattrs have "user.pvfs2." as a prefix */
-#define SPECIAL_DIST_NAME_KEYSTR        "dist_name\0"
-#define SPECIAL_DIST_NAME_KEYLEN         21
-#define SPECIAL_DIST_PARAMS_KEYSTR      "dist_params\0"
-#define SPECIAL_DIST_PARAMS_KEYLEN       23
-#define SPECIAL_NUM_DFILES_KEYSTR       "num_dfiles\0"
-#define SPECIAL_NUM_DFILES_KEYLEN        22
+#define SPECIAL_DIST_NAME_KEYSTR       "dist_name\0"
+#define SPECIAL_DIST_NAME_KEYLEN        21
+#define SPECIAL_DIST_PARAMS_KEYSTR     "dist_params\0"
+#define SPECIAL_DIST_PARAMS_KEYLEN      23
+#define SPECIAL_NUM_DFILES_KEYSTR      "num_dfiles\0"
+#define SPECIAL_NUM_DFILES_KEYLEN       22
+#define SPECIAL_LAYOUT_KEYSTR          "layout\0"
+#define SPECIAL_LAYOUT_KEYLEN           18
+#define SPECIAL_SERVER_LIST_KEYSTR     "server_list\0"
+#define SPECIAL_SERVER_LIST_KEYLEN      23
 #define SPECIAL_METAFILE_HINT_KEYSTR    "meta_hint\0"
 #define SPECIAL_METAFILE_HINT_KEYLEN    21
 #define SPECIAL_MIRROR_PARAMS_KEYSTR	"mirror\0"

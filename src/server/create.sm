@@ -216,7 +216,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
 
     if(layout->algorithm == PVFS_SYS_LAYOUT_LIST)
     {
-        for(i=0; i<layout->server_list.count; i++)
+        for(i = 0; i < layout->server_list.count; i++)
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, "layout list server %d: %lld\n", 
                 i, lld(layout->server_list.servers[i])); 
@@ -262,8 +262,10 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
         /* we can do a stuffed create here, only one datafile */
         s_op->req->u.create.attr.u.meta.dfile_count = 1;
         s_op->resp.u.create.metafile_attrs.u.meta.dfile_count = 1;
-        s_op->resp.u.create.metafile_attrs.u.meta.dfile_array = malloc(sizeof(PVFS_handle));
+        s_op->resp.u.create.metafile_attrs.u.meta.dfile_array =
+                                            malloc(sizeof(PVFS_handle));
         s_op->u.create.handle_array_local = malloc(sizeof(PVFS_handle));
+
         if(!s_op->resp.u.create.metafile_attrs.u.meta.dfile_array ||
            !s_op->u.create.handle_array_local)
         {
@@ -288,8 +290,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
                     sizeof(*s_op->u.create.handle_array_remote) *
                     s_op->u.create.num_io_servers);
     s_op->u.create.remote_io_servers = malloc(
-                    sizeof(char*) *
-                    s_op->u.create.num_io_servers);
+                    sizeof(char*) * s_op->u.create.num_io_servers);
 
     if(!s_op->resp.u.create.metafile_attrs.u.meta.dfile_array || 
         !s_op->u.create.handle_array_local ||
@@ -627,7 +628,7 @@ static PINT_sm_action write_keyvals(
 
     if(s_op->u.create.handle_array_remote_count)
     {
-        for(i=0; i<s_op->u.create.num_io_servers; i++)
+        for(i = 0; i < s_op->u.create.num_io_servers; i++)
         {
             /* find remote server positions and set handles */
             if(strcmp(s_op->u.create.io_servers[i], config->host_id))
@@ -669,7 +670,8 @@ static PINT_sm_action write_keyvals(
 
     s_op->val_a[0].buffer = s_op->resp.u.create.metafile_attrs.u.meta.dfile_array;
     s_op->val_a[0].buffer_sz =
-                    s_op->resp.u.create.metafile_attrs.u.meta.dfile_count * sizeof(PVFS_handle);
+                    s_op->resp.u.create.metafile_attrs.u.meta.dfile_count *
+                    sizeof(PVFS_handle);
 
     s_op->key_a[1].buffer = Trove_Common_Keys[METAFILE_DIST_KEY].key;
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
@@ -749,39 +751,41 @@ static PINT_sm_action setattr_setobj_attribs(
     a_p = &s_op->req->u.create.attr;
 
 
-     /* 
-      * Remember that mtime is versioned on disk! so convert it here..
-      * It is better to do it here than change the PVFS_object_attr_overwrite_setable
-      * macro, since there are many more users of it, I think.
-      */
+    /* 
+     * Remember that mtime is versioned on disk! so convert it here..
+     * It is better to do it here than change the PVFS_object_attr_overwrite_setable
+     * macro, since there are many more users of it, I think.
+     */
     if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
-     {
-         PVFS_time orig_mtime = a_p->mtime;
-         a_p->mtime = PINT_util_mktime_version(orig_mtime);
-         gossip_debug(GOSSIP_SETATTR_DEBUG, "setting version "
+    {
+        PVFS_time orig_mtime = a_p->mtime;
+        a_p->mtime = PINT_util_mktime_version(orig_mtime);
+        gossip_debug(GOSSIP_SETATTR_DEBUG, "setting version "
                  "to %llu\n\tmtime is %llu\n",
                  llu(a_p->mtime), llu(orig_mtime));
-     }
+    }
 
-     /*
-        we have the attribs stored in the dspace, as well as the
-        requested attribs to store.  overwrite the ones that are setable
-        and specified by the mask value in the request; macro defined in
-        pvfs2-storage.h.  NOTE: the following function versions the mtime
-        if PVFS_ATTR_COMMON_MTIME_SET is not set in the attribute mask.
-        */
-     PVFS_object_attr_overwrite_setable(dspace_a_p, a_p);
+    /*
+     * we have the attribs stored in the dspace, as well as the
+     * requested attribs to store.  overwrite the ones that are setable
+     * and specified by the mask value in the request; macro defined in
+     * pvfs2-storage.h.  NOTE: the following function versions the mtime
+     * if PVFS_ATTR_COMMON_MTIME_SET is not set in the attribute mask.
+     */
+    PVFS_object_attr_overwrite_setable(dspace_a_p, a_p);
 
 #ifdef ENABLE_SECURITY_CERT
-     /*                                                              
-      * if owner info is missing, map from credential
-      * note that user must have admin rights to set owner info
-      * to another user (see perm_create() below)
-      */
+    /*                                                              
+     * if owner info is missing, map from credential
+     * note that user must have admin rights to set owner info
+     * to another user (see perm_create() below)
+     */
     num_groups = PVFS_REQ_LIMIT_GROUPS;
 
-    ret = PINT_map_credential(&s_op->req->u.create.credential, &uid,
-                              &num_groups, group_array);
+    ret = PINT_map_credential(&s_op->req->u.create.credential,
+                              &uid,
+                              &num_groups,
+                              group_array);
     if (ret != 0)
     {
         js_p->error_code = ret;
@@ -814,12 +818,16 @@ static PINT_sm_action setattr_setobj_attribs(
     ds_attr = &(s_op->ds_attr);
     PVFS_object_attr_to_ds_attr(dspace_a_p, ds_attr);
 
-    ret = job_trove_dspace_setattr(
-        s_op->req->u.create.fs_id, s_op->resp.u.create.metafile_handle,
-        ds_attr,
-        TROVE_SYNC,
-        smcb, 0, js_p, &j_id, server_job_context,
-        s_op->req->hints);
+    ret = job_trove_dspace_setattr(s_op->req->u.create.fs_id,
+                                   s_op->resp.u.create.metafile_handle,
+                                   ds_attr,
+                                   TROVE_SYNC,
+                                   smcb,
+                                   0,
+                                   js_p,
+                                   &j_id,
+                                   server_job_context,
+                                   s_op->req->hints);
 
     return ret;
 }
@@ -830,8 +838,9 @@ static int setup_resp(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
 
-    /* NOTE:  Distribution was sent from the client in the original request structure, so there's no need to
-     *        to send the same information back.
+    /* NOTE:  Distribution was sent from the client in the
+     * original request structure, so there's no need to
+     * send the same information back.
      */ 
     if ( s_op->attr.owner >= 0 )
     {
@@ -859,11 +868,13 @@ static int setup_resp(
 
     if ( s_op->attr.mtime )
     {
-       /* Must "un-version" mtime before sending back to client:  When the mtime is stored in dspace in 
-        * in the setobj_attribs state, the mtime is "versioned", i.e., the time, given in seconds since
+       /* Must "un-version" mtime before sending back to client:
+        * When the mtime is stored in dspace in the setobj_attribs state,
+        * the mtime is "versioned", i.e., the time, given in seconds since
         * the Epoch, is modified using PINT_util_mktime_version().
         */
-       s_op->resp.u.create.metafile_attrs.mtime = PINT_util_mkversion_time(s_op->attr.mtime);
+       s_op->resp.u.create.metafile_attrs.mtime =
+                           PINT_util_mkversion_time(s_op->attr.mtime);
        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_COMMON_MTIME;
     }
 
@@ -879,7 +890,8 @@ static int setup_resp(
        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_COMMON_TYPE;
     }
 
-    if ( s_op->resp.u.create.metafile_attrs.u.meta.dfile_count && s_op->resp.u.create.metafile_attrs.u.meta.dfile_array )
+    if ( s_op->resp.u.create.metafile_attrs.u.meta.dfile_count &&
+         s_op->resp.u.create.metafile_attrs.u.meta.dfile_array )
     {
        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_META_DFILES;
     }

@@ -143,6 +143,8 @@ char *get_opname_string(pvfs2_kernel_op_t *new_op)
             return "OP_FSKEY";
         else if (type == PVFS2_VFS_OP_FILE_IOX)
             return "OP_FILE_IOX";
+        else if (type == PVFS2_VFS_OP_FEATURES)
+            return "OP_FEATURES";
     }
     return "OP_UNKNOWN?";
 }
