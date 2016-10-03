@@ -191,6 +191,11 @@ typedef struct
 
 typedef struct
 {
+    uint64_t features;
+} pvfs2_features_response_t;
+
+typedef struct
+{
     int32_t type;
     PVFS_error status;
     /* currently trailer is used only by readdir and readdirplus */
@@ -224,6 +229,7 @@ typedef struct
         pvfs2_param_response_t param;
         pvfs2_perf_count_response_t perf_count;
         pvfs2_fs_key_response_t fs_key;
+        pvfs2_features_response_t features;
     } resp;
 } pvfs2_downcall_t;
 

@@ -250,6 +250,11 @@ typedef struct
 
 typedef struct
 {
+    uint64_t features;
+} pvfs2_features_request_t;
+
+typedef struct
+{
     int32_t type;
     PVFS_uid uid;
     PVFS_gid gid;
@@ -287,6 +292,7 @@ typedef struct
         pvfs2_param_request_t param;
         pvfs2_perf_count_request_t perf_count;
         pvfs2_fs_key_request_t fs_key;
+        pvfs2_features_request_t features;
     } req;
 } pvfs2_upcall_t;
 

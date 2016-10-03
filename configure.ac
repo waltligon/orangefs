@@ -443,7 +443,7 @@ fi]
 dnl a mechanism to turn on readahead caching (for kernel interface)
 RA_CACHE=""
 AC_ARG_ENABLE(racache,
-[  --enable-racache   **EXPERIMENTAL** Enables readahead in kernel interface],
+[  --enable-racache        Enables readahead in the Client Core ],
 [if test "x$enableval" = "xyes" ; then
 RA_CACHE="-DUSE_RA_CACHE"
 fi]

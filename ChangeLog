@@ -59,6 +59,10 @@ New functionality:
 		* - Added readahead caching feature.
 		* - Changed readahead parameter into union so as not to change
 		    kernel protocol.
+		* - Added support allowing the upstream Linux/OrangeFS kernel
+		    module and the client core to communicate a "features" list
+		    between them, in order to support backwards compatibility with
+		    future enhancements.
 
 
 * - Kernel Module
