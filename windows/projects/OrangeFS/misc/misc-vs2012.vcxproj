@@ -246,7 +246,6 @@
     <ClCompile Include="..\..\..\..\src\common\misc\dist-dir-utils.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\extent-utils.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\md5.c" />
-    <ClCompile Include="..\..\..\..\src\common\misc\mmap-ra-cache.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\msgpairarray.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\pint-cached-config.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\pint-eattr.c" />

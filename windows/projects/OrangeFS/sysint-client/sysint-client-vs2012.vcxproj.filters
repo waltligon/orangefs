@@ -162,9 +162,6 @@
     <ClCompile Include="..\..\..\..\src\client\sysint\sys-truncate.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\src\client\sysint\rcache.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-dirdata-array.c">
       <Filter>Source Files</Filter>
     </ClCompile>

@@ -21,12 +21,13 @@
 /* ignore the __attribute__ keyword */
 #define __attribute__(x)  
 
-#define index(s, c)    strchr(s, c)
+#define index(s, c)               strchr(s, c)
 #define snprintf(s, n, f, ...)    _snprintf(s, n, f, __VA_ARGS__)
-#define strdup(s)      _strdup(s)
-#define strcasecmp     stricmp
-#define strncasecmp    strnicmp
-#define strtoll(str, end, base)    _atoi64(str)
+#define strdup(s)                 _strdup(s)
+#define strcasecmp                stricmp
+#define strncasecmp               strnicmp
+#define strtoll(str, end, base)   _atoi64(str)
+#define strtok_r(s, d, v)         strtok_s(s, d, v)
 
 /*
  * gettimeofday

@@ -245,7 +245,6 @@
     <ClCompile Include="..\..\..\..\src\client\sysint\perf-count-timer.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\pint-sysdev-unexp.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\pint-sysint-utils.c" />
-    <ClCompile Include="..\..\..\..\src\client\sysint\rcache.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\remove.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\server-get-config.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\sys-atomic-eattr.c" />
