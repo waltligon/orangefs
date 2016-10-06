@@ -626,10 +626,7 @@ enum PVFS_server_param
     PVFS_SERV_PARAM_EVENT_DISABLE = 6, /* event disable */
     PVFS_SERV_PARAM_SYNC_META = 7,   /* metadata sync flags */
     PVFS_SERV_PARAM_SYNC_DATA = 8,   /* file data sync flags */
-    PVFS_SERV_PARAM_DROP_CACHES = 9,
-    PVFS_SERV_PARAM_SET_HISTORY = 11, /* Set history param */
-    PVFS_SERV_PARAM_SET_INTERVAL = 12, /* Set interval param */
-    PVFS_SERV_PARAM_SET_KEY_COUNT = 13 /* Set key count param */
+    PVFS_SERV_PARAM_DROP_CACHES = 9
 };
 
 enum PVFS_mgmt_param_type
