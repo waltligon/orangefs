@@ -159,6 +159,7 @@ typedef struct server_configuration_s
     int  client_job_flow_timeout;
     int  client_retry_limit;        /* how many times to retry client operations */
     int  client_retry_delay_ms;     /* delay between retries */
+    int  perf_update_history;      /* how many perf samples to keep */
     int  perf_update_interval;      /* how quickly (in msecs) to
                                        update perf monitor              */
     uint32_t  *precreate_batch_size;    /* batch size for each ds type */

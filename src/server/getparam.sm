@@ -81,7 +81,7 @@ static PINT_sm_action getparam_work(
     if(user_opts->perf_update_interval != interval){
     /* handle the case where whats in server config conflicts with current perf setting */
     }
-    if(user_opts->perf_hist != hist){
+    if(user_opts->perf_update_history != hist){
     /* handle the case where whats in server config conflicts with current perf setting */
     }
     s_op->resp.u.mgmt_getparam.history = hist;

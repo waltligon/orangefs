@@ -440,10 +440,6 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
         if (arg > 0)
             pc->interval = arg;
         break;
-    case PINT_PERF_KEY_COUNT:
-        if (arg > 0)
-            pc->key_count = arg;
-        break;
     default:
         gen_mutex_unlock(&pc->mutex);
         return(-PVFS_EINVAL);
