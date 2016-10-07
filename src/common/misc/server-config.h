@@ -161,7 +161,6 @@ typedef struct server_configuration_s
     int  client_retry_delay_ms;     /* delay between retries */
     int  perf_update_interval;      /* how quickly (in msecs) to
                                        update perf monitor              */
-    int  perf_hist;
     uint32_t  *precreate_batch_size;    /* batch size for each ds type */
     uint32_t  *precreate_low_threshold; /* threshold for each ds type */
     char *logfile;                  /* what log file to write to */
