@@ -119,6 +119,7 @@ nested machine pvfs2_client_remove_helper_sm
     state object_remove_failure
     {
         run remove_object_remove_failure;
+        SECURITY_RETRY_REMOVE => parent_init;
         default => remove_helper_cleanup;
     }
 
@@ -268,7 +269,7 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     unsigned int uret;
-    static unsigned int sleep_count = 0;
+    static unsigned int sleep_count = 1;
 
    /*
     * NOTE: it's easier to clean up from a metafile with no datafiles
@@ -335,6 +336,8 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    unsigned int uret;
+    static unsigned int sleep_count = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: object_remove_setup_msgpair\n");
@@ -372,6 +375,21 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
     }
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+
+
+    if ( sleep_count == 0 )
+    {
+       sleep_count++;
+       gossip_err("%s: waiting for 35 seconds before sending request to remove object handle\n",
+                 __func__);
+       uret=sleep(35);
+       if (uret)
+       {
+          gossip_err("%s:sleep failed(%u)\n"
+                    ,__func__,uret);
+       }
+    }
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -419,6 +437,12 @@ static PINT_sm_action remove_object_remove_failure(
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, " directory not empty -- "
                      "returning error\n");
+    }
+    else if (js_p->error_code == -PVFS_TIMEOUT_CAP)
+    {
+       /* regenerate the capability and retry object remove */
+       js_p->error_code = SECURITY_RETRY_REMOVE;
+       return SM_ACTION_COMPLETE;
     }
     else
     {

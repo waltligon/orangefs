@@ -119,6 +119,10 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
     if (dest && src)
     {
+        gossip_err("%s:src->mask(X%0x) src->objtype(%d)\n"
+                  ,__func__
+                  ,src->mask
+                  ,src->objtype);
         if (src->mask & PVFS_ATTR_COMMON_UID)
         {
             dest->owner = src->owner;
@@ -178,6 +182,9 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 {
                     return ret;
                 }
+                gossip_err("%s:dest->dist_dir_bitmap(%p)\n"
+                          ,__func__
+                          ,dest->dist_dir_bitmap);
                 memcpy(dest->dist_dir_bitmap,
                        src->dist_dir_bitmap, dist_dir_bitmap_size);
             }
@@ -392,6 +399,10 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
 {
     if (attr)
     {
+        gossip_err("%s:attr->mask(%x) attr->objtype(%d)\n"
+                  ,__func__
+                  ,attr->mask
+                  ,attr->objtype);
         if (attr->mask & PVFS_ATTR_CAPABILITY)
         {
             if (attr->capability.signature)
@@ -457,6 +468,9 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
         }
         if (attr->mask & PVFS_ATTR_DISTDIR_ATTR)
         {   
+            gossip_err("%s:About to free dist_dir_bitmap(%p)\n"
+                      ,__func__
+                      ,attr->dist_dir_bitmap);
             if (attr->dist_dir_bitmap)
             {   
                 free(attr->dist_dir_bitmap);

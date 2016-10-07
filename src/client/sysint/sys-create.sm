@@ -755,6 +755,10 @@ static PINT_sm_action create_cleanup(
         sm_p->u.create.dirent_handle = NULL;
     }
 
+    gossip_err("%s:calling PINT_free_object_attr with mask(%x), object(%d)\n"
+              ,__func__
+              ,sm_p->u.create.attr.mask
+              ,sm_p->u.create.attr.objtype);
     PINT_free_object_attr(&sm_p->u.create.attr);
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
