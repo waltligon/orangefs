@@ -3640,6 +3640,9 @@ static int unstuff_comp_fn(void *v_p,
 
         /* replace attrs found by getattr */
         /* PINT_copy_object_attr() takes care of releasing old memory */
+
+        gossip_err("%s:resp_p->u.unstuff.attr.mask(%0x)\n",__func__
+                                                          ,resp_p->u.unstuff.attr.mask);
         PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.unstuff.attr);
 
         cap = &resp_p->u.unstuff.attr.capability;

@@ -268,8 +268,12 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
     PVFS_object_attr *attr = NULL;
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+
+//turn this on to test timeout
+#if 1 
     unsigned int uret;
-    static unsigned int sleep_count = 1;
+    static unsigned int sleep_count = 0;
+#endif
 
    /*
     * NOTE: it's easier to clean up from a metafile with no datafiles
@@ -291,7 +295,6 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
     PINT_SERVREQ_TREE_REMOVE_FILL(
         msg_p->req,
         sm_p->u.remove.parent_attr.capability,
-        //sm_p->parent_capability,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         0,
@@ -313,6 +316,8 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
         js_p->error_code = ret;
     }
 
+
+#if 1
     if ( sleep_count == 0 )
     {
        sleep_count++;
@@ -325,6 +330,8 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
                     ,__func__,uret);
        }
     }
+#endif
+
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
@@ -336,8 +343,12 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+
+//turn this on to test timeout
+#if 0
     unsigned int uret;
     static unsigned int sleep_count = 0;
+#endif
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: object_remove_setup_msgpair\n");
@@ -377,6 +388,7 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
 
 
+#if 0
     if ( sleep_count == 0 )
     {
        sleep_count++;
@@ -389,6 +401,7 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
                     ,__func__,uret);
        }
     }
+#endif
 
     return SM_ACTION_COMPLETE;
 }
@@ -402,8 +415,6 @@ static PINT_sm_action remove_datafile_remove_failure(
      * regenerate a capability and retry the datafile removes.  To accomplish this, all we
      * need to do is rerun getattr to regen the capability and retry the datafile removes.
      */
-
-    gossip_err("%s:js_p->error_code(%d)\n",__func__,js_p->error_code);
 
     switch(js_p->error_code)
     {
