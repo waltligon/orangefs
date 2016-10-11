@@ -389,6 +389,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
         if (src->mask & PVFS_ATTR_CAPABILITY)
         {
+            PINT_cleanup_capability(&dest->capability);
             ret = PINT_copy_capability(&src->capability, &dest->capability);
             if (ret < 0)
             {
