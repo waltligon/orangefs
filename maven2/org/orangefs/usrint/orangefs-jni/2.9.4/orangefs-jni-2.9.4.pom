@@ -78,7 +78,7 @@
             <uniqueVersion>false</uniqueVersion>
             <id>orangefs-repo</id>
             <name>OrangeFS Repository</name>
-            <url>svn:https://www.orangefs.org/svn/orangefs/branches/maven-repository/maven2</url>
+            <url>svn:https://dev.orangefs.org/svn/orangefs/branches/maven-repository/maven2</url>
         </repository>
     </distributionManagement>
 </project>
