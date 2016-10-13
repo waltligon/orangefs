@@ -22,6 +22,9 @@ New functionality:
 	4.  Added kernel module support for iter vs iov/nr-segs for kernels
 	    that support iter.
 
+	5.  An additional package is required to build OrangeFS:
+	    libattr-devel.
+
 * - Software Infrastructure
 	* - Added malloc tracing feature.
 	* - Corrected issues with the --enable-fast option.  This option
