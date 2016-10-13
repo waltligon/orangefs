@@ -637,7 +637,7 @@ enum PVFS_server_param
     PVFS_SERV_PARAM_SYNC_META = 9,       /* metadata sync flags */
     PVFS_SERV_PARAM_SYNC_DATA = 10,      /* file data sync flags */
     PVFS_SERV_PARAM_DROP_CACHES = 11,
-    PVFS_SERV_PARAM_TURN_OFF_TIMEOUTS    /* set bypass_timeout_check */
+    PVFS_SERV_PARAM_TURN_OFF_TIMEOUTS = 12 /* set bypass_timeout_check */
 };
 
 enum PVFS_mgmt_param_type
