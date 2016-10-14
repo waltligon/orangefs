@@ -38,10 +38,10 @@ extern int pint_client_pid;
 extern PINT_event_id PINT_client_sys_event_id;
 
 /*
-  used for locally storing completed operations from test() call so
-  that we can retrieve them in testsome() while still making progress
-  (and possible completing operations in the test() call
-*/
+ * used for locally storing completed operations from test() call so
+ * that we can retrieve them in testsome() while still making progress
+ * (and possible completing operations in the test() call
+ */
 static int s_completion_list_index = 0;
 static PINT_smcb *s_completion_list[MAX_RETURNED_JOBS] = {NULL};
 static gen_mutex_t s_completion_list_mutex = GEN_MUTEX_INITIALIZER;
@@ -429,7 +429,7 @@ struct PINT_state_machine_s *client_op_state_get_machine(int op)
             /* now check range for mgmt functions */
             if (op <= PVFS_OP_MGMT_MAXVAL)
             {
-                return PINT_client_sm_mgmt_table[op-PVFS_OP_SYS_MAXVAL-1].sm;
+                return PINT_client_sm_mgmt_table[(op - PVFS_OP_SYS_MAXVAL) - 1].sm;
             }
             else
             {
@@ -710,9 +710,9 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     PINT_smcb_set_cancelled(smcb);
 
     /*
-      don't return an error if nothing is cancelled, because
-      everything may have completed already
-    */
+     * don't return an error if nothing is cancelled, because
+     * everything may have completed already
+     */
     ret = 0;
 
     /* now run through and cancel the outstanding jobs */
@@ -922,8 +922,11 @@ PVFS_error PINT_client_state_machine_testany(
    *op_count = 0;
  
    /* check for requests completed previously */
-   ret = completion_list_retrieve_any_completed(
-       op_id_array, user_ptr_array, error_code_array, limit, op_count);
+   ret = completion_list_retrieve_any_completed(op_id_array,
+                                                user_ptr_array,
+                                                error_code_array,
+                                                limit,
+                                                op_count);
  
    /* return them if found */
    if ((ret == 0) && (*op_count > 0))
@@ -968,8 +971,11 @@ PVFS_error PINT_client_state_machine_testany(
    }
  
    /* terminated SMs have added themselves to the completion list */
-   ret = completion_list_retrieve_any_completed(
-       op_id_array, user_ptr_array, error_code_array, limit, op_count);
+   ret = completion_list_retrieve_any_completed(op_id_array,
+                                                user_ptr_array,
+                                                error_code_array,
+                                                limit,
+                                                op_count);
    gen_mutex_unlock(&test_mutex);
    return(ret);
 }
@@ -1017,8 +1023,11 @@ PVFS_error PINT_client_state_machine_testsome(
     *op_count = 0;
 
     /* check for requests completed previously */
-    ret = completion_list_retrieve_some_completed(
-        op_id_array, user_ptr_array, error_code_array, limit, op_count);
+    ret = completion_list_retrieve_some_completed(op_id_array,
+                                                  user_ptr_array,
+                                                  error_code_array,
+                                                  limit,
+                                                  op_count);
 
     /* return them if found */
     if ((ret == 0) && (*op_count > 0))
@@ -1063,8 +1072,11 @@ PVFS_error PINT_client_state_machine_testsome(
     }
 
     /* terminated SMs have added themselves to the completion list */
-    ret = completion_list_retrieve_some_completed(
-        op_id_array, user_ptr_array, error_code_array, limit, op_count);
+    ret = completion_list_retrieve_some_completed(op_id_array,
+                                                  user_ptr_array,
+                                                  error_code_array,
+                                                  limit,
+                                                  op_count);
     gen_mutex_unlock(&test_mutex);
     return(ret);
 }

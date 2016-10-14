@@ -65,12 +65,12 @@ static PINT_sm_action getparam_work(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -1; //Removed tmp_on = 0
-    unsigned int key_count, interval, hist;  //added this line
+    int ret = -1; 
+    unsigned int key_count, interval, hist;
     struct server_configuration_s *user_opts;
 
     //retreiving the various parameters
-    ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_HISTORY_SIZE, &hist);
+    ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_UPDATE_HISTORY, &hist);
     if(ret != 0) /* Verify return value */;
     ret = PINT_perf_get_info(PINT_server_pc, PINT_PERF_KEY_COUNT, &key_count);
     if(ret != 0) /* Verify return value */;

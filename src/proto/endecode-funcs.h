@@ -80,11 +80,11 @@ typedef uint64_t u_int64_t;
 } while (0)
 
 #define encode_int32_t(pptr,x) do { \
-    *(int32_t*) *(pptr) = htobmi32(*(x)); \
+    *(int32_t *) *(pptr) = htobmi32(*(x)); \
     *(pptr) += 4; \
 } while (0)
 #define decode_int32_t(pptr,x) do { \
-    *(x) = bmitoh32(*(int32_t*) *(pptr)); \
+    *(x) = bmitoh32(*(int32_t *) *(pptr)); \
     *(pptr) += 4; \
 } while (0)
 
@@ -180,8 +180,8 @@ typedef uint64_t u_int64_t;
  * Please remember when changing a fundamental type, e.g. PVFS_size, to update
  * also the set of #defines that tell the encoder what its type really is.
  */
-#define encode_enum encode_int32_t
-#define decode_enum decode_int32_t
+#define encode_enum(pptr,pbuf) encode_int32_t(pptr,pbuf)
+#define decode_enum(pptr,pbuf) decode_int32_t(pptr,pbuf)
 
 /* memory alloc and free, just for decoding */
 #if 0
@@ -322,8 +322,8 @@ static inline void decode_##name(char **pptr, sname *x) { \
 #define endecode_fields_6_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6) \
     endecode_fields_6_generic(name, struct name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6)
 
-#define endecode_fields_7(name,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7) \
-static inline void encode_##name(char **pptr, const name *x) { \
+#define endecode_fields_7_generic(name,sname,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7) \
+static inline void encode_##name(char **pptr, const sname *x) { \
     encode_##t1(pptr, &x->x1); \
     encode_##t2(pptr, &x->x2); \
     encode_##t3(pptr, &x->x3); \
@@ -332,7 +332,7 @@ static inline void encode_##name(char **pptr, const name *x) { \
     encode_##t6(pptr, &x->x6); \
     encode_##t7(pptr, &x->x7); \
 } \
-static inline void decode_##name(char **pptr, name *x) { \
+static inline void decode_##name(char **pptr, sname *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
     decode_##t3(pptr, &x->x3); \
@@ -342,28 +342,13 @@ static inline void decode_##name(char **pptr, name *x) { \
     decode_##t7(pptr, &x->x7); \
 }
 
-#define endecode_fields_7_struct(name,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7) \
-static inline void encode_##name(char **pptr, const struct name *x) { \
-    encode_##t1(pptr, &x->x1); \
-    encode_##t2(pptr, &x->x2); \
-    encode_##t3(pptr, &x->x3); \
-    encode_##t4(pptr, &x->x4); \
-    encode_##t5(pptr, &x->x5); \
-    encode_##t6(pptr, &x->x6); \
-    encode_##t7(pptr, &x->x7); \
-} \
-static inline void decode_##name(char **pptr, struct name *x) { \
-    decode_##t1(pptr, &x->x1); \
-    decode_##t2(pptr, &x->x2); \
-    decode_##t3(pptr, &x->x3); \
-    decode_##t4(pptr, &x->x4); \
-    decode_##t5(pptr, &x->x5); \
-    decode_##t6(pptr, &x->x6); \
-    decode_##t7(pptr, &x->x7); \
-}
+#define endecode_fields_7(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6, t7, x7) \
+    endecode_fields_7_generic(name, name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6, t7, x7)
+#define endecode_fields_7_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6, t7, x7) \
+    endecode_fields_7_generic(name, struct name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6, t7, x7)
 
-#define endecode_fields_8_struct(name,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8) \
-static inline void encode_##name(char **pptr, const struct name *x) { \
+#define endecode_fields_8_generic(name,sname,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8) \
+static inline void encode_##name(char **pptr, const sname *x) { \
     encode_##t1(pptr, &x->x1); \
     encode_##t2(pptr, &x->x2); \
     encode_##t3(pptr, &x->x3); \
@@ -373,7 +358,7 @@ static inline void encode_##name(char **pptr, const struct name *x) { \
     encode_##t7(pptr, &x->x7); \
     encode_##t8(pptr, &x->x8); \
 } \
-static inline void decode_##name(char **pptr, struct name *x) { \
+static inline void decode_##name(char **pptr, sname *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
     decode_##t3(pptr, &x->x3); \
@@ -383,6 +368,11 @@ static inline void decode_##name(char **pptr, struct name *x) { \
     decode_##t7(pptr, &x->x7); \
     decode_##t8(pptr, &x->x8); \
 }
+
+#define endecode_fields_8(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6, t7, x7, t8, x8) \
+    endecode_fields_8_generic(name, name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6, t7, x7, t8, x8)
+#define endecode_fields_8_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6, t7, x7, t8, x8) \
+    endecode_fields_8_generic(name, struct name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5, t6, x6, t7, x7, t8, x8)
 
 #define endecode_fields_9_struct(name,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9) \
 static inline void encode_##name(char **pptr, const struct name *x) { \
@@ -906,20 +896,20 @@ static inline void decode_##name(char **pptr, struct name *x)                 \
 };
 /* 3 fields, then an array, then 2 fields, then an array */
 #define endecode_fields_3a2a_struct(name, t1, x1, t2, x2, t3, x3, tn1, n1, ta1, a1, t4, x4, t5, x5, tn2, n2, ta2, a2) \
-static inline void encode_##name(char **pptr, const struct name *x) { int i; \
+static inline void encode_##name(char **pptr, const struct name *x) { int i;  \
     encode_##t1(pptr, &x->x1); \
     encode_##t2(pptr, &x->x2); \
     encode_##t3(pptr, &x->x3); \
     encode_##tn1(pptr, &x->n1); \
     if (x->n1 > 0) \
-        for (i=0; i<x->n1; i++) \
+        for (i=0; i<(int)(x->n1); i++) \
             encode_##ta1(pptr, &(x)->a1[i]); \
     align8(pptr); \
     encode_##t4(pptr, &x->x4); \
     encode_##t5(pptr, &x->x5); \
     encode_##tn2(pptr, &x->n2); \
     if (x->n2 > 0) \
-        for (i=0; i<x->n2; i++) \
+        for (i=0; i<(int)(x->n2); i++) \
             encode_##ta2(pptr, &(x)->a2[i]); \
     align8(pptr); \
 } \
@@ -931,7 +921,7 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
     if (x->n1 > 0) \
     { \
         x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
-        for (i=0; i<x->n1; i++) \
+        for (i=0; i<(int)(x->n1); i++) \
             decode_##ta1(pptr, &(x)->a1[i]); \
     } \
     else \
@@ -943,7 +933,7 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
     if (x->n2 > 0) \
     { \
         x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
-        for (i=0; i<x->n2; i++) \
+        for (i=0; i<(int)(x->n2); i++) \
             decode_##ta2(pptr, &(x)->a2[i]); \
     } \
     else \
@@ -958,14 +948,14 @@ static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##t3(pptr, &x->x3); \
     encode_##tn1(pptr, &x->n1); \
     if (x->n1 > 0) \
-        for (i=0; i<x->n1; i++) \
+        for (i=0; i<(int)(x->n1); i++) \
             encode_##ta1(pptr, &(x)->a1[i]); \
     align8(pptr); \
     encode_##t4(pptr, &x->x4); \
     encode_##t5(pptr, &x->x5); \
     encode_##tn2(pptr, &x->n2); \
     if (x->n2 > 0) \
-        for (i=0; i<x->n2; i++) \
+        for (i=0; i<(int)(x->n2); i++) \
             encode_##ta2(pptr, &(x)->a2[i]); \
     align8(pptr); \
     encode_##t6(pptr, &x->x6); \
@@ -979,7 +969,7 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
     if (x->n1 > 0) \
     { \
         x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
-        for (i=0; i<x->n1; i++) \
+        for (i=0; i<(int)(x->n1); i++) \
             decode_##ta1(pptr, &(x)->a1[i]); \
     } \
     else \
@@ -991,7 +981,7 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
     if (x->n2 > 0) \
     { \
         x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
-        for (i=0; i<x->n2; i++) \
+        for (i=0; i<(int)(x->n2); i++) \
             decode_##ta2(pptr, &(x)->a2[i]); \
     } \
     else \

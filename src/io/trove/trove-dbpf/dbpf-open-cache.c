@@ -21,7 +21,6 @@
 #include <assert.h>
 #include <limits.h>
 #include <string.h>
-#include <db.h>
 #include <dirent.h>
 
 #include "trove.h"

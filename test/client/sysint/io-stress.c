@@ -96,18 +96,18 @@ static PVFS_error post_generic_read(io_request *req);
 io_request vfs_request[NUM_IO];
 /* this hashtable is used to keep track of operations in progress */
 #define DEFAULT_OPS_IN_PROGRESS_HTABLE_SIZE 67
-static int hash_key(void *key, int table_size);
-static int hash_key_compare(void *key, struct qlist_head *link);
+static int hash_key(const void *key, int table_size);
+static int hash_key_compare(const void *key, struct qlist_head *link);
 static struct qhash_table *s_ops_in_progress_table = NULL;
 
-static int hash_key(void *key, int table_size)
+static int hash_key(const void *key, int table_size)
 {
     PVFS_id_gen_t tag = *((PVFS_id_gen_t *)key);
     return (tag % table_size);
 }
 
-static int hash_key_compare(void *key, struct qlist_head *link)
-{
+static int hash_key_compare(const void *key, struct qlist_head *link)
+{ 
     io_request *vfs_request = NULL;
     PVFS_id_gen_t tag = *((PVFS_id_gen_t *)key);
 

@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef HAVE_MALLOC_H
-#include <malloc.h>
+/* #include <malloc.h> */
 #endif
 #include <errno.h>
 #include <assert.h>
@@ -18,7 +18,6 @@
 #include "pvfs2-internal.h"
 #include "acache.h"
 #include "ncache.h"
-#include "rcache.h"
 #include "client-capcache.h"
 #include "pint-cached-config.h"
 #include "pvfs2-sysint.h"
@@ -38,7 +37,12 @@
 
 PINT_smcb *g_smcb = NULL; 
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 PINT_event_id PINT_client_sys_event_id;
 
@@ -64,8 +68,7 @@ typedef enum
     CLIENT_JOB_TIME_MGR_INIT = (1 << 9),
     CLIENT_DIST_INIT         = (1 << 10),
     CLIENT_SECURITY_INIT     = (1 << 11),
-    CLIENT_RCACHE_INIT       = (1 << 12),
-    CLIENT_CAPCACHE_INIT     = (1 << 13)
+    CLIENT_CAPCACHE_INIT     = (1 << 12)
 } PINT_client_status_flag;
 
 /* PVFS_sys_initialize()
@@ -299,15 +302,6 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
         goto error_exit;        
     }        
     client_status_flag |= CLIENT_NCACHE_INIT;
-
-    /* initialize the readdir cache and set the default timeout */
-    ret = PINT_rcache_initialize();
-    if (ret < 0)
-    {
-        gossip_lerr("Error initializing readdir cache\n");
-        goto error_exit;        
-    }
-    client_status_flag |= CLIENT_RCACHE_INIT;
 
     /* initialize the server configuration manager */
     ret = PINT_server_config_mgr_initialize();

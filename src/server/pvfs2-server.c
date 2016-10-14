@@ -25,6 +25,7 @@
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 
+#include "pvfs2-internal.h"
 #include "bmi.h"
 #include "gossip.h"
 #include "job.h"
@@ -42,11 +43,11 @@
 #include "id-generator.h"
 #include "job-time-mgr.h"
 #include "pint-cached-config.h"
-#include "pvfs2-internal.h"
+/* #include "pvfs2-internal.h" */
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-event.h"
 #include "pint-util.h"
-#include "pint-malloc.h"
+/* #include "pint-malloc.h" */
 #include "pint-uid-mgmt.h"
 #include "pint-security.h"
 #include "security-util.h"
@@ -361,8 +362,7 @@ int main(int argc, char **argv)
 #endif
 
     /* kick off timer for expired jobs */
-    ret = server_state_machine_alloc_noreq(
-        PVFS_SERV_JOB_TIMER, &(tmp_op));
+    ret = server_state_machine_alloc_noreq(PVFS_SERV_JOB_TIMER, &(tmp_op));
     if (ret == 0)
     {
         ret = server_state_machine_start_noreq(tmp_op);
@@ -777,7 +777,6 @@ static int server_initialize_subsystems(
     PVFS_fs_id orig_fsid=0;
     PVFS_ds_flags init_flags = 0;
     int bmi_flags = BMI_INIT_SERVER;
-    int shm_key_hint;
     int server_index;
 
     if(server_config.enable_events)
@@ -872,28 +871,12 @@ static int server_initialize_subsystems(
 
     /*********** START OF TROVE INITIALIZATION ************/
 
-    ret = trove_collection_setinfo(0, 0, TROVE_DB_CACHE_SIZE_BYTES,
-                                   &server_config.db_cache_size_bytes);
-    /* this should never fail */
-    assert(ret == 0);
     ret = trove_collection_setinfo(0, 0, TROVE_MAX_CONCURRENT_IO,
                                    &server_config.trove_max_concurrent_io);
     /* this should never fail */
     assert(ret == 0);
 
-    /* help trove chose a differentiating shm key if needed for Berkeley DB */
-    shm_key_hint = generate_shm_key_hint(&server_index);
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "Server using shm key hint: %d\n", shm_key_hint);
-    ret = trove_collection_setinfo(0, 0, TROVE_SHM_KEY_HINT, &shm_key_hint);
-    assert(ret == 0);
-
-    if(server_config.db_cache_type && (!strcmp(server_config.db_cache_type,
-                                               "mmap")))
-    {
-        /* set db cache type to mmap rather than sys */
-        init_flags |= TROVE_DB_CACHE_MMAP;
-    }
+    generate_shm_key_hint(&server_index);
 
 /********/
 
@@ -948,6 +931,13 @@ static int server_initialize_subsystems(
         {
             PVFS_perror("Error: PINT_handle_load_mapping", ret);
             return(ret);
+        }
+
+        /* XXX: This is really the same for all collections, yet is specified
+         * separately. */
+        ret = trove_collection_set_fs_config(cur_fs->coll_id, &server_config);
+        if (ret < 0) {
+            gossip_err("Error setting filesystem configuration in Trove\n");
         }
 
         /*
@@ -1207,18 +1197,6 @@ static int server_initialize_subsystems(
     gossip_debug(GOSSIP_SERVER_DEBUG, "%d filesystem(s) initialized\n",
                  PINT_llist_count(server_config.file_systems));
 
-    /*
-     * Migrate database if needed
-     */
-    ret = trove_migrate(server_config.trove_method,
-			server_config.data_path,
-			server_config.meta_path);
-    if (ret < 0)
-    {
-        gossip_err("trove_migrate failed: ret=%d\n", ret);
-        return(ret);
-    }
-
     *server_status_flag |= SERVER_TROVE_INIT;
 
     /*********** END OF TROVE INITIALIZATION ************/
@@ -1260,34 +1238,74 @@ static int server_initialize_subsystems(
     *server_status_flag |= SERVER_REQ_SCHED_INIT;
 
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
-                            /* hist size should be in server config too */
-    PINT_server_pc = PINT_perf_initialize(server_keys);
-    if(!PINT_server_pc)
+    /* history size should be in server config too */
+    PINT_server_pc = PINT_perf_initialize(PINT_PERF_COUNTER,
+                                          server_keys, 
+                                          server_perf_start_rollover);
+
+    PINT_server_tpc = PINT_perf_initialize(PINT_PERF_TIMER,
+                                           server_tkeys, 
+                                           server_perf_start_rollover);
+    if(!PINT_server_pc || !PINT_server_tpc)
     {
         gossip_err("Error initializing performance counters.\n");
         return(ret);
     }
-    ret = PINT_perf_set_info(PINT_server_pc, PINT_PERF_UPDATE_INTERVAL, 
-                                        server_config.perf_update_interval);
-    if (ret < 0)
+    if (server_config.perf_update_interval > 0)
     {
-        gossip_err("Error PINT_perf_set_info (update interval)\n");
-        return(ret);
+        ret = PINT_perf_set_info(PINT_server_pc,
+                                 PINT_PERF_UPDATE_INTERVAL, 
+                                 server_config.perf_update_interval);
+        if (ret < 0)
+        {
+            gossip_err("Error PINT_perf_set_info (update interval)\n");
+            return(ret);
+        }
+        ret = PINT_perf_set_info(PINT_server_tpc,
+                                 PINT_PERF_UPDATE_INTERVAL, 
+                                 server_config.perf_update_interval);
+        if (ret < 0)
+        {
+            gossip_err("Error PINT_perf_set_info (update interval)\n");
+            return(ret);
+        }
+    }
+    if (server_config.perf_update_history > 0)
+    {
+        ret = PINT_perf_set_info(PINT_server_pc,
+                                 PINT_PERF_UPDATE_HISTORY, 
+                                 server_config.perf_update_history);
+        if (ret < 0)
+        {
+            gossip_err("Error PINT_perf_set_info (update history)\n");
+            return(ret);
+        }
+        ret = PINT_perf_set_info(PINT_server_tpc,
+                                 PINT_PERF_UPDATE_HISTORY, 
+                                 server_config.perf_update_history);
+        if (ret < 0)
+        {
+            gossip_err("Error PINT_perf_set_info (update history)\n");
+            return(ret);
+        }
     }
     /* if history_size is greater than 1, start the rollover SM */
     if (PINT_server_pc->running)
     {
+        ret = server_perf_start_rollover(PINT_server_pc, PINT_server_tpc);
+#if 0
         struct PINT_smcb *tmp_op = NULL;
-        ret = server_state_machine_alloc_noreq(
-                PVFS_SERV_PERF_UPDATE, &(tmp_op));
+        ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
+                                               &(tmp_op));
         if (ret == 0)
         {
             ret = server_state_machine_start_noreq(tmp_op);
         }
+#endif
         if (ret < 0)
         {
             PVFS_perror_gossip("Error: failed to start perf update "
-                        "state machine.\n", ret);
+                               "state machine.\n", ret);
             return(ret);
         }
     }
@@ -1547,7 +1565,7 @@ static void reload_config(void)
                  fs_conf);
     /* We received a SIGHUP. Update configuration in place */
     if (PINT_parse_config(&sighup_server_config, fs_conf,
-                          s_server_options.server_alias, 1) < 0)
+                          s_server_options.server_alias, 1) == 1)
     {
         gossip_err("Error: Please check your config files.\n");
         gossip_err("Error: SIGHUP unable to update configuration.\n");
@@ -1568,7 +1586,16 @@ static void reload_config(void)
         /* Reset the debug mask */
         gossip_set_debug_mask(1, PVFS_debug_eventlog_to_mask(orig_server_config->event_logging));
 
-        orig_filesystems = server_config.file_systems;
+        /* Modify the TurnOffTimeouts feature */
+        gossip_err("%s:Changing original bypass_timeout_check(%d) to (%d)\n"
+                  ,__func__
+                  ,orig_server_config->bypass_timeout_check
+                  ,sighup_server_config.bypass_timeout_check);
+        orig_server_config->bypass_timeout_check = sighup_server_config.bypass_timeout_check;
+     
+
+        orig_filesystems = orig_server_config->file_systems;
+
         /* Loop and update all stored file systems */
         while(orig_filesystems)
         {
@@ -1598,7 +1625,7 @@ static void reload_config(void)
             }
             if(!found_matching_config)
             {
-                gossip_err("Error: SIGHUP unable to update configuration"
+                gossip_err("Error: SIGHUP unable to update configuration. "
                            "Matching configuration not found.\n");
                 break;
             }
@@ -1840,6 +1867,7 @@ static int server_shutdown(
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         security "
                      "module           [ stopped ]\n");
     }
+
 #ifdef ENABLE_CERTCACHE    
     if (status & SERVER_CERTCACHE_INIT)
     {
@@ -1862,7 +1890,7 @@ static int server_shutdown(
     }
 #endif /* ENABLE_CREDCACHE */
 
-#ifdef ENABLE_CAPCACHE    
+#ifdef ENABLE_CAPCACHE
     if (status & SERVER_CAPCACHE_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting capability "
@@ -1896,6 +1924,7 @@ static int server_shutdown(
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting performance "
                      "interface     [   ...   ]\n");
         PINT_perf_finalize(PINT_server_pc);
+        PINT_perf_finalize(PINT_server_tpc);
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         performance "
                      "interface     [ stopped ]\n");
     }
@@ -2345,6 +2374,13 @@ int server_state_machine_start(
                          PINT_HINT_GET_HANDLE(s_op->req->hints),
                          s_op->req->op);
         s_op->resp.op = s_op->req->op;
+
+        /* start request timer 
+         * if we are not tracking this request we will never call end
+         * this is not a problem so pretty much call this for all
+         * normal requests
+         */
+        PINT_perf_timer_start(&s_op->start_time);
     }
 
     s_op->addr = s_op->unexp_bmi_buff.addr;
@@ -2679,6 +2715,42 @@ static int generate_shm_key_hint(int* server_index)
     srand((unsigned int)time(NULL));
     return(rand());
 }
+
+/* server_perf_start_rollover
+ * This functions starts the performance counter rollover timer for the
+ * server - it is server specific and thus is here not in misc
+ */
+int server_perf_start_rollover(struct PINT_perf_counter *pc,
+                               struct PINT_perf_counter *tpc)
+{
+    int ret = 0;
+    struct PINT_smcb *tmp_op = NULL;
+    struct PINT_server_op *s_op = NULL;
+
+    if (!pc)
+    {
+        gossip_err("server_perf_start_rollover called with NULL pc\n");
+        return -1;
+    }
+    pc->running = 1;
+
+    ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
+                                           &(tmp_op));
+    if (ret != 0)
+    {
+        gossip_err("server_perf_start_rollover failed to alloc SM\n");
+        return ret;
+    }
+
+    s_op = PINT_sm_frame(tmp_op, PINT_FRAME_CURRENT);
+    s_op->u.perf_update.pc = pc;
+    s_op->u.perf_update.tpc = tpc;
+
+    ret = server_state_machine_start_noreq(tmp_op);
+
+    return ret;
+}
+
 
 /* precreate_pool_initialize()
  * 

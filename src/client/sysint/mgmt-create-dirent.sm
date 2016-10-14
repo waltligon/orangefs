@@ -25,7 +25,12 @@
 #include "pvfs2-internal.h"
 #include "dist-dir-utils.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 static int mgmt_create_dirent_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);

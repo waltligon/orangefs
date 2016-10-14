@@ -37,6 +37,12 @@ static int tree_setattr_comp_fn(
 
 nested machine pvfs2_mkdir_work_sm
 {
+    state prep_sm
+    {
+        run mkdir_prep_sm;
+        default => create;
+    }
+
     state create
     {
         run mkdir_directory_dspace_create;
@@ -126,14 +132,8 @@ machine pvfs2_mkdir_sm
     state prelude
     {
         jump pvfs2_prelude_sm;
-        success => prep_sm;
+        success => work;
         default => final_response;
-    }
-
-    state prep_sm
-    {
-        run mkdir_prep_sm;
-        default => work;
     }
 
     state work
@@ -739,12 +739,11 @@ static PINT_sm_action mkdir_dirdata_keyval_setattr(
     return ret;
 }
 
-
-
 static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     s_op->resp.u.mkdir.handle = 0;
+
 
     /* clean up objects */
     PINT_free_object_attr(s_op->u.mkdir.saved_attr);
@@ -755,6 +754,49 @@ static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
         js_p->error_code = -PVFS_EINVAL;
     }
     return 1;
+}
+
+/*
+ * Function: mkdir_free
+ *
+ * Params:   server_op *s_op,
+ *
+ * Returns:  N/A
+ *
+ * Synopsis: free memory - can be called from outside this source file.
+ *
+ */
+void mkdir_free(
+        struct PINT_server_op *s_op)
+{
+    if (s_op->attr.dirdata_handles)
+    {
+        free(s_op->attr.dirdata_handles);
+    }
+    if (s_op->attr.dist_dir_bitmap)
+    {
+        free(s_op->attr.dist_dir_bitmap);
+    }
+    if (s_op->u.mkdir.handle_array_local)
+    {
+        free(s_op->u.mkdir.handle_array_local);
+    }
+    if (s_op->u.mkdir.handle_array_remote)
+    {
+        free(s_op->u.mkdir.handle_array_remote);
+    }
+    if (s_op->key_a)
+    {
+        free(s_op->key_a);
+    }
+    if (s_op->val_a)
+    {
+        free(s_op->val_a);
+    }
+    if (s_op->error_a)
+    {
+        free(s_op->error_a);
+    }
 }
 
 /*
@@ -772,13 +814,10 @@ static PINT_sm_action mkdir_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    free(s_op->attr.dirdata_handles);
-    free(s_op->attr.dist_dir_bitmap);
-    free(s_op->u.mkdir.handle_array_local);
-    free(s_op->u.mkdir.handle_array_remote);
-    free(s_op->key_a);
-    free(s_op->val_a);
-    free(s_op->error_a);
+
+    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TMKDIR, &s_op->start_time);
+    mkdir_free(s_op);
+
     if (s_op->msgarray_op.count > 0)
     {
         PINT_free_object_attr(&s_op->req->u.tree_setattr.attr);

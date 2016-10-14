@@ -51,6 +51,12 @@ struct PVFS_mgmt_server_stat
 
 /* performance monitoring statistics */
 
+enum PINT_perf_type
+{
+    PINT_PERF_COUNTER = 0,
+    PINT_PERF_TIMER = 1,
+};
+
 /*
  * defines all of the keys known to PVFS
  * performance monitoring subsystem
@@ -68,16 +74,49 @@ enum PINT_server_perf_keys
     PINT_PERF_METADATA_KEYVAL_OPS = 5,  /* metadata keyval ops */
     PINT_PERF_REQSCHED = 6,             /* instantaneous active requests */
     PINT_PERF_REQUESTS = 7,             /* requests received */
-    PINT_PERF_SMALL_READ = 8,           /* bytes read by small_io */
-    PINT_PERF_SMALL_WRITE = 9,          /* bytes written by small_io */
-    PINT_PERF_FLOW_READ = 10,           /* bytes read by flow */
-    PINT_PERF_FLOW_WRITE = 11,          /* bytes written by flow */
-    PINT_PERF_CREATE = 12,              /* create requests called */
-    PINT_PERF_REMOVE = 13,              /* remove requests called */
-    PINT_PERF_MKDIR = 14,               /* mkdir requests called */
-    PINT_PERF_RMDIR = 15,               /* rmdir requests called */
-    PINT_PERF_GETATTR = 16,             /* getattr requests called */
-    PINT_PERF_SETATTR = 17,             /* setattr requests called */
+    PINT_PERF_IOREAD = 8,               /* bytes read by io */
+    PINT_PERF_IOWRITE = 9,              /* bytes written io */
+    PINT_PERF_SMALL_READ = 10,          /* bytes read by small_io */
+    PINT_PERF_SMALL_WRITE = 11,         /* bytes written by small_io */
+    PINT_PERF_FLOW_READ = 12,           /* bytes read by flow */
+    PINT_PERF_FLOW_WRITE = 13,          /* bytes written by flow */
+    PINT_PERF_CREATE = 14,              /* create requests called */
+    PINT_PERF_REMOVE = 15,              /* remove requests called */
+    PINT_PERF_MKDIR = 16,               /* mkdir requests called */
+    PINT_PERF_RMDIR = 17,               /* rmdir requests called */
+    PINT_PERF_GETATTR = 18,             /* getattr requests called */
+    PINT_PERF_SETATTR = 19,             /* setattr requests called */
+    PINT_PERF_IO = 20,                  /* io requests called */
+    PINT_PERF_SMALL_IO = 21,            /* small_io requests called */
+    PINT_PERF_READDIR = 22,             /* readdir requests called */
+};
+
+/*
+ * Defines timer keys for performance monitorinfg
+ */
+enum PINT_server_perf_tkeys
+{
+    PINT_PERF_TLOOKUP = 0,              /* time for lookup requests */
+    PINT_PERF_TCREATE = 1,              /* time for create requests */
+    PINT_PERF_TREMOVE = 2,              /* time for remove requests */
+    PINT_PERF_TMKDIR = 3,               /* time for mkdir requests */
+    PINT_PERF_TRMDIR = 4,               /* time for rmdir requests */
+    PINT_PERF_TGETATTR = 5,             /* time for getattr requests */
+    PINT_PERF_TSETATTR = 6,             /* time for setattr requests */
+    PINT_PERF_TIO = 7,                  /* time for io requests */
+    PINT_PERF_TSMALL_IO = 8,            /* time for small_io requests */
+    PINT_PERF_TREADDIR = 9,             /* time for readdir requests */
+};
+
+/** A counter is simply a 64-bit integer.  A timer is 4 64-bit integers 
+ * This is included int the perf structs in common/misc/pint-perf-counter
+ */
+struct PINT_perf_timer
+{
+    int64_t sum;   /* the sum of several time samples for computing avg */
+    int64_t count; /* the number of time samples currently in sum */
+    int64_t min;   /* minimum time sample */
+    int64_t max;   /* maximum time sample */
 };
 
 /* low level information about individual server level objects */
@@ -161,7 +200,7 @@ PVFS_error PVFS_mgmt_noop(
     PVFS_BMI_addr_t addr,
     PVFS_hint hints);
 
-const char* PVFS_mgmt_map_addr(
+const char *PVFS_mgmt_map_addr(
     PVFS_fs_id fs_id,
     PVFS_BMI_addr_t addr,
     int* server_type);
@@ -254,13 +293,14 @@ PVFS_error PVFS_mgmt_statfs_all(
 PVFS_error PVFS_imgmt_perf_mon_list(
     PVFS_fs_id fs_id,
     const PVFS_credential *credential,
+    int32_t cnt_type,
     int64_t **perf_matrix,
     uint64_t *end_time_ms_array,
     PVFS_BMI_addr_t *addr_array,
     uint32_t* next_id_array,
     int server_count,
     int *key_count,
-    int history_count,
+    int *sample_count,
     PVFS_error_details *details,
     PVFS_mgmt_op_id *op_id,
     PVFS_hint hints,
@@ -269,13 +309,14 @@ PVFS_error PVFS_imgmt_perf_mon_list(
 PVFS_error PVFS_mgmt_perf_mon_list(
     PVFS_fs_id fs_id,
     const PVFS_credential *credential,
+    int32_t cnt_type,
     int64_t **perf_matrix,
     uint64_t *end_time_ms_array,
     PVFS_BMI_addr_t *addr_array,
     uint32_t *next_id_array,
     int server_count,
     int *key_count,
-    int history_count,
+    int *sample_count,
     PVFS_error_details *details,
     PVFS_hint hints);
 

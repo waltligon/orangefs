@@ -18,6 +18,6 @@ import org.apache.hadoop.fs.DelegateToFileSystem;
 public class OrangeFs extends DelegateToFileSystem {
     OrangeFs(final URI theUri, final Configuration conf)
             throws IOException, URISyntaxException {
-        super(theUri, new OrangeFileSystem(), conf, "ofs", true);
+        super(theUri, new OrangeFileSystem(), conf, "ofs", false);
     }
 }

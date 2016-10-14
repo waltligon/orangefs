@@ -19,7 +19,12 @@
 #include "client-state-machine.h"
 #include "job-time-mgr.h"
 
+/*
+ * now included from client-steate-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 %%
 

@@ -28,7 +28,7 @@
 #include "pint-util.h"
 #include "security-util.h"
 
-const char PVFS2_BLANK_ISSUER[] = "";
+char PVFS2_BLANK_ISSUER[] = "";
 
 /* defined later */
 static int check_req_size(struct PVFS_server_req *req);
@@ -1236,8 +1236,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         decode_free(resp->u.getattr.attr.capability.handle_array);
                         decode_free(resp->u.getattr.attr.capability.signature);
                     }
-                    if (resp->u.getattr.attr.mask
-                         & PVFS_ATTR_DISTDIR_ATTR)
+                    if (resp->u.getattr.attr.mask & PVFS_ATTR_DISTDIR_ATTR)
                     {
                        decode_free
                         (resp->u.getattr.attr.dist_dir_bitmap);
@@ -1253,10 +1252,18 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     {
                         decode_free(resp->u.unstuff.attr.u.meta.dfile_array);
                     }
-                    if (resp->u.unstuff.attr.mask 
-                         & PVFS_ATTR_META_MIRROR_DFILES)
-                       decode_free
-                        (resp->u.unstuff.attr.u.meta.mirror_dfile_array);
+                    if (resp->u.unstuff.attr.mask & PVFS_ATTR_META_MIRROR_DFILES)
+                    {
+                       decode_free(resp->u.unstuff.attr.u.meta.mirror_dfile_array);
+                    }
+                    if (resp->u.unstuff.attr.capability.signature)
+                    {
+                       decode_free(resp->u.unstuff.attr.capability.signature);
+                    }
+                    if (resp->u.unstuff.attr.capability.handle_array)
+                    {
+                       decode_free(resp->u.unstuff.attr.capability.handle_array);
+                    }
                     break;
 
                 case PVFS_SERV_MGMT_EVENT_MON:
@@ -1303,6 +1310,13 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                              resp->u.listattr.attr[i].capability.handle_array);
                            decode_free(
                              resp->u.listattr.attr[i].capability.signature);
+                          }
+                          if (resp->u.listattr.attr[i].mask & 
+                              PVFS_ATTR_DISTDIR_ATTR) {
+                           decode_free(
+                             resp->u.listattr.attr[i].dist_dir_bitmap);
+                           decode_free(
+                             resp->u.listattr.attr[i].dirdata_handles);
                           }
                          }/*end for*/
                          decode_free(resp->u.listattr.attr);
@@ -1427,14 +1441,14 @@ static int check_resp_size(struct PVFS_server_resp *resp)
 
 static void zero_capability(PVFS_capability *cap)
 {
-    cap->issuer = (char *) PVFS2_BLANK_ISSUER;
+    cap->issuer = PVFS2_BLANK_ISSUER;
     cap->sig_size = 0;
     cap->num_handles = 0;
 }
 
 static void zero_credential(PVFS_credential *cred)
 {
-    cred->issuer = (char *) PVFS2_BLANK_ISSUER;
+    cred->issuer = PVFS2_BLANK_ISSUER;
     cred->num_groups = 0;
     cred->sig_size = 0;
 }

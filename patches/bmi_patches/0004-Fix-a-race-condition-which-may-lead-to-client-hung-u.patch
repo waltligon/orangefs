@@ -1,0 +1,113 @@
+From 87b89de02a4542f1b40e45c2ddadd87c039ff906 Mon Sep 17 00:00:00 2001
+From: Zhang Jingwang <jingwang.zhang@emc.com>
+Date: Sun, 21 Apr 2013 23:26:58 -0400
+Subject: [PATCH 4/6] Fix a race condition which may lead to client hung up.
+
+The correctness of BMI depends on the order of two events: the
+completion event of the work request for the MSG_CTS message, the
+arrival of the message with type MSG_RTS_DONE.
+
+If the MSG_RTS_DONE messages arrives first, then there would be no
+request in the state of RQ_RTS_WAITING_RTS_DONE, so it can't advance
+the state machine. As a result, a log message is printed and the
+message is lost.
+
+Change-Id: I6876727b29d3dcb23446055c2b247e882b339ce5
+---
+ src/io/bmi/bmi_ib/ib.c |   36 +++++++++++++++++++++---------------
+ 1 files changed, 21 insertions(+), 15 deletions(-)
+
+diff --git a/src/io/bmi/bmi_ib/ib.c b/src/io/bmi/bmi_ib/ib.c
+index efba3a0..cca3675 100644
+--- a/src/io/bmi/bmi_ib/ib.c
++++ b/src/io/bmi/bmi_ib/ib.c
+@@ -227,8 +227,8 @@ static int ib_check_cq(void)
+ 		struct ib_work *rq = sq;  /* rename */
+ 		rq_state_t state = rq->state.recv;
+ 		
+-		if (state == RQ_RTS_WAITING_CTS_SEND_COMPLETION)
+-		    rq->state.recv = RQ_RTS_WAITING_RTS_DONE;
++		if (state & RQ_RTS_WAITING_CTS_SEND_COMPLETION)
++		    rq->state.recv &= ~RQ_RTS_WAITING_CTS_SEND_COMPLETION;
+ 		else if (state == RQ_CANCELLED)
+ 		    ;
+ 		else
+@@ -589,8 +589,11 @@ encourage_recv_incoming(struct buf_head *bh, msg_type_t type, u_int32_t byte_len
+ 	if (rq->state.recv == RQ_RTS_WAITING_CTS_BUFFER) {
+ 	    int ret;
+ 	    ret = send_cts(rq);
+-	    if (ret == 0)
+-		rq->state.recv = RQ_RTS_WAITING_CTS_SEND_COMPLETION;
++	    if (ret == 0) {
++		rq->state.recv = RQ_RTS_WAITING_RTS_DONE |
++                    RQ_RTS_WAITING_CTS_SEND_COMPLETION |
++                    RQ_RTS_WAITING_USER_TEST;
++            }
+ 	    /* else keep waiting until we can send that cts */
+ 	}
+ 
+@@ -608,7 +611,7 @@ encourage_recv_incoming(struct buf_head *bh, msg_type_t type, u_int32_t byte_len
+ 	rq = NULL;
+ 	qlist_for_each_entry(rqt, &ib_device->recvq, list) {
+ 	    if (rqt->c == c && rqt->rts_mop_id == mh_rts_done.mop_id &&
+-		rqt->state.recv == RQ_RTS_WAITING_RTS_DONE) {
++		rqt->state.recv & RQ_RTS_WAITING_RTS_DONE) {
+ 		rq = rqt;
+ 		break;
+ 	    }
+@@ -630,7 +633,7 @@ encourage_recv_incoming(struct buf_head *bh, msg_type_t type, u_int32_t byte_len
+ 	post_rr(c, bh);
+ 
+ 	if (rq) {
+-		rq->state.recv = RQ_RTS_WAITING_USER_TEST;
++		rq->state.recv &= ~RQ_RTS_WAITING_RTS_DONE;
+ 	}
+ 
+     } else if (type == MSG_BYE) {
+@@ -1057,8 +1060,11 @@ post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
+ 	memcache_register(ib_device->memcache, &rq->buflist);
+ #endif
+ 	sret = send_cts(rq);
+-	if (sret == 0)
+-	    rq->state.recv = RQ_RTS_WAITING_CTS_SEND_COMPLETION;
++	if (sret == 0) {
++            rq->state.recv = RQ_RTS_WAITING_RTS_DONE |
++                RQ_RTS_WAITING_CTS_SEND_COMPLETION |
++                RQ_RTS_WAITING_USER_TEST;
++        }
+ 	goto out;
+     }
+ 
+@@ -1202,9 +1208,11 @@ test_rq(struct ib_work *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
+ 	debug(2, "%s: rq %p %s, encouraging", __func__, rq,
+ 	  rq_state_name(rq->state.recv));
+ 	ret = send_cts(rq);
+-	if (ret == 0)
+-	    rq->state.recv = RQ_RTS_WAITING_CTS_SEND_COMPLETION;
+-	/* else keep waiting until we can send that cts */
++	if (ret == 0) {
++            rq->state.recv = RQ_RTS_WAITING_RTS_DONE |
++                RQ_RTS_WAITING_CTS_SEND_COMPLETION |
++                RQ_RTS_WAITING_USER_TEST;
++        } /* else keep waiting until we can send that cts */
+ 	debug(2, "%s: rq %p now %s", __func__, rq, rq_state_name(rq->state.recv));
+     } else if (rq->state.recv == RQ_CANCELLED && complete) {
+ 	debug(2, "%s: rq %p cancelled", __func__, rq);
+@@ -1520,12 +1528,10 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
+ 	    struct ib_work *rq = qlist_upcast(l);
+ 	    if (rq->c != c) continue;
+ #if !MEMCACHE_BOUNCEBUF
+-	    if (rq->state.recv == RQ_RTS_WAITING_RTS_DONE)
++	    if (rq->state.recv & RQ_RTS_WAITING_RTS_DONE)
+ 		memcache_deregister(ib_device->memcache, &rq->buflist);
+ #  if MEMCACHE_EARLY_REG
+-	    /* pin on post, dereg all these */
+-	    if (rq->state.recv == RQ_RTS_WAITING_CTS_SEND_COMPLETION)
+-		memcache_deregister(ib_device->memcache, &rq->buflist);
++            /* pin on post, dereg all these */
+ 	    if (rq->state.recv == RQ_WAITING_INCOMING
+ 	      && rq->buflist.tot_len > ib_device->eager_buf_payload)
+ 		memcache_deregister(ib_device->memcache, &rq->buflist);
+-- 
+1.7.2.5
+

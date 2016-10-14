@@ -18,7 +18,7 @@ static int pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
 
     return vfs_follow_link(nd, pvfs2_inode->link_target);
 }
-#else
+#elif defined(HAVE_ND_SET_LINK)
 static void *pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
@@ -35,6 +35,20 @@ static void *pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
     nd_set_link(nd, pvfs2_inode->link_target);
     return NULL;
 
+}
+
+#else
+static const char *pvfs2_follow_link(struct dentry *dentry, void **cookie)
+{
+    char *target =  PVFS2_I(dentry->d_inode)->link_target;
+
+    gossip_debug(GOSSIP_INODE_DEBUG,
+                 "%s: called on %s (target is %p)\n",
+                 __func__, (char *)dentry->d_name.name, target);
+
+    *cookie = target;
+
+    return target;
 }
 #endif
 
