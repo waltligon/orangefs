@@ -629,7 +629,7 @@ static PINT_sm_action validation_dirdata_mismatch(
                  "mismatch called, let client try again!!\n");
 
     /* using a new error code?? use the try again error code*/
-    js_p->error_code = -PVFS_EAGAIN;
+    js_p->error_code = -PVFS_EDISTDIR;
     return SM_ACTION_COMPLETE;
 }
 

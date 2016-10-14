@@ -304,7 +304,7 @@ static int rmdirent_remove_directory_entry(
              "rmdirent: error: WRONG dirdata object for the dirent! Returning error.\n");    
  
         /* return an error to tell the client to try again */
-        js_p->error_code = -PVFS_EAGAIN;
+        js_p->error_code = -PVFS_EDISTDIR;
         return SM_ACTION_COMPLETE;
     }   
     else
@@ -404,7 +404,7 @@ static PINT_sm_action rmdirent_update_directory_attr(
  * into an error to return to the user if possible, and print an error
  * if something unexpected has occurred.
  *
- * NOTE: we should only ever hit this state with PVFS_EAGAIN if a client
+ * NOTE: we should only ever hit this state with PVFS_EDISTDIR if a client
  * has old information after a directory has split. Otherwise, nothing
  * else should be modifying trove in such a way that the keyval isn't
  * there at this point, because the keyval read has to have succeeded
@@ -421,7 +421,7 @@ static PINT_sm_action rmdirent_remove_directory_entry_failure(
 	case -TROVE_ENOENT:
 	    js_p->error_code = -PVFS_ENOENT;
 	    break;
-        case -PVFS_EAGAIN:
+        case -PVFS_EDISTDIR:
             gossip_debug(GOSSIP_SERVER_DEBUG, "mismatch dirdata!!\n");
             break;
 	default:

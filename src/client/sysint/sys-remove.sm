@@ -588,13 +588,13 @@ static PINT_sm_action remove_crdirent_retry_or_fail(
                  "remove state: crdirent_retry_or_fail\n");
 
     /* try again if we get a dirdata mismatch. */
-    if (js_p->error_code == -PVFS_EAGAIN &&
+    if (js_p->error_code == -PVFS_EDISTDIR &&
         sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit)
     {
         sm_p->u.remove.retry_count++;
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "  received -PVFS_EAGAIN, wrong dirdata server or revoked capability,\n  will do getattr and retry crdirent (attempt number %d)!\n",
+                "  received -PVFS_EDISTDIR, wrong dirdata server or revoked capability,\n  will do getattr and retry crdirent (attempt number %d)!\n",
                 sm_p->u.remove.retry_count);
 
         /* clear acache content */
@@ -644,13 +644,13 @@ static PINT_sm_action remove_rmdirent_retry_or_fail(
                  "remove state: rmdirent_retry_or_fail\n");
 
     /* try again if we get a dirdata mismatch. */
-    if (js_p->error_code == -PVFS_EAGAIN &&
+    if (js_p->error_code == -PVFS_EDISTDIR &&
         sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit)
     {
         sm_p->u.remove.retry_count++;
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "  received -PVFS_EAGAIN, wrong dirdata server, will do getattr and retry rmdirent!\n");
+                "  received -PVFS_EDISTDIR, wrong dirdata server, will do getattr and retry rmdirent!\n");
 
         /* clear acache content */
         PINT_acache_invalidate(sm_p->parent_ref);

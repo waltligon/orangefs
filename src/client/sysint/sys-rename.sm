@@ -1128,11 +1128,11 @@ static PINT_sm_action rename_chdirent_retry_or_failure(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    /* try again if we get a -PVFS_EAGAIN failure. */
-    if (js_p->error_code == -PVFS_EAGAIN) 
+    /* try again if we get a -PVFS_EDISTDIR failure. */
+    if (js_p->error_code == -PVFS_EDISTDIR) 
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "rename_chdirent: received -PVFS_EAGAIN, wrong dirdata server, "
+                "rename_chdirent: received -PVFS_EDISTDIR, wrong dirdata server, "
                 "will do getattr and retry chdirent!\n");
 
         /* clear acache content */
@@ -1238,13 +1238,13 @@ static PINT_sm_action rename_crdirent_retry_or_fail(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    /* try again if we get a -PVFS_EAGAIN failure. */
-    if (js_p->error_code == -PVFS_EAGAIN) 
+    /* try again if we get a -PVFS_EDISTDIR failure. */
+    if (js_p->error_code == -PVFS_EDISTDIR) 
     {
         PVFS_uid local_uid;
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "rename_crdirent: received -PVFS_EAGAIN, wrong dirdata server, "
+                "rename_crdirent: received -PVFS_EDISTDIR, wrong dirdata server, "
                 "will do getattr and retry crdirent!\n");
 
         /* clear acache content */
@@ -1356,14 +1356,14 @@ static PINT_sm_action rename_rmdirent_retry_or_fail(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
 
-    /* try again if we get a -PVFS_EAGAIN failure. */
-    if (js_p->error_code == -PVFS_EAGAIN &&
+    /* try again if we get a -PVFS_EDISTDIR failure. */
+    if (js_p->error_code == -PVFS_EDISTDIR &&
         sm_p->u.rename.retry_count < sm_p->msgarray_op.params.retry_limit) 
     {
         sm_p->u.rename.retry_count++;
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "rename_rmdirent: received -PVFS_EAGAIN, wrong dirdata server, "
+                "rename_rmdirent: received -PVFS_EDISTDIR, wrong dirdata server, "
                 "will do getattr and retry rmdirent!\n");
 
         /* clear acache content */
