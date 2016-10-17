@@ -2374,17 +2374,13 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request,
         free(credential);
     }
 
-    /* for some reason the original did not check here but checked */
-    /* after a read completed (down below) seems like we would */
-    /* rather it was here so we will try it out */
+    /* We do not call check_for_speculative here because we cannot
+     * tell if the current buffer was EOF until it gets back - if we
+     * did then t ends up creating a lot of extra cycles through
+     * the code - so we are leaving it out for now, maybe rework
+     * it in the future
+     */
 
-    /* this is a problem here because we cannot tell if the current */
-    /* buffer was EOF until it gets back - this then ends up creating */
-    /* a lot of extra cycles through the code - leaving it out for */
-    /* now, maybe rework it in the future */
-
-    /* now see if we can add a speculative read to this one */
-    /* ret = check_for_speculative(vfs_request, buff); */
     if (ret < 0)
     {
         PVFS_perror_gossip("Calling chgeck for speculative failed", ret);
@@ -2455,7 +2451,7 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
     int b;
 
     gossip_debug(GOSSIP_RACACHE_DEBUG,
-                 "check_for_speculative called\n");
+                 "CHECK_for_speculative called\n");
 
     /* buff is the readahead buffer we just finished reading 
      * don't start a speculative on a speculative or if we are
@@ -2527,9 +2523,7 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
         {
             gossip_debug(GOSSIP_RACACHE_DEBUG,
                 "--- check_for_speculative error in pint_racache_get_block\n");
-            PVFS_hint_free(rareq->hints);
-            free(rareq);
-            return 0;
+            goto fast_exit;
         }
         /* check return status */
         switch(rareq->racache_status)
@@ -2553,7 +2547,7 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
             if (ret)
             {
                 gossip_err("failed to allocated a phantom request");
-                return ret;
+                goto fast_exit;
             }
             break;
         case RACACHE_HIT :
@@ -2562,7 +2556,8 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
              * been read or is being read.
              */
             gossip_debug(GOSSIP_RACACHE_DEBUG,
-                  "--- check_for_speculative found buffer - spec req freed\n");
+                  "--- check_for_speculative found exist buffer"
+                  "- Do not issue a spec read\n");
             break;
         case RACACHE_NONE:
             /* no buffers available so no more readahead */
@@ -2570,17 +2565,18 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
                          "--- check_for_speculative buffer NA\n");
             PVFS_hint_free(rareq->hints);
             free (rareq);
-            return 0;
+            goto fast_exit;
         default:
             gossip_err("unexpected return from pint_racache_get_block");
             PVFS_hint_free(rareq->hints);
             free (rareq);
-            return ret;
+            goto fast_exit;
         } /* end switch */
     } /* end for loop */
     /* there should be an unused phantom req left over */
+fast_exit:
     gossip_debug(GOSSIP_RACACHE_DEBUG,
-                 "--- check_for_speculative freeing unused phantom req NA\n");
+                 "--- CHECK_for_speculative freeing unused phantom req NA\n");
     PVFS_hint_free(rareq->hints);
     free (rareq);
     return ret;
@@ -2627,10 +2623,9 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
          * is 0) or if the request is too large for readahead to be
          * worthwhile.
          *
-         * Note it doesn't make sense for the upcall to pass count
-         * and size, rather it should pass readcnt, which could
-         * override the default.  This logic needs to be adjusted
-         * for this.
+         * The readahead_size field of the io request is not a buffer
+         * size but the number of bytes to readahead - this is converted
+         * into the readsz, the number of buffers to read ahead.
          */
         if ((pint_racache_buff_count() > 0) &&  
             (pint_racache_buff_size() > 0) &&
@@ -2722,9 +2717,20 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
                          buff->file_offset)),
                        amt_returned); /* should always be req.io.count */
 
-                /* see if there is a buffer following this one and
-                 * start a readahead if not */
+                /* see if there is an unread buffer following this one and
+                 * start a readahead if so */
+                /* Do we want to read ahead each buffer or wait until
+                 * we have readcnt buffers to read and issue them all
+                 * at once?  If we remove this call readahead calls
+                 * will only happen when an incoming request initiates
+                 * an actual read in RCACHE_READ below which causes
+                 * check_for_speculative to run when that request
+                 * returns in package_downcall_members
+                 */
+#define PVFS2_RACACHE_ALWAYS_READ 1
+#if PVFS2_RACACHE_ALWAYS_READ
                 ret = check_for_speculative(vfs_request, buff);
+#endif
 
                 buff = NULL; /* just being safe */
                 vfs_request->op_id = -1;
@@ -3896,16 +3902,17 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                     if (vfs_request->is_readahead_speculative != 0)
                     {
                         gossip_debug(GOSSIP_RACACHE_DEBUG,
-                                     "Posted Spec Read Completed"
-                                     " %d bytes into buffer %d\n",
-                                     (int)buff->data_sz, (int)buff->buff_id);
+                                      "Posted Spec Read Completed"
+                                      " %d bytes into buffer %d\n",
+                                      (int)buff->data_sz, (int)buff->buff_id);
                     }
                     else
                     {
                         gossip_debug(GOSSIP_RACACHE_DEBUG,
-                                     "Posted Readahead Completed"
-                                     " %d bytes into buffer %d\n",
-                                     (int)buff->data_sz, (int)buff->buff_id);
+                                      "Posted Readahead Completed"
+                                      " %d bytes into buffer %d\n",
+                                      (int)buff->data_sz, (int)buff->buff_id);
+                        check_for_speculative(vfs_request, buff);    
                     }
 
                     PVFS_Request_free(&vfs_request->mem_req);
@@ -3977,12 +3984,12 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                                          "... skip spec\n");
                         }
                     }
-                    /* Why are we checking here after a read has completed */
-                    /* Why not when we issue the read so they run concurrently */
-                    /* Try adding a call there and then decide if this one is needed */
-
+                    /* We call this here because  until the first request comes back
+                     * we don't know if it hit EOF or not, we we wait on the first and
+                     * then initiate the rest as this request returns
+                     */
                     /* see if we need to start a new readahead */
-                    check_for_speculative(vfs_request, buff);
+                    /* check_for_speculative(vfs_request, buff); */
                 }
                 else /* readahead_posted is not set */
                 {
@@ -4391,9 +4398,6 @@ static inline PVFS_error handle_unexp_vfs_request(vfs_request_t *vfs_request)
             */
         case PVFS2_VFS_OP_FILE_IO:
 #ifdef USE_RA_CACHE
-            gossip_debug(GOSSIP_RACACHE_DEBUG,
-                         "io request setting readahead to %d bytes\n",
-                         s_opts.readahead_size);
             /* The readahead_size field of the io upcall is
              * not the same as our internal field.  THis field
              * indicates in bytes approximately how much readahead
@@ -4409,6 +4413,9 @@ static inline PVFS_error handle_unexp_vfs_request(vfs_request_t *vfs_request)
             /* for now readahead is fixed to this const */
             vfs_request->in_upcall.req.io.readahead_size = 
                     PVFS2_RACACHE_READSZ_NOVALUE;
+            gossip_debug(GOSSIP_RACACHE_DEBUG,
+                         "io request setting readahead size to %d bytes\n",
+                         vfs_request->in_upcall.req.io.readahead_size);
 #endif
             ret = post_io_request(vfs_request);
             break;
