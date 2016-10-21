@@ -190,13 +190,13 @@ enum PVFS_server_op
 /* max number of keys or key/value pairs to set or get in an operation */
 #define PVFS_REQ_LIMIT_EATTR_LIST       PVFS_MAX_XATTR_LISTLEN 
 /* max size of security signature (in bytes) */
-#define PVFS_REQ_LIMIT_SIGNATURE PVFS_SYS_LIMIT_SIGNATURE
+#define PVFS_REQ_LIMIT_SIGNATURE        PVFS_SYS_LIMIT_SIGNATURE
 /* max number of groups in credential array */
-#define PVFS_REQ_LIMIT_GROUPS PVFS_SYS_LIMIT_GROUPS
+#define PVFS_REQ_LIMIT_GROUPS           PVFS_SYS_LIMIT_GROUPS
 /* max size of credential/capability issuer (in bytes) */
-#define PVFS_REQ_LIMIT_ISSUER PVFS_SYS_LIMIT_ISSUER
+#define PVFS_REQ_LIMIT_ISSUER           PVFS_SYS_LIMIT_ISSUER
 /* max size of a certificate buffer (in bytes) */
-#define PVFS_REQ_LIMIT_CERT PVFS_SYS_LIMIT_CERT
+#define PVFS_REQ_LIMIT_CERT             PVFS_SYS_LIMIT_CERT
 /* max size of a certificate private key (in bytes) */
 #define PVFS_REQ_LIMIT_SECURITY_KEY 8192
 /* max size of userid/password for cert request (in bytes) */
