@@ -44,6 +44,7 @@ static struct racache_s racache =
     PTHREAD_MUTEX_INITIALIZER,
     PVFS2_DEFAULT_RACACHE_BUFCNT,
     PVFS2_DEFAULT_RACACHE_BUFSZ,
+    PVFS2_DEFAULT_RACACHE_READCNT,
     QLIST_HEAD_INIT(racache.buff_free),
     QLIST_HEAD_INIT(racache.buff_lru),
     NULL,
@@ -86,6 +87,17 @@ int pint_racache_set_buff_count_size(int bufcnt, int bufsz)
     return pint_racache_buf_resize(bufcnt, bufsz);
 }
 
+int pint_racache_read_count(void)
+{
+    return racache.readcnt;
+}
+
+int pint_racache_set_read_count(int readcnt)
+{
+    racache.readcnt = readcnt;
+    return 0;
+}
+
 int pint_racache_initialize(void)
 {
     int ret = -1;
@@ -119,12 +131,13 @@ int pint_racache_initialize(void)
     return 0;
 }
 
-/* reset an individual buffer */
+/* reset a file */
 static void racache_init_file(racache_file_t *file)
 {
-    /* do not init vp, id, buff_sz 
-     * this will be used to reinit buff struct */
     memset(&file->refn, 0, sizeof(PVFS_object_ref));
+
+    /* eventually want a way to pass this in from the file */
+    file->readcnt = racache.readcnt;
 
     INIT_QLIST_HEAD(&file->hash_link);
     INIT_QLIST_HEAD(&file->buff_list);
@@ -133,7 +146,7 @@ static void racache_init_file(racache_file_t *file)
 /* reset an individual buffer */
 static void racache_init_buff(racache_buffer_t *buff)
 {
-    /* do not init vp, id, buff_sz 
+    /* do not init vp, id, buff_sz, readcnt
      * this will be used to reinit buff struct */
     buff->valid = 0;
     buff->being_freed = 0;
@@ -152,6 +165,12 @@ static void racache_init_buff(racache_buffer_t *buff)
 static int racache_buf_init(racache_t *racache)
 {
     int i = 0;
+
+    if (racache->bufcnt * racache->bufsz == 0)
+    {
+        /* racache turned off */
+        return 0;
+    }
     
     racache->buffarray =
                 (racache_buffer_t *)malloc(sizeof(racache_buffer_t) * 
@@ -191,6 +210,7 @@ static int racache_buf_init(racache_t *racache)
         }
 
         racache->buffarray[i].buff_sz = racache->bufsz;
+        racache->buffarray[i].readcnt = racache->readcnt;
         racache->buffarray[i].buffer = vp;
         racache->buffarray[i].buff_id = i;
 
@@ -391,6 +411,18 @@ static racache_buffer_t *racache_buf_get(racache_file_t *racache_file)
     }
     /* wipes non-permanent fields and inits lists */
     racache_init_buff(buff);
+    /* set file read count */
+    if (racache_file->readcnt >= 0 &&
+        racache_file->readcnt <= PVFS2_MAX_RACACHE_READCNT)
+    {
+        /* set from value attached to file */
+        buff->readcnt = racache_file->readcnt;
+    }
+    else
+    {
+        /* set from default value */
+        buff->readcnt = pint_racache_read_count();
+    }
     /* put at tail of lru list */
     qlist_add_tail(&buff->buff_lru, &racache.buff_lru);
     /* add to this file's buffer list */
