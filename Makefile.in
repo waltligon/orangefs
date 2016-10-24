@@ -1268,6 +1268,7 @@ clean::
                 $(VISS) $(VISOBJS) \
 				$(VISMISCOBJS) \
 				$(KARMAOBJS) \
+				$(STATECOMP) $(STATECOMPOBJS) $(STATECOMPGEN) \
                 $(MEMANALYSIS) $(MEMANALYSISOBJS) $(MEMANALYSISDEPS) \
 				$(BMILIBRARIES) $(LIBBMIOBJS) \
 				$(FUSEOBJS) \
@@ -1358,7 +1359,7 @@ endif
 nodep:; @:
 
 # default rule for generating dependency files
-%.d: %.c
+%.d: %.c $(STATECOMP)
 	$(Q) "  DEP		$@"
 	$(E)CC="$(CC)" $(srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(DB_CFLAGS) $(call modcflags,$<) $< > $@
 

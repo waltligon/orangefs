@@ -162,14 +162,6 @@ typedef enum
     SERVER_CERTCACHE_INIT      = (1 << 23)
 } PINT_server_status_flag;
 
-typedef enum
-{   
-    PRELUDE_SCHEDULER_DONE     = (1 << 0),
-    PRELUDE_GETATTR_DONE       = (1 << 1),
-    PRELUDE_PERM_CHECK_DONE    = (1 << 2),
-    PRELUDE_LOCAL_CALL         = (1 << 3),
-} PINT_prelude_flag;
-
 struct PINT_server_create_op
 {
     const char **io_servers;
@@ -692,8 +684,6 @@ typedef struct PINT_server_op
     PVFS_fs_id target_fs_id;
     PVFS_object_attr *target_object_attr;
 
-    PINT_prelude_flag prelude_mask;
-
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
 
@@ -751,7 +741,6 @@ typedef struct PINT_server_op
       if (__location != REMOTE_OPERATION && (__location == LOCAL_OPERATION || ( __handle && ! strcmp(server_config->host_id, server_name)))) { \
         __location = LOCAL_OPERATION; \
         __req = __s_op->req; \
-        __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL; \
       } \
       else { \
         memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op)); \
@@ -895,7 +884,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
 /* server side state machines */
 extern struct PINT_state_machine_s pvfs2_mirror_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_call_msgpairarray_sm;
-extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_with_prelude_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_create_immutable_copies_sm;
@@ -905,6 +894,7 @@ extern struct PINT_state_machine_s pvfs2_pjmp_set_attr_work_sm;
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_with_prelude_sm;
+extern struct PINT_state_machine_s pvfs2_get_attr_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_sm;

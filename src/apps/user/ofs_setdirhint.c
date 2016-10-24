@@ -185,10 +185,10 @@ int main(int argc, char **argv)
                 {
                     perror("create_layout");
                 }
-                eattr_str = (char *)malloc(PVFS_REQ_LIMIT_LAYOUT);
+                eattr_str = (char *)malloc(PVFS_SYS_LIMIT_LAYOUT);
                 ret = pvfs_layout_string(layout,
                                          eattr_str,
-                                         PVFS_REQ_LIMIT_LAYOUT);
+                                         PVFS_SYS_LIMIT_LAYOUT);
                 if (ret != 0)
                 {
                     perror("layout_string");
@@ -449,18 +449,18 @@ static int parse_args(int argc, char **argv, struct rm_options *user_opts_p)
 
 static void usage(int argc, char **argv)
 {
-    fprintf(stderr, "Usage: %s [-?vVidrf] pvfs2_filename[s]\n", argv[0]);
-    fprintf(stderr, "\t-h\thelp - print this message\n");
-    fprintf(stderr, "\t-v\tverbose - print informative messages\n");
-    fprintf(stderr, "\t-V\tVersion - print Version info\n");
-    fprintf(stderr, "\t-i\tinteractive - ask before removing each item\n");
-    fprintf(stderr, "\t-D\tdist_name - string name of distribution\n");
-    fprintf(stderr, "\t-p\tdist_params - string list K:V+K:V ...\n");
-    fprintf(stderr, "\t-n\tnum_dfiles - int number of dfiles\n");
-    fprintf(stderr, "\t-l\tlayout - int layout number\n");
-    fprintf(stderr, "\t-L\tserver_list - string : list of server numbers \n");
-    fprintf(stderr, "\t-d\tdebug - print debugging info\n");
-    fprintf(stderr, "\t-r\trecursive - remove directories and their contents\n");
+    fprintf(stderr, "Usage: %s [-hVvdirDpnlL] pvfs2 dir name[s]\n", argv[0]);
+    fprintf(stderr, "\t-h, --help - print this message\n");
+    fprintf(stderr, "\t-V, --Version - print Version info\n");
+    fprintf(stderr, "\t-v, --verbose - print informative messages\n");
+    fprintf(stderr, "\t-d, --debug - print debugging info\n");
+    fprintf(stderr, "\t-i, --interactive - ask before setting each item\n");
+    fprintf(stderr, "\t-r, --recursive - set subdirectories\n");
+    fprintf(stderr, "\t-D, --dist_name - string name of distribution\n");
+    fprintf(stderr, "\t-p, --dist_params - string list K:V+K:V ...\n");
+    fprintf(stderr, "\t-n, --num_datafiles - int number of dfiles\n");
+    fprintf(stderr, "\t-l, --layout - int(string) layout number(name)\n");
+    fprintf(stderr, "\t-L, --server_list - string list of server numbers \n");
 }
 
 /*
