@@ -1249,6 +1249,12 @@ endecode_fields_3a2a1_struct (
  */
 typedef PVFS_credential PVFS_credentials;
 
+/*The following two limits pertain to the readdirplus request.  They are
+ * exposed here for user programs that want to use the readdirplus count.
+ */
+#define PVFS_SYS_LIMIT_LISTATTR 60
+#define PVFS_SYS_LIMIT_DIRENT_COUNT_READDIRPLUS PVFS_SYS_LIMIT_LISTATTR
+
 
 #endif /* __PVFS2_TYPES_H */
 
