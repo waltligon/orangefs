@@ -24,9 +24,13 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "pint-security.h"
+#include "pint-cached-config.h"
 
-#define GETATTR 100
-
+enum
+{
+    LOCAL_OPERATION = 2,
+    REMOTE_OPERATION = 3
+};
 
 %%
 
@@ -51,7 +55,7 @@ machine pvfs2_list_attr_sm
     {
         pjmp listattr_setup_getattr
         {
-            GETATTR => pvfs2_pjmp_get_attr_work_sm;
+            LOCAL_OPERATION => pvfs2_pjmp_get_attr_work_sm;
         }
         success => interpret_getattrs;
         default => final_response;
@@ -128,8 +132,8 @@ static PINT_sm_action listattr_setup_getattr(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {    
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *getattr_op;
-    int ret;
+    struct PINT_server_op *getattr_op = NULL;
+    struct PVFS_server_req *req = NULL;
     int i;
 
     s_op->u.listattr.parallel_sms = 0;
@@ -146,44 +150,17 @@ static PINT_sm_action listattr_setup_getattr(
             continue;
         }
 
-        getattr_op = malloc(sizeof(*getattr_op));
-        if(!getattr_op)
-        {
-            s_op->u.listattr.errors[i] = -PVFS_ENOMEM;
-            gossip_debug(GOSSIP_SERVER_DEBUG, 
-                "listattr: failed to setup nested sm for handle: %llu\n", 
-                llu(s_op->req->u.listattr.handles[i]));
-            continue;
-        }
-        memset(getattr_op, 0, sizeof(*getattr_op));
+        PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, getattr_op,
+            s_op->req->u.listattr.handles[i],
+            s_op->req->u.listattr.fs_id,
+            js_p->error_code, req, LOCAL_OPERATION);
 
-        /* TODO: need a way to explicitly set the right inputs to the
-         * getattr nested sm.  This code block is very fragile.
-         */
-
-        /* need attrs that the prelude would have read normally */
-        PVFS_ds_attr_to_object_attr(&s_op->u.listattr.ds_attr_a[i],
-            &getattr_op->attr);
-        getattr_op->attr.mask = PVFS_ATTR_COMMON_ALL;
-        getattr_op->ds_attr = s_op->u.listattr.ds_attr_a[i];
-        /* need a valid request structure for some generic features like access
-         * logging 
-         */
-        getattr_op->req = s_op->req;
-        /* need to fill in the input parameters to the getattr nested machine */
-        getattr_op->u.getattr.fs_id = s_op->req->u.listattr.fs_id;
-        getattr_op->u.getattr.handle = s_op->req->u.listattr.handles[i];
-        getattr_op->u.getattr.attrmask = s_op->req->u.listattr.attrmask;
-
-        ret = PINT_sm_push_frame(smcb, GETATTR, getattr_op);
-        if(ret < 0)
-        {
-            s_op->u.listattr.errors[i] = -PVFS_ENOMEM;
-            gossip_debug(GOSSIP_SERVER_DEBUG, 
-                "listattr: failed to setup nested sm for handle: %llu\n", 
-                llu(s_op->req->u.listattr.handles[i]));
-            continue;
-        }
+        PINT_SERVREQ_GETATTR_FILL(*req, s_op->req->capability,
+            s_op->req->u.getattr.credential,
+            s_op->req->u.listattr.fs_id,
+            s_op->req->u.listattr.handles[i],
+            s_op->req->u.listattr.attrmask,
+            s_op->req->hints);
 
         s_op->u.listattr.parallel_sms++;
     }

@@ -185,10 +185,10 @@ int main(int argc, char **argv)
                 {
                     perror("create_layout");
                 }
-                eattr_str = (char *)malloc(PVFS_REQ_LIMIT_LAYOUT);
+                eattr_str = (char *)malloc(PVFS_SYS_LIMIT_LAYOUT);
                 ret = pvfs_layout_string(layout,
                                          eattr_str,
-                                         PVFS_REQ_LIMIT_LAYOUT);
+                                         PVFS_SYS_LIMIT_LAYOUT);
                 if (ret != 0)
                 {
                     perror("layout_string");
