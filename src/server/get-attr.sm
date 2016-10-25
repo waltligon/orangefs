@@ -270,7 +270,7 @@ nested machine pvfs2_get_attr_with_prelude_sm
     }
 }
 
-machine pvfs2_get_attr_sm
+nested machine pvfs2_get_attr_sm
 {
     state work
     {

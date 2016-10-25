@@ -223,10 +223,15 @@ enum PVFS_sys_layout_algorithm
     /* order the datafiles based on the list specified */
     PVFS_SYS_LAYOUT_LOCAL = 5
 };
+/* These define the valid range of layout numbers */
 #define PVFS_SYS_LAYOUT_NULL 0
 #define PVFS_SYS_LAYOUT_MAX 5
+/* This is used to sat layout if none is requested */
 #define PVFS_SYS_LAYOUT_DEFAULT_ALGORITHM PVFS_SYS_LAYOUT_ROUND_ROBIN
+/* This is the code for a default layout */
 #define PVFS_SYS_LAYOUT_DEFAULT NULL
+/* For list layout this is the largest string encoding */
+#define PVFS_SYS_LIMIT_LAYOUT 4096
 
 /* The list of datafile servers that can be passed into PVFS_sys_create
  * to specify the exact layout of a file.  The count parameter will override
@@ -253,7 +258,7 @@ typedef struct PVFS_sys_layout_s
      */
     struct PVFS_sys_server_list server_list;
 } PVFS_sys_layout;
-#define extra_size_PVFS_sys_layout PVFS_REQ_LIMIT_LAYOUT
+#define extra_size_PVFS_sys_layout PVFS_SYS_LIMIT_LAYOUT
 
 #ifdef WIN32
 void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x);
@@ -1133,6 +1138,13 @@ struct profiler
 #define PVFS2_SECURITY_TIMEOUT_MIN   5
 #define PVFS2_SECURITY_TIMEOUT_MAX   (10*365*24*60*60)   /* ten years */
 
+#define PVFS_SYS_LIMIT_CERT           8192
+#define PVFS_SYS_LIMIT_KEY            8192
+#define PVFS_SYS_LIMIT_HANDLES_COUNT  1024
+#define PVFS_SYS_LIMIT_GROUPS         32
+#define PVFS_SYS_LIMIT_ISSUER         128
+#define PVFS_SYS_LIMIT_SIGNATURE      512
+
 extern char PVFS2_BLANK_ISSUER[];
 
 typedef unsigned char *PVFS_cert_data;
@@ -1150,7 +1162,7 @@ endecode_fields_1a_struct (
     skip4,,
     uint32_t, buf_size,
     PVFS_cert_data, buf);
-#define extra_size_PVFS_certificate PVFS_REQ_LIMIT_CERT
+#define extra_size_PVFS_certificate PVFS_SYS_LIMIT_CERT
 
 /* Buffer and structure for certificate private key */
 typedef unsigned char *PVFS_key_data;
@@ -1166,7 +1178,7 @@ endecode_fields_1a_struct (
     skip4,,
     uint32_t, buf_size,
     PVFS_key_data, buf);
-#define extra_size_PVFS_security_key PVFS_REQ_LIMIT_KEY
+#define extra_size_PVFS_security_key PVFS_SYS_LIMIT_KEY
 
 typedef unsigned char *PVFS_signature;
 
@@ -1194,23 +1206,23 @@ endecode_fields_3a2a_struct (
     uint32_t, op_mask,
     uint32_t, num_handles,
     PVFS_handle, handle_array);
-#define extra_size_PVFS_capability (PVFS_REQ_LIMIT_HANDLES_COUNT * \
+#define extra_size_PVFS_capability (PVFS_SYS_LIMIT_HANDLES_COUNT * \
                                     sizeof(PVFS_handle)          + \
-                                    PVFS_REQ_LIMIT_ISSUER        + \
-                                    PVFS_REQ_LIMIT_SIGNATURE)
+                                    PVFS_SYS_LIMIT_ISSUER        + \
+                                    PVFS_SYS_LIMIT_SIGNATURE)
 
 /* A credential identifies a user and is signed by the client/user 
    private key. */
 typedef struct PVFS_credential PVFS_credential;
 struct PVFS_credential 
 {
-    PVFS_uid userid;           /* user id */
-    uint32_t num_groups;       /* length of group_array */
-    PVFS_gid *group_array;     /* groups for which the user is a member */
-    char *issuer;              /* alias of the issuing server */
-    PVFS_time timeout;         /* seconds after epoch to time out */
-    uint32_t sig_size;         /* length of the signature in bytes */
-    PVFS_signature signature;  /* digital signature */
+    PVFS_uid userid;              /* user id */
+    uint32_t num_groups;          /* length of group_array */
+    PVFS_gid *group_array;        /* groups for which the user is a member */
+    char *issuer;                 /* alias of the issuing server */
+    PVFS_time timeout;            /* seconds after epoch to time out */
+    uint32_t sig_size;            /* length of the signature in bytes */
+    PVFS_signature signature;     /* digital signature */
     PVFS_certificate certificate; /* user certificate buffer */
 };
 endecode_fields_3a2a1_struct (
@@ -1225,10 +1237,10 @@ endecode_fields_3a2a1_struct (
     uint32_t, sig_size,
     PVFS_signature, signature,
     PVFS_certificate, certificate);
-#define extra_size_PVFS_credential (PVFS_REQ_LIMIT_GROUPS    * \
+#define extra_size_PVFS_credential (PVFS_SYS_LIMIT_GROUPS    * \
                                     sizeof(PVFS_gid)         + \
-                                    PVFS_REQ_LIMIT_ISSUER    + \
-                                    PVFS_REQ_LIMIT_SIGNATURE + \
+                                    PVFS_SYS_LIMIT_ISSUER    + \
+                                    PVFS_SYS_LIMIT_SIGNATURE + \
                                     extra_size_PVFS_certificate)
 
 /* 
@@ -1236,6 +1248,12 @@ endecode_fields_3a2a1_struct (
  * For all new code use PVFS_credential.
  */
 typedef PVFS_credential PVFS_credentials;
+
+/*The following two limits pertain to the readdirplus request.  They are
+ * exposed here for user programs that want to use the readdirplus count.
+ */
+#define PVFS_SYS_LIMIT_LISTATTR 60
+#define PVFS_SYS_LIMIT_DIRENT_COUNT_READDIRPLUS PVFS_SYS_LIMIT_LISTATTR
 
 
 #endif /* __PVFS2_TYPES_H */
