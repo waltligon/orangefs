@@ -286,7 +286,7 @@ static size_t direct_locked_write(int fd,
     {
         if((write_offset + size) > stream_size)
 	{
-            ret = DBPF_RESIZE(fd, (write_offset + size));
+            ret = ftruncate(fd, (write_offset + size));
 	    if(ret < 0)
 	    {
 		gossip_err("failed ftruncate of O_DIRECT fd to size: %d\n",
@@ -1277,7 +1277,7 @@ static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
         return ret;
     }
 
-    ret = DBPF_RESIZE(open_ref.fd, tmpsize);
+    ret = ftruncate(open_ref.fd, tmpsize);
     if(ret < 0)
     {
         return(ret);
