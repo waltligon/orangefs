@@ -2,6 +2,23 @@
 
 OrangeFS Release ChangeLog
 -----------------------
+orangefs-2.9.x (Subversion Branch v.2.9.x)
+http://dev.orangefs.org/svn/orangefs/branches/v.2.9.x
+
+
+* - Server  
+	* - Enhanced permission checking and job scheduling for tree
+	    operations.
+	* - Removed memory leaks from the getattr operation and restructured
+	    keyval buffer management.
+
+* - Clients
+	* - Client Core
+		* - Enhanced the readahead cache with multiple readahead
+		    buffers.
+
+
+
 
 orangefs-2.9.6 (Subversion Branch v.2.9.6)
 http://dev.orangefs.org/svn/orangefs/branches/v.2.9.6
