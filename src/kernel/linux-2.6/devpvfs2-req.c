@@ -646,7 +646,7 @@ static ssize_t pvfs2_devreq_write_iter(struct kiocb *iocb,
 	hash_link =
 		qhash_search_and_remove(htable_ops_in_progress, &(head.tag));
 	if (!hash_link) {
-		gossip_deubg(GOSSIP_DEV_DEBUG,"WARNING: No one's waiting for tag %llu\n",
+		gossip_debug(GOSSIP_DEV_DEBUG,"WARNING: No one's waiting for tag %llu\n",
 			   llu(head.tag));
 		goto out;
 	}
