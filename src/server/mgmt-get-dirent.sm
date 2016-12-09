@@ -239,7 +239,7 @@ static int mgmt_get_dirent(
                 "mgmt_get_dirent: error: WRONG dirdata object for the dirent! Returning error.\n");
 
         /* return an error to tell the client to try again */
-        js_p->error_code = -PVFS_EDISTDIR;
+        js_p->error_code = -PVFS_ESTALE;
         return SM_ACTION_COMPLETE;
     }
     else

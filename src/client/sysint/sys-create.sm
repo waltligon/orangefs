@@ -612,31 +612,40 @@ static PINT_sm_action create_crdirent_failure(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: crdirent_failure\n");
 
     /* if need to retry. clear the error_code and setup getattr. */
-    if(js_p->error_code == -PVFS_EDISTDIR &&
+    if((js_p->error_code == -PVFS_ESTALE || js_p->error_code == -PVFS_EAGAIN) &&
        sm_p->u.create.retry_count < sm_p->msgarray_op.params.retry_limit)
     {
         sm_p->u.create.retry_count++;
 
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "create: received -PVFS_EDISTDIR, will retry getattr and crdirent (attempt number %d).\n",
-                     sm_p->u.create.retry_count);
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "create: received -%s, will retry getattr and crdirent (attempt number %d).\n",
+               js_p->error_code == -PVFS_ESTALE ? "PVFS_ESTALE" : "PVFS_EAGAIN",
+               sm_p->u.create.retry_count);
         gossip_debug(GOSSIP_CLIENT_DEBUG,"%s:sm_p->getattr.attr.mask(0x%0x)\n",__func__,sm_p->getattr.attr.mask);
         
         /* clear attributes */
         PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
-        /* clear acache content */
-        PINT_acache_invalidate(sm_p->object_ref);
-        /* clear capcache content */
-        local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
 
-        if (local_uid == (PVFS_uid) -1)
+        if (js_p->error_code == -PVFS_ESTALE)
         {
-            local_uid = PINT_util_getuid();
-
-            PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
-                          sizeof(PVFS_uid), &local_uid);
+            /* clear acache content */
+            PINT_acache_invalidate(sm_p->object_ref);
         }
 
-        PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+        if (js_p->error_code == -PVFS_EAGAIN)
+        {
+            /* clear capcache content */
+            local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+
+            if (local_uid == (PVFS_uid) -1)
+            {
+                local_uid = PINT_util_getuid();
+
+                PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
+                          sizeof(PVFS_uid), &local_uid);
+            }
+
+            PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+        }
 
         /* set up new getattr */
         PINT_SM_GETATTR_STATE_FILL(

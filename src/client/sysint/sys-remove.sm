@@ -25,6 +25,7 @@
 #include "ncache.h"
 #include "pvfs2-internal.h"
 #include "dist-dir-utils.h"
+#include "client-capcache.h"
 
 /*
   PVFS_{i}sys_remove takes the following steps:
@@ -588,17 +589,39 @@ static PINT_sm_action remove_crdirent_retry_or_fail(
                  "remove state: crdirent_retry_or_fail\n");
 
     /* try again if we get a dirdata mismatch. */
-    if (js_p->error_code == -PVFS_EDISTDIR &&
+    if ((js_p->error_code == -PVFS_ESTALE || js_p->error_code == -PVFS_EAGAIN) &&
         sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit)
     {
         sm_p->u.remove.retry_count++;
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "  received -PVFS_EDISTDIR, wrong dirdata server or revoked capability,\n  will do getattr and retry crdirent (attempt number %d)!\n",
-                sm_p->u.remove.retry_count);
+               "  received -%s, will do getattr and retry crdirent (attempt number %d)!\n",
+               js_p->error_code == -PVFS_ESTALE ? "PVFS_ESTALE" : "PVFS_EAGAIN",
+               sm_p->u.remove.retry_count);
 
-        /* clear acache content */
-        PINT_acache_invalidate(sm_p->parent_ref);
+        if (js_p->error_code == -PVFS_ESTALE)
+        {
+            /* clear acache content */
+            PINT_acache_invalidate(sm_p->parent_ref);
+        }
+
+        if (js_p->error_code == -PVFS_EAGAIN)
+        {
+            PVFS_uid local_uid;
+
+            /* clear capcache content */
+            local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+
+            if (local_uid == (PVFS_uid) -1)
+            {
+                local_uid = PINT_util_getuid();
+
+                PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
+                          sizeof(PVFS_uid), &local_uid);
+            }
+
+            PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+        }
 
         js_p->error_code = CRDIRENT_RETRY;
         return SM_ACTION_COMPLETE;
@@ -644,16 +667,39 @@ static PINT_sm_action remove_rmdirent_retry_or_fail(
                  "remove state: rmdirent_retry_or_fail\n");
 
     /* try again if we get a dirdata mismatch. */
-    if (js_p->error_code == -PVFS_EDISTDIR &&
+    if ((js_p->error_code == -PVFS_ESTALE || js_p->error_code == -PVFS_EAGAIN) &&
         sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit)
     {
         sm_p->u.remove.retry_count++;
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "  received -PVFS_EDISTDIR, wrong dirdata server, will do getattr and retry rmdirent!\n");
+                "  received -%s will do getattr and retry rmdirent (attempt number %d)!\n",
+               js_p->error_code == -PVFS_ESTALE ? "PVFS_ESTALE" : "PVFS_EAGAIN",
+               sm_p->u.remove.retry_count);
 
-        /* clear acache content */
-        PINT_acache_invalidate(sm_p->parent_ref);
+        if (js_p->error_code == -PVFS_ESTALE)
+        {
+            /* clear acache content */
+            PINT_acache_invalidate(sm_p->parent_ref);
+        }
+
+        if (js_p->error_code == -PVFS_EAGAIN)
+        {
+            PVFS_uid local_uid;
+
+            /* clear capcache content */
+            local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+
+            if (local_uid == (PVFS_uid) -1)
+            {
+                local_uid = PINT_util_getuid();
+
+                PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
+                          sizeof(PVFS_uid), &local_uid);
+            }
+
+            PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+        }
 
         js_p->error_code = RMDIRENT_RETRY_NEED_GETATTR;
         return SM_ACTION_COMPLETE;

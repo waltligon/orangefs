@@ -1128,12 +1128,12 @@ static PINT_sm_action rename_chdirent_retry_or_failure(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    /* try again if we get a -PVFS_EDISTDIR failure. */
-    if (js_p->error_code == -PVFS_EDISTDIR) 
+    /* try again if we get a -PVFS_ESTALE failure. */
+    if (js_p->error_code == -PVFS_ESTALE) 
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "rename_chdirent: received -PVFS_EDISTDIR, wrong dirdata server, "
-                "will do getattr and retry chdirent!\n");
+                "rename_chdirent: received -PVFS_ESTALE, "
+                "wrong dirdata server, retrying...\n");
 
         /* clear acache content */
         PINT_acache_invalidate(sm_p->u.rename.parent_refns[1]);
@@ -1238,30 +1238,41 @@ static PINT_sm_action rename_crdirent_retry_or_fail(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    /* try again if we get a -PVFS_EDISTDIR failure. */
-    if (js_p->error_code == -PVFS_EDISTDIR) 
+    /* try again if we get a -PVFS_ESTALE or -PVFS_EAGAIN failure. */
+    if ((js_p->error_code == -PVFS_ESTALE || js_p->error_code == -PVFS_EAGAIN) &&
+         sm_p->u.rename.retry_count < sm_p->msgarray_op.params.retry_limit)
     {
-        PVFS_uid local_uid;
+        sm_p->u.rename.retry_count++;
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "rename_crdirent: received -PVFS_EDISTDIR, wrong dirdata server, "
-                "will do getattr and retry crdirent!\n");
+                "rename_crdirent: received -%s, "
+                "will do getattr and retry crdirent (attempt number %d).\n",
+               js_p->error_code == -PVFS_ESTALE ? "PVFS_ESTALE" : "PVFS_EAGAIN",
+               sm_p->u.rename.retry_count);
 
-        /* clear acache content */
-        PINT_acache_invalidate(sm_p->u.rename.parent_refns[1]);
-
-        /* clear capcache content */
-        local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
-
-        if (local_uid == (PVFS_uid) -1)
+        if (js_p->error_code == -PVFS_ESTALE)
         {
-            local_uid = PINT_util_getuid();
-
-            PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
-                          sizeof(PVFS_uid), &local_uid);
+            /* clear acache content */
+            PINT_acache_invalidate(sm_p->u.rename.parent_refns[1]);
         }
 
-        PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+        if (js_p->error_code == -PVFS_EAGAIN)
+        {
+            PVFS_uid local_uid;
+
+            /* clear capcache content */
+            local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+
+            if (local_uid == (PVFS_uid) -1)
+            {
+                local_uid = PINT_util_getuid();
+
+                PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
+                          sizeof(PVFS_uid), &local_uid);
+            }
+
+            PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+        }
 
         js_p->error_code = RENAME_CRDIRENT_RETRY_NEED_GETATTR;
 
@@ -1356,18 +1367,42 @@ static PINT_sm_action rename_rmdirent_retry_or_fail(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
 
-    /* try again if we get a -PVFS_EDISTDIR failure. */
-    if (js_p->error_code == -PVFS_EDISTDIR &&
+    /* try again if we get a -PVFS_ESTALE or -PVFS_EAGAIN failure. */
+    if ((js_p->error_code == -PVFS_ESTALE || js_p->error_code == -PVFS_EAGAIN) &&
         sm_p->u.rename.retry_count < sm_p->msgarray_op.params.retry_limit) 
     {
         sm_p->u.rename.retry_count++;
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "rename_rmdirent: received -PVFS_EDISTDIR, wrong dirdata server, "
-                "will do getattr and retry rmdirent!\n");
+                "rename_rmdirent: received -%s, "
+                "will do getattr and retry rmdirent (attempt number %d).\n",
+               js_p->error_code == -PVFS_ESTALE ? "PVFS_ESTALE" : "PVFS_EAGAIN",
+               sm_p->u.rename.retry_count);
 
-        /* clear acache content */
-        PINT_acache_invalidate(sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index]);
+        if (js_p->error_code == -PVFS_ESTALE)
+        {
+            /* clear acache content */
+            PINT_acache_invalidate(sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index]);
+        }
+
+        if (js_p->error_code == -PVFS_EAGAIN)
+        {
+            PVFS_uid local_uid;
+
+            /* clear capcache content */
+            local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+
+            if (local_uid == (PVFS_uid) -1)
+            {
+                local_uid = PINT_util_getuid();
+
+                PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
+                          sizeof(PVFS_uid), &local_uid);
+            }
+
+            PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+        }
+
 	js_p->error_code = RENAME_RMDIRENT_RETRY_NEED_GETATTR;
 
 	return  SM_ACTION_COMPLETE;

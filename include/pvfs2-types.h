@@ -811,6 +811,7 @@ PVFS_error PVFS_errno_to_error(int err);
 #define PVFS_EACCES          E(58) /* Access not allowed */
 #define PVFS_ECONNRESET      E(59) /* Connection reset by peer */
 #define PVFS_ERANGE          E(60) /* Math out of range, or buf too small */
+#define PVFS_ESTALE          E(61) /* Wrong distributed directoryserver */
 
 /***************** non-errno/pvfs2 specific error codes *****************/
 #define PVFS_ECANCEL    (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
@@ -822,7 +823,6 @@ PVFS_error PVFS_errno_to_error(int err);
 #define PVFS_ETRYAGAIN  (7|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ENOTPVFS   (8|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ESECURITY  (9|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
-#define PVFS_EDISTDIR   (10|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERRNO ERROR CODES!
  *
@@ -831,7 +831,7 @@ PVFS_error PVFS_errno_to_error(int err);
  * UNIX ERRNO VALUE IN THE MACROS BELOW (USED IN
  * src/common/misc/errno-mapping.c and the kernel module)
  */
-#define PVFS_ERRNO_MAX          61
+#define PVFS_ERRNO_MAX          62
 
 /*
  * If system headers do not define these, assign them, with arbitrary
@@ -933,6 +933,7 @@ PVFS_error PINT_errno_mapping[PVFS_ERRNO_MAX + 1] = { \
     EACCES,                                           \
     ECONNRESET,   /* 59 */                            \
     ERANGE,                                           \
+    ESTALE,                                           \
     0         /* PVFS_ERRNO_MAX */                    \
 };                                                    \
 const char *PINT_non_errno_strerror_mapping[] = {     \
