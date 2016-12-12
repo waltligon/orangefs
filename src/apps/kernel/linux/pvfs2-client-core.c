@@ -830,9 +830,8 @@ static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.gid);
 
     /* compat */
-    refn.handle =
-      pvfs2_khandle_to_ino(
-        &(vfs_request->in_upcall.req.getattr.refn.khandle));
+    refn.handle = pvfs2_khandle_to_ino(
+                  &(vfs_request->in_upcall.req.getattr.refn.khandle));
     refn.fs_id = vfs_request->in_upcall.req.getattr.refn.fs_id;
 
     ret = PVFS_isys_getattr(

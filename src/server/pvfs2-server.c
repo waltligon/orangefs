@@ -130,17 +130,31 @@ static char startup_cwd[PATH_MAX+1];
  */
 PINT_server_trove_keys_s Trove_Common_Keys[] =
 {
-    {ROOT_HANDLE_KEYSTR, ROOT_HANDLE_KEYLEN},
-    {DIRECTORY_ENTRY_KEYSTR, DIRECTORY_ENTRY_KEYLEN},
-    {DATAFILE_HANDLES_KEYSTR, DATAFILE_HANDLES_KEYLEN},
-    {METAFILE_DIST_KEYSTR, METAFILE_DIST_KEYLEN},
-    {SYMLINK_TARGET_KEYSTR, SYMLINK_TARGET_KEYLEN},
-    {METAFILE_LAYOUT_KEYSTR, METAFILE_LAYOUT_KEYLEN},
-    {NUM_DFILES_REQ_KEYSTR, NUM_DFILES_REQ_KEYLEN},
-    {DIST_DIR_ATTR_KEYSTR, DIST_DIR_ATTR_KEYLEN},
-    {DIST_DIRDATA_BITMAP_KEYSTR, DIST_DIRDATA_BITMAP_KEYLEN},
+    {ROOT_HANDLE_KEYSTR,          ROOT_HANDLE_KEYLEN},
+    {DIRECTORY_ENTRY_KEYSTR,      DIRECTORY_ENTRY_KEYLEN},
+    {DATAFILE_HANDLES_KEYSTR,     DATAFILE_HANDLES_KEYLEN},
+    {METAFILE_DIST_KEYSTR,        METAFILE_DIST_KEYLEN},
+    {SYMLINK_TARGET_KEYSTR,       SYMLINK_TARGET_KEYLEN},
+    {METAFILE_LAYOUT_KEYSTR,      METAFILE_LAYOUT_KEYLEN},
+    {NUM_DFILES_REQ_KEYSTR,       NUM_DFILES_REQ_KEYLEN},
+    {DIST_DIR_ATTR_KEYSTR,        DIST_DIR_ATTR_KEYLEN},
+    {DIST_DIRDATA_BITMAP_KEYSTR,  DIST_DIRDATA_BITMAP_KEYLEN},
     {DIST_DIRDATA_HANDLES_KEYSTR, DIST_DIRDATA_HANDLES_KEYLEN},
 };
+
+PINT_server_trove_keys_s Trove_Special_Keys[] =
+{
+    {SPECIAL_DIST_NAME_STRING     , SPECIAL_DIST_NAME_KEYLEN},
+    {SPECIAL_DIST_PARAMS_STRING   , SPECIAL_DIST_PARAMS_KEYLEN},
+    {SPECIAL_NUM_DFILES_STRING    , SPECIAL_NUM_DFILES_KEYLEN},
+    {SPECIAL_LAYOUT_STRING        , SPECIAL_LAYOUT_KEYLEN},
+    {SPECIAL_SERVER_LIST_STRING   , SPECIAL_SERVER_LIST_KEYLEN},
+    {SPECIAL_METAFILE_HINT_STRING , SPECIAL_METAFILE_HINT_KEYLEN},
+    {SPECIAL_MIRROR_COPIES_STRING , SPECIAL_MIRROR_COPIES_KEYLEN},
+    {SPECIAL_MIRROR_HANDLES_STRING, SPECIAL_MIRROR_HANDLES_KEYLEN},
+    {SPECIAL_MIRROR_STATUS_STRING , SPECIAL_MIRROR_STATUS_KEYLEN},
+};
+
 
 /* These three are used continuously in our wait loop.  They could be
  * relatively large, so rather than allocate them on the stack, we'll
@@ -3203,6 +3217,69 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
     }
 
     return(0);
+}
+
+/* THese functions are for managing the keyval buffers in the state
+ * machines.  They use the generic field "free_val" to record which
+ * buffers do NOT need to be freed - presumable because they are freed
+ * elsewhere.
+ */
+
+void keep_keyval_buffers(struct PINT_server_op *s_op, int buf)
+{
+    if (buf >= KEYVAL && buf < s_op->keyval_count)
+    {   
+        s_op->free_val |= 0x1 << (buf + 1);
+    }       
+}
+            
+void free_keyval_buffers(struct PINT_server_op *s_op)
+{                           
+    int i = 0;
+            
+    /* free_val is a bitmap of buffers that are not to be
+     * freed because they are referenced elsewhere
+     */     
+    if (!(s_op->free_val & KEYVAL))
+    {       
+        if (s_op->val.buffer)
+        {
+            free(s_op->val.buffer);
+        }
+    }       
+                    
+    memset(&(s_op->val), 0, sizeof(s_op->val));
+    memset(&(s_op->key), 0, sizeof(s_op->key));
+        
+    if (s_op->val_a)
+    {   
+        for (i = 0; i < s_op->keyval_count; i++)
+        {
+            if (!(s_op->free_val & (0x1 << (i + 1))))
+            {
+                if (s_op->val_a[i].buffer)
+                {
+                    free(s_op->val_a[i].buffer);
+                }
+            }
+            s_op->val_a[i].buffer = NULL;
+        }
+        free(s_op->val_a);
+        s_op->val_a = NULL;
+    }
+
+    if (s_op->key_a)
+    {
+        free(s_op->key_a);
+        s_op->key_a = NULL;
+    }
+    if (s_op->error_a)
+    {
+        free(s_op->error_a);
+        s_op->error_a = NULL;
+    }
+
+    s_op->free_val = 0;
 }
 
 /*
