@@ -41,23 +41,18 @@
 #endif
 
 /* New facility for dealing with keyval buffers.
- * Old system has a function free_keyval_buffers that looks at
- * a global variable s_op->free_val and if it is true it will
- * free all buffers, then free buffer structures.  If it is
- * false it will only free buffer structures and not buffers
- * assuming the buffers are referenced elsewhere.  New approach
- * is to zero keyval buffer pointerss we do not want to
- * automatically free, eliminating the variable.
- * This will use a new macro called KEEP_BUF
+ * Defined in pvfs2-server.c/h
  */
-
-#define KEYVAL -1
 
 #define KEEP_BUFFER(buf)                          \
     keep_keyval_buffers(s_op, buf);
 
 static uint64_t UINT64_HIGH = 0xffffffffffffffffULL;
 
+/* This was moved to src/server/pvfs2-server.c so it is
+ * visible across the server code
+ */
+#if 0
 /* These are defined in src/common/misc/pvfs2-internal.h
  * This table SHOULD be defined using macros not the strings
  * See Trove_Common_Keys in src/server/pvfs2-server.c
@@ -76,6 +71,7 @@ PINT_server_trove_keys_s Trove_Special_Keys[] =
     {"user.pvfs2.mirror.handles", SPECIAL_MIRROR_HANDLES_KEYLEN},
     {"user.pvfs2.mirror.status" , SPECIAL_MIRROR_STATUS_KEYLEN},
 };
+#endif
 
 enum
 {
@@ -90,8 +86,6 @@ enum
 };
 
 static void free_nested_getattr_data(struct PINT_server_op *s_op);
-static void free_keyval_buffers(struct PINT_server_op *s_op);
-static void keep_keyval_buffers(struct PINT_server_op *s_op, int buf);
 
 %%
 
@@ -2134,7 +2128,8 @@ static PINT_sm_action getattr_get_dir_hint(
     /* wrapping up get_bitmap_and_dirdata_handles */
     if (js_p->error_code == -TROVE_ENOENT)
     {
-        gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr: no DIST_DIR_ATTR key present, not getting DIR_HINTS! \n");
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+        "getattr: no DIST_DIR_ATTR key present, not getting DIR_HINTS! \n");
         return SM_ACTION_COMPLETE;
     }
 
@@ -2414,9 +2409,15 @@ static PINT_sm_action getattr_interpret_dir_hint(
             /* no error, so set the count from the list */
             /* list should be in the buffer of the k/v read */
             s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count = 
-                    atoi(s_op->val_a[SERVER_LIST_KEY].buffer);
+                    strtol(s_op->val_a[SERVER_LIST_KEY].buffer,
+                    NULL,
+                    10);
+            /* WBL
+             * should this be s_op->val_a[SERVER_LIST_KEY].read_sz ? 
+             * instead of strlen(buffer) and if not, should it be
+             * strlen + 1 ? */
             s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize = 
-                    strlen(s_op->val_a[SERVER_LIST_KEY].buffer);
+                    strlen(s_op->val_a[SERVER_LIST_KEY].buffer) + 1;
             /* force the dfile_count */
             s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = 
                   s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count;
@@ -2436,63 +2437,6 @@ static PINT_sm_action getattr_interpret_dir_hint(
         js_p->error_code = 0;
     }/* end if val_a and key_a */
     return SM_ACTION_COMPLETE;
-}
-
-static void keep_keyval_buffers(struct PINT_server_op *s_op, int buf)
-{
-    if (buf >= KEYVAL && buf < s_op->keyval_count)
-    {
-        s_op->free_val |= 0x1 << (buf + 1);
-    }
-}
-
-static void free_keyval_buffers(struct PINT_server_op *s_op)
-{
-    int i = 0;
-
-    /* free_val is a bitmap of buffers that are not to be
-     * freed because they are referenced elsewhere
-     */
-    if (!(s_op->free_val & KEYVAL))
-    {
-        if (s_op->val.buffer)
-        {
-            free(s_op->val.buffer);
-        }
-    }
-
-    memset(&(s_op->val), 0, sizeof(s_op->val));
-    memset(&(s_op->key), 0, sizeof(s_op->key));
- 
-    if (s_op->val_a)
-    {
-        for (i = 0; i < s_op->keyval_count; i++)
-        {
-            if (!(s_op->free_val & (0x1 << (i + 1))))
-            {
-                if (s_op->val_a[i].buffer)
-                {
-                    free(s_op->val_a[i].buffer);
-                }
-            }
-            s_op->val_a[i].buffer = NULL;
-        }
-        free(s_op->val_a);
-        s_op->val_a = NULL;
-    }
-
-    if (s_op->key_a)
-    {
-        free(s_op->key_a);
-        s_op->key_a = NULL;
-    }
-    if (s_op->error_a)
-    {
-        free(s_op->error_a);
-        s_op->error_a = NULL;
-    }
-
-    s_op->free_val = 0;
 }
 
 static int perm_getattr(PINT_server_op *s_op)
