@@ -9,8 +9,10 @@
 
 #include <gossip.h>
 #include "dbpf.h"
+#define debug1(format,...) gossip_debug(GOSSIP_TROVE_DEBUG,"%s: "format,__FUNCTION__)
 #define debug(format,...) gossip_debug(GOSSIP_TROVE_DEBUG,"%s: "format,__FUNCTION__,__VA_ARGS__)
 #define debug2(...)
+#define error1(format,...) gossip_err("%s: "format,__FUNCTION__)
 #define error(format,...) gossip_err("%s: "format,__FUNCTION__,__VA_ARGS__)
 #define log gossip_err
 
@@ -670,7 +672,7 @@ static int initialize(char* points)
 
   if (g_cluster || g_session)
   {
-    error("double connect !!!\n", 0);
+    error1("double connect !!!\n");
     abort();
   }
 
@@ -733,7 +735,7 @@ static int initialize(char* points)
  */
 static void finalize(void)
 {
-  debug("disconnecting from cluster\n", 0);
+  debug1("disconnecting from cluster\n");
 
   if (g_cluster && g_session)
   {
@@ -805,7 +807,7 @@ int dbpf_db_open(char* name, int compare, struct dbpf_db** db, int create, struc
     case COLLECTIONS:
       if (collname)
       {
-        error("collname provided where it is not intended to\n", 0);
+        error1("collname provided where it is not intended to\n");
         free(tdb->name);
         tdb->name = 0;
         free(tdb);
@@ -825,7 +827,7 @@ int dbpf_db_open(char* name, int compare, struct dbpf_db** db, int create, struc
       }
       else
       {
-        error("collname is not provided for collections database\n", 0);
+        error1("collname is not provided for collections database\n");
         free(tdb->name);
         tdb->name = 0;
         free(tdb);
