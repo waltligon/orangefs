@@ -644,6 +644,12 @@ static PINT_sm_action tree_setattr_setup(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    else
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,"%s:s_op->resp.u.tree_setattr.status(%p)\n"
+                                        ,__func__
+                                        ,s_op->resp.u.tree_setattr.status);         
+    }
 
     return (tree_communicate_partition_handles(smcb, js_p, s_op->req->u.tree_setattr.handle_count,
         s_op->req->u.tree_setattr.fs_id, PVFS_SERV_TREE_SETATTR,
@@ -809,6 +815,9 @@ static int tree_setattr_work_cleanup(struct PINT_smcb *smcb,
                                         ,__func__
                                         ,i
                                         ,s_tree->status[i]);
+        gossip_debug(GOSSIP_SERVER_DEBUG,"%s: s_tree->status(%p)\n"
+                                        ,__func__
+                                        ,s_tree->status);
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,"%s: Resp op:%d \tResp status:%d\n"

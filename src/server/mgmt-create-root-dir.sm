@@ -35,7 +35,8 @@ enum
 {
     NO_REQ = 100,
     LOCAL_OPERATION,
-    REMOTE_OPERATION
+    REMOTE_OPERATION,
+    CLEANUP
 };
 
 static char *lost_and_found_string = "lost+found";
@@ -84,7 +85,7 @@ machine pvfs2_mgmt_create_root_dir_sm
     state retry_remote_dirdata_dspace
     {
         run mgmt_create_root_dir_retry_remote_dirdata_dspace;
-        default => request_remote_dirdata_dspace;
+        default => cleanup_noreq;
     }
 
     state create_local_dirdata_dspace
@@ -153,15 +154,14 @@ machine pvfs2_mgmt_create_root_dir_sm
     state local_mkdir
     {
         jump pvfs2_mkdir_work_sm;
-        success => local_mkdir_cleanup;
-        default => cleanup_noreq;
+        default => local_mkdir_cleanup;
     }
 
     state local_mkdir_cleanup
     {
         run mgmt_create_root_dir_local_mkdir_cleanup;
-        success => crdirent_lost_and_found_setup_msgpair;
-        default => cleanup_noreq;
+        CLEANUP => cleanup_noreq;
+        default => crdirent_lost_and_found_setup_msgpair;
     }
 
     state crdirent_lost_and_found_setup_msgpair
@@ -182,13 +182,13 @@ machine pvfs2_mgmt_create_root_dir_sm
     state local_crdirent
     {
         jump pvfs2_crdirent_work_sm;
-        success => local_crdirent_cleanup;
-        default => delete_lost_and_found_handle_setup_msgpair;
+        default => local_crdirent_cleanup;
     }
 
     state local_crdirent_cleanup
     {
         run mgmt_create_root_dir_local_crdirent_cleanup;
+        CLEANUP => delete_lost_and_found_handle_setup_msgpair;
         default => cleanup_noreq;
     }
 
@@ -209,8 +209,7 @@ machine pvfs2_mgmt_create_root_dir_sm
     state local_delete
     {
         jump pvfs2_remove_work_sm;
-        success => local_delete_cleanup;
-        default => cleanup_noreq;
+        default => local_delete_cleanup;
     }
 
     state local_delete_cleanup
@@ -451,6 +450,11 @@ static PINT_sm_action mgmt_create_root_dir_retry_remote_dirdata_dspace(
 {
     job_id_t tmp_id;
 
+    if (js_p->error_code != 0)
+    {
+        return SM_ACTION_COMPLETE;
+    }
+
     if (++num_retries > 3)
     {
         gossip_err("Unable to create root directory."
@@ -675,9 +679,12 @@ static PINT_sm_action mgmt_create_root_dir_tree_setattr_cleanup(
     struct PINT_server_op *tree_setattr_op = NULL;
     int task_id = 0;
     int remaining = 0;
+
     tree_setattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
 
     PINT_free_object_attr(&tree_setattr_op->req->u.tree_setattr.attr);
+    PINT_cleanup_capability(&tree_setattr_op->req->capability);
+
     free(tree_setattr_op->req);
     free(tree_setattr_op);
 
@@ -945,20 +952,39 @@ static PINT_sm_action mgmt_create_root_dir_local_mkdir_cleanup(
     mkdir_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    /* Save the newly created meta handle */
-    s_op->u.mgmt_create_root_dir.lost_and_found_handle = mkdir_op->resp.u.mkdir.handle;
+    gossip_err("Error code sent back from mkdir request: %d\n",js_p->error_code);
 
-    /* Clean up memory that was allocated by the mkdir state machine. */
+#if 0
+    if (js_p->error_code == 0)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        gossip_err("Setting error code to %d for testing.\n",js_p->error_code);
+    }
+#endif
+
+    if (js_p->error_code)
+    {
+        char errstr[256];
+        PVFS_strerror_r(js_p->error_code, errstr, sizeof(errstr));
+        gossip_err("WARNING:  Unable to create the directory object for lost+found on this host: %s\n",errstr);
+        gossip_err("To create the directory manually:  mkdir -m 777 <mountpoint>/lost+found\n");
+        js_p->error_code = CLEANUP;
+        s_op->u.mgmt_create_root_dir.lost_and_found_handle = 0;
+    }
+    else
+    {
+        /* Save the newly created meta handle */
+        s_op->u.mgmt_create_root_dir.lost_and_found_handle = mkdir_op->resp.u.mkdir.handle;
+    }
+
+
+    /* Clean up memory that was allocated by the local-mkdir states. */
     mkdir_free(mkdir_op);
     PINT_cleanup_capability(&mkdir_op->req->capability);
 
     free(mkdir_op->req);
     free(mkdir_op);
 
-    if (js_p->error_code)
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "Failed to create lost+found directory\n");
-    }
     return SM_ACTION_COMPLETE;
 }
 
@@ -1127,12 +1153,29 @@ static PINT_sm_action mgmt_create_root_dir_local_crdirent_cleanup(
 
     crdirent_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
 
+    gossip_err("Error code returned from crdirent:%d\n",js_p->error_code);
+
+#if 0
+    if (js_p->error_code == 0)
+    {
+       js_p->error_code = -PVFS_ENOMEM;
+       gossip_err("Error code modified to %d for testing\n",js_p->error_code);
+    }
+#endif
+
+    /* free credential copied into crdirent request */
+    PINT_cleanup_capability(&crdirent_op->req->capability);
+
     free(crdirent_op->req);
     free(crdirent_op);
 
     if (js_p->error_code)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "Failed to create lost+found directory\n");
+        char errstr[256];
+        PVFS_strerror_r(js_p->error_code, errstr, sizeof(errstr));
+        gossip_err("WARNING:  Unable to create the directory entry for lost+found on this host: %s\n",errstr);
+        gossip_err("To create the directory manually:  mkdir -m 777 <mountpoint>/lost+found\n");
+        js_p->error_code = CLEANUP;
     }
     return SM_ACTION_COMPLETE;
 }
@@ -1154,6 +1197,10 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
     int ret = -PVFS_EINVAL;
     server_configuration_s *config = get_server_config_struct();
     char server_name[1024];
+
+    /* Remove the directory object since we bombed on creating a directory
+     * entry with it!
+     */
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt-create-root-dir state: "
                  "delete_lost_and_found_handle_setup_msgpair_array\n");
@@ -1263,7 +1310,10 @@ static PINT_sm_action mgmt_create_root_dir_local_delete_cleanup(
 
     if (js_p->error_code)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "Failed to remove lost+found directory\n");
+        char errstr[256];
+        PVFS_strerror_r(js_p->error_code, errstr, sizeof(errstr));
+        gossip_err("WARNING:  Unable to remove the directory object for lost+found on this host: %s\n",errstr);
+        js_p->error_code = CLEANUP;
     }
     return SM_ACTION_COMPLETE;
 }
@@ -1286,13 +1336,32 @@ static PINT_sm_action mgmt_create_root_dir_cleanup_noreq( struct PINT_smcb *smcb
 
     assert(s_op);
 
-    if (js_p->error_code != 0)
+
+    switch(js_p->error_code)
     {
-        char errstr[256];
-        PVFS_strerror_r(js_p->error_code, errstr, sizeof(errstr));
-        gossip_err("Warning: unable to create root dir due to error: %s\n", 
-                   errstr);
-        gossip_err("         Your FS may be in an inconsistent state\n");
+       case 0:
+       {
+           break;
+       }
+       case CLEANUP:
+       {
+           /* We use CLEANUP only for the lost+found errors.  Error information has already been
+            * posted in prior states.  Plus, if the lost+found directory isn't created, the 
+            * filesystem can still run.
+            */
+           js_p->error_code=0;
+           break;
+       }
+       default:
+       {
+           /* All other errors are critical to the creation of the root directory */
+           char errstr[256];
+           PVFS_strerror_r(js_p->error_code, errstr, sizeof(errstr));
+           gossip_err("CRITICAL ERROR: unable to create the root directory due to error: %s\n", 
+                      errstr);
+           gossip_err("         Your FS may be in an inconsistent state\n");
+           break;   
+       }
     }
 
     if(s_op->key_a)
