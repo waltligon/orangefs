@@ -91,6 +91,7 @@ enum
     TROVE_DIRECTIO_TIMEOUT
 };
 
+struct server_configuration_s;
 /** Initializes the Trove layer.  Must be called before any other Trove
  *  functions.
  */
@@ -99,7 +100,8 @@ int trove_initialize(
     TROVE_method_callback method_callback,
     char *data_path,
     char *meta_path,
-    TROVE_ds_flags flags);
+    TROVE_ds_flags flags,
+    struct server_configuration_s *server_config);
 
 int trove_finalize(TROVE_method_id method_id);
 
@@ -537,11 +539,6 @@ int trove_collection_setinfo(
 			     TROVE_context_id context_id,
 			     int option,
 			     void *parameter);
-
-struct server_configuration_s;
-int trove_collection_set_fs_config(
-        TROVE_coll_id coll_id,
-        struct server_configuration_s *cfg);
 
 #endif
 

@@ -263,13 +263,6 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
     return ret;
 }
 
-static int dbpf_collection_set_fs_config(TROVE_method_id method_id,
-        TROVE_coll_id coll_id, struct server_configuration_s *cfg)
-{
-    server_cfg = cfg;
-    return 0;
-}
-
 int dbpf_collection_seteattr(TROVE_coll_id coll_id,
                              TROVE_keyval_s *key_p,
                              TROVE_keyval_s *val_p,
@@ -401,10 +394,13 @@ int dbpf_collection_deleattr(TROVE_coll_id coll_id,
 
 static int dbpf_initialize(char *data_path,
 			   char *meta_path,
-                           TROVE_ds_flags flags)
+                           TROVE_ds_flags flags,
+                           struct server_configuration_s *server_config)
 {
     int ret = -TROVE_EINVAL;
     struct dbpf_storage *sto_p = NULL;
+
+    server_cfg = server_config;
 
     /* initialize events */
     PINT_event_define_group("trove_dbpf", &trove_dbpf_event_group);
@@ -606,12 +602,13 @@ static int stop_directio_threads(void)
 
 static int dbpf_direct_initialize(char *data_path,
 				  char *meta_path,
-				  TROVE_ds_flags flags)
+				  TROVE_ds_flags flags,
+                                  struct server_configuration_s *server_config)
 {
     int ret;
 
     /* some parts of initialization are shared with other methods */
-    ret = dbpf_initialize(data_path, meta_path, flags);
+    ret = dbpf_initialize(data_path, meta_path, flags, server_config);
     if(ret < 0)
     {
         return(ret);
@@ -1887,8 +1884,7 @@ struct TROVE_mgmt_ops dbpf_mgmt_direct_ops =
     dbpf_collection_getinfo,
     dbpf_collection_seteattr,
     dbpf_collection_geteattr,
-    dbpf_collection_deleattr,
-    dbpf_collection_set_fs_config
+    dbpf_collection_deleattr
 };
 
 /* dbpf_mgmt_ops
@@ -1911,8 +1907,7 @@ struct TROVE_mgmt_ops dbpf_mgmt_ops =
     dbpf_collection_getinfo,
     dbpf_collection_seteattr,
     dbpf_collection_geteattr,
-    dbpf_collection_deleattr,
-    dbpf_collection_set_fs_config
+    dbpf_collection_deleattr
 };
 
 typedef struct

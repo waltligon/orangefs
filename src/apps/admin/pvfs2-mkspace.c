@@ -335,7 +335,7 @@ int main(int argc, char **argv)
     {
         ret = pvfs2_rmspace(opts.data_space, opts.meta_space,
 			    opts.collection, opts.coll_id, 
-			    opts.collection_only, opts.verbose);
+			    opts.collection_only, opts.verbose, NULL);
     }
     else
     {
@@ -344,7 +344,7 @@ int main(int argc, char **argv)
 			    opts.collection, opts.coll_id, 
 			    opts.root_handle, opts.meta_ranges, 
 			    opts.data_ranges, opts.collection_only, 
-			    opts.verbose);
+			    opts.verbose, NULL);
     }
     return ret;
 }

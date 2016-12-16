@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <unistd.h>
 
+#include "server-config.h"
+
 #include "cassandra.h"
 
 #include <gossip.h>
@@ -775,7 +777,7 @@ int dbpf_db_open(char* name, int compare, struct dbpf_db** db, int create, struc
   int r = 0;
 
   if (!open_dbs) {
-    r = initialize(getenv("CASS_POINTS"));
+    r = initialize(sc->db_points);
     if (r)
       return r;
   }

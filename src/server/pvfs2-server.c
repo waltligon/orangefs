@@ -880,12 +880,12 @@ static int server_initialize_subsystems(
 
 /********/
 
-
     ret = trove_initialize(server_config.trove_method, 
                            trove_coll_to_method_callback,
                            server_config.data_path,
 		           server_config.meta_path,
-                           init_flags);
+                           init_flags,
+                           &server_config);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: trove_initialize", ret);
@@ -931,13 +931,6 @@ static int server_initialize_subsystems(
         {
             PVFS_perror("Error: PINT_handle_load_mapping", ret);
             return(ret);
-        }
-
-        /* XXX: This is really the same for all collections, yet is specified
-         * separately. */
-        ret = trove_collection_set_fs_config(cur_fs->coll_id, &server_config);
-        if (ret < 0) {
-            gossip_err("Error setting filesystem configuration in Trove\n");
         }
 
         /*

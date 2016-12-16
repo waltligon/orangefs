@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 
     /* initialize trove, verifying storage space exists */
     ret = trove_initialize(
-      TROVE_METHOD_DBPF, NULL, data_path, meta_path, 0);
+      TROVE_METHOD_DBPF, NULL, data_path, meta_path, 0, NULL);
     if (ret < 0) 
     {
         printf("Error from trove_initialize is %d.\n",ret);

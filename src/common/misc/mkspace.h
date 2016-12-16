@@ -22,7 +22,8 @@ int pvfs2_mkspace(
     char *meta_handle_ranges,
     char *data_handle_ranges,
     int create_collection_only,
-    int verbose);
+    int verbose,
+    struct server_configuration_s *config);
 
 int pvfs2_rmspace(
     char *data_path,
@@ -30,6 +31,7 @@ int pvfs2_rmspace(
     char *collection,
     TROVE_coll_id coll_id,
     int remove_collection_only,
-    int verbose);
+    int verbose,
+    struct server_configuration_s *config);
 
 #endif /* __MKSPACE_H */

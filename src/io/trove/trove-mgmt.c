@@ -89,7 +89,8 @@ int trove_initialize(TROVE_method_id method_id,
                      TROVE_method_callback method_callback,
                      char *data_path,
                      char *meta_path,
-                     TROVE_ds_flags flags)
+                     TROVE_ds_flags flags,
+                     struct server_configuration_s *server_config)
 {
     int ret = -TROVE_EALREADY;
 
@@ -119,7 +120,8 @@ int trove_initialize(TROVE_method_id method_id,
       initialize can fail if storage name isn't valid, but we want
       those op pointers to be right either way.
     */
-    ret = mgmt_method_table[method_id]->initialize(data_path, meta_path, flags);
+    ret = mgmt_method_table[method_id]->initialize(data_path, meta_path, flags,
+            server_config);
     if (ret > -1)
     {
         ret = 1;

@@ -1060,18 +1060,6 @@ int trove_collection_setinfo(
            parameter);
 }
 
-int trove_collection_set_fs_config(
-    TROVE_coll_id coll_id,
-    struct server_configuration_s *cfg)
-{
-    TROVE_method_id method_id;
-    method_id = global_trove_method_callback(coll_id);
-    return mgmt_method_table[method_id]->collection_set_fs_config(
-            method_id,
-            coll_id,
-            cfg);
-}
-
 /*
  * Local variables:
  *  c-indent-level: 4

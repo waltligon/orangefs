@@ -124,7 +124,8 @@ int pvfs2_mkspace(char *data_path,
                   char *meta_handle_ranges,
                   char *data_handle_ranges,
                   int create_collection_only,
-                  int verbose)
+                  int verbose,
+                  struct server_configuration_s *config)
 {
     int ret = - 1, count = 0;
     TROVE_op_id op_id;
@@ -215,7 +216,8 @@ int pvfs2_mkspace(char *data_path,
 			       NULL, 
 			       data_path,
 			       meta_path,
-			       0);
+			       0,
+                               config);
         if (ret > -1)
         {
             gossip_err("error: storage space %s or %s already "
@@ -236,7 +238,8 @@ int pvfs2_mkspace(char *data_path,
                            NULL, 
 	                   data_path,
                            meta_path,
-                           0);
+                           0,
+                           config);
     if (ret < 0)
     {
 	gossip_err("error: trove initialize failed; aborting!\n");
@@ -484,7 +487,8 @@ int pvfs2_rmspace(
     char *collection,
     TROVE_coll_id coll_id,
     int remove_collection_only,
-    int verbose)
+    int verbose,
+    struct server_configuration_s *config)
 {
     int ret = -1;
     TROVE_op_id op_id;
@@ -495,7 +499,7 @@ int pvfs2_rmspace(
     {
         ret = trove_initialize(
 	    TROVE_METHOD_DBPF, NULL,
-	    data_path, meta_path, 0);
+	    data_path, meta_path, 0, config);
         if (ret == -1)
         {
             gossip_err("error: storage space %s or %s does not "

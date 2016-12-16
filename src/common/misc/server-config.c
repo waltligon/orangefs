@@ -112,6 +112,8 @@ static DOTCONF_CB(get_db_cache_size_bytes);
 static DOTCONF_CB(get_db_cache_type);
 /* LMDB */
 static DOTCONF_CB(get_db_max_size);
+/* Cassandra */
+static DOTCONF_CB(get_db_points);
 static DOTCONF_CB(get_param);
 static DOTCONF_CB(get_value);
 static DOTCONF_CB(get_default_num_dfiles);
@@ -1109,6 +1111,11 @@ static const configoption_t options[] =
     /* LMDB: maximum size of database map
      */
     {"DBMaxSize", ARG_INT, get_db_max_size, NULL,
+        CTX_STORAGEHINTS,"536870912"},
+
+    /* Cassandra: hostname of database
+     */
+    {"DBPoints", ARG_STR, get_db_points, NULL,
         CTX_STORAGEHINTS,"536870912"},
 
     /* This option specifies a parameter name to be passed to the 
@@ -2908,6 +2915,20 @@ DOTCONF_CB(get_db_max_size)
     return NULL;
 }
 
+DOTCONF_CB(get_db_points)
+{
+    struct server_configuration_s *config_s = 
+                    (struct server_configuration_s *)cmd->context;
+
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    config_s->db_points = strdup(cmd->data.str);
+    return NULL;
+}
+
 DOTCONF_CB(get_root_handle)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
@@ -3954,6 +3975,12 @@ void PINT_config_release(struct server_configuration_s *config_s)
         {
             free(config_s->db_cache_type);
             config_s->db_cache_type = NULL;
+        }
+
+        if (config_s->db_points)
+        {
+            free(config_s->db_points);
+            config_s->db_points = NULL;
         }
 
         if (config_s->server_alias)
@@ -5432,7 +5459,8 @@ int PINT_config_pvfs2_mkspace(struct server_configuration_s *config)
                                 cur_meta_handle_range,
                                 cur_data_handle_range,
                                 create_collection_only,
-                                1);
+                                1,
+                                config);
 
             gossip_debug(
                 GOSSIP_SERVER_DEBUG,"\n*****************************\n");
@@ -5489,7 +5517,8 @@ int PINT_config_pvfs2_rmspace(struct server_configuration_s *config)
                                 cur_fs->file_system_name,
                                 cur_fs->coll_id,
                                 remove_collection_only,
-                                1);
+                                1,
+                                config);
             gossip_debug(
                 GOSSIP_SERVER_DEBUG,"\n*****************************\n");
         }
