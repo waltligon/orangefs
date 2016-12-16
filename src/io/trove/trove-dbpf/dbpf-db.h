@@ -34,14 +34,15 @@ struct dbpf_data
 #define DBPF_DB_CURSOR_SET_RANGE 3
 #define DBPF_DB_CURSOR_FIRST 4
 
-/* dbpf_db_open(name, compare, db, create, cfg): Open the database
+/* dbpf_db_open(name, compare, db, create, cfg, collname): Open the database
  * called *name* which uses key format *compare* and store a pointer
  * in *db*. The *create* argument is true if the database should be
  * created. It is an error to specify *create* when the database already
  * exists. The *cfg* argument is the server configuration and may be
- * used to find database-specific arguments. */
+ * used to find database-specific arguments. 
+ * *collname* is used in Cassandra as a primary key, not used in BDB/LMDB */
 int dbpf_db_open(char *, int, dbpf_db **, int,
-    struct server_configuration_s *);
+    struct server_configuration_s *, char*);
 
 /* dbpf_db_close(db): Close the database *db*. */
 int dbpf_db_close(dbpf_db *);

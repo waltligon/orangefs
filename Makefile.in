@@ -382,6 +382,10 @@ SERVERCFLAGS += @LDAP_CPPFLAGS@
 
 SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ @OPENSSL_LIB@ -lm @LDAP_LIB@
 
+ifeq ($(DATABASE_BACKEND),cassandra)
+SERVERLIBS += -lcassandra
+endif
+
 ifdef NEEDS_LIBRT 
 	SERVERLIBS += -lrt
 endif

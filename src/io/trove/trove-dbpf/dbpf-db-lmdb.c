@@ -109,7 +109,7 @@ static int keyval_compare(const MDB_val *a, const MDB_val *b)
 }
 
 int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
-    int create, struct server_configuration_s *cfg)
+    int create, struct server_configuration_s *cfg, char* coll)
 {
     MDB_txn *txn;
     int r;

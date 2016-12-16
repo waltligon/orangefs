@@ -109,7 +109,7 @@ static int keyval_compare(DB *dbp, const DBT *a, const DBT *b)
 }
 
 int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
-    int create, struct server_configuration_s *cfg)
+    int create, struct server_configuration_s *cfg, char* coll)
 {
     int r;
     *db = malloc(sizeof **db);

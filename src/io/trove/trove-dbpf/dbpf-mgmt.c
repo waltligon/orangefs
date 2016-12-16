@@ -82,7 +82,7 @@ static int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
                                      void **user_ptrs,
                                      PVFS_error *errors);
 
-static int dbpf_db_create(char *dbname);
+static int dbpf_db_create(char *dbname, char* collname);
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
 static struct server_configuration_s *server_cfg;
@@ -624,7 +624,7 @@ static int dbpf_direct_initialize(char *data_path,
         dbpf_finalize();
         return(ret);
     }
-    
+
     return(0);
 }
 
@@ -673,15 +673,15 @@ int dbpf_finalize(void)
             ret = dbpf_db_sync(my_storage_p->coll_db);
             if (ret)
             {
-                gossip_err("dbpf_finalize collection sync: %s\n", 
+                gossip_err("dbpf_finalize collection sync: %s\n",
                            strerror(ret));
                 return -ret;
             }
-    
+
             ret = dbpf_db_close(my_storage_p->coll_db);
             if (ret)
             {
-                gossip_err("dbpf_finalize collection close: %s\n", 
+                gossip_err("dbpf_finalize collection close: %s\n",
                            strerror(ret));
                 return -ret;
             }
@@ -689,7 +689,7 @@ int dbpf_finalize(void)
         else
         {
             gossip_err("dbpf_finalize: collections database not defined\n");
-        } 
+        }
         free(my_storage_p->data_path);
         free(my_storage_p->meta_path);
         free(my_storage_p);
@@ -731,14 +731,14 @@ int dbpf_storage_create(char *data_path,
     }
 
     DBPF_GET_STO_ATTRIB_DBNAME(sto_attrib_dbname, PATH_MAX, meta_path);
-    ret = dbpf_db_create(sto_attrib_dbname);
+    ret = dbpf_db_create(sto_attrib_dbname, 0);
     if (ret != 0)
     {
         return ret;
     }
 
     DBPF_GET_COLLECTIONS_DBNAME(collections_dbname, PATH_MAX, meta_path);
-    ret = dbpf_db_create(collections_dbname);
+    ret = dbpf_db_create(collections_dbname, 0);
     if (ret != 0)
     {
         gossip_lerr("dbpf_storage_create: removing storage attribute database after failed create attempt");
@@ -943,7 +943,7 @@ int dbpf_collection_create(char *collname,
     }
     else if(ret < 0)
     {
-	ret = dbpf_db_create(path_name);
+	ret = dbpf_db_create(path_name, collname);
         if (ret != 0)
         {
             gossip_err("dbpf_db_create failed on attrib db %s\n", path_name);
@@ -951,7 +951,7 @@ int dbpf_collection_create(char *collname,
         }
     }
 
-    error = dbpf_db_open(path_name, 0, &db_p, 0, server_cfg);
+    error = dbpf_db_open(path_name, 0, &db_p, 0, server_cfg, collname);
     if (error)
     {
         gossip_err("dbpf_db_open failed on attrib db %s\n", path_name);
@@ -1005,7 +1005,7 @@ int dbpf_collection_create(char *collname,
     }
     if(ret < 0)
     {
-        ret = dbpf_db_create(path_name);
+        ret = dbpf_db_create(path_name, collname);
         if (ret != 0)
         {
             gossip_err("dbpf_db_create failed on %s\n", path_name);
@@ -1022,7 +1022,7 @@ int dbpf_collection_create(char *collname,
     }
     if(ret < 0)
     {
-        ret = dbpf_db_create(path_name);
+        ret = dbpf_db_create(path_name, collname);
         if (ret != 0)
         {
             gossip_err("dbpf_db_create failed on %s\n", path_name);
@@ -1514,7 +1514,7 @@ int dbpf_collection_lookup(char *collname,
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 my_storage_p->meta_path, coll_p->coll_id);
     
-    ret = dbpf_db_open(path_name, 0, &coll_p->coll_attr_db, 0, server_cfg);
+    ret = dbpf_db_open(path_name, 0, &coll_p->coll_attr_db, 0, server_cfg, collname);
     if (ret)
     {
         free(coll_p->meta_path);
@@ -1595,7 +1595,7 @@ int dbpf_collection_lookup(char *collname,
                               my_storage_p->meta_path, coll_p->coll_id);
 
     ret = dbpf_db_open(path_name, DBPF_DB_COMPARE_DS_ATTR, &coll_p->ds_db,
-        0, server_cfg);
+        0, server_cfg, collname);
     if (ret)
     {
         dbpf_db_close(coll_p->coll_attr_db);
@@ -1611,7 +1611,7 @@ int dbpf_collection_lookup(char *collname,
 
 
     ret = dbpf_db_open(path_name, DBPF_DB_COMPARE_KEYVAL, &coll_p->keyval_db,
-        0, server_cfg);
+        0, server_cfg, collname);
     if (ret)
     {
         dbpf_db_close(coll_p->coll_attr_db);
@@ -1694,6 +1694,7 @@ struct dbpf_storage *dbpf_storage_lookup(
         return NULL;
     }
 
+#ifndef USE_CASSANDRA /* Cassandra does not have local files, so this stat should be disabled */
     if (stat(meta_path, &sbuf) < 0)
     {
 	*error_p = -TROVE_ENOENT;
@@ -1705,6 +1706,7 @@ struct dbpf_storage *dbpf_storage_lookup(
 	gossip_err("%s is not a directory\n", meta_path);
 	return NULL;
     }
+#endif
 
     sto_p = (struct dbpf_storage *)malloc(sizeof(struct dbpf_storage));
     if (sto_p == NULL)
@@ -1734,6 +1736,7 @@ struct dbpf_storage *dbpf_storage_lookup(
 
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, meta_path);
 
+#ifndef USE_CASSANDRA /* Cassandra does not have local files, so this stat should be disabled */
     /* we want to stat the attrib db first in case it doesn't
      * exist but the storage directory does
      */
@@ -1742,8 +1745,9 @@ struct dbpf_storage *dbpf_storage_lookup(
         *error_p = -TROVE_ENOENT;
         return NULL;
     }
+#endif
 
-    ret = dbpf_db_open(path_name, 0, &sto_p->sto_attr_db, 0, server_cfg);
+    ret = dbpf_db_open(path_name, 0, &sto_p->sto_attr_db, 0, server_cfg, 0);
     if (ret)
     {
         *error_p = ret;
@@ -1758,7 +1762,7 @@ struct dbpf_storage *dbpf_storage_lookup(
 
     DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, meta_path);
 
-    ret = dbpf_db_open(path_name, 0, &sto_p->coll_db, 0, server_cfg);
+    ret = dbpf_db_open(path_name, 0, &sto_p->coll_db, 0, server_cfg, 0);
     if (ret)
     {
         *error_p = ret;
@@ -1846,11 +1850,11 @@ static int dbpf_mkpath(char *pathname, mode_t mode)
 /* Internal function for creating first instances of the databases for
  * a db plus files storage region.
  */
-static int dbpf_db_create(char *dbname)
+static int dbpf_db_create(char *dbname, char* collname)
 {
     dbpf_db *db;
     int r;
-    r = dbpf_db_open(dbname, 0, &db, 1, server_cfg);
+    r = dbpf_db_open(dbname, 0, &db, 1, server_cfg, collname);
     if (r)
     {
         return -r;

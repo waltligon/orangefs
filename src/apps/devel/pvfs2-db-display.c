@@ -32,6 +32,7 @@ typedef struct
     char dbpath[PATH_MAX];
     char hexdir[PATH_MAX];
     int verbose;
+    char cluster[PATH_MAX];
 } options_t;
 
 /* globals */
@@ -54,6 +55,7 @@ int main( int argc, char **argv )
     dbpf_db *db_p = NULL;
     char *path = NULL;
     int ret, path_len; 
+    int create = 1;
 
     if( (ret = process_args( argc, argv)) != 0 )
     {
@@ -74,7 +76,7 @@ int main( int argc, char **argv )
 
     /* collection database */
     sprintf(path, "%s/%s", opts.dbpath, COLLECTION_FILE );
-    ret = dbpf_db_open(path, 0, &db_p, 0, NULL);
+    ret = dbpf_db_open(path, 0, &db_p, create, NULL, NULL);
     if (ret == 0) 
     {
         printf("Collection Database\n");
@@ -85,7 +87,7 @@ int main( int argc, char **argv )
     /* storage database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s", opts.dbpath, STORAGE_FILE );
-    ret = dbpf_db_open(path, 0, &db_p, 0, NULL);
+    ret = dbpf_db_open(path, 0, &db_p, create, NULL, NULL);
     if (ret == 0) 
     {
         printf("Storage Database\n");
@@ -96,7 +98,7 @@ int main( int argc, char **argv )
     /* dspace database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, DATASPACE_FILE );
-    ret = dbpf_db_open(path, DBPF_DB_COMPARE_DS_ATTR, &db_p, 0, NULL);
+    ret = dbpf_db_open(path, DBPF_DB_COMPARE_DS_ATTR, &db_p, create, NULL, opts.hexdir);
     if (ret == 0) 
     {
         printf("Dataspace Database\n");
@@ -107,7 +109,7 @@ int main( int argc, char **argv )
     /* keyval database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, KEYVAL_FILE );
-    ret = dbpf_db_open(path, DBPF_DB_COMPARE_KEYVAL, &db_p, 0, NULL);
+    ret = dbpf_db_open(path, DBPF_DB_COMPARE_KEYVAL, &db_p, create, NULL, opts.hexdir);
     if (ret == 0) 
     {
         printf("Keyval Database\n");
@@ -118,7 +120,7 @@ int main( int argc, char **argv )
     /* collection attribute database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, COLLECTION_ATTR_FILE );
-    ret = dbpf_db_open(path, 0, &db_p, 0, NULL);
+    ret = dbpf_db_open(path, 0, &db_p, create, NULL, opts.hexdir);
     if (ret == 0) 
     {
         printf("Collection Attributes Database\n");
@@ -126,6 +128,7 @@ int main( int argc, char **argv )
         dbpf_db_close(db_p);
     }
 
+exit:
     free(path);
     return 0;
 }
@@ -510,6 +513,7 @@ int process_args(int argc, char ** argv)
         {"dbpath",1,0,0},
         {"hexdir",1,0,0},
         {"hexhandles",0,0,0},
+        {"cluster",1,0,0},
         {0,0,0,0}
     };
 
@@ -522,7 +526,7 @@ int process_args(int argc, char ** argv)
             case 0: /* help */ 
                 print_help(argv[0]); 
                 exit(0);
-                                                                                            case 1: /* verbose */
+            case 1: /* verbose */
                 opts.verbose = 1; 
                 break;
 
@@ -535,6 +539,10 @@ int process_args(int argc, char ** argv)
             case 4: /* hexhandles */
                 hex = 1;
                 break;
+          case 5: /* cluster */
+            strncpy(opts.cluster, optarg, PATH_MAX);
+            break;
+
             default:
                 print_help(argv[0]);
                 return -1;
@@ -555,6 +563,14 @@ int process_args(int argc, char ** argv)
         print_help(argv[0]);
         return -1;
     }
+
+    if( strncmp( opts.cluster,"",PATH_MAX ) == 0 )
+    {
+        fprintf(stderr, "\nError: --cluster option must be given.\n");
+        print_help(argv[0]);
+        return -1;
+    }
+
 
     return 0;
 }
