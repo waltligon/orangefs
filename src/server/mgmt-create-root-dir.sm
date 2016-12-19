@@ -685,6 +685,11 @@ static PINT_sm_action mgmt_create_root_dir_tree_setattr_cleanup(
     PINT_free_object_attr(&tree_setattr_op->req->u.tree_setattr.attr);
     PINT_cleanup_capability(&tree_setattr_op->req->capability);
 
+    if ( tree_setattr_op->resp.u.tree_setattr.status )
+    {
+       free(tree_setattr_op->resp.u.tree_setattr.status);
+    }
+
     free(tree_setattr_op->req);
     free(tree_setattr_op);
 
@@ -1150,12 +1155,43 @@ static PINT_sm_action mgmt_create_root_dir_local_crdirent_cleanup(
     struct PINT_server_op *crdirent_op = NULL;
     int task_id = 0;
     int remaining;
+    int i;
 
     crdirent_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
 
     gossip_err("Error code returned from crdirent:%d\n",js_p->error_code);
 
-#if 0
+    /* free memory created in pvfs2_crdirent_work_sm */
+    if (crdirent_op->free_val)
+    {
+       free(crdirent_op->val.buffer);
+    }
+
+    for (i=0; i<crdirent_op->keyval_count; i++)
+    {
+       if (crdirent_op->val_a && crdirent_op->val_a[i].buffer && crdirent_op->free_val)
+       {
+          free(crdirent_op->val_a[i].buffer);
+       }
+    }
+
+    if (crdirent_op->val_a)
+    {
+        free(crdirent_op->val_a);
+    }
+    if (crdirent_op->key_a)
+    {
+        free(crdirent_op->key_a);
+    }
+    if (crdirent_op->error_a)
+    {
+       free(crdirent_op->error_a);
+    }
+
+    PINT_free_object_attr(&crdirent_op->attr);
+    PINT_free_object_attr(&crdirent_op->u.crdirent.saved_attr);
+
+#if 1
     if (js_p->error_code == 0)
     {
        js_p->error_code = -PVFS_ENOMEM;
@@ -1197,6 +1233,9 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
     int ret = -PVFS_EINVAL;
     server_configuration_s *config = get_server_config_struct();
     char server_name[1024];
+    PINT_sm_msgpair_state *msg_p = NULL;
+    struct PVFS_server_req *remove_req = NULL;
+    struct PINT_server_op *remove_op = NULL;
 
     /* Remove the directory object since we bombed on creating a directory
      * entry with it!
@@ -1214,15 +1253,13 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
         s_op->u.mgmt_create_root_dir.lost_and_found_handle, s_op->target_fs_id);
     if (! strcmp(server_name, config->host_id))
     {   /* local */
-        struct PVFS_server_req *remove_req = NULL;
-        struct PINT_server_op *remove_op = NULL;
 
         remove_req = malloc(sizeof(struct PVFS_server_req));
         if (! remove_req)
         {
             gossip_err("Unable to allocate remove_req\n");
             js_p->error_code = -PVFS_ENOMEM;
-            return SM_ACTION_COMPLETE;
+            goto error_cleanup;
         }
         memset(remove_req, 0, sizeof(*remove_req));
 
@@ -1239,7 +1276,7 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
         {
             gossip_err("Unable to allocate remove_op\n");
             js_p->error_code = -PVFS_ENOMEM;
-            return SM_ACTION_COMPLETE;
+            goto error_cleanup;
         }
         memset(remove_op, 0, sizeof(*remove_op));
         remove_op->req = remove_req;
@@ -1249,7 +1286,6 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
     }
     else
     {   /* remote */
-        PINT_sm_msgpair_state *msg_p = NULL;
 
         PINT_msgpair_init(&s_op->msgarray_op);
         msg_p = &s_op->msgarray_op.msgpair;
@@ -1278,12 +1314,32 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
         {
             gossip_err("Failed to map meta server address\n");
             js_p->error_code = ret;
-            return SM_ACTION_COMPLETE;
+            goto error_cleanup;
         }
 
         PINT_sm_push_frame(smcb, REMOTE_OPERATION, &s_op->msgarray_op);
         js_p->error_code = REMOTE_OPERATION;
     }
+
+    return SM_ACTION_COMPLETE;
+
+error_cleanup:
+    if (remove_req)
+    {
+       PINT_cleanup_capability(&remove_req->capability);
+       free(remove_req);
+    }
+
+    if (remove_op)
+    {
+       free(remove_op);
+    }
+
+    if (msg_p)
+    {
+       PINT_cleanup_capability(&msg_p->req.capability);
+    }
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -1305,6 +1361,7 @@ static PINT_sm_action mgmt_create_root_dir_local_delete_cleanup(
     int remaining;
 
     remove_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
+    PINT_cleanup_capability(&remove_op->req->capability);
     free(remove_op->req);
     free(remove_op);
 
