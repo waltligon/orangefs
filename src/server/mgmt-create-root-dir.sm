@@ -792,6 +792,7 @@ static PINT_sm_action mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_sys_attr sys_attr;
+    PVFS_object_attr attr;
     PVFS_sys_layout layout;
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
@@ -800,6 +801,11 @@ static PINT_sm_action mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair(
     PVFS_BMI_addr_t svr_addr;
 
     js_p->error_code = 0;
+
+    /* I think we can eliminate the sys_attr and just set values
+     * directly in the attr.  A sys_attr is really only for users
+     * an object_attr is the real one we use internally.
+     */
 
     memset(&sys_attr, 0, sizeof(sys_attr));
     sys_attr.owner = getuid();
@@ -825,7 +831,12 @@ static PINT_sm_action mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair(
     }
 
     PINT_cached_config_get_server_name(server_name, 1024,
-            meta_handle_extent_array.extent_array[0].first, s_op->target_fs_id);
+    meta_handle_extent_array.extent_array[0].first, s_op->target_fs_id);
+
+    attr.objtype = PVFS_TYPE_DIRECTORY;
+    attr.mask   |= PVFS_ATTR_COMMON_TYPE;
+    PINT_CONVERT_ATTR(&attr, &sys_attr, 0);
+
     if (! strcmp(server_name, config->host_id))
     {   /* local */
         struct PVFS_server_req *mkdir_req = NULL;
@@ -846,7 +857,7 @@ static PINT_sm_action mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair(
             s_op->u.mgmt_create_root_dir.credential,
             s_op->target_fs_id,
             meta_handle_extent_array,
-            sys_attr,
+            attr,
             s_op->attr.dist_dir_attr.num_servers,
             s_op->attr.dist_dir_attr.num_servers,
             s_op->attr.dist_dir_attr.split_size,
@@ -882,7 +893,7 @@ static PINT_sm_action mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair(
             s_op->u.mgmt_create_root_dir.credential,
             s_op->target_fs_id,
             meta_handle_extent_array,
-            sys_attr,
+            attr,
             s_op->attr.dist_dir_attr.num_servers,
             s_op->attr.dist_dir_attr.num_servers,
             s_op->attr.dist_dir_attr.split_size,

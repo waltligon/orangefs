@@ -109,7 +109,7 @@ static PVFS_offset physical_to_logical_offset(void* params,
     {
         return -1;
     }
-    
+
     /* to what stripe belongs that physical offset? */
     /* must get size of strips of this server in one stripe first */
     for (jj = 0; jj < ui_count; jj++)
@@ -245,7 +245,8 @@ static PVFS_size contiguous_length(void* params,
     /* parse parameter */
     PINT_dist_strips *strips;
     PVFS_offset ui_offset_in_stripe, logical_offset;
-    unsigned int ui_count, ii, ui_stripe_nr, ui_stripe_size;
+    unsigned int ui_count, ii, ui_stripe_nr;
+    PVFS_size ui_stripe_size;
 
     logical_offset = physical_to_logical_offset(
         params, fd, physical_offset);
@@ -257,7 +258,7 @@ static PVFS_size contiguous_length(void* params,
     {
         return -1;
     }
-    
+
     /* get number of stripes */
     ui_stripe_size = strips[ui_count - 1].offset +
         strips[ui_count - 1].size;

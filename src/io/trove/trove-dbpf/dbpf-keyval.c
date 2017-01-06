@@ -847,7 +847,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
         if(*op_p->u.k_iterate.position_p == TROVE_ITERATE_START)
         {
             *op_p->u.k_iterate.position_p = count-1;
-            /* store a session identifier in the top 32 bits */
+            /* store a session identifier in the second 16 bits */
             tmp_pos += readdir_session;
             *op_p->u.k_iterate.position_p += (tmp_pos << 32);
             readdir_session++;
@@ -1455,16 +1455,15 @@ return_error:
     return ret;
 }    
 
-int PINT_dbpf_keyval_iterate(
-    dbpf_db *db,
-    TROVE_handle handle,
-    char type,
-    PINT_dbpf_keyval_pcache *pcache,    
-    TROVE_keyval_s *keys_array,
-    TROVE_keyval_s *values_array,
-    int *count,
-    TROVE_ds_position pos,
-    PINT_dbpf_keyval_iterate_callback callback)
+int PINT_dbpf_keyval_iterate(dbpf_db *db,
+                             TROVE_handle handle,
+                             char type,
+                             PINT_dbpf_keyval_pcache *pcache,    
+                             TROVE_keyval_s *keys_array,
+                             TROVE_keyval_s *values_array,
+                             int *count,
+                             TROVE_ds_position pos,
+                             PINT_dbpf_keyval_iterate_callback callback)
 {
 
     int ret = -TROVE_EINVAL, i=0, get_key_count=0;
@@ -1504,8 +1503,11 @@ int PINT_dbpf_keyval_iterate(
     }
     else
     {
-        ret = dbpf_keyval_iterate_skip_to_position(
-            handle, type, pos, pcache, dbc);
+        ret = dbpf_keyval_iterate_skip_to_position(handle,
+                                                   type,
+                                                   pos,
+                                                   pcache,
+                                                   dbc);
         if(ret != 0 && ret != DBPF_ITERATE_CURRENT_POSITION)
         {
             goto return_error;
@@ -1528,8 +1530,12 @@ int PINT_dbpf_keyval_iterate(
             }
         }
 
-        ret = dbpf_keyval_iterate_cursor_get(
-            handle, type, dbc,  key, val, DBPF_DB_CURSOR_CURRENT);
+        ret = dbpf_keyval_iterate_cursor_get(handle,
+                                             type,
+                                             dbc, 
+                                             key,
+                                             val,
+                                             DBPF_DB_CURSOR_CURRENT);
         if(ret != 0)
         {
             goto return_error;
@@ -1564,8 +1570,12 @@ int PINT_dbpf_keyval_iterate(
             key->buffer_sz = PVFS_NAME_MAX;
         }
 
-        ret = dbpf_keyval_iterate_cursor_get(
-            handle, type, dbc, key, val, DBPF_DB_CURSOR_NEXT);
+        ret = dbpf_keyval_iterate_cursor_get(handle,
+                                             type,
+                                             dbc,
+                                             key,
+                                             val,
+                                             DBPF_DB_CURSOR_NEXT);
         if(ret != 0)
         {
             goto return_error;

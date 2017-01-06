@@ -725,14 +725,13 @@ int trove_dspace_remove_list(
 
 /** Initiate removal of a data space.
  */
-int trove_dspace_remove(
-    TROVE_coll_id coll_id,
-    TROVE_handle handle,
-    TROVE_ds_flags flags,
-    void* user_ptr,
-    TROVE_context_id context_id,
-    TROVE_op_id* out_op_id_p,
-    PVFS_hint  hints)
+int trove_dspace_remove(TROVE_coll_id coll_id,
+                        TROVE_handle handle,
+                        TROVE_ds_flags flags,
+                        void* user_ptr,
+                        TROVE_context_id context_id,
+                        TROVE_op_id* out_op_id_p,
+                        PVFS_hint  hints)
 {
     TROVE_method_id method_id;
     method_id = global_trove_method_callback(coll_id);

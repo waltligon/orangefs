@@ -97,15 +97,15 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 /* Reserved keys */
 enum 
 {
-    ROOT_HANDLE_KEY      = 0,
-    DIR_ENT_KEY          = 1,
-    METAFILE_HANDLES_KEY = 2,
-    METAFILE_DIST_KEY    = 3,
-    SYMLINK_TARGET_KEY   = 4,
-    METAFILE_LAYOUT_KEY  = 5,
-    NUM_DFILES_REQ_KEY   = 6,       
-    DIST_DIR_ATTR_KEY    = 7,
-    DIST_DIRDATA_BITMAP_KEY      = 8,
+    ROOT_HANDLE_KEY          = 0,
+    DIR_ENT_KEY              = 1,
+    METAFILE_HANDLES_KEY     = 2,
+    METAFILE_DIST_KEY        = 3,
+    SYMLINK_TARGET_KEY       = 4,
+    METAFILE_LAYOUT_KEY      = 5,
+    NUM_DFILES_REQ_KEY       = 6,       
+    DIST_DIR_ATTR_KEY        = 7,
+    DIST_DIRDATA_BITMAP_KEY  = 8,
     DIST_DIRDATA_HANDLES_KEY = 9
 
 };
@@ -117,18 +117,20 @@ enum
  *
  * WBL V3 Uncomment this declaration if it doesn't cause problems
  */
-/* extern PINT_server_trove_keys_s Trove_Special_Keys[]; */
+extern PINT_server_trove_keys_s Trove_Special_Keys[];
 /* optional; user-settable keys */
 enum 
 {
     DIST_NAME_KEY        = 0,
     DIST_PARAMS_KEY      = 1,
     NUM_DFILES_KEY       = 2,
-    NUM_SPECIAL_KEYS     = 3, /* not an index */
-    METAFILE_HINT_KEY    = 3,
-    MIRROR_COPIES_KEY    = 4,
-    MIRROR_HANDLES_KEY   = 5,
-    MIRROR_STATUS_KEY    = 6,
+    LAYOUT_KEY           = 3,
+    SERVER_LIST_KEY      = 4,
+    NUM_SPECIAL_KEYS     = 5, /* not an index */
+    METAFILE_HINT_KEY    = 5,
+    MIRROR_COPIES_KEY    = 6,
+    MIRROR_HANDLES_KEY   = 7,
+    MIRROR_STATUS_KEY    = 8,
 };
 
 typedef enum
@@ -159,14 +161,6 @@ typedef enum
     SERVER_CREDCACHE_INIT      = (1 << 22),
     SERVER_CERTCACHE_INIT      = (1 << 23)
 } PINT_server_status_flag;
-
-typedef enum
-{   
-    PRELUDE_SCHEDULER_DONE     = (1 << 0),
-    PRELUDE_GETATTR_DONE       = (1 << 1),
-    PRELUDE_PERM_CHECK_DONE    = (1 << 2),
-    PRELUDE_LOCAL_CALL         = (1 << 3),
-} PINT_prelude_flag;
 
 struct PINT_server_create_op
 {
@@ -690,8 +684,6 @@ typedef struct PINT_server_op
     PVFS_fs_id target_fs_id;
     PVFS_object_attr *target_object_attr;
 
-    PINT_prelude_flag prelude_mask;
-
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
 
@@ -749,7 +741,6 @@ typedef struct PINT_server_op
       if (__location != REMOTE_OPERATION && (__location == LOCAL_OPERATION || ( __handle && ! strcmp(server_config->host_id, server_name)))) { \
         __location = LOCAL_OPERATION; \
         __req = __s_op->req; \
-        __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL; \
       } \
       else { \
         memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op)); \
@@ -893,7 +884,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
 /* server side state machines */
 extern struct PINT_state_machine_s pvfs2_mirror_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_call_msgpairarray_sm;
-extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_with_prelude_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_create_immutable_copies_sm;
@@ -903,6 +894,7 @@ extern struct PINT_state_machine_s pvfs2_pjmp_set_attr_work_sm;
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_with_prelude_sm;
+extern struct PINT_state_machine_s pvfs2_get_attr_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
@@ -932,6 +924,14 @@ extern void getattr_free(struct PINT_server_op *s_op);
 struct server_configuration_s *get_server_config_struct(void);
 int server_perf_start_rollover(struct PINT_perf_counter *pc,
                                struct PINT_perf_counter *tpc);
+
+/* keyval management prototypes */
+void free_keyval_buffers(struct PINT_server_op *s_op);
+void keep_keyval_buffers(struct PINT_server_op *s_op, int buf);
+/* this macro is used in keyval management to represent the key and val
+ * pointers of the s_op
+ */
+#define KEYVAL -1
 
 /* exported state machine resource reclamation function */
 int server_post_unexpected_recv(void);

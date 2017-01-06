@@ -124,6 +124,7 @@ nested machine pvfs2_client_getattr_sm
     state acache_lookup
     {
         run getattr_acache_lookup;
+        GETATTR_CACHE_MISS => object_getattr_setup_msgpair;
         default => client_capcache_lookup;
     }
 
@@ -703,6 +704,29 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
 
     assert(object_ref.fs_id != PVFS_FS_ID_NULL);
     assert(object_ref.handle != PVFS_HANDLE_NULL);
+
+    /* Since we are going to the metadata server for this object, return all
+     * attributes stored on this server.  While you're at it, go ahead and
+     * regenerate a new capability.  NOTE:  We may not know the object's type,
+     * so we ask for everything under the sun; however, getattr on the server
+     * will know the object's type, once prelude runs and retrieves this
+     * handle's dspace entry.  No worries.
+     *
+     * One exception is PVFS_ATTR_SYMLNK_ALL.  If set, then the server side
+     * getattr will retrieve the "st" (symlink target) entry from the keyval 
+     * database.  This poses a problem for symlink creation, because it needs to
+     * send a getattr to generate a capability BEFORE the "st" entry is created.
+     * Thus, PVFS_ATTR_SYMLNK_ALL is not automatically added.  When the symlink
+     * target is needed, the calling client should put this attribute in its
+     * request mask.  
+     */
+     PINT_attrmask_print(GOSSIP_ACACHE_DEBUG,sm_p->getattr.req_attrmask);
+     sm_p->getattr.req_attrmask |= PVFS_ATTR_COMMON_ALL
+                                | PVFS_ATTR_META_ALL
+                                | PVFS_ATTR_DISTDIR_ATTR
+                                | PVFS_ATTR_DIR_ALL
+                                | PVFS_ATTR_CAPABILITY;
+     PINT_attrmask_print(GOSSIP_ACACHE_DEBUG,sm_p->getattr.req_attrmask);
 
     /* setup the msgpair to do a getattr operation */
     PINT_SERVREQ_GETATTR_FILL(msg_p->req,
@@ -1809,21 +1833,23 @@ static PINT_sm_action getattr_client_capcache_insert(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    /* get local uid for indexing */
+    /* If the LOCAL_UID hint is not set, which can happen when the sysint interface
+     * is called by an app like pvfs2-ls, then we set local uid to the process uid
+     * running this code.  Otherwise, we assume the hint contains the proper uid,
+     * as is the case for the client core.
+     */
     local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
-    if (local_uid != (PVFS_uid) -1)
+    if (local_uid == (PVFS_uid) -1)
     {
-        ret = PINT_client_capcache_update(sm_p->getattr.object_ref, 
-                  local_uid, &sm_p->getattr.attr.capability);
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: "
-                     "PINT_client_capcache_update returned %d\n",
+        local_uid = PINT_util_getuid();
+    }
+
+    ret = PINT_client_capcache_update(sm_p->getattr.object_ref, 
+                                      local_uid, 
+                                      &sm_p->getattr.attr.capability);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: "
+                 "PINT_client_capcache_update returned %d\n",
                      __func__, ret);
-    }
-    else
-    {
-        gossip_err("%s: could not get local uid for client capcache\n",
-                   __func__);
-    }
 
     return SM_ACTION_COMPLETE;
 }

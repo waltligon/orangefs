@@ -162,29 +162,64 @@ struct PVFS_datafile_attr_s
 typedef struct PVFS_datafile_attr_s PVFS_datafile_attr;
 endecode_fields_1(PVFS_datafile_attr, PVFS_size, size);
 
+/* this is only for layouts used as directory hints to
+ * prevent some of the conversion back and forth between
+ * strings and BMI_addr_t that goes on otherwise
+ */
+struct PVFS_dirhint_server_list_s
+{
+    int32_t count;
+    int32_t bufsize;
+    char *servers;
+};
+typedef struct PVFS_dirhint_server_list_s PVFS_dirhint_server_list;
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+endecode_fields_3(PVFS_dirhint_server_list,
+        int32_t, count,
+        int32_t, bufsize,
+        string, servers);
+#endif
+
+struct PVFS_dirhint_layout_s
+{
+    enum PVFS_sys_layout_algorithm algorithm;
+    PVFS_dirhint_server_list server_list;
+};
+typedef struct PVFS_dirhint_layout_s PVFS_dirhint_layout;
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+endecode_fields_2(PVFS_dirhint_layout,
+        uint32_t, algorithm,
+        PVFS_dirhint_server_list, server_list);
+#endif
+
 /* extended hint attributes for a directory object */
 struct PVFS_directory_hint_s
 {
-    uint32_t  dist_name_len;
+    uint32_t           dist_name_len;
     /* what is the distribution name? */
-    char     *dist_name;
+    char              *dist_name;
     /* what are the distribution parameters? */
-    uint32_t  dist_params_len;
-    char     *dist_params;
+    uint32_t           dist_params_len;
+    char               *dist_params;
     /* how many dfiles ought to be used */
-    uint32_t dfile_count;
+    uint32_t            dfile_count;
+    /* how servers are selected */
+    PVFS_dirhint_layout layout;
 };
 typedef struct PVFS_directory_hint_s PVFS_directory_hint;
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
-endecode_fields_7(PVFS_directory_hint,
+endecode_fields_8(PVFS_directory_hint,
         uint32_t, dist_name_len,
         skip4,,
         string, dist_name,
         uint32_t, dist_params_len,
         skip4,,
         string, dist_params,
-        uint32_t, dfile_count);
+        uint32_t, dfile_count,
+        PVFS_dirhint_layout, layout);
 #endif
 
 /* attributes specific to directory objects */

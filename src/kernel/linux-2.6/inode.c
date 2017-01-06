@@ -110,11 +110,17 @@ static int pvfs2_readpages(
  * struct causes the kernel to allows us to use O_DIRECT on
  * open.
  */
+#ifdef C_22c6186_FLAVORED_DIO
+static ssize_t pvfs2_direct_IO(struct kiocb *iocb,
+                               struct iov_iter *iter,
+                               loff_t offset)
+#else
 static ssize_t pvfs2_direct_IO(int rw,
                      struct kiocb *iocb,
                      const struct iovec *iov,
                      loff_t pos,
                      unsigned long nr_segs)
+#endif
 {
 
      gossip_debug(GOSSIP_INODE_DEBUG,
