@@ -81,7 +81,7 @@
   uncomment for timing of individual operation information to be
   emitted to the pvfs2-client logging output
 */
-#define CLIENT_CORE_OP_TIMING
+/* #define CLIENT_CORE_OP_TIMING */
 
 #ifdef CLIENT_CORE_OP_TIMING
 #include "pint-util.h"
