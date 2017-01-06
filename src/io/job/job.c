@@ -36,7 +36,6 @@ static TROVE_context_id global_trove_context = -1;
 
 /* queues of pending jobs */
 static job_desc_q_p completion_queue_array[JOB_MAX_CONTEXTS] = {NULL};
-static int completion_error = 0;
 static job_desc_q_p bmi_unexp_queue = NULL;
 static int bmi_unexp_pending_count = 0;
 static int bmi_pending_count = 0;
@@ -3921,6 +3920,7 @@ int job_null(
     return(0);
 }
 
+#ifdef __PVFS2_JOB_THREADED__
 
 /* job_test()
  *
@@ -3947,8 +3947,6 @@ int job_test(job_id_t id,
 
     return(ret);
 }
-
-#ifdef __PVFS2_JOB_THREADED__
 
 /* job_testsome()
  *
@@ -4044,152 +4042,6 @@ int job_testsome(job_id_t * id_array,
     return(ret);
 }
 
-#else /* __PVFS2_JOB_THREADED__ */
-
-/* job_testsome()
- *
- * check for completion of a set of jobs, don't return until
- * either all jobs complete or timeout expires
- *
- * returns 0 if nothing done, 1 if something done, -errno on failure
- */
-int job_testsome(job_id_t * id_array,
-                 int *inout_count_p,
-                 int *out_index_array,
-                 void **returned_user_ptr_array,
-                 job_status_s * out_status_array_p,
-                 int timeout_ms,
-                 job_context_id context_id)
-{
-    int ret = -1;
-    struct timeval target_time;
-    struct timeval end;
-    int original_count = *inout_count_p;
-    int time_exhaust_flag = 0;
-
-    /* use this as a chance to do a cheap test on the request
-     * scheduler
-     */
-    if ((ret = do_one_test_cycle_req_sched()) < 0)
-    {
-        return (ret);
-    }
-
-    /* check before we do anything else to see if the completion queue
-     * has anything in it
-     */
-    gen_mutex_lock(&completion_mutex);
-    ret = completion_query_some(id_array,
-                                 inout_count_p,
-                                 out_index_array,
-                                 returned_user_ptr_array,
-                                 out_status_array_p);
-    gen_mutex_unlock(&completion_mutex);
-    /* return here on error or completion */
-    if (ret < 0)
-    {
-        return (ret);
-    }
-    if (ret > 0)
-    {
-        return (1);
-    }
-
-    *inout_count_p = original_count;
-
-    /* figure out when the function should time out */
-    if(timeout_ms > 0)
-    {
-        ret = gettimeofday(&target_time, NULL);
-        if (ret < 0)
-        {
-            return (ret);
-        }
-        target_time.tv_sec += (timeout_ms/1000);
-        target_time.tv_usec += (timeout_ms%1000)*1000;
-        if(target_time.tv_usec > 1000000)
-        {
-            target_time.tv_sec++;
-            target_time.tv_usec -= 1000000;
-        }
-    }
-
-    /* if we fall through to this point, then we need to just try
-     * to eat up the timeout until the jobs that we want hit the
-     * completion queue
-     */
-    do
-    {
-
-        if (timeout_ms)
-        {
-            do_one_work_cycle_all(10);
-        }
-        else
-        {
-            do_one_work_cycle_all(0);
-        }
-
-        /* check queue now to see if anything is done */
-        gen_mutex_lock(&completion_mutex);
-        ret = completion_query_some(id_array,
-                                     inout_count_p,
-                                     out_index_array,
-                                     returned_user_ptr_array,
-                                     out_status_array_p);
-        gen_mutex_unlock(&completion_mutex);
-        /* return here on error or completion */
-        if (ret < 0)
-        {
-            return (ret);
-        }
-        if (ret  > 0)
-        {
-            return (1);
-        }
-
-        *inout_count_p = original_count;
-
-        /* if we reach this point, decide if we timeout or continue */
-        if(timeout_ms == 0)
-        {
-            time_exhaust_flag = 1;
-        }
-        else if(timeout_ms < 0)
-        {
-            time_exhaust_flag = 0;
-        }
-        else
-        {
-            ret = gettimeofday(&end, NULL);
-            if (ret < 0)
-            {
-                return (ret);
-            }
-
-            /* compare current time with our projected timeout point */
-            if((end.tv_sec > target_time.tv_sec) || ((end.tv_sec ==
-                target_time.tv_sec) && (end.tv_usec >=
-                target_time.tv_usec)))
-            {
-                time_exhaust_flag = 1;
-            }
-            else
-            {
-                time_exhaust_flag = 0;
-            }
-        }
-
-    } while (!time_exhaust_flag);
-
-    /* fall through, nothing done, time is used up */
-    *inout_count_p = 0;
-
-    return (0);
-}
-#endif /* __PVFS2_JOB_THREADED__ */
-
-#ifdef __PVFS2_JOB_THREADED__
 /* job_testcontext()
  *
  * check for completion of any jobs currently in progress.  Don't return
@@ -4285,146 +4137,153 @@ int job_testcontext(job_id_t * out_id_array_p,
 
 #else /* __PVFS2_JOB_THREADED__ */
 
-/* job_testcontext()
- *
- * check for completion of any jobs currently in progress.  Don't return
- * until either at least one job has completed or the timeout has
- * expired
- *
- * returns 0 on success, -errno on failure
+/*
+ * Test for completion of jobs. Returns a non-negative number representing the
+ * number of jobs which completed. Does not fail.
  */
-int job_testcontext(job_id_t * out_id_array_p,
-                    int *inout_count_p,
-                    void **returned_user_ptr_array,
-                    job_status_s * out_status_array_p,
-                    int timeout_ms,
-                    job_context_id context_id)
+static ssize_t job_has_completed(int specify, size_t len, job_id_t *ids,
+        int *completed_ids, void **ptrs, job_status_s *statuses,
+        int timeout_ms, job_context_id context_id)
 {
-    int ret = -1;
-    struct timeval target_time;
-    struct timeval end;
-    int original_count = *inout_count_p;
-    int time_exhaust_flag = 0;
-
-    /* use this as a chance to do a cheap test on the request
-     * scheduler
-     */
-    if ((ret = do_one_test_cycle_req_sched()) < 0)
+    int outlen = len;
+    ssize_t ret;
+    if (specify)
     {
-        return (ret);
+        ret = completion_query_some(ids, &outlen, completed_ids, ptrs,
+                statuses);
     }
+    else
+    {
+        ret = completion_query_context(ids, &outlen, ptrs, statuses,
+                context_id);
+    }
+    return ret ? outlen : 0;
+}
 
-    /* check before we do anything else to see if the completion queue
-     * has anything in it
-     */
-    gen_mutex_lock(&completion_mutex);
-    ret = completion_query_context(out_id_array_p,
-                                 inout_count_p,
-                                 returned_user_ptr_array,
-                                 out_status_array_p, context_id);
-    gen_mutex_unlock(&completion_mutex);
-    /* return here on error or completion */
+/*
+ * Look for completed jobs. If none, do some work until either the timeout
+ * passes or a job completes. If specify is 1, test for completion of the jobs
+ * specified in ids. If specify is 0, test for completion of all jobs of a
+ * specific context.
+ *
+ * Note that context_id is unused if specify is 1.
+ *
+ * When specify is 0, the completed jobs are returned in ids. When specify
+ * is 1, the completed jobs are returned in completed_ids as indices into ids.
+ *
+ * Returns the number of jobs which completed or a negative number representing
+ * the error on failure.
+ */
+static ssize_t job_test_internal(int specify, size_t len, job_id_t *ids,
+        int *completed_ids, void **ptrs, job_status_s *statuses,
+        int timeout_ms, job_context_id context_id)
+{
+    int ret;
+    struct timespec end, now;
+
+    ret = do_one_test_cycle_req_sched();
     if (ret < 0)
     {
-        return (ret);
+        return ret;
     }
-    if (ret > 0)
+
+    ret = job_has_completed(specify, len, ids, completed_ids, ptrs, statuses,
+            timeout_ms, context_id);
+    if (ret)
     {
-        return (1);
+        return ret;
     }
 
-    *inout_count_p = original_count;
-
-    /* figure out when the function should time out */
-    if(timeout_ms > 0)
+    if (timeout_ms > 0)
     {
-        ret = gettimeofday(&target_time, NULL);
-        if (ret < 0)
+        ret = clock_gettime(CLOCK_MONOTONIC, &end);
+        if (ret == -1)
         {
-            return (ret);
+            return ret;
         }
-        target_time.tv_sec += (timeout_ms/1000);
-        target_time.tv_usec += (timeout_ms%1000)*1000;
-        if(target_time.tv_usec > 1000000)
+        end.tv_sec += timeout_ms/1000;
+        end.tv_nsec += (timeout_ms%1000)*1000000;
+        if (end.tv_nsec > 1000000000)
         {
-            target_time.tv_sec++;
-            target_time.tv_usec -= 1000000;
+            end.tv_sec++;
+            end.tv_nsec -= 1000000000;
         }
     }
 
-    /* if we fall through to this point, then we need to just try
-     * to eat up the timeout until the jobs that we want hit the
-     * completion queue
-     */
     do
     {
+        do_one_work_cycle_all(timeout_ms ? 10 : 0);
 
-        if (timeout_ms)
+        ret = job_has_completed(specify, len, ids, completed_ids, ptrs,
+                statuses, timeout_ms, context_id);
+        if (ret)
         {
-            do_one_work_cycle_all(10);
-        }
-        else
-        {
-            do_one_work_cycle_all(0);
-        }
-
-        /* check queue now to see if anything is done */
-        gen_mutex_lock(&completion_mutex);
-        ret = completion_query_context(out_id_array_p,
-                                     inout_count_p,
-                                     returned_user_ptr_array,
-                                     out_status_array_p,
-                                     context_id);
-        gen_mutex_unlock(&completion_mutex);
-        /* return here on error or completion */
-        if (ret < 0)
-        {
-            return (ret);
-        }
-        if (ret  > 0)
-        {
-            return (1);
+            return ret;
         }
 
-        *inout_count_p = original_count;
-
-        /* if we reach this point, decide if we timeout or continue */
-        if(timeout_ms == 0)
+        ret = clock_gettime(CLOCK_MONOTONIC, &now);
+        if (ret == -1)
         {
-            time_exhaust_flag = 1;
+            return ret;
         }
-        else if(timeout_ms < 0)
-        {
-            time_exhaust_flag = 0;
-        }
-        else
-        {
-            ret = gettimeofday(&end, NULL);
-            if (ret < 0)
-            {
-                return (ret);
-            }
+    } while (timeout_ms > 0 && (now.tv_sec <= end.tv_sec &&
+            (now.tv_sec != end.tv_sec || now.tv_nsec < end.tv_nsec)));
 
-            /* compare current time with our projected timeout point */
-            if((end.tv_sec > target_time.tv_sec) || ((end.tv_sec ==
-                target_time.tv_sec) && (end.tv_usec >=
-                target_time.tv_usec)))
-            {
-                time_exhaust_flag = 1;
-            }
-            else
-            {
-                time_exhaust_flag = 0;
-            }
-        }
-
-    } while (!time_exhaust_flag);
-
-    /* fall through, nothing done, time is used up */
-    *inout_count_p = 0;
-
-    return (0);
+    return 0;
 }
+
+/*
+ * The following job_test functions all return 0 on success and a negative
+ * integer representing the error on failure.
+ */
+
+/* Look for completion of a set of job in a context. */
+int job_testsome(job_id_t *id_array, int *inout_count_p, int *out_index_array,
+        void **returned_user_ptr_array, job_status_s *out_status_array_p,
+        int timeout_ms, job_context_id context_id)
+{
+    ssize_t count;
+    count = job_test_internal(1, *inout_count_p, id_array, out_index_array,
+            returned_user_ptr_array, out_status_array_p, timeout_ms,
+            context_id);
+    if (count >= 0)
+    {
+        *inout_count_p = count;
+    }
+    return count >= 0 ? 0 : count;
+}
+
+/* Look for completion of a all jobs in a context. */
+int job_testcontext(job_id_t *out_id_array_p, int *inout_count_p,
+        void **returned_user_ptr_array, job_status_s *out_status_array_p,
+        int timeout_ms, job_context_id context_id)
+{
+    ssize_t count;
+    count = job_test_internal(0, *inout_count_p, out_id_array_p, NULL,
+            returned_user_ptr_array, out_status_array_p, timeout_ms,
+            context_id);
+    if (count >= 0)
+    {
+        *inout_count_p = count;
+    }
+    return count >= 0 ? 0 : count;
+}
+
+/* Look for completion of a specific job. */
+int job_test(job_id_t id, int *out_count_p, void **returned_user_ptr_p,
+        job_status_s *out_status_p, int timeout_ms, job_context_id context_id)
+{
+    ssize_t count;
+    int completed_id;
+    count = job_test_internal(1, 1, &id, &completed_id, returned_user_ptr_p,
+            out_status_p, timeout_ms, context_id);
+    if (count >= 0)
+    {
+        *out_count_p = count;
+    }
+    return count >= 0 ? 0 : count;
+}
+
 #endif /* __PVFS2_JOB_THREADED__ */
 
 
@@ -5169,11 +5028,6 @@ static int completion_query_some(job_id_t * id_array,
 
     *inout_count_p = 0;
 
-    if (completion_error)
-    {
-        return (completion_error);
-    }
-
     /* count how many of the id's are non zero */
     for (i = 0; i < incount; i++)
     {
@@ -5265,10 +5119,6 @@ static int completion_query_context(job_id_t * out_id_array_p,
     int incount = *inout_count_p;
     *inout_count_p = 0;
 
-    if (completion_error)
-    {
-        return (completion_error);
-    }
     while (*inout_count_p < incount && (query =
                                         job_desc_q_shownext(
                                         completion_queue_array[context_id])))
