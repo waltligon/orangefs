@@ -160,28 +160,28 @@ int job_dev_unexp(struct PINT_dev_unexp_info* dev_unexp_d,
                   job_context_id context_id);
 
 /* device write */
-int job_dev_write(void* buffer,
-                  int size,
-                  PVFS_id_gen_t tag,
-                  enum PINT_dev_buffer_type buffer_type,
-                  void* user_ptr,
-                  job_aint status_user_tag,
-                  job_status_s * out_status_p,
-                  job_id_t * id,
-                  job_context_id context_id);
+void job_dev_write(void* buffer,
+                   int size,
+                   PVFS_id_gen_t tag,
+                   enum PINT_dev_buffer_type buffer_type,
+                   void* user_ptr,
+                   job_aint status_user_tag,
+                   job_status_s * out_status_p,
+                   job_id_t * id,
+                   job_context_id context_id);
 
 /* device write list */
-int job_dev_write_list(void** buffer_list,
-                       int* size_list,
-                       int list_count,
-                       int total_size,
-                       PVFS_id_gen_t tag,
-                       enum PINT_dev_buffer_type buffer_type,
-                       void* user_ptr,
-                       job_aint status_user_tag,
-                       job_status_s* out_status_p,
-                       job_id_t* id,
-                       job_context_id context_id);
+void job_dev_write_list(void** buffer_list,
+                        int* size_list,
+                        int list_count,
+                        int total_size,
+                        PVFS_id_gen_t tag,
+                        enum PINT_dev_buffer_type buffer_type,
+                        void* user_ptr,
+                        job_aint status_user_tag,
+                        job_status_s* out_status_p,
+                        job_id_t* id,
+                        job_context_id context_id);
 
 /* request scheduler post */
 int job_req_sched_post(enum PVFS_server_op op,

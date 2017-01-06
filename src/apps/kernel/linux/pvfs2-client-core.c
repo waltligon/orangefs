@@ -3249,9 +3249,6 @@ PVFS_error write_device_response(
     job_status_s *jstat,
     job_context_id context)
 {
-    PVFS_error ret = -1;
-    int outcount = 0;
-
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, 
                  "%s: writing device response. tag: %llu, "
                  "error code: %d\n",
@@ -3260,32 +3257,18 @@ PVFS_error write_device_response(
     if (buffer_list && size_list && list_size &&
         total_size && (list_size < MAX_LIST_SIZE))
     {
-        ret = job_dev_write_list(buffer_list, size_list, list_size,
+        job_dev_write_list(buffer_list, size_list, list_size,
                                  total_size, tag, PINT_DEV_EXT_ALLOC,
                                  NULL, 0, jstat, job_id, context);
-        if (ret < 0)
-        {
-            PVFS_perror("job_dev_write_list()", ret);
-            return ret;
-        }
-        else if (ret == 0)
-        {
-	    ret = job_test(*job_id, &outcount, NULL, jstat, -1, context);
-            if (ret < 0)
-            {
-                PVFS_perror("job_test()", ret);
-                return ret;
-            }
-        }
 
         if (jstat->error_code != 0)
         {
             PVFS_perror("job_bmi_write_list() error code",
                         jstat->error_code);
-            ret = -1;
+            return -1;
         }
     }
-    return ret;
+    return 0;
 }
 
 /* encoding needed by client-core to copy readdir entries to the shared page */

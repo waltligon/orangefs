@@ -955,10 +955,8 @@ int job_dev_unexp(
 /* job_dev_write()
  *
  * posts a device write
- *
- * returns 0 on success, -errno on failure, and 1 on immediate completion
  */
-int job_dev_write(void* buffer,
+void job_dev_write(void* buffer,
     int size,
     PVFS_id_gen_t tag,
     enum PINT_dev_buffer_type buffer_type,
@@ -973,23 +971,24 @@ int job_dev_write(void* buffer,
      * decide later to make the function asynchronous
      */
 #ifdef __PVFS2_CLIENT__
-    int ret = -1;
+    int ret;
     ret = PINT_dev_write(buffer, size, buffer_type, tag);
-    if(ret < 0)
+    if (ret < 0)
     {
         /* error posting */
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
-        return(1);
+        return;
     }
-
-    /* immediate completion */
-    out_status_p->error_code = 0;
-    out_status_p->status_user_tag = status_user_tag;
-    out_status_p->actual_size = size;
-    return(1);
+    else
+    {
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->actual_size = size;
+    }
 #else
-    return(-PVFS_ENOSYS);
+    abort();
 #endif
 }
 
@@ -1000,7 +999,7 @@ int job_dev_write(void* buffer,
  *
  * returns 0 on success, -errno on failure, and 1 on immediate completion
  */
-int job_dev_write_list(void** buffer_list,
+void job_dev_write_list(void** buffer_list,
     int* size_list,
     int list_count,
     int total_size,
@@ -1017,24 +1016,24 @@ int job_dev_write_list(void** buffer_list,
      * decide later to make the function asynchronous
      */
 #ifdef __PVFS2_CLIENT__
-    int ret = -1;
-    ret = PINT_dev_write_list(buffer_list, size_list, list_count,
-        total_size, buffer_type, tag);
-    if(ret < 0)
+    int ret;
+    ret = PINT_dev_write_list(buffer_list, size_list, list_count, total_size,
+            buffer_type, tag);
+    if (ret < 0)
     {
         /* error posting */
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
-        return(1);
     }
-
-    /* immediate completion */
-    out_status_p->error_code = 0;
-    out_status_p->status_user_tag = status_user_tag;
-    out_status_p->actual_size = total_size;
-    return(1);
+    else
+    {
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->actual_size = total_size;
+    }
 #else
-    return(-PVFS_ENOSYS);
+    abort();
 #endif
 }
 
