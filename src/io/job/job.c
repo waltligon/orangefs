@@ -57,12 +57,8 @@ static gen_mutex_t initialized_mutex = GEN_MUTEX_INITIALIZER;
 static pthread_cond_t completion_cond = PTHREAD_COND_INITIALIZER;
 #endif /* __PVFS2_JOB_THREADED__ */
 
-/* number of jobs to test for at once inside of do_one_work_cycle() */
-enum
-{
-    job_work_metric = 5,
-    thread_wait_timeout = 10000        /* usecs */
-};
+/* number of jobs to test for at once inside of do_one_test_cycle_req_sched() */
+#define JOB_WORK_METRIC 5
 
 /* cap how many keys we dump into trove at once when filling precreate pools
  * so that it doesn't clog up trove queues
@@ -139,10 +135,6 @@ static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp);
 static void trove_thread_mgr_callback(void* data,
     PVFS_error error_code);
 static void flow_callback(flow_descriptor* flow_d, int cancel_path);
-#ifndef __PVFS2_JOB_THREADED__
-static gen_mutex_t work_cycle_mutex = GEN_MUTEX_INITIALIZER;
-static void do_one_work_cycle_all(int idle_time_ms);
-#endif
 #ifdef __PVFS2_TROVE_SUPPORT__
 static void precreate_pool_get_thread_mgr_callback(
     void* data, 
@@ -4147,6 +4139,7 @@ static ssize_t job_has_completed(int specify, size_t len, job_id_t *ids,
 {
     int outlen = len;
     ssize_t ret;
+    gen_mutex_lock(&completion_mutex);
     if (specify)
     {
         ret = completion_query_some(ids, &outlen, completed_ids, ptrs,
@@ -4157,6 +4150,7 @@ static ssize_t job_has_completed(int specify, size_t len, job_id_t *ids,
         ret = completion_query_context(ids, &outlen, ptrs, statuses,
                 context_id);
     }
+    gen_mutex_unlock(&completion_mutex);
     return ret ? outlen : 0;
 }
 
@@ -4212,7 +4206,38 @@ static ssize_t job_test_internal(int specify, size_t len, job_id_t *ids,
 
     do
     {
-        do_one_work_cycle_all(timeout_ms ? 10 : 0);
+        int idle = timeout_ms ? 10 : 0;
+        int total_pending_count = 0;
+    
+        total_pending_count = bmi_pending_count + bmi_unexp_pending_count
+                + flow_pending_count + dev_unexp_pending_count
+                + trove_pending_count;
+
+        if (bmi_pending_count || bmi_unexp_pending_count || flow_pending_count)
+        {
+            PINT_thread_mgr_bmi_push(idle);
+            idle = 0;
+        }
+        if (dev_unexp_pending_count)
+        {
+            PINT_thread_mgr_dev_push(idle);
+        }
+#ifdef __PVFS2_TROVE_SUPPORT__
+        if(trove_pending_count || flow_pending_count)
+            PINT_thread_mgr_trove_push(idle_time_ms);
+#endif
+
+        if(total_pending_count == 0 && idle != 0)
+        {
+#ifdef WIN32
+            Sleep(idle_time_ms);
+#else
+            struct timespec ts;
+            ts.tv_sec = idle/1000;
+            ts.tv_nsec = (idle%1000)*1000*1000;
+            nanosleep(&ts, NULL);
+#endif
+        }
 
         ret = job_has_completed(specify, len, ids, completed_ids, ptrs,
                 statuses, timeout_ms, context_id);
@@ -4974,10 +4999,10 @@ static void fill_status(struct job_desc *jd,
 static int do_one_test_cycle_req_sched(void)
 {
     int ret = -1;
-    int count = job_work_metric;
-    req_sched_id id_array[job_work_metric];
-    void *user_ptr_array[job_work_metric];
-    int error_code_array[job_work_metric];
+    int count = JOB_WORK_METRIC;
+    req_sched_id id_array[JOB_WORK_METRIC];
+    void *user_ptr_array[JOB_WORK_METRIC];
+    int error_code_array[JOB_WORK_METRIC];
     int i;
     struct job_desc *tmp_desc = NULL;
 
@@ -5161,57 +5186,6 @@ static int completion_query_context(job_id_t * out_id_array_p,
         return (0);
     }
 }
-
-#ifndef __PVFS2_JOB_THREADED__
-/* do_one_work_cycle_all()
- *
- * makes progress when threads are not used
- *
- * no return value
- */
-static void do_one_work_cycle_all(int idle_time_ms)
-{
-    int total_pending_count = 0;
-    
-    gen_mutex_lock(&work_cycle_mutex);
-
-    total_pending_count = bmi_pending_count + bmi_unexp_pending_count
-        + flow_pending_count + dev_unexp_pending_count + trove_pending_count;
-
-    if (bmi_pending_count || bmi_unexp_pending_count || flow_pending_count)
-    {
-        PINT_thread_mgr_bmi_push(idle_time_ms);
-        idle_time_ms = 0;
-    }
-    if (dev_unexp_pending_count)
-    {
-        PINT_thread_mgr_dev_push(idle_time_ms);
-    }
-#ifdef __PVFS2_TROVE_SUPPORT__
-    if(trove_pending_count || flow_pending_count)
-        PINT_thread_mgr_trove_push(idle_time_ms);
-#endif
-
-    if(total_pending_count == 0 && idle_time_ms != 0)
-    {
-        /* The caller would like for us to idle if necessary, but we really
-         * don't have a single thing to do.  Sleep here to prevent busy
-         * spins.
-         */
-#ifdef WIN32
-        Sleep(idle_time_ms);
-#else
-        struct timespec ts;
-         ts.tv_sec = idle_time_ms/1000;
-         ts.tv_nsec = (idle_time_ms%1000)*1000*1000;
-         nanosleep(&ts, NULL);
-#endif
-    }
-
-    gen_mutex_unlock(&work_cycle_mutex);
-    return;
-}
-#endif
 
 /* flow_callback()
  *
