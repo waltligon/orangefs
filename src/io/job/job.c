@@ -5871,7 +5871,7 @@ int job_precreate_pool_get_handles(
  */
 static void precreate_pool_get_handles_try_post(struct job_desc* jd)
 {
-    struct precreate_pool* pool;
+    struct precreate_pool* pool=NULL;
     TROVE_op_id tmp_id;
     int ret;
     struct precreate_pool_get_trove* tmp_trove_array;
@@ -6004,6 +6004,7 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
              */
             j = 0;
             total_pool_count = qlist_count( &fs->precreate_pool_list );
+            gossip_err("%s: total_pool_count(%d)\n",__func__,total_pool_count);
             gossip_debug( GOSSIP_SERVER_DEBUG, "%s: total pool count %d\n",
                          __func__, total_pool_count);
 
@@ -6016,6 +6017,7 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             {
                 pool = qlist_entry(jd->u.precreate_pool.current_pool, 
                                    struct precreate_pool, list_link);
+                gossip_err("%s:pool(%p)\n",__func__,pool);
 
             } while( ( j++ < total_pool_count ) && ( pool != NULL ) && 
                      ( pool->pool_type != jd->u.precreate_pool.type ) && 

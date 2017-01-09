@@ -85,7 +85,7 @@ machine pvfs2_mgmt_create_root_dir_sm
     state retry_remote_dirdata_dspace
     {
         run mgmt_create_root_dir_retry_remote_dirdata_dspace;
-        default => cleanup_noreq;
+        default => request_remote_dirdata_dspace;
     }
 
     state create_local_dirdata_dspace
@@ -147,6 +147,14 @@ machine pvfs2_mgmt_create_root_dir_sm
     state mkdir_lost_and_found_msg_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
+        default => remote_mkdir_lost_and_found_cleanup;
+        /*success => crdirent_lost_and_found_setup_msgpair;
+        default => cleanup_noreq;*/
+    }
+
+    state remote_mkdir_lost_and_found_cleanup
+    {
+        run mgmt_create_root_dir_remote_mkdir_lost_and_found_cleanup;
         success => crdirent_lost_and_found_setup_msgpair;
         default => cleanup_noreq;
     }
@@ -450,23 +458,16 @@ static PINT_sm_action mgmt_create_root_dir_retry_remote_dirdata_dspace(
 {
     job_id_t tmp_id;
 
-    if (js_p->error_code != 0)
-    {
-        return SM_ACTION_COMPLETE;
-    }
+    /* if the remote dspace dirdata handle cannot be retrieved from the appropriate precreate pool,
+     * then continue trying every 30 seconds. The idea is that a sysadmin will see these messages
+     * and resolve the problem.
+     */
 
-    if (++num_retries > 3)
-    {
-        gossip_err("Unable to create root directory."
-                   " Please ensure that all configured servers are running."
-                   " Will continue to retry...\n");
-        num_retries = 0;
-    }
-    else
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-             "Unable to obtain remote handles for root directory.\n");
-    }
+    num_retries++;
+
+    gossip_err("Unable to create root directory after %d %s.\n"
+               " Please ensure that all configured servers are running.\n"
+               " Will continue to retry...\n", num_retries, (num_retries > 1) ? "retries" : "retry");
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
         "Sleeping for 30 seconds before retrying.\n");
@@ -727,6 +728,7 @@ static PINT_sm_action mgmt_create_root_dir_write_keyval_to_meta_handle(
         return SM_ACTION_COMPLETE;
     }
     memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
+    memset(s_op->key_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
 
     s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
@@ -944,6 +946,13 @@ static int mkdir_lost_and_found_comp_fn(void *v_p,
         llu(s_op->u.mgmt_create_root_dir.lost_and_found_handle));
 
     return 0;
+}
+
+static PINT_sm_action mgmt_create_root_dir_remote_mkdir_lost_and_found_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+   js_p->error_code = 0;
+   return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action mgmt_create_root_dir_local_mkdir_cleanup(
@@ -1191,7 +1200,7 @@ static PINT_sm_action mgmt_create_root_dir_local_crdirent_cleanup(
     PINT_free_object_attr(&crdirent_op->attr);
     PINT_free_object_attr(&crdirent_op->u.crdirent.saved_attr);
 
-#if 1
+#if 0
     if (js_p->error_code == 0)
     {
        js_p->error_code = -PVFS_ENOMEM;
