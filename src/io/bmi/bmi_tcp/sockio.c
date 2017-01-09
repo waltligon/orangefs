@@ -13,7 +13,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
-#include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #ifdef HAVE_NETDB_H
@@ -185,8 +184,6 @@ int BMI_sockio_nbrecv(int s,
 {
     int ret, comp = len;
 
-    assert(fcntl(s, F_GETFL, 0) & O_NONBLOCK);
-
     while (comp)
     {
       nbrecv_restart:
@@ -226,7 +223,6 @@ int BMI_sockio_nbrecv(int s,
 int BMI_sockio_nbpeek(int s, void* buf, int len)
 {
     int ret;
-    assert(fcntl(s, F_GETFL, 0) & O_NONBLOCK);
 
   nbpeek_restart:
     ret = recv(s, buf, len, (MSG_PEEK|DEFAULT_MSG_FLAGS));
