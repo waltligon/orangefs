@@ -4660,8 +4660,8 @@ static PVFS_error process_vfs_requests(void)
                   operation handling can be making progress on the
                   other ops in progress
                 */
-                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
-                             " returned unexp vfs_request %p, tag: %llu\n",
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                             "received unexp vfs_request %p, tag: %llu\n",
                              vfs_request,
                              llu(vfs_request->info.tag));
                 ret = handle_unexp_vfs_request(vfs_request);
@@ -4692,8 +4692,8 @@ static PVFS_error process_vfs_requests(void)
             }
             log_operation_timing(vfs_request);
 
-            gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
-                         " returned completed vfs_request %p\n",
+            gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                         "completed vfs_request %p\n",
                          vfs_request);
             /*
              * if this is not a dev unexp msg, it's a non-blocking
