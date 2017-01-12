@@ -2225,6 +2225,25 @@ int BMI_cancel(bmi_op_id_t id,
     return (ret);
 }
 
+int BMI_get_fd(BMI_addr_t addr)
+{
+    ref_st_p tmp_ref;
+    gen_mutex_lock(&ref_mutex);
+    tmp_ref = ref_list_search_addr(cur_ref_list, addr);
+    if (!tmp_ref)
+    {
+        gen_mutex_unlock(&ref_mutex);
+        return (bmi_errno_to_pvfs(-EPROTO));
+    }
+    gen_mutex_unlock(&ref_mutex);
+
+    if (tmp_ref->interface->get_fd)
+    {
+        return tmp_ref->interface->get_fd(tmp_ref->method_addr);
+    }
+    return -1;
+}
+
 /**************************************************************
  * method callback functions
  */

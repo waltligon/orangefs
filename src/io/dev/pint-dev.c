@@ -48,6 +48,7 @@ struct iovec {
 #include "pvfs2-types.h"
 #include "pvfs2-debug.h"
 #include "gossip.h"
+#include "job.h"
 #include "pint-dev.h"
 #ifndef WIN32
 #include "pvfs2-dev-proto.h"
@@ -248,6 +249,12 @@ int PINT_dev_initialize(
                        __func__);
             goto out;
         }
+    }
+
+    ret = job_add_poll_fd(pdev_fd, POLLIN, JOB_POLL_TYPE_DEV);
+    if (ret < 0)
+    {
+        gossip_err("%s: job_add_poll_fd failure\n", __func__);
     }
 
 out:

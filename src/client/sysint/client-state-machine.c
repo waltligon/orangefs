@@ -840,7 +840,7 @@ PVFS_error PINT_client_state_machine_test(
 			  &job_count, /* in/out parameter */
 			  smcb_p_array,
 			  job_status_array,
-			  10,
+			  0,
 			  pint_client_sm_context);
     assert(ret > -1);
 

@@ -181,6 +181,8 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 int BMI_cancel(bmi_op_id_t id, 
 	       bmi_context_id context_id);
 
+int BMI_get_fd(BMI_addr_t addr);
+
 #endif /* __BMI_H */
 
 /* @} */

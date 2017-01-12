@@ -172,6 +172,7 @@ struct bmi_method_ops
     int (*open_context)(bmi_context_id);
     void (*close_context)(bmi_context_id);
     int (*cancel)(bmi_op_id_t, bmi_context_id);
+    int (*get_fd)(bmi_method_addr_p);
     const char* (*rev_lookup_unexpected)(bmi_method_addr_p);
     int (*query_addr_range)(bmi_method_addr_p, const char *, int);
 };

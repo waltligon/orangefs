@@ -725,6 +725,12 @@ void job_precreate_pool_set_index(
  * job test/wait for completion functions
  */
 
+#define JOB_POLL_TYPE_DEV 0
+#define JOB_POLL_TYPE_BMI 1
+
+int job_add_poll_fd(int fd, short events, int type);
+void job_remove_poll_fd(int fd);
+
 int job_test(job_id_t id,
              int *out_count_p,
              void **returned_user_ptr_p,

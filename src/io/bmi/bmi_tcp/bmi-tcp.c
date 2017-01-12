@@ -51,6 +51,7 @@
 #include "gen-locks.h"
 #include "pint-hint.h"
 #include "pint-event.h"
+#include "job.h"
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 static gen_cond_t interface_cond = GEN_COND_INITIALIZER;
@@ -192,6 +193,8 @@ void BMI_tcp_close_context(bmi_context_id context_id);
 
 int BMI_tcp_cancel(bmi_op_id_t id, 
                    bmi_context_id context_id);
+
+int BMI_tcp_get_fd(bmi_method_addr_p addr);
 
 char BMI_tcp_method_name[] = "bmi_tcp";
 
@@ -388,6 +391,7 @@ const struct bmi_method_ops bmi_tcp_ops = {
     .open_context = BMI_tcp_open_context,
     .close_context = BMI_tcp_close_context,
     .cancel = BMI_tcp_cancel,
+    .get_fd = BMI_tcp_get_fd,
     .rev_lookup_unexpected = BMI_tcp_addr_rev_lookup_unexpected,
     .query_addr_range = BMI_tcp_query_addr_range,
 };
@@ -1932,6 +1936,12 @@ int BMI_tcp_cancel(bmi_op_id_t id,
     return (0);
 }
 
+int BMI_tcp_get_fd(bmi_method_addr_p addr)
+{
+    struct tcp_addr *tcp_addr_data;
+    tcp_addr_data = addr->method_data;
+    return tcp_addr_data->socket;
+}
 
 /*
  * For now, we only support wildcard strings that are IP addresses
@@ -2587,6 +2597,18 @@ static int tcp_sock_init(bmi_method_addr_p my_method_addr)
     {
 	return (bmi_tcp_errno_to_pvfs(-EINVAL));
     }
+
+#ifndef __PVFS2_JOB_THREADED__
+    if (ret >= 0 || ret == -EINPROGRESS)
+    {
+        if (job_add_poll_fd(tcp_addr_data->socket, POLLIN, JOB_POLL_TYPE_BMI)
+                < 0)
+        {
+            gossip_err("%s: job_add_poll_fd failure\n", __func__);
+            return ret;
+        }
+    }
+#endif
 
     if (ret < 0)
     {

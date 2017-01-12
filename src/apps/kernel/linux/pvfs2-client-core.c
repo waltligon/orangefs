@@ -75,7 +75,7 @@
   default timeout value to wait for completion of in progress
   operations
 */
-#define PVFS2_CLIENT_DEFAULT_TEST_TIMEOUT_MS 10
+#define PVFS2_CLIENT_DEFAULT_TEST_TIMEOUT_MS 2000
 
 /*
   uncomment for timing of individual operation information to be
@@ -4501,6 +4501,12 @@ repost_op:
 #endif
                 {
                     ret = add_op_to_ops_in_progress_table(vfs_request);
+                }
+                if (!ret && vfs_request)
+                {
+                    int error;
+                    ret = PINT_client_state_machine_test(vfs_request->op_id,
+                            &error);
                 }
             }
         }

@@ -16,6 +16,7 @@
 #include <string.h>
 #include <assert.h>
 #include <time.h>
+#include <poll.h>
 
 #include "state-machine.h"
 #include "job.h"
@@ -37,14 +38,7 @@ static TROVE_context_id global_trove_context = -1;
 /* queues of pending jobs */
 static job_desc_q_p completion_queue_array[JOB_MAX_CONTEXTS] = {NULL};
 static job_desc_q_p bmi_unexp_queue = NULL;
-static int bmi_unexp_pending_count = 0;
-static int bmi_pending_count = 0;
-static int trove_pending_count = 0;
-static int flow_pending_count = 0;
 static job_desc_q_p dev_unexp_queue = NULL;
-#ifdef __PVFS2_CLIENT__
-static int dev_unexp_pending_count = 0;
-#endif
 /* locks for internal queues */
 static gen_mutex_t bmi_unexp_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t dev_unexp_mutex = GEN_MUTEX_INITIALIZER;
@@ -55,6 +49,11 @@ static gen_mutex_t initialized_mutex = GEN_MUTEX_INITIALIZER;
 
 #ifdef __PVFS2_JOB_THREADED__
 static pthread_cond_t completion_cond = PTHREAD_COND_INITIALIZER;
+#else /* __PVFS2_JOB_THREADED__ */
+static struct pollfd *job_pfds;
+static size_t job_pfds_len, job_pfds_limit;
+static int *job_poll_types;
+static int *job_poll_out;
 #endif /* __PVFS2_JOB_THREADED__ */
 
 /* number of jobs to test for at once inside of do_one_test_cycle_req_sched() */
@@ -443,7 +442,22 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
      * we must queue up to test it later
      */
     *id = jd->job_id;
-    bmi_pending_count++;
+
+#ifndef __PVFS2_JOB_THREADED__
+    {
+        size_t i;
+        int fd;
+        fd = BMI_get_fd(addr);
+        for (i = 0; i < job_pfds_len; i++)
+        {
+            if (job_pfds[i].fd == fd)
+            {
+                job_pfds[i].events |= POLLOUT;
+                job_poll_out[i]++;
+            }
+        }
+    }
+#endif
 
     return(job_time_mgr_add(jd, timeout_sec));
 }
@@ -542,7 +556,23 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
      * we must queue up to test it later
      */
     *id = jd->job_id;
-    bmi_pending_count++;
+
+#ifndef __PVFS2_JOB_THREADED__
+    {
+        size_t i;
+        int fd;
+        fd = BMI_get_fd(addr);
+        for (i = 0; i < job_pfds_len; i++)
+        {
+            if (job_pfds[i].fd == fd)
+            {
+                job_pfds[i].events |= POLLOUT;
+                job_poll_out[i]++;
+            }
+        }
+    }
+#endif
+
     return(job_time_mgr_add(jd, timeout_sec));
 }
 
@@ -622,7 +652,6 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
      * we must queue up to test it later
      */
     *id = jd->job_id;
-    bmi_pending_count++;
 
     return(job_time_mgr_add(jd, timeout_sec));
 }
@@ -707,7 +736,6 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
      * we must queue up to test it later
      */
     *id = jd->job_id;
-    bmi_pending_count++;
 
     return(job_time_mgr_add(jd, timeout_sec));
 }
@@ -791,7 +819,6 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
     gen_mutex_lock(&bmi_unexp_mutex);
     *id = jd->job_id;
     job_desc_q_add(bmi_unexp_queue, jd);
-    bmi_unexp_pending_count++;
     gen_mutex_unlock(&bmi_unexp_mutex);
 
     PINT_thread_mgr_bmi_unexp_handler(bmi_thread_mgr_unexp_handler);
@@ -806,7 +833,6 @@ int job_bmi_unexp_cancel(job_id_t id)
     gen_mutex_lock(&bmi_unexp_mutex);
     jd = id_gen_safe_lookup(id);
     job_desc_q_remove(jd);
-    bmi_unexp_pending_count--;
     gen_mutex_unlock(&bmi_unexp_mutex);
 
     gen_mutex_lock(&completion_mutex);
@@ -932,7 +958,6 @@ int job_dev_unexp(
     gen_mutex_lock(&dev_unexp_mutex);
     *id = jd->job_id;
     job_desc_q_add(dev_unexp_queue, jd);
-    dev_unexp_pending_count++;
     gen_mutex_unlock(&dev_unexp_mutex);
 
     PINT_thread_mgr_dev_unexp_handler(dev_thread_mgr_unexp_handler);
@@ -1352,9 +1377,6 @@ int job_flow(flow_descriptor * flow_d,
 
     /* queue up the job desc. for later completion */
     *id = jd->job_id;
-    flow_pending_count++;
-    gossip_debug(GOSSIP_FLOW_DEBUG, "Job flows in progress (post time): %d\n",
-            flow_pending_count);
 
     return(job_time_mgr_add(jd, timeout_sec));
 }
@@ -1483,7 +1505,6 @@ int job_trove_bstream_write_list(TROVE_coll_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 } 
@@ -1574,7 +1595,6 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -1647,7 +1667,6 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -1732,7 +1751,6 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -1820,7 +1838,6 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -1906,7 +1923,6 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -2001,7 +2017,6 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -2080,7 +2095,6 @@ int job_trove_keyval_remove_list(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -2155,7 +2169,6 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -2237,7 +2250,6 @@ int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
      * we must queue up to test it later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -2322,7 +2334,6 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
      * we must queue up to test it later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -2412,7 +2423,6 @@ int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
      * we must queue up to test it later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -2495,7 +2505,6 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
      * we must queue up to test it later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -2579,7 +2588,6 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
      * we must queue up to test it later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -2686,7 +2694,6 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -2801,7 +2808,6 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -2893,7 +2899,6 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -2981,7 +2986,6 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -3072,7 +3076,6 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -3162,7 +3165,6 @@ int job_trove_dspace_create_list(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -3248,7 +3250,6 @@ int job_trove_dspace_remove_list(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -3332,7 +3333,6 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -3416,7 +3416,6 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -3527,7 +3526,6 @@ int job_trove_fs_create(char *collname,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -3703,7 +3701,6 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -3783,7 +3780,6 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -3864,7 +3860,6 @@ int job_trove_fs_deleattr(PVFS_fs_id coll_id,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
 
     return (0);
 }
@@ -4129,6 +4124,94 @@ int job_testcontext(job_id_t * out_id_array_p,
 
 #else /* __PVFS2_JOB_THREADED__ */
 
+int job_add_poll_fd(int fd, short events, int type)
+{
+    if (!job_pfds)
+    {
+        job_pfds = calloc(16, sizeof *job_pfds);
+        if (!job_pfds)
+        {
+            return -ENOMEM;
+        }
+        job_poll_types = calloc(16, sizeof *job_poll_types);
+        if (!job_poll_types)
+        {
+            free(job_pfds);
+            return -ENOMEM;
+        }
+        job_poll_out = calloc(16, sizeof *job_poll_out);
+        if (!job_poll_out)
+        {
+            free(job_poll_types);
+            free(job_pfds);
+            return -ENOMEM;
+        }
+        job_pfds_limit = 16;
+    }
+
+    if (job_pfds_len >= job_pfds_limit)
+    {
+        struct pollfd *new_pfds;
+        int *new_poll_types;
+        int *new_poll_out;
+        new_pfds = realloc(job_pfds, (job_pfds_limit + 16)*sizeof *job_pfds);
+        if (!new_pfds)
+        {
+            return -ENOMEM;
+        }
+        new_poll_types = realloc(job_poll_types,
+                (job_pfds_limit + 16)*sizeof *job_poll_types);
+        if (!new_poll_types)
+        {
+            /* Undo the realloc. We hope this won't fail. */
+            job_pfds = realloc(job_pfds, job_pfds_limit*sizeof *job_pfds);
+            assert(job_pfds);
+            return -ENOMEM;
+        }
+        new_poll_out = realloc(job_poll_out,
+                (job_pfds_limit + 16)*sizeof *job_poll_out);
+        if (!new_poll_out)
+        {
+            /* Undo the realloc. We hope this won't fail. */
+            job_poll_types = realloc(job_poll_types,
+                    job_pfds_limit*sizeof *job_poll_types);
+            assert(job_poll_types);
+            job_pfds = realloc(job_pfds, job_pfds_limit*sizeof *job_pfds);
+            assert(job_pfds);
+            return -ENOMEM;
+        }
+        job_pfds = new_pfds;
+        job_poll_types = new_poll_types;
+        job_poll_out = new_poll_out;
+        job_pfds_limit += 16;
+    } 
+    job_pfds[job_pfds_len].fd = fd;
+    job_pfds[job_pfds_len].events = events;
+    job_poll_types[job_pfds_len] = type;
+    job_poll_out[job_pfds_len] = 0;
+    job_pfds_len++;
+    return 0;
+}
+
+void job_remove_poll_fd(int fd)
+{
+    int copy = 0;
+    size_t i;
+    for (i = 0; i < job_pfds_len; i++)
+    {
+        if (job_pfds[i].fd == fd)
+        {
+            copy = 1;
+        }
+        if (copy && i < job_pfds_len - 1)
+        {
+            job_pfds[i].fd = job_pfds[i + 1].fd;
+            job_pfds[i].events = job_pfds[i + 1].events; 
+        }
+    }
+    /* XXX: Should job_pfds shrink? */
+}
+
 /*
  * Test for completion of jobs. Returns a non-negative number representing the
  * number of jobs which completed. Does not fail.
@@ -4172,8 +4255,8 @@ static ssize_t job_test_internal(int specify, size_t len, job_id_t *ids,
         int *completed_ids, void **ptrs, job_status_s *statuses,
         int timeout_ms, job_context_id context_id)
 {
+    size_t i;
     int ret;
-    struct timespec end, now;
 
     ret = do_one_test_cycle_req_sched();
     if (ret < 0)
@@ -4181,62 +4264,89 @@ static ssize_t job_test_internal(int specify, size_t len, job_id_t *ids,
         return ret;
     }
 
-    ret = job_has_completed(specify, len, ids, completed_ids, ptrs, statuses,
-            timeout_ms, context_id);
+    /*
+     * Check whether any jobs are complete. This happens in two cases. Either
+     * more than len jobs had completed in the last call, and there are some
+     * left over. Alternatively a state machine finished a job.
+     */
+    ret = job_has_completed(specify, len, ids, completed_ids, ptrs,
+            statuses, timeout_ms, context_id);
     if (ret)
     {
         return ret;
     }
 
-    if (timeout_ms > 0)
+    ret = poll(job_pfds, job_pfds_len, timeout_ms);
+    if (ret == -1)
     {
-        ret = clock_gettime(CLOCK_MONOTONIC, &end);
-        if (ret == -1)
-        {
-            return ret;
-        }
-        end.tv_sec += timeout_ms/1000;
-        end.tv_nsec += (timeout_ms%1000)*1000000;
-        if (end.tv_nsec > 1000000000)
-        {
-            end.tv_sec++;
-            end.tv_nsec -= 1000000000;
-        }
+        return -errno;
     }
-
-    do
+    else if (ret > 0)
     {
-        int idle = timeout_ms ? 10 : 0;
-        int total_pending_count = 0;
-    
-        total_pending_count = bmi_pending_count + bmi_unexp_pending_count
-                + flow_pending_count + dev_unexp_pending_count
-                + trove_pending_count;
+        for (i = 0; i < job_pfds_len; i++)
+        {
+            if (!job_pfds[i].revents)
+            {
+                continue;
+            }
+            if (job_poll_types[i] == JOB_POLL_TYPE_DEV)
+            {
+                /* XXX: 10? */
+                static struct PINT_dev_unexp_info dev_unexp_array[10];
+                struct job_desc *tmp_desc;
+                int outcount, i;
 
-        if (bmi_pending_count || bmi_unexp_pending_count || flow_pending_count)
-        {
-            PINT_thread_mgr_bmi_push(idle);
-            idle = 0;
-        }
-        if (dev_unexp_pending_count)
-        {
-            PINT_thread_mgr_dev_push(idle);
-        }
-#ifdef __PVFS2_TROVE_SUPPORT__
-        if(trove_pending_count || flow_pending_count)
-            PINT_thread_mgr_trove_push(idle_time_ms);
-#endif
+                ret = PINT_dev_test_unexpected(10, &outcount,
+                        dev_unexp_array, 0);
+                if (ret < 0)
+                {
+                    PVFS_perror_gossip("critical device failure", ret);
+                    gossip_err("Exiting...\n");
+                    /* exit with a particular code so that the pvfs2-client
+                     * wrapper knows that it should not attempt a restart of the
+                     * pvfs2-client-core
+                     */
+                    exit(-PVFS_ENODEV);
+                }
 
-        if(total_pending_count == 0 && idle != 0)
-        {
-#ifdef WIN32
-            Sleep(idle_time_ms);
-#else
-            struct timespec ts;
-            ts.tv_sec = idle/1000;
-            ts.tv_nsec = (idle%1000)*1000*1000;
-            nanosleep(&ts, NULL);
-#endif
+                for (i = 0; i < outcount; i++)
+                {
+
+                    /* remove the operation from the pending dev_unexp queue */
+                    tmp_desc = job_desc_q_shownext(dev_unexp_queue);
+                    /* XXX: Wasn't the count used to make sure we don't run out
+                     * of dev_unexp operations. */
+                    /* heavy load didn't kill it but let's make sure */
+                    if (tmp_desc->completed_flag == 0)
+                    {
+                        job_desc_q_remove(tmp_desc);
+                        /* set appropriate fields and store in completed
+                         * queue */
+                        *(tmp_desc->u.dev_unexp.info) = dev_unexp_array[i];
+                        /* set completed flag while holding queue lock */
+                        tmp_desc->completed_flag = 1;
+                        if (completion_queue_array[tmp_desc->context_id])
+                        {
+                            job_desc_q_add(completion_queue_array[
+                                    tmp_desc->context_id], tmp_desc);
+                        }
+                    }
+                }
+
+            }
+            else if (job_poll_types[i] == JOB_POLL_TYPE_BMI)
+            {
+                PINT_thread_mgr_bmi_push(0);
+            }
+            /* XXX: Is this the right place to remove POLLOUT?
+             * What if it didn't finish writing in one cycle? */
+            if (job_pfds[i].revents & POLLOUT)
+            {
+                if (!--job_poll_out[i])
+                {
+                    job_pfds[i].events &= ~POLLOUT;
+                }
+            }
         }
 
         ret = job_has_completed(specify, len, ids, completed_ids, ptrs,
@@ -4245,14 +4355,7 @@ static ssize_t job_test_internal(int specify, size_t len, job_id_t *ids,
         {
             return ret;
         }
-
-        ret = clock_gettime(CLOCK_MONOTONIC, &now);
-        if (ret == -1)
-        {
-            return ret;
-        }
-    } while (timeout_ms > 0 && (now.tv_sec <= end.tv_sec &&
-            (now.tv_sec != end.tv_sec || now.tv_nsec < end.tv_nsec)));
+    }
 
     return 0;
 }
@@ -4400,7 +4503,6 @@ static void precreate_pool_get_thread_mgr_callback_unlocked(
             llu(*((PVFS_handle*)tmp_trove->key.buffer)));
     }
 
-    trove_pending_count--;
     tmp_trove->jd->u.precreate_pool.trove_pending--;
 
     /* don't overwrite error codes from other trove ops */
@@ -4467,7 +4569,6 @@ static void precreate_pool_iterate_callback(
         /* set completed flag while holding queue lock */
         tmp_desc->completed_flag = 1;
 
-        trove_pending_count--;
 
 #ifdef __PVFS2_JOB_THREADED__
         /* wake up anyone waiting for completion */
@@ -4563,7 +4664,6 @@ static void precreate_pool_fill_thread_mgr_callback(
         /* a trove operation completed successfully */
         jd->u.precreate_pool.precreate_handle_index += 
             jd->u.precreate_pool.posted_count;
-        trove_pending_count--;
 
         /* increment in-memory count for this pool */
         gen_mutex_lock(&precreate_pool_mutex);
@@ -4682,7 +4782,6 @@ static void precreate_pool_fill_thread_mgr_callback(
                             &tmp_id,
                             jd->hints);
     
-    trove_pending_count++;
 
     if(ret < 0)
     {
@@ -4750,14 +4849,6 @@ static void trove_thread_mgr_callback(
         /* set completed flag while holding queue lock */
         tmp_desc->completed_flag = 1;
 
-/* the value of trove_pending_count is only used in the non-threaded
- * situation. so, to prevent reported data races from helgrind, we
- * will only modify it's value in the non-threaded case.
-*/
-#ifndef __PVFS2_JOB_THREADED__
-        trove_pending_count--;
-#endif
-
 #ifdef __PVFS2_JOB_THREADED__
         /* wake up anyone waiting for completion */
         pthread_cond_signal(&completion_cond);
@@ -4801,8 +4892,6 @@ static void bmi_thread_mgr_callback(
         /* set completed flag while holding queue lock */
         tmp_desc->completed_flag = 1;
 
-        bmi_pending_count--;
-
 #ifdef __PVFS2_JOB_THREADED__
         /* wake up anyone waiting for completion */
         pthread_cond_signal(&completion_cond);
@@ -4840,7 +4929,6 @@ static void bmi_thread_mgr_unexp_handler(
     if (tmp_desc->completed_flag == 0)
     {
         job_desc_q_remove(tmp_desc);
-        bmi_unexp_pending_count--;
         gen_mutex_unlock(&bmi_unexp_mutex);
         /* set appropriate fields and store in completed queue */
         *(tmp_desc->u.bmi_unexp.info) = *unexp;
@@ -4887,7 +4975,6 @@ static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp)
     if (tmp_desc->completed_flag == 0)
     {
         job_desc_q_remove(tmp_desc);
-        dev_unexp_pending_count--;
         gen_mutex_unlock(&dev_unexp_mutex);
         /* set appropriate fields and store in completed queue */
         *(tmp_desc->u.dev_unexp.info) = *unexp;
@@ -5217,10 +5304,6 @@ static void flow_callback(flow_descriptor* flow_d, int cancel_path)
                    tmp_desc);
     /* set completed flag while holding queue lock */
     tmp_desc->completed_flag = 1;
-
-    flow_pending_count--;
-    gossip_debug(GOSSIP_FLOW_DEBUG, "Job flows in progress (callback time): %d\n",
-            flow_pending_count);
 
 #ifdef __PVFS2_JOB_THREADED__
     /* wake up anyone waiting for completion */
@@ -5958,7 +6041,6 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
         else
         {
             /* callback will be triggered later */
-            trove_pending_count++;
             jd->u.precreate_pool.trove_pending++;
         }
     }
@@ -6156,7 +6238,6 @@ int job_precreate_pool_iterate_handles(PVFS_fs_id fsid,
      * immediately complete and we must queue up to test later
      */
     *id = jd->job_id;
-    trove_pending_count++;
     gen_mutex_unlock(&precreate_pool_mutex);
 
     return (0);
