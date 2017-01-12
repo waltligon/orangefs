@@ -148,15 +148,13 @@ machine pvfs2_mgmt_create_root_dir_sm
     {
         jump pvfs2_msgpairarray_sm;
         default => remote_mkdir_lost_and_found_cleanup;
-        /*success => crdirent_lost_and_found_setup_msgpair;
-        default => cleanup_noreq;*/
     }
 
     state remote_mkdir_lost_and_found_cleanup
     {
         run mgmt_create_root_dir_remote_mkdir_lost_and_found_cleanup;
-        success => crdirent_lost_and_found_setup_msgpair;
-        default => cleanup_noreq;
+        CLEANUP => cleanup_noreq;
+        default => crdirent_lost_and_found_setup_msgpair;
     }
 
     state local_mkdir
@@ -951,8 +949,29 @@ static int mkdir_lost_and_found_comp_fn(void *v_p,
 static PINT_sm_action mgmt_create_root_dir_remote_mkdir_lost_and_found_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-   js_p->error_code = 0;
-   return SM_ACTION_COMPLETE;
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    char errstr[256]={0};
+    char server_name[256]={0};
+
+    if (js_p->error_code)
+    {
+        PINT_cached_config_get_server_name(server_name
+                                          ,sizeof(server_name)
+                                          ,s_op->msgarray_op.msgpair.handle
+                                          ,s_op->target_fs_id);
+        PVFS_strerror_r(js_p->error_code, errstr, sizeof(errstr));
+        gossip_err("WARNING:  Unable to create the directory object for lost+found on remote server(%s): %s\n"
+                  ,server_name
+                  ,errstr);
+        gossip_err("To manually create the directory as root:  mkdir -m 777 <mountpoint>/lost+found\n");
+        js_p->error_code = CLEANUP;
+        s_op->u.mgmt_create_root_dir.lost_and_found_handle = 0;
+    }
+        
+    /*cleanup msgpair */
+    PINT_msgpairarray_destroy(&s_op->msgarray_op);
+
+    return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action mgmt_create_root_dir_local_mkdir_cleanup(
@@ -981,7 +1000,7 @@ static PINT_sm_action mgmt_create_root_dir_local_mkdir_cleanup(
         char errstr[256];
         PVFS_strerror_r(js_p->error_code, errstr, sizeof(errstr));
         gossip_err("WARNING:  Unable to create the directory object for lost+found on this host: %s\n",errstr);
-        gossip_err("To create the directory manually:  mkdir -m 777 <mountpoint>/lost+found\n");
+        gossip_err("To manually create the directory as root:  mkdir -m 777 <mountpoint>/lost+found\n");
         js_p->error_code = CLEANUP;
         s_op->u.mgmt_create_root_dir.lost_and_found_handle = 0;
     }
@@ -1219,7 +1238,7 @@ static PINT_sm_action mgmt_create_root_dir_local_crdirent_cleanup(
         char errstr[256];
         PVFS_strerror_r(js_p->error_code, errstr, sizeof(errstr));
         gossip_err("WARNING:  Unable to create the directory entry for lost+found on this host: %s\n",errstr);
-        gossip_err("To create the directory manually:  mkdir -m 777 <mountpoint>/lost+found\n");
+        gossip_err("To manually create the directory as root:  mkdir -m 777 <mountpoint>/lost+found\n");
         js_p->error_code = CLEANUP;
     }
     return SM_ACTION_COMPLETE;

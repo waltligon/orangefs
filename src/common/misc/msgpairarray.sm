@@ -529,6 +529,13 @@ static PINT_sm_action msgpairarray_completion_fn(
 	if (msg_p->complete)
 	    continue;
 
+#if 1
+        if (msg_p->req.op == PVFS_SERV_MKDIR)
+        {
+           msg_p->op_status = -PVFS_ENOMEM;
+        }
+#endif
+
         if (msg_p->op_status != 0)
         {
             char s[1024];
