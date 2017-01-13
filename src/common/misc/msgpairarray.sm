@@ -502,14 +502,25 @@ static PINT_sm_action msgpairarray_completion_fn(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = NULL;
+    
     int ret = -PVFS_EINVAL, i = 0;
     int need_retry = 0;
-    struct PINT_decoded_msg decoded_resp;
+    struct PINT_decoded_msg *decoded_resp=NULL;
     const char* server_string = NULL;
     int server_type;
 
     /* response structure (decoded) */
     struct PVFS_server_resp *resp_p = NULL;
+
+    /* decoded_resp structure for each msgpair */
+    decoded_resp = calloc(mop->count,sizeof(*decoded_resp));
+    if ( !decoded_resp )
+    {
+       gossip_err("%s:Error allocated memory for decoded_resp\n",__func__);
+       js_p->error_code = -PVFS_ENOMEM;
+       return SM_ACTION_COMPLETE;
+    }
 
     js_p->error_code = 0;
 
@@ -519,7 +530,7 @@ static PINT_sm_action msgpairarray_completion_fn(
 
     for (i = 0; i < mop->count; i++)
     {
-        PINT_sm_msgpair_state *msg_p = &mop->msgarray[i];
+        msg_p = &mop->msgarray[i];
         assert(msg_p);
 
 	/*
@@ -555,7 +566,7 @@ static PINT_sm_action msgpairarray_completion_fn(
 
         ret = PINT_serv_decode_resp(msg_p->fs_id,
                                     msg_p->encoded_resp_p,
-                                    &decoded_resp,
+                                    &decoded_resp[i],
                                     &msg_p->svr_addr,
                                     msg_p->recv_status.actual_size,
                                     &resp_p);
@@ -566,8 +577,9 @@ static PINT_sm_action msgpairarray_completion_fn(
             gossip_debug(GOSSIP_MSGPAIR_DEBUG,"%s: error code %d from PINT_serv_decode_resp, "
                                               "from server %d\n"
                                              , __func__, msg_p->op_status, i);
-
-            goto cleanup;
+            msg_p->complete = 1;
+            continue;
+            //goto cleanup;
         }
         else
         {
@@ -585,7 +597,9 @@ static PINT_sm_action msgpairarray_completion_fn(
                   }
                   else
                   {
-                     goto cleanup; /*bypass the comp fn*/
+                     //goto cleanup; /*bypass the comp fn*/
+                     msg_p->complete=1;
+                     continue;
                   }
                }
                default:
@@ -606,7 +620,9 @@ static PINT_sm_action msgpairarray_completion_fn(
                      gossip_debug(GOSSIP_MSGPAIR_DEBUG,"notice: msgpairarray_complete: error %d "
                                                        "from server %d\n"
                                                       ,resp_p->status, i);
-                     goto cleanup; /*bypass the comp fn*/
+                     msg_p->complete=1;
+                     continue;
+                     //goto cleanup; /*bypass the comp fn*/
                   }
                }/*end default*/
             }/*end switch*/
@@ -632,35 +648,8 @@ static PINT_sm_action msgpairarray_completion_fn(
         }
 
         gossip_debug(GOSSIP_MSGPAIR_DEBUG,"op_status(%d) msgpair(%d)\n",msg_p->op_status,i);
-
-
-cleanup:
-        /* cleanup capability */
-        PINT_cleanup_capability(&msg_p->req.capability);
-
-        /* free all the resources that we used to send and receive. */
-        ret = PINT_serv_free_msgpair_resources(
-            &msg_p->encoded_req, msg_p->encoded_resp_p, &decoded_resp,
-            &msg_p->svr_addr, msg_p->max_resp_sz);
-        if (ret)
-        {
-            PVFS_perror_gossip("Failed to free msgpair resources", ret);
-            js_p->error_code = ret;
-        }
-
-        memset(&msg_p->encoded_req,0,sizeof(msg_p->encoded_req));
-        msg_p->encoded_resp_p = NULL;
-        msg_p->max_resp_sz = 0;
-
-        /*
-          mark that this msgpair has been completed and should not be
-          retried in the case of possible future retries
-        */
-        msg_p->complete = 1;
-
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair %d "
-                     "marked complete\n", __func__, smcb, i);
     }/*end for each msgpair*/
+
 
     if (need_retry) {
         /*
@@ -671,7 +660,7 @@ cleanup:
         mop->params.comp_ct = 0;
         for (i=0; i < mop->count; i++) {
 
-            PINT_sm_msgpair_state *msg_p = &mop->msgarray[i];
+            msg_p = &mop->msgarray[i];
 
             if (msg_p->complete)
                 continue;
@@ -703,6 +692,7 @@ cleanup:
 
             } else {
                 char s[1024];
+                msg_p->complete=1;
                 server_string = PINT_cached_config_map_addr(
                     msg_p->fs_id, msg_p->svr_addr, &server_type);
                 if(!server_string)
@@ -729,8 +719,48 @@ cleanup:
                     js_p->error_code = msg_p->op_status;
             }
 
-        }/*end for*/
+        }/*end for each msgpair*/
     }/*end if retry*/
+
+    /*release resources for msgpairs*/
+    for (i=0; i < mop->count; i++)
+    {
+        msg_p = &mop->msgarray[i];
+
+        /* cleanup capability, only if the msgpair completed.
+         * If the msgpair did NOT complete, then the capability
+         * is still needed for the retry.  Completed means that 
+         * the msgpair really did complete but can also mean that
+         * an error occurred in which a retry was not feasible. 
+         */
+        if (msg_p->complete == 1)
+        {
+           PINT_cleanup_capability(&msg_p->req.capability);
+        }
+
+        /* free all the resources that we used to send and receive,
+         * whether or not the msgpair completed or not.  For retries,
+         * these structures will be rebuilt
+         */
+        ret = PINT_serv_free_msgpair_resources(
+            &msg_p->encoded_req, msg_p->encoded_resp_p, &decoded_resp[i],
+            &msg_p->svr_addr, msg_p->max_resp_sz);
+        if (ret)
+        {
+            PVFS_perror_gossip("Failed to free msgpair resources", ret);
+            js_p->error_code = ret;
+        }
+
+        msg_p->encoded_resp_p = NULL;
+        msg_p->max_resp_sz = 0;
+
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair %d "
+                     "marked complete\n", __func__, smcb, i);
+    }/*end for each msgpair*/
+
+    /* free the array of decoded response structures*/
+    free(decoded_resp);
+
     return SM_ACTION_COMPLETE;
 }
 
