@@ -1426,9 +1426,9 @@ static int server_check_if_root_directory_created( void )
         }
 
         /*
-           check if root handle is in our handle range for this fs.
-           if it is, we're responsible for creating it on disk when
-           creating the storage space
+         * check if root handle is in our handle range for this fs.
+         * if it is, we're responsible for creating it on disk when
+         * creating the storage space
          */
         root_handle = cur_fs->root_handle;
 
@@ -1439,7 +1439,8 @@ static int server_check_if_root_directory_created( void )
 
         if( ret == 0 && strcmp(handle_server, server_config.host_id) == 0 )
         {
-            /* we own this handle, hurrah! now look if we have a DIST_DIR_ATTR keyval
+            /* we own this handle, hurrah! 
+             * now look if we have a DIST_DIR_ATTR keyval
              * record, we want one. */
             key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
             key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;

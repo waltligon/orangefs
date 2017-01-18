@@ -1001,6 +1001,7 @@ static int mkdir_lost_and_found_comp_fn(void *v_p,
     }
 
     /* otherwise, just stash the newly created meta handle */
+    /* this one is for doing a remote crdirent */
     s_op->u.mgmt_create_root_dir.lost_and_found_handle =
                                           resp_p->u.mkdir.handle;
 
@@ -1029,11 +1030,9 @@ static PINT_sm_action mgmt_create_root_dir_local_mkdir_cleanup(
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* Save the newly created meta handle */
-    /* already done in completion func */
-#if 0
+    /* this one is for doing a local crdirent */
     s_op->u.mgmt_create_root_dir.lost_and_found_handle =
                                           mkdir_op->resp.u.mkdir.handle;
-#endif
 
     /* Clean up memory that was allocated by the mkdir state machine. */
     mkdir_free(mkdir_op);
@@ -1192,8 +1191,7 @@ static PINT_sm_action crdirent_lost_and_found_setup_msgpair(
 
         msg_p->fs_id = s_op->target_fs_id;
         /* send to dirdata server */
-        msg_p->handle = 
-                    s_op->attr.dirdata_handles[dirdata_server_index];
+        msg_p->handle = s_op->attr.dirdata_handles[dirdata_server_index];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = crdirent_lost_and_found_comp_fn;
 
