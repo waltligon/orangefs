@@ -692,7 +692,8 @@ static int tree_setattr_comp_fn(void *v_p,
         gossip_debug(GOSSIP_SERVER_DEBUG,"%s: caller_handle_index:%u "
                                          "\tarray_local_count:%d\n"
                                         ,__func__
-                                        ,m_tree->caller_handle_index                                        ,s_tree_comm->handle_array_local_count);
+                                        ,m_tree->caller_handle_index
+                                        ,s_tree_comm->handle_array_local_count);
         gossip_debug(GOSSIP_SERVER_DEBUG,"%s: status for file %d is %d\n"
                                         ,__func__
                                         ,i
@@ -752,6 +753,7 @@ static int tree_setattr_work_cleanup(struct PINT_smcb *smcb,
                      ,error_code);
 
 
+/*what if error_code is zero but one of the remote status entries is not?*/
         if (task_id == REMOTE_OPERATION)
         {
             if (error_code != 0)
@@ -786,6 +788,7 @@ static int tree_setattr_work_cleanup(struct PINT_smcb *smcb,
             {
                tree_req = &(tree_msgarray[j].req.u.tree_setattr);
                PINT_free_object_attr(&tree_req->attr);
+               gossip_err("%s:Cleaning up capability from PVFS_SERV_TREE_SETATTR\tError code(%d)\n",__func__,error_code);
             }/*end for*/
            PINT_msgpairarray_destroy(&old_frame->msgarray_op);
 

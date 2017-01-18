@@ -517,7 +517,7 @@ static PINT_sm_action msgpairarray_completion_fn(
     decoded_resp = calloc(mop->count,sizeof(*decoded_resp));
     if ( !decoded_resp )
     {
-       gossip_err("%s:Error allocated memory for decoded_resp\n",__func__);
+       gossip_err("%s:Error allocating memory for decoded_resp\n",__func__);
        js_p->error_code = -PVFS_ENOMEM;
        return SM_ACTION_COMPLETE;
     }
@@ -543,6 +543,7 @@ static PINT_sm_action msgpairarray_completion_fn(
 #if 1
         if (msg_p->req.op == PVFS_SERV_MKDIR)
         {
+           gossip_err("%s:setting op_status for testing.\n",__func__);
            msg_p->op_status = -PVFS_ENOMEM;
         }
 #endif
@@ -636,7 +637,7 @@ static PINT_sm_action msgpairarray_completion_fn(
          *       message (to handle different types of messages all in
          *       the same array).
          */
-        gossip_debug(GOSSIP_MIRROR_DEBUG,"\texecuting msg_p->comp_fn..\n");
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG,"\texecuting msg_p->comp_fn..\n");
         /* If we call the completion function, store the result on
          * a per message pair basis.  Also store some non-zero
          * (failure) value in js_p->error_code if we see one.
@@ -646,7 +647,7 @@ static PINT_sm_action msgpairarray_completion_fn(
         {
             js_p->error_code = msg_p->op_status;
         }
-
+        msg_p->complete=1;
         gossip_debug(GOSSIP_MSGPAIR_DEBUG,"op_status(%d) msgpair(%d)\n",msg_p->op_status,i);
     }/*end for each msgpair*/
 
@@ -740,15 +741,17 @@ static PINT_sm_action msgpairarray_completion_fn(
 
         /* free all the resources that we used to send and receive,
          * whether or not the msgpair completed or not.  For retries,
-         * these structures will be rebuilt
+         * these structures will be rebuilt.
          */
-        ret = PINT_serv_free_msgpair_resources(
-            &msg_p->encoded_req, msg_p->encoded_resp_p, &decoded_resp[i],
-            &msg_p->svr_addr, msg_p->max_resp_sz);
-        if (ret)
+        PINT_encode_release(&msg_p->encoded_req, PINT_ENCODE_REQ);
+        memset(&msg_p->encoded_req,0,sizeof(msg_p->encoded_req));
+        if ( decoded_resp[i].enc_type != 0 )
         {
-            PVFS_perror_gossip("Failed to free msgpair resources", ret);
-            js_p->error_code = ret;
+           PINT_decode_release(&decoded_resp[i],PINT_DECODE_RESP);
+        }
+        if ( msg_p->svr_addr )
+        {
+           BMI_memfree(msg_p->svr_addr, msg_p->encoded_resp_p, msg_p->max_resp_sz, BMI_RECV);
         }
 
         msg_p->encoded_resp_p = NULL;

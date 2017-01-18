@@ -681,6 +681,9 @@ static PINT_sm_action mgmt_create_root_dir_tree_setattr_cleanup(
 
     tree_setattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
 
+
+    gossip_err("%s:task_id(%d)\tremaining(%d)\n",__func__,task_id,remaining);
+
     PINT_free_object_attr(&tree_setattr_op->req->u.tree_setattr.attr);
     PINT_cleanup_capability(&tree_setattr_op->req->capability);
 
@@ -968,7 +971,7 @@ static PINT_sm_action mgmt_create_root_dir_remote_mkdir_lost_and_found_cleanup(
         s_op->u.mgmt_create_root_dir.lost_and_found_handle = 0;
     }
         
-    /*cleanup msgpair */
+    /*cleanup msgpair(s) */
     PINT_msgpairarray_destroy(&s_op->msgarray_op);
 
     return SM_ACTION_COMPLETE;
