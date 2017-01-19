@@ -14,6 +14,7 @@
 #include "pvfs2-bufmap.h"
 #include "pvfs2-types.h"
 #include "pvfs2-internal.h"
+#include <linux/aio.h>
 
 static int read_one_page(struct page *page)
 {
@@ -104,6 +105,31 @@ static int pvfs2_readpages(
     return 0;
 }
 
+/*
+ * Having a direct_IO entry point in the address_space_operations
+ * struct causes the kernel to allows us to use O_DIRECT on
+ * open.
+ */
+#ifdef C_22c6186_FLAVORED_DIO
+static ssize_t pvfs2_direct_IO(struct kiocb *iocb,
+                               struct iov_iter *iter,
+                               loff_t offset)
+#else
+static ssize_t pvfs2_direct_IO(int rw,
+                     struct kiocb *iocb,
+                     const struct iovec *iov,
+                     loff_t pos,
+                     unsigned long nr_segs)
+#endif
+{
+
+     gossip_debug(GOSSIP_INODE_DEBUG,
+                  "pvfs2_direct_IO: %s\n",
+                  iocb->ki_filp->f_path.dentry->d_name.name);
+
+     return -EINVAL;
+}
+
 #ifdef HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE
 static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
 #else
@@ -168,7 +194,8 @@ struct address_space_operations pvfs2_address_operations =
     .readpage = pvfs2_readpage,
     .readpages = pvfs2_readpages,
     .invalidatepage = pvfs2_invalidatepage,
-    .releasepage = pvfs2_releasepage
+    .releasepage = pvfs2_releasepage,
+    .direct_IO = pvfs2_direct_IO
 #endif
 };
 
@@ -656,7 +683,7 @@ struct inode *pvfs2_get_custom_inode_common(
         inode->i_bdev = NULL;
         inode->i_cdev = NULL;
         inode->i_mapping->a_ops = &pvfs2_address_operations;
-#ifndef PVFS2_LINUX_KERNEL_2_4
+#ifdef BACKING_DEV_IN_ADDR_SPACE
         inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 #endif
 

@@ -8,11 +8,6 @@
  * Utility for displaying PVFS Berkeley DBs in textual form for debugging
  *   */
 
-/* This is a kludge to keep calloc and free from being redefined
-   to our PINT_ versions. That way we can keep from having a depency
-   on the pvfs library. */
-#define PINT_MALLOC_H
-
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
@@ -23,22 +18,13 @@
 #include "trove-types.h"
 #include "pvfs2-storage.h"
 #include "pvfs2-internal.h"
+#include "trove-dbpf/dbpf.h"
 
 #define COLLECTION_FILE         "collections.db"
 #define STORAGE_FILE            "storage_attributes.db"
 #define DATASPACE_FILE          "dataspace_attributes.db"
 #define KEYVAL_FILE             "keyval.db"
 #define COLLECTION_ATTR_FILE    "collection_attributes.db"
-
-/* from src/io/trove/trove-dbpf/dbpf-keyval.c and include/pvfs2-types.h */
-#define DBPF_MAX_KEY_LENGTH 256
-
-/* from src/io/trove/trove-dbpf/dbpf-keyval.c */
-struct dbpf_keyval_db_entry
-{
-    TROVE_handle handle;
-    char key[DBPF_MAX_KEY_LENGTH];
-};
 
 typedef struct
 {
@@ -51,25 +37,19 @@ typedef struct
 /* globals */
 static options_t opts;
 
-int open_db( DB **db_p, char *path, int type, int set_keyval_compare, int flags);
-void close_db( DB *db_p );
-int find_pool_keys(DB *db_p_coll_attr, DB *db_p_keyval);
-void remove_preallocated_handles(DB *db_p_keyval, PVFS_handle pool_handle);
+int find_pool_keys(dbpf_db *db_p_coll_attr, dbpf_db *db_p_keyval);
+void remove_preallocated_handles(dbpf_db *db_p_keyval, PVFS_handle pool_handle);
 void print_help(char *progname);
 int process_args(int argc, char ** argv);
-int PINT_trove_dbpf_keyval_compare(DB * dbp, const DBT * a, const DBT * b);
+int PINT_trove_dbpf_keyval_compare(dbpf_db * dbp, const struct dbpf_data * a, const struct dbpf_data * b);
+void print_keyval( struct dbpf_data key, struct dbpf_data val );
 
 #define TROVE_db_cache_size_bytes 1610612736
 
 int main( int argc, char **argv )
 {
-    DB *db_p_coll_attr = NULL, *db_p_keyval = NULL;
-    DB_ENV dbe;
-    DB_ENV *dbe_p = &dbe;
+    dbpf_db *db_p_coll_attr = NULL, *db_p_keyval = NULL;
     char *path = NULL;
-    u_int32_t db_flags = DB_THREAD,
-              env_flags = DB_INIT_MPOOL,
-              type = DB_UNKNOWN;
     int ret, path_len; 
 
     if( (ret = process_args( argc, argv)) != 0 )
@@ -87,115 +67,53 @@ int main( int argc, char **argv )
         return ENOMEM;
     }
 
-    ret = db_env_create(&dbe_p, 0);
-    if (ret != 0) 
-    {
-        printf("Error creating env handle: %s\n", db_strerror(ret));
-        return ret;
-    }
-
-    /* Open the environment. */
-    ret = dbe_p->open(dbe_p,
-                      opts.dbpath,
-                      env_flags,
-                      0);
-    if (ret != 0) 
-    {
-        printf("Environment open failed: %s", db_strerror(ret));
-        return ret;
-    } 
-
     /* Open collection attribute database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, COLLECTION_ATTR_FILE );
-    ret = open_db( &db_p_coll_attr, path, type, 0, db_flags);
+    ret = dbpf_db_open(path, 0, &db_p_coll_attr, 0, NULL);
     if (ret != 0)
     {
         printf("Unable to open collection attributes database: %s\n",
-                db_strerror(ret));
+                strerror(ret));
         return ret;
     }
 
     /* Open keyval database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, KEYVAL_FILE );
-    ret = open_db( &db_p_keyval, path, type, 1, db_flags);
+    ret = dbpf_db_open(path, DBPF_DB_COMPARE_KEYVAL, &db_p_keyval, 0, NULL);
     if (ret != 0)
     {
-        printf("Unable to open keyval database: %s\n", db_strerror(ret));
+        printf("Unable to open keyval database: %s\n", strerror(ret));
         return ret;
     }
 
     find_pool_keys(db_p_coll_attr, db_p_keyval);
 
     /* Close the databases. */
-    close_db(db_p_keyval);
-    close_db(db_p_coll_attr);
-
-    dbe_p->close(dbe_p, 0);
+    dbpf_db_close(db_p_keyval);
+    dbpf_db_close(db_p_coll_attr);
 
     free(path);
     return 0;
 }
 
-int open_db( DB **db_p, char *path, int type, int set_keyval_compare, int flags)
+int find_pool_keys(dbpf_db *db_p_coll_attr, dbpf_db *db_p_keyval)
 {
     int ret = 0;
-
-    ret = db_create(db_p, NULL, 0);
-    if (ret != 0) 
-    {
-        close_db( *db_p );
-        printf("Couldn't create db_p for %s: %s\n", path, db_strerror(ret));
-        return ret;
-    }
-
-    if (set_keyval_compare)
-    {
-        (*db_p)->set_bt_compare((*db_p), PINT_trove_dbpf_keyval_compare);
-    }
-
-    ret = (*db_p)->open(*db_p, NULL, path, NULL, type, flags, 0 );
-    if (ret != 0) 
-    {
-        close_db( *db_p );
-        printf("Couldn't open %s: %s\n", path, db_strerror(ret));
-        return ret;
-    }
-    return ret;
-}
-
-void close_db( DB *db_p )
-{
-    int ret = 0;
-    if( db_p )
-    {
-        ret = db_p->close(db_p, 0);
-    }
-
-    if (ret != 0) 
-    {
-        printf("Couldn't close db_p: %s\n", db_strerror(ret));
-    }
-    return;
-}
-
-int find_pool_keys(DB *db_p_coll_attr, DB *db_p_keyval)
-{
-    int ret = 0;
-    DBC *dbc_p = NULL;
+    dbpf_cursor *dbc_p = NULL;
     int i;
     char type_string[11] = { 0 }; /* 32 bit type only needs 10 digits */
     PVFS_ds_type type;
-    DBT key, val;
+    struct dbpf_data key, val;
     int key_size;
     char *key_string = NULL;
     PVFS_handle pool_handle = PVFS_HANDLE_NULL;
 
-    ret = db_p_coll_attr->cursor(db_p_coll_attr, NULL, &dbc_p, 0);
+    ret = dbpf_db_cursor(db_p_coll_attr, &dbc_p, 0);
     if( ret != 0 )
     {
-        printf("Unable to open cursor: %s\n", db_strerror(ret));
+        printf("Unable to open cursor: %s\n", strerror(ret));
         return ret;
     }
 
@@ -213,20 +131,15 @@ int find_pool_keys(DB *db_p_coll_attr, DB *db_p_keyval)
         snprintf(key_string, key_size, "precreate-pool-%s-%s",
                  opts.host, type_string);
 
-        memset(&key, 0, sizeof(key));
         key.data = key_string;
-        key.size = key.ulen = key_size;
-        key.flags = DB_DBT_USERMEM;
-
-        memset(&val, 0, sizeof(val));
+        key.len = key_size;
         val.data = &pool_handle;
-        val.ulen = sizeof(pool_handle);
-        val.flags = DB_DBT_USERMEM;
+        val.len = sizeof(pool_handle);
 
-        ret = dbc_p->c_get(dbc_p, &key, &val, DB_SET);
+        ret = dbpf_db_cursor_get(dbc_p, &key, &val, DBPF_DB_CURSOR_SET, key_size);
         if (ret != 0)
         {
-            printf("Unable to retrieve pool handle: %s\n", db_strerror(ret));
+            printf("Unable to retrieve pool handle: %s\n", strerror(ret));
             return ret;
         }
 
@@ -236,7 +149,7 @@ int find_pool_keys(DB *db_p_coll_attr, DB *db_p_keyval)
     return(0);
 }
 
-void print_keyval( DBT key, DBT val )
+void print_keyval( struct dbpf_data key, struct dbpf_data val )
 {
     struct dbpf_keyval_db_entry *k;
     uint64_t vh, kh;
@@ -245,32 +158,32 @@ void print_keyval( DBT key, DBT val )
 
     k = key.data;
     printf("(%llu)", llu(k->handle));
-    if( key.size == 8 )
+    if( key.len == 8 )
     {
-        printf("()(%d) -> ", key.size);
+        printf("()(%zu) -> ", key.len);
     }
-    else if( key.size == 16 )
+    else if( key.len == 16 )
     {
         char *tmp;
         tmp = k->key;
         kh = *(uint64_t *)tmp;
-        printf("(%llu)(%d) -> ", llu(kh), key.size);
+        printf("(%llu)(%zu) -> ", llu(kh), key.len);
     }
     else
     {
-        printf("(%s)(%d) -> ", k->key,  key.size);
+        printf("(%s)(%zu) -> ", k->key,  key.len);
     }
 
     if( strncmp(k->key, "dh", 3) == 0 || strncmp(k->key, "de", 3) == 0 )
     {
         int s = 0;
-        while(s < val.size )
+        while(s < val.len )
         {
-            vh = *(uint64_t *)(val.data + s);
+            vh = *(uint64_t *)((unsigned char *)val.data + s);
             printf("(%llu)", llu(vh));
             s += sizeof(TROVE_handle);
         }
-        printf("(%d)\n", val.size);
+        printf("(%zu)\n", val.len);
 
     }
 
@@ -280,63 +193,62 @@ void print_keyval( DBT key, DBT val )
         * the PINT_dist struct is packed/encoded before writing to db. that
         * means the first uint32_t bytes are the length of the string, skip
         * it. */
-       char *dname = val.data + sizeof(uint32_t);
-       printf("(%s)(%d)\n", dname, val.size );
+       char *dname = (char *)val.data + sizeof(uint32_t);
+       printf("(%s)(%zu)\n", dname, val.len );
     }
 
-    else if( strlen(k->key) > 2 && val.size == 8 )
+    else if( strlen(k->key) > 2 && val.len == 8 )
     {
         /* should be cases of filename to handle */
         vh = *(uint64_t *)val.data;
-        printf("(%llu)(%d)\n", llu(vh), val.size );
+        printf("(%llu)(%zu)\n", llu(vh), val.len );
     }
 
-    else if( (key.size == 8 || key.size == 16 ) && val.size == 4 )
+    else if( (key.len == 8 || key.len == 16 ) && val.len == 4 )
     {
         vi = *(uint32_t *)val.data;
-        printf("(%u)(%d)\n", vi, val.size );
+        printf("(%u)(%zu)\n", vi, val.len );
     }
     else
     {
         /* just print out the size of the data, try not to segfault */
-        printf("(%d)\n",  val.size);
+        printf("(%zu)\n",  val.len);
     }
 
     return;
 }
 
-void remove_preallocated_handles(DB *db_p_keyval, PVFS_handle pool_handle)
+void remove_preallocated_handles(dbpf_db *db_p_keyval, PVFS_handle pool_handle)
 {
     int ret = 0;
-    DBC *dbc_p = NULL;
-    DBT key, val;
+    dbpf_cursor *dbc_p = NULL;
+    struct dbpf_data key, val;
     struct dbpf_keyval_db_entry key_entry;
     struct dbpf_keyval_db_entry *key_ptr;
+    unsigned char data_buf[1024];
 
-    ret = db_p_keyval->cursor(db_p_keyval, NULL, &dbc_p, 0);
+    ret = dbpf_db_cursor(db_p_keyval, &dbc_p, 1);
     if( ret != 0 )
     {
-        printf("Unable to open cursor: %s\n", db_strerror(ret));
+        printf("Unable to open cursor: %s\n", strerror(ret));
         return;
     }
  
-    memset(&key, 0, sizeof(key));
     memset(&key_entry, 0, sizeof(key_entry));
     key_entry.handle = pool_handle;
     key.data = &key_entry;
-    key.size = key.ulen = sizeof(TROVE_handle);
-    key.flags = DB_DBT_USERMEM;
+    key.len = sizeof(TROVE_handle);
+    val.data = data_buf;
+    val.len = sizeof data_buf;
  
-    memset(&val, 0, sizeof(val));
-
-    ret = dbc_p->c_get(dbc_p, &key, &val, DB_SET);
+    ret = dbpf_db_cursor_get(dbc_p, &key, &val, DBPF_DB_CURSOR_SET, sizeof(TROVE_handle));
     if (ret != 0)
     {
         printf("Unable to remove count of handles in pool %llu: %s\n",
-               llu(pool_handle), db_strerror(ret));
+               llu(pool_handle), strerror(ret));
         return;
     }   
-    if (key.size != 8 || val.size != 4 || key_entry.handle != pool_handle)
+    if (key.len != 8 || val.len != 4 || key_entry.handle != pool_handle)
     {
         printf("Problem removing count of handles in pool %llu\n",
                 llu(pool_handle)); 
@@ -346,37 +258,37 @@ void remove_preallocated_handles(DB *db_p_keyval, PVFS_handle pool_handle)
     print_keyval( key, val );
     if (opts.remove)
     {
-        ret = dbc_p->c_del(dbc_p, 0);
+        ret = dbpf_db_cursor_del(dbc_p);
         if (ret != 0)
         {
             key_ptr = (struct dbpf_keyval_db_entry *) key.data;
 
             printf("Unable to remove count record for pool %llu: %s\n",
-                    llu(key_ptr->handle), db_strerror(ret));
+                    llu(key_ptr->handle), strerror(ret));
             return;
         }
     }
 
-    memset(&key, 0, sizeof(key));
-    memset(&val, 0, sizeof(val));
-    ret = dbc_p->c_get(dbc_p, &key, &val, DB_NEXT);
+    key.len = sizeof(TROVE_handle);
+    val.len = sizeof data_buf;
+    ret = dbpf_db_cursor_get(dbc_p, &key, &val, DBPF_DB_CURSOR_NEXT, sizeof(TROVE_handle));
     key_ptr = (struct dbpf_keyval_db_entry *) key.data;
-    while (ret == 0 && key.size == 16 && val.size == 0 &&
+    while (ret == 0 && key.len == 16 && val.len == 0 &&
            key_ptr->handle == pool_handle)
     {
         printf("Removing: ");
         print_keyval( key, val );
         if (opts.remove)
         {
-            ret = dbc_p->c_del(dbc_p, 0);
+            ret = dbpf_db_cursor_del(dbc_p);
             if (ret != 0)
             {
                 printf("*** REMOVE FAILED ***\n");
             }
         }
-        memset(&key, 0, sizeof(key));
-        memset(&val, 0, sizeof(val));
-        ret = dbc_p->c_get(dbc_p, &key, &val, DB_NEXT);
+        key.len = sizeof(TROVE_handle);
+        val.len = sizeof data_buf;
+        ret = dbpf_db_cursor_get(dbc_p, &key, &val, DBPF_DB_CURSOR_NEXT, sizeof(TROVE_handle));
         key_ptr = (struct dbpf_keyval_db_entry *) key.data;
     }
 /*
@@ -384,7 +296,7 @@ printf("ret=%d, key.size=%u, val.size=%u, key_ptr->handle=%llu, handle=%llu\n",
 ret, key.size, val.size, llu(key_ptr->handle), llu(*((PVFS_handle *) key_ptr->key)));
 */
 
-    dbc_p->c_close( dbc_p );
+    dbpf_db_cursor_close(dbc_p);
     return;
 }
 
@@ -480,38 +392,6 @@ void print_help(char *progname)
                     "\t--host<name>\t\thost whose preallocated "
                     "handles should be removed\n");
     return;
-}
-
-#define DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(_size) \
-    (_size - sizeof(TROVE_handle))
-
-int PINT_trove_dbpf_keyval_compare(
-    DB * dbp, const DBT * a, const DBT * b)
-{
-    struct dbpf_keyval_db_entry db_entry_a;
-    struct dbpf_keyval_db_entry db_entry_b;
-
-    memcpy(&db_entry_a, a->data, sizeof(struct dbpf_keyval_db_entry));
-    memcpy(&db_entry_b, b->data, sizeof(struct dbpf_keyval_db_entry));
-
-    if(db_entry_a.handle != db_entry_b.handle)
-    {
-        return (db_entry_a.handle < db_entry_b.handle) ? -1 : 1;
-    }
-
-    if(a->size > b->size)
-    {
-        return 1;
-    }
-
-    if(a->size < b->size)
-    {
-        return -1;
-    }
-
-    /* must be equal */
-    return (memcmp(db_entry_a.key, db_entry_b.key,
-                    DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->size)));
 }
 
 /*

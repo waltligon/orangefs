@@ -10,6 +10,7 @@
 #include "ncache.h"
 #include "tcache.h"
 #include "pint-util.h"
+#include "pint-sysint-utils.h"
 #include "pvfs2-debug.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
@@ -141,16 +142,22 @@ void PINT_ncache_finalize(void)
 {
     gen_mutex_lock(&ncache_mutex);
 
-    if (ncache == NULL)
+    if(ncache != NULL)
     {
         PINT_tcache_finalize(ncache);
         ncache = NULL;
     }
 
+    if(ncache_pc != NULL)
+    {
+        PINT_perf_finalize(ncache_pc);
+        ncache_pc = NULL;
+    }
+
     gen_mutex_unlock(&ncache_mutex);
     return;
 }
-  
+
 /**
  * Retrieves parameters from the ncache 
  * @see PINT_tcache_options
@@ -467,7 +474,9 @@ struct PINT_perf_counter* PINT_ncache_get_pc(void)
  */
 static int PINT_ncache_initialize_perf_counter(void)
 {
-    ncache_pc = PINT_perf_initialize(ncache_keys);
+    ncache_pc = PINT_perf_initialize(PINT_PERF_COUNTER,
+                                     ncache_keys,
+                                     client_perf_start_rollover);
     if(!ncache_pc)
     {
         gossip_err("Error: PINT_perf_initialize failure.\n");

@@ -111,21 +111,7 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
 	return ERR_PTR(-ENOMEM);
     }
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
     new_op->upcall.req.lookup.sym_follow = PVFS2_LOOKUP_LINK_NO_FOLLOW;
-#elif defined(PVFS_KMOD_LOOKUP_TAKES_NAMEIDATA)
-    /*
-      if we're at a symlink, should we follow it? never attempt to
-      follow negative dentries
-    */
-    new_op->upcall.req.lookup.sym_follow =
-         ((nd &&
-           (nd->flags & LOOKUP_FOLLOW) &&
-           (dentry->d_inode != NULL)) ?
-          PVFS2_LOOKUP_LINK_FOLLOW : PVFS2_LOOKUP_LINK_NO_FOLLOW);
-#else
-    new_op->upcall.req.lookup.sym_follow = flags & LOOKUP_FOLLOW;
-#endif
 
     if (dir)
     {
@@ -217,6 +203,18 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
                          "pvfs2_lookup: Adding *negative* dentry %p\n for %s\n",
                          dentry, dentry->d_name.name);
 
+           /*
+            * set the pvfs2 specific dentry operations pointer for
+            * the negative dentry that we're adding now so that
+            * a potential future lookup of this cached negative
+            * dentry can be properly revalidated.
+            */
+            if (!dentry->d_op) {
+#ifndef HAVE_D_SET_D_OP
+              dentry->d_op = &pvfs2_dentry_operations;
+#endif
+            }
+
             d_add(dentry, inode);
 
             res = NULL;
@@ -235,11 +233,19 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
                      "%s:%s:%d Found good inode [%lu] with count [%d]\n", 
                      __FILE__, __func__, __LINE__, inode->i_ino,
                      (int)atomic_read(&inode->i_count));
+#ifndef HAVE_D_SET_D_OP
+	dentry->d_op = &pvfs2_dentry_operations;
+#endif
 
         res = pvfs2_d_splice_alias(dentry, inode);
 
         gossip_debug(GOSSIP_NAME_DEBUG, "Lookup success (inode ct = %d)\n",
                      (int)atomic_read(&inode->i_count));
+
+	if (res)
+#ifndef HAVE_D_SET_D_OP
+	res->d_op = &pvfs2_dentry_operations;
+#endif
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
         res = NULL;

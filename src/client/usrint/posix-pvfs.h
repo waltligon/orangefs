@@ -16,6 +16,28 @@
 /* define FD flags unique to PVFS here */
 #define PVFS_FD_NOCACHE 0x10000
 
+/*** helper functions - not part of POSIX ***/
+
+/* creates a layout from a path and serverlist */
+extern PVFS_sys_layout *pvfs_layout(const char *path, char *serverlist);
+
+/* creates a layout from an open file descriptor and serverlist */
+extern PVFS_sys_layout *pvfs_layout_fd(int fd, char *serverlist);
+
+/* creates a layout string in buff from a layout struct */
+extern int pvfs_layout_string(PVFS_sys_layout *layout,
+                              void *buff,
+                              int size);
+
+/* frees a layout struct */
+void pvfs_release_layout(PVFS_sys_layout *layout);
+
+/* functions to check fd or path validity */
+extern int pvfs_valid_path(const char *path);
+
+extern int pvfs_valid_fd(int fd);
+
+/*** POSIX based IO functions ***/
 /* pvfs_open */
 extern int pvfs_open(const char *path, int flags, ...);
 

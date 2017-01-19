@@ -13,6 +13,7 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
+#include "pint-perf-counter.h"
 #include "pint-security.h"
 #include "security-util.h"
 #include "pint-cached-config.h"
@@ -101,21 +102,34 @@ nested machine pvfs2_remove_dirdata_handles_work_sm
     {
         run remove_get_dirent_count_setup_tree_getattr;
         success => get_dirent_count_call_tree_getattr;
-        default => remove_dirdata_handles_cleanup;
+        default => get_dirent_count_cleanup_tree_getattr;
     }   
     
     state get_dirent_count_call_tree_getattr
     {
         jump pvfs2_tree_getattr_work_sm;
-        success => remove_dirdata_handles_setup_tree_remove;
+        success => get_dirent_count_examine_tree_getattr;
         default => remove_dirdata_handles_cleanup;
     }   
+
+    state get_dirent_count_examine_tree_getattr
+    {
+        run remove_get_dirent_count_examine_tree_getattr;
+        success => remove_dirdata_handles_setup_tree_remove;
+        default => remove_dirdata_handles_cleanup;
+    }
+
+    state get_dirent_count_cleanup_tree_getattr
+    {
+        run remove_get_dirent_count_cleanup_tree_getattr;
+        default => remove_dirdata_handles_cleanup;
+    }
  
     state remove_dirdata_handles_setup_tree_remove
     {
         run remove_dirdata_handles_setup_tree_remove;
         success => remove_dirdata_handles_call_tree_remove;
-        default => remove_dirdata_handles_cleanup;
+        default => remove_dirdata_handles_cleanup_tree_remove;
     }   
     
     state remove_dirdata_handles_call_tree_remove
@@ -130,6 +144,12 @@ nested machine pvfs2_remove_dirdata_handles_work_sm
         run remove_dirdata_handles_check_remove_success;
         success => remove_dirdata_handles_cleanup;
         default => rebuild_dirdata_handle_local;
+    }
+
+    state remove_dirdata_handles_cleanup_tree_remove
+    {
+        run remove_dirdata_handles_cleanup_tree_remove;
+        default => remove_dirdata_handles_cleanup;
     }
     
     state rebuild_dirdata_handle_local
@@ -280,6 +300,7 @@ static PINT_sm_action remove_check_object_type(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
     if(s_op->attr.objtype == PVFS_TYPE_DATAFILE)
     {
 	/* it must be a datafile, transition to try reading datafile 
@@ -335,6 +356,10 @@ static PINT_sm_action remove_verify_object_metadata(
 
     if (a_p->objtype == PVFS_TYPE_DIRECTORY)
     {
+        /* This is the first point we know this is a rmdir so
+         * increment the counter for rmdir requests
+         */
+
 	js_p->error_code = STATE_TYPE_DIRECTORY;
 
 	gossip_debug(
@@ -582,6 +607,7 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
     int location = 0;
 
     attr_p = &s_op->attr;
+    /* This pushes a frame for the getattr */
     PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, getattr_op,
         attr_p->dirdata_handles[0], s_op->req->u.remove.fs_id,
         location, req, LOCAL_OPERATION);
@@ -604,19 +630,30 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
+static PINT_sm_action remove_get_dirent_count_cleanup_tree_getattr(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *getattr_op = NULL;
+    int task_id = 0, error_code = 0;
+
+    /* Clean up the frame that was created for tree_getattr. */
+    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    tree_getattr_free(getattr_op);
+    PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(getattr_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action remove_get_dirent_count_examine_tree_getattr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = NULL;
     struct PINT_server_op *getattr_op = NULL;
-    struct PINT_server_op *remove_op = NULL;
-    struct PVFS_server_req *req = NULL;
     PVFS_object_attr *attr_p = NULL;
-    int location = 0;
     int task_id = 0, error_code = 0;
     int i = 0;
 
     /* Make sure the count of directory entries that we retrieved was 0. */
+    /* This pops the frame for the getattr */
     getattr_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     attr_p = &s_op->attr;
@@ -644,19 +681,32 @@ static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
     tree_getattr_free(getattr_op);
     PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(getattr_op);
 
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *remove_op = NULL;
+    struct PVFS_server_req *req = NULL;
+    PVFS_object_attr *attr_p = NULL;
+    int location = 0;
+
     attr_p = &s_op->attr;
     assert(attr_p);
 
     /* initialize rebuild array */
     s_op->u.remove.rebuild_dirdata_index_array_remote = 
-        malloc(sizeof(int) * 
-                attr_p->dist_dir_attr.num_servers);
+            malloc(sizeof(int) * attr_p->dist_dir_attr.num_servers);
+
     if(!s_op->u.remove.rebuild_dirdata_index_array_remote )
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
+    /* This pushes a frame for the tree remove */
     PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, remove_op,
         attr_p->dirdata_handles[0], s_op->req->u.remove.fs_id,
         location, req, LOCAL_OPERATION);
@@ -673,6 +723,19 @@ static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action remove_dirdata_handles_cleanup_tree_remove(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *remove_op = NULL;
+    int task_id = 0, error_code = 0;
+
+    /* Clean up the frame that was created for tree_remove. */
+    remove_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    tree_remove_free(remove_op);
+    PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(remove_op);
+    return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action remove_dirdata_handles_check_remove_success(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -682,11 +745,14 @@ static PINT_sm_action remove_dirdata_handles_check_remove_success(
     int task_id = 0, error_code = 0;
     int i = 0;
 
+    /* This pops the frame for the tree remove - success */
     remove_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (error_code != 0)
     {
         js_p->error_code = error_code;
+        tree_remove_free(remove_op);
+        PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(remove_op);
         return SM_ACTION_COMPLETE;
     }
     attr_p = &s_op->attr;
@@ -1073,6 +1139,21 @@ static PINT_sm_action remove_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    if (s_op->attr.objtype == PVFS_TYPE_DIRECTORY)
+    {
+        PINT_perf_count(PINT_server_pc, PINT_PERF_RMDIR, 1, PINT_PERF_ADD);
+        PINT_perf_timer_end(PINT_server_tpc,
+                            PINT_PERF_TRMDIR,
+                            &s_op->start_time);
+    }
+    else if (s_op->attr.objtype == PVFS_TYPE_METAFILE)
+    {
+        PINT_perf_count(PINT_server_pc, PINT_PERF_REMOVE, 1, PINT_PERF_ADD);
+        PINT_perf_timer_end(PINT_server_tpc,
+                            PINT_PERF_TREMOVE,
+                            &s_op->start_time);
+    }
 
     PINT_free_object_attr(&s_op->attr);
     return(server_state_machine_complete(smcb));

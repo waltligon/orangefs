@@ -33,10 +33,34 @@
 #define OID_KEYVAL ".1.3.6.1.4.1.7778.5"
 #define OID_REQSCHED ".1.3.6.1.4.1.7778.6"
 #define OID_REQUESTS ".1.3.6.1.4.1.7778.7"
+
+#define OID_IO_READ ".1.3.6.1.4.1.7778.18"
+#define OID_IO_WRITE ".1.3.6.1.4.1.7778.19"
+
 #define OID_SMALL_READ ".1.3.6.1.4.1.7778.8"
 #define OID_SMALL_WRITE ".1.3.6.1.4.1.7778.9"
 #define OID_FLOW_READ ".1.3.6.1.4.1.7778.10"
 #define OID_FLOW_WRITE ".1.3.6.1.4.1.7778.11"
+#define OID_REQ_CREATE ".1.3.6.1.4.1.7778.12"
+#define OID_REQ_REMOVE ".1.3.6.1.4.1.7778.13"
+#define OID_REQ_MKDIR ".1.3.6.1.4.1.7778.14"
+#define OID_REQ_RMDIR ".1.3.6.1.4.1.7778.15"
+#define OID_REQ_GETATTR ".1.3.6.1.4.1.7778.16"
+#define OID_REQ_SETATTR ".1.3.6.1.4.1.7778.17"
+#define OID_REQ_IO ".1.3.6.1.4.1.7778.20"
+#define OID_REQ_SMALL_IO ".1.3.6.1.4.1.7778.21"
+#define OID_REQ_READDIR ".1.3.6.1.4.1.7778.22"
+
+#define OID_TIMER_LOOKUP ".1.3.6.1.4.1.7778.40"
+#define OID_TIMER_CREAT ".1.3.6.1.4.1.7778.41"
+#define OID_TIMER_REMOVE ".1.3.6.1.4.1.7778.42"
+#define OID_TIMER_MKDIR ".1.3.6.1.4.1.7778.43"
+#define OID_TIMER_RMDIR ".1.3.6.1.4.1.7778.24"
+#define OID_TIMER_GETATTR ".1.3.6.1.4.1.7778.45"
+#define OID_TIMER_SETATTR ".1.3.6.1.4.1.7778.46"
+#define OID_TIMER_IO ".1.3.6.1.4.1.7778.47"
+#define OID_TIMER_SMALL_IO ".1.3.6.1.4.1.7778.48"
+#define OID_TIMER_READDIR ".1.3.6.1.4.1.7778.49"
 
 #define INT_TYPE "INTEGER"
 #define CNT_TYPE "COUNTER"
@@ -64,10 +88,21 @@ static struct MGMT_perf_iod key_table[] =
    {OID_KEYVAL, CNT_TYPE, PINT_PERF_METADATA_KEYVAL_OPS, "Metadata KEYVAL Ops"},
    {OID_REQSCHED, INT_TYPE, PINT_PERF_REQSCHED, "Requests Active"},
    {OID_REQUESTS, CNT_TYPE, PINT_PERF_REQUESTS, "Requests Received"},
+   {OID_IO_READ, CNT_TYPE, PINT_PERF_IOREAD, "Bytes Read by IO"},
+   {OID_IO_WRITE, CNT_TYPE, PINT_PERF_IOWRITE, "Bytes Written by IO"},
    {OID_SMALL_READ, CNT_TYPE, PINT_PERF_SMALL_READ, "Bytes Read by Small_IO"},
    {OID_SMALL_WRITE, CNT_TYPE, PINT_PERF_SMALL_WRITE, "Bytes Written by Small_IO"},
    {OID_FLOW_READ, CNT_TYPE, PINT_PERF_FLOW_READ, "Bytes Read by Flow"},
    {OID_FLOW_WRITE, CNT_TYPE, PINT_PERF_FLOW_WRITE, "Bytes Written by Flow"},
+   {OID_REQ_CREATE, CNT_TYPE, PINT_PERF_CREATE, "create requests called"},
+   {OID_REQ_REMOVE, CNT_TYPE, PINT_PERF_REMOVE, "remove requests called"},
+   {OID_REQ_MKDIR, CNT_TYPE, PINT_PERF_MKDIR, "mkdir requests called"},
+   {OID_REQ_RMDIR, CNT_TYPE, PINT_PERF_RMDIR, "rmdir requests called"},
+   {OID_REQ_GETATTR, CNT_TYPE, PINT_PERF_GETATTR, "getattr requests called"},
+   {OID_REQ_SETATTR, CNT_TYPE, PINT_PERF_SETATTR, "setattr requests called"},
+   {OID_REQ_IO, CNT_TYPE, PINT_PERF_IO, "io requests called"},
+   {OID_REQ_SMALL_IO, CNT_TYPE, PINT_PERF_SMALL_IO, "small io requests called"},
+   {OID_REQ_READDIR, CNT_TYPE, PINT_PERF_READDIR, "readdir requests called"},
    {NULL, NULL, -1, NULL}   /* this halts the key count */
 };
 
@@ -89,7 +124,7 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    int i;
+    int i, k;
     PVFS_credential creds;
     int io_server_count;
     int64_t **perf_matrix;
@@ -98,6 +133,7 @@ int main(int argc, char **argv)
     PVFS_BMI_addr_t *addr_array, server_addr;
     char *cmd_buffer = (char *)malloc(CMD_BUF_SIZE);
     int max_keys, key_count;
+    time_t snaptime = 0;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -160,8 +196,9 @@ int main(int argc, char **argv)
         }
 
         /* count how many I/O servers we have */
-        ret = PVFS_mgmt_count_servers(cur_fs, PVFS_MGMT_IO_SERVER,
-                                    &io_server_count);
+        ret = PVFS_mgmt_count_servers(cur_fs,
+                                      PVFS_MGMT_IO_SERVER,
+                                      &io_server_count);
         if (ret < 0)
         {
             PVFS_perror("PVFS_mgmt_count_servers", ret);
@@ -177,9 +214,9 @@ int main(int argc, char **argv)
 	        return -1;
         }
         ret = PVFS_mgmt_get_server_array(cur_fs,
-                     PVFS_MGMT_IO_SERVER,
-				     addr_array,
-				     &io_server_count);
+                                         PVFS_MGMT_IO_SERVER,
+				                         addr_array,
+				                         &io_server_count);
         if (ret < 0)
         {
 	        PVFS_perror("PVFS_mgmt_get_server_array", ret);
@@ -197,10 +234,10 @@ int main(int argc, char **argv)
         perror("malloc");
         return(-1);
     }
-    for(i=0; i<io_server_count; i++)
+    for(i = 0; i < io_server_count; i++)
     {
-	    perf_matrix[i] = (int64_t *)malloc(HISTORY * (max_keys + 2)
-                                        * sizeof(int64_t));
+	    perf_matrix[i] = (int64_t *)malloc(HISTORY * (max_keys + 2) *
+                                           sizeof(int64_t));
 	    if (perf_matrix[i] == NULL)
 	    {
 	        perror("malloc");
@@ -217,7 +254,7 @@ int main(int argc, char **argv)
 	     perror("malloc");
 	     return -1;
     }
-    memset(next_id_array, 0, io_server_count*sizeof(uint32_t));
+    memset(next_id_array, 0, io_server_count * sizeof(uint32_t));
 
     /* allocate an array to keep up with end times from each server */
     end_time_ms_array = (uint64_t *)malloc(io_server_count * sizeof(uint64_t));
@@ -226,13 +263,13 @@ int main(int argc, char **argv)
 	    perror("malloc");
 	    return -1;
     }
+    memset(end_time_ms_array, 0, io_server_count * sizeof(uint64_t));
 
 
     /* loop for ever, grabbing stats when requested */
     while (1)
     {
         int srv = 0;
-        time_t snaptime = 0;
         const char *returnType = NULL; 
         int64_t returnValue = 0;
         /* wait for a request from SNMP driver */
@@ -264,8 +301,28 @@ int main(int argc, char **argv)
             }
             /* replace newlines with null char */
             for(c = cmd_buffer; *c != '\0'; c++)
+            {
                 if (*c == '\n')
+                {
                     *c = '\0';
+                }
+            }
+            /* this is a valid measurement */
+            for(k = 0;
+                k < max_keys && strcmp(cmd_buffer, key_table[k].key_oid);
+                k++);
+            /* out of for loop k equals selected key */
+            if (k < max_keys)
+            {
+                returnType = key_table[k].key_type;
+            }
+            else
+            {
+                /* invalid command */
+                fprintf(stdout,"NONE\n");
+                fflush(stdout);
+                continue;
+            }
         }
         else
         {
@@ -278,53 +335,29 @@ int main(int argc, char **argv)
         /* good command - read counters */
         if (time(NULL) - snaptime > 60)
         {
+            int history = HISTORY;
             snaptime = time(NULL);
             key_count = max_keys;
 	        ret = PVFS_mgmt_perf_mon_list(cur_fs,
-				          &creds,
-				          perf_matrix, 
-				          end_time_ms_array,
-				          addr_array,
-				          next_id_array,
-				          io_server_count, 
-                          &key_count,
-				          HISTORY,
-				          NULL, NULL);
+				                          &creds,
+                                          PINT_PERF_COUNTER,
+				                          perf_matrix, 
+				                          end_time_ms_array,
+				                          addr_array,
+				                          next_id_array,
+				                          io_server_count, 
+                                          &key_count,
+				                          &history,
+				                          NULL,
+                                          NULL);
 	        if (ret < 0)
 	        {
 	            PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
 	            return -1;
 	        }
+            returnValue = perf_matrix[srv][key_table[k].key_number];
         }
 
-        /* format requested OID */
-        if (perf_matrix[srv][key_count] != 0)
-        {
-            int k;
-            /* this is a valid measurement */
-            for(k = 0; k < max_keys &&
-                    strcmp(cmd_buffer, key_table[k].key_oid); k++);
-            /* out of for loop k equals selected key */
-            if (k < max_keys)
-            {
-                returnType = key_table[k].key_type;
-                returnValue = perf_matrix[srv][key_table[k].key_number];
-            }
-            else
-            {
-                /* invalid command */
-                fprintf(stdout,"NONE\n");
-                fflush(stdout);
-                continue;
-            }
-        }
-        else
-        {
-            /* invalid measurement */
-            fprintf(stdout,"NONE\n");
-            fflush(stdout);
-            continue;
-        }
         fprintf(stdout, "%s\n%llu\n", returnType, llu(returnValue));
         fflush(stdout);
         /* return to top for next command */
@@ -421,6 +454,24 @@ static void usage(int argc, char **argv)
     fprintf(stderr, "Example: %s -m /mnt/pvfs2\n", argv[0]);
     fprintf(stderr, "Usage  : %s [-s bmi_address_string]\n", argv[0]);
     fprintf(stderr, "Example: %s -s tcp://localhost:3334\n", argv[0]);
+    fprintf(stderr, "OID_READ .1.3.6.1.4.1.7778.0\n");
+    fprintf(stderr, "OID_WRITE .1.3.6.1.4.1.7778.1\n");
+    fprintf(stderr, "OID_MREAD .1.3.6.1.4.1.7778.2\n");
+    fprintf(stderr, "OID_MWRITE .1.3.6.1.4.1.7778.3\n");
+    fprintf(stderr, "OID_DSPACE .1.3.6.1.4.1.7778.4\n");
+    fprintf(stderr, "OID_KEYVAL .1.3.6.1.4.1.7778.5\n");
+    fprintf(stderr, "OID_REQSCHED .1.3.6.1.4.1.7778.6\n");
+    fprintf(stderr, "OID_REQUESTS .1.3.6.1.4.1.7778.7\n");
+    fprintf(stderr, "OID_SMALL_READ .1.3.6.1.4.1.7778.8\n");
+    fprintf(stderr, "OID_SMALL_WRITE .1.3.6.1.4.1.7778.9\n");
+    fprintf(stderr, "OID_FLOW_READ .1.3.6.1.4.1.7778.10\n");
+    fprintf(stderr, "OID_FLOW_WRITE .1.3.6.1.4.1.7778.11\n");
+    fprintf(stderr, "OID_REQ_CREATE .1.3.6.1.4.1.7778.12\n");
+    fprintf(stderr, "OID_REQ_REMOVE .1.3.6.1.4.1.7778.13\n");
+    fprintf(stderr, "OID_REQ_MKDIR .1.3.6.1.4.1.7778.14\n");
+    fprintf(stderr, "OID_REQ_RMDIR .1.3.6.1.4.1.7778.15\n");
+    fprintf(stderr, "OID_REQ_GETATTR .1.3.6.1.4.1.7778.16\n");
+    fprintf(stderr, "OID_REQ_SETATTR .1.3.6.1.4.1.7778.17\n");
     return;
 }
 

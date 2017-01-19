@@ -17,6 +17,7 @@
 #include "openfile-util.h"
 #include "iocommon.h"
 #include "pvfs-path.h"
+#include "bmi.h"
 
 #define PVFS_ATTR_DEFAULT_MASK \
         (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE |\
@@ -46,6 +47,133 @@ static int my_glibc_getcwd(char *buf, unsigned long size)
     return syscall(SYS_getcwd, buf, size);
 }
 #endif
+
+/**
+ * functions to verify a valid PVFS file or path
+ */
+int pvfs_valid_path(const char *path)
+{
+    int ret;
+    ret = is_pvfs_path(&path, 0);
+    PVFS_free_expanded(path);
+    /* clear errors */
+    errno = 0;
+    return ret;
+}
+
+int pvfs_valid_fd(int fd)
+{
+    pvfs_descriptor *pd;  
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    if (pd->s->fsops == &glibc_ops)
+    {
+        /* This is not a PVFS file or dir */
+        return 0;
+    }
+    return 1;
+}
+
+/**
+ * helper function for constructing layouts
+ * arguments are the fd and/or path to a
+ * directory or file in the target filesystem
+ * and an ascii list of comma delimited integers
+ * representing the desired servers
+ * caller frees the layout returned and the
+ * server list inside of it.
+ */
+
+PVFS_sys_layout *pvfs_layout(const char *path, char *serverlist)
+{
+    int dfd;
+    PVFS_sys_layout *layout;
+
+    dfd = pvfs_open(path, O_RDONLY);
+    if (dfd < 0)
+    {
+        return NULL;
+    }
+    layout = pvfs_layout_fd(dfd, serverlist);
+    pvfs_close(dfd);
+    return layout;
+}
+
+/* external users must always call pvfs_release_layout
+ * when using this function
+ */
+PVFS_sys_layout *pvfs_layout_fd(int dfd, char *serverlist)
+{
+    int ret;
+    pvfs_descriptor *dpd;
+    PVFS_fs_id fs_id;
+    PVFS_sys_layout *layout;
+
+    dpd = pvfs_find_descriptor(dfd);
+    if (!dpd)
+    {
+        return NULL;
+    }
+    fs_id = dpd->s->pvfs_ref.fs_id;
+
+    layout = (PVFS_sys_layout *)malloc(sizeof(PVFS_sys_layout));
+    if (!layout)
+    {
+        return NULL;
+    }
+    layout->algorithm = PVFS_SYS_LAYOUT_LIST;
+    layout->server_list.count = 0;
+    layout->server_list.servers = NULL;
+    ret = iocommon_parse_serverlist(serverlist,
+                                    &layout->server_list,
+                                    fs_id);
+    if (ret == -1)
+    {
+        free(layout);
+        return NULL;
+    }
+    return layout;
+}
+
+int pvfs_layout_string(PVFS_sys_layout *layout, void *buff, int size)
+{
+    char *srvstr = NULL;
+    int s = 0;
+    int strsz = 0;
+
+    srvstr = (char *)buff;
+    sprintf(srvstr, "%05d", layout->server_list.count);
+    srvstr += 6;
+    strsz = 6;
+    for (s = 0; s < layout->server_list.count; s++)
+    {
+        const char *tstr = NULL;
+        tstr = BMI_addr_rev_lookup(layout->server_list.servers[s]);
+        if (!tstr)
+        {
+            return -1;
+        }
+        if ((strsz += (strnlen(tstr, size - strsz) + 1)) < size)
+        {
+            strcpy(srvstr, tstr);
+            srvstr[-1] = ' ';    /* delimit entries with a space */
+            srvstr = (char *)buff + strsz;
+        }
+    }
+    /* make sure buff is terminated */
+    memset(srvstr, 0, size - strsz);
+    return 0;
+}
+
+void pvfs_release_layout(PVFS_sys_layout *layout)
+{
+    free(layout->server_list.servers);
+    free(layout);
+}
 
 /**
  *  pvfs_open
@@ -1339,7 +1467,8 @@ int pvfs_futimesat(int dirfd,
         attr.atime = times[0].tv_sec;
         attr.mtime = times[1].tv_sec;
     }
-    attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_MTIME;
+    attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_ATIME_SET |
+                PVFS_ATTR_SYS_MTIME | PVFS_ATTR_SYS_MTIME_SET;
     rc = iocommon_setattr(pd2->s->pvfs_ref, &attr);
     if (path)
     {
@@ -1395,7 +1524,8 @@ int pvfs_futimes(int fd, const struct timeval times[2])
         attr.atime = times[0].tv_sec;
         attr.mtime = times[1].tv_sec;
     }
-    attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_MTIME;
+    attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_ATIME_SET |
+                PVFS_ATTR_SYS_MTIME | PVFS_ATTR_SYS_MTIME_SET;
     rc = iocommon_setattr(pd->s->pvfs_ref, &attr);
     pvfs_close(pd->fd);
     return rc;
@@ -1930,12 +2060,22 @@ int pvfs_linkat(int olddirfd, const char *oldpath,
 }
 
 /**
- * this reads exactly one dirent, count is ignored
+ * This reads exactly one dirent, count is ignored.
+ *
+ * On success, 1 is returned.
+ * On end of directory, 0 is returned.
+ * On error, -1 is returned.
  */
 int pvfs_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 {
+    int ret;
     gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_readdir: called with %d\n", fd);
-    return pvfs_getdents(fd, dirp, sizeof(struct dirent));
+    ret = pvfs_getdents(fd, dirp, sizeof(struct dirent));
+    if(ret > 0)
+    {
+        return 1;
+    }
+    return ret;
 }
 
 /**

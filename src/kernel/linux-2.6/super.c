@@ -1115,7 +1115,7 @@ struct super_block* pvfs2_get_sb(struct super_block *sb,
         ret = -ENOMEM;
         goto error_exit;
     }
-    gossip_debug(GOSSIP_SUPER_DEBUG, "Allocated root inode [%p] with mode %o\n",
+    gossip_debug(GOSSIP_SUPER_DEBUG, "%s:Allocated root inode [%p] with mode %o\n",__func__,
                  root, root->i_mode);
 
     /* allocates and places root dentry in dcache */
@@ -1431,7 +1431,7 @@ int pvfs2_fill_sb(struct super_block *sb,
         return -ENOMEM;
     }
     gossip_debug(GOSSIP_SUPER_DEBUG,
-                 "Allocated root inode [%p] with mode %x\n",
+                 "%s:Allocated root inode [%p] with mode %x\n",__func__,
                  root, root->i_mode);
 
     /* allocates and places root dentry in dcache */
@@ -1479,7 +1479,7 @@ struct super_block *pvfs2_get_sb(struct file_system_type *fst,
 #endif
 
     gossip_debug(GOSSIP_SUPER_DEBUG,
-                 "pvfs2_get_sb: called with devname %s\n", devname);
+                 "%s: called with devname %s\n", __func__, devname);
 
     if (devname)
     {

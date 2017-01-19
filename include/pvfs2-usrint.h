@@ -24,19 +24,28 @@
 /* Must have LARGEFILE and LARGEFILE64 for PVFS usrint */
 #ifdef _LARGEFILE_SOURCE
 #undef _LARGEFILE_SOURCE
-#define _LARGEFILE_SOURCE 1
 #endif
+#define _LARGEFILE_SOURCE 1
 #ifdef _LARGEFILE64_SOURCE
 #undef _LARGEFILE64_SOURCE
-#define _LARGEFILE64_SOURCE 1
 #endif
+#define _LARGEFILE64_SOURCE 1
 /* If programmer didn't specify this, force it to 64bit */
 /* This only affects the default interface */
 #ifndef _FILE_OFFSET_BITS
 #define _FILE_OFFSET_BITS 64
 #endif
+#ifdef _FORTIFY_SOURCE
+#undef _FORTIFY_SOURCE
+#endif
+#define _FORTIFY_SOURCE 0
 
 #include <features.h>
+
+#ifdef __USE_FORTIFY_LEVEL
+#undef __USE_FORTIFY_LEVEL
+#endif
+#define __USE_FORTIFY_LEVEL 0
 
 #include <fcntl.h>
 #include <utime.h>
@@ -87,6 +96,21 @@ enum
     PVFS_FETCH_AND_ADD = 0xADD
 };
 
+/* functions to check fd or path validity */
+extern int pvfs_valid_path(const char *path);
+
+extern int pvfs_valid_fd(int fd);
+
+/* functions to process server lists */
+extern PVFS_sys_layout *pvfs_layout(const char *path,char *serverlist);
+
+extern PVFS_sys_layout *pvfs_layout_fd(int dfd, char *serverlist);
+
+extern int pvfs_layout_string(PVFS_sys_layout *layout,
+                              void *buff,
+                              int size);
+
+extern void pvfs_release_layout(PVFS_sys_layout *layout);
 
 /* pvfs_open */
 extern int pvfs_open(const char *path, int flags, ...);

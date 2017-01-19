@@ -55,7 +55,7 @@ PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op)
             case PVFS2_VFS_OP_TRUNCATE:
                 fsid = op->upcall.req.truncate.refn.fs_id;
                 break;
-            case PVFS2_VFS_OP_MMAP_RA_FLUSH:
+            case PVFS2_VFS_OP_RA_FLUSH:
                 fsid = op->upcall.req.ra_cache_flush.refn.fs_id;
                 break;
             case PVFS2_VFS_OP_FS_UMOUNT:
@@ -687,7 +687,8 @@ int pvfs2_flush_inode(struct inode *inode)
     {
         gossip_debug(GOSSIP_UTILS_DEBUG,
                      "pvfs2_flush_inode skipping setattr()\n");
-        return 0;
+        ret = 0;
+        goto skip;
     }
         
     memset(s,0,HANDLESTRINGSIZE);
@@ -697,6 +698,8 @@ int pvfs2_flush_inode(struct inode *inode)
                  inode->i_mode);
 
     ret = pvfs2_inode_setattr(inode, &wbattr);
+
+skip:
     kfree(s);
     return ret;
 }
@@ -712,14 +715,16 @@ int pvfs2_flush_inode(struct inode *inode)
 /* directory entry key */
 #define DIRENT_KEY  "system.pvfs2." DIRECTORY_ENTRY_KEYSTR
 
+/* NOTE - kernel/fs should never add or remove things from the value of
+ * an xattr - this was a misguided approach
+ */
+#if 0
 /* Extended attributes helper functions */
 static char *xattr_non_zero_terminated[] = {
     DFILE_KEY,
     DIST_KEY,
     ROOT_KEY,
 };
-
-/* Extended attributes helper functions */
 
 /*
  * this function returns 
@@ -728,6 +733,7 @@ static char *xattr_non_zero_terminated[] = {
  */
 static int xattr_zero_terminated(const char *name)
 {
+    return 0;
     int i;
     static int xattr_count = sizeof(xattr_non_zero_terminated)/sizeof(char *);
     for (i = 0;i < xattr_count; i++)
@@ -737,6 +743,9 @@ static int xattr_zero_terminated(const char *name)
     }
     return 1;
 }
+#endif
+
+/* Extended attributes helper functions */
 
 static char *xattr_resvd_keys[] = {
     DFILE_KEY,
@@ -787,7 +796,8 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
         gossip_err("pvfs2_inode_getxattr: bogus NULL pointers\n");
         return -EINVAL;
     }
-    if (size < 0 || (strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
+    if (size < 0 ||
+        (strlen(name) + strlen(prefix) + 1) >= PVFS_MAX_XATTR_NAMELEN)
     {
         gossip_err("Invalid size (%d) or key length (%d)\n", 
                 (int) size, (int)(strlen(name)+strlen(prefix)));
@@ -845,33 +855,15 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
          */
         if (ret == 0)
         {
-            ssize_t new_length;
             length = new_op->downcall.resp.getxattr.val_sz;
-            /*
-             * if the xattr corresponding to name was not terminated with a \0
-             * then we return the entire response length
-             */
-            if (xattr_zero_terminated(name) == 0)
-            {
-                new_length = length;
-            }
-            /*
-             * if it was terminated by a \0 then we return 1 less for the getfattr
-             * programs to play nicely with displaying it
-             */
-            else {
-                new_length = length - 1;
-            }
-            /* Just return the length of the queried attribute after
-             * subtracting the \0 thingie */
             if (size == 0)
             {
-                ret = new_length;
+                ret = length;
             }
             else
             {
                 /* check to see if key length is > provided buffer size */
-                if (new_length > size)
+                if (length > size)
                 {
                     ret = -ERANGE;
                 }
@@ -879,9 +871,8 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
                 {
                     /* No size problems */
                     memset(buffer, 0, size);
-                    memcpy(buffer, new_op->downcall.resp.getxattr.val, 
-                            new_length);
-                    ret = new_length;
+                    memcpy(buffer, new_op->downcall.resp.getxattr.val, length);
+                    ret = length;
                     s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
                     gossip_debug(GOSSIP_XATTR_DEBUG,
                         "pvfs2_inode_getxattr: inode %s key %s "
@@ -939,7 +930,7 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
 
     if (prefix)
     {
-        if(strlen(name)+strlen(prefix) >= PVFS_MAX_XATTR_NAMELEN)
+        if(strlen(name) + strlen(prefix) + 1 >= PVFS_MAX_XATTR_NAMELEN)
         {
 		gossip_err("pvfs2_inode_setxattr: bogus key size (%d)\n", 
 				(int)(strlen(name)+strlen(prefix)));
@@ -948,7 +939,7 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
     }
     else
     {
-        if(strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
+        if(strlen(name) + 1 >= PVFS_MAX_XATTR_NAMELEN)
         {
 		gossip_err("pvfs2_inode_setxattr: bogus key size (%d)\n",
 			   (int)(strlen(name)));
@@ -999,25 +990,27 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
          * later on...
          */
         ret = snprintf((char*)new_op->upcall.req.setxattr.keyval.key,
-            PVFS_MAX_XATTR_NAMELEN, "%s%s", prefix, name);
-        new_op->upcall.req.setxattr.keyval.key_sz = 
-            ret + 1;
+                       PVFS_MAX_XATTR_NAMELEN, "%s%s", prefix, name);
+        new_op->upcall.req.setxattr.keyval.key_sz = ret + 1;
         memcpy(new_op->upcall.req.setxattr.keyval.val, value, size);
-        new_op->upcall.req.setxattr.keyval.val[size] = '\0';
-        /* For some reason, val_sz should include the \0 at the end as well */
-        new_op->upcall.req.setxattr.keyval.val_sz = size + 1;
+        /* xattr buffers should never have anything added or removed,
+         * nor should the size ever be altered - WBL
+         */
+        new_op->upcall.req.setxattr.keyval.val_sz = size;
 
-        gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_setxattr: key %s, key_sz %d "
-                " value size %zd\n", 
-                 (char*)new_op->upcall.req.setxattr.keyval.key, 
-                 (int) new_op->upcall.req.setxattr.keyval.key_sz,
-                 size + 1);
+        gossip_debug(GOSSIP_XATTR_DEBUG,
+                     "pvfs2_inode_setxattr: key %s, key_sz %d "
+                     " value size %zd\n", 
+                      (char*)new_op->upcall.req.setxattr.keyval.key, 
+                      (int) new_op->upcall.req.setxattr.keyval.key_sz,
+                      size + 1);
 
         ret = service_operation(
             new_op, "pvfs2_inode_setxattr", 
             get_interruptible_flag(inode));
 
-        gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_setxattr: returning %d\n", ret);
+        gossip_debug(GOSSIP_XATTR_DEBUG,
+                     "pvfs2_inode_setxattr: returning %d\n", ret);
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
@@ -2043,8 +2036,8 @@ int pvfs2_fill_handle(struct inode *inode, struct file_handle *fhandle)
 
 #endif /* HAVE_FILL_HANDLE_INODE_OPERATIONS */
 
-#ifdef USE_MMAP_RA_CACHE
-int pvfs2_flush_mmap_racache(struct inode *inode)
+#ifdef USE_RA_CACHE
+int pvfs2_flush_racache(struct inode *inode)
 {
     int ret = -EINVAL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
@@ -2053,25 +2046,25 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
     char *s2 = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
     gossip_debug(GOSSIP_UTILS_DEBUG,
-                 "pvfs2_flush_mmap_racache %s: Handle is %s | fs_id %d\n",
-                 k2s(get_khandle_from_ino(inode),s),
-                 k2s(&(pvfs2_inode->refn.khandle),s),
+                 "pvfs2_flush_racache %s: Handle is %s | fs_id %d\n",
+                 k2s(get_khandle_from_ino(inode),s1),
+                 k2s(&(pvfs2_inode->refn.khandle),s2),
                  pvfs2_inode->refn.fs_id);
 
     kfree(s1);
     kfree(s2);
 
-    new_op = op_alloc(PVFS2_VFS_OP_MMAP_RA_FLUSH);
+    new_op = op_alloc(PVFS2_VFS_OP_RA_FLUSH);
     if (!new_op)
     {
         return -ENOMEM;
     }
     new_op->upcall.req.ra_cache_flush.refn = pvfs2_inode->refn;
 
-    ret = service_operation(new_op, "pvfs2_flush_mmap_racache",
+    ret = service_operation(new_op, "pvfs2_flush_racache",
                       get_interruptible_flag(inode));
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_mmap_racache got return "
+    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_racache got return "
                 "value of %d\n",ret);
 
     op_release(new_op);

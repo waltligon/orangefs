@@ -99,6 +99,7 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb,
     s_op->access_type = PINT_server_req_get_access_type(s_op->req);
     s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
 
+
     /* add the user to the uid mgmt system */
 /* TODO: not currently supported w/new security system
     ret = PINT_add_user_to_uid_mgmt(s_op->req->credentials.uid);
@@ -122,17 +123,6 @@ static PINT_sm_action prelude_req_sched(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
 
-    if (s_op->prelude_mask & PRELUDE_SCHEDULER_DONE)
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "(%p) %s (prelude sm) state: req_sched already done... "
-                     "skipping.\n", s_op,
-                     PINT_map_server_op_to_string(s_op->req->op));
-
-        js_p->error_code = 0;
-        return SM_ACTION_COMPLETE;
-    }   
- 
     gossip_debug(GOSSIP_MIRROR_DEBUG,
                  "Executing pvfs2_prelude_work_sm:prelude_req_sched\n");
     gossip_debug(GOSSIP_MIRROR_DEBUG,
@@ -172,17 +162,6 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
-
-    if (s_op->prelude_mask & PRELUDE_GETATTR_DONE)
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "(%p) %s (prelude sm) state: getattr already done... "
-                     "skipping.\n", s_op,
-                     PINT_map_server_op_to_string(s_op->req->op));
-
-        js_p->error_code = 0;
-        return SM_ACTION_COMPLETE;
-    }
 
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "start\n");
 
@@ -437,15 +416,6 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
     s_op->target_object_attr = &s_op->attr;
 
-    if (s_op->prelude_mask & PRELUDE_PERM_CHECK_DONE)
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "(%p) %s (prelude sm) state: perm check already done... "
-                     "skipping.\n", s_op,
-                     PINT_map_server_op_to_string(s_op->req->op));
-        return SM_ACTION_COMPLETE;
-    }
-
     PINT_debug_capability(&s_op->req->capability, "Received");
 
     if (s_op->target_fs_id != PVFS_FS_ID_NULL)
@@ -589,6 +559,9 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     if (ret)
     {
         ret = PINT_perm_check(s_op);
+        gossip_debug(GOSSIP_SERVER_DEBUG,"%s:return from PINT_perm_check=%d\n"
+                                        ,__func__
+                                        ,ret);
     }
     else
     {        
@@ -623,8 +596,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     js_p->error_code = ret;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "(%p) %s (prelude sm) state: perm_check (status = %d)\n",
-                 s_op, PINT_map_server_op_to_string(s_op->req->op),
+                 "(%p) %s (req=%d) (prelude sm) state: perm_check (status = %d)\n",
+                 s_op, PINT_map_server_op_to_string(s_op->req->op),s_op->req->op,
                  js_p->error_code);
 
     FINISH_PROFILER("pv2", profiler, 1);

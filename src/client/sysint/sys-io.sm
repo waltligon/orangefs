@@ -27,12 +27,18 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "client-capcache.h"
+#include "init-vars.h"
 
 #define IO_MAX_SEGMENT_NUM 50 
 #define IO_ATTR_MASKS (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|\
                        PVFS_ATTR_CAPABILITY)
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 enum
 {
@@ -49,6 +55,7 @@ enum
     IO_NO_MIRRORING,
     IO_FATAL_ERROR,
     IO_RENEW_CAPABILITY,
+    IO_ATIME_UPDATE,
 };
 
 /* Helper functions local to sys-io.sm. */
@@ -117,6 +124,10 @@ static int io_contexts_init(PINT_client_sm *sm_p, int count,
 
 static void io_contexts_destroy(PINT_client_sm *sm_p);
 
+static int io_atime_setattr_comp_fn(void *v_p,
+                                    struct PVFS_server_resp *resp_p,
+                                    int index);
+
 static int unstuff_needed(PVFS_Request mem_req,
                           PVFS_offset file_req_offset,
                           PINT_dist *dist_p,
@@ -170,6 +181,20 @@ machine pvfs2_client_io_sm
     state inspect_attr
     {
         run io_inspect_attr;
+        success => unstuff_needed_check;
+        IO_ATIME_UPDATE => io_atime_setattr_xfer_msgpair;
+        default => io_cleanup;
+    }
+
+    state io_atime_setattr_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => unstuff_needed_check;
+    }
+
+    state unstuff_needed_check
+    {
+        run io_unstuff_needed_check;
         IO_UNSTUFF => unstuff_setup_msgpair;
         IO_GETATTR_SERVER => unstuff_setup_msgpair;
         success => io_datafile_setup_msgpairs;
@@ -283,6 +308,7 @@ machine pvfs2_client_io_sm
     state io_cleanup
     {
         run io_cleanup;
+        IO_RENEW_CAPABILITY => io_renew_capability;
         default => terminate;
     }
 }
@@ -472,6 +498,12 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
         io_datafile_index_array_destroy(sm_p);
         io_contexts_destroy(sm_p);
 
+        if (sm_p->u.io.dfile_size_array)
+        {
+           /* added this to avoid memory leak during retries and/or capability renewals */
+           PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->u.io.dfile_size_array);
+        }
+
         if (PINT_smcb_cancelled(smcb))
         {
             js_p->error_code = -PVFS_ECANCEL;
@@ -481,6 +513,13 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
         if (js_p->error_code == IO_RENEW_CAPABILITY)
         {
             gossip_debug(GOSSIP_IO_DEBUG, "  sys-io renewing capability.\n");
+   
+            /* reset the total_size to zero, since we have to retry all IO to each server, when
+             * ANY of the servers complain about an out-of-date capability.  Otherwise, we may
+             * get the wrong total amount!
+             */
+            sm_p->u.io.total_size=0;
+
             js_p->error_code = 0;
             return SM_ACTION_COMPLETE;
         }
@@ -505,7 +544,13 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
 static PINT_sm_action io_inspect_attr(struct PINT_smcb *smcb,
                                       job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_client_sm *sm_p;
+    PVFS_time curtime;
+    int ret;
+
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    js_p->error_code = 0;
+
     if (PINT_smcb_cancelled(smcb))
     {
         js_p->error_code = -PVFS_ECANCEL;
@@ -524,6 +569,152 @@ static PINT_sm_action io_inspect_attr(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_EINVAL;
         return(SM_ACTION_COMPLETE);
     }
+
+    /* Note: see initialize.c to see how relatime gets set.
+     *   if relatime < 0,  then relatime feature disabled
+     *   if relatime == 0, then always update atime
+     *   if relatime > 0,  then atime is updated only if relatime seconds have
+     *                     elapsed since last atime update. (We won't update
+     *                     atime for every write like the Linux Kernel's
+     *                     relatime. Ideally, do that server side.)
+     */
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "Checking if atime update necessary using "
+                 "relatime_timeout=%d\n",
+                 relatime_timeout);
+    curtime = PINT_util_get_current_time();
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "attr->atime     = %llu\n",
+                 llu(sm_p->getattr.attr.atime));
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "attr->mtime     = %llu\n",
+                 llu(sm_p->getattr.attr.mtime));
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "currtime = %llu\n",
+                 llu(curtime));
+    if(relatime_timeout >= 0 &&
+       (sm_p->getattr.attr.atime + relatime_timeout) <= curtime)
+    {
+        PVFS_sys_attr atime_update_attr;
+        PINT_sm_msgpair_state *msg_p;
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "relatime logic dictates atime WILL BE updated!\n");
+        memset(&atime_update_attr, 0, sizeof(atime_update_attr));
+        atime_update_attr.atime = curtime;
+        atime_update_attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_ATIME_SET;
+
+        PINT_msgpair_init(&sm_p->msgarray_op);
+        msg_p = &sm_p->msgarray_op.msgpair;
+
+        PINT_SERVREQ_SETATTR_FILL(msg_p->req,
+                                  sm_p->getattr.attr.capability,
+                                  *sm_p->cred_p,
+                                  sm_p->object_ref.fs_id,
+                                  sm_p->object_ref.handle,
+                                  PVFS_TYPE_METAFILE,
+                                  atime_update_attr,
+                                  0,
+                                  sm_p->hints);
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "%s: I/O atime setattr mask (sent to server): %x\n",
+                     __func__,
+                     msg_p->req.u.setattr.attr.mask);
+
+#define DO_ACACHE_UPDATE 1
+#if DO_ACACHE_UPDATE == 1
+        /* Used to update acache in completion function. */
+        sm_p->getattr.attr.atime = curtime;
+#endif
+
+        msg_p->fs_id = sm_p->object_ref.fs_id;
+        msg_p->handle = sm_p->object_ref.handle;
+        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+        msg_p->comp_fn = io_atime_setattr_comp_fn;
+
+        ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
+                                               msg_p->handle,
+                                               msg_p->fs_id);
+
+        if (ret)
+        {
+            gossip_err("Failed to map meta server address. "
+                       "Continuing so I/O is not impacted by this failure.\n");
+            js_p->error_code = 0;
+            return(SM_ACTION_COMPLETE);
+        }
+
+        PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+        js_p->error_code = IO_ATIME_UPDATE;
+        return(SM_ACTION_COMPLETE);
+    }
+
+    js_p->error_code = 0;
+    return(SM_ACTION_COMPLETE);
+}
+
+static int io_atime_setattr_comp_fn(void *v_p,
+                                    struct PVFS_server_resp *resp_p,
+                                    int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p;
+    PVFS_object_ref tmp_ref;
+
+    static unsigned int counter=0;
+    static unsigned int counter_max=10000;
+
+    sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+
+    tmp_ref.handle = sm_p->object_ref.handle;
+    tmp_ref.fs_id = sm_p->object_ref.fs_id;
+
+
+    if(resp_p->status == 0)
+    {
+#if DO_ACACHE_UPDATE == 1
+        /* TODO: resolve issues with acache_update. */
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "%s: I/O atime attr mask (for acache update): %x\n",
+                     __func__,
+                     sm_p->getattr.attr.mask);
+        PINT_acache_update(tmp_ref,
+                           &sm_p->getattr.attr,
+                           (sm_p->getattr.attr.mask & PVFS_ATTR_DATA_SIZE ?
+                           &sm_p->getattr.size : NULL));
+#else
+        PINT_acache_invalidate(tmp_ref);
+#endif
+    }
+    else
+    {
+        /* display error message every 10th time it happens. This is only temporary until we
+         * find the problem.
+         */
+        if (counter%10 == 0)
+        {
+           gossip_err("%s:count(%d):Error returned from setattr:%d\n",__func__,counter,resp_p->status);
+           counter++;
+           if (counter==counter_max)
+           {
+              counter=0;
+           }
+           
+        }
+     
+        //gossip_err("I/O atime setattr failed. "
+        //           "Continuing so I/O is not impacted by this failure.\n");
+    }
+
+    /* Always return success. */
+    return 0;
+}
+
+static PINT_sm_action io_unstuff_needed_check(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* determine if we need to unstuff or not to service this request */
     js_p->error_code = unstuff_needed(sm_p->u.io.mem_req,
@@ -2049,7 +2240,27 @@ static PINT_sm_action io_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_uid local_uid;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_cleanup\n", sm_p);
+
+    /* capability most likely expired */
+    if (js_p->error_code == -PVFS_EAGAIN)
+    {
+        /* invalidate the capability from the capcache, so the next getattr will actually
+         * generate a NEW capability!
+         */
+        local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+        if ( local_uid == -1 )
+        {
+           local_uid = PINT_util_getuid();
+           PVFS_hint_add(&sm_p->hints,PVFS_HINT_LOCAL_UID_NAME,sizeof(PVFS_uid),&local_uid);
+        }
+        PINT_client_capcache_invalidate(sm_p->object_ref,local_uid);
+
+        js_p->error_code = IO_RENEW_CAPABILITY;
+        return SM_ACTION_COMPLETE;
+    }
 
     io_contexts_destroy(sm_p);
 
@@ -2123,9 +2334,16 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
 
         if (cur_ctx->msg.recv_status.error_code)
         {
-            PVFS_perror_gossip(
-                    "io_decode_ack_response (recv_status.error_code)",
-                    cur_ctx->msg.recv_status.error_code);
+            /* EAGAIN may signal that a capability has timed out and can happen
+             * many, many times.  So, don't display an error message in this case.
+             */
+            if (cur_ctx->msg.recv_status.error_code != -PVFS_EAGAIN &&
+                cur_ctx->msg.recv_status.error_code != -EAGAIN)
+            {
+               PVFS_perror_gossip(
+                       "io_decode_ack_response (recv_status.error_code)",
+                       cur_ctx->msg.recv_status.error_code);
+            }
             ret = cur_ctx->msg.recv_status.error_code;
         }
         else if (cur_ctx->msg.op_status)
@@ -3282,6 +3500,12 @@ static void io_contexts_destroy(PINT_client_sm *sm_p)
         PINT_flow_clear(&(sm_p->u.io.contexts[i].flow_desc));
     }
 
+    /* cleanup memory allocated for the capabilities */
+    for (i=0; i<sm_p->u.io.context_count; i++)
+    {
+        PINT_cleanup_capability(&(sm_p->u.io.contexts[i].msg.req.capability));
+    }
+
     free(sm_p->u.io.contexts);
     sm_p->u.io.contexts = NULL;
     sm_p->u.io.context_count = 0;
@@ -3410,12 +3634,6 @@ static int unstuff_comp_fn(void *v_p,
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "Updating attributes after unstuff\n");
 
-#if 0 /* Don't cache size_array. */
-        PINT_acache_update(sm_p->object_ref,
-                           &resp_p->u.unstuff.attr,
-                           NULL,
-                           NULL); /* TODO should we try to cache size_array here? */
-#endif
         PINT_acache_update(sm_p->object_ref,
                            &resp_p->u.unstuff.attr,
                            NULL);
@@ -3431,13 +3649,6 @@ static int unstuff_comp_fn(void *v_p,
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "Updating attributes before reading "
                      "beyond stuffing boundary.\n");
-
-#if 0 /* Don't cache size_array. */
-        PINT_acache_update(sm_p->object_ref,
-                           &resp_p->u.getattr.attr,
-                           NULL,
-                           NULL); /* TODO should we try to cache size_array here? */
-#endif
         PINT_acache_update(sm_p->object_ref,
                            &resp_p->u.getattr.attr,
                            NULL);

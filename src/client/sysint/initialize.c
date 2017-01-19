@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef HAVE_MALLOC_H
-#include <malloc.h>
+/* #include <malloc.h> */
 #endif
 #include <errno.h>
 #include <assert.h>
@@ -18,7 +18,6 @@
 #include "pvfs2-internal.h"
 #include "acache.h"
 #include "ncache.h"
-#include "rcache.h"
 #include "client-capcache.h"
 #include "pint-cached-config.h"
 #include "pvfs2-sysint.h"
@@ -34,10 +33,16 @@
 #include "job-time-mgr.h"
 #include "pint-util.h"
 #include "pint-event.h"
+#include "init-vars.h"
 
 PINT_smcb *g_smcb = NULL; 
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 PINT_event_id PINT_client_sys_event_id;
 
@@ -63,8 +68,7 @@ typedef enum
     CLIENT_JOB_TIME_MGR_INIT = (1 << 9),
     CLIENT_DIST_INIT         = (1 << 10),
     CLIENT_SECURITY_INIT     = (1 << 11),
-    CLIENT_RCACHE_INIT       = (1 << 12),
-    CLIENT_CAPCACHE_INIT     = (1 << 13)
+    CLIENT_CAPCACHE_INIT     = (1 << 12)
 } PINT_client_status_flag;
 
 /* PVFS_sys_initialize()
@@ -96,6 +100,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     PINT_smcb *smcb = NULL;
     uint64_t debug_mask = 0;
     char *event_mask = NULL;
+	char *relatime_timeout_str = NULL;
 
     if (pvfs_sys_init_flag)
     {
@@ -133,6 +138,30 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     if (debug_file)
     {
         gossip_enable_file(debug_file, "w");
+    }
+
+    /* Gather preferrred relatime_timeout:
+     *   if relatime < 0, then relatime feature disabled
+     *   if relatime == 0, then always update atime
+     *   if relatime > 0, then atime is updated only if relatime seconds have
+     *                    elapsed since last atime update. (We won't update
+     *                    atime for every write like the Linux Kernel's
+     *                    relatime. Ideally, do that server side.)
+     */
+    relatime_timeout_str = getenv("PVFS2_RELATIME_TIMEOUT");
+    if(relatime_timeout_str != NULL)
+    {
+        relatime_timeout = atoi(relatime_timeout_str);
+#if 0
+        gossip_err("%s: Detected environment variable --> "
+                   "PVFS2_RELATIME_TIMEOUT=%d\n",
+                   __func__,
+                   relatime_timeout);
+#endif
+    }
+    else
+    {
+        relatime_timeout = 24 * 60 * 60; /* Default timeout of 1 Day. */
     }
 
     ret = PINT_event_init(PINT_EVENT_TRACE_TAU);
@@ -273,15 +302,6 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
         goto error_exit;        
     }        
     client_status_flag |= CLIENT_NCACHE_INIT;
-
-    /* initialize the readdir cache and set the default timeout */
-    ret = PINT_rcache_initialize();
-    if (ret < 0)
-    {
-        gossip_lerr("Error initializing readdir cache\n");
-        goto error_exit;        
-    }
-    client_status_flag |= CLIENT_RCACHE_INIT;
 
     /* initialize the server configuration manager */
     ret = PINT_server_config_mgr_initialize();

@@ -1,4 +1,5 @@
 dnl **************************************************************
+dnl
 dnl PVFS2 AUTOCONF SCRIPT
 dnl
 dnl Process this file with autoconf to produce a configure script.
@@ -18,10 +19,10 @@ dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=2
 PVFS2_VERSION_MINOR=9
-PVFS2_VERSION_SUB=0
-#PVFS2_VERSION_RELEASE="orangefs"
+PVFS2_VERSION_SUB=6
+PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
-PVFS2_VERSION_PRE="orangefs-$CONFIGURE_TIME"
+PVFS2_VERSION_PRE="-DEVEL-$CONFIGURE_TIME"
 
 PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE$PVFS2_VERSION_PRE
 AC_SUBST(PVFS2_VERSION)
@@ -254,13 +255,30 @@ AC_ARG_ENABLE(server,
 [  --disable-server        Disables building of PVFS2 server],
 [if test "x$enableval" = "xyes" ; then
     BUILD_SERVER=1
-    NEED_BERKELEY_DB=yes
 else
     BUILD_SERVER=""
 fi],
-    BUILD_SERVER=1
-    NEED_BERKELEY_DB=yes)
+    BUILD_SERVER=1)
 AC_SUBST(BUILD_SERVER)
+
+AC_ARG_WITH(db-backend,
+[  --with-db-backend        Use specified database (bdb or lmdb).],
+if test "${withval}" = "bdb"
+then
+    DATABASE_BACKEND=bdb
+    NEED_BERKELEY_DB=yes
+elif test "${withval}" = "lmdb"
+then
+    DATABASE_BACKEND=lmdb
+else
+    AC_MSG_ERROR(database backend ${withval} invalid)
+fi
+AC_SUBST(DATABASE_BACKEND)
+AC_SUBST(NEED_BERKELEY_DB),
+DATABASE_BACKEND=bdb
+NEED_BERKELEY_DB=yes
+AC_SUBST(DATABASE_BACKEND)
+AC_SUBST(NEED_BERKELEY_DB))
 
 dnl locate OpenSSL libraries
 AX_OPENSSL
@@ -303,12 +321,14 @@ AC_ARG_ENABLE(capcache,
 else
     ENABLE_CAPCACHE=
 fi],
-[ENABLE_CAPCACHE=1
- AC_DEFINE(ENABLE_CAPCACHE, 1, Define if capability cache is enabled)]
+[if test "x$ENABLE_SECURITY_KEY" = "x1" -o "x$ENABLE_SECURITY_CERT" = "x1"; then
+    ENABLE_CAPCACHE=1
+    AC_DEFINE(ENABLE_CAPCACHE, 1, Define if capability cache is enabled)
+else
+    ENABLE_CAPCACHE=
+fi]
 )
 AC_SUBST(ENABLE_CAPCACHE)
-
-
 
 dnl check for credential cache
 AC_ARG_ENABLE(credcache,
@@ -409,9 +429,7 @@ AC_SUBST(BUILD_BMI_ONLY)
 dnl if we're only building the BMI lib, disable checks for server and DB.
 if test "x$BUILD_BMI_ONLY" = "x1"; then
 	BUILD_SERVER=""
-	NEED_BERKELEY_DB=no
 	AC_SUBST(BUILD_SERVER)
-	AC_SUBST(NEED_BERKELEY_DB)
 fi
 
 dnl a mechanism to turn off perf counters
@@ -422,16 +440,15 @@ AC_ARG_ENABLE(perf-counters,
 fi]
 ,)
 
-dnl a mechanism to turn on mmap-readahead caching (for kernel interface)
-MMAP_RA_CACHE=""
-AC_ARG_ENABLE(mmap-racache,
-[  --enable-mmap-racache   **EXPERIMENTAL** Enables mmap-readahead in kernel 
-                          interface],
+dnl a mechanism to turn on readahead caching (for kernel interface)
+RA_CACHE=""
+AC_ARG_ENABLE(racache,
+[  --enable-racache        Enables readahead in the Client Core ],
 [if test "x$enableval" = "xyes" ; then
-MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
+RA_CACHE="-DUSE_RA_CACHE"
 fi]
 ,)
-AC_SUBST(MMAP_RA_CACHE)
+AC_SUBST(RA_CACHE)
 
 dnl a mechanism that resets the file position pointer when an error occurs whether
 dnl or not any bytes were written (kernel interface only).
@@ -439,8 +456,9 @@ RESET_FILE_POS=""
 AC_ARG_ENABLE(reset-file-pos,
 [  --enable-reset-file-pos Resets file position pointer in kernel interface upon error],
 [if test "x$enableval" = "xyes" ; then
-RESET_FILE_POS="-DRESET_FILE_POS"
-fi]
+    RESET_FILE_POS="-DRESET_FILE_POS"
+ fi
+]
 ,)
 AC_SUBST(RESET_FILE_POS)
 
@@ -480,14 +498,21 @@ test_for_karma()
 }
 
 dnl optionally disable building the karma gui
+dnl AC_ARG_ENABLE(karma,
+dnl [  --disable-karma         Disables optional gui.  (Enabled by default)],
+dnl [ if test "x$enableval" = "xyes" ; then
+dnl       test_for_karma
+dnl    fi
+dnl ],
+dnl [test_for_karma]
+dnl )
+
 AC_ARG_ENABLE(karma,
-[  --disable-karma         Disables optional gui.  (Enabled by default)],
+[  --enable-karma          Enables optional gui.  (Disabled by default)],
 [ if test "x$enableval" = "xyes" ; then
       test_for_karma
-   fi
-],
-[test_for_karma]
-)
+  fi
+])
 
 dnl shared or static client library (see --enable-shared below)
 AC_ARG_ENABLE(static,
@@ -658,6 +683,33 @@ AC_TRY_COMPILE(
     ,
     AC_MSG_RESULT(no)
 )
+
+dnl Check for updated selinux so it won't break usrint
+AC_MSG_CHECKING([for const security_context_t in setfilecon])
+old_cflags="$CFLAGS"
+CFLAGS="$CFLAGS -Werror"
+AC_TRY_COMPILE(
+    [
+        #include <stdio.h>
+        #include <selinux/selinux.h>
+        int setfilecon(const char *path, const char *con)
+        {
+            return 0;
+        }
+    ],
+    [
+        int ret;
+        const char *sc_t = NULL;
+	    ret = setfilecon("somepath", sc_t);
+    ],
+    [
+       AC_MSG_RESULT(yes)
+       AC_DEFINE(HAVE_CONST_SECURITY_CONTEXT, 1, Define if setfilecon uses a const security_context_t)
+    ],
+    AC_MSG_RESULT(no)
+)
+CFLAGS="$old_cflags"
+
 dnl Check byte ordering
 AC_C_BIGENDIAN
 
@@ -671,12 +723,6 @@ AC_ARG_WITH(mtrace,
 [  --with-mtrace           Use mtrace (must set MALLOC_TRACE to output file)],
 CFLAGS="$CFLAGS -include mcheck.h"
 AC_DEFINE(WITH_MTRACE, 1, Define if mtrace memory leak detection was enabled)
-)
-
-dnl This particular one enables berkeley db to emit detected errors
-AC_ARG_WITH(berkdb-debug,
-[  --with-berkdb-debug     Use berkeley db error reporting (if detected).],
-AC_DEFINE(BERKDB_ERROR_REPORTING, 1, Define if berkeley db error reporting was enabled)
 )
 
 TAU_INCS=
@@ -734,8 +780,10 @@ AC_ARG_WITH(kernel,
         vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
     elif test -r  $withval/include/generated/utsrelease.h && grep -qE UTS_RELEASE..3\\. $withval/include/generated/utsrelease.h; then
         vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
+    elif test -r  $withval/include/generated/utsrelease.h && grep -qE UTS_RELEASE..4\\. $withval/include/generated/utsrelease.h; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
     else
-        AC_MSG_ERROR(The kernel source tree does not appear to be 2.6 or 3.X)
+        AC_MSG_ERROR(The kernel source tree does not appear to be 2.6 or 3.X or 4.X)
         
     fi
 
@@ -1005,9 +1053,9 @@ fi
 dnl shared or static client library
 AC_ARG_ENABLE(threaded,
     [  --disable-threaded      Do not build threaded client library],
-    [if "x$THREADED_KMOD_HELPER = xyes" ; then
+    [if test "x$THREADED_KMOD_HELPER" = "xyes" ; then
          build_threaded=yes
-         AC_MSG_WARN([Ignoring --disable-threaded in favor of --enable-threaded-kmod-heaper.])
+         AC_MSG_WARN([Ignoring --disable-threaded in favor of --enable-threaded-kmod-helper.])
      else
          build_threaded=$enableval
      fi
@@ -1133,6 +1181,22 @@ fi],
 [AC_DEFINE(PVFS_MALLOC_REDEF, 1,
       [Should we redefine malloc.])
 MALLOC_REDEF=1
+])
+
+dnl Method to disable malloc debug
+AC_ARG_ENABLE(malloc-debug,
+[  --disable-malloc-debug  Do not compile in malloc debug tracing],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_MALLOC_DEBUG, 1,
+      [Should we compile in malloc debug tracing.])
+   MALLOC_DEBUG=1
+else
+   AC_DEFINE(PVFS_MALLOC_DEBUG, 0,
+      [Should we compile in malloc debug tracing.])
+fi],
+[AC_DEFINE(PVFS_MALLOC_DEBUG, 1,
+      [Should we compile in malloc debug tracing.])
+MALLOC_DEBUG=1
 ])
 
 dnl Method to disable malloc checking a magic number
@@ -1770,22 +1834,23 @@ dnl
 dnl glibc 2.15 and later don't declare gets anymore for ISO C11 mode 
 dnl and if _GNU_SOURCE is defined.
 dnl     - http://gcc.gnu.org/bugzilla/show_bug.cgi?id=51785
-AC_MSG_CHECKING([for gets])
+AC_MSG_CHECKING([for gets in stdio.h])
 oldcflags="$CFLAGS"
 CFLAGS="$CFLAGS -Werror"
 AC_TRY_COMPILE(
     [
-      #include <stdio.h>
+       #include <stdio.h>
     ],
     [
-      char *s;
-      gets(s);
+       char *s;
+       gets(s);
     ],
-    AC_MSG_RESULT(yes)
-    ,
     [
-      AC_MSG_RESULT(no)
-      AC_DEFINE(GETS_IS_GONE, 1, Define if gets is gone from stdio.h)
+       AC_MSG_RESULT(yes)
+       AC_DEFINE(HAVE_STDIO_GETS, 1, Define if gets supported in stdio.h)
+    ],
+    [
+       AC_MSG_RESULT(no)
     ]
 )
 CFLAGS="$oldcflags"
@@ -1803,6 +1868,7 @@ AC_OUTPUT(include/pvfs2.h
 Makefile
 module.mk
 src/apps/admin/module.mk
+src/apps/admin/lmdb/module.mk
 src/apps/admin/pvfs2-config
 src/apps/devel/module.mk
 src/apps/karma/module.mk
@@ -1828,6 +1894,7 @@ src/common/mgmt/module.mk
 src/common/security/module.mk
 src/common/hash/module.mk
 src/common/token-utils/module.mk
+src/common/lmdb/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
@@ -1859,6 +1926,11 @@ doc/random/module.mk
 examples/orangefs-server
 examples/orangefs-client
 doc/doxygen/pvfs2-doxygen.conf
+src/client/jni/pom.xml
+src/client/hadoop/orangefs-hadoop1/pom.xml
+src/client/hadoop/orangefs-hadoop1/src/main/resources/conf/hadoop-env.sh
+src/client/hadoop/orangefs-hadoop2/pom.xml
+src/client/hadoop/orangefs-hadoop2/src/main/resources/conf/hadoop-env.sh
 )
 
 chmod +x $BUILD_ABSOLUTE_TOP/src/apps/admin/pvfs2-config
@@ -1921,10 +1993,10 @@ else
    AC_MSG_RESULT([PVFS2 configured for the 2.4.x kernel module      : yes])
 fi
 
-if test "x$MMAP_RA_CACHE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
-   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      :  no])
+if test "x$RA_CACHE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
+   AC_MSG_RESULT([PVFS2 configured for using the ra-cache           :  no])
 else
-   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      : yes])
+   AC_MSG_RESULT([PVFS2 configured for using the ra-cache           : yes])
 fi
 
 if test "x$RESET_FILE_POS" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then

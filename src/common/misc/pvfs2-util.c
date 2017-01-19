@@ -44,6 +44,11 @@
 #define ENABLE_SECURITY_MODE
 #endif
 
+
+#ifdef ENABLE_SECURITY_MODE
+void debug_gencred(char *args[]);
+#endif
+
 #ifndef ENABLE_SECURITY_MODE
 #include <pwd.h>
 #include <grp.h>
@@ -114,6 +119,8 @@ static int parse_encoding_string(const char *cp,
 static int parse_num_dfiles_string(const char* cp, int* num_dfiles);
 
 #ifndef ENABLE_SECURITY_MODE
+static int PINT_is_idnum(const char *str);
+
 static int PINT_gen_unsigned_credential(const char *user, const char *group,
                                         unsigned int timeout, PVFS_credential *cred);
 #endif
@@ -443,7 +450,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
     } while (0)
 
 /* return 1 if string is a uid/gid number */
-int PINT_is_idnum(const char *str)
+static int PINT_is_idnum(const char *str)
 {
     char *pstr, *endptr;
     unsigned long id;
@@ -701,8 +708,7 @@ int PVFS_util_get_umask(void)
     return mask;
 }
 
-int PVFS_util_copy_sys_attr(
-    PVFS_sys_attr *dest_attr, PVFS_sys_attr *src_attr)
+int PVFS_util_copy_sys_attr(PVFS_sys_attr *dest_attr, PVFS_sys_attr *src_attr)
 {
     int ret = -PVFS_EINVAL;
 
@@ -1651,6 +1657,7 @@ int PVFS_util_resolve(
         if (ppath_local)
         {
             PVFS_free_path(Ppath);
+            ppath_local=0;
         }
         return(0);
     }
@@ -1714,11 +1721,17 @@ int PVFS_util_resolve(
             if (ppath_local)
             {
                 PVFS_free_path(Ppath);
+                ppath_local=0;
             }
         }
         free(tmp_path);
 
         /* fall through and preserve "ret" to be returned */
+    }
+
+    if (ppath_local)
+    {
+       free(Ppath);
     }
 
     return(ret);

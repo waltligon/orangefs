@@ -21,7 +21,12 @@
 #include "PINT-reqproto-encode.h"
 #include "security-util.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 static int server_parse_config(struct server_configuration_s *config,
                                char *fs_config_buf,
@@ -280,6 +285,7 @@ static int server_parse_config(struct server_configuration_s *config,
         {
             server_alias = PINT_util_guess_alias();
             ret = PINT_parse_config(config, fs_template, server_alias, 0);
+            free(server_alias);
         }
         else
         {
