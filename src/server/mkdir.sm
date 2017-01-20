@@ -530,11 +530,13 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *attr;
+    PVFS_object_attr *attr = NULL;
     int i,j;
+    int num_handles = 0;
+    PVFS_handle *handle_array = NULL;
+    int ret;
 
     attr = &s_op->attr;
-
 
     /* dirdata_handles[0] was set in a previous state; so, all we need to do
      * here is gather up the remote handles.
@@ -553,6 +555,35 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
         gossip_debug(GOSSIP_MKDIR_DEBUG, 
                 "\t\tdirdata server %d: %llu.\n",
                 i, llu(attr->dirdata_handles[i]));
+    }
+
+    /* Make a capability for requests dealing with these handles. */
+    /* First, create new handle array with target handle and dirdata handles */
+    num_handles = s_op->u.mkdir.num_dirdata_servers + 1;
+    handle_array = (PVFS_handle *) malloc(num_handles * sizeof(PVFS_handle));
+    if (handle_array == NULL)
+    {
+        gossip_err("mkdir: out of memory in %s\n", __func__);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    handle_array[0] = s_op->resp.u.mkdir.handle;
+    memcpy((handle_array + 1),
+           attr->dirdata_handles,
+           s_op->attr.dist_dir_attr.num_servers * sizeof(PVFS_handle));
+
+    /* create new capability -- note that handle_array will be freed by
+       PINT_cleanup_capability when the SM completes */
+    ret = PINT_server_to_server_capability(&s_op->u.mkdir.server_to_server_capability,
+                                           s_op->target_fs_id,
+                                           num_handles,
+                                           handle_array);
+    if (ret != 0)
+    {
+        gossip_err("mkdir: unable to retrieve server-to-server "
+                   "capability in %s\n", __func__);
+        js_p->error_code = -PVFS_EACCES;
+        return SM_ACTION_COMPLETE;
     }
 
     return SM_ACTION_COMPLETE;
@@ -593,7 +624,7 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
 
 
     PINT_SERVREQ_TREE_SETATTR_FILL(msg_p->req,
-                                   s_op->req->capability,
+                                   s_op->u.mkdir.server_to_server_capability,
                                    s_op->req->u.mkdir.credential,
                                    s_op->u.mkdir.fs_id,
                                    PVFS_TYPE_DIRDATA,
@@ -606,7 +637,6 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
                                    NULL);
 
     s_op->u.mkdir.saved_attr = &msg_p->req.u.mkdir.attr;
-    s_op->u.mkdir.saved_capability = &msg_p->req.capability;
 
     msg_p->fs_id = s_op->u.mkdir.fs_id;
     msg_p->handle = s_op->u.mkdir.handle_array_remote[0]; 
@@ -841,8 +871,7 @@ static PINT_sm_action mkdir_dirdata_keyval_setattr(
     int keyval_count = 3;
 
     /* free saved capability */
-    PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
-    s_op->u.mkdir.saved_capability = NULL;
+    PINT_cleanup_capability(&s_op->u.mkdir.server_to_server_capability);
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, 
             "  writing dist-dir-struct keyvals for meta handle: %llu "
@@ -878,7 +907,7 @@ static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 
     /* clean up objects */
     PINT_free_object_attr(s_op->u.mkdir.saved_attr);
-    PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
+    PINT_cleanup_capability(&s_op->u.mkdir.server_to_server_capability);
 
     if (js_p->error_code > -1)
     {
