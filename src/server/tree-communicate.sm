@@ -788,7 +788,6 @@ static int tree_setattr_work_cleanup(struct PINT_smcb *smcb,
             {
                tree_req = &(tree_msgarray[j].req.u.tree_setattr);
                PINT_free_object_attr(&tree_req->attr);
-               gossip_err("%s:Cleaning up capability from PVFS_SERV_TREE_SETATTR\tError code(%d)\n",__func__,error_code);
             }/*end for*/
            PINT_msgpairarray_destroy(&old_frame->msgarray_op);
 

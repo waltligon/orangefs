@@ -1617,6 +1617,7 @@ static PINT_sm_action getattr_setup_resp(
          */
         js_p->error_code = 0;
     }
+
     if (js_p->error_code < 0)
     {
         free_nested_getattr_data(s_op);

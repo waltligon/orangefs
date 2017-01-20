@@ -541,7 +541,7 @@ static PINT_sm_action msgpairarray_completion_fn(
 	    continue;
 
 #if 1
-        if (msg_p->req.op == PVFS_SERV_MKDIR)
+        if (msg_p->req.op == PVFS_SERV_TREE_SETATTR)
         {
            gossip_err("%s:setting op_status for testing.\n",__func__);
            msg_p->op_status = -PVFS_ENOMEM;

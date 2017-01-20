@@ -678,11 +678,59 @@ static PINT_sm_action mgmt_create_root_dir_tree_setattr_cleanup(
     struct PINT_server_op *tree_setattr_op = NULL;
     int task_id = 0;
     int remaining = 0;
+    int error_code = 0;
+    int i,ret;
+    char server_name[1024]={0};
+    char errstr[256]={0};
 
-    tree_setattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
+    tree_setattr_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining);
+
+    for (i=0; i<tree_setattr_op->resp.u.tree_setattr.handle_count &&
+              tree_setattr_op->resp.u.tree_setattr.status[i] != 0
+            ; i++)
+    {
+        ret = PINT_cached_config_get_server_name(server_name,
+                                                 1024,
+                                                 tree_setattr_op->req->u.tree_setattr.handle_array[i],
+                                                 tree_setattr_op->req->u.tree_setattr.fs_id);
+        if (ret != 0)
+        {
+           PVFS_strerror_r(ret, errstr, sizeof(errstr));
+           gossip_err("%s:Error locating server name for handle(%llu)\n",
+                      __func__,
+                      llu(tree_setattr_op->req->u.tree_setattr.handle_array[i]));
+           gossip_err("%s:Error(%d):%s\n",__func__,ret,errstr);
+           js_p->error_code = ret;
+           return SM_ACTION_COMPLETE;
+        }
 
 
-    gossip_err("%s:task_id(%d)\tremaining(%d)\n",__func__,task_id,remaining);
+        if (i==0)
+        {
+           /* Unable to set attributes on the dirdata handle on this host */
+           gossip_err("%s : CRITICAL : Error setting attributes for the local dirdata handle : %llu on %s.\n"
+                     ,__func__
+                     ,llu(tree_setattr_op->req->u.tree_setattr.handle_array[i])
+                     ,server_name);
+        }
+        else
+        {
+           /* Unable to set attributes on a remote dirdata handle */
+           gossip_err("%s : CRITICAL : Error setting attributes for remote dirdata handle : %llu on %s\n"
+                     ,__func__
+                     ,llu(tree_setattr_op->req->u.tree_setattr.handle_array[i])
+                     ,server_name);
+        }
+
+        PVFS_strerror_r(tree_setattr_op->resp.u.tree_setattr.status[i],errstr,sizeof(errstr));
+        gossip_err("%s : CRITICAL : Error(%d) : %s\n",__func__,tree_setattr_op->resp.u.tree_setattr.status[i],errstr);
+
+        if (js_p->error_code == 0)
+        {
+           js_p->error_code = tree_setattr_op->resp.u.tree_setattr.status[i];
+        }
+    }/*end for*/
+
 
     PINT_free_object_attr(&tree_setattr_op->req->u.tree_setattr.attr);
     PINT_cleanup_capability(&tree_setattr_op->req->capability);
@@ -1433,9 +1481,8 @@ static PINT_sm_action mgmt_create_root_dir_cleanup_noreq( struct PINT_smcb *smcb
        }
        case CLEANUP:
        {
-           /* We use CLEANUP only for the lost+found errors.  Error information has already been
-            * posted in prior states.  Plus, if the lost+found directory isn't created, the 
-            * filesystem can still run.
+           /* We use CLEANUP to signal that error information has already been
+            * posted in prior states. 
             */
            js_p->error_code=0;
            break;
@@ -1445,9 +1492,10 @@ static PINT_sm_action mgmt_create_root_dir_cleanup_noreq( struct PINT_smcb *smcb
            /* All other errors are critical to the creation of the root directory */
            char errstr[256];
            PVFS_strerror_r(js_p->error_code, errstr, sizeof(errstr));
-           gossip_err("CRITICAL ERROR: unable to create the root directory due to error: %s\n", 
-                      errstr);
-           gossip_err("         Your FS may be in an inconsistent state\n");
+           gossip_err("%s:CRITICAL ERROR: unable to create the root directory due to error: %s\n", 
+                      __func__,errstr);
+           gossip_err("%s:CRITICAL ERROR: Your FS is in an inconsistent state\n",__func__);
+           gossip_err("%sCRITICAL ERROR: Recreate your storage area and restart your servers.\n",__func__);
            break;   
        }
     }
