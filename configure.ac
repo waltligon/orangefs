@@ -1547,6 +1547,11 @@ dnl
 AX_IB
 
 dnl
+dnl Configure bmi_rdma, if --with-rdma or a variant given.
+dnl
+AX_RDMA
+
+dnl
 dnl Configure bmi_portals, if --with-portals or a variant given.
 dnl
 AX_PORTALS
@@ -1899,6 +1904,7 @@ src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
 src/io/bmi/bmi_mx/module.mk
 src/io/bmi/bmi_ib/module.mk
+src/io/bmi/bmi_rdma/module.mk
 src/io/bmi/bmi_portals/module.mk
 src/io/bmi/bmi_zoid/module.mk
 src/io/description/module.mk
@@ -2131,7 +2137,8 @@ dnl When traffic will only appear on one device, suggest that TCP be disabled.
 dnl But leave TCP as default on, certainly, as that is what most people want.
 dnl
 if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
-	x$BUILD_OPENIB = x1 -o x$BUILD_PORTALS = x1 -o x$BUILD_ZOID = x1 ; then
+	x$BUILD_OPENIB = x1 -o x$BUILD_RDMA = x1 -o x$BUILD_PORTALS = x1 -o \
+	x$BUILD_ZOID = x1 ; then
     if test x$BUILD_BMI_TCP = x1 ; then
 	AC_MSG_WARN([You have selected to build $PKGSTR to use a "fast" network
 		    interface, but have not disabled TCP.  The way this is

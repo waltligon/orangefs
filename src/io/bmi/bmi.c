@@ -86,6 +86,9 @@ extern struct bmi_method_ops bmi_mx_ops;
 #ifdef __STATIC_METHOD_BMI_IB__
 extern struct bmi_method_ops bmi_ib_ops;
 #endif
+#ifdef __STATIC_METHOD_BMI_RDMA__
+extern struct bmi_method_ops bmi_rdma_ops;
+#endif
 #ifdef __STATIC_METHOD_BMI_PORTALS__
 extern struct bmi_method_ops bmi_portals_ops;
 #endif
@@ -105,6 +108,9 @@ static struct bmi_method_ops *const static_methods[] = {
 #endif
 #ifdef __STATIC_METHOD_BMI_IB__
     &bmi_ib_ops,
+#endif
+#ifdef __STATIC_METHOD_BMI_RDMA__
+    &bmi_rdma_ops,
 #endif
 #ifdef __STATIC_METHOD_BMI_PORTALS__
     &bmi_portals_ops,
