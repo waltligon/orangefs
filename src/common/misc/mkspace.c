@@ -414,6 +414,8 @@ int pvfs2_mkspace(char *data_path,
 
         /* set root directory dspace attributes */
         memset(&attr, 0, sizeof(TROVE_ds_attributes_s));
+        attr.fs_id = coll_id;
+        attr.handle = new_root_handle;
         attr.uid = getuid();
         attr.gid = getgid();
         attr.mode = 0777;
@@ -426,7 +428,9 @@ int pvfs2_mkspace(char *data_path,
                                    &attr,
                                    TROVE_SYNC,
                                    NULL,
-            trove_context, &op_id, NULL);
+                                   trove_context,
+                                   &op_id,
+                                   NULL);
 
         while (ret == 0)
         {

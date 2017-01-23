@@ -140,7 +140,10 @@ PVFS_error PVFS_isys_setattr(
     PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
-    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &ref.handle);
+    PVFS_hint_add(&sm_p->hints,
+                  PVFS_HINT_HANDLE_NAME,
+                  sizeof(PVFS_handle),
+                  &ref.handle);
 
     ret = PVFS_util_copy_sys_attr(&sm_p->u.setattr.sys_attr, &attr);
     if(ret < 0)
@@ -234,16 +237,15 @@ static PINT_sm_action setattr_msg_setup_msgpair(
     objtype = ((sm_p->u.setattr.sys_attr.mask & PVFS_ATTR_SYS_TYPE) ? 
          sm_p->u.setattr.sys_attr.objtype : PVFS_TYPE_NONE);
 
-    PINT_SERVREQ_SETATTR_FILL(
-        msg_p->req,
-        sm_p->getattr.attr.capability,
-        *sm_p->cred_p,
-        sm_p->object_ref.fs_id,
-        sm_p->object_ref.handle,
-        objtype,
-        sm_p->u.setattr.sys_attr,
-        0,
-        sm_p->hints);
+    PINT_SERVREQ_SETATTR_FILL(msg_p->req,
+                              sm_p->getattr.attr.capability,
+                              *sm_p->cred_p,
+                              sm_p->object_ref.fs_id,
+                              sm_p->object_ref.handle,
+                              objtype,
+                              sm_p->u.setattr.sys_attr,
+                              0,
+                              sm_p->hints);
 
     /* clients should not be able to mess with dfile and distribution
      * information here.  Those parameters should only be set at create time.

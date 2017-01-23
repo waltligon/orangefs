@@ -734,7 +734,8 @@ static PINT_sm_action create_cleanup(
             js_p->error_code = ret;
         }
 
-        /* invalidate the acache entry for the parent directory, because we created a new directory entry which
+        /* invalidate the acache entry for the parent directory,
+         * because we created a new directory entry which
          * changes the timestamps on the directory.
          */
         PINT_acache_invalidate(sm_p->parent_ref);
