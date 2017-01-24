@@ -926,10 +926,6 @@ static PINT_sm_action setattr_work_cleanup(
         free(s_op->val_a);
     }
 
-
-#if 1
-    js_p->error_code = -PVFS_ENOMEM;
-#endif
     return SM_ACTION_COMPLETE;
 }
 

@@ -1691,6 +1691,10 @@ static PINT_sm_action crdirent_remove_entries_cleanup(
     {
         js_p->error_code = 0;
     }
+
+#if 1
+    js_p->error_code = -PVFS_ENOMEM;
+#endif
     return SM_ACTION_COMPLETE;
 }
 

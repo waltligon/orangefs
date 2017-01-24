@@ -209,7 +209,13 @@ machine pvfs2_mgmt_create_root_dir_sm
     state delete_lost_and_found_handle_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        default => cleanup_noreq;
+        default => remote_delete_cleanup;
+    }
+
+    state remote_delete_cleanup
+    {
+       run mgmt_create_root_dir_remote_delete_cleanup;
+       default => cleanup_noreq;
     }
 
     state local_delete
@@ -876,6 +882,9 @@ static PINT_sm_action mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair(
 
     gossip_debug(GOSSIP_SERVER_DEBUG," mgmt_create_root_dir: posting mkdir req for lost+found dir.\n ");
 
+    gossip_err("%s:capability currently in s_op->u.mgmt_create_root_dir.capability\n",__func__);
+    PINT_debug_capability(&s_op->u.mgmt_create_root_dir.capability,"mkdir lost+found");
+
     ret = PINT_cached_config_get_next_meta(
         s_op->target_fs_id,
         &svr_addr, &meta_handle_extent_array);
@@ -1014,7 +1023,7 @@ static PINT_sm_action mgmt_create_root_dir_remote_mkdir_lost_and_found_cleanup(
         gossip_err("WARNING:  Unable to create the directory object for lost+found on remote server(%s): %s\n"
                   ,server_name
                   ,errstr);
-        gossip_err("To manually create the directory as root:  mkdir -m 777 <mountpoint>/lost+found\n");
+        gossip_err("To manually create the directory as the root user:  mkdir -m 777 <mountpoint>/lost+found\n");
         js_p->error_code = CLEANUP;
         s_op->u.mgmt_create_root_dir.lost_and_found_handle = 0;
     }
@@ -1173,7 +1182,7 @@ static PINT_sm_action mgmt_create_root_dir_crdirent_lost_and_found_setup_msgpair
                                                handle_array);
         if (ret != 0)
         {
-            gossip_err("mgmt-create-root-dir: unable to retrieve server-to-server "
+            gossip_err("mgmt-create-root-dir: unable to create server-to-server "
                        "capability in %s\n", __func__);
             js_p->error_code = -PVFS_EACCES;
             return SM_ACTION_COMPLETE;
@@ -1302,6 +1311,10 @@ static int crdirent_lost_and_found_comp_fn(void *v_p,
     gossip_debug(GOSSIP_SERVER_DEBUG, "%s: enter\n", __func__);
 
     assert(resp_p->op == PVFS_SERV_CRDIRENT);
+
+#if 1
+    resp_p->status = -PVFS_ENOMEM;
+#endif
     return resp_p->status;
 }
 
@@ -1312,9 +1325,11 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
     int ret = -PVFS_EINVAL;
     server_configuration_s *config = get_server_config_struct();
     char server_name[1024];
+    char errstr[256]={0};
     PINT_sm_msgpair_state *msg_p = NULL;
     struct PVFS_server_req *remove_req = NULL;
     struct PINT_server_op *remove_op = NULL;
+    PVFS_hint hints = NULL;
 
     /* Remove the directory object since we bombed on creating a directory
      * entry with it!
@@ -1326,10 +1341,35 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
                  "lost+found directory handle %llu\n",
                  llu(s_op->u.mgmt_create_root_dir.lost_and_found_handle));
 
-    js_p->error_code = 0;
-
     PINT_cached_config_get_server_name(server_name, 1024,
         s_op->u.mgmt_create_root_dir.lost_and_found_handle, s_op->target_fs_id);
+
+    PVFS_strerror_r(js_p->error_code, errstr, sizeof(errstr));
+
+    gossip_err("Error creating a directory entry for lost+found on server %s : %s\n"
+              ,server_name
+              ,errstr);
+    gossip_err("Removing directory object.\n");
+
+    js_p->error_code = 0;
+
+    /* hint with lost+found handle is needed, if executing remove.sm with
+     * the prelude.
+     */
+    hints = calloc(1,sizeof(*hints));
+    if (!hints)
+    {
+       gossip_err("%s:Error allocating memory for hints.\n",__func__);
+       js_p->error_code = -PVFS_ENOMEM;
+       return SM_ACTION_COMPLETE;
+    }
+    PVFS_hint_add(&hints
+                 ,PVFS_HINT_HANDLE_NAME
+                 ,sizeof(PVFS_handle)
+                 ,&s_op->u.mgmt_create_root_dir.lost_and_found_handle);
+
+    PINT_debug_capability(&s_op->u.mgmt_create_root_dir.capability,"mgmt_create_root_dir_delete_lost_and_found_handle_setup_msgpair");
+
     if (! strcmp(server_name, config->host_id))
     {   /* local */
 
@@ -1376,7 +1416,7 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
             s_op->u.mgmt_create_root_dir.credential,
             s_op->target_fs_id,
             s_op->u.mgmt_create_root_dir.lost_and_found_handle,
-            NULL);
+            hints);
 
         msg_p->fs_id = s_op->target_fs_id;
         msg_p->handle = 
@@ -1426,10 +1466,53 @@ static int delete_lost_and_found_handle_comp_fn(void *v_p,
                                        struct PVFS_server_resp *resp_p,
                                        int index)
 {
-    gossip_debug(GOSSIP_SERVER_DEBUG, "delete_lost_and_found_handle_comp_fn\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "delete_lost_and_found_handle_comp_fn...status(%d)\n",resp_p->status);
 
     assert(resp_p->op == PVFS_SERV_REMOVE);
+
+#if 0
+    resp_p->status = -PVFS_ENOMEM;
+#endif
+
     return resp_p->status;
+}
+
+static PINT_sm_action mgmt_create_root_dir_remote_delete_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    char errstr[256]={0};
+    char server_name[1024]={0};
+    int ret;
+
+    PVFS_hint_free(s_op->msgarray_op.msgpair.req.hints);
+
+    if (js_p->error_code != 0)
+    {
+       ret = PINT_cached_config_get_server_name(server_name,
+                                                sizeof(server_name),
+                                                s_op->msgarray_op.msgpair.req.u.remove.handle,
+                                                s_op->msgarray_op.msgpair.req.u.remove.fs_id);
+       if (ret != 0)
+       {
+          PVFS_strerror_r(ret, errstr, sizeof(errstr));
+          gossip_err("%s:Error locating server name for handle(%llu)\n",
+                     __func__,
+                     llu(s_op->msgarray_op.msgpair.req.u.remove.handle));
+          gossip_err("%s:Error(%d):%s\n",__func__,ret,errstr);
+          gossip_err("%s:Directory object for lost+found not deleted.\n",__func__);
+          js_p->error_code = CLEANUP;
+          return SM_ACTION_COMPLETE;
+       }
+
+       PVFS_strerror_r(js_p->error_code,errstr,sizeof(errstr));
+
+       gossip_err("%s: Error deleting directory object(%llu) for lost+found on server %s : %s\n"
+                 ,__func__,llu(s_op->msgarray_op.msgpair.req.u.remove.handle),server_name,errstr);
+       js_p->error_code = CLEANUP;
+    }
+
+   return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action mgmt_create_root_dir_local_delete_cleanup(
@@ -1494,7 +1577,7 @@ static PINT_sm_action mgmt_create_root_dir_cleanup_noreq( struct PINT_smcb *smcb
            PVFS_strerror_r(js_p->error_code, errstr, sizeof(errstr));
            gossip_err("%s:CRITICAL ERROR: unable to create the root directory due to error: %s\n", 
                       __func__,errstr);
-           gossip_err("%s:CRITICAL ERROR: Your FS is in an inconsistent state\n",__func__);
+           gossip_err("%s:CRITICAL ERROR: Your FS is in an inconsistent state.\n",__func__);
            gossip_err("%sCRITICAL ERROR: Recreate your storage area and restart your servers.\n",__func__);
            break;   
        }

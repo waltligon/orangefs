@@ -540,7 +540,7 @@ static PINT_sm_action msgpairarray_completion_fn(
 	if (msg_p->complete)
 	    continue;
 
-#if 1
+#if 0
         if (msg_p->req.op == PVFS_SERV_TREE_SETATTR)
         {
            gossip_err("%s:setting op_status for testing.\n",__func__);
@@ -580,7 +580,6 @@ static PINT_sm_action msgpairarray_completion_fn(
                                              , __func__, msg_p->op_status, i);
             msg_p->complete = 1;
             continue;
-            //goto cleanup;
         }
         else
         {
@@ -598,7 +597,6 @@ static PINT_sm_action msgpairarray_completion_fn(
                   }
                   else
                   {
-                     //goto cleanup; /*bypass the comp fn*/
                      msg_p->complete=1;
                      continue;
                   }
@@ -623,7 +621,6 @@ static PINT_sm_action msgpairarray_completion_fn(
                                                       ,resp_p->status, i);
                      msg_p->complete=1;
                      continue;
-                     //goto cleanup; /*bypass the comp fn*/
                   }
                }/*end default*/
             }/*end switch*/
