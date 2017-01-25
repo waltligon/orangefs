@@ -996,6 +996,8 @@ static int mkdir_lost_and_found_comp_fn(void *v_p,
 	return resp_p->status;
     }
 
+    PINT_debug_capability(&resp_p->u.mkdir.capability,"mkdir_lost_and_found_comp_fn");
+
     /* otherwise, just stash the newly created meta handle */
     s_op->u.mgmt_create_root_dir.lost_and_found_handle = resp_p->u.mkdir.handle;
 
@@ -1330,6 +1332,8 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
     struct PVFS_server_req *remove_req = NULL;
     struct PINT_server_op *remove_op = NULL;
     PVFS_hint hints = NULL;
+    PVFS_capability capability = {0};
+    PVFS_handle *dir_handle = NULL;
 
     /* Remove the directory object since we bombed on creating a directory
      * entry with it!
@@ -1353,22 +1357,7 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
 
     js_p->error_code = 0;
 
-    /* hint with lost+found handle is needed, if executing remove.sm with
-     * the prelude.
-     */
-    hints = calloc(1,sizeof(*hints));
-    if (!hints)
-    {
-       gossip_err("%s:Error allocating memory for hints.\n",__func__);
-       js_p->error_code = -PVFS_ENOMEM;
-       return SM_ACTION_COMPLETE;
-    }
-    PVFS_hint_add(&hints
-                 ,PVFS_HINT_HANDLE_NAME
-                 ,sizeof(PVFS_handle)
-                 ,&s_op->u.mgmt_create_root_dir.lost_and_found_handle);
 
-    PINT_debug_capability(&s_op->u.mgmt_create_root_dir.capability,"mgmt_create_root_dir_delete_lost_and_found_handle_setup_msgpair");
 
     if (! strcmp(server_name, config->host_id))
     {   /* local */
@@ -1406,13 +1395,41 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
     else
     {   /* remote */
 
+        /* hint with lost+found handle is needed, if executing remove.sm with
+         * the prelude, as is done in the remote case.
+         */
+        hints = calloc(1,sizeof(*hints));
+        if (!hints)
+        {
+           gossip_err("%s:Error allocating memory for hints.\n",__func__);
+           js_p->error_code = -PVFS_ENOMEM;
+           return SM_ACTION_COMPLETE;
+        }
+        PVFS_hint_add(&hints
+                     ,PVFS_HINT_HANDLE_NAME
+                     ,sizeof(PVFS_handle)
+                     ,&s_op->u.mgmt_create_root_dir.lost_and_found_handle);
+ 
+        dir_handle = calloc(1,sizeof(*dir_handle));
+        if ( !dir_handle )
+        {
+           gossip_err("%s:Error allocating memory for dir_handle.\n",__func__);
+           js_p->error_code = -PVFS_ENOMEM;
+           /* to do: cleanup hints */
+           return SM_ACTION_COMPLETE;
+        }
+        *dir_handle = s_op->u.mgmt_create_root_dir.lost_and_found_handle;
+        ret = PINT_server_to_server_capability(&capability
+                                              ,s_op->target_fs_id
+                                              ,1
+                                              ,dir_handle);
         PINT_msgpair_init(&s_op->msgarray_op);
         msg_p = &s_op->msgarray_op.msgpair;
         PINT_serv_init_msgarray_params(s_op, s_op->target_fs_id);
 
         PINT_SERVREQ_REMOVE_FILL(
             msg_p->req,
-            s_op->u.mgmt_create_root_dir.capability,
+            capability,
             s_op->u.mgmt_create_root_dir.credential,
             s_op->target_fs_id,
             s_op->u.mgmt_create_root_dir.lost_and_found_handle,
@@ -1439,6 +1456,8 @@ static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_ms
         PINT_sm_push_frame(smcb, REMOTE_OPERATION, &s_op->msgarray_op);
         js_p->error_code = REMOTE_OPERATION;
     }
+
+    PINT_cleanup_capability(&capability);
 
     return SM_ACTION_COMPLETE;
 
