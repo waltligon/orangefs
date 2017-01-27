@@ -531,7 +531,7 @@ struct PINT_server_mkdir_op
     PVFS_fs_id fs_id;
     PVFS_handle_extent_array handle_extent_array;
     PVFS_size init_dirdata_size;
-    PVFS_capability *saved_capability;
+    PVFS_capability server_to_server_capability;
     PVFS_object_attr *saved_attr;
 
     /* dist-dir-struct
