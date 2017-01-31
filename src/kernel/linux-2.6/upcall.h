@@ -213,6 +213,7 @@ enum pvfs2_param_request_op
     PVFS2_PARAM_REQUEST_OP_READAHEAD_SIZE = 26,
     PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT = 27,
     PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT_SIZE = 28,
+    PVFS2_PARAM_REQUEST_OP_READAHEAD_READCNT = 29,
 #endif
 };
 
@@ -247,6 +248,11 @@ typedef struct
     PVFS_fs_id fsid;
     int32_t    __pad1;
 } pvfs2_fs_key_request_t;
+
+typedef struct
+{
+    uint64_t features;
+} pvfs2_features_request_t;
 
 typedef struct
 {
@@ -287,6 +293,7 @@ typedef struct
         pvfs2_param_request_t param;
         pvfs2_perf_count_request_t perf_count;
         pvfs2_fs_key_request_t fs_key;
+        pvfs2_features_request_t features;
     } req;
 } pvfs2_upcall_t;
 

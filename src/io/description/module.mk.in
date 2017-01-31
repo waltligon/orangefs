@@ -5,6 +5,7 @@ LIBSRC += \
 	$(DIR)/pint-distribution.c \
 	$(DIR)/pint-dist-utils.c \
 	$(DIR)/dist-basic.c \
+	$(DIR)/dist-object.c \
 	$(DIR)/dist-simple-stripe.c \
 	$(DIR)/dist-varstrip-parser.c \
 	$(DIR)/dist-twod-stripe.c \
@@ -16,6 +17,7 @@ SERVERSRC += \
 	$(DIR)/pint-distribution.c \
 	$(DIR)/pint-dist-utils.c \
 	$(DIR)/dist-basic.c \
+	$(DIR)/dist-object.c \
 	$(DIR)/dist-simple-stripe.c \
 	$(DIR)/dist-varstrip-parser.c \
 	$(DIR)/dist-twod-stripe.c \

@@ -21,10 +21,12 @@ ADMINSRC := \
 	$(DIR)/pvfs2-fsck.c\
 	$(DIR)/pvfs2-validate.c\
 	$(DIR)/pvfs2-cp.c \
+	$(DIR)/pvfs2-cp-object.c \
 	$(DIR)/pvfs2-write.c \
 	$(DIR)/pvfs2-viewdist.c \
 	$(DIR)/pvfs2-xattr.c \
 	$(DIR)/pvfs2-touch.c \
+	$(DIR)/pvfs2-touch-object.c \
 	$(DIR)/pvfs2-remove-object.c \
 	$(DIR)/pvfs2-ln.c \
 	$(DIR)/pvfs2-perror.c \

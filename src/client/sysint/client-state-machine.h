@@ -64,20 +64,20 @@ job_context_id PINT_client_get_sm_context(void);
 /* this structure is used to handle mirrored retries in the small-io case*/
 typedef struct PINT_client_mirror_ctx
 {
-  /*which copy of the mirrored handle are we using?*/
-  uint32_t     current_copies_count;
+    /* which copy of the mirrored handle are we using?*/
+    uint32_t     current_copies_count;
 
-  /*the primary datahandle*/
-  PVFS_handle  original_datahandle;
+    /* the primary datahandle*/
+    PVFS_handle  original_datahandle;
 
-  /*the server_nr for the primary datahandle*/
-  uint32_t original_server_nr;
+    /* the server_nr for the primary datahandle*/
+    uint32_t original_server_nr;
 
-  /*do we retry the primary or use a mirrored handle?*/ 
-  PVFS_boolean retry_original;
+    /* do we retry the primary or use a mirrored handle?*/ 
+    PVFS_boolean retry_original;
 
-  /*did the current message for this handle complete without any errors?*/
-  PVFS_boolean msg_completed;
+    /* did the current message for this handle complete without any errors?*/
+    PVFS_boolean msg_completed;
 
 } PINT_client_small_io_ctx;
 
@@ -94,15 +94,15 @@ typedef struct PINT_sm_getattr_state
 {
     PVFS_object_ref object_ref;
 
-   /* request sys attrmask.  Some combination of
+    /* request sys attrmask.  Some combination of
      * PVFS_ATTR_SYS_*
      */
     uint32_t req_attrmask;
     
     /*
-      Either from the acache or full getattr op, this is the resuling
-      attribute that can be used by calling state machines
-    */
+     * Either from the acache or full getattr op, this is the resuling
+     * attribute that can be used by calling state machines
+     */
     PVFS_object_attr attr;
 
 
@@ -244,6 +244,13 @@ struct PINT_client_getattr_sm
     PVFS_sysresp_getattr *getattr_resp_p; /* destination for output */
 };
 
+struct PINT_client_gethandles_sm
+{
+    PVFS_object_ref object;
+    uint32_t mask;
+    PVFS_sysresp_gethandles *resp_p; /* destination for output */
+};
+
 struct PINT_client_setattr_sm
 {
     PVFS_sys_attr sys_attr; /* input parameter */
@@ -352,6 +359,8 @@ struct PINT_client_io_sm
 
     PVFS_size * dfile_size_array;
     int small_io;
+
+    int object_num;     //for access to an individual object
 };
 
 struct PINT_client_flush_sm
@@ -673,7 +682,7 @@ typedef struct PINT_client_sm
 
     /* generic getattr used with getattr sub state machines */
     PINT_sm_getattr_state getattr;
-    /* generic dirent array used by both readdir and readdirplus state machines */
+    /* generic dirent array used by readdir and readdirplus state machines */
     PINT_sm_readdir_state readdir_state;
     struct PINT_client_readdir_sm readdir;
 
@@ -699,6 +708,7 @@ typedef struct PINT_client_sm
         struct PINT_client_mkdir_sm mkdir;
         struct PINT_client_symlink_sm sym;
         struct PINT_client_getattr_sm getattr;
+        struct PINT_client_gethandles_sm gethandles;
         struct PINT_client_setattr_sm setattr;
         struct PINT_client_io_sm io;
         struct PINT_client_flush_sm flush;
@@ -814,6 +824,7 @@ enum
     PVFS_SYS_FS_ADD                = 19,
     PVFS_SYS_READDIRPLUS           = 20,
     PVFS_SYS_ATOMICEATTR           = 21,
+    PVFS_SYS_GETHANDLES            = 22,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -834,7 +845,7 @@ enum
     PVFS_DEV_UNEXPECTED            = 400
 };
 
-#define PVFS_OP_SYS_MAXVALID  22
+#define PVFS_OP_SYS_MAXVALID  23
 #define PVFS_OP_SYS_MAXVAL 69
 #define PVFS_OP_MGMT_MAXVALID 84
 #define PVFS_OP_MGMT_MAXVAL 199
@@ -907,6 +918,7 @@ extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_sysint_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_datafile_getattr_sizes_sm;
+extern struct PINT_state_machine_s pvfs2_client_sysint_gethandles_sm;
 extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_small_io_sm;

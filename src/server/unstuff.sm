@@ -213,7 +213,7 @@ static PINT_sm_action inspect_keyvals(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    char* tmpbuf;
+    char *tmpbuf;
 
     if(js_p->error_code == 0)
     {
@@ -266,8 +266,8 @@ static PINT_sm_action get_handles(
     }
 
     /* allocate room for final number of handles we want */
-    s_op->u.unstuff.dfile_array = 
-        malloc(s_op->u.unstuff.num_dfiles_req * sizeof(PVFS_handle));
+    s_op->u.unstuff.dfile_array = malloc(s_op->u.unstuff.num_dfiles_req *
+                                         sizeof(PVFS_handle));
     if(!s_op->u.unstuff.dfile_array)
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -275,8 +275,8 @@ static PINT_sm_action get_handles(
     }
 
     /* the very first handle should be our current stuffed handle */
-    s_op->u.unstuff.dfile_array[0] 
-        = s_op->resp.u.unstuff.attr.u.meta.dfile_array[0];
+    s_op->u.unstuff.dfile_array[0] = 
+            s_op->resp.u.unstuff.attr.u.meta.dfile_array[0];
 
     if(s_op->u.unstuff.num_dfiles_req == 1)
     {
@@ -290,19 +290,18 @@ static PINT_sm_action get_handles(
     /* NOTE: we are leaving the existing resp attr structure alone until we
      * get a successful answer from get_handles() and commit to disk
      */
-    ret = job_precreate_pool_get_handles(
-        s_op->req->u.unstuff.fs_id,
-        (s_op->u.unstuff.num_dfiles_req-1),
-        PVFS_TYPE_DATAFILE,
-        NULL,
-        &s_op->u.unstuff.dfile_array[1],
-        0,
-        smcb,
-        0,
-        js_p,
-        &j_id,
-        server_job_context,
-        s_op->req->hints);
+    ret = job_precreate_pool_get_handles(s_op->req->u.unstuff.fs_id,
+                                         (s_op->u.unstuff.num_dfiles_req - 1),
+                                         PVFS_TYPE_DATAFILE,
+                                         NULL,
+                                         &s_op->u.unstuff.dfile_array[1],
+                                         0,
+                                         smcb,
+                                         0,
+                                         js_p,
+                                         &j_id,
+                                         server_job_context,
+                                         s_op->req->hints);
     return ret;
 }
 
@@ -328,26 +327,32 @@ static PINT_sm_action set_handles_on_object(
     /* replace dfile information in attr structure */
     free(s_op->resp.u.unstuff.attr.u.meta.dfile_array);
     s_op->resp.u.unstuff.attr.u.meta.dfile_array 
-        = s_op->u.unstuff.dfile_array;
+                = s_op->u.unstuff.dfile_array;
     s_op->resp.u.unstuff.attr.u.meta.dfile_count 
-        = s_op->u.unstuff.num_dfiles_req;
+                = s_op->u.unstuff.num_dfiles_req;
 
     /* write new datafile handles to disk */
     s_op->key.buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
 
     s_op->val.buffer = 
-        s_op->resp.u.unstuff.attr.u.meta.dfile_array; 
+                s_op->resp.u.unstuff.attr.u.meta.dfile_array; 
     s_op->val.buffer_sz =
-        s_op->resp.u.unstuff.attr.u.meta.dfile_count * sizeof(PVFS_handle);
+                s_op->resp.u.unstuff.attr.u.meta.dfile_count *
+                sizeof(PVFS_handle);
 
-    return job_trove_keyval_write(
-        s_op->req->u.unstuff.fs_id,
-        s_op->req->u.unstuff.handle,
-        &s_op->key,
-        &s_op->val,
-        0, NULL, smcb, 0, js_p, &j_id, server_job_context,
-        s_op->req->hints);
+    return job_trove_keyval_write(s_op->req->u.unstuff.fs_id,
+                                  s_op->req->u.unstuff.handle,
+                                  &s_op->key,
+                                  &s_op->val,
+                                  0,
+                                  NULL,
+                                  smcb,
+                                  0,
+                                  js_p,
+                                  &j_id,
+                                  server_job_context,
+                                  s_op->req->hints);
 }
 
 static PINT_sm_action update_dfile_count(
@@ -362,12 +367,16 @@ static PINT_sm_action update_dfile_count(
      */
     PVFS_object_attr_to_ds_attr(&s_op->resp.u.unstuff.attr, &s_op->ds_attr);
 
-    return job_trove_dspace_setattr(
-        s_op->req->u.unstuff.fs_id, s_op->req->u.unstuff.handle,
-        &s_op->ds_attr,
-        TROVE_SYNC,
-        smcb, 0, js_p, &j_id, server_job_context,
-        s_op->req->hints);
+    return job_trove_dspace_setattr(s_op->req->u.unstuff.fs_id,
+                                    s_op->req->u.unstuff.handle,
+                                    &s_op->ds_attr,
+                                    TROVE_SYNC,
+                                    smcb,
+                                    0,
+                                    js_p,
+                                    &j_id,
+                                    server_job_context,
+                                    s_op->req->hints);
 }
 
 static PINT_sm_action remove_layout(
@@ -379,15 +388,20 @@ static PINT_sm_action remove_layout(
     /* remove the layout and num_dfiles_req keyvals as the layout has
      * now been chosen.
      */
-    return job_trove_keyval_remove_list(
-        s_op->req->u.unstuff.fs_id, s_op->req->u.unstuff.handle,
-        s_op->key_a,
-        s_op->val_a,
-        s_op->error_a,
-        2,
-        TROVE_SYNC, NULL,
-        smcb, 0, js_p, &j_id, server_job_context,
-        s_op->req->hints);
+    return job_trove_keyval_remove_list(s_op->req->u.unstuff.fs_id,
+                                        s_op->req->u.unstuff.handle,
+                                        s_op->key_a,
+                                        s_op->val_a,
+                                        s_op->error_a,
+                                        2,
+                                        TROVE_SYNC,
+                                        NULL,
+                                        smcb,
+                                        0,
+                                        js_p,
+                                        &j_id,
+                                        server_job_context,
+                                        s_op->req->hints);
 }
 
 /* get_capability_setup

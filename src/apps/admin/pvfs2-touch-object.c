@@ -20,6 +20,7 @@
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "bmi.h"
+#include "pvfs2-dist-object.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -141,8 +142,8 @@ int main(int argc, char **argv)
                        & ~PVFS_util_get_umask(), 0);
         attr.atime = time(NULL);
         attr.mtime = attr.atime;
-        attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-        attr.dfile_count = 0;
+        attr.mask = PVFS_ATTR_SYS_ALL_SETABLE | PVFS_ATTR_SYS_DFILE_COUNT;
+        attr.dfile_count = 4;
 
         parent_ref = resp_lookup.ref;
 
@@ -203,11 +204,19 @@ int main(int argc, char **argv)
             }
         }
 
+        //basic instantiation for object dist temporary
+
+        PVFS_sys_dist mydist;
+        char distName[]="object_dist";
+        PVFS_object_params myParams;
+        mydist.name = distName;
+        mydist.params = &myParams;
+
         rc = PVFS_sys_create(filename,
                              parent_ref,
                              attr,
                              &credentials,
-                             NULL,      
+                             &mydist,       //created for object interface
                              &resp_create,
                              &layout,
                              NULL);
@@ -232,6 +241,42 @@ int main(int argc, char **argv)
 
     return ret;
 }
+
+/* write 'count' bytes from 'buffer' into (unix or pvfs2) file 'dest' 
+    added in to test object interfacing*/
+/*static size_t generic_write(file_object *dest, char *buffer, 
+    int64_t offset, size_t count, PVFS_credential *credentials,
+    int object_num)
+{
+    PVFS_Request mem_req, file_req;
+    PVFS_sysresp_io resp_io;
+    int ret;
+
+    if (dest->fs_type == UNIX_FILE)
+	return(write(dest->u.ufs.fd, buffer, count));
+    else
+    {
+	file_req = PVFS_BYTE;
+	ret = PVFS_Request_contiguous(count, PVFS_BYTE, &mem_req);
+	if (ret < 0)
+	{
+	    PVFS_perror("PVFS_Request_contiguous", ret);
+	    return(ret);
+	}
+	PVFS_util_refresh_credential(credentials);
+	ret = PVFS_sys_io_object(dest->u.pvfs2.ref, file_req, offset,
+		buffer, mem_req, credentials, &resp_io, hints, object_num);
+	if (ret == 0) 
+        {
+            PVFS_Request_free(&mem_req);
+	    return(resp_io.total_completed);
+        }
+	else
+	    PVFS_perror("PVFS_sys_write", ret);
+    }
+    return ret;
+}*/
+
 
 /* parse_args()
  *

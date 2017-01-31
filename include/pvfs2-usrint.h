@@ -101,6 +101,17 @@ extern int pvfs_valid_path(const char *path);
 
 extern int pvfs_valid_fd(int fd);
 
+/* functions to process server lists */
+extern PVFS_sys_layout *pvfs_layout(const char *path,char *serverlist);
+
+extern PVFS_sys_layout *pvfs_layout_fd(int dfd, char *serverlist);
+
+extern int pvfs_layout_string(PVFS_sys_layout *layout,
+                              void *buff,
+                              int size);
+
+extern void pvfs_release_layout(PVFS_sys_layout *layout);
+
 /* pvfs_open */
 extern int pvfs_open(const char *path, int flags, ...);
 
@@ -343,6 +354,12 @@ extern void *pvfs_mmap(void *start, size_t length, int prot, int flags,
 extern int pvfs_munmap(void *start, size_t length);
 
 extern int pvfs_msync(void *start, size_t length, int flags);
+
+/* pvfs_open_object */
+extern int pvfs_open_object(int fd, int obj_num);
+
+/* creates a file of object distribution and creates it with 4 dfiles */
+extern int pvfs_creat_object(const char *path, mode_t mode);
 
 #endif
 

@@ -34,19 +34,6 @@ SERVERSRC += $(src)
 LIBBMISRC += $(src)
 
 #
-# Add extra include paths and warnings just for this directory.
-#
-cflags :=
-ifdef GNUC
-cflags += -W -Wcast-qual -Wshadow -Wwrite-strings
-endif
-
-#
-# Extra cflags for files in this directory.
-#
-MODCFLAGS_$(DIR) := $(cflags)
-
-#
 # Each particular IB API needs its headers.
 #
 MODCFLAGS_$(DIR)/vapi.c := -I@IB_INCDIR@

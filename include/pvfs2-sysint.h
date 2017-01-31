@@ -48,12 +48,12 @@ struct PVFS_sys_attr_s
     PVFS_size size;
     PVFS2_ALIGN_VAR(char *, link_target);/**< NOTE: caller must free if valid */
     PVFS2_ALIGN_VAR(int32_t, dfile_count);
-    PVFS2_ALIGN_VAR(int32_t, distr_dir_servers_initial); /* Changed to int32_t so that size of structure does not change */
-    PVFS2_ALIGN_VAR(int32_t, distr_dir_servers_max); /* Changed to int32_t so that size of structure does not change */
-    PVFS2_ALIGN_VAR(int32_t, distr_dir_split_size); /* Changed to int32_t so that size of structure does not change */
+    PVFS2_ALIGN_VAR(int32_t, distr_dir_servers_initial);
+    PVFS2_ALIGN_VAR(int32_t, distr_dir_servers_max);
+    PVFS2_ALIGN_VAR(int32_t, distr_dir_split_size);
     PVFS2_ALIGN_VAR(uint32_t, mirror_copies_count);
-    PVFS2_ALIGN_VAR(char*, dist_name);   /**< NOTE: caller must free if valid */
-    PVFS2_ALIGN_VAR(char*, dist_params); /**< NOTE: caller must free if valid */
+    PVFS2_ALIGN_VAR(char *, dist_name);  /**< NOTE: caller must free if valid */
+    PVFS2_ALIGN_VAR(char *, dist_params);/**< NOTE: caller must free if valid */
     PVFS_size dirent_count;
     PVFS_ds_type objtype;
     PVFS_flags flags;
@@ -61,6 +61,14 @@ struct PVFS_sys_attr_s
     PVFS_size blksize;
 };
 typedef struct PVFS_sys_attr_s PVFS_sys_attr;
+
+/* this helper function assumes attr is a pointer to a PVFS_sys_attr
+ * struct.  It first frees any of the internal pointers (link target
+ * dist_name, dist_param et. al. then then frees main struct.  Any
+ * modifications to this struct should be checked against the code
+ * for this function.
+ */
+PVFS_error PVFS_sys_attr_free(PVFS_sys_attr *attr);
 
 /** Describes a PVFS2 file system. */
 struct PVFS_sys_mntent
@@ -110,6 +118,14 @@ struct PVFS_sysresp_getattr_s
     PVFS_sys_attr attr;
 };
 typedef struct PVFS_sysresp_getattr_s PVFS_sysresp_getattr;
+
+struct PVFS_sysresp_gethandles_s
+{
+    PVFS_handle* handle_array;
+    PVFS2_ALIGN_VAR(int32_t, dfile_count); /* Changed to int32_t so that size of structure does not change */
+};
+
+typedef struct PVFS_sysresp_gethandles_s PVFS_sysresp_gethandles;
 
 /* setattr */
 /* no data returned in setattr response */
@@ -305,6 +321,20 @@ PVFS_error PVFS_sys_getattr(
     PVFS_sysresp_getattr *resp,
     PVFS_hint hints);
 
+PVFS_error PVFS_sys_gethandles(
+    PVFS_object_ref ref,
+    const PVFS_credential *credential,
+    PVFS_sysresp_gethandles *resp,
+    PVFS_hint hint);
+
+PVFS_error PVFS_isys_gethandles(
+    PVFS_object_ref ref,
+    const PVFS_credential *credential,
+    PVFS_sysresp_gethandles *resp,
+    PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
+    void *user_ptr);
+
 PVFS_error PVFS_isys_setattr(
     PVFS_object_ref ref,
     PVFS_sys_attr attr,
@@ -462,6 +492,19 @@ PVFS_error PVFS_isys_io(
     PVFS_hint hints,
     void *user_ptr);
 
+PVFS_error PVFS_isys_io_object(PVFS_object_ref ref,
+                        PVFS_Request file_req,
+                        PVFS_offset file_req_offset,
+                        void *buffer,
+                        PVFS_Request mem_req,
+                        const PVFS_credential *credential,
+                        PVFS_sysresp_io *resp_p,
+                        enum PVFS_io_type io_type,
+                        PVFS_sys_op_id *op_id,
+                        PVFS_hint hints,
+                        void *user_ptr,
+                        int object_num);
+
 /** Macro for convenience read is a call to io */
 #define PVFS_isys_read(x1,x2,x3,x4,x5,x6,y,x7,x8,x9) \
 PVFS_isys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,x7,x8,x9)
@@ -488,6 +531,18 @@ PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,z)
 /** Macro for convenience write is a call to io */
 #define PVFS_sys_write(x1,x2,x3,x4,x5,x6,y,z) \
 PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE,z)
+
+PVFS_error PVFS_sys_io_object(PVFS_object_ref ref,
+                              PVFS_Request file_req,
+                              PVFS_offset file_req_offset,
+                              void *buffer,
+                              PVFS_Request mem_req,
+                              const PVFS_credential *credential,
+                              PVFS_sysresp_io *resp_p,
+                              enum PVFS_io_type io_type,
+                              PVFS_hint hints,
+                              int object_number);
+
 
 PVFS_error PVFS_isys_truncate(
     PVFS_object_ref ref,

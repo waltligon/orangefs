@@ -1,0 +1,268 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface routines for obtaining metadata (handles/dfile count) of an object
+ *  (file or directory).
+ */
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+#include "pint-util.h"
+#include "pvfs2-util.h"
+#include "pint-cached-config.h"
+#include "PINT-reqproto-encode.h"
+#include "pvfs2-internal.h"
+#include "pvfs2-types-debug.h"
+#include "security-util.h"
+#include "dist-dir-utils.h"
+
+/* pvfs2_client_gethandles_sm
+ *
+ * The sm_p->msgpair structure is used to get the attributes of the
+ * object itself.  We convert the original attribute mask
+ * to ask for datafile and distribution info
+ * if the user asked for file size (PVFS_ATTR_SYS_SIZE).  This allows
+ * us to obtain this information (if the object turns out to be a
+ * metafile) so that we can later look up the datafile sizes and
+ * calculate the overall file size.
+ *
+ * The sm_p->msgpairarray is used to get datafile sizes, if it turns
+ * out that we need them.  This space will also need to be freed, if
+ * we grab these sizes.
+ */
+
+%%
+
+machine pvfs2_client_sysint_gethandles_sm
+{
+    state io_init
+    {
+        run PVFS_io_init;
+        default => dowork;
+    }
+    state dowork
+    {
+        jump pvfs2_client_getattr_sm;
+        default => transfer_handles; 
+    }
+
+    state transfer_handles
+    {
+        run PVFS_transfer_handles;
+        default => set_sys_response;
+    }
+
+    state set_sys_response
+    {
+        run gethandles_set_sys_response;
+        default => terminate;
+    }
+}
+    
+%%
+
+PVFS_error PVFS_isys_gethandles(PVFS_object_ref ref,
+                                const PVFS_credential *credential,
+                                PVFS_sysresp_gethandles *resp_p,
+                                PVFS_sys_op_id *op_id,
+                                PVFS_hint hints,
+                                void *user_ptr)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_gethandles entered\n");
+
+    if ((ref.handle == PVFS_HANDLE_NULL) ||
+        (ref.fs_id == PVFS_FS_ID_NULL) || (resp_p == NULL))
+    {
+        gossip_err("invalid (NULL) required argument\n");
+        return ret;
+    }
+    
+    PINT_smcb_alloc(&smcb,
+                    PVFS_SYS_GETHANDLES, 
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
+    if (smcb == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_init_msgarray_params(sm_p, sm_p->object_ref.fs_id);
+
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
+    sm_p->object_ref = ref;
+    sm_p->error_code = 0;
+
+    PVFS_hint_copy(hints, &sm_p->hints);
+    PVFS_hint_add(&sm_p->hints,
+                  PVFS_HINT_HANDLE_NAME,
+                  sizeof(PVFS_handle),
+                  &ref.handle);
+
+    sm_p->u.gethandles.object = ref;
+    sm_p->u.gethandles.mask = PVFS_ATTR_META_DFILES;
+    sm_p->u.gethandles.resp_p = resp_p;
+
+    return PINT_client_state_machine_post(smcb,
+                                          op_id,
+                                          user_ptr);
+}
+
+/** Retrieve object attributes.
+ */
+PVFS_error PVFS_sys_gethandles(PVFS_object_ref ref,
+                               const PVFS_credential *credential,
+                               PVFS_sysresp_gethandles *resp_p,
+                               PVFS_hint hints)
+{
+    PVFS_error ret, error;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_gethandles entered\n");
+
+    ret = PVFS_isys_gethandles(ref,
+                               credential,
+                               resp_p,
+                               &op_id,
+                               hints,
+                               NULL);
+    if (ret)
+    {
+        PVFS_perror_gossip("PVFS_isys_gethandles call", ret);
+        return ret;
+    }
+
+    if(op_id != -1)
+    {
+        /* did not complete immediately, so we wait */
+
+        ret = PVFS_sys_wait(op_id, "gethandles", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+        }
+        if(error)
+        {
+            ret = error;
+        }
+        PINT_sys_release(op_id);
+    }
+
+    return ret;
+}
+
+/* this is used as a state to call a fill for the getattr 
+ *
+ */
+
+static PINT_sm_action PVFS_io_init(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
+    PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
+                               sm_p->u.gethandles.object,
+                               sm_p->u.gethandles.mask,
+                               PVFS_TYPE_NONE,
+                               0);
+
+    return SM_ACTION_COMPLETE;
+}
+
+/*function used to transfer the handles brought back in the client state machine structure
+ *into another portion of the state machine pointer dedicated to the access of handles 
+ *for user interaction
+ */
+
+static PINT_sm_action PVFS_transfer_handles (struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i = 0, num_dfiles = 0;    
+
+    num_dfiles = sm_p->u.gethandles.resp_p->dfile_count =
+                 sm_p->getattr.attr.u.meta.dfile_count;
+    sm_p->u.gethandles.resp_p->handle_array =
+                 (PVFS_handle *)malloc(num_dfiles * sizeof(PVFS_handle));
+
+    for(i = 0; i < num_dfiles; i++)
+    {
+        sm_p->u.gethandles.resp_p->handle_array[i] =
+                 sm_p->getattr.attr.u.meta.dfile_array[i];
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action gethandles_set_sys_response(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_sysresp_gethandles * sysresp = NULL;
+    PVFS_object_attr *attr = NULL;
+
+    if(js_p->error_code != 0)
+    {
+        PINT_SET_OP_COMPLETE;
+        return SM_ACTION_TERMINATE;
+    }
+
+    attr = &sm_p->getattr.attr;
+    assert(attr);
+    
+    /* If we get to this state action, 
+     * the gethandles state machine was invoked, so
+     * we can assume that one of the PVFS_[i]sys_gethandles functions
+     * was called, and the response field must be filled in for the
+     * user.
+     */
+
+    sysresp = sm_p->u.gethandles.resp_p;
+   
+    int i = 0;
+    
+    if (js_p->error_code == 0)
+    {
+        sysresp->dfile_count = sm_p->u.gethandles.resp_p->dfile_count;
+        for(i = 0; i < sysresp->dfile_count; i++)
+        {
+            sysresp->handle_array[i] = sm_p->u.gethandles.resp_p->handle_array[i];
+        }
+    }
+    else
+    {
+        /* in case of failure, blank out response */ 
+        memset(sm_p->u.gethandles.resp_p, 0, sizeof(PVFS_sysresp_gethandles));
+    }
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

@@ -18,6 +18,7 @@ extern PINT_dist basic_dist;
 extern PINT_dist simple_stripe_dist;
 extern PINT_dist varstrip_dist;
 extern PINT_dist twod_stripe_dist;
+extern PINT_dist object_dist;
 
 /* Struct for determining how to set a distribution parameter by name */
 typedef struct PINT_dist_param_offset_s
@@ -74,6 +75,9 @@ int PINT_dist_initialize(server_configuration_s* server_config)
     /* Register the twod stripe distribution */
     PINT_register_distribution(&twod_stripe_dist);
 
+    /* Register the object distribution */
+    PINT_register_distribution(&object_dist);
+
     /* add an associated unregister to any new distributions */
     return ret;
 }
@@ -85,6 +89,7 @@ void PINT_dist_finalize(void)
     PINT_unregister_distribution(varstrip_dist.dist_name);
     PINT_unregister_distribution(simple_stripe_dist.dist_name);
     PINT_unregister_distribution(twod_stripe_dist.dist_name);
+    PINT_unregister_distribution(object_dist.dist_name);
 
     free(PINT_dist_param_table);
     PINT_dist_param_table = 0;
