@@ -261,7 +261,7 @@ fi],
 AC_SUBST(BUILD_SERVER)
 
 AC_ARG_WITH(db-backend,
-[  --with-db-backend        Use specified database (bdb, lmdb, or cassandra).],
+[  --with-db-backend        Use specified database (bdb, lmdb, cassandra, couchbase).],
 if test "${withval}" = "bdb"
 then
     DATABASE_BACKEND=bdb
@@ -272,6 +272,9 @@ then
 elif test "${withval}" = "cassandra"
 then
     DATABASE_BACKEND=cassandra
+elif test "${withval}" = "couchbase"
+then
+    DATABASE_BACKEND=couchbase
 else
     AC_MSG_ERROR(database backend ${withval} invalid)
 fi

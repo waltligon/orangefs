@@ -386,6 +386,10 @@ ifeq ($(DATABASE_BACKEND),cassandra)
 SERVERLIBS += -lcassandra
 endif
 
+ifeq ($(DATABASE_BACKEND),couchbase)
+SERVERLIBS += -lcouchbase
+endif
+
 ifdef NEEDS_LIBRT 
 	SERVERLIBS += -lrt
 endif

@@ -32,6 +32,10 @@ SERVERSRC += \
 #MODCFLAGS_$(DIR) = -I$(CASSANDRA_INCLUDE) -DUSE_CASSANDRA
 MODCFLAGS_$(DIR) = -DUSE_CASSANDRA
 endif
+ifeq ($(DATABASE_BACKEND),couchbase)
+SERVERSRC += \
+	$(DIR)/dbpf-db-couchbase.c
+endif
 
 # Grab trove-ledger.h from handle-mgmt.  Also make _GNU_SOURCE definition 
 # required for access to pread/pwrite on Linux.  _XOPEN_SOURCE seems to be

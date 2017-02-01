@@ -1691,6 +1691,7 @@ struct dbpf_storage *dbpf_storage_lookup(
         return NULL;
     }
 
+#if 0
 #ifndef USE_CASSANDRA /* Cassandra does not have local files, so this stat should be disabled */
     if (stat(meta_path, &sbuf) < 0)
     {
@@ -1703,6 +1704,7 @@ struct dbpf_storage *dbpf_storage_lookup(
 	gossip_err("%s is not a directory\n", meta_path);
 	return NULL;
     }
+#endif
 #endif
 
     sto_p = (struct dbpf_storage *)malloc(sizeof(struct dbpf_storage));
@@ -1733,6 +1735,7 @@ struct dbpf_storage *dbpf_storage_lookup(
 
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, meta_path);
 
+#if 0
 #ifndef USE_CASSANDRA /* Cassandra does not have local files, so this stat should be disabled */
     /* we want to stat the attrib db first in case it doesn't
      * exist but the storage directory does
@@ -1742,6 +1745,7 @@ struct dbpf_storage *dbpf_storage_lookup(
         *error_p = -TROVE_ENOENT;
         return NULL;
     }
+#endif
 #endif
 
     ret = dbpf_db_open(path_name, 0, &sto_p->sto_attr_db, 0, server_cfg, 0);
