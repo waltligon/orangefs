@@ -117,7 +117,7 @@ enum
  *
  * WBL V3 Uncomment this declaration if it doesn't cause problems
  */
-/* extern PINT_server_trove_keys_s Trove_Special_Keys[]; */
+extern PINT_server_trove_keys_s Trove_Special_Keys[];
 /* optional; user-settable keys */
 enum 
 {
@@ -531,7 +531,7 @@ struct PINT_server_mkdir_op
     PVFS_fs_id fs_id;
     PVFS_handle_extent_array handle_extent_array;
     PVFS_size init_dirdata_size;
-    PVFS_capability *saved_capability;
+    PVFS_capability server_to_server_capability;
     PVFS_object_attr *saved_attr;
 
     /* dist-dir-struct
@@ -924,6 +924,14 @@ extern void getattr_free(struct PINT_server_op *s_op);
 struct server_configuration_s *get_server_config_struct(void);
 int server_perf_start_rollover(struct PINT_perf_counter *pc,
                                struct PINT_perf_counter *tpc);
+
+/* keyval management prototypes */
+void free_keyval_buffers(struct PINT_server_op *s_op);
+void keep_keyval_buffers(struct PINT_server_op *s_op, int buf);
+/* this macro is used in keyval management to represent the key and val
+ * pointers of the s_op
+ */
+#define KEYVAL -1
 
 /* exported state machine resource reclamation function */
 int server_post_unexpected_recv(void);

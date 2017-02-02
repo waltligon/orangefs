@@ -898,6 +898,14 @@ do {                                                                      \
     PINT_CONVERT_ATTR(&(__req).u.setattr.attr, &(__attr), __extra_amask); \
 } while (0)
 
+    /*
+     * converting attr and modifying it in a FILL macro is bad form
+     * moving this back into the state machines for this and mkdir
+    (__attr).objtype = (__objtype);                                       \
+    (__attr).mask |= PVFS_ATTR_SYS_TYPE;                                  \
+    PINT_CONVERT_ATTR(&(__req).u.setattr.attr, &(__attr), __extra_amask); \
+     */
+
 /* lookup path ************************************************/
 /* - looks up as many elements of the specified path as possible */
 struct PVFS_servreq_lookup_path
@@ -1004,36 +1012,46 @@ endecode_fields_9_struct(
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent) + \
      extra_size_PVFS_credential + extra_size_PVFS_object_attr)
 
-#define PINT_SERVREQ_MKDIR_FILL(__req,                                         \
-                                __cap,                                         \
-                                __cred,                                        \
-                                __fs_id,                                       \
-                                __ext_array,                                   \
-                                __attr,                                        \
-                                __distr_dir_servers_initial,                   \
-                                __distr_dir_servers_max,                       \
-                                __distr_dir_split_size,                        \
-                                __layout,                                      \
-                                __hints)                                       \
-do {                                                                           \
-    memset(&(__req), 0, sizeof(__req));                                        \
-    (__req).op = PVFS_SERV_MKDIR;                                              \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                                \
-    (__req).u.mkdir.credential = (__cred);                                     \
-    (__req).hints = (__hints);                                                 \
-    (__req).u.mkdir.fs_id = __fs_id;                                           \
-    (__req).u.mkdir.handle_extent_array.extent_count =                         \
-        (__ext_array).extent_count;                                            \
-    (__req).u.mkdir.handle_extent_array.extent_array =                         \
-        (__ext_array).extent_array;                                            \
-    (__req).u.mkdir.distr_dir_servers_initial = (__distr_dir_servers_initial); \
-    (__req).u.mkdir.distr_dir_servers_max = (__distr_dir_servers_max);         \
-    (__req).u.mkdir.distr_dir_split_size = (__distr_dir_split_size);           \
-    (__req).u.mkdir.layout = __layout;                                         \
-    (__attr).objtype = PVFS_TYPE_DIRECTORY;                                    \
-    (__attr).mask   |= PVFS_ATTR_SYS_TYPE;                                     \
-    PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);                    \
+#define PINT_SERVREQ_MKDIR_FILL(__req,                               \
+                                __cap,                               \
+                                __cred,                              \
+                                __fs_id,                             \
+                                __ext_array,                         \
+                                __attr,                              \
+                                __distr_dir_servers_initial,         \
+                                __distr_dir_servers_max,             \
+                                __distr_dir_split_size,              \
+                                __layout,                            \
+                                __hints)                             \
+do {                                                                 \
+    memset(&(__req), 0, sizeof(__req));                              \
+    (__req).op = PVFS_SERV_MKDIR;                                    \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                      \
+    (__req).u.mkdir.credential = (__cred);                           \
+    (__req).hints = (__hints);                                       \
+    (__req).u.mkdir.fs_id = __fs_id;                                 \
+    (__req).u.mkdir.handle_extent_array.extent_count =               \
+                    (__ext_array).extent_count;                      \
+    (__req).u.mkdir.handle_extent_array.extent_array =               \
+                    (__ext_array).extent_array;                      \
+    (__req).u.mkdir.distr_dir_servers_initial =                      \
+                    (__distr_dir_servers_initial);                   \
+    (__req).u.mkdir.distr_dir_servers_max =                          \
+                    (__distr_dir_servers_max);                       \
+    (__req).u.mkdir.distr_dir_split_size =                           \
+                    (__distr_dir_split_size);                        \
+    (__req).u.mkdir.layout = __layout;                               \
+    PINT_copy_object_attr(&(__req).u.mkdir.attr, &(__attr));         \
 } while (0)
+
+    /* calling a convert in a fill macro is bad form - it prevents
+     * accessing all of the attr fields plus it obsfucates.
+     * I am moving these back to the state machines both here and
+     * in setattr
+    (__attr).objtype = PVFS_TYPE_DIRECTORY;                          \
+    (__attr).mask   |= PVFS_ATTR_COMMON_TYPE;                        \
+    PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);          \
+     */
 
 struct PVFS_servresp_mkdir
 {

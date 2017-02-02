@@ -5386,9 +5386,9 @@ int PINT_config_pvfs2_mkspace(struct server_configuration_s *config)
             }
 
             cur_meta_handle_range = PINT_config_get_meta_handle_range_str(
-                config, cur_fs);
+                            config, cur_fs);
             cur_data_handle_range = PINT_config_get_data_handle_range_str(
-                config, cur_fs);
+                            config, cur_fs);
 
             /*
               make sure have either a meta or data handle range (or

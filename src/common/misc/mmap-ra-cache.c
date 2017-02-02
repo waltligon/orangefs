@@ -128,7 +128,7 @@ int pint_racache_initialize(void)
                      "initalized.  returning success\n");
         ret = 0;
     }
-    return 0;
+    return ret;
 }
 
 /* reset a file */

@@ -4,6 +4,7 @@ OrangeFS Release ChangeLog
 -----------------------
 orangefs-2.9.x (Subversion Branch v.2.9.x)
 http://dev.orangefs.org/svn/orangefs/branches/v.2.9.x
+up to rev 12755 in trunk
 
 
 * - Server  
@@ -11,6 +12,9 @@ http://dev.orangefs.org/svn/orangefs/branches/v.2.9.x
 	    operations.
 	* - Removed memory leaks from the getattr operation and restructured
 	    keyval buffer management.
+	* - Corrected problem with mgmt-create-root-dir related to having a
+	    correct capability when calling tree-setattr.
+	* - Fixed capability errors that may occur during mkdir.
 
 * - Clients
 	* - Client Core
