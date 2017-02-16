@@ -17,7 +17,7 @@
 #include "orange.h"
 
 /* optional parameters, filled in by parse_args() */
-struct rm_options
+struct user_options
 {
     char *dist_name;
     char *dist_params;
@@ -39,7 +39,7 @@ struct layout_table_s
 };
 
 static int translate_layout(char *layout);
-static int parse_args(int argc, char **argv, struct rm_options *user_opts_p);
+static int parse_args(int argc, char **argv, struct user_options *user_opts_p);
 static void usage(int argc, char **argv);
 
 int main(int argc, char **argv)
@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     FTSENT *node;
     int flags = 0;
     unsigned char error_seen = 0;
-    struct rm_options user_opts =
+    struct user_options user_opts =
                       {NULL, NULL, 0, 0, NULL, 0, 0, 0, 0, 0, NULL};
     
     /* look at command line arguments */
@@ -274,7 +274,10 @@ int main(int argc, char **argv)
         case FTS_NSOK : /* no stat ok */
         case FTS_ERR :  /* error */
         default:
-            fprintf(stderr, "%s: %s is not a directory, or symbolic link\n", argv[0], node->fts_path);
+            fprintf(stderr,
+                    "%s: %s is not a directory, or symbolic link\n",
+                    argv[0],
+                    node->fts_path);
             usage(argc, argv);
             ret = -1;
             goto main_out;
@@ -336,7 +339,7 @@ static int translate_layout(char *layout)
  *
  * Returns 0 on success and exits with EXIT_FAILURE on failure.
  */
-static int parse_args(int argc, char **argv, struct rm_options *user_opts_p)
+static int parse_args(int argc, char **argv, struct user_options *user_opts_p)
 {
     int one_opt = 0;
     char flags[] = "vVdirfhD:p:n:l:L:";

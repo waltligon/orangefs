@@ -2558,17 +2558,17 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
                   "--- check_for_speculative found exist buffer"
                   "- Do not issue a spec read\n");
             break;
+        /* in these two cases we are no longer processing readaheadss
+         * either because the buffers are busy or there is an error
+         * so we jump to fast_exit, free the rareq and go
+         */
         case RACACHE_NONE:
             /* no buffers available so no more readahead */
             gossip_debug(GOSSIP_RACACHE_DEBUG,
                          "--- check_for_speculative buffer NA\n");
-            PVFS_hint_free(rareq->hints);
-            free (rareq);
             goto fast_exit;
         default:
             gossip_err("unexpected return from pint_racache_get_block");
-            PVFS_hint_free(rareq->hints);
-            free (rareq);
             goto fast_exit;
         } /* end switch */
     } /* end for loop */

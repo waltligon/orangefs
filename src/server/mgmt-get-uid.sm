@@ -89,6 +89,12 @@ static PINT_sm_action uid_mgmt_do_work(
     /* gather all uid statistics and store them in the static array */
     PINT_dump_all_uid_stats(static_array);
 
+    for (i=0; i<UID_MGMT_MAX_HISTORY; i++)
+    {
+        gossip_err("%s:static_array[%d].uid   = %d\n",__func__,i,static_array[i].uid);
+        gossip_err("%s:static_array[%d].count = %llu\n",__func__,i,(long long unsigned int)static_array[i].count);
+    }
+
     /* get a timestamp for the max history we want to look through */
     PINT_util_get_current_timeval(&oldest);
     oldest.tv_sec -= s_op->req->u.mgmt_get_uid.history;
