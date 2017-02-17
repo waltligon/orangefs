@@ -223,7 +223,7 @@ static struct options *parse_args(int argc, char* argv[])
 
     tmp_opts->history = atoi(argv[argc - 1]);
     tmp_opts->history_set = 1;
-    if(!tmp_opts->mnt_point_set || !tmp_opts->history >= 1)
+    if(!tmp_opts->mnt_point_set || tmp_opts->history < 1)
     {
         if(!tmp_opts->mnt_point_set)
         {
@@ -233,7 +233,7 @@ static struct options *parse_args(int argc, char* argv[])
         {
             fprintf(stderr,"Error: History is required.\n");
         }
-        if(!tmp_opts->history <= 0)
+        if(tmp_opts->history < 0)
         {
             fprintf(stderr,"Error: History is must be greater than 0.\n");
         }
