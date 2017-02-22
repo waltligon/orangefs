@@ -1099,7 +1099,7 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
         credential,
         vfs_request->in_upcall.req.readdirplus.mask,
         &vfs_request->response.readdirplus,
-        &vfs_request->op_id, (void *)vfs_request, hints);
+        &vfs_request->op_id, hints, (void *)vfs_request);
     vfs_request->hints = hints;
 
     if (credential)
