@@ -175,14 +175,20 @@ static int ib_check_cq(void)
                       llu(wc.id), 
                       wc_status_string(wc.status), 
                       bh->c->peername);
-                if (wc.id) 
+
+                if (bh) 
                 {
-                    ib_connection_t *c = ptr_from_int64(wc.id);
+                    ib_connection_t *c = bh->c;
                     if (c->cancelled) 
                     {
                         debug(0,
                             "%s: ignoring send error on cancelled conn to %s",
-                            __func__, bh->c->peername);
+                            __func__, c->peername);
+                    }
+                    else
+                    {
+                        debug(0, "%s: send error on non-cancelled conn to %s",
+                              __func__, c->peername);
                     }
                 }
             } 
