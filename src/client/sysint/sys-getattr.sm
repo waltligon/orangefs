@@ -2064,7 +2064,10 @@ static PINT_sm_action getattr_cleanup(struct PINT_smcb *smcb,
     }
 
     /* cleanup getattr when an error occurs */
-    PINT_free_object_attr(&getattr->attr);
+    if (js_p->error_code)
+    {
+        PINT_free_object_attr(&getattr->attr);
+    }
 
     return SM_ACTION_COMPLETE;
 }
