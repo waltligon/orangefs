@@ -84,7 +84,9 @@ machine pvfs2_client_mkdir_sm
     state mkdir_msg_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => mkdir_getattr_setup;
+/*        success => mkdir_getattr_setup; */
+/*        success => mkdir_crdirent_setup_msgpair; */
+        success => cleanup;
         default => mkdir_msg_failure;
     }
 
@@ -94,6 +96,7 @@ machine pvfs2_client_mkdir_sm
         default => cleanup;
     }
 
+/*
     state mkdir_getattr_setup
     {
         run mkdir_getattr_setup;
@@ -127,6 +130,7 @@ machine pvfs2_client_mkdir_sm
         run mkdir_seteattr_failure;
         default => delete_handle_setup_msgpair;
     }
+*/
 
     state mkdir_crdirent_setup_msgpair
     {
@@ -317,7 +321,9 @@ static int mkdir_msg_comp_fn(void *v_p,
                              int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+    PVFS_uid local_uid;
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir_msg_comp_fn\n");
 
@@ -328,8 +334,23 @@ static int mkdir_msg_comp_fn(void *v_p,
         return resp_p->status;
     }
 
-    /* insert entry into attr cache */
-    PINT_acache_update(sm_p->object_ref, &resp_p->u.mkdir.attr, NULL);
+    PINT_debug_capability(&resp_p->u.mkdir.capability, "mkdir returned");
+
+    /* get local uid for indexing */
+    local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+    if (local_uid != (PVFS_uid) -1)
+    {
+        ret = PINT_client_capcache_update(sm_p->object_ref,
+                  local_uid, &resp_p->u.mkdir.capability);
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: "
+                     "PINT_client_capcache_update returned %d\n",
+                     __func__, ret);
+    }
+    else
+    {
+        gossip_err("%s: could not get local uid for client capcache\n",
+                   __func__);
+    }
 
     return 0;
 }
@@ -553,8 +574,6 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
-
-PINT_debug_capability(&sm_p->getattr.attr.capability, "Calling MKDIR_FILL with capability");
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -822,11 +841,13 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
     }
 
     PVFS_util_release_sys_attr(&sm_p->u.mkdir.sys_attr);
+/*
     PINT_free_object_attr(&sm_p->getattr.attr);
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->u.mkdir.metadata_getattr);
     
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+*/
 
     sm_p->error_code = (sm_p->u.mkdir.stored_error_code ?
                         sm_p->u.mkdir.stored_error_code :
@@ -876,7 +897,7 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
     return SM_ACTION_TERMINATE;
 }
 
-
+#if 0
 static PINT_sm_action mkdir_getattr_setup(struct PINT_smcb *smcb,
                                           job_status_s *js_p)
 {
@@ -1057,6 +1078,7 @@ static PINT_sm_action mkdir_seteattr_failure(struct PINT_smcb *smcb,
     PVFS_perror_gossip("mkdir seteattr failed", js_p->error_code);
     return SM_ACTION_COMPLETE;
 }
+#endif
 
 /*
  * Local variables:

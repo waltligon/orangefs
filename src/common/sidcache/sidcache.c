@@ -221,7 +221,7 @@ int SID_string_to_type(const char *typestring)
         return -PVFS_EINVAL;
     }
 
-    mytype = (char *)malloc(len);
+    mytype = (char *)malloc(len+1);
 
     for (i = 0; i < len; i++)
     {

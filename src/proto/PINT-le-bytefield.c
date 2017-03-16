@@ -222,7 +222,7 @@ static void lebf_initialize(void)
             case PVFS_SERV_MKDIR:
                 zero_credential(&req.u.mkdir.credential);
                 req.u.mkdir.attr.mask = 0;
-                resp.u.mkdir.attr.mask = 0;
+                zero_capability(&resp.u.create.capability);
                 reqsize = extra_size_PVFS_servreq_mkdir;
                 respsize = extra_size_PVFS_servresp_mkdir;
                 break;

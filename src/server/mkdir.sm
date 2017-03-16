@@ -45,7 +45,7 @@ nested machine pvfs2_mkdir_work_sm
     {
         run mkdir_setattrib;
 /*        success => create_dirdata; */
-        success => write_keyval_to_meta_handle;
+        success => write_keyvals;
         default => err_msg;
     }
 
@@ -53,14 +53,14 @@ nested machine pvfs2_mkdir_work_sm
     state create_dirdata
     {
         run mkdir_create_dirdata;
-        success => write_keyval_to_meta_handle;
+        success => write_keyvals;
         default => err_msg;
     }
 */
 
-    state write_keyval_to_meta_handle
+    state write_keyvals
     {
-        run mkdir_write_keyval_to_meta_handle;
+        run mkdir_write_keyvals;
         success => setup_getattr_request;
         default => err_msg;
     }
@@ -74,7 +74,7 @@ nested machine pvfs2_mkdir_work_sm
 
     state initiate_getattr_request
     {
-        jump pvfs2_get_attr_work_sm;
+        jump pvfs2_get_attr_with_prelude_sm;
         default => setup_resp;
     }
 
@@ -153,10 +153,10 @@ static PINT_sm_action mkdir_create(struct PINT_smcb *smcb, job_status_s *js_p)
     ret = job_trove_dspace_create(s_op->u.mkdir.fs_id,
                                   s_op->u.mkdir.handle,
                                   PVFS_TYPE_DIRECTORY,
-                                  NULL,
-                                  TROVE_SYNC,
-                                  smcb,
-                                  0,
+                                  NULL,       /* hint */
+                                  TROVE_SYNC, /* flags */
+                                  smcb,       /* user_ptr */
+                                  0,          /* status_user_tag */
                                   js_p,
                                   &i,
                                   server_job_context,
@@ -190,6 +190,7 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_MKDIR_DEBUG, " setting directory version to "
                  "%llu\n\tmtime is %llu\n", llu(ds_attr->mtime),
                  llu(PINT_util_mkversion_time(ds_attr->mtime)));
+
 
     ret = job_trove_dspace_setattr(s_op->u.mkdir.fs_id,
                                    s_op->u.mkdir.handle,
@@ -316,25 +317,27 @@ static int tree_setattr_comp_fn(void *v_p,
 /* V3 SIDs will get added to the handles, possibly the bitmap too, and
  * the attr should be moved into the dspace record
  */
-/** writes 3 keyvals for the new directory - the distdir attributes, the
- * bitmap, and the handles of the dirdata objects
+/** writes 2 keyvals for the new directory - the bitmap and the handles
+ * of the dirdata objects
+ * ADD BACKPOINTER V3
  */
-static PINT_sm_action mkdir_write_keyval_to_meta_handle(
-                                            struct PINT_smcb *smcb,
-                                            job_status_s *js_p)
+static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
+                                          job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr;
     int ret = -1;
     job_id_t j_id;
 
-    /* total 2 keyvals,
-     * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES */
-    int keyval_count = 2;
+    /* total 3 keyvals,
+     * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES, PARENT */
+    int keyval_count = 3;
 
     /* free saved capability */
+/*
     PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
     s_op->u.mkdir.saved_capability = NULL;
+*/
 
     attr = &s_op->req->u.mkdir.attr;
 
@@ -344,6 +347,7 @@ static PINT_sm_action mkdir_write_keyval_to_meta_handle(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    ZEROMEM(s_op->key_a, (sizeof(PVFS_ds_keyval) * keyval_count));
 
     s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
     if(!s_op->val_a)
@@ -352,19 +356,28 @@ static PINT_sm_action mkdir_write_keyval_to_meta_handle(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
-    s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
+    ZEROMEM(s_op->val_a, (sizeof(PVFS_ds_keyval) * keyval_count));
+
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
+    s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
 
     s_op->val_a[0].buffer_sz = attr->u.dir.dist_dir_attr.bitmap_size * 
                                sizeof(PVFS_dist_dir_bitmap_basetype);
     s_op->val_a[0].buffer = attr->u.dir.dist_dir_bitmap;
 
-    s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
-    s_op->val_a[1].buffer = attr->u.dir.dirdata_handles;
+    s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
+
     s_op->val_a[1].buffer_sz = OSASZ(attr->u.dir.dist_dir_attr.dirdata_count,
                                      attr->u.dir.dist_dir_attr.sid_count);
+    s_op->val_a[1].buffer = attr->u.dir.dirdata_handles;
+
+    s_op->key_a[2].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
+    s_op->key_a[2].buffer = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
+
+    s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.mkdir.sid_count);
+    s_op->val_a[2].buffer = s_op->req->u.mkdir.parent;
+
 
     ret = job_trove_keyval_write_list(
                                   s_op->req->u.mkdir.fs_id,
@@ -372,10 +385,10 @@ static PINT_sm_action mkdir_write_keyval_to_meta_handle(
                                   s_op->key_a,
                                   s_op->val_a,
                                   keyval_count,
-                                  TROVE_SYNC,
-                                  NULL,
-                                  smcb,
-                                  0,
+                                  TROVE_SYNC, /* flags */
+                                  NULL,       /* vtag */
+                                  smcb,       /* user_ptr */
+                                  0,          /* status_user_tag */
                                   js_p,
                                   &j_id,
                                   server_job_context,
@@ -396,37 +409,48 @@ static PINT_sm_action mkdir_setup_getattr_request(
                                             struct PINT_smcb *smcb,
                                             job_status_s *js_p)
 {
-   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-   struct PINT_server_op *getattr_op;
-   int ret;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *getattr_op;
+    int ret;
+    PVFS_capability capability;
 
-   getattr_op = calloc(1,sizeof(*getattr_op));
-   if ( !getattr_op )
-   {
-      js_p->error_code = -PVFS_ENOMEM;
-      return SM_ACTION_COMPLETE;
-   }
+    getattr_op = calloc(1,sizeof(*getattr_op));
+    if ( !getattr_op )
+    {
+       js_p->error_code = -PVFS_ENOMEM;
+       return SM_ACTION_COMPLETE;
+    }
 
-   getattr_op->attr = s_op->resp.u.mkdir.attr;
+    PINT_null_capability(&capability);
 
-   getattr_op->req = s_op->req;
+    getattr_op->req = &getattr_op->decoded.stub_dec.req;        
+    PINT_SERVREQ_GETATTR_FILL(*getattr_op->req,
+                              capability,
+                              s_op->req->u.mkdir.credential,
+                              s_op->req->u.mkdir.fs_id,
+                              s_op->u.mkdir.handle,
+                              PVFS_ATTR_READ_ALL_FASTEST,
+                              NULL);
 
-   getattr_op->u.getattr.fs_id      = s_op->req->u.mkdir.fs_id;
-   getattr_op->u.getattr.handle     = s_op->req->u.mkdir.handle;
-   getattr_op->u.getattr.attrmask   = PVFS_ATTR_READ_ALL_FASTEST;
-   getattr_op->u.getattr.credential = s_op->req->u.mkdir.credential;
+    PINT_cleanup_capability(&capability);
+/*
+    getattr_op->u.getattr.fs_id      = s_op->req->u.mkdir.fs_id;
+    getattr_op->u.getattr.handle     = s_op->u.mkdir.handle;
+    getattr_op->u.getattr.attrmask   = PVFS_ATTR_READ_ALL_FASTEST;
+    getattr_op->u.getattr.credential = s_op->req->u.mkdir.credential;
+*/
 
-   ret = PINT_sm_push_frame(smcb, 0, getattr_op);
-   if ( ret < 0 )
-   {
-      gossip_err("%s:Error pushing getattr frame onto mkdir stack:ret(%d)\n",__func__,ret);
-      free(getattr_op);
-      js_p->error_code = ret;
-      return SM_ACTION_COMPLETE;
-   }
+    ret = PINT_sm_push_frame(smcb, 0, getattr_op);
+    if ( ret < 0 )
+    {
+       gossip_err("%s:Error pushing getattr frame onto mkdir stack:ret(%d)\n",
+                   __func__, ret);
+       free(getattr_op);
+       js_p->error_code = ret;
+       return SM_ACTION_COMPLETE;
+    }
 
-   return SM_ACTION_COMPLETE;
-
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -445,37 +469,26 @@ static PINT_sm_action mkdir_setup_response(
    struct PINT_server_op *s_op;
    int task_id;
    int remaining;
-#if 0
    int ret;
    PVFS_object_attr *resp_attr;
-#endif
 
    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
-
-#if 0
-   if ( js_p->error_code )
-   {
-      goto out;
-   }
+   resp_attr = &(getattr_op->resp.u.getattr.attr);
 
    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-   resp_attr = &(getattr_op->resp.u.mkdir.attr);
-
-   ret = PINT_copy_object_attr( &s_op->resp.u.mkdir.attr,resp_attr );
+   ret  = PINT_copy_capability(&resp_attr->capability, 
+                               &s_op->resp.u.mkdir.capability);
    if (ret)
    {
-      gossip_err("%s:Error copying metafile attributes from getattr to lookup:ret(%d)\n",__func__,ret);
+      gossip_err("%s: Error copying capability from getattr to mkdir response: ret(%d)\n",__func__,ret);
       js_p->error_code = ret;
-      goto out;
    }
 
-out:
-#endif
-   s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
    free(getattr_op);
    return SM_ACTION_COMPLETE;
 }
+
 static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     if (js_p->error_code > -1)
