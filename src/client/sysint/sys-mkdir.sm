@@ -84,7 +84,7 @@ machine pvfs2_client_mkdir_sm
     state mkdir_msg_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-/*        success => mkdir_getattr_setup; */
+/*        success => mkdir_seteattr_setup_msgpair; */
 /*        success => mkdir_crdirent_setup_msgpair; */
         success => cleanup;
         default => mkdir_msg_failure;
@@ -97,19 +97,6 @@ machine pvfs2_client_mkdir_sm
     }
 
 /*
-    state mkdir_getattr_setup
-    {
-        run mkdir_getattr_setup;
-        default => mkdir_getattr;
-    }
-
-    state mkdir_getattr
-    {
-        jump pvfs2_client_getattr_sm;
-        success => mkdir_seteattr_setup_msgpair;
-        default => delete_handle_setup_msgpair;
-    }
-
     state mkdir_seteattr_setup_msgpair
     {
         run mkdir_seteattr_setup_msgpair;
@@ -210,8 +197,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
         return ret;
     }
 
-    if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) !=
-        PVFS_ATTR_SYS_ALL_SETABLE)
+    if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) != PVFS_ATTR_SYS_ALL_SETABLE)
     {
         gossip_lerr("PVFS_isys_mkdir() failure: invalid attribute mask %d, "
                     "expected SYS_ALL_SETABLE (%d)\n",
@@ -245,6 +231,12 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     sm_p->u.mkdir.stored_error_code = 0;
     sm_p->u.mkdir.retry_count = 0;
 
+    PVFS_hint_copy(hints, &sm_p->hints);
+    PVFS_hint_add(&sm_p->hints,
+                  PVFS_HINT_HANDLE_NAME,
+                  sizeof(PVFS_handle),
+                  &parent_ref.handle);
+
     sm_p->parent_ref = parent_ref;
 
     /* V3 need to add config default and dir override ability */
@@ -255,12 +247,11 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
                             fs_config->metadata_replication_factor;
     sm_p->u.mkdir.dirdata_sid_count =
                             fs_config->metadata_replication_factor;
-
-    PVFS_hint_copy(hints, &sm_p->hints);
-    PVFS_hint_add(&sm_p->hints,
-                  PVFS_HINT_HANDLE_NAME,
-                  sizeof(PVFS_handle),
-                  &parent_ref.handle);
+    if (fs_config->metadata_replication_factor <= 0)
+    {
+        sm_p->u.mkdir.metadata_sid_count = 1;
+        sm_p->u.mkdir.dirdata_sid_count = 1;
+    }
 
     /* TODO: For now, just use round robin layout. */
     sm_p->u.mkdir.layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
@@ -269,9 +260,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
                  "under parent handle %s on fs %d\n", object_name,
                  PVFS_OID_str(&parent_ref.handle), parent_ref.fs_id);
 
-    return PINT_client_state_machine_post(smcb,
-                                          op_id,
-                                          user_ptr);
+    return PINT_client_state_machine_post(smcb, op_id, user_ptr);
 }
 
 /** Create a new directory.
@@ -320,12 +309,11 @@ static int mkdir_msg_comp_fn(void *v_p,
                              struct PVFS_server_resp *resp_p,
                              int index)
 {
-#if 0
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     int ret;
     PVFS_uid local_uid;
-#endif
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir_msg_comp_fn\n");
 
@@ -338,7 +326,6 @@ static int mkdir_msg_comp_fn(void *v_p,
 
     PINT_debug_capability(&resp_p->u.mkdir.capability, "mkdir returned");
 
-#if 0
     /* get local uid for indexing */
     local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
 
@@ -363,7 +350,6 @@ static int mkdir_msg_comp_fn(void *v_p,
         gossip_err("%s: could not get local uid for client capcache\n",
                    __func__);
     }
-#endif
 
     return 0;
 }
@@ -388,10 +374,9 @@ static int mkdir_delete_handle_comp_fn(void *v_p,
     return resp_p->status;
 }
 
-/* ======================== STATE ACTIONS ============================ */
+/* <================= STATE ACTION FUNCTIONS ====================> */
 
-static PINT_sm_action mkdir_init(struct PINT_smcb *smcb,
-                                 job_status_s *js_p)
+static PINT_sm_action mkdir_init(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
@@ -427,6 +412,9 @@ static PINT_sm_action mkdir_init(struct PINT_smcb *smcb,
 
 /** looks at the attributes of the parent directory and decides if it impacts
  *  the mkdir in any way
+ *
+ *  Determine the number of dirdata files and sids involved, which may be
+ *  impacted by the parent dir attrs
  */
 static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
                                                    job_status_s *js_p)
@@ -452,12 +440,8 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     PINT_debug_capability(&sm_p->getattr.attr.capability,
                           "mkdir_parent_getattr_inspect");
 
-    for (i = 0; i < attr->u.dir.dist_dir_attr.dirdata_count; i++)
-    {
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "                           dirdata_handle[%d] = %s\n",
-                     i, PVFS_OID_str(&attr->u.dir.dirdata_handles[i]));
-    }
+    PINT_debug_dist_dir_handles(GOSSIP_CLIENT_DEBUG, attr->u.dir.dist_dir_attr,
+                                attr->u.dir.dirdata_handles);
 
     /* do we have a setgid bit? */
     if(attr->perms & PVFS_G_SGID)
@@ -567,6 +551,11 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     /* Allocate OIDs and SIDs for a directory.
      * There is one OID for the metadata, and n OIDs for the dirdata
      * and each OID has multiple SIDs.
+     *
+     * Note that we go ahead and create distr_dir_servers_max OIDs even
+     * though initially we may only distribute to distr_dir_servers_initial
+     * of them.
+     *
      * We send this request to one meta server, which in turn sends it
      * to the other meta servers.
      */
@@ -577,7 +566,6 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                            &sm_p->u.mkdir.metadata_handle,
                            sm_p->u.mkdir.metadata_sid_count, /* in */
                            &sm_p->u.mkdir.metadata_sid_array,
-/* TODO: ECQ determine correct number to use for distr_dir_servers. */
                            sm_p->u.mkdir.sys_attr.distr_dir_servers_max,/* in */
                            &sm_p->u.mkdir.dirdata_handles,
                            sm_p->u.mkdir.dirdata_sid_count, /* in */
@@ -628,9 +616,15 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->comp_fn = mkdir_msg_comp_fn;
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
-    if (ret)
+    if (ret < 0)
     {
-        gossip_err("Failed to map meta server address\n");
+        gossip_err("PVFS_sys_mkdir: failed to look up SID\n");
+        /* V3 how to handle failure here ?
+         * If we have to do a SID lookup we need to have SM block on
+         * that action, or call a nested SM or something
+         *
+         * Should return a SM error code, call a lookup SM, then resume
+         */
         js_p->error_code = ret;
     }
 
