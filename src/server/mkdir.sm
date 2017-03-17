@@ -516,10 +516,12 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     free(s_op->req->u.mkdir.attr.u.dir.dist_dir_bitmap);
     free(s_op->key_a);
     free(s_op->val_a);
+#if 0
     if (s_op->msgarray_op.count > 0)
     {
         PINT_free_object_attr(&s_op->req->u.tree_setattr.attr);
     }
+#endif
     return(server_state_machine_complete(smcb));
 }
 

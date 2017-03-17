@@ -320,10 +320,12 @@ static int mkdir_msg_comp_fn(void *v_p,
                              struct PVFS_server_resp *resp_p,
                              int index)
 {
+#if 0
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     int ret;
     PVFS_uid local_uid;
+#endif
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir_msg_comp_fn\n");
 
@@ -336,8 +338,18 @@ static int mkdir_msg_comp_fn(void *v_p,
 
     PINT_debug_capability(&resp_p->u.mkdir.capability, "mkdir returned");
 
+#if 0
     /* get local uid for indexing */
     local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+
+    if (local_uid == (PVFS_uid) -1)
+    {
+        local_uid = PINT_util_getuid();
+
+        PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
+                      sizeof(PVFS_uid), &local_uid);
+    }
+
     if (local_uid != (PVFS_uid) -1)
     {
         ret = PINT_client_capcache_update(sm_p->object_ref,
@@ -351,6 +363,7 @@ static int mkdir_msg_comp_fn(void *v_p,
         gossip_err("%s: could not get local uid for client capcache\n",
                    __func__);
     }
+#endif
 
     return 0;
 }
@@ -564,7 +577,8 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                            &sm_p->u.mkdir.metadata_handle,
                            sm_p->u.mkdir.metadata_sid_count, /* in */
                            &sm_p->u.mkdir.metadata_sid_array,
-                           sm_p->u.mkdir.sys_attr.distr_dir_servers_max, /* in */
+/* TODO: ECQ determine correct number to use for distr_dir_servers. */
+                           sm_p->u.mkdir.sys_attr.distr_dir_servers_max,/* in */
                            &sm_p->u.mkdir.dirdata_handles,
                            sm_p->u.mkdir.dirdata_sid_count, /* in */
                            &sm_p->u.mkdir.dirdata_sid_array);
@@ -574,6 +588,12 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
+
+    /* object ref will now refer to newly created metadata object */
+    sm_p->object_ref.handle = *sm_p->u.mkdir.metadata_handle;
+    sm_p->object_ref.fs_id = sm_p->parent_ref.fs_id;
+    sm_p->object_ref.sid_count = sm_p->u.mkdir.metadata_sid_count;
+    sm_p->object_ref.sid_array = sm_p->u.mkdir.metadata_sid_array;
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -826,6 +846,7 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: cleanup\n");
 
+/* Only used if we send seteattr message
     if(sm_p->u.mkdir.val_array)
     {
         if((sm_p->getattr.attr.mask & PVFS_ATTR_DIR_HINT) &&
@@ -839,15 +860,9 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
     {
         free(sm_p->u.mkdir.key_array);
     }
+*/
 
     PVFS_util_release_sys_attr(&sm_p->u.mkdir.sys_attr);
-/*
-    PINT_free_object_attr(&sm_p->getattr.attr);
-
-    PINT_SM_GETATTR_STATE_CLEAR(sm_p->u.mkdir.metadata_getattr);
-    
-    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
-*/
 
     sm_p->error_code = (sm_p->u.mkdir.stored_error_code ?
                         sm_p->u.mkdir.stored_error_code :
@@ -883,15 +898,28 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
         PVFS_perror_gossip("mkdir failed with error", sm_p->error_code);
     }
 
-    /* free sid arrays */
-    if (sm_p->object_ref.sid_array)
+    if (sm_p->u.mkdir.metadata_handle)
     {
-        free(sm_p->object_ref.sid_array);
+        free(sm_p->u.mkdir.metadata_handle);
+        sm_p->u.mkdir.metadata_handle = NULL;
     }
-    if (sm_p->parent_ref.sid_array)
+    if (sm_p->u.mkdir.metadata_sid_array)
     {
-        free(sm_p->parent_ref.sid_array);
+        free(sm_p->u.mkdir.metadata_sid_array);
+        sm_p->u.mkdir.metadata_sid_array = NULL;
     }
+    if (sm_p->u.mkdir.dirdata_handles)
+    {
+        free(sm_p->u.mkdir.dirdata_handles);
+        sm_p->u.mkdir.dirdata_handles = NULL;
+    }
+    if (sm_p->u.mkdir.dirdata_sid_array)
+    {
+        free(sm_p->u.mkdir.dirdata_sid_array);
+        sm_p->u.mkdir.dirdata_sid_array = NULL;
+    }
+
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
