@@ -806,11 +806,14 @@ int pint_racache_finalize(void)
     racache_buffer_t *racache_buffer = NULL;
     struct qlist_head *vfs_link = NULL;
 
+    /* make sure we actually initialized */
     if (RACACHE_INITIALIZED())
     {
         gen_mutex_lock(&racache.mutex);
+        /* cyle each bucket of file hash table */
         for (i = 0; i < racache.hash_table->table_size; i++)
         {
+            /* cyle each file in the bucket */
             while((hash_link = qhash_search_and_remove_at_index(
                                                    racache.hash_table, i)))
             {
@@ -818,6 +821,7 @@ int pint_racache_finalize(void)
                                            racache_file_t,
                                            hash_link);
 
+                /* cycle each buffer linked to the file */
                 while ((buff_link = qlist_pop(&racache_file->buff_list)))
                 {
                     racache_buffer = qlist_entry(buff_link,
@@ -827,22 +831,44 @@ int pint_racache_finalize(void)
                                  "Freeing buffer %d with %d waiters\n",
                                  racache_buffer->buff_id,
                                  racache_buffer->vfs_cnt);
+                    /* remove each waiting request and free the links */
                     while((vfs_link = qlist_pop(&racache_buffer->vfs_link)))
                     {
                         racache_buffer->vfs_cnt--;
                         /* don't worry about the vfs_request
                          * we don't deal with that here */
                         free(qlist_entry(vfs_link, gen_link_t, link));
-                    }
-                }
+                    } /* while vfs_link */
+                    /* don't free the racache_buffer struct - done below */
+                } /* while buff_link */
+                /* free the file struct */
                 free(racache_file);
             } /* while hash_link */
         } /* for i < table_size */
 
         ret = 0;
+        /* free the hash struct */
         qhash_finalize(racache.hash_table);
+        /* free buffers */
+        for (i = 0; i < racache.bufcnt; i++)
+        {
+            free(racache.buffarray[i].buffer);
+        }
+        /* this frees the array of buffer recs */
+        free(racache.buffarray);
+        /* free old buffers if we were in the middle of a resize */
+        if (racache.oldarray && racache.oldarray_cnt)
+        {
+            for (i = 0; i < racache.oldarray_cnt; i++)
+            {
+                if (racache.oldarray[i].buffer)
+                {
+                    free(racache.oldarray[i].buffer);
+                }
+            }
+            free(racache.oldarray);
+        }
         racache.hash_table = NULL; /* is this properly freed? */
-        free(racache.buffarray); /* this frees the array of buffer recs */
         gen_mutex_unlock(&racache.mutex);
 
         /* FIXME: race condition here */

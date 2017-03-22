@@ -31,6 +31,7 @@
 #include "pvfs2-sysint.h"
 
 #include "trove.h"
+#include "client-state-machine.h"
 #include "server-config.h"
 
 int PINT_server_get_config(struct server_configuration_s *config,

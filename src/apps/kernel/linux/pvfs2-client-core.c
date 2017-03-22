@@ -421,7 +421,6 @@ static void pvfs2_khandle_from_handle(PVFS_handle *handle,
 
 static void client_core_sig_handler(int signum)
 {
-    gossip_err("Client Core Caught Signal %d - Halt Processing\n", signum);
     s_client_is_processing = 0;
     s_client_signal = signum;
 }
@@ -3088,6 +3087,7 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
             PINT_client_io_cancel(vfs_request->op_ids[j]);
             PVFS_Request_free(&vfs_request->mem_req_a[j]);
             PVFS_Request_free(&vfs_request->file_req_a[j]);
+            PVFS_hint_free(vfs_request->hints);
         }
         free(vfs_request->in_upcall.trailer_buf);
         vfs_request->in_upcall.trailer_buf = NULL;
@@ -3936,6 +3936,7 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
 
                     PVFS_Request_free(&vfs_request->mem_req);
                     PVFS_Request_free(&vfs_request->file_req);
+                    PVFS_hint_free(vfs_request->hints);
                     gossip_debug(GOSSIP_RACACHE_DEBUG,
                                  "vfs_request = %p waiters = %d\n",
                                  vfs_request, buff->vfs_cnt);
@@ -4028,6 +4029,7 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                                   vfs_request, iotype);
                         PVFS_Request_free(&vfs_request->mem_req);
                         PVFS_Request_free(&vfs_request->file_req);
+                        PVFS_hint_free(vfs_request->hints);
                     }
                     vfs_request->out_downcall.resp.io.amt_complete =
                             (size_t)vfs_request->response.io.total_completed;
@@ -4036,6 +4038,7 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                 /* RA_CACHE disabled so do this */
                 PVFS_Request_free(&vfs_request->mem_req);
                 PVFS_Request_free(&vfs_request->file_req);
+                PVFS_hint_free(vfs_request->hints);
 
                 vfs_request->out_downcall.resp.io.amt_complete =
                         (size_t)vfs_request->response.io.total_completed;
@@ -4083,6 +4086,7 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
             {
                 PVFS_Request_free(&vfs_request->mem_req_a[j]);
                 PVFS_Request_free(&vfs_request->file_req_a[j]);
+                PVFS_hint_free(vfs_request->hints);
             }
             free(vfs_request->mem_req_a);
             free(vfs_request->file_req_a);
@@ -4686,7 +4690,7 @@ static PVFS_error process_vfs_requests(void)
             {
                 gossip_err("op_id %Ld != completed op id %Ld\n",
                         lld(vfs_request->op_id), lld(op_id_array[i]));
-                continue;
+                continue; /* for i loop */
             }
             else if (vfs_request->num_ops > 1)
             {
@@ -4696,14 +4700,14 @@ static PVFS_error process_vfs_requests(void)
                 {
                     if (op_id_array[i] == vfs_request->op_ids[j])
                     {
-                        break;
+                        break; /* for j loop */
                     }
                 }
                 if (j == vfs_request->num_ops)
                 {
                     gossip_err("completed op id (%Ld) is weird\n",
                               lld(op_id_array[i]));
-                    continue;
+                    continue; /* for i loop */
                 }
             }
 
@@ -4735,7 +4739,7 @@ static PVFS_error process_vfs_requests(void)
                  * client isys call), we can move
                  * on to the next request in the queue.
                  */
-                continue;
+                continue; /* for i loop */
             }
 
             /* We've just completed an (expected) operation on this request,
@@ -4746,7 +4750,7 @@ static PVFS_error process_vfs_requests(void)
             /* if operation is not complete, we gotta continue */
             if (vfs_request->num_incomplete_ops != 0)
             {
-                continue;
+                continue; /* for i loop */
             }
             log_operation_timing(vfs_request);
 
@@ -4820,7 +4824,7 @@ static PVFS_error process_vfs_requests(void)
                                                    "error completion");
 
                     assert(ret == 0);
-                    continue;
+                    continue; /* for i loop */
                 }
             }
 
@@ -4861,10 +4865,16 @@ static PVFS_error process_vfs_requests(void)
                         free(glink);
                         buff->vfs_cnt--; /* this should decrement to 0 */
     
-                        if (vl->is_readahead_speculative)
+                        /* the first vl is equal for vfs_request
+                         * if it is speculative don't free here
+                         * because we need it below - we will have
+                         * to free it later
+                         */
+                        if (vl->is_readahead_speculative &&
+                            vl != vfs_request)
                         {
                             gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-                                         "--- Free speculative vfs_request\n");
+                                         "--- Free speculative vl\n");
                             /* clean up */
                             vl->racache_buff = NULL;
                             gossip_err("Free vl = %p\n", vl);
@@ -4876,10 +4886,16 @@ static PVFS_error process_vfs_requests(void)
                                         "--- Racache downcall write %p \n", vl);
                             gossip_err("Copy vreq = %p\n", vfs_request);
                             gossip_err("Copy vl = %p\n", vl);
-                            vl->out_downcall.status =
-                                             vfs_request->out_downcall.status;
-                            vl->out_downcall.type =
-                                             vfs_request->out_downcall.type;
+                            /* first vl equals vfs_request so don'e need
+                             * to copy these
+                             */
+                            if (vl != vfs_request)
+                            {
+                                vl->out_downcall.status =
+                                                vfs_request->out_downcall.status;
+                                vl->out_downcall.type =
+                                                vfs_request->out_downcall.type;
+                            }
 
                             ret = write_downcall(vl);
                             if (ret < 0)
@@ -4902,9 +4918,23 @@ static PVFS_error process_vfs_requests(void)
                             /* clean up */
                             vl->racache_buff = NULL;
                         }
-                    }
+                    } /* while link */
                     gossip_debug(GOSSIP_RACACHE_DEBUG,
                                  "--- List Processing Complete\n");
+                    /* If the main request was speculative we will
+                     * free it here because we are done with it now
+                     */
+                    if (vfs_request->is_readahead_speculative)
+                    {
+                            gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                                         "--- Free speculative vfs_request\n");
+                            /* clean up */
+                            vfs_request->racache_buff = NULL;
+                            gossip_err("Free vfs_request = %p\n", vl);
+                            free(vfs_request);
+                        /* done with this vfs_request */
+                        continue; /* for i loop */
+                    }
 #if 0
                     /* spec requests are not part of the main pool
                      * they are malloced so we need to free them
@@ -4928,7 +4958,7 @@ static PVFS_error process_vfs_requests(void)
                          * after this
                          */
                         pint_racache_finish_resize(buff);
-                        continue;
+                        continue; /* for i loop */
                     }
                     /* if buffer being freed then add to free list 
                      * and remove from lru and buffer lists
@@ -4948,7 +4978,7 @@ static PVFS_error process_vfs_requests(void)
                     gossip_debug(GOSSIP_RACACHE_DEBUG,
                                  "--- Racache transaction %p complete\n",
                                  vfs_request);
-                    continue;
+                    continue; /* for i loop */
                 }
 #endif
                 /* this handles non-readahead non-cancelled requests 
@@ -4978,7 +5008,7 @@ static PVFS_error process_vfs_requests(void)
             }
             gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Done with Request(%d)\n",i);
             gossip_err("***\n");
-        }
+        } /* for i loop */
 
         /* The status of the remount thread needs to be checked in the event 
          * the remount fails on client-core startup. If this is the initial 
@@ -5003,8 +5033,8 @@ static PVFS_error process_vfs_requests(void)
             return -PVFS_EAGAIN; 
         }
     }
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-                 "process_vfs_requests returning\n");
+    gossip_err("Client Core Caught Signal %d - Halt Processing\n",
+               s_client_signal);
     return 0;
 }
 
@@ -5014,14 +5044,6 @@ int main(int argc, char **argv)
     time_t start_time;
     struct tm *local_time = NULL;
     uint64_t debug_mask = GOSSIP_NO_DEBUG;
-    /* these moved to a utility func, should probably
-     * be in perf_counter struct */
-    /* PINT_client_sm *acache_timer_sm_p = NULL; */
-    /* PINT_smcb *acache_smcb = NULL; */
-    /* PINT_client_sm *ncache_timer_sm_p = NULL; */
-    /* PINT_smcb *ncache_smcb = NULL; */
-    /* PINT_client_sm *capcache_timer_sm_p = NULL; */
-    /* PINT_smcb *capcache_smcb = NULL; */
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
     struct sigaction segv_action;
@@ -5259,9 +5281,9 @@ int main(int argc, char **argv)
 
     /* original code made into a function */
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Start Counter Rollover\n");
-    client_perf_start_rollover(PINT_acache_get_pc(), NULL);
-    client_perf_start_rollover(PINT_ncache_get_pc(), NULL);
-    client_perf_start_rollover(PINT_client_capcache_get_pc(), NULL);
+    ret = client_perf_start_rollover(PINT_acache_get_pc(), NULL);
+    ret = client_perf_start_rollover(PINT_ncache_get_pc(), NULL);
+    ret = client_perf_start_rollover(PINT_client_capcache_get_pc(), NULL);
 
     /* set up structure for kernel interaction */
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Init Ops In Progress Table\n");
@@ -5269,7 +5291,7 @@ int main(int argc, char **argv)
     if (ret)
     {
         PVFS_perror_gossip("initialize_ops_in_progress_table", ret);
-        /* finalize_perf_items(2, acache_smcb, ncache_smcb); */
+        //finalize_perf_items(3, acache_smcb, ncache_smcb, capcache_smcb);
         return ret;
     }   
 
@@ -5278,7 +5300,7 @@ int main(int argc, char **argv)
     if (ret < 0)
     {
         PVFS_perror_gossip("PINT_dev_initialize", ret);
-        /* finalize_perf_items(2, acache_smcb, ncache_smcb); */
+        //finalize_perf_items(3, acache_smcb, ncache_smcb, capcache_smcb);
         return -PVFS_EDEVINIT;
     }
 
@@ -5289,7 +5311,7 @@ int main(int argc, char **argv)
     if (ret < 0)
     {
         PVFS_perror_gossip("PINT_dev_get_mapped_region", ret);
-        /* finalize_perf_items(2, acache_smcb, ncache_smcb); */
+        //finalize_perf_items(3, acache_smcb, ncache_smcb, capcache_smcb);
         return ret;
     }
 
@@ -5298,7 +5320,7 @@ int main(int argc, char **argv)
     if (ret < 0)
     {
         PVFS_perror_gossip("device job_open_context failed", ret);
-        /* finalize_perf_items(2, acache_smcb, ncache_smcb); */
+        //finalize_perf_items(3, acache_smcb, ncache_smcb, capcache_smcb);
         return ret;
     }
 
@@ -5312,7 +5334,7 @@ int main(int argc, char **argv)
     if (pthread_create(&remount_thread, NULL, exec_remount, NULL))
     {
         gossip_err("Cannot create remount thread!");
-        /* finalize_perf_items(2, acache_smcb, ncache_smcb); */
+        //finalize_perf_items(3, acache_smcb, ncache_smcb, capcache_smcb);
         return -1;
     }
 
@@ -5366,16 +5388,25 @@ int main(int argc, char **argv)
     PINT_dev_put_mapped_regions(NUM_MAP_DESC, s_io_desc);
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Free Timers\n");
-    /* these timers are now started in a utility func
-     * should add smcb and hints to the perf_counter
-     * struct so we don't have these hanging about here
-     */
-    /*PVFS_hint_free(acache_timer_sm_p->hints); */
-    /*PINT_smcb_free(acache_smcb); */
-    /*PVFS_hint_free(ncache_timer_sm_p->hints); */
-    /*PINT_smcb_free(ncache_smcb); */
-    /*PVFS_hint_free(capcache_timer_sm_p->hints); */
-    /*PINT_smcb_free(capcache_smcb); */
+    {
+        struct PINT_perf_counter *ac_pcnt = PINT_acache_get_pc();
+        PINT_smcb *ac_smcb = ac_pcnt->smcb;
+        PINT_client_sm *ac_sm_p = PINT_sm_frame(ac_smcb, PINT_FRAME_CURRENT);
+        PVFS_hint_free(ac_sm_p->hints);
+        PINT_smcb_free(ac_smcb);
+    }{
+        struct PINT_perf_counter *nc_pcnt = PINT_ncache_get_pc();
+        PINT_smcb *nc_smcb = nc_pcnt->smcb;
+        PINT_client_sm *nc_sm_p = PINT_sm_frame(nc_smcb, PINT_FRAME_CURRENT);
+        PVFS_hint_free(nc_sm_p->hints);
+        PINT_smcb_free(nc_smcb);
+    }{
+        struct PINT_perf_counter *capc_pcnt = PINT_client_capcache_get_pc();
+        PINT_smcb *capc_smcb = capc_pcnt->smcb;
+        PINT_client_sm *capc_sm_p = PINT_sm_frame(capc_smcb, PINT_FRAME_CURRENT);
+        PVFS_hint_free(capc_sm_p->hints);
+        PINT_smcb_free(capc_smcb);
+    }
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "calling PVFS_sys_finalize()\n");
