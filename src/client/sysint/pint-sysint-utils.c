@@ -360,8 +360,11 @@ int PINT_client_security_finalize(void)
 }
 
 #endif /* HAVE_OPENSSL */
-   
+ 
 /* client only routine to start a timer for perf counters */
+/* should add an smcb pointer to the perf_counter and put
+ * its timer there - makes shutting down easier
+ */
 int client_perf_start_rollover(struct PINT_perf_counter *pc,
                                struct PINT_perf_counter *tpc)
 {

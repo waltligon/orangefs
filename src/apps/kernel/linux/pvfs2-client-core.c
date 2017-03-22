@@ -141,6 +141,7 @@ typedef struct
     int readahead_size;
     int readahead_count;
     int readahead_readcnt;
+    int readahead_pinned;
 } options_t;
 
 /*
@@ -206,6 +207,11 @@ typedef struct
 
     struct qlist_head hash_link;
 
+#ifdef CLIENT_CORE_OP_TIMING
+    PINT_time_marker start;
+    PINT_time_marker end;
+#endif
+
     union
     {
         PVFS_sysresp_lookup lookup;
@@ -221,11 +227,6 @@ typedef struct
         PVFS_sysresp_readdirplus readdirplus;
         PVFS_sysresp_io *iox;
     } response;
-
-#ifdef CLIENT_CORE_OP_TIMING
-    PINT_time_marker start;
-    PINT_time_marker end;
-#endif
 
 } vfs_request_t;
 
@@ -420,6 +421,7 @@ static void pvfs2_khandle_from_handle(PVFS_handle *handle,
 
 static void client_core_sig_handler(int signum)
 {
+    gossip_err("Client Core Caught Signal %d - Halt Processing\n", signum);
     s_client_is_processing = 0;
     s_client_signal = signum;
 }
@@ -1721,7 +1723,7 @@ fail_downcall:
         "Failed to umount via host %s\n",
         vfs_request->in_upcall.req.fs_umount.pvfs2_config_server);
 
-    PVFS_perror("Umount failed", ret);
+    PVFS_perror_gossip("Umount failed", ret);
 
     vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_UMOUNT;
     vfs_request->out_downcall.status = ret;
@@ -2380,10 +2382,12 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request,
      * it in the future
      */
 
+#if 0
     if (ret < 0)
     {
-        PVFS_perror_gossip("Calling chgeck for speculative failed", ret);
+        PVFS_perror_gossip("Calling check for speculative failed", ret);
     }
+#endif
 
     return ret;
 }
@@ -2484,15 +2488,16 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
                         &(vfs_request->in_upcall.req.io.refn.khandle));
     refn.fs_id = vfs_request->in_upcall.req.io.refn.fs_id;
 
-    /* we need a request struct in order to search for
-     * a buffer, so we build one here.  If we find a
-     * buffer we will free this, otherwise it will become
-     * an active speculative readahead
+    /* We need a request struct in order to search for
+     * a buffer, so we build one here.  
+     * If we find a buffer we will free this, * otherwise
+     * it will become an active speculative readahead. 
+     * This function mallocs the rareq buffer.
      */
     ret = create_phantom_req(&rareq, vfs_request, prev_buff);
     if (ret)
     {
-        gossip_err("failed to allocated a phantom request");
+        gossip_err("failed to allocate a phantom request");
         return ret;
     }
 
@@ -2541,12 +2546,12 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
                 gossip_debug(GOSSIP_RACACHE_DEBUG,
                              "--- check_for_speculative post successful\n");
             }
-            /* create a new phantom request for the next buffer */
+            /* malloc a new phantom request for the next buffer */
             ret = create_phantom_req(&rareq, vfs_request, prev_buff);
             if (ret)
             {
                 gossip_err("failed to allocated a phantom request");
-                goto fast_exit;
+                return ret;
             }
             break;
         case RACACHE_HIT :
@@ -2558,7 +2563,7 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
                   "--- check_for_speculative found exist buffer"
                   "- Do not issue a spec read\n");
             break;
-        /* in these two cases we are no longer processing readaheadss
+        /* in these two cases we are no longer processing readaheads
          * either because the buffers are busy or there is an error
          * so we jump to fast_exit, free the rareq and go
          */
@@ -2566,13 +2571,16 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
             /* no buffers available so no more readahead */
             gossip_debug(GOSSIP_RACACHE_DEBUG,
                          "--- check_for_speculative buffer NA\n");
+            ret = 0;
             goto fast_exit;
         default:
             gossip_err("unexpected return from pint_racache_get_block");
+            ret = -1;
             goto fast_exit;
         } /* end switch */
     } /* end for loop */
     /* there should be an unused phantom req left over */
+    ret = 0;
 fast_exit:
     gossip_debug(GOSSIP_RACACHE_DEBUG,
                  "--- CHECK_for_speculative freeing unused phantom req NA\n");
@@ -2610,12 +2618,12 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
                      "vfs_request = %p\n", vfs_request);
         free(s);
         /*
-          if a non-zero readahead size and count are specified, check
-          the readahead cache for the read data being requested --
-          this should always be the case during mmap/execution, but
-          never the case during normal I/O reads (to avoid this
-          overhead in the common case)
-        */
+         * if a non-zero readahead size and count are specified, check
+         * the readahead cache for the read data being requested --
+         * this should always be the case during mmap/execution, but
+         * never the case during normal I/O reads (to avoid this
+         * overhead in the common case)
+         */
         /* This is where we bypass the racache
          * We do this if the cache parameters are not set to usable
          * values, if the request is set for no readahead (read count
@@ -2666,8 +2674,9 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
             if (vfs_request->in_upcall.req.io.readahead_size !=
                                   PVFS2_RACACHE_READSZ_NOVALUE)
             {
-                buff->readcnt = vfs_request->in_upcall.req.io.readahead_size /
-                                pint_racache_buff_size();
+                /* should be (ra_sz / bf_sz) + 1 ? */
+                buff->readcnt = (vfs_request->in_upcall.req.io.readahead_size /
+                                 pint_racache_buff_size()) + 1;
             }
             switch (vfs_request->racache_status)
             {
@@ -2691,6 +2700,7 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
                     break;
                 }
 
+                /* We DID find enough data so copy it out and done */
                 vfs_request->out_downcall.type = PVFS2_VFS_OP_FILE_IO;
                 vfs_request->out_downcall.status = 0;
                 vfs_request->response.io.total_completed = amt_returned;
@@ -2750,6 +2760,7 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
                              "--- Readahead cache read!\n");
                 if (!buff) /* This is a sanity check */
                 {
+                    gossip_err("racache_get_block returned READ but no buff!\n");
                     break; /* could not get a buffer go do a regular read */
                 }
                 /* post a readahead request here */
@@ -2764,9 +2775,9 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
                     return ret;
                 }
                 /*
-                 * otherwise * fallback to normal posting/servicing
+                 * this falls through to normal posting/servicing
+                 * 35 lines or so below
                  */
-                /* IS THIS RIGHT?  FAILED POST SHOULD JUST FAIL? */
                 break;
 
             case RACACHE_NONE: /* could not allocated a buffer */
@@ -3265,7 +3276,7 @@ PVFS_error write_device_response(
                                  NULL, 0, jstat, job_id, context);
         if (ret < 0)
         {
-            PVFS_perror("job_dev_write_list()", ret);
+            PVFS_perror_gossip("job_dev_write_list()", ret);
             return ret;
         }
         else if (ret == 0)
@@ -3273,14 +3284,14 @@ PVFS_error write_device_response(
 	    ret = job_test(*job_id, &outcount, NULL, jstat, -1, context);
             if (ret < 0)
             {
-                PVFS_perror("job_test()", ret);
+                PVFS_perror_gossip("job_test()", ret);
                 return ret;
             }
         }
 
         if (jstat->error_code != 0)
         {
-            PVFS_perror("job_bmi_write_list() error code",
+            PVFS_perror_gossip("job_bmi_write_list() error code",
                         jstat->error_code);
             ret = -1;
         }
@@ -3878,6 +3889,15 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
         case PVFS2_VFS_OP_FSYNC:
             break;
         case PVFS2_VFS_OP_FILE_IO:
+            /* replace non-errno error code to avoid passing to kernel */
+            if (*error_code == -PVFS_ECANCEL)
+            {
+                /* if an ECANCEL shows up here without going through the 
+                 * cancel_op_in_progress() path, then -PVFS_ETIMEDOUT is 
+                 * a better errno approximation than -PVFS_EINTR 
+                 */
+                *error_code = -PVFS_ETIMEDOUT;
+            }
             if (*error_code == 0)
             {
                 /* IO request just completed */
@@ -3916,10 +3936,14 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
 
                     PVFS_Request_free(&vfs_request->mem_req);
                     PVFS_Request_free(&vfs_request->file_req);
-                    /* loop over waiting requests */
                     gossip_debug(GOSSIP_RACACHE_DEBUG,
                                  "vfs_request = %p waiters = %d\n",
                                  vfs_request, buff->vfs_cnt);
+                    /* Loop over waiting requests 
+                     * Do not unroll the waiter list 
+                     * Just copy the data out to where it needs to go
+                     * List is torn down later
+                     */
                     qlist_for_each_entry(gen_link, &buff->vfs_link, link)
                     {
                         vl = gen_link->payload;
@@ -3972,7 +3996,9 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                              * for all requests, but not for waiters.
                              * We assume any error on the overall
                              * request should be sent to all waiting
-                             * processes
+                             * processes.
+                             * This error_code is always 0 here because
+                             * we bypass all of this for error_code != 0
                              */
                             vl->out_downcall.status = *error_code;
                             vl->out_downcall.type = vfs_request->in_upcall.type;
@@ -3983,12 +4009,6 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                                          "... skip spec\n");
                         }
                     }
-                    /* We call this here because  until the first request comes back
-                     * we don't know if it hit EOF or not, we we wait on the first and
-                     * then initiate the rest as this request returns
-                     */
-                    /* see if we need to start a new readahead */
-                    /* check_for_speculative(vfs_request, buff); */
                 }
                 else /* readahead_posted is not set */
                 {
@@ -4024,15 +4044,29 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                              lld(vfs_request->info.tag));
 #endif
             } /* if error_code == 0 */
-            /* replace non-errno error code to avoid passing to kernel */
-            if (*error_code == -PVFS_ECANCEL)
+#ifdef USE_RA_CACHE
+            else
             {
-                /* if an ECANCEL shows up here without going through the 
-                 * cancel_op_in_progress() path, then -PVFS_ETIMEDOUT is 
-                 * a better errno approximation than -PVFS_EINTR 
-                 */
-                *error_code = -PVFS_ETIMEDOUT;
+               /* we need to tag all waiters with the non-zero error_code
+                * for later processing
+                * vfs_request status is set at the bottom of this function
+                */
+                if (vfs_request->racache_status == RACACHE_POSTED)
+                {
+                    gen_link_t *gen_link;
+                    vfs_request_t *vl;
+
+                    qlist_for_each_entry(gen_link,
+                                         &vfs_request->racache_buff->vfs_link,
+                                         link)
+                    {
+                        vl = gen_link->payload;
+                        vl->out_downcall.status = *error_code;
+                        vl->out_downcall.type = vfs_request->in_upcall.type;
+                    }
+                }
             }
+#endif
             break;
         case PVFS2_VFS_OP_FILE_IOX:
         {
@@ -4093,7 +4127,7 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                 }
             }
             else {
-                PVFS_perror("getxattr: ", *error_code);
+                PVFS_perror_gossip("getxattr: ", *error_code);
             }
             /* free up the memory allocate to response.geteattr */
             free(vfs_request->response.geteattr.val_array[0].buffer);
@@ -4557,6 +4591,7 @@ static PVFS_error write_downcall(vfs_request_t *vfs_request)
         list_size++;
         total_size += vfs_request->out_downcall.trailer_size;
     }
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Writing Downcall\n");
     ret = write_device_response(buffer_list,
                                 size_list,
                                 list_size,
@@ -4587,6 +4622,7 @@ static PVFS_error process_vfs_requests(void)
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "process_vfs_requests called\n");
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Post Initial Unexp Requests\n");
     /* allocate and post all of our initial unexpected vfs requests */
     for(i = 0; i < MAX_NUM_OPS; i++)
     {
@@ -4616,6 +4652,7 @@ static PVFS_error process_vfs_requests(void)
     */
     pthread_mutex_unlock(&remount_mutex);
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Start Processing Loop\n");
     while(s_client_is_processing)
     {
         op_count = MAX_NUM_OPS;
@@ -4628,15 +4665,19 @@ static PVFS_error process_vfs_requests(void)
                  "Calling PVFS_sys_testany for new requests\n");
 #endif
 
+        /* gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PVFS_sys_testany\n"); */
         ret = PVFS_sys_testany(op_id_array,
                                &op_count,
                                (void *)vfs_request_array,
                                error_code_array,
                                PVFS2_CLIENT_DEFAULT_TEST_TIMEOUT_MS);
 
+        /* gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Process Request Array\n"); */
         for(i = 0; i < op_count; i++)
         {
+            gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Process Request Array(%d)\n",i);
             vfs_request = vfs_request_array[i];
+            gossip_err("*** New vfs_request = %p\n", vfs_request);
 
             assert(vfs_request);
 /*             assert(vfs_request->op_id == op_id_array[i]); */
@@ -4661,7 +4702,7 @@ static PVFS_error process_vfs_requests(void)
                 if (j == vfs_request->num_ops)
                 {
                     gossip_err("completed op id (%Ld) is weird\n",
-                            lld(op_id_array[i]));
+                              lld(op_id_array[i]));
                     continue;
                 }
             }
@@ -4734,11 +4775,14 @@ static PVFS_error process_vfs_requests(void)
                 vfs_request->racache_status == RACACHE_POSTED &&
                 vfs_request->racache_buff != NULL)
             {
+                gossip_debug(GOSSIP_RACACHE_DEBUG,
+                             "Process Waiting Racache Requests \n");
                 qlist_for_each_entry(glink,
                                      &vfs_request->racache_buff->vfs_link,
                                      link)
                 {
                     vl = glink->payload;
+                    gossip_err("Loop 1 vl = %p\n", vl);
                     /* get a shared kernel/userspace buffer for the I/O
                      * transfer
                      */
@@ -4760,7 +4804,6 @@ static PVFS_error process_vfs_requests(void)
                 }
             }
             /* now deal with primary request */
-            // if (!vfs_request->is_readahead_speculative)
             else
 #endif
             {
@@ -4781,7 +4824,11 @@ static PVFS_error process_vfs_requests(void)
                 }
             }
 
+            gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                         "Calling package_downcall_members\n");
             package_downcall_members(vfs_request, &error_code_array[i]);
+            gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                         "package_downcall_members Returns\n");
 
             /*
              * write the downcall if the operation was NOT a
@@ -4810,19 +4857,25 @@ static PVFS_error process_vfs_requests(void)
                         glink = qlist_entry(link, gen_link_t, link);
                         assert(glink);
                         vl = (vfs_request_t *)glink->payload;
+                        gossip_err("Loop 2 vl = %p\n", vl);
                         free(glink);
-                        buff->vfs_cnt --; /* this should decrement to 0 */
+                        buff->vfs_cnt--; /* this should decrement to 0 */
     
                         if (vl->is_readahead_speculative)
                         {
                             gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                                          "--- Free speculative vfs_request\n");
-                            free(vfs_request);
+                            /* clean up */
+                            vl->racache_buff = NULL;
+                            gossip_err("Free vl = %p\n", vl);
+                            free(vl);
                         }
                         else
                         {
                             gossip_debug(GOSSIP_RACACHE_DEBUG,
                                         "--- Racache downcall write %p \n", vl);
+                            gossip_err("Copy vreq = %p\n", vfs_request);
+                            gossip_err("Copy vl = %p\n", vl);
                             vl->out_downcall.status =
                                              vfs_request->out_downcall.status;
                             vl->out_downcall.type =
@@ -4846,9 +4899,9 @@ static PVFS_error process_vfs_requests(void)
                                     "--- repost_unexp_vfs_request failed "
                                     "(tag=%lld)\n", lld(vl->info.tag));
                             }
+                            /* clean up */
+                            vl->racache_buff = NULL;
                         }
-                        /* clean up */
-                        vl->racache_buff = NULL;
                     }
                     gossip_debug(GOSSIP_RACACHE_DEBUG,
                                  "--- List Processing Complete\n");
@@ -4923,6 +4976,8 @@ static PVFS_error process_vfs_requests(void)
                 ret = repost_unexp_vfs_request(vfs_request, "cancellation");
                 assert(ret == 0);
             }
+            gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Done with Request(%d)\n",i);
+            gossip_err("***\n");
         }
 
         /* The status of the remount thread needs to be checked in the event 
@@ -4959,12 +5014,14 @@ int main(int argc, char **argv)
     time_t start_time;
     struct tm *local_time = NULL;
     uint64_t debug_mask = GOSSIP_NO_DEBUG;
-    PINT_client_sm *acache_timer_sm_p = NULL;
-    PINT_smcb *acache_smcb = NULL;
-    PINT_client_sm *ncache_timer_sm_p = NULL;
-    PINT_smcb *ncache_smcb = NULL;
-    PINT_client_sm *capcache_timer_sm_p = NULL;
-    PINT_smcb *capcache_smcb = NULL;
+    /* these moved to a utility func, should probably
+     * be in perf_counter struct */
+    /* PINT_client_sm *acache_timer_sm_p = NULL; */
+    /* PINT_smcb *acache_smcb = NULL; */
+    /* PINT_client_sm *ncache_timer_sm_p = NULL; */
+    /* PINT_smcb *ncache_smcb = NULL; */
+    /* PINT_client_sm *capcache_timer_sm_p = NULL; */
+    /* PINT_smcb *capcache_smcb = NULL; */
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
     struct sigaction segv_action;
@@ -4984,6 +5041,12 @@ int main(int argc, char **argv)
 #endif
 
     memset(&s_opts, 0, sizeof(options_t));
+#ifdef USE_RA_CACHE
+    s_opts.readahead_size = PVFS2_DEFAULT_RACACHE_BUFSZ; /* in bytes */
+    s_opts.readahead_count = PVFS2_DEFAULT_RACACHE_BUFCNT;
+    s_opts.readahead_readcnt = PVFS2_DEFAULT_RACACHE_READCNT;
+    s_opts.readahead_pinned = PVFS2_DEFAULT_RACACHE_PINNED;
+#endif
     parse_args(argc, argv, &s_opts);
 
     signal(SIGHUP,  client_core_sig_handler);
@@ -5009,21 +5072,6 @@ int main(int argc, char **argv)
         }
     }
 
-#ifdef USE_RA_CACHE
-    if (s_opts.readahead_size == 0)
-    {
-        s_opts.readahead_size = PVFS2_DEFAULT_RACACHE_BUFSZ; /* in bytes */
-    }
-    if (s_opts.readahead_count == 0)
-    {
-        s_opts.readahead_count = PVFS2_DEFAULT_RACACHE_BUFCNT;
-    }
-    if (s_opts.readahead_readcnt == 0)
-    {
-        s_opts.readahead_readcnt = PVFS2_DEFAULT_RACACHE_READCNT;
-    }
-#endif
-
     /* convert gossip mask if provided on command line */
     if (s_opts.gossip_mask)
     {
@@ -5035,19 +5083,19 @@ int main(int argc, char **argv)
         gossip_set_logstamp(s_opts.logstamp_type);
     }
     /*
-      initialize pvfs system interface
-
-      NOTE: we do not rely on a pvfstab file at all in here, as
-      mounting a pvfs2 volume through the kernel interface now
-      requires you to specify a server and fs name in the form of:
-
-      protocol://server/fs_name
-
-      At kernel mount time, we dynamically resolve and add the file
-      system mount information to the pvfs2 system interface (and also
-      (re)configure the acache at that time since it's based on the
-      dynamic server configurations)
-    */
+     * initialize pvfs system interface
+     *
+     * NOTE: we do not rely on a pvfstab file at all in here, as
+     * mounting a pvfs2 volume through the kernel interface now
+     * requires you to specify a server and fs name in the form of:
+     *
+     * protocol://server/fs_name
+     *
+     * At kernel mount time, we dynamically resolve and add the file
+     * system mount information to the pvfs2 system interface (and also
+     * (re)configure the acache at that time since it's based on the
+     * dynamic server configurations)
+     */
     ret = PVFS_sys_initialize(debug_mask);
     if (ret < 0)
     {
@@ -5090,8 +5138,8 @@ int main(int argc, char **argv)
     local_time = localtime(&start_time);
 
     gossip_err("PVFS Client Daemon Started.  Version %s\n", PVFS2_VERSION);
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,  "***********************"
-                 "****************************\n");
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                 "***************************************************\n");
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  " %s starting at %.4d-%.2d-%.2d %.2d:%.2d\n",
                  argv[0], (local_time->tm_year + 1900),
@@ -5101,42 +5149,52 @@ int main(int argc, char **argv)
                  "***************************************************\n");
 
 #ifdef USE_RA_CACHE
-    pint_racache_initialize();
+    pint_racache_initialize(s_opts.readahead_count,
+                            s_opts.readahead_size,
+                            s_opts.readahead_readcnt,
+                            s_opts.readahead_pinned);
 #endif
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Setup Credential Cache\n");
     ret = setup_credential_cache(&s_opts);
     if (ret < 0)
     {
-        PVFS_perror("setup_credential_cache", ret);
+        PVFS_perror_gossip("setup_credential_cache", ret);
         return(ret);
     }
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Set Acache Parameters\n");
     ret = set_acache_parameters(&s_opts);
     if(ret < 0)
     {
-        PVFS_perror("set_acache_parameters", ret);
+        PVFS_perror_gossip("set_acache_parameters", ret);
         return(ret);
     }
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Set Ncache Parameters\n");
     ret = set_ncache_parameters(&s_opts);
     if(ret < 0)
     {
-        PVFS_perror("set_ncache_parameters", ret);
+        PVFS_perror_gossip("set_ncache_parameters", ret);
         return(ret);
     }
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Set Capcache Parameters\n");
     ret = set_capcache_parameters(&s_opts);
     if(ret < 0)
     {
-        PVFS_perror("set_capcache_parameters", ret);
+        PVFS_perror_gossip("set_capcache_parameters", ret);
         return(ret);
     }
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Set Device Parameters\n");
     set_device_parameters(&s_opts);
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Enable Events\n");
     if(s_opts.events)
     {
         PINT_event_enable(s_opts.events);
     }
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Set Acache Counters\n");
     if(PINT_acache_get_pc())
     {
         ret = PINT_perf_set_info(PINT_acache_get_pc(),
@@ -5157,6 +5215,7 @@ int main(int argc, char **argv)
         return(-PVFS_ENOMEM);
     }
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Set Ncache Counters\n");
     if(PINT_ncache_get_pc())
     {
         ret = PINT_perf_set_info(PINT_ncache_get_pc(),
@@ -5177,6 +5236,7 @@ int main(int argc, char **argv)
         return(-PVFS_ENOMEM);
     }
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Set Capcache Counters\n");
     if(PINT_client_capcache_get_pc())
     {
         ret = PINT_perf_set_info(PINT_client_capcache_get_pc(),
@@ -5198,121 +5258,47 @@ int main(int argc, char **argv)
     }
 
     /* original code made into a function */
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Start Counter Rollover\n");
     client_perf_start_rollover(PINT_acache_get_pc(), NULL);
     client_perf_start_rollover(PINT_ncache_get_pc(), NULL);
     client_perf_start_rollover(PINT_client_capcache_get_pc(), NULL);
-#if 0
-    /* start a timer to roll over performance counters (acache) */
-    PINT_smcb_alloc(&acache_smcb,
-                    PVFS_CLIENT_PERF_COUNT_TIMER,
-                    sizeof(struct PINT_client_sm),
-                    client_op_state_get_machine,
-                    client_state_machine_terminate,
-                    s_client_dev_context);
-    if (!acache_smcb)
-    {
-        finalize_perf_items(0);
-        return(-PVFS_ENOMEM);
-    }
-
-    acache_timer_sm_p = PINT_sm_frame(acache_smcb, PINT_FRAME_CURRENT);
-    acache_timer_sm_p->u.perf_count_timer.interval_secs = 
-                    &s_opts.perf_time_interval_secs;
-    acache_timer_sm_p->u.perf_count_timer.pc = PINT_acache_get_pc();
-
-    ret = PINT_client_state_machine_post(acache_smcb, NULL, NULL);
-    if (ret < 0)
-    {
-        gossip_lerr("Error posting acache timer.\n");
-        finalize_perf_items(1, acache_smcb);
-        return(ret);
-    }
-
-    /* start a timer to roll over performance counters (ncache) */
-    PINT_smcb_alloc(&ncache_smcb,
-                    PVFS_CLIENT_PERF_COUNT_TIMER,
-                    sizeof(struct PINT_client_sm),
-                    client_op_state_get_machine,
-                    client_state_machine_terminate,
-                    s_client_dev_context);
-    if (!ncache_smcb)
-    {
-        finalize_perf_items(1, acache_smcb);
-        return(-PVFS_ENOMEM);
-    }
-
-    ncache_timer_sm_p = PINT_sm_frame(ncache_smcb, PINT_FRAME_CURRENT);
-    ncache_timer_sm_p->u.perf_count_timer.interval_secs = 
-                    &s_opts.perf_time_interval_secs;
-    ncache_timer_sm_p->u.perf_count_timer.pc = PINT_ncache_get_pc();
-
-    ret = PINT_client_state_machine_post(ncache_smcb, NULL, NULL);
-    if (ret < 0)
-    {
-        gossip_lerr("Error posting ncache timer.\n");
-        finalize_perf_items(2, acache_smcb, ncache_smcb);
-        return(ret);
-    }
-
-    /* start a timer to roll over performance counters (capcache) */
-    PINT_smcb_alloc(&capcache_smcb,
-                    PVFS_CLIENT_PERF_COUNT_TIMER,
-                    sizeof(struct PINT_client_sm),
-                    client_op_state_get_machine,
-                    client_state_machine_terminate,
-                    s_client_dev_context);
-    if (!capcache_smcb)
-    {
-        finalize_perf_items( 1, acache_smcb);
-        return(-PVFS_ENOMEM);
-    }
-
-    capcache_timer_sm_p = PINT_sm_frame(capcache_smcb, PINT_FRAME_CURRENT);
-    capcache_timer_sm_p->u.perf_count_timer.interval_secs = 
-                    &s_opts.perf_time_interval_secs;
-    capcache_timer_sm_p->u.perf_count_timer.pc = PINT_client_capcache_get_pc();
-
-    ret = PINT_client_state_machine_post(capcache_smcb, NULL, NULL);
-    if (ret < 0)
-    {
-        gossip_lerr("Error posting capcache timer.\n");
-        finalize_perf_items( 2, acache_smcb, capcache_smcb );
-        return(ret);
-    }
-#endif
 
     /* set up structure for kernel interaction */
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Init Ops In Progress Table\n");
     ret = initialize_ops_in_progress_table();
     if (ret)
     {
-        PVFS_perror("initialize_ops_in_progress_table", ret);
-        finalize_perf_items(2, acache_smcb, ncache_smcb);
+        PVFS_perror_gossip("initialize_ops_in_progress_table", ret);
+        /* finalize_perf_items(2, acache_smcb, ncache_smcb); */
         return ret;
     }   
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Initialize Device\n");
     ret = PINT_dev_initialize("/dev/pvfs2-req", 0);
     if (ret < 0)
     {
-        PVFS_perror("PINT_dev_initialize", ret);
-        finalize_perf_items(2, acache_smcb, ncache_smcb);
+        PVFS_perror_gossip("PINT_dev_initialize", ret);
+        /* finalize_perf_items(2, acache_smcb, ncache_smcb); */
         return -PVFS_EDEVINIT;
     }
 
     /* setup a mapped region for I/O transfers */
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Setup I/O Transfer Regions\n");
     memset(s_io_desc, 0 , NUM_MAP_DESC * sizeof(struct PVFS_dev_map_desc));
     ret = PINT_dev_get_mapped_regions(NUM_MAP_DESC, s_io_desc, s_desc_params);
     if (ret < 0)
     {
-        PVFS_perror("PINT_dev_get_mapped_region", ret);
-        finalize_perf_items(2, acache_smcb, ncache_smcb);
+        PVFS_perror_gossip("PINT_dev_get_mapped_region", ret);
+        /* finalize_perf_items(2, acache_smcb, ncache_smcb); */
         return ret;
     }
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Open Job Context\n");
     ret = job_open_context(&s_client_dev_context);
     if (ret < 0)
     {
-        PVFS_perror("device job_open_context failed", ret);
-        finalize_perf_items(2, acache_smcb, ncache_smcb);
+        PVFS_perror_gossip("device job_open_context failed", ret);
+        /* finalize_perf_items(2, acache_smcb, ncache_smcb); */
         return ret;
     }
 
@@ -5322,19 +5308,24 @@ int main(int argc, char **argv)
     */
     pthread_mutex_lock(&remount_mutex);
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Create Remount Thread\n");
     if (pthread_create(&remount_thread, NULL, exec_remount, NULL))
     {
         gossip_err("Cannot create remount thread!");
-        finalize_perf_items(2, acache_smcb, ncache_smcb);
+        /* finalize_perf_items(2, acache_smcb, ncache_smcb); */
         return -1;
     }
 
+    /******************** Start Processing *************************/
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Start Processing Requests\n");
     ret = process_vfs_requests();
     if (ret)
     {
 	gossip_err("Failed to process vfs requests!\n");
     }
+    /********************* End Processing **************************/
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Shutting Down\n");
     /* join remount thread; should be long done by now */
     if (remount_complete == REMOUNT_COMPLETED )
     {
@@ -5345,8 +5336,10 @@ int main(int argc, char **argv)
         pthread_cancel(remount_thread);
     }
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Finalize Ops In Progress\n");
     finalize_ops_in_progress_table();
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Freeing Allocated Resources\n");
     /* free all allocated resources */
     for(i = 0; i < MAX_NUM_OPS; i++)
     {
@@ -5355,24 +5348,34 @@ int main(int argc, char **argv)
         free(s_vfs_request_array[i]);
     }
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Close Job Context\n");
     job_close_context(s_client_dev_context);
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Finalize Tcache\n");
     PINT_tcache_finalize(credential_cache);
     credential_cache = NULL;
 
 #ifdef USE_RA_CACHE
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Finalize Racache\n");
     pint_racache_finalize();
 #endif
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Finalize Dev\n");
     PINT_dev_finalize();
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Put Mapped Rregions\n");
     PINT_dev_put_mapped_regions(NUM_MAP_DESC, s_io_desc);
 
-    PVFS_hint_free(acache_timer_sm_p->hints);
-    PINT_smcb_free(acache_smcb);
-    PVFS_hint_free(ncache_timer_sm_p->hints);
-    PINT_smcb_free(ncache_smcb);
-    PVFS_hint_free(capcache_timer_sm_p->hints);
-    PINT_smcb_free(capcache_smcb);
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Free Timers\n");
+    /* these timers are now started in a utility func
+     * should add smcb and hints to the perf_counter
+     * struct so we don't have these hanging about here
+     */
+    /*PVFS_hint_free(acache_timer_sm_p->hints); */
+    /*PINT_smcb_free(acache_smcb); */
+    /*PVFS_hint_free(ncache_timer_sm_p->hints); */
+    /*PINT_smcb_free(ncache_smcb); */
+    /*PVFS_hint_free(capcache_timer_sm_p->hints); */
+    /*PINT_smcb_free(capcache_smcb); */
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "calling PVFS_sys_finalize()\n");
@@ -5430,6 +5433,7 @@ static void print_help(char *progname)
     printf("--readahead-size=VALUE        size of readahead buffers\n");
     printf("--readahead-count=VALUE       number of readahead buffers\n");
     printf("--readahead-readcnt=VALUE     number of buffers to read ahead\n");
+    printf("--readahead-pinned=VALUE      use pinned buffers T(1) or F(0)\n");
 #endif
     printf("--logfile=VALUE               override the default log file\n");
     printf("--logtype=file|syslog         specify writing logs to file or syslog\n");
@@ -5462,6 +5466,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"readahead-size",1,0,0},
         {"readahead-count",1,0,0},
         {"readahead-readcnt",1,0,0},
+        {"readahead-pinned",1,0,0},
 #endif
         {"gossip-mask",1,0,0},
         {"acache-hard-limit",1,0,0},
@@ -5755,6 +5760,16 @@ static void parse_args(int argc, char **argv, options_t *opts)
                         exit(EXIT_FAILURE);
                     }
                 }
+                else if (strcmp("readahead-pinned", cur_option) == 0)
+                {
+                    ret = sscanf(optarg, "%u", &opts->readahead_pinned);
+                    if(ret != 1)
+                    {
+                        gossip_err(
+                            "Error: invalid readahead-pinned value.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                }
 #endif
                 else if (strcmp("gossip-mask", cur_option) == 0)
                 {
@@ -5848,7 +5863,7 @@ static void reset_acache_timeout(void)
     int min_stored_timeout = 0, max_acache_timeout_ms = 0;
 
     min_stored_timeout =
-        PINT_server_config_mgr_get_abs_min_handle_recycle_time();
+                PINT_server_config_mgr_get_abs_min_handle_recycle_time();
 
     /*
       if all file systems have been unmounted, this value will be -1,
@@ -5863,8 +5878,8 @@ static void reset_acache_timeout(void)
           there are no entries in the cache that could exceed the new
           timeout.
         */
-        max_acache_timeout_ms = PVFS_util_min(
-            (min_stored_timeout * 1000), s_opts.acache_timeout);
+        max_acache_timeout_ms = PVFS_util_min((min_stored_timeout * 1000),
+                                              s_opts.acache_timeout);
 
         if (max_acache_timeout_ms != s_opts.acache_timeout)
         {
