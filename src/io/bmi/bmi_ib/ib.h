@@ -358,6 +358,7 @@ struct ib_device_func {
     void (*ack_cq_completion_event)(void);
     int (*check_cq)(struct bmi_ib_wc *wc);
     const char *(*wc_status_string)(int status);
+    int (*wc_status_to_bmi)(int status);
     int (*mem_register)(memcache_entry_t *c);
     void (*mem_deregister)(memcache_entry_t *c);
     int (*check_async_events)(void);
