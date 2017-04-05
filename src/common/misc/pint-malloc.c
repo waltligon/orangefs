@@ -20,12 +20,6 @@
 #include <malloc.h>
 #endif
 
-/* locally configured options - must be edited here before compile */
-#if 0
-#define memdebug fprintf
-#else
-#define memdebug(stream, format, ...)
-#endif
 
 /*
  * These functions call the default version of the various
@@ -113,6 +107,16 @@ void clean_free(void *ptr)
 #include "gen-locks.h"
 #include "gossip.h"
 
+#if PVFS_MALLOC_DEBUG
+#define memdebug if(memdebugflag)fprintf
+static FILE *dbfp = NULL;
+static int memdebugflag = 0;
+#define __PMDBGPASS ,file,line
+#else
+#define memdebug(stream, format, ...)
+#define __PMDBGPASS 
+#endif
+
 #if PVFS2_SIZEOF_VOIDP == 64
     typedef uint64_t ptrint_t;
 #else
@@ -198,6 +202,10 @@ void clean_free(void *ptr)
 
 #ifdef PINT_free
 #undef PINT_free
+#endif
+
+#ifdef PINT_free2
+#undef PINT_free2
 #endif
 
 /* Struct to handle PVFS malloc features is allocated just before the
@@ -366,7 +374,7 @@ void *PINT_malloc_minimum(size_t size)
     return mem;
 }
 
-void *PINT_malloc(size_t size)
+void *PINT_malloc (size_t size __PMDBG)
 {
     void *mem;
     size_t sizeplus;
@@ -395,22 +403,22 @@ void *PINT_malloc(size_t size)
     extra->align = 0;
 #endif
 
-    memdebug(stderr, "call to MALLOC size %d addr %p returning %p \n",
-             (int)size, mem, (void *)((ptrint_t)mem + EXTRA_SIZE));
+    memdebug(dbfp, "%s line %d MALLOC size %d addr %p returning %p \n",
+             file, line, (int)size, mem, (void *)((ptrint_t)mem + EXTRA_SIZE));
 
     return (void *)((ptrint_t)mem + EXTRA_SIZE);
 }
 
-void *PINT_calloc(size_t nmemb, size_t size)
+void *PINT_calloc(size_t nmemb, size_t size __PMDBG)
 {
-    void *p = PINT_malloc(nmemb * size);
+    void *p = PINT_malloc(nmemb * size __PMDBGPASS);
 #if !PVFS_MALLOC_ZERO
     memset(p, 0, nmemb * size);
 #endif
     return p;
 }
 
-int PINT_posix_memalign(void **mem, size_t alignment, size_t size)
+int PINT_posix_memalign (void **mem, size_t alignment, size_t size __PMDBG)
 {
     size_t sizeplus;
     size_t alignplus;
@@ -424,7 +432,7 @@ int PINT_posix_memalign(void **mem, size_t alignment, size_t size)
         *mem = NULL;
         return EINVAL;
     }
-    /* make sure alignment is at least the size of a pointere */
+    /* make sure alignment is at least the size of a pointer */
     alignplus = alignment;
     if (alignment < sizeof(void *))
     {
@@ -458,19 +466,19 @@ int PINT_posix_memalign(void **mem, size_t alignment, size_t size)
     extra->align = alignment;
 #endif
 
-    memdebug(stderr, "call to MEMALIGN size %d addr %p "
+    memdebug(dbfp, "%s line %d MEMALIGN size %d addr %p "
                      "align %d returning %p \n",
-                     (int)size, mem_orig, (int)alignment, *mem);
+                     file, line, (int)size, mem_orig, (int)alignment, *mem);
 
     return 0;
 }
 
-void *PINT_memalign(size_t alignment, size_t size)
+void *PINT_memalign (size_t alignment, size_t size __PMDBG)
 {
     int rc = 0;
     void *mem = NULL;
 
-    rc = PINT_posix_memalign(&mem, alignment, size);
+    rc = PINT_posix_memalign(&mem, alignment, size __PMDBGPASS);
     if (rc)
     {
         errno = rc;
@@ -479,7 +487,7 @@ void *PINT_memalign(size_t alignment, size_t size)
     return mem;
 }
 
-void *PINT_valloc(size_t size)
+void *PINT_valloc (size_t size __PMDBG)
 {
     size_t align;
     align = sysconf(_SC_PAGESIZE);
@@ -492,10 +500,10 @@ void *PINT_valloc(size_t size)
             align = 4096;
         }
     }
-    return PINT_memalign(align, size);
+    return PINT_memalign(align, size __PMDBGPASS);
 }
 
-void *PINT_realloc(void *mem, size_t size)
+void *PINT_realloc (void *mem, size_t size __PMDBG)
 {
     void *ptr = NULL;
     size_t newsize = 0;
@@ -504,12 +512,12 @@ void *PINT_realloc(void *mem, size_t size)
 
     if (mem == NULL)
     {
-        return PINT_malloc(size);
+        return PINT_malloc(size __PMDBGPASS);
     }
 
     if (size == 0)
     {
-        PINT_free(mem);
+        PINT_free(mem __PMDBGPASS);
         return NULL;
     }
 
@@ -535,13 +543,15 @@ void *PINT_realloc(void *mem, size_t size)
     extra->mem = ptr;
     extra->size = newsize;
 
-    memdebug(stderr, "call to REALLOC size %d addr %p newaddr %p returned %p\n",
-             (int)size, mem, ptr, (void *)((ptrint_t)ptr + region_offset));
+    memdebug(dbfp,
+             "%s line %d REALLOC size %d addr %p newaddr %p returned %p\n",
+             file, line, (int)size, mem, ptr, 
+             (void *)((ptrint_t)ptr + region_offset));
 
     return (void *)((ptrint_t)ptr + region_offset);
 }
 
-char *PINT_strdup(const char *str)
+char *PINT_strdup (const char *str __PMDBG)
 {
     int str_size = strlen(str);
     char *new_str = NULL;
@@ -549,7 +559,7 @@ char *PINT_strdup(const char *str)
     {
         return NULL;
     }
-    new_str = (char *)PINT_malloc(str_size + 1);
+    new_str = (char *)PINT_malloc(str_size + 1 __PMDBGPASS);
     if (!new_str)
     {
         return NULL;
@@ -559,7 +569,7 @@ char *PINT_strdup(const char *str)
     return new_str;
 }
 
-char *PINT_strndup(const char *str, size_t size)
+char *PINT_strndup (const char *str, size_t size __PMDBG)
 {
     int str_size = strlen(str);
     char *new_str = NULL;
@@ -571,7 +581,7 @@ char *PINT_strndup(const char *str, size_t size)
     {
         return NULL;
     }
-    new_str = (char *)PINT_malloc(str_size + 1);
+    new_str = (char *)PINT_malloc(str_size + 1 __PMDBGPASS);
     if (!new_str)
     {
         return NULL;
@@ -581,31 +591,47 @@ char *PINT_strndup(const char *str, size_t size)
     return new_str;
 }
 
-void PINT_free(void *mem)
+void PINT_free2(void *mem)
+{
+#if PVFS_MALLOC_DEBUG
+    static char unk[] = "src/unknown.c"; /* format satisfies analysis parser */
+    PINT_free(mem, unk, -1);
+#else
+    PINT_free(mem);
+#endif
+}
+
+void PINT_free (void *mem __PMDBG)
 {
     extra_t *extra;
     void *orig_mem; /* so we can zero the mem before free */
 
     if (!mem)
     {
-        memdebug(stderr, "call to FREE addr %p \n", mem);
+        memdebug(dbfp, "%s line %d FREE addr %p \n", file, line, mem);
         return;
     }
 
     extra = (void *)((ptrint_t)mem - EXTRA_SIZE);
     orig_mem = extra->mem;
 
-    memdebug(stderr, "call to FREE addr %p real addr %p", mem, orig_mem);
-    memdebug(stderr, " size %d", (int)extra->size);
+    memdebug(dbfp, "%s line %d FREE addr %p realaddr %p",
+             file, line, mem, orig_mem);
+    memdebug(dbfp, " size %d", (int)extra->size);
 #if PVFS_MALLOC_CHECK_ALIGN
-    memdebug(stderr, " align %d", (int)extra->align);
+    memdebug(dbfp, " align %d", (int)extra->align);
 #endif
-    memdebug(stderr, "\n");
+    memdebug(dbfp, "\n");
 
 #if PVFS_MALLOC_MAGIC
     if (extra->magic != (uint32_t)PVFS_MALLOC_MAGIC_NUM)
     {
+#if PVFS_MALLOC_DEBUG
+        gossip_lerr("PINT_free: free fails magic number test (%s line %d)\n",
+                    file, line);
+#else
         gossip_lerr("PINT_free: free fails magic number test\n");
+#endif
         return;
     }
 #endif
@@ -627,7 +653,10 @@ void init_glibc_malloc(void)
     static int recurse_flag = 0;
     static gen_mutex_t init_mutex = 
                        (gen_mutex_t)GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
-    void *libc_handle;
+    void *libc_handle = NULL;
+#if PVFS_MALLOC_DEBUG
+    char *dbgfile = NULL;
+#endif
 
     /* prevent multiple threads from running this */
     if (init_flag)
@@ -643,7 +672,24 @@ void init_glibc_malloc(void)
 
     /* running init_glibc_malloc */
     recurse_flag = 1;
-    memdebug(stderr, "init_glibc_malloc running\n");
+
+    /* this is not glibc, per se, but PINT_malloc init */
+#if PVFS_MALLOC_DEBUG
+    memdebugflag = 0;
+    dbgfile = getenv("OFS_MALLOC_DEBUG");
+    if (dbgfile)
+    {
+        dbfp = fopen(dbgfile, "w");
+        if (!dbfp)
+        {
+            perror("init_glibc_malloc:fopen malloc debug file");
+            exit(-1);
+        }
+        memdebugflag = 1;
+    }
+#endif
+
+    memdebug(dbfp, "init_glibc_malloc:running\n");
 
     libc_handle = dlopen("libc.so.6", RTLD_LAZY|RTLD_GLOBAL);
     if (!libc_handle)

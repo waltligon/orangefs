@@ -12,8 +12,5 @@ STATECOMPGEN := \
     $(DIR)/parser.c \
     $(DIR)/parser.h \
 
-# shut up warnings for problems from flex-2.5.33
-MODCFLAGS_$(DIR)/scanner.c := -D__STDC_VERSION__=0
-
 .SECONDARY: $(STATECOMPGEN)
 

@@ -101,6 +101,17 @@ extern int pvfs_valid_path(const char *path);
 
 extern int pvfs_valid_fd(int fd);
 
+/* functions to process server lists */
+extern PVFS_sys_layout *pvfs_layout(const char *path,char *serverlist);
+
+extern PVFS_sys_layout *pvfs_layout_fd(int dfd, char *serverlist);
+
+extern int pvfs_layout_string(PVFS_sys_layout *layout,
+                              void *buff,
+                              int size);
+
+extern void pvfs_release_layout(PVFS_sys_layout *layout);
+
 /* pvfs_open */
 extern int pvfs_open(const char *path, int flags, ...);
 

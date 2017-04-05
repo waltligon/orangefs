@@ -22,7 +22,12 @@
 #include "security-util.h"
 #include "sid.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 static int server_parse_config(struct server_configuration_s *config,
                                char *fs_config_buf,

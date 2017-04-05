@@ -20,7 +20,12 @@
 #include "PINT-reqproto-encode.h"
 #include "sid.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 static int del_eattr_comp_fn(void *v_p,
                              struct PVFS_server_resp *resp_p,

@@ -96,7 +96,7 @@ static int io_send_ack(struct PINT_smcb *smcb, job_status_s *js_p)
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
-        
+
     /* this is where we report the file size to the client before
      * starting the I/O transfer, or else report an error if we
      * failed to get the size, or failed for permission reasons
@@ -315,6 +315,9 @@ static PINT_sm_action io_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
         PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
     }
 
+    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TIO, &s_op->start_time);
+
+
     return(server_state_machine_complete(smcb));
 }
 
@@ -345,6 +348,24 @@ static PINT_sm_action io_send_completion_ack(
     struct server_configuration_s *user_opts = get_server_config_struct();
     
     gossip_debug(GOSSIP_IO_DEBUG,"Executing io_send_completion_ack.\n");
+
+    /*
+     * First update counters
+     */
+    if (s_op->req->u.io.io_type == PVFS_IO_READ)
+    {
+        PINT_perf_count(PINT_server_pc,
+                        PINT_PERF_IOREAD,
+                        s_op->u.io.flow_d->total_transferred,
+                        PINT_PERF_ADD);
+    }
+    else /* it is a WRITE */
+    {
+        PINT_perf_count(PINT_server_pc,
+                        PINT_PERF_IOWRITE,
+                        s_op->u.io.flow_d->total_transferred,
+                        PINT_PERF_ADD);
+    }
     
     /* we only send this trailing ack if we are working on a write
      * operation; otherwise just cut out early

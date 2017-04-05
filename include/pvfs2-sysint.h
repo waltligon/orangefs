@@ -53,8 +53,8 @@ struct PVFS_sys_attr_s
     PVFS2_ALIGN_VAR(int32_t, distr_dir_servers_max);
     PVFS2_ALIGN_VAR(int32_t, distr_dir_split_size);
     PVFS2_ALIGN_VAR(uint32_t, mirror_copies_count);
-    PVFS2_ALIGN_VAR(char*, dist_name);   /**< NOTE: caller must free if valid */
-    PVFS2_ALIGN_VAR(char*, dist_params); /**< NOTE: caller must free if valid */
+    PVFS2_ALIGN_VAR(char *, dist_name);  /**< NOTE: caller must free if valid */
+    PVFS2_ALIGN_VAR(char *, dist_params);/**< NOTE: caller must free if valid */
     PVFS_size dirent_count;
     PVFS_ds_type objtype;
     PVFS_flags flags;
@@ -63,6 +63,14 @@ struct PVFS_sys_attr_s
     uint32_t stuffed;
 };
 typedef struct PVFS_sys_attr_s PVFS_sys_attr;
+
+/* this helper function assumes attr is a pointer to a PVFS_sys_attr
+ * struct.  It first frees any of the internal pointers (link target
+ * dist_name, dist_param et. al. then then frees main struct.  Any
+ * modifications to this struct should be checked against the code
+ * for this function.
+ */
+PVFS_error PVFS_sys_attr_free(PVFS_sys_attr *attr);
 
 /** Describes a PVFS2 file system. */
 struct PVFS_sys_mntent

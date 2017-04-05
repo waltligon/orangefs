@@ -33,7 +33,12 @@
 #include "server-config.h"
 #include "client-capcache.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 enum
 {
@@ -236,7 +241,8 @@ PVFS_error PVFS_isys_create(char *object_name,
 
     /* save the original attribute passed in. since create does it's own
      * retries we need the original attribute available on retries */
-    PINT_copy_object_attr(&(sm_p->u.create.store_attr), &(sm_p->u.create.attr));
+    PINT_copy_object_attr(&(sm_p->u.create.store_attr),
+                          &(sm_p->u.create.attr));
 
     sm_p->u.create.stored_error_code = 0;
     sm_p->u.create.retry_count = 0;
@@ -275,22 +281,17 @@ PVFS_error PVFS_isys_create(char *object_name,
     if(layout)
     {
         /* make sure it is a supported layout */
-        switch(layout->algorithm)
+        if ((layout->algorithm <= PVFS_SYS_LAYOUT_NULL) ||
+            (layout->algorithm > PVFS_SYS_LAYOUT_MAX))
         {
-            /* these are valid */
-            case PVFS_SYS_LAYOUT_ROUND_ROBIN:
-            case PVFS_SYS_LAYOUT_RANDOM:
-            case PVFS_SYS_LAYOUT_LIST:
-                break;
-            /* anything else is not */
-            default:
-                return(-PVFS_EINVAL);
+            return(-PVFS_EINVAL);
         }
 
         sm_p->u.create.layout.algorithm = layout->algorithm;
         if(layout->algorithm == PVFS_SYS_LAYOUT_LIST)
         {
-            sm_p->u.create.layout.server_list.count = layout->server_list.count;
+            sm_p->u.create.layout.server_list.count =
+                    layout->server_list.count;
             sm_p->u.create.layout.server_list.servers =
                     malloc(layout->server_list.count * sizeof(PVFS_BMI_addr_t));
             if(!sm_p->u.create.layout.server_list.servers)
@@ -304,7 +305,10 @@ PVFS_error PVFS_isys_create(char *object_name,
     }
     else
     {
-        sm_p->u.create.layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
+        /* we check for dir hint in another state and
+         * then set default if there is no other layout
+         */
+        sm_p->u.create.layout.algorithm = PVFS_SYS_LAYOUT_NULL;
     }
 
     /* If the user specifies a distribution use that
@@ -327,6 +331,10 @@ PVFS_error PVFS_isys_create(char *object_name,
     }
     else
     {
+        /* leave NULL for now we will check if there is
+         * a dir hint and if no then get the deffault
+         */
+        sm_p->u.create.dist = NULL;
         /* Get the default distribution */
         sm_p->u.create.dist = get_default_distribution(sm_p->parent_ref.fs_id);
         if (!sm_p->u.create.dist)
@@ -525,7 +533,7 @@ static PINT_sm_action create_init(struct PINT_smcb *smcb, job_status_s *js_p)
                                         js_p,
                                         &tmp_id,
                                         pint_client_sm_context);
-    }    
+    }
 
    return SM_ACTION_COMPLETE;
 }
@@ -568,6 +576,17 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         sm_p->u.create.attr.group = attr->group;
         /* note that permission checking is left to server even in this case */
     }
+
+#ifdef ENABLE_SECURITY_CERT
+    /* we need to know the correct owner group in cert. mode */
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "adding gid hint: %d\n", 
+                 sm_p->u.create.attr.group);
+    PVFS_hint_add(&sm_p->hints,
+                  PVFS_HINT_OWNER_GID_NAME,
+                  sizeof(uint32_t), 
+                  &sm_p->u.create.attr.group);
+#endif
+
     /* !!! change more later */
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_parent_getattr: [%p] "
                  "dirdata_server_count = %d "
@@ -1048,7 +1067,8 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                 sm_p->parent_ref.sid_array,   /* back ptr to dir */
                 sm_p->hints);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,"create: msg_p->req.op(%d)\n",msg_p->req.op);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create: msg_p->req.op(%d)\n",msg_p->req.op);
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
@@ -1110,8 +1130,10 @@ static PINT_sm_action create_crdirent_failure(struct PINT_smcb *smcb,
         {
             local_uid = PINT_util_getuid();
 
-            PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
-                          sizeof(PVFS_uid), &local_uid);
+            PVFS_hint_add(&sm_p->hints,
+                          PVFS_HINT_LOCAL_UID_NAME,
+                          sizeof(PVFS_uid),
+                          &local_uid);
         }
 
         PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
@@ -1196,7 +1218,6 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
          * set size to 0 
          * we know that the file size is zero, since we just created it. 
          */ 
-
         ret = PINT_acache_update(sm_p->object_ref,
                                  &sm_p->u.create.attr,
                                  &data_size);
@@ -1204,9 +1225,17 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
         {
             js_p->error_code = ret;
         }
+
+        /* invalidate the acache entry for the parent directory,
+         * because we created a new directory entry which
+         * changes the timestamps on the directory.
+         */
+        PINT_acache_invalidate(sm_p->parent_ref);
+
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
-             (sm_p->u.create.retry_count < sm_p->msgarray_op.params.retry_limit))
+             (sm_p->u.create.retry_count <
+              sm_p->msgarray_op.params.retry_limit))
     {
         sm_p->u.create.stored_error_code = 0;
         sm_p->u.create.retry_count++;

@@ -1058,11 +1058,17 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
         }
     }
 
-    /* NOTE: we call the function associated with each message,
+    /* NOTE: we call the completion function associated with each message,
      *       not just the one from the first array element.  so
      *       there could in theory be different functions for each
      *       message (to handle different types of messages all in
      *       the same array).
+     */
+    /* if resp_p->status is non-zero, then only the header of the
+     * the response is actually decoded.  However, if there is 
+     * a msgpair-defined completion function, then allow that 
+     * function to execute, just in case the non-zero status has
+     * a special meaning to the particular request being processed.
      */
     if (msg_p->comp_fn != NULL)
     {
@@ -1118,17 +1124,17 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
         msg_p->op_action = PVFS_MPA_RETRY;
     }
 
+    /* cleanup capability
+     * Maybe should be part of serv_free_msgpair_resources - V3
+     */
+    PINT_cleanup_capability(&msg_p->req.capability);
+
     /* free all the resources that we used to send and receive. */
     ret = PINT_serv_free_msgpair_resources(&msg_p->encoded_req,
                                            msg_p->encoded_resp_p,
                                            &decoded_msg,
                                            &msg_p->svr_addr,
                                            msg_p->max_resp_sz);
-
-    /* cleanup capability
-     * Maybe should be part of serv_free_msgpair_resources - V3
-     */
-    PINT_cleanup_capability(&msg_p->req.capability);
 
     if (ret)
     {

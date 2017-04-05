@@ -13,7 +13,6 @@
 extern "C" {
 #endif
 
-#include <db.h>
 #include <aio.h>
 #include "trove.h"
 #include "gen-locks.h"
@@ -21,9 +20,11 @@ extern "C" {
 #include "dbpf-keyval-pcache.h"
 #include "dbpf-open-cache.h"
 #include "pint-event.h"
+#include "dbpf-db.h"
 
 /* For unknown Berkeley DB errors, we return some large value
  */
+/* This will return 19, ENOENT, No such device due to the bits in 4243. */
 #define DBPF_ERROR_UNKNOWN 4243
 
 /* Incremental versions are backward compatible with previous releases
@@ -36,23 +37,7 @@ extern "C" {
 
 #define LAST_HANDLE_STRING                                  "last_handle"
 
-#ifdef HAVE_DB_DIRTY_READ
-#define TROVE_DB_DIRTY_READ DB_DIRTY_READ
-#else
-#define TROVE_DB_DIRTY_READ             0
-#endif /* HAVE_DB_DIRTY_READ */
-
-#ifdef __PVFS2_TROVE_THREADED__
-#define TROVE_DB_THREAD DB_THREAD
-#else
-#define TROVE_DB_THREAD         0
-#endif /* __PVFS2_TROVE_THREADED__ */
-
 #define TROVE_DB_MODE                                                 0600
-#define TROVE_DB_TYPE                                             DB_BTREE
-#define TROVE_DB_OPEN_FLAGS        (TROVE_DB_DIRTY_READ | TROVE_DB_THREAD)
-#define TROVE_DB_CREATE_FLAGS            (DB_CREATE | TROVE_DB_OPEN_FLAGS)
-
 #define TROVE_FD_MODE 0600
 
 /*
@@ -193,13 +178,13 @@ struct dbpf_aio_ops
     int (*aio_fsync) (int operation, struct aiocb *aiocbp);
 };
 
-typedef int (* PINT_dbpf_keyval_iterate_callback)(void *,
+typedef int (* PINT_dbpf_keyval_iterate_callback)(dbpf_cursor *,
                                                   TROVE_handle handle,
                                                   TROVE_keyval_s *key,
                                                   TROVE_keyval_s *val);
 
 int PINT_dbpf_keyval_iterate(
-    DB *db_p,
+    dbpf_db *db,
     TROVE_handle handle,
     char type,
     PINT_dbpf_keyval_pcache *pcache,    
@@ -210,7 +195,78 @@ int PINT_dbpf_keyval_iterate(
     PINT_dbpf_keyval_iterate_callback callback);
 
 int PINT_dbpf_dspace_remove_keyval(
-    void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
+    dbpf_cursor *, TROVE_handle handle, TROVE_keyval_s *, TROVE_keyval_s *);
+
+/**
+ * Structure for key in the keyval DB:
+ *
+ * The keys in the keyval database are now stored as the following
+ * struct (dbpf_keyval_db_entry).  The size of key field (the common
+ * name or component name of the key) is not explicitly specified in the
+ * struct, instead it is calculated from the DBT->size field of the
+ * berkeley db key using the macros below.  Its important that the
+ * 'size' and 'ulen' fields of the DBT key struct are set correctly when
+ * calling get and put.  'size' should be the actual size of the string, 'ulen'
+ * should be the size available for the dbpf_keyval_db_entry struct, most
+ * likely sizeof(struct dbpf_keyval_db_entry).
+ */
+
+/* Note - DBPF_MAX_KEY_LENGTH is also defined in trove-migrate.c. Any
+ * change should be evaluated for its impact there.
+ */
+#define DBPF_MAX_KEY_LENGTH PVFS_NAME_MAX
+
+struct dbpf_keyval_db_entry
+{
+    TROVE_handle handle;
+    char type; /* will be one of the types enumerated by dbpf_key_type */
+    char key[DBPF_MAX_KEY_LENGTH];
+};
+
+#define DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(_size) \
+    (sizeof(TROVE_handle) + sizeof(char) + _size)
+
+#define DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(_size) \
+    (_size - sizeof(TROVE_handle) - sizeof(char))
+
+/**
+ * The keyval database contains attributes for pvfs2 handles
+ * (files, directories, symlinks, etc.) that are not considered
+ * common attributes.  Each key in the keyval database consists of a
+ * handle and a string.  The handles can be of different types, and the strings
+ * vary based on the type of handle and the data to be stored (the value for that
+ * key).  The following table lists all the currently stored keyvals, 
+ * based on their handle type:
+ *
+ * Handle Type   Key Class   Key                       Value    
+ * ================================================================
+ * 
+ * meta-file     COMMON      "mh"                      Datafile Array
+ * meta-file     COMMON      "md"                      Distribution
+ * symlink       COMMON      "st"                      Target Handle
+ * directory     COMMON      "de"                      Entries Handle
+ * dir-ent       COMPONENT   <component name>          Entry Handle
+ * [metafile, 
+ *  symlink, 
+ *  directory]   XATTR       <extended attribute name> <extended attribute content>
+ *
+ * The descriptions for the common keys are:
+ *
+ * md:  (m)etafile (d)istribution - stores the distribution type
+ * mh:  stores the (d)atafile (h)andles that exist for this metafile
+ * st:  stores the (s)ymlink (t)arget path that the symlink references
+ * de:  stores the handle that manages the (d)irectory (e)ntries for this directory
+ *
+ * The <component name> strings are the actual object names 
+ * (files, directories, etc) in the directory.  They map to the handles for those 
+ * objects.
+ *
+ * There is also now a special 'null' keyval that has a handle and the null
+ * string as its key.  This acts as handle info for a particular handle.  This
+ * is useful for dir-ent handles, where the number of entries on that handle
+ * must be counted.  The null keyval is accessed internally, based on flags
+ * passed in through the API.
+ */
 
 struct dbpf_storage
 {
@@ -219,8 +275,8 @@ struct dbpf_storage
     char *data_path;   /* path to data storage directory */
     char *meta_path;   /* path to metadata storage directory */
     char *config_path; /* path to config storage directory */
-    DB *sto_attr_db;
-    DB *coll_db;
+    dbpf_db *sto_attr_db;
+    dbpf_db *coll_db;
 };
 
 struct dbpf_collection
@@ -230,10 +286,9 @@ struct dbpf_collection
     char *data_path;   /* path to data collection directory */
     char *meta_path;   /* path to metadata collection directory */
     char *config_path; /* path to config collection directory */
-    DB *coll_attr_db;
-    DB *ds_db;
-    DB *keyval_db;
-    DB_ENV *coll_env;
+    dbpf_db *coll_attr_db;
+    dbpf_db *ds_db;
+    dbpf_db *keyval_db;
     TROVE_coll_id coll_id;
     TROVE_handle root_dir_handle;
     struct dbpf_storage *storage;
@@ -263,12 +318,6 @@ struct dbpf_collection_db_entry
 /* entry types */
 #define DBPF_ENTRY_TYPE_CONST      0x01
 #define DBPF_ENTRY_TYPE_COMPONENT  0x02
-
-int PINT_trove_dbpf_keyval_compare(DB * dbp, const DBT * a, const DBT * b);
-int PINT_trove_dbpf_ds_attr_compare(DB * dbp, const DBT * a, const DBT * b);
-int PINT_trove_dbpf_ds_attr_compare_reversed(DB * dbp,
-                                             const DBT * a,
-                                             const DBT * b);
 
 int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
                          TROVE_object_ref ref,
@@ -610,24 +659,12 @@ void dbpf_collection_deregister(struct dbpf_collection *entry);
 /* function for mapping db errors to trove errors */
 PVFS_error dbpf_db_error_to_trove_error(int db_error_value);
 
-#define DBPF_OPEN   open
-#define DBPF_WRITE  write
-#define DBPF_LSEEK  lseek
-#define DBPF_READ   read
-#define DBPF_CLOSE  close
-#define DBPF_UNLINK unlink
-#define DBPF_SYNC   fdatasync
-#define DBPF_RESIZE ftruncate
-#define DBPF_FSTAT  fstat
-#define DBPF_ACCESS access
-#define DBPF_FCNTL  fcntl
-
 #define DBPF_AIO_SYNC_IF_NECESSARY(dbpf_op_ptr, fd, ret)  \
 do {                                                      \
     int tmp_ret, tmp_errno;                               \
     if (dbpf_op_ptr->flags & TROVE_SYNC)                  \
     {                                                     \
-        if ((tmp_ret = DBPF_SYNC(fd)) != 0)               \
+        if ((tmp_ret = fdatasync(fd)) != 0)               \
         {                                                 \
             tmp_errno = errno;                            \
             ret = -trove_errno_to_trove_error(tmp_errno); \
@@ -646,7 +683,7 @@ do {                                                     \
     int tmp_ret, tmp_errno;                              \
     if (dbpf_op_ptr->flags & TROVE_SYNC)                 \
     {                                                    \
-        if ((tmp_ret = DBPF_SYNC(fd)) != 0)              \
+        if ((tmp_ret = fdatasync(fd)) != 0)              \
         {                                                \
             tmp_errno = errno;                           \
             gossip_err("[fd = %d] SYNC failed: %s\n",    \
@@ -667,11 +704,11 @@ do {                                                          \
     ret = 0;                                                  \
     if (dbpf_op_ptr->flags & TROVE_SYNC)                      \
     {                                                         \
-        if ((tmp_ret = db_ptr->sync(db_ptr, 0)) != 0)         \
+        if ((tmp_ret = dbpf_db_sync(db_ptr)) != 0)            \
         {                                                     \
             gossip_err("db SYNC failed: %s\n",                \
-                       db_strerror(tmp_ret));                 \
-            ret = -dbpf_db_error_to_trove_error(tmp_ret);     \
+                       strerror(tmp_ret));                    \
+            ret = -tmp_ret;       \
         }                                                     \
         gossip_debug(GOSSIP_TROVE_DEBUG,                      \
                      "db SYNC called servicing op type %s\n", \
@@ -725,13 +762,6 @@ do {                                           \
                     PINT_PERF_SET);            \
 } while(0)
 
-extern DB_ENV *dbpf_getdb_env(const char *path,
-                              unsigned int env_flags,
-                              int *err_p);
-extern int dbpf_putdb_env(DB_ENV *dbenv, const char *path);
-extern int db_open(DB *db_p, const char *dbname, int, int);
-extern int db_close(DB *db_p);
-
 int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p);
 
 struct dbpf_storage *dbpf_storage_lookup(char *data_path,
@@ -768,8 +798,7 @@ int dbpf_collection_lookup(char *collname,
 
 int dbpf_collection_clear(TROVE_coll_id coll_id);
 
-int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
-                            TROVE_keyval_s *name_array,
+int dbpf_collection_iterate(TROVE_keyval_s *name_array,
                             TROVE_coll_id *coll_id_array,
                             int *inout_count_p,
                             TROVE_ds_flags flags,

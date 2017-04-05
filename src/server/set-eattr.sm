@@ -77,7 +77,7 @@ machine pvfs2_set_eattr_sm
     {
         pjmp setup_create_immutable_copies
         {
-           CREATE_IMM_COPIES => pvfs2_pjmp_create_immutable_copies_sm;
+            CREATE_IMM_COPIES => pvfs2_pjmp_create_immutable_copies_sm;
         }
         success => inspect_imm_copies;
         default => final_response;
@@ -85,8 +85,8 @@ machine pvfs2_set_eattr_sm
 
     state inspect_imm_copies
     {
-         run inspect_imm_copies;
-         default => final_response;
+        run inspect_imm_copies;
+        default => final_response;
     }
 */
 
@@ -247,33 +247,35 @@ static int seteattr_setobj_eattribs(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action seteattr_get_metahint_flag(struct PINT_smcb *smcb
                                                 ,job_status_s *js_p)
 {
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s ...\n",__func__);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s ...\n",__func__);
 
-   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-   struct PVFS_servreq_seteattr *seteattr = &(s_op->req->u.seteattr);
-   char mir_mode_key[] = USER_PVFS2_MIRROR_MODE;
-   char meta_hint_key[] = "user.pvfs2.meta_hint";
-   int ret = 0;
-   job_id_t j_id;
-   int i;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PVFS_servreq_seteattr *seteattr = &(s_op->req->u.seteattr);
+    char mir_mode_key[] = USER_PVFS2_MIRROR_MODE;
+    char meta_hint_key[] = "user.pvfs2.meta_hint";
+    int ret = 0;
+    job_id_t j_id;
+    int i;
 
-   for (i = 0; i < seteattr->nkey; i++)
-   {
-       if (strncmp(mir_mode_key,
-                   seteattr->key[i].buffer,
-                   strlen(mir_mode_key)) == 0)
-       {
-           break;
-       }
-   }
+    for (i = 0; i < seteattr->nkey; i++)
+    {
+        if (strncmp(mir_mode_key,
+                    seteattr->key[i].buffer,
+                    strlen(mir_mode_key)) == 0)
+        {
+            break;
+        }
+    }
 
-   if (i == seteattr->nkey)
-   {
-       /* mirror.mode key not found, so we don't need to change meta-hint */
-       js_p->error_code = SKIP_UPDATE;
-       return SM_ACTION_COMPLETE;
-   }
-
+    if (i == seteattr->nkey)
+    {
+        /* mirror.mode key not found, 
+         * so we don't need to change meta-hint 
+         */
+        js_p->error_code = SKIP_UPDATE;
+        return SM_ACTION_COMPLETE;
+    }
+ 
    /* setup call to retrieve meta-hint */
    init_keyval_structs(s_op, s_op->free_val);
 
@@ -312,9 +314,9 @@ static PINT_sm_action seteattr_get_metahint_flag(struct PINT_smcb *smcb
    return ret;
 
 error_exit:
-   init_keyval_structs(s_op, s_op->free_val);
+    init_keyval_structs(s_op, s_op->free_val);
 
-   return SM_ACTION_COMPLETE;
+    return SM_ACTION_COMPLETE;
 }/* end seteattr_get_metahint_flag */
 
 

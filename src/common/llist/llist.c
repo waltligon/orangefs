@@ -16,7 +16,7 @@ PINT_llist_p PINT_llist_new(void)
 
     if (!(l_p = (PINT_llist_p) malloc(sizeof(PINT_llist))))
     {
-	return (NULL);
+        return (NULL);
     }
     l_p->next = l_p->item = NULL;
     return (l_p);
@@ -30,7 +30,7 @@ int PINT_llist_empty(PINT_llist_p l_p)
 {
     if (l_p->next == NULL)
     {
-	return (1);
+        return (1);
     }
     return (0);
 }
@@ -43,30 +43,24 @@ int PINT_llist_empty(PINT_llist_p l_p)
  */
 int PINT_llist_add_to_tail(PINT_llist_p l_p, void *item)
 {
-    PINT_llist_p orig_l_p = l_p;
     PINT_llist_p new_p;
 
-    if (!l_p)	/* not a list */
+    if (!l_p)        /* not a list */
     {
-	return (-1);
+        return (-1);
     }
 
     /* NOTE: first "item" pointer in list is _always_ NULL */
 
     if ((new_p = (PINT_llist_p) malloc(sizeof(PINT_llist))) == NULL)
     {
-	return -1;
+        return -1;
     }
     new_p->next = NULL;
     new_p->item = item;
     while (l_p->next)
     {
-        if (l_p->next == orig_l_p)
-        {
-            fprintf(stderr, "Mangled llist!\n");
-            return -1;
-        }
-	l_p = l_p->next;
+        l_p = l_p->next;
     }
     l_p->next = new_p;
     return (0);
@@ -82,16 +76,16 @@ int PINT_llist_add_to_head(PINT_llist_p l_p, void *item)
 {
     PINT_llist_p new_p;
 
-    if (!l_p)	/* not a list */
+    if (!l_p)        /* not a list */
     {
-	return (-1);
+        return (-1);
     }
 
     /* NOTE: first "item" pointer in list is _always_ NULL */
 
     if ((new_p = (PINT_llist_p) malloc(sizeof(PINT_llist))) == NULL)
     {
-	return -1;
+        return -1;
     }
     new_p->next = l_p->next;
     new_p->item = item;
@@ -108,7 +102,7 @@ void *PINT_llist_head(PINT_llist_p l_p)
 {
     if (!l_p || !l_p->next)
     {
-	return (NULL);
+        return (NULL);
     }
     return (l_p->next->item);
 }
@@ -119,20 +113,13 @@ void *PINT_llist_head(PINT_llist_p l_p)
  */
 void *PINT_llist_tail(PINT_llist_p l_p)
 {
-    PINT_llist_p orig_l_p = l_p;
     if (!l_p || !l_p->next)
     {
-	return (NULL);
+        return (NULL);
     }
     while (l_p->next)
     {
-        if (l_p->next == orig_l_p)
-        {
-            fprintf(stderr, "Mangled llist!\n");
-            return NULL;
-        }
-	/* NOTE: "comp" function must return _0_ if a match is made */
-	l_p = l_p->next;
+        l_p = l_p->next;
     }
     return (l_p->item);
 }
@@ -144,26 +131,20 @@ void *PINT_llist_tail(PINT_llist_p l_p)
  */
 void *PINT_llist_search(PINT_llist_p l_p,
                         void *key,
-                        int (*comp) (void *,
-		                     void *))
+                        int (*cmp_item) (void *,
+                                         void *))
 {
-    PINT_llist_p orig_l_p = l_p;
-    if (!l_p || !l_p->next || !comp)	/* no or empty list */
+    if (!l_p || !l_p->next || !cmp_item)        /* no or empty list */
     {
-	return (NULL);
+        return (NULL);
     }
 
     for (l_p = l_p->next; l_p; l_p = l_p->next)
     {
-        if (l_p->next == orig_l_p)
+        /* NOTE: "comp" function must return _0_ if a match is made */
+        if (!(*cmp_item) (key, l_p->item))
         {
-            fprintf(stderr, "Mangled llist!\n");
-            return NULL;
-        }
-	/* NOTE: "comp" function must return _0_ if a match is made */
-	if (!(*comp) (key, l_p->item))
-        {
-	    return (l_p->item);
+            return (l_p->item);
         }
     }
     return (NULL);
@@ -177,24 +158,18 @@ void *PINT_llist_search(PINT_llist_p l_p,
  */
 void *PINT_llist_rem(PINT_llist_p l_p,
                      void *key,
-                     int (*comp) (void *,
-		                  void *))
+                     int (*cmp_item) (void *,
+                                      void *))
 {
-    PINT_llist_p orig_l_p = l_p;
-    if (!l_p || !l_p->next || !comp)	/* no or empty list */
+    if (!l_p || !l_p->next || !cmp_item)        /* no or empty list */
     {
-	return (NULL);
+        return (NULL);
     }
 
     for (; l_p->next; l_p = l_p->next)
     {
-        if (l_p->next == orig_l_p)
-        {
-            fprintf(stderr, "Mangled llist!\n");
-            return NULL;
-        }
         /* NOTE: "comp" function must return _0_ if a match is made */
-        if (!(*comp) (key, l_p->next->item))
+        if (!(*cmp_item) (key, l_p->next->item))
         {
             void *i_p = l_p->next->item;
             PINT_llist_p rem_p = l_p->next;
@@ -217,21 +192,15 @@ void *PINT_llist_rem(PINT_llist_p l_p,
  */
 int PINT_llist_count(PINT_llist_p l_p)
 {
-    PINT_llist_p orig_l_p = l_p;
     int count = 0;
 
     if (!l_p)
     {
-	return (-1);
+        return (-1);
     }
 
     for (l_p = l_p->next; l_p; l_p = l_p->next)
     {
-        if (l_p->next == orig_l_p)
-        {
-            fprintf(stderr, "Mangled llist!\n");
-            return count;
-        }
         count++;
     }
 
@@ -243,27 +212,21 @@ int PINT_llist_count(PINT_llist_p l_p)
  *
  * Returns -1 on error, 0 on success
  */
-int PINT_llist_doall(PINT_llist_p l_p, int (*fn) (void *))
+int PINT_llist_doall(PINT_llist_p l_p, int (*do_item) (void *))
 {
-    PINT_llist_p orig_l_p = l_p;
     PINT_llist_p tmp_p;
 
-    if (!l_p || !l_p->next || !fn)
+    if (!l_p || !l_p->next || !do_item)
     {
-	return (-1);
+        return (-1);
     }
     for (l_p = l_p->next; l_p;)
     {
-        if (l_p->next == orig_l_p)
-        {
-            fprintf(stderr, "Mangled llist!\n");
-            return -1;
-        }
         tmp_p = l_p->next;        /* save pointer to next element in case the
                                  * function destroys the element pointed to
                                  * by l_p...
                                  */
-        (*fn) (l_p->item);
+        (*do_item) (l_p->item);
         l_p = tmp_p;
     }
     return (0);
@@ -275,29 +238,23 @@ int PINT_llist_doall(PINT_llist_p l_p, int (*fn) (void *))
  * Returns -1 on error, 0 on success
  */
 int PINT_llist_doall_arg(PINT_llist_p l_p,
-                         int (*fn) (void *item,
-	                            void *arg),
+                         int (*do_item) (void *item,
+                                         void *arg),
                          void *arg)
 {
-    PINT_llist_p orig_l_p = l_p;
     PINT_llist_p tmp_p;
 
-    if (!l_p || !l_p->next || !fn)
+    if (!l_p || !l_p->next || !do_item)
     {
-	return (-1);
+        return (-1);
     }
     for (l_p = l_p->next; l_p;)
     {
-        if (l_p->next == orig_l_p)
-        {
-            fprintf(stderr, "Mangled llist!\n");
-            return -1;
-        }
         tmp_p = l_p->next;        /* save pointer to next element in case the
                                  * function destroys the element pointed to
                                  * by l_p...
                                  */
-        (*fn) (l_p->item, arg);
+        (*do_item) (l_p->item, arg);
         l_p = tmp_p;
     }
     return (0);
@@ -305,16 +262,13 @@ int PINT_llist_doall_arg(PINT_llist_p l_p,
 
 /* PINT_llist_free() - frees all memory associated with a list
  *
- * Relies on passed function to free memory for an item.  A null
- * function means to clean up the list but leave the referenced
- * structures in place
+ * Relies on passed function to free memory for an item
  */
-void PINT_llist_free(PINT_llist_p l_p, void (*fn) (void *))
+void PINT_llist_free(PINT_llist_p l_p, void (*free_item) (void *))
 {
-    PINT_llist_p orig_l_p = l_p;
     PINT_llist_p tmp_p;
 
-    if (!l_p)
+    if (!l_p || !free_item)
     {
         return;
     }
@@ -325,18 +279,10 @@ void PINT_llist_free(PINT_llist_p l_p, void (*fn) (void *))
     free(tmp_p);
     while (l_p)
     {
-        if (l_p->next == orig_l_p)
-        {
-            fprintf(stderr, "Mangled llist!\n");
-            break;
-        }
-        if (fn)
-        {
-	    (*fn) (l_p->item);
-        }
-	tmp_p = l_p;
-	l_p = l_p->next;
-	free(tmp_p);
+        (*free_item) (l_p->item);
+        tmp_p = l_p;
+        l_p = l_p->next;
+        free(tmp_p);
     }
 }
 

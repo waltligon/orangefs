@@ -26,7 +26,12 @@
 #include "PINT-reqproto-encode.h"
 #include "sid.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 static int root_check_comp_fn(void *v_p,
                               struct PVFS_server_resp *resp_p,
@@ -373,7 +378,12 @@ static PINT_sm_action mgmt_setparam_list_cleanup(struct PINT_smcb *smcb,
         for(i = 0; i < sm_p->u.setparam_list.count; i++)
         {
             int status;
-            if (sm_p->u.setparam_list.param == PVFS_SERV_PARAM_ROOT_CHECK)
+
+            /* Skip if failure occurs before allocating memory for the root
+             * check status array, usually after calling a get_attr.
+             */
+            if (sm_p->u.setparam_list.param == PVFS_SERV_PARAM_ROOT_CHECK &&
+                sm_p->u.setparam_list.root_check_status_array != NULL)
             {
                 status = sm_p->u.setparam_list.root_check_status_array[i];
             }

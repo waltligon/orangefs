@@ -26,7 +26,12 @@
 #include "security-util.h"
 #include "sid.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 static int get_eattr_comp_fn(void *v_p,
                              struct PVFS_server_resp *resp_p,
@@ -178,6 +183,11 @@ static int get_eattr_comp_fn(void *v_p,
 
     /* only posted one msgpair */
     assert(i==0);
+
+    /* now, msgpairarray does not set the op_status with resp_p->status
+     * BEFORE entering into this completion function.  So, we do it now.
+     */
+    sm_p->msgarray_op.msgarray[i].op_status = resp_p->status;
 
     /* if this particular request was successful, then store the server
      * response and let the caller sort it out */

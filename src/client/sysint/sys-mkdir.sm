@@ -31,7 +31,12 @@
 #include "dist-dir-utils.h"
 #include "client-capcache.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 enum
 {
@@ -207,6 +212,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     }
 
     if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) !=
+            /* s_op->val_a[k].buffer = &attr->u.dir.hint.dfile_count; */
         PVFS_ATTR_SYS_ALL_SETABLE)
     {
         gossip_lerr("PVFS_isys_mkdir() failure: invalid attribute mask %d, "
@@ -236,7 +242,9 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     PINT_init_sysint_credential(sm_p->cred_p, credential);
 
     sm_p->u.mkdir.object_name = object_name;
+
     PVFS_util_copy_sys_attr(&sm_p->u.mkdir.sys_attr, &attr);
+
     sm_p->u.mkdir.mkdir_resp = resp;
     sm_p->u.mkdir.stored_error_code = 0;
     sm_p->u.mkdir.retry_count = 0;
@@ -331,9 +339,29 @@ static int mkdir_msg_comp_fn(void *v_p,
 
     /* also insert entry into attr cache */
     PINT_CONVERT_ATTR(&attr, &sm_p->u.mkdir.sys_attr, 0);
+
     /* V3 need to put capability into the acache */
     attr.capability = resp_p->u.mkdir.capability;
+
+/* WBL - REVIEW this - can we update attr without size array?
+ * can we avoid the following invalidation - what at the
+ * consequences of being a little out of date?  how much
+ * performance do we lose?  Can we pass new timestamps back
+ * so we can update cache rather then invalidate?  Is this the right
+ * place to invalidate anyway, this is the return of the mkdir not the
+ * crdirent, which would have updated the parent's stimestamp.
+ */
+
+#if 0 /* Don't cache size_array. */
     PINT_acache_update(sm_p->object_ref, &attr, NULL);
+#endif
+
+
+    /* invalidate the acache entry for the parent object, since a successful
+     * mkdir has now changed the timestamps on the parent's dirdata handle, 
+     * invalidating the timestamps stored with the parent.
+     */
+    PINT_acache_invalidate(sm_p->object_ref);
 
     return 0;
 }
@@ -871,7 +899,6 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
 }
-
 
 static PINT_sm_action mkdir_getattr_setup(struct PINT_smcb *smcb,
                                           job_status_s *js_p)

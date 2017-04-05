@@ -291,6 +291,20 @@ sub emit_security
     if ($seckeyflag || $seccertflag || $opt_trusted == 1)
     {
         print $target "\n\t<Security>\n";
+        if ($seckeyflag || $seccertflag)
+        {
+           print $target "\t\tTurnOffTimeouts no\n";
+        }
+        else
+        {
+           print $target "\t\tTurnOffTimeouts yes\n";
+        }
+    }
+    else
+    {
+        print $target "\n\t<Security>\n";
+        print $target "\t\tTurnOffTimeouts yes\n";
+        print $target "\t</Security>\n";
     }
 
     if ($opt_trusted == 1)

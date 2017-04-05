@@ -34,7 +34,12 @@ enum {
     NO_WORK = 1
 };
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 static int readdirplus_fetch_attrs_comp_fn(void *v_p,
                                            struct PVFS_server_resp *resp_p,

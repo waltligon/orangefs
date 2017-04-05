@@ -113,7 +113,8 @@ enum PVFS_server_op
   || (x) == PVFS_SERV_MGMT_REMOVE_DIRENT)
 
 #define PVFS_REQ_COPY_CAPABILITY(__cap, __req) \
-    assert(PINT_copy_capability(&(__cap), &((__req).capability)) == 0)
+    { int rc = PINT_copy_capability(&(__cap), &((__req).capability)); \
+    assert(rc == 0); }
 
 /******************************************************************/
 /* This struct ised used to control the way the server passes requests
@@ -162,8 +163,9 @@ do {                                             \
  * parameters used within the request protocol
  */
 
-/* max size of layout information (may include explicit server list */
-#define PVFS_REQ_LIMIT_LAYOUT             4096
+/* max size of layout information - may include explicit server list */
+                                          /* from pvfs2-types.h */
+#define PVFS_REQ_LIMIT_LAYOUT             PVFS_SYS_LIMIT_LAYOUT
 /* max size of opaque distribution parameters */
 #define PVFS_REQ_LIMIT_DIST_BYTES         1024
 /* max size of each configuration file transmitted to clients.
@@ -195,17 +197,17 @@ do {                                             \
 /* max count of dirent handles associated with a directory */
 #define PVFS_REQ_LIMIT_DIRENT_FILE_COUNT 1024
 /* max number of handles for which we return attributes */
-#define PVFS_REQ_LIMIT_LISTATTR 60
+#define PVFS_REQ_LIMIT_LISTATTR PVFS_SYS_LIMIT_LISTATTR
 /* max count of directory entries per readdir request */
 #define PVFS_REQ_LIMIT_DIRENT_COUNT 512
 /* max count of directory entries per readdirplus request */
-#define PVFS_REQ_LIMIT_DIRENT_COUNT_READDIRPLUS PVFS_REQ_LIMIT_LISTATTR
+#define PVFS_REQ_LIMIT_DIRENT_COUNT_READDIRPLUS PVFS_SYS_LIMIT_LISTATTR
 /* max number of perf metrics returned by mgmt perf mon op */
 #define PVFS_REQ_LIMIT_MGMT_PERF_MON_COUNT 16
 /* max number of events returned by mgmt event mon op */
 #define PVFS_REQ_LIMIT_MGMT_EVENT_MON_COUNT 2048
 /* max number of handles returned by any operation using an array of handles */
-#define PVFS_REQ_LIMIT_HANDLES_COUNT 1024
+#define PVFS_REQ_LIMIT_HANDLES_COUNT PVFS_SYS_LIMIT_HANDLES_COUNT
 /* typical numb er of SIDs per handle, there are this number times the
  * number of handles PLUS the handles that can be sent
  * adjust both this ratio and the handles count to get something
@@ -239,13 +241,13 @@ do {                                             \
 /* max number of keys or key/value pairs to set or get in an operation */
 #define PVFS_REQ_LIMIT_EATTR_LIST       PVFS_MAX_XATTR_LISTLEN 
 /* max size of security signature (in bytes) */
-#define PVFS_REQ_LIMIT_SIGNATURE 512
+#define PVFS_REQ_LIMIT_SIGNATURE        PVFS_SYS_LIMIT_SIGNATURE
 /* max number of groups in credential array */
-#define PVFS_REQ_LIMIT_GROUPS 32
+#define PVFS_REQ_LIMIT_GROUPS           PVFS_SYS_LIMIT_GROUPS
 /* max size of credential/capability issuer (in bytes) */
-#define PVFS_REQ_LIMIT_ISSUER 128
+#define PVFS_REQ_LIMIT_ISSUER           PVFS_SYS_LIMIT_ISSUER
 /* max size of a certificate buffer (in bytes) */
-#define PVFS_REQ_LIMIT_CERT 8192
+#define PVFS_REQ_LIMIT_CERT             PVFS_SYS_LIMIT_CERT
 /* max size of a certificate private key (in bytes) */
 #define PVFS_REQ_LIMIT_SECURITY_KEY 8192
 /* max size of userid/password for cert request (in bytes) */
@@ -1219,6 +1221,14 @@ do {                                             \
     PINT_CONVERT_ATTR(&(__req).u.setattr.attr, &(__attr), __extra_amask);\
 } while (0)
 
+    /*
+     * converting attr and modifying it in a FILL macro is bad form
+     * moving this back into the state machines for this and mkdir
+    (__attr).objtype = (__objtype);                                       \
+    (__attr).mask |= PVFS_ATTR_SYS_TYPE;                                  \
+    PINT_CONVERT_ATTR(&(__req).u.setattr.attr, &(__attr), __extra_amask); \
+     */
+
 /* lookup path ************************************************/
 /* - looks up as many elements of the specified path as possible */
 struct PVFS_servreq_lookup_path
@@ -1456,6 +1466,15 @@ do {                                                       \
     (__attr).mask   |= PVFS_ATTR_SYS_TYPE;                 \
     PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);\
 } while (0)
+
+    /* calling a convert in a fill macro is bad form - it prevents
+     * accessing all of the attr fields plus it obsfucates.
+     * I am moving these back to the state machines both here and
+     * in setattr
+    (__attr).objtype = PVFS_TYPE_DIRECTORY;                          \
+    (__attr).mask   |= PVFS_ATTR_COMMON_TYPE;                        \
+    PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);          \
+     */
 
 struct PVFS_servresp_mkdir
 {
@@ -2363,30 +2382,34 @@ do {                                                       \
 
 struct PVFS_servreq_mgmt_perf_mon
 {
-    uint32_t next_id;  /* next time stamp id we want to retrieve */
+    uint32_t cnt_type;     /* type of perf counters to retrieve */
+    uint32_t next_id;      /* next time stamp id we want to retrieve */
     uint32_t key_count;    /* how many counters per measurements we want */
     uint32_t count;        /* how many measurements we want */
 };
-endecode_fields_3_struct(
+endecode_fields_4_struct(
     PVFS_servreq_mgmt_perf_mon,
+    uint32_t, cnt_type,
     uint32_t, next_id,
     uint32_t, key_count,
     uint32_t, count);
 
 #define PINT_SERVREQ_MGMT_PERF_MON_FILL(__req,         \
                                         __cap,         \
+                                        __cnt_type,    \
                                         __next_id,     \
                                         __key_count,   \
-                                        __count,       \
+                                        __sample_count,\
                                         __hints)       \
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
     (__req).op = PVFS_SERV_MGMT_PERF_MON;              \
     PVFS_REQ_COPY_CAPABILITY((__cap), (__req));        \
     (__req).hints = (__hints);                         \
+    (__req).u.mgmt_perf_mon.cnt_type = (__cnt_type);   \
     (__req).u.mgmt_perf_mon.next_id = (__next_id);     \
     (__req).u.mgmt_perf_mon.key_count = (__key_count); \
-    (__req).u.mgmt_perf_mon.count = (__count);         \
+    (__req).u.mgmt_perf_mon.count = (__sample_count);  \
 } while (0)
 
 struct PVFS_servresp_mgmt_perf_mon
@@ -2394,6 +2417,7 @@ struct PVFS_servresp_mgmt_perf_mon
     int64_t *perf_array;            /* array of statistics */
     uint32_t perf_array_count;      /* size of above array */
     uint32_t key_count;             /* number of keys in each sample */
+    uint32_t sample_count;          /* number of samples (history) */
     uint32_t suggested_next_id;     /* next id to pick up from this point */
     uint64_t end_time_ms;           /* end time for final array entry */
     uint64_t cur_time_ms;           /* current time according to svr */
@@ -2404,7 +2428,7 @@ endecode_fields_5a_struct(
     uint32_t, suggested_next_id,
     uint64_t, end_time_ms,
     uint64_t, cur_time_ms,
-    skip4,,
+    uint32_t, sample_count,
     uint32_t, perf_array_count,
     int64_t,  perf_array);
 #define extra_size_PVFS_servresp_mgmt_perf_mon \

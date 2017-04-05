@@ -124,16 +124,16 @@ int main(int argc, char **argv)
 
     /* create /lost+found, if it isn't there already */
     ret = create_lost_and_found(cur_fs,
-                                &creds);
+				&creds);
     if (ret != 0)
     {
-        if (ret == -PVFS_EAGAIN)
+	if (ret == -PVFS_EAGAIN)
         {
-            printf("Failed to create lost+found: likely the system is "
-                   "already in admin mode.  Use pvfs2-set-mode to change "
-                   "back to normal mode prior to running pvfs2-fsck.\n");
-        }
-        return -1;
+	    printf("Failed to create lost+found: likely the system is "
+		   "already in admin mode.  Use pvfs2-set-mode to change "
+		   "back to normal mode prior to running pvfs2-fsck.\n");
+	}
+	return -1;
     }
 
     param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;

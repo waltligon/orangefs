@@ -1,4 +1,3 @@
-/* we will keep a copy and keep one in the environment */
 /* (C) 2011 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
@@ -23,10 +22,6 @@
 #endif
 #include <errno.h>
 #include <pint-cached-config.h>
-
-static int iocommon_parse_serverlist(char *serverlist,
-                                     struct PVFS_sys_server_list *slist,
-                                     PVFS_fs_id fsid);
 
 /** this is a global analog of errno for pvfs specific
  *  errors errno is set to EIO and this is set to the
@@ -377,9 +372,9 @@ errorout:
  * Parses a simple string to find the number and select of servers
  * for the LIST layout method
  */
-static int iocommon_parse_serverlist(char *serverlist,
-                                     struct PVFS_sys_server_list *slist,
-                                     PVFS_fs_id fsid)
+int iocommon_parse_serverlist(char *serverlist,
+                              struct PVFS_sys_server_list *slist,
+                              PVFS_fs_id fsid)
 {
     PVFS_BMI_addr_t *server_array;
     int count;
@@ -400,7 +395,7 @@ static int iocommon_parse_serverlist(char *serverlist,
         errno = EINVAL;
         return -1;
     }
-    slist->count = atoi(tok);
+    slist->count = strtol(tok, NULL, 10);
 /* V3 cleanup */
 #if 0
     PINT_cached_config_count_servers(fsid, PINT_SERVER_TYPE_IO, &count);
@@ -417,13 +412,14 @@ static int iocommon_parse_serverlist(char *serverlist,
         return -1;
     }
     slist->servers = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t) *
-                                                slist->count);
+                                               slist->count);
     if (!slist->servers)
     {
         errno = ENOMEM;
         return -1;
     }
-    server_array = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t)*count);
+    server_array = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t) *
+                                             count);
     if (!server_array)
     {
         free(slist->servers);
@@ -447,9 +443,16 @@ static int iocommon_parse_serverlist(char *serverlist,
         return ret;
     }
     for (i = 0; i < slist->count; i++)
-    {
+    {   
+        int tokval;
         tok = strtok_r(NULL, ":", &save_ptr);
-        if (!tok || atoi(tok) < 0 || atoi(tok) >= count)
+        if (!tok)
+        {
+            errno = EINVAL;
+            return -1;
+        }
+        tokval = strtol(tok, NULL, 10);
+        if (tokval < 0 || tokval >= count)
         {
             free(slist->servers);
             slist->servers = NULL;
@@ -457,7 +460,7 @@ static int iocommon_parse_serverlist(char *serverlist,
             errno = EINVAL;
             return -1;
         }
-        slist->servers[i] = server_array[atoi(tok)];
+        slist->servers[i] = server_array[tokval];
     }
     free(server_array);
     return 0;
@@ -591,7 +594,8 @@ int iocommon_create_file(const char *filename,
             }
             layout->server_list.count = 0;
             layout->server_list.servers = NULL;
-            rc = iocommon_parse_serverlist(value, &layout->server_list,
+            rc = iocommon_parse_serverlist(value,
+                                           &layout->server_list,
                                            parent_ref.fs_id);
             if (rc < 0)
             {
@@ -729,6 +733,7 @@ int iocommon_expand_path (PVFS_path_t *Ppath,
         /* create a usrint file descriptor for it */
         gossip_debug(GOSSIP_USRINT_DEBUG,
                "iocommon_expand_path calls pvfs_alloc_descriptor %d\n", rc);
+        /* returnes mutex LOCK on pd and pd->s */
         pd = pvfs_alloc_descriptor(&glibc_ops, rc, NULL, 0);
         pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
         pd->true_fd = rc;
@@ -1326,7 +1331,7 @@ finish:
     {
         cache_flag = *(int *)value;
     }
-    /* now allocate file descriptor */
+    /* now allocate file descriptor - mutex LOCK pd and pd->s */
     pd = pvfs_alloc_descriptor(&pvfs_ops, -1, &file_ref, cache_flag);
     if (!pd)
     {
@@ -1338,6 +1343,7 @@ finish:
 
     /* Get the file's type information from its attributes */
     errno = 0;
+    /* descriptor and state mutex remains locked */
     rc = PVFS_sys_getattr(pd->s->pvfs_ref,
                           PVFS_ATTR_SYS_ALL_NOHINT,
                           credential,
@@ -1495,6 +1501,7 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
             }
             /* Get the file's size in bytes as the ending offset */
             errno = 0;
+            /* descriptor state mutex remains locked */
             rc = PVFS_sys_getattr(pd->s->pvfs_ref,
                                   PVFS_ATTR_SYS_SIZE,
                                   credential,
@@ -1558,6 +1565,7 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
                 {
                     goto errorout;
                 }
+                /* descriptor state mutex remains locked */
                 rc = PVFS_sys_readdir(pd->s->pvfs_ref,
                                       pd->s->token,
                                       dirent_read_count,
@@ -3159,6 +3167,7 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
         count = PVFS_REQ_LIMIT_DIRENT_COUNT;
     }
     errno = 0;
+    /* descrpitor state mutex remains locked */
     rc = PVFS_sys_readdir(pd->s->pvfs_ref,
                           token,
                           count,
@@ -3178,7 +3187,7 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
         dirp->d_off = pd->s->file_pointer;
 #endif
 #ifdef _DIRENT_HAVE_D_RECLEN
-        dirp->d_reclen = sizeof(PVFS_dirent);
+        dirp->d_reclen = sizeof(struct dirent);
 #endif
 #ifdef _DIRENT_HAVE_D_TYPE
 #ifndef DT_UNKNOWN
@@ -3250,6 +3259,7 @@ int iocommon_getdents64(pvfs_descriptor *pd,
         count = PVFS_REQ_LIMIT_DIRENT_COUNT;
     }
     errno = 0;
+    /* descrpitor state mutex remains locked */
     rc = PVFS_sys_readdir(pd->s->pvfs_ref,
                           token,
                           count,

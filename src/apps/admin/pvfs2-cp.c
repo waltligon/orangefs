@@ -213,6 +213,7 @@ int main (int argc, char ** argv)
 main_out:
     generic_cleanup(&src, &dest, &credentials);
     PVFS_sys_finalize();
+    PINT_cleanup_credential(&credentials);
     free(user_opts);
     free(buffer);
 
@@ -714,13 +715,10 @@ void make_attribs(PVFS_sys_attr *attr, PVFS_credential *credentials,
     attr->group = credentials->group_array[0];
     attr->perms = PVFS_util_translate_mode(mode, 0);
     attr->mask = (PVFS_ATTR_SYS_ALL_SETABLE);
+
     if (nr_datafiles > 0)
     {
         attr->dfile_count = nr_datafiles;
-    }
-
-    if (attr->dfile_count > 0)
-    {
         attr->mask |= PVFS_ATTR_SYS_DFILE_COUNT;
     }
 }

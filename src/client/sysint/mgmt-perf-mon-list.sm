@@ -24,7 +24,12 @@
 #include "PINT-reqproto-encode.h"
 #include "sid.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
 
 static int perf_mon_list_comp_fn(void* v_p,
                                  struct PVFS_server_resp *resp_p,
@@ -60,13 +65,14 @@ machine pvfs2_client_mgmt_perf_mon_list_sm
  */
 PVFS_error PVFS_imgmt_perf_mon_list(PVFS_fs_id fs_id,
                                     const PVFS_credential *credential,
+                                    int32_t cnt_type,
                                     int64_t **perf_matrix,
                                     uint64_t *end_time_ms_array,
                                     PVFS_BMI_addr_t *addr_array,
                                     uint32_t* next_id_array,
                                     int server_count,
                                     int *key_count,
-                                    int history_count,
+                                    int *sample_count,
                                     PVFS_error_details *details,
                                     PVFS_mgmt_op_id *op_id,
                                     PVFS_hint hints,
@@ -79,8 +85,8 @@ PVFS_error PVFS_imgmt_perf_mon_list(PVFS_fs_id fs_id,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_imgmt_perf_mon_list entered\n");
 
-    if ((server_count < 1) || (history_count < 1) || !key_count
-             || (*key_count < 1) || !perf_matrix || !addr_array
+    if ((server_count < 1) || !sample_count || (*sample_count < 1) ||
+             !key_count || (*key_count < 1) || !perf_matrix || !addr_array
              || !end_time_ms_array)
     {
 	return -PVFS_EINVAL;
@@ -104,11 +110,13 @@ PVFS_error PVFS_imgmt_perf_mon_list(PVFS_fs_id fs_id,
 
     sm_p->u.perf_mon_list.fs_id = fs_id;
     /* perf_matrix should be server_count * key_count * history count */
+    sm_p->u.perf_mon_list.cnt_type = cnt_type;
     sm_p->u.perf_mon_list.perf_matrix = perf_matrix;
     sm_p->u.perf_mon_list.server_count = server_count;
     sm_p->u.perf_mon_list.key_count = key_count;
     sm_p->u.perf_mon_list.req_keys = *key_count;
-    sm_p->u.perf_mon_list.history_count = history_count;
+    sm_p->u.perf_mon_list.sample_count = sample_count;
+    sm_p->u.perf_mon_list.req_sample = *sample_count;
     sm_p->u.perf_mon_list.addr_array = addr_array;
     sm_p->u.perf_mon_list.next_id_array = next_id_array;
     sm_p->u.perf_mon_list.end_time_ms_array = end_time_ms_array;
@@ -130,13 +138,14 @@ PVFS_error PVFS_imgmt_perf_mon_list(PVFS_fs_id fs_id,
  */
 PVFS_error PVFS_mgmt_perf_mon_list(PVFS_fs_id fs_id,
                                    const PVFS_credential *credential,
+                                   int32_t cnt_type,
                                    int64_t **perf_matrix,
                                    uint64_t *end_time_ms_array,
                                    PVFS_BMI_addr_t *addr_array,
                                    uint32_t* next_id_array,
                                    int server_count,
                                    int *key_count,
-                                   int history_count,
+                                   int *sample_count,
                                    PVFS_error_details *details,
                                    PVFS_hint hints)
 {
@@ -148,13 +157,14 @@ PVFS_error PVFS_mgmt_perf_mon_list(PVFS_fs_id fs_id,
 
     ret = PVFS_imgmt_perf_mon_list(fs_id,
                                    credential,
+                                   cnt_type,
                                    perf_matrix,
                                    end_time_ms_array,
                                    addr_array,
                                    next_id_array,
                                    server_count,
                                    key_count,
-                                   history_count,
+                                   sample_count,
                                    details,
                                    &op_id,
                                    hints,
@@ -189,9 +199,14 @@ static int perf_mon_list_comp_fn(void* v_p,
 				 int i)
 {
     int j = 0;
+#if 0
+    int h = 0;
+#endif
     PINT_smcb *smcb = v_p;
     PINT_smcb *parent_smcb = smcb->parent_smcb;
     PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
+    int key_size = (sm_p->u.perf_mon_list.cnt_type == PINT_PERF_TIMER) ?
+                           sizeof(struct PINT_perf_timer) : sizeof(int64_t);
 
     /* if this particular request was successful, then store the 
      * performance information in an array to be returned to caller
@@ -199,19 +214,43 @@ static int perf_mon_list_comp_fn(void* v_p,
     if (sm_p->msgarray_op.msgarray[i].op_status == 0)
     {
 	sm_p->u.perf_mon_list.next_id_array[i] = 
-	                resp_p->u.mgmt_perf_mon.suggested_next_id;
+	                        resp_p->u.mgmt_perf_mon.suggested_next_id;
 	sm_p->u.perf_mon_list.end_time_ms_array[i] =
-	                resp_p->u.mgmt_perf_mon.end_time_ms;
-	*sm_p->u.perf_mon_list.key_count = resp_p->u.mgmt_perf_mon.key_count;
-	memcpy(sm_p->u.perf_mon_list.perf_matrix[i],
-	       resp_p->u.mgmt_perf_mon.perf_array,
-	       resp_p->u.mgmt_perf_mon.perf_array_count * sizeof(int64_t));
+	                        resp_p->u.mgmt_perf_mon.end_time_ms;
+	*sm_p->u.perf_mon_list.key_count =
+                                resp_p->u.mgmt_perf_mon.key_count;
+	*sm_p->u.perf_mon_list.sample_count = 
+                                resp_p->u.mgmt_perf_mon.sample_count;
+
+#if 0
+        /* dump first part of array for debugging */
+        {int i; for(i = 0; i < *sm_p->u.perf_mon_list.key_count+2; i++)
+                { printf("%lld ",
+                        (long long int)resp_p->u.mgmt_perf_mon.perf_array[i]);} 
+         printf("\n");}
+#endif
+
+        memcpy(sm_p->u.perf_mon_list.perf_matrix[i],
+               resp_p->u.mgmt_perf_mon.perf_array,
+               *sm_p->u.perf_mon_list.sample_count *
+               ((*sm_p->u.perf_mon_list.key_count * key_size) +
+                (2 * sizeof(int64_t))));
+#if 0
+        for (h = 0; h < *sm_p->u.perf_mon_list.sample_count; h++)
+        {
+            int coff = h * (sm_p->u.perf_mon_list.req_keys + 2);
+            int soff = h * (resp_p->u.mgmt_perf_mon.key_count + 2);
+	    memcpy(&sm_p->u.perf_mon_list.perf_matrix[i][coff],
+	           &resp_p->u.mgmt_perf_mon.perf_array[soff],
+	           (*sm_p->u.perf_mon_list.key_count + 2) * sizeof(int64_t));
+        }
+#endif
     }
  
     /* if this is the last response, check all of the status values and 
      * return error code if any requests failed 
      */
-    if (i == (sm_p->msgarray_op.count -1))
+    if (i == (sm_p->msgarray_op.count - 1))
     {
 	for (j = 0; j < sm_p->msgarray_op.count; j++)
 	{
@@ -244,9 +283,10 @@ static PINT_sm_action mgmt_perf_mon_list_setup_msgpair(struct PINT_smcb *smcb,
     {
 	PINT_SERVREQ_MGMT_PERF_MON_FILL(msg_p->req,
                                         capability,
+                                        sm_p->u.perf_mon_list.cnt_type,
                                         sm_p->u.perf_mon_list.next_id_array[i],
                                         *sm_p->u.perf_mon_list.key_count,
-                                        sm_p->u.perf_mon_list.history_count,
+                                        *sm_p->u.perf_mon_list.sample_count,
                                         sm_p->hints);
 
         msg_p->msgclass = PVFS_IO_METADATA;
@@ -286,8 +326,7 @@ static PINT_sm_action mgmt_perf_mon_list_cleanup(struct PINT_smcb *smcb,
         {
 	    if (sm_p->msgarray_op.msgarray[i].op_status != 0)
 	    {
-		if (errct <
-                    sm_p->u.perf_mon_list.details->count_allocated)
+		if (errct < sm_p->u.perf_mon_list.details->count_allocated)
 		{
 		    sm_p->u.perf_mon_list.details->error[errct].error =
                                     sm_p->msgarray_op.msgarray[i].op_status;
@@ -296,7 +335,9 @@ static PINT_sm_action mgmt_perf_mon_list_cleanup(struct PINT_smcb *smcb,
 		    errct++;
 		}
 		else
-		{ sm_p->u.perf_mon_list.details->count_exceeded = 1; }
+		{
+                    sm_p->u.perf_mon_list.details->count_exceeded = 1;
+                }
 	    }
 	}
 	sm_p->u.perf_mon_list.details->count_used = errct;

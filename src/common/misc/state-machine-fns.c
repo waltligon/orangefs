@@ -71,7 +71,7 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
          /* base frame will not be processed */
 
          gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                      "[SM Terminating Child]: my_frame:%p\n",my_frame);
+                      "[SM Terminating Child]: my_frame:%p\n", my_frame);
 #ifdef WIN32
          qlist_for_each_entry(f,
                               &smcb->parent_smcb->frames,
@@ -91,6 +91,7 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
         gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
                      "[SM Terminating Child]: children_running:%d\n",
                      smcb->parent_smcb->children_running);
+
         if (--smcb->parent_smcb->children_running <= 0)
         {
             /* no more child state machines running, so we can
@@ -106,8 +107,7 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
         if (smcb->parent_smcb)
         {
             gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                         "[SM Terminating Child]: calling "
-                         "terminate function.\n");
+                       "[SM Terminating Child]: calling terminate function.\n");
         }   
         (*smcb->terminate_fn)(smcb, r);
     }
@@ -688,9 +688,9 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
         if (frame_entry->frame)
         {
            gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                        "PINT_smcb_free: frame:%p \ttask-id:%d\n"
-                       ,frame_entry->frame
-                       ,frame_entry->task_id);
+                        "PINT_smcb_free: frame:%p \ttask-id:%d\n",
+                        frame_entry->frame,
+                        frame_entry->task_id);
         }
         else
         {

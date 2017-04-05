@@ -673,7 +673,6 @@ static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(
                              NULL);
 
     s_op->u.mkdir.saved_attr = &msg_p->req.u.mkdir.attr;
-    s_op->u.mkdir.saved_capability = &msg_p->req.capability;
 
     msg_p->fs_id = s_op->u.mkdir.fs_id;
     msg_p->handle = s_op->u.mkdir.handle_array_remote[0]; 
@@ -810,10 +809,6 @@ static PINT_sm_action mkdir_dirdata_keyval_setattr(struct PINT_smcb *smcb,
      * PVFS_DIST_DIR_ATTR, PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES 
      */
     int keyval_count = 3;
-
-    /* free saved capability */
-    PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
-    s_op->u.mkdir.saved_capability = NULL;
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, 
             "  writing dist-dir-struct keyvals for meta handle: %s "

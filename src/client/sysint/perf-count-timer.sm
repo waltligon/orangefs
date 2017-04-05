@@ -17,7 +17,14 @@
 #include "pint-perf-counter.h"
 #include "sid.h"
 
+/*
+ * Now included from client-state-machine.h
+ */
+#if 0
 extern job_context_id pint_client_sm_context;
+#endif
+
+enum{ STOP_TIMER=15 };
 
 %%
 
@@ -27,7 +34,14 @@ machine pvfs2_client_perf_count_timer_sm
     {
         run perf_count_timer_do_work;
         success => do_work;
+        STOP_TIMER => stop_timer;
         default => error;
+    }
+
+    state stop_timer 
+    {
+        run perf_count_timer_stop;
+        default => terminate;
     }
 
     state error 
@@ -53,6 +67,21 @@ static PINT_sm_action perf_count_timer_error(struct PINT_smcb *smcb,
 
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_DEFERRED;
+}
+
+/* perf_count_timer_stop()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static PINT_sm_action perf_count_timer_stop(struct PINT_smcb *smcb,
+                                            job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "perf timer state: perf_count_timer_stop\n");
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 /* perf_count_timer_do_work()
@@ -101,7 +130,17 @@ static PINT_sm_action perf_count_timer_do_work(struct PINT_smcb *smcb,
         }
     }
  
+    /* NOTE: tpc is not used in the client yet, but this function does
+     * nothing if passed a NULL pointer so this should be perfectly safe
+     * to do.
+     */
     PINT_perf_rollover(sm_p->u.perf_count_timer.pc);
+    PINT_perf_rollover(sm_p->u.perf_count_timer.tpc);
+
+    if (!sm_p->u.perf_count_timer.pc->running)
+    {
+        return STOP_TIMER;
+    }
         
     /* post another timer */
     return job_req_sched_post_timer(

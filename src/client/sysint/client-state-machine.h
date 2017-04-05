@@ -55,6 +55,8 @@
 /* grab a new capability if the current one expires in 2 minutes or less */
 #define CAP_TIMEOUT_BUFFER 120
 
+extern job_context_id pint_client_sm_context;
+
 int PINT_client_state_machine_initialize(void);
 void PINT_client_state_machine_finalize(void);
 job_context_id PINT_client_get_sm_context(void);
@@ -64,20 +66,20 @@ job_context_id PINT_client_get_sm_context(void);
 #if 0
 typedef struct PINT_client_mirror_ctx
 {
-  /*which copy of the mirrored handle are we using?*/
-  uint32_t     current_copies_count;
+    /* which copy of the mirrored handle are we using?*/
+    uint32_t     current_copies_count;
 
-  /*the primary datahandle*/
-  PVFS_handle  original_datahandle;
+    /* the primary datahandle*/
+    PVFS_handle  original_datahandle;
 
-  /*the server_nr for the primary datahandle*/
-  uint32_t original_server_nr;
+    /* the server_nr for the primary datahandle*/
+    uint32_t original_server_nr;
 
-  /*do we retry the primary or use a mirrored handle?*/ 
-  PVFS_boolean retry_original;
+    /* do we retry the primary or use a mirrored handle?*/ 
+    PVFS_boolean retry_original;
 
-  /*did the current message for this handle complete without any errors?*/
-  PVFS_boolean msg_completed;
+    /* did the current message for this handle complete without any errors?*/
+    PVFS_boolean msg_completed;
 
 } PINT_client_small_io_ctx;
 
@@ -95,7 +97,7 @@ typedef struct PINT_sm_getattr_state
 {
     PVFS_object_ref object_ref;
 
-   /* request sys attrmask.  Some combination of
+    /* request sys attrmask.  Some combination of
      * PVFS_ATTR_SYS_*
      */
     uint32_t req_attrmask;
@@ -509,12 +511,14 @@ struct PINT_client_mgmt_statfs_list_sm
 struct PINT_client_mgmt_perf_mon_list_sm
 {
     PVFS_fs_id fs_id;
+    int32_t cnt_type;
     int64_t **perf_matrix;
     uint64_t *end_time_ms_array;
     int server_count; 
     int req_keys; 
     int *key_count; 
-    int history_count; 
+    int req_sample; 
+    int *sample_count; 
     PVFS_id_gen_t *addr_array;
     uint32_t *next_id_array;
     PVFS_error_details *details;
@@ -625,6 +629,7 @@ struct PINT_client_perf_count_timer_sm
 {
     unsigned int *interval_secs;
     struct PINT_perf_counter *pc;
+    struct PINT_perf_counter *tpc;
 };
 
 struct PINT_client_job_timer_sm
@@ -915,7 +920,7 @@ do {                                                                \
 
 struct PINT_client_op_entry_s
 {
-    struct PINT_state_machine_s * sm;
+    struct PINT_state_machine_s *sm;
 };
 
 extern struct PINT_client_op_entry_s PINT_client_sm_sys_table[];
