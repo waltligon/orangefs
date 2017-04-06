@@ -545,7 +545,6 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
     PINT_dist *current_dist; 
     int ret = 0;
     int num_dfiles_requested = 0;
-    int tmp_i;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: parent_getattr_inspect\n");
 

@@ -85,8 +85,8 @@ machine pvfs2_client_mkdir_sm
     {
         jump pvfs2_msgpairarray_sm;
 /*        success => mkdir_seteattr_setup_msgpair; */
-/*        success => mkdir_crdirent_setup_msgpair; */
-        success => cleanup;
+        success => mkdir_setattr_setup_msgpair;
+/*        success => cleanup; */
         default => mkdir_msg_failure;
     }
 
@@ -94,6 +94,26 @@ machine pvfs2_client_mkdir_sm
     {
         run mkdir_msg_failure;
         default => cleanup;
+    }
+
+    state mkdir_setattr_setup_msgpair
+    {
+        run mkdir_setattr_setup_msgpair;
+        success => mkdir_setattr_xfer_msgpair;
+        default => mkdir_setattr_failure;
+    }
+
+    state mkdir_setattr_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => mkdir_crdirent_setup_msgpair;
+        default => mkdir_setattr_failure;
+    }
+
+    state mkdir_setattr_failure
+    {
+        run mkdir_setattr_failure;
+        default => delete_handle_setup_msgpair;
     }
 
 /*
@@ -325,6 +345,7 @@ static int mkdir_msg_comp_fn(void *v_p,
     }
 
     PINT_debug_capability(&resp_p->u.mkdir.capability, "mkdir returned");
+    PINT_copy_capability(&resp_p->u.mkdir.capability, &sm_p->u.mkdir.capability);
 
     /* get local uid for indexing */
     local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
@@ -421,7 +442,6 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
-    int i;
     int32_t distr_dir_servers_initial_requested = 0;
     int32_t distr_dir_servers_max_requested = 0;
     int32_t distr_dir_split_size_requested = 0;
@@ -538,6 +558,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
+    int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -575,6 +596,16 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
         gossip_err("Failed to generate OIDs and SIDs for new directory\n");
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
+    }
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "mkdir selected meta server: %s,\ndirdata servers:\n",
+                     PVFS_OID_str(sm_p->u.mkdir.metadata_handle));
+
+    for (i = 0; i < sm_p->u.mkdir.sys_attr.distr_dir_servers_max; i++)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "\t%s\n",
+                     PVFS_OID_str(&sm_p->u.mkdir.dirdata_handles[i]));
     }
 
     /* object ref will now refer to newly created metadata object */
@@ -639,6 +670,99 @@ static PINT_sm_action mkdir_msg_failure(struct PINT_smcb *smcb,
     sm_p->u.mkdir.stored_error_code = js_p->error_code;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: mkdir_msg_failure\n");
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
+                                                  job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i = 0;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    int ret = -PVFS_EINVAL;
+    PVFS_sys_attr dummy_sys_attr;
+    PVFS_object_attr dirdata_attr;
+
+    /* NOTE: any memory allocated here will be free'd in the cleanup function */
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: setattr_setup_msgpair\n");
+
+    memset(&dirdata_attr, 0, sizeof(PVFS_object_attr));
+    dirdata_attr.objtype = PVFS_TYPE_DIRDATA;
+    ret = PINT_init_dist_dir_state(&dirdata_attr.u.dirdata.dist_dir_attr,
+                               &dirdata_attr.u.dirdata.dist_dir_bitmap,
+                               sm_p->u.mkdir.sys_attr.distr_dir_servers_max,
+                               sm_p->u.mkdir.dirdata_sid_count,
+                               0,
+                               sm_p->u.mkdir.sys_attr.distr_dir_servers_initial,
+                               sm_p->u.mkdir.sys_attr.distr_dir_split_size);
+
+    dirdata_attr.u.dirdata.dirdata_handles = sm_p->u.mkdir.dirdata_handles;
+    dirdata_attr.u.dirdata.dirdata_sids = sm_p->u.mkdir.dirdata_sid_array;
+    dirdata_attr.mask = PVFS_ATTR_DISTDIR_ATTR;
+
+    memset(&dummy_sys_attr, 0, sizeof(PVFS_sys_attr));
+
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op,
+                           sm_p->u.mkdir.dirdata_sid_count);
+    if (ret != 0)
+    {
+        gossip_err("Failed to initialize %d msgpairs\n",
+                   sm_p->u.mkdir.dirdata_sid_count);
+        js_p->error_code = ret;
+        return(SM_ACTION_COMPLETE);
+    }
+
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
+    {
+        PINT_SERVREQ_SETATTR_FILL(msg_p->req,
+                                  sm_p->u.mkdir.capability,
+                                  *sm_p->cred_p,
+                                  sm_p->parent_ref.fs_id,
+                                  sm_p->u.mkdir.dirdata_handles[i],
+                                  sm_p->u.mkdir.dirdata_sid_count,
+                                  sm_p->u.mkdir.dirdata_sid_array,
+                                  PVFS_TYPE_DIRDATA,
+                                  dummy_sys_attr,
+                                  0,
+                                  NULL);
+
+        PINT_copy_object_attr(&msg_p->req.u.setattr.attr, &dirdata_attr);
+        msg_p->msgclass = PVFS_IO_METADATA;
+        msg_p->msgdir = PVFS_IO_WRITE;
+        msg_p->fs_id = sm_p->parent_ref.fs_id;
+        msg_p->handle = sm_p->u.mkdir.dirdata_handles[i];
+        msg_p->sid_count = sm_p->u.mkdir.dirdata_sid_count;
+        msg_p->sid_index = 0;
+        msg_p->sid_array = sm_p->u.mkdir.dirdata_sid_array;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = NULL;
+
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &sm_p->object_ref.sid_array[0]);
+        if (ret)
+        {
+            gossip_err("Failed to map meta server address\n");
+            js_p->error_code = ret;
+        }
+        else
+        {
+            js_p->error_code = 0;
+        }
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action mkdir_setattr_failure(struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    sm_p->u.mkdir.stored_error_code = js_p->error_code;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: mkdir_setattr_failure\n");
+
+    PVFS_perror_gossip("mkdir setattr failed", js_p->error_code);
     return SM_ACTION_COMPLETE;
 }
 
@@ -707,6 +831,8 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                sm_p->parent_ref.sid_array,
                sm_p->hints);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->getattr.attr.u.dir.dirdata_handles[
                                                      dirdata_server_index];
@@ -840,22 +966,6 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: cleanup\n");
 
-/* Only used if we send seteattr message
-    if(sm_p->u.mkdir.val_array)
-    {
-        if((sm_p->getattr.attr.mask & PVFS_ATTR_DIR_HINT) &&
-            (sm_p->getattr.attr.u.dir.hint.dfile_count > 0))
-        {
-            free(sm_p->u.mkdir.val_array[0].buffer);
-        }
-        free(sm_p->u.mkdir.val_array);
-    }
-    if(sm_p->u.mkdir.key_array)
-    {
-        free(sm_p->u.mkdir.key_array);
-    }
-*/
-
     PVFS_util_release_sys_attr(&sm_p->u.mkdir.sys_attr);
 
     sm_p->error_code = (sm_p->u.mkdir.stored_error_code ?
@@ -864,15 +974,19 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
 
     if (sm_p->error_code == 0)
     {
+        sm_p->u.mkdir.mkdir_resp->ref = sm_p->object_ref;
+/*
         sm_p->u.mkdir.mkdir_resp->ref.fs_id = sm_p->parent_ref.fs_id;
         sm_p->u.mkdir.mkdir_resp->ref.handle = sm_p->object_ref.handle;
         sm_p->u.mkdir.mkdir_resp->ref.sid_count = sm_p->object_ref.sid_count;
         sm_p->u.mkdir.mkdir_resp->ref.sid_array = sm_p->object_ref.sid_array;
+*/
 
         /* insert newly created directory handle into the ncache */
         PINT_ncache_update((const char*)sm_p->u.mkdir.object_name, 
                            (const PVFS_object_ref *)&sm_p->object_ref, 
                            (const PVFS_object_ref *)&(sm_p->parent_ref));
+
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.mkdir.retry_count < sm_p->msgarray_op.params.retry_limit))

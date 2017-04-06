@@ -239,6 +239,8 @@ struct PINT_client_mkdir_sm
     int dirdata_sid_count;
     PVFS_SID *dirdata_sid_array;
 
+    PVFS_capability capability;
+
     PINT_sm_getattr_state metadata_getattr;
 
     /* keep first */
