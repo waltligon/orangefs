@@ -677,7 +677,7 @@ static void encourage_recv_incoming(struct buf_head *bh,
             bmi_size_t len = byte_len - sizeof(mh_eager);
             if (len > rq->buflist.tot_len)
             {
-                error("%s: EAGER received %lld too small for buffer %lld",
+                error("%s: EAGER received %lld too large for buffer %lld",
                       __func__, 
                       lld(len), 
                       lld(rq->buflist.tot_len));
@@ -765,7 +765,7 @@ static void encourage_recv_incoming(struct buf_head *bh,
         {
             if ((int) mh_rts.tot_len > rq->buflist.tot_len) 
             {
-                error("%s: RTS received %llu too small for buffer %llu",
+                error("%s: RTS received %llu too large for buffer %llu",
                       __func__, 
                       llu(mh_rts.tot_len), 
                       llu(rq->buflist.tot_len));
