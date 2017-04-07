@@ -194,6 +194,7 @@ static int ib_check_cq(void)
                         sq = bh->sq;
                         if (sq)
                         {
+                            sq->state.send = SQ_ERROR;
                             sq->mop->error_code = wc.status;
                         }
                         break;
@@ -1564,13 +1565,11 @@ static int test_sq(struct ib_work *sq,
 
         ret = 1;
         goto out;
-    } 
-    else 
+    }
+    else if (sq->state.send == SQ_ERROR)
     {
-        debug(7, "%s: sq %p found, not done, state %s",
-              __func__,
-              sq, 
-              sq_state_name(sq->state.send));
+        debug(0, "%s: sq %p found, state %s",
+              __func__, sq, sq_state_name(sq->state.send));
 
         *err = wc_status_to_bmi(sq->mop->error_code);
         if (*err != 0)
@@ -1592,6 +1591,13 @@ static int test_sq(struct ib_work *sq,
             ret = 1;
             goto out;
         }
+    }
+    else 
+    {
+        debug(7, "%s: sq %p found, not done, state %s",
+              __func__,
+              sq, 
+              sq_state_name(sq->state.send));
     }
 
     ret = 0;
@@ -1716,12 +1722,10 @@ static int test_rq(struct ib_work *rq,
         ret = 1;
         goto out;
     } 
-    else 
+    else if (rq->state.recv == RQ_ERROR)
     {
-        debug(7, "%s: rq %p found, not done, state %s",
-              __func__,
-              rq, 
-              rq_state_name(rq->state.recv));
+        debug(0, "%s: rq %p found, state %s",
+              __func__, rq, rq_state_name(rq->state.recv));
 
         if (rq->mop)
         {
@@ -1746,6 +1750,13 @@ static int test_rq(struct ib_work *rq,
                 goto out;
             }
         }
+    }
+    else 
+    {
+        debug(7, "%s: rq %p found, not done, state %s",
+              __func__,
+              rq, 
+              rq_state_name(rq->state.recv));
     }
 
     ret = 0;
