@@ -233,10 +233,11 @@ static int racache_buf_init(racache_t *racache)
         {
             int ret = 0;
             int cnt = 0;
+            int numpg = racache->bufsz / page_size;
             int *tp = vp;
             
             /* dummy write to buffer to ensure it is in RAM */
-            while (tp)
+            while (tp && numpg--)
             {
                 *tp = 0;
                 tp += (page_size / sizeof(int));
