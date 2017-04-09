@@ -1,9 +1,8 @@
 /*
- * (C) 2011 Clemson University
+ * (C) 2017 Clemson University.
  *
- * See COPYING in top-level directory.
+ * See LICENSE in src/client/jni directory.
  */
-
 #include "libPVFS2JNI_common.h"
 #include <dirent.h>
 #include <errno.h>
