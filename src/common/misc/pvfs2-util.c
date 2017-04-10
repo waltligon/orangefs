@@ -44,11 +44,6 @@
 #define ENABLE_SECURITY_MODE
 #endif
 
-
-#ifdef ENABLE_SECURITY_MODE
-void debug_gencred(char *args[]);
-#endif
-
 #ifndef ENABLE_SECURITY_MODE
 #include <pwd.h>
 #include <grp.h>
@@ -1662,7 +1657,6 @@ int PVFS_util_resolve(const char* local_path,
         if (ppath_local)
         {
             PVFS_free_path(Ppath);
-            ppath_local=0;
         }
         return(0);
     }
@@ -1726,17 +1720,11 @@ int PVFS_util_resolve(const char* local_path,
             if (ppath_local)
             {
                 PVFS_free_path(Ppath);
-                ppath_local=0;
             }
         }
         free(tmp_path);
 
         /* fall through and preserve "ret" to be returned */
-    }
-
-    if (ppath_local)
-    {
-       free(Ppath);
     }
 
     return(ret);

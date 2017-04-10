@@ -109,16 +109,9 @@ nested machine pvfs2_remove_dirdata_handles_work_sm
     state get_dirent_count_call_tree_getattr
     {
         jump pvfs2_tree_getattr_work_sm;
-        success => get_dirent_count_examine_tree_getattr;
-        default => remove_dirdata_handles_cleanup;
-    }   
-
-    state get_dirent_count_examine_tree_getattr
-    {
-        run remove_get_dirent_count_examine_tree_getattr;
         success => remove_dirdata_handles_setup_tree_remove;
         default => remove_dirdata_handles_cleanup;
-    }
+    }   
 
     state get_dirent_count_cleanup_tree_getattr
     {
@@ -301,7 +294,6 @@ static PINT_sm_action remove_check_object_type(struct PINT_smcb *smcb,
                                                job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
     if(s_op->attr.objtype == PVFS_TYPE_DATAFILE)
     {
         /* it must be a datafile, transition to try reading datafile 
@@ -359,11 +351,19 @@ static PINT_sm_action remove_verify_object_metadata(struct PINT_smcb *smcb,
         /* This is the first point we know this is a rmdir so
          * increment the counter for rmdir requests
          */
+        PINT_perf_count(PINT_server_pc, PINT_PERF_RMDIR, 1, PINT_PERF_ADD);
 
 	js_p->error_code = STATE_TYPE_DIRECTORY;
 
         gossip_debug(GOSSIP_SERVER_DEBUG, "  type is directory; removing "
                      "dirdata object before removing directory itself.\n");
+    }
+    else
+    {
+        /* This is the first point we know this is a file rm so
+         * increment the counter for remove requests
+         */
+        PINT_perf_count(PINT_server_pc, PINT_PERF_REMOVE, 1, PINT_PERF_ADD);
     }
 
     return SM_ACTION_COMPLETE;
@@ -668,19 +668,6 @@ static PINT_sm_action remove_get_dirent_count_cleanup_tree_getattr(
 static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *getattr_op = NULL;
-    int task_id = 0, error_code = 0;
-
-    /* Clean up the frame that was created for tree_getattr. */
-    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
-    tree_getattr_free(getattr_op);
-    PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(getattr_op);
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action remove_get_dirent_count_examine_tree_getattr(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
     struct PINT_server_op *s_op = NULL;
     struct PINT_server_op *getattr_op = NULL;
     struct PINT_server_op *remove_op = NULL;
@@ -691,7 +678,6 @@ static PINT_sm_action remove_get_dirent_count_examine_tree_getattr(
     int i = 0;
 
     /* Make sure the count of directory entries that we retrieved was 0. */
-    /* This pops the frame for the getattr */
     getattr_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     attr_p = &s_op->attr;
@@ -724,8 +710,7 @@ static PINT_sm_action remove_get_dirent_count_examine_tree_getattr(
 
     /* initialize rebuild array */
     s_op->u.remove.rebuild_dirdata_index_array_remote = 
-            malloc(sizeof(int) * attr_p->u.dir.dist_dir_attr.dirdata_count);
-
+                malloc(sizeof(int) * attr_p->u.dir.dist_dir_attr.dirdata_count);
     if(!s_op->u.remove.rebuild_dirdata_index_array_remote )
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -775,7 +760,6 @@ static PINT_sm_action remove_dirdata_handles_check_remove_success(
     int task_id = 0, error_code = 0;
     int i = 0;
 
-    /* This pops the frame for the tree remove - success */
     remove_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (error_code != 0)
@@ -1214,21 +1198,6 @@ static PINT_sm_action remove_remove_dspace(struct PINT_smcb *smcb,
 static PINT_sm_action remove_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    if (s_op->attr.objtype == PVFS_TYPE_DIRECTORY)
-    {
-        PINT_perf_count(PINT_server_pc, PINT_PERF_RMDIR, 1, PINT_PERF_ADD);
-        PINT_perf_timer_end(PINT_server_tpc,
-                            PINT_PERF_TRMDIR,
-                            &s_op->start_time);
-    }
-    else if (s_op->attr.objtype == PVFS_TYPE_METAFILE)
-    {
-        PINT_perf_count(PINT_server_pc, PINT_PERF_REMOVE, 1, PINT_PERF_ADD);
-        PINT_perf_timer_end(PINT_server_tpc,
-                            PINT_PERF_TREMOVE,
-                            &s_op->start_time);
-    }
 
     PINT_free_object_attr(&s_op->attr);
     return(server_state_machine_complete(smcb));

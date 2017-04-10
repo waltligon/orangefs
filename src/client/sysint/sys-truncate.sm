@@ -25,16 +25,10 @@
 #include "acache.h"
 #include "pvfs2-internal.h"
 #include "sid.h"
-#include "client-capcache.h"
 
 #define TRUNCATE_UNSTUFF 100
 
-/*
- * Now included from client-state-machine.h
- */
-#if 0
 extern job_context_id pint_client_sm_context;
-#endif
 
 static int unstuff_needed(PVFS_size size, PINT_dist *dist_p, uint32_t mask);
 
@@ -199,7 +193,6 @@ static int unstuff_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-    int local_uid, ret;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"unstuff completion fn: unstuff_comp_fn\n");
@@ -222,20 +215,6 @@ static int unstuff_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
     /* replace attrs found by getattr */
     /* PINT_copy_object_attr() takes care of releasing old memory */
     PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.unstuff.attr);
-
-    /* update client capcache with returned cap */
-    local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
-    if (local_uid == (PVFS_uid) -1) {
-        local_uid = PINT_util_getuid();
-    }
-    PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
-    ret = PINT_client_capcache_update(sm_p->object_ref, local_uid,
-                                      &resp_p->u.unstuff.attr.capability);
-    if (ret < 0)
-    {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: capcache update returned "
-                     "%d\n", __func__, ret);
-    }
 
     return(0);
 }

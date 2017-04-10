@@ -632,9 +632,7 @@ struct PINT_perf_counter* PINT_acache_get_pc(void)
  */
 static int PINT_acache_initialize_perf_counter(void)
 {
-    acache_pc = PINT_perf_initialize(PINT_PERF_COUNTER,
-                                     acache_keys,
-                                     client_perf_start_rollover);
+    acache_pc = PINT_perf_initialize(acache_keys);
     if(!acache_pc)
     {
         gossip_err("%s: Error: PINT_perf_initialize failure.\n", __func__);

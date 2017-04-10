@@ -24,14 +24,8 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "sid.h"
-#include "pvfs2-types-debug.h"
 
-/*
- * Now included from client-state-machine.h
- */
-#if 0
 extern job_context_id pint_client_sm_context;
-#endif
 
 static int setattr_msg_comp_fn(void *v_p,
                                struct PVFS_server_resp *resp_p,
@@ -279,7 +273,6 @@ static PINT_sm_action setattr_msg_setup_msgpair(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "setattr attr mask sent to server: 0x%x\n",
                  (int)sm_p->u.setattr.sys_attr.mask);
-    PINT_attrmask_print(GOSSIP_ACACHE_DEBUG,sm_p->u.setattr.sys_attr.mask);
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
@@ -296,16 +289,24 @@ static PINT_sm_action setattr_cleanup(struct PINT_smcb *smcb,
                                       job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr attr;
 
     sm_p->error_code = js_p->error_code;
 
-    /* Since we just updated attributes (most of the time we are updating timestamps) 
-     * for this object, we must invalidate it's acache entry.  We do not do partial 
-     * updates anymore.
+    /* either update acache or invalidate depending on if we were successful
+     * or not 
      */
     if(sm_p->error_code == 0)
     {
-       PINT_acache_invalidate(sm_p->object_ref);
+        PINT_CONVERT_ATTR(&attr, &sm_p->u.setattr.sys_attr, 0);
+#if 0 /* Don't cache size_array. */
+        PINT_acache_update(sm_p->object_ref, &attr, NULL, NULL);
+#endif
+        PINT_acache_update(sm_p->object_ref, &attr, NULL);
+    }
+    else
+    {
+        PINT_acache_invalidate(sm_p->object_ref);
     }
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);

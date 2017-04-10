@@ -169,10 +169,7 @@ typedef struct
 
 typedef struct
 {
-    union {
-        int64_t value64;
-        int32_t value32[2];
-    } u;
+    int64_t value;
 } pvfs2_param_response_t;
 
 #define PERF_COUNT_BUF_SIZE 4096
@@ -188,11 +185,6 @@ typedef struct
     int32_t __pad1;
     char    fs_key[FS_KEY_BUF_SIZE];
 } pvfs2_fs_key_response_t;
-
-typedef struct
-{
-    uint64_t features;
-} pvfs2_features_response_t;
 
 typedef struct
 {
@@ -229,7 +221,6 @@ typedef struct
         pvfs2_param_response_t param;
         pvfs2_perf_count_response_t perf_count;
         pvfs2_fs_key_response_t fs_key;
-        pvfs2_features_response_t features;
     } resp;
 } pvfs2_downcall_t;
 

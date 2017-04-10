@@ -122,8 +122,7 @@ static int parse_args(int argc, char **argv, struct options_t *my_args)
 	switch(one_opt)
         {
 	    case('c'):
-            {
-                for(j=0; j<strlen(optarg) && isdigit(optarg[j]); j++);
+            {   for(j=0; j<strlen(optarg) && isdigit(optarg[j]); j++);
                 if (j==strlen(optarg)) 
                     my_args->copies = atoi(optarg);
                 else
@@ -131,8 +130,7 @@ static int parse_args(int argc, char **argv, struct options_t *my_args)
                 break;
             }
             case('m'):
-            {
-                for(j=0; j<strlen(optarg) && isdigit(optarg[j]); j++);
+            {   for(j=0; j<strlen(optarg) && isdigit(optarg[j]); j++);
                 if (j==strlen(optarg))
                    my_args->mode = atoi(optarg);
                 else

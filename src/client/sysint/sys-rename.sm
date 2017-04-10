@@ -31,12 +31,7 @@
 #include "dist-dir-utils.h"
 #include "client-capcache.h"
 
-/*
- * Now included from client-state-machine.h
- */
-#if 0
 extern job_context_id pint_client_sm_context;
-#endif
 
 enum
 {
@@ -1258,8 +1253,6 @@ static PINT_sm_action rename_cleanup(struct PINT_smcb *smcb,
                                      job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_ref replaced_ref = {0};
-
     sm_p->error_code = (sm_p->u.rename.stored_error_code ?
                         sm_p->u.rename.stored_error_code :
                         js_p->error_code);
@@ -1283,37 +1276,10 @@ static PINT_sm_action rename_cleanup(struct PINT_smcb *smcb,
                 (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[1]));
     }
 
-
-    /* invalidate the acache entries for the parent references because their 
-     * timestamps have changed.  NOTE: the parent references COULD be the same.
-     */
-    PINT_acache_invalidate(sm_p->u.rename.parent_refns[0]);
-    PINT_acache_invalidate(sm_p->u.rename.parent_refns[1]);
-
-
-    /* if the destination object required a  replacement, then we need to invalidate the 
-     * acache entry for the object that was removed.
-     */
-    if ( sm_p->u.rename.target_dirent_exists )
-    {
-       replaced_ref.handle = sm_p->u.rename.old_dirdata_handle;
-       replaced_ref.fs_id  = sm_p->u.rename.parent_refns[1].fs_id;
-       PINT_acache_invalidate(replaced_ref);
-    }
-
-    /* cleanup stored capabilities */
-    PINT_cleanup_capability(&sm_p->u.rename.caps[0]);
-    PINT_cleanup_capability(&sm_p->u.rename.caps[1]);
-    PINT_cleanup_capability(&sm_p->parent_capability);
-
-    /* cleanup stored attributes */
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
-    /* cleanup msgpairarray */ 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
-
     PINT_SET_OP_COMPLETE;
-
     return SM_ACTION_TERMINATE;
 }
 

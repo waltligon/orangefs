@@ -17,14 +17,8 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "sid.h"
-#include "client-capcache.h"
 
-/*
- * Now included from client-state-machine.h
- */
-#if 0
 extern job_context_id pint_client_sm_context;
-#endif
 
 enum
 {
@@ -311,21 +305,11 @@ static PINT_sm_action remove_helper_cleanup(struct PINT_smcb *smcb,
                                             job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_uid local_uid;
-
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: helper cleanup\n");
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     PINT_acache_invalidate(sm_p->object_ref);
-
-    local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
-    if ( local_uid == (PVFS_uid) -1 )
-    {
-       local_uid = PINT_util_getuid();
-       PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME, sizeof(PVFS_uid), &local_uid);
-    }
-    PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 

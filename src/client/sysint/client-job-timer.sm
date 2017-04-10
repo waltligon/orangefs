@@ -20,12 +20,7 @@
 #include "job-time-mgr.h"
 #include "sid.h"
 
-/*
- * now included from client-steate-machine.h
- */
-#if 0
 extern job_context_id pint_client_sm_context;
-#endif
 
 %%
 

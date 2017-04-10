@@ -19,11 +19,24 @@
 #include "statecomp.h"
 #include "parser.h"
 
+/*
+  we're never interactive, so avoid isatty call that sometimes
+  fails due to occassional improper ioctl command mappings --
+  these can cause an infinite loop in statecomp execution.
+*/
+#define YY_ALWAYS_INTERACTIVE 0
+#define YY_NEVER_INTERACTIVE 1
+
 /* No push/pop of scanner state. */
 #define YY_STACK_USED 0
 
 /* No main needed. */
 #define YY_MAIN 0
+
+/* For the new and broken flex-2.5.33, it defines isatty() no matter what,
+ * but we can tell it not to include unistd.h that really defines that.
+ */
+#define YY_NO_UNISTD_H 1
 
 /*
  * flex-2.5.33 produces these non-static functions that are never used

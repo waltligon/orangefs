@@ -181,7 +181,7 @@ void PINT_release_extent_list(PINT_llist *extent_list)
 {
     if (extent_list)
     {
-        PINT_llist_free(extent_list, PINT_free2);
+        PINT_llist_free(extent_list,free);
     }
 }
 #endif

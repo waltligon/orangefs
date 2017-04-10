@@ -24,12 +24,7 @@
 #include "PINT-reqproto-encode.h"
 #include "sid.h"
 
-/*
- * Now included from client-state-machine.h
- */
-#if 0
 extern job_context_id pint_client_sm_context;
-#endif
 
 static int set_eattr_comp_fn(void *v_p,
                              struct PVFS_server_resp *resp_p,
@@ -144,7 +139,7 @@ PVFS_error PVFS_isys_seteattr_list(PVFS_object_ref ref,
                                PVFS_TYPE_NONE,
                                0);
 
-    return PINT_client_state_machine_post(smcb, op_id, user_ptr);
+    return PINT_client_state_machine_post(smcb,  op_id, user_ptr);
 }
 
 /**
@@ -312,7 +307,6 @@ static PINT_sm_action set_eattr_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->comp_fn = set_eattr_comp_fn;
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
-
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");

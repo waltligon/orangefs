@@ -25,12 +25,9 @@
 #  define __unused
 #endif
 
-/* 20 16kB buffers allocated to each connection for unexpected messages */
+/* 20 8kB buffers allocated to each connection for unexpected messages */
 #define DEFAULT_EAGER_BUF_NUM  (20)
-#define DEFAULT_EAGER_BUF_SIZE (16 << 10)
-/* TODO: decide if 16kB is the best size for this. Used to be 8kB, but 
- *       that prevented it from ever using small-io.
- */ 
+#define DEFAULT_EAGER_BUF_SIZE (8 << 10)
 
 struct buf_head;
 
@@ -396,15 +393,17 @@ extern ib_device_t *ib_device;
 /*
  * Internal functions in util.c.
  */
-void error(const char *fmt, ...);
-void error_errno(const char *fmt, ...);
-void error_xerrno(int errnum, const char *fmt, ...);
+void error(const char *fmt, ...) __attribute__((noreturn,format(printf,1,2)));
+void error_errno(const char *fmt, ...)
+  __attribute__((noreturn,format(printf,1,2)));
+void error_xerrno(int errnum, const char *fmt, ...)
+  __attribute__((noreturn,format(printf,2,3)));
 void warning(const char *fmt, ...) __attribute__((format(printf,1,2)));
 void warning_errno(const char *fmt, ...) __attribute__((format(printf,1,2)));
 void warning_xerrno(int errnum, const char *fmt, ...)
   __attribute__((format(printf,2,3)));
 void info(const char *fmt, ...) __attribute__((format(printf,1,2)));
-void *bmi_ib_malloc(unsigned long n); /* removed "malloc" attribute */
+void *bmi_ib_malloc(unsigned long n) __attribute__((malloc));
 void *qlist_del_head(struct qlist_head *list);
 void *qlist_try_del_head(struct qlist_head *list);
 const char *sq_state_name(sq_state_t num);
@@ -484,12 +483,3 @@ void memcache_cache_flush(void *md);
 #endif
 
 #endif  /* __ib_h */
-
-/*
- * Local variables:
- *  c-indent-level: 4
- *  c-basic-offset: 4
- * End:
- *
- * vim: ts=8 sts=4 sw=4 expandtab
- */

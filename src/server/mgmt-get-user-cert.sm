@@ -312,7 +312,7 @@ static PINT_sm_action get_user_cert_ldap_lookup(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *userid = s_op->req->u.mgmt_get_user_cert.userid;
     unsigned char *pwd;        
-    RSA *rsa_privkey=NULL, *rsa_pubkey=NULL;
+    RSA *rsa_privkey, *rsa_pubkey;
     int ret, flen;
 
     /*** decrypt password ***/

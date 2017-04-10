@@ -34,12 +34,7 @@
 #define IO_ATTR_MASKS (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|\
                        PVFS_ATTR_CAPABILITY)
 
-/*
- * Now included from client-state-machine.h
- */
-#if 0
 extern job_context_id pint_client_sm_context;
-#endif
 
 enum
 {
@@ -312,7 +307,6 @@ machine pvfs2_client_io_sm
     state io_cleanup
     {
         run io_cleanup;
-        IO_RENEW_CAPABILITY => io_renew_capability;
         default => terminate;
     }
 }
@@ -734,12 +728,6 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
         io_datafile_index_array_destroy(sm_p);
         /* io_contexts_destroy(sm_p); */
 
-        if (sm_p->u.io.dfile_size_array)
-        {
-           /* added this to avoid memory leak during retries and/or capability renewals */
-           PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->u.io.dfile_size_array);
-        }
-
         if (PINT_smcb_cancelled(smcb))
         {
             js_p->error_code = -PVFS_ECANCEL;
@@ -749,13 +737,6 @@ static PINT_sm_action io_init(struct PINT_smcb *smcb,
         if (js_p->error_code == IO_RENEW_CAPABILITY)
         {
             gossip_debug(GOSSIP_IO_DEBUG, "  sys-io renewing capability.\n");
-   
-            /* reset the total_size to zero, since we have to retry all IO to each server, when
-             * ANY of the servers complain about an out-of-date capability.  Otherwise, we may
-             * get the wrong total amount!
-             */
-            sm_p->u.io.total_size=0;
-
             js_p->error_code = 0;
             return SM_ACTION_COMPLETE;
         }
@@ -902,14 +883,10 @@ static int io_atime_setattr_comp_fn(void *v_p,
     PINT_client_sm *sm_p;
     PVFS_object_ref tmp_ref;
 
-    static unsigned int counter=0;
-    static unsigned int counter_max=10000;
-
     sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     tmp_ref.handle = sm_p->object_ref.handle;
     tmp_ref.fs_id = sm_p->object_ref.fs_id;
-
 
     if(resp_p->status == 0)
     {
@@ -929,22 +906,8 @@ static int io_atime_setattr_comp_fn(void *v_p,
     }
     else
     {
-        /* display error message every 10th time it happens. This is only temporary until we
-         * find the problem.
-         */
-        if (counter%10 == 0)
-        {
-           gossip_err("%s:count(%d):Error returned from setattr:%d\n",__func__,counter,resp_p->status);
-           counter++;
-           if (counter==counter_max)
-           {
-              counter=0;
-           }
-           
-        }
-     
-        //gossip_err("I/O atime setattr failed. "
-        //           "Continuing so I/O is not impacted by this failure.\n");
+        gossip_err("I/O atime setattr failed. "
+                   "Continuing so I/O is not impacted by this failure.\n");
     }
 
     /* Always return success. */
@@ -2634,27 +2597,7 @@ error_exit:
 static PINT_sm_action io_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_uid local_uid;
-
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_cleanup\n", sm_p);
-
-    /* capability most likely expired */
-    if (js_p->error_code == -PVFS_EAGAIN)
-    {
-        /* invalidate the capability from the capcache, so the next getattr will actually
-         * generate a NEW capability!
-         */
-        local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
-        if ( local_uid == -1 )
-        {
-           local_uid = PINT_util_getuid();
-           PVFS_hint_add(&sm_p->hints,PVFS_HINT_LOCAL_UID_NAME,sizeof(PVFS_uid),&local_uid);
-        }
-        PINT_client_capcache_invalidate(sm_p->object_ref,local_uid);
-
-        js_p->error_code = IO_RENEW_CAPABILITY;
-        return SM_ACTION_COMPLETE;
-    }
 
     /* io_contexts_destroy(sm_p); */
 
@@ -2732,16 +2675,9 @@ static inline int io_decode_ack_response(PINT_client_io_ctx *cur_ctx,
 
         if (cur_ctx->msg.recv_status.error_code)
         {
-            /* EAGAIN may signal that a capability has timed out and can happen
-             * many, many times.  So, don't display an error message in this case.
-             */
-            if (cur_ctx->msg.recv_status.error_code != -PVFS_EAGAIN &&
-                cur_ctx->msg.recv_status.error_code != -EAGAIN)
-            {
-               PVFS_perror_gossip(
-                       "io_decode_ack_response (recv_status.error_code)",
-                       cur_ctx->msg.recv_status.error_code);
-            }
+            PVFS_perror_gossip(
+                    "io_decode_ack_response (recv_status.error_code)",
+                    cur_ctx->msg.recv_status.error_code);
             ret = cur_ctx->msg.recv_status.error_code;
         }
         else if (cur_ctx->msg.op_status)

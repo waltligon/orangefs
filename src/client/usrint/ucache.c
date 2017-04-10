@@ -13,7 +13,7 @@
  */
 #include <pvfs2-config.h>
 #include <gen-locks.h>
-/* #include <malloc.h> */
+#include <malloc.h>
 #include "usrint.h"
 #include "posix-ops.h"
 #include "openfile-util.h"

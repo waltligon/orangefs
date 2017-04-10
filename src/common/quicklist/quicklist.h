@@ -194,7 +194,6 @@ static __inline__ void qlist_splice(struct qlist_head *qlist, struct qlist_head 
  * @pos:	the type * to use as a loop counter.
  * @head:	the head for your list.
  * @member:	the name of the list_struct within the struct.
- * NOTE: DO NOT REMOVE files from a list this way!!!
  */
 #ifdef WIN32
 #define qlist_for_each_entry(pos, head, member, type)        \
@@ -208,8 +207,7 @@ static __inline__ void qlist_splice(struct qlist_head *qlist, struct qlist_head 
          pos = qlist_entry(pos->member.next, typeof(*pos), member))	
 #endif
 /**
- * qlist_for_each_entry_safe - iterate over list of given type
- *                             safe against removal of list entry
+ * qlist_for_each_entry_safe - iterate over list of given type safe against removal of list entry
  * @pos:	the type * to use as a loop counter.
  * @n:		another type * to use as temporary storage
  * @head:	the head for your list.

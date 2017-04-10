@@ -9,6 +9,8 @@
 
 #include "pvfs2-internal.h"
 
+#include <db.h>
+
 #include "trove.h"
 #include "trove-internal.h"
 

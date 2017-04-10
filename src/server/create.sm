@@ -241,7 +241,6 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
         /* TJS: */
         s_op->resp.u.create.datafile_handles = malloc(sizeof(PVFS_handle));
         s_op->u.create.handle_array_local = malloc(sizeof(PVFS_handle));
-
         if(!s_op->resp.u.create.metafile_attrs.u.meta.dfile_array ||
            !s_op->u.create.handle_array_local)
         {
@@ -655,20 +654,6 @@ static PINT_sm_action remove_local_datafile_handles(struct PINT_smcb *smcb,
     int ret = -1;
     job_id_t j_id;
 
-#if 0
-    if ( s_op->attr.mtime )
-    {
-       /* Must "un-version" mtime before sending back to client:
-        * When the mtime is stored in dspace in the setobj_attribs state,
-        * the mtime is "versioned", i.e., the time, given in seconds since
-        * the Epoch, is modified using PINT_util_mktime_version().
-        */
-       s_op->resp.u.create.metafile_attrs.mtime =
-                           PINT_util_mkversion_time(s_op->attr.mtime);
-       s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_COMMON_MTIME;
-    }
-#endif
-
     /* save the error code before we begin cleanup */
     if(!s_op->u.create.saved_error_code)
     {
@@ -738,7 +723,6 @@ static PINT_sm_action setup_final_response(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TCREATE, &s_op->start_time);
 
     /* retrieve original error code if present */
     if(s_op->u.create.saved_error_code)

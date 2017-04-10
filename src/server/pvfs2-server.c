@@ -25,7 +25,6 @@
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 
-#include "pvfs2-internal.h"
 #include "bmi.h"
 #include "gossip.h"
 #include "job.h"
@@ -44,12 +43,11 @@
 #include "id-generator.h"
 #include "job-time-mgr.h"
 #include "pint-cached-config.h"
-/* #include "pvfs2-internal.h" */
+#include "pvfs2-internal.h"
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-event.h"
 #include "pint-util.h"
-#include "client-state-machine.h"
-/* #include "pint-malloc.h" */
+#include "pint-malloc.h"
 #include "pint-uid-mgmt.h"
 #include "pint-security.h"
 #include "security-util.h"
@@ -132,32 +130,18 @@ static char startup_cwd[PATH_MAX+1];
  */
 PINT_server_trove_keys_s Trove_Common_Keys[] =
 {
-    {ROOT_HANDLE_KEYSTR,          ROOT_HANDLE_KEYLEN},
-    {DIRECTORY_ENTRY_KEYSTR,      DIRECTORY_ENTRY_KEYLEN},
-    {DATAFILE_HANDLES_KEYSTR,     DATAFILE_HANDLES_KEYLEN},
-    {METAFILE_DIST_KEYSTR,        METAFILE_DIST_KEYLEN},
-    {SYMLINK_TARGET_KEYSTR,       SYMLINK_TARGET_KEYLEN},
-    {METAFILE_LAYOUT_KEYSTR,      METAFILE_LAYOUT_KEYLEN},
-    {NUM_DFILES_REQ_KEYSTR,       NUM_DFILES_REQ_KEYLEN},
-    {DIST_DIR_ATTR_KEYSTR,        DIST_DIR_ATTR_KEYLEN},
-    {DIST_DIRDATA_BITMAP_KEYSTR,  DIST_DIRDATA_BITMAP_KEYLEN},
+    {ROOT_HANDLE_KEYSTR, ROOT_HANDLE_KEYLEN},
+    {DIRECTORY_ENTRY_KEYSTR, DIRECTORY_ENTRY_KEYLEN},
+    {DATAFILE_HANDLES_KEYSTR, DATAFILE_HANDLES_KEYLEN},
+    {METAFILE_DIST_KEYSTR, METAFILE_DIST_KEYLEN},
+    {SYMLINK_TARGET_KEYSTR, SYMLINK_TARGET_KEYLEN},
+    {METAFILE_LAYOUT_KEYSTR, METAFILE_LAYOUT_KEYLEN},
+    {NUM_DFILES_REQ_KEYSTR, NUM_DFILES_REQ_KEYLEN},
+    {DIST_DIR_ATTR_KEYSTR, DIST_DIR_ATTR_KEYLEN},
+    {DIST_DIRDATA_BITMAP_KEYSTR, DIST_DIRDATA_BITMAP_KEYLEN},
     {DIST_DIRDATA_HANDLES_KEYSTR, DIST_DIRDATA_HANDLES_KEYLEN},
     {OBJECT_PARENT_KEYSTR, OBJECT_PARENT_KEYLEN},
 };
-
-PINT_server_trove_keys_s Trove_Special_Keys[] =
-{
-    {SPECIAL_DIST_NAME_STRING     , SPECIAL_DIST_NAME_KEYLEN},
-    {SPECIAL_DIST_PARAMS_STRING   , SPECIAL_DIST_PARAMS_KEYLEN},
-    {SPECIAL_NUM_DFILES_STRING    , SPECIAL_NUM_DFILES_KEYLEN},
-    {SPECIAL_LAYOUT_STRING        , SPECIAL_LAYOUT_KEYLEN},
-    {SPECIAL_SERVER_LIST_STRING   , SPECIAL_SERVER_LIST_KEYLEN},
-    {SPECIAL_METAFILE_HINT_STRING , SPECIAL_METAFILE_HINT_KEYLEN},
-    {SPECIAL_MIRROR_COPIES_STRING , SPECIAL_MIRROR_COPIES_KEYLEN},
-    {SPECIAL_MIRROR_HANDLES_STRING, SPECIAL_MIRROR_HANDLES_KEYLEN},
-    {SPECIAL_MIRROR_STATUS_STRING , SPECIAL_MIRROR_STATUS_KEYLEN},
-};
-
 
 /* These three are used continuously in our wait loop.  They could be
  * relatively large, so rather than allocate them on the stack, we'll
@@ -195,13 +179,9 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret);
 static int create_pidfile(char *pidfile);
 static void write_pidfile(int fd);
 static void remove_pidfile(void);
+static int generate_shm_key_hint(int* server_index);
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
-
-struct server_configuration_s *PINT_get_server_config(void)
-{
-    return &server_config;
-}
 
 int main(int argc, char **argv)
 {
@@ -410,7 +390,8 @@ int main(int argc, char **argv)
 #endif
 
     /* kick off timer for expired jobs */
-    ret = server_state_machine_alloc_noreq(PVFS_SERV_JOB_TIMER, &(tmp_op));
+    ret = server_state_machine_alloc_noreq(
+                    PVFS_SERV_JOB_TIMER, &(tmp_op));
     if (ret == 0)
     {
         ret = server_state_machine_start_noreq(tmp_op);
@@ -870,7 +851,10 @@ static int server_initialize_subsystems(
     TROVE_context_id trove_context = -1;
     char buf[16] = {0};
     PVFS_fs_id orig_fsid=0;
+    PVFS_ds_flags init_flags = 0;
     int bmi_flags = 0;
+    int shm_key_hint;
+    int server_index;
 
     if(!(*server_status_flag & SERVER_EVENT_INIT) && 
        server_config.enable_events)
@@ -1000,9 +984,37 @@ static int server_initialize_subsystems(
         /* this should never fail */
         ret = trove_collection_setinfo(0,
                                        0,
+                                       TROVE_DB_CACHE_SIZE_BYTES,
+                                       &server_config.db_cache_size_bytes);
+        assert(ret == 0);
+
+        /* this should never fail */
+        ret = trove_collection_setinfo(0,
+                                       0,
                                        TROVE_MAX_CONCURRENT_IO,
                                        &server_config.trove_max_concurrent_io);
         assert(ret == 0);
+
+        /* help trove chose a differentiating shm key
+         * if needed for Berkeley DB
+         */
+        shm_key_hint = generate_shm_key_hint(&server_index);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "Server using shm key hint: %d\n",
+                     shm_key_hint);
+
+        ret = trove_collection_setinfo(0,
+                                       0,
+                                       TROVE_SHM_KEY_HINT,
+                                       &shm_key_hint);
+        assert(ret == 0);
+
+        if(server_config.db_cache_type &&
+           (!strcmp(server_config.db_cache_type, "mmap")))
+        {
+            /* set db cache type to mmap rather than sys */
+            init_flags |= TROVE_DB_CACHE_MMAP;
+        }
 
         /* Fire up TROVE */
         ret = trove_initialize(server_config.trove_method, 
@@ -1010,7 +1022,7 @@ static int server_initialize_subsystems(
                                server_config.data_path,
                                server_config.meta_path,
                                server_config.config_path,
-                               0);
+                               init_flags);
 
         if (ret < 0)
         {
@@ -1081,7 +1093,6 @@ static int server_initialize_subsystems(
             if (ret < 0)
             {
                 gossip_err("Error setting directio threads num\n");
-                return ret;
             }
     
             ret = trove_collection_setinfo(
@@ -1093,7 +1104,6 @@ static int server_initialize_subsystems(
             if (ret < 0)
             {
                 gossip_err("Error setting directio ops per queue\n");
-                return ret;
             }
 
             ret = trove_collection_setinfo(cur_fs->coll_id,
@@ -1104,7 +1114,6 @@ static int server_initialize_subsystems(
             if (ret < 0)
             {
                 gossip_err("Error setting directio threads num\n");
-                return ret;
             }
 
             ret = trove_collection_lookup(cur_fs->trove_method,
@@ -1117,29 +1126,6 @@ static int server_initialize_subsystems(
             {
                 gossip_err("Error initializing trove for filesystem %s\n",
                             cur_fs->file_system_name);
-                return ret;
-            }
-
-            /* XXX: This is really the same for all collections, yet is
-             * specified separately. */
-            ret = trove_collection_set_fs_config(cur_fs->coll_id,
-                    &server_config);
-            if (ret < 0) {
-                gossip_err("Error setting filesystem configuration in Trove\n");
-                return ret;
-            }
-    
-            /*
-               set storage hints if any.  if any of these fail, we
-               can't error out since they're just hints.  thus, we
-               complain in logging and continue.
-               */
-            ret = trove_collection_setinfo(cur_fs->coll_id,
-                                           0,
-                                           TROVE_DIRECTIO_THREADS_NUM,
-                                           (void *)&cur_fs->directio_thread_num);
-            if (ret < 0) {
-                gossip_err("Error setting filesystem configuration in Trove\n");
                 return ret;
             }
 
@@ -1320,6 +1306,18 @@ static int server_initialize_subsystems(
                      "%d filesystem(s) initialized\n",
                      PINT_llist_count(server_config.file_systems));
 
+        /*
+         * Migrate database if needed
+         */
+        ret = trove_migrate(server_config.trove_method,
+			    server_config.data_path,
+			    server_config.meta_path);
+        if (ret < 0)
+        {
+            gossip_err("trove_migrate failed: ret=%d\n", ret);
+            return(ret);
+        }
+
         *server_status_flag |= SERVER_FILESYS_INIT;
     }
     /********** END OF TROVE INIT ***********/
@@ -1375,55 +1373,21 @@ static int server_initialize_subsystems(
     /* Initialize performance counters */
     if(!(*server_status_flag & SERVER_PERF_COUNTER_INIT))
     {
-        /* history size should be in server config too */
-        PINT_server_pc = PINT_perf_initialize(PINT_PERF_COUNTER,
-                                              server_keys, 
-                                              server_perf_start_rollover);
-
-        PINT_server_tpc = PINT_perf_initialize(PINT_PERF_TIMER,
-                                               server_tkeys, 
-                                               server_perf_start_rollover);
-        if(!PINT_server_pc || !PINT_server_tpc)
+        /* hist size should be in server config too */
+        PINT_server_pc = PINT_perf_initialize(server_keys);
+        if(!PINT_server_pc)
+        {
             gossip_err("Error initializing performance counters.\n");
-        return(ret);
-
-        if (server_config.perf_update_interval > 0)
-        {
-            ret = PINT_perf_set_info(PINT_server_pc,
-                                     PINT_PERF_UPDATE_INTERVAL, 
-                                     server_config.perf_update_interval);
-            if (ret < 0)
-            {
-                gossip_err("Error PINT_perf_set_info (update interval)\n");
-                return(ret);
-            }
-            ret = PINT_perf_set_info(PINT_server_tpc,
-                                     PINT_PERF_UPDATE_INTERVAL, 
-                                     server_config.perf_update_interval);
-            if (ret < 0)
-            {
-                gossip_err("Error PINT_perf_set_info (update interval)\n");
-                return(ret);
-            }
+            return(ret);
         }
-        if (server_config.perf_update_history > 0)
+
+        ret = PINT_perf_set_info(PINT_server_pc,
+                                 PINT_PERF_UPDATE_INTERVAL, 
+                                 server_config.perf_update_interval);
+        if (ret < 0)
         {
-            ret = PINT_perf_set_info(PINT_server_pc,
-                                     PINT_PERF_UPDATE_HISTORY, 
-                                     server_config.perf_update_history);
-            if (ret < 0)
-            {
-                gossip_err("Error PINT_perf_set_info (update history)\n");
-                return(ret);
-            }
-            ret = PINT_perf_set_info(PINT_server_tpc,
-                                     PINT_PERF_UPDATE_HISTORY, 
-                                     server_config.perf_update_history);
-            if (ret < 0)
-            {
-                gossip_err("Error PINT_perf_set_info (update history)\n");
-                return(ret);
-            }
+            gossip_err("Error PINT_perf_set_info (update interval)\n");
+            return(ret);
         }
 
         /* if history_size is greater than 1, start the rollover SM */
@@ -1568,17 +1532,14 @@ static int server_check_if_root_directory_created( void )
 /* V3 */
 #if 0
         /*
-         * check if root handle is in our handle range for this fs.
-         * if it is, we're responsible for creating it on disk when
-         * creating the storage space
+           check if root handle is in our handle range for this fs.
+           if it is, we're responsible for creating it on disk when
+           creating the storage space
          */
         root_handle = cur_fs->root_handle;
 
-        ret = PINT_cached_config_get_server_name(handle_server,
-                                                 BMI_MAX_ADDR_LEN-1,
-                                                 root_handle,
-                                                 cur_fs->coll_id);
-
+        ret = PINT_cached_config_get_server_name( handle_server,
+                BMI_MAX_ADDR_LEN-1, root_handle, cur_fs->coll_id);
         if ((ret == 0) && (strcmp(handle_server, server_config.host_id) == 0))
 #endif
         if (is_root_srv)
@@ -1620,7 +1581,6 @@ static int server_check_if_root_directory_created( void )
                 ret = server_state_machine_alloc_noreq(
                                            PVFS_SERV_MGMT_CREATE_ROOT_DIR,
                                            &(tmp_op));
-
                 if (ret < 0)
                 {
                     return ret;
@@ -1629,22 +1589,13 @@ static int server_check_if_root_directory_created( void )
                 tmp_sop = PINT_sm_frame(tmp_op, PINT_FRAME_CURRENT);
                 tmp_sop->target_fs_id = cur_fs->coll_id;
                 tmp_sop->target_handle = root_handle;
-
-                tmp_sop->msgarray_op.params.job_context =
-                                     server_job_context;
-                tmp_sop->msgarray_op.params.job_timeout =
-                                     server_config.client_job_bmi_timeout;
-                tmp_sop->msgarray_op.params.retry_limit = 10;
-                tmp_sop->msgarray_op.params.retry_delay =
-                                     server_config.client_retry_delay_ms;
-
                 ret = server_state_machine_start_noreq(tmp_op);
 
                 if (ret < 0)
                 {
                     PVFS_perror_gossip("Error: failed to start root directory "
-                                       "creation noreq state machine.\n",
-                                       ret);
+                            "creation noreq state machine.\n",
+                            ret);
                     PINT_smcb_free(tmp_op);
                     return ret;
                 }
@@ -1779,17 +1730,7 @@ static void reload_config(void)
         gossip_set_debug_mask(1,
                 PVFS_debug_eventlog_to_mask(orig_server_config->event_logging));
 
-        /* Modify the TurnOffTimeouts feature */
-        gossip_err("%s:Changing original bypass_timeout_check(%d) to (%d)\n"
-                  ,__func__
-                  ,orig_server_config->bypass_timeout_check
-                  ,sighup_server_config.bypass_timeout_check);
-        orig_server_config->bypass_timeout_check =
-                            sighup_server_config.bypass_timeout_check;
-     
-
-        orig_filesystems = orig_server_config->file_systems;
-
+        orig_filesystems = server_config.file_systems;
         /* Loop and update all stored file systems */
         while(orig_filesystems)
         {
@@ -1819,7 +1760,7 @@ static void reload_config(void)
             }
             if(!found_matching_config)
             {
-                gossip_err("Error: SIGHUP unable to update configuration. "
+                gossip_err("Error: SIGHUP unable to update configuration"
                            "Matching configuration not found.\n");
                 break;
             }
@@ -1925,9 +1866,7 @@ static void reload_config(void)
         /* The set_info call grabs the interface_mutex, so we are
          * basically using that to lock this resource
          */
-        BMI_set_info(0,
-                     BMI_TRUSTED_CONNECTION,
-                     (void *) &server_config);
+        BMI_set_info(0, BMI_TRUSTED_CONNECTION, (void *) &server_config);
 #endif
         PINT_config_release(&sighup_server_config); /* Free memory */
     }
@@ -2067,7 +2006,6 @@ static int server_shutdown(PINT_server_status_flag status,
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         security "
                      "module           [ stopped ]\n");
     }
-
 #ifdef ENABLE_CERTCACHE    
     if (status & SERVER_CERTCACHE_INIT)
     {
@@ -2090,7 +2028,7 @@ static int server_shutdown(PINT_server_status_flag status,
     }
 #endif /* ENABLE_CREDCACHE */
 
-#ifdef ENABLE_CAPCACHE
+#ifdef ENABLE_CAPCACHE    
     if (status & SERVER_CAPCACHE_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting capability "
@@ -2124,7 +2062,6 @@ static int server_shutdown(PINT_server_status_flag status,
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting performance "
                      "interface     [   ...   ]\n");
         PINT_perf_finalize(PINT_server_pc);
-        PINT_perf_finalize(PINT_server_tpc);
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         performance "
                      "interface     [ stopped ]\n");
     }
@@ -2587,24 +2524,14 @@ int server_state_machine_start(PINT_smcb *smcb, job_status_s *js_p)
                      PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
                      PINT_HINT_GET_REQUEST_ID(s_op->req->hints),
                      PINT_HINT_GET_RANK(s_op->req->hints));
-        PINT_EVENT_START(PINT_sm_event_id,
-                         server_controlling_pid,
-                         NULL,
-                         &s_op->event_id,
+        PINT_EVENT_START(PINT_sm_event_id, server_controlling_pid,
+                         NULL, &s_op->event_id,
                          PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
                          PINT_HINT_GET_REQUEST_ID(s_op->req->hints),
                          PINT_HINT_GET_RANK(s_op->req->hints),
                          PINT_HINT_GET_HANDLE(s_op->req->hints),
                          s_op->req->op);
-
         s_op->resp.op = s_op->req->op;
-
-        /* start request timer 
-         * if we are not tracking this request we will never call end
-         * this is not a problem so pretty much call this for all
-         * normal requests
-         */
-        PINT_perf_timer_start(&s_op->start_time);
     }
 
     s_op->addr = s_op->unexp_bmi_buff.addr;
@@ -2960,102 +2887,51 @@ void PINT_server_access_debug(PINT_server_op *s_op,
 }
 #endif /* GOSSIP_DISABLE_DEBUG */
 
-/* server_perf_start_rollover
- * This functions starts the performance counter rollover timer for the
- * server - it is server specific and thus is here not in misc
+/* generate_shm_key_hint()
+ *
+ * Makes a best effort to produce a unique shm key (for Trove's Berkeley
+ * DB use) for each server.  By default it will base this on the server's
+ * position in the fs.conf, but it will fall back to using a random number
+ *
+ * returns integer key
  */
-int server_perf_start_rollover(struct PINT_perf_counter *pc,
-                               struct PINT_perf_counter *tpc)
+static int generate_shm_key_hint(int* server_index)
 {
-    int ret = 0;
-    struct PINT_smcb *tmp_op = NULL;
-    struct PINT_server_op *s_op = NULL;
+    struct host_alias_s *cur_alias = NULL;
+    struct filesystem_configuration_s *first_fs;
 
-    if (!pc)
+    *server_index = 1;
+
+    PINT_llist *cur = server_config.host_aliases;
+
+    /* iterate through list of aliases in configuration file */
+    while(cur)
     {
-        gossip_err("server_perf_start_rollover called with NULL pc\n");
-        return -1;
-    }
-    pc->running = 1;
-
-    ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
-                                           &(tmp_op));
-    if (ret != 0)
-    {
-        gossip_err("server_perf_start_rollover failed to alloc SM\n");
-        return ret;
-    }
-
-    s_op = PINT_sm_frame(tmp_op, PINT_FRAME_CURRENT);
-    s_op->u.perf_update.pc = pc;
-    s_op->u.perf_update.tpc = tpc;
-
-    ret = server_state_machine_start_noreq(tmp_op);
-
-    return ret;
-}
-
-/* THese functions are for managing the keyval buffers in the state
- * machines.  They use the generic field "free_val" to record which
- * buffers do NOT need to be freed - presumable because they are freed
- * elsewhere.
- */
-
-void keep_keyval_buffers(struct PINT_server_op *s_op, int buf)
-{
-    if (buf >= KEYVAL && buf < s_op->keyval_count)
-    {   
-        s_op->free_val |= 0x1 << (buf + 1);
-    }       
-}
-            
-void free_keyval_buffers(struct PINT_server_op *s_op)
-{                           
-    int i = 0;
-            
-    /* free_val is a bitmap of buffers that are not to be
-     * freed because they are referenced elsewhere
-     */     
-    if (!(s_op->free_val & KEYVAL))
-    {       
-        if (s_op->val.buffer)
+        cur_alias = PINT_llist_head(cur);
+        if(!cur_alias)
         {
-            free(s_op->val.buffer);
+            break;
         }
-    }       
-                    
-    memset(&(s_op->val), 0, sizeof(s_op->val));
-    memset(&(s_op->key), 0, sizeof(s_op->key));
-        
-    if (s_op->val_a)
-    {   
-        for (i = 0; i < s_op->keyval_count; i++)
+        if(strcmp(cur_alias->bmi_address, server_config.host_id) == 0)
         {
-            if (!(s_op->free_val & (0x1 << (i + 1))))
-            {
-                if (s_op->val_a[i].buffer)
-                {
-                    free(s_op->val_a[i].buffer);
-                }
-            }
-            s_op->val_a[i].buffer = NULL;
+            /* match */
+            /* space the shm keys out by 10 to allow for Berkeley DB using 
+             * using more than one key on each server
+             */
+            first_fs = PINT_llist_head(server_config.file_systems);
+            return(first_fs->coll_id + (*server_index)*10);
         }
-        free(s_op->val_a);
-        s_op->val_a = NULL;
-    }
 
-    if (s_op->key_a)
-    {
-        free(s_op->key_a);
-        s_op->key_a = NULL;
+        (*server_index)++;
+        cur = PINT_llist_next(cur);
     }
-    if (s_op->error_a)
-    {
-        free(s_op->error_a);
-        s_op->error_a = NULL;
-    }
-
-    s_op->free_val = 0;
+    
+    /* If we reach this point, we didn't find this server in the alias list.
+     * This is not a normal situation, but fall back to using a random
+     * number for the key just to be safe.
+     */
+    srand((unsigned int)time(NULL));
+    return(rand());
 }
 
 /*

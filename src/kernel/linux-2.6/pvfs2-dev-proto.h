@@ -28,7 +28,7 @@
 #define PVFS2_VFS_OP_RENAME            0xFF00000A
 #define PVFS2_VFS_OP_STATFS            0xFF00000B
 #define PVFS2_VFS_OP_TRUNCATE          0xFF00000C
-#define PVFS2_VFS_OP_RA_FLUSH          0xFF00000D
+#define PVFS2_VFS_OP_MMAP_RA_FLUSH     0xFF00000D
 #define PVFS2_VFS_OP_FS_MOUNT          0xFF00000E
 #define PVFS2_VFS_OP_FS_UMOUNT         0xFF00000F
 #define PVFS2_VFS_OP_GETXATTR          0xFF000010
@@ -42,10 +42,6 @@
 #define PVFS2_VFS_OP_FSKEY             0xFF00EE02
 #define PVFS2_VFS_OP_READDIRPLUS       0xFF00EE03
 #define PVFS2_VFS_OP_FILE_IOX          0xFF00EE04
-#define PVFS2_VFS_OP_FEATURES          0xFF00EE05
-
-/* features is a 64-bit unsigned bitmask */
-#define PVFS2_FEATURE_READAHEAD 1
 
 /* Misc constants. Please retain them as multiples of 8!
  * Otherwise 32-64 bit interactions will be messed up :)

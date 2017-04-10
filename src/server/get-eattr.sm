@@ -108,8 +108,8 @@ static PINT_sm_action geteattr_setup_resp(struct PINT_smcb *smcb,
         }
 
         js_p->error_code = PINT_eattr_check_access(
-                &s_op->req->u.geteattr.key[i],
-                NULL);
+                        &s_op->req->u.geteattr.key[i],
+                        NULL);
         if(js_p->error_code != 0)
         {
             /* not prefixed: treat this as if the key does not exist */
@@ -119,14 +119,15 @@ static PINT_sm_action geteattr_setup_resp(struct PINT_smcb *smcb,
     }
 
     s_op->resp.u.geteattr.val =
-            malloc(s_op->req->u.geteattr.nkey * sizeof(PVFS_ds_keyval));
+                    malloc(s_op->req->u.geteattr.nkey * sizeof(PVFS_ds_keyval));
     if (!s_op->resp.u.geteattr.val)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
     s_op->resp.u.geteattr.err =
-            malloc(s_op->req->u.geteattr.nkey * sizeof(PVFS_error));
+                    malloc(s_op->req->u.geteattr.nkey * sizeof(PVFS_error));
+    if (!s_op->resp.u.geteattr.err)
     {
         free(s_op->resp.u.geteattr.val);
         js_p->error_code = -PVFS_ENOMEM;
@@ -136,7 +137,7 @@ static PINT_sm_action geteattr_setup_resp(struct PINT_smcb *smcb,
     for (i = 0; i < s_op->req->u.geteattr.nkey; i++)
     {
         s_op->resp.u.geteattr.val[i].buffer = malloc(
-                s_op->req->u.geteattr.valsz[i]);
+                        s_op->req->u.geteattr.valsz[i]);
         if (!s_op->resp.u.geteattr.val[i].buffer)
         {
             for(--i; i >= 0; --i)
@@ -149,8 +150,7 @@ static PINT_sm_action geteattr_setup_resp(struct PINT_smcb *smcb,
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
         }
-        s_op->resp.u.geteattr.val[i].buffer_sz =
-                s_op->req->u.geteattr.valsz[i];
+        s_op->resp.u.geteattr.val[i].buffer_sz = s_op->req->u.geteattr.valsz[i];
     }
 
     return SM_ACTION_COMPLETE;

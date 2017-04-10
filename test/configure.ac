@@ -223,32 +223,10 @@ fi
 AC_SUBST(MPI_INTELC)
 AC_SUBST(MPI_GNUC)
 
-AC_ARG_WITH(db-backend,
-[  --with-db-backend        Use specified database (bdb or lmdb).],
-if test "${withval}" = "bdb"
-then
-    DATABASE_BACKEND=bdb
-    NEED_BERKELEY_DB=yes
-elif test "${withval}" = "lmdb"
-then
-    DATABASE_BACKEND=lmdb
-else
-    AC_MSG_ERROR(database backend ${withval} invalid)
-fi
-AC_SUBST(DATABASE_BACKEND)
-AC_SUBST(NEED_BERKELEY_DB),
-DATABASE_BACKEND=bdb
-NEED_BERKELEY_DB=yes
-AC_SUBST(DATABASE_BACKEND)
-AC_SUBST(NEED_BERKELEY_DB))
-
-if test "x$NEED_BERKELEY_DB" = "xyes" ; then
-    AC_ARG_WITH(db,
-           [  --with-db=<dir>         Location of installed DB package (default=
-/usr)],
-           [AX_BERKELEY_DB(${withval})],
-           [AX_BERKELEY_DB("")])
-fi      
+AC_ARG_WITH(db,
+	[  --with-db=<dir>         Location of installed DB package (default=/usr)],
+	[AX_BERKELEY_DB(${withval})],
+	[AX_BERKELEY_DB("")])
 
 AC_ARG_WITH(openssl,
 		 [  --with-openssl=<dir>  Location of installed openssl package (default=/usr)

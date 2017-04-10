@@ -54,53 +54,28 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket);
 do { \
     struct tcp_addr* tcp_data = (m)->method_data; \
     if(tcp_data->socket > -1){ \
-        int rc; \
         struct epoll_event event;\
         memset(&event, 0, sizeof(event));\
         event.events = EPOLLIN|EPOLLERR|EPOLLHUP;\
         event.data.ptr = tcp_data->map;\
-        rc = epoll_ctl(s->epfd, EPOLL_CTL_ADD, tcp_data->socket, &event);\
-        if (rc == -1) \
-        { \
-            if (errno != EEXIST) \
-            { \
-                gossip_err("BMI_socket_collection_add returns error\n"); \
-            } \
-            else \
-            { \
-                errno = 0; \
-            } \
-        } \
+        epoll_ctl(s->epfd, EPOLL_CTL_ADD, tcp_data->socket, &event);\
     } \
 } while(0)
 
 #define BMI_socket_collection_remove(s, m) \
 do { \
-    int rc; \
     struct epoll_event event;\
     struct tcp_addr* tcp_data = (m)->method_data; \
     tcp_data->write_ref_count = 0; \
     memset(&event, 0, sizeof(event));\
     event.events = 0;\
     event.data.ptr = tcp_data->map;\
-    rc = epoll_ctl(s->epfd, EPOLL_CTL_DEL, tcp_data->socket, &event);\
-    if (rc == -1) \
-    { \
-        if (errno != ENOENT) \
-        { \
-            gossip_err("BMI_socket_collection_remove returns error\n"); \
-        } \
-        else \
-        { \
-            errno = 0; \
-        } \
-    } \
+    epoll_ctl(s->epfd, EPOLL_CTL_DEL, tcp_data->socket, &event);\
 } while(0)
 
 /* we _must_ have a valid socket at this point if we want to write data */
 #define BMI_socket_collection_add_write_bit(s, m) \
 do { \
-    int rc; \
     struct tcp_addr* tcp_data = (m)->method_data; \
     struct epoll_event event;\
     assert(tcp_data->socket > -1); \
@@ -108,11 +83,7 @@ do { \
     memset(&event, 0, sizeof(event));\
     event.events = EPOLLIN|EPOLLERR|EPOLLHUP|EPOLLOUT;\
     event.data.ptr = tcp_data->map;\
-    rc = epoll_ctl(s->epfd, EPOLL_CTL_MOD, tcp_data->socket, &event);\
-    if (rc == -1) \
-    { \
-        gossip_err("BMI_socket_collection_add_write_bit returns error\n"); \
-    } \
+    epoll_ctl(s->epfd, EPOLL_CTL_MOD, tcp_data->socket, &event);\
 } while(0)
 
 #define BMI_socket_collection_remove_write_bit(s, m) \
@@ -122,15 +93,10 @@ do { \
     tcp_data->write_ref_count--; \
     assert(tcp_data->write_ref_count > -1); \
     if (tcp_data->write_ref_count == 0) { \
-        int rc; \
         memset(&event, 0, sizeof(event));\
         event.events = EPOLLIN|EPOLLERR|EPOLLHUP;\
         event.data.ptr = tcp_data->map;\
-        rc = epoll_ctl(s->epfd, EPOLL_CTL_MOD, tcp_data->socket, &event);\
-        if (rc == -1) \
-        { \
-            gossip_err("BMI_socket_collection_remove_write_bit returns error\n"); \
-        } \
+        epoll_ctl(s->epfd, EPOLL_CTL_MOD, tcp_data->socket, &event);\
     }\
 } while(0)
 

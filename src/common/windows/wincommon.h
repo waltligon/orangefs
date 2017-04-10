@@ -26,7 +26,6 @@
 #define strdup(s)      _strdup(s)
 #define strcasecmp     stricmp
 #define strncasecmp    strnicmp
-#define strtoll(str, end, base)    _atoi64(str)
 
 /*
  * gettimeofday

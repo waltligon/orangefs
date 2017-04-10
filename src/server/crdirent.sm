@@ -54,7 +54,7 @@ machine pvfs2_crdirent_sm
     {
         jump pvfs2_prelude_sm;
         success => get_bitmap_and_dirdata_handles;
-        default => return;
+        default => final_response;
     }
 
     /* these are used to validate the new entry */
@@ -62,21 +62,21 @@ machine pvfs2_crdirent_sm
     {
         run crdirent_get_bitmap_and_dirdata_handles;
         success => validate;
-        default => return;
+        default => final_response;
     }
 
     state validate
     {
         run crdirent_validate;
         success => write_directory_entry;
-        default => return;
+        default => final_response;
     }
 
     state write_directory_entry
     {
         run crdirent_write_directory_entry;
         success => check_for_split;
-        default => return;
+        default => final_response;
     }
 
     state check_for_split

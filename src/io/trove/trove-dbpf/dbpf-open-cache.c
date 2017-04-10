@@ -21,6 +21,7 @@
 #include <assert.h>
 #include <limits.h>
 #include <string.h>
+#include <db.h>
 #include <dirent.h>
 
 #include "trove.h"
@@ -585,7 +586,7 @@ static int open_fd(
     }
 #endif
 
-    *fd = open(filename, flags, mode);
+    *fd = DBPF_OPEN(filename, flags, mode);
 
 #ifdef HAVE_FCNTL_F_NOCACHE
     if(type == DBPF_FD_DIRECT_WRITE || type == DBPF_FD_DIRECT_READ)
@@ -740,7 +741,7 @@ static void* unlink_bstream(void *context)
     
         tmp_st = qlist_entry(tmp_item, struct file_struct, list_link);
         time(&start_time);
-        ret = unlink(tmp_st->pathname);
+        ret = DBPF_UNLINK(tmp_st->pathname);
         gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, 
                      "Unlinked filename: (ret=%d, errno=%d, "
                      "elapsed-time=%ld(secs) )\n%s\n", 
@@ -764,7 +765,7 @@ static void close_fd(
                  "dbpf_open_cache closing fd %d of type %d\n",
                  fd,
                  type);
-    close(fd);
+    DBPF_CLOSE(fd);
 }
 
 void clear_stranded_bstreams(TROVE_coll_id coll_id)

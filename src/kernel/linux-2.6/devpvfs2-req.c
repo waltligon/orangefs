@@ -101,11 +101,8 @@ static ssize_t pvfs2_devreq_read(
     int ret = 0;
     ssize_t len = 0;
     pvfs2_kernel_op_t *cur_op = NULL;
-    uint64_t tag;
     static int32_t magic = PVFS2_DEVREQ_MAGIC;
     int32_t proto_ver = PVFS_KERNEL_PROTO_VERSION;
-    PVFS_fs_id fs_id;
-    pvfs2_kernel_op_t *op=NULL, *temp=NULL;
 
     if (!(file->f_flags & O_NONBLOCK))
     {
@@ -115,20 +112,15 @@ static ssize_t pvfs2_devreq_read(
     }
     else
     {
+        pvfs2_kernel_op_t *op = NULL, *temp = NULL;
         /* get next op (if any) from top of list */
         spin_lock(&pvfs2_request_list_lock);
         list_for_each_entry_safe (op, temp, &pvfs2_request_list, list)
         {
-            spin_lock(&op->lock);
-
-            tag = 0;
-            cur_op = NULL;
-
-            fs_id = fsid_of_op(op);
+            PVFS_fs_id fsid = fsid_of_op(op);
             /* Check if this op's fsid is known and needs remounting */
-            if (fs_id != PVFS_FS_ID_NULL && fs_mount_pending(fs_id) == 1)
+            if (fsid != PVFS_FS_ID_NULL && fs_mount_pending(fsid) == 1)
             {
-                spin_unlock(&op->lock);
                 gossip_debug(GOSSIP_DEV_DEBUG, "Skipping op tag %llu %s\n", llu(op->tag), get_opname_string(op));
                 continue;
             }
@@ -137,29 +129,21 @@ static ssize_t pvfs2_devreq_read(
              */
             else {
                 cur_op = op;
-                if ( !op_state_waiting(op) )
-                {
-                   spin_unlock(&op->lock);
-                   continue; /*check next op*/
-                }
-                tag = op->tag;
-                list_del(&op->list);
-                op->op_linger_tmp--;
+                spin_lock(&cur_op->lock);
+                list_del(&cur_op->list);
+                cur_op->op_linger_tmp--;
                 /* if there is a trailer, re-add it to the request list */
-                if (op->op_linger == 2 && op->op_linger_tmp == 1)
+                if (cur_op->op_linger == 2 && cur_op->op_linger_tmp == 1)
                 {
-                    /* re-add it to the head of the list */
-                    list_add(&op->list, &pvfs2_request_list);
-
-                    if (op->upcall.trailer_size <= 0 || op->upcall.trailer_buf == NULL)
+                    if (cur_op->upcall.trailer_size <= 0 || cur_op->upcall.trailer_buf == NULL) 
                     {
-                       spin_unlock(&op->lock);
-                       gossip_err("BUG:trailer_size is %ld and trailer buf is %p\n",
-                               (long) cur_op->upcall.trailer_size, cur_op->upcall.trailer_buf);
-                       break;
+                        gossip_err("BUG:trailer_size is %ld and trailer buf is %p\n",
+                                (long) cur_op->upcall.trailer_size, cur_op->upcall.trailer_buf);
                     }
+                    /* readd it to the head of the list */
+                    list_add(&cur_op->list, &pvfs2_request_list);
                 }
-                spin_unlock(&op->lock);
+                spin_unlock(&cur_op->lock);
                 break;
             }
         }
@@ -168,28 +152,22 @@ static ssize_t pvfs2_devreq_read(
 
     if (cur_op)
     {
-        gossip_debug(GOSSIP_DEV_DEBUG, "%s : client-core: reading op tag %llu %s\n"
-                                     , __func__, llu(cur_op->tag), get_opname_string(cur_op));
-
         spin_lock(&cur_op->lock);
 
-        if ( ! (op_state_waiting(cur_op) && cur_op->tag == tag) )
+        gossip_debug(GOSSIP_DEV_DEBUG, "client-core: reading op tag %llu %s\n", llu(cur_op->tag), get_opname_string(cur_op));
+        if (op_state_in_progress(cur_op) || op_state_serviced(cur_op))
         {
-           spin_unlock(&cur_op->lock);
-           gossip_err("%s : WARNING : Op is not in WAITING state but in state(%d); tag (%llu) should be (%llu)\n"
-                     ,__func__,cur_op->op_state,llu(cur_op->tag),llu(tag));
-           len = -EAGAIN;
-           goto exit_pvfs2_devreq_read;
+            if (cur_op->op_linger == 1)
+                gossip_err("WARNING: Current op already queued...skipping\n");
         }
-
-
-        if ( cur_op->op_linger == 1 ||
-           ( cur_op->op_linger == 2 && cur_op->op_linger_tmp == 0 ) ) 
+        else if (cur_op->op_linger == 1 
+                || (cur_op->op_linger == 2 && cur_op->op_linger_tmp == 0)) 
         {
             set_op_state_inprogress(cur_op);
 
             /* atomically move the operation to the htable_ops_in_progress */
-            qhash_add(htable_ops_in_progress, (void *) &(cur_op->tag), &cur_op->list);
+            qhash_add(htable_ops_in_progress,
+                      (void *) &(cur_op->tag), &cur_op->list);
         }
 
         spin_unlock(&cur_op->lock);
@@ -269,561 +247,334 @@ static ssize_t pvfs2_devreq_read(
         */
         len = -EAGAIN;
     }
-
-exit_pvfs2_devreq_read:
-
     return len;
 }
 
-#ifndef HAVE_IOV_ITER
+/* Common function for writev() and aio_write() callers into the device */
+static ssize_t pvfs2_devreq_writev(
+    struct file *file,
+    const struct iovec *iov,
+    unsigned long count,
+    loff_t *offset)
+{
+    pvfs2_kernel_op_t *op = NULL;
+    struct qhash_head *hash_link = NULL;
+    void *buffer = NULL;
+    void *ptr = NULL;
+    unsigned long i = 0;
+    static int max_downsize = MAX_ALIGNED_DEV_REQ_DOWNSIZE;
+    int ret = 0, num_remaining = max_downsize;
+    int notrailer_count = 4; /* number of elements in the iovec without the trailer */
+    int payload_size = 0;
+    int32_t magic = 0;
+    int32_t proto_ver = 0;
+    uint64_t tag = 0;
+    ssize_t total_returned_size = 0;
+
+    /* Either there is a trailer or there isn't */
+    if (count != notrailer_count && count != (notrailer_count + 1))
+    {
+        gossip_err("Error: Number of iov vectors is (%ld) and notrailer count is %d\n",
+                count, notrailer_count);
+        return -EPROTO;
+    }
+    buffer = dev_req_alloc();
+    if (!buffer)
+    {
+        return -ENOMEM;
+    }
+    ptr = buffer;
+
+    for (i = 0; i < notrailer_count; i++)
+    {
+        if (iov[i].iov_len > num_remaining)
+        {
+            gossip_err("writev error: Freeing buffer and returning\n");
+            dev_req_release(buffer);
+            return -EMSGSIZE;
+        }
+        ret = copy_from_user(ptr, iov[i].iov_base, iov[i].iov_len);
+        if (ret)
+        {
+            gossip_err("Failed to copy data from user space\n");
+            dev_req_release(buffer);
+            return -EIO;
+        }
+        num_remaining -= iov[i].iov_len;
+        ptr += iov[i].iov_len;
+        payload_size += iov[i].iov_len;
+    }
+    total_returned_size = payload_size;
+
+    /* these elements are currently 8 byte aligned (8 bytes for (version +  
+     * magic) 8 bytes for tag).  If you add another element, either make it 8
+     * bytes big, or use get_unaligned when asigning  */
+    ptr = buffer;
+    proto_ver = *((int32_t *)ptr);
+    ptr += sizeof(int32_t);
+
+    magic = *((int32_t *)ptr);
+    ptr += sizeof(int32_t);
+
+    tag = *((uint64_t *)ptr);
+    ptr += sizeof(uint64_t);
+
+    if (magic != PVFS2_DEVREQ_MAGIC)
+    {
+        gossip_err("Error: Device magic number does not match.\n");
+        dev_req_release(buffer);
+        return -EPROTO;
+    }
+    if (proto_ver != PVFS_KERNEL_PROTO_VERSION)
+    {
+        gossip_err("Error: Device protocol version numbers do not match.\n");
+        gossip_err("Please check that your pvfs2 module and pvfs2-client versions are consistent.\n");
+        dev_req_release(buffer);
+        return -EPROTO;
+    }
+
+
+    /* lookup (and remove) the op based on the tag */
+    hash_link = qhash_search_and_remove(htable_ops_in_progress, &(tag));
+    if (hash_link)
+    {
+        op = qhash_entry(hash_link, pvfs2_kernel_op_t, list);
+        if (op)
+        {
+            /* Increase ref count! */
+            get_op(op);
+            /* cut off magic and tag from payload size */
+            payload_size -= (2*sizeof(int32_t) + sizeof(uint64_t));
+            if (payload_size <= sizeof(pvfs2_downcall_t))
+            {
+                /* copy the passed in downcall into the op */
+                memcpy(&op->downcall, ptr, sizeof(pvfs2_downcall_t));
+            }
+            else
+            {
+                gossip_debug(GOSSIP_DEV_DEBUG, "writev: Ignoring %d bytes\n", payload_size);
+            }
+
+            /* Do not allocate needlessly if client-core forgets to reset trailer size on op errors */
+            if (op->downcall.status == 0 && op->downcall.trailer_size > 0)
+            {
+                gossip_debug(GOSSIP_DEV_DEBUG, "writev: trailer size %ld\n", (unsigned long) op->downcall.trailer_size);
+                if (count != (notrailer_count + 1))
+                {
+                    gossip_err("Error: trailer size (%ld) is non-zero, no trailer elements though? (%ld)\n",
+                            (unsigned long) op->downcall.trailer_size, count);
+                    dev_req_release(buffer);
+                    put_op(op);
+                    return -EPROTO;
+                }
+                if (iov[notrailer_count].iov_len > op->downcall.trailer_size)
+                {
+                    gossip_err("writev error: trailer size (%ld) != iov_len (%ld)\n",
+                            (unsigned long) op->downcall.trailer_size, 
+                            (unsigned long) iov[notrailer_count].iov_len);
+                    dev_req_release(buffer);
+                    put_op(op);
+                    return -EMSGSIZE;
+                }
+                /* Allocate a buffer large enough to hold the trailer bytes */
+                op->downcall.trailer_buf = (void *) vmalloc(op->downcall.trailer_size);
+                if (op->downcall.trailer_buf != NULL) 
+                {
+                    gossip_debug(GOSSIP_DEV_DEBUG, "vmalloc: %p\n", op->downcall.trailer_buf);
+                    ret = copy_from_user(op->downcall.trailer_buf, iov[notrailer_count].iov_base,
+                            iov[notrailer_count].iov_len);
+                    if (ret)
+                    {
+                        gossip_err("Failed to copy trailer data from user space\n");
+                        dev_req_release(buffer);
+                        gossip_debug(GOSSIP_DEV_DEBUG, "vfree: %p\n", op->downcall.trailer_buf);
+                        vfree(op->downcall.trailer_buf);
+                        op->downcall.trailer_buf = NULL;
+                        put_op(op);
+                        return -EIO;
+                    }
+                }
+                else {
+                    /* Change downcall status */
+                    op->downcall.status = -ENOMEM;
+                    gossip_err("writev: could not vmalloc for trailer!\n");
+                }
+            }
+
+            /*
+              if this operation is an I/O operation and if it was
+              initiated on behalf of a *synchronous* VFS I/O operation,
+              only then we need to wait
+              for all data to be copied before we can return to avoid
+              buffer corruption and races that can pull the buffers
+              out from under us.
+
+              Essentially we're synchronizing with other parts of the
+              vfs implicitly by not allowing the user space
+              application reading/writing this device to return until
+              the buffers are done being used.
+            */
+            if ((op->upcall.type == PVFS2_VFS_OP_FILE_IO 
+                    && op->upcall.req.io.async_vfs_io == PVFS_VFS_SYNC_IO) 
+                    || op->upcall.type == PVFS2_VFS_OP_FILE_IOX)
+            {
+                int timed_out = 0;
+                DECLARE_WAITQUEUE(wait_entry, current);
+                
+                /*
+                 * tell the vfs op waiting on a waitqueue 
+                 * that this op is done 
+                 */
+                spin_lock(&op->lock);
+                set_op_state_serviced(op);
+                spin_unlock(&op->lock);
+
+                add_wait_queue_exclusive(
+                    &op->io_completion_waitq, &wait_entry);
+                wake_up_interruptible(&op->waitq);
+
+                while(1)
+                {
+                    set_current_state(TASK_INTERRUPTIBLE);
+
+                    spin_lock(&op->lock);
+                    if (op->io_completed)
+                    {
+                        spin_unlock(&op->lock);
+                        break;
+                    }
+                    spin_unlock(&op->lock);
+
+                    if (!signal_pending(current))
+                    {
+                        int timeout = MSECS_TO_JIFFIES(
+                            1000 * op_timeout_secs);
+                        if (!schedule_timeout(timeout))
+                        {
+                            gossip_debug(GOSSIP_DEV_DEBUG, "*** I/O wait time is up\n");
+                            timed_out = 1;
+                            break;
+                        }
+                        continue;
+                    }
+
+                    gossip_debug(GOSSIP_DEV_DEBUG, "*** signal on I/O wait -- aborting\n");
+                    break;
+                }
+
+                set_current_state(TASK_RUNNING);
+                remove_wait_queue(&op->io_completion_waitq, &wait_entry);
+
+                /*
+                  NOTE: for I/O operations we handle releasing the op
+                  object except in the case of timeout.  the reason we
+                  can't free the op in timeout cases is that the op
+                  service logic in the vfs retries operations using
+                  the same op ptr, thus it can't be freed.
+                */
+                if (!timed_out)
+                {
+                    op_release(op);
+                }
+            }
+#ifdef HAVE_AIO_VFS_SUPPORT
+            else if (op->upcall.type == PVFS2_VFS_OP_FILE_IO
+                    && op->upcall.req.io.async_vfs_io == PVFS_VFS_ASYNC_IO)
+            {
+                pvfs2_kiocb *x = (pvfs2_kiocb *) op->priv;
+                if (x == NULL || x->iov == NULL 
+                        || x->op != op 
+                        || x->bytes_to_be_copied <= 0)
+                {
+                    if (x)
+                    {
+                        gossip_debug(GOSSIP_DEV_DEBUG, "WARNING: pvfs2_iocb from op"
+                                "has invalid fields! %p, %p(%p), %d\n",
+                                x->iov, x->op, op, (int) x->bytes_to_be_copied);
+                    }
+                    else
+                    {
+                        gossip_debug(GOSSIP_DEV_DEBUG, "WARNING: cannot retrieve the "
+                                "pvfs2_iocb pointer from op!\n");
+                    }
+                    /* Most likely means that it was cancelled! */
+                }
+                else
+                {
+                    int bytes_copied;
+
+                    if (op->downcall.status != 0)
+                    {
+                        ret = pvfs2_normalize_to_errno(
+                                op->downcall.status);
+                        bytes_copied = ret;
+                    }
+                    else {
+                        bytes_copied = op->downcall.resp.io.amt_complete;
+                    }
+                    gossip_debug(GOSSIP_DEV_DEBUG, "[AIO] status of transfer: %d\n", bytes_copied);
+                    if (x->rw == PVFS_IO_READ
+                            && bytes_copied > 0)
+                    {
+                        /* try and copy it out to user-space */
+                        bytes_copied = pvfs_bufmap_copy_to_user_task_iovec(
+                                x->tsk,
+                                x->iov, x->nr_segs,
+                                x->buffer_index,
+                                bytes_copied);
+                    }
+                    spin_lock(&op->lock);
+                    /* we tell VFS that the op is now serviced! */
+                    set_op_state_serviced(op);
+                    gossip_debug(GOSSIP_DEV_DEBUG, "Setting state of %p to %d [SERVICED]\n",
+                            op, op->op_state);
+                    x->bytes_copied = bytes_copied;
+                    /* call aio_complete to finish the operation to wake up regular aio waiters */
+                    aio_complete(x->kiocb, x->bytes_copied, 0);
+                    op->io_completed = 1;
+                    /* also wake up any aio cancellers that may be waiting for us to finish the op */
+                    wake_up_interruptible(&op->io_completion_waitq);
+                    spin_unlock(&op->lock);
+                }
+                put_op(op);
+            }
+#endif
+            else
+            {
+                
+                /* tell the vfs op waiting on a waitqueue that this op is done */
+                spin_lock(&op->lock);
+                set_op_state_serviced(op);
+                spin_unlock(&op->lock);
+                /*
+                  for every other operation (i.e. non-I/O), we need to
+                  wake up the callers for downcall completion
+                  notification
+                */
+                wake_up_interruptible(&op->waitq);
+            }
+        }
+    }
+    else
+    {
+        /* ignore downcalls that we're not interested in */
+        gossip_debug(GOSSIP_DEV_DEBUG, "WARNING: No one's waiting for tag %llu\n", llu(tag));
+    }
+    dev_req_release(buffer);
+
+    /* if we are called from aio context, just mark that the iocb is completed */
+    return total_returned_size;
+}
+
+#ifdef HAVE_COMBINED_AIO_AND_VECTOR
 /*
- * Old-fashioned (non iov_iter) function for writev() callers into the device.
- *
- * Userspace should have written:
- *  - __u32 version                      iov[0]
- *  - __u32 magic                        iov[1]
- *  - __u64 tag                          iov[2]
- *  - struct orangefs_downcall_s         iov[3]
- *  - trailer buffer (READDIR op only)   iov[4]
+ * Kernels >= 2.6.19 have no writev, use this instead with SYNC_KEY.
  */
 static ssize_t pvfs2_devreq_aio_write(struct kiocb *kiocb,
                                       const struct iovec *iov,
-                                      unsigned long count,
-                                      loff_t offset)
+                                      unsigned long count, loff_t offset)
 {
-    int i;
-    int ret = 0;
-    int total = 0;
-    struct {
-      __u32 version;
-      __u32 magic;
-      __u64 tag;
-    } head  = { 0 ,0, 0 };
-    int head_size = sizeof(head);
-    int bad_iov_len = 0;
-    int bad_iov_copy = 0;
-    static char *head_parts_names[] = {
-      "version",
-      "magic",
-      "tag"
-    };
-    int downcall_size = sizeof(pvfs2_downcall_t);
-    int downcall_iovec = 3;
-    int trailer_iovec = 4;
-
-    struct qhash_head *hash_link = NULL;
-    pvfs2_kernel_op_t *op = NULL;
-
-    gossip_debug(GOSSIP_DEV_DEBUG, "%s: count:%lu:\n", __func__, count);
-
-    /*
-     * Grind through the iovec array, make sure it is at least
-     * as big as it should be and fetch out version, magic and teg
-     * on the way through...
-     */
-    for (i = 0; i < count; i++) {
-
-      switch (i) {
-
-      case 0:
-
-        if (iov[i].iov_len != sizeof(head.version))
-          bad_iov_len = 1;
-	else
-          bad_iov_copy = copy_from_user(&(head.version),
-                                        (__u32 __user *)(iov[i].iov_base),
-                                        iov[i].iov_len);
-        break;
-
-      case 1:
-
-        if (iov[i].iov_len != sizeof(head.magic))
-          bad_iov_len = 1;
-	else
-          bad_iov_copy = copy_from_user(&(head.magic),
-                                        (__u32 __user *)(iov[i].iov_base),
-                                        iov[i].iov_len);
-        break;
-
-      case 2:
-
-        if (iov[i].iov_len != sizeof(head.tag))
-          bad_iov_len = 1;
-	else
-          bad_iov_copy = copy_from_user(&(head.tag),
-                                        (__u64 __user *)(iov[i].iov_base),
-                                        iov[i].iov_len);
-        break;
-
-      case 3:
-
-        if (iov[i].iov_len != downcall_size)
-          bad_iov_len = 1;
-        break;
-
-      default:
-        break;
-      }
-
-      if (bad_iov_len) {
-        gossip_err("%s: bad iov_len for %s, bailing.\n",
-                   __func__,
-                   head_parts_names[i]);
-        ret = -EFAULT;
-        goto out;
-      }
-
-      if (bad_iov_copy) {
-        gossip_err("%s: failed copy_from_user for %s, bailing.\n",
-                   __func__,
-                   head_parts_names[i]);
-        ret = -EFAULT;
-        goto out;
-      }
-
-      total = total + iov[i].iov_len;
-    }
-
-    ret = total;
-
-    if (total < MAX_DEV_REQ_DOWNSIZE) {
-      gossip_err("%s: total:%d: must be at least:%u:\n",
-                 __func__,
-                 total,
-                 (unsigned int) MAX_DEV_REQ_DOWNSIZE);
-      ret = -EFAULT;
-      goto out;
-    }
-
-    if (head.magic != PVFS2_DEVREQ_MAGIC) {
-      gossip_err("%s: bad magic.\n", __func__);
-      ret = -EFAULT;
-      goto out;
-    }
-
-    if (head.version != PVFS_KERNEL_PROTO_VERSION) {
-      gossip_err("%s: kernel module and userspace versions do not match.\n",
-                 __func__);
-      ret = -EFAULT;
-      goto out;
-    }
-
-    hash_link = qhash_search_and_remove(htable_ops_in_progress, &(head.tag));
-    if (!hash_link) {
-      gossip_debug(GOSSIP_DEV_DEBUG,"WARNING: No one's waiting for tag %llu\n", llu(head.tag));
-      goto out;
-    }
-
-    op = qhash_entry(hash_link, pvfs2_kernel_op_t, list);
-    if (!op) {
-      gossip_err("%s: got hash link, but no op.\n", __func__);
-      ret = -EPROTO;
-      goto out;
-    }
-
-    get_op(op); /* increase ref count. */
-
-    if (copy_from_user(&op->downcall,
-                      (pvfs2_downcall_t __user *)(iov[downcall_iovec].iov_base),
-                      iov[downcall_iovec].iov_len)) {
-      gossip_err("%s: failed to copy downcall.\n", __func__);
-      put_op(op);
-      ret = -EFAULT;
-      goto out;
-    }
-
-    if (op->downcall.status)
-      goto wakeup;
-
-    /*
-     * We've successfully peeled off the head and the downcall.
-     * Something has gone awry if total doesn't equal the
-     * sum of head_size, downcall_size and trailer_size.
-     */
-    if ((head_size + downcall_size + op->downcall.trailer_size) != total) {
-      gossip_err("%s: funky write, head_size:%d: downcall_size:%d: "
-                 "trailer_size:%lld: total size:%d:\n",
-                 __func__,
-                 head_size,
-                 downcall_size,
-                 op->downcall.trailer_size,
-                 total);
-      put_op(op);
-      ret = -EFAULT;
-      goto out;
-    }
-
-    /* Only READDIR operations should have trailers. */
-    if ((op->downcall.type != PVFS2_VFS_OP_READDIR) &&
-        (op->downcall.trailer_size != 0)) {
-            gossip_err("%s: %x operation with trailer.",
-                       __func__,
-                       op->downcall.type);
-            put_op(op);
-            ret = -EFAULT;
-            goto out;
-    }
-
-    /* READDIR operations should always have trailers. */
-    if ((op->downcall.type == PVFS2_VFS_OP_READDIR) &&
-        (op->downcall.trailer_size == 0)) {
-      gossip_err("%s: %x operation with no trailer.",
-                 __func__,
-                 op->downcall.type);
-      put_op(op);
-      ret = -EFAULT;
-      goto out;
-    }
-
-    if (op->downcall.type != PVFS2_VFS_OP_READDIR)
-      goto wakeup;
-
-    op->downcall.trailer_buf = vmalloc(op->downcall.trailer_size);
-    if (op->downcall.trailer_buf == NULL) {
-      gossip_err("%s: failed trailer vmalloc.\n", __func__);
-      put_op(op);
-      ret = -ENOMEM;
-      goto out;
-    }
-    memset(op->downcall.trailer_buf, 0, op->downcall.trailer_size);
-
-    if (copy_from_user(op->downcall.trailer_buf,
-                       (char __user *)(iov[trailer_iovec].iov_base),
-                       iov[trailer_iovec].iov_len)) {
-      gossip_err("%s: failed to copy trailer.\n", __func__);
-      vfree(op->downcall.trailer_buf);
-      put_op(op);
-      ret = -EFAULT;
-      goto out;
-    }
-
-wakeup:
-
-    /*
-     * If this operation is an I/O operation we need to wait
-     * for all data to be copied before we can return to avoid
-     * buffer corruption and races that can pull the buffers
-     * out from under us.
-     *
-     * Essentially we're synchronizing with other parts of the
-     * vfs implicitly by not allowing the user space
-     * application reading/writing this device to return until
-     * the buffers are done being used.
-     */
-    if (op->downcall.type == PVFS2_VFS_OP_FILE_IO) {
-      int timed_out = 0;
-      DECLARE_WAITQUEUE(wait_entry, current);
-    
-      /*
-       * tell the vfs op waiting on a waitqueue
-       * that this op is done
-       */
-      spin_lock(&op->lock);
-      set_op_state_serviced(op);
-      spin_unlock(&op->lock);
-    
-      add_wait_queue_exclusive(&op->io_completion_waitq, &wait_entry);
-      wake_up_interruptible(&op->waitq);
-    
-      while (1) {
-        set_current_state(TASK_INTERRUPTIBLE);
-
-        spin_lock(&op->lock);
-        if (op->io_completed) {
-          spin_unlock(&op->lock);
-          break;
-        }
-        spin_unlock(&op->lock);
-    
-        if (!signal_pending(current)) {
-          int timeout = MSECS_TO_JIFFIES(1000 * op_timeout_secs);
-          if (!schedule_timeout(timeout)) {
-            gossip_debug(GOSSIP_DEV_DEBUG, "%s: timed out.\n", __func__);
-            timed_out = 1;
-            break;
-          }
-          continue;
-        }
- 
-        gossip_debug(GOSSIP_DEV_DEBUG,
-                     "%s: signal on I/O wait, aborting\n",
-                     __func__);
-        break;
-      }
-
-      set_current_state(TASK_RUNNING);
-      remove_wait_queue(&op->io_completion_waitq, &wait_entry);
-    
-      /* NOTE: for I/O operations we handle releasing the op
-       * object except in the case of timeout.  the reason we
-       * can't free the op in timeout cases is that the op
-       * service logic in the vfs retries operations using
-       * the same op ptr, thus it can't be freed.
-       */
-      if (!timed_out)
-        op_release(op);
-    } else {
-      /*
-       * tell the vfs op waiting on a waitqueue that
-       * this op is done
-       */
-      spin_lock(&op->lock);
-      set_op_state_serviced(op);
-      spin_unlock(&op->lock);
-      /*
-       * for every other operation (i.e. non-I/O), we need to
-       * wake up the callers for downcall completion
-       * notification
-       */
-      wake_up_interruptible(&op->waitq);
-    }
-
-out:
-
-    return ret;
-}
-#endif
-
-#ifdef HAVE_IOV_ITER
-/*
- * Function for writev() callers into the device.
- *
- * Userspace should have written:
- *  - __u32 version
- *  - __u32 magic
- *  - __u64 tag
- *  - struct orangefs_downcall_s
- *  - trailer buffer (in the case of READDIR operations)
- */
-static ssize_t pvfs2_devreq_write_iter(struct kiocb *iocb,
-                                      struct iov_iter *iter)
-{
-	ssize_t ret;
-	pvfs2_kernel_op_t *op = NULL;
-	struct {
-		__u32 version;
-		__u32 magic;
-		__u64 tag;
-	} head;
-	int total = ret = iov_iter_count(iter);
-	int n;
-	int downcall_size = sizeof(pvfs2_downcall_t);
-	int head_size = sizeof(head);
-	struct qhash_head *hash_link = NULL;
-
-	gossip_debug(GOSSIP_DEV_DEBUG, "%s: total:%d: ret:%zd:\n",
-		     __func__,
-		     total,
-		     ret);
-
-        if (total < MAX_DEV_REQ_DOWNSIZE) {
-		gossip_err("%s: total:%d: must be at least:%lu:\n",
-			   __func__,
-			   total,
-			   MAX_DEV_REQ_DOWNSIZE);
-		ret = -EFAULT;
-		goto out;
-	}
-     
-	n = copy_from_iter(&head, head_size, iter);
-	if (n < head_size) {
-		gossip_err("%s: failed to copy head.\n", __func__);
-		ret = -EFAULT;
-		goto out;
-	}
-
-	gossip_debug(GOSSIP_DEV_DEBUG,
-		     "%s: userspace claims version:%d:\n",
-		     __func__,
-		     head.version);
-
-	if (head.magic != PVFS2_DEVREQ_MAGIC) {
-		gossip_err("Error: Device magic number does not match.\n");
-		ret = -EPROTO;
-		goto out;
-	}
-
-	hash_link =
-		qhash_search_and_remove(htable_ops_in_progress, &(head.tag));
-	if (!hash_link) {
-		gossip_debug(GOSSIP_DEV_DEBUG,"WARNING: No one's waiting for tag %llu\n",
-			   llu(head.tag));
-		goto out;
-	}
-
-	op = qhash_entry(hash_link, pvfs2_kernel_op_t, list);
-	if (!op) {
-		gossip_err("%s: got hash link, but no op.\n", __func__);
-		ret = -EPROTO;
-		goto out;
-	}
-
-	get_op(op); /* increase ref count. */
-
-	n = copy_from_iter(&op->downcall, downcall_size, iter);
-	if (n != downcall_size) {
-		gossip_err("%s: failed to copy downcall.\n", __func__);
-		put_op(op);
-		ret = -EFAULT;
-		goto out;
-	}
-
-	if (op->downcall.status)
-		goto wakeup;
-
-	/*
-	 * We've successfully peeled off the head and the downcall. 
-	 * Something has gone awry if total doesn't equal the
-	 * sum of head_size, downcall_size and trailer_size.
-	 */
-	if ((head_size + downcall_size + op->downcall.trailer_size) != total) {
-		gossip_err("%s: funky write, head_size:%d"
-			   ": downcall_size:%d: trailer_size:%lld"
-			   ": total size:%d:\n",
-			   __func__,
-			   head_size,
-			   downcall_size,
-			   op->downcall.trailer_size,
-			   total);
-		put_op(op);
-		ret = -EFAULT;
-		goto out;
-	}
-
-	/* Only READDIR operations should have trailers. */
-	if ((op->downcall.type != PVFS2_VFS_OP_READDIR) &&
-	    (op->downcall.trailer_size != 0)) {
-		gossip_err("%s: %x operation with trailer.",
-			   __func__,
-			   op->downcall.type);
-		put_op(op);
-		ret = -EFAULT;
-		goto out;
-	}
-
-	/* READDIR operations should always have trailers. */
-	if ((op->downcall.type == PVFS2_VFS_OP_READDIR) &&
-	    (op->downcall.trailer_size == 0)) {
-		gossip_err("%s: %x operation with no trailer.",
-			   __func__,
-			   op->downcall.type);
-		put_op(op);
-		ret = -EFAULT;
-		goto out;
-	}
-
-	if (op->downcall.type != PVFS2_VFS_OP_READDIR)
-		goto wakeup;
-
-	op->downcall.trailer_buf =
-		vmalloc(op->downcall.trailer_size);
-	if (op->downcall.trailer_buf == NULL) {
-		gossip_err("%s: failed trailer vmalloc.\n",
-			   __func__);
-		put_op(op);
-		ret = -ENOMEM;
-		goto out;
-	}
-	memset(op->downcall.trailer_buf, 0, op->downcall.trailer_size);
-	n = copy_from_iter(op->downcall.trailer_buf,
-			   op->downcall.trailer_size,
-			   iter);
-	if (n != op->downcall.trailer_size) {
-		gossip_err("%s: failed to copy trailer.\n", __func__);
-		vfree(op->downcall.trailer_buf);
-		put_op(op);
-		ret = -EFAULT;
-		goto out;
-	}
-
-wakeup:
-
-	/*
-	 * If this operation is an I/O operation we need to wait
-	 * for all data to be copied before we can return to avoid
-	 * buffer corruption and races that can pull the buffers
-	 * out from under us.
-	 *
-	 * Essentially we're synchronizing with other parts of the
-	 * vfs implicitly by not allowing the user space
-	 * application reading/writing this device to return until
-	 * the buffers are done being used.
-	 */
-	if (op->downcall.type == PVFS2_VFS_OP_FILE_IO) {
-		int timed_out = 0;
-		DEFINE_WAIT(wait_entry);
-
-		/*
-		 * tell the vfs op waiting on a waitqueue
-		 * that this op is done
-		 */
-		spin_lock(&op->lock);
-		set_op_state_serviced(op);
-		spin_unlock(&op->lock);
-
-		wake_up_interruptible(&op->waitq);
-
-		while (1) {
-			spin_lock(&op->lock);
-			prepare_to_wait_exclusive(
-				&op->io_completion_waitq,
-				&wait_entry,
-				TASK_INTERRUPTIBLE);
-			if (op->io_completed) {
-				spin_unlock(&op->lock);
-				break;
-			}
-			spin_unlock(&op->lock);
-
-			if (!signal_pending(current)) {
-				int timeout =
-				    MSECS_TO_JIFFIES(1000 *
-						     op_timeout_secs);
-				if (!schedule_timeout(timeout)) {
-					gossip_debug(GOSSIP_DEV_DEBUG,
-						"%s: timed out.\n",
-						__func__);
-					timed_out = 1;
-					break;
-				}
-				continue;
-			}
-
-			gossip_debug(GOSSIP_DEV_DEBUG,
-				"%s: signal on I/O wait, aborting\n",
-				__func__);
-			break;
-		}
-
-		spin_lock(&op->lock);
-		finish_wait(&op->io_completion_waitq, &wait_entry);
-		spin_unlock(&op->lock);
-
-		/* NOTE: for I/O operations we handle releasing the op
-		 * object except in the case of timeout.  the reason we
-		 * can't free the op in timeout cases is that the op
-		 * service logic in the vfs retries operations using
-		 * the same op ptr, thus it can't be freed.
-		 */
-		if (!timed_out)
-			op_release(op);
-	} else {
-		/*
-		 * tell the vfs op waiting on a waitqueue that
-		 * this op is done
-		 */
-		spin_lock(&op->lock);
-		set_op_state_serviced(op);
-		spin_unlock(&op->lock);
-		/*
-		 * for every other operation (i.e. non-I/O), we need to
-		 * wake up the callers for downcall completion
-		 * notification
-		 */
-		wake_up_interruptible(&op->waitq);
-	}
-out:
-	return ret;
+    return pvfs2_devreq_writev(kiocb->ki_filp, iov, count, &kiocb->ki_pos);
 }
 #endif
 
@@ -1413,10 +1164,10 @@ struct file_operations pvfs2_devreq_file_operations =
     poll : pvfs2_devreq_poll
 #else
     .read = pvfs2_devreq_read,
-#ifdef HAVE_IOV_ITER
-    .write_iter = pvfs2_devreq_write_iter,
-#else
+#ifdef HAVE_COMBINED_AIO_AND_VECTOR
     .aio_write = pvfs2_devreq_aio_write,
+#else
+    .writev = pvfs2_devreq_writev,
 #endif
     .open = pvfs2_devreq_open,
     .release = pvfs2_devreq_release,

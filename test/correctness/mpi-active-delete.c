@@ -25,7 +25,6 @@
 
 /* DEFAULT VALUES FOR OPTIONS */
 static char opt_dir[256] = "";
-static int iterations = 10;
 
 /* function prototypes */
 static int parse_args(
@@ -46,13 +45,9 @@ int main(
 {
     int fd;
     char file[256];
-    char error_msg[512];
     char* buf;
     int ret;
     int current_deleter = 0;
-    int delete_tries=0;
-    unsigned int DELETE_MAX=10;
-    int increase_sleep_time=0;
 
     /* startup MPI and determine the rank of this process */
     MPI_Init(&argc, &argv);
@@ -69,58 +64,27 @@ int main(
     /* parse the command line arguments */
     parse_args(argc, argv);
 
-    int i;
-    /* Parent does <iterations> number of deletes, then aborts*/
     if (mynod == 0)
     {
-    	for (i=0; i < iterations; i++)
+        while(1)
         {
             current_deleter++;
             current_deleter = current_deleter % nprocs;
             if(current_deleter == 0)
-            {
                 current_deleter ++;
-            }
+
+            sleep(SLEEP_TIME);
             sprintf(file, "%s/%d", opt_dir, current_deleter);
-            delete_tries=0;
-            increase_sleep_time=0;
-            while (1)
+            fprintf(stderr, "Deleting: %s\n", file);
+
+            ret = unlink(file);
+            if(ret < 0)
             {
-               delete_tries++;
-               sleep(SLEEP_TIME+increase_sleep_time);
-               fprintf(stderr, "Deleting: %s: try #%d sleep time increase(%d)\n", file, delete_tries,increase_sleep_time);
-               increase_sleep_time += 30;
-
-               ret = unlink(file);
-               if(ret < 0)
-               {
-                  if (delete_tries > DELETE_MAX || errno != ENOENT)
-                  {
-                     sprintf(error_msg,"unlink %s",file);
-            	     perror(error_msg);
-                     MPI_Abort(MPI_COMM_WORLD, 1);
-                     break;
-                  }
-                  else 
-                  {
-                    /* retry the unlink.  It is possible that the other process
-                     * on this same machine hasn't been given the opportunity to 
-                     * create its file.  So, lets try it again!
-                     */
-                    continue;
-                  }
-               }
-               break;
-            }/*end while*/
-        }/*end for*/
-
-    	fprintf(stderr, "Successfully completed %d of %d iterations.\n", i,iterations);
-    	fprintf(stderr, "Calling MPI_Abort and returning success (0). Ugly, but effective.\n");
-    	MPI_Abort(MPI_COMM_WORLD, 0);
-
-
+                perror("unlink");
+                MPI_Abort(MPI_COMM_WORLD, 1);
+            }
+        }
     }
-    /* Children will read and recreate files forever until parent aborts*/
     else
     {
         buf = malloc(1024*1024);
@@ -134,19 +98,11 @@ int main(
 
         while(1)
         {
-
-
-        	fd = open(file, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
-
+            fd = open(file, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
             if(fd < 0)
             {
-                sprintf(error_msg,"open %s",file);
-            	perror(error_msg);
+                perror("open");
                 MPI_Abort(MPI_COMM_WORLD, 1);
-            }
-            else
-            {
-            	fprintf(stderr, "Opened file %s: node %d.\n",file,mynod);
             }
 
             while(1)
@@ -154,33 +110,20 @@ int main(
                 ret = write(fd, buf, 1024*1024);
                 if(ret < 0)
                 {
-                    sprintf(error_msg,"write %s ... continuing ...",file);
-                	perror(error_msg);
+                    perror("write");
+                    fprintf(stderr, "... continuing ...");
                     sleep(SLEEP_TIME/2);
                     break;
                 }
-                /*
-                else
-				{
-					fprintf(stderr, "node %d wrote %s successfully\n", mynod,file);
-				}
-				*/
                 ret = read(fd, buf, 1024*1024);
                 if(ret < 0)
                 {
-                    sprintf(error_msg,"read %s",file);
-                	perror(error_msg);
+                    perror("read");
+                    fprintf(stderr, "... continuing ...");
                     sleep(SLEEP_TIME/2);
                     break;
                 }
-                /*
-                else
-                {
-                	fprintf(stderr, "node %d read %s successfully\n", mynod,file);
-                }
-                */
             }
-
         }
     }
 
@@ -194,21 +137,17 @@ static int parse_args(
 {
     int c;
 
-    while ((c = getopt(argc, argv, "i:d:h")) != EOF)
+    while ((c = getopt(argc, argv, "d:h")) != EOF)
     {
         switch (c)
         {
         case 'd':      /* dir */
             strncpy(opt_dir, optarg, 255);
             break;
-        case 'i':
-        	iterations = atoi(optarg);
-        	break;
         case 'h':
             if (mynod == 0)
                 usage();
             exit(0);
-
         case '?':      /* unknown */
             if (mynod == 0)
                 usage();
@@ -226,9 +165,7 @@ static void usage(
     printf("Usage: mpi-active-delete [<OPTIONS>...]\n");
     printf("\n<OPTIONS> is one of\n");
     printf(" -d       directory to place test files in\n");
-    printf(" -i       number of iterations\n");
     printf(" -h       print this help\n");
-
 }
 
 /*

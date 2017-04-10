@@ -12,8 +12,8 @@
 #ifndef __ORANGE_H
 #define __ORANGE_H
 
-#include "pvfs2.h"
 #include "pvfs2-usrint.h"
+#include "pvfs2.h"
 
 #endif /* __ORANGE_H */
 

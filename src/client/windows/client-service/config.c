@@ -62,7 +62,6 @@ static KEYWORD_CB(threads);
 static KEYWORD_CB(user_mode);
 static KEYWORD_CB(user);
 static KEYWORD_CB(perms);
-static KEYWORD_CB(write_time);
 static KEYWORD_CB(debug);
 static KEYWORD_CB(security_mode);
 static KEYWORD_CB(key_file);
@@ -79,7 +78,6 @@ CONFIG_KEYWORD_DEF config_keyword_defs[] =
     { "user", keyword_cb_user },
     { "new-file-perms", keyword_cb_perms },
     { "new-dir-perms", keyword_cb_perms },
-    { "disable-update-write-time", keyword_cb_write_time },
     { "debug", keyword_cb_debug },
     { "debug-stderr", keyword_cb_debug },
     { "debug-file", keyword_cb_debug },
@@ -349,13 +347,6 @@ static KEYWORD_CB(perms)
     {
         options->new_dir_perms = (unsigned int) mask;
     }
-
-    return 0;
-}
-
-static KEYWORD_CB(write_time)
-{
-    options->disable_update_write_time = TRUE;
 
     return 0;
 }

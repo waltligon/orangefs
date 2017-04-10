@@ -365,8 +365,6 @@ static int hash_compare(const void *key, struct qhash_head *link)
 
 /* What we do in this function is to walk the list of operations that are in progress
  * in the hash table and mark them as purged as well.
- * This function is only called when /dev/pvfs2-req file is closed, which can happen when
- * the client is shutdown OR when the client aborts.
  */
 void purge_inprogress_ops(void)
 {
@@ -378,16 +376,9 @@ void purge_inprogress_ops(void)
         qhash_for_each_safe(tmp_link, scratch, &(htable_ops_in_progress->array[i]))
         {
             pvfs2_kernel_op_t *op = qhash_entry(tmp_link, pvfs2_kernel_op_t, list);
+            spin_lock(&op->lock);
             gossip_debug(GOSSIP_INIT_DEBUG, "pvfs2-client-core: purging in-progress op tag %llu %s\n",
                     llu(op->tag), get_opname_string(op));
-            spin_lock(&op->lock);
-            if ( !op_state_in_progress(op) )
-            {
-               /* if this op is NOT in the inprogress state but is still on this list, then */
-               /* this op is being handled by pvfs2_clean_up_interrupted_operation.         */
-               spin_unlock(&op->lock);
-               continue;
-            }
             set_op_state_purged(op);
             spin_unlock(&op->lock);
             wake_up_interruptible(&op->waitq);

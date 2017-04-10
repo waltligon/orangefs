@@ -1,5 +1,4 @@
 dnl **************************************************************
-dnl
 dnl PVFS2 AUTOCONF SCRIPT
 dnl
 dnl Process this file with autoconf to produce a configure script.
@@ -19,10 +18,10 @@ dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=3
 PVFS2_VERSION_MINOR=0
-PVFS2_VERSION_SUB=6
+PVFS2_VERSION_SUB=2
 PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
-PVFS2_VERSION_PRE="-DEVEL-$CONFIGURE_TIME"
+#PVFS2_VERSION_PRE="orangefs-$CONFIGURE_TIME"
 
 PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE$PVFS2_VERSION_PRE
 AC_SUBST(PVFS2_VERSION)
@@ -257,30 +256,13 @@ AC_ARG_ENABLE(server,
 [  --disable-server        Disables building of PVFS2 server],
 [if test "x$enableval" = "xyes" ; then
     BUILD_SERVER=1
+    NEED_BERKELEY_DB=yes
 else
     BUILD_SERVER=""
 fi],
-    BUILD_SERVER=1)
+    BUILD_SERVER=1
+    NEED_BERKELEY_DB=yes)
 AC_SUBST(BUILD_SERVER)
-
-AC_ARG_WITH(db-backend,
-[  --with-db-backend        Use specified database (bdb or lmdb).],
-if test "${withval}" = "bdb"
-then
-    DATABASE_BACKEND=bdb
-    NEED_BERKELEY_DB=yes
-elif test "${withval}" = "lmdb"
-then
-    DATABASE_BACKEND=lmdb
-else
-    AC_MSG_ERROR(database backend ${withval} invalid)
-fi
-AC_SUBST(DATABASE_BACKEND)
-AC_SUBST(NEED_BERKELEY_DB),
-DATABASE_BACKEND=bdb
-NEED_BERKELEY_DB=yes
-AC_SUBST(DATABASE_BACKEND)
-AC_SUBST(NEED_BERKELEY_DB))
 
 dnl locate OpenSSL libraries
 AX_OPENSSL
@@ -431,7 +413,9 @@ AC_SUBST(BUILD_BMI_ONLY)
 dnl if we're only building the BMI lib, disable checks for server and DB.
 if test "x$BUILD_BMI_ONLY" = "x1"; then
 	BUILD_SERVER=""
+	NEED_BERKELEY_DB=no
 	AC_SUBST(BUILD_SERVER)
+	AC_SUBST(NEED_BERKELEY_DB)
 fi
 
 dnl a mechanism to turn off perf counters
@@ -442,15 +426,16 @@ AC_ARG_ENABLE(perf-counters,
 fi]
 ,)
 
-dnl a mechanism to turn on readahead caching (for kernel interface)
-RA_CACHE=""
-AC_ARG_ENABLE(racache,
-[  --enable-racache        Enables readahead in the Client Core ],
+dnl a mechanism to turn on mmap-readahead caching (for kernel interface)
+MMAP_RA_CACHE=""
+AC_ARG_ENABLE(mmap-racache,
+[  --enable-mmap-racache   **EXPERIMENTAL** Enables mmap-readahead in kernel 
+                          interface],
 [if test "x$enableval" = "xyes" ; then
-RA_CACHE="-DUSE_RA_CACHE"
+MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
 fi]
 ,)
-AC_SUBST(RA_CACHE)
+AC_SUBST(MMAP_RA_CACHE)
 
 dnl a mechanism that resets the file position pointer when an error occurs whether
 dnl or not any bytes were written (kernel interface only).
@@ -458,9 +443,8 @@ RESET_FILE_POS=""
 AC_ARG_ENABLE(reset-file-pos,
 [  --enable-reset-file-pos Resets file position pointer in kernel interface upon error],
 [if test "x$enableval" = "xyes" ; then
-    RESET_FILE_POS="-DRESET_FILE_POS"
- fi
-]
+RESET_FILE_POS="-DRESET_FILE_POS"
+fi]
 ,)
 AC_SUBST(RESET_FILE_POS)
 
@@ -500,21 +484,14 @@ test_for_karma()
 }
 
 dnl optionally disable building the karma gui
-dnl AC_ARG_ENABLE(karma,
-dnl [  --disable-karma         Disables optional gui.  (Enabled by default)],
-dnl [ if test "x$enableval" = "xyes" ; then
-dnl       test_for_karma
-dnl    fi
-dnl ],
-dnl [test_for_karma]
-dnl )
-
 AC_ARG_ENABLE(karma,
-[  --enable-karma          Enables optional gui.  (Disabled by default)],
+[  --disable-karma         Disables optional gui.  (Enabled by default)],
 [ if test "x$enableval" = "xyes" ; then
       test_for_karma
-  fi
-])
+   fi
+],
+[test_for_karma]
+)
 
 dnl NOTE: removing the linux-gnu host check for now; we may want to put it back
 dnl before releaseing any code, though...  -Phil
@@ -719,6 +696,12 @@ AC_ARG_WITH(mtrace,
 [  --with-mtrace           Use mtrace (must set MALLOC_TRACE to output file)],
 CFLAGS="$CFLAGS -include mcheck.h"
 AC_DEFINE(WITH_MTRACE, 1, Define if mtrace memory leak detection was enabled)
+)
+
+dnl This particular one enables berkeley db to emit detected errors
+AC_ARG_WITH(berkdb-debug,
+[  --with-berkdb-debug     Use berkeley db error reporting (if detected).],
+AC_DEFINE(BERKDB_ERROR_REPORTING, 1, Define if berkeley db error reporting was enabled)
 )
 
 TAU_INCS=
@@ -1060,9 +1043,9 @@ fi
 dnl shared or static client library
 AC_ARG_ENABLE(threaded,
     [  --disable-threaded      Do not build threaded client library],
-    [if test "x$THREADED_KMOD_HELPER" = "xyes" ; then
+    [if "x$THREADED_KMOD_HELPER = xyes" ; then
          build_threaded=yes
-         AC_MSG_WARN([Ignoring --disable-threaded in favor of --enable-threaded-kmod-helper.])
+         AC_MSG_WARN([Ignoring --disable-threaded in favor of --enable-threaded-kmod-heaper.])
      else
          build_threaded=$enableval
      fi
@@ -1188,22 +1171,6 @@ fi],
 [AC_DEFINE(PVFS_MALLOC_REDEF, 1,
       [Should we redefine malloc.])
 MALLOC_REDEF=1
-])
-
-dnl Method to disable malloc debug
-AC_ARG_ENABLE(malloc-debug,
-[  --disable-malloc-debug  Do not compile in malloc debug tracing],
-[if test "x$enableval" = "xyes" ; then
-   AC_DEFINE(PVFS_MALLOC_DEBUG, 1,
-      [Should we compile in malloc debug tracing.])
-   MALLOC_DEBUG=1
-else
-   AC_DEFINE(PVFS_MALLOC_DEBUG, 0,
-      [Should we compile in malloc debug tracing.])
-fi],
-[AC_DEFINE(PVFS_MALLOC_DEBUG, 1,
-      [Should we compile in malloc debug tracing.])
-MALLOC_DEBUG=1
 ])
 
 dnl Method to disable malloc checking a magic number
@@ -1882,7 +1849,6 @@ AC_OUTPUT(include/pvfs2.h
 Makefile
 module.mk
 src/apps/admin/module.mk
-src/apps/admin/lmdb/module.mk
 src/apps/admin/pvfs2-config
 src/apps/devel/module.mk
 src/apps/karma/module.mk
@@ -1909,7 +1875,6 @@ src/common/sidcache/module.mk
 src/common/policycomp/module.mk
 src/common/hash/module.mk
 src/common/token-utils/module.mk
-src/common/lmdb/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
@@ -2026,10 +1991,10 @@ else
    AC_MSG_RESULT([PVFS2 configured for the 2.4.x kernel module      : yes])
 fi
 
-if test "x$RA_CACHE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
-   AC_MSG_RESULT([PVFS2 configured for using the ra-cache           :  no])
+if test "x$MMAP_RA_CACHE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
+   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      :  no])
 else
-   AC_MSG_RESULT([PVFS2 configured for using the ra-cache           : yes])
+   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      : yes])
 fi
 
 if test "x$RESET_FILE_POS" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then

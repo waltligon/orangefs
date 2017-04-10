@@ -31,20 +31,15 @@
 
 #define PVFS_USER_CERT_KEY_SIZE    1024
 
-/*
- * Now included from client-state-machine.h
- */
-#if 0
 extern job_context_id pint_client_sm_context;
-#endif
 
 static int public_key_comp_fn(void* v_p,
-                              struct PVFS_server_resp *resp_p,
-                              int i);
+				              struct PVFS_server_resp *resp_p,
+				              int i);
 
 static int userid_pwd_comp_fn(void* v_p,
-                              struct PVFS_server_resp *resp_p,
-                              int i);
+				              struct PVFS_server_resp *resp_p,
+				              int i);
 
 %%
 

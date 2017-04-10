@@ -27,12 +27,7 @@
 #include "sid.h"
 #include "pvfs-path.h"
 
-/*
- * Now included from client-state-machine.h
- */
-#if 0
 extern job_context_id pint_client_sm_context;
-#endif
 
 #define GET_CURRENT_CONTEXT(__sm_p)                                          \
 (&(__sm_p->u.lookup.contexts[__sm_p->u.lookup.current_context]))

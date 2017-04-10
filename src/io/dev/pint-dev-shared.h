@@ -95,7 +95,7 @@ struct PVFS_dev_map_desc
  * Disable this code when not compiling for the use of the linux kernel
  * module helper code.  Not all client machines have ioctl, poll.
  */
-#ifdef __linux__
+#ifdef WITH_LINUX_KMOD
 
 #define PVFS_DEV_MAGIC 'k'
 
@@ -136,7 +136,7 @@ PVFS_DEV_CLIENT_STRING    = _IOW(PVFS_DEV_MAGIC,
 PVFS_DEV_MAXNR            = DEV_MAX_NR,
 };
 
-#endif  /* __linux__ */
+#endif  /* WITH_LINUX_KMOD */
 
 #endif /* __PINT_DEV_SHARED_H */
 

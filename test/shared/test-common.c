@@ -30,14 +30,7 @@ static char pvfsEXELocation[PATH_MAX]; /* Used to prefix the command line
 static void copy_pvfs2_to_stat(
     const PVFS_sys_attr * attr,
     struct stat         * fileStats);
-
 static void display_common_usage(char* exeName);
-
-int create_directory_intl(const char * directory,
-                          const int    mode,    
-                          const int    use_pvfs2_lib,
-                          const int    verbose, 
-	                  const int	create_path);
 
 #define WHITE_SPACE "\t \n\r"
 

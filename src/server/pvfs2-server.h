@@ -35,12 +35,11 @@
 #include "state-machine.h"
 #include "pint-event.h"
 #include "server-config.h"
-#include "pint-perf-counter.h"
 
 
 extern job_context_id server_job_context;
 
-#define PVFS2_SERVER_DEFAULT_TIMEOUT_MS      1000
+#define PVFS2_SERVER_DEFAULT_TIMEOUT_MS      100
 #define BMI_UNEXPECTED_OP                    999
 
 /* BMI operation timeout if not specified in config file */
@@ -118,7 +117,7 @@ enum
  *
  * WBL V3 Uncomment this declaration if it doesn't cause problems
  */
-extern PINT_server_trove_keys_s Trove_Special_Keys[];
+/* extern PINT_server_trove_keys_s Trove_Special_Keys[]; */
 /* optional; user-settable keys */
 enum 
 {
@@ -440,11 +439,6 @@ struct PINT_server_crdirent_op
     PVFS_handle *remote_dirdata_handles;
 };
 
-struct PINT_server_setattr_op
-{
-    PVFS_handle *remote_dirdata_handles;
-};
-
 struct PINT_server_rmdirent_op
 {
     PVFS_handle dirdata_handle;
@@ -579,7 +573,7 @@ struct PINT_server_mkdir_op
     PVFS_fs_id fs_id;
     PVFS_handle handle;        /* metadata handle passed by request */
     PVFS_size init_dirdata_size;
-    PVFS_capability server_to_server_capability;
+    PVFS_capability *saved_capability;
     PVFS_object_attr *saved_attr;
 
     /* dist-dir-struct
@@ -669,12 +663,6 @@ struct PINT_server_mgmt_create_root_dir_op
     int handle_index;
 };
 
-struct PINT_server_perf_update_op
-{
-    struct PINT_perf_counter *pc;
-    struct PINT_perf_counter *tpc;
-};
-
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -687,9 +675,7 @@ typedef struct PINT_server_op
 
     enum PVFS_server_op op;  /* type of operation that we are servicing */
 
-    /* variables used for monitoring and timing requests */
     PINT_event_id event_id;
-    struct timespec start_time;     /* start time of a timer in ns */
 
     /* holds id from request scheduler so we can release it later */
     job_id_t scheduled_id; 
@@ -737,6 +723,8 @@ typedef struct PINT_server_op
     PVFS_fs_id target_fs_id;
     PVFS_object_attr *target_object_attr;
 
+    PINT_prelude_flag prelude_mask;
+
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
     
@@ -759,7 +747,7 @@ typedef struct PINT_server_op
         struct PINT_server_getconfig_op getconfig;
         struct PINT_server_lookup_op lookup;
         struct PINT_server_crdirent_op crdirent;
-        struct PINT_server_setattr_op setattr;
+        /* struct PINT_server_setattr_op setattr; */
         struct PINT_server_readdir_op readdir;
         struct PINT_server_remove_op remove;
         struct PINT_server_chdirent_op chdirent;
@@ -784,7 +772,6 @@ typedef struct PINT_server_op
         struct PINT_server_tree_communicate_op tree_communicate;
         struct PINT_server_mgmt_get_dirent_op mgmt_get_dirent;
         struct PINT_server_mgmt_create_root_dir_op mgmt_create_root_dir;
-        struct PINT_server_perf_update_op perf_update;
     } u;
 
 } PINT_server_op;
@@ -819,6 +806,9 @@ do {                                                                        \
       {                                                                     \
           __location = LOCAL_OPERATION;                                     \
           __req = __s_op->req;                                              \
+          __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE  |                  \
+                                 PRELUDE_PERM_CHECK_DONE |                  \
+                                 PRELUDE_LOCAL_CALL;                        \
       }                                                                     \
       else                                                                  \
       {                                                                     \
@@ -997,7 +987,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
 /* server side state machines */
 extern struct PINT_state_machine_s pvfs2_mirror_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_call_msgpairarray_sm;
-extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_create_immutable_copies_sm;
@@ -1007,7 +997,6 @@ extern struct PINT_state_machine_s pvfs2_pjmp_set_attr_work_sm;
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_with_prelude_sm;
-extern struct PINT_state_machine_s pvfs2_get_attr_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
@@ -1017,7 +1006,6 @@ extern struct PINT_state_machine_s pvfs2_check_entry_not_exist_sm;
 extern struct PINT_state_machine_s pvfs2_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_remove_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
-extern struct PINT_state_machine_s pvfs2_crdirent_work_sm;
 extern struct PINT_state_machine_s pvfs2_unexpected_sm;
 extern struct PINT_state_machine_s pvfs2_create_immutable_copies_sm;
 extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
@@ -1029,27 +1017,13 @@ extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_dirdata_split_sm;
 
 extern void tree_getattr_free(PINT_server_op *s_op);
-extern void tree_setattr_free(PINT_server_op *s_op);
 extern void tree_remove_free(PINT_server_op *s_op);
-extern void mkdir_free(struct PINT_server_op *s_op);
-extern void getattr_free(struct PINT_server_op *s_op);
 
 /* V3 */
 #if 0
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
 #endif
-
-int server_perf_start_rollover(struct PINT_perf_counter *pc,
-                               struct PINT_perf_counter *tpc);
-
-/* keyval management prototypes */
-void free_keyval_buffers(struct PINT_server_op *s_op);
-void keep_keyval_buffers(struct PINT_server_op *s_op, int buf);
-/* this macro is used in keyval management to represent the key and val
- * pointers of the s_op
- */
-#define KEYVAL -1
 
 /* exported state machine resource reclamation function */
 int server_post_unexpected_recv(void);

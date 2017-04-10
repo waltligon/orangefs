@@ -20,6 +20,8 @@ LOCALTESTSRC := \
 	$(DIR)/trove-touch.c \
 	$(DIR)/trove-create-stress.c \
 	$(DIR)/trove-key-iterate.c \
+	$(DIR)/db-hack.c \
+	$(DIR)/db-dspace.c \
 	$(DIR)/test-listio-aio-convert.c \
         $(DIR)/trove-bench-concurrent.c
 	

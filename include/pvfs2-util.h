@@ -51,7 +51,6 @@ int PVFS_util_gen_credential(const char *user,
                              const char *keypath,
                              const char *certpath,
                              PVFS_credential *cred);
-
 int PVFS_util_refresh_credential(PVFS_credential *cred);
 
 /* NOTE: for backwards compatibility only. 

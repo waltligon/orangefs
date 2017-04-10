@@ -92,7 +92,8 @@ static int fake_perf_ct = sizeof(fake_perf) / sizeof(*fake_perf);
 #endif
 
 /* internal fn prototypes */
-static int gui_comm_stats_collect(void);
+static int gui_comm_stats_collect(
+    void);
 
 /* gui_comm_setup()
  *
@@ -100,7 +101,8 @@ static int gui_comm_stats_collect(void);
  *
  * Returns 0 on success, -1 on failure (some error initializing).
  */
-int gui_comm_setup(void)
+int gui_comm_setup(
+    void)
 {
     char msgbuf[128];
     int ret, i, j;
@@ -118,8 +120,7 @@ int gui_comm_setup(void)
     gui_comm_fslist = gtk_list_store_new(4,
                                          G_TYPE_STRING,
                                          G_TYPE_STRING,
-                                         G_TYPE_STRING,
-                                         G_TYPE_INT);
+                                         G_TYPE_STRING, G_TYPE_INT);
 
     ret = PVFS_sys_initialize(0);
     if (ret < 0)
@@ -143,14 +144,11 @@ int gui_comm_setup(void)
 
         gtk_list_store_append(gui_comm_fslist, &iter);
 
-        for (j = strlen(tab->mntent_array[i].the_pvfs_config_server);
-             j > 0;
+        for (j = strlen(tab->mntent_array[i].the_pvfs_config_server); j > 0;
              j--)
         {
             if (tab->mntent_array[i].the_pvfs_config_server[j] == '/')
-            {
                 break;
-            }
         }
 
         assert(j < 128);
@@ -170,14 +168,10 @@ int gui_comm_setup(void)
 
         gtk_list_store_set(gui_comm_fslist,
                            &iter,
-                           GUI_FSLIST_MNTPT,
-                           tab->mntent_array[i].mnt_dir,
-                           GUI_FSLIST_SERVER,
-                           msgbuf,
-                           GUI_FSLIST_FSNAME,
-                           tab->mntent_array[i].pvfs_fs_name,
-                           GUI_FSLIST_FSID,
-                           (gint) cur_fs_id, -1);
+                           GUI_FSLIST_MNTPT, tab->mntent_array[i].mnt_dir,
+                           GUI_FSLIST_SERVER, msgbuf,
+                           GUI_FSLIST_FSNAME, tab->mntent_array[i].pvfs_fs_name,
+                           GUI_FSLIST_FSID, (gint) cur_fs_id, -1);
     }
 
     /* credential for current user */
@@ -188,7 +182,6 @@ int gui_comm_setup(void)
              128,
              "monitoring %s by default.",
              tab->mntent_array[0].the_pvfs_config_server);
-
     gui_message_new(msgbuf);
 
     /* prepare config server name for passing to
@@ -198,9 +191,7 @@ int gui_comm_setup(void)
     for (j = strlen(tab->mntent_array[0].the_pvfs_config_server); j > 0; j--)
     {
         if (tab->mntent_array[0].the_pvfs_config_server[j] == '/')
-        {
             break;
-        }
     }
 
     assert(j < 128);
@@ -215,17 +206,17 @@ int gui_comm_setup(void)
     }
 
     gui_comm_set_active_fs(msgbuf,
-                           tab->mntent_array[0].pvfs_fs_name,
-                           default_fsid);
+                           tab->mntent_array[0].pvfs_fs_name, default_fsid);
 
     return 0;
 }
 
 /* gui_comm_set_active_fsid(contact_server, fsname, fsid)
  */
-void gui_comm_set_active_fs(char *contact_server,
-                            char *fs_name,
-                            PVFS_fs_id new_fsid)
+void gui_comm_set_active_fs(
+    char *contact_server,
+    char *fs_name,
+    PVFS_fs_id new_fsid)
 {
     int i, ret, outcount;
     char msgbuf[80];
@@ -238,9 +229,7 @@ void gui_comm_set_active_fs(char *contact_server,
     gui_set_title(msgbuf);
 
     if (new_fsid == cur_fsid)
-    {
         return;
-    }
 
     cur_fsid = new_fsid;
 
@@ -256,9 +245,7 @@ void gui_comm_set_active_fs(char *contact_server,
 
     /* allocate space for our stats if we need to */
     if (internal_stats != NULL && internal_stat_ct == outcount)
-    {
         return;
-    }
     else if (internal_stats != NULL)
     {
         /* free all our dynamically allocated memory for resizing */
@@ -272,9 +259,7 @@ void gui_comm_set_active_fs(char *contact_server,
     }
 
     internal_stats = (struct PVFS_mgmt_server_stat *)
-                       malloc(outcount *
-                              sizeof(struct PVFS_mgmt_server_stat));
-
+        malloc(outcount * sizeof(struct PVFS_mgmt_server_stat));
     internal_stat_ct = outcount;
 
     internal_details = PVFS_error_details_new(outcount);
@@ -284,14 +269,12 @@ void gui_comm_set_active_fs(char *contact_server,
     {
         free(internal_addrs);
     }
-    internal_addrs = (PVFS_BMI_addr_t *) malloc(outcount *
-                                                sizeof(PVFS_BMI_addr_t));
-
+    internal_addrs = (PVFS_BMI_addr_t *)
+        malloc(outcount * sizeof(PVFS_BMI_addr_t));
     internal_addr_ct = outcount;
     ret = PVFS_mgmt_get_server_array(cur_fsid,
                                      PVFS_MGMT_IO_SERVER |
-                                             PVFS_MGMT_META_SERVER,
-                                     internal_addrs,
+                                     PVFS_MGMT_META_SERVER, internal_addrs,
                                      &outcount);
     if (ret < 0)
     {
@@ -301,13 +284,10 @@ void gui_comm_set_active_fs(char *contact_server,
 
     /* allocate space for performance data */
     bigperfbuf = (struct PVFS_mgmt_perf_stat *)
-                   malloc(GUI_COMM_PERF_HISTORY *
-                          outcount *
-                          sizeof(struct PVFS_mgmt_perf_stat));
-
+        malloc(GUI_COMM_PERF_HISTORY * outcount *
+               sizeof(struct PVFS_mgmt_perf_stat));
     internal_perf = (struct PVFS_mgmt_perf_stat **)
-                    malloc(outcount *
-                        sizeof(struct PVFS_mgmt_perf_stat *));
+        malloc(outcount * sizeof(struct PVFS_mgmt_perf_stat *));
 
     for (i = 0; i < outcount; i++)
     {
@@ -331,8 +311,8 @@ void gui_comm_set_active_fs(char *contact_server,
  * Returns 0 on success, -1 on failure (some error grabbing data).
  */
 int gui_comm_stats_retrieve(
-            struct PVFS_mgmt_server_stat **svr_stat,
-            int *svr_stat_ct)
+    struct PVFS_mgmt_server_stat **svr_stat,
+    int *svr_stat_ct)
 {
     int ret;
 
@@ -344,15 +324,12 @@ int gui_comm_stats_retrieve(
     /* for now, call gui_comm_stats_collect() to get new data */
     ret = gui_comm_stats_collect();
     if (ret != 0)
-    {
         return ret;
-    }
 
     if (visible_stats == NULL)
     {
         visible_stats = (struct PVFS_mgmt_server_stat *)
-                          malloc(internal_stat_ct *
-                                  sizeof(struct PVFS_mgmt_server_stat));
+            malloc(internal_stat_ct * sizeof(struct PVFS_mgmt_server_stat));
         visible_stat_ct = internal_stat_ct;
     }
 
@@ -371,7 +348,8 @@ int gui_comm_stats_retrieve(
  *
  * Updates internal stat structures.
  */
-static int gui_comm_stats_collect(void)
+static int gui_comm_stats_collect(
+    void)
 {
     int ret;
     char msgbuf[64];
@@ -388,9 +366,7 @@ static int gui_comm_stats_collect(void)
                                 internal_addrs,
                                 internal_stat_ct, internal_details, NULL);
     if (ret == 0)
-    {
         return 0;
-    }
     else if (ret == -PVFS_EDETAIL)
     {
         int i;
@@ -429,36 +405,34 @@ static int gui_comm_stats_collect(void)
 
 /* gui_comm_perf_collect()
  */
-static int gui_comm_perf_collect(void)
+static int gui_comm_perf_collect(
+    void)
 {
     int ret = 0;
     char err_msg[64];
     char msgbuf[64];
-    int key_count = GUI_COMM_PERF_KEYCOUNT;
-    int sample_count = GUI_COMM_PERF_HISTORY;
+    int key_count;
     int64_t **perf_data;
     int srv;
 
 #ifndef FAKE_PERF
+    key_count = GUI_COMM_PERF_KEYCOUNT;
+
     perf_data = (int64_t **)malloc(internal_addr_ct * sizeof(int64_t *));
     for (srv = 0; srv < internal_addr_ct; srv++)
-    {
-        perf_data[srv] = (int64_t *)malloc(sizeof(int64_t) *
-                                           (GUI_COMM_PERF_KEYCOUNT + 2) *
-                                           GUI_COMM_PERF_HISTORY);
-    }
+            perf_data[srv] = (int64_t *)malloc(sizeof(int64_t) *
+                    (GUI_COMM_PERF_KEYCOUNT + 2) *
+                    GUI_COMM_PERF_HISTORY);
 
     ret = PVFS_mgmt_perf_mon_list(cur_fsid,
                                   &cred,
-                                  PINT_PERF_COUNTER,
                                   perf_data,
                                   internal_end_time_ms,
                                   internal_addrs,
                                   internal_perf_ids,
                                   internal_addr_ct,
                                   &key_count,
-                                  &sample_count,
-                                  internal_details, 
+                                  GUI_COMM_PERF_HISTORY, internal_details, 
                                   NULL);
     if (ret == 0)
     {
@@ -468,7 +442,7 @@ static int gui_comm_perf_collect(void)
         for (srv = 0; srv < internal_addr_ct; srv++)
         {
             int i;
-            for (i = 0; i < sample_count; i++)
+            for (i = 0; i < GUI_COMM_PERF_HISTORY; i++)
             {
                 internal_perf[srv][i].valid_flag =
                         (perf_data[srv][(i * (key_count + 2)) + key_count] != 0.0);
@@ -519,9 +493,7 @@ static int gui_comm_perf_collect(void)
     }
 
     for (srv = 0; srv < internal_addr_ct; srv++)
-    {
         free(perf_data[srv]);
-    }
     free(perf_data);
 #endif
 
@@ -533,8 +505,8 @@ static int gui_comm_perf_collect(void)
  * Passes back pointer to "raw" traffic data, fills in # of servers.
  */
 int gui_comm_traffic_retrieve(
-            struct gui_traffic_raw_data **svr_traffic,
-            int *svr_traffic_ct)
+    struct gui_traffic_raw_data **svr_traffic,
+    int *svr_traffic_ct)
 {
     int ret, svr, idx;
 
@@ -545,21 +517,17 @@ int gui_comm_traffic_retrieve(
 #else
     ret = gui_comm_perf_collect();
     if (ret != 0)
-    {
         return ret;
-    }
 
     /* initialize visible_perf array if we haven't already */
     if (visible_perf == NULL)
     {
         visible_perf = (struct gui_traffic_raw_data *)
-                        malloc(internal_addr_ct *
-                               sizeof(struct gui_traffic_raw_data));
+            malloc(internal_addr_ct * sizeof(struct gui_traffic_raw_data));
         assert(visible_perf != NULL);
     }
     memset(visible_perf,
-           0,
-           internal_addr_ct * sizeof(struct gui_traffic_raw_data));
+           0, internal_addr_ct * sizeof(struct gui_traffic_raw_data));
 
     /* summarize data and store in visible_perf array */
     for (svr = 0; svr < internal_addr_ct; svr++)
@@ -572,9 +540,7 @@ int gui_comm_traffic_retrieve(
         for (idx = 0; idx < GUI_COMM_PERF_HISTORY; idx++)
         {
             if (!internal_perf[svr][idx].valid_flag)
-            {
                 continue;
-            }
 
             if (!valid_start_time)
             {
@@ -608,13 +574,9 @@ int gui_comm_traffic_retrieve(
 
             /* simple, if somewhat inaccurate, handling of overflow */
             if (raw->meta_write_ops < 0)
-            {
                 raw->meta_write_ops = 0;
-            }
             if (raw->meta_read_ops < 0)
-            {
                 raw->meta_read_ops = 0;
-            }
         }
     }
 

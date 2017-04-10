@@ -61,13 +61,7 @@ struct options {
 #define DEFAULT_CERTFILE_LEN     17
 #endif
 
-int  get_current_userid(char *userid, int buflen);
-void sec_error(const char *msg, int err);
-int get_default_path(const char *filename,char *path);
-int get_file_paths(struct options *options,char *keypath,char *certpath);
-int store_cert_and_key(struct options *options,PVFS_certificate *cert,PVFS_security_key *key);
-char *get_option_value(int argc, char **argv, int *argi);
-int parse_args(int argc, char **argv, struct options *options);
+int get_current_userid(char *userid, int buflen);
 
 void sec_error(const char *msg, int err)
 {

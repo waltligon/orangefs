@@ -60,9 +60,7 @@ int main(int argc, char **argv)
     }
 
     printf("Initializing...");
-    pc = PINT_perf_initialize(PINT_PERF_COUNTER,
-                              acache_keys_array,
-                              NULL);  /* this doesn't seem to do anything */
+    pc = PINT_perf_initialize(acache_keys_array);
     if(!pc)
     {
         fprintf(stderr, "Error: PINT_perf_initialize() failure.\n");
@@ -152,7 +150,7 @@ int main(int argc, char **argv)
     print_counters(pc, NULL, NULL);
 
     printf("Reducing history size...");
-    PINT_perf_set_info(pc, PINT_PERF_UPDATE_HISTORY, 3);
+    PINT_perf_set_info(pc, PINT_PERF_HISTORY_SIZE, 3);
     printf("Done.\n");
 
     print_counters(pc, NULL, NULL);
@@ -171,7 +169,7 @@ int main(int argc, char **argv)
     print_counters(pc, NULL, NULL);
 
     printf("Increasing history size...");
-    PINT_perf_set_info(pc, PINT_PERF_UPDATE_HISTORY, 5);
+    PINT_perf_set_info(pc, PINT_PERF_HISTORY_SIZE, 5);
     printf("Done.\n");
 
     print_counters(pc, NULL, NULL);
@@ -182,7 +180,7 @@ int main(int argc, char **argv)
     print_counters(pc, &tmp_key_count, &tmp_history_size);
 
     printf("Reducing history size to one...");
-    PINT_perf_set_info(pc, PINT_PERF_UPDATE_HISTORY, 1);
+    PINT_perf_set_info(pc, PINT_PERF_HISTORY_SIZE, 1);
     printf("Done.\n");
 
     print_counters(pc, NULL, NULL);
@@ -238,7 +236,8 @@ static void print_counters(struct PINT_perf_counter* pc, int* in_key_count,
     else
     {
         /* get dimensions */
-        ret = PINT_perf_get_info(pc, PINT_PERF_KEY_COUNT, &key_count);
+        ret = PINT_perf_get_info(pc, PINT_PERF_KEY_COUNT, 
+            &key_count);
         assert(ret == 0);
     }
 
@@ -248,7 +247,8 @@ static void print_counters(struct PINT_perf_counter* pc, int* in_key_count,
     }
     else
     {
-        ret = PINT_perf_get_info(pc, PINT_PERF_UPDATE_HISTORY, &history_size);
+        ret = PINT_perf_get_info(pc, PINT_PERF_HISTORY_SIZE, 
+            &history_size);
         assert(ret == 0);
     }
 
@@ -258,7 +258,8 @@ static void print_counters(struct PINT_perf_counter* pc, int* in_key_count,
     /* retrieve values from perf counter api */
     PINT_perf_retrieve(pc,
                        stat_matrix,
-                       key_count);
+                       key_count,
+                       history_size);
 
     printf("===================\n");
 

@@ -27,7 +27,6 @@
 #include "pvfs2-sysint.h"
 #include "gen-locks.h"
 #include "pint-cached-config.h"
-#include "pint-perf-counter.h"
 #include "pvfs2-sysint.h"
 
 #include "trove.h"
@@ -49,10 +48,6 @@ int PINT_lookup_parent(char *filename,
 
 int PINT_client_security_initialize(void);
 int PINT_client_security_finalize(void);
-
-/* client only function to start update timer for perf counted */
-int client_perf_start_rollover(struct PINT_perf_counter *pc,
-                               struct PINT_perf_counter *tpc);
 
 /*
  * Local variables:

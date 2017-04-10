@@ -316,13 +316,10 @@ int PINT_copy_credential(const PVFS_credential *src, PVFS_credential *dest)
     dest->certificate.buf = NULL;
 #endif
 
-    if (src->issuer)
+    dest->issuer = strdup(src->issuer);
+    if (!dest->issuer)
     {
-        dest->issuer = strdup(src->issuer);
-        if (!dest->issuer)
-        {
-            return -PVFS_ENOMEM;
-        }
+        return -PVFS_ENOMEM;
     }
 
     if (src->sig_size)

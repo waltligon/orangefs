@@ -6,8 +6,5 @@ USERSRC := \
 	$(DIR)/pvfs2-rm.c  \
 	$(DIR)/ofs_xattr.c \
 	$(DIR)/ofs_rm.c \
-	$(DIR)/ofs_cp.c \
-	$(DIR)/ofs_setdirhint.c
-
-#	V3: PVFS_mgmt_map_addr currently undefined
-#	$(DIR)/ofs_graphite_driver.c \
+	$(DIR)/ofs_cp.c    
+ 

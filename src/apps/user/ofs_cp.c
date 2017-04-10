@@ -16,7 +16,6 @@
 #include <unistd.h>
 #include <limits.h>
 #include <string.h>
-#include <getopt.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -54,8 +53,6 @@ struct cp_options
     int mode;
     int times;
     int total_written;
-    int layout;
-    char *server_list;
     char *srcfile;
     char *destfile;
     char *created;
@@ -462,28 +459,6 @@ static int copy_file(char *srcfile,
         open_flags |= O_HINTS;
     }
 
-    if (user_opts->layout > 1 && user_opts->layout <= PVFS_SYS_LAYOUT_MAX)
-    {
-        int list_len = 0;
-        if (user_opts->layout != PVFS_SYS_LAYOUT_LIST ||
-            (user_opts->server_list &&
-             (list_len = strlen(user_opts->server_list)) >= 1))
-        {
-            PVFS_hint_add(&hints,
-                          PVFS_HINT_LAYOUT_NAME,
-                          sizeof(int),
-                          &user_opts->layout);
-            if (user_opts->layout == PVFS_SYS_LAYOUT_LIST)
-            {
-                PVFS_hint_add(&hints,
-                              PVFS_HINT_SERVERLIST_NAME,
-                              list_len + 1,
-                              user_opts->server_list);
-            }
-        }
-        open_flags |= O_HINTS;
-    }
-
     dst = open(destfile, open_flags, 0600, hints);
     if (dst == -1)
     {
@@ -608,29 +583,11 @@ err_out:
  */
 static int parse_args(int argc, char *argv[], struct cp_options *user_opts)
 {
-    const char flags[] = "hmptDTVvrs:n:b:l:L:";
+    const char flags[] = "hmptDTVvrs:n:b:";
     int one_opt = 0;
     struct stat s_sbuf, d_sbuf;
     int ret = -1, s_ret = -1, d_ret = -1;
     int index = 1; /* stand-in for optind */
-
-    static struct option lopt[] = {
-        {"mode", 0, NULL, 'm'},
-        {"preserve", 0, NULL, 'p'},
-        {"times", 0, NULL, 't'},
-        {"Debug", 0, NULL, 'D'},
-        {"TIming", 0, NULL, 'T'},
-        {"strip-size", 0, NULL, 's'},
-        {"num-datafiles", 0, NULL, 'n'},
-        {"buffer-size", 0, NULL, 'b'},
-        {"layout", 0, NULL, 'l'},
-        {"server-list", 0, NULL, 'L'},
-        {"recursive", 0, NULL, 'r'},
-        {"help", 0, NULL, 'h'},
-        {"Version", 0, NULL, 'V'},
-        {"verbose", 0, NULL, 'v'},
-        {NULL, 0, NULL, 0}
-    };
 
     opterr = 0;
 
@@ -642,7 +599,7 @@ static int parse_args(int argc, char *argv[], struct cp_options *user_opts)
     user_opts->buf_size = OFS_COPY_BUFSIZE_DEFAULT;
 
     /* look at command line arguments */
-    while((one_opt = getopt_long(argc, argv, flags, lopt, NULL)) != -1)
+    while((one_opt = getopt(argc, argv, flags)) != -1)
     {
         index++;
         switch(one_opt)
@@ -692,22 +649,6 @@ static int parse_args(int argc, char *argv[], struct cp_options *user_opts)
             case('b'):
                 ret = sscanf(optarg, "%d", &user_opts->buf_size);
                 if(ret < 1)
-                {
-                    return(-1);
-                }
-                index++;
-                break;
-            case('l'):
-                ret = sscanf(optarg, "%d", &user_opts->layout);
-                if(ret < 1)
-                {
-                    return(-1);
-                }
-                index++;
-                break;
-            case('L'):
-                user_opts->server_list = strdup(optarg);
-                if (!user_opts->server_list)
                 {
                     return(-1);
                 }
@@ -920,8 +861,6 @@ static void usage(int argc, char **argv)
         "\n-s <strip_size>           size of access to PVFS2 volume"
         "\n-n <num_datafiles>        number of PVFS2 datafiles to use"
         "\n-b <buffer_size in bytes> how much data to read/write at once"
-        "\n-l <layout number>        layout algorithm to use"
-        "\n-L <colon delimited ints> list of servers for LIST layout"
         "\n-r                        recursively copy directories"
         "\n-m                        preserve mode of the files"
         "\n-p                        preserve owner of the files (requires root)"

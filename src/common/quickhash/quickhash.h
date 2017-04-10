@@ -130,14 +130,14 @@ static inline void qhash_add(struct qhash_table *table,
                              const void *key,
                              struct qhash_head *link)
 {
-    int indx = 0;
+    int index = 0;
 
     /* hash on the key */
-    indx = table->hash(key, table->table_size);
+    index = table->hash(key, table->table_size);
 
     /* add to the tail of the linked list at that offset */
     qhash_lock(&table->lock);
-    qhash_add_tail(link, &(table->array[indx]));
+    qhash_add_tail(link, &(table->array[index]));
     qhash_unlock(&table->lock);
 
     return;
@@ -178,15 +178,15 @@ static inline struct qhash_head *qhash_first(struct qhash_table *table)
 static inline struct qhash_head *qhash_search(struct qhash_table *table,
                                               const void *key)
 {
-    int indx = 0;
+    int index = 0;
     struct qhash_head *tmp_link = NULL;
 
     /* find the hash value */
-    indx = table->hash(key, table->table_size);
+    index = table->hash(key, table->table_size);
 
     /* linear search at index to find match */
     qhash_lock(&table->lock);
-    qhash_for_each(tmp_link, &(table->array[indx]))
+    qhash_for_each(tmp_link, &(table->array[index]))
     {
 	if (table->compare(key, tmp_link))
 	{
@@ -239,15 +239,15 @@ static inline struct qhash_head *qhash_search_and_remove(
                                                   struct qhash_table *table,
                                                   const void *key)
 {
-    int indx = 0;
+    int index = 0;
     struct qhash_head *tmp_link = NULL, *tmp_link_safe = NULL;
 
     /* find the hash value */
-    indx = table->hash(key, table->table_size);
+    index = table->hash(key, table->table_size);
 
     /* linear search at index to find match */
     qhash_lock(&table->lock);
-    qhash_for_each_safe(tmp_link, tmp_link_safe, &(table->array[indx]))
+    qhash_for_each_safe(tmp_link, tmp_link_safe, &(table->array[index]))
     {
 	if (table->compare(key, tmp_link))
 	{

@@ -1055,11 +1055,3 @@ static void vapi_ib_finalize(void)
     ib_device->priv = NULL;
 }
 
-/*
- * Local variables:
- *  c-indent-level: 4
- *  c-basic-offset: 4
- * End:
- *
- * vim: ts=8 sts=4 sw=4 expandtab
- */

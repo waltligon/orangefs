@@ -26,7 +26,7 @@ extern gen_mutex_t dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 extern pthread_cond_t dbpf_op_completed_cond;
 
 static int dbpf_sync_db(
-    dbpf_db * dbp, 
+    DB * dbp, 
     enum s_sync_context_e sync_context_type, 
     dbpf_sync_context_t * sync_context)
 {
@@ -36,12 +36,12 @@ static int dbpf_sync_db(
                  "in coalesce_queue:%d pending:%d\n",
                  sync_context_type, sync_context->coalesce_counter, 
                  sync_context->sync_counter);
-    ret = dbpf_db_sync(dbp);
+    ret = dbp->sync(dbp, 0);
     if(ret != 0)
     {
         gossip_err("db SYNC failed: %s\n",
-                   strerror(ret));
-        ret = -ret;
+                   db_strerror(ret));
+        ret = -dbpf_db_error_to_trove_error(ret);
         return ret;
     }
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
@@ -109,7 +109,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
 {
 
     int ret = 0;
-    dbpf_db * dbp = NULL;
+    DB * dbp = NULL;
     dbpf_sync_context_t * sync_context;
     dbpf_queued_op_t *ready_op;
     int sync_context_type;

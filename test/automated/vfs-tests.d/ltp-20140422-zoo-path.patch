@@ -51,13 +51,3 @@
  
      if [ $? -eq 0 ]; then
        echo "INFO: ltp-pan reported all tests PASS"
---- ltp-20140422/testcases/kernel/syscalls/bdflush/bdflush01.c	2014-05-30 15:59:37.288777102 -0400
-+++ ltp-20140422-patched/testcases/kernel/syscalls/bdflush/bdflush01.c 15:58:27.124773706 -0400
-@@ -81,7 +81,6 @@
- #include <unistd.h>
- #include <errno.h>
- #include <sys/stat.h>
--#include <sys/kdaemon.h>
- 
- #include "test.h"
- #include "linux_syscall_numbers.h"

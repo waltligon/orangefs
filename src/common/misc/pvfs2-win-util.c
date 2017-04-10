@@ -111,9 +111,9 @@ static void PINT_util_fsent_destroy(PINT_fstab_entry_t * entry);
 #define PVFS2_DYNAMIC_TAB_INDEX  (PVFS2_MAX_TABFILES - 1)
 #define PVFS2_DYNAMIC_TAB_NAME              "<DynamicTab>"
 
-PVFS_util_tab s_stat_tab_array[PVFS2_MAX_TABFILES];
-int s_stat_tab_count = 0;
-gen_mutex_t s_stat_tab_mutex = GEN_MUTEX_INITIALIZER;
+static PVFS_util_tab s_stat_tab_array[PVFS2_MAX_TABFILES];
+static int s_stat_tab_count = 0;
+static gen_mutex_t s_stat_tab_mutex = GEN_MUTEX_INITIALIZER;
 
 static int parse_flowproto_string(
     const char *input,

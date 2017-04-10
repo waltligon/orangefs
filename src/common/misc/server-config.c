@@ -75,7 +75,6 @@ static DOTCONF_CB(get_tcp_buffer_receive);
 static DOTCONF_CB(get_tcp_bind_specific);
 static DOTCONF_CB(get_perf_update_interval);
 static DOTCONF_CB(get_rootsrv);
-static DOTCONF_CB(get_perf_update_history);
 static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_root_dirdata_handle);
 static DOTCONF_CB(get_name);
@@ -114,12 +113,9 @@ static DOTCONF_CB(get_attr_cache_max_num_elems);
 static DOTCONF_CB(get_trove_sync_meta);
 static DOTCONF_CB(get_trove_sync_data);
 static DOTCONF_CB(get_file_stuffing);
-static DOTCONF_CB(get_trove_max_concurrent_io);
-/* Berkeley DB */
 static DOTCONF_CB(get_db_cache_size_bytes);
+static DOTCONF_CB(get_trove_max_concurrent_io);
 static DOTCONF_CB(get_db_cache_type);
-/* LMDB */
-static DOTCONF_CB(get_db_max_size);
 static DOTCONF_CB(get_param);
 static DOTCONF_CB(get_value);
 static DOTCONF_CB(get_default_num_dfiles);
@@ -144,7 +140,6 @@ static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
 static DOTCONF_CB(get_credential_timeout);
 static DOTCONF_CB(get_capability_timeout);
-static DOTCONF_CB(get_turn_off_timeouts);
 static DOTCONF_CB(get_credcache_timeout);
 static DOTCONF_CB(get_capcache_timeout);
 static DOTCONF_CB(get_certcache_timeout);
@@ -334,23 +329,15 @@ static const configoption_t options[] =
     {"CapabilityTimeoutSecs", ARG_INT, get_capability_timeout, NULL,
         CTX_SECURITY, "600"},
 
-    /* Prevent the server from issuing an error whenever a capability or 
-     * credential expires.  In this case, the client provides the only 
-     * mechanism determining when a capability or credential needs to be 
-     * regenerated.  
-     */
-    {"TurnOffTimeouts", ARG_STR, get_turn_off_timeouts, NULL,
-        CTX_SECURITY, "yes"}, 
-
-    /* Server-side Credential cache timeout in seconds */
+    /* Credential cache timeout in seconds */
     {"CredentialCacheTimeoutSecs", ARG_INT, get_credcache_timeout, NULL,
         CTX_SECURITY, "3600"},
 
-    /* Server-side Capability cache timeout in seconds */
+    /* Capability cache timeout in seconds */
     {"CapabilityCacheTimeoutSecs", ARG_INT, get_capcache_timeout, NULL,
         CTX_SECURITY, "600"},
 
-    /* Server-side Certificate cache timeout in seconds */
+    /* Certificate cache timeout in seconds */
     {"CertificateCacheTimeoutSecs", ARG_INT, get_certcache_timeout, NULL,
         CTX_SECURITY, "3600"},
 
@@ -869,21 +856,14 @@ static const configoption_t options[] =
     {"FileStuffing",ARG_STR, get_file_stuffing, NULL, 
         CTX_FILESYSTEM,"yes"},
 
-     /* This specifies the number of samples
-      * that performance monitor should keep
-      *
-      * Can be set in either Default or ServerOptions contexts.
-      */
-    {"PerfUpdateHistory", ARG_INT, get_perf_update_history, NULL,
-        CTX_DEFAULTS, "10"},
-
      /* This specifies the frequency (in milliseconds) 
       * that performance monitor should be updated
+      * when the OrangeFS server is running in admin mode.
       *
       * Can be set in either Default or ServerOptions contexts.
       */
-    {"PerfUpdateInterval", ARG_INT, get_perf_update_interval, NULL,
-        CTX_DEFAULTS, "1000"},
+    {"PerfUpdateInterval",ARG_INT, get_perf_update_interval,NULL,
+        CTX_DEFAULTS,"1000"},
 
     /* List the BMI modules to load when the server is started.  At present,
      * only tcp, infiniband, and myrinet are valid BMI modules.  
@@ -1094,24 +1074,19 @@ static const configoption_t options[] =
     {"TroveSyncData",ARG_STR, get_trove_sync_data, NULL, 
         CTX_STORAGEHINTS,"yes"},
 
-    /* Berkeley DB: The DBCacheSizeBytes option allows users to set the size of
-     * the shared memory buffer pool (i.e., cache) for Berkeley DB. The size is
+    /* The DBCacheSizeBytes option allows users to set the size of the
+     * shared memory buffer pool (i.e., cache) for Berkeley DB. The size is
      * specified in bytes.
      * See BDB documentation for <c>set_cachesize()</c> for more info.
      */
     {"DBCacheSizeBytes", ARG_INT, get_db_cache_size_bytes, NULL,
         CTX_STORAGEHINTS,"0"},
 
-    /* Berkeley DB: cache type for berkeley db environment. <c>sys</c> and
-     * <c>mmap</c> are valid values for this option
+    /* cache type for berkeley db environment.  <c>sys</c> and <c>mmap</c> are valid
+     * values for this option
      */
     {"DBCacheType", ARG_STR, get_db_cache_type, NULL,
         CTX_STORAGEHINTS, "sys"},
-
-    /* LMDB: maximum size of database map
-     */
-    {"DBMaxSize", ARG_INT, get_db_max_size, NULL,
-        CTX_STORAGEHINTS,"536870912"},
 
     /* This option specifies a parameter name to be passed to the 
      * distribution to be used.  This option should be immediately
@@ -1288,7 +1263,6 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
     config_s->client_retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
     config_s->client_retry_delay_ms = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
     config_s->trove_max_concurrent_io = 16;
-    config_s->db_max_size = 536870912;
 
     if (cache_config_files(config_s, global_config_filename))
     {
@@ -1407,15 +1381,6 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
         return 1;
     }
     
-    /* Users don't need to learn about this unless they want to
-    */
-    if (!config_s->perf_update_history)
-    {
-        gossip_err("Configuration file error.  "
-                   "No PerfUpdateHistory specified.\n");
-        return 1;
-    }
-
     /* Users don't need to learn about this unless they want to
     */
     if (!config_s->perf_update_interval)
@@ -2092,14 +2057,6 @@ DOTCONF_CB(get_client_retry_delay)
     struct server_configuration_s *config_s = 
              (struct server_configuration_s *)cmd->context;
     config_s->client_retry_delay_ms = cmd->data.value;
-    return NULL;
-}
-
-DOTCONF_CB(get_perf_update_history)
-{
-    struct server_configuration_s *config_s = 
-                    (struct server_configuration_s *)cmd->context;
-    config_s->perf_update_history = cmd->data.value;
     return NULL;
 }
 
@@ -2983,8 +2940,7 @@ DOTCONF_CB(get_db_cache_type)
 {
     struct server_configuration_s *config_s =
             (struct server_configuration_s *)cmd->context;
-
-
+    
     if(strcmp(cmd->data.str, "sys") && strcmp(cmd->data.str, "mmap"))
     {
         return "Unsupported parameter supplied to DBCacheType option, must "
@@ -3000,20 +2956,7 @@ DOTCONF_CB(get_db_cache_type)
     {
         return "strdup() failure";
     }
-    return NULL;
-}
 
-DOTCONF_CB(get_db_max_size)
-{
-    struct server_configuration_s *config_s = 
-                    (struct server_configuration_s *)cmd->context;
-
-    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
-       config_s->my_server_options == 0)
-    {
-        return NULL;
-    }
-    config_s->db_max_size = cmd->data.value;
     return NULL;
 }
 
@@ -3711,39 +3654,6 @@ DOTCONF_CB(get_capability_timeout)
         gossip_err("Warning: CapabilityTimeoutSecs value invalid (%ld) - "
                    "using default (%d)\n", cmd->data.value,
                    config_s->capability_timeout);
-    }
-
-    return NULL;
-}
-
-DOTCONF_CB(get_turn_off_timeouts)
-{
-    struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
-
-#if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
-    /* You cannot turn off timeouts if using enhanced security */
-    config_s->bypass_timeout_check = 0;
-
-    /* Give a warning */
-    gossip_err("%s:When using enhanced security, timeout checks "
-               "on the server cannot be disabled.  Setting "
-               "bypass_timeout_check to 0.\n",__func__);
-
-    return NULL;  
-#endif
-
-    if ( !strcasecmp(cmd->data.str, "yes") )
-    {
-         config_s->bypass_timeout_check = 1;
-    }
-    else if ( !strcasecmp(cmd->data.str, "no") )
-    {
-         config_s->bypass_timeout_check = 0;
-    }
-    else
-    {
-        return("TurnOffTimeouts must be 'yes' or 'no'.\n");
     }
 
     return NULL;
@@ -4685,10 +4595,7 @@ static host_alias_t *find_host_alias_ptr_by_alias(
             cur = PINT_llist_next(cur);
         }
     }
-    if(index)
-    {
-        *index = ind - 1;
-    }
+    if(index) *index = ind - 1;
     return ret;
 }
 #endif

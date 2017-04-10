@@ -64,14 +64,11 @@ int main(int argc, char **argv)
 
     /* translate local path into pvfs2 relative path */
     ret = PVFS_util_resolve(user_opts->mnt_point,
-                            &cur_fs,
-                            pvfs_path,
-                            PVFS_NAME_MAX);
+        &cur_fs, pvfs_path, PVFS_NAME_MAX);
     if(ret < 0)
     {
-	fprintf(stderr,
-                "Error: could not find filesystem for %s in pvfstab\n", 
-	        user_opts->mnt_point);
+	fprintf(stderr, "Error: could not find filesystem for %s in pvfstab\n", 
+	    user_opts->mnt_point);
 	return(-1);
     }
 
@@ -93,9 +90,7 @@ int main(int argc, char **argv)
                                            &server_type);
        if (ret)
        {
-          fprintf(stderr,
-                  "Server string (%s) is undefined. Check config file.\n",
-                  user_opts->server);
+          fprintf(stderr,"Server string (%s) is undefined.  Check config file.\n",user_opts->server);
           goto out;
        }
        ret = PVFS_mgmt_setparam_single(cur_fs,
@@ -107,18 +102,13 @@ int main(int argc, char **argv)
                                        NULL                  /*hints*/);
        if (ret)
        {
-          fprintf(stderr,
-                  "Error(%d) setting mode on server(%s)\n",
-                  ret,
-                  user_opts->server);
+          fprintf(stderr,"Error(%d) setting mode on server(%s)\n",ret,user_opts->server);
           goto out;
        }        
        else
        {
-          fprintf(stderr,
-                  "Successfully set mode(%s) on server (%s)\n",
-                  user_opts->mode==PVFS_SERVER_ADMIN_MODE ? "admin" : "normal",
-                  user_opts->server);
+          fprintf(stderr,"Successfully set mode(%s) on server (%s)\n",user_opts->mode==PVFS_SERVER_ADMIN_MODE?"admin":"normal"
+                                                                     ,user_opts->server);
        }
     }
     else
@@ -127,22 +117,17 @@ int main(int argc, char **argv)
 	                             &creds,
 				     PVFS_SERV_PARAM_MODE,
                                      &param_value,
-				     NULL,/* details */
-				     NULL /* hints */);
+				     NULL,/*details*/
+				     NULL /*hints */);
         if (ret)
         {
-           fprintf(stderr,
-                   "Error(%d) setting mode for mount point(%s)\n",
-                   ret,
-                   user_opts->mnt_point);
+           fprintf(stderr,"Error(%d) setting mode for mount point(%s)\n",ret,user_opts->mnt_point);
            goto out;
         }
         else
         {
-           fprintf(stderr,
-                   "Successfully set mode (%s) for mount point(%s)\n",
-                   user_opts->mode==PVFS_SERVER_ADMIN_MODE ? "admin" : "normal",
-                   user_opts->mnt_point);
+           fprintf(stderr,"Successfully set mode (%s) for mount point(%s)\n",user_opts->mode==PVFS_SERVER_ADMIN_MODE?"admin":"normal"
+                                                                            ,user_opts->mnt_point);
         }
     }
 
@@ -170,15 +155,13 @@ static struct options* parse_args(int argc, char* argv[])
 
     /* create storage for the command line options */
     tmp_opts = (struct options*)malloc(sizeof(struct options));
-    if(!tmp_opts)
-    {
+    if(!tmp_opts){
 	return(NULL);
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* look at command line arguments */
-    while((one_opt = getopt(argc, argv, flags)) != EOF)
-    {
+    while((one_opt = getopt(argc, argv, flags)) != EOF){
 	switch(one_opt)
         {
             case('v'):
@@ -234,17 +217,11 @@ static struct options* parse_args(int argc, char* argv[])
     if(!tmp_opts->mnt_point_set || !tmp_opts->mode_set)
     {
         if(!tmp_opts->mnt_point_set)
-        {
-            fprintf(stderr,"Error: Mount point is required.\n");
-        }
+          fprintf(stderr,"Error: Mount point is required.\n");
         if(!tmp_opts->mode_set)
-        {
-            fprintf(stderr,"Error: Mode is required.\n");
-        }
+          fprintf(stderr,"Error: Mode is required.\n");
 	if(tmp_opts->mnt_point)
-        {
 	    free(tmp_opts->mnt_point);
-        }
 	free(tmp_opts);
 	return(NULL);
     }
@@ -256,19 +233,13 @@ static struct options* parse_args(int argc, char* argv[])
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr,
-            "Usage  : %s [-s server] -m <filesystem mount point>  <mode>\n\n",
-	    argv[0]);
-    fprintf(stderr,
-            "Mount point and mode are required. "
-            "If server is given, then mode will be set only on that server; "
-            "otherwise, mode is set on "
-            "all servers for the given mount point.\n\n");
-    fprintf(stderr,
-            "Example:All-Severs: %s -m /mnt/pvfs2 normal\n\n",
-	    argv[0]);
-    fprintf(stderr,
-            "Example:One-Server: %s -s tcp://localhost:3334/pvfs2-fs -m /mnt/pvfs2 admin\n\n",argv[0]);
+    fprintf(stderr, "Usage  : %s [-s server] -m <filesystem mount point>  <mode>\n\n",
+	argv[0]);
+    fprintf(stderr, "Mount point and mode are required.  If server is given, then mode will be set only on that server; otherwise, mode is set on "
+                    "all servers for the given mount point.\n\n");
+    fprintf(stderr, "Example:All-Severs: %s -m /mnt/pvfs2 normal\n\n",
+	argv[0]);
+    fprintf(stderr, "Example:One-Server: %s -s tcp://localhost:3334/pvfs2-fs -m /mnt/pvfs2 admin\n\n",argv[0]);
     fprintf(stderr, "Available modes include: admin,normal\n");
 
     return;

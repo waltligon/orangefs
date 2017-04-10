@@ -111,7 +111,21 @@ static struct dentry *pvfs2_lookup(struct inode *dir,
 	return ERR_PTR(-ENOMEM);
     }
 
+#ifdef PVFS2_LINUX_KERNEL_2_4
     new_op->upcall.req.lookup.sym_follow = PVFS2_LOOKUP_LINK_NO_FOLLOW;
+#elif defined(PVFS_KMOD_LOOKUP_TAKES_NAMEIDATA)
+    /*
+      if we're at a symlink, should we follow it? never attempt to
+      follow negative dentries
+    */
+    new_op->upcall.req.lookup.sym_follow =
+         ((nd &&
+           (nd->flags & LOOKUP_FOLLOW) &&
+           (dentry->d_inode != NULL)) ?
+          PVFS2_LOOKUP_LINK_FOLLOW : PVFS2_LOOKUP_LINK_NO_FOLLOW);
+#else
+    new_op->upcall.req.lookup.sym_follow = flags & LOOKUP_FOLLOW;
+#endif
 
     if (dir)
     {

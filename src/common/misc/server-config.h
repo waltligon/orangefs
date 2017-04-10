@@ -38,9 +38,6 @@ typedef struct phys_server_desc_s
     int server_type;
 } phys_server_desc_t;
 
-/* note that the term bmi_address used here refers to the URL-like
- * string, not the internal BMI_address type
- */
 typedef struct host_alias_s
 {
     char *host_alias;        /* this is a traditional host name */
@@ -165,15 +162,12 @@ typedef struct distribution_config_s
 
 } distribution_config_t;
 
-/* note that the term bmi_address used here refers to the URL-like
- * string, not the internal BMI_address type
- */
 typedef struct server_configuration_s
 {
     PVFS_SID host_sid;              /* SID of this server */
     char *host_id;                  /* bmi_address of this server */
     /* V3 host_index is probably obsolete */
-    int host_index;                 /* index in table of this server */
+    int host_index;
     char *server_alias;             /* command line server-alias parameter */
     int my_server_options;
 
@@ -191,7 +185,6 @@ typedef struct server_configuration_s
     int  client_job_flow_timeout;
     int  client_retry_limit;        /* how many times to retry client ops */
     int  client_retry_delay_ms;     /* delay between retries */
-    int  perf_update_history;       /* how many perf samples to keep */
     int  perf_update_interval;      /* how quickly (in msecs) to */
                                     /*    update perf monitor    */
 /* V3 remove precreate stuff */
@@ -245,8 +238,6 @@ typedef struct server_configuration_s
     int db_cache_size_bytes;      /* cache size to use in berkeley db */
                                   /*   if zero, use defaults */
     char *db_cache_type;
-    int db_max_size;                /* size of database map
-                                     */
     int trove_alt_aio_mode;       /* enables experimental alternative AIO
                                    * implementation for some types of 
                                    * operations 
@@ -284,11 +275,6 @@ typedef struct server_configuration_s
 
     int credential_timeout;          /* credential timeout in seconds */
     int capability_timeout;          /* capability timeout in seconds */
-
-    int bypass_timeout_check;        /* Correlates to TurnOffTimeouts in server conf file */
-                                     /* Only applies to a server.                         */
-                                     /* 1 = don't check for timeout                       */
-                                     /* 0 = check for timeout                             */
 
     int credcache_timeout;           /* credential cache timeout in seconds */
     int capcache_timeout;            /* capability cache timeout in seconds */

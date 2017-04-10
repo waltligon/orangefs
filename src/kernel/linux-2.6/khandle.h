@@ -20,7 +20,7 @@
  * HANDLESTRINGSIZE is a safe amount of space for the memory allocation.
  */
 char *k2s(PVFS_khandle *, char *);
-#define HANDLESTRINGSIZE 64
+#define HANDLESTRINGSIZE 40
 
 /*
  * compare 2 khandles assumes little endian thus from large address to

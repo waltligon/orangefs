@@ -6,7 +6,6 @@
 
 #include <errno.h>
 
-#include "gossip.h"
 #include "trove.h"
 #include "trove-internal.h"
 
@@ -99,7 +98,6 @@ PVFS_error trove_errno_to_trove_error(int errno_value)
             return s_trove_error_map[i].trove_value;
         }
     }
-    gossip_lerr("trove_errno_to_trove_error: unknown errno value\n");
     return 4242; /* just return some identifiable number */
 }
 

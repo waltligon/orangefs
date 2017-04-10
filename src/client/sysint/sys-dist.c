@@ -5,9 +5,6 @@
  */
 #include <stdlib.h>
 #include <string.h>
-#ifdef WIN32
-#include "wincommon.h"
-#endif
 #include "gossip.h"
 #include "pvfs2-internal.h"
 #include "pint-distribution.h"

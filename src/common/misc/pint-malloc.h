@@ -12,13 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* pint-malloc.h should not be included before malloc.h
- * so we'll just go ahead and include it here
- */
-#ifdef HAVE_MALLOC_H
-#include <malloc.h>
-#endif
-
 #ifndef WIN32
 /* pint-malloc.c is not used on Windows */
 #include <unistd.h>
@@ -39,35 +32,21 @@ struct glibc_malloc_ops_s
     void  (*close)(int fd);
 };
 
-#ifndef PVFS_MALLOC_DEBUG
-# define PVFS_MALLOC_DEBUG 0
-#endif
-
-#if PVFS_MALLOC_DEBUG
-#define __PMDBG   ,char *file,int line
-#else
-#define __PMDBG
-#endif
-
 extern void init_glibc_malloc(void) GCC_CONSTRUCTOR(INIT_PRIORITY_MALLOC);
 
 extern int PINT_check_address(void *ptr) GCC_UNUSED;
 extern int PINT_check_malloc(void *ptr) GCC_UNUSED;
 
 extern void *PINT_malloc_minimum(size_t size);
-
-extern void *PINT_malloc (size_t size __PMDBG);
-extern void *PINT_calloc (size_t nmemb, size_t size __PMDBG);
-extern int   PINT_posix_memalign (void **mem,
-                                       size_t alignment,
-                                       size_t size __PMDBG);
-extern void *PINT_memalign (size_t alignment, size_t size __PMDBG) GCC_MALLOC;
-extern void *PINT_valloc (size_t size __PMDBG) GCC_MALLOC;
-extern void *PINT_realloc (void *mem, size_t size __PMDBG);
-extern char *PINT_strdup (const char *str __PMDBG) GCC_MALLOC;
-extern char *PINT_strndup (const char *str, size_t size __PMDBG) GCC_MALLOC;
-extern void  PINT_free (void *mem __PMDBG);
-extern void  PINT_free2(void *mem);
+extern void *PINT_malloc(size_t size);
+extern void *PINT_calloc(size_t nmemb, size_t size);
+extern int   PINT_posix_memalign(void **mem, size_t alignment, size_t size);
+extern void *PINT_memalign(size_t alignment, size_t size) GCC_MALLOC;
+extern void *PINT_valloc(size_t size) GCC_MALLOC;
+extern void *PINT_realloc(void *mem, size_t size);
+extern char *PINT_strdup(const char *str) GCC_MALLOC;
+extern char *PINT_strndup(const char *str, size_t size) GCC_MALLOC;
+extern void  PINT_free(void *mem);
 
 #include "pint-clean-malloc.h"
 #else
@@ -103,64 +82,58 @@ extern void  PINT_free2(void *mem);
 
 /* Make sure code that calls default malloc gets our version */
 
-# if PVFS_MALLOC_DEBUG
-#  define __PMDBGARGS ,__FILE__,__LINE__
-# else
-#  define __PMDBGARGS
-# endif 
-
 # ifdef malloc
 #  undef malloc
 # endif
-# define malloc(x) PINT_malloc((x) __PMDBGARGS)
+/* Defining malloc with an arg avoids losing on __attribute__((malloc))  */
+# define malloc(x) PINT_malloc(x)
 
 # ifdef calloc
 #  undef calloc
 # endif
-# define calloc(x, y) PINT_calloc((x), (y) __PMDBGARGS)
+# define calloc PINT_calloc
 
 # ifdef posix_memalign
 #  undef posix_memalign
 # endif
-# define posix_memalign(x, y, z) \
-                 PINT_posix_memalign((x), (y), (z) __PMDBGARGS)
+# define posix_memalign PINT_posix_memalign
 
 # ifdef memalign
 #  undef memalign
 # endif
-# define memalign(x, y) PINT_memalign((x), (y) __PMDBGARGS)
+# define memalign PINT_memalign
 
 # ifdef valloc
 #  undef valloc
 # endif
-# define valloc(x) PINT_valloc((x) __PMDBGARGS)
+# define valloc PINT_valloc
 
 # ifdef realloc
 #  undef realloc
 # endif
-# define realloc(x, y) PINT_realloc((x), (y) __PMDBGARGS)
+# define realloc PINT_realloc
 
 # ifdef strdup
 #  undef strdup
 # endif
-# define strdup(x) PINT_strdup((x) __PMDBGARGS)
+# define strdup PINT_strdup
 
 # ifdef strndup
 #  undef strndup
 # endif
-# define strndup(x, y) PINT_strndup((x), (y) __PMDBGARGS)
+# define strndup PINT_strndup
 
 # ifdef free
 #  undef free
 # endif
-# define free(x) PINT_free((x) __PMDBGARGS)
+# define free PINT_free
 
 # ifdef cfree
 #  undef cfree
 # endif
-# define cfree(x) PINT_free((x) __PMDBGARGS)
+# define cfree PINT_free
 
-#else /* not PVFS_MALLOC_REDEF */
+#else /* PVFS_MALLOC_REDEF */
 
 /* Make sure code that directly calls our malloc just gets the default */
 
@@ -182,60 +155,55 @@ extern void  PINT_free2(void *mem);
 # ifdef PINT_calloc
 #  undef PINT_calloc
 # endif
-# define PINT_calloc(w, x, y, z) calloc((w), (x))
+# define PINT_calloc calloc
 
 # ifdef PINT_posix_memalign
 #  undef PINT_posix_memalign
 # endif
-# define PINT_posix_memalign(v, w, x, y, z) posix_memalign((v), (w), (x))
+# define PINT_posix_memalign posix_memalign
 
 # ifdef PINT_memalign
 #  undef PINT_memalign
 # endif
-# define PINT_memalign(w, x, y, z) memalign((w), (x))
+# define PINT_memalign memalign
 
 # ifdef PINT_valloc
 #  undef PINT_valloc
 # endif
-# define PINT_valloc(x, y, z) valloc((x))
+# define PINT_valloc valloc
 
 # ifdef PINT_realloc
 #  undef PINT_realloc
 # endif
-# define PINT_realloc(w, x, y, z) realloc((w), (x))
+# define PINT_realloc realloc
 
 # ifdef PINT_strdup
 #  undef PINT_strdup
 # endif
-# define PINT_strdup(x, y, z) strdup((x))
+# define PINT_strdup strdup
 
 #  ifdef PINT_strndup
 #  undef PINT_strndup
 # endif
-# define PINT_strndup(w, x, y, z) strndup((w), (x))
+# define PINT_strndup strndup
 
 # ifdef PINT_free
 #  undef PINT_free
 # endif
-# define PINT_free(x, y, z) free((x))
-
-# ifdef PINT_free2
-#  undef PINT_free2
-# endif
-# define PINT_free2 free
+# define PINT_free free
 
 #endif
 
 #if !PVFS_MALLOC_ZERO || !PVFS_MALLOC_REDEF
-# define ZEROMEM(p, s) memset((p), 0, (s))
+# define ZEROMEM(p,s) memset((p), 0, (s))
 #else
-# define ZEROMEM(p, s) 
+# define ZEROMEM(p,s) 
 #endif
 
 #if !PVFS_MALLOC_FREE_ZERO || !PVFS_MALLOC_REDEF
-# define ZEROFREE(p, s) memset((p), 0, (s))
+# define ZEROFREE(p,s) memset((p), 0, (s))
 #else
-# define ZEROFREE(p, s) 
+# define ZEROFREE(p,s) 
 #endif
 
 #endif

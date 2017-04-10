@@ -26,12 +26,7 @@
 #include "sid.h"
 #include "dist-dir-utils.h"
 
-/*
- * Now included from client-state-machine.h
- */
-#if 0
 extern job_context_id pint_client_sm_context;
-#endif
 
 enum
 {
@@ -397,6 +392,7 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
                                                 job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -412,8 +408,6 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
 
     /* initialize the msgarray struct */
     PINT_msgpairarray_init(&sm_p->msgarray_op, sm_p->object_ref.sid_count);
-
-    PINT_debug_capability(&sm_p->getattr.attr.capability,"symlink dspace create");
 
     /* use msgpair array to send create to each SID */
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
@@ -440,7 +434,7 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
         msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = symlink_create_comp_fn;
 
-        /* ret = */PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
         /* V3 how to process error in this loop?  Just bail? */
     }
 
@@ -713,12 +707,6 @@ static PINT_sm_action symlink_cleanup(struct PINT_smcb *smcb,
         PINT_ncache_update((const char*) sm_p->u.sym.link_name,
                            (const PVFS_object_ref*) &(sm_p->object_ref),
                            (const PVFS_object_ref*) &(sm_p->parent_ref));
-
-        /* Invalidate the symlink's parent from the acache, because
-         * creating a symlink entry modifies the timestamps on the
-         * directory.
-         */
-        PINT_acache_invalidate(sm_p->parent_ref);
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.sym.retry_count < sm_p->msgarray_op.params.retry_limit))

@@ -326,7 +326,7 @@ int dbpf_queue_or_service(
     if(coll_p->immediate_completion &&
        (DBPF_OP_IS_KEYVAL(op_p->type) || DBPF_OP_IS_DSPACE(op_p->type)))
     {
-        dbpf_db * dbp;
+        DB * dbp;
         *out_op_id_p = 0;
         ret = op_p->svc_fn(op_p);
         if(ret < 0)

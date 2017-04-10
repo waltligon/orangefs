@@ -24,13 +24,9 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "pint-security.h"
-#include "pint-cached-config.h"
 
-enum
-{
-    LOCAL_OPERATION = 2,
-    REMOTE_OPERATION = 3
-};
+#define GETATTR 100
+
 
 %%
 
@@ -55,7 +51,7 @@ machine pvfs2_list_attr_sm
     {
         pjmp listattr_setup_getattr
         {
-            LOCAL_OPERATION => pvfs2_pjmp_get_attr_work_sm;
+            GETATTR => pvfs2_pjmp_get_attr_work_sm;
         }
         success => interpret_getattrs;
         default => final_response;
@@ -132,7 +128,8 @@ static PINT_sm_action listattr_setup_getattr(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {    
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *getattr_op = NULL;
+    struct PINT_server_op *getattr_op;
+    int ret;
     int i;
 
     s_op->u.listattr.parallel_sms = 0;
@@ -161,23 +158,10 @@ static PINT_sm_action listattr_setup_getattr(
         }
         memset(getattr_op, 0, sizeof(*getattr_op));
 
-#if 0
-	/* FIXME sids */
-        PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, getattr_op,
-            s_op->req->u.listattr.handles[i],
-            s_op->req->u.listattr.fs_id,
-            js_p->error_code, req, LOCAL_OPERATION);
+        /* TODO: need a way to explicitly set the right inputs to the
+         * getattr nested sm.  This code block is very fragile.
+         */
 
-        PINT_SERVREQ_GETATTR_FILL(*req, s_op->req->capability,
-            s_op->req->u.getattr.credential,
-            s_op->req->u.listattr.fs_id,
-            s_op->req->u.listattr.handles[i],
-            s_op->req->u.listattr.attrmask,
-            s_op->req->hints);
-#endif
-
-#if 0
-	/* from trunk? */
         /* need attrs that the prelude would have read normally */
         PVFS_object_attr_from_ds_attr(&getattr_op->attr,
                                       &s_op->u.listattr.ds_attr_a[i]);
@@ -201,7 +185,6 @@ static PINT_sm_action listattr_setup_getattr(
                 PVFS_OID_str(&s_op->req->u.listattr.handles[i]));
             continue;
         }
-#endif
 
         s_op->u.listattr.parallel_sms++;
     }
@@ -259,14 +242,12 @@ static PINT_sm_action listattr_interpret_getattrs(struct PINT_smcb *smcb,
             if(!PVFS_OID_cmp(&s_op->req->u.listattr.handles[j],
                              &getattr_op->u.getattr.handle))
             {
-                PINT_copy_object_attr(&s_op->u.listattr.attr_a[j],
-                                    &getattr_op->resp.u.getattr.attr);
+                s_op->u.listattr.attr_a[j] = getattr_op->resp.u.getattr.attr;
                 s_op->u.listattr.errors[j] = tmp_err;
+                free(getattr_op);
                 break;
             }
         }
-        getattr_free(getattr_op);
-        free(getattr_op);
     }
 
     /* if we reached this point, then we have a successful ack to send back;

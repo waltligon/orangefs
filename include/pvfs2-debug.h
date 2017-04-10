@@ -89,8 +89,8 @@ PVFS_DEBUG_MASK(GOSSIP_DIST_DEBUG);
 PVFS_DEBUG_MASK(GOSSIP_BMI_DEBUG_IB);
 #define GOSSIP_DBPF_ATTRCACHE_DEBUG_INIT      (uint64_t)0 , ((uint64_t)1 << 20)
 PVFS_DEBUG_MASK(GOSSIP_DBPF_ATTRCACHE_DEBUG);
-#define GOSSIP_RACACHE_DEBUG_INIT             (uint64_t)0 , ((uint64_t)1 << 21)
-PVFS_DEBUG_MASK(GOSSIP_RACACHE_DEBUG);
+#define GOSSIP_MMAP_RCACHE_DEBUG_INIT         (uint64_t)0 , ((uint64_t)1 << 21)
+PVFS_DEBUG_MASK(GOSSIP_MMAP_RCACHE_DEBUG);
 #define GOSSIP_LOOKUP_DEBUG_INIT              (uint64_t)0 , ((uint64_t)1 << 22)
 PVFS_DEBUG_MASK(GOSSIP_LOOKUP_DEBUG);
 #define GOSSIP_REMOVE_DEBUG_INIT              (uint64_t)0 , ((uint64_t)1 << 23)
@@ -328,7 +328,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     /* Debug the client name cache.  Only useful on the client. */
     { "ncache", {GOSSIP_NCACHE_DEBUG_INIT} },
     /* Debug read-ahead cache events.  Only useful on the client. */
-    { "racache", GOSSIP_RACACHE_DEBUG },
+    { "mmaprcache", {GOSSIP_MMAP_RCACHE_DEBUG_INIT} },
     /* Debug the attribute cache.  Only useful on the client. */
     { "acache", {GOSSIP_ACACHE_DEBUG_INIT} },
     /* Log/Debug distribution calls */

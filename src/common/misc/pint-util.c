@@ -564,26 +564,11 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             dest->u.dir.hint.dist_params_len = src->u.dir.hint.dist_params_len;
             if (dest->u.dir.hint.dist_params_len > 0)
             {
-                dest->u.dir.hint.dist_params =
-                        strdup(src->u.dir.hint.dist_params);
+                dest->u.dir.hint.dist_params 
+                        = strdup(src->u.dir.hint.dist_params);
                 if (dest->u.dir.hint.dist_params == NULL)
                 {
                     free(dest->u.dir.hint.dist_name);
-                    return ret;
-                }
-            }
-            dest->u.dir.hint.layout.algorithm =
-                    src->u.dir.hint.layout.algorithm;
-            dest->u.dir.hint.layout.server_list.count =
-                    src->u.dir.hint.layout.server_list.count;
-            dest->u.dir.hint.layout.server_list.bufsize =
-                    src->u.dir.hint.layout.server_list.bufsize;
-            if (dest->u.dir.hint.layout.server_list.bufsize)
-            {
-                dest->u.dir.hint.layout.server_list.servers =
-                        strdup(src->u.dir.hint.layout.server_list.servers);
-                if (dest->u.dir.hint.layout.server_list.servers == NULL)
-                {
                     return ret;
                 }
             }
@@ -742,7 +727,6 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
         if (src->mask & PVFS_ATTR_CAPABILITY)
         {
-            PINT_cleanup_capability(&dest->capability);
             ret = PINT_copy_capability(&src->capability, &dest->capability);
             if (ret < 0)
             {
@@ -771,8 +755,7 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
             {
                 free(attr->capability.handle_array);
             }            
-            if (attr->capability.issuer &&
-                (attr->capability.issuer != PVFS2_BLANK_ISSUER))
+            if (attr->capability.issuer)
             {
                 free(attr->capability.issuer);
             }
@@ -828,11 +811,6 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
             {
                 free(attr->u.dir.hint.dist_params);
                 attr->u.dir.hint.dist_params = NULL;
-            }
-            if (attr->u.dir.hint.layout.server_list.servers)
-            {
-                free(attr->u.dir.hint.layout.server_list.servers);
-                attr->u.dir.hint.layout.server_list.servers = NULL;
             }
         }
         if (attr->mask & PVFS_ATTR_DISTDIR_ATTR)
@@ -1080,7 +1058,7 @@ void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
     /* figure out how big this encoding will be first */
 
     tmp_size = 16; /* enumeration and list count */
-    for(i = 0; i < x->server_list.count; i++)
+    for(i=0 ; i<x->server_list.count; i++)
     {
         /* room for each server encoding */
         tmp_size +=
@@ -1102,7 +1080,7 @@ void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
     encode_skip4(pptr, NULL);
     encode_int32_t(pptr, &x->server_list.count);
     encode_skip4(pptr, NULL);
-    for(i = 0; i < x->server_list.count; i++)
+    for(i=0 ; i<x->server_list.count; i++)
     {
         encode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
     }
@@ -1121,11 +1099,11 @@ void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x)
     decode_skip4(pptr, NULL);
     if(x->server_list.count)
     {
-        x->server_list.servers = malloc(x->server_list.count *
-                                        sizeof(*(x->server_list.servers)));
+        x->server_list.servers =
+                 malloc(x->server_list.count*sizeof(*(x->server_list.servers)));
         assert(x->server_list.servers);
     }
-    for(i = 0 ; i < x->server_list.count; i++)
+    for(i=0 ; i<x->server_list.count; i++)
     {
         decode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
     }

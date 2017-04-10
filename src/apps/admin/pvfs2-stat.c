@@ -34,27 +34,22 @@ struct options
     int     nFollowLink;
     char ** pszFiles;
     int     nNumFiles;
-    int     nDfiles;
 };
 
 /* Function Prototypes */
 static void usage(int argc, char** argv);
-static int parse_args(int argc, char** argv, struct options *opts);
-static void enable_verbose(struct options *opts);
-static void enable_dereference(struct options *opts);
-static void enable_dfiles(struct options *opts);
-
-static int do_stat(const char             *pszFile,
-                   const char             *pszRelativeFile, 
-                   const PVFS_fs_id        fs_id, 
-                   const PVFS_credential  *credentials,
-                   const struct options   *opts);
-
-void print_stats(const PVFS_object_ref *ref,
-                 const char            *pszName,
-                 const char            *pszRelativeName,
-                 const PVFS_sys_attr   *attr,
-                 const struct options  *opts);
+static int parse_args(int argc, char** argv, struct options * opts);
+static void enable_verbose(struct options * opts);
+static void enable_dereference(struct options * opts);
+static int do_stat(const char             * pszFile,
+                   const char             * pszRelativeFile, 
+                   const PVFS_fs_id         fs_id, 
+                   const PVFS_credential  * credentials,
+                   const struct options   * opts);
+void print_stats(const PVFS_object_ref * ref,
+                 const char            * pszName,
+                 const char            * pszRelativeName,
+                 const PVFS_sys_attr   * attr);
 
 int main(int argc, char **argv)
 {
@@ -269,8 +264,7 @@ static int do_stat(const char             * pszFile,
    print_stats(&ref,
                pszFile, 
                pszRelativeFile, 
-               &(getattr_response.attr),
-               opts);
+               &(getattr_response.attr));
    
    return(0);
 }
@@ -281,32 +275,53 @@ static int do_stat(const char             * pszFile,
  *
  * returns pointer to options structure on success, NULL on failure
  */
-static int parse_args(int argc, char **argv, struct options *opts)
+static int parse_args(int argc, char** argv, struct options * opts)
 {
     int    i            = 0, 
            ret          = 0, 
            option_index = 0;
-
-    const char *flags = "vVLD?";
+    const char * cur_option   = NULL;
 
     static struct option long_opts[] =
     {
-        {"help",0,0,'?'},
-        {"version",0,0,'v'},
-        {"verbose",0,0,'V'},
-        {"dereference",0,0,'L'},
-        {"dfiles",0,0,'D'},
+        {"help",0,0,0},
+        {"version",0,0,0},
+        {"verbose",0,0,0},
+        {"dereference",0,0,0},
         {0,0,0,0}
     };
 
-   while((ret = getopt_long(argc, argv, flags, long_opts, &option_index)) != -1)
+   while((ret = getopt_long_only(argc, argv, "VL", long_opts, &option_index)) != -1)
    {
       switch (ret)
       {
+         case 0:
+               cur_option = long_opts[option_index].name;
    
-         case 'v': /* --version     */ 
+               if(strcmp("help", cur_option) == 0)
+               {
+                  usage(argc, argv);
+                  exit(0);
+               }
+               else if(strcmp("verbose", cur_option) == 0)
+               {
+                  enable_verbose(opts);
+               }
+               else if(strcmp("dereference", cur_option) == 0)
+               {
+                  enable_dereference(opts);
+               }
+               else if (strcmp("version", cur_option) == 0)
+               {
                   printf("%s\n", PVFS2_VERSION);
                   exit(0);
+               }
+               else
+               {
+                  usage(argc, argv);
+                  exit(0);
+               }
+               break;
 
          case 'V': /* --verbose     */ 
                   enable_verbose(opts);
@@ -314,10 +329,6 @@ static int parse_args(int argc, char **argv, struct options *opts)
                    
          case 'L': /* --dereference */
                   enable_dereference(opts);
-                  break;
-         
-         case 'D': /* --dfiles */
-                  enable_dfiles(opts);
                   break;
          
          case '?': 
@@ -382,16 +393,10 @@ static void enable_dereference(struct options * opts)
    opts->nFollowLink = 1;  
 }
 
-static void enable_dfiles(struct options * opts)
-{
-   opts->nDfiles = 1;  
-}
-
-void print_stats(const PVFS_object_ref *ref,
-                 const char            *pszName,
-                 const char            *pszRelativeName,
-                 const PVFS_sys_attr   *attr,
-                 const struct options  *opts)
+void print_stats(const PVFS_object_ref * ref,
+                 const char            * pszName,
+                 const char            * pszRelativeName,
+                 const PVFS_sys_attr   * attr)
 {
    char a_time[100] = ""; 
    char m_time[100] = "";  
@@ -521,21 +526,6 @@ void print_stats(const PVFS_object_ref *ref,
    {
       fprintf(stdout, "  datafiles     : %d\n", attr->dfile_count);
    }
-
-#if 0
-   if( (attr->mask & PVFS_ATTR_SYS_DFILE_COUNT) &&
-       (attr->objtype == PVFS_TYPE_METAFILE) &&
-       opts->nDfiles)
-   {
-      int i;
-      fprintf(stdout, "  dfile handles : ");
-      for(i = 0; i < attr->dfile_count; i++)
-      {
-         fprintf(stdout, "%llu ", llu(attr->dfile_array[i]));
-      }
-      fprintf(stdout, "\n");
-   }
-#endif
 
    if( (attr->mask & PVFS_ATTR_SYS_BLKSIZE) &&
        (attr->objtype == PVFS_TYPE_METAFILE))

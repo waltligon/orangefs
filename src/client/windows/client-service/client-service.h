@@ -46,7 +46,6 @@ typedef struct
     int threads;
     unsigned int new_file_perms,
                  new_dir_perms;
-    int disable_update_write_time;
     int debug;
     int debug_stderr;
     char debug_mask[STR_BUF_LEN];
