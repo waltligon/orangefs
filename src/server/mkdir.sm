@@ -485,6 +485,7 @@ static PINT_sm_action mkdir_setup_response(
       js_p->error_code = ret;
    }
 
+   PINT_cleanup_capability(&(*getattr_op->req).capability);
    free(getattr_op);
    return SM_ACTION_COMPLETE;
 }

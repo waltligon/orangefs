@@ -751,6 +751,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
     }
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    free(dirdata_attr.u.dirdata.dist_dir_bitmap);
     return SM_ACTION_COMPLETE;
 }
 
@@ -758,7 +759,15 @@ static PINT_sm_action mkdir_setattr_failure(struct PINT_smcb *smcb,
                                              job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i = 0;
+    PINT_sm_msgpair_state *msg_p = NULL;
+
     sm_p->u.mkdir.stored_error_code = js_p->error_code;
+
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
+    {
+        PINT_free_object_attr(&msg_p->req.u.setattr.attr);
+    }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: mkdir_setattr_failure\n");
 
@@ -775,6 +784,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index;
     int dirdata_sid_index;
+    int i = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "mkdir state: crdirent_setup_msgpair\n");
@@ -808,6 +818,12 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                  PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
                                                   dirdata_server_index]),
                  dirdata_server_index);
+
+    /* Clean up previous use of msgpair */
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
+    {
+        PINT_free_object_attr(&msg_p->req.u.setattr.attr);
+    }
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -1026,6 +1042,8 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
         free(sm_p->u.mkdir.dirdata_sid_array);
         sm_p->u.mkdir.dirdata_sid_array = NULL;
     }
+
+    PINT_cleanup_capability(&sm_p->u.mkdir.capability);
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
