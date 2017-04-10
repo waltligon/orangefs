@@ -4281,8 +4281,9 @@ static inline PVFS_error handle_unexp_vfs_request(vfs_request_t *vfs_request)
     }
 
     if (remount_complete == REMOUNT_NOTCOMPLETED &&
-        (vfs_request->in_upcall.type != PVFS2_VFS_OP_FS_MOUNT) && 
-        (vfs_request->in_upcall.type != PVFS2_VFS_OP_CANCEL) )
+        (vfs_request->in_upcall.type != PVFS2_VFS_OP_FS_MOUNT) &&
+        (vfs_request->in_upcall.type != PVFS2_VFS_OP_CANCEL) &&
+        (vfs_request->in_upcall.type != PVFS2_VFS_OP_FEATURES) )
     {
         gossip_debug(
             GOSSIP_CLIENTCORE_DEBUG, "Got an upcall operation of "
@@ -4457,7 +4458,7 @@ static inline PVFS_error handle_unexp_vfs_request(vfs_request_t *vfs_request)
 #else
             vfs_request->out_downcall.resp.features.features = 0;
 #endif
-            vfs_request->out_downcall.status = ret;
+            vfs_request->out_downcall.status = 0;
             vfs_request->out_downcall.type = vfs_request->in_upcall.type;
             vfs_request->op_id = -1;
             ret = 0;
