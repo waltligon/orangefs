@@ -221,9 +221,8 @@ static void lebf_initialize(void)
                 break;
             case PVFS_SERV_MKDIR:
                 zero_credential(&req.u.mkdir.credential);
-                /* req.u.mkdir.handle_extent_array.extent_count = 0; */
                 req.u.mkdir.attr.mask = 0;
-                zero_capability(&resp.u.mkdir.capability);
+                zero_capability(&resp.u.create.capability);
                 reqsize = extra_size_PVFS_servreq_mkdir;
                 respsize = extra_size_PVFS_servresp_mkdir;
                 break;
@@ -1091,8 +1090,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 break;
 
             case PVFS_SERV_MKDIR:
-                /* decode_free(req->u.mkdir.handle_extent_array.extent_array);
-                 */
                 decode_free(req->u.mkdir.credential.group_array);
                 decode_free(req->u.mkdir.credential.signature);
 #ifdef ENABLE_SECURITY_CERT

@@ -572,7 +572,9 @@ struct PINT_server_mkdir_op
 {
     PVFS_fs_id fs_id;
     PVFS_handle handle;        /* metadata handle passed by request */
+/*
     PVFS_size init_dirdata_size;
+*/
     PVFS_capability *saved_capability;
     PVFS_object_attr *saved_attr;
 
@@ -584,12 +586,12 @@ struct PINT_server_mkdir_op
     /* not using these right now
     const char **dirdata_servers;
     const char **remote_dirdata_servers;
-    */
     int num_dirdata_servers;
     PVFS_handle* handle_array_local;
     PVFS_handle* handle_array_remote;
     int handle_array_local_count;
     int handle_array_remote_count;
+    */
     PVFS_error saved_error_code;
     int handle_index;
 };
