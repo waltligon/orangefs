@@ -864,6 +864,29 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	    AC_MSG_RESULT(no)
 	    )
 
+
+
+
+
+	dnl checking if we have write-iter callback in file_operations
+	AC_MSG_CHECKING(for iter operations in kernel file_operations structure)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+	#ifdef HAVE_KCONFIG
+	#include <linux/kconfig.h>
+	#endif
+		#include <linux/fs.h>
+		], [
+			struct file_operations filop = { .write_iter = NULL };
+		],
+		AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_ITER_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has iter operations),
+		AC_MSG_RESULT(no)
+	)
+
+
+
+
 	dnl checking if we have a writex callback in file_operations
 	AC_MSG_CHECKING(for writex member in file_operations structure)
 	AC_TRY_COMPILE([
