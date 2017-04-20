@@ -37,7 +37,7 @@ static memcache_entry_t *memcache_add(memcache_device_t *memcache_device,
                                       bmi_size_t len)
 {
     memcache_entry_t *c;
-    
+
     c = malloc(sizeof(*c));
     if (bmi_rdma_likely(c))
     {
@@ -46,7 +46,7 @@ static memcache_entry_t *memcache_add(memcache_device_t *memcache_device,
         c->count = 1;
         qlist_add_tail(&c->list, &memcache_device->list);
     }
-    
+
     return c;
 }
 
@@ -76,21 +76,21 @@ static memcache_entry_t *memcache_lookup_cover(
     struct qlist_head *l;
     const char *end = (const char *) buf + len;
     memcache_entry_t *cbest = 0;
-    
+
     qlist_for_each(l, &memcache_device->list)
     {
         memcache_entry_t *c = qlist_entry(l, memcache_entry_t, list);
-        
+
         if (!(c->buf <= buf && end <= (const char *) c->buf + c->len))
         {
             continue;
         }
-        
+
         if (!cbest)
         {
             goto take;
         }
-        
+
         if (c->count < cbest->count)
         {
             continue;   /* discard lower refcnt one */
@@ -104,13 +104,13 @@ static memcache_entry_t *memcache_lookup_cover(
         {
             goto take;
         }
-        
+
         continue;
-        
+
 take:
         cbest = c;
     }
-    
+
     return cbest;
 }
 
@@ -124,7 +124,7 @@ static memcache_entry_t *memcache_lookup_exact(
                                         bmi_size_t len)
 {
     struct qlist_head *l;
-    
+
     qlist_for_each(l, &memcache_device->list)
     {
         memcache_entry_t *c = qlist_entry(l, memcache_entry_t, list);
@@ -133,7 +133,7 @@ static memcache_entry_t *memcache_lookup_exact(
             return c;
         }
     }
-    
+
     return 0;
 }
 
@@ -153,9 +153,9 @@ void *memcache_memalloc(void *md,
 {
     memcache_device_t *memcache_device = md;
     void *buf;
-    
+
     debug(4, "%s: len %lld limit %d", __func__, lld(len), eager_limit);
-    
+
     /* search in size cache first */
     if (len > eager_limit)
     {
@@ -180,18 +180,18 @@ void *memcache_memalloc(void *md,
         }
         gen_mutex_unlock(&memcache_device->mutex);
     }
-    
+
     buf = malloc(len);
-    
+
     if (bmi_rdma_unlikely(!buf))
     {
         goto out;
     }
-    
+
     if (len > eager_limit)
     {
         memcache_entry_t *c;
-        
+
         gen_mutex_lock(&memcache_device->mutex);
         /* could be recycled buffer */
         c = memcache_lookup_cover(memcache_device, buf, len);
@@ -225,10 +225,10 @@ void *memcache_memalloc(void *md,
                 debug(4, "%s: new reg, buf %p", __func__, c->buf);
             }
         }
-        
+
         gen_mutex_unlock(&memcache_device->mutex);
     }
-    
+
 out:
     return buf;
 }
@@ -239,7 +239,7 @@ int memcache_memfree(void *md,
 {
     memcache_device_t *memcache_device = md;
     memcache_entry_t *c;
-    
+
     gen_mutex_lock(&memcache_device->mutex);
     /* okay if not found, just not cached; perhaps an eager-size buffer */
     c = memcache_lookup_exact(memcache_device, buf, len);
@@ -247,7 +247,7 @@ int memcache_memfree(void *md,
     {
         debug(4, "%s: cache free buf %p len %lld",
               __func__, c->buf, lld(c->len));
-        
+
         if (c->count != 1)
         {
             error("%s: buf %p len %lld count %d, expected 1",
@@ -255,23 +255,23 @@ int memcache_memfree(void *md,
             gen_mutex_unlock(&memcache_device->mutex);
             return EINVAL;
         }
-        
+
         /* cache it */
         --c->count;
         if (c->count == 0)
         {
             memcache_device->mem_deregister(c);
         }
-        
+
         qlist_del(&c->list);
         qlist_add(&c->list, &memcache_device->free_chunk_list);
         gen_mutex_unlock(&memcache_device->mutex);
-        
+
         return 0;
     }
-    
+
     gen_mutex_unlock(&memcache_device->mutex);
-    
+
     free(buf);
     return 0;
 }
@@ -285,7 +285,7 @@ void memcache_register(void *md,
 {
     int i, ret;
     memcache_device_t *memcache_device = md;
-    
+
     buflist->memcache = bmi_rdma_malloc(buflist->num *
                                         sizeof(*buflist->memcache));
     if (!buflist->memcache)
@@ -294,9 +294,9 @@ void memcache_register(void *md,
               __func__, buflist->num * sizeof(*buflist->memcache));
         return;
     }
-    
+
     gen_mutex_lock(&memcache_device->mutex);
-    
+
     for (i = 0; i < buflist->num; i++)
     {
         memcache_entry_t *c;
@@ -310,7 +310,7 @@ void memcache_register(void *md,
             {
                 memcache_device->mem_register(c);
             }
-            
+
             debug(2, "%s: hit [%d] %p len %lld (via %p len %lld) refcnt now %d",
                   __func__,
                   i,
@@ -327,7 +327,7 @@ void memcache_register(void *md,
                   i,
                   buflist->buf.send[i],
                   lld(buflist->len[i]));
-            
+
             c = memcache_add(memcache_device,
                              buflist->buf.recv[i],
                              buflist->len[i]);
@@ -337,7 +337,7 @@ void memcache_register(void *md,
                 error("%s: no memory for cache entry", __func__);
                 goto out;
             }
-            
+
             ret = memcache_device->mem_register(c);
             if (ret)
             {
@@ -346,10 +346,10 @@ void memcache_register(void *md,
                 goto out;
             }
         }
-        
+
         buflist->memcache[i] = c;
     }
-    
+
 out:
     gen_mutex_unlock(&memcache_device->mutex);
 }
@@ -373,7 +373,7 @@ void memcache_deregister(void *md,
 {
     int i;
     memcache_device_t *memcache_device = md;
-    
+
     gen_mutex_lock(&memcache_device->mutex);
     for (i = 0; i < buflist->num; i++)
     {
@@ -395,7 +395,7 @@ void memcache_deregister(void *md,
               c->count);
         /* let garbage collection do rdma_mem_deregister(c) for refcnt == 0 */
     }
-    
+
     free(buflist->memcache);
     gen_mutex_unlock(&memcache_device->mutex);
 }
@@ -407,7 +407,7 @@ void *memcache_init(int (*mem_register)(memcache_entry_t *),
                     void (*mem_deregister)(memcache_entry_t *))
 {
     memcache_device_t *memcache_device;
-    
+
     memcache_device = bmi_rdma_malloc(sizeof(*memcache_device));
     INIT_QLIST_HEAD(&memcache_device->list);
     gen_mutex_init(&memcache_device->mutex);
@@ -424,9 +424,9 @@ void memcache_shutdown(void *md)
 {
     memcache_device_t *memcache_device = md;
     memcache_entry_t *c, *cn;
-    
+
     gen_mutex_lock(&memcache_device->mutex);
-    
+
     qlist_for_each_entry_safe(c, cn, &memcache_device->list, list)
     {
         if (c->count > 0)
@@ -436,7 +436,7 @@ void memcache_shutdown(void *md)
         qlist_del(&c->list);
         free(c);
     }
-    
+
     qlist_for_each_entry_safe(c, cn, &memcache_device->free_chunk_list, list)
     {
         if (c->count > 0)
@@ -447,7 +447,7 @@ void memcache_shutdown(void *md)
         free(c->buf);
         free(c);
     }
-    
+
     gen_mutex_unlock(&memcache_device->mutex);
     free(memcache_device);
 }
@@ -460,7 +460,7 @@ void memcache_cache_flush(void *md)
 {
     memcache_device_t *memcache_device = md;
     memcache_entry_t *c, *cn;
-    
+
     debug(4, "%s", __func__);
     qlist_for_each_entry_safe(c, cn, &memcache_device->list, list);
     {

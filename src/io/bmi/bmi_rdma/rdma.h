@@ -28,49 +28,49 @@
 /* 20 16kB buffers allocated to each connection for unexpected messages */
 #define DEFAULT_EAGER_BUF_NUM  (20)
 #define DEFAULT_EAGER_BUF_SIZE (16 << 10)
-/* TODO: decide if 16kB is the best size for this. Used to be 8kB, but 
+/* TODO: decide if 16kB is the best size for this. Used to be 8kB, but
  *       that prevented it from ever using small-io.
  */
 
 struct buf_head;
 
 /*
- * Connection record.  Each machine gets its own set of buffers and 
+ * Connection record.  Each machine gets its own set of buffers and
  * an entry in this table.
  */
 typedef struct
 {
     struct qlist_head list;
-    
+
     /* connection management */
     struct bmi_method_addr *remote_map;
     char *peername;  /* string representation of remote_map */
-    
+
     /* per-connection buffers */
     void *eager_send_buf_contig;    /* bounce bufs, for short sends */
     void *eager_recv_buf_contig;    /* eager bufs, for short recvs */
-    
+
     /* list of free bufs */
     struct qlist_head eager_send_buf_free;
     struct qlist_head eager_recv_buf_free;
     struct buf_head *eager_send_buf_head_contig;
     struct buf_head *eager_recv_buf_head_contig;
-    
+
     int cancelled;  /* was any operation cancelled by BMI */
     int refcnt;     /* sq or rq that need the connection to hang around */
     int closed;     /* closed, but hanging around waiting for zero refcnt */
-    
+
     int send_credit;    /* free slots on receiver */
     int return_credit;  /* receive buffers he filled but that we've emptied */
-    
+
     void *priv;     /* TODO: change from void to rdma_connection_priv? */
-    
+
     BMI_addr_t bmi_addr;
 } rdma_connection_t;
 
 /*
  * List structure of buffer areas, represents one at each local
- * and remote side. 
+ * and remote side.
  */
 struct buf_head
 {
@@ -192,8 +192,8 @@ static name_t msg_type_names[] =
 
 /*
  * Pin and cache explicitly allocated things to avoid registration
- * overheads.  Two sources of entries here:  first, when BMI_memalloc 
- * is used to allocate big enough chunks, the malloced regions are 
+ * overheads.  Two sources of entries here:  first, when BMI_memalloc
+ * is used to allocate big enough chunks, the malloced regions are
  * entered into this list.  Second, when a bmi/ib routine needs to pin
  * memory, it is cached here too.  Note that the second case really
  * needs a dreg-style consistency check against userspace freeing, though.
@@ -204,11 +204,11 @@ typedef struct
     void *buf;
     bmi_size_t len;
     int count;      /* refcount, usage of this entry */
-    
+
     /* IB-specific fields */
     struct
     {
-        uint64_t mrh;   
+        uint64_t mrh;
         uint32_t lkey;  /* 32-bit mandated by IB spec */
         uint32_t rkey;
     } memkeys;
@@ -240,12 +240,12 @@ struct rdma_work
     struct qlist_head list;
     int type;               /* BMI_SEND or BMI_RECV */
     struct method_op *mop;  /* pointer back to owning method_op */
-    
+
     rdma_connection_t *c;
-    
+
     /* gather (send) or scatter (recv) list of buffers */
     rdma_buflist_t buflist;
-    
+
     /* places to hang just one buf when not using _list funcs, avoids
      * small mallocs in that case but permits use of generic code */
     union
@@ -254,21 +254,21 @@ struct rdma_work
         void *recv;
     } buflist_one_buf;
     bmi_size_t buflist_one_len;
-    
+
     /* bh represents our local buffer for sending, maybe CTS messages
      * as sent for receive items */
     struct buf_head *bh;
-    
+
     /* tag as posted by user, or return value on recvs */
     bmi_msg_tag_t bmi_tag;
-    
+
     /* send or receive state */
     union
     {
         sq_state_t send;
         rq_state_t recv;
     } state;
-    
+
     int is_unexpected;      /* send: if user posted an unexpected message */
     u_int64_t rts_mop_id;   /* recv: return tag to give to rts sender */
     bmi_size_t actual_len;  /* recv: could be shorter than posted */
@@ -276,7 +276,7 @@ struct rdma_work
 
 /*
  * Header structure used for various sends.  Make sure these stay fully 64-bit
- * aligned.  All of eager, rts, and cts messages must start with ->type so 
+ * aligned.  All of eager, rts, and cts messages must start with ->type so
  * we can switch on that first.  All elements in these arrays will be encoded
  * by the usual le-bytefield encoder used for all wire transfers.
  */
@@ -380,9 +380,9 @@ struct bmi_rdma_wc
 /*
  * RoCE/RDMA functions
  *
- * TODO: it is in this format because for IB they generalized the calls in 
+ * TODO: it is in this format because for IB they generalized the calls in
  * order to be able to use VAPI or OpenIB. For RoCE/RDMA, these can probably
- * be changed to normal functions definitions/prototypes (a separate file 
+ * be changed to normal functions definitions/prototypes (a separate file
  * is not needed).
  */
 struct rdma_device_func
@@ -415,15 +415,15 @@ struct rdma_device_func
  */
 typedef struct
 {
-    struct rdma_cm_id *listen_id;   /* id on which to listen for new 
+    struct rdma_cm_id *listen_id;   /* id on which to listen for new
                                      * connections; equiv. to a TCP socket */
     struct bmi_method_addr *listen_addr;    /* and BMI listen address */
-    
+
     struct qlist_head connection;   /* list of current connections */
     struct qlist_head sendq;  /* outstanding sent items */
     struct qlist_head recvq;  /* outstanding posted receives (or unexpecteds) */
     void *memcache;     /* opaque structure that holds memory cache state */
-    
+
     /*
      * Both eager and bounce buffers are the same size, and same number, since
      * there is a symmetry of how many can be in use at the same time.
@@ -435,7 +435,7 @@ typedef struct
     int eager_buf_num;
     unsigned long eager_buf_size;
     bmi_size_t eager_buf_payload;
-    
+
     void *priv;
     struct rdma_device_func func;   /* TODO: this probably isn't needed */
 } rdma_device_t;
@@ -497,7 +497,7 @@ void memcache_cache_flush(void *md);
 /*
  * Memory caching settings, needed both by rdma.c and rdma-int.c.
  */
-/* 
+/*
  * TODO: these haven't been changed in 10 years, so I removed all the
  *       bouncebuf sections and made the early_reg sections permanent.
  *       Is this alright?

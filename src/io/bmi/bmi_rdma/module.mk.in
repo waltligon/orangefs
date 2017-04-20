@@ -28,7 +28,7 @@ LIBBMISRC += $(src)
 #
 # Each particular RDMA API needs its headers.
 #
-MODCFLAGS_$(DIR)/rdma-int.c := -I@RDMA_INCDIR@ 
+MODCFLAGS_$(DIR)/rdma-int.c := -I@RDMA_INCDIR@
 
 #
 # Tell the main driver about the APIs that are available.

@@ -31,7 +31,7 @@ error (const char *fmt, ...)
 {
     char s[2048];
     va_list ap;
-    
+
     va_start(ap, fmt);
     vsprintf(s, fmt, ap);
     va_end(ap);
@@ -45,7 +45,7 @@ error_errno(const char *fmt, ...)
 {
     char s[2048];
     va_list ap;
-    
+
     va_start(ap, fmt);
     vsprintf(s, fmt, ap);
     va_end(ap);
@@ -58,7 +58,7 @@ error_xerrno(int errnum, const char *fmt, ...)
 {
     char s[2048];
     va_list ap;
-    
+
     va_start(ap, fmt);
     vsprintf(s, fmt, ap);
     va_end(ap);
@@ -71,7 +71,7 @@ warning(const char *fmt, ...)
 {
     char s[2048];
     va_list ap;
-    
+
     va_start(ap, fmt);
     vsprintf(s, fmt, ap);
     va_end(ap);
@@ -83,7 +83,7 @@ void * __hidden
 bmi_rdma_malloc(unsigned long n)
 {
     char *x;
-    
+
     if (n == 0)
     {
         error("%s: alloc 0 bytes", __func__);
@@ -104,7 +104,7 @@ void * __hidden
 qlist_del_head(struct qlist_head *list)
 {
     struct qlist_head *h;
-    
+
     if (qlist_empty(list))
     {
         error("%s: empty list %p", __func__, list);
@@ -119,7 +119,7 @@ void * __hidden
 qlist_try_del_head(struct qlist_head *list)
 {
     struct qlist_head *h;
-    
+
     if (qlist_empty(list))
     {
         return 0;
@@ -173,7 +173,7 @@ memcpy_to_buflist(rdma_buflist_t *buflist, const void *buf, bmi_size_t len)
 {
     int i;
     const char *cp = buf;
-    
+
     for (i = 0; i < buflist->num && len > 0; i++)
     {
         bmi_size_t bytes = buflist->len[i];
@@ -192,7 +192,7 @@ memcpy_from_buflist(rdma_buflist_t *buflist, void *buf)
 {
     int i;
     char *cp = buf;
-    
+
     for (i = 0; i < buflist->num; i++)
     {
         memcpy(cp, buflist->buf.send[i], (size_t) buflist->len[i]);
