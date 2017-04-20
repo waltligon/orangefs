@@ -241,7 +241,6 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     /* why all of these asserts? shouldn't this be checked above
      * and error codes returned if bad?
      */
-    assert(attr->mask & PVFS_ATTR_CAPABILITY);
     assert(attr->mask & PVFS_ATTR_META_DFILES);
     assert(attr->mask & PVFS_ATTR_META_DIST);
     assert(attr->u.meta.dfile_count > 0);
