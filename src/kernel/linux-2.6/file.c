@@ -1,4 +1,8 @@
 /*
+
+
+
+
  * (C) 2001 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
@@ -3614,21 +3618,6 @@ int pvfs2_lock(struct file *f, int flags, struct file_lock *lock)
     return -ENOSYS;
 }
 
-#ifdef HAVE_ITER_FILE_OPERATIONS
-ssize_t pvfs2_file_write_iter(struct kiocb *my_kiocb, struct iov_iter *my_iov_iter)
-{
-    gossip_err("write-iter not supported\n");
-    return -ENOSYS;
-}
-
-ssize_t pvfs2_file_read_iter(struct kiocb *my_kiocb, struct iov_iter *my_iov_iter)
-{
-    gossip_err("read-iter not supported\n");
-    return -ENOSYS;
-}
-#endif
-
-
 /** PVFS2 implementation of VFS file operations */
 struct file_operations pvfs2_file_operations =
 {
@@ -3647,10 +3636,6 @@ struct file_operations pvfs2_file_operations =
     .llseek = pvfs2_file_llseek,
     .read = pvfs2_file_read,
     .write = pvfs2_file_write,
-#ifdef HAVE_ITER_FILE_OPERATIONS
-    .write_iter = pvfs2_file_write_iter,
-    .read_iter  = pvfs2_file_read_iter,
-#endif
 #ifdef HAVE_COMBINED_AIO_AND_VECTOR
     /* for >= 2.6.19 */
 #ifdef HAVE_AIO_VFS_SUPPORT
