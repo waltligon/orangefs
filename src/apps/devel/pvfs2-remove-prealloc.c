@@ -12,7 +12,6 @@
 #include <string.h>
 #include <getopt.h>
 #include <errno.h>
-#include <db.h>
 
 #include "pvfs2-types.h"
 #include "trove-types.h"

@@ -1,5 +1,6 @@
 /*
  * Copyright © Acxiom Corporation, 2005
+ * (C) 2017 Clemson University and Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */

@@ -138,16 +138,16 @@ static int pvfs2_proc_debug_mask_handler(
         gossip_debug(GOSSIP_PROC_DEBUG,"Downcall:\treturn status:%d\treturn "
                                        "value:%x\n"
                                       ,(int)new_op->downcall.status
-                                      ,(int)new_op->downcall.resp.param.value);
+                                      ,(int)new_op->downcall.resp.param.u.value64);
 
-        ret=PVFS_proc_mask_to_eventlog(new_op->downcall.resp.param.value
+        ret=PVFS_proc_mask_to_eventlog(new_op->downcall.resp.param.u.value64
                                       ,client_debug_string);
         gossip_debug(GOSSIP_PROC_DEBUG,"New client debug string is %s\n"
                                       ,client_debug_string);
      }
      op_release(new_op);
      printk("PVFS: client debug mask has been modified to \"%s\" (0x%08llx).\n"
-           ,client_debug_string, llu(new_op->downcall.resp.param.value));
+           ,client_debug_string, llu(new_op->downcall.resp.param.u.value64));
   }
   else if (write && !strcmp(ctl->procname,DEBUG_HELP))
   {
@@ -225,13 +225,13 @@ static int pvfs2_param_proc_handler(
         /* should this be based on lenp rather than op? */
         if (extra->op == PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT_SIZE)
         {
-            new_op->upcall.req.param.value2[0] = val[0];
-            new_op->upcall.req.param.value2[1] = val[1];
+            new_op->upcall.req.param.u.value32[0] = val[0];
+            new_op->upcall.req.param.u.value32[1] = val[1];
         }
         else
 #endif
         {
-            new_op->upcall.req.param.value = val[0];
+            new_op->upcall.req.param.u.value64 = val[0];
         }
         new_op->upcall.req.param.type = PVFS2_PARAM_REQUEST_SET;
     }
@@ -253,13 +253,13 @@ static int pvfs2_param_proc_handler(
 #if defined(USE_RA_CACHE)
         if (extra->op == PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT_SIZE)
         {
-            val[0] = (int)new_op->downcall.resp.param.value2[0];
-            val[1] = (int)new_op->downcall.resp.param.value2[1];
+            val[0] = (int)new_op->downcall.resp.param.u.value32[0];
+            val[1] = (int)new_op->downcall.resp.param.u.value32[1];
         }
         else
 #endif
         {
-            val[0] = (int)new_op->downcall.resp.param.value;
+            val[0] = (int)new_op->downcall.resp.param.u.value64;
         }
         gossip_debug(GOSSIP_PROC_DEBUG, "pvfs2: proc read %d\n", val[0]);
 #if defined(HAVE_PROC_HANDLER_FILE_ARG)
@@ -481,6 +481,11 @@ static struct pvfs2_param_extra perf_readahead_count_extra = {
 };
 static struct pvfs2_param_extra perf_readahead_count_size_extra = {
     .op = PVFS2_PARAM_REQUEST_OP_READAHEAD_COUNT_SIZE,
+    .min = 0,
+    .max = INT_MAX,
+};
+static struct pvfs2_param_extra perf_readahead_readcnt_extra = {
+    .op = PVFS2_PARAM_REQUEST_OP_READAHEAD_READCNT,
     .min = 0,
     .max = INT_MAX,
 };
@@ -897,6 +902,15 @@ static struct ctl_table pvfs2_table[] = {
         .mode = 0644,
         .proc_handler = &pvfs2_param_proc_handler,
         .extra1 = &perf_readahead_count_size_extra
+    },
+    /* parameter for readahead read buffer count */
+    {
+        CTL_NAME(15)
+        .procname = "readahead-readcnt",
+        .maxlen = sizeof(int),
+        .mode = 0644,
+        .proc_handler = &pvfs2_param_proc_handler,
+        .extra1 = &perf_readahead_readcnt_extra
     },
 #endif
     { CTL_NAME(CTL_NONE) }

@@ -51,7 +51,7 @@ int main(
     int ret;
     int current_deleter = 0;
     int delete_tries=0;
-    unsigned int DELETE_MAX=5;
+    unsigned int DELETE_MAX=10;
     int increase_sleep_time=0;
 
     /* startup MPI and determine the rank of this process */

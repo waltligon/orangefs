@@ -13,7 +13,6 @@
 #include "pint-sysint-utils.h"
 #include "acache.h"
 #include "ncache.h"
-#include "rcache.h"
 #include "client-capcache.h"
 #include "gen-locks.h"
 #include "pint-cached-config.h"
@@ -96,7 +95,6 @@ int PVFS_sys_finalize()
     }
 
     PINT_client_capcache_finalize();
-    PINT_rcache_finalize();
     PINT_ncache_finalize();
     PINT_acache_finalize();
     PINT_cached_config_finalize();

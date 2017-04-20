@@ -2550,6 +2550,96 @@ case err: bmi_errno = BMI_##err; break
     return bmi_errno;
 }
 
+/*
+ * Converts a BMI status/error code into a string representation.
+ */
+const char *bmi_status_string(int status)
+{
+    const char *s = "(UNKNOWN)";
+
+#define __CASE(status)      \
+case -status:               \
+case status: s = #status; break
+
+    switch (status)
+    {
+        case BMI_SUCCESS:
+            s = "BMI_SUCCESS";
+            break;
+
+        __CASE(BMI_EPERM);
+        __CASE(BMI_ENOENT);
+        __CASE(BMI_EINTR);
+        __CASE(BMI_EIO);
+        __CASE(BMI_ENXIO);
+        __CASE(BMI_EBADF);
+        __CASE(BMI_EAGAIN);
+        __CASE(BMI_ENOMEM);
+        __CASE(BMI_EFAULT);
+        __CASE(BMI_EBUSY);
+        __CASE(BMI_EEXIST);
+        __CASE(BMI_ENODEV);
+        __CASE(BMI_ENOTDIR);
+        __CASE(BMI_EISDIR);
+        __CASE(BMI_EINVAL);
+        __CASE(BMI_EMFILE);
+        __CASE(BMI_EFBIG);
+        __CASE(BMI_ENOSPC);
+        __CASE(BMI_EROFS);
+        __CASE(BMI_EMLINK);
+        __CASE(BMI_EPIPE);
+        __CASE(BMI_EDEADLK);
+        __CASE(BMI_ENAMETOOLONG);
+        __CASE(BMI_ENOLCK);
+        __CASE(BMI_ENOSYS);
+        __CASE(BMI_ENOTEMPTY);
+        __CASE(BMI_ELOOP);
+        __CASE(BMI_EWOULDBLOCK);
+        __CASE(BMI_ENOMSG);
+        __CASE(BMI_EUNATCH);
+        __CASE(BMI_EBADR);
+        __CASE(BMI_EDEADLOCK);
+        __CASE(BMI_ENODATA);
+        __CASE(BMI_ETIME);
+        __CASE(BMI_ENONET);
+        __CASE(BMI_EREMOTE);
+        __CASE(BMI_ECOMM);
+        __CASE(BMI_EPROTO);
+        __CASE(BMI_EBADMSG);
+        __CASE(BMI_EOVERFLOW);
+        __CASE(BMI_ERESTART);
+        __CASE(BMI_EMSGSIZE);
+        __CASE(BMI_EPROTOTYPE);
+        __CASE(BMI_ENOPROTOOPT);
+        __CASE(BMI_EPROTONOSUPPORT);
+        __CASE(BMI_EOPNOTSUPP);
+        __CASE(BMI_EADDRINUSE);
+        __CASE(BMI_EADDRNOTAVAIL);
+        __CASE(BMI_ENETDOWN);
+        __CASE(BMI_ENETUNREACH);
+        __CASE(BMI_ENETRESET);
+        __CASE(BMI_ENOBUFS);
+        __CASE(BMI_ETIMEDOUT);
+        __CASE(BMI_ECONNREFUSED);
+        __CASE(BMI_EHOSTDOWN);
+        __CASE(BMI_EHOSTUNREACH);
+        __CASE(BMI_EALREADY);
+        __CASE(BMI_EACCES);
+        __CASE(BMI_ECONNRESET);
+        __CASE(BMI_ECANCEL);
+        __CASE(BMI_EDEVINIT);
+        __CASE(BMI_EDETAIL);
+        __CASE(BMI_EHOSTNTFD);
+        __CASE(BMI_EADDRNTFD);
+        __CASE(BMI_ENORECVR);
+        __CASE(BMI_ETRYAGAIN);
+    }
+
+#undef __CASE
+
+    return s;
+}
+
 /* bmi_check_forget_list()
  * 
  * Scans queue of items that methods have suggested that we forget about 

@@ -223,7 +223,7 @@ static struct options *parse_args(int argc, char* argv[])
 
     tmp_opts->interval = atoi(argv[argc - 1]);
     tmp_opts->interval_set = 1;
-    if(!tmp_opts->mnt_point_set || !tmp_opts->interval >= 1)
+    if(!tmp_opts->mnt_point_set || tmp_opts->interval < 1)
     {
         if(!tmp_opts->mnt_point_set)
         {
@@ -233,7 +233,7 @@ static struct options *parse_args(int argc, char* argv[])
         {
             fprintf(stderr,"Error: Interval is required.\n");
         }
-        if(!tmp_opts->interval <= 0)
+        if(tmp_opts->interval > 0)
         {
             fprintf(stderr,"Error: Interval is must be greater than 0.\n");
         }
