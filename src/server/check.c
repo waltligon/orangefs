@@ -288,14 +288,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
                 handle = s_op->target_handle;
                 break;
         }
-/* TODO: remove
-        if (handle == PVFS_HANDLE_NULL || fs_id == PVFS_FS_ID_NULL)
-        {
-            gossip_err("%s: operation %d has no handle/fs_id\n", __func__,
-                       (int) s_op->req->op);
-            return -PVFS_EINVAL;
-        }
-*/
+
         if (PVFS_OID_NE(&handle, &PVFS_HANDLE_NULL))
         {
             gossip_debug(GOSSIP_SECURITY_DEBUG,
@@ -312,9 +305,11 @@ int PINT_perm_check(struct PINT_server_op *s_op)
             }
             if (i == cap->num_handles)
             {
-                 gossip_err("%s: attempted to perform an operation on target "
+                 gossip_err("%s: attempted to perform a %s operation on target "
                            "handle %s that was not in the capability\n", 
-                           __func__, PVFS_OID_str(&handle));
+                           __func__,
+                           PINT_map_server_op_to_string(s_op->req->op), 
+                           PVFS_OID_str(&handle));
                  ret = -PVFS_EACCES;
                  goto PINT_perm_check_exit;
             }
