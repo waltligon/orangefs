@@ -405,7 +405,7 @@ retry:
     
     /* TODO: is there anything that was previously taken care of in
      * init_connection_modify_qp() that still needs to be done?
-     *    - the local ack timeout (previously attr.timeout = 22 in
+     *    - the local ack timeout (previously attr.timeout = 14 in
      *      init_connection_modify_qp) is set from the subnet_timeout value
      *      from opensm when using rdma_cm. It is currently set to 18. You
      *      can use the command opensm -c <config-file> to dump the current
@@ -1105,6 +1105,44 @@ static const char *rdma_wc_status_string(int status)
 }
 
 /*
+ * rdma_wc_status_to_bmi()
+ *
+ * Description:
+ *  Convert an IBV work completion status into a BMI error code.
+ *
+ *  Params:
+ *   [in] status - integer value of work completion status (ibv_wc_status)
+ *
+ *  Returns:
+ *   Integer value representing appropriate BMI error code
+ */
+static int rdma_wc_status_to_bmi(int status)
+{
+    int result = 0;
+
+    switch (status)
+    {
+        case IBV_WC_SUCCESS;
+            result = 0;
+            break;
+
+        case IBV_WC_RETRY_EXC_ERR:
+            debug(0, "%s: converting IBV_WC_RETRY_EXC_ERR to BMI_EHOSTUNREACH",
+                  __func__);
+            result = -BMI_EHOSTUNREACH;
+            break;
+
+        default:
+            warning("%s: unhandled wc status %s, error code unchanged",
+                    __func__, rdma_wc_status_string(status));
+            result = status;
+            break;
+    }
+
+    return result;
+}
+
+/*
  * async_event_type_string()
  *
  * Description:
@@ -1466,6 +1504,7 @@ int int_rdma_initialize(void)
     rdma_device->func.prepare_cq_block = rdma_prepare_cq_block;
     rdma_device->func.ack_cq_completion_event = rdma_ack_cq_completion_event;
     rdma_device->func.wc_status_string = rdma_wc_status_string;
+    rdma_device->func.wc_status_to_bmi = rdma_wc_status_to_bmi;
     rdma_device->func.mem_register = rdma_mem_register;
     rdma_device->func.mem_deregister = rdma_mem_deregister;
     rdma_device->func.check_async_events = rdma_check_async_events;

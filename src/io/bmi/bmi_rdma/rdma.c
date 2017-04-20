@@ -69,6 +69,7 @@ int accept_timeout_ms = 2000;
 #define prepare_cq_block rdma_device->func.prepare_cq_block
 #define ack_cq_completion_event rdma_device->func.ack_cq_completion_event
 #define wc_status_string rdma_device->func.wc_status_string
+#define wc_status_to_bmi rdma_device->func.wc_status_to_bmi
 #define mem_register rdma_device->func.mem_register
 #define mem_deregister rdma_device->func.mem_deregister
 #define check_async_events rdma_device->func.check_async_events
@@ -183,26 +184,39 @@ static int rdma_check_cq(void)
              * and vendor_err can be relied upon */
             if (wc.opcode == BMI_RDMA_OP_SEND)
             {
-                debug(0, "%s: entry id 0x%llx SEND error %s to %s",
+                debug(0, "%s: entry id %llu SEND error %s to %s",
                       __func__,
                       llu(wc.id),
                       wc_status_string(wc.status),
                       bh->c->peername);
                 
-                if (wc.id)
+                if (bh)
                 {
-                    rdma_connection_t *c = ptr_from_int64(wc.id);
+                    rdma_connection_t *c = bh->c;
                     if (c->cancelled)
                     {
                         debug(0,
                               "%s: ignoring send error on cancelled conn to %s",
                               __func__, bh->c->peername);
                     }
+                    else
+                    {
+                        debug(0, "%s: send error on non-cancelled conn to %s",
+                              __func__, c->peername);
+
+                        sq = bh->sq;
+                        if (sq)
+                        {
+                            sq->state.send = SQ_ERROR;
+                            sq->mop->error_code = wc.status;
+                        }
+                        break;
+                    }
                 }
             }
             else
             {
-                warning("%s: entry id 0x%llx opcode %s error %s from %s",
+                warning("%s: entry id %llu opcode %s error %s from %s",
                         __func__,
                         llu(wc.id),
                         wc_opcode_string(wc.opcode),
@@ -350,7 +364,7 @@ static int rdma_check_cq(void)
         }
         else
         {
-            warning("%s: cq entry id 0x%llx opcode %d unexpected",
+            warning("%s: cq entry id %llu opcode %d unexpected",
                     __func__, llu(wc.id), wc.opcode);
         }    
     }
@@ -765,7 +779,7 @@ static void encourage_recv_incoming(struct buf_head *bh,
             bmi_size_t len = byte_len - sizeof(mh_eager);
             if (len > rq->buflist.tot_len)
             {
-                error("%s: EAGER received %lld too small for buffer %lld",
+                error("%s: EAGER received %lld too large for buffer %lld",
                       __func__,
                       lld(len),
                       lld(rq->buflist.tot_len));
@@ -852,7 +866,7 @@ static void encourage_recv_incoming(struct buf_head *bh,
             /* found matching receive */
             if ((int) mh_rts.tot_len > rq->buflist.tot_len)
             {
-                error("%s: RTS received %llu too small for buffer %llu",
+                error("%s: RTS received %llu too large for buffer %llu",
                       __func__,
                       llu(mh_rts.tot_len),
                       llu(rq->buflist.tot_len));
@@ -1779,9 +1793,10 @@ static int test_sq(struct rdma_work *sq,
                    int complete)
 {
     rdma_connection_t *c;
+    int ret = 0;
     
-    debug(9, "%s: sq %p outid %p err %p size %p user_ptr %p complete %d",
-          __func__, sq, outid, err, size, user_ptr, complete);
+    debug(7, "%s (in): sq %p complete %d",
+          __func__, sq, complete);
     
     if (sq->state.send == SQ_WAITING_USER_TEST)
     {
@@ -1814,7 +1829,8 @@ static int test_sq(struct rdma_work *sq,
                 rdma_close_connection(c);
             }
             
-            return 1;
+            ret = 1;
+            goto out;
         }
         /* this state needs help, push it (ideally would be triggered
          * when the resource is freed... XXX */
@@ -1839,7 +1855,7 @@ static int test_sq(struct rdma_work *sq,
     {
         debug(2, "%s: sq %p cancelled", __func__, sq);
         *outid = sq->mop->op_id;
-        *err = -PVFS_ETIMEDOUT;
+        *err = -BMI_ETIMEDOUT;
         
         if (user_ptr)
         {
@@ -1858,17 +1874,56 @@ static int test_sq(struct rdma_work *sq,
             rdma_close_connection(c);
         }
         
-        return 1;
+        ret = 1;
+        goto out;
+    }
+    else if (sq->state.send == SQ_ERROR)
+    {
+        debug(0, "%s: sq %p found, state %s",
+              __func__, sq, sq_state_name(sq->state.send));
+
+        *err = wc_status_to_bmi(sq->mop->error_code);
+        if (*err != 0)
+        {
+            *outid = sq->mop->op_id;
+
+            if (user_ptr)
+            {
+                *user_ptr = sq->mop->user_ptr;
+            }
+
+            qlist_del(&sq->list);
+            id_gen_fast_unregister(sq->mop->op_id);
+            c = sq->c;
+            free(sq->mop);
+            free(sq);
+            --c->refcnt;
+
+            ret = 1;
+            goto out;
+        }
     }
     else
     {
-        debug(9, "%s: sq %p found, not done, state %s",
+        debug(7, "%s: sq %p found, not done, state %s",
               __func__,
               sq,
               sq_state_name(sq->state.send));
     }
     
-    return 0;
+    ret = 0;
+
+out:
+
+    debug(7, "%s (out): sq %p outid %lld err %s size %lld user_ptr %p",
+          __func__,
+          sq,
+          lld(*outid),
+          bmi_status_string(*err),
+          lld(*size),
+          *user_ptr);
+
+    return ret;
 }
 
 /*
@@ -1902,9 +1957,9 @@ static int test_rq(struct rdma_work *rq,
                    int complete)
 {
     rdma_connection_t *c;
+    int ret = 0;
     
-    debug(9, "%s: rq %p outid %p err %p size %p user_ptr %p complete %d",
-          __func__, rq, outid, err, size, user_ptr, complete);
+    debug(7, "%s: rq %p complete %d", __func__, rq, complete);
     
     if (rq->state.recv == RQ_EAGER_WAITING_USER_TEST ||
         rq->state.recv == RQ_RTS_WAITING_USER_TEST)
@@ -1941,15 +1996,14 @@ static int test_rq(struct rdma_work *rq,
                 rdma_close_connection(c);
             }
             
-            return 1;
+            ret = 1;
+            goto out;
         }
         /* this state needs help, push it (ideally would be triggered
          * when the resource is freed...) XXX */
     }
     else if (rq->state.recv == RQ_RTS_WAITING_CTS_BUFFER)
     {
-        int ret;
-        
         debug(2, "%s: rq %p %s, encouraging",
               __func__,
               rq,
@@ -1971,7 +2025,7 @@ static int test_rq(struct rdma_work *rq,
     else if (rq->state.recv == RQ_CANCELLED && complete)
     {
         debug(2, "%s: rq %p canelled", __func__, rq);
-        *err = -PVFS_ETIMEDOUT;
+        *err = -BMI_ETIMEDOUT;
         
         if (rq->mop)
         {
@@ -1993,17 +2047,60 @@ static int test_rq(struct rdma_work *rq,
         {
             rdma_close_connection(c);
         }
-        return 1;
+
+        ret = 1;
+        goto out;
+    }
+    else if (rq->state.recv == RQ_ERROR)
+    {
+        debug(0, "%s: rq %p found, state %s",
+              __func__, rq, rq_state_name(rq->state.recv));
+
+        if (rq->mop)
+        {
+            *err = wc_status_to_bmi(rq->mop->error_code);
+            if (*err != 0)
+            {
+                *outid = rq->mop->op_id;
+
+                if (user_ptr)
+                {
+                    *user_ptr = rq->mop->user_ptr;
+                }
+
+                qlist_del(&rq->list);
+                id_gen_fast_unregister(rq->mop->op_id);
+                c = rq->c;
+                free(rq->mop);
+                free(rq);
+                --c->refcnt;
+
+                ret = 1;
+                goto out;
+            }
+        }
     }
     else
     {
-        debug(9, "%s: rq %p found, not done, state %s",
+        debug(7, "%s: rq %p found, not done, state %s",
               __func__,
               rq,
               rq_state_name(rq->state.recv));
     }
     
-    return 0;
+    ret = 0;
+
+out:
+
+    debug(7, "%s (out): rq %p outid %lld err %s size %lld user_ptr %p",
+          __func__,
+          rq,
+          lld(*outid),
+          bmi_status_string(*err),
+          lld(*size),
+          *user_ptr);
+
+    return ret;
 }
 
 /*
@@ -2245,31 +2342,38 @@ static int BMI_rdma_cancel(bmi_op_id_t id,
     rdma_check_cq();
     mop = id_gen_fast_lookup(id);
     tsq = mop->method_data;
-    
-    if (tsq->type == BMI_SEND)
+
+    if (tsq)
     {
-        /*
-         * Cancelling completed operations is fine, they will be
-         * tested later.  Any others trigger full shutdown of the
-         * connection.
-         */
-        if (tsq->state.send != SQ_WAITING_USER_TEST)
+        if (tsq->type == BMI_SEND)
         {
-            c = tsq->c;
+            /*
+             * Cancelling completed operations is fine, they will be
+             * tested later.  Any others trigger full shutdown of the
+             * connection.
+             */
+            if (tsq->state.send != SQ_WAITING_USER_TEST)
+            {
+                c = tsq->c;
+            }
+
+            debug(0, "%s: sq %p id %lld cancelling op", __func__, tsq, lld(id));
+        }
+        else
+        {
+            /* actually a recv */
+            struct rdma_work *rq = mop->method_data;
+
+            if (!(rq->state.recv == RQ_EAGER_WAITING_USER_TEST ||
+                  rq->state.recv == RQ_RTS_WAITING_USER_TEST))
+            {
+                c = rq->c;
+            }
+
+            debug(0, "%s: rq %p id %lld cancelling op", __func__, rq, lld(id));
         }
     }
-    else
-    {
-        /* actually a recv */
-        struct rdma_work *rq = mop->method_data;
-        
-        if (!(rq->state.recv == RQ_EAGER_WAITING_USER_TEST ||
-              rq->state.recv == RQ_RTS_WAITING_USER_TEST))
-        {
-            c = rq->c;
-        }
-    }
-    
+
     if (c && !c->cancelled)
     {
         /*
