@@ -252,7 +252,7 @@ int memcache_memfree(void *md,
             error("%s: buf %p len %lld count %d, expected 1",
                   __func__, c->buf, lld(c->len), c->count); 
             gen_mutex_unlock(&memcache_device->mutex);
-            return EINVAL;
+            return -EINVAL;
         }
         /* cache it */
         --c->count;

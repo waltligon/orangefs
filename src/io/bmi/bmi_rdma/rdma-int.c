@@ -1122,7 +1122,7 @@ static int rdma_wc_status_to_bmi(int status)
 
     switch (status)
     {
-        case IBV_WC_SUCCESS;
+        case IBV_WC_SUCCESS:
             result = 0;
             break;
 

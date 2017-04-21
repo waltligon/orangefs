@@ -3375,6 +3375,70 @@ static int rdma_block_for_activity(int timeout_ms)
 }
 
 /*
+ * BMI_rdma_memalloc()
+ *
+ * Description:
+ *  Wrapper for memcache_memalloc(), which retrieves a free memory buffer
+ *  or allocates a new memcache entry if no buffers of the desired length
+ *  are available. If this is the first reference to the memcache entry, then
+ *  the memory region is pinned.
+ *
+ * Params:
+ *  [in] len - length of buffer to retrieve/allocate
+ *
+ * Returns:
+ *  Pointer to buffer
+ */
+static void *BMI_rdma_memalloc(bmi_size_t len,
+                               enum bmi_op_type send_recv __unused)
+{
+    return memcache_memalloc(rdma_device->memcache,
+                             len,
+                             rdma_device->eager_buf_payload);
+}
+
+/*
+ * BMI_rdma_memfree()
+ *
+ * Description:
+ *  Wrapper for memcache_memfree(), which frees a memory buffer. If the buffer
+ *  belongs to a memcache entry, the entry is removed from the memcache and 
+ *  returned to the free chunk list. If this was the last reference to the 
+ *  memcache entry, then the memory region is unpinned.
+ *
+ * Params:
+ *  [in] buf - buffer to be freed/deregistered
+ *  [in] len - length of the buffer
+ *
+ * Returns:
+ *  0 on success, -errno on failure
+ */
+static int BMI_rdma_memfree(void *buf,
+                            bmi_size_t len,
+                            enum bmi_op_type send_recv __unused)
+{
+    return memcache_memfree(rdma_device->memcache, buf, len);
+}
+
+/*
+ * BMI_rdma_unexpected_free()
+ *
+ * Description:
+ *  Frees an unexpected buffer.
+ *
+ * Params:
+ *  [in] buf - buffer to be freed
+ *
+ * Returns:
+ *  0
+ */
+static int BMI_rdma_unexpected_free(void *buf)
+{
+    free(buf);
+    return 0;
+}
+
+/*
  * BMI_rdma_get_info()
  *
  * Description:
@@ -3418,7 +3482,7 @@ static int BMI_rdma_get_info(int option,
  *
  * Params:
  *  [in] option - BMI_DROP_ADDR or BMI_OPTIMISTIC_BUFFER_REG
- *  [-] param   - unused (TODO: whis is this "__unused"?? Looks used to me.)
+ *  [-] param   - unused (TODO: why is this "__unused"?? Looks used to me.)
  *
  * Returns:
  *  0 (TODO: no error?)
@@ -3651,6 +3715,9 @@ const struct bmi_method_ops bmi_rdma_ops =
     .finalize = BMI_rdma_finalize,
     .set_info = BMI_rdma_set_info,
     .get_info = BMI_rdma_get_info,
+    .memalloc = BMI_rdma_memalloc,
+    .memfree = BMI_rdma_memfree,
+    .unexpected_free = BMI_rdma_unexpected_free,
     .post_send = BMI_rdma_post_send,
     .post_sendunexpected = BMI_rdma_post_sendunexpected,
     .post_recv = BMI_rdma_post_recv,

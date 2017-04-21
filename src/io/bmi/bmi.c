@@ -1437,6 +1437,10 @@ int BMI_memfree(BMI_addr_t addr,
 
     /* free the memory */
     ret = tmp_ref->interface->memfree(buffer, size, send_recv);
+    if (ret != 0)
+    {
+        return (bmi_errno_to_pvfs(ret));
+    }
 
     return (ret);
 }
