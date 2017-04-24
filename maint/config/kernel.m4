@@ -864,6 +864,7 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	    AC_MSG_RESULT(no)
 	    )
 
+
 	dnl checking if we have a writex callback in file_operations
 	AC_MSG_CHECKING(for writex member in file_operations structure)
 	AC_TRY_COMPILE([

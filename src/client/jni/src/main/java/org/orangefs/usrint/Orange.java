@@ -1,7 +1,7 @@
-/* 
- * (C) 2011 Clemson University
+/*
+ * (C) 2017 Clemson University.
  *
- * See COPYING in top-level directory.
+ * See LICENSE in src/client/jni directory.
  */
 package org.orangefs.usrint;
 
