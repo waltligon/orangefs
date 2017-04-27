@@ -1298,6 +1298,11 @@ sub get_ionames
         print $OUT "Next you must list the hostnames of " .
                    "the I/O servers.\nAcceptable syntax is " .
                    "\"node1, node2, ...\" or \"node{#-#,#,#}\".\n";
+        if ($bmi_module eq "bmi_rdma") {
+            print $OUT "NOTE: For RDMA, make sure you use the IB device " .
+                       "names if your servers have both ethernet and IB " .
+                       "interfaces.\n";
+        }
         $ioline = prompt_word(
             "Enter hostnames [Default is localhost]: ",
             "localhost");

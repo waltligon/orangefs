@@ -2816,6 +2816,7 @@ static int rdma_client_event_loop(struct rdma_event_channel *ec,
     struct rdma_cm_event *event = NULL;
     char peername[2048];
     int ret = -1;
+    static int already_printed = 0;
 
     while (rdma_get_cm_event(ec, &event) == 0)
     {
@@ -2844,7 +2845,7 @@ static int rdma_client_event_loop(struct rdma_event_channel *ec,
             rdma_map->c = rdma_new_connection(event_copy.id, peername, 0);
             if (!rdma_map->c)
             {
-                error("%s: rdma_new_connection failed", __func__);
+                gossip_err("Error: %s: rdma_new_connection failed", __func__);
                 return -EINVAL; /* TODO: more appropriate error? */
             }
             rdma_map->c->remote_map = remote_map;
@@ -2852,6 +2853,28 @@ static int rdma_client_event_loop(struct rdma_event_channel *ec,
             debug(4, "%s: connection complete", __func__);
 
             break;
+        }
+        else if (event_copy.event == RDMA_CM_EVENT_ADDR_ERROR)
+        {
+            gossip_err("Error: %s: got event %s.\n",
+                       __func__, rdma_event_str(event_copy.event));
+
+            if (!already_printed)
+            {
+                already_printed = 1;
+                gossip_err("NOTE: This event means there was a problem "
+                           "resolving a server address. If your servers have "
+                           "both ethernet and IB interfaces, make sure you "
+                           "are using the IB device name in your config and "
+                           "tab files.\n");
+            }
+            
+            return -BMI_EHOSTNTFD;
+        }
+        else
+        {
+            gossip_err("%s: rdma_get_cm_event() found unhandled event %s",
+                       __func__, rdma_event_str(event_copy.event));
         }
     }
 
@@ -2937,6 +2960,7 @@ static int rdma_client_connect(rdma_method_addr_t *rdma_map,
     }
 
     rdma_freeaddrinfo(addrinfo);
+    addrinfo = NULL;
 
     ret = rdma_client_event_loop(ec, rdma_map, remote_map, timeout_ms);
     if (ret)
@@ -2948,21 +2972,22 @@ static int rdma_client_connect(rdma_method_addr_t *rdma_map,
 
 error_out:
 
-    if (addrinfo)
+    if (ec)
     {
-        if (ec)
+        if (conn_id)
         {
-            if (conn_id)
-            {
-                rdma_destroy_id(conn_id);
-                conn_id = NULL;
-            }
-
-            rdma_destroy_event_channel(ec);
-            ec = NULL;
+            rdma_destroy_id(conn_id);
+            conn_id = NULL;
         }
 
+        rdma_destroy_event_channel(ec);
+        ec = NULL;
+    }
+
+    if (addrinfo)
+    {
         rdma_freeaddrinfo(addrinfo);
+        addrinfo = NULL;
     }
 
     if (port_str)
