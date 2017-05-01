@@ -4666,10 +4666,12 @@ static PVFS_error process_vfs_requests(void)
             {
                 gossip_err("op_id %Ld != completed op id %Ld\n",
                         lld(vfs_request->op_id), lld(op_id_array[i]));
+#ifdef USE_RA_CACHE
                 if (vfs_request->is_readahead_speculative)
                 {
                     gossip_err("SPEC request returned too early 1\n");
                 }
+#endif
                 continue; /* for i loop */
             }
             else if (vfs_request->num_ops > 1)
@@ -4687,10 +4689,12 @@ static PVFS_error process_vfs_requests(void)
                 {
                     gossip_err("completed op id (%Ld) is weird\n",
                               lld(op_id_array[i]));
+#ifdef USE_RA_CACHE
                     if (vfs_request->is_readahead_speculative)
                     {
                         gossip_err("SPEC request returned too early 2\n");
                     }
+#endif
                     continue; /* for i loop */
                 }
             }
@@ -4723,10 +4727,12 @@ static PVFS_error process_vfs_requests(void)
                  * client isys call), we can move
                  * on to the next request in the queue.
                  */
+#ifdef USE_RA_CACHE
                 if (vfs_request->is_readahead_speculative)
                 {
                     gossip_err("SPEC request returned too early 3\n");
                 }
+#endif
                 continue; /* for i loop */
             }
 
@@ -4738,10 +4744,12 @@ static PVFS_error process_vfs_requests(void)
             /* if operation is not complete, we gotta continue */
             if (vfs_request->num_incomplete_ops != 0)
             {
+#ifdef USE_RA_CACHE
                 if (vfs_request->is_readahead_speculative)
                 {
                     gossip_err("SPEC request returned to early 4\n");
                 }
+#endif
                 continue; /* for i loop */
             }
             log_operation_timing(vfs_request);
@@ -4816,10 +4824,12 @@ static PVFS_error process_vfs_requests(void)
                                                    "error completion 2");
 
                     assert(ret == 0);
+#ifdef USE_RA_CACHE
                     if (vfs_request->is_readahead_speculative)
                     {
                         gossip_err("SPEC request returned to early 5\n");
                     }
+#endif
                     continue; /* for i loop */
                 }
             }
