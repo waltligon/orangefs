@@ -223,13 +223,7 @@ static int rdma_new_connection(rdma_connection_t *c,
     }
 
     /* build connection priv */
-    rc = malloc(sizeof(*rc));
-    if (!rc)
-    {
-        /* TODO: is this the best way to handle it? exit? */
-        error("%s: malloc %ld bytes failed", __func__, sizeof(*rc));
-    }
-
+    rc = bmi_rdma_malloc(sizeof(*rc));
     c->priv = rc;
     rc->id = id;
 
@@ -292,13 +286,8 @@ static int rdma_new_connection(rdma_connection_t *c,
             rd->sg_max_len = attr.cap.max_recv_sge;
         }
 
-        rd->sg_tmp_array = malloc(rd->sg_max_len * sizeof(*rd->sg_tmp_array));
-        if (!rd->sg_tmp_array)
-        {
-            /* TODO: is this the best way to handle it? exit? */
-            error("%s: malloc %ld bytes failed",
-                  __func__, (rd->sg_max_len * sizeof(*rd->sg_tmp_array)));
-        }
+        rd->sg_tmp_array = bmi_rdma_malloc(rd->sg_max_len *
+                                           sizeof(*rd->sg_tmp_array));
     }
     else
     {
@@ -346,6 +335,8 @@ static int rdma_new_connection(rdma_connection_t *c,
 
     /* TODO: don't need exchange data anymore. What else needs to change? */
 
+    //build_conn_params(&conn_param);
+    
     /* On the client, setup connection parameters and connect */
     if (!is_server)
     {
@@ -524,7 +515,7 @@ static void rdma_close_connection(rdma_connection_t *c)
     if (rc->eager_send_mr)
     {
         ret = ibv_dereg_mr(rc->eager_send_mr);
-        if (ret < 0)
+        if (ret)
         {
             error_xerrno(ret, "%s: ibv_dereg_mr eager send", __func__);
             goto out;
@@ -534,7 +525,7 @@ static void rdma_close_connection(rdma_connection_t *c)
     if (rc->eager_recv_mr)
     {
         ret = ibv_dereg_mr(rc->eager_recv_mr);
-        if (ret < 0)
+        if (ret)
         {
             error_xerrno(ret, "%s: ibv_dereg_mr eager recv", __func__);
             goto out;
@@ -1451,10 +1442,6 @@ static int return_active_nic_handle(struct rdma_device_priv *rd,
  */
 int int_rdma_initialize(void)
 {
-    /* TODO: do I need to lock/unlock the mutex before/after each error()
-     *       call in this function? See note in BMI_rdma_initialize()
-     */
-
     int flags, ret = 0;
     //struct ibv_device *nic_handle;
     //struct ibv_context *ctx;
@@ -1463,13 +1450,7 @@ int int_rdma_initialize(void)
     struct ibv_port_attr hca_port;  /* TODO: compatible? */
     struct ibv_device_attr hca_cap;
 
-    rd = malloc(sizeof(*rd));
-    if (!rd)
-    {
-        /* TODO: is this the best way to handle it? */
-        error("%s: malloc %ld bytes failed", __func__, sizeof(*rd));
-        /* TODO: return? exit? */
-    }
+    rd = bmi_rdma_malloc(sizeof(*rd));
     rdma_device->priv = rd;
 
     ret = return_active_nic_handle(rd, &hca_port);

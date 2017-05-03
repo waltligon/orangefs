@@ -2655,41 +2655,21 @@ static rdma_connection_t *rdma_new_connection(struct rdma_cm_id *id,
         debug(4, "%s: [CLIENT] starting, peername=%s", __func__, peername);
     }
 
-    c = malloc(sizeof(*c));
-    if (!c)
-    {
-        /* TODO: is this the best way to handle it? exit ?*/
-        error("%s: malloc %ld bytes failed", __func__, sizeof(*c));
-    }
+    c = bmi_rdma_malloc(sizeof(*c));
     c->peername = strdup(peername);
 
     /* fill send and recv free lists and buf heads */
-    c->eager_send_buf_contig = malloc(rdma_device->eager_buf_num *
-                                      rdma_device->eager_buf_size);
-    c->eager_recv_buf_contig = malloc(rdma_device->eager_buf_num *
-                                      rdma_device->eager_buf_size);
-
-    if (!c->eager_send_buf_contig || !c->eager_recv_buf_contig)
-    {
-        /* TODO: is this the best way to handle it? exit? */
-        error("%s: malloc %ld bytes failed",
-              __func__,
-              rdma_device->eager_buf_num * rdma_device->eager_buf_size);
-    }
-
+    c->eager_send_buf_contig = bmi_rdma_malloc(rdma_device->eager_buf_num *
+                                               rdma_device->eager_buf_size);
+    c->eager_recv_buf_contig = bmi_rdma_malloc(rdma_device->eager_buf_num *
+                                               rdma_device->eager_buf_size);
     INIT_QLIST_HEAD(&c->eager_send_buf_free);
     INIT_QLIST_HEAD(&c->eager_recv_buf_free);
 
-    c->eager_send_buf_head_contig = malloc(rdma_device->eager_buf_num *
+    c->eager_send_buf_head_contig = bmi_rdma_malloc(rdma_device->eager_buf_num *
                                         sizeof(*c->eager_send_buf_head_contig));
-    c->eager_recv_buf_head_contig = malloc(rdma_device->eager_buf_num *
+    c->eager_recv_buf_head_contig = bmi_rdma_malloc(rdma_device->eager_buf_num *
                                         sizeof(*c->eager_recv_buf_head_contig));
-
-    if (!c->eager_send_buf_head_contig || !c->eager_recv_buf_head_contig)
-    {
-        /* TODO: is this the best way to handle it? exit? */
-        error("%s: malloc failed", __func__);
-    }
 
     for (i = 0; i < rdma_device->eager_buf_num; i++)
     {
@@ -2914,12 +2894,7 @@ static int rdma_client_connect(rdma_method_addr_t *rdma_map,
      * actually writes the port number into the string.
      */
     port_str_len = snprintf(NULL, 0, "%d", rdma_map->port);
-    port_str = (char *) malloc(port_str_len + 1);
-    if (!port_str)
-    {
-        ret = -BMI_ENOMEM;
-        goto error_out;
-    }
+    port_str = bmi_rdma_malloc(port_str_len + 1);
     snprintf(port_str, (port_str_len + 1), "%d", rdma_map->port);
 
     ret = rdma_getaddrinfo(rdma_map->hostname, port_str, NULL, &addrinfo);
@@ -3076,7 +3051,7 @@ retry:
         exit(1);
     }
 
-    timeout_ms = (int *) malloc(sizeof(int));
+    timeout_ms = (int *) bmi_rdma_malloc(sizeof(int));
     if (timeout_ms)
     {
         *timeout_ms = accept_timeout_ms;
@@ -3158,16 +3133,23 @@ void *rdma_server_accept_thread(void *arg)
             {
                 debug(4, "%s: received event: %s",
                       __func__, rdma_event_str(event_copy.event));
-
+                
                 /* TODO: do I need to build the connection/context here? */
+                //struct rdma_conn_param conn_param;
+                //build_conn_params(&conn_param);
 
                 /* TODO: do I need to do pre-connection stuff here? */
 
                 /* TODO: do I need to pass any connection parameters? */
+                //ret = rdma_accept(event_copy.id, &conn_param);
+                /*
+                 * TODO: HAVEN'T CREATED THE QP YET!
+                 *       SERVER LOGIC IS FLAWED! NEEDS REWORK!
+                 */
                 ret = rdma_accept(event_copy.id, NULL);
                 if (ret)
                 {
-                    warning("%s: accept connection, errno=%d", __func__, errno);
+                    warning("%s: rdma_accept(): %s", __func__, strerror(errno));
                     continue;
                 }
 
@@ -3178,7 +3160,7 @@ void *rdma_server_accept_thread(void *arg)
                  */
 
 #if 1 /* TODO: can we get rid of rc? */
-                rc = (struct rdma_conn *) malloc(sizeof(*rc));
+                rc = (struct rdma_conn *) bmi_rdma_malloc(sizeof(*rc));
                 if (!rc)
                 {
                     warning("%s: unable to malloc rc, errno=%d",
@@ -3209,7 +3191,7 @@ void *rdma_server_accept_thread(void *arg)
                     free(rc);
                 }
 #else
-//                conn_id = (struct rdma_cm_id *) malloc(sizeof(*conn_id));
+//                conn_id = (struct rdma_cm_id *) bmi_rdma_malloc(sizeof(*conn_id));
 //                if (!conn_id)
 //                {
 //                    warning("%s: unable to malloc conn_id, errno=%d",
@@ -3585,24 +3567,17 @@ static int BMI_rdma_initialize(struct bmi_method_addr *listen_addr,
     /* check params */
     if (!!listen_addr ^ (init_flags & BMI_INIT_SERVER))
     {
-        error("%s: error: BMI_INIT_SERVER requires non-null "
-              "listen_addr and v.v", __func__);
+        error("%s: BMI_INIT_SERVER requires non-null listen_addr and v.v",
+              __func__);
         exit(1);
     }
 
     bmi_rdma_method_id = method_id;
 
-    rdma_device = malloc(sizeof(*rdma_device));
+    rdma_device = bmi_rdma_malloc(sizeof(*rdma_device));
     if (!rdma_device)
     {
-        /*
-         * Release the mutex while calling error() because it calls
-         * gossip_backtrace() which means there is a chance it could exit().
-         */
-        gen_mutex_unlock(&interface_mutex);
-        /* TODO: is this the best way to handle it? */
-        error("%s: malloc %ld bytes failed", __func__, sizeof(*rdma_device));
-        gen_mutex_lock(&interface_mutex);
+        return bmi_errno_to_pvfs(-ENOMEM);
     }
 
     /* TODO: equivalent of openib_ib_initialize() and vapi_ib_initialize()? */

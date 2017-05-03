@@ -17,13 +17,6 @@
 #include "pvfs2-internal.h"
 
 /*
- * TODO: Should error calls exit? This was changed in revision 10276.
- *       I believe the exit calls may have been commented out because
- *       exiting from here was causing memory leaks. But if it is an error
- *       shouldn't it at least provide a way to cleanup and then exit?
- */
-
-/*
  * Utility functions.
  */
 void __hidden
@@ -36,7 +29,7 @@ error (const char *fmt, ...)
     vsprintf(s, fmt, ap);
     va_end(ap);
     gossip_err("Error: %s.\n", s);
-    gossip_backtrace();
+    //gossip_backtrace();
     /*exit(1);*/
 }
 
