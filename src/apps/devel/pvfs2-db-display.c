@@ -74,7 +74,7 @@ int main( int argc, char **argv )
 
     /* collection database */
     sprintf(path, "%s/%s", opts.dbpath, COLLECTION_FILE );
-    ret = dbpf_db_open(path, 0, &db_p, 0, 536870912);
+    ret = dbpf_db_open(path, 0, &db_p, 0, NULL);
     if (ret == 0) 
     {
         printf("Collection Database\n");
@@ -85,7 +85,7 @@ int main( int argc, char **argv )
     /* storage database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s", opts.dbpath, STORAGE_FILE );
-    ret = dbpf_db_open(path, 0, &db_p, 0, 536870912);
+    ret = dbpf_db_open(path, 0, &db_p, 0, NULL);
     if (ret == 0) 
     {
         printf("Storage Database\n");
@@ -96,7 +96,7 @@ int main( int argc, char **argv )
     /* dspace database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, DATASPACE_FILE );
-    ret = dbpf_db_open(path, DBPF_DB_COMPARE_DS_ATTR, &db_p, 0, 536870912);
+    ret = dbpf_db_open(path, DBPF_DB_COMPARE_DS_ATTR, &db_p, 0, NULL);
     if (ret == 0) 
     {
         printf("Dataspace Database\n");
@@ -107,7 +107,7 @@ int main( int argc, char **argv )
     /* keyval database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, KEYVAL_FILE );
-    ret = dbpf_db_open(path, DBPF_DB_COMPARE_KEYVAL, &db_p, 0, 536870912);
+    ret = dbpf_db_open(path, DBPF_DB_COMPARE_KEYVAL, &db_p, 0, NULL);
     if (ret == 0) 
     {
         printf("Keyval Database\n");
@@ -118,7 +118,7 @@ int main( int argc, char **argv )
     /* collection attribute database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, COLLECTION_ATTR_FILE );
-    ret = dbpf_db_open(path, 0, &db_p, 0, 536870912);
+    ret = dbpf_db_open(path, 0, &db_p, 0, NULL);
     if (ret == 0) 
     {
         printf("Collection Attributes Database\n");

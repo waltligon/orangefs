@@ -1,5 +1,11 @@
 /* pvfs2-test-config.h.in.  Generated from configure.ac by autoheader.  */
 
+/* Define if db library has DB_BUFFER_SMALL error */
+#undef HAVE_DB_BUFFER_SMALL
+
+/* Define if db library has DB_DIRTY_READ flag */
+#undef HAVE_DB_DIRTY_READ
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
@@ -48,6 +54,9 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
+/* Define if DB stat function takes malloc function ptr */
+#undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
+
 /* Define to 1 if you have the <zlib.h> header file. */
 #undef HAVE_ZLIB_H
 
@@ -62,6 +71,9 @@
 
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
+
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
