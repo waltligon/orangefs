@@ -2136,6 +2136,12 @@ int PINT_trove_dbpf_ds_attr_compare_reversed(DB * dbp,
     TROVE_handle handle_a;
     TROVE_handle handle_b;
 
+    if (a->size < sizeof(TROVE_handle) || b->size < sizeof(TROVE_handle))
+    {
+        gossip_err("DBPF dspace collection corrupt\n");
+        abort();
+    }
+
     memcpy(&handle_a, a->data, sizeof(TROVE_handle));
     memcpy(&handle_b, b->data, sizeof(TROVE_handle));
 
@@ -2153,6 +2159,12 @@ int PINT_trove_dbpf_ds_attr_compare(DB * dbp, const DBT * a, const DBT * b)
 
     TROVE_handle handle_a;
     TROVE_handle handle_b;
+
+    if (a->size < sizeof(TROVE_handle) || b->size < sizeof(TROVE_handle))
+    {
+        gossip_err("DBPF dspace collection corrupt\n");
+        abort();
+    }
 
     memcpy(&handle_a, a->data, sizeof(TROVE_handle));
     memcpy(&handle_b, b->data, sizeof(TROVE_handle));

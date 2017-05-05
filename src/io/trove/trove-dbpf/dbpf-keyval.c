@@ -2341,6 +2341,16 @@ int PINT_trove_dbpf_keyval_compare(DB *dbp, const DBT *a, const DBT *b)
     memcpy(&db_entry_a, a->data, sizeof(struct dbpf_keyval_db_entry));
     memcpy(&db_entry_b, b->data, sizeof(struct dbpf_keyval_db_entry));
 
+    /* If the key is so small that it cannot contain the struct, our database
+     * is corrupt. Then compare the handle, type, and size. Finally if only the
+     * key data itself differs, compare it. */
+    if (a->size < DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0) ||
+            b->size < DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0))
+    {
+        gossip_err("DBPF keyval collection corrupt\n");
+        abort();
+    }
+
     if((cmpval = PVFS_OID_cmp(&db_entry_a.handle, &db_entry_b.handle)))
     {
         return (cmpval < 0) ? -1 : 1;
@@ -2356,7 +2366,7 @@ int PINT_trove_dbpf_keyval_compare(DB *dbp, const DBT *a, const DBT *b)
         return 1;
     }
 
-    if(a->size < b->size)
+    else if(a->size < b->size)
     {
         return -1;
     }
