@@ -1543,11 +1543,10 @@ do {                                                              \
 struct PVFS_servreq_rmdirent
 {
     char *entry;               /* name of entry to remove */
-    PVFS_handle handle;        /* metadata for split */
-    PVFS_handle dirent_handle; /* handle of directory bucket */
-    PVFS_fs_id fs_id;          /* file system */
-    int32_t sid_count;         /* reflexive - of bucket */
-    PVFS_SID *sid_array;       /* reflexive - of bucket */
+    PVFS_handle handle;        /* handle of dirdata */
+    PVFS_fs_id fs_id;          /* file system ID */
+    int32_t sid_count;         /* reflexive - of dirdata */
+    PVFS_SID *sid_array;       /* reflexive - of dirdata */
 };
 endecode_fields_4a_struct(
     PVFS_servreq_rmdirent,
@@ -1561,22 +1560,18 @@ endecode_fields_4a_struct(
                     (roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES + 1) + \
                      (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID)))
 
-/* V3: The state machine doesn't use handle so we can get
-       rid of it. The sid_count and sid_array we need will
-       be for the dirent_handle. */
 #define PINT_SERVREQ_RMDIRENT_FILL(__req,                \
                                    __cap,                \
                                    __fsid,               \
                                    __handle,             \
                                    __sid_count,          \
                                    __sid_array,          \
-                                   __dirent_handle,      \
                                    __entry,              \
                                    __hints)              \
 do {                                                     \
     memset(&(__req), 0, sizeof(__req));                  \
     (__req).op = PVFS_SERV_RMDIRENT;                     \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;              \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                 \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                \
     PVFS_REQ_COPY_CAPABILITY((__cap), (__req));          \
     (__req).hints = (__hints);                           \
@@ -1584,7 +1579,6 @@ do {                                                     \
     (__req).u.rmdirent.handle = (__handle);              \
     (__req).u.rmdirent.sid_count = (__sid_count);        \
     (__req).u.rmdirent.sid_array = (__sid_array);        \
-    (__req).u.rmdirent.dirent_handle = (__dirent_handle);\
     (__req).u.rmdirent.entry = (__entry);                \
 } while (0);
 

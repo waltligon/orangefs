@@ -1011,7 +1011,7 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].handle,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].sid_count,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].sid_array,
-          sm_p->u.rename.dirdata_handle[sm_p->u.rename.rmdirent_index],
+          /* sm_p->u.rename.dirdata_handle[sm_p->u.rename.rmdirent_index], */
           sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index],
           sm_p->hints);
 
@@ -1024,6 +1024,10 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
     /* FIX THIS !!!! 
      * It seems like we don't need this, but suspect it is needed to
      * select which dir bucket the target entry is in
+     *
+     * If the dirdata handles are in parent_refns, then what is this
+     * field for?  There was confusion in rename, but this field is
+     * several places in this code - but not sure what for.  WBL
      */
     /* sm_p->u.rename.dirdata_handle[sm_p->u.rename.rmdirent_index]; */
 
