@@ -378,39 +378,6 @@ struct bmi_rdma_wc
 };
 
 /*
- * RoCE/RDMA functions
- *
- * TODO: it is in this format because for IB they generalized the calls in
- * order to be able to use VAPI or OpenIB. For RoCE/RDMA, these can probably
- * be changed to normal functions definitions/prototypes (a separate file
- * is not needed).
- */
-struct rdma_device_func
-{
-    int (*new_connection)(rdma_connection_t *c,
-                          struct rdma_cm_id *id,
-                          int is_server);
-    void (*close_connection)(rdma_connection_t *c);
-    //void (*drain_qp)(rdma_connection_t *c);
-    void (*disconnect)(rdma_connection_t *c);
-    int (*rdma_initialize)(void);
-    void (*rdma_finalize)(void);
-    void (*post_sr)(const struct buf_head *bh, u_int32_t len);
-    void (*post_rr)(const rdma_connection_t *c, struct buf_head *bh);
-    void (*post_sr_rdmaw)(struct rdma_work *sq,
-                          msg_header_cts_t *mh_cts,
-                          void *mh_cts_buf);
-    void (*prepare_cq_block)(int *cq_fd, int *async_fd);
-    void (*ack_cq_completion_event)(void);
-    int (*check_cq)(struct bmi_rdma_wc *wc);
-    const char *(*wc_status_string)(int status);
-    int (*wc_status_to_bmi)(int status);
-    int (*mem_register)(memcache_entry_t *c);
-    void (*mem_deregister)(memcache_entry_t *c);
-    int (*check_async_events)(void);
-};
-
-/*
  * State that applies accross all users of the device, built at initialization.
  */
 typedef struct
@@ -437,7 +404,6 @@ typedef struct
     bmi_size_t eager_buf_payload;
 
     void *priv;
-    struct rdma_device_func func;   /* TODO: this probably isn't needed */
 } rdma_device_t;
 extern rdma_device_t *rdma_device;
 
