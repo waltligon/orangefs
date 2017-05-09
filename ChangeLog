@@ -4,7 +4,7 @@ OrangeFS Release ChangeLog
 -----------------------
 orangefs-2.9.x (Subversion Branch v.2.9.x)
 http://dev.orangefs.org/svn/orangefs/branches/v.2.9.x
-up to rev 12830 in trunk
+up to rev 12840 in trunk
 
 
 New functionality:
@@ -23,12 +23,15 @@ New functionality:
 	* - Fixed capability errors that may occur during mkdir.
 	* - Correctly populate the position token during a readdir operation
 	    to prevent overrun of dirdata index bits.
+	* - Correct the max size calculation for a readdir response.
 
 * - Clients
 	* - Client Core
 		* - Enhanced the readahead cache with multiple readahead
 		    buffers.
 		* - Corrected double-free bug in readahead code
+		* - Corrected additional problems with readahead code
+		    and removes memory leaks identified by Valgrind.
 		* - Enhanced the remount procedure to handle new 
 		    PVFS2_VFS_OP_FEATURES request.
 
@@ -39,6 +42,7 @@ New functionality:
 		    appropriate.
 		* - Corrected readdir token processing that periodically
 		    caused directory entries to be ignored.
+		* - Enhanced error message in msgpairarray_completion_fn.
 
 * - BMI
 	* - InfiniBand protocol
