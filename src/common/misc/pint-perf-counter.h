@@ -11,6 +11,7 @@
 #include "pvfs2-types.h"
 #include "pvfs2-mgmt.h"
 #include "gen-locks.h"
+#include "state-machine.h"
 
 enum PINT_perf_defaults
 {
@@ -75,6 +76,7 @@ struct PINT_perf_counter
     int history;                         /**< number of history intervals */
     int running;                         /**< true if a rollover running */
     int interval;                        /**< milliseconds between rollovers */
+    PINT_smcb *smcb;                     /**< smcb of rollover timer */
     struct PINT_perf_sample *sample;     /**< list of samples for this counter */
     int (*start_rollover)(struct PINT_perf_counter *pc,
                           struct PINT_perf_counter *tpc);

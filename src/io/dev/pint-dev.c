@@ -322,11 +322,11 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
         /* we would like to use a memaligned region that is a multiple
          * of the system page size
          */
-        /* ptr = PINT_mem_aligned_alloc(total_size, page_size); */
         posix_memalign(&ptr, page_size, total_size);
         if (!ptr)
         {
             desc[i].ptr = NULL;
+            gossip_err("Error: posix_memalign FAILED returned %d\n", errno);
             break;
         }
 
@@ -358,6 +358,7 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
             ret = ioctl(pdev_fd, ioctl_cmd[i], &desc[i]);
             if (ret < 0)
             {
+                gossip_err("Error: ioctl FAILED returned %d\n", errno);
                 break;
             }
             pvfs2_bufmap_desc_count = params[i].dev_buffer_count;
@@ -366,11 +367,14 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
             pvfs2_bufmap_desc_shift = LOG2(pvfs2_bufmap_desc_size);
         }
     }
-    if (i != ndesc) {
+    if (i != ndesc)
+    {
+        /* free up partially allocated buffers */
         int j;
-        for (j = 0; j < i; j++) {
-            if (desc[j].ptr) {
-                /* PINT_mem_aligned_free(desc[j].ptr); */
+        for (j = 0; j < i; j++)
+        {
+            if (desc[j].ptr)
+            {
                 free(desc[j].ptr);
                 desc[j].ptr = NULL;
             }
