@@ -963,7 +963,7 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(
                                                          job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PVFS_server_req *req = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_object_attr attr;
     int ret,i;
 
@@ -1034,7 +1034,12 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(
                  attr.objtype, llu(attr.atime),
                  llu((PINT_util_mkversion_time(attr.mtime))), llu(attr.ctime));
 
-    PINT_SERVREQ_TREE_SETATTR_FILL(*req,
+    /* msgpair_init already does cleanup */
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
+    PINT_serv_init_msgarray_params(s_op, s_op->req->u.remove.fs_id);
+
+    PINT_SERVREQ_TREE_SETATTR_FILL(msg_p->req,
                                    s_op->req->capability,
                                    s_op->req->u.remove.credential,
                                    s_op->req->u.remove.fs_id,
@@ -1046,6 +1051,11 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(
                                    0,    /* V3 sid count */
                                    NULL, /* V3 sid array */
                                    s_op->req->hints);
+
+    msg_p->fs_id = s_op->req->u.remove.fs_id;
+    msg_p->handle = s_op->attr.u.dir.dirdata_handles[0];
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = NULL;
 
     /* V3 */
 #if 0

@@ -194,6 +194,7 @@ static int unstuff_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int local_uid, ret;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"unstuff completion fn: unstuff_comp_fn\n");
@@ -408,7 +409,8 @@ static PINT_sm_action truncate_unstuff_setup_msgpair(struct PINT_smcb *smcb,
                               sm_p->object_ref.handle,
                               sm_p->object_ref.sid_count,
                               sm_p->object_ref.sid_array,
-                              PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE);
+                              PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|
+                                   PVFS_ATTR_CAPABILITY);
     
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
