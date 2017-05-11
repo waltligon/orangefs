@@ -398,11 +398,11 @@ static inline void decode_PVFS_directory_attr(char **pptr,
     }                                                                         
 }
 
-#define defree_PVFS_directory_attr(x)   \
-do {                                    \
-    decode_free(&(x)->hint);            \
-    decode_free(&(x)->dist_dir_bitmap); \
-    decode_free(&(x)->dirdata_handles); \
+#define defree_PVFS_directory_attr(x)       \
+do {                                        \
+    defree_PVFS_directory_hint(&(x)->hint); \
+    decode_free(&(x)->dist_dir_bitmap);     \
+    decode_free(&(x)->dirdata_handles);     \
 } while(0)
 
 #endif

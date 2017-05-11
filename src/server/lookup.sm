@@ -1107,6 +1107,11 @@ static PINT_sm_action lookup_compute_directory_entry_location(
     int last_dirdata_sid_index=0;
     int i;
 
+    /* Record the distributed directory bitmap and handles for the response. */
+    ret = PINT_copy_object_attr(
+          &s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.array_index],
+          &s_op->u.lookup.attr);
+        
     /* find the segment that we should look up in the directory */
     ret = PINT_string_next_segment(s_op->req->u.lookup_path.path,
                                    &s_op->u.lookup.segp,
