@@ -378,7 +378,7 @@ struct bmi_rdma_wc
 };
 
 /*
- * State that applies accross all users of the device, built at initialization.
+ * State that applies across all users of the device, built at initialization.
  */
 typedef struct
 {

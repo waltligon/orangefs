@@ -35,7 +35,7 @@
 #ifdef HAVE_VALGRIND_H
 #   include <memcheck.h>
 #else
-#   define VALGRIND_MAKE_MEM_DEFINDED(addr, len)
+#   define VALGRIND_MAKE_MEM_DEFINED(addr,len)
 #endif
 
 #include "rdma.h"
@@ -177,7 +177,7 @@ static int BMI_rdma_open_context(bmi_context_id context_id __unused);
 
 static void BMI_rdma_close_context(bmi_context_id context_id __unused);
 
-static int BMI_rdma_cancel(bmi_op_id_t id, 
+static int BMI_rdma_cancel(bmi_op_id_t id,
                            bmi_context_id context_id __unused);
 
 static const char *BMI_rdma_rev_lookup(struct bmi_method_addr *meth);
@@ -185,15 +185,15 @@ static const char *BMI_rdma_rev_lookup(struct bmi_method_addr *meth);
 /* internal functions */
 static const char *wc_opcode_string(int opcode);
 
-static int rdma_wc_status_to_bmi(int status);
+static int wc_status_to_bmi(int status);
 
-static const char *rdma_wc_status_string(int status);
+static const char *wc_status_string(int status);
 
 static const char *async_event_type_string(enum ibv_event_type event_type);
 
-static int rdma_check_cq(void);
+static int check_cq(void);
 
-static int rdma_get_one_completion(struct bmi_rdma_wc *wc);
+static int get_one_completion(struct bmi_rdma_wc *wc);
 
 static void msg_header_init(msg_header_common_t *mh_common,
                             rdma_connection_t *c,
@@ -282,14 +282,18 @@ static rdma_connection_t *rdma_new_connection(struct rdma_cm_id *id,
                                               const char *peername,
                                               int is_server);
 
+static rdma_connection_t *alloc_connection(const char *peername);
+
+static void alloc_eager_bufs(rdma_connection_t *c);
+
+static int register_memory(rdma_connection_t *c);
+
 static void build_qp_init_attr(int *num_wr,
                                struct ibv_qp_init_attr *attr);
 
-static void build_conn_params(struct rdma_conn_param *params);
+static int verify_qp_caps(struct ibv_qp_init_attr attr, int num_wr);
 
-static int INT_rdma_new_connection(rdma_connection_t *c,
-                                   struct rdma_cm_id *id,
-                                   int is_server);
+static void build_conn_params(struct rdma_conn_param *params);
 
 //static void init_connection_modify_qp(struct ibv_qp *qp,
 //                                      uint32_t remote_qp_num,
@@ -298,8 +302,6 @@ static int INT_rdma_new_connection(rdma_connection_t *c,
 //static void rdma_drain_qp(rdma_connect_t *c);
 
 static void rdma_close_connection(rdma_connection_t *c);
-
-static void INT_rdma_close_connection(rdma_connection_t *c);
 
 static int rdma_client_event_loop(struct rdma_event_channel *ec,
                                   rdma_method_addr_t *rdma_map,
@@ -317,22 +319,22 @@ void *rdma_server_process_client_thread(void *arg);
 
 static int rdma_block_for_activity(int timeout_ms);
 
-static void rdma_prepare_cq_block(int *cq_fd, int *async_fd);
+static void prepare_cq_block(int *cq_fd, int *async_fd);
 
-static void rdma_ack_cq_completion_event(void);
+static void ack_cq_completion_event(void);
 
-static int rdma_check_async_events(void);
+static int check_async_events(void);
 
-static int rdma_mem_register(memcache_entry_t *c);
+static int mem_register(memcache_entry_t *c);
 
-static void rdma_mem_deregister(memcache_entry_t *c);
+static void mem_deregister(memcache_entry_t *c);
+
+static int build_rdma_context(void);
 
 static int return_active_nic_handle(struct rdma_device_priv *rd,
                                     struct ibv_port_attr *hca_port);
 
-static int int_rdma_initialize(void);
-
-static void rdma_finalize(void);
+static void cleanup_rdma_context(void);
 
 
 /* structure to hold RDMA connection info passed to the accept thread */
@@ -410,7 +412,7 @@ struct rdma_connection_priv
 /* NOTE:  You have to be sure that ib_uverbs.ko is loaded, otherwise it
  * will segfault and/or not find the ib device.
  * TODO:  Find some way to check and see if ib_uverbs.ko is loaded (if
- *        needed for RDMA_RoCE)
+ *        needed for RDMA/RoCE)
  */
 
 
@@ -447,7 +449,7 @@ static const char *wc_opcode_string(int opcode)
 }
 
 /*
- * rdma_wc_status_to_bmi()
+ * wc_status_to_bmi()
  *
  * Description:
  *  Convert an IBV work completion status into a BMI error code.
@@ -458,7 +460,7 @@ static const char *wc_opcode_string(int opcode)
  * Returns:
  *  Integer value representing appropriate BMI error code
  */
-static int rdma_wc_status_to_bmi(int status)
+static int wc_status_to_bmi(int status)
 {
     int result = 0;
 
@@ -476,7 +478,7 @@ static int rdma_wc_status_to_bmi(int status)
 
         default:
             warning("%s: unhandled wc status %s, error code unchanged",
-                    __func__, rdma_wc_status_string(status));
+                    __func__, wc_status_string(status));
             result = status;
             break;
     }
@@ -487,7 +489,7 @@ static int rdma_wc_status_to_bmi(int status)
 #define CASE(e)  case e: s = #e; break
 
 /*
- * rdma_wc_status_string()
+ * wc_status_string()
  *
  * Description:
  *  Return string form of work completion status field.
@@ -498,7 +500,7 @@ static int rdma_wc_status_to_bmi(int status)
  * Returns:
  *  String representation of status
  */
-static const char *rdma_wc_status_string(int status)
+static const char *wc_status_string(int status)
 {
     const char *s = "(UNKNOWN)";
 
@@ -587,7 +589,7 @@ static const char *async_event_type_string(enum ibv_event_type event_type)
 #undef CASE
 
 /*
- * rdma_check_cq()
+ * check_cq()
  *
  * Description:
  *  Wander through single completion queue, pulling off messages and
@@ -600,7 +602,7 @@ static const char *async_event_type_string(enum ibv_event_type event_type)
  * Returns:
  *  Number of new things that arrived.
  */
-static int rdma_check_cq(void)
+static int check_cq(void)
 {
     int ret = 0;
     struct buf_head *bh = NULL;
@@ -614,7 +616,7 @@ static int rdma_check_cq(void)
         bh = NULL;
         sq = NULL;
 
-        vret = rdma_get_one_completion(&wc);
+        vret = get_one_completion(&wc);
         if (vret == 0 || wc.id == 0)
         {
             break;  /* empty */
@@ -633,7 +635,7 @@ static int rdma_check_cq(void)
                 debug(0, "%s: entry id %llu SEND error %s to %s",
                       __func__,
                       llu(wc.id),
-                      rdma_wc_status_string(wc.status),
+                      wc_status_string(wc.status),
                       bh->c->peername);
 
                 if (bh)
@@ -666,7 +668,7 @@ static int rdma_check_cq(void)
                         __func__,
                         llu(wc.id),
                         wc_opcode_string(wc.opcode),
-                        rdma_wc_status_string(wc.status),
+                        wc_status_string(wc.status),
                         bh->c->peername);
             }
             continue;
@@ -819,7 +821,7 @@ static int rdma_check_cq(void)
 }
 
 /*
- * rdma_get_one_completion()
+ * get_one_completion()
  *
  * Description:
  *  Poll the completion queue for a single completed work request
@@ -831,7 +833,7 @@ static int rdma_check_cq(void)
  *  0 if cq empty or if unhandled opcode found, 1 if completion found,
  *  otherwise -errno returned
  */
-static int rdma_get_one_completion(struct bmi_rdma_wc *wc)
+static int get_one_completion(struct bmi_rdma_wc *wc)
 {
     struct rdma_device_priv *rd = rdma_device->priv;
     struct ibv_wc desc;
@@ -1126,7 +1128,7 @@ static void post_sr(const struct buf_head *bh,
  *  the big data to the other side.  A bit messy since an RDMA write may
  *  not scatter to the receiver, but can gather from the sender, and we may
  *  have a non-trivial buflist on both sides.  The mh_cts variable length
- *  fields must be decoded as we go. 
+ *  fields must be decoded as we go.
  *
  * Params:
  *  [in] sq         - pointer to send work request
@@ -2404,7 +2406,7 @@ static int post_recv(bmi_op_id_t *id,
     c = rdma_map->c;
 
     /* poll interface first to save a few steps below */
-    rdma_check_cq();
+    check_cq();
 
     /* check to see if matching recv is in the queue */
     rq = find_matching_recv(RQ_EAGER_WAITING_USER_POST |
@@ -2763,7 +2765,7 @@ static int test_sq(struct rdma_work *sq,
         debug(0, "%s: sq %p found, state %s",
               __func__, sq, sq_state_name(sq->state.send));
 
-        *err = rdma_wc_status_to_bmi(sq->mop->error_code);
+        *err = wc_status_to_bmi(sq->mop->error_code);
         if (*err != 0)
         {
             *outid = sq->mop->op_id;
@@ -2939,7 +2941,7 @@ static int test_rq(struct rdma_work *rq,
 
         if (rq->mop)
         {
-            *err = rdma_wc_status_to_bmi(rq->mop->error_code);
+            *err = wc_status_to_bmi(rq->mop->error_code);
             if (*err != 0)
             {
                 *outid = rq->mop->op_id;
@@ -3023,7 +3025,7 @@ static int BMI_rdma_testcontext(int incount,
     gen_mutex_lock(&interface_mutex);
 
 restart:
-    activity += rdma_check_cq();
+    activity += check_cq();
 
     /*
      * Walk _all_ entries on sq, rq, marking them completed or
@@ -3120,7 +3122,7 @@ static int BMI_rdma_testunexpected(int incount __unused,
 
     /* Check CQ, then look for the first unexpected message. */
 restart:
-    activity += rdma_check_cq();
+    activity += check_cq();
 
     n = 0;
     qlist_for_each(l, &rdma_device->recvq)
@@ -3220,7 +3222,7 @@ static int BMI_rdma_cancel(bmi_op_id_t id,
     rdma_connection_t *c = 0;
 
     gen_mutex_lock(&interface_mutex);
-    rdma_check_cq();
+    check_cq();
     mop = id_gen_fast_lookup(id);
     tsq = mop->method_data;
 
@@ -3363,7 +3365,7 @@ static const char *BMI_rdma_rev_lookup(struct bmi_method_addr *meth)
  * rdma_alloc_method_addr()
  *
  * Description:
- *  Build and fill a RDMA-specific method_addr structure.
+ *  Build and fill an RDMA-specific method_addr structure.
  *
  * Params:
  *  [in] c              - pointer to connection new method_addr will belong to
@@ -3510,6 +3512,7 @@ static struct bmi_method_addr *BMI_rdma_method_addr_lookup(const char *id)
  * rdma_new_connection()
  *
  * Description:
+ *  TODO: split into build connection and establish connection?
  *  Build new connection.
  *
  * Params:
@@ -3524,22 +3527,196 @@ static rdma_connection_t *rdma_new_connection(struct rdma_cm_id *id,
                                               const char *peername,
                                               int is_server)
 {
-    rdma_connection_t *c;
-    int i, ret;
+    rdma_connection_t *c = NULL;
+    struct rdma_connection_priv *rc = NULL;
+    struct ibv_qp_init_attr attr;
+    struct rdma_conn_param conn_param;
+    struct rdma_cm_event *event = NULL;
+    struct rdma_cm_event event_copy;
+    int i;
+    int ret;
+    int num_wr = 0;
 
     if (is_server)
     {
-        debug(4, "%s: [SERVER] starting, peername=%s", __func__, peername);
+        debug(4, "%s: [SERVER] starting, peername=%s, channel=%d",
+              __func__, peername, id->channel->fd);
     }
     else
     {
-        debug(4, "%s: [CLIENT] starting, peername=%s", __func__, peername);
+        debug(4, "%s: [CLIENT] starting, peername=%s, channel=%d",
+              __func__, peername, id->channel->fd);
     }
 
-    c = bmi_rdma_malloc(sizeof(*c));
+    c = alloc_connection(peername);
+
+    /* build connection priv */
+    rc = bmi_rdma_malloc(sizeof(*rc));
+    c->priv = rc;
+    rc->id = id;
+
+    ret = register_memory(c);
+    if (ret)
+    {
+        goto error_out;
+    }
+
+    /* create the main queue pair */
+    debug(0, "%s: creating main queue pair", __func__);
+    build_qp_init_attr(&num_wr, &attr);
+
+    /* NOTE: rdma_create_qp() automatically transitions the QP through its
+     * states; after allocation and connection it is ready to post receives
+     */
+    debug(0, "%s: calling rdma_create_qp", __func__);
+    ret = rdma_create_qp(id, rd->nic_pd, &attr);
+    if (ret)
+    {
+        error("%s: rdma_create_qp failed", __func__);
+        goto error_out;
+    }
+
+    rc->qp = id->qp;
+
+    VALGRIND_MAKE_MEM_DEFINED(&attr, sizeof(&attr));
+    VALGRIND_MAKE_MEM_DEFINED(&rc->qp->qp_num, sizeof(rc->qp->qp_num));
+
+    ret = verify_qp_caps(attr, num_wr);
+    if (ret)
+    {
+        goto error_out;
+    }
+
+    /* TODO: don't need exchange data anymore. What else needs to change? */
+
+    //build_conn_params(&conn_params);
+
+    /* On the client, setup connection parameters and connect */
+    if (!is_server)
+    {
+        /* TODO: is this all that should be insided if statment? */
+        /* TODO: should build_conn_params() be outside the if so it happens
+         *       on the server too?
+         */
+
+        build_conn_params(&conn_param);
+
+retry:
+        ret = rdma_connect(id, &conn_param);
+        if (ret)
+        {
+            if (errno == EINTR)
+            {
+                goto retry;
+            }
+            else
+            {
+                warning("%s: connect to server %s: %m", __func__, c->peername);
+                goto error_out;
+            }
+        }
+    }
+
+    /* TODO: is this the right place to do this for the server, too? */
+    /* wait until the connection is established */
+    ret = rdma_get_cm_event(id->channel, &event);
+    if (!ret)
+    {
+        memcpy(&event_copy, event, sizeof(*event));
+        rdma_ack_cm_event(event);
+
+        /* TODO: will this always happen first/right away? should we loop? */
+        if (event_copy.event != RDMA_CM_EVENT_ESTABLISHED)
+        {
+            error("%s: unexpected event: %s",
+                  __func__, rdma_event_str(event_copy.event));
+            goto error_out;
+        }
+
+        debug(4, "%s: connected, peername=%s", __func__, c->peername);
+    }
+    else
+    {
+        error_errno("%s: rdma_get_cm_event failed", __func__);
+        goto error_out;
+    }
+
+    /* TODO: is there anything that was previously taken care of in
+     * init_connection_modify_qp() that still needs to be done?
+     *    - the local ack timeout (previously attr.timeout = 14 in
+     *      init_connection_modify_qp) is set from the subnet_timeout value
+     *      from opensm when using rdma_cm. It is currently set to 18. You
+     *      can use the command opensm -c <config-file> to dump current
+     *      opensm configuration to a file.
+     */
+
+    /* post initial RRs and RRs for acks */
+    debug(0, "%s: entering for loop for post_rr", __func__);
+    for (i = 0; i < rdma_device->eager_buf_num; i++)
+    {
+        post_rr(c, &c->eager_recv_buf_head_contig[i]);
+    }
+
+    return c;
+
+error_out:
+
+    rdma_close_connection(c);
+    c = NULL;
+    return NULL;
+}
+
+/*
+ * alloc_connection()
+ *
+ * Description:
+ *  Allocate and initialize a new connection structure.
+ *
+ * Params:
+ *  [in] peername - remote peername for the connection
+ *
+ * Returns:
+ *  Pointer to new connection.
+ */
+static rdma_connection_t *alloc_connection(const char *peername)
+{
+    rdma_connection_t *c = bmi_rdma_malloc(sizeof(*c));
     c->peername = strdup(peername);
 
-    /* fill send and recv free lists and buf heads */
+    alloc_eager_bufs(c);
+
+    /* put it on the list */
+    qlist_add(&c->list, &rdma_device->connection);
+
+    /* other vars */
+    c->remote_map = 0;
+    c->cancelled = 0;
+    c->refcnt = 0;
+    c->closed = 0;
+
+    /* save one credit back for emergency credit refill */
+    c->send_credit = rdma_device->eager_buf_num - 1;
+    c->return_credit = 0;
+
+    return c;
+}
+
+/*
+ * alloc_eager_bufs()
+ *
+ * Description:
+ *  Fill send and recv free lists and buf heads
+ *
+ * Params:
+ *  [in/out] c - connection new buffers will belong to
+ *
+ * Returns:
+ *  none
+ */
+static void alloc_eager_bufs(rdma_connection_t *c)
+{
+    int i = 0;
+
     c->eager_send_buf_contig = bmi_rdma_malloc(rdma_device->eager_buf_num *
                                                rdma_device->eager_buf_size);
     c->eager_recv_buf_contig = bmi_rdma_malloc(rdma_device->eager_buf_num *
@@ -3571,39 +3748,57 @@ static rdma_connection_t *rdma_new_connection(struct rdma_cm_id *id,
         qlist_add_tail(&ebs->list, &c->eager_send_buf_free);
         qlist_add_tail(&ebr->list, &c->eager_recv_buf_free);
     }
+}
 
-    /* put it on the list */
-    qlist_add(&c->list, &rdma_device->connection);
+/*
+ * register_memory()
+ *
+ * Description:
+ *  Register eager send and recv memory regions.
+ *
+ * Params:
+ *  [in/out] c - connection the memory regions will belong to
+ *
+ * Returns:
+ *  0 on success, -errno on failure
+ */
+static int register_memory(rdma_connection_t *c)
+{
+    struct rdma_connection_priv *rc = c->priv;
+    struct rdma_device_priv *rd = rdma_device->priv;
+    size_t len;
+    int access_flags;
 
-    /* other vars */
-    c->remote_map = 0;
-    c->cancelled = 0;
-    c->refcnt = 0;
-    c->closed = 0;
+    len = rdma_device->eager_buf_num * rdma_device->eager_buf_size;
+    access_flags = IBV_ACCESS_LOCAL_WRITE
+                       | IBV_ACCESS_REMOTE_WRITE
+                       | IBV_ACCESS_REMOTE_READ;
 
-    /* save one credit back for emergency credit refill */
-    c->send_credit = rdma_device->eager_buf_num - 1;
-    c->return_credit = 0;
-
-    if (is_server)
+    /* register memory region, Recv side */
+    debug(0, "%s: calling ibv_reg_mr recv side", __func__);
+    rc->eager_recv_mr = ibv_reg_mr(rd->nic_pd,
+                                   c->eager_recv_buf_contig,
+                                   len,
+                                   access_flags);
+    if (!rc->eager_recv_mr)
     {
-        debug(4, "%s: [SERVER SIDE] calling new_connection, channel=%d",
-              __func__, id->channel->fd);
-    }
-    else
-    {
-        debug(4, "%s: [CLIENT SIDE] calling new_connection, channel=%d",
-              __func__, id->channel->fd);
+        error("%s: ibv_reg_mr eager recv failed", __func__);
+        return -ENOMEM;
     }
 
-    ret = INT_rdma_new_connection(c, id, is_server);
-    if (ret)
+    /* register memory region, Send side */
+    debug(0, "%s: calling ibv_reg_mr send side", __func__);
+    rc->eager_send_mr = ibv_reg_mr(rd->nic_pd,
+                                   c->eager_send_buf_contig,
+                                   len,
+                                   access_flags);
+    if (!rc->eager_send_mr)
     {
-        rdma_close_connection(c);
-        c = NULL;
+        error("%s: ibv_reg_mr eager send failed", __func__);
+        return -ENOMEM;
     }
 
-    return c;
+    return 0;
 }
 
 /*
@@ -3652,6 +3847,91 @@ static void build_qp_init_attr(int *num_wr,
 }
 
 /*
+ * verify_qp_caps()
+ *
+ * Description:
+ *  Checks the capabilities returned by rdma_create_qp() to make sure we got
+ *  at least what we asked for. If the device capabilities haven't been set
+ *  yet, they will be set according to the attributes of the new QP.
+ *  Otherwise, the new QP's attributes will be checked against the device
+ *  capabilities we already have.
+ *
+ * Params:
+ *  [in] attr   - attributes of the newly created QP
+ *  [in] num_wr - requested number of work requests
+ *
+ * Returns:
+ *  0 on success, -errno on failure
+ */
+static int verify_qp_caps(struct ibv_qp_init_attr attr, int num_wr)
+{
+    struct rdma_device_priv *rd = rdma_device->priv;
+
+    if (rd->sg_max_len == 0)
+    {
+        /* set device capabilities */
+        rd->sg_max_len = attr.cap.max_send_sge;
+        if (attr.cap.max_recv_sge < rd->sg_max_len)
+        {
+            rd->sg_max_len = attr.cap.max_recv_sge;
+        }
+
+        rd->sg_tmp_array = bmi_rdma_malloc(rd->sg_max_len *
+                                           sizeof(*rd->sg_tmp_array));
+    }
+    else
+    {
+        /* compare the caps that came back against what we already have */
+        if (attr.cap.max_send_sge < rd->sg_max_len)
+        {
+            error("%s: new conn has smaller send SG array size %d vs %d",
+                  __func__, attr.cap.max_send_sge, rd->sg_max_len);
+            return -EINVAL;
+        }
+
+        if (attr.cap.max_recv_sge < rd->sg_max_len)
+        {
+            error("%s: new conn has smaller recv SG array size %d vs %d",
+                  __func__, attr.cap.max_recv_sge, rd->sg_max_len);
+            return -EINVAL;
+        }
+    }
+
+    if (rd->max_unsignaled_sends == 0)
+    {
+        /* set device capabilities */
+        rd->max_unsignaled_sends = attr.cap.max_send_wr;
+    }
+    else
+    {
+        /* compare the caps that came back against what we already have */
+        if (attr.cap.max_send_wr < rd->max_unsignaled_sends)
+        {
+            error("%s: new conn has smaller max_send_wr, %d vs %d",
+                  __func__, attr.cap.max_send_wr, rd->max_unsignaled_sends);
+            return -EINVAL;
+        }
+    }
+
+    /* verify we got what we asked for */
+    if ((int) attr.cap.max_recv_wr < num_wr)
+    {
+        error("%s: asked for %d recv WRs on QP, got %d",
+              __func__, num_wr, attr.cap.max_recv_wr);
+        return -EINVAL;
+    }
+
+    if ((int) attr.cap.max_send_wr < num_wr)
+    {
+        error("%s: asked for %d send WRs on QP, got %d",
+              __func__, num_wr, attr.cap.max_send_wr);
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+/*
  * build_conn_params()
  *
  * Description:
@@ -3671,238 +3951,6 @@ static void build_conn_params(struct rdma_conn_param *params)
     params->initiator_depth = 1;
     params->retry_count = 7;
     params->rnr_retry_count = 7;
-}
-
-/*
- * INT_rdma_new_connection()
- *
- * TODO: break into multiple functions
- *
- * Description:
- *  Build new connection.
- *
- * Params:
- *  [in/out] c - connection structure
- *  [in] id    - RDMA CM identifier new connection will be associated with
- *  [in] is_server - 0=client, 1=server
- *
- * Returns:
- *  0 on success, -errno on failure
- */
-static int INT_rdma_new_connection(rdma_connection_t *c,
-                                   struct rdma_cm_id *id,
-                                   int is_server)
-{
-    struct rdma_connection_priv *rc;
-    struct rdma_device_priv *rd = rdma_device->priv;
-    int i, ret;
-    int num_wr = 0;
-    size_t len;
-    struct ibv_qp_init_attr attr;
-    struct rdma_conn_param conn_param;
-    struct rdma_cm_event *event = NULL;
-    struct rdma_cm_event event_copy;
-
-    if (is_server)
-    {
-        debug(0, "%s: [SERVER] starting, channel=%d",
-              __func__, id->channel->fd);
-    }
-    else
-    {
-        debug(0, "%s: [CLIENT] starting, channel=%d",
-              __func__, id->channel->fd);
-    }
-
-    /* build connection priv */
-    rc = bmi_rdma_malloc(sizeof(*rc));
-    c->priv = rc;
-    rc->id = id;
-
-    /* register memory region, Recv side */
-    len = rdma_device->eager_buf_num * rdma_device->eager_buf_size;
-
-    debug(0, "%s: calling ibv_reg_mr recv side", __func__);
-    rc->eager_recv_mr = ibv_reg_mr(rd->nic_pd,
-                                   c->eager_recv_buf_contig,
-                                   len,
-                                   IBV_ACCESS_LOCAL_WRITE
-                                       | IBV_ACCESS_REMOTE_WRITE
-                                       | IBV_ACCESS_REMOTE_READ);
-    if (!rc->eager_recv_mr)
-    {
-        error("%s: register_mr eager recv", __func__);
-        return -ENOMEM;
-    }
-
-    /* register memory region, Send side */
-    debug(0, "%s: calling ibv_reg_mr send side", __func__);
-    rc->eager_send_mr = ibv_reg_mr(rd->nic_pd,
-                                   c->eager_send_buf_contig,
-                                   len,
-                                   IBV_ACCESS_LOCAL_WRITE
-                                       | IBV_ACCESS_REMOTE_WRITE
-                                       | IBV_ACCESS_REMOTE_READ);
-    if (!rc->eager_send_mr)
-    {
-        error("%s: register_mr eager send", __func__);
-        return -ENOMEM;
-    }
-
-    /* create the main queue pair */
-    debug(0, "%s: creating main queue pair", __func__);
-    build_qp_init_attr(&num_wr, &attr);
-
-    /* NOTE: rdma_create_qp() automatically transitions the QP through its
-     * states; after allocation and connection it is ready to post receives
-     */
-    debug(0, "%s: calling rdma_create_qp", __func__);
-    ret = rdma_create_qp(id, rd->nic_pd, &attr);
-    if (ret)
-    {
-        error("%s: create QP", __func__);
-        return -EINVAL;
-    }
-
-    rc->qp = id->qp;
-
-    VALGRIND_MAKE_MEM_DEFINED(&attr, sizeof(&attr));
-    VALGRIND_MAKE_MEM_DEFINED(&rc->qp->qp_num, sizeof(rc->qp->qp_num));
-
-    /* compare the caps that came back against what we already have */
-    if (rd->sg_max_len == 0)
-    {
-        rd->sg_max_len = attr.cap.max_send_sge;
-        if (attr.cap.max_recv_sge < rd->sg_max_len)
-        {
-            rd->sg_max_len = attr.cap.max_recv_sge;
-        }
-
-        rd->sg_tmp_array = bmi_rdma_malloc(rd->sg_max_len *
-                                           sizeof(*rd->sg_tmp_array));
-    }
-    else
-    {
-        if (attr.cap.max_send_sge < rd->sg_max_len)
-        {
-            error("%s: new conn has smaller send SG array size %d vs %d",
-                  __func__, attr.cap.max_send_sge, rd->sg_max_len);
-            return -EINVAL;
-        }
-        if (attr.cap.max_recv_sge < rd->sg_max_len)
-        {
-            error("%s: new conn has smaller recv SG array size %d vs %d",
-                  __func__, attr.cap.max_recv_sge, rd->sg_max_len);
-            return -EINVAL;
-        }
-    }
-
-    if (rd->max_unsignaled_sends == 0)
-    {
-        rd->max_unsignaled_sends = attr.cap.max_send_wr;
-    }
-    else
-    {
-        if (attr.cap.max_send_wr < rd->max_unsignaled_sends)
-        {
-            error("%s: new conn has smaller max_send_wr, %d vs %d",
-                  __func__, attr.cap.max_send_wr, rd->max_unsignaled_sends);
-            return -EINVAL;
-        }
-    }
-
-    /* verify we got what we asked for */
-    if ((int) attr.cap.max_recv_wr < num_wr)
-    {
-        error("%s: asked for %d recv WRs on QP, got %d",
-              __func__, num_wr, attr.cap.max_recv_wr);
-        return -EINVAL;
-    }
-    if ((int) attr.cap.max_send_wr < num_wr)
-    {
-        error("%s: asked for %d send WRs on QP, got %d",
-              __func__, num_wr, attr.cap.max_send_wr);
-        return -EINVAL;
-    }
-
-    /* TODO: don't need exchange data anymore. What else needs to change? */
-
-    //build_conn_params(&conn_param);
-    
-    /* On the client, setup connection parameters and connect */
-    if (!is_server)
-    {
-        /* TODO: is this all that should be inside if statement? */
-        /* TODO: should build_conn_params() be outside the if so it happens
-         *       on the server too?
-         */
-
-        build_conn_params(&conn_param);
-
-retry:
-        ret = rdma_connect(id, &conn_param);
-        if (ret)
-        {
-            if (errno == EINTR)
-            {
-                goto retry;
-            }
-            else
-            {
-                ret = -errno;
-                warning("%s: connect to server %s: %m", __func__, c->peername);
-                return ret;
-            }
-        }
-    }
-
-    /* TODO: is this the right place to do this for the server, too? */
-    /* wait until the connection is established */
-    ret = rdma_get_cm_event(id->channel, &event);
-    if (!ret)
-    {
-        memcpy(&event_copy, event, sizeof(*event));
-        rdma_ack_cm_event(event);
-
-        /* TODO: will this always happen first/right away? should we loop? */
-        if (event_copy.event != RDMA_CM_EVENT_ESTABLISHED)
-        {
-            error("%s: unexpected event: %s",
-                  __func__, rdma_event_str(event_copy.event));
-            return -EINVAL;
-        }
-
-        debug(4, "%s: connected, peername=%s", __func__, c->peername);
-    }
-    else
-    {
-        ret = -errno;
-        error("%s: rdma_get_cm_event failed: errno = %s",
-              __func__, strerror(errno));
-        /* TODO: could use error_errno() instead, but there might be a problem
-         *       with that function (in util.c). Does vsprintf() not have the
-         *       potential to alter errno?
-         */
-        return ret;
-    }
-
-    /* TODO: is there anything that was previously taken care of in
-     * init_connection_modify_qp() that still needs to be done?
-     *    - the local ack timeout (previously attr.timeout = 14 in
-     *      init_connection_modify_qp) is set from the subnet_timeout value
-     *      from opensm when using rdma_cm. It is currently set to 18. You
-     *      can use the command opensm -c <config-file> to dump the current
-     *      opensm configuration to a file.
-     */
-
-    /* post initial RRs and RRs for acks */
-    debug(0, "%s: entering for loop for post_rr", __func__);
-    for (i = 0; i < rdma_device->eager_buf_num; i++)
-    {
-        post_rr(c, &c->eager_recv_buf_head_contig[i]);
-    }
-
-    return 0;
 }
 
 /*
@@ -3931,7 +3979,8 @@ retry:
  *
  * Description:
  *  Try to close and free a connection, but only do it if refcnt has
- *  gone to zero.
+ *  gone to zero. Called in response to an explicit BYE message or
+ *  at finalize time.
  *
  * Params:
  *  [in/out] c - pointer to connection to close
@@ -3941,6 +3990,12 @@ retry:
  */
 static void rdma_close_connection(rdma_connection_t *c)
 {
+    int ret = 0;
+    struct rdma_connection_priv *rc = c->priv;
+    struct rdma_cm_event *event = NULL;
+    struct rdma_cm_event event_copy;
+    struct rdma_event_channel *channel = NULL;
+
     debug(2, "%s: closing connection to %s", __func__, c->peername);
     c->closed = 1;
     if (c->refcnt != 0)
@@ -3949,7 +4004,75 @@ static void rdma_close_connection(rdma_connection_t *c)
         return;
     }
 
-    INT_rdma_close_connection(c);
+    /* disconnect (also transfers associated QP to error state */
+    rdma_disconnect(rc->id);
+
+    /* TODO: is this loop necessary? do we need to wait for the event? */
+    /* wait for disconnected event */
+    while (rdma_get_cm_event(rc->id->channel, &event) == 0)
+    {
+        memcpy(&event_copy, event, sizeof(*event));
+        rdma_ack_cm_event(event);
+
+        if (event_copy.event == RDMA_CM_EVENT_DISCONNECT)
+        {
+            break;
+        }
+
+        /* TODO: should I compare event_copy.id and rc->id to make sure
+         *       what we expected is actually what disconnected?
+         */
+    }
+
+    /* destroy the queue pair */
+    if (rc->qp)
+    {
+        rdma_destroy_qp(rc->id);
+        if (rc->qp != NULL)
+        {
+            error("%s: rdma_destroy_qp failed", __func__);
+        }
+    }
+
+    /* destroy the memory regions */
+    if (rc->eager_send_mr)
+    {
+        ret = ibv_dereg_mr(rc->eager_send_mr);
+        if (ret)
+        {
+            error_xerrno(ret, "%s: ibv_dereg_mr eager send failed", __func__);
+        }
+    }
+
+    if (rc->eager_recv_mr)
+    {
+        ret = ibv_dereg_mr(rc->eager_recv_mr);
+        if (ret)
+        {
+            error_xerrno(ret, "%s: ibv_dereg_mr eager recv failed", __func__);
+        }
+    }
+
+    /* destroy the id and event channel */
+    if (rc->id)
+    {
+        channel = rc->id->channel;
+
+        ret = rdma_destroy_id(rc->id);
+        if (ret < 0)
+        {
+            error_errno("%s: rdma_destroy_id failed", __func__);
+        }
+
+        ret = rdma_destroy_event_channel(channel);
+        if (ret < 0)
+        {
+            error_errno("%s: rdma_destroy_event_channel failed", __func__);
+        }
+        channel = NULL;
+    }
+
+    free(rc);
 
     free(c->eager_send_buf_contig);
     free(c->eager_recv_buf_contig);
@@ -3967,100 +4090,6 @@ static void rdma_close_connection(rdma_connection_t *c)
     free(c->peername);
     qlist_del(&c->list);
     free(c);
-}
-
-/*
- * INT_rdma_close_connection()
- *
- * Description:
- *  At an explicit BYE message, or at finalize time, shut down a connection.
- *  If descriptors are posted, defer and clean up the connection structures
- *  later.
- *
- * Params:
- *  [in] c - pointer to the connection to close
- *
- * Returns:
- *  none
- */
-static void INT_rdma_close_connection(rdma_connection_t *c)
-{
-    int ret;
-    struct rdma_connection_priv *rc = c->priv;
-    struct rdma_cm_event *event = NULL;
-    struct rdma_cm_event event_copy;
-    struct rdma_event_channel *channel = NULL;
-
-    /* disconnect (also transfers associated QP to error state) */
-    rdma_disconnect(rc->id);
-
-    /* TODO: is this loop necessary? do we need to wait for the event? */
-    /* wait for disconnected event */
-    while (rdma_get_cm_event(rc->id->channel, &event) == 0)
-    {
-        memcpy(&event_copy, event, sizeof(*event));
-        rdma_ack_cm_event(event);
-
-        if (event_copy.event == RDMA_CM_EVENT_DISCONNECTED)
-        {
-            break;
-        }
-
-        /* TODO: should I compare event_copy.id and rc->id to make sure
-         *       what we expected is actually what disconnected?
-         */
-    }
-
-    /* destroy the queue pair */
-    if (rc->qp)
-    {
-        rdma_destroy_qp(rc->id);
-        if (rc->qp != NULL)
-        {
-            error("%s: rdma_destroy_qp", __func__);
-            goto out;
-        }
-    }
-
-    /* destroy the memory regions */
-    if (rc->eager_send_mr)
-    {
-        ret = ibv_dereg_mr(rc->eager_send_mr);
-        if (ret)
-        {
-            error_xerrno(ret, "%s: ibv_dereg_mr eager send", __func__);
-            goto out;
-        }
-    }
-
-    if (rc->eager_recv_mr)
-    {
-        ret = ibv_dereg_mr(rc->eager_recv_mr);
-        if (ret)
-        {
-            error_xerrno(ret, "%s: ibv_dereg_mr eager_recv", __func__);
-            goto out;
-        }
-    }
-
-    /* destroy the id and event channel */
-    if (rc->id)
-    {
-        channel = rc->id->channel;
-
-        ret = rdma_destroy_id(rc->id);
-        if (ret < 0)
-        {
-            error_xerrno(ret, "%s: rdma_destroy_id", __func__);
-            goto out;
-        }
-
-        rdma_destroy_event_channel(channel);
-        channel = NULL;
-    }
-
-out:
-    free(rc);
 }
 
 /*
@@ -4143,7 +4172,7 @@ static int rdma_client_event_loop(struct rdma_event_channel *ec,
                            "are using the IB device name in your config and "
                            "tab files.\n");
             }
-            
+
             return -BMI_EHOSTNTFD;
         }
         else
@@ -4428,7 +4457,7 @@ void *rdma_server_accept_thread(void *arg)
             {
                 debug(4, "%s: received event: %s",
                       __func__, rdma_event_str(event_copy.event));
-                
+
                 /* TODO: do I need to build the connection/context here? */
                 //struct rdma_conn_param conn_param;
                 //build_conn_params(&conn_param);
@@ -4621,7 +4650,7 @@ out:
  * Description:
  *  Ask the device to write to its FD if a CQ event happens, and poll on it
  *  as well as the listen_id for activity, but do not actually respond to
- *  anything.  A later rdma_check_cq will handle CQ events, and a later call to
+ *  anything.  A later check_cq will handle CQ events, and a later call to
  *  testunexpected will pick up new connections.
  *
  * Params:
@@ -4639,7 +4668,7 @@ static int rdma_block_for_activity(int timeout_ms)
     int numfd;
     int ret = 0;
 
-    rdma_prepare_cq_block(&pfd[0].fd, &pfd[1].fd);
+    prepare_cq_block(&pfd[0].fd, &pfd[1].fd);
     pfd[0].events = POLLIN;
     pfd[1].events = POLLIN;
     numfd = 2;
@@ -4649,7 +4678,7 @@ static int rdma_block_for_activity(int timeout_ms)
     {
         if (pfd[0].revents == POLLIN)
         {
-            rdma_ack_cq_completion_event();
+            ack_cq_completion_event();
             return 1;
         }
 
@@ -4657,7 +4686,7 @@ static int rdma_block_for_activity(int timeout_ms)
         ret = 2;
         if (pfd[1].revents == POLLIN)
         {
-            rdma_check_async_events();
+            check_async_events();
         }
     }
     else if (ret < 0)
@@ -4677,7 +4706,7 @@ static int rdma_block_for_activity(int timeout_ms)
 }
 
 /*
- * rdma_prepare_cq_block()
+ * prepare_cq_block()
  *
  * Description:
  *  Get the RDMA device's completion queue ready to block for activity by
@@ -4692,7 +4721,7 @@ static int rdma_block_for_activity(int timeout_ms)
  * Returns:
  *  none
  */
-static void rdma_prepare_cq_block(int *cq_fd,
+static void prepare_cq_block(int *cq_fd,
                                   int *async_fd)
 {
     struct rdma_device_priv *rd = rdma_device->priv;
@@ -4712,7 +4741,7 @@ static void rdma_prepare_cq_block(int *cq_fd,
 }
 
 /*
- * rdma_ack_cq_completion_event()
+ * ack_cq_completion_event()
  *
  * Description:
  *  As poll says there is something to read, get the event, but
@@ -4725,7 +4754,7 @@ static void rdma_prepare_cq_block(int *cq_fd,
  * Returns:
  *  none
  */
-static void rdma_ack_cq_completion_event(void)
+static void ack_cq_completion_event(void)
 {
     struct rdma_device_priv *rd = rdma_device->priv;
     struct ibv_cq *cq;
@@ -4741,7 +4770,7 @@ static void rdma_ack_cq_completion_event(void)
 }
 
 /*
- * rdma_check_async_events()
+ * check_async_events()
  *
  * Description:
  *  Check for an asynchronous event on the RDMA device context and ack it.
@@ -4752,7 +4781,7 @@ static void rdma_ack_cq_completion_event(void)
  * Returns:
  *  0 if no event, 1 if an event was found, -errno on failure
  */
-static int rdma_check_async_events(void)
+static int check_async_events(void)
 {
     struct rdma_device_priv *rd = rdma_device->priv;
     int ret;
@@ -4803,8 +4832,8 @@ static void *BMI_rdma_memalloc(bmi_size_t len,
  *
  * Description:
  *  Wrapper for memcache_memfree(), which frees a memory buffer. If the buffer
- *  belongs to a memcache entry, the entry is removed from the memcache and 
- *  returned to the free chunk list. If this was the last reference to the 
+ *  belongs to a memcache entry, the entry is removed from the memcache and
+ *  returned to the free chunk list. If this was the last reference to the
  *  memcache entry, then the memory region is unpinned.
  *
  * Params:
@@ -4840,7 +4869,7 @@ static int BMI_rdma_unexpected_free(void *buf)
 }
 
 /*
- * rdma_mem_register(), rdma_mem_deregister()
+ * mem_register(), mem_deregister()
  *
  * Description:
  *  Memory registration and deregistration.  Used both by sender and
@@ -4860,7 +4889,7 @@ static int BMI_rdma_unexpected_free(void *buf)
  *  register   - 0 on success, -errno on failure
  *  deregister - none
  */
-static int rdma_mem_register(memcache_entry_t *c)
+static int mem_register(memcache_entry_t *c)
 {
     struct ibv_mr *mrh;
     struct rdma_device_priv *rd = rdma_device->priv;
@@ -4904,7 +4933,7 @@ retry:
     return 0;
 }
 
-static void rdma_mem_deregister(memcache_entry_t *c)
+static void mem_deregister(memcache_entry_t *c)
 {
     int ret;
     struct ibv_mr *mrh;
@@ -5017,6 +5046,208 @@ static int BMI_rdma_set_info(int option,
     return 0;
 }
 
+/*
+ * BMI_rdma_initialize()
+ *
+ * Description:
+ *  Startup, once per application.
+ *
+ * Params:
+ *  [in] listen_addr - for a server, address to listen for connect requests on
+ *  [in] method_id   - global identifier for rdma method
+ *  [in] init_flags  - BMI method initialization flags; used to indicate
+ *                     whether server or client in this case
+ *
+ * Returns:
+ *  0 on success, -errno on failure
+ */
+static int BMI_rdma_initialize(struct bmi_method_addr *listen_addr,
+                               int method_id,
+                               int init_flags)
+{
+    int ret;
+
+    debug(0, "Initializing RDMA module");
+
+    gen_mutex_lock(&interface_mutex);
+
+    /* check params */
+    if (!!listen_addr ^ (init_flags & BMI_INIT_SERVER))
+    {
+        error("%s: BMI_INIT_SERVER requires non-null listen_addr and v.v",
+              __func__);
+        exit(1);
+    }
+
+    bmi_rdma_method_id = method_id;
+
+    rdma_device = bmi_rdma_malloc(sizeof(*rdma_device));
+    if (!rdma_device)
+    {
+        return bmi_errno_to_pvfs(-ENOMEM);
+    }
+
+    ret = build_rdma_context();
+    if (ret)
+    {
+        gen_mutex_unlock(&interface_mutex);
+        return bmi_errno_to_pvfs(-BMI_ENODEV);
+    }
+
+    /* initialize memcache */
+    rdma_device->memcache = memcache_init(mem_register,
+                                          mem_deregister);
+
+    /*
+     * Setup connection.
+     */
+    if (init_flags & BMI_INIT_SERVER)
+    {
+        rdma_server_init_listener(listen_addr);
+        rdma_device->listen_addr = listen_addr;
+    }
+    else
+    {
+        rdma_device->listen_id = NULL;
+        rdma_device->listen_addr = NULL;
+    }
+
+    /*
+     * Initialize data structures.
+     */
+    INIT_QLIST_HEAD(&rdma_device->connection);
+    INIT_QLIST_HEAD(&rdma_device->sendq);
+    INIT_QLIST_HEAD(&rdma_device->recvq);
+
+    rdma_device->eager_buf_num = DEFAULT_EAGER_BUF_NUM;
+    rdma_device->eager_buf_size = DEFAULT_EAGER_BUF_SIZE;
+    rdma_device->eager_buf_payload = rdma_device->eager_buf_size -
+                                     sizeof(msg_header_eager_t);
+
+    gen_mutex_unlock(&interface_mutex);
+
+    debug(0, "rdma module successfully initialized");
+    return ret;
+}
+
+/*
+ * build_rdma_context()
+ *
+ * Description:
+ *  Called as part of the initialization process for the BMI RDMA module.
+ *  Builds and initializes the RDMA device context, as well as the  data
+ *  structures that are associated with the device context and are required
+ *  for RDMA communication to occur (i.e. protection domain, completion
+ *  channel, completion queue).
+ *
+ * Params:
+ *  none
+ *
+ * Returns:
+ *  0 on success, -errno on failure
+ */
+static int build_rdma_context(void)
+{
+    int flags, ret = 0;
+    //struct ibv_device *nic_handle;
+    //struct ibv_context *ctx;
+    int cqe_num;    /* local variables, mainly for debug */
+    struct rdma_device_priv *rd;
+    struct ibv_port_attr hca_port;  /* TODO: compatible? */
+    struct ibv_device_attr hca_cap;
+
+    rd = bmi_rdma_malloc(sizeof(*rd));
+    rdma_device->priv = rd;
+
+    ret = return_active_nic_handle(rd, &hca_port);
+    if (ret)
+    {
+        return -ENOSYS;
+    }
+
+    /* TODO: is the nic_lid field still needed? */
+    //rd->nic_lid = hca_port.lid;
+
+    /* Query the device for the max_ requests and such */
+    ret = ibv_query_device(rd->ctx, &hca_cap);
+    if (ret)
+    {
+        error_xerrno(ret, "%s: ibv_query_device", __func__);
+        return -ENOSYS;
+    }
+    VALGRIND_MAKE_MEM_DEFINED(&hca_cap, sizeof(hca_cap));
+
+    debug(1, "%s: max %d completion queue entries", __func__, hca_cap.max_cq);
+    cqe_num = IBV_NUM_CQ_ENTRIES;
+    rd->nic_max_sge = hca_cap.max_sge;
+    rd->nic_max_wr = hca_cap.max_qp_wr;
+
+    if (hca_cap.max_cq < cqe_num)
+    {
+        cqe_num = hca_cap.max_cq;
+        warning("%s: hardly enough completion queue entries %d, hoping for %d",
+                __func__, hca_cap.max_cq, IBV_NUM_CQ_ENTRIES);
+    }
+
+    /* Allocate a Protection Domain (global) */
+    rd->nic_pd = ibv_alloc_pd(rd->ctx);
+    if (!rd->nic_pd)
+    {
+        error("%s: ibv_alloc_pd failed", __func__);
+        return -ENOMEM;
+    }
+
+    /* Create a completion channel for blocking on CQ events */
+    rd->channel = ibv_create_comp_channel(rd->ctx);
+    if (!rd->channel)
+    {
+        error("%s: ibv_create_comp_channel failed", __func__);
+        return -EINVAL;
+    }
+
+    /* Build a CQ (global), connected to this channel */
+    rd->nic_cq = ibv_create_cq(rd->ctx, cqe_num, NULL, rd->channel, 0);
+    if (!rd->nic_cq)
+    {
+        error("%s: ibv_create_cq failed", __func__);
+        return -EINVAL;
+    }
+
+    /* Use non-blocking IO on the async fd and completion fd */
+    flags = fcntl(rd->ctx->async_fd, F_GETFL);
+    if (flags < 0)
+    {
+        error_errno("%s: set async fd nonblocking", __func__);
+        return -EINVAL;
+    }
+
+    if (fcntl(rd->ctx->async_fd, F_SETFL, flags | O_NONBLOCK) < 0)
+    {
+        error_errno("%s: set async fd nonblocking", __func__);
+        return -EINVAL;
+    }
+
+    flags = fcntl(rd->channel->fd, F_GETFL);
+    if (flags < 0)
+    {
+        error_errno("%s: get completion fd flags", __func__);
+        return -EINVAL;
+    }
+    if (fcntl(rd->channel->fd, F_SETFL, flags | O_NONBLOCK) < 0)
+    {
+        error_errno("%s: set completion fd nonblocking", __func__);
+        return -EINVAL;
+    }
+
+    /* will be set on first connection */
+    rd->sg_tmp_array = 0;
+    rd->sg_max_len = 0;
+    rd->num_unsignaled_sends = 0;
+    rd->max_unsignaled_sends = 0;
+
+    return 0;
+}
+
 /* TODO: not needed anymore */
 #if 0
 //static struct ibv_device *get_nic_handle(void)
@@ -5050,7 +5281,7 @@ static int BMI_rdma_set_info(int option,
  *  valid IBV_PORT_ACTIVE.
  *
  * Params:
- *  [out] rd - preallocated from int_rdma_initialize(); rd->ctx is allocated
+ *  [out] rd - preallocated from build_rdma_context(); rd->ctx is allocated
  *             by rdma_get_devices() inside this function
  *  [out] hca_port - hcas port attributes
  *
@@ -5137,205 +5368,6 @@ static int return_active_nic_handle(struct rdma_device_priv *rd,
 }
 
 /*
- * BMI_rdma_initialize()
- *
- * Description:
- *  Startup, once per application.
- *
- * Params:
- *  [in] listen_addr - for a server, address to listen for connect requests on
- *  [in] method_id   - global identifier for rdma method
- *  [in] init_flags  - BMI method initialization flags; used to indicate
- *                     whether server or client in this case
- *
- * Returns:
- *  0 on success, -errno on failure
- */
-static int BMI_rdma_initialize(struct bmi_method_addr *listen_addr,
-                               int method_id,
-                               int init_flags)
-{
-    int ret;
-
-    debug(0, "Initializing RDMA module");
-
-    gen_mutex_lock(&interface_mutex);
-
-    /* check params */
-    if (!!listen_addr ^ (init_flags & BMI_INIT_SERVER))
-    {
-        error("%s: BMI_INIT_SERVER requires non-null listen_addr and v.v",
-              __func__);
-        exit(1);
-    }
-
-    bmi_rdma_method_id = method_id;
-
-    rdma_device = bmi_rdma_malloc(sizeof(*rdma_device));
-    if (!rdma_device)
-    {
-        return bmi_errno_to_pvfs(-ENOMEM);
-    }
-
-    /* TODO: equivalent of openib_ib_initialize() and vapi_ib_initialize()? */
-    ret = int_rdma_initialize();
-    if (ret)
-    {
-        gen_mutex_unlock(&interface_mutex);
-        return bmi_errno_to_pvfs(-BMI_ENODEV);
-    }
-
-    /* initialize memcache */
-    rdma_device->memcache = memcache_init(rdma_mem_register,
-                                          rdma_mem_deregister);
-
-    /*
-     * Setup connection.
-     */
-    if (init_flags & BMI_INIT_SERVER)
-    {
-        rdma_server_init_listener(listen_addr);
-        rdma_device->listen_addr = listen_addr;
-    }
-    else
-    {
-        rdma_device->listen_id = NULL;
-        rdma_device->listen_addr = NULL;
-    }
-
-    /*
-     * Initialize data structures.
-     */
-    INIT_QLIST_HEAD(&rdma_device->connection);
-    INIT_QLIST_HEAD(&rdma_device->sendq);
-    INIT_QLIST_HEAD(&rdma_device->recvq);
-
-    rdma_device->eager_buf_num = DEFAULT_EAGER_BUF_NUM;
-    rdma_device->eager_buf_size = DEFAULT_EAGER_BUF_SIZE;
-    rdma_device->eager_buf_payload = rdma_device->eager_buf_size -
-                                     sizeof(msg_header_eager_t);
-
-    gen_mutex_unlock(&interface_mutex);
-
-    debug(0, "rdma module successfully initialized");
-    return ret;
-}
-
-/*
- * int_rdma_initialize()
- *
- * Description:
- *  Startup, once per application. Equivalent of openib_ib_initialize().
- *
- * Params:
- *  none
- *
- * Returns:
- *  0 on success, -errno on failure
- */
-static int int_rdma_initialize(void)
-{
-    int flags, ret = 0;
-    //struct ibv_device *nic_handle;
-    //struct ibv_context *ctx;
-    int cqe_num;    /* local variables, mainly for debug */
-    struct rdma_device_priv *rd;
-    struct ibv_port_attr hca_port;  /* TODO: compatible? */
-    struct ibv_device_attr hca_cap;
-
-    rd = bmi_rdma_malloc(sizeof(*rd));
-    rdma_device->priv = rd;
-
-    ret = return_active_nic_handle(rd, &hca_port);
-    if (ret)
-    {
-        return -ENOSYS;
-    }
-
-    /* TODO: is the nic_lid field still needed? */
-    //rd->nic_lid = hca_port.lid;
-    
-    /* Query the device for the max_ requests and such */
-    ret = ibv_query_device(rd->ctx, &hca_cap);
-    if (ret)
-    {
-        error_xerrno(ret, "%s: ibv_query_device", __func__);
-        return -ENOSYS;
-    }
-    VALGRIND_MAKE_MEM_DEFINED(&hca_cap, sizeof(hca_cap));
-
-    debug(1, "%s: max %d completion queue entries", __func__, hca_cap.max_cq);
-    cqe_num = IBV_NUM_CQ_ENTRIES;
-    rd->nic_max_sge = hca_cap.max_sge;
-    rd->nic_max_wr = hca_cap.max_qp_wr;
-
-    if (hca_cap.max_cq < cqe_num)
-    {
-        cqe_num = hca_cap.max_cq;
-        warning("%s: hardly enough completion queue entries %d, hoping for %d",
-                __func__, hca_cap.max_cq, IBV_NUM_CQ_ENTRIES);
-    }
-
-    /* Allocate a Protection Domain (global) */
-    rd->nic_pd = ibv_alloc_pd(rd->ctx);
-    if (!rd->nic_pd)
-    {
-        error("%s: ibv_alloc_pd failed", __func__);
-        return -ENOMEM;
-    }
-
-    /* Create a completion channel for blocking on CQ events */
-    rd->channel = ibv_create_comp_channel(rd->ctx);
-    if (!rd->channel)
-    {
-        error("%s: ibv_create_comp_channel failed", __func__);
-        return -EINVAL;
-    }
-
-    /* Build a CQ (global), connected to this channel */
-    rd->nic_cq = ibv_create_cq(rd->ctx, cqe_num, NULL, rd->channel, 0);
-    if (!rd->nic_cq)
-    {
-        error("%s: ibv_create_cq failed", __func__);
-        return -EINVAL;
-    }
-
-    /* Use non-blocking IO on the async fd and completion fd */
-    flags = fcntl(rd->ctx->async_fd, F_GETFL);
-    if (flags < 0)
-    {
-        error_errno("%s: set async fd nonblocking", __func__);
-        return -EINVAL;
-    }
-
-    if (fcntl(rd->ctx->async_fd, F_SETFL, flags | O_NONBLOCK) < 0)
-    {
-        error_errno("%s: set async fd nonblocking", __func__);
-        return -EINVAL;
-    }
-
-    flags = fcntl(rd->channel->fd, F_GETFL);
-    if (flags < 0)
-    {
-        error_errno("%s: get completion fd flags", __func__);
-        return -EINVAL;
-    }
-    if (fcntl(rd->channel->fd, F_SETFL, flags | O_NONBLOCK) < 0)
-    {
-        error_errno("%s: set completion fd nonblocking", __func__);
-        return -EINVAL;
-    }
-
-    /* will be set on first connection */
-    rd->sg_tmp_array = 0;
-    rd->sg_max_len = 0;
-    rd->num_unsignaled_sends = 0;
-    rd->max_unsignaled_sends = 0;
-
-    return 0;
-}
-
-/*
  * BMI_rdma_finalize()
  *
  * Description:
@@ -5410,7 +5442,7 @@ static int BMI_rdma_finalize(void)
 
     memcache_shutdown(rdma_device->memcache);
 
-    rdma_finalize();
+    cleanup_rdma_context();
 
     free(rdma_device);
     rdma_device = NULL;
@@ -5421,10 +5453,11 @@ static int BMI_rdma_finalize(void)
 }
 
 /*
- * rdma_finalize()
+ * cleanup_rdma_context()
  *
  * Description:
- *  Shutdown.
+ *  Destroy/deallocate the data structures that are associated with the
+ *  RDMA device context.
  *
  * Params:
  *  none
@@ -5432,7 +5465,7 @@ static int BMI_rdma_finalize(void)
  * Returns:
  *  none
  */
-static void rdma_finalize(void)
+static void cleanup_rdma_context(void)
 {
     struct rdma_device_priv *rd = rdma_device->priv;
     int ret;
