@@ -48,8 +48,6 @@ static PVFS_error db_error(int db_error_value)
         case DB_RUNRECOVERY:
             gossip_err("Error: DB_RUNRECOVERY encountered.\n");
             return TROVE_EIO;
-        case DB_BUFFER_SMALL:
-            return TROVE_ERANGE;
     }
     return DBPF_ERROR_UNKNOWN; /* return some identifiable value */
 }
@@ -201,19 +199,9 @@ int dbpf_db_get(struct dbpf_db *db, struct dbpf_data *key,
     db_data.ulen = val->len;
     db_data.flags = DB_DBT_USERMEM;
     r = db->db->get(db->db, NULL, &db_key, &db_data, 0);
-    if (r == DB_BUFFER_SMALL)
-    {
-        val->len = db_data.size;
-        return db_error(r);
-    }
-    else if (r)
+    if (r && r != DB_BUFFER_SMALL)
     {
         return db_error(r);
-    }
-    if (val->len < db_data.size)
-    {
-        val->len = db_data.size;
-        return db_error(ERANGE);
     }
     val->len = db_data.size;
     return 0;
@@ -313,27 +301,9 @@ int dbpf_db_cursor_get(struct dbpf_cursor *dbc, struct dbpf_data *key,
         flags = DB_FIRST;
     }
     r = dbc->dbc->c_get(dbc->dbc, &db_key, &db_data, flags);
-    if (r == DB_BUFFER_SMALL)
-    {
-        key->len = db_key.size;
-        val->len = db_data.size;
-        return db_error(r);
-    }
-    else if (r)
+    if (r && r != DB_BUFFER_SMALL)
     {
         return db_error(r);
-    }
-    if (key->len < db_key.size)
-    {
-        key->len = db_key.size;
-        val->len = db_data.size;
-        return db_error(ERANGE);
-    }
-    if (val->len < db_data.size)
-    {
-        key->len = db_key.size;
-        val->len = db_data.size;
-        return db_error(ERANGE);
     }
     key->len = db_key.size;
     val->len = db_data.size;
