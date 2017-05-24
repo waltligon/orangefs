@@ -361,7 +361,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
  */
 
 #define FREEFIELD(x) do { \
-    if (attr->u.x != NULL) { free(attr->u.x); } \
+    if (attr->u.x != NULL) { free(attr->u.x); attr->u.x = NULL; } \
 } while (0)
 
 /* This macro is only for OID/SID arrays it checks to see if they are
@@ -370,8 +370,8 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 #define FREEPACK(o,s,oc) do { \
     if (attr->u.o == NULL || attr->u.s == NULL) \
     { \
-        if (attr->u.o != NULL) { free(attr->u.o); } \
-        if (attr->u.s != NULL) { free(attr->u.s); } \
+        if (attr->u.o != NULL) { free(attr->u.o); attr->u.o = NULL; } \
+        if (attr->u.s != NULL) { free(attr->u.s); attr->u.s = NULL; } \
     } \
     else \
     { \
@@ -379,12 +379,16 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
         { \
             /* OIDs and SIDs are packed */ \
             free(attr->u.o); \
+            attr->u.o = NULL; \
+            attr->u.s = NULL; \
         } \
         else \
         { \
             /* not packed */ \
             free(attr->u.o); \
+            attr->u.o = NULL; \
             free(attr->u.s); \
+            attr->u.s = NULL; \
         } \
     } \
 } while (0)

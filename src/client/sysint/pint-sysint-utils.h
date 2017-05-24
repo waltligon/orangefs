@@ -44,7 +44,7 @@ void PINT_put_server_config_struct(struct server_configuration_s *config);
 int PINT_lookup_parent(char *filename,
                        PVFS_fs_id fs_id,
                        PVFS_credential *credential,
-                       PVFS_handle * handle);
+                       PVFS_object_ref *parent_ref);
 
 int PINT_client_security_initialize(void);
 int PINT_client_security_finalize(void);
