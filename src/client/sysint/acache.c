@@ -473,7 +473,7 @@ int PINT_acache_update(
     PVFS_object_attr *attr, /**< attributes to copy into cache */
     PVFS_size* size)        /**< logical file size (NULL if not available) */
 {
-    struct acache_payload* tmp_payload = NULL;
+    struct acache_payload *tmp_payload = NULL;
     uint32_t save_mask;
     int ret = -1;
 

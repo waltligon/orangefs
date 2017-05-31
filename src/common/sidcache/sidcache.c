@@ -209,19 +209,19 @@ int SID_string_to_type(const char *typestring)
         return -PVFS_EINVAL;
     }
 
-    len = 0;
-    while(typestring[len] != 0 &&
-          len < MAX_TYPE_STR + 1)
-    {
-        len++;
-    }
+    /* there are at most MAX_TYPE_STR non-zero chars */
+    len = strnlen(typestring, MAX_TYPE_STR + 1);
 
     if (len > MAX_TYPE_STR)
     {
         return -PVFS_EINVAL;
     }
 
-    mytype = (char *)malloc(len);
+    mytype = (char *)malloc(len + 1);
+    if (!mytype)
+    {
+        return -1;
+    }
 
     for (i = 0; i < len; i++)
     {
@@ -230,7 +230,7 @@ int SID_string_to_type(const char *typestring)
     mytype[len] = 0;
 
     for (i = 0;
-         strcmp(type_conv_table[i].typestring, mytype) &&
+         strncmp(type_conv_table[i].typestring, mytype, MAX_TYPE_STR) &&
          type_conv_table[i].typeval != SID_SERVER_NULL;
          i++);
 
@@ -249,7 +249,7 @@ int SID_string_to_type(const char *typestring)
 }
 
 /* We are expecting a string of the form "someattr=val" where val is an
- * integer.  If attributes is not careted yet, we create it.  If
+ * integer.  If attributes is not created yet, we create it.  If
  * something goes wrong we pretty much just return -1 without trying to
  * diagnose it sinice this is a very limited parse
  */
@@ -275,6 +275,11 @@ int SID_set_attr(const char *attr_str, int **attributes)
     }
 
     myattr = (char *)malloc(len + 1);
+    if (!myattr)
+    {
+        gossip_err("%s: failed to malloc myattr\n", __func__);
+        return -1;
+    }
     for (i = 0; i < len; i++)
     {
         if (attr_str[i] == '=')
@@ -305,6 +310,12 @@ int SID_set_attr(const char *attr_str, int **attributes)
     if (!*attributes)
     {
         *attributes = (int *)malloc(SID_NUM_ATTR * sizeof(int));
+        if (!myattr)
+        {
+            gossip_err("%s: failed to malloc attributes\n", __func__);
+            free(myattr);
+            return -1;
+        }
         memset(*attributes, -1, SID_NUM_ATTR * sizeof(int));
         atflag = 1;
     }
@@ -314,6 +325,7 @@ int SID_set_attr(const char *attr_str, int **attributes)
         if(!strcmp(myattr, SID_attr_map[i]))
         {
             /* found the one we want */
+            /* call frees attributes */
             *attributes[i] = atoi(myval);
             free(myattr);
             return 0;
@@ -340,6 +352,7 @@ void SID_cacheval_init(SID_cacheval_t **cacheval)
 {
     memset((*cacheval)->attr, -1, (sizeof(int) * SID_NUM_ATTR));
     memset(&((*cacheval)->bmi_addr), -1, sizeof(BMI_addr));
+    (*cacheval)->url = (char *)&(*cacheval)[1];
     (*cacheval)->url[0] = 0;
 }
 
@@ -350,6 +363,11 @@ void SID_cacheval_init(SID_cacheval_t **cacheval)
 */
 void SID_cacheval_pack(const SID_cacheval_t *cacheval, DBT *val)
 {
+    if (!cacheval)
+    {
+        gossip_err("%s: NULL caacheval passed in\n", __func__);
+        return;
+    }
     val->data = (SID_cacheval_t *)cacheval;
     val->size = (sizeof(int) * SID_NUM_ATTR) +
                  sizeof(BMI_addr) +
@@ -370,20 +388,25 @@ void SID_cacheval_pack(const SID_cacheval_t *cacheval, DBT *val)
  * Returns 0 on success, otherwise -1 is returned
  */
 int SID_cacheval_alloc(SID_cacheval_t **cacheval,
-                       int sid_attributes[],
-                       BMI_addr sid_bmi,
-                       char *sid_url)
+                       const int sid_attributes[],
+                       const BMI_addr sid_bmi,
+                       const char *sid_url)
 {
     if(!sid_url)
     {
-        gossip_err("The url passed to SID_cacheval_alloc is NULL\n");
+        gossip_err("%s: url passed in is NULL\n", __func__);
         *cacheval = NULL;
         return(-1);
     }
 
     /* Mallocing space for the SID_cacheval_t struct */
     *cacheval = (SID_cacheval_t *)malloc(sizeof(SID_cacheval_t) +
-                                          (strlen(sid_url) + 1));
+                                                (strlen(sid_url) + 1));
+    if (!*cacheval)
+    {
+        gossip_err("%s: failed to malloc cacheval\n", __func__);
+        return -1;
+    }
     SID_cacheval_init(cacheval);
     
     /* Setting the values of the SID_cacheval_t struct */    
@@ -398,9 +421,13 @@ int SID_cacheval_alloc(SID_cacheval_t **cacheval,
  * This function clean up a SID_cacheval_t struct by freeing the dynamically
  * created SID_cacheval_t struct
  */
-void SID_cacheval_free(SID_cacheval_t **cacheval_t)
+void SID_cacheval_free(SID_cacheval_t **cacheval)
 {
-    free(*cacheval_t);
+    if (!cacheval)
+    {
+        return;
+    }
+    free(*cacheval);
 }
 
 /** HELPER - copies cacheval out of DBT
@@ -411,7 +438,17 @@ void SID_cacheval_free(SID_cacheval_t **cacheval_t)
  */
 void SID_cacheval_unpack(SID_cacheval_t **cacheval, DBT *data)
 {              
+    if (!cacheval || !data)
+    {
+        gossip_err("%s: NULL cacheval or data passed\n", __func__);
+        return;
+    }
     *cacheval = malloc(data->size);
+    /* no point in calling init if we are going to overwrite anyway */
+    if (!*cacheval)
+    {
+        return;
+    }
     memcpy(*cacheval, data->data, data->size);
 }
 
@@ -474,7 +511,7 @@ static int SID_cache_parse_header(FILE *inpfile,
      */
     if(*records_in_file == 0)
     {
-        gossip_err("There are no sids in the input file\n");
+        gossip_err("%s: There are no sids in the input file\n", __func__);
         return(-1);
     }
     
@@ -482,12 +519,22 @@ static int SID_cache_parse_header(FILE *inpfile,
      * and initializing the attributes string array 
      */
     attrs_strings = (char **)malloc(sizeof(char *) * *attrs_in_file);
+    if (!attrs_strings)
+    {
+        gossip_err("%s: malloc attr strings failed\n", __func__);
+        return -1;
+    }
     memset(attrs_strings, '\0', sizeof(char *) * *attrs_in_file);
 
     /* Mallocing space to hold the positions of the attributes in the file for
      * the cacheval_t attribute arrays and initializing the position array 
      */
     *attr_positions = (int *)malloc(sizeof(int) * *attrs_in_file);
+    if (!attrs_strings)
+    {
+        gossip_err("%s: malloc attr positions failed\n", __func__);
+        return -1;
+    }
     memset(*attr_positions, 0, (sizeof(int) * *attrs_in_file));
     
     /* Getting the attribute strings from the input file */
@@ -496,6 +543,11 @@ static int SID_cache_parse_header(FILE *inpfile,
         fscanf(inpfile, "%s", tmp_buff);
         attrs_strings[i] = (char *)malloc(sizeof(char) *
                                           (strlen(tmp_buff) + 1));
+        if (!attrs_strings[i])
+        {
+            gossip_err("%s: malloc attr strings %d failed\n", __func__, i);
+            return -1;
+        }
         strncpy(attrs_strings[i], tmp_buff, (strlen(tmp_buff) + 1));
     }
 
@@ -924,6 +976,11 @@ int SID_cache_lookup_bmi(DB *dbp, const PVFS_SID *search_sid, char **bmi_url)
 
     /* Malloc the outgoing BMI address char * to be size of retrieved one */
     *bmi_url = malloc(strlen(temp->url) + 1);
+    if (!*bmi_url)
+    {
+        gossip_err("%s: failed to malloc bmi_url\n", __func__);
+        return -1;
+    }
 
     /* Copy retrieved BMI address to outgoing one */
     strcpy(*bmi_url, temp->url);
@@ -1806,6 +1863,11 @@ int SID_bulk_insert_into_sid_cache(DB *dbp, DBT *input)
 
     /* Malloc buffer DBT */
     output.data = malloc(input->size);
+    if (!output.data)
+    {
+        gossip_err("%s: failed to malloc buffer\n", __func__);
+        return -1;
+    }
     output.ulen = input->size;
     output.flags = DB_DBT_USERMEM;
 
@@ -2009,7 +2071,7 @@ int SID_create_secondary_dbs(
     ret = SID_initialize_secondary_dbs(secondary_dbs);
     if(ret)
     {
-        gossip_err("Could not initialize secondary atttribute db array\n");
+        gossip_err("Could not initialize secondary attribute db array\n");
         return(ret);
     }
 
@@ -2742,29 +2804,43 @@ int SID_add(const PVFS_SID *sid,
             int attributes[])
 {
     int ret = 0;
-    int i = 0;
     SID_cacheval_t *cval;
 
+    /* This allocates and fills in the cacheval */
+    ret = SID_cacheval_alloc(&cval, attributes, bmi_addr, url);
+
+#if 0
+    /* ALL of this is taken care of in cacheval_alloc */
     cval = (SID_cacheval_t *)malloc(sizeof(SID_cacheval_t) + strlen(url) + 1);
     if(!cval)
     {
+        gossip_err("%s: unable to malloc cacheeval\n", __func__);
         return -1;
     }
-    /* load up the cval */
+    /* zero out the cval - WBL probably not needed */
     memset(cval, 0, sizeof(SID_cacheval_t) + strlen(url) + 1);
+    /* intialize struct */
+    SID_cacheval_init(cval);
+
+    /* the url array is placed immediately after the rest of the cval */
+    cval->url = (char *)&cval[1];
     strcpy(cval->url, url);
     cval->bmi_addr = bmi_addr;
+#endif
+
     /* if bmi_addr is zero, should register with BMI */
     if (cval->bmi_addr == 0);
     {
         /* enter url into BMI to get BMI addr */
         ret = BMI_addr_lookup(&cval->bmi_addr, cval->url);
         if (ret != 0 && ret != -BMI_NOTINITIALIZED)
-        {
-             return ret;
+        {   
+            free(cval);
+            return ret;
         }
     }
 
+#if 0
     if (attributes)
     {
         /* this assumes we are adding a new record so we are not
@@ -2775,6 +2851,7 @@ int SID_add(const PVFS_SID *sid,
             cval->attr[i] = attributes[i];
         }
     }
+#endif
 
     /* if a server already exists this should fail and we
      * just move on to the next one

@@ -207,12 +207,12 @@ void clean_free(void *ptr)
 typedef struct extra_s
 {
     void     *mem;
-    size_t   size;
+    int64_t   size;
 #if PVFS_MALLOC_MAGIC
-    uint32_t magic;
+    uint64_t magic;
 #endif
 #if PVFS_MALLOC_CHECK_ALIGN
-    size_t   align;
+    int64_t   align;
 #endif
 } extra_t;
 
@@ -347,7 +347,7 @@ int PINT_check_malloc(void *ptr)
     {
         return 0;
     }
-    if (extra->magic == (uint32_t)PVFS_MALLOC_MAGIC_NUM)
+    if (extra->magic == (uint64_t)PVFS_MALLOC_MAGIC_NUM)
     {
         return 1;
     }
@@ -388,7 +388,7 @@ void *PINT_malloc(size_t size)
 #endif
     extra->mem   = mem;
 #if PVFS_MALLOC_MAGIC
-    extra->magic = (uint32_t)PVFS_MALLOC_MAGIC_NUM;
+    extra->magic = (uint64_t)PVFS_MALLOC_MAGIC_NUM;
 #endif
     extra->size  = sizeplus;
 #if PVFS_MALLOC_CHECK_ALIGN
@@ -451,7 +451,7 @@ int PINT_posix_memalign(void **mem, size_t alignment, size_t size)
 #endif
     extra->mem   = mem_orig;
 #if PVFS_MALLOC_MAGIC
-    extra->magic = (uint32_t)PVFS_MALLOC_MAGIC_NUM;
+    extra->magic = (uint64_t)PVFS_MALLOC_MAGIC_NUM;
 #endif
     extra->size  = sizeplus;
 #if PVFS_MALLOC_CHECK_ALIGN
@@ -515,7 +515,7 @@ void *PINT_realloc(void *mem, size_t size)
 
     extra = (void *)((ptrint_t)mem - EXTRA_SIZE);
 #if PVFS_MALLOC_MAGIC
-    if (extra->magic != (uint32_t)PVFS_MALLOC_MAGIC_NUM)
+    if (extra->magic != (uint64_t)PVFS_MALLOC_MAGIC_NUM)
     {
         gossip_err("PINT_realloc: realloc fails magic number test\n");
         gossip_err("mem = %p size = %d, emem = %p, esize = %d\n",
@@ -603,7 +603,7 @@ void PINT_free(void *mem)
     memdebug(stderr, "\n");
 
 #if PVFS_MALLOC_MAGIC
-    if (extra->magic != (uint32_t)PVFS_MALLOC_MAGIC_NUM)
+    if (extra->magic != (uint64_t)PVFS_MALLOC_MAGIC_NUM)
     {
         gossip_lerr("PINT_free: free fails magic number test\n");
         return;

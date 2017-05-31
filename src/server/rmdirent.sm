@@ -394,12 +394,13 @@ static PINT_sm_action rmdirent_update_directory_attr(struct PINT_smcb *smcb,
     PVFS_ds_attributes *ds_attr = NULL;
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
-    dspace_attr = &s_op->u.rmdirent.dirdata_attr;
+    dspace_attr = &s_op->attr;
     dspace_attr->mask |= (PVFS_ATTR_COMMON_ATIME |
                           PVFS_ATTR_COMMON_MTIME |
                           PVFS_ATTR_COMMON_CTIME);
 
     PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
+
     ds_attr = &(s_op->u.rmdirent.dirdata_ds_attr);
     PVFS_ds_attr_from_object_attr(ds_attr, tmp_attr_ptr);
 
@@ -463,13 +464,14 @@ static PINT_sm_action rmdirent_setup_resp(
         /* We return the handle from the directory entry in the
          * response
          */
-        s_op->resp.u.rmdirent.entry_handle = *s_op->u.rmdirent.entry_handle;
-        s_op->resp.u.rmdirent.handle_sid_count = s_op->metasidcnt;
-        s_op->resp.u.rmdirent.handle_sid_array = s_op->u.rmdirent.entry_handle[1];
+        s_op->resp.u.rmdirent.entry_handle = s_op->u.rmdirent.entry_handle[0];
+        s_op->resp.u.rmdirent.sid_count = s_op->metasidcnt;
+        s_op->resp.u.rmdirent.sid_array =
+                             (PVFS_SID *)&s_op->u.rmdirent.entry_handle[1];
 
         gossip_debug(GOSSIP_SERVER_DEBUG,
                      "  succeeded; returning handle %s in response\n",
-                     PVFS_OID_str(s_op->resp.u.rmdirent.entry_handle));
+                     PVFS_OID_str(&s_op->resp.u.rmdirent.entry_handle));
     }
     else
     {

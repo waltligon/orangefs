@@ -150,19 +150,20 @@ do { PINT_dist tmp_dist; \
 } while (0)
 #endif
 
-static inline void  decode_PINT_dist(char **pptr, PINT_dist **x) 
+static inline int decode_PINT_dist(char **pptr, PINT_dist **x) 
 {
     PINT_dist tmp_dist; 
     decode_string(pptr, &tmp_dist.dist_name); 
     if (tmp_dist.dist_name[0] == 0)
     {
+        /* empty string for distribution name */
         *x = NULL;
         *pptr += 8;  /* align to 8 */
-        return;
+        return -1;
     }
     tmp_dist.params = 0; 
     tmp_dist.methods = 0; 
-    /* bizzare lookup function fills in most fields */ 
+    /* lookup function fills in most fields */ 
     PINT_dist_lookup(&tmp_dist); 
     if (!tmp_dist.methods)
     { 
@@ -171,6 +172,11 @@ static inline void  decode_PINT_dist(char **pptr, PINT_dist **x)
     } 
     /* later routines assume dist is a big contiguous thing, do so */ 
     *x = decode_malloc(PINT_DIST_PACK_SIZE(&tmp_dist)); 
+    if (!*x)
+    {
+        /* out of memory */
+        return -1;
+    }
     memcpy(*x, &tmp_dist, sizeof(PINT_dist)); 
 
     (*x)->dist_name = (char *)(*x) + roundup8(sizeof(PINT_dist)); 
@@ -180,6 +186,7 @@ static inline void  decode_PINT_dist(char **pptr, PINT_dist **x)
     ((*x)->methods->decode_lebf) (pptr, (*x)->params); 
 
     align8(pptr); 
+    return 0;
 }
 
 #define defree_PINT_dist(x) do { \

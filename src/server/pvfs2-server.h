@@ -447,7 +447,7 @@ struct PINT_server_rmdirent_op
     PVFS_SID *sid_array;       /* holds sids of dirent object */
     PVFS_size dirent_count;
 /*    PVFS_object_attr dirdata_attr; */
-/*    PVFS_ds_attributes dirdata_ds_attr; */
+    PVFS_ds_attributes dirdata_ds_attr; 
 };
 
 struct PINT_server_chdirent_op

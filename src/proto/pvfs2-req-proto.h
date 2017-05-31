@@ -1548,11 +1548,10 @@ struct PVFS_servreq_rmdirent
     int32_t sid_count;         /* reflexive - of dirdata */
     PVFS_SID *sid_array;       /* reflexive - of dirdata */
 };
-endecode_fields_4a_struct(
+endecode_fields_3a_struct(
     PVFS_servreq_rmdirent,
     string, entry,
     PVFS_handle, handle,
-    PVFS_handle, dirent_handle,
     PVFS_fs_id, fs_id,
     int32_t, sid_count,
     PVFS_SID, sid_array);

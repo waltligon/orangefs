@@ -238,31 +238,46 @@ static inline void encode_PVFS_metafile_attr(char **pptr,
 static inline void decode_PVFS_metafile_attr(char **pptr,
                                              PVFS_metafile_attr *x)
 {
-    int dfiles_i, sid_i;                                                
+    int dfiles_i, sid_i, ret; 
 
-    decode_PINT_dist(pptr, &(x)->dist);                                 
-    (x)->dist_size = PINT_DIST_PACK_SIZE((x)->dist);                    
-    decode_uint32_t(pptr, &(x)->mirror_mode);                           
-    decode_uint32_t(pptr, &(x)->stuffed);                               
+    ret = decode_PINT_dist(pptr, &(x)->dist); 
+    if (ret)
+    {
+        (x)->dist_size = PINT_DIST_PACK_SIZE((x)->dist); 
+    }
+    else
+    {
+        /* error decoding distribution */
+        gossip_err("%s: Error decoding distribution \n", __func__);
+    }
+    decode_uint32_t(pptr, &(x)->mirror_mode); 
+    decode_uint32_t(pptr, &(x)->stuffed);   
     decode_uint32_t(pptr, &(x)->stuffed_size);                          
     decode_uint32_t(pptr, &(x)->dfile_count);                           
     decode_uint32_t(pptr, &(x)->sid_count);                             
     decode_skip4(pptr,);
 
-    (x)->dfile_array = decode_malloc(                                   
-                       OSASZ((x)->dfile_count, (x)->sid_count));        
+    (x)->dfile_array = decode_malloc(OSASZ((x)->dfile_count,
+                                     (x)->sid_count)); 
+    if ((x)->dfile_array)
+    {
+        (x)->sid_array = (PVFS_SID *)&((x)->dfile_array[(x)->dfile_count]); 
 
-    (x)->sid_array = (PVFS_SID *)&((x)->dfile_array[(x)->dfile_count]); 
+        for (dfiles_i = 0; dfiles_i < (x)->dfile_count; dfiles_i++)         
+        {                                                                   
+	    decode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);          
+        }                                                                   
 
-    for (dfiles_i = 0; dfiles_i < (x)->dfile_count; dfiles_i++)         
-    {                                                                   
-	decode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);          
-    }                                                                   
-
-    for (sid_i = 0; sid_i < (x)->dfile_count * (x)->sid_count; sid_i++) 
-    {                                                                   
-	decode_PVFS_SID(pptr, &(x)->sid_array[sid_i]);                  
-    }                                                                   
+        for (sid_i = 0; sid_i < ((x)->dfile_count * (x)->sid_count); sid_i++) 
+        {                                                                   
+	    decode_PVFS_SID(pptr, &(x)->sid_array[sid_i]);                  
+        }                                                                   
+    }
+    else
+    {
+        /* error allocating memory */
+        gossip_err("%s: Error allocating memory\n", __func__);
+    }
     decode_uint64_t(pptr, &(x)->flags);                        
 }
 
