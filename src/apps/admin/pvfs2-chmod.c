@@ -144,15 +144,11 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
       ret = PINT_lookup_parent(pvfs_path,
                                cur_fs,
                                &credentials, 
-                               &parent_ref.handle);
+                               &parent_ref);
       if(ret < 0)
       {
           PVFS_perror("PINT_lookup_parent", ret);
           return -1;
-      }
-      else
-      {
-          parent_ref.fs_id = cur_fs;
       }
       memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 

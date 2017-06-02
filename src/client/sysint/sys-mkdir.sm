@@ -366,11 +366,6 @@ static int mkdir_msg_comp_fn(void *v_p,
                      "PINT_client_capcache_update returned %d\n",
                      __func__, ret);
     }
-    else
-    {
-        gossip_err("%s: could not get local uid for client capcache\n",
-                   __func__);
-    }
 
     return 0;
 }
@@ -802,7 +797,8 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
         PINT_find_dist_dir_bucket(dirdata_hash,
             &sm_p->getattr.attr.u.dir.dist_dir_attr,
             sm_p->getattr.attr.u.dir.dist_dir_bitmap);
-    dirdata_sid_index = dirdata_server_index * sm_p->parent_ref.sid_count;
+    dirdata_sid_index = dirdata_server_index *
+                        sm_p->getattr.attr.u.dir.dist_dir_attr.sid_count;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "mkdir: selecting bucket No.%d from dist_dir_bitmap.\n",

@@ -1301,7 +1301,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_LOOKUP_PATH: 
                 {
                     struct PVFS_servresp_lookup_path *lookup = &resp->u.lookup_path;
-                    int i;
                     if ( lookup->handle_count > 0 && lookup->handle_array )
                     {
                      decode_free(lookup->handle_array);
@@ -1310,6 +1309,9 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     {
                        decode_free(lookup->sid_array);
                     }
+#if 0
+/* Memory allocated by decoding PVFS_object_attr is now released by
+ * the defree_PVFS_object_attr macro in pvfs2-attr.h */
                     if ( lookup->attr_count > 0 && lookup->attr_array )
                     {
                        for (i=0; i<lookup->attr_count; i++)
@@ -1318,6 +1320,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                        }
                        decode_free(lookup->attr_array);
                     }
+#endif
                     break;
                 }
                 
@@ -1357,6 +1360,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     break;
 
                 case PVFS_SERV_GETATTR:
+#if 0
+/* Freeing of attr resources is done in pvfs2-attr.h in defree_PVFS_* macros. */
                     if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DIST)
                     {
                         decode_free(resp->u.getattr.attr.u.meta.dist);
@@ -1365,14 +1370,14 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     {
                        decode_free(resp->u.getattr.attr.u.meta.dfile_array);
                     }
-#if 0
+//#if 0
                     if (resp->u.getattr.attr.mask &
                         PVFS_ATTR_META_MIRROR_DFILES)
                     {
                        decode_free
                         (resp->u.getattr.attr.u.meta.mirror_dfile_array);
                     }
-#endif
+//#endif
                     if (resp->u.getattr.attr.mask & PVFS_ATTR_CAPABILITY)
                     {
                         decode_free(
@@ -1386,6 +1391,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                        decode_free
                         (resp->u.getattr.attr.u.dir.dirdata_handles);
                     }
+#endif
                     break;
 
                 case PVFS_SERV_UNSTUFF:

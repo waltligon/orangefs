@@ -90,13 +90,14 @@ void PINT_put_server_config_struct(struct server_configuration_s *config)
 int PINT_lookup_parent(char *filename,
                        PVFS_fs_id fs_id,
                        PVFS_credential *credential,
-                       PVFS_handle *handle)
+                       PVFS_object_ref *parent_ref)
 {
     int ret = -PVFS_EINVAL;
     char buf[PVFS_SEGMENT_MAX] = {0};
     PVFS_sysresp_lookup resp_look;
 
     memset(&resp_look, 0, sizeof(PVFS_sysresp_lookup));
+    memset(parent_ref, 0, sizeof(PVFS_object_ref));
 
     if (PINT_get_base_dir(filename, buf, PVFS_SEGMENT_MAX))
     {
@@ -105,7 +106,7 @@ int PINT_lookup_parent(char *filename,
             gossip_err("Invalid dirname (no leading '/')\n");
         }
         gossip_err("cannot get parent directory of %s\n", filename);
-        *handle = PVFS_HANDLE_NULL;
+        memset(parent_ref, 0, sizeof(*parent_ref));
         return ret;
     }
 
@@ -117,11 +118,11 @@ int PINT_lookup_parent(char *filename,
     if (ret < 0)
     {
         gossip_err("Lookup failed on %s\n", buf);
-        *handle = PVFS_HANDLE_NULL;
+        memset(parent_ref, 0, sizeof(*parent_ref));
         return ret;
     }
 
-    *handle = resp_look.ref.handle;
+    PVFS_object_ref_copy(parent_ref, &resp_look.ref);
     return 0;
 }
 

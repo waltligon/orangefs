@@ -1266,6 +1266,8 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
         sm_p->u.create.dirent_sid_array = NULL;
     }
 
+    PINT_free_object_attr(&sm_p->u.create.store_attr);
+
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
     PINT_SET_OP_COMPLETE;

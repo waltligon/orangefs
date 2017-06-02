@@ -576,57 +576,57 @@ typedef struct PVFS_object_ref_s
 do { \
     if (dst->sid_count != 0 || dst->sid_array != NULL) \
     { \
-        gossip_err("tried to init a non empty PVFS_object_ref"); \
+        gossip_err("tried to init a non empty PVFS_object_ref\n"); \
         break; \
     } \
-    memset(oref, 0; sizeof(PVFS_object_ref)); \
+    memset((oref), 0, sizeof(PVFS_object_ref)); \
     if (sid_count == -1) \
     { \
-        oref->sid_count = 3; \
+        (oref)->sid_count = 3; \
     } \
     else \
     { \
-        oref->sid_count = sid_count; \
+        (oref)->sid_count = sid_count; \
     } \
-    oref->sid_array = (PVFS_SID *)malloc(SASZ(oref->sid_count)); \
-    if (!oref->sid_array) \
+    (oref)->sid_array = (PVFS_SID *)malloc(SASZ((oref)->sid_count)); \
+    if (!(oref)->sid_array) \
     { \
         gossip_err("malloc returned error");\
         break; \
     } \
-    ZEROMEM(oref->sid_array, SASZ(oref->sid_count)); \
+    ZEROMEM((oref)->sid_array, SASZ((oref)->sid_count)); \
 } while (0)
 
 /* dst must be empty (released) */
 #define PVFS_object_ref_copy(dst, src) \
 do { \
-    if (dst->sid_count != 0 || dst->sid_array != NULL) \
+    if ((dst)->sid_count != 0 || (dst)->sid_array != NULL) \
     { \
-        gossip_err("tried to copy to a non empty PVFS_object_ref"); \
+        gossip_err("tried to copy to a non empty PVFS_object_ref\n"); \
         break; \
     } \
-    *dst = *src; \
-    if (src->sid_count > 0 && src->sid_array) \
+    *(dst) = *(src); \
+    if ((src)->sid_count > 0 && (src)->sid_array) \
     { \
-        dst->sid_array = (PVFS_SID *)malloc(SASZ(src->sid_count)); \
-        if (!dst->sid_array) \
+        (dst)->sid_array = (PVFS_SID *)malloc(SASZ((src)->sid_count)); \
+        if (!(dst)->sid_array) \
         { \
             gossip_err("malloc returned error");\
             break; \
         } \
-        ZEROMEM(dst->sid_array, SASZ(src->sid_count)); \
-        memcpy(dst->sid_array, src->sid_array, SASZ(src->sid_count)); \
+        ZEROMEM((dst)->sid_array, SASZ((src)->sid_count)); \
+        memcpy((dst)->sid_array, (src)->sid_array, SASZ((src)->sid_count)); \
     } \
 } while (0)
 
 /* does not free the object_ref, but the resources it holds */
 #define PVFS_object_ref_release(oref) \
 do { \
-    if (oref->sid_count > 0 && oref->sid_array) \
+    if ((oref)->sid_count > 0 && (oref)->sid_array) \
     { \
-        free(oref->sid_array); \
+        free((oref)->sid_array); \
     } \
-    memset(oref, 0; sizeof(PVFS_object_ref)); \
+    memset((oref), 0, sizeof(PVFS_object_ref)); \
 } while (0)
 
 /* kernel compatibility version of a PVFS_handle */

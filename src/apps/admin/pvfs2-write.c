@@ -483,8 +483,7 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
 		PVFS_perror("PVFS_sys_lookup", ret);
 		return (-1);
 	    }
-	    parent_ref.handle = resp_lookup.ref.handle;
-	    parent_ref.fs_id = resp_lookup.ref.fs_id;
+            PVFS_object_ref_copy(&parent_ref, &resp_lookup.ref);
 
 	    while (!PINT_string_next_segment(srcname, &segp, &segstate))
 	    {
@@ -496,8 +495,6 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
 	{
 	    /* get the absolute path on the pvfs2 file system */
 	    
-	    /*parent_ref.fs_id = obj->pvfs2.fs_id; */
-
 	    if (PINT_remove_base_dir(obj->u.pvfs2.pvfs2_path,str_buf, 
                                      PVFS_NAME_MAX))
 	    {
@@ -511,7 +508,7 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
 	    }
 	    ret = PINT_lookup_parent(obj->u.pvfs2.pvfs2_path, 
                                      obj->u.pvfs2.fs_id, credentials,
-                                     &parent_ref.handle);
+                                     &parent_ref);
 	    if (ret < 0)
 	    {
 		PVFS_perror("PVFS_util_lookup_parent", ret);
@@ -539,7 +536,6 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
 		    strncat(obj->u.pvfs2.pvfs2_path, prev_segp, PVFS_NAME_MAX);
 		    entry_name = prev_segp;
 		}
-		parent_ref.fs_id = obj->u.pvfs2.fs_id;
 	    }
 	}
 

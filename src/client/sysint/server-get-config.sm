@@ -389,6 +389,8 @@ static PINT_sm_action server_get_config_setup_msgpair(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    PINT_cleanup_capability(&capability);
+
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
