@@ -18,10 +18,10 @@ dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=3
 PVFS2_VERSION_MINOR=0
-PVFS2_VERSION_SUB=2
+PVFS2_VERSION_SUB=4
 PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
-#PVFS2_VERSION_PRE="orangefs-$CONFIGURE_TIME"
+PVFS2_VERSION_PRE="-$CONFIGURE_TIME"
 
 PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE$PVFS2_VERSION_PRE
 AC_SUBST(PVFS2_VERSION)
@@ -256,13 +256,30 @@ AC_ARG_ENABLE(server,
 [  --disable-server        Disables building of PVFS2 server],
 [if test "x$enableval" = "xyes" ; then
     BUILD_SERVER=1
-    NEED_BERKELEY_DB=yes
 else
     BUILD_SERVER=""
 fi],
-    BUILD_SERVER=1
-    NEED_BERKELEY_DB=yes)
+    BUILD_SERVER=1)
 AC_SUBST(BUILD_SERVER)
+
+AC_ARG_WITH(db-backend,
+[  --with-db-backend        Use specified database (bdb or lmdb).],
+if test "${withval}" = "bdb"
+then
+    DATABASE_BACKEND=bdb
+    NEED_BERKELEY_DB=yes
+elif test "${withval}" = "lmdb"
+then
+    DATABASE_BACKEND=lmdb
+else
+    AC_MSG_ERROR(database backend ${withval} invalid)
+fi
+AC_SUBST(DATABASE_BACKEND)
+AC_SUBST(NEED_BERKELEY_DB),
+DATABASE_BACKEND=bdb
+NEED_BERKELEY_DB=yes
+AC_SUBST(DATABASE_BACKEND)
+AC_SUBST(NEED_BERKELEY_DB))
 
 dnl locate OpenSSL libraries
 AX_OPENSSL
@@ -413,9 +430,7 @@ AC_SUBST(BUILD_BMI_ONLY)
 dnl if we're only building the BMI lib, disable checks for server and DB.
 if test "x$BUILD_BMI_ONLY" = "x1"; then
 	BUILD_SERVER=""
-	NEED_BERKELEY_DB=no
 	AC_SUBST(BUILD_SERVER)
-	AC_SUBST(NEED_BERKELEY_DB)
 fi
 
 dnl a mechanism to turn off perf counters
@@ -696,12 +711,6 @@ AC_ARG_WITH(mtrace,
 [  --with-mtrace           Use mtrace (must set MALLOC_TRACE to output file)],
 CFLAGS="$CFLAGS -include mcheck.h"
 AC_DEFINE(WITH_MTRACE, 1, Define if mtrace memory leak detection was enabled)
-)
-
-dnl This particular one enables berkeley db to emit detected errors
-AC_ARG_WITH(berkdb-debug,
-[  --with-berkdb-debug     Use berkeley db error reporting (if detected).],
-AC_DEFINE(BERKDB_ERROR_REPORTING, 1, Define if berkeley db error reporting was enabled)
 )
 
 TAU_INCS=
@@ -1849,6 +1858,7 @@ AC_OUTPUT(include/pvfs2.h
 Makefile
 module.mk
 src/apps/admin/module.mk
+src/apps/admin/lmdb/module.mk
 src/apps/admin/pvfs2-config
 src/apps/devel/module.mk
 src/apps/karma/module.mk
@@ -1875,6 +1885,7 @@ src/common/sidcache/module.mk
 src/common/policycomp/module.mk
 src/common/hash/module.mk
 src/common/token-utils/module.mk
+src/common/lmdb/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk

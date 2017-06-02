@@ -570,6 +570,8 @@ populate_shared_memory:
     }
 
 
+    gossip_debug(GOSSIP_FILE_DEBUG,"%s:service_operation return code(%d)\n",__func__,(int)ret);
+
     if (ret < 0)
     {
           /* this macro is defined in pvfs2-kernel.h */
@@ -1326,6 +1328,10 @@ static ssize_t do_readv_writev(struct rw_options *rw)
     struct iovec *iovecptr = NULL, *ptr = NULL;
     loff_t *offset;
     char *s = kmalloc(HANDLESTRINGSIZE, GFP_KERNEL);
+#ifdef GWC_USES_KIOCB
+    struct kiocb iocb;
+    struct iov_iter iter;
+#endif
 
     total_count = 0;
     ret = -EINVAL;
@@ -1398,14 +1404,30 @@ static ssize_t do_readv_writev(struct rw_options *rw)
 #ifdef PVFS2_LINUX_KERNEL_2_4
         ret = pvfs2_precheck_file_write(file, inode, &count, offset);
 #else
+#ifdef GWC_USES_KIOCB
+	init_sync_kiocb(&iocb, file);
+	iov_iter_init(&iter,
+		      WRITE,
+		      rw->dest.address.iov,
+		      rw->dest.address.nr_segs,
+		      pvfs_bufmap_size_query());
+	ret = generic_write_checks(&iocb, &iter);
+        if (ret <= 0)
+        {
+            gossip_err("%s: failed generic argument checks.\n", rw->fnstr);
+            goto out;
+        }
+
+#else
         ret = generic_write_checks(file, offset, &count, S_ISBLK(inode->i_mode));
-#endif
         if (ret != 0)
         {
             gossip_err("%s: failed generic argument checks.\n", rw->fnstr);
             goto out;
         }
 
+#endif
+#endif
         memset(s,0,HANDLESTRINGSIZE);
         gossip_debug(GOSSIP_FILE_DEBUG,
                      "%s/%s(%s): proceeding with offset : %llu, size %d\n",
@@ -2076,19 +2098,13 @@ static ssize_t wait_for_iox(struct rw_options *rw,
           else
           {
               memset(s,0,HANDLESTRINGSIZE);
-              gossip_err(
-                "%s: error in %s handle %s, FILE: %s\n  -- returning %ld\n",
-                rw->fnstr, 
-                rw->type == IO_READX ?
-                  "noncontig read from" :
-                  "noncontig write to",
-                k2s(get_khandle_from_ino(rw->inode),s),
-                (rw->file &&
-                 rw->file->f_dentry &&
-                 rw->file->f_dentry->d_name.name ?
-                   (char *) rw->file->f_dentry->d_name.name :
-                   "UNKNOWN"),
-                (long) ret);
+              gossip_err("%s: error in %s handle %s, FILE: %s\n  -- returning %ld\n",
+                          rw->fnstr, 
+                          rw->type == IO_READX ? "noncontig read from" : "noncontig write to",
+                          k2s(get_khandle_from_ino(rw->inode),s),
+                          (rw->file && rw->file->f_dentry && rw->file->f_dentry->d_name.name ?
+                          (char *) rw->file->f_dentry->d_name.name : "UNKNOWN"),
+                          (long) ret);
           }
           goto out;
     }

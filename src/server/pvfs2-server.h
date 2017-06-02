@@ -39,7 +39,7 @@
 
 extern job_context_id server_job_context;
 
-#define PVFS2_SERVER_DEFAULT_TIMEOUT_MS      100
+#define PVFS2_SERVER_DEFAULT_TIMEOUT_MS      1000
 #define BMI_UNEXPECTED_OP                    999
 
 /* BMI operation timeout if not specified in config file */
@@ -439,6 +439,11 @@ struct PINT_server_crdirent_op
     PVFS_handle *remote_dirdata_handles;
 };
 
+struct PINT_server_setattr_op
+{
+    PVFS_handle *remote_dirdata_handles;
+};
+
 struct PINT_server_rmdirent_op
 {
     PVFS_handle dirdata_handle;
@@ -749,7 +754,7 @@ typedef struct PINT_server_op
         struct PINT_server_getconfig_op getconfig;
         struct PINT_server_lookup_op lookup;
         struct PINT_server_crdirent_op crdirent;
-        /* struct PINT_server_setattr_op setattr; */
+        struct PINT_server_setattr_op setattr;
         struct PINT_server_readdir_op readdir;
         struct PINT_server_remove_op remove;
         struct PINT_server_chdirent_op chdirent;
@@ -1008,6 +1013,7 @@ extern struct PINT_state_machine_s pvfs2_check_entry_not_exist_sm;
 extern struct PINT_state_machine_s pvfs2_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_remove_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
+extern struct PINT_state_machine_s pvfs2_crdirent_work_sm;
 extern struct PINT_state_machine_s pvfs2_unexpected_sm;
 extern struct PINT_state_machine_s pvfs2_create_immutable_copies_sm;
 extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
@@ -1019,7 +1025,10 @@ extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_dirdata_split_sm;
 
 extern void tree_getattr_free(PINT_server_op *s_op);
+extern void tree_setattr_free(PINT_server_op *s_op);
 extern void tree_remove_free(PINT_server_op *s_op);
+extern void mkdir_free(struct PINT_server_op *s_op);
+extern void getattr_free(struct PINT_server_op *s_op);
 
 /* V3 */
 #if 0

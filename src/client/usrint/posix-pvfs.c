@@ -1962,12 +1962,22 @@ int pvfs_linkat(int olddirfd, const char *oldpath,
 }
 
 /**
- * this reads exactly one dirent, count is ignored
+ * This reads exactly one dirent, count is ignored.
+ *
+ * On success, 1 is returned.
+ * On end of directory, 0 is returned.
+ * On error, -1 is returned.
  */
 int pvfs_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 {
+    int ret;
     gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_readdir: called with %d\n", fd);
-    return pvfs_getdents(fd, dirp, sizeof(struct dirent));
+    ret = pvfs_getdents(fd, dirp, sizeof(struct dirent));
+    if(ret > 0)
+    {
+        return 1;
+    }
+    return ret;
 }
 
 /**

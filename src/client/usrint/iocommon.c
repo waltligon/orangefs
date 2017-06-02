@@ -3178,7 +3178,7 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
         dirp->d_off = pd->s->file_pointer;
 #endif
 #ifdef _DIRENT_HAVE_D_RECLEN
-        dirp->d_reclen = sizeof(PVFS_dirent);
+        dirp->d_reclen = sizeof(struct dirent);
 #endif
 #ifdef _DIRENT_HAVE_D_TYPE
 #ifndef DT_UNKNOWN

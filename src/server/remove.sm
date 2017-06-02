@@ -109,9 +109,16 @@ nested machine pvfs2_remove_dirdata_handles_work_sm
     state get_dirent_count_call_tree_getattr
     {
         jump pvfs2_tree_getattr_work_sm;
-        success => remove_dirdata_handles_setup_tree_remove;
+        success => get_dirent_count_examine_tree_getattr;
         default => remove_dirdata_handles_cleanup;
     }   
+
+    state get_dirent_count_examine_tree_getattr
+    {
+        run remove_get_dirent_count_examine_tree_getattr;
+        success => remove_dirdata_handles_setup_tree_remove;
+        default => remove_dirdata_handles_cleanup;
+    }
 
     state get_dirent_count_cleanup_tree_getattr
     {
@@ -665,15 +672,12 @@ static PINT_sm_action remove_get_dirent_count_cleanup_tree_getattr(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
+static PINT_sm_action remove_get_dirent_count_examine_tree_getattr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = NULL;
     struct PINT_server_op *getattr_op = NULL;
-    struct PINT_server_op *remove_op = NULL;
-    struct PVFS_server_req *req = NULL;
     PVFS_object_attr *attr_p = NULL;
-    int location = 0;
     int task_id = 0, error_code = 0;
     int i = 0;
 
@@ -704,6 +708,18 @@ static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
       subordinate frame) */
     tree_getattr_free(getattr_op);
     PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(getattr_op);
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *remove_op = NULL;
+    struct PVFS_server_req *req = NULL;
+    PVFS_object_attr *attr_p = NULL;
+    int location = 0;
 
     attr_p = &s_op->attr;
     assert(attr_p);
@@ -1045,7 +1061,6 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(
 #if 0
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-#endif
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
@@ -1054,6 +1069,7 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
+#endif
 
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
     js_p->error_code = 0;

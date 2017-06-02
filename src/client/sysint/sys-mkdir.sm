@@ -366,11 +366,6 @@ static int mkdir_msg_comp_fn(void *v_p,
                      "PINT_client_capcache_update returned %d\n",
                      __func__, ret);
     }
-    else
-    {
-        gossip_err("%s: could not get local uid for client capcache\n",
-                   __func__);
-    }
 
     return 0;
 }

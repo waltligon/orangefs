@@ -58,8 +58,6 @@ enum
     TROVE_NOOVERWRITE            = 1 << 3, 
     TROVE_ONLYOVERWRITE          = 1 << 4,
 
-    TROVE_DB_CACHE_MMAP          = 1 << 5,
-    TROVE_DB_CACHE_SYS           = 1 << 6,
     TROVE_KEYVAL_HANDLE_COUNT    = 1 << 7,
     TROVE_BINARY_KEY             = 1 << 8, /* tell trove this is a binary key */
     TROVE_KEYVAL_ITERATE_REMOVE  = 1 << 9, /* tell trove to delete keyvals as it iterates */
@@ -82,14 +80,12 @@ enum
     TROVE_COLLECTION_ATTR_CACHE_SIZE,
     TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
     TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
-    TROVE_DB_CACHE_SIZE_BYTES,
     TROVE_ALT_AIO_MODE,
     TROVE_MAX_CONCURRENT_IO,
     TROVE_COLLECTION_COALESCING_HIGH_WATERMARK,
     TROVE_COLLECTION_COALESCING_LOW_WATERMARK,
     TROVE_COLLECTION_META_SYNC_MODE,
     TROVE_COLLECTION_IMMEDIATE_COMPLETION,
-    TROVE_SHM_KEY_HINT,
     TROVE_DIRECTIO_THREADS_NUM,
     TROVE_DIRECTIO_OPS_PER_QUEUE,
     TROVE_DIRECTIO_TIMEOUT
@@ -151,7 +147,6 @@ int trove_collection_lookup(TROVE_method_id method_id,
                             TROVE_op_id *out_op_id_p);
 
 int trove_collection_iterate(TROVE_method_id method_id,
-                             TROVE_ds_position *inout_position_p,
                              TROVE_keyval_s *name_array,
                              TROVE_coll_id *coll_id_array,
                              int *inout_count_p,
@@ -519,6 +514,11 @@ int trove_collection_setinfo(TROVE_coll_id coll_id,
                              TROVE_context_id context_id,
                              int option,
                              void *parameter);
+
+struct server_configuration_s;
+int trove_collection_set_fs_config(
+        TROVE_coll_id coll_id,
+        struct server_configuration_s *cfg);
 
 #endif
 
