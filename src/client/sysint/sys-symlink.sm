@@ -26,8 +26,6 @@
 #include "sid.h"
 #include "dist-dir-utils.h"
 
-extern job_context_id pint_client_sm_context;
-
 enum
 {
     SYMLINK_RETRY = 170

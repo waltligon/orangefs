@@ -433,7 +433,7 @@ struct PINT_state_machine_s *client_op_state_get_machine(int op)
             /* now check range for mgmt functions */
             if (op <= PVFS_OP_MGMT_MAXVAL)
             {
-                return PINT_client_sm_mgmt_table[op-PVFS_OP_SYS_MAXVAL-1].sm;
+                return PINT_client_sm_mgmt_table[(op - PVFS_OP_SYS_MAXVAL) - 1].sm;
             }
             else
             {

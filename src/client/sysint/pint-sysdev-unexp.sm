@@ -18,8 +18,6 @@
 #include "job-time-mgr.h"
 #include "sid.h"
 
-extern job_context_id pint_client_sm_context;
-
 %%
 
 machine pvfs2_sysdev_unexp_sm

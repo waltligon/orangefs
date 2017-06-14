@@ -39,8 +39,6 @@
 
 PINT_smcb *g_smcb = NULL; 
 
-extern job_context_id pint_client_sm_context;
-
 PINT_event_id PINT_client_sys_event_id;
 
 int pint_client_pid;

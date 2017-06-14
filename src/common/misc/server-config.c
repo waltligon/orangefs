@@ -75,6 +75,7 @@ static DOTCONF_CB(get_tcp_buffer_receive);
 static DOTCONF_CB(get_tcp_bind_specific);
 static DOTCONF_CB(get_perf_update_interval);
 static DOTCONF_CB(get_rootsrv);
+static DOTCONF_CB(get_perf_update_history);
 static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_root_dirdata_handle);
 static DOTCONF_CB(get_name);
@@ -859,14 +860,21 @@ static const configoption_t options[] =
     {"FileStuffing",ARG_STR, get_file_stuffing, NULL, 
         CTX_FILESYSTEM,"yes"},
 
-     /* This specifies the frequency (in milliseconds) 
-      * that performance monitor should be updated
-      * when the OrangeFS server is running in admin mode.
+     /* This specifies the number of samples
+      * that performance monitor should keep
       *
       * Can be set in either Default or ServerOptions contexts.
       */
-    {"PerfUpdateInterval",ARG_INT, get_perf_update_interval,NULL,
-        CTX_DEFAULTS,"1000"},
+    {"PerfUpdateHistory", ARG_INT, get_perf_update_history, NULL,
+        CTX_DEFAULTS, "10"},
+
+     /* This specifies the frequency (in milliseconds) 
+      * that performance monitor should be updated
+      *
+      * Can be set in either Default or ServerOptions contexts.
+      */
+    {"PerfUpdateInterval", ARG_INT, get_perf_update_interval, NULL,
+        CTX_DEFAULTS, "1000"},
 
     /* List the BMI modules to load when the server is started.  At present,
      * only tcp, infiniband, and myrinet are valid BMI modules.  
@@ -1390,6 +1398,15 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
         return 1;
     }
     
+    /* Users don't need to learn about this unless they want to
+    */
+    if (!config_s->perf_update_history)
+    {
+        gossip_err("Configuration file error.  "
+                   "No PerfUpdateHistory specified.\n");
+        return 1;
+    }
+
     /* Users don't need to learn about this unless they want to
     */
     if (!config_s->perf_update_interval)
@@ -2066,6 +2083,14 @@ DOTCONF_CB(get_client_retry_delay)
     struct server_configuration_s *config_s = 
              (struct server_configuration_s *)cmd->context;
     config_s->client_retry_delay_ms = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_perf_update_history)
+{
+    struct server_configuration_s *config_s = 
+                    (struct server_configuration_s *)cmd->context;
+    config_s->perf_update_history = cmd->data.value;
     return NULL;
 }
 

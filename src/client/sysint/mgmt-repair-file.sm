@@ -29,8 +29,6 @@
 #include "sys-create.h"
 #include "sid.h"
 
-extern job_context_id pint_client_sm_context;
-
 %%
 
 machine pvfs2_client_mgmt_repair_file_sm

@@ -19,8 +19,6 @@
 #include "security-util.h"
 #include "sid.h"
 
-extern job_context_id pint_client_sm_context;
-
 #define WRITE_ACK_RCV 0
 #define SRC_FLOW_POST 1
 #define NUM_OF_PHASES 2

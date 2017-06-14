@@ -33,8 +33,6 @@
 #include "server-config.h"
 #include "client-capcache.h"
 
-extern job_context_id pint_client_sm_context;
-
 enum
 {
     CREATE_RETRY = 170

@@ -185,21 +185,9 @@ typedef struct server_configuration_s
     int  client_job_flow_timeout;
     int  client_retry_limit;        /* how many times to retry client ops */
     int  client_retry_delay_ms;     /* delay between retries */
+    int  perf_update_history;       /* how many sample to keep   */
     int  perf_update_interval;      /* how quickly (in msecs) to */
                                     /*    update perf monitor    */
-/* V3 remove precreate stuff */
-#if 0
-    uint32_t *precreate_batch_size;    /* batch size for each ds type */
-    uint32_t *precreate_low_threshold; /* threshold for each ds type */
-#endif
-
-/* V3 ECQ - unneeded?
-   Is this the same as int32_t distr_dir_servers_initial which is at bottom?
- */
-#if 0
-    uint32_t init_num_dirdata_handles; /* initial number of dirdata handles */
-                                       /*    when creating a new directory */
-#endif
     char *logfile;                  /* what log file to write to */
     char *logtype;                  /* "file" or "syslog" destination */
     enum gossip_logstamp logstamp_type; /* how to timestamp logs */
@@ -281,6 +269,11 @@ typedef struct server_configuration_s
     int credcache_timeout;           /* credential cache timeout in seconds */
     int capcache_timeout;            /* capability cache timeout in seconds */
     int certcache_timeout;           /* certificate cache timeout in seconds */
+
+    int bypass_timeout_check;        /* Correlates to TurnOffTimeouts in server conf file */
+                                     /* Only applies to a server.                         */
+                                     /* 1 = don't check for timeout                       */
+                                     /* 0 = check for timeout                             */
 
     void *private_data;
     int32_t tree_width;
@@ -364,13 +357,6 @@ PVFS_fs_id PINT_config_get_fs_id_by_fs_name(
         struct server_configuration_s *config_s,
         char *fs_name);
 
-/* V3 obsolete */
-#if 0
-struct host_handle_mapping_s *PINT_get_handle_mapping(
-    PINT_llist *list,
-    char *alias);
-#endif
-
 PINT_llist *PINT_config_get_filesystems(
         struct server_configuration_s *config_s);
 
@@ -383,9 +369,6 @@ int PINT_config_get_fs_key(
         PVFS_fs_id fs_id,
         char **key,
         int *length);
-
-/* defined in src/server/pvfs2-server.c only valid in server code */
-struct server_configuration_s *get_server_config_struct(void);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 int PINT_config_pvfs2_mkspace(struct server_configuration_s *config);

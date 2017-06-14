@@ -757,15 +757,18 @@ typedef uint64_t PVFS_dist_dir_hash_type;
 enum PVFS_server_param
 {
     PVFS_SERV_PARAM_INVALID = 0,
-    PVFS_SERV_PARAM_GOSSIP_MASK = 1, /* gossip debugging on or off */
-    PVFS_SERV_PARAM_FSID_CHECK = 2,  /* verify that an fsid is ok */
-    PVFS_SERV_PARAM_ROOT_CHECK = 3,  /* verify existance of root handle */
-    PVFS_SERV_PARAM_MODE = 4,        /* change the current server mode */
-    PVFS_SERV_PARAM_EVENT_ENABLE = 5,    /* event enable */
-    PVFS_SERV_PARAM_EVENT_DISABLE = 6, /* event disable */
-    PVFS_SERV_PARAM_SYNC_META = 7,   /* metadata sync flags */
-    PVFS_SERV_PARAM_SYNC_DATA = 8,   /* file data sync flags */
-    PVFS_SERV_PARAM_DROP_CACHES = 9
+    PVFS_SERV_PARAM_GOSSIP_MASK = 1,       /* gossip debugging on or off */
+    PVFS_SERV_PARAM_FSID_CHECK = 2,        /* verify that an fsid is ok */
+    PVFS_SERV_PARAM_ROOT_CHECK = 3,        /* verify existance of root handle */
+    PVFS_SERV_PARAM_MODE = 4,              /* change the current server mode */
+    PVFS_SERV_PARAM_PERF_HISTORY = 5,      /* set counter history size */
+    PVFS_SERV_PARAM_PERF_INTERVAL = 6,     /* set counter interval time */
+    PVFS_SERV_PARAM_EVENT_ENABLE = 7,      /* event enable */
+    PVFS_SERV_PARAM_EVENT_DISABLE = 8,     /* event disable */
+    PVFS_SERV_PARAM_SYNC_META = 9,         /* metadata sync flags */
+    PVFS_SERV_PARAM_SYNC_DATA = 10,        /* file data sync flags */
+    PVFS_SERV_PARAM_DROP_CACHES = 11,
+    PVFS_SERV_PARAM_TURN_OFF_TIMEOUTS = 12 /* set bypass_timeout_check */
 };
 
 enum PVFS_mgmt_param_type
@@ -803,7 +806,8 @@ enum PVFS_server_mode
 
 #ifdef PVFS_USE_OLD_ACL_FORMAT
 /* OLD PVFS ACL Format - a null terminated array of these */
-typedef struct {
+typedef struct
+{
     int32_t  p_tag;
     uint32_t p_perm;
     uint32_t p_id;
@@ -811,13 +815,15 @@ typedef struct {
 #else
 /* PVFS2 ACL structures - Matches Linux ACL EA structures */
 /* matches POSIX ACL-XATTR format */
-typedef struct {
+typedef struct
+{
     int16_t  p_tag;
     uint16_t p_perm;
     uint32_t p_id;
 } pvfs2_acl_entry;
 
-typedef struct {
+typedef struct
+{
     uint32_t p_version;
     pvfs2_acl_entry p_entries[0];
 } pvfs2_acl_header;

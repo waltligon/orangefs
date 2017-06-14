@@ -2337,23 +2337,25 @@ endecode_fields_3_struct(
     enum, param,
     PVFS_mgmt_setparam_value, value);
 
-#define PINT_SERVREQ_MGMT_SETPARAM_FILL(__req,                   \
-                                        __cap,                   \
-                                        __fsid,                  \
-                                        __param,                 \
-                                        __value,                 \
-                                        __hints)                 \
-do {                                                             \
-    memset(&(__req), 0, sizeof(__req));                          \
-    (__req).op = PVFS_SERV_MGMT_SETPARAM;                        \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;                         \
-    (__req).ctrl.type = PVFS_REQ_PRIMARY;                        \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                  \
-    (__req).hints = (__hints);                                   \
-    (__req).u.mgmt_setparam.fs_id = (__fsid);                    \
-    (__req).u.mgmt_setparam.param = (__param);                   \
-    (__req).u.mgmt_setparam.value = (__value);                   \
-    /* if type string should we dup the string??? */             \
+#define PINT_SERVREQ_MGMT_SETPARAM_FILL(__req,                      \
+                                        __cap,                      \
+                                        __fsid,                     \
+                                        __param,                    \
+                                        __value,                    \
+                                        __hints)                    \
+do {                                                                \
+    memset(&(__req), 0, sizeof(__req));                             \
+    (__req).op = PVFS_SERV_MGMT_SETPARAM;                           \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                            \
+    (__req).ctrl.type = PVFS_REQ_PRIMARY;                           \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                     \
+    (__req).hints = (__hints);                                      \
+    (__req).u.mgmt_setparam.fs_id = (__fsid);                       \
+    (__req).u.mgmt_setparam.param = (__param);                      \
+    if(__value){                                                    \
+        (__req).u.mgmt_setparam.value.type = (__value)->type;       \
+        (__req).u.mgmt_setparam.value.u.value = (__value)->u.value; \
+    }                                                               \
 } while (0)
 
 /* mgmt_noop ********************************************************/
@@ -2375,30 +2377,34 @@ do {                                                       \
 
 struct PVFS_servreq_mgmt_perf_mon
 {
-    uint32_t next_id;  /* next time stamp id we want to retrieve */
+    uint32_t cnt_type;     /* type of perf counters to retrieve */
+    uint32_t next_id;      /* next time stamp id we want to retrieve */
     uint32_t key_count;    /* how many counters per measurements we want */
     uint32_t count;        /* how many measurements we want */
 };
-endecode_fields_3_struct(
+endecode_fields_4_struct(
     PVFS_servreq_mgmt_perf_mon,
+    uint32_t, cnt_type,
     uint32_t, next_id,
     uint32_t, key_count,
     uint32_t, count);
 
 #define PINT_SERVREQ_MGMT_PERF_MON_FILL(__req,         \
                                         __cap,         \
+                                        __cnt_type,    \
                                         __next_id,     \
                                         __key_count,   \
-                                        __count,       \
+                                        __sample_count,\
                                         __hints)       \
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
     (__req).op = PVFS_SERV_MGMT_PERF_MON;              \
     PVFS_REQ_COPY_CAPABILITY((__cap), (__req));        \
     (__req).hints = (__hints);                         \
+    (__req).u.mgmt_perf_mon.cnt_type = (__cnt_type);   \
     (__req).u.mgmt_perf_mon.next_id = (__next_id);     \
     (__req).u.mgmt_perf_mon.key_count = (__key_count); \
-    (__req).u.mgmt_perf_mon.count = (__count);         \
+    (__req).u.mgmt_perf_mon.count = (__sample_count);  \
 } while (0)
 
 struct PVFS_servresp_mgmt_perf_mon
@@ -2406,6 +2412,7 @@ struct PVFS_servresp_mgmt_perf_mon
     int64_t *perf_array;            /* array of statistics */
     uint32_t perf_array_count;      /* size of above array */
     uint32_t key_count;             /* number of keys in each sample */
+    uint32_t sample_count;          /* number of samples (history) */
     uint32_t suggested_next_id;     /* next id to pick up from this point */
     uint64_t end_time_ms;           /* end time for final array entry */
     uint64_t cur_time_ms;           /* current time according to svr */
@@ -2416,7 +2423,7 @@ endecode_fields_5a_struct(
     uint32_t, suggested_next_id,
     uint64_t, end_time_ms,
     uint64_t, cur_time_ms,
-    skip4,,
+    uint32_t, sample_count,
     uint32_t, perf_array_count,
     int64_t,  perf_array);
 #define extra_size_PVFS_servresp_mgmt_perf_mon \

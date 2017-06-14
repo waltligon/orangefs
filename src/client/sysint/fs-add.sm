@@ -46,7 +46,6 @@ enum {
 };
 
 gen_mutex_t mt_config = GEN_MUTEX_INITIALIZER;
-extern job_context_id pint_client_sm_context;
 
 static int server_fetch_config_comp_fn(void *v_p,
                                        struct PVFS_server_resp *resp_p,

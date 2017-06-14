@@ -17,6 +17,7 @@
 #include "server-config.h"
 #include "pint-security.h"
 
+enum{ STOP_TIMER=15 };
 %%
 
 machine pvfs2_perf_update_sm
@@ -25,7 +26,14 @@ machine pvfs2_perf_update_sm
 	{
 		run perf_update_do_work;
 		success => do_work;
+                STOP_TIMER => stop_timer;
 		default => error;
+	}
+
+	state stop_timer 
+	{
+		run perf_update_stop_timer;
+		default => terminate;
 	}
 
 	state error 
@@ -37,17 +45,33 @@ machine pvfs2_perf_update_sm
 
 %%
 
+/** perf_update_stop_timer()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static PINT_sm_action perf_update_stop_timer(struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_perf_finalize(s_op->u.perf_update.pc);
+
+    return(server_state_machine_complete(smcb));
+}
+
 /** perf_update_error()
  *
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
  */
-static PINT_sm_action perf_update_error(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action perf_update_error(struct PINT_smcb *smcb,
+                                        job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_err("Error: stopping server performance monitoring.\n");
 
-    PINT_perf_finalize(PINT_server_pc);
+    PINT_perf_finalize(s_op->u.perf_update.pc);
 
     return(server_state_machine_complete(smcb));
 }
@@ -57,9 +81,10 @@ static PINT_sm_action perf_update_error(
  * resets counters, updates metrices, etc- this is intended to be called
  * repeatedly on a regular interval
  */
-static PINT_sm_action perf_update_do_work(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action perf_update_do_work(struct PINT_smcb *smcb,
+                                          job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
     PVFS_debug_mask current_mask = {GOSSIP_NO_DEBUG_INIT};
     int current_debug_on = 0;
@@ -76,7 +101,7 @@ static PINT_sm_action perf_update_do_work(
     gossip_get_debug_mask(&current_debug_on, &current_mask);
     if(DBG_TRUE(DBG_AND(2, current_mask, GOSSIP_PERFCOUNTER_DEBUG)))
     {
-        tmp_text = PINT_perf_generate_text(PINT_server_pc, 4096);
+        tmp_text = PINT_perf_generate_text(s_op->u.perf_update.pc, 4096);
         if(tmp_text)
         {
             token = strtok_r(tmp_text, delim, &ptr);
@@ -90,15 +115,22 @@ static PINT_sm_action perf_update_do_work(
     }
     
     /* roll over to next set of statistics */
-    PINT_perf_rollover(PINT_server_pc);
+    /* These do nothing if passed NULL */
+    PINT_perf_rollover(s_op->u.perf_update.pc);
+    PINT_perf_rollover(s_op->u.perf_update.tpc);
+
+    if (!s_op->u.perf_update.pc->running)
+    {
+        return STOP_TIMER;
+    }
 	
     /* post another timer */
-    return(job_req_sched_post_timer(PINT_server_pc->interval,
-	        smcb,
-	        0,
-	        js_p,
-	        &tmp_id,
-	        server_job_context));
+    return(job_req_sched_post_timer(s_op->u.perf_update.pc->interval,
+                                    smcb,
+                                    0,
+                                    js_p,
+                                    &tmp_id,
+                                    server_job_context));
 }
 
 static int perm_perf_update(PINT_server_op *s_op)
@@ -116,8 +148,6 @@ struct PINT_server_req_params pvfs2_perf_update_params =
     .perm = perm_perf_update,
     .state_machine = &pvfs2_perf_update_sm
 };
-
-
 
 
 /*

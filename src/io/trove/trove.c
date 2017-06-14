@@ -28,7 +28,9 @@ extern struct TROVE_dspace_ops  *dspace_method_table[];
 extern struct TROVE_bstream_ops *bstream_method_table[];
 extern struct TROVE_mgmt_ops    *mgmt_method_table[];
 
+/* this doesn't make much sense - why not pvfs2-server.c */
 struct PINT_perf_counter* PINT_server_pc = NULL;
+struct PINT_perf_counter* PINT_server_tpc = NULL;
 
 int TROVE_shm_key_hint = 0;
 int TROVE_max_concurrent_io = 16;

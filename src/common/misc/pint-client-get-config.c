@@ -17,11 +17,10 @@
 #include "gossip.h"
 #include "str-utils.h"
 #include "pint-cached-config.h"
+#include "pint-client-get-config.h"
 #include "PINT-reqproto-encode.h"
 #include "security-util.h"
 #include "sid.h"
-
-extern job_context_id pint_client_sm_context;
 
 /* <====================== PUBLIC FUNCTIONS =====================> */
 

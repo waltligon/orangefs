@@ -64,8 +64,8 @@ static int32_t pdev_magic;
 #ifdef WITH_LINUX_KMOD
 static int32_t pdev_max_upsize;
 
-#endif  /* WITH_LINUX_KMOD */
 static int32_t pdev_max_downsize;
+#endif  /* WITH_LINUX_KMOD */
 
 int32_t pvfs2_bufmap_total_size, pvfs2_bufmap_desc_size;
 int32_t pvfs2_bufmap_desc_count, pvfs2_bufmap_desc_shift;
@@ -694,21 +694,22 @@ int PINT_dev_write_list(
     enum PINT_dev_buffer_type buffer_type,
     PVFS_id_gen_t tag)
 {
-    struct iovec io_array[10];
+    struct iovec io_array[5];
     int io_count = 3;
     int i;
     int ret = -1;
     int32_t proto_ver = PVFS_KERNEL_PROTO_VERSION;
     int bytes_to_write = 0;
+    int sizeof_downcall = sizeof(pvfs2_downcall_t);
 #ifdef WIN32
     char *buffer, *b;
     size_t bsize = 0;
 #endif
     
-    /* lets be reasonable about list size :) */
-    /* two vecs are taken up by magic nr and tag */
-    if (list_count > 7)
+    /* There will be a downcall iovec, and maybe a trailer iovec. */
+    if (list_count > 2)
     {
+        gossip_err("%s: list_count:%d:\n", __func__, list_count);
         return (-(PVFS_EINVAL|PVFS_ERROR_DEV));
     }
 
@@ -721,8 +722,12 @@ int PINT_dev_write_list(
         return (-(PVFS_EINVAL|PVFS_ERROR_DEV));
     }
 
-    if (size_list[0] > pdev_max_downsize)
+    if (size_list[0] != sizeof_downcall)
     {
+        gossip_err("%s: downcall iovec size should be :%d: was :%d:\n",
+                   __func__,
+                   sizeof_downcall,
+                   size_list[0]);
         return(-(PVFS_EMSGSIZE|PVFS_ERROR_DEV));
     }
 
@@ -774,10 +779,15 @@ int PINT_dev_write_list(
     ret = writev(pdev_fd, io_array, io_count);
 #endif
 
-    if (ret == bytes_to_write)
+    if (ret == bytes_to_write) {
       return(0);
-    else
+    } else {
+      gossip_err("%s: tried to write :%d: bytes, writev returned :%d:\n",
+                 __func__,
+                 bytes_to_write,
+                 ret);
       return(-(PVFS_EIO|PVFS_ERROR_DEV));   
+    }
 }
 
 /* PINT_dev_remount()

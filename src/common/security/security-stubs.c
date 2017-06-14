@@ -16,6 +16,7 @@
 #include "pint-util.h"
 #include "server-config.h"
 #include "pint-cached-config.h"
+#include "pvfs2-server.h"
 
 #include "pint-security.h"
 #include "security-util.h"

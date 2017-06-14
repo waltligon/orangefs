@@ -33,6 +33,10 @@
 #define OID_KEYVAL ".1.3.6.1.4.1.7778.5"
 #define OID_REQSCHED ".1.3.6.1.4.1.7778.6"
 #define OID_REQUESTS ".1.3.6.1.4.1.7778.7"
+
+#define OID_IO_READ ".1.3.6.1.4.1.7778.18"
+#define OID_IO_WRITE ".1.3.6.1.4.1.7778.19"
+
 #define OID_SMALL_READ ".1.3.6.1.4.1.7778.8"
 #define OID_SMALL_WRITE ".1.3.6.1.4.1.7778.9"
 #define OID_FLOW_READ ".1.3.6.1.4.1.7778.10"
@@ -43,6 +47,20 @@
 #define OID_REQ_RMDIR ".1.3.6.1.4.1.7778.15"
 #define OID_REQ_GETATTR ".1.3.6.1.4.1.7778.16"
 #define OID_REQ_SETATTR ".1.3.6.1.4.1.7778.17"
+#define OID_REQ_IO ".1.3.6.1.4.1.7778.20"
+#define OID_REQ_SMALL_IO ".1.3.6.1.4.1.7778.21"
+#define OID_REQ_READDIR ".1.3.6.1.4.1.7778.22"
+
+#define OID_TIMER_LOOKUP ".1.3.6.1.4.1.7778.40"
+#define OID_TIMER_CREAT ".1.3.6.1.4.1.7778.41"
+#define OID_TIMER_REMOVE ".1.3.6.1.4.1.7778.42"
+#define OID_TIMER_MKDIR ".1.3.6.1.4.1.7778.43"
+#define OID_TIMER_RMDIR ".1.3.6.1.4.1.7778.24"
+#define OID_TIMER_GETATTR ".1.3.6.1.4.1.7778.45"
+#define OID_TIMER_SETATTR ".1.3.6.1.4.1.7778.46"
+#define OID_TIMER_IO ".1.3.6.1.4.1.7778.47"
+#define OID_TIMER_SMALL_IO ".1.3.6.1.4.1.7778.48"
+#define OID_TIMER_READDIR ".1.3.6.1.4.1.7778.49"
 
 #define INT_TYPE "INTEGER"
 #define CNT_TYPE "COUNTER"
@@ -70,6 +88,8 @@ static struct MGMT_perf_iod key_table[] =
    {OID_KEYVAL, CNT_TYPE, PINT_PERF_METADATA_KEYVAL_OPS, "Metadata KEYVAL Ops"},
    {OID_REQSCHED, INT_TYPE, PINT_PERF_REQSCHED, "Requests Active"},
    {OID_REQUESTS, CNT_TYPE, PINT_PERF_REQUESTS, "Requests Received"},
+   {OID_IO_READ, CNT_TYPE, PINT_PERF_IOREAD, "Bytes Read by IO"},
+   {OID_IO_WRITE, CNT_TYPE, PINT_PERF_IOWRITE, "Bytes Written by IO"},
    {OID_SMALL_READ, CNT_TYPE, PINT_PERF_SMALL_READ, "Bytes Read by Small_IO"},
    {OID_SMALL_WRITE, CNT_TYPE, PINT_PERF_SMALL_WRITE, "Bytes Written by Small_IO"},
    {OID_FLOW_READ, CNT_TYPE, PINT_PERF_FLOW_READ, "Bytes Read by Flow"},
@@ -80,6 +100,9 @@ static struct MGMT_perf_iod key_table[] =
    {OID_REQ_RMDIR, CNT_TYPE, PINT_PERF_RMDIR, "rmdir requests called"},
    {OID_REQ_GETATTR, CNT_TYPE, PINT_PERF_GETATTR, "getattr requests called"},
    {OID_REQ_SETATTR, CNT_TYPE, PINT_PERF_SETATTR, "setattr requests called"},
+   {OID_REQ_IO, CNT_TYPE, PINT_PERF_IO, "io requests called"},
+   {OID_REQ_SMALL_IO, CNT_TYPE, PINT_PERF_SMALL_IO, "small io requests called"},
+   {OID_REQ_READDIR, CNT_TYPE, PINT_PERF_READDIR, "readdir requests called"},
    {NULL, NULL, -1, NULL}   /* this halts the key count */
 };
 
@@ -312,17 +335,19 @@ int main(int argc, char **argv)
         /* good command - read counters */
         if (time(NULL) - snaptime > 60)
         {
+            int history = HISTORY;
             snaptime = time(NULL);
             key_count = max_keys;
 	        ret = PVFS_mgmt_perf_mon_list(cur_fs,
 				                          &creds,
+                                          PINT_PERF_COUNTER,
 				                          perf_matrix, 
 				                          end_time_ms_array,
 				                          addr_array,
 				                          next_id_array,
 				                          io_server_count, 
                                           &key_count,
-				                          HISTORY,
+				                          &history,
 				                          NULL,
                                           NULL);
 	        if (ret < 0)

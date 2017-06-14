@@ -27,12 +27,13 @@
 #include "pvfs2-sysint.h"
 #include "gen-locks.h"
 #include "pint-cached-config.h"
+#include "pint-perf-counter.h"
 #include "pvfs2-sysint.h"
 
 #include "trove.h"
 #include "server-config.h"
 
-int PINT_client_get_config(struct server_configuration_s *config,
+int PINT_server_get_config(struct server_configuration_s *config,
                            struct PVFS_sys_mntent* mntent_p,
                            const PVFS_credential *credential,
                            PVFS_hint hints);
@@ -48,6 +49,10 @@ int PINT_lookup_parent(char *filename,
 
 int PINT_client_security_initialize(void);
 int PINT_client_security_finalize(void);
+
+/* client only function to start update timer for perf counted */
+int client_perf_start_rollover(struct PINT_perf_counter *pc,
+                               struct PINT_perf_counter *tpc);
 
 /*
  * Local variables:

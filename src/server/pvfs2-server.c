@@ -48,6 +48,7 @@
 #include "pint-event.h"
 #include "pint-util.h"
 #include "pint-malloc.h"
+#include "pint-sysint-utils.h"
 #include "pint-uid-mgmt.h"
 #include "pint-security.h"
 #include "security-util.h"
@@ -390,8 +391,7 @@ int main(int argc, char **argv)
 #endif
 
     /* kick off timer for expired jobs */
-    ret = server_state_machine_alloc_noreq(
-                    PVFS_SERV_JOB_TIMER, &(tmp_op));
+    ret = server_state_machine_alloc_noreq(PVFS_SERV_JOB_TIMER, &(tmp_op));
     if (ret == 0)
     {
         ret = server_state_machine_start_noreq(tmp_op);
@@ -1325,20 +1325,71 @@ static int server_initialize_subsystems(
     }
 
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
-    /* Initialize performance counters */
-    if(!(*server_status_flag & SERVER_PERF_COUNTER_INIT))
+    /* history size should be in server config too */
+    PINT_server_pc = PINT_perf_initialize(PINT_PERF_COUNTER,
+                                          server_keys, 
+                                          server_perf_start_rollover);
+
+    PINT_server_tpc = PINT_perf_initialize(PINT_PERF_TIMER,
+                                           server_tkeys, 
+                                           server_perf_start_rollover);
+    if(!PINT_server_pc || !PINT_server_tpc)
     {
-        /* hist size should be in server config too */
-        PINT_server_pc = PINT_perf_initialize(server_keys);
-        if(!PINT_server_pc)
+        gossip_err("Error initializing performance counters.\n");
+        return(ret);
+    }
+    if (server_config.perf_update_interval > 0)
+    {
+        ret = PINT_perf_set_info(PINT_server_pc,
+                                 PINT_PERF_UPDATE_INTERVAL, 
+                                 server_config.perf_update_interval);
+        if (ret < 0)
+        {
+            gossip_err("Error PINT_perf_set_info (update interval)\n");
+            return(ret);
+        }
+        ret = PINT_perf_set_info(PINT_server_tpc,
+                                 PINT_PERF_UPDATE_INTERVAL, 
+                                 server_config.perf_update_interval);
+        if (ret < 0)
+        {
+            gossip_err("Error PINT_perf_set_info (update interval)\n");
+            return(ret);
+        }
+    }
+    if (server_config.perf_update_history > 0)
+    {
+        ret = PINT_perf_set_info(PINT_server_pc,
+                                 PINT_PERF_UPDATE_HISTORY, 
+                                 server_config.perf_update_history);
+        if (ret < 0)
+        {
+            gossip_err("Error PINT_perf_set_info (update history)\n");
+            return(ret);
+        }
+        ret = PINT_perf_set_info(PINT_server_tpc,
+                                 PINT_PERF_UPDATE_HISTORY, 
+                                 server_config.perf_update_history);
+        if (ret < 0)
+        {
+            gossip_err("Error PINT_perf_set_info (update history)\n");
+            return(ret);
+        }
+    }
+    /* if history_size is greater than 1, start the rollover SM */
+    if (PINT_server_pc->running)
+    {
+        ret = server_perf_start_rollover(PINT_server_pc, PINT_server_tpc);
+#if 0
+        struct PINT_smcb *tmp_op = NULL;
+        ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
+                                               &(tmp_op));
+        if (ret == 0)
         {
             gossip_err("Error initializing performance counters.\n");
             return(ret);
         }
-
-        ret = PINT_perf_set_info(PINT_server_pc,
-                                 PINT_PERF_UPDATE_INTERVAL, 
-                                 server_config.perf_update_interval);
+#endif
         if (ret < 0)
         {
             gossip_err("Error PINT_perf_set_info (update interval)\n");
@@ -2018,6 +2069,7 @@ static int server_shutdown(PINT_server_status_flag status,
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting performance "
                      "interface     [   ...   ]\n");
         PINT_perf_finalize(PINT_server_pc);
+        PINT_perf_finalize(PINT_server_tpc);
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         performance "
                      "interface     [ stopped ]\n");
     }
@@ -2488,6 +2540,13 @@ int server_state_machine_start(PINT_smcb *smcb, job_status_s *js_p)
                          PINT_HINT_GET_HANDLE(s_op->req->hints),
                          s_op->req->op);
         s_op->resp.op = s_op->req->op;
+
+        /* start request timer 
+         * if we are not tracking this request we will never call end
+         * this is not a problem so pretty much call this for all
+         * normal requests
+         */
+        PINT_perf_timer_start(&s_op->start_time);
     }
 
     s_op->addr = s_op->unexp_bmi_buff.addr;
@@ -2888,6 +2947,41 @@ static int generate_shm_key_hint(int* server_index)
      */
     srand((unsigned int)time(NULL));
     return(rand());
+}
+
+/* server_perf_start_rollover
+ * This functions starts the performance counter rollover timer for the
+ * server - it is server specific and thus is here not in misc
+ */
+int server_perf_start_rollover(struct PINT_perf_counter *pc,
+                               struct PINT_perf_counter *tpc)
+{
+    int ret = 0;
+    struct PINT_smcb *tmp_op = NULL;
+    struct PINT_server_op *s_op = NULL;
+
+    if (!pc)
+    {
+        gossip_err("server_perf_start_rollover called with NULL pc\n");
+        return -1;
+    }
+    pc->running = 1;
+
+    ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
+                                           &(tmp_op));
+    if (ret != 0)
+    {
+        gossip_err("server_perf_start_rollover failed to alloc SM\n");
+        return ret;
+    }
+
+    s_op = PINT_sm_frame(tmp_op, PINT_FRAME_CURRENT);
+    s_op->u.perf_update.pc = pc;
+    s_op->u.perf_update.tpc = tpc;
+
+    ret = server_state_machine_start_noreq(tmp_op);
+
+    return ret;
 }
 
 /*

@@ -35,6 +35,7 @@
 #include "state-machine.h"
 #include "pint-event.h"
 #include "server-config.h"
+#include "pint-perf-counter.h"
 
 
 extern job_context_id server_job_context;
@@ -670,6 +671,12 @@ struct PINT_server_mgmt_create_root_dir_op
     int handle_index;
 };
 
+struct PINT_server_perf_update_op
+{
+    struct PINT_perf_counter *pc;
+    struct PINT_perf_counter *tpc;
+};
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -682,7 +689,9 @@ typedef struct PINT_server_op
 
     enum PVFS_server_op op;  /* type of operation that we are servicing */
 
+    /* variables used for monitoring and timing requests */
     PINT_event_id event_id;
+    struct timespec start_time;     /* start time of a timer in ns */
 
     /* holds id from request scheduler so we can release it later */
     job_id_t scheduled_id; 
@@ -779,6 +788,7 @@ typedef struct PINT_server_op
         struct PINT_server_tree_communicate_op tree_communicate;
         struct PINT_server_mgmt_get_dirent_op mgmt_get_dirent;
         struct PINT_server_mgmt_create_root_dir_op mgmt_create_root_dir;
+        struct PINT_server_perf_update_op perf_update;
     } u;
 
 } PINT_server_op;
@@ -926,9 +936,6 @@ extern struct PINT_server_req_entry PINT_server_req_table[];
 
 /* Exported Prototypes */
 
-/* This declareation is in src/common/misc/server-config.h */
-/* struct server_configuration_s *get_server_config_struct(void); */
-
 int PINT_server_req_get_object_ref(struct PVFS_server_req *req,
                                    PVFS_fs_id *fs_id,
                                    PVFS_handle *handle);
@@ -1031,10 +1038,10 @@ extern void mkdir_free(struct PINT_server_op *s_op);
 extern void getattr_free(struct PINT_server_op *s_op);
 
 /* V3 */
-#if 0
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
-#endif
+int server_perf_start_rollover(struct PINT_perf_counter *pc,
+                               struct PINT_perf_counter *tpc);
 
 /* exported state machine resource reclamation function */
 int server_post_unexpected_recv(void);
@@ -1052,10 +1059,6 @@ int server_state_machine_alloc_noreq(enum PVFS_server_op op,
                                      struct PINT_smcb ** new_op);
 int server_state_machine_start_noreq(struct PINT_smcb *new_op);
 int server_state_machine_complete_noreq(PINT_smcb *smcb);
-int PINT_server_get_config(struct server_configuration_s *config,
-                           struct PVFS_sys_mntent *mntent_p,
-                           const PVFS_credential *credential,
-                           PVFS_hint hints);
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #if 0

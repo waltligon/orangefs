@@ -44,8 +44,6 @@
  * we grab these sizes.
  */
 
-extern job_context_id pint_client_sm_context;
-
 enum
 {
     GETATTR_CACHE_MISS = 1,

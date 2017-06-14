@@ -55,6 +55,8 @@
 /* grab a new capability if the current one expires in 2 minutes or less */
 #define CAP_TIMEOUT_BUFFER 120
 
+extern job_context_id pint_client_sm_context;
+
 int PINT_client_state_machine_initialize(void);
 void PINT_client_state_machine_finalize(void);
 job_context_id PINT_client_get_sm_context(void);
@@ -511,12 +513,14 @@ struct PINT_client_mgmt_statfs_list_sm
 struct PINT_client_mgmt_perf_mon_list_sm
 {
     PVFS_fs_id fs_id;
+    int32_t cnt_type;
     int64_t **perf_matrix;
     uint64_t *end_time_ms_array;
     int server_count; 
     int req_keys; 
     int *key_count; 
-    int history_count; 
+    int req_sample; 
+    int *sample_count; 
     PVFS_id_gen_t *addr_array;
     uint32_t *next_id_array;
     PVFS_error_details *details;
@@ -627,6 +631,7 @@ struct PINT_client_perf_count_timer_sm
 {
     unsigned int *interval_secs;
     struct PINT_perf_counter *pc;
+    struct PINT_perf_counter *tpc;
 };
 
 struct PINT_client_job_timer_sm
@@ -917,7 +922,7 @@ do {                                                                \
 
 struct PINT_client_op_entry_s
 {
-    struct PINT_state_machine_s * sm;
+    struct PINT_state_machine_s *sm;
 };
 
 extern struct PINT_client_op_entry_s PINT_client_sm_sys_table[];

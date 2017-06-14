@@ -465,29 +465,33 @@ static PINT_sm_action mkdir_setup_response(
         struct PINT_smcb *smcb,
         job_status_s *js_p)
 {
-   struct PINT_server_op *getattr_op;
-   struct PINT_server_op *s_op;
-   int task_id;
-   int remaining;
-   int ret;
-   PVFS_object_attr *resp_attr;
+    struct PINT_server_op *getattr_op;
+    struct PINT_server_op *s_op;
+    int task_id;
+    int remaining;
+    int ret;
+    PVFS_object_attr *resp_attr;
 
-   getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
-   resp_attr = &(getattr_op->resp.u.getattr.attr);
+    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
+    resp_attr = &(getattr_op->resp.u.getattr.attr);
 
-   s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-   ret  = PINT_copy_capability(&resp_attr->capability, 
+    ret  = PINT_copy_capability(&resp_attr->capability, 
                                &s_op->resp.u.mkdir.capability);
-   if (ret)
-   {
-      gossip_err("%s: Error copying capability from getattr to mkdir response: ret(%d)\n",__func__,ret);
-      js_p->error_code = ret;
-   }
+    if (ret)
+    {
+        gossip_err("%s: Error copying capability from getattr to mkdir response: ret(%d)\n",__func__,ret);
+        js_p->error_code = ret;
+    }
 
-   PINT_cleanup_capability(&(*getattr_op->req).capability);
-   free(getattr_op);
-   return SM_ACTION_COMPLETE;
+    /* clean up objects */
+    PINT_free_object_attr(s_op->u.mkdir.saved_attr);
+    PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
+
+    PINT_cleanup_capability(&(*getattr_op->req).capability);
+    free(getattr_op);
+    return SM_ACTION_COMPLETE;
 }
 
 static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
@@ -541,6 +545,7 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TMKDIR, &s_op->start_time);
     mkdir_free(s_op);
 #if 0
     if (s_op->msgarray_op.count > 0)
