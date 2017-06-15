@@ -269,7 +269,6 @@ int PVFS_fsck_check_server_configs(
     int ret = 0;
     int num_servers = 0;
     int i = 0;
-    int server_type = 0;
     PVFS_BMI_addr_t *addresses = NULL;
     char *fs_config = NULL;
     char *fs_config_diff = NULL;
@@ -314,7 +313,6 @@ int PVFS_fsck_check_server_configs(
 
     for (i = 0; i < num_servers; i++)
     {
-        server_type = 0;
         server_name = NULL;
 
         /* get the pretty server name */

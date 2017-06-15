@@ -185,7 +185,7 @@ int PINT_dev_initialize(
         gossip_err("%s: ioctl() PVFS_DEV_DEBUG failure.\n", __func__);
     } else {
       mask2_info.mask1_value = 0;
-      mask2_info.mask2_value = gossip_debug_mask;
+      mask2_info.mask2_value = gossip_debug_mask.mask2;
       ret = ioctl(pdev_fd, PVFS_DEV_CLIENT_MASK, &mask2_info);
       if (ret < 0) {
         gossip_err("%s: ioctl() PVFS_DEV_CLIENT_MASK failure.\n", __func__);
@@ -206,10 +206,10 @@ int PINT_dev_initialize(
       for (i = 0; i < num_keyword_mask_map; i++) {
         bytes = snprintf(client_debug_array_string + offset,
                          PVFS2_MAX_DEBUG_ARRAY_LEN - offset,
-                         "%s 0 %llx\n",
+                         "%s 0 %llux%llux\n",
                          s_keyword_mask_map[i].keyword,
-                         (unsigned long long)s_keyword_mask_map[i].
-                         mask_val);
+                         llu(s_keyword_mask_map[i].mask.mask1),
+                         llu(s_keyword_mask_map[i].mask.mask2));
         if ((bytes + offset) < PVFS2_MAX_DEBUG_ARRAY_LEN) {
           offset = strlen(client_debug_array_string);
         } else {

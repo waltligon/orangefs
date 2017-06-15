@@ -502,9 +502,9 @@ int main(int argc, char **argv)
     serverstr = (const char **)malloc(io_server_count * sizeof(char *));
     for (s = srv_index; s < io_server_count; s++)
     {
-        int servertype;
+        //int servertype;
         int n;
-        const char *cp;
+        const char *cp=NULL;
         char *p, *p2;
 
         /* This utility needs a way to translate a URL address into a BMI

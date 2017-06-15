@@ -849,7 +849,6 @@ static PINT_sm_action msgpairarray_complete_ack_flow (struct PINT_smcb *smcb,
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[mop->index];
-    int ret = -PVFS_EINVAL;
 
     switch (js_p->status_user_tag)
     {
@@ -893,7 +892,7 @@ static PINT_sm_action msgpairarray_complete_ack_flow (struct PINT_smcb *smcb,
             /* ack isn't finished so set timeout for ack and
              * deal with errors when its done - why not cancel if error?
              */
-            ret = job_reset_timeout(msg_p->ack_id, mop->params.job_timeout);
+            job_reset_timeout(msg_p->ack_id, mop->params.job_timeout);
         }
         if(msg_p->flow_status.error_code && msg_p->ack_id == 0)
         {
@@ -1263,7 +1262,7 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
 {
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[mop->index];
     int ret = -PVFS_EINVAL;
-    unsigned long status_user_tag = 0;
+    //unsigned long status_user_tag = 0;
     struct PINT_decoded_msg decoded_msg;
     struct PVFS_server_resp *resp = NULL;
 
@@ -1272,7 +1271,7 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
 
     assert(js_p);
 
-    status_user_tag = (unsigned long)js_p->status_user_tag;
+    //status_user_tag = (unsigned long)js_p->status_user_tag;
 
     if (js_p->error_code)
     {

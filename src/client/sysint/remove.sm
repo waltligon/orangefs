@@ -170,7 +170,6 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
-    int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
    /*
@@ -212,7 +211,7 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
     msg_p->comp_fn = NULL;
 
     /* the first SID of the first object is the target */
-    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+    PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
