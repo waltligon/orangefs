@@ -126,6 +126,9 @@ case $VMSYSTEM in
 	cloud-rhel*|cloud-centos*|cloud-sl6*|cloud-fedora*|cloud-*suse)
 		VMUSER=ec2-user
 		;;
+	cloud-fedora17)
+		VMUSER=ec2-user
+		;;
 	*)
 		echo "System $VMSYSTEM not supported."
 		exit 1

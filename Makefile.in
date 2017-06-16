@@ -1485,6 +1485,8 @@ endif
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-config-convert $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-getmattr $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-setmattr $(bindir)
+	install -m 755 $(srcdir)/src/apps/admin/pvfs2-start-all.sh $(bindir)
+	install -m 755 $(srcdir)/src/apps/admin/pvfs2-stop-all.sh $(bindir)
 ifdef BUILD_KARMA
 	install -m 755 $(KARMA) $(bindir)
 endif
