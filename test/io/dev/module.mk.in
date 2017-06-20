@@ -1,4 +1,0 @@
-DIR := io/dev
-
-TESTSRC += \
-	$(DIR)/dev-test.c

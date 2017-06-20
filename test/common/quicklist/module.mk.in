@@ -1,2 +1,0 @@
-DIR := common/quicklist
-TESTSRC += $(DIR)/example.c
