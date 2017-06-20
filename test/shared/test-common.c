@@ -520,9 +520,6 @@ int create_file(
     PVFS_fs_id fs_id;
     PVFS_credential credential;
     struct file_ref stFileRef;
-    
-    /* Remove file first */ 
-    remove_file(fileName,use_pvfs2_lib,verbose);
    
     /* Remove the file before trying to create it */
     printf("\tRemoving file if it exists. Any errors may be safely ignored.");
