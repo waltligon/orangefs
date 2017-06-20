@@ -1,1 +1,0 @@
-<a href="http://www.orangefs.org" target="_blank"><div class="logo"></div></a>
