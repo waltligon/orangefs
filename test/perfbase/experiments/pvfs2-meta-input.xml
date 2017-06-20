@@ -1,0 +1,61 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE input SYSTEM "../../dtd/pb_input.dtd">
+
+<input>
+ <experiment>pvfs2_meta</experiment>
+
+ <named_location>
+  <name>operation</name>
+  <match>op=</match>
+ </named_location>
+
+ <named_location>
+  <name>machine</name>
+  <match>host=</match>
+ </named_location>
+
+ <named_location>
+  <name>cvs_stamp</name>
+  <match>cvsstamp=</match>
+ </named_location>
+
+ <named_location>
+  <name>meta_servers</name>
+  <match>meta=</match>
+ </named_location>
+
+ <named_location>
+  <name>io_servers</name>
+  <match>io=</match>
+ </named_location>
+
+ <named_location>
+  <name>clients</name>
+  <match>procs: </match>
+ </named_location>
+
+ <named_location>
+  <name>OP_total</name>
+  <match>ops: </match>
+ </named_location>
+
+ <named_location>
+  <name>capacity</name>
+  <match>dbsize: </match>
+ </named_location>
+
+ <tabular_location columns="3">
+  <match>====</match>
+  <skip>1</skip>
+
+  <tabular_value>
+   <name>iteration</name>
+   <pos>1</pos>
+  </tabular_value>
+
+  <tabular_value>
+   <name>latency</name>
+   <pos>2</pos>
+  </tabular_value>
+ </tabular_location>
+</input>

@@ -1,0 +1,311 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="SM Files">
+      <UniqueIdentifier>{8095f4e0-25ea-46b8-8c62-ca8fbd151bad}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\..\src\client\sysint\acache.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\client-job-timer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\client-state-machine.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\error-details.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\finalize.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\fs-add.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\getparent.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\initialize.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-create-dirent.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-event-mon-list.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-config.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-dfile-array.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-dirdata-handle.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-uid-list.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-iterate-handles-list.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-misc.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-noop.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-perf-mon-list.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-remove-dirent.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-remove-object.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-setparam-list.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-statfs-list.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\ncache.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\perf-count-timer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\pint-sysdev-unexp.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\pint-sysint-utils.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\remove.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\server-get-config.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-create.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-del-eattr.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-dist.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-flush.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-get-eattr.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-getattr.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-io.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-list-eattr.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-lookup.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-mkdir.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-readdir.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-readdirplus.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-remove.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-rename.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-set-eattr.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-setattr.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-small-io.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-statfs.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-symlink.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-truncate.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\rcache.c">
+      <Filter>SM Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-dirdata-array.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-atomic-eattr.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\src\client\sysint\acache.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\src\client\sysint\client-state-machine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\src\client\sysint\ncache.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\src\client\sysint\pint-sysint-utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\src\client\sysint\rcache.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\client-job-timer.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-truncate.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\fs-add.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-create-dirent.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-event-mon-list.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-get-dfile-array.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-get-dirdata-handle.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-get-uid-list.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-iterate-handles-list.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-noop.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-perf-mon-list.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-remove-dirent.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-remove-object.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-setparam-list.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-statfs-list.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\perf-count-timer.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\pint-sysdev-unexp.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\remove.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\server-get-config.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-create.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-del-eattr.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-flush.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-get-eattr.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-getattr.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-io.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-list-eattr.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-lookup.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-mkdir.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-readdir.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-readdirplus.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-remove.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-rename.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-set-eattr.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-setattr.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-small-io.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-statfs.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-symlink.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-get-dirdata-array.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-atomic-eattr.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>

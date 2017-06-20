@@ -1,0 +1,17 @@
+RewriteEngine On
+
+# Require SSL
+RewriteCond %{HTTPS} off
+RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [L,R=302]
+
+# Block public access to README and other htaccess files
+RewriteCond %{REQUEST_FILENAME} ^.*/README$ [OR]
+RewriteCond %{REQUEST_FILENAME} ^.*\.htaccess$
+RewriteRule ^(.*)$ - [L,R=404]
+
+# Authenticate user
+AuthType basic
+AuthName "OrangeFS Certificate Downloads"
+AuthBasicProvider file
+AuthUserFile /path/to/passwd/file/.htpasswd
+Require valid-user

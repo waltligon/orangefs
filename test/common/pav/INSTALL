@@ -1,0 +1,9 @@
+Install for pav:
+
+Installation should be extremely simple:
+
+1.) untar the pav-<version>.tar.gz package
+
+2.) copy the resulting directory (pav-<version>) to wherever you like,
+and adjust your PATH environment to include this directory.
+

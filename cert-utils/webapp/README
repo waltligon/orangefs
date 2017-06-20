@@ -1,0 +1,85 @@
+The purpose of this project is to provide a web interface that allows users
+of an OrangeFS system to download certificates. The certificates are created
+using the Globus Toolkit and provide access control for the user's files.
+
+
+Requirements:
+-------------
+Apache2
+PHP5
+Perl
+Globus Toolkit - http://www.globus.org/
+
+Apache2 Requirements:
+---------------------
+
+Modules:
+   mod_php5
+   mod_ssl
+
+Configuration:
+   This directory must be able to execute php scripts and use htacces files.
+   The cgi-bin directory must be able to execute cgi scripts.
+   
+   Example:
+   
+   <Directory /path/to/this/directory>
+	    Options Indexes FollowSymLinks MultiViews
+	    AllowOverride All
+	    
+	    <FilesMatch "\.ph(p3?|tml)$">
+	        SetHandler application/x-httpd-php
+	    </FilesMatch>
+	    <FilesMatch "\.phps$">
+	        SetHandler application/x-httpd-php-source
+	    </FilesMatch>
+	</Directory>
+	
+	<Directory /path/to/this/directory/cgi-bin>
+	    Options +ExecCGI
+	</Directory>
+
+
+Perl Requirements:
+------------------
+
+Packages:
+	perl-suid
+	
+Modules:
+	Data::Dumper
+	IPC::Run
+	CGI
+	
+
+Permissions:
+------------
+
+./cgi-bin/download.pl is a setuid script. This allows it to write files to
+user's home directories and run the Globus scripts almost as if the user had
+logged in through a terminal. The following command will set the correct
+permissions for the script, but should be run as root or with sudo:
+
+   chown root:apache ./cgi-bin/download.pl && chmod ug+xs,o-rwx ./cgi-bin/download.pl
+   
+
+Customization:
+--------------
+
+The download script can be edited as needed.
+
+The web interface can be customized by creating or editing these 4 files:
+    custom.css
+    custom_header.php
+    custom_content.php
+    custom_footer.php
+
+The custom* files will be included only if they exist and the php files will
+be included instead of the related default_* php files.
+
+Authentication can be setup any way you would like using ./.htaccess but the
+user logged in, the REMOTE_USER, has to be a user on the same system this
+is located.
+
+
+

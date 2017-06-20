@@ -1,0 +1,40 @@
+#!/bin/sh
+
+#PBS -N PVFS2TEST
+#PBS -l walltime=1:00:00
+#PBS -o /tmp/PVFS2TEST.out.DATE
+#PBS -e /tmp/PVFS2TEST.err.DATE
+
+# Change into the working directory
+cd $PBS_O_WORKDIR
+# Set the path to match the path of the submitter
+PATH=$PBS_O_PATH
+
+# TODO: need to update path to get proper mpich2 build
+
+############################
+#Change these variables if you want
+#to name your config files something
+#else.
+CONFIGFILE="CONFIG"
+PAVCONFIG="PAVCONFIG"
+NODEFILE="nodes.conf"
+
+cat $PBS_NODEFILE>/home/USER/testing/DATE/work/$NODEFILE
+cd $PBS_O_WORKDIR
+email=`grep EMAIL $CONFIGFILE | cut -d "=" -f 2`
+
+mpdboot --rsh=rsh --file=$HOME/nightly/nodes.conf
+
+# run test harness, send email if it returns an error code
+./pvfs2tests.py $CONFIGFILE $PAVCONFIG /home/USER/testing/DATE/work/$NODEFILE
+if [ $? != 0 ] ; then
+	echo "pvfs2tests.py failure." | mail -s "PVFS2 test: FAIL" "$email" 
+fi
+
+mpdallexit
+
+# cleanup scratch area
+rm -rf /home/USER/testing/DATE
+
+exit 0

@@ -1,0 +1,302 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MemLeaks|Win32">
+      <Configuration>MemLeaks</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MemLeaks|x64">
+      <Configuration>MemLeaks</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{7506190B-64BE-4D64-95A4-4C22D48E0994}</ProjectGuid>
+    <RootNamespace>misc</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v110</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v110</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v110</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v110</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v110</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v110</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <TargetName>misc</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetName>misc</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <TargetName>misc</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TargetName>misc</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\common\security;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..\;..\..\..\..\include;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <CustomBuildStep>
+      <Command>
+      </Command>
+    </CustomBuildStep>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+    </CustomBuild>
+    <CustomBuild>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+    </CustomBuild>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\common\security;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..\;..\..\..\..\include;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <CustomBuildStep>
+      <Command>
+      </Command>
+    </CustomBuildStep>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+    </CustomBuild>
+    <CustomBuild>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+    </CustomBuild>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\common\security;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..\;..\..\..\..\include;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+    </CustomBuild>
+    <CustomBuild>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+    </CustomBuild>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\common\security;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..\;..\..\..\..\include;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+    </CustomBuild>
+    <CustomBuild>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+    </CustomBuild>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\common\security;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..\;..\..\..\..\include;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+    <CustomBuildStep>
+      <Command>
+      </Command>
+    </CustomBuildStep>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+    </CustomBuild>
+    <CustomBuild>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+    </CustomBuild>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\common\security;..\..\..\..\src\proto;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..\;..\..\..\..\include;..\..\..\openssl\include</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+    </CustomBuild>
+    <CustomBuild>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+    </CustomBuild>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\..\src\common\dotconf\dotconf.c" />
+    <ClCompile Include="..\..\..\..\src\common\llist\llist.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\digest.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\dist-dir-utils.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\extent-utils.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\md5.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\mmap-ra-cache.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\msgpairarray.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\pint-cached-config.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\pint-eattr.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\pint-hint.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\pint-perf-counter.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\pint-util.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\pvfs2-debug.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\pvfs2-win-util.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\realpath.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\server-config-mgr.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\server-config.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\state-machine-fns.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\tcache.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\void.c" />
+    <ClCompile Include="..\..\..\..\src\common\misc\xattr-utils.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\src\common\dotconf\dotconf.h" />
+    <ClInclude Include="..\..\..\..\src\common\llist\llist.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\dist-dir-utils.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\extent-utils.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\md5.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\mkspace.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\mmap-ra-cache.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\msgpairarray.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\pint-cached-config.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\pint-eattr.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\pint-hint.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\pint-malloc.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\pint-mem.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\pint-perf-counter.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\pint-util.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\pvfs2-internal.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\pvfs2-types-debug.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\realpath.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\server-config-mgr.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\server-config.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\state-machine.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\tcache.h" />
+    <ClInclude Include="..\..\..\..\src\common\misc\xattr-utils.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\..\src\common\misc\msgpairarray.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\common\misc\void.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

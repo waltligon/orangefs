@@ -1,0 +1,403 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MemLeaks|Win32">
+      <Configuration>MemLeaks</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MemLeaks|x64">
+      <Configuration>MemLeaks</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{CD20A8BE-CC52-465E-9F40-A97A3912ED14}</ProjectGuid>
+    <RootNamespace>sysintclient</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\..\src\common\security;..\..\..\openssl\include;..\..\..\..\src\client\usrint</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4047;4133</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+    </CustomBuild>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\..\src\common\security;..\..\..\openssl\include;..\..\..\..\src\client\usrint</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4047;4133</DisableSpecificWarnings>
+      <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+    </CustomBuild>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\..\src\common\security;..\..\..\openssl\include;..\..\..\..\src\client\usrint</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4047;4133</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+    </CustomBuild>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\..\src\common\security;..\..\..\openssl\include;..\..\..\..\src\client\usrint</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4047;4133</DisableSpecificWarnings>
+      <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+    </CustomBuild>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\..\src\common\security;..\..\..\openssl\include;..\..\..\..\src\client\usrint</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+      <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4047;4133</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+    </CustomBuild>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\..\src\common\security;..\..\..\openssl\include;..\..\..\..\src\client\usrint</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+      <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4047;4133</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+    </CustomBuild>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\..\src\client\sysint\acache.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\client-job-timer.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\client-state-machine.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\error-details.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\finalize.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\fs-add.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\getparent.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\initialize.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-create-dirent.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-event-mon-list.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-config.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-dfile-array.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-dirdata-array.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-dirdata-handle.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-get-uid-list.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-iterate-handles-list.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-misc.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-noop.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-perf-mon-list.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-remove-dirent.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-remove-object.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-setparam-list.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\mgmt-statfs-list.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\ncache.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\perf-count-timer.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\pint-sysdev-unexp.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\pint-sysint-utils.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\rcache.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\remove.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\server-get-config.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-atomic-eattr.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-create.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-del-eattr.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-dist.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-flush.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-get-eattr.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-getattr.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-io.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-list-eattr.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-lookup.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-mkdir.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-readdir.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-readdirplus.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-remove.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-rename.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-set-eattr.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-setattr.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-small-io.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-statfs.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-symlink.c" />
+    <ClCompile Include="..\..\..\..\src\client\sysint\sys-truncate.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\src\client\sysint\acache.h" />
+    <ClInclude Include="..\..\..\..\src\client\sysint\client-state-machine.h" />
+    <ClInclude Include="..\..\..\..\src\client\sysint\ncache.h" />
+    <ClInclude Include="..\..\..\..\src\client\sysint\pint-sysint-utils.h" />
+    <ClInclude Include="..\..\..\..\src\client\sysint\rcache.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\client-job-timer.sm">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MemLeaks|Win32'">..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'">..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+      <FileType>Document</FileType>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\fs-add.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-create-dirent.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-event-mon-list.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-get-dfile-array.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-get-dirdata-handle.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-iterate-handles-list.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-noop.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-perf-mon-list.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-remove-dirent.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-remove-object.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-setparam-list.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-statfs-list.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\perf-count-timer.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\pint-sysdev-unexp.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\remove.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\server-get-config.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-create.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-del-eattr.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-flush.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-get-eattr.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-getattr.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-io.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-list-eattr.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-lookup.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-mkdir.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-readdir.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-readdirplus.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-remove.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-rename.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-set-eattr.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-setattr.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-small-io.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-statfs.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-symlink.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-truncate.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-get-uid-list.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\mgmt-get-dirdata-array.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\..\src\client\sysint\sys-atomic-eattr.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

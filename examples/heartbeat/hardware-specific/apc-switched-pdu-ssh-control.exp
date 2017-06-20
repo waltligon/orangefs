@@ -1,0 +1,217 @@
+#!/usr/bin/expect -f
+
+# expect script to login to a baytech management module and control power
+# to one of its outlets
+
+# gather command line arguments into variables
+set host [lrange $argv 0 0]   
+set user [lrange $argv 1 1] 
+set password [lrange $argv 2 2] 
+set outlet [lrange $argv 3 3]
+set command [lrange $argv 4 4]
+
+# complain if we don't get exactly 5 arguments
+if {$argc!=5} {
+	send_user "Usage: apc-switched-pdu-ssh-control.exp <host> <user> <password> <outlet> <cmd>\n"
+	send_user "   NOTE: <cmd> may be \"on\" \"off\" or \"reboot\"\n"
+	exit 1
+}
+
+set apc_command ""
+
+if { [string compare $command "on"] == 0 } {
+	set apc_command "1"
+}
+if { [string compare $command "off"] == 0 } {
+	set apc_command "2"
+}
+if { [string compare $command "reboot"] == 0 } {
+	set apc_command "3"
+}
+
+if { [string compare $apc_command ""] == 0 } {
+	send_error "Error: <cmd> must be one of on|off|reboot.\n"
+	exit 1
+}
+
+# use a 30 second timeout
+set timeout 30 
+
+# this disables showing interaction on stdout.  It should be commented
+# if you are trying to debug this script and want to see what it is doing
+log_user 0
+
+# delete old log file and start a new one
+#system rm -f /tmp/expect.log
+#log_file -a /tmp/expect.log
+
+# open ssh connection.  Turn off strict host checking so ssh doesn't ask us 
+# if it is ok to connect to this hostname
+spawn ssh "-oStrictHostKeyChecking no" $user@$host 
+
+# Look for passwod prompt
+expect {
+	"*?assword:*" {}
+	default {
+		# password prompt never showed up
+		send_user "failed to ssh to host $host\n"
+		exit 1
+	}
+}
+
+# Send password aka $password 
+send -- "$password\r"
+
+# look for top level prompt
+expect {
+	"> *" {}
+	default {
+		# our user name and password did not work
+		send_user "Error: host $host failed to accept username and password\n"
+		exit 1
+	}
+}
+
+send -- "1\r"
+
+expect {
+	"> *" {}
+	default {
+		# our user name and password did not work
+		send_user "Error: unable to control outlet\n"
+		exit 1
+	}
+}
+
+send -- "2\r"
+
+expect {
+	"> *" {}
+	default {
+		# our user name and password did not work
+		send_user "Error: unable to control outlet\n"
+		exit 1
+	}
+}
+
+send -- "1\r"
+
+while {1} {
+        expect {
+                "*to continue*" {send -- "\r"}
+                "> " {break }
+                default {}
+        }
+}
+
+send -- "$outlet\r"
+
+expect {
+	"> *" {}
+	default {
+		# our user name and password did not work
+		send_user "Error: unable to control outlet\n"
+		exit 1
+	}
+}
+
+send -- "1\r"
+
+expect {
+	"> *" {}
+	default {
+		# our user name and password did not work
+		send_user "Error: unable to control outlet\n"
+		exit 1
+	}
+}
+
+
+send -- "$apc_command\r"
+
+expect {
+	"*to continue*" {}
+	default {
+		# our user name and password did not work
+		send_user "Error: unable to control outlet\n"
+		exit 1
+	}
+}
+
+send -- "YES\r"
+
+while {1} {
+        expect {
+                "*to continue*" {send -- "\r"}
+                "> " {break }
+                default {}
+        }
+}
+
+send -- \003
+
+expect {
+	"> *" {}
+	default {
+		# our user name and password did not work
+		send_user "Error: unable to control outlet\n"
+		exit 1
+	}
+}
+
+send -- \003
+
+expect {
+	"> *" {}
+	default {
+		# our user name and password did not work
+		send_user "Error: unable to control outlet\n"
+		exit 1
+	}
+}
+
+send -- \003
+
+while {1} {
+        expect {
+                "*to continue*" {send -- "\r"}
+                "> " {break }
+                default {}
+        }
+}
+
+send -- \003
+
+expect {
+	"> *" {}
+	default {
+		# our user name and password did not work
+		send_user "Error: unable to control outlet\n"
+		exit 1
+	}
+}
+
+send -- \003
+
+expect {
+	"> *" {}
+	default {
+		# our user name and password did not work
+		send_user "Error: unable to control outlet\n"
+		exit 1
+	}
+}
+
+# send logout command
+send -- "4\r"
+
+expect {
+        eof {}
+        default {
+                send_user "Error: could not log out cleanly\n"
+                close
+                wait
+                exit 1
+        }
+}
+

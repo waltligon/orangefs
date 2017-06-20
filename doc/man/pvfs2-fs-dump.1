@@ -1,0 +1,40 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\"
+.TH PVFS2-LS 1 "SEPTEMBER 2003"  PVFS2 "PVFS2 Manuals"
+.SH NAME
+pvfs2-fs-dump \- Display lower-level information about a pvfs2 file system
+.SH SYNOPSIS
+.B pvfs2-fs-dump
+.I [-d] [-v] [-m mount_point]
+
+.SH DESCRIPTION
+Display lower-level information about the PVFS2 file system at
+.I mount_point
+
+.SH OPTIONS
+.IP -d
+output in a format suitable for dot (part of the graphviz package:
+http://www.research.att.com/sw/tools/graphviz/)
+.IP -v 
+print version and exit
+.IP -m
+Display the information about the PVFS2 volume mounted at
+.I mount_point
+
+.SH ENVIRONMENT
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate 
+.IR pvfs2tab
+file
+
+.SH BUGS
+Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
+.SH AUTHOR
+The PVFS2 development team (pvfs2-developers@beowulf-underground.org)
+.SH "SEE ALSO"
+.BR pvfs2-server (1),
+.BR pvfs2-statfs (1)
+.BR pvfs2-ping (1)
+.BR pvfs2-cp (1)
+.BR pvfs2-genconfig (1)

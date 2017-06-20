@@ -1,0 +1,6 @@
+#!/bin/sh 
+
+mkdir ${PVFS2_MOUNTPOINT}/fstest
+
+gcc ${USERLIB_SCRIPTS}/fstest.c -o ${PVFS2_DEST}/fstest && \
+	export ${PRELOAD} && ${PVFS2_DEST}/fstest -p ${PVFS2_MOUNTPOINT}/fstest

@@ -1,0 +1,57 @@
+--- ltp-full-20120903/runltp	2012-09-03 00:39:26.000000000 -0400
++++ ltp-full-20120903-patched/runltp	2012-10-23 15:33:25.709909793 -0400
+@@ -79,6 +79,7 @@
+     export LTPROOT=${PWD}
+     export TMPBASE="/tmp"
+     export PATH="${PATH}:${LTPROOT}/testcases/bin"
++    export ZOOFILE="$$"
+ 
+     [ -d "$LTPROOT/testcases/bin" ] ||
+     {
+@@ -163,9 +164,9 @@
+     -b DEVICE       Some tests require an unmounted block device
+                     to run correctly.
+     -B DEVICE_FS_TYPE The file system of test block devices.
++	-z ZOOFILE      Specify an alternate path to zoo file.
+ 
+-
+-    example: ${0##*/} -c 2 -i 2 -m 2,4,10240,1 -D 2,10,10240,1 -p -q  -l /tmp/result-log.$$ -o /tmp/result-output.$$ -C /tmp/result-failed.$$ -d ${PWD}
++    example: ./${0##*/} -c 2 -i 2 -m 2,4,10240,1 -D 2,10,10240,1 -p -q  -l /tmp/result-log.$$ -o /tmp/result-output.$$ -C /tmp/result-failed.$$ -d ${PWD}
+ 
+ 
+ 	EOF
+@@ -211,7 +212,7 @@
+ 
+     version_date=$(cat "$LTPROOT/Version")
+ 
+-    while getopts a:c:C:d:D:f:F:ehi:K:g:l:m:M:Nno:pqr:s:S:t:T:w:x:b:B: arg
++        while getopts a:c:C:d:D:f:ehi:g:l:m:Nno:pqr:s:t:T:vw:x:z: arg
+     do  case $arg in
+         a)  EMAIL_TO=$OPTARG
+             ALT_EMAIL_OUT=1;;
+@@ -424,6 +425,8 @@
+             INSTANCES="-x $OPTARG";;
+         b) DEVICE=$OPTARG;;
+         B) DEVICE_FS_TYPE=$OPTARG;;
++    
++		z)  ZOOFILE=$OPTARG;;
+         \?) usage;;
+         esac
+     done
+@@ -740,7 +743,7 @@
+     fi
+ 
+     [ ! -z "$QUIET_MODE" ] && { echo "INFO: Test start time: $(date)" ; }
+-    PAN_COMMAND="${LTPROOT}/bin/ltp-pan $QUIET_MODE -e -S $INSTANCES $DURATION -a $$ \
++    PAN_COMMAND="${LTPROOT}/pan/pan $QUIET_MODE -e -S $INSTANCES $DURATION -a $ZOOFILE \
+     -n $$ $PRETTY_PRT -f ${TMP}/alltests $LOGFILE $OUTPUTFILE $FAILCMDFILE"
+     echo "COMMAND:    $PAN_COMMAND"
+     if [ ! -z "$TAG_RESTRICT_STRING" ] ; then
+@@ -834,6 +837,7 @@
+     # Some tests need to run inside the "bin" directory.
+     cd "${LTPROOT}/testcases/bin"
+     "${LTPROOT}/bin/ltp-pan" $QUIET_MODE -e -S $INSTANCES $DURATION -a $$ -n $$ $PRETTY_PRT -f ${TMP}/alltests $LOGFILE $OUTPUTFILE $FAILCMDFILE
++    "${LTPROOT}/bin/ltp-pan" $QUIET_MODE -e -S $INSTANCES $DURATION -a $ZOOFILE -n $$ $PRETTY_PRT -f ${TMP}/alltests $LOGFILE $OUTPUTFILE $FAILCMDFILE
+      
+     if [ $? -eq 0 ]; then
+       echo "INFO: ltp-pan reported all tests PASS"
