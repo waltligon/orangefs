@@ -23,6 +23,8 @@
 
 /* This is a change to create.sm. */
 
+/* This is another change to create.sm. */
+
 %%
 
 machine pvfs2_create_sm

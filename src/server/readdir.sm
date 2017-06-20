@@ -23,6 +23,8 @@
 
 /* This is another change to readdir.sm. Another bad idea. */
 
+/* Third change to readdir.sm. */
+
 enum
 {
     STATE_ENOTDIR = 7

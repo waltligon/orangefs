@@ -30,6 +30,8 @@ static int tree_setattr_comp_fn(
         int index);
 */
 
+/* Change to mkdir.sm. */
+
 %%
 
 nested machine pvfs2_mkdir_work_sm
