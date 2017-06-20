@@ -21,6 +21,8 @@
 
 #define REPLACE_DONE 100
 
+/* This is a change to create.sm. */
+
 %%
 
 machine pvfs2_create_sm
