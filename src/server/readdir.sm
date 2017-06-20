@@ -19,12 +19,6 @@
 #include "trove.h"
 #include "pint-security.h"
 
-/* This is a test change to readdir.sm. I will later decide this was a very bad change that I wish hadn't been made. */
-
-/* This is another change to readdir.sm. Another bad idea. */
-
-/* Third change to readdir.sm. */
-
 enum
 {
     STATE_ENOTDIR = 7
