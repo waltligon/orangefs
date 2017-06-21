@@ -119,7 +119,8 @@ static PINT_sm_action perf_update_do_work(struct PINT_smcb *smcb,
     PINT_perf_rollover(s_op->u.perf_update.pc);
     PINT_perf_rollover(s_op->u.perf_update.tpc);
 
-    if (!s_op->u.perf_update.pc->running)
+    if (!s_op->u.perf_update.pc ||
+        !s_op->u.perf_update.pc->running)
     {
         return STOP_TIMER;
     }
