@@ -122,7 +122,11 @@ static PINT_sm_action perf_update_do_work(struct PINT_smcb *smcb,
     if (!s_op->u.perf_update.pc ||
         !s_op->u.perf_update.pc->running)
     {
-        return STOP_TIMER;
+        /* something wrong or we are supposed to stop the
+         * rollover so we will return that code
+         */
+        js_p->error_code = STOP_TIMER;
+        return SM_ACTION_COMPLETE;
     }
 	
     /* post another timer */

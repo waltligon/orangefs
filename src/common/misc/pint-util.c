@@ -395,8 +395,15 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
 void PINT_free_object_attr(PVFS_object_attr *attr)
 {
+    if (!attr)
+    {
+        return;
+    }
+
+    /* first cleanup the cap */
     PINT_cleanup_capability(&attr->capability);
 
+    /* clean up rest of attr based on type */
     switch(attr->objtype)
     {
     case PVFS_TYPE_METAFILE:
