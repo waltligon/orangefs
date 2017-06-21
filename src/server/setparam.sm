@@ -69,6 +69,8 @@ static PINT_sm_action setparam_work(struct PINT_smcb *smcb, job_status_s *js_p)
     struct filesystem_configuration_s *fs_conf;
     char buf[16] = {0};
 
+    js_p->error_code = 0;
+
     switch(s_op->req->u.mgmt_setparam.param)
     {
         case PVFS_SERV_PARAM_TURN_OFF_TIMEOUTS:

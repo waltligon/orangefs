@@ -438,57 +438,83 @@ out:
 }
 
 static int pvfs2_xattr_get_acl_access(
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+#ifdef HAVE_XATTR_HANDLER_GET_4_4
+                                      const struct xattr_handler *handler,
                                       struct dentry *dentry,
+                                      const char *name,
+                                      void *buffer,
+                                      size_t size)
+#elif defined(HAVE_XATTR_HANDLER_GET_2_6_33)
+                                      struct dentry *dentry,
+                                      const char *name,
+                                      void *buffer,
+                                      size_t size,
+                                      int handler_flag)
+
 #else
                                       struct inode *inode,
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-                                      const char *name, 
-                                      void *buffer, 
-                                      size_t size
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-                                      , int handler_flag
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-                                      )
+                                      const char *name,
+                                      void *buffer,
+                                      size_t size)
+#endif
 {
-    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_xattr_get_acl_access %s\n", name);
+    gossip_debug(GOSSIP_ACL_DEBUG, "%s: %s\n", __func__, name);
+
     if (strcmp(name, "") != 0)
     {
-        gossip_err("get_acl_access invalid name %s\n", name);
+        gossip_err("%s invalid name %s\n", __func__, name);
         return -EINVAL;
     }
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-    return pvfs2_xattr_get_acl(dentry->d_inode, ACL_TYPE_ACCESS, buffer, size);
+
+#if defined(HAVE_XATTR_HANDLER_GET_4_4) || \
+    defined(HAVE_XATTR_HANDLER_GET_2_6_33)
+    return pvfs2_xattr_get_acl(dentry->d_inode,
 #else
-    return pvfs2_xattr_get_acl(inode, ACL_TYPE_ACCESS, buffer, size);
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+    return pvfs2_xattr_get_acl(inode,
+#endif
+                               ACL_TYPE_ACCESS,
+                               buffer,
+                               size);
 }
 
 static int pvfs2_xattr_get_acl_default(
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-                                       struct dentry *dentry,
+#ifdef HAVE_XATTR_HANDLER_GET_4_4
+                                      const struct xattr_handler *handler,
+                                      struct dentry *dentry,
+                                      const char *name,
+                                      void *buffer,
+                                      size_t size)
+#elif defined(HAVE_XATTR_HANDLER_GET_2_6_33)
+                                      struct dentry *dentry,
+                                      const char *name,
+                                      void *buffer,
+                                      size_t size,
+                                      int handler_flag)
+
 #else
-                                       struct inode *inode,
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-                                       const char *name, 
-                                       void *buffer, 
-                                       size_t size
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-                                       , int handler_flags
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-                                       )
+                                      struct inode *inode,
+                                      const char *name,
+                                      void *buffer,
+                                      size_t size)
+#endif
 {
-    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_xattr_get_acl_default %s\n", name);
+    gossip_debug(GOSSIP_ACL_DEBUG, "%s: %s\n", __func__, name);
+
     if (strcmp(name, "") != 0)
     {
-        gossip_err("get_acl_default invalid name %s\n", name);
+        gossip_err("%s: invalid name %s\n", __func__, name);
         return -EINVAL;
     }
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-    return pvfs2_xattr_get_acl(dentry->d_inode, ACL_TYPE_DEFAULT, buffer, size);
+
+#if defined(HAVE_XATTR_HANDLER_GET_4_4) || \
+    defined(HAVE_XATTR_HANDLER_GET_2_6_33)
+    return pvfs2_xattr_get_acl(dentry->d_inode,
 #else
-    return pvfs2_xattr_get_acl(inode, ACL_TYPE_DEFAULT, buffer, size);
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+    return pvfs2_xattr_get_acl(inode,
+#endif
+                               ACL_TYPE_ACCESS,
+                               buffer,
+                               size);
 }
 
 static int pvfs2_xattr_set_acl(struct inode *inode,
@@ -570,20 +596,29 @@ err:
     return error;
 }
 
+
 static int pvfs2_xattr_set_acl_access(
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
-        struct dentry *dentry,
-#else
-        struct inode *inode, 
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-        const char *name, 
-        const void *buffer, 
-        size_t size, 
-        int flags
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
-        , int handler_flags
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-        )
+#ifdef HAVE_XATTR_HANDLER_SET_4_4
+                                      const struct xattr_handler *handler,
+                                      struct dentry *dentry,
+                                      const char *name, 
+                                      const void *buffer, 
+                                      size_t size, 
+                                      int flags)
+#elif defined (HAVE_XATTR_HANDLER_SET_2_6_33)
+                                      struct dentry *dentry,
+                                      const char *name, 
+                                      const void *buffer, 
+                                      size_t size, 
+                                      int flags,
+                                      int handler_flags)
+#else /* pre 2.6.33 */
+                                      struct inode *inode, 
+                                      const char *name,
+                                      const void *buffer,
+                                      size_t size,
+                                      int flags)
+#endif
 {
     gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_xattr_set_acl_access: %s\n", name);
     if (strcmp(name, "") != 0)
@@ -591,27 +626,36 @@ static int pvfs2_xattr_set_acl_access(
         gossip_err("set_acl_access invalid name %s\n", name);
         return -EINVAL;
     }
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+#if defined(HAVE_XATTR_HANDLER_SET_4_4) || \
+    defined(HAVE_XATTR_HANDLER_SET_2_6_33)
     return pvfs2_xattr_set_acl(dentry->d_inode, ACL_TYPE_ACCESS, buffer, size);
-#else
+#else /* pre 2.6.33 */
     return pvfs2_xattr_set_acl(inode, ACL_TYPE_ACCESS, buffer, size);
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+#endif
 }
 
 static int pvfs2_xattr_set_acl_default(
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
-        struct dentry *dentry,
-#else
-        struct inode *inode, 
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-        const char *name, 
-        const void *buffer, 
-        size_t size, 
-        int flags
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
-        , int handler_flags
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-        )
+#ifdef HAVE_XATTR_HANDLER_SET_4_4
+                                       const struct xattr_handler *handler,
+                                       struct dentry *dentry,
+                                       const char *name, 
+                                       const void *buffer, 
+                                       size_t size, 
+                                       int flags)
+#elif defined (HAVE_XATTR_HANDLER_SET_2_6_33)
+                                       struct dentry *dentry,
+                                       const char *name,
+                                       const void *buffer,
+                                       size_t size,
+                                       int flags,
+                                       int handler_flags)
+#else /* pre 2.6.33 */
+                                       struct inode *inode,
+                                       const char *name,
+                                       const void *buffer,
+                                       size_t size,
+                                       int flags)
+#endif
 {
     gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_xattr_set_acl_default: %s\n", name);
     if (strcmp(name, "") != 0)
@@ -619,9 +663,10 @@ static int pvfs2_xattr_set_acl_default(
         gossip_err("set_acl_default invalid name %s\n", name);
         return -EINVAL;
     }
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+#if defined(HAVE_XATTR_HANDLER_SET_4_4) || \
+    defined(HAVE_XATTR_HANDLER_SET_2_6_33)
     return pvfs2_xattr_set_acl(dentry->d_inode, ACL_TYPE_DEFAULT, buffer, size);
-#else
+#else /* pre 2.6.33 */
     return pvfs2_xattr_set_acl(inode, ACL_TYPE_DEFAULT, buffer, size);
 #endif
 }

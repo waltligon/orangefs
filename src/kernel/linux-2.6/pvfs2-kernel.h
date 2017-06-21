@@ -328,63 +328,90 @@ static inline int convert_to_internal_xattr_flags(int setxattr_flags)
 }
 
 int pvfs2_xattr_set_trusted(
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
-    struct dentry *dentry, 
+#ifdef HAVE_XATTR_HANDLER_SET_4_4
+                            const struct xattr_handler *handler,
+                            struct dentry *dentry,
+                            const char *name,
+                            const void *buffer,
+                            size_t size,
+                            int flags);
+#elif defined(HAVE_XATTR_HANDLER_SET_2_6_33)
+                            struct dentry *dentry,
+                            const char *name,
+                            const void *buffer,
+                            size_t size,
+                            int flags,
+                            int handler_flags);
 #else
-    struct inode *inode, 
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-    const char *name, 
-    const void *buffer, 
-    size_t size, 
-    int flags
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
-    , int handler_flags
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-    );
-
-int pvfs2_xattr_get_trusted(
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-    struct dentry *dentry,
-#else
-    struct inode *inode,
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-    const char *name, 
-    void *buffer, 
-    size_t size
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-    , int handler_flags
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-    );
+                            struct inode *inode,
+                            const char *name,
+                            const void *buffer,
+                            size_t size,
+                            int flags);
+#endif
 
 int pvfs2_xattr_set_default(
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
-    struct dentry *dentry, 
+#ifdef HAVE_XATTR_HANDLER_SET_4_4
+                            const struct xattr_handler *handler,
+                            struct dentry *dentry,
+                            const char *name,
+                            const void *buffer,
+                            size_t size,
+                            int flags);
+#elif defined(HAVE_XATTR_HANDLER_SET_2_6_33)
+                            struct dentry *dentry,
+                            const char *name,
+                            const void *buffer,
+                            size_t size,
+                            int flags,
+                            int handler_flags);
 #else
-    struct inode *inode, 
-#endif /*HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-    const char *name, 
-    const void *buffer, 
-    size_t size, 
-    int flags
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
-    , int handler_flags
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-    );
+                            struct inode *inode,
+                            const char *name,
+                            const void *buffer,
+                            size_t size,
+                            int flags);
+#endif
+
+int pvfs2_xattr_get_trusted(
+#ifdef HAVE_XATTR_HANDLER_GET_4_4
+                            const struct xattr_handler *handler,
+                            struct dentry *dentry,
+                            const char *name,
+                            void *buffer,
+                            size_t size);
+#elif defined(HAVE_XATTR_HANDLER_GET_2_6_33)
+                            struct dentry *dentry,
+                            const char *name,
+                            void *buffer,
+                            size_t size,
+                            int handler_flags);
+#else
+                            struct inode *inode,
+                            const char *name,
+                            void *buffer,
+                            size_t size);
+#endif
 
 int pvfs2_xattr_get_default(
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-    struct dentry *dentry,
+#ifdef HAVE_XATTR_HANDLER_GET_4_4
+                            const struct xattr_handler *handler,
+                            struct dentry *dentry,
+                            const char *name,
+                            void *buffer,
+                            size_t size);
+#elif defined(HAVE_XATTR_HANDLER_GET_2_6_33)
+                            struct dentry *dentry,
+                            const char *name,
+                            void *buffer,
+                            size_t size,
+                            int handler_flags);
 #else
-    struct inode *inode,
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-    const char *name, 
-    void *buffer, 
-    size_t size
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-    , int handler_flags
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-    );
-
+                            struct inode *inode,
+                            const char *name,
+                            void *buffer,
+                            size_t size);
+#endif
 
 #endif
 

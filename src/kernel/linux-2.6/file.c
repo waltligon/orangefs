@@ -1385,23 +1385,29 @@ static ssize_t do_readv_writev(struct rw_options *rw)
 #else
 #ifdef GWC_USES_KIOCB
 	init_sync_kiocb(&iocb, file);
+	iocb.ki_pos = file->f_pos;
+	if (file->f_flags & O_APPEND)
+		iocb.ki_flags = IOCB_APPEND;
 	iov_iter_init(&iter,
 		      WRITE,
 		      rw->dest.address.iov,
 		      rw->dest.address.nr_segs,
-		      pvfs_bufmap_size_query());
+		      rw->dest.address.iov->iov_len);
 	ret = generic_write_checks(&iocb, &iter);
         if (ret <= 0)
         {
-            gossip_err("%s: failed generic argument checks.\n", rw->fnstr);
+            gossip_err("%s: failed generic argument checks 1.\n", rw->fnstr);
             goto out;
         }
-
+	if (file->f_flags & O_APPEND)
+		*offset = i_size_read(inode);
 #else
-        ret = generic_write_checks(file, offset, &count, S_ISBLK(inode->i_mode));
+        ret =
+            generic_write_checks(file, offset, &count, S_ISBLK(inode->i_mode));
+
         if (ret != 0)
         {
-            gossip_err("%s: failed generic argument checks.\n", rw->fnstr);
+            gossip_err("%s: failed generic argument checks 2.\n", rw->fnstr);
             goto out;
         }
 
@@ -3208,19 +3214,26 @@ int pvfs2_ioctl(
     if(cmd == FS_IOC_GETFLAGS)
     {
         val = 0;
-        ret = pvfs2_xattr_get_default(
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-                file->f_dentry,
-#else
-                file->f_dentry->d_inode,
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-                "user.pvfs2.meta_hint",
-                &val, 
-                sizeof(val)
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-                , 0
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-                );
+
+#ifdef HAVE_XATTR_HANDLER_GET_4_4
+        ret = pvfs2_inode_getxattr(file_inode(file),
+                                   "", 
+                                   "user.pvfs2.meta_hint",
+                                   &val,
+                                   sizeof(val));
+#elif defined (HAVE_XATTR_HANDLER_GET_2_6_33)
+        ret = pvfs2_xattr_get_default(file->f_dentry,
+                                      "user.pvfs2.meta_hint",
+                                      &val, 
+                                      sizeof(val),
+                                      0);
+#else /* pre 2.6.33 */
+        ret = pvfs2_xattr_get_default(file->f_dentry->d_inode,
+                                      "user.pvfs2.meta_hint",
+                                      &val,
+                                      sizeof(val));
+#endif
+
         if(ret < 0 && ret != -ENODATA)
         {
             return ret;
@@ -3257,20 +3270,28 @@ int pvfs2_ioctl(
         val = uval;
         gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_ioctl: FS_IOC_SETFLAGS: %llu\n",
                      (unsigned long long)val);
-        ret = pvfs2_xattr_set_default(
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM 
-                file->f_dentry,
-#else
-                file->f_dentry->d_inode,
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-                "user.pvfs2.meta_hint",
-                &val, 
-                sizeof(val), 
-                0
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM 
-                , 0                                      
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-                );
+
+#ifdef HAVE_XATTR_HANDLER_SET_4_4
+        ret = pvfs2_inode_setxattr(file_inode(file),
+                                      "",
+                                      "user.pvfs2.meta_hint",
+                                      &val,
+                                      sizeof(val),
+                                      0);
+#elif defined (HAVE_XATTR_HANDLER_SET_2_6_33)
+        ret = pvfs2_xattr_set_default(file->f_dentry,
+                                      "user.pvfs2.meta_hint",
+                                      &val, 
+                                      sizeof(val), 
+                                      0,
+                                      0);                                     
+#else /* pre 2.6.33 */
+        ret = pvfs2_xattr_set_default(file->f_dentry->d_inode,
+                                      "user.pvfs2.meta_hint",
+                                      &val,
+                                      sizeof(val),
+                                      0);
+#endif
     }
 
     return ret;

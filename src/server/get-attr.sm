@@ -1643,7 +1643,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     ret = PINT_capcache_quick_sign(&respattr->capability);
     if (ret != 0)
     {
-        ret = PINT_sign_capability(&respattr->capability);        
+        ret = PINT_sign_capability(&respattr->capability,NULL);        
     }
     else
     {
@@ -1651,7 +1651,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
         insert_flag = 0;
     }
 #else
-    ret = PINT_sign_capability(&respattr->capability);
+    ret = PINT_sign_capability(&respattr->capability,NULL);
 #endif
 
     if (ret < 0)

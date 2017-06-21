@@ -136,7 +136,7 @@ int PINT_security_cache_ca_cert(void);
 
 int PINT_init_capability(PVFS_capability *cap);
 
-int PINT_sign_capability(PVFS_capability *cap);
+int PINT_sign_capability(PVFS_capability *cap,PVFS_time *force_timeout);
 
 int PINT_verify_capability(const PVFS_capability *cap);
 

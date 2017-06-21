@@ -736,9 +736,9 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     PINT_smcb_set_cancelled(smcb);
 
     /*
-      don't return an error if nothing is cancelled, because
-      everything may have completed already
-    */
+     * don't return an error if nothing is cancelled, because
+     * everything may have completed already
+     */
     ret = 0;
 
     /* now run through and cancel the outstanding jobs */

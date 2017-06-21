@@ -266,6 +266,11 @@ typedef struct server_configuration_s
     int credential_timeout;          /* credential timeout in seconds */
     int capability_timeout;          /* capability timeout in seconds */
 
+    int bypass_timeout_check;        /* Correlates to TurnOffTimeouts in server conf file */
+                                     /* Only applies to a server.                         */
+                                     /* 1 = don't check for timeout                       */
+                                     /* 0 = check for timeout                             */
+
     int credcache_timeout;           /* credential cache timeout in seconds */
     int capcache_timeout;            /* capability cache timeout in seconds */
     int certcache_timeout;           /* certificate cache timeout in seconds */

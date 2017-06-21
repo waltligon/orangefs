@@ -10,6 +10,11 @@
  * counters.
  */
 
+#ifdef WIN32
+#include <Windows.h>
+#include <math.h>
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 #ifndef WIN32
@@ -25,6 +30,31 @@
 #include "pint-perf-counter.h"
 #include "pint-util.h"
 #include "gossip.h"
+
+#ifdef WIN32
+#define clock_gettime(clk_id, tp)    _clock_gettime(tp)
+
+/* Use Windows performance counter to emulate clock_gettime */
+static int _clock_gettime(struct timespec *tp)
+{
+    static uint64_t freq = 0;
+    LARGE_INTEGER qpc;
+    uint64_t modulus;
+
+    if (!freq) {
+        QueryPerformanceFrequency(&qpc);
+        freq = qpc.QuadPart;
+    }
+
+    QueryPerformanceCounter(&qpc);
+
+    tp->tv_sec = qpc.QuadPart / freq;
+    modulus = qpc.QuadPart % freq;
+    tp->tv_nsec = (long) floor((double) modulus / (double) freq * 1000000000.0);
+
+    return 0;
+}
+#endif
 
 static struct timespec timediff(struct timespec start, struct timespec end);
 

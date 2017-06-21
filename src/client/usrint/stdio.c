@@ -95,9 +95,17 @@ int __dprintf_chk (int fd, int flag, const char *fmt, ...);
 int __vdprintf_chk (int fd, int flag, const char *fmt, va_list ap);
 char *__gets_chk (char *str, size_t n);
 char *__fgets_chk (char *s, size_t size, int n, FILE *stream);
-size_t __fread_chk (void *ptr, size_t size, size_t nmemb, FILE *stream);
 char *__fgets_unlocked_chk (char *s, size_t size, int n, FILE *stream);
-size_t __fread_unlocked_chk (void *ptr, size_t size, size_t nmemb, FILE *stream);
+size_t __fread_chk (void *ptr,
+                    size_t plen,
+                    size_t size,
+                    size_t nmemb,
+                    FILE *stream);
+size_t __fread_unlocked_chk (void *ptr,
+                             size_t plen,
+                             size_t size,
+                             size_t nmemb,
+                             FILE *stream);
 
 /* this is defined in openfile-util.g because it is used openfile-util.c
  * _P_IO_MAGIC     0xF0BD0000
@@ -1068,7 +1076,11 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 /**
  * __fread_chk
  */
-size_t __fread_chk (void *ptr, size_t size, size_t nmemb, FILE *stream)
+size_t __fread_chk (void *ptr,
+                    size_t plen,
+                    size_t size,
+                    size_t nmemb,
+                    FILE *stream)
 {
     return fread(ptr, size, nmemb, stream);
 }
@@ -1217,7 +1229,11 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
 /**
  * __fread_unlocked_chk
  */
-size_t __fread_unlocked_chk (void *ptr, size_t size, size_t nmemb, FILE *stream)
+size_t __fread_unlocked_chk (void *ptr,
+                             size_t plen,
+                             size_t size,
+                             size_t nmemb,
+                             FILE *stream)
 {
     return fread_unlocked(ptr, size, nmemb, stream);
 }

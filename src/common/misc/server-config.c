@@ -144,6 +144,7 @@ static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
 static DOTCONF_CB(get_credential_timeout);
 static DOTCONF_CB(get_capability_timeout);
+static DOTCONF_CB(get_turn_off_timeouts);
 static DOTCONF_CB(get_credcache_timeout);
 static DOTCONF_CB(get_capcache_timeout);
 static DOTCONF_CB(get_certcache_timeout);
@@ -333,15 +334,23 @@ static const configoption_t options[] =
     {"CapabilityTimeoutSecs", ARG_INT, get_capability_timeout, NULL,
         CTX_SECURITY, "600"},
 
-    /* Credential cache timeout in seconds */
+    /* Prevent the server from issuing an error whenever a capability or 
+     * credential expires.  In this case, the client provides the only 
+     * mechanism determining when a capability or credential needs to be 
+     * regenerated.  
+     */
+    {"TurnOffTimeouts", ARG_STR, get_turn_off_timeouts, NULL,
+        CTX_SECURITY, "yes"}, 
+
+    /* Server-side Credential cache timeout in seconds */
     {"CredentialCacheTimeoutSecs", ARG_INT, get_credcache_timeout, NULL,
         CTX_SECURITY, "3600"},
 
-    /* Capability cache timeout in seconds */
+    /* Server-side Capability cache timeout in seconds */
     {"CapabilityCacheTimeoutSecs", ARG_INT, get_capcache_timeout, NULL,
         CTX_SECURITY, "600"},
 
-    /* Certificate cache timeout in seconds */
+    /* Server-side Certificate cache timeout in seconds */
     {"CertificateCacheTimeoutSecs", ARG_INT, get_certcache_timeout, NULL,
         CTX_SECURITY, "3600"},
 
@@ -3702,6 +3711,39 @@ DOTCONF_CB(get_capability_timeout)
         gossip_err("Warning: CapabilityTimeoutSecs value invalid (%ld) - "
                    "using default (%d)\n", cmd->data.value,
                    config_s->capability_timeout);
+    }
+
+    return NULL;
+}
+
+DOTCONF_CB(get_turn_off_timeouts)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+#if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
+    /* You cannot turn off timeouts if using enhanced security */
+    config_s->bypass_timeout_check = 0;
+
+    /* Give a warning */
+    gossip_err("%s:When using enhanced security, timeout checks "
+               "on the server cannot be disabled.  Setting "
+               "bypass_timeout_check to 0.\n",__func__);
+
+    return NULL;  
+#endif
+
+    if ( !strcasecmp(cmd->data.str, "yes") )
+    {
+         config_s->bypass_timeout_check = 1;
+    }
+    else if ( !strcasecmp(cmd->data.str, "no") )
+    {
+         config_s->bypass_timeout_check = 0;
+    }
+    else
+    {
+        return("TurnOffTimeouts must be 'yes' or 'no'.\n");
     }
 
     return NULL;
