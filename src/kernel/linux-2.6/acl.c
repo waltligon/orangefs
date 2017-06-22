@@ -575,7 +575,11 @@ static int pvfs2_xattr_set_acl(struct inode *inode,
         }
         else if (acl) 
         {
+#ifdef HAVE_POSIX_ACL_USER_NAMESPACE
+            error = posix_acl_valid(&init_user_ns, acl);
+#else
             error = posix_acl_valid(acl);
+#endif
             if (error)
             {
                 gossip_err("pvfs2_xattr_set_acl: posix_acl_valid returned "
