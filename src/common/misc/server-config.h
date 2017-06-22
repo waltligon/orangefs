@@ -275,11 +275,6 @@ typedef struct server_configuration_s
     int capcache_timeout;            /* capability cache timeout in seconds */
     int certcache_timeout;           /* certificate cache timeout in seconds */
 
-    int bypass_timeout_check;        /* Correlates to TurnOffTimeouts in server conf file */
-                                     /* Only applies to a server.                         */
-                                     /* 1 = don't check for timeout                       */
-                                     /* 0 = check for timeout                             */
-
     void *private_data;
     int32_t tree_width;
     int32_t tree_threshold;

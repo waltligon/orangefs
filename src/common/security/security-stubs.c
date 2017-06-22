@@ -99,7 +99,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
 
 int PINT_verify_capability(const PVFS_capability *cap)
 {
-    struct server_configuration_s *config = PINT_get_server_config();
+    struct server_configuration_s *config = get_server_config_struct();
 
     if (!cap)
     {
@@ -156,7 +156,7 @@ int PINT_sign_credential(PVFS_credential *cred)
 
 int PINT_verify_credential(const PVFS_credential *cred)
 {
-    struct server_configuration_s *config = PINT_get_server_config();
+    struct server_configuration_s *config = get_server_config_struct();
 
     if (!cred)
     {
