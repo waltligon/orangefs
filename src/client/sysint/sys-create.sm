@@ -33,8 +33,6 @@
 #include "server-config.h"
 #include "client-capcache.h"
 
-extern job_context_id pint_client_sm_context;
-
 enum
 {
     CREATE_RETRY = 170
@@ -1265,6 +1263,8 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
         free(sm_p->u.create.dirent_sid_array);
         sm_p->u.create.dirent_sid_array = NULL;
     }
+
+    PINT_free_object_attr(&sm_p->u.create.store_attr);
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 

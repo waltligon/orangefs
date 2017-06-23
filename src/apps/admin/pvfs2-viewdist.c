@@ -139,7 +139,7 @@ static int generic_server_location(file_object *obj,
 {
     char *buffer = (char *) malloc(4096);
     int ret, num_dfiles, count;
-    PVFS_fs_id fsid;
+    //PVFS_fs_id fsid;
 
     if (obj->fs_type == UNIX_FILE)
     {
@@ -152,7 +152,7 @@ static int generic_server_location(file_object *obj,
             perror("fgetxattr:");
             return -1;
         }
-        fsid = obj->u.ufs.fs_id;
+        //fsid = obj->u.ufs.fs_id;
     }
     else
     {
@@ -172,7 +172,7 @@ static int generic_server_location(file_object *obj,
             return -1;
         }
         ret = val.read_sz;
-        fsid = obj->u.pvfs2.fs_id;
+        //fsid = obj->u.pvfs2.fs_id;
     }
     /*
      * At this point, we know all the dfile handles

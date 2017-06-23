@@ -10,6 +10,7 @@
 #include "ncache.h"
 #include "tcache.h"
 #include "pint-util.h"
+#include "pint-sysint-utils.h"
 #include "pvfs2-debug.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
@@ -499,7 +500,9 @@ struct PINT_perf_counter* PINT_ncache_get_pc(void)
  */
 static int PINT_ncache_initialize_perf_counter(void)
 {
-    ncache_pc = PINT_perf_initialize(ncache_keys);
+    ncache_pc = PINT_perf_initialize(PINT_PERF_COUNTER,
+                                     ncache_keys,
+                                     client_perf_start_rollover);
     if(!ncache_pc)
     {
         gossip_err("Error: PINT_perf_initialize failure.\n");

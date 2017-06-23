@@ -26,8 +26,6 @@
 #include "pint-util.h"
 #include "security-util.h"
 
-extern job_context_id pint_client_sm_context;
-
 %%
 
 machine pvfs2_client_mgmt_get_dirdata_array_sm

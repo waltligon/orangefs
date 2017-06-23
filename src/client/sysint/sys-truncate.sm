@@ -25,10 +25,9 @@
 #include "acache.h"
 #include "pvfs2-internal.h"
 #include "sid.h"
+#include "client-capcache.h"
 
 #define TRUNCATE_UNSTUFF 100
-
-extern job_context_id pint_client_sm_context;
 
 static int unstuff_needed(PVFS_size size, PINT_dist *dist_p, uint32_t mask);
 
@@ -193,6 +192,7 @@ static int unstuff_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int local_uid, ret;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"unstuff completion fn: unstuff_comp_fn\n");
@@ -209,6 +209,20 @@ static int unstuff_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
     }
 
     assert(resp_p->op == PVFS_SERV_UNSTUFF);
+
+    /* update client capcache with returned cap */
+    local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+    if (local_uid == (PVFS_uid) -1) {
+        local_uid = PINT_util_getuid();
+    }
+    PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
+    ret = PINT_client_capcache_update(sm_p->object_ref, local_uid,
+                                      &resp_p->u.unstuff.attr.capability);
+    if (ret < 0)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: capcache update returned "
+                     "%d\n", __func__, ret);
+    }
     
     PINT_acache_update(sm_p->object_ref, &resp_p->u.unstuff.attr, NULL);
 
@@ -241,7 +255,6 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     /* why all of these asserts? shouldn't this be checked above
      * and error codes returned if bad?
      */
-    assert(attr->mask & PVFS_ATTR_CAPABILITY);
     assert(attr->mask & PVFS_ATTR_META_DFILES);
     assert(attr->mask & PVFS_ATTR_META_DIST);
     assert(attr->u.meta.dfile_count > 0);
@@ -394,7 +407,8 @@ static PINT_sm_action truncate_unstuff_setup_msgpair(struct PINT_smcb *smcb,
                               sm_p->object_ref.handle,
                               sm_p->object_ref.sid_count,
                               sm_p->object_ref.sid_array,
-                              PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE);
+                              PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|
+                                   PVFS_ATTR_CAPABILITY);
     
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
@@ -475,8 +489,7 @@ static int unstuff_needed(PVFS_size size,
         return(1);
     }
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "sys-truncate will not unstuff the file.\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate will not unstuff the file.\n");
     return(0);
 }
 

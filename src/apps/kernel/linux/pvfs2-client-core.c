@@ -39,6 +39,7 @@
 #include "server-config-mgr.h"
 #include "client-state-machine.h"
 #include "pint-perf-counter.h"
+#include "pint-sysint-utils.h"
 #include "pvfs2-encode-stubs.h"
 #include "pint-event.h"
 
@@ -1230,7 +1231,7 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
         return -PVFS_ENOMEM;
     }
     vfs_request->response.geteattr.val_array[0].buffer = 
-        (void *) malloc(PVFS_REQ_LIMIT_VAL_LEN);
+        (void *) malloc(PVFS_MAX_XATTR_VALUELEN);
     if (vfs_request->response.geteattr.val_array[0].buffer == NULL)
     {
         free(vfs_request->response.geteattr.val_array);
@@ -1238,7 +1239,7 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
         return -PVFS_ENOMEM;
     }
     vfs_request->response.geteattr.val_array[0].buffer_sz = 
-        PVFS_REQ_LIMIT_VAL_LEN;
+        PVFS_MAX_XATTR_VALUELEN;
 
     fill_hints(&hints, vfs_request);
 
@@ -1909,7 +1910,7 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                 PVFS2_PARAM_REQUEST_GET)
             {
                 ret = PINT_perf_get_info(PINT_acache_get_pc(),
-                                         PINT_PERF_HISTORY_SIZE,
+                                         PINT_PERF_UPDATE_HISTORY,
                                          &tmp_perf_val);
                 vfs_request->out_downcall.resp.param.value = tmp_perf_val;
             }
@@ -1917,13 +1918,13 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             {
                 tmp_perf_val = vfs_request->in_upcall.req.param.value;
                 ret = PINT_perf_set_info(PINT_acache_get_pc(),
-                                         PINT_PERF_HISTORY_SIZE,
+                                         PINT_PERF_UPDATE_HISTORY,
                                          tmp_perf_val);
                 ret = PINT_perf_set_info(PINT_ncache_get_pc(),
-                                         PINT_PERF_HISTORY_SIZE,
+                                         PINT_PERF_UPDATE_HISTORY,
                                          tmp_perf_val);
                 ret = PINT_perf_set_info(PINT_client_capcache_get_pc(),
-                                         PINT_PERF_HISTORY_SIZE,
+                                         PINT_PERF_UPDATE_HISTORY,
                                          tmp_perf_val);
             }    
             vfs_request->out_downcall.status = ret;
@@ -3000,7 +3001,7 @@ static inline void package_downcall_members(
                         vfs_request->in_upcall.uid,
                         vfs_request->in_upcall.gid);
 
-                    /* compat */
+                    /* Turn the parent khandle in the upcall into a handle. */
                     refn1.handle =
                      pvfs2_khandle_to_ino(
                       &(vfs_request->in_upcall.req.create.parent_refn.khandle));
@@ -3009,17 +3010,25 @@ static inline void package_downcall_members(
                     refn1.__pad1 = 
                       vfs_request->in_upcall.req.create.parent_refn.__pad1;
 
-
-//hubcap            vfs_request->out_downcall.resp.create.refn =
+                    /* Obtain the handle of the target object. */
                     refn2 =
                       perform_lookup_on_create_error(
                         refn1,
-//hubcap                vfs_request->in_upcall.req.create.parent_refn,
                         vfs_request->in_upcall.req.create.d_name,
                         credential,
                         1,
                         hints);
                     vfs_request->hints = hints;
+
+                    /*
+                     * Convert the target handle into a khandle and
+                     * put it into the downcall response.
+                     */
+                    pvfs2_khandle_from_handle(
+                      &(refn2.handle),
+                      &(vfs_request->out_downcall.resp.create.refn.khandle));
+		    vfs_request->out_downcall.resp.create.refn.fs_id =
+                      refn2.fs_id;
 
                     if (credential)
                     {
@@ -3027,7 +3036,6 @@ static inline void package_downcall_members(
                         free(credential);
                     }
 
-//hubcap            if (vfs_request->out_downcall.resp.create.refn.handle ==
                     if (refn2.handle ==
                         PVFS_HANDLE_NULL)
                     {
@@ -3059,10 +3067,10 @@ static inline void package_downcall_members(
             }
             else
             {
-//hubcap                vfs_request->out_downcall.resp.create.refn =
-//hubcap                    vfs_request->response.create.ref;
-
-                /* compat 2 */
+                /*
+                 * The object was successfully created, convert its
+                 * handle into a khandle for the downcall response.
+                 */
                 pvfs2_khandle_from_handle(
                   &(vfs_request->response.create.ref.handle),
                   &(vfs_request->out_downcall.resp.create.refn.khandle));
@@ -4204,7 +4212,7 @@ int main(int argc, char **argv)
     if(PINT_acache_get_pc())
     {
         ret = PINT_perf_set_info(PINT_acache_get_pc(),
-                                 PINT_PERF_HISTORY_SIZE,
+                                 PINT_PERF_UPDATE_HISTORY,
                                  s_opts.perf_history_size);
         if(ret < 0)
         {
@@ -4224,7 +4232,7 @@ int main(int argc, char **argv)
     if(PINT_ncache_get_pc())
     {
         ret = PINT_perf_set_info(PINT_ncache_get_pc(),
-                                 PINT_PERF_HISTORY_SIZE,
+                                 PINT_PERF_UPDATE_HISTORY,
                                  s_opts.perf_history_size);
         if(ret < 0)
         {
@@ -4244,7 +4252,7 @@ int main(int argc, char **argv)
     if(PINT_client_capcache_get_pc())
     {
         ret = PINT_perf_set_info(PINT_client_capcache_get_pc(),
-                                 PINT_PERF_HISTORY_SIZE,
+                                 PINT_PERF_UPDATE_HISTORY,
                                  s_opts.perf_history_size);
         if(ret < 0)
         {
@@ -4261,21 +4269,29 @@ int main(int argc, char **argv)
         return(-PVFS_ENOMEM);
     }
 
+    /* original code made into a function */
+    client_perf_start_rollover(PINT_acache_get_pc(), NULL);
+    client_perf_start_rollover(PINT_ncache_get_pc(), NULL);
+    client_perf_start_rollover(PINT_client_capcache_get_pc(), NULL);
+#if 0
     /* start a timer to roll over performance counters (acache) */
-    PINT_smcb_alloc(&acache_smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
-            sizeof(struct PINT_client_sm),
-            client_op_state_get_machine,
-            client_state_machine_terminate,
-            s_client_dev_context);
+    PINT_smcb_alloc(&acache_smcb,
+                    PVFS_CLIENT_PERF_COUNT_TIMER,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    s_client_dev_context);
     if (!acache_smcb)
     {
         finalize_perf_items(0);
         return(-PVFS_ENOMEM);
     }
+
     acache_timer_sm_p = PINT_sm_frame(acache_smcb, PINT_FRAME_CURRENT);
     acache_timer_sm_p->u.perf_count_timer.interval_secs = 
-        &s_opts.perf_time_interval_secs;
+                    &s_opts.perf_time_interval_secs;
     acache_timer_sm_p->u.perf_count_timer.pc = PINT_acache_get_pc();
+
     ret = PINT_client_state_machine_post(acache_smcb, NULL, NULL);
     if (ret < 0)
     {
@@ -4284,20 +4300,24 @@ int main(int argc, char **argv)
         return(ret);
     }
 
-    PINT_smcb_alloc(&ncache_smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
-            sizeof(struct PINT_client_sm),
-            client_op_state_get_machine,
-            client_state_machine_terminate,
-            s_client_dev_context);
+    /* start a timer to roll over performance counters (ncache) */
+    PINT_smcb_alloc(&ncache_smcb,
+                    PVFS_CLIENT_PERF_COUNT_TIMER,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    s_client_dev_context);
     if (!ncache_smcb)
     {
         finalize_perf_items(1, acache_smcb);
         return(-PVFS_ENOMEM);
     }
+
     ncache_timer_sm_p = PINT_sm_frame(ncache_smcb, PINT_FRAME_CURRENT);
     ncache_timer_sm_p->u.perf_count_timer.interval_secs = 
-        &s_opts.perf_time_interval_secs;
+                    &s_opts.perf_time_interval_secs;
     ncache_timer_sm_p->u.perf_count_timer.pc = PINT_ncache_get_pc();
+
     ret = PINT_client_state_machine_post(ncache_smcb, NULL, NULL);
     if (ret < 0)
     {
@@ -4306,20 +4326,24 @@ int main(int argc, char **argv)
         return(ret);
     }
 
-    PINT_smcb_alloc(&capcache_smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
-            sizeof(struct PINT_client_sm),
-            client_op_state_get_machine,
-            client_state_machine_terminate,
-            s_client_dev_context);
+    /* start a timer to roll over performance counters (capcache) */
+    PINT_smcb_alloc(&capcache_smcb,
+                    PVFS_CLIENT_PERF_COUNT_TIMER,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    s_client_dev_context);
     if (!capcache_smcb)
     {
         finalize_perf_items( 1, acache_smcb);
         return(-PVFS_ENOMEM);
     }
+
     capcache_timer_sm_p = PINT_sm_frame(capcache_smcb, PINT_FRAME_CURRENT);
     capcache_timer_sm_p->u.perf_count_timer.interval_secs = 
-        &s_opts.perf_time_interval_secs;
+                    &s_opts.perf_time_interval_secs;
     capcache_timer_sm_p->u.perf_count_timer.pc = PINT_client_capcache_get_pc();
+
     ret = PINT_client_state_machine_post(capcache_smcb, NULL, NULL);
     if (ret < 0)
     {
@@ -4327,8 +4351,9 @@ int main(int argc, char **argv)
         finalize_perf_items( 2, acache_smcb, capcache_smcb );
         return(ret);
     }
+#endif
 
-
+    /* set up structure for kernel interaction */
     ret = initialize_ops_in_progress_table();
     if (ret)
     {
@@ -4881,7 +4906,7 @@ static void reset_acache_timeout(void)
             PINT_acache_finalize();
             PINT_acache_initialize();
             PINT_perf_set_info(PINT_acache_get_pc(),
-                               PINT_PERF_HISTORY_SIZE,
+                               PINT_PERF_UPDATE_HISTORY,
                                s_opts.perf_history_size);
             s_opts.acache_timeout = max_acache_timeout_ms;
             set_acache_parameters(&s_opts);

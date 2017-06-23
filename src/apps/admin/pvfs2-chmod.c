@@ -88,7 +88,7 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   PVFS_credential credentials;
   PVFS_sysresp_getattr resp_getattr;
   PVFS_sys_attr new_attr;
-  uint32_t attrmask;
+  //uint32_t attrmask;
   /* translate local path into pvfs2 relative path */
   ret = PVFS_util_resolve(destfile, &cur_fs, pvfs_path, PVFS_NAME_MAX);
   if(ret < 0)
@@ -144,15 +144,11 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
       ret = PINT_lookup_parent(pvfs_path,
                                cur_fs,
                                &credentials, 
-                               &parent_ref.handle);
+                               &parent_ref);
       if(ret < 0)
       {
           PVFS_perror("PINT_lookup_parent", ret);
           return -1;
-      }
-      else
-      {
-          parent_ref.fs_id = cur_fs;
       }
       memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 
@@ -171,9 +167,9 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
   }
 
   memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
-  attrmask = (PVFS_ATTR_SYS_ALL_SETABLE);
     
 #if 0
+  attrmask = (PVFS_ATTR_SYS_ALL_SETABLE);
   ret = PVFS_sys_getattr(resp_lookup.ref,
                          attrmask,
                          &credentials,

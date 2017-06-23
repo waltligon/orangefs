@@ -27,8 +27,6 @@
 #include "sid.h"
 #include "pvfs-path.h"
 
-extern job_context_id pint_client_sm_context;
-
 #define GET_CURRENT_CONTEXT(__sm_p)                                          \
 (&(__sm_p->u.lookup.contexts[__sm_p->u.lookup.current_context]))
 
@@ -999,6 +997,7 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
     }
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);

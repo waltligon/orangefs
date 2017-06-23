@@ -1634,6 +1634,8 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    strcpy(respattr->capability.issuer, "S:");
+    strcat(respattr->capability.issuer, config->server_alias);
 
 #if defined(ENABLE_CAPCACHE) && defined(ENABLE_SECURITY_MODE)
     /* if capability fields match cached capability, use
@@ -1641,7 +1643,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     ret = PINT_capcache_quick_sign(&respattr->capability);
     if (ret != 0)
     {
-        ret = PINT_sign_capability(&respattr->capability);        
+        ret = PINT_sign_capability(&respattr->capability,NULL);        
     }
     else
     {
@@ -1649,7 +1651,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
         insert_flag = 0;
     }
 #else
-    ret = PINT_sign_capability(&respattr->capability);
+    ret = PINT_sign_capability(&respattr->capability,NULL);
 #endif
 
     if (ret < 0)
@@ -1874,20 +1876,39 @@ static void free_nested_getattr_data(struct PINT_server_op *s_op)
     return;
 }
 
+/*
+ * Function: getattr_free
+ *
+ * Params:   server_op *s_op,
+ *
+ * Returns:  N/A
+ *
+ * Synopsis: free memory - can be called from outside this source file.
+ *
+ */
+void getattr_free(
+        struct PINT_server_op *s_op)
+{
+    free_keyval_buffers(s_op);
+
+    PINT_free_object_attr(&s_op->resp.u.getattr.attr);
+}
+
 static PINT_sm_action getattr_cleanup(struct PINT_smcb *smcb,
                                       job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    free_keyval_buffers(s_op);
-
-    PINT_free_object_attr(&s_op->resp.u.getattr.attr);
+    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TGETATTR, &s_op->start_time);
+    getattr_free(s_op);
     return(server_state_machine_complete(smcb));
 }
 
 static PINT_sm_action getattr_with_prelude_init(struct PINT_smcb *smcb,
                                                 job_status_s *js_p)
 {
+    PINT_perf_count(PINT_server_pc, PINT_PERF_GETATTR, 1, PINT_PERF_ADD);
+
     js_p->error_code = 0;    
     return SM_ACTION_COMPLETE;
 }

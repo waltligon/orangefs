@@ -153,14 +153,10 @@ static int make_link(PVFS_credential      * pCredentials,
         return(-1);
     }
     
-    /* TODO: We need to change the PINT_lookup_parent to an API call (pvfs_util), 
-     * and we need to change this to use it. Maybe send entire parent_refn so
-     * that the fs_id is filled in also
-     */
     ret = PINT_lookup_parent( (char *) pszPvfsPath, 
                               fs_id, 
                               pCredentials, 
-                              &parent_ref.handle);
+                              &parent_ref);
 
     if(ret < 0)
     {
@@ -168,8 +164,6 @@ static int make_link(PVFS_credential      * pCredentials,
         return(-1);
     }
     
-    parent_ref.fs_id = fs_id;
-
     if(nVerbose)
     {
         fprintf(stderr, "Creating Symlink\n");

@@ -576,57 +576,57 @@ typedef struct PVFS_object_ref_s
 do { \
     if (dst->sid_count != 0 || dst->sid_array != NULL) \
     { \
-        gossip_err("tried to init a non empty PVFS_object_ref"); \
+        gossip_err("tried to init a non empty PVFS_object_ref\n"); \
         break; \
     } \
-    memset(oref, 0; sizeof(PVFS_object_ref)); \
+    memset((oref), 0, sizeof(PVFS_object_ref)); \
     if (sid_count == -1) \
     { \
-        oref->sid_count = 3; \
+        (oref)->sid_count = 3; \
     } \
     else \
     { \
-        oref->sid_count = sid_count; \
+        (oref)->sid_count = sid_count; \
     } \
-    oref->sid_array = (PVFS_SID *)malloc(SASZ(oref->sid_count)); \
-    if (!oref->sid_array) \
+    (oref)->sid_array = (PVFS_SID *)malloc(SASZ((oref)->sid_count)); \
+    if (!(oref)->sid_array) \
     { \
         gossip_err("malloc returned error");\
         break; \
     } \
-    ZEROMEM(oref->sid_array, SASZ(oref->sid_count)); \
+    ZEROMEM((oref)->sid_array, SASZ((oref)->sid_count)); \
 } while (0)
 
 /* dst must be empty (released) */
 #define PVFS_object_ref_copy(dst, src) \
 do { \
-    if (dst->sid_count != 0 || dst->sid_array != NULL) \
+    if ((dst)->sid_count != 0 || (dst)->sid_array != NULL) \
     { \
-        gossip_err("tried to copy to a non empty PVFS_object_ref"); \
+        gossip_err("tried to copy to a non empty PVFS_object_ref\n"); \
         break; \
     } \
-    *dst = *src; \
-    if (src->sid_count > 0 && src->sid_array) \
+    *(dst) = *(src); \
+    if ((src)->sid_count > 0 && (src)->sid_array) \
     { \
-        dst->sid_array = (PVFS_SID *)malloc(SASZ(src->sid_count)); \
-        if (!dst->sid_array) \
+        (dst)->sid_array = (PVFS_SID *)malloc(SASZ((src)->sid_count)); \
+        if (!(dst)->sid_array) \
         { \
             gossip_err("malloc returned error");\
             break; \
         } \
-        ZEROMEM(dst->sid_array, SASZ(src->sid_count)); \
-        memcpy(dst->sid_array, src->sid_array, SASZ(src->sid_count)); \
+        ZEROMEM((dst)->sid_array, SASZ((src)->sid_count)); \
+        memcpy((dst)->sid_array, (src)->sid_array, SASZ((src)->sid_count)); \
     } \
 } while (0)
 
 /* does not free the object_ref, but the resources it holds */
 #define PVFS_object_ref_release(oref) \
 do { \
-    if (oref->sid_count > 0 && oref->sid_array) \
+    if ((oref)->sid_count > 0 && (oref)->sid_array) \
     { \
-        free(oref->sid_array); \
+        free((oref)->sid_array); \
     } \
-    memset(oref, 0; sizeof(PVFS_object_ref)); \
+    memset((oref), 0, sizeof(PVFS_object_ref)); \
 } while (0)
 
 /* kernel compatibility version of a PVFS_handle */
@@ -757,15 +757,18 @@ typedef uint64_t PVFS_dist_dir_hash_type;
 enum PVFS_server_param
 {
     PVFS_SERV_PARAM_INVALID = 0,
-    PVFS_SERV_PARAM_GOSSIP_MASK = 1, /* gossip debugging on or off */
-    PVFS_SERV_PARAM_FSID_CHECK = 2,  /* verify that an fsid is ok */
-    PVFS_SERV_PARAM_ROOT_CHECK = 3,  /* verify existance of root handle */
-    PVFS_SERV_PARAM_MODE = 4,        /* change the current server mode */
-    PVFS_SERV_PARAM_EVENT_ENABLE = 5,    /* event enable */
-    PVFS_SERV_PARAM_EVENT_DISABLE = 6, /* event disable */
-    PVFS_SERV_PARAM_SYNC_META = 7,   /* metadata sync flags */
-    PVFS_SERV_PARAM_SYNC_DATA = 8,   /* file data sync flags */
-    PVFS_SERV_PARAM_DROP_CACHES = 9
+    PVFS_SERV_PARAM_GOSSIP_MASK = 1,       /* gossip debugging on or off */
+    PVFS_SERV_PARAM_FSID_CHECK = 2,        /* verify that an fsid is ok */
+    PVFS_SERV_PARAM_ROOT_CHECK = 3,        /* verify existance of root handle */
+    PVFS_SERV_PARAM_MODE = 4,              /* change the current server mode */
+    PVFS_SERV_PARAM_PERF_HISTORY = 5,      /* set counter history size */
+    PVFS_SERV_PARAM_PERF_INTERVAL = 6,     /* set counter interval time */
+    PVFS_SERV_PARAM_EVENT_ENABLE = 7,      /* event enable */
+    PVFS_SERV_PARAM_EVENT_DISABLE = 8,     /* event disable */
+    PVFS_SERV_PARAM_SYNC_META = 9,         /* metadata sync flags */
+    PVFS_SERV_PARAM_SYNC_DATA = 10,        /* file data sync flags */
+    PVFS_SERV_PARAM_DROP_CACHES = 11,
+    PVFS_SERV_PARAM_TURN_OFF_TIMEOUTS = 12 /* set bypass_timeout_check */
 };
 
 enum PVFS_mgmt_param_type
@@ -803,7 +806,8 @@ enum PVFS_server_mode
 
 #ifdef PVFS_USE_OLD_ACL_FORMAT
 /* OLD PVFS ACL Format - a null terminated array of these */
-typedef struct {
+typedef struct
+{
     int32_t  p_tag;
     uint32_t p_perm;
     uint32_t p_id;
@@ -811,13 +815,15 @@ typedef struct {
 #else
 /* PVFS2 ACL structures - Matches Linux ACL EA structures */
 /* matches POSIX ACL-XATTR format */
-typedef struct {
+typedef struct
+{
     int16_t  p_tag;
     uint16_t p_perm;
     uint32_t p_id;
 } pvfs2_acl_entry;
 
-typedef struct {
+typedef struct
+{
     uint32_t p_version;
     pvfs2_acl_entry p_entries[0];
 } pvfs2_acl_header;

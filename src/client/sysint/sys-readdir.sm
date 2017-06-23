@@ -28,8 +28,6 @@
 #include "pvfs2-internal.h"
 #include "sid.h"
 
-extern job_context_id pint_client_sm_context;
-
 static int readdir_msg_comp_fn(void *v_p,
                                struct PVFS_server_resp *resp_p,
                                int index);
@@ -477,7 +475,6 @@ static PINT_sm_action readdir_finish_partial_read(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
-    int ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "readdir state: "
                  "readdir_finish_partial_read\n");
@@ -533,8 +530,7 @@ static PINT_sm_action readdir_finish_partial_read(
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = readdir_msg_comp_fn;
 
-    ret = PVFS_SID_get_addr(
-            &msg_p->svr_addr, &msg_p->sid_array[0]);
+    PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;

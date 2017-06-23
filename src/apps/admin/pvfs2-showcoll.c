@@ -682,54 +682,49 @@ static int print_collections(void)
 {
     int ret, count;
     TROVE_op_id op_id;
-    TROVE_coll_id coll_id;
-    TROVE_keyval_s name;
-    TROVE_ds_position pos;
-    char *coll_name;
+    TROVE_coll_id coll_id[32];
+    TROVE_keyval_s name[32];
+    int i;
 
-    coll_name = malloc(PATH_MAX);
-    if (coll_name == NULL) return -1;
-    memset(coll_name,0,PATH_MAX);
-
-    name.buffer    = coll_name;
-    name.buffer_sz = PATH_MAX;
-    name.read_sz   = 0;
-    count = 1;
-    pos = TROVE_ITERATE_START;
+    count = 32;
+    for (i = 0; i < 32; i++)
+    {
+        char *coll_name;
+        coll_name = malloc(PATH_MAX);
+        if (coll_name == NULL)
+            return -1;
+        memset(coll_name,0,PATH_MAX);
+        name[i].buffer    = coll_name;
+        name[i].buffer_sz = PATH_MAX;
+        name[i].read_sz   = 0;
+    }
 
     fprintf(stdout, "Storage space %s and %s collections:\n",
 	    data_path, meta_path);
 
-    while (count > 0)
+    ret = trove_collection_iterate(TROVE_METHOD_DBPF, name, coll_id, &count,
+        0 /* flags */, 0 /* vtag */, NULL /* user ptr */, &op_id);
+    if (ret != 1) 
     {
-	ret = trove_collection_iterate(TROVE_METHOD_DBPF,
-                                       &pos,
-				       &name,
-				       &coll_id,
-				       &count,
-				       0 /* flags */,
-				       0 /* vtag */,
-				       NULL /* user ptr */,
-				       &op_id);
-	if (ret != 1)
+        for (i = 0; i < 32; i++)
         {
-	    free(coll_name);
-	    return -1;
-	}
-	
-	if (count > 0)
-        {
-            fprintf(stdout, "\t%s (coll_id = %d)\n", coll_name, coll_id);
+            free(name[i].buffer);
         }
-        memset(coll_name, 0, PATH_MAX);
-        memset(&name, 0, sizeof(name));
-        name.buffer    = coll_name;
-        name.buffer_sz = PATH_MAX;
-        name.read_sz   = 0;
+        return -1;
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        fprintf(stdout, "\t%s (coll_id = %d)\n", (char *)name[i].buffer,
+            coll_id[i]);
+    }
+
+    for (i = 0; i < 32; i++)
+    {
+        free(name[i].buffer);
     }
 
     fprintf(stdout, "\n");
-    free(coll_name);
     return 0;
 }
 

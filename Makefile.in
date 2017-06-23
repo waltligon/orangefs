@@ -165,7 +165,8 @@ INCLUDES := \
     src/common/gen-locks \
     src/common/events \
     src/common/sidcache \
-    src/client/usrint
+    src/client/usrint \
+    src/common/lmdb
 GENINCLUDES := \
 	include
 else
@@ -181,6 +182,7 @@ INCLUDES := \
     src/common/events \
     src/common/sidcache \
     src/common/security \
+    src/common/lmdb \
     src/client/usrint \
     src/io/trove \
     src/io/bmi \
@@ -218,7 +220,9 @@ LDFLAGS += @LDFLAGS@ @UUID_LDFLAGS@
 SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@ @LDAP_LDFLAGS@
 SERVER_LDFLAGS += @UUID_LDFLAGS@
+DATABASE_BACKEND = @DATABASE_BACKEND@
 DB_CFLAGS = @DB_CFLAGS@
+DB_LIB = @DB_LIB@
 LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
 PICFLAGS = -fPIC
 # Libraries - rt libs tend to depend on other libs so they go first
@@ -1048,11 +1052,11 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 	$(Q) "  LD		$@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $< $(VISMISCOBJS) $(LIBS) $(call modldflags,$<)
 
-# rule for building development tools and its objects. don't know why db isn't
-# already in libs.
+# rule for building development tools and its objects.
 $(DEVELTOOLS): %: %.o
-	$(Q) "  LD 		$@"
-	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBS) -ldb $(call modldflags,$<)
+	$(Q) "  LD              $@"
+	$(E)$(LD) -o $@ $< $(LDFLAGS) $(SERVERLIBS) lib/libpvfs2-server.a $(call modldflags,$<)
+
 
 ifdef BUILD_JNI
 $(OFS_JNI_JAR): $(JNIJAVA)

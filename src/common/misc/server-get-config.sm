@@ -21,8 +21,6 @@
 #include "security-util.h"
 #include "sid.h"
 
-extern job_context_id pint_client_sm_context;
-
 static int server_parse_config(struct server_configuration_s *config,
                                char *fs_config_buf,
                                uint32_t fs_config_buf_size);

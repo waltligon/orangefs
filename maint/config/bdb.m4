@@ -1,4 +1,3 @@
-
 AC_DEFUN([AX_BERKELEY_DB],
 [
     dbpath=ifelse([$1], ,,$1)
@@ -14,34 +13,34 @@ AC_DEFUN([AX_BERKELEY_DB],
     lib=notfound
 
     if test "x$dbpath" != "x" ; then
-    oldcflags=$CFLAGS
-    for dbheader in db4 db3 notfound; do
-        AC_COMPILE_IFELSE(
-            [AC_LANG_SOURCE([[#include "$dbpath/include/$dbheader/db.h"]])],
-            [DB_CFLAGS="-I$dbpath/include/$dbheader/"
-             break])
-    done
+	oldcflags=$CFLAGS
+	for dbheader in db4 db3 notfound; do
+		AC_COMPILE_IFELSE(
+			[AC_LANG_SOURCE([[#include "$dbpath/include/$dbheader/db.h"]])],
+			[DB_CFLAGS="-I$dbpath/include/$dbheader/"
+			 break])
+	done
 
-    if test "x$dbheader" = "xnotfound"; then
-        AC_COMPILE_IFELSE(
-            [AC_LANG_SOURCE([[#include "$dbpath/include/db.h"]])],
-            [DB_CFLAGS="-I$dbpath/include/"],
-            [AC_MSG_FAILURE(
-                Invalid libdb path specified. No db.h found.)])
-    fi
+	if test "x$dbheader" = "xnotfound"; then
+		AC_COMPILE_IFELSE(
+			[AC_LANG_SOURCE([[#include "$dbpath/include/db.h"]])],
+			[DB_CFLAGS="-I$dbpath/include/"],
+			[AC_MSG_FAILURE(
+				Invalid libdb path specified. No db.h found.)])
+	fi
 
         DB_LDFLAGS="-L${dbpath}/lib"
-    LDFLAGS="$DB_LDFLAGS ${LDFLAGS}"
+	LDFLAGS="$DB_LDFLAGS ${LDFLAGS}"
 
-    LIBS="${oldlibs} -ldb -lpthread"
-    DB_LIB="-ldb"
-    CFLAGS="$DB_CFLAGS $oldcflags"
-    AC_TRY_LINK(
-        [#include <db.h>],
-        [DB *dbp; db_create(&dbp, NULL, 0);],
-        lib=db)
-    CFLAGS=$oldcflags
-    
+	LIBS="${oldlibs} -ldb -lpthread"
+	DB_LIB="-ldb"
+	CFLAGS="$DB_CFLAGS $oldcflags"
+	AC_TRY_LINK(
+		[#include <db.h>],
+		[DB *dbp; db_create(&dbp, NULL, 0);],
+		lib=db)
+	CFLAGS=$oldcflags
+	
     else
         dnl Typically a distro's db-devel package (or whatever
         dnl they might call it) includes /usr/include/db.h. 
@@ -126,10 +125,9 @@ AC_DEFUN([AX_BERKELEY_DB],
     if test "x$lib" = "xnotfound" ; then
            AC_MSG_ERROR(could not find DB libraries)
     else
-           dnl AC_MSG_RESULT($lib)
-           AC_MSG_RESULT(yes)
+           AC_MSG_RESULT($lib)
     fi
-    AC_SUBST(DB_CFLAGS)    
+    AC_SUBST(DB_CFLAGS)	
     AC_SUBST(DB_LIB)
     
     dnl See if we have a new enough version of Berkeley DB; needed for
@@ -147,57 +145,8 @@ AC_DEFUN([AX_BERKELEY_DB],
     dnl try: http://www.sleepycat.com/download/index.shtml
     dnl or: /parl/pcarns/rpms/db4-4.0.14-1mdk.src.rpm (to build rpm))
     dnl       )
-    
-    dnl Test to check for DB_ENV variable to error callback fn.  Then
-    dnl test to see if third parameter must be const (related but not 
-    dnl exactly the same).
-    AC_MSG_CHECKING(for dbenv parameter to DB error callback function)
+
     oldcflags=$CFLAGS
-    CFLAGS="$USR_CFLAGS $DB_CFLAGS -Werror"
-    AC_TRY_COMPILE([
-    #include <db.h>
-    
-    void error_callback_fn(const DB_ENV *dbenv,
-                           const char *prefix,
-                           const char *message)
-    {
-        return;
-    }
-    ], [
-    DB *db;
-    
-    db->set_errcall(db, error_callback_fn);
-    ], AC_MSG_RESULT(yes)
-    AC_DEFINE(HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK, 1,
-    Define if DB error callback function takes dbenv parameter)
-    have_dbenv_parameter_to_db_error_callback=yes,
-    AC_MSG_RESULT(no)
-    have_dbenv_parameter_to_db_error_callback=no)
-    
-    if test "x$have_dbenv_parameter_to_db_error_callback" = "xyes" ; then
-        dnl Test if compilation succeeds without const; we expect that it will
-        dnl not.
-        dnl NOTE: still using -Werror!
-        AC_MSG_CHECKING(if third parameter to error callback function is const)
-        AC_TRY_COMPILE([
-        #include <db.h>
-        
-        void error_callback_fn(const DB_ENV *dbenv,
-                               const char *prefix,
-                               char *message)
-        {
-            return;
-        }
-        ], [
-        DB *db;
-        
-        db->set_errcall(db, error_callback_fn);
-        ], AC_MSG_RESULT(no),
-        AC_MSG_RESULT(yes)
-        AC_DEFINE(HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK, 1,
-        Define if third param (message) to DB error callback function is const))
-    fi
-    
     CFLAGS="$USR_CFLAGS $DB_CFLAGS -Werror"    
     dnl Test to check for unknown third param to DB stat (four params 
     dnl total).  The unknown parameter is a function ptr so that the
@@ -223,48 +172,6 @@ AC_DEFUN([AX_BERKELEY_DB],
     AC_MSG_RESULT(no)
     have_db_stat_malloc=no)
 
-    dnl Test to check for txnid parameter to DB stat (DB 4.3.xx+)
-    if test "x$have_db_stat_malloc" = "xno" ; then
-    
-       AC_MSG_CHECKING(for txnid parameter to DB stat function)
-       AC_TRY_COMPILE([
-       #include <db.h>
-       ], [
-       int ret = 0;
-       DB *db = db;
-       DB_TXN *txnid = txnid;
-       u_int32_t flags = 0;
-    
-        ret = db->stat(db, txnid, NULL, flags);
-        ], AC_MSG_RESULT(yes)
-        AC_DEFINE(HAVE_TXNID_PARAMETER_TO_DB_STAT, 1, 
-        Define if DB stat function takes txnid parameter)
-        have_txnid_param_to_stat=yes,
-        AC_MSG_RESULT(no)
-        have_txnid_param_to_stat=no)
-    
-    fi
-    
-    dnl Test to check for txnid parameter to DB open (DB4.1+)
-    AC_MSG_CHECKING(for txnid parameter to DB open function)
-    AC_TRY_COMPILE([
-    #include <db.h>
-    ], [
-    int ret = 0;
-    DB *db = NULL;
-    DB_TXN *txnid = NULL;
-    char *file = NULL;
-    char *database = NULL;
-    DBTYPE type = 0;
-    u_int32_t flags = 0;
-    int mode = 0;
-    
-    ret = db->open(db, txnid, file, database, type, flags, mode);
-    ], AC_MSG_RESULT(yes)
-    AC_DEFINE(HAVE_TXNID_PARAMETER_TO_DB_OPEN, 1,
-    Define if DB open function takes a txnid parameter),
-    AC_MSG_RESULT(no))
-    
     dnl check for DB_DIRTY_READ (it is not in db-3.2.9, for example)
     AC_MSG_CHECKING(for DB_DIRTY_READ flag)
     AC_TRY_COMPILE([
@@ -286,20 +193,6 @@ AC_DEFUN([AX_BERKELEY_DB],
     AC_DEFINE(HAVE_DB_BUFFER_SMALL, 1, [Define if db library has DB_BUFFER_SMALL error]),
     AC_MSG_RESULT(no))
 
-    dnl Test to check for db->get_pagesize
-    AC_MSG_CHECKING(for berkeley db get_pagesize function)
-    AC_TRY_COMPILE([
-    #include <db.h>
-    ], [
-    int ret = 0;
-    DB *db = NULL;
-    int pagesize;
-    
-    ret = db->get_pagesize(db, &pagesize);
-    ], AC_MSG_RESULT(yes)
-    AC_DEFINE(HAVE_DB_GET_PAGESIZE, 1, [Define if DB has get_pagesize function]),
-    AC_MSG_RESULT(no))
-    
     dnl Check BDB version here since it's just a warning
     AC_MSG_CHECKING([Berkeley DB version])
     AC_TRY_COMPILE(

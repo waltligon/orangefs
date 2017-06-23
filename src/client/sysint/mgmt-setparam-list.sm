@@ -26,8 +26,6 @@
 #include "PINT-reqproto-encode.h"
 #include "sid.h"
 
-extern job_context_id pint_client_sm_context;
-
 static int root_check_comp_fn(void *v_p,
                               struct PVFS_server_resp *resp_p,
                               int i);
@@ -321,7 +319,7 @@ static PINT_sm_action mgmt_setparam_list_setup_msgpair(struct PINT_smcb *smcb,
                                         sm_p->getattr.attr.capability,
                                         sm_p->u.setparam_list.fs_id,
                                         sm_p->u.setparam_list.param,
-                                        *sm_p->u.setparam_list.value,
+                                        sm_p->u.setparam_list.value,
                                         sm_p->hints);
 
         msg_p->msgclass = PVFS_IO_METADATA;
@@ -337,8 +335,10 @@ static PINT_sm_action mgmt_setparam_list_setup_msgpair(struct PINT_smcb *smcb,
         {
             case PVFS_SERV_PARAM_ROOT_CHECK:
                 msg_p->comp_fn = root_check_comp_fn;
-                sm_p->u.setparam_list.root_check_status_array =
-                       (int *)malloc(sm_p->u.setparam_list.count * sizeof(int));
+
+                sm_p->u.setparam_list.root_check_status_array = (int *)
+                       malloc(sm_p->u.setparam_list.count * sizeof(int));
+
                 memset(sm_p->u.setparam_list.root_check_status_array,
                        -1,
                        (sm_p->u.setparam_list.count * sizeof(int)));
@@ -373,7 +373,12 @@ static PINT_sm_action mgmt_setparam_list_cleanup(struct PINT_smcb *smcb,
         for(i = 0; i < sm_p->u.setparam_list.count; i++)
         {
             int status;
-            if (sm_p->u.setparam_list.param == PVFS_SERV_PARAM_ROOT_CHECK)
+
+            /* Skip if failure occurs before allocating memory for the root
+             * check status array, usually after calling a get_attr.
+             */
+            if (sm_p->u.setparam_list.param == PVFS_SERV_PARAM_ROOT_CHECK &&
+                sm_p->u.setparam_list.root_check_status_array != NULL)
             {
                 status = sm_p->u.setparam_list.root_check_status_array[i];
             }

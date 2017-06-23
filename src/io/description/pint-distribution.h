@@ -152,7 +152,7 @@ do { PINT_dist tmp_dist; \
 
 static inline int decode_PINT_dist(char **pptr, PINT_dist **x) 
 {
-    PINT_dist tmp_dist; 
+    PINT_dist tmp_dist = {0}; 
     decode_string(pptr, &tmp_dist.dist_name); 
     if (tmp_dist.dist_name[0] == 0)
     {

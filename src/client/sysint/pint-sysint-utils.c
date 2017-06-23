@@ -90,13 +90,14 @@ void PINT_put_server_config_struct(struct server_configuration_s *config)
 int PINT_lookup_parent(char *filename,
                        PVFS_fs_id fs_id,
                        PVFS_credential *credential,
-                       PVFS_handle *handle)
+                       PVFS_object_ref *parent_ref)
 {
     int ret = -PVFS_EINVAL;
     char buf[PVFS_SEGMENT_MAX] = {0};
     PVFS_sysresp_lookup resp_look;
 
     memset(&resp_look, 0, sizeof(PVFS_sysresp_lookup));
+    memset(parent_ref, 0, sizeof(PVFS_object_ref));
 
     if (PINT_get_base_dir(filename, buf, PVFS_SEGMENT_MAX))
     {
@@ -105,7 +106,7 @@ int PINT_lookup_parent(char *filename,
             gossip_err("Invalid dirname (no leading '/')\n");
         }
         gossip_err("cannot get parent directory of %s\n", filename);
-        *handle = PVFS_HANDLE_NULL;
+        memset(parent_ref, 0, sizeof(*parent_ref));
         return ret;
     }
 
@@ -117,11 +118,11 @@ int PINT_lookup_parent(char *filename,
     if (ret < 0)
     {
         gossip_err("Lookup failed on %s\n", buf);
-        *handle = PVFS_HANDLE_NULL;
+        memset(parent_ref, 0, sizeof(*parent_ref));
         return ret;
     }
 
-    *handle = resp_look.ref.handle;
+    PVFS_object_ref_copy(parent_ref, &resp_look.ref);
     return 0;
 }
 
@@ -363,6 +364,42 @@ int PINT_client_security_finalize(void)
 
 #endif /* HAVE_OPENSSL */
    
+/* client only routine to start a timer for perf counters */
+int client_perf_start_rollover(struct PINT_perf_counter *pc,
+                               struct PINT_perf_counter *tpc)
+{
+    int ret = 0;
+    PINT_smcb *tmpsmcb = NULL;
+    PINT_client_sm *tmptimer_sm_p = NULL;
+    
+
+    PINT_smcb_alloc(&tmpsmcb,
+                    PVFS_CLIENT_PERF_COUNT_TIMER,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
+                 /* s_client_dev_context); */
+    if (!tmpsmcb)
+    {
+        /* finalize_perf_items(0); */
+        return(-PVFS_ENOMEM);
+    }
+
+    tmptimer_sm_p = PINT_sm_frame(tmpsmcb, PINT_FRAME_CURRENT);
+    tmptimer_sm_p->u.perf_count_timer.pc = pc;
+    tmptimer_sm_p->u.perf_count_timer.tpc = tpc;
+    pc->running = 1;
+
+    ret = PINT_client_state_machine_post(tmpsmcb, NULL, NULL);
+    if (ret < 0)
+    {
+        gossip_lerr("Error posting acache timer.\n");
+        /* finalize_perf_items(1, tmpsmcb); */
+        return(ret);
+    }
+    return 0;
+}
 
 /*
  * Local variables:

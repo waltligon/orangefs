@@ -26,7 +26,6 @@
 #include "sid.h"
 #include "dist-dir-utils.h"
 
-extern job_context_id pint_client_sm_context;
 
 static int mgmt_create_dirent_comp_fn(void *v_p,
                                       struct PVFS_server_resp *resp_p,

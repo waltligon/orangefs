@@ -30,7 +30,7 @@ typedef struct
      KERNEL_MASK,
      CLIENT_MASK,
   } mask_type;
-  uint64_t mask_value;
+  PVFS_debug_mask mask_value;
 } dev_mask_info_t;
 
 enum pvfs_bufmap_type {

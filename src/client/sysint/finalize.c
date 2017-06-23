@@ -28,8 +28,6 @@
 #include "pint-event.h"
 #include "sid.h"
 
-extern job_context_id pint_client_sm_context;
-
 extern PINT_smcb *g_smcb;
 
 #ifdef WIN32

@@ -148,7 +148,7 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
     {
         return ret;
     }
-    if (temp_cacheval->bmi_addr == 0);
+    if (temp_cacheval->bmi_addr == 0)
     {
         /* enter url into BMI to get BMI addr */
         ret = BMI_addr_lookup(&temp_cacheval->bmi_addr, temp_cacheval->url);
@@ -515,7 +515,7 @@ int PVFS_OBJ_gen_file(PVFS_fs_id fs_id,
     *sid_array = (PVFS_SID *)malloc(n * sizeof(PVFS_SID));
     PVFS_SID_get_server_first_n(NULL, *sid_array, &n, meta_server);
 
-    /* generate dirdata handles */
+    /* generate datafile handles */
     *datafile_handles = (PVFS_OID *)malloc(datafile_count * sizeof(PVFS_OID));
     for (i = 0; i < datafile_count; i++)
     {
@@ -569,7 +569,7 @@ int PVFS_OBJ_gen_dir(PVFS_fs_id fs_id,
     }
 
     /* generate SIDs for dirdata objects */
-    n = dirdata_sid_count;
+    n = dirdata_sid_count * dirdata_count;
     *dirdata_sid_array = (PVFS_SID *)malloc(n * sizeof(PVFS_SID));
     PVFS_SID_get_server_next_n(NULL, *dirdata_sid_array, &n, dird_server);
     return ret;

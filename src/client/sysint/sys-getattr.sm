@@ -44,8 +44,6 @@
  * we grab these sizes.
  */
 
-extern job_context_id pint_client_sm_context;
-
 enum
 {
     GETATTR_CACHE_MISS = 1,
@@ -126,6 +124,7 @@ nested machine pvfs2_client_getattr_sm
     state acache_lookup
     {
         run getattr_acache_lookup;
+        GETATTR_CACHE_MISS => object_getattr_setup_msgpair;
         default => client_capcache_lookup;
     }
 
@@ -2016,6 +2015,15 @@ static PINT_sm_action getattr_client_capcache_insert(struct PINT_smcb *smcb,
 
     /* get local uid for indexing */
     local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
+
+    if (local_uid == (PVFS_uid) -1)
+    {
+        local_uid = PINT_util_getuid();
+
+        PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
+                      sizeof(PVFS_uid), &local_uid);
+    }
+
     if (local_uid != (PVFS_uid) -1)
     {
         ret = PINT_client_capcache_update(sm_p->getattr.object_ref, 
@@ -2023,11 +2031,6 @@ static PINT_sm_action getattr_client_capcache_insert(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: "
                      "PINT_client_capcache_update returned %d\n",
                      __func__, ret);
-    }
-    else
-    {
-        gossip_err("%s: could not get local uid for client capcache\n",
-                   __func__);
     }
 
     return SM_ACTION_COMPLETE;
@@ -2064,7 +2067,10 @@ static PINT_sm_action getattr_cleanup(struct PINT_smcb *smcb,
     }
 
     /* cleanup getattr when an error occurs */
-    PINT_free_object_attr(&getattr->attr);
+    if (js_p->error_code)
+    {
+        PINT_free_object_attr(&getattr->attr);
+    }
 
     return SM_ACTION_COMPLETE;
 }

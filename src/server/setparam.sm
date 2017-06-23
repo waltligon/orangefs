@@ -58,8 +58,7 @@ machine pvfs2_setparam_sm
  *
  * actually does the "work" involved in setting a runtime server parameter
  */
-static PINT_sm_action setparam_work(struct PINT_smcb *smcb,
-                                    job_status_s *js_p)
+static PINT_sm_action setparam_work(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1, tmp_on = 0;
@@ -70,23 +69,53 @@ static PINT_sm_action setparam_work(struct PINT_smcb *smcb,
     struct filesystem_configuration_s *fs_conf;
     char buf[16] = {0};
 
+    js_p->error_code = 0;
+
     switch(s_op->req->u.mgmt_setparam.param)
     {
+        case PVFS_SERV_PARAM_TURN_OFF_TIMEOUTS:
+        {
+             user_opts = get_server_config_struct();
+             char *value = s_op->req->u.mgmt_setparam.value.u.string_value;
+             gossip_err("%s: current server value(%d) requested value(%s)\n"
+                       ,__func__,user_opts->bypass_timeout_check
+                       ,value);
+             if ( !strcasecmp(value,"yes") )
+             {
+                user_opts->bypass_timeout_check = 1;
+             }
+             else if ( !strcasecmp(value,"no") )
+             {
+                user_opts->bypass_timeout_check = 0;
+             }
+             else
+             {
+                js_p->error_code = -PVFS_EINVAL;
+             }
+
+             gossip_err("%s: Modified bypass_timeout_check(%d)\n"
+                       ,__func__,user_opts->bypass_timeout_check);
+
+             return SM_ACTION_COMPLETE;
+        }
+
         case PVFS_SERV_PARAM_GOSSIP_MASK:
             gossip_get_debug_mask(&tmp_on, &tmp_mask);
-            gossip_set_debug_mask(1, 
-                       s_op->req->u.mgmt_setparam.value.u.mask_value);
+            gossip_set_debug_mask(1, s_op->req->u.mgmt_setparam.value.u.mask_value);
             js_p->error_code = 0;
             return SM_ACTION_COMPLETE;
+
         case PVFS_SERV_PARAM_INVALID:
             gossip_lerr("Error: mgmt_setparam for unknown parameter %d.\n",
                         (int)s_op->req->u.mgmt_setparam.param);
             js_p->error_code = -PVFS_ENOSYS;
             return SM_ACTION_COMPLETE;
+
         case PVFS_SERV_PARAM_FSID_CHECK:
             js_p->error_code = check_fs_id(
-                         (PVFS_fs_id)s_op->req->u.mgmt_setparam.value.u.value);
+                       (PVFS_fs_id)s_op->req->u.mgmt_setparam.value.u.value);
             return SM_ACTION_COMPLETE;
+
         case PVFS_SERV_PARAM_ROOT_CHECK:
             tmp_handle = s_op->req->u.mgmt_setparam.value.u.handle_value;
             gossip_debug(GOSSIP_SERVER_DEBUG,
@@ -96,7 +125,7 @@ static PINT_sm_action setparam_work(struct PINT_smcb *smcb,
                          s_op->req->u.mgmt_setparam.fs_id);
             ret = job_trove_dspace_verify(s_op->req->u.mgmt_setparam.fs_id,
                                           tmp_handle,
-                                          0, 
+                                          0,
                                           smcb,
                                           0,
                                           js_p,
@@ -104,15 +133,72 @@ static PINT_sm_action setparam_work(struct PINT_smcb *smcb,
                                           server_job_context,
                                           s_op->req->hints);
             return(ret);
+
+        case PVFS_SERV_PARAM_PERF_HISTORY:
+        {
+            ret = 0;
+            int val = 0;
+            if (s_op->req->u.mgmt_setparam.value.type ==
+                PVFS_MGMT_PARAM_TYPE_STRING)
+            {
+                val = atoi(s_op->req->u.mgmt_setparam.value.u.string_value);
+            }
+            else
+            {
+                val = s_op->req->u.mgmt_setparam.value.u.value;
+            }
+            if (val > 0)
+            {
+                ret = PINT_perf_set_info(PINT_server_pc,
+                                         PINT_PERF_UPDATE_HISTORY,
+                                         val);
+                js_p->error_code = ret;
+                ret = PINT_perf_set_info(PINT_server_tpc,
+                                         PINT_PERF_UPDATE_HISTORY,
+                                         val);
+                js_p->error_code = ret;
+            }
+            return SM_ACTION_COMPLETE;
+        }
+
+        case PVFS_SERV_PARAM_PERF_INTERVAL:
+        {
+            ret = 0;
+            int val = 0;
+            if (s_op->req->u.mgmt_setparam.value.type ==
+                PVFS_MGMT_PARAM_TYPE_STRING)
+            {
+                val = atoi(s_op->req->u.mgmt_setparam.value.u.string_value);
+            }
+            else
+            {
+                val = s_op->req->u.mgmt_setparam.value.u.value;
+            }
+            if (val > 0)
+            {
+                ret = PINT_perf_set_info(PINT_server_pc,
+                                         PINT_PERF_UPDATE_INTERVAL,
+                                         val);
+                js_p->error_code = ret;
+                ret = PINT_perf_set_info(PINT_server_tpc,
+                                         PINT_PERF_UPDATE_INTERVAL,
+                                         val);
+                js_p->error_code = ret;
+            }
+            return SM_ACTION_COMPLETE;
+        }
+
         case PVFS_SERV_PARAM_EVENT_ENABLE:
             ret = 0;
             PINT_event_enable(s_op->req->u.mgmt_setparam.value.u.string_value);
             js_p->error_code = ret;
             return SM_ACTION_COMPLETE;
+
         case PVFS_SERV_PARAM_EVENT_DISABLE:
             PINT_event_disable(s_op->req->u.mgmt_setparam.value.u.string_value);
             js_p->error_code = 0;
             return SM_ACTION_COMPLETE;
+
         case PVFS_SERV_PARAM_SYNC_META:
             user_opts = get_server_config_struct();
             fs_conf = PINT_config_find_fs_id(user_opts, 
@@ -126,6 +212,7 @@ static PINT_sm_action setparam_work(struct PINT_smcb *smcb,
             }
             js_p->error_code = 0;
             return SM_ACTION_COMPLETE;
+
         case PVFS_SERV_PARAM_SYNC_DATA:
             user_opts = get_server_config_struct();
             fs_conf = PINT_config_find_fs_id(user_opts, 
@@ -155,6 +242,7 @@ static PINT_sm_action setparam_work(struct PINT_smcb *smcb,
             }
             js_p->error_code = 0;
             return SM_ACTION_COMPLETE;
+
         case PVFS_SERV_PARAM_MODE:
 
             ret = job_req_sched_change_mode(
@@ -167,6 +255,7 @@ static PINT_sm_action setparam_work(struct PINT_smcb *smcb,
 
             js_p->error_code = 0;
             return ret;
+
         case PVFS_SERV_PARAM_DROP_CACHES:
             js_p->error_code = drop_caches();
             return SM_ACTION_COMPLETE;
@@ -200,45 +289,38 @@ static PINT_sm_action setparam_cleanup(
  */
 static int check_fs_id(PVFS_fs_id fs_id)
 {
-    int ret = -PVFS_ENOENT, count = 1;
-    TROVE_ds_position pos = TROVE_ITERATE_START;
-    TROVE_keyval_s name;
-    TROVE_coll_id tmp_coll;
+    int ret, count = 1;
+    TROVE_keyval_s name[32];
+    TROVE_coll_id tmp_coll[32];
     TROVE_op_id tmp_id;
     struct server_configuration_s * server_config;
+    int i;
 
-    name.buffer = malloc(PVFS_NAME_MAX);
-    if (!name.buffer)
-    {
-        ret = -PVFS_ENOMEM;
-        goto check_failed;
+    for (i = 0; i < 32; i++) {
+        name[i].buffer = malloc(PVFS_NAME_MAX);
+        if (!name[i].buffer)
+        {
+            ret = -PVFS_ENOMEM;
+            goto check_failed;
+        }
+        name[i].buffer_sz = PVFS_NAME_MAX;
     }
-    name.buffer_sz = PVFS_NAME_MAX;
 
     server_config = get_server_config_struct();
 
-    while(count == 1)
+    ret = trove_collection_iterate(server_config->trove_method, name, tmp_coll,
+        &count, 0, 0, NULL, &tmp_id);
+    if (ret < 0)
     {
-        ret = trove_collection_iterate(
-            server_config->trove_method,
-            &pos, &name, &tmp_coll, &count, 0, 0, NULL, &tmp_id);
+        goto free_name_buffer;
+    }
 
-        if (ret == 0)
-        {
-            gossip_lerr("Error: unexpected trove behavior.\n");
-            ret = -PVFS_EINVAL;
-            goto free_name_buffer;
-        }
-        
-        if (ret < 0)
-        {
-            goto free_name_buffer;
-        }
-
+    ret = -PVFS_ENOENT;
+    for (i = 0; i < count; i++)
+    {
         gossip_debug(GOSSIP_SERVER_DEBUG, "looking for fs_id: %d, "
-                     "found %d.\n", (int)fs_id, (int)tmp_coll);
-
-        if ((count > 0) && (tmp_coll == fs_id))
+                     "found %d.\n", (int)fs_id, (int)tmp_coll[i]);
+        if (tmp_coll[i] == fs_id)
         {
             /* we found a matching collection */
             ret = 0;
@@ -247,9 +329,11 @@ static int check_fs_id(PVFS_fs_id fs_id)
     }
 
 free_name_buffer:
-    free(name.buffer);
+    for (i = 0; i < 32; i++)
+    {
+        free(name[i].buffer);
+    }
 check_failed:
-
     return ret;
 }
 

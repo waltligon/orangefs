@@ -31,11 +31,16 @@
 #ifdef WIN32
 #include <io.h>
 
+/* a downsize call approximation */
+#define WIN32_DOWNCALL_SIZE    8200
+
 /* define our own iovec */
 struct iovec {
     void   *iov_base;
     size_t iov_len;
 };
+
+
 #endif
 
 #include "pvfs2-internal.h"
@@ -48,7 +53,7 @@ struct iovec {
 #include "pvfs2-dev-proto.h"
 #endif
 
-#ifdef WITH_LINUX_KMOD
+#ifdef __linux__
 static int setup_dev_entry(
     const char *dev_name);
 
@@ -56,16 +61,15 @@ static int parse_devices(
     const char *targetfile,
     const char *devname, 
     int *majornum);
-#endif  /* WITH_LINUX_KMOD */
+#endif  /* __linux__ */
 
 
 static int pdev_fd = -1;
 static int32_t pdev_magic;
-#ifdef WITH_LINUX_KMOD
+#ifdef __linux__
 static int32_t pdev_max_upsize;
-
-#endif  /* WITH_LINUX_KMOD */
 static int32_t pdev_max_downsize;
+#endif  /* __linux__ */
 
 int32_t pvfs2_bufmap_total_size, pvfs2_bufmap_desc_size;
 int32_t pvfs2_bufmap_desc_count, pvfs2_bufmap_desc_shift;
@@ -80,10 +84,10 @@ int PINT_dev_initialize(
     const char *dev_name,
     int flags)
 {
-#ifdef WITH_LINUX_KMOD
+#ifdef __linux__
     int ret = -1;
     char *debug_string = getenv("PVFS2_KMODMASK");
-    uint64_t debug_mask = 0;
+    PVFS_debug_mask debug_mask = GOSSIP_NO_DEBUG;
     dev_mask_info_t mask_info;
     dev_mask2_info_t mask2_info;
     int upstream_kmod = 0;
@@ -161,8 +165,8 @@ int PINT_dev_initialize(
     if (ret < 0)
     {
         gossip_err("Error: ioctl() PVFS_DEV_DEBUG failure (kernel debug mask to"
-                   " %x)\n"
-                  ,(unsigned int)debug_mask);
+                   " %llx %llx)\n",
+                   llu(debug_mask.mask1), llu(debug_mask.mask2));
         close(pdev_fd);
         return -(PVFS_ENODEV|PVFS_ERROR_DEV);
     }
@@ -185,7 +189,7 @@ int PINT_dev_initialize(
         gossip_err("%s: ioctl() PVFS_DEV_DEBUG failure.\n", __func__);
     } else {
       mask2_info.mask1_value = 0;
-      mask2_info.mask2_value = gossip_debug_mask;
+      mask2_info.mask2_value = gossip_debug_mask.mask2;
       ret = ioctl(pdev_fd, PVFS_DEV_CLIENT_MASK, &mask2_info);
       if (ret < 0) {
         gossip_err("%s: ioctl() PVFS_DEV_CLIENT_MASK failure.\n", __func__);
@@ -206,10 +210,10 @@ int PINT_dev_initialize(
       for (i = 0; i < num_keyword_mask_map; i++) {
         bytes = snprintf(client_debug_array_string + offset,
                          PVFS2_MAX_DEBUG_ARRAY_LEN - offset,
-                         "%s 0 %llx\n",
+                         "%s 0 %llux%llux\n",
                          s_keyword_mask_map[i].keyword,
-                         (unsigned long long)s_keyword_mask_map[i].
-                         mask_val);
+                         llu(s_keyword_mask_map[i].mask.mask1),
+                         llu(s_keyword_mask_map[i].mask.mask2));
         if ((bytes + offset) < PVFS2_MAX_DEBUG_ARRAY_LEN) {
           offset = strlen(client_debug_array_string);
         } else {
@@ -229,12 +233,12 @@ out:
     if (ret < 0)
     {
         gossip_err("Error: ioctl() PVFS_DEV_DEBUG failure (client debug mask to"
-                   " %x)\n"
-                  ,(unsigned int)gossip_debug_mask);
+                   " %llx %llx)\n",
+                   llu(gossip_debug_mask.mask1), llu(gossip_debug_mask.mask2));
         close(pdev_fd);
         return -(PVFS_ENODEV|PVFS_ERROR_DEV);
     }
-#endif  /* WITH_LINUX_KMOD */
+#endif  /* __linux__ */
     return 0;
 }
 
@@ -267,13 +271,13 @@ void PINT_dev_finalize(void)
 int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
                                 struct PINT_dev_params *params)
 {
-#ifdef WITH_LINUX_KMOD
+#ifdef __linux__
     int i, ret = -1;
     uint64_t page_size = sysconf(_SC_PAGE_SIZE), total_size;
     void *ptr = NULL;
     int ioctl_cmd[2] = {PVFS_DEV_MAP, 0};
     int debug_on = 0;
-    uint64_t debug_mask = 0;
+    PVFS_debug_mask debug_mask = GOSSIP_NO_DEBUG;
 
     for (i = 0; i < ndesc; i++)
     {
@@ -355,7 +359,7 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
         }
         return -(PVFS_ENOMEM|PVFS_ERROR_DEV);
     }
-#endif  /* WITH_LINUX_KMOD */
+#endif  /* __linux__ */
     return 0;
 }
 
@@ -437,7 +441,7 @@ int PINT_dev_test_unexpected(
         int max_idle_time)
 {
     int ret = -1;
-#ifdef WITH_LINUX_KMOD
+#ifdef __linux__
     int avail = -1, i = 0;
     struct pollfd pfd;
     int32_t *magic = NULL;
@@ -650,7 +654,7 @@ dev_test_unexp_error:
     }
 
     *outcount = 0;
-#endif  /* WITH_LINUX_KMOD */
+#endif  /* __linux__ */
     return ret;
 }
 
@@ -694,20 +698,25 @@ int PINT_dev_write_list(
     enum PINT_dev_buffer_type buffer_type,
     PVFS_id_gen_t tag)
 {
-    struct iovec io_array[10];
+    struct iovec io_array[5];
     int io_count = 3;
     int i;
     int ret = -1;
     int32_t proto_ver = PVFS_KERNEL_PROTO_VERSION;
-#ifdef WIN32
+    int bytes_to_write = 0;
+#ifndef WIN32
+    int sizeof_downcall = sizeof(pvfs2_downcall_t);
+#else
     char *buffer, *b;
     size_t bsize = 0;
+    int sizeof_downcall = WIN32_DOWNCALL_SIZE;
 #endif
     
-    /* lets be reasonable about list size :) */
-    /* two vecs are taken up by magic nr and tag */
-    if (list_count > 7)
+    
+    /* There will be a downcall iovec, and maybe a trailer iovec. */
+    if (list_count > 2)
     {
+        gossip_err("%s: list_count:%d:\n", __func__, list_count);
         return (-(PVFS_EINVAL|PVFS_ERROR_DEV));
     }
 
@@ -720,22 +729,30 @@ int PINT_dev_write_list(
         return (-(PVFS_EINVAL|PVFS_ERROR_DEV));
     }
 
-    if (size_list[0] > pdev_max_downsize)
+    if (size_list[0] != sizeof_downcall)
     {
+        gossip_err("%s: downcall iovec size should be :%d: was :%d:\n",
+                   __func__,
+                   sizeof_downcall,
+                   size_list[0]);
         return(-(PVFS_EMSGSIZE|PVFS_ERROR_DEV));
     }
 
     io_array[0].iov_base = &proto_ver;
     io_array[0].iov_len = sizeof(int32_t);
+    bytes_to_write += io_array[0].iov_len;
     io_array[1].iov_base = &pdev_magic;
     io_array[1].iov_len = sizeof(int32_t);
+    bytes_to_write += io_array[1].iov_len;
     io_array[2].iov_base = &tag;
     io_array[2].iov_len = sizeof(uint64_t);
+    bytes_to_write += io_array[2].iov_len;
 
     for (i=0; i<list_count; i++)
     {
         io_array[i+3].iov_base = buffer_list[i];
         io_array[i+3].iov_len = size_list[i];
+        bytes_to_write += io_array[i + 3].iov_len;
         io_count++;
     }
 
@@ -768,7 +785,16 @@ int PINT_dev_write_list(
 #else
     ret = writev(pdev_fd, io_array, io_count);
 #endif
-    return ((ret < 0) ? -(PVFS_EIO|PVFS_ERROR_DEV) : 0);
+
+    if (ret == bytes_to_write) {
+      return(0);
+    } else {
+      gossip_err("%s: tried to write :%d: bytes, writev returned :%d:\n",
+                 __func__,
+                 bytes_to_write,
+                 ret);
+      return(-(PVFS_EIO|PVFS_ERROR_DEV));   
+    }
 }
 
 /* PINT_dev_remount()
@@ -782,7 +808,7 @@ int PINT_dev_remount(void)
 {
     int ret = -PVFS_EINVAL;
 
-#ifdef WITH_LINUX_KMOD
+#ifdef __linux__
     if (pdev_fd > -1)
     {
         ret = ((ioctl(pdev_fd, PVFS_DEV_REMOUNT_ALL, NULL) < 0) ?
@@ -792,7 +818,7 @@ int PINT_dev_remount(void)
             gossip_err("Error: ioctl PVFS_DEV_REMOUNT_ALL failure\n");
         }
     }
-#endif  /* WITH_LINUX_KMOD */
+#endif  /* __linux__ */
     return ret;
 }
 
@@ -834,7 +860,7 @@ void PINT_dev_memfree(void *buffer, int size)
     free(buffer);
 }
 
-#ifdef WITH_LINUX_KMOD
+#ifdef __linux__
 /* setup_dev_entry()
  *
  * sets up the device file
@@ -962,7 +988,7 @@ static int parse_devices(
     fclose(devfile);
     return 0;
 }
-#endif  /* WITH_LINUX_KMOD */
+#endif  /* __linux__ */
 
 /*
  * Local variables:

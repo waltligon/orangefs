@@ -26,8 +26,6 @@
 #include "sid.h"
 #include "dist-dir-utils.h"
 
-extern job_context_id pint_client_sm_context;
-
 enum
 {
     SYMLINK_RETRY = 170
@@ -392,7 +390,6 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
                                                 job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -PVFS_EINVAL;
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -434,7 +431,7 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
         msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = symlink_create_comp_fn;
 
-        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+        PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
         /* V3 how to process error in this loop?  Just bail? */
     }
 

@@ -19,27 +19,33 @@
         dist_dir_attr.server_no, dist_dir_attr.branch_level); } while (0)
 
 #define PINT_debug_dist_dir_bitmap(debugmask,dist_dir_attr,dist_dir_bitmap) \
-    do { int i; \
-         unsigned char *c = NULL; \
-        gossip_debug(debugmask, "dist_dir_bitmap:\n"); \
-        for(i = dist_dir_attr.bitmap_size - 1; i >= 0 ; i--) \
-        { \
-            c = (unsigned char *)(dist_dir_bitmap + i); \
-            gossip_debug(debugmask, \
-                    " i=%d : %02x %02x %02x %02x\n", \
-                    i, c[3], c[2], c[1], c[0]); \
-        } \
+    do { if (gossip_debug_enabled(debugmask)) \
+           { \
+             int i; \
+             unsigned char *c = NULL; \
+            gossip_debug(debugmask, "distributed directory bitmap:\n"); \
+            for(i = dist_dir_attr.bitmap_size - 1; i >= 0 ; i--) \
+            { \
+                c = (unsigned char *)(dist_dir_bitmap + i); \
+                gossip_debug(debugmask, \
+                        " i=%d : %02x %02x %02x %02x\n", \
+                          i, c[3], c[2], c[1], c[0]); \
+            } \
+           } \
     } while (0)
 
 #define PINT_debug_dist_dir_handles(debugmask,dist_dir_attr, dist_dir_handles) \
-    do { int i; \
-        gossip_debug(debugmask, "dist_dir_handles:\n"); \
-        for(i = 0; i < dist_dir_attr.dirdata_count ; i++) \
-        { \
-            gossip_debug(debugmask, \
-                    "\t\tdirdata server %d: %llu.\n", \
-                    i, llu(dist_dir_handles[i])); \
-        } \
+    do { if (gossip_debug_enabled(debugmask)) \
+           { \
+             int i; \
+             gossip_debug(debugmask, "distributed directory handles:\n"); \
+             for(i = 0; i < dist_dir_attr.dirdata_count ; i++) \
+             { \
+                 gossip_debug(debugmask, \
+                         "\t\tdirdata server %d: %s\n", \
+                         i, PVFS_OID_str(&dist_dir_handles[i])); \
+             } \
+           } \
     } while (0)
 
 #define PINT_debug_dist_dir(debugmask,dist_dir_attr,dist_dir_bitmap,dist_dir_handles) \

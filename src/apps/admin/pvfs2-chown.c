@@ -133,7 +133,7 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile)
              PVFS_perror("PVFS_sys_lookup", ret);
              return -1;
          }
-         parent_ref = resp_lookup.ref;
+         PVFS_object_ref_copy(&parent_ref, &resp_lookup.ref);
     }
     else
     {
@@ -152,15 +152,11 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile)
         ret = PINT_lookup_parent(pvfs_path,
                                  cur_fs,
                                  &credentials, 
-                                 &parent_ref.handle);
+                                 &parent_ref);
         if(ret < 0)
         {
             PVFS_perror("PINT_lookup_parent", ret);
             return -1;
-        }
-        else
-        {
-            parent_ref.fs_id = cur_fs;
         }
     }
     memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));

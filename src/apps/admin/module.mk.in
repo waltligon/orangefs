@@ -1,11 +1,13 @@
 DIR := src/apps/admin
 
 ADMINSRC := \
-	$(DIR)/pvfs2-check-config.c \
 	$(DIR)/pvfs2-set-debugmask.c \
 	$(DIR)/pvfs2-set-mode.c \
+	$(DIR)/pvfs2-set-perf-history.c \
+	$(DIR)/pvfs2-set-perf-interval.c \
 	$(DIR)/pvfs2-set-eventmask.c \
 	$(DIR)/pvfs2-set-sync.c \
+	$(DIR)/pvfs2-set-turn-off-timeouts.c \
 	$(DIR)/pvfs2-ls.c \
 	$(DIR)/pvfs2-ping.c \
 	$(DIR)/pvfs2-stat.c \
@@ -39,7 +41,7 @@ endif
 
 ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \
-	$(DIR)/pvfs2-change-fsid.c \
 	$(DIR)/pvfs2-showcoll.c
 
+#	$(DIR)/pvfs2-change-fsid.c \
 #	$(DIR)/pvfs2-migrate-collection.c \ 

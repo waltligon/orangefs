@@ -49,7 +49,7 @@
             (PVFS_ATTR_COMMON_ALL  | PVFS_ATTR_FASTEST | \
              PVFS_ATTR_CAPABILITY  | PVFS_ATTR_META_ALL | \
              PVFS_ATTR_DIR_ALL     | PVFS_ATTR_DATA_ALL | \
-             PVFS_ATTR_SYMLINK_ALL | PVFS_DIRDATA_ALL)
+             PVFS_ATTR_SYMLNK_ALL  | PVFS_ATTR_DIRDATA_ALL)
 
 #define PVFS_ATTR_READ_FASTEST \
             (PVFS_ATTR_COMMON_ALL  | PVFS_ATTR_FASTEST) \
@@ -58,7 +58,7 @@
             (PVFS_ATTR_COMMON_ALL  | PVFS_ATTR_LATEST | \
              PVFS_ATTR_CAPABILITY  | PVFS_ATTR_META_ALL | \
              PVFS_ATTR_DIR_ALL     | PVFS_ATTR_DATA_ALL | \
-             PVFS_ATTR_SYMLINK_ALL | PVFS_DIRDATA_ALL)
+             PVFS_ATTR_SYMLNK_ALL  | PVFS_ATTR_DIRDATA_ALL)
 
 #define PVFS_ATTR_FASTEST            (1 << 15)
 #define PVFS_ATTR_LATEST             (1 << 16)
@@ -241,7 +241,7 @@ static inline void decode_PVFS_metafile_attr(char **pptr,
     int dfiles_i, sid_i, ret; 
 
     ret = decode_PINT_dist(pptr, &(x)->dist); 
-    if (ret)
+    if (!ret)
     {
         (x)->dist_size = PINT_DIST_PACK_SIZE((x)->dist); 
     }
@@ -413,11 +413,11 @@ static inline void decode_PVFS_directory_attr(char **pptr,
     }                                                                         
 }
 
-#define defree_PVFS_directory_attr(x)   \
-do {                                    \
-    decode_free(&(x)->hint);            \
-    decode_free(&(x)->dist_dir_bitmap); \
-    decode_free(&(x)->dirdata_handles); \
+#define defree_PVFS_directory_attr(x)       \
+do {                                        \
+    defree_PVFS_directory_hint(&(x)->hint); \
+    decode_free(&(x)->dist_dir_bitmap);     \
+    decode_free(&(x)->dirdata_handles);     \
 } while(0)
 
 #endif

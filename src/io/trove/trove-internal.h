@@ -364,6 +364,8 @@ struct TROVE_dspace_ops
                               TROVE_context_id context_id);
 };
 
+struct server_configuration_s;
+
 struct TROVE_mgmt_ops
 {
     int (*initialize)(char *data_path,
@@ -401,8 +403,7 @@ struct TROVE_mgmt_ops
 
     int (*collection_clear)(TROVE_coll_id coll_id);
 
-    int (*collection_iterate)(TROVE_ds_position *inout_position_p,
-			      TROVE_keyval_s *name_array,
+    int (*collection_iterate)(TROVE_keyval_s *name_array,
 			      TROVE_coll_id *coll_id_array,
 			      int *inout_count_p,
 			      TROVE_ds_flags flags,
@@ -444,6 +445,11 @@ struct TROVE_mgmt_ops
 			       void *user_ptr,
 			       TROVE_context_id context_id,
 			       TROVE_op_id *out_op_id_p);
+
+    int (*collection_set_fs_config)(
+            TROVE_method_id method_id,
+            TROVE_coll_id coll_id,
+            struct server_configuration_s *cfg);
 };
 
 struct TROVE_context_ops

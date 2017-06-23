@@ -410,7 +410,11 @@ int SID_cacheval_alloc(SID_cacheval_t **cacheval,
     SID_cacheval_init(cacheval);
     
     /* Setting the values of the SID_cacheval_t struct */    
-    memcpy((*cacheval)->attr, sid_attributes, (sizeof(int) * SID_NUM_ATTR));
+    if (sid_attributes)
+    {
+        /* attributes may or may not be provided */
+        memcpy((*cacheval)->attr, sid_attributes, (sizeof(int) * SID_NUM_ATTR));
+    }
     memcpy(&((*cacheval)->bmi_addr), &sid_bmi, sizeof(BMI_addr));
     strncpy((*cacheval)->url, sid_url, (strlen(sid_url) + 1));
 
@@ -603,7 +607,7 @@ static int SID_type_load(FILE *inpfile, const PVFS_SID *sid)
     char linebuff[TYPELINELEN];
     char *lineptr = linebuff;
     char *saveptr = linebuff;
-    char *typeword;
+    char *typeword = NULL;
     PVFS_SID sid_buf;
     struct SID_type_s type_buf;
 

@@ -50,7 +50,7 @@ int main(int argc, char **argv)
     PVFS_credential creds;
     struct PVFS_mgmt_server_stat *stat_array = NULL;
     int outcount;
-    int server_type;
+    //int server_type;
     char scratch_size[SCRATCH_LEN] = {0};
     char scratch_total[SCRATCH_LEN] = {0};
 
@@ -162,12 +162,12 @@ int main(int argc, char **argv)
         if (j == 0)
         {
             printf("\nmeta server statistics:\n");
-            server_type = PVFS_MGMT_META_SERVER;
+            //server_type = PVFS_MGMT_META_SERVER;
         }
         else
         {
             printf("\nI/O server statistics:\n");
-            server_type = PVFS_MGMT_IO_SERVER;
+            //server_type = PVFS_MGMT_IO_SERVER;
         }
 
         printf("---------------------------------------\n\n");
