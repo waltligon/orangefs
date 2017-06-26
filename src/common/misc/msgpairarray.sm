@@ -713,7 +713,11 @@ cleanup:
                                                             &server_type);
                 if(!server_string)
                 {
-                    server_string = "[UNKNOWN]";
+                    server_string = BMI_addr_rev_lookup(msg_p->svr_addr);
+                    if (!server_string)
+                    {
+                        server_string = "[UNKNOWN]";
+                    }
                 }
                 PVFS_strerror_r(msg_p->op_status, s, sizeof(s));
                 gossip_err_unless_quiet("*** %s: msgpair to server %s failed: %s\n",

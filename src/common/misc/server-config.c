@@ -1207,11 +1207,11 @@ static const configoption_t options[] =
     {"TreeThreshold", ARG_INT, tree_threshold, NULL,
         CTX_FILESYSTEM, "2"},
 
-    /* Specifies the default for initial number of servers to hold directory entries. */
+    /* Specifies the default for initial number of servers to hold directory entries. Note that this number cannot exceed 65535 (max value of a 16-bit unsigned integer). */
     {"DistrDirServersInitial", ARG_INT, distr_dir_servers_initial, NULL,
         CTX_FILESYSTEM, "1"},
 
-    /* Specifies the default for maximum number of servers to hold directory entries. */
+    /* Specifies the default for maximum number of servers to hold directory entries. Note that this number cannot exceed 65535 (max value of a 16-bit unsigned integer). */
     {"DistrDirServersMax", ARG_INT, distr_dir_servers_max, NULL,
         CTX_FILESYSTEM, "4"},
 

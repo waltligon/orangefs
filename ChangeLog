@@ -4,6 +4,13 @@ OrangeFS Release ChangeLog
 -----------------------
 orangefs-2.9.x (Subversion Branch v.2.9.x)
 http://dev.orangefs.org/svn/orangefs/branches/v.2.9.x
+up to rev 12840 in trunk
+
+
+New functionality:
+	1.  Added support for Oracle Linux 7.3 with one caveat:  Cannot use
+	    OrangeFS as the backing filesystem for a user-defined loop device.
+	    Support will be forth coming.
 
 
 * - Server  
@@ -11,11 +18,37 @@ http://dev.orangefs.org/svn/orangefs/branches/v.2.9.x
 	    operations.
 	* - Removed memory leaks from the getattr operation and restructured
 	    keyval buffer management.
+	* - Corrected problem with mgmt-create-root-dir related to having a
+	    correct capability when calling tree-setattr.
+	* - Fixed capability errors that may occur during mkdir.
+	* - Correctly populate the position token during a readdir operation
+	    to prevent overrun of dirdata index bits.
+	* - Correct the max size calculation for a readdir response.
 
 * - Clients
 	* - Client Core
 		* - Enhanced the readahead cache with multiple readahead
 		    buffers.
+		* - Corrected double-free bug in readahead code
+		* - Corrected additional problems with readahead code
+		    and removes memory leaks identified by Valgrind.
+		* - Enhanced the remount procedure to handle new 
+		    PVFS2_VFS_OP_FEATURES request.
+
+	* - All Clients
+		* - Dual license OrangeFS JNI and Hadoop clients under both the
+		    LGPL version 2.1 and Apache License version 2.  Added
+		    Omnibond to the Copyright in source files where
+		    appropriate.
+		* - Corrected readdir token processing that periodically
+		    caused directory entries to be ignored.
+		* - Enhanced error message in msgpairarray_completion_fn.
+
+* - BMI
+	* - InfiniBand protocol
+		* - Improved IB's ability to report a lost connection, allowing
+		    the system interface to recover the connection.  Needed
+		    for failover.
 
 
 
