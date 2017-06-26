@@ -830,6 +830,12 @@ DEVELTOOLS := $(patsubst %.c,%, $(filter %.c, $(DEVELSRC)))
 # DEVELDEPENDS is a list of dependency files for development programs
 DEVELDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(DEVELSRC)))
 
+# malloc analysis tool, built for the build machine, not the
+# host machine, in the case of cross-compilation
+MEMANALYSISOBJS := $(patsubst %.c,%.o,$(MEMANALYSISSRC))
+MEMANALYSISDEPS := $(patsubst %.c,%.d,$(MEMANALYSISSRC))
+
+
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
@@ -877,7 +883,10 @@ statecompgen: $(STATECOMPGEN)
 policycompgen: $(POLICYCOMPGEN)
 
 # target for building development tools
-develtools: $(DEVELTOOLS)
+develtools: $(DEVELTOOLS) $(MEMANALYSIS)
+
+# this is needed for the make dist
+memanalysisgen: $(MEMANALYSISGEN)
 
 # Build linux-2.6 kernel module if requested.
 # Can't use the actual file target since we don't know how to figure out
@@ -1203,6 +1212,15 @@ $(POLICYCOMP): $(POLICYCOMPOBJS)
 	$(Q) "  BUILD_LD	$@"
 	$(E)$(BUILD_LD) -o $@ $(BUILD_LDFLAGS) $(POLICYCOMPOBJS) $(call modldflags,$<)
 
+# special rules to malloc analysis tool using build host compiler
+$(MEMANALYSISOBJS): %.o: %.c
+	$(Q) "  BUILD_CC	$@"
+	$(E)$(BUILD_CC) $(BUILD_CFLAGS) $< -c -o $@ $(call modcflags,$<)
+
+$(MEMANALYSIS): $(MEMANALYSISOBJS)
+	$(Q) "  BUILD_LD	$@"
+	$(E)$(BUILD_LD) -o $@ $(BUILD_LDFLAGS) $(MEMANALYSISOBJS) $(call modldflags,$<)
+
 # rule for generating cscope information
 cscope:
 	find @SRC_ABSOLUTE_TOP@ -iname "*.[ch]" -o -iname "*.sm" \
@@ -1263,7 +1281,7 @@ clean::
                 $(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) \
                 $(BMILIBRARIES) $(FUSEOBJS) \
                 $(VISMISCDEPENDS) $(KARMAOBJS) \
-                $(STATECOMP) $(STATECOMPOBJS) \
+                $(MEMANALYSIS) $(MEMANALYSISOBJS) $(MEMANALYSISDEPS) \
                 $(POLICYCOMP) $(POLICYCOMPOBJS) \
                 $(PYCGEN) $(PYCGEN_AUX) \
                 src/server/pvfs2-server-server.o \
@@ -1281,6 +1299,7 @@ endif
 ifndef DIST_RELEASE
 	$(E)rm -f $(STATECOMPGEN)
 	$(E)rm -f $(POLICYCOMPGEN) 
+	$(E)rm -f $(MEMANALYSISGEN)
 endif
 
 ifneq (,$(LINUX_KERNEL_SRC))
@@ -1494,7 +1513,7 @@ ifdef BUILD_FUSE
 endif
 
 	# install any development tools built
-	for i in $(notdir $(DEVELTOOLS)) ; do \
+	for i in $(notdir $(DEVELTOOLS) $(MEMANALYSIS)) ; do \
 		if [ -f $(srcdir)/src/apps/devel/$$i ]; then install -m 755 $(srcdir)/src/apps/devel/$$i $(bindir); fi;\
 	done
 

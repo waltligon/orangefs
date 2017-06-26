@@ -25,6 +25,7 @@
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 
+#include "pvfs2-internal.h"
 #include "bmi.h"
 #include "gossip.h"
 #include "job.h"
@@ -43,11 +44,11 @@
 #include "id-generator.h"
 #include "job-time-mgr.h"
 #include "pint-cached-config.h"
-#include "pvfs2-internal.h"
+/* #include "pvfs2-internal.h" */
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-event.h"
 #include "pint-util.h"
-#include "pint-malloc.h"
+/* #include "pint-malloc.h" */
 #include "pint-sysint-utils.h"
 #include "pint-uid-mgmt.h"
 #include "pint-security.h"
