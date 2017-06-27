@@ -888,7 +888,8 @@ extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_create_immutable_copies_sm;
-extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_work_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_with_prelude_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_without_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_set_attr_work_sm;
 
 /* nested state machines */

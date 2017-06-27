@@ -55,7 +55,7 @@ machine pvfs2_list_attr_sm
     {
         pjmp listattr_setup_getattr
         {
-            LOCAL_OPERATION => pvfs2_pjmp_get_attr_work_sm;
+            LOCAL_OPERATION => pvfs2_pjmp_get_attr_without_prelude_sm;
         }
         success => interpret_getattrs;
         default => final_response;
@@ -134,10 +134,18 @@ static PINT_sm_action listattr_setup_getattr(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *getattr_op = NULL;
     struct PVFS_server_req *req = NULL;
+    PVFS_credential credential;
     int i;
 
     s_op->u.listattr.parallel_sms = 0;
     js_p->error_code = 0;
+
+    /* Make sure that the attrmask that came from userland does
+     * not specify PVFS_ATTR_CAPABILITY, because we don't have
+     * a valid credential to pass along for creating a capability.
+     */
+    s_op->req->u.listattr.attrmask &= ~PVFS_ATTR_CAPABILITY;
+    memset(&credential, 0, sizeof(credential));
 
     for(i=0; i<s_op->req->u.listattr.nhandles; i++)
     {
@@ -156,7 +164,7 @@ static PINT_sm_action listattr_setup_getattr(
             js_p->error_code, req, LOCAL_OPERATION);
 
         PINT_SERVREQ_GETATTR_FILL(*req, s_op->req->capability,
-            s_op->req->u.getattr.credential,
+            credential,
             s_op->req->u.listattr.fs_id,
             s_op->req->u.listattr.handles[i],
             s_op->req->u.listattr.attrmask,
