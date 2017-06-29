@@ -1422,7 +1422,7 @@ install:: all
 	install -m 644 $(srcdir)/src/io/bmi/bmi-types.h $(includedir)
 
 	install -d $(libdir)
-	install -m 755 lib/*.* $(libdir)
+	install -m 644 lib/*.* $(libdir)
 else
 install:: all install_doc
 	install -d $(includedir)
@@ -1443,23 +1443,23 @@ install:: all install_doc
 	install -d $(libdir)
 ifneq (,$(LIBRARIES_STATIC))
 	for i in $(notdir $(LIBRARIES_STATIC)) ; do \
-	    install -m 755 lib/$$i $(libdir) ;\
+	    install -m 644 lib/$$i $(libdir) ;\
 	done
 ifneq (,$(KERNAPPSTHR))
 	for i in $(notdir $(LIBRARIES_THREADED_STATIC)) ; do \
-	    install -m 755 lib/$$i $(libdir) ;\
+	    install -m 644 lib/$$i $(libdir) ;\
 	done
 endif
 endif
 ifneq (,$(LIBRARIES_SHARED))
 	for i in $(notdir $(LIBRARIES_SHARED)) ; do \
-	    install -m 755 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
+	    install -m 644 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
 	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
 	    $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
 	done
 ifneq (,$(KERNAPPSTHR))
 	for i in $(notdir $(LIBRARIES_THREADED_SHARED)) ; do \
-	    install -m 755 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
+	    install -m 644 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
 	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
 	   $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
 	done
