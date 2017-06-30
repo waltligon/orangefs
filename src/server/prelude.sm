@@ -27,6 +27,7 @@
 #ifdef ENABLE_CREDCACHE
 #include "credcache.h"
 #endif
+#include "config-utils.h"
 
 /* prelude state machine:
  * This is a nested state machine that performs initial setup 

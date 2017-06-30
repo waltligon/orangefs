@@ -521,7 +521,7 @@ sub emit_filesystem
     $step = $total_num_handles_available->copy();
     $step->bdiv($total_ranges);
 
-    print $target "\n<Filesystem>\n";
+    print $target "\n<FileSystem>\n";
     print $target "\tName $name\n";
     print $target "\tID $fs_id\n";
     print $target "\tRootHandle $root_handle\n";
@@ -640,7 +640,7 @@ sub emit_filesystem
 
     emit_distribution($target, $opt_dist_name, $opt_dist_params);
 
-    print $target "</Filesystem>\n";
+    print $target "</FileSystem>\n";
 }
 
 sub emit_serveropts

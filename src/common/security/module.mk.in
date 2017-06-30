@@ -45,4 +45,5 @@ endif
 MODCFLAGS_$(DIR)/pint-ldap-map.c := -DLDAP_DEPRECATED=1
 else
 SERVERSRC += $(DIR)/security-stubs.c
+MODCFLAGS_$(DIR)/security-stubs.c = -I$(srcdir)/src/server
 endif

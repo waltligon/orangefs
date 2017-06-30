@@ -20,6 +20,8 @@
 #include "pint-security.h"
 #include "security-util.h"
 
+#include "config-utils.h"
+
 
 int PINT_security_initialize(void)
 {

@@ -61,6 +61,7 @@
 #ifdef ENABLE_CERTCACHE
 #include "certcache.h"
 #endif
+#include "config-utils.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -203,10 +204,6 @@ static int precreate_pool_count(
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
 
-struct server_configuration_s *PINT_get_server_config(void)
-{
-    return &server_config;
-}
 
 int main(int argc, char **argv)
 {
@@ -265,6 +262,9 @@ int main(int argc, char **argv)
     }
 
     server_status_flag |= SERVER_CONFIG_INIT;
+
+    /* set server_config pointer */
+    PINT_set_server_config(&server_config);
 
     if (!PINT_config_is_valid_configuration(&server_config))
     {
@@ -948,8 +948,9 @@ static int server_initialize_subsystems(
             return(ret);
         }
 
-        /* XXX: This is really the same for all collections, yet is specified
-         * separately. */
+        /* This function sets the server_cfg for the system and cfg_fs for the coll_id,
+         * within the trove subsystem
+         */
         ret = trove_collection_set_fs_config(cur_fs->coll_id, &server_config);
         if (ret < 0) {
             gossip_err("Error setting filesystem configuration in Trove\n");
