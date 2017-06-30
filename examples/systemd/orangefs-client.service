@@ -1,0 +1,12 @@
+[Unit]
+Description=OrangeFS Parallel File System Client
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/orangefs/sbin/pvfs2-client -f -p /opt/orangefs/sbin/pvfs2-client-core -L /opt/orangefs/log/pvfs2-client.log
+
+                                                                                             
+[Install]
+WantedBy=multi-user.target
+
