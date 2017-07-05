@@ -5179,7 +5179,7 @@ int PINT_config_trim_filesystems_except(struct server_configuration_s *config_s,
             }
             cur = PINT_llist_next(cur);
         }
-    #endif
+#endif
 
         new_fs = PINT_llist_rem(config_s->file_systems,
                                 &fs_id,
