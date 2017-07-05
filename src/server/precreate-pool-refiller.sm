@@ -18,6 +18,7 @@
 #include "server-config.h"
 #include "pint-util.h"
 #include "security-util.h"
+#include "config-utils.h"
 
 static int batch_create_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -124,7 +125,7 @@ static PINT_sm_action wait_for_threshold_fn(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
-    struct server_configuration_s *user_opts = get_server_config_struct();
+    struct server_configuration_s *user_opts = PINT_get_server_config();
     int index = 0;
 
     PVFS_ds_type_to_int(s_op->u.precreate_pool_refiller.type, &index);
@@ -149,7 +150,7 @@ static PINT_sm_action store_handles_fn(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
-    struct server_configuration_s *user_opts = get_server_config_struct();
+    struct server_configuration_s *user_opts = PINT_get_server_config();
     int index = 0;
 
     PVFS_ds_type_to_int( s_op->u.precreate_pool_refiller.type, &index );
@@ -178,7 +179,7 @@ static PINT_sm_action setup_batch_create_fn(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
-    struct server_configuration_s *user_opts = get_server_config_struct();
+    struct server_configuration_s *user_opts = PINT_get_server_config();
     int index = 0;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "setting up msgpair to get precreated "
@@ -234,7 +235,7 @@ static PINT_sm_action setup_fn(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct server_configuration_s *user_opts = get_server_config_struct();
+    struct server_configuration_s *user_opts = PINT_get_server_config();
     PVFS_capability *cap = &s_op->u.precreate_pool_refiller.capability;
     int index = 0;
     int ret;

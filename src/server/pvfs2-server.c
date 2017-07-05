@@ -1618,7 +1618,7 @@ static void reload_config(void)
     else /* Successful load of config */
     {
         /* Get the current server configuration and update global items */
-        orig_server_config = get_server_config_struct();
+        orig_server_config =  PINT_get_server_config();
         if (orig_server_config->event_logging)
         {
             free(orig_server_config->event_logging);
@@ -2643,11 +2643,6 @@ int server_state_machine_terminate(
     return SM_ACTION_TERMINATE;
 }
 
-struct server_configuration_s *get_server_config_struct(void)
-{
-    return &server_config;
-}
-
 /* server_op_get_machine()
  * 
  * looks up the state machine for the op * given and returns it, or
@@ -2843,7 +2838,7 @@ static int precreate_pool_initialize(int server_index)
     int handle_count = 0;
     int fs_count = 0;
     unsigned int types_to_pool = 0;
-    struct server_configuration_s *user_opts = get_server_config_struct();
+    struct server_configuration_s *user_opts = PINT_get_server_config();
     assert(user_opts);
 
     /* iterate through list of file systems */
@@ -3215,7 +3210,7 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
     struct PINT_smcb *tmp_smcb = NULL;
     struct PINT_server_op *s_op;
     int ret, index = 0;
-    struct server_configuration_s *user_opts = get_server_config_struct();
+    struct server_configuration_s *user_opts = PINT_get_server_config();
 
     assert(user_opts);
     PVFS_ds_type_to_int(type, &index);

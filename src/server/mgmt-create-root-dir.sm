@@ -21,6 +21,7 @@
 #include "security-util.h"
 #include "server-config.h"
 #include "dist-dir-utils.h"
+#include "config-utils.h"
 #ifdef ENABLE_SECURITY_CERT
 #include "cert-util.h"
 #endif
@@ -244,7 +245,7 @@ static PINT_sm_action mgmt_create_root_dir_check_for_request(
 {
 
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    server_configuration_s *user_opts = get_server_config_struct();
+    server_configuration_s *user_opts = PINT_get_server_config();
 #ifdef ENABLE_SECURITY_CERT
     X509 *xcert = NULL;
     PVFS_certificate *cert = NULL;
@@ -341,7 +342,7 @@ static PINT_sm_action mgmt_create_root_dir_create_dist_dir_struct(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    server_configuration_s *user_opts = get_server_config_struct();
+    server_configuration_s *user_opts = PINT_get_server_config();
     PVFS_object_attr *attr;
     int num_total_dirdata_servers, num_initial_dirdata_servers;
     int ret = -1;
@@ -516,7 +517,7 @@ static PINT_sm_action mgmt_create_root_dir_create_local_dirdata_dspace(
     int ret = -PVFS_ENOMEM;
     job_id_t tmp_id;
     PVFS_handle_extent_array extent_array;
-    server_configuration_s *user_opts = get_server_config_struct();
+    server_configuration_s *user_opts = PINT_get_server_config();
 
     attr = (&s_op->attr);
 
@@ -858,7 +859,7 @@ static PINT_sm_action mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair(
     PVFS_sys_layout layout;
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
-    server_configuration_s *config = get_server_config_struct();
+    server_configuration_s *config = PINT_get_server_config();
     char server_name[1024];
     PVFS_BMI_addr_t svr_addr;
 
@@ -1054,7 +1055,7 @@ static PINT_sm_action crdirent_lost_and_found_setup_msgpair(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    server_configuration_s *config = get_server_config_struct();
+    server_configuration_s *config = PINT_get_server_config();
     char server_name[1024];
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index;
@@ -1250,7 +1251,7 @@ static PINT_sm_action delete_lost_and_found_handle_setup_msgpair(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    server_configuration_s *config = get_server_config_struct();
+    server_configuration_s *config = PINT_get_server_config();
     char server_name[1024];
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt-create-root-dir state: "
