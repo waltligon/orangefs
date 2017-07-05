@@ -287,25 +287,6 @@ sub emit_security
     # if securitycert or cafile used, use cert-based options
     $seccertflag = defined($opt_security_cert) || defined($opt_ca_file);
 
-    if ($seckeyflag || $seccertflag || $opt_trusted == 1)
-    {
-        print $target "\n\t<Security>\n";
-        if ($seckeyflag || $seccertflag)
-        {
-           print $target "\t\tTurnOffTimeouts no\n";
-        }
-        else
-        {
-           print $target "\t\tTurnOffTimeouts yes\n";
-        }
-    }
-    else
-    {
-        print $target "\n\t<Security>\n";
-        print $target "\t\tTurnOffTimeouts yes\n";
-        print $target "\t</Security>\n";
-    }
-
     if ($opt_trusted == 1)
     {
         emit_trusted($target, $opt_trusted_port, $opt_trusted_network,
@@ -440,6 +421,14 @@ sub emit_defaults
     {
         print $target "\tTCPBindSpecific yes\n";
     }
+
+    
+    # TurnOffTimeouts always defaults to yes and applies to all servers.
+    # Either they are on or off.  This is only temporary until we correct
+    # all areas of the code that should check for invalid  timeouts.
+    print $target "\n\t<Security>\n";
+    print $target "\t\tTurnOffTimeouts yes\n";
+    print $target "\t</Security>\n";
 
     # if --metaspec is used, security options are done per-server
     # otherwise do them here
