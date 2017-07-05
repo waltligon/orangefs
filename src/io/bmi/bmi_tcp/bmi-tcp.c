@@ -879,6 +879,7 @@ void *BMI_tcp_memalloc(bmi_size_t size,
      * is implemented in terms of malloc thus it should work on all
      * platforms
      */
+
     posix_memalign(&ptr, 4096, size);
     return ptr;
 }

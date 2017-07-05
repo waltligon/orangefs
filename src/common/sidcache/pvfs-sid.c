@@ -148,7 +148,7 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
     {
         return ret;
     }
-    if (temp_cacheval->bmi_addr == 0);
+    if (temp_cacheval->bmi_addr == 0)
     {
         /* enter url into BMI to get BMI addr */
         ret = BMI_addr_lookup(&temp_cacheval->bmi_addr, temp_cacheval->url);

@@ -204,6 +204,10 @@ static int memdebugflag = 0;
 #undef PINT_free
 #endif
 
+#ifdef PINT_free2
+#undef PINT_free2
+#endif
+
 /* Struct to handle PVFS malloc features is allocated just before the
  * returned memory
  */
@@ -351,7 +355,7 @@ int PINT_check_malloc(void *ptr)
     {
         return 0;
     }
-    if (extra->magic == (uint32_t)PVFS_MALLOC_MAGIC_NUM)
+    if (extra->magic == PVFS_MALLOC_MAGIC_NUM)
     {
         return 1;
     }
@@ -392,7 +396,7 @@ void *PINT_malloc (size_t size __PMDBG)
 #endif
     extra->mem   = mem;
 #if PVFS_MALLOC_MAGIC
-    extra->magic = (uint32_t)PVFS_MALLOC_MAGIC_NUM;
+    extra->magic = PVFS_MALLOC_MAGIC_NUM;
 #endif
     extra->size  = sizeplus;
 #if PVFS_MALLOC_CHECK_ALIGN
@@ -454,7 +458,7 @@ int PINT_posix_memalign (void **mem, size_t alignment, size_t size __PMDBG)
 #endif
     extra->mem   = mem_orig;
 #if PVFS_MALLOC_MAGIC
-    extra->magic = (uint32_t)PVFS_MALLOC_MAGIC_NUM;
+    extra->magic = PVFS_MALLOC_MAGIC_NUM;
 #endif
     extra->size  = sizeplus;
 #if PVFS_MALLOC_CHECK_ALIGN
@@ -518,7 +522,7 @@ void *PINT_realloc (void *mem, size_t size __PMDBG)
 
     extra = (void *)((ptrint_t)mem - EXTRA_SIZE);
 #if PVFS_MALLOC_MAGIC
-    if (extra->magic != (uint32_t)PVFS_MALLOC_MAGIC_NUM)
+    if (extra->magic != PVFS_MALLOC_MAGIC_NUM)
     {
         gossip_err("PINT_realloc: realloc fails magic number test\n");
         gossip_err("mem = %p size = %d, emem = %p, esize = %d\n",
@@ -619,7 +623,7 @@ void PINT_free (void *mem __PMDBG)
     memdebug(dbfp, "\n");
 
 #if PVFS_MALLOC_MAGIC
-    if (extra->magic != (uint32_t)PVFS_MALLOC_MAGIC_NUM)
+    if (extra->magic != PVFS_MALLOC_MAGIC_NUM)
     {
 #if PVFS_MALLOC_DEBUG
         gossip_lerr("PINT_free: free fails magic number test (%s line %d)\n",

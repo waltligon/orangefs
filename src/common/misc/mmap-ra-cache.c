@@ -46,13 +46,13 @@ int pvfs2_mmap_ra_cache_initialize(void)
             goto return_error;
         }
 
-        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+        gossip_debug(GOSSIP_RACACHE_DEBUG,
                      "mmap_ra_cache_initialized\n");
         ret = 0;
     }
     else
     {
-        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "mmap readahead cache already "
+        gossip_debug(GOSSIP_RACACHE_DEBUG, "mmap readahead cache already "
                      "initalized.  returning success\n");
         ret = 0;
     }
@@ -93,7 +93,7 @@ int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
                   &refn, &cache_elem->hash_link);
         gen_mutex_unlock(&s_mmap_ra_cache_mutex);
 
-        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "Inserted mmap ra cache "
+        gossip_debug(GOSSIP_RACACHE_DEBUG, "Inserted mmap ra cache "
                      "element %s, %d of size %llu\n",
                      PVFS_OID_str(&cache_elem->refn.handle),
                      cache_elem->refn.fs_id,
@@ -130,7 +130,7 @@ int pvfs2_mmap_ra_cache_get_block(PVFS_object_ref refn,
 
             if (cache_elem->data_sz > (offset + len))
             {
-                gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                gossip_debug(GOSSIP_RACACHE_DEBUG,
                              "mmap_ra_cache_get_block got block at "
                              "offset %llu, len %llu\n",  llu(offset),
                              llu(len));
@@ -150,14 +150,14 @@ int pvfs2_mmap_ra_cache_get_block(PVFS_object_ref refn,
                                 ((offset + len) - cache_elem->data_sz);
 
                 gossip_debug(
-                    GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_get_block "
+                    GOSSIP_RACACHE_DEBUG, "mmap_ra_cache_get_block "
                     "found invalid block [%llu/%llu]\n",
                     llu(offset), llu(len));
 
                 if (actual_len > 0)
                 {
                     gossip_debug(
-                        GOSSIP_MMAP_RCACHE_DEBUG, " data_sz is %llu, "
+                        GOSSIP_RACACHE_DEBUG, " data_sz is %llu, "
                         "offset is %llu len is %llu\n\t(filling partial %d "
                         "bytes)\n", llu(cache_elem->data_sz), llu(offset),
                         llu(len), actual_len);
@@ -176,7 +176,7 @@ int pvfs2_mmap_ra_cache_get_block(PVFS_object_ref refn,
         else
         {
             gossip_debug(
-                GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_get_block "
+                GOSSIP_RACACHE_DEBUG, "mmap_ra_cache_get_block "
                 "clean cache miss (nothing here)\n");
         }
         gen_mutex_unlock(&s_mmap_ra_cache_mutex);
@@ -202,7 +202,7 @@ int pvfs2_mmap_ra_cache_flush(PVFS_object_ref refn)
             assert(cache_elem);
             assert(cache_elem->data);
 
-            gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "Flushed mmap ra cache "
+            gossip_debug(GOSSIP_RACACHE_DEBUG, "Flushed mmap ra cache "
                          "element %s, %d of size %llu\n",
                          PVFS_OID_str(&cache_elem->refn.handle),
                          cache_elem->refn.fs_id,
@@ -255,7 +255,7 @@ int pvfs2_mmap_ra_cache_finalize(void)
 
         /* FIXME: race condition here */
         gen_mutex_destroy(&s_mmap_ra_cache_mutex);
-        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_finalized\n");
+        gossip_debug(GOSSIP_RACACHE_DEBUG, "mmap_ra_cache_finalized\n");
     }
     return ret;
 }
