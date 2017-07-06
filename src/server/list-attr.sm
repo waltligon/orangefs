@@ -55,7 +55,7 @@ machine pvfs2_list_attr_sm
     {
         pjmp listattr_setup_getattr
         {
-            LOCAL_OPERATION => pvfs2_pjmp_get_attr_without_prelude_sm;
+            LOCAL_OPERATION => pvfs2_pjmp_get_attr_with_prelude_sm;
         }
         success => interpret_getattrs;
         default => final_response;
@@ -145,7 +145,7 @@ static PINT_sm_action listattr_setup_getattr(
      * a valid credential to pass along for creating a capability.
      */
     s_op->req->u.listattr.attrmask &= ~PVFS_ATTR_CAPABILITY;
-    memset(&credential, 0, sizeof(credential));
+    PINT_init_credential(&credential);
 
     for(i=0; i<s_op->req->u.listattr.nhandles; i++)
     {
