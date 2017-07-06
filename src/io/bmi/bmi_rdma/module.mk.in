@@ -14,8 +14,7 @@ ifneq (,$(BUILD_RDMA))
 # Local definitions.
 #
 DIR := src/io/bmi/bmi_rdma
-cfiles := rdma.c util.c mem.c rdma-int.c
-apis := -DRDMA
+cfiles := rdma.c util.c mem.c
 
 #
 # Export these to the top Makefile to tell it what to build.
@@ -26,13 +25,8 @@ SERVERSRC += $(src)
 LIBBMISRC += $(src)
 
 #
-# Each particular RDMA API needs its headers.
+# RDMA API needs its headers.
 #
-MODCFLAGS_$(DIR)/rdma-int.c := -I@RDMA_INCDIR@
-
-#
-# Tell the main driver about the APIs that are available.
-#
-MODCFLAGS_$(DIR)/ib.c := $(apis)
+MODCFLAGS_$(DIR)/rdma.c := -I@RDMA_INCDIR@
 
 endif  # BUILD_RDMA
