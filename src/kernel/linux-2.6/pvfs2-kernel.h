@@ -1031,8 +1031,8 @@ void mask_blocked_signals(sigset_t *orig_sigset);
 
 void unmask_blocked_signals(sigset_t *orig_sigset);
 
-#ifdef USE_MMAP_RA_CACHE
-int pvfs2_flush_mmap_racache(struct inode *inode);
+#ifdef USE_RA_CACHE
+int pvfs2_flush_racache(struct inode *inode);
 #endif
 
 int pvfs2_unmount_sb(struct super_block *sb);
@@ -1184,20 +1184,20 @@ do {                                                      \
 #define get_suid_flag(inode)                              \
 (PVFS2_SB(inode->i_sb)->mnt_options.suid)
 
-#ifdef USE_MMAP_RA_CACHE
-#define clear_inode_mmap_ra_cache(inode) \
+#ifdef USE_RA_CACHE
+#define clear_inode_ra_cache(inode) \
 do { \
   char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL); \
   gossip_debug(GOSSIP_INODE_DEBUG, \
-               "calling clear_inode_mmap_ra_cache on %s\n", \
+               "calling clear_inode_ra_cache on %s\n", \
                k2s(get_khandle_from_ino(inode),s)); \
   kfree(s); \
-  pvfs2_flush_mmap_racache(inode); \
-  gossip_debug(GOSSIP_INODE_DEBUG, "clear_inode_mmap_ra_cache finished\n"); \
+  pvfs2_flush_racache(inode); \
+  gossip_debug(GOSSIP_INODE_DEBUG, "clear_inode_ra_cache finished\n"); \
 } while(0)
 #else
-#define clear_inode_mmap_ra_cache(inode)
-#endif /* USE_MMAP_RA_CACHE */
+#define clear_inode_ra_cache(inode)
+#endif /* USE_RA_CACHE */
 
 #define add_pvfs2_sb(sb)                                             \
 do {                                                                 \
