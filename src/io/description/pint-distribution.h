@@ -167,7 +167,7 @@ static inline int decode_PINT_dist(char **pptr, PINT_dist **x)
     PINT_dist_lookup(&tmp_dist); 
     if (!tmp_dist.methods)
     { 
-	gossip_err("%s: decode_PINT_dist: methods is null\n", __func__); 
+	gossip_err("%s: methods is null\n", __func__); 
 	exit(1); 
     } 
     /* later routines assume dist is a big contiguous thing, do so */ 

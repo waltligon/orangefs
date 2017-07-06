@@ -441,16 +441,15 @@ AC_ARG_ENABLE(perf-counters,
 fi]
 ,)
 
-dnl a mechanism to turn on mmap-readahead caching (for kernel interface)
-MMAP_RA_CACHE=""
-AC_ARG_ENABLE(mmap-racache,
-[  --enable-mmap-racache   **EXPERIMENTAL** Enables mmap-readahead in kernel 
-                          interface],
+dnl a mechanism to turn on readahead caching (for kernel interface)
+RA_CACHE=""
+AC_ARG_ENABLE(racache,
+[  --enable-racache   **EXPERIMENTAL** Enables readahead in kernel interface],
 [if test "x$enableval" = "xyes" ; then
-MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
+RA_CACHE="-DUSE_RA_CACHE"
 fi]
 ,)
-AC_SUBST(MMAP_RA_CACHE)
+AC_SUBST(RA_CACHE)
 
 dnl a mechanism that resets the file position pointer when an error occurs whether
 dnl or not any bytes were written (kernel interface only).
@@ -500,6 +499,15 @@ test_for_karma()
 }
 
 dnl optionally disable building the karma gui
+dnl AC_ARG_ENABLE(karma,
+dnl [  --disable-karma         Disables optional gui.  (Enabled by default)],
+dnl [ if test "x$enableval" = "xyes" ; then
+dnl       test_for_karma
+dnl    fi
+dnl ],
+dnl [test_for_karma]
+dnl )
+
 AC_ARG_ENABLE(karma,
 [  --enable-karma          Enables optional gui.  (Disabled by default)],
 [ if test "x$enableval" = "xyes" ; then
@@ -1179,6 +1187,22 @@ fi],
 [AC_DEFINE(PVFS_MALLOC_REDEF, 1,
       [Should we redefine malloc.])
 MALLOC_REDEF=1
+])
+
+dnl Method to disable malloc debug
+AC_ARG_ENABLE(malloc-debug,
+[  --disable-malloc-debug  Do not compile in malloc debug tracing],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_MALLOC_DEBUG, 1,
+      [Should we compile in malloc debug tracing.])
+   MALLOC_DEBUG=1
+else
+   AC_DEFINE(PVFS_MALLOC_DEBUG, 0,
+      [Should we compile in malloc debug tracing.])
+fi],
+[AC_DEFINE(PVFS_MALLOC_DEBUG, 1,
+      [Should we compile in malloc debug tracing.])
+MALLOC_DEBUG=1
 ])
 
 dnl Method to disable malloc checking a magic number
@@ -2001,10 +2025,10 @@ else
    AC_MSG_RESULT([PVFS2 configured for the 2.4.x kernel module      : yes])
 fi
 
-if test "x$MMAP_RA_CACHE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
-   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      :  no])
+if test "x$RA_CACHE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
+   AC_MSG_RESULT([PVFS2 configured for using the ra-cache           :  no])
 else
-   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      : yes])
+   AC_MSG_RESULT([PVFS2 configured for using the ra-cache           : yes])
 fi
 
 if test "x$RESET_FILE_POS" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then

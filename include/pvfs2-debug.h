@@ -21,18 +21,8 @@
 #include <stdarg.h>
 #include "pvfs2-types.h"
 
-#if 0
-typedef struct PVFS_debug_mask_s
-{
-    uint64_t mask1;
-    uint64_t mask2;
-} PVFS_debug_mask;
-
-endecode_fields_2(
-    PVFS_debug_mask,
-    uint64_t, mask1,
-    uint64_t, mask2);
-#endif
+/* typedef PVFS_debug_mask is defined in pvfs2-types.h
+ */
 
 /* These macros let you deal with the 2-part nature of the mask */
 #define __PVFS_DBGMSK_RT(l,r) (r)
@@ -89,8 +79,8 @@ PVFS_DEBUG_MASK(GOSSIP_DIST_DEBUG);
 PVFS_DEBUG_MASK(GOSSIP_BMI_DEBUG_IB);
 #define GOSSIP_DBPF_ATTRCACHE_DEBUG_INIT      (uint64_t)0 , ((uint64_t)1 << 20)
 PVFS_DEBUG_MASK(GOSSIP_DBPF_ATTRCACHE_DEBUG);
-#define GOSSIP_MMAP_RCACHE_DEBUG_INIT         (uint64_t)0 , ((uint64_t)1 << 21)
-PVFS_DEBUG_MASK(GOSSIP_MMAP_RCACHE_DEBUG);
+#define GOSSIP_RACACHE_DEBUG_INIT             (uint64_t)0 , ((uint64_t)1 << 21)
+PVFS_DEBUG_MASK(GOSSIP_RACACHE_DEBUG);
 #define GOSSIP_LOOKUP_DEBUG_INIT              (uint64_t)0 , ((uint64_t)1 << 22)
 PVFS_DEBUG_MASK(GOSSIP_LOOKUP_DEBUG);
 #define GOSSIP_REMOVE_DEBUG_INIT              (uint64_t)0 , ((uint64_t)1 << 23)
@@ -327,7 +317,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     /* Debug the client name cache.  Only useful on the client. */
     { "ncache", {GOSSIP_NCACHE_DEBUG_INIT} },
     /* Debug read-ahead cache events.  Only useful on the client. */
-    { "mmaprcache", {GOSSIP_MMAP_RCACHE_DEBUG_INIT} },
+    { "racache", GOSSIP_RACACHE_DEBUG },
     /* Debug the attribute cache.  Only useful on the client. */
     { "acache", {GOSSIP_ACACHE_DEBUG_INIT} },
     /* Log/Debug distribution calls */

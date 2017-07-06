@@ -574,7 +574,7 @@ typedef struct PVFS_object_ref_s
  */
 #define PVFS_object_ref_init(oref, sid_count) \
 do { \
-    if (dst->sid_count != 0 || dst->sid_array != NULL) \
+    if ((oref)->sid_count != 0 || (oref)->sid_array != NULL) \
     { \
         gossip_err("tried to init a non empty PVFS_object_ref\n"); \
         break; \

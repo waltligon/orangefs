@@ -733,14 +733,14 @@ bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
         /* for normal tcp, it is simply hostname:port */
         if ((delim = index(tcp_string, ':')) == NULL)
         {
-	    gossip_lerr("Error: malformed tcp address.\n");
+	    gossip_err("Error: malformed tcp address.\n");
             goto errorout;
         }
 
         ret = sscanf((delim + 1), "%d", &(tcp_addr_data->port));
         if (ret != 1)
         {
-	    gossip_lerr("Error: malformed tcp address.\n");
+	    gossip_err("Error: malformed tcp address.\n");
             goto errorout;
         }
 
@@ -874,6 +874,12 @@ void *BMI_tcp_memalloc(bmi_size_t size,
 
     /* return (calloc(1,(size_t) size)); */
     /* return PINT_mem_aligned_alloc(size, 4096); */
+    /* all malloc related calls go through src/common/misc/pint-malloc.c
+     * these are redefined as neede to stadard calls - posix_memalign
+     * is implemented in terms of malloc thus it should work on all
+     * platforms
+     */
+
     posix_memalign(&ptr, 4096, size);
     return ptr;
 }

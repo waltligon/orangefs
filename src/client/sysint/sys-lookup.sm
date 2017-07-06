@@ -729,7 +729,8 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
         return resp_p->status;
     }
 
-    /* we are assuming here that we were able to resolve at least one segment */
+    /* we are assuming here that we were able
+     * to resolve at least one segment */
     assert(resp_p->u.lookup_path.handle_count);
 
     gossip_debug(GOSSIP_LOOKUP_DEBUG, "- Resolved %d segments\n",
@@ -773,20 +774,25 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
         last_resolved_refn.handle = resp_p->u.lookup_path.handle_array[i];
 
 
-        /* In the response structure, the sid_count is (the number of handles * the metasidcnt).
-         * So, each handle has metasidcnt sids.  If that handle happens to be a metafile object,
-         * then the sid_count and sids for its datafile handles are stored in the attr_array and
+        /* In the response structure, the sid_count is
+         * (the number of handles * the metasidcnt).
+         * So, each handle has metasidcnt sids.  
+         * If that handle happens to be a metafile object,
+         * then the sid_count and sids for its datafile 
+         * handles are stored in the attr_array and
          * are NOT included in the higher-level sid count.
          */
         last_resolved_refn.sid_count = metasidcnt;
-        last_resolved_refn.sid_array = calloc(metasidcnt,sizeof(*last_resolved_refn.sid_array));
+        last_resolved_refn.sid_array = 
+                   calloc(metasidcnt,sizeof(*last_resolved_refn.sid_array));
         if ( !last_resolved_refn.sid_array )
         {
            gossip_err("%s:Unable to allocate memory for sid_array\n",__func__);
            return -PVFS_ENOMEM;
         }
-        memcpy(last_resolved_refn.sid_array,&(resp_p->u.lookup_path.sid_array[i * metasidcnt])
-                                            ,metasidcnt * sizeof(*last_resolved_refn.sid_array));
+        memcpy(last_resolved_refn.sid_array,
+               &(resp_p->u.lookup_path.sid_array[i * metasidcnt]),
+               metasidcnt * sizeof(*last_resolved_refn.sid_array));
 
         cur_seg->seg_resolved_refn = last_resolved_refn;
 
@@ -796,15 +802,22 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
          */
         if (i < resp_p->u.lookup_path.attr_count)
         {
-            /* add update to acache here or when msgpairarray returns */
+            /* add update to acache here or when msgpairarray returns 
+             * WBL - V3 this is not done in either place currently and
+             * we have to re-fetch the attr from the server.  Add this
+             * here! */
             PINT_free_object_attr(&(cur_seg->seg_attr));
             PINT_copy_object_attr(&(cur_seg->seg_attr),
                                   &(resp_p->u.lookup_path.attr_array[i]));
         }
 
         
-        memcpy(oid1,PVFS_OID_str(&last_resolved_refn.handle),OID_STR_SZ); 
-        memcpy(oid2,PVFS_OID_str(&cur_seg->seg_starting_refn.handle),OID_STR_SZ); 
+        memcpy(oid1,
+               PVFS_OID_str(&last_resolved_refn.handle),
+               OID_STR_SZ); 
+        memcpy(oid2,
+               PVFS_OID_str(&cur_seg->seg_starting_refn.handle),
+               OID_STR_SZ); 
         gossip_debug(GOSSIP_LOOKUP_DEBUG, "*** ncache update on %s target "
                      "(%s|%d) parent (%s|%d)\n",
                      cur_seg->seg_name,
