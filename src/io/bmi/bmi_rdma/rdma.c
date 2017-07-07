@@ -331,6 +331,8 @@ static void mem_deregister(memcache_entry_t *c);
 
 static int build_rdma_context(void);
 
+/* TODO: quick hack - need to rearrange data structures and prototypes */
+struct rdma_device_priv;
 static int return_active_nic_handle(struct rdma_device_priv *rd,
                                     struct ibv_port_attr *hca_port);
 
@@ -361,6 +363,7 @@ struct rdma_device_priv
     struct ibv_pd *nic_pd;     /* single protection domain for all memory/QPs */
     /* TODO: is the nic_lid field needed? */
     //uint16_t nic_lid;          /* local id (nic) */
+    int nic_port;              /* port number */
     struct ibv_comp_channel *channel;
 
     /* max values as reported by NIC */
@@ -688,7 +691,7 @@ static int check_cq(void)
             }
             ptr = bh->buf;
 
-            VALGRIND_MAKE_MEM_DEFINDED(ptr, byte_len);
+            VALGRIND_MAKE_MEM_DEFINED(ptr, byte_len);
             decode_msg_header_common_t(&ptr, &mh_common);
             bh->c->send_credit += mh_common.credit;
 
@@ -1254,7 +1257,7 @@ static void post_sr_rdmaw(struct rdma_work *sq,
         else
         {
             sr.wr_id = 0;
-            wr.send_flags = 0;
+            sr.send_flags = 0;
         }
 
         ret = ibv_post_send(rc->qp, &sr, &bad_wr);
@@ -3529,10 +3532,8 @@ static rdma_connection_t *rdma_new_connection(struct rdma_cm_id *id,
 {
     rdma_connection_t *c = NULL;
     struct rdma_connection_priv *rc = NULL;
+    struct rdma_device_priv *rd = rdma_device->priv;
     struct ibv_qp_init_attr attr;
-    struct rdma_conn_param conn_param;
-    struct rdma_cm_event *event = NULL;
-    struct rdma_cm_event event_copy;
     int i;
     int ret;
     int num_wr = 0;
@@ -3566,7 +3567,7 @@ static rdma_connection_t *rdma_new_connection(struct rdma_cm_id *id,
     build_qp_init_attr(&num_wr, &attr);
 
     /* NOTE: rdma_create_qp() automatically transitions the QP through its
-     * states; after allocation and connection it is ready to post receives
+     * states; after allocation it is ready to post receives
      */
     debug(0, "%s: calling rdma_create_qp", __func__);
     ret = rdma_create_qp(id, rd->nic_pd, &attr);
@@ -3575,6 +3576,15 @@ static rdma_connection_t *rdma_new_connection(struct rdma_cm_id *id,
         error("%s: rdma_create_qp failed", __func__);
         goto error_out;
     }
+
+    /* TODO: is there anything that was previously taken care of in
+     * init_connection_modify_qp() that still needs to be donw?
+     *    - the local ack timeout (previously attr.timeout = 14 in
+     *      init_connection_modify_qp) is set from the subnet_timeout value
+     *      from opensm when using rdma_cm. It is currently set to 18. You
+     *      can use the command opensm -c <config-file> to dump current
+     *      opensm configuration to a file.
+     */
 
     rc->qp = id->qp;
 
@@ -3586,69 +3596,6 @@ static rdma_connection_t *rdma_new_connection(struct rdma_cm_id *id,
     {
         goto error_out;
     }
-
-    /* TODO: don't need exchange data anymore. What else needs to change? */
-
-    //build_conn_params(&conn_params);
-
-    /* On the client, setup connection parameters and connect */
-    if (!is_server)
-    {
-        /* TODO: is this all that should be insided if statment? */
-        /* TODO: should build_conn_params() be outside the if so it happens
-         *       on the server too?
-         */
-
-        build_conn_params(&conn_param);
-
-retry:
-        ret = rdma_connect(id, &conn_param);
-        if (ret)
-        {
-            if (errno == EINTR)
-            {
-                goto retry;
-            }
-            else
-            {
-                warning("%s: connect to server %s: %m", __func__, c->peername);
-                goto error_out;
-            }
-        }
-    }
-
-    /* TODO: is this the right place to do this for the server, too? */
-    /* wait until the connection is established */
-    ret = rdma_get_cm_event(id->channel, &event);
-    if (!ret)
-    {
-        memcpy(&event_copy, event, sizeof(*event));
-        rdma_ack_cm_event(event);
-
-        /* TODO: will this always happen first/right away? should we loop? */
-        if (event_copy.event != RDMA_CM_EVENT_ESTABLISHED)
-        {
-            error("%s: unexpected event: %s",
-                  __func__, rdma_event_str(event_copy.event));
-            goto error_out;
-        }
-
-        debug(4, "%s: connected, peername=%s", __func__, c->peername);
-    }
-    else
-    {
-        error_errno("%s: rdma_get_cm_event failed", __func__);
-        goto error_out;
-    }
-
-    /* TODO: is there anything that was previously taken care of in
-     * init_connection_modify_qp() that still needs to be done?
-     *    - the local ack timeout (previously attr.timeout = 14 in
-     *      init_connection_modify_qp) is set from the subnet_timeout value
-     *      from opensm when using rdma_cm. It is currently set to 18. You
-     *      can use the command opensm -c <config-file> to dump current
-     *      opensm configuration to a file.
-     */
 
     /* post initial RRs and RRs for acks */
     debug(0, "%s: entering for loop for post_rr", __func__);
@@ -3835,7 +3782,7 @@ static void build_qp_init_attr(int *num_wr,
     attr->cap.max_recv_sge = 16;
     attr->cap.max_send_sge = 16;
 
-    if ((int) attr->cap.max_recv_sge > rd->nid_max_sge)
+    if ((int) attr->cap.max_recv_sge > rd->nic_max_sge)
     {
         attr->cap.max_recv_sge = rd->nic_max_sge;
         attr->cap.max_send_sge = rd->nic_max_sge - 1;
@@ -4005,7 +3952,7 @@ static void rdma_close_connection(rdma_connection_t *c)
     }
 
     /* disconnect (also transfers associated QP to error state */
-    rdma_disconnect(rc->id);
+    //rdma_disconnect(rc->id);
 
     /* TODO: is this loop necessary? do we need to wait for the event? */
     /* wait for disconnected event */
@@ -4014,7 +3961,9 @@ static void rdma_close_connection(rdma_connection_t *c)
         memcpy(&event_copy, event, sizeof(*event));
         rdma_ack_cm_event(event);
 
-        if (event_copy.event == RDMA_CM_EVENT_DISCONNECT)
+        /* TODO: I think maybe I should be checking for this in the
+         *       server_accept_thread and client_event_loop instead */
+        if (event_copy.event == RDMA_CM_EVENT_DISCONNECTED)
         {
             break;
         }
@@ -4057,6 +4006,11 @@ static void rdma_close_connection(rdma_connection_t *c)
     if (rc->id)
     {
         channel = rc->id->channel;
+        
+        gossip_err("%s: destroying id=%llu, fd=%d\n",
+                   __func__,
+                   llu(int64_from_ptr(rc->id)),
+                   channel->fd);
 
         ret = rdma_destroy_id(rc->id);
         if (ret < 0)
@@ -4064,12 +4018,8 @@ static void rdma_close_connection(rdma_connection_t *c)
             error_errno("%s: rdma_destroy_id failed", __func__);
         }
 
-        ret = rdma_destroy_event_channel(channel);
-        if (ret < 0)
-        {
-            error_errno("%s: rdma_destroy_event_channel failed", __func__);
-        }
-        channel = NULL;
+        //rdma_destroy_event_channel(channel);
+        //channel = NULL;
     }
 
     free(rc);
@@ -4118,50 +4068,93 @@ static int rdma_client_event_loop(struct rdma_event_channel *ec,
                                   int timeout_ms)
 {
     struct rdma_cm_event *event = NULL;
+    struct rdma_cm_event event_copy;
+    struct rdma_conn_param conn_param;
     char peername[2048];
     int ret = -1;
     static int already_printed = 0;
+    rdma_connection_t *c = NULL;
 
     while (rdma_get_cm_event(ec, &event) == 0)
     {
-        struct rdma_cm_event event_copy;
-
         memcpy(&event_copy, event, sizeof(*event));
         rdma_ack_cm_event(event);
 
         if (event_copy.event == RDMA_CM_EVENT_ADDR_RESOLVED)
         {
+            /* TODO: does the rdma_resolve_route() call need to be after
+             *       I have registered the memory regions, created the queue
+             *       pair, and posted receives? */
             ret = rdma_resolve_route(event_copy.id, timeout_ms);
             if (ret)
             {
-                warning("%s: cannot resolve RDMA route to dest: %m", __func__);
+                warning("%s: cannot resolve RDMA route to dest: %s",
+                        __func__, strerror(errno));
                 return -errno;
             }
         }
         else if (event_copy.event == RDMA_CM_EVENT_ROUTE_RESOLVED)
         {
-            sprintf(peername, "%s:%d",
+            sprintf(peername,
+                    "%s:%d",
                     inet_ntoa(event_copy.id->route.addr.dst_sin.sin_addr),
                     rdma_map->port);
 
-            debug(4, "%s: connecting to peername=%s", __func__, peername);
-
+            debug(0,
+                "%s: calling rdma_new_connection for peername=%s on channel=%d",
+                __func__, peername, event_copy.id->channel->fd);
+            
             rdma_map->c = rdma_new_connection(event_copy.id, peername, 0);
             if (!rdma_map->c)
             {
-                gossip_err("Error: %s: rdma_new_connection failed", __func__);
+                error_xerrno(EINVAL,
+                             "%s: rdma_new_connection failed", __func__);
                 return -EINVAL; /* TODO: more appropriate error? */
             }
             rdma_map->c->remote_map = remote_map;
 
-            debug(4, "%s: connection complete", __func__);
+            /* associate the new connection with the id */
+            event_copy.id->context = (void *) rdma_map->c;
 
+            debug(0, "%s: returned from rdma_new_connection", __func__);
+
+            /* try to connect to the server */
+            build_conn_params(&conn_param);
+
+retry:
+            ret = rdma_connect(event_copy.id, &conn_param);
+            if (ret)
+            {
+                if (errno == EINTR)
+                {
+                    goto retry;
+                }
+                else
+                {
+                    warning("%s: connect to server %s: %s",
+                            __func__, peername, strerror(errno));
+                    rdma_close_connection(rdma_map->c);
+                    rdma_map->c = NULL;
+                    return -EINVAL; /* TODO: more appropriate error? */
+                }
+            }
+        }
+        else if (event_copy.event == RDMA_CM_EVENT_ESTABLISHED)
+        {
+            /* this will happen after the server calls rdma_accept() */
+            debug(4, "%s: received event: %s",
+                  __func__, rdma_event_str(event_copy.event));
+
+            c = (rdma_connection_t *) event_copy.id->context;
+            /* TODO: make sure c == rdma_map->c? */
+
+            debug(4, "%s: connected, peername=%s", __func__, c->peername);
             break;
         }
         else if (event_copy.event == RDMA_CM_EVENT_ADDR_ERROR)
         {
-            gossip_err("Error: %s: got event %s.\n",
-                       __func__, rdma_event_str(event_copy.event));
+            error("%s: got event %s.",
+                  __func__, rdma_event_str(event_copy.event));
 
             if (!already_printed)
             {
@@ -4170,16 +4163,26 @@ static int rdma_client_event_loop(struct rdma_event_channel *ec,
                            "resolving a server address. If your servers have "
                            "both ethernet and IB interfaces, make sure you "
                            "are using the IB device name in your config and "
-                           "tab files.\n");
+                           "tab files.");
             }
 
             return -BMI_EHOSTNTFD;
         }
+        else if (event_copy.event == RDMA_CM_EVENT_ROUTE_ERROR)
+        {
+            error("%s: got event %s: status=%d (%s)",
+                  __func__,
+                  rdma_event_str(event_copy.event),
+                  event_copy.status,
+                  strerror(-event_copy.status));
+        }
         else
         {
-            gossip_err("%s: rdma_get_cm_event() found unhandled event %s",
-                       __func__, rdma_event_str(event_copy.event));
+            error("%s: rdma_get_cm_event() found unhandled event %s",
+                  __func__, rdma_event_str(event_copy.event));
         }
+
+        /* TODO: retry to connect if RDMA_CM_EVENT_REJECTED? */
     }
 
     return 0;
@@ -4249,6 +4252,9 @@ static int rdma_client_connect(rdma_method_addr_t *rdma_map,
         ret = -errno;
         goto error_out;
     }
+
+    gossip_err("%s: new id=%llu, fd=%d\n",
+               __func__, llu(int64_from_ptr(conn_id)), conn_id->channel->fd); 
 
     ret = rdma_resolve_addr(conn_id, NULL, addrinfo->ai_dst_addr, timeout_ms);
     if (ret)
@@ -4337,6 +4343,11 @@ static void rdma_server_init_listener(struct bmi_method_addr *addr)
         error_errno("%s: create RDMA_CM id", __func__);
     }
 
+    gossip_err("%s: listen_id=%llu, fd=%d\n",
+               __func__,
+               llu(int64_from_ptr(rdma_device->listen_id)),
+               rdma_device->listen_id->channel->fd);
+
 retry:
     ret = rdma_bind_addr(rdma_device->listen_id, (struct sockaddr *) &skin);
     if (ret)
@@ -4361,6 +4372,8 @@ retry:
         exit(1);
     }
 
+/* TODO: why doesn't it work asynchronously? */
+/* 
     flags = fcntl(rdma_device->listen_id->channel->fd, F_GETFL);
     if (flags < 0)
     {
@@ -4374,7 +4387,7 @@ retry:
         error_errno("%s: fcntl setfl nonblock listen id", __func__);
         exit(1);
     }
-
+*/
     timeout_ms = (int *) bmi_rdma_malloc(sizeof(int));
     if (timeout_ms)
     {
@@ -4416,6 +4429,8 @@ retry:
 void *rdma_server_accept_thread(void *arg)
 {
     struct rdma_cm_event *event = NULL;
+    struct rdma_cm_event event_copy;
+    rdma_connection_t *c = NULL;
     int ret = 0;
     int timeout_ms = 10000;
     struct rdma_conn *rc;
@@ -4442,113 +4457,132 @@ void *rdma_server_accept_thread(void *arg)
         gen_mutex_unlock(&accept_thread_mutex);
 
         /* wait for a connection request */
-        while (rdma_get_cm_event(rdma_device->listen_id->channel, &event) == 0)
+        /* TODO: will this block? should it? should I use a while loop? */
+        ret = rdma_get_cm_event(rdma_device->listen_id->channel, &event);
+        if (ret)
         {
-            struct rdma_cm_event event_copy;
+            error_errno("%s: rdma_get_cm_event failed", __func__);
+            continue;
+        }
 
-            memcpy(&event_copy, event, sizeof(*event));
-            rdma_ack_cm_event(event);
+        memcpy(&event_copy, event, sizeof(*event));
+        rdma_ack_cm_event(event);
 
-            /*
-             * TODO: should I use a while loop here? Will a connect request
-             *       always be the first event that happens on a server?
-             */
-            if (event_copy.event == RDMA_CM_EVENT_CONNECT_REQUEST)
-            {
-                debug(4, "%s: received event: %s",
-                      __func__, rdma_event_str(event_copy.event));
-
-                /* TODO: do I need to build the connection/context here? */
-                //struct rdma_conn_param conn_param;
-                //build_conn_params(&conn_param);
-
-                /* TODO: do I need to do pre-connection stuff here? */
-
-                /* TODO: do I need to pass any connection parameters? */
-                //ret = rdma_accept(event_copy.id, &conn_param);
-                /*
-                 * TODO: HAVEN'T CREATED THE QP YET!
-                 *       SERVER LOGIC IS FLAWED! NEEDS REWORK!
-                 */
-                ret = rdma_accept(event_copy.id, NULL);
-                if (ret)
-                {
-                    warning("%s: rdma_accept(): %s", __func__, strerror(errno));
-                    continue;
-                }
-
-                /* TODO: is this where I need to wait for
-                 *       RDMA_CM_EVENT_ESTABLISHED to occur? Or at least
-                 *       somewhere around here, before starting the
-                 *       rdma_server_process_client_thread?
-                 */
+        if (event_copy.event == RDMA_CM_EVENT_CONNECT_REQUEST)
+        {
+            debug(4, "%s: received event: %s",
+                  __func__, rdma_event_str(event_copy.event));
 
 #if 1 /* TODO: can we get rid of rc? */
-                rc = (struct rdma_conn *) bmi_rdma_malloc(sizeof(*rc));
-                if (!rc)
-                {
-                    warning("%s: unable to malloc rc, errno=%d",
-                            __func__, errno);
-                    sleep(30);
-                    continue;
-                }
-
-                rc->id = event_copy.id;
-                rc->hostname = strdup(
-                                inet_ntoa(rc->id->route.addr.dst_sin.sin_addr));
-                rc->port = ntohs(rc->id->route.addr.dst_sin.sin_port);
-                sprintf(rc->peername, "%s:%d", rc->hostname, rc->port);
-
-                debug(0, "%s: starting rdma_server_process_client_thread "
-                      "for channel=%d",
-                      __func__, rc->id->channel->fd);
-
-                /* start the client thread */
-                if (pthread_create(&thread,
-                                   NULL,
-                                   &rdma_server_process_client_thread,
-                                   rc))
-                {
-                    warning("%s: unable to create accept_client "
-                            "thread, errno=%d",
-                            __func__, errno);
-                    free(rc);
-                }
-#else
-//                conn_id = (struct rdma_cm_id *) bmi_rdma_malloc(sizeof(*conn_id));
-//                if (!conn_id)
-//                {
-//                    warning("%s: unable to malloc conn_id, errno=%d",
-//                            __func__, errno);
-//                    sleep(30);
-//                    continue;
-//                }
-//
-//                conn_id = event_copy.id;
-//
-//                debug(0, "%s: starting rdma_server_process_client_thread "
-//                      "for channel=%d",
-//                      __func__, conn_id->channel->fd);
-//
-//                /* start the client thread */
-//                if (pthread_create(&thread,
-//                                   NULL,
-//                                   &rdma_server_process_client_thread,
-//                                   conn_id))
-//                {
-//                    warning("%s: unable to create accept_client "
-//                            "thread, errno=%d",
-//                            __func__, errno);
-//                    free(conn_id);
-//                }
-#endif
-
-
-                /* TODO: break out of the loop or return? */
+            rc = (struct rdma_conn *) bmi_rdma_malloc(sizeof(rc));
+            if (!rc)
+            {
+                warning("%s: unable to malloc rc, errno=%d",
+                        __func__, errno);
+                sleep(30);
+                continue;
             }
 
-            /* TODO: do I need to handle a disconnect event here too? */
+            rc->id = event_copy.id;     /* id for new connection */
+            rc->hostname = strdup(
+                            inet_ntoa(rc->id->route.addr.dst_sin.sin_addr));
+            rc->port = ntohs(rc->id->route.addr.dst_sin.sin_port);
+            sprintf(rc->peername, "%s:%d", rc->hostname, rc->port);
+
+            debug(0,
+                "%s: starting rdma_server_process_client_thread for channel=%d",
+                __func__, rc->id->channel->fd);
+
+            /* start the client thread */
+            if (pthread_create(&thread,
+                               NULL,
+                               &rdma_server_process_client_thread,
+                               rc))
+            {
+                warning("%s: unable to create process_client thread, errno=%d",
+                        __func__, errno);
+                free(rc);
+            }
+#else
+//            conn_id = (struct rdma_cm_id *) bmi_rdma_malloc(sizeof(*conn_id));
+//            if (!conn_id)
+//            {
+//                warning("%s: unable to malloc conn_id, errno=%d",
+//                        __func__, errno);
+//                sleep(30);
+//                continue;
+//            }
+//
+//            conn_id = event_copy.id;
+//
+//            debug(0,
+//                "%s: starting rdma_server_process_client_thread for channel=%d",
+//                __func__, conn_id->channel->fd);
+//
+//            /* start the client thread */
+//            if (pthread_create(&thread,
+//                               NULL,
+//                               &rdma_server_process_client_thread,
+//                               conn_id))
+//            {
+//                warning("%s: unable to create accept_client thread, errno=%d",
+//                        __func__, errno);
+//                free(conn_id);
+//            }
+#endif
         }
+        else if (event_copy.event == RDMA_CM_EVENT_ESTABLISHED)
+        {
+            /* this will happen after rdma_accept() has been called
+             * from rdma_server_process_client_thread */
+
+            debug(4, "%s: received event: %s",
+                  __func__, rdma_event_str(event_copy.event));
+
+            c = (rdma_connection_t *) event_copy.id->context;
+
+            /* don't set reconnect flag on this addr; we are a server in this
+             * case and the peer will be responsible for maintaining the
+             * connection
+             */
+            //c->remote_map = rdma_alloc_method_addr(c, rc->hostname, rc->port, 0);
+            /* TODO: THIS IS ONLY TEMPORARY! Need to move the info stored
+             *       in struct rdma_conn into rdma_connection_t */
+            c->remote_map = rdma_alloc_method_addr(c,
+                        inet_ntoa(event_copy.id->route.addr.dst_sin.sin_addr),
+                        ntohs(event_copy.id->route.addr.dst_sin.sin_port),
+                        0);
+
+            /* register this address with the method control layer */
+            c->bmi_addr = bmi_method_addr_reg_callback(c->remote_map);
+            if (c->bmi_addr == 0)
+            {
+                error_xerrno(ENOMEM, "%s: bmi_method_addr_reg_callback",
+                             __func__);
+                /* TODO: break, cleanup, return null? */
+                break;
+            }
+
+            debug(0, "%s: accepted new connection from %s at server",
+                  __func__, c->peername);
+
+            /* TODO: cleanup rc? */
+        }
+        else if (event_copy.event == RDMA_CM_EVENT_DISCONNECTED)
+        {
+            debug(4, "%s: received event: %s",
+                  __func__, rdma_event_str(event_copy.event));
+
+            /* TODO: something... */
+        }
+        else
+        {
+            error("%s: unexpected event: %s",
+                  __func__, rdma_event_str(event_copy.event));
+            continue;
+        }
+
+        /* TODO: do I need to handle a disconnect event here, too? */
     }
 
     pthread_exit(0);
@@ -4590,56 +4624,36 @@ void *rdma_server_process_client_thread(void *arg)
     c = rdma_new_connection(rc->id, rc->peername, 1);
     if (!c)
     {
-        error_xerrno(EINVAL, "%s: new rdma connection failed", __func__);
+        error_xerrno(EINVAL, "%s: rdma_new_connection failed", __func__);
         goto out;
     }
     debug(0, "%s: returned from rdma_new_connection", __func__);
 
-    /* don't set reconnect flag on this addr; we are a server in this
-     * case and the peer will be responsible for maintaining the
-     * connection
-     */
-    c->remote_map = rdma_alloc_method_addr(c, rc->hostname, rc->port, 0);
+    /* associate the new connection with the id */
+    rc->id->context = (void *) c;
 
-    /* register this address with the method control layer */
-    c->bmi_addr = bmi_method_addr_reg_callback(c->remote_map);
-    if (c->bmi_addr == 0)
+    /* TODO: do I need to build the connection/context here? */
+    //struct rdma_conn_param conn_param;
+    //build_conn_params(&conn_param);
+
+    /* TODO: do I need to do pre-connection stuff here? */
+
+    /* TODO: do I need to pass any connection parameters? */
+    //ret = rdma_accept(rc->id, &conn_param);
+    ret = rdma_accept(rc->id, NULL);
+    if (ret)
     {
-        error_xerrno(ENOMEM, "%s: bmi_method_addr_reg_callback", __func__);
-        goto out;
+        warning("%s: rdma_accept(): %s", __func__, strerror(errno));
+        free(rc);       /* TODO: do this here? */
     }
-
-    debug(0, "%s: accepted new connection %s at server",
-          __func__, c->peername);
-    ret = 1;
 
 out:
     gen_mutex_unlock(&interface_mutex);
-    /* TODO: equivalent of closing a socket? */
 
-    /* TODO: !!! should we really be destroying the qp and id here?
-     *   - maybe they were only closing the socket here before because
-     *     the socket was only needed to setup the connection, but once
-     *     connected it wasn't needed anymore. However, I believe the id
-     *     and qp are still needed here.
+    /* TODO: should I free rc and rc->hostname here? are they still needed?
+     *       what about the id? how long is an rdma_cm_id needed? when do I
+     *       destroy it?
      */
-    if (rc)
-    {
-        if (rc->id)
-        {
-            if (rc->id->qp)
-            {
-                rdma_destroy_qp(rc->id);
-            }
-
-            rdma_destroy_id(rc->id);
-        }
-        if (rc->hostname)
-        {
-            free(rc->hostname);
-        }
-        free(rc);
-    }
 
     return NULL;
 }
@@ -5213,6 +5227,8 @@ static int build_rdma_context(void)
         return -EINVAL;
     }
 
+    /* TODO: ibv_req_notify_cq? */
+
     /* Use non-blocking IO on the async fd and completion fd */
     flags = fcntl(rd->ctx->async_fd, F_GETFL);
     if (flags < 0)
@@ -5302,7 +5318,7 @@ static int return_active_nic_handle(struct rdma_device_priv *rd,
      * nature that we had discussed */
     rd->nic_port = IBV_PORT;
 
-    dev_list = rdma_get_device(&num_devs);
+    dev_list = rdma_get_devices(&num_devs);
     if (num_devs <= 0)
     {
         error("%s: NO RDMA DEVICES FOUND", __func__);
@@ -5422,6 +5438,10 @@ static int BMI_rdma_finalize(void)
         pthread_join(accept_thread_id, NULL);
 
         channel = rdma_device->listen_id->channel;
+        gossip_err("%s: destroying id=%llu, fd=%d\n",
+                   __func__,
+                   llu(int64_from_ptr(rdma_device->listen_id)),
+                   rdma_device->listen_id->channel->fd);
         rdma_destroy_id(rdma_device->listen_id);
         rdma_destroy_event_channel(channel);
         channel = NULL;
