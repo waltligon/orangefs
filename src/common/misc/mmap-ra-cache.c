@@ -88,8 +88,6 @@ int pint_racache_set_buff_count_size(int bufcnt, int bufsz)
 
 int pint_racache_initialize(void)
 {
-    int ret = -1;
-
     if (!RACACHE_INITIALIZED())
     {
         if (racache_buf_init(&racache) < 0)
@@ -108,13 +106,11 @@ int pint_racache_initialize(void)
 
         gossip_debug(GOSSIP_RACACHE_DEBUG,
                      "ra_cache_initialized\n");
-        ret = 0;
     }
     else
     {
         gossip_debug(GOSSIP_RACACHE_DEBUG, "readahead cache already "
                      "initalized.  returning success\n");
-        ret = 0;
     }
     return 0;
 }
