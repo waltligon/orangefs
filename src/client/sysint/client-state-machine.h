@@ -481,12 +481,14 @@ struct PINT_client_rename_sm
     PVFS_ds_type types[2];           /* old/new object types */
     PVFS_capability caps[2];         /* old/new capabilities */
     PVFS_handle dirdata_handle[2];   /* old/new dirdata handles */
+    PVFS_handle dirent_handle[2];    /* old/new dirent handles for parent dirs */
     PVFS_SID *dirdata_sids[2];       /* old/new dirdata sids */
     int retry_count;
     int stored_error_code;
     int rmdirent_index;
     int target_dirent_exists;
     PVFS_handle old_dirdata_handle;
+    PVFS_handle old_dirent_handle;
 };
 
 struct PINT_client_mgmt_setparam_list_sm 

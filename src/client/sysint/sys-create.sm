@@ -1194,7 +1194,6 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
          * set size to 0 
          * we know that the file size is zero, since we just created it. 
          */ 
-
         ret = PINT_acache_update(sm_p->object_ref,
                                  &sm_p->u.create.attr,
                                  &data_size);
@@ -1202,6 +1201,12 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
         {
             js_p->error_code = ret;
         }
+
+        /* invalidate the acache entry for the parent directory, because we created a new directory entry which
+         * changes the timestamps on the directory.
+         */
+        PINT_acache_invalidate(sm_p->parent_ref);
+
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.create.retry_count < sm_p->msgarray_op.params.retry_limit))

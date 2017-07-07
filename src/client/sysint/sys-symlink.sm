@@ -234,6 +234,7 @@ PVFS_error PVFS_isys_symlink(char *entry_name,
 
     sm_p->parent_ref = parent_ref;
 
+    sm_p->parent_ref = parent_ref;
     PVFS_hint_copy(hints, &sm_p->hints);
 
     gossip_debug(
@@ -405,6 +406,8 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
 
     /* initialize the msgarray struct */
     PINT_msgpairarray_init(&sm_p->msgarray_op, sm_p->object_ref.sid_count);
+
+    PINT_debug_capability(&sm_p->getattr.attr.capability,"symlink dspace create");
 
     /* use msgpair array to send create to each SID */
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
@@ -704,6 +707,12 @@ static PINT_sm_action symlink_cleanup(struct PINT_smcb *smcb,
         PINT_ncache_update((const char*) sm_p->u.sym.link_name,
                            (const PVFS_object_ref*) &(sm_p->object_ref),
                            (const PVFS_object_ref*) &(sm_p->parent_ref));
+
+        /* Invalidate the symlink's parent from the acache, because
+         * creating a symlink entry modifies the timestamps on the
+         * directory.
+         */
+        PINT_acache_invalidate(sm_p->parent_ref);
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.sym.retry_count < sm_p->msgarray_op.params.retry_limit))
