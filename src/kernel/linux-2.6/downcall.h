@@ -171,7 +171,7 @@ typedef struct
 {
     union {
         int64_t value64;
-        int64_t value32[2];
+        int32_t value32[2];
     } u;
 } pvfs2_param_response_t;
 
