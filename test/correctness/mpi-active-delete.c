@@ -52,6 +52,7 @@ int main(
     int current_deleter = 0;
     int delete_tries=0;
     unsigned int DELETE_MAX=5;
+    int increase_sleep_time=0;
 
     /* startup MPI and determine the rank of this process */
     MPI_Init(&argc, &argv);
@@ -82,11 +83,13 @@ int main(
             }
             sprintf(file, "%s/%d", opt_dir, current_deleter);
             delete_tries=0;
+            increase_sleep_time=0;
             while (1)
             {
                delete_tries++;
-               sleep(SLEEP_TIME);
-               fprintf(stderr, "Deleting: %s: try #%d\n", file, delete_tries);
+               sleep(SLEEP_TIME+increase_sleep_time);
+               fprintf(stderr, "Deleting: %s: try #%d sleep time increase(%d)\n", file, delete_tries,increase_sleep_time);
+               increase_sleep_time += 30;
 
                ret = unlink(file);
                if(ret < 0)
