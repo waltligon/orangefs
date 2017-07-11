@@ -18,7 +18,6 @@
 #include "security-util.h"
 #include "pint-cached-config.h"
 #include "pint-util.h"
-#include "config-utils.h"
 
 /* Implementation notes
  *
@@ -782,7 +781,7 @@ static PINT_sm_action remove_rebuild_dirdata_handle_local(
     int ret = -PVFS_ENOMEM;
     job_id_t tmp_id;
     PVFS_handle_extent_array extent_array;
-    server_configuration_s *user_opts = PINT_get_server_config();
+    server_configuration_s *user_opts = PINT_server_config_mgr_get_config();
 
     /* save error_code */
     gossip_debug(

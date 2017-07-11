@@ -36,7 +36,7 @@
 #include "state-machine.h"
 #include "pint-event.h"
 #include "pint-perf-counter.h"
-#include "config-utils.h"
+#include "server-config-mgr.h"
 
 extern job_context_id server_job_context;
 
@@ -729,7 +729,7 @@ typedef struct PINT_server_op
 #define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb, __s_op, __handle, __fs_id, __location, __req, __task_id) \
     do { \
       char server_name[1024]; \
-      struct server_configuration_s *server_config = PINT_get_server_config(); \
+      struct server_configuration_s *server_config = PINT_server_config_mgr_get_config(); \
       __s_op = malloc(sizeof(struct PINT_server_op)); \
       if(!__s_op) { return -PVFS_ENOMEM; } \
       memset(__s_op, 0, sizeof(struct PINT_server_op)); \

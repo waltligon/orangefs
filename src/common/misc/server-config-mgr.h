@@ -9,7 +9,6 @@
 
 #include "pvfs2-internal.h"
 #include "server-config.h"
-#include "config-utils.h"
 
 int PINT_server_config_mgr_initialize(void);
 
@@ -33,15 +32,21 @@ void __PINT_server_config_mgr_put_config(
 
 int PINT_server_config_mgr_get_abs_min_handle_recycle_time(void);
 
-/* client and server retrieve fs configuration from different sources */
+
+/* client and server retrieve system configuration from different sources */
 #if defined(__PVFS2_CLIENT__)
+
 #define PINT_server_config_mgr_get_config __PINT_server_config_mgr_get_config
 #define PINT_server_config_mgr_put_config __PINT_server_config_mgr_put_config
+
 #elif defined(__PVFS2_SERVER__)
-#include "src/server/pvfs2-server.h"
+
 #define PINT_server_config_mgr_get_config(__fsid) PINT_get_server_config()
+#include "config-utils.h"
 static inline void PINT_server_config_mgr_put_config(
     struct server_configuration_s *config_s) { return; }
+#define PINT_server_config_mgr_set_config(__cfg) PINT_set_server_config(__cfg)
+
 #endif
 
 #endif  /* __SERVER_CONFIG_MGR_H */

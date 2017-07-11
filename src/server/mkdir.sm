@@ -21,7 +21,6 @@
 #include "pvfs2-dist-basic.h"
 #include "dist-dir-utils.h"
 #include "pint-uid-map.h"
-#include "config-utils.h"
 
 
 enum 
@@ -269,7 +268,7 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
     PVFS_object_attr *attr;
     int num_total_dirdata_servers=0, num_initial_dirdata_servers=0, num_meta=0,
         split_size=0;
-    server_configuration_s *user_opts = PINT_get_server_config();
+    server_configuration_s *user_opts = PINT_server_config_mgr_get_config();
     int ret = -1;
     unsigned char *c;
     int i;
@@ -399,7 +398,7 @@ static PINT_sm_action mkdir_dirdata_dspace_create(
     int ret = -PVFS_ENOMEM;
     job_id_t tmp_id;
     PVFS_handle_extent_array extent_array;
-    server_configuration_s *user_opts = PINT_get_server_config();
+    server_configuration_s *user_opts = PINT_server_config_mgr_get_config();
 
     attr = (&s_op->attr);
 

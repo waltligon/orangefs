@@ -20,7 +20,6 @@
 #include "pint-request.h"
 #include "pint-perf-counter.h"
 #include "pint-security.h"
-#include "config-utils.h"
 
 %%
 
@@ -129,7 +128,7 @@ static PINT_sm_action small_io_start_job(
  
     /* figure out if the fs config has trove data sync turned on or off
      */
-    server_config = PINT_get_server_config();
+    server_config = PINT_server_config_mgr_get_config();
     if(!server_config)
     {
         gossip_err("small_io: server config is NULL!\n");

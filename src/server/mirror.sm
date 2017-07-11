@@ -17,7 +17,6 @@
 #include "pint-cached-config.h"
 #include "client-state-machine.h"
 #include "security-util.h"
-#include "config-utils.h"
 
 /*
  * now included from client-state-machine.h
@@ -506,7 +505,7 @@ static PINT_sm_action post_ack_and_flow (struct PINT_smcb *smcb,
     struct filesystem_configuration_s *cur_fs = NULL;
     struct server_configuration_s *server_config = NULL;
 
-    server_config = PINT_get_server_config();
+    server_config = PINT_server_config_mgr_get_config();
     cur_fs = PINT_config_find_fs_id(server_config,reqmir_p->fs_id);
          
     /*post write-ack and flow for each destination handle*/
@@ -719,7 +718,7 @@ static PINT_sm_action check_comm ( struct PINT_smcb *smcb, job_status_s *js_p)
     struct filesystem_configuration_s *cur_fs = NULL;
     struct server_configuration_s *server_config = NULL;
 
-    server_config = PINT_get_server_config();
+    server_config = PINT_server_config_mgr_get_config();
     cur_fs = PINT_config_find_fs_id(server_config,reqmir_p->fs_id);
   
     if( cur_fs == NULL )
@@ -1057,3 +1056,13 @@ struct PINT_server_req_params pvfs2_mirror_params =
 	.get_object_ref = PINT_get_object_ref_mirror,
 	.state_machine = &pvfs2_mirror_sm
 };
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */
+

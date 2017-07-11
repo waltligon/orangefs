@@ -35,7 +35,6 @@
 #include "pint-uid-map.h"
 #include "check.h"
 #include "capcache.h"
-#include "config-utils.h"
 
 #if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
 #define ENABLE_SECURITY_MODE
@@ -1591,7 +1590,7 @@ static PINT_sm_action getattr_create_capability(
     
     resp_attr->capability.fsid = s_op->u.getattr.fs_id;
 
-    config = PINT_get_server_config();
+    config = PINT_server_config_mgr_get_config();
     resp_attr->capability.issuer = 
         (char *) malloc(strlen(config->server_alias) + 3);
     if (resp_attr->capability.issuer == NULL)
