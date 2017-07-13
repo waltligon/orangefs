@@ -4076,6 +4076,7 @@ static int rdma_client_event_loop(struct rdma_event_channel *ec,
     int ret = -1;
     static int already_printed = 0;
     rdma_connection_t *c = NULL;
+    int num_retries = 0;    /* number of retries for rdma_resolve_route() */
 
     while (rdma_get_cm_event(ec, &event) == 0)
     {
@@ -4087,6 +4088,7 @@ static int rdma_client_event_loop(struct rdma_event_channel *ec,
             /* TODO: does the rdma_resolve_route() call need to be after
              *       I have registered the memory regions, created the queue
              *       pair, and posted receives? */
+retry_resolve:
             ret = rdma_resolve_route(event_copy.id, timeout_ms);
             if (ret)
             {
@@ -4123,13 +4125,13 @@ static int rdma_client_event_loop(struct rdma_event_channel *ec,
             /* try to connect to the server */
             build_conn_params(&conn_param);
 
-retry:
+retry_connect:
             ret = rdma_connect(event_copy.id, &conn_param);
             if (ret)
             {
                 if (errno == EINTR)
                 {
-                    goto retry;
+                    goto retry_connect;
                 }
                 else
                 {
@@ -4177,6 +4179,15 @@ retry:
                   rdma_event_str(event_copy.event),
                   event_copy.status,
                   strerror(-event_copy.status));
+
+            while (num_retries < 10)
+            {
+                warning("%s: retrying rdma_resolve_route()", __func__);
+                num_retries++;
+                goto retry_resolve;
+            }
+
+            return event_copy.status;
         }
         else
         {
@@ -4212,7 +4223,7 @@ static int rdma_client_connect(rdma_method_addr_t *rdma_map,
     struct rdma_addrinfo *addrinfo = NULL;
     struct rdma_cm_id *conn_id = NULL;
     struct rdma_event_channel *ec = NULL;
-    int timeout_ms = 500;   /* TODO: choose optimized timeout value */
+    int timeout_ms = 1000;   /* TODO: choose optimized timeout value */
 
     debug(4, "%s: starting", __func__);
 
