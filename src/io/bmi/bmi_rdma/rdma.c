@@ -3954,6 +3954,7 @@ static void rdma_close_connection(rdma_connection_t *c)
     /* disconnect (also transfers associated QP to error state */
     //rdma_disconnect(rc->id);
 
+#if 0
     /* TODO: is this loop necessary? do we need to wait for the event? */
     /* wait for disconnected event */
     while (rdma_get_cm_event(rc->id->channel, &event) == 0)
@@ -3972,6 +3973,7 @@ static void rdma_close_connection(rdma_connection_t *c)
          *       what we expected is actually what disconnected?
          */
     }
+#endif
 
     /* destroy the queue pair */
     if (rc->qp)
