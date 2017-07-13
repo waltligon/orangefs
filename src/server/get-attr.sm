@@ -128,36 +128,7 @@ nested machine pvfs2_get_attr_work_sm
     {
         run getattr_datafile_handles_safety_check;
         default => read_metafile_distribution;
-        /*
-         success => read_mirrored_copies_count_if_required; 
-         default => check_if_capability_required;
-         */
     }
-
-    /* V3 should not need these states any more */
-    /*
-    state read_mirrored_copies_count_if_required
-    {
-        run getattr_read_mirrored_copies_count_if_required;
-        SKIP_NEXT_STATE => read_metafile_distribution_if_required;
-        default => read_mirrored_handles_if_required;
-    }
-
-    state read_mirrored_handles_if_required
-    {
-        run getattr_read_mirrored_handles_if_required;
-        SKIP_NEXT_STATE => read_metafile_distribution_if_required;
-        default => mirrored_handles_safety_check;
-    }
- 
-    state mirrored_handles_safety_check
-    {
-        run getattr_mirrored_handles_safety_check;
-        success => read_metafile_distribution_if_required;
-        default => setup_resp;
-    }
-    */
-    /* V3 End of old states */
 
     state read_metafile_distribution
     {
@@ -170,27 +141,6 @@ nested machine pvfs2_get_attr_work_sm
         run interpret_metafile_distribution;
         default => check_if_capability_required;
     }
-
-/*
-    state detect_stuffed
-    {
-        run getattr_detect_stuffed;
-        default => read_stuffed_size;
-    }
-
-    state read_stuffed_size
-    {
-        run getattr_read_stuffed_size;
-        success => interpret_stuffed_size;
-        default => check_if_capability_required;
-    }
-
-    state interpret_stuffed_size
-    {
-        run getattr_interpret_stuffed_size;
-        default => check_if_capability_required;
-    }
-*/
 
 /* DIRECTORY */
 

@@ -231,10 +231,14 @@
                      object_name, PVFS_OID_str(&parent_ref.handle),
                      parent_ref.fs_id);
 
-        /* NOTE: This state machine previously multiplied the default job timeout
-         * by five to allow for potentially long sync delays.  We instead now set
-         * the default client BMI timeout higher for all operations: if a sync can 
-         * go slow then so can any other arbitrary operation queued behind it. -PHC
+        /* NOTE: This state machine previously 
+         * multiplied the default job timeout
+         * by five to allow for potentially long
+         * sync delays.  We instead now set
+         * the default client BMI timeout higher
+         * for all operations: if a sync can 
+         * go slow then so can any other arbitrary
+         * operation queued behind it. -PHC
          */
         
         return PINT_client_state_machine_post(smcb,
@@ -370,10 +374,8 @@
         /*
          * Find metadata replication factor from configuration
          */
-        server_config = PINT_get_server_config_struct(
-                                        sm_p->u.lookup.starting_refn.fs_id);
-        cur_fs = PINT_config_find_fs_id(server_config,
-                                        sm_p->u.lookup.starting_refn.fs_id);
+        server_config = PINT_get_server_config_struct(sm_p->parent_ref.fs_id);
+        cur_fs = PINT_config_find_fs_id(server_config,sm_p->parent_ref.fs_id);
         metasidcnt = cur_fs->metadata_replication_factor;
         PINT_put_server_config_struct(server_config);
 

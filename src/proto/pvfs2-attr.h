@@ -42,6 +42,9 @@
 
 /* New simpler mask system, built on old system */
 
+#define PVFS_ATTR_DEFAULT \
+             PVFS_ATTR_READ_ALL_LATEST
+
 #define PVFS_ATTR_READ_ALL \
              PVFS_ATTR_READ_ALL_FASTEST 
 
@@ -59,6 +62,9 @@
              PVFS_ATTR_CAPABILITY  | PVFS_ATTR_META_ALL | \
              PVFS_ATTR_DIR_ALL     | PVFS_ATTR_DATA_ALL | \
              PVFS_ATTR_SYMLNK_ALL  | PVFS_ATTR_DIRDATA_ALL)
+
+#define PVFS_ATTR_READ_LATEST \
+            (PVFS_ATTR_COMMON_ALL  | PVFS_ATTR_LATEST) \
 
 #define PVFS_ATTR_FASTEST            (1 << 15)
 #define PVFS_ATTR_LATEST             (1 << 16)

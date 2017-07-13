@@ -1294,7 +1294,9 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
             gossip_debug(GOSSIP_IO_DEBUG, "%s: entered with error: %s\n",
                          __func__, buf);
         }
-        return js_p->error_code;
+        /* attempt to free resources */
+        goto free_resources;
+        /*return js_p->error_code;*/
     }
 
     /* decode the response from the server */
@@ -1307,7 +1309,9 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
             buf[sizeof(buf)-1] = '\0';
             gossip_debug(GOSSIP_IO_DEBUG, "%s: failed: %s\n", __func__, buf);
         }
-        return ret;
+        /* attempt to free resources */
+        goto free_resources;
+        /*return ret;*/
     }
 
     /* save the datafile size */
@@ -1329,6 +1333,7 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
         break;
     }
 
+free_resources:
     /* now we can destroy I/O request response resources */
     ret = PINT_serv_free_msgpair_resources(&msg_p->encoded_req,
                                            msg_p->encoded_resp_p,
@@ -1346,6 +1351,10 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
         return ret;
     }
 
+    if (js_p->error_code)
+    {
+        ret = js_p->error_code;
+    }
     return ret;
 }
 
@@ -1866,26 +1875,29 @@ int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
                                      PVFS_BMI_addr_t *svr_addr_p,
                                      int max_resp_sz)
 {
-    int ret = -PVFS_EINVAL;
+    int ret = 0;
 
-    if (encoded_req_p &&
-        encoded_resp_p &&
-        decoded_msg_p &&
-        svr_addr_p)
+    if (encoded_req_p)
     {
         PINT_encode_release(encoded_req_p, PINT_ENCODE_REQ);
         memset(encoded_req_p, 0, sizeof(*encoded_req_p));
-
+    }
+    if (encoded_resp_p)
+    {
+        /* did we used to do this?  why no more? */
+    }
+    if (decoded_msg_p)
+    {
         /* this should release the msg struct but not the resp buffer
          * it points to
          */
         PINT_decode_release(decoded_msg_p, PINT_DECODE_RESP);
         memset(decoded_msg_p, 0, sizeof(*decoded_msg_p));
-
-        BMI_memfree(*svr_addr_p, encoded_resp_p, max_resp_sz, BMI_RECV);
+    }
+    if (svr_addr_p)
+    {
+        ret = BMI_memfree(*svr_addr_p, encoded_resp_p, max_resp_sz, BMI_RECV);
         encoded_resp_p = NULL;
-
-        ret = 0;
     }
     return ret;
 }
