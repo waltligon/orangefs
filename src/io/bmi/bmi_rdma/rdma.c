@@ -4009,10 +4009,10 @@ static void rdma_close_connection(rdma_connection_t *c)
     {
         channel = rc->id->channel;
         
-        gossip_err("%s: destroying id=%llu, fd=%d\n",
-                   __func__,
-                   llu(int64_from_ptr(rc->id)),
-                   channel->fd);
+        debug(0, "%s: destroying id=%llu, fd=%d\n",
+              __func__,
+              llu(int64_from_ptr(rc->id)),
+              channel->fd);
 
         ret = rdma_destroy_id(rc->id);
         if (ret < 0)
@@ -4266,8 +4266,8 @@ static int rdma_client_connect(rdma_method_addr_t *rdma_map,
         goto error_out;
     }
 
-    gossip_err("%s: new id=%llu, fd=%d\n",
-               __func__, llu(int64_from_ptr(conn_id)), conn_id->channel->fd); 
+    debug(0, "%s: new id=%llu, fd=%d\n",
+          __func__, llu(int64_from_ptr(conn_id)), conn_id->channel->fd); 
 
     ret = rdma_resolve_addr(conn_id, NULL, addrinfo->ai_dst_addr, timeout_ms);
     if (ret)
@@ -4356,10 +4356,10 @@ static void rdma_server_init_listener(struct bmi_method_addr *addr)
         error_errno("%s: create RDMA_CM id", __func__);
     }
 
-    gossip_err("%s: listen_id=%llu, fd=%d\n",
-               __func__,
-               llu(int64_from_ptr(rdma_device->listen_id)),
-               rdma_device->listen_id->channel->fd);
+    debug(0, "%s: listen_id=%llu, fd=%d\n",
+          __func__,
+          llu(int64_from_ptr(rdma_device->listen_id)),
+          rdma_device->listen_id->channel->fd);
 
 retry:
     ret = rdma_bind_addr(rdma_device->listen_id, (struct sockaddr *) &skin);
@@ -5451,10 +5451,10 @@ static int BMI_rdma_finalize(void)
         pthread_join(accept_thread_id, NULL);
 
         channel = rdma_device->listen_id->channel;
-        gossip_err("%s: destroying id=%llu, fd=%d\n",
-                   __func__,
-                   llu(int64_from_ptr(rdma_device->listen_id)),
-                   rdma_device->listen_id->channel->fd);
+        debug(0, "%s: destroying id=%llu, fd=%d\n",
+              __func__,
+              llu(int64_from_ptr(rdma_device->listen_id)),
+              rdma_device->listen_id->channel->fd);
         rdma_destroy_id(rdma_device->listen_id);
         rdma_destroy_event_channel(channel);
         channel = NULL;
