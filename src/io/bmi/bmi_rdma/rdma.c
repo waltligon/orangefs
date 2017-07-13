@@ -4474,7 +4474,7 @@ void *rdma_server_accept_thread(void *arg)
                   __func__, rdma_event_str(event_copy.event));
 
 #if 1 /* TODO: can we get rid of rc? */
-            rc = (struct rdma_conn *) bmi_rdma_malloc(sizeof(rc));
+            rc = (struct rdma_conn *) bmi_rdma_malloc(sizeof(*rc));
             if (!rc)
             {
                 warning("%s: unable to malloc rc, errno=%d",
