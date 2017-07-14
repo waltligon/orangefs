@@ -3136,6 +3136,17 @@ restart:
             msg_header_eager_t mh_eager;
             char *ptr = rq->bh->buf;
             rdma_connection_t *c = rq->c;
+            
+            /* TODO: is there a better way to do this? */
+            /* don't try to process the recv until the server has all the
+             * information it needs about the connection */
+            if (!c->remote_map)
+            {
+                /* NOTE: this should only happen occassionally when a new
+                 *       client first connects */
+                debug(0, "%s: waiting...", __func__);
+                continue;
+            }
 
             decode_msg_header_eager_t(&ptr, &mh_eager);
 
@@ -4485,6 +4496,8 @@ void *rdma_server_accept_thread(void *arg)
         {
             debug(4, "%s: received event: %s",
                   __func__, rdma_event_str(event_copy.event));
+            debug(0, "%s: CONNECT_REQUEST: id = %llu",
+                  __func__, llu(event_copy.id));
 
 #if 1 /* TODO: can we get rid of rc? */
             rc = (struct rdma_conn *) bmi_rdma_malloc(sizeof(*rc));
@@ -4551,6 +4564,8 @@ void *rdma_server_accept_thread(void *arg)
 
             debug(4, "%s: received event: %s",
                   __func__, rdma_event_str(event_copy.event));
+            debug(0, "%s: EVENT_ESTABLISHED: id = %llu",
+                  __func__, llu(event_copy.id));
 
             c = (rdma_connection_t *) event_copy.id->context;
 
