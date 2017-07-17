@@ -157,8 +157,6 @@ PVFS_DEBUG_MASK(GOSSIP_WIN_CLIENT_DEBUG);
 PVFS_DEBUG_MASK(GOSSIP_SECURITY_DEBUG);
 #define GOSSIP_USRINT_DEBUG_INIT              (uint64_t)0 , ((uint64_t)1 << 59)
 PVFS_DEBUG_MASK(GOSSIP_USRINT_DEBUG);
-#define GOSSIP_RCACHE_DEBUG_INIT              (uint64_t)0 , ((uint64_t)1 << 60)
-PVFS_DEBUG_MASK(GOSSIP_RCACHE_DEBUG);
 #define GOSSIP_SECCACHE_DEBUG_INIT            (uint64_t)0 , ((uint64_t)1 << 61)
 PVFS_DEBUG_MASK(GOSSIP_SECCACHE_DEBUG);
 #define GOSSIP_SIDCACHE_DEBUG_INIT            (uint64_t)0 , ((uint64_t)1 << 62)
@@ -394,8 +392,6 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "seccache", {GOSSIP_SECCACHE_DEBUG_INIT} },
     /* Client User Interface */
     { "usrint", {GOSSIP_USRINT_DEBUG_INIT} },
-    /* rcache */
-    { "rcache", {GOSSIP_RCACHE_DEBUG_INIT} },
     /* Sidcache debugging */
     { "sidcache", {GOSSIP_SIDCACHE_DEBUG_INIT} },
     /* Everything except the periodic events.  Useful for debugging */

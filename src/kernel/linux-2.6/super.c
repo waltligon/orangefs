@@ -1479,7 +1479,7 @@ struct super_block *pvfs2_get_sb(struct file_system_type *fst,
 #endif
 
     gossip_debug(GOSSIP_SUPER_DEBUG,
-                 "pvfs2_get_sb: called with devname %s\n", devname);
+                 "%s: called with devname %s\n", __func__, devname);
 
     if (devname)
     {
