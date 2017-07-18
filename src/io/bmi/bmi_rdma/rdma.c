@@ -56,11 +56,11 @@ rdma_device_t *rdma_device __hidden = NULL;
 /* RDMA CM listen backlog */
 static int listen_backlog = 16384;
 
-/* accept thread variables */
-static gen_mutex_t accept_thread_mutex = GEN_MUTEX_INITIALIZER;
-int accept_thread_shutdown = 0;
-gen_thread_t accept_thread_id;
-int accept_timeout_ms = 2000;
+/* listener thread variables */
+static gen_mutex_t listener_thread_mutex = GEN_MUTEX_INITIALIZER;
+int listener_thread_shutdown = 0;
+gen_thread_t listener_thread_id;
+//int listener_timeout_ms = 2000;   /* TODO: okay to get rid of? */
 
 /* constants used to initialize infiniband device */
 static const int IBV_PORT = 1;  /* TODO: what if it isn't Port 1? */
@@ -313,9 +313,9 @@ static int rdma_client_connect(rdma_method_addr_t *rdma_map,
 
 static void rdma_server_init_listener(struct bmi_method_addr *addr);
 
-void *rdma_server_accept_thread(void *arg);
+void *rdma_server_listener_thread(void *arg);
 
-void *rdma_server_process_client_thread(void *arg);
+void *rdma_server_accept_client_thread(void *arg);
 
 static int rdma_block_for_activity(int timeout_ms);
 
@@ -3589,7 +3589,7 @@ static rdma_connection_t *rdma_new_connection(struct rdma_cm_id *id,
     }
 
     /* TODO: is there anything that was previously taken care of in
-     * init_connection_modify_qp() that still needs to be donw?
+     * init_connection_modify_qp() that still needs to be done?
      *    - the local ack timeout (previously attr.timeout = 14 in
      *      init_connection_modify_qp) is set from the subnet_timeout value
      *      from opensm when using rdma_cm. It is currently set to 18. You
@@ -3974,7 +3974,7 @@ static void rdma_close_connection(rdma_connection_t *c)
         rdma_ack_cm_event(event);
 
         /* TODO: I think maybe I should be checking for this in the
-         *       server_accept_thread and client_event_loop instead */
+         *       server_listener_thread and client_event_loop instead */
         if (event_copy.event == RDMA_CM_EVENT_DISCONNECTED)
         {
             break;
@@ -4346,7 +4346,6 @@ static void rdma_server_init_listener(struct bmi_method_addr *addr)
     struct sockaddr_in skin;
     rdma_method_addr_t *rc = addr->method_data;
     struct rdma_event_channel *ec = NULL;
-    int *timeout_ms;
     int ret = 0;
 
     memset(&skin, 0, sizeof(skin));
@@ -4412,75 +4411,55 @@ retry:
         exit(1);
     }
 */
-    timeout_ms = (int *) bmi_rdma_malloc(sizeof(int));
-    if (timeout_ms)
+
+    /* start the listener thread */
+    debug(0, "%s: starting rdma_server_listener_thread", __func__);
+    if (pthread_create(&listener_thread_id,
+                       NULL,
+                       &rdma_server_listener_thread,
+                       NULL))
     {
-        *timeout_ms = accept_timeout_ms;
-        /* start the accept thread */
-        debug(0, "%s: starting rdma_server_accept_thread", __func__);
-        if (pthread_create(&accept_thread_id,
-                           NULL,
-                           &rdma_server_accept_thread,
-                           timeout_ms))
-        {
-            error("%s: unable to start accept thread, errno=%d",
-                  __func__, errno);
-            exit(1);
-        }
-    }
-    else
-    {
-        error("%s: unable to malloc memory for timeout_ms, errno=%d",
-              __func__, errno);
+        error("%s: unable to start listener thread, errno=%d", __func__, errno);
         exit(1);
     }
 }
 
 /*
- * rdma_server_accept_thread()
+ * rdma_server_listener_thread()
+ * TODO: should this be rdma_server_event_loop() instead?
  *
  * Description:
- *  Server thread that waits for a connection request event from the client to
- *  show up on the listen id's event channel and accepts it, then starts the
- *  server-side client thread.
+ *  Event handler for server-side RDMA Communication Manager events.
  *
- * Params (TODO):
- *  [in] arg - timeout_ms passed as thread arg to pthread_create?
+ * Params:
+ *  None
  *
  * Returns:
  *  TODO - doesn't? not until server is stopped??
  */
-void *rdma_server_accept_thread(void *arg)
+void *rdma_server_listener_thread(void *arg)
 {
     struct rdma_cm_event *event = NULL;
     struct rdma_cm_event event_copy;
     rdma_connection_t *c = NULL;
     int ret = 0;
-    int timeout_ms = 10000;
     struct rdma_conn *rc;
     //struct rdma_cm_id *conn_id;
     gen_thread_t thread;
 
-    if (arg)
-    {
-        timeout_ms = *(int *) arg;
-        free(arg);
-    }
-
-    debug(0, "%s: starting, timeout_ms=%d", __func__, timeout_ms);
+    debug(0, "%s: starting", __func__);
 
     for (;;)
     {
         /* check for shutdown */
-        gen_mutex_lock(&accept_thread_mutex);
-        if (accept_thread_shutdown)
+        gen_mutex_lock(&listener_thread_mutex);
+        if (listener_thread_shutdown)
         {
-            gen_mutex_unlock(&accept_thread_mutex);
+            gen_mutex_unlock(&listener_thread_mutex);
             break;
         }
-        gen_mutex_unlock(&accept_thread_mutex);
+        gen_mutex_unlock(&listener_thread_mutex);
 
-        /* wait for a connection request */
         /* TODO: will this block? should it? should I use a while loop? */
         ret = rdma_get_cm_event(rdma_device->listen_id->channel, &event);
         if (ret)
@@ -4516,16 +4495,16 @@ void *rdma_server_accept_thread(void *arg)
             sprintf(rc->peername, "%s:%d", rc->hostname, rc->port);
 
             debug(0,
-                "%s: starting rdma_server_process_client_thread for channel=%d",
+                "%s: starting rdma_server_accept_client_thread for channel=%d",
                 __func__, rc->id->channel->fd);
 
-            /* start the client thread */
+            /* start a thread to accept the new client connection */
             if (pthread_create(&thread,
                                NULL,
-                               &rdma_server_process_client_thread,
+                               &rdma_server_accept_client_thread,
                                rc))
             {
-                warning("%s: unable to create process_client thread, errno=%d",
+                warning("%s: unable to create accept_client thread, errno=%d",
                         __func__, errno);
                 free(rc);
             }
@@ -4542,13 +4521,13 @@ void *rdma_server_accept_thread(void *arg)
 //            conn_id = event_copy.id;
 //
 //            debug(0,
-//                "%s: starting rdma_server_process_client_thread for channel=%d",
+//                "%s: starting rdma_server_accept_client_thread for channel=%d",
 //                __func__, conn_id->channel->fd);
 //
-//            /* start the client thread */
+//            /* start a thread to accept the new client connection */
 //            if (pthread_create(&thread,
 //                               NULL,
-//                               &rdma_server_process_client_thread,
+//                               &rdma_server_accept_client_thread,
 //                               conn_id))
 //            {
 //                warning("%s: unable to create accept_client thread, errno=%d",
@@ -4560,7 +4539,7 @@ void *rdma_server_accept_thread(void *arg)
         else if (event_copy.event == RDMA_CM_EVENT_ESTABLISHED)
         {
             /* this will happen after rdma_accept() has been called
-             * from rdma_server_process_client_thread */
+             * from rdma_server_accept_client_thread */
 
             debug(4, "%s: received event: %s",
                   __func__, rdma_event_str(event_copy.event));
@@ -4617,10 +4596,10 @@ void *rdma_server_accept_thread(void *arg)
 }
 
 /*
- * rdma_server_process_client_thread()
+ * rdma_server_accept_client_thread()
  *
  * Description:
- *  Server-side thread that ... creates a new connection to the client???
+ *  Server-side thread that accepts a new connection from a client.
  *
  * Params (TODO):
  *  [] arg -
@@ -4629,9 +4608,8 @@ void *rdma_server_accept_thread(void *arg)
  *  TODO
  *
  * TODO: why is this a thread? (many clients/connections?)
- *       why is it called the client thread? Or is it "process client thread"?
  */
-void *rdma_server_process_client_thread(void *arg)
+void *rdma_server_accept_client_thread(void *arg)
 {
     rdma_connection_t *c;
     struct rdma_conn *rc;
@@ -5457,13 +5435,13 @@ static int BMI_rdma_finalize(void)
     {
         rdma_method_addr_t *rdma_map = rdma_device->listen_addr->method_data;
 
-        /* tell the accept thread to terminate */
-        gen_mutex_lock(&accept_thread_mutex);
-        accept_thread_shutdown = 1;
-        gen_mutex_unlock(&accept_thread_mutex);
+        /* tell the listener thread to terminate */
+        gen_mutex_lock(&listener_thread_mutex);
+        listener_thread_shutdown = 1;
+        gen_mutex_unlock(&listener_thread_mutex);
 
-        /* wait for the accept thread to end */
-        pthread_join(accept_thread_id, NULL);
+        /* wait for the listener thread to end */
+        pthread_join(listener_thread_id, NULL);
 
         channel = rdma_device->listen_id->channel;
         debug(0, "%s: destroying id=%llu, fd=%d\n",
