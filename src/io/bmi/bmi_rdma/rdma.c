@@ -60,7 +60,7 @@ static int listen_backlog = 16384;
 static gen_mutex_t listener_thread_mutex = GEN_MUTEX_INITIALIZER;
 int listener_thread_shutdown = 0;
 gen_thread_t listener_thread_id;
-//int listener_timeout_ms = 2000;   /* TODO: okay to get rid of? */
+int listener_timeout_ms = 2000;   /* TODO: test this, may be too long */
 
 /* constants used to initialize infiniband device */
 static const int IBV_PORT = 1;  /* TODO: what if it isn't Port 1? */
@@ -4346,6 +4346,7 @@ static void rdma_server_init_listener(struct bmi_method_addr *addr)
     struct sockaddr_in skin;
     rdma_method_addr_t *rc = addr->method_data;
     struct rdma_event_channel *ec = NULL;
+    int *timeout_ms;
     int ret = 0;
 
     memset(&skin, 0, sizeof(skin));
@@ -4395,8 +4396,7 @@ retry:
         exit(1);
     }
 
-/* TODO: why doesn't it work asynchronously? */
-/* 
+    /* make rdma_get_cm_event() non-blocking for the listen_id */
     flags = fcntl(rdma_device->listen_id->channel->fd, F_GETFL);
     if (flags < 0)
     {
@@ -4410,16 +4410,28 @@ retry:
         error_errno("%s: fcntl setfl nonblock listen id", __func__);
         exit(1);
     }
-*/
 
-    /* start the listener thread */
-    debug(0, "%s: starting rdma_server_listener_thread", __func__);
-    if (pthread_create(&listener_thread_id,
-                       NULL,
-                       &rdma_server_listener_thread,
-                       NULL))
+    timeout_ms = (int *) bmi_rdma_malloc(sizeof(int));
+    if (timeout_ms)
     {
-        error("%s: unable to start listener thread, errno=%d", __func__, errno);
+        *timeout_ms = listener_timeout_ms;
+
+        /* start the listener thread */
+        debug(0, "%s: starting rdma_server_listener_thread", __func__);
+        if (pthread_create(&listener_thread_id,
+                           NULL,
+                           &rdma_server_listener_thread,
+                           timeout_ms))
+        {
+            error("%s: unable to start listener thread, errno=%d",
+                  __func__, errno);
+            exit(1);
+        }
+    }
+    else
+    {
+        error("%s: unable to malloc memory for a timeout_ms, errno=%d",
+              __func__, errno);
         exit(1);
     }
 }
@@ -4432,7 +4444,7 @@ retry:
  *  Event handler for server-side RDMA Communication Manager events.
  *
  * Params:
- *  None
+ *  [in] arg - timeout in ms to be used when polling the event channel
  *
  * Returns:
  *  TODO - doesn't? not until server is stopped??
@@ -4443,11 +4455,19 @@ void *rdma_server_listener_thread(void *arg)
     struct rdma_cm_event event_copy;
     rdma_connection_t *c = NULL;
     int ret = 0;
+    int timeout_ms = 2000;  /* TODO: test this, it may be too long */
     struct rdma_conn *rc;
     //struct rdma_cm_id *conn_id;
     gen_thread_t thread;
+    struct pollfd listener;
 
-    debug(0, "%s: starting", __func__);
+    if (arg)
+    {
+        timeout_ms = *(int *) arg;
+        free(arg);
+    }
+
+    debug(0, "%s: starting, timeout_ms=%d", __func__, timeout_ms);
 
     for (;;)
     {
@@ -4460,7 +4480,29 @@ void *rdma_server_listener_thread(void *arg)
         }
         gen_mutex_unlock(&listener_thread_mutex);
 
-        /* TODO: will this block? should it? should I use a while loop? */
+        /* We poll on the event channel first so that we can use a timeout
+         * to break out every now and then to check for shutdown. Once poll()
+         * tells us something is there, then we call rdma_get_cm_event() to
+         * retrieve the actual event. */
+        listener.fd = rdma_device->listen_id->channel->fd;
+        listener.events = POLLIN;
+        ret = poll(&listener, 1, timeout_ms);
+        if (ret < 0)
+        {
+            if (errno != EINTR)
+            {
+                error_errno("%s: poll event channel failed", __func__);
+                /* TODO: keep going or exit? */
+            }
+            continue;
+        }
+        else if (ret == 0)
+        {
+            /* timed out */
+            continue;
+        }
+
+        /* if we get here, poll found something on the event channel */
         ret = rdma_get_cm_event(rdma_device->listen_id->channel, &event);
         if (ret)
         {
