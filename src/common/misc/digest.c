@@ -32,7 +32,11 @@ static int digest(const char *digest_name,
                   const void *buf, const size_t buf_len,
                   char **output, size_t *output_len)
 {
+#ifdef OPENSSL_1_1
     EVP_MD_CTX *mdctx;
+#elif
+    EVP_MD_CTX mdctx;
+#else
     const EVP_MD *md;
     unsigned int digest_len;
     void *digest_value;
@@ -56,16 +60,24 @@ static int digest(const char *digest_name,
     /*
      * OpenSSL 1.1 does not allow assignment to mdctx on the stack. Must allocate with new and free functions instead.
     */
+#ifdef OPENSSL_1_1
     mdctx=EVP_MD_CTX_new();
     EVP_DigestInit(mdctx, md);
     EVP_DigestUpdate(mdctx, buf, buf_len);
     EVP_DigestFinal(mdctx, digest_value, &digest_len);
-
+#elif
+    memset(&mdctx, 0, sizeof(mdctx));
+    EVP_DigestInit(&mdctx, md);
+    EVP_DigestUpdate(&mdctx, buf, buf_len);
+    EVP_DigestFinal(&mdctx, digest_value, &digest_len);
+#endif
     if (output)
         *output = digest_value;
     if (output_len)
         *output_len = digest_len;
+#ifdef OPENSSL_1_1
     EVP_MD_CTX_free(mdctx);
+#endif
     return 0;
 }
 
