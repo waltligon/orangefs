@@ -1480,13 +1480,22 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                                  decode_free(
                                        resp->u.listattr.attr[i].capability.signature);
                              }
-                          if (resp->u.listattr.attr[i].mask & 
-                              PVFS_ATTR_DISTDIR_ATTR) {
-                           decode_free(
-                             resp->u.listattr.attr[i].dist_dir_bitmap);
-                           decode_free(
-                             resp->u.listattr.attr[i].dirdata_handles);
-                          }
+                             if (resp->u.listattr.attr[i].objtype ==
+                                 PVFS_TYPE_DIRDATA)
+                             {
+                                 decode_free(
+                                       resp->u.listattr.attr[i].u.dirdata.dist_dir_bitmap);
+                                 decode_free(
+                                       resp->u.listattr.attr[i].u.dirdata.dirdata_handles);
+                             }
+                             if (resp->u.listattr.attr[i].objtype ==
+                                 PVFS_TYPE_DIRECTORY)
+                             {
+                                 decode_free(
+                                       resp->u.listattr.attr[i].u.dir.dist_dir_bitmap);
+                                 decode_free(
+                                       resp->u.listattr.attr[i].u.dir.dirdata_handles);
+                             }
                          }/*end for*/
                          decode_free(resp->u.listattr.attr);
                      }/*end if attr*/
