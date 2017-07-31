@@ -1,0 +1,57 @@
+.TH PVFS2-CHOWN 1 2017-06-30
+.SH NAME
+\fBpvfs2-chown\fR \(en modify the owner and group of files in OrangeFS
+volumes
+.SH SYNOPSIS
+\fBpvfs2-chown\fR [\fB\-v\fR] \fIuser group filename(s)\fR
+.SH DESCRIPTION
+The
+.B pvfs2-chown
+utility modifies the owner and group of the OrangeFS files specified.
+The
+.I user
+and
+.I group
+are either numerical or symbolic.  Symbolic names will be looked up on
+the local system.
+.PP
+The options are as follows:
+.IP -v
+Print version number and exit.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate
+.IR pvfs2tab
+file
+.SH FILES
+.I /etc/passwd
+.PP
+.I /etc/pvfs2tab
+.SH EXAMPLES
+Set a file's owner to
+.I user
+and group to
+.IR group .
+.PP
+.RS 6n
+pvfs2-chown user group /mnt/foo
+.RE
+.SH CAVEATS
+In a network of multiple clients, if the user database is not
+sychronized between systems, these settings will have little meaning.
+They will be enforced, which can cause problems if this is not wanted.
+.PP
+Note that because OrangeFS is a network filesystem, any user with access
+to the network may be able to circumvent file permissions.
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR chown ( 1 ),
+.BR pvfs2-chmod ( 1 ),
+.BR pvfs2-stat ( 1 ),
+.BR pvfs2tab ( 5 )

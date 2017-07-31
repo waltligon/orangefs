@@ -1,19 +1,25 @@
-.TH PVFS2-FS-DUMP 1 2017-07-03
+.TH PVFS2-GET-UID 1 2017-07-03
 .SH NAME
-\fBpvfs2-fs-dump\fR \(en display lower-level information about an
+\fBpvfs2-get-uid\fR \(en display lower-level information about an
 OrangeFS file system
 .SH SYNOPSIS
-\fBpvfs2-fs-dump\fR [\fB\-v\fR] [\fB\-m \fImount_point\fR]
+\fBpvfs2-get-uid\fR [\fB\-s \fIserver\fR] [\fB\-t \fIhistory\fR]
+[\fB\-f \fIfs_id\fR]
 .SH DESCRIPTION
 The
-.B pvfs2-fs-dump
-utility displays low level information about the file system database.
+.B pvfs2-get-uid
+performs the pvfs2-get-uid function.
 .PP
 The options are as follows:
-.IP -v
-Print version number and exit.
-.IP -m mount_point
+.IP -s
+Specify the s option.
 Specify the file system to operate on.
+.IP -t
+Specify the t option.
+.IP -f
+Specify the f option.
+.IP -h
+Display synopsis.
 .SH ENVIRONMENT
 .IP PVFS2_DEBUGFILE
 If set to the path of a local file, redirect debug output to it.
