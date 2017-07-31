@@ -1414,6 +1414,7 @@ install_doc:
 	install -m 644 $(srcdir)/doc/man/*.5 $(mandir)/man5
 	gzip -f ${mandir}/man1/pvfs2*.1
 	gzip -f ${mandir}/man5/pvfs2*.5
+	ln -fs pvfs2-ls.1.gz $(mandir)/man1/pvfs2-lsplus.1.gz
 
 ifdef BUILD_BMI_ONLY
 install:: all

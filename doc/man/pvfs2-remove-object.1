@@ -1,37 +1,41 @@
-.TH PVFS2-CP 1 2017-07-03
+.TH PVFS2-REMOVE-OBJECT 1 2017-07-03
 .SH NAME
-\fBpvfs2-cp\fR \(en copy files to and from OrangeFS volumes
+\fBpvfs2-remove-object\fR \(en remove internal object from OrangeFS
+volume
 .SH SYNOPSIS
-\fBpvfs2-cp\fR [\fB\-s \fIstrip_size\fR] [\fB\-n \fInum_datafiles\fR]
-[\fB\-b \fIbuffer_size_in_bytes\fR] [\fB\-tv\fR] \fIsrc_file dst_file\fR
+\fBpvfs2-remove-object\fR [\fB\-hv\fR] [\fB\-f \fIfs_id\fR]
+[\fB\-o \fIhandle\fR] [\fB\-p \fIhandle \-d \fIentry_name\fR]
 .SH DESCRIPTION
 The
-.B pvfs2-cp
-utility copies the file
-.I src_file
-to
-.I dst_file
-where the files may either be on OrangeFS volumes or local files.  When
-operating on OrangeFS volumes it works through the OrangeFS library and
-not through the kernel interface.
+.B pvfs2-remove-object
+removes an object from an OrangeFS volume by handle number.  This would
+be used to repair a corrupt file system.  Improper use of this utility
+could corrupt a file system.
+.PP
+The
+.B -p
+and
+.B -d
+options must be used together to remove a directory entry.
 .PP
 The options are as follows:
-.IP -s
-Specify a strip size to use when creating
-.IR dst_file .
-This only applies to OrangeFS volumes.
-.IP -n
-Specify a number of datafiles to use when creating
-.IR dst_file .
-This only applies to OrangeFS volumes.
-.IP -b
-Use an intermediate buffer of
-.I buffer_size
-bytes when copying the file.
-.IP -t
-Report some timing information.
+.IP -h
+Display synopsis.
 .IP -v
 Print version number and exit.
+.IP -f
+Use
+.I fs_id
+as file system ID.
+.IP -o
+Remove the handle
+.IR handle .
+.IP -p
+Specify the parent handle
+.IR handle .
+.IP -p
+Specify the dirent name
+.IR entry_name .
 .SH ENVIRONMENT
 .IP PVFS2_DEBUGFILE
 If set to the path of a local file, redirect debug output to it.
@@ -66,6 +70,5 @@ utility.
 .SH BUGS
 Please submit bug reports to pvfs2-developers@beowulf-underground.org
 .SH SEE ALSO
-.BR cp ( 1 ),
-.BR pvfs2-ln ( 1 ),
+.BR pvfs2-stat ( 1 ),
 .BR pvfs2tab ( 5 )

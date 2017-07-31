@@ -1,0 +1,67 @@
+.TH PVFS2-LN 1 2017-06-30
+.SH NAME
+\fBpvfs2-ln\fR \(en create a soft link in an OrangeFS volume
+.SH SYNOPSIS
+\fBpvfs2-ln\fR \fB\-s\fR [\fB\-Vvh\fR] \fItarget link_name\fR
+.SH DESCRIPTION
+The
+.B pvfs2-ln
+utility creates a soft link (symlink) at
+.I link_name
+which points to
+.I target
+where
+.I target
+will be in an OrangeFS volume.  The
+.I link_name
+may refer to files across file systems and even non-existent files.
+.PP
+The options are as follows:
+.IP -V
+Display verbose messages.
+.IP -v
+Print version number and exit.
+.IP -h
+Display synopsis.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate
+.IR pvfs2tab
+file
+.SH FILES
+.I /etc/pvfs2tab
+.SH EXAMPLES
+Create a link at
+.I /mnt/bar
+referring to the file
+.IR /mnt/foo 
+referring to it by a relative path.
+.PP
+.RS 6n
+pvfs2-ln -s foo /mnt/bar
+.RE
+.PP
+Create a link at
+.I /mnt/bar
+referring to the file
+.IR /etc/motd
+which is not in the OrangeFS volume.
+.PP
+.RS 6n
+pvfs2-ln -s /etc/motd /mnt/bar
+.RE
+.SH CAVEATS
+A link to a file outside of the OrangeFS volume will refer to a
+different file if the file system is mounted at different mount points
+or on different machines.
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR ln ( 1 ),
+.BR pvfs2-cp ( 1 ),
+.BR pvfs2tab ( 5 )
