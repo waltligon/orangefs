@@ -30,6 +30,11 @@
 
 static int racache_buf_init(racache_t *racache);
 static racache_buffer_t *racache_buf_get(racache_file_t *racache_file);
+
+/* this internal flag indicates if we have NOT had a problem calling
+ * mlock() - if we have a problem we stop using it regardless of
+ * what is passed in for initialization.  Should be used with racache.pinned
+ */
 static int lock_mem = 1; /* should we try to lock memory */
 
 static int hash_key(const void *key, int table_size);
@@ -44,12 +49,16 @@ static struct racache_s racache =
     PTHREAD_MUTEX_INITIALIZER,
     PVFS2_DEFAULT_RACACHE_BUFCNT,
     PVFS2_DEFAULT_RACACHE_BUFSZ,
+    PVFS2_DEFAULT_RACACHE_READCNT,
+    PVFS2_DEFAULT_RACACHE_PINNED,
     QLIST_HEAD_INIT(racache.buff_free),
     QLIST_HEAD_INIT(racache.buff_lru),
-    NULL,
-    NULL,
-    NULL,
-    0
+    NULL,  /* hash table */
+    NULL,  /* buffarray */
+    NULL,  /* oldarray */
+    0,     /* oldarray_cnt */
+    0,     /* oldarray_rem */
+    0      /* oldarray_sz */
 };
 
 #define RACACHE_INITIALIZED() (racache.hash_table)
@@ -86,12 +95,50 @@ int pint_racache_set_buff_count_size(int bufcnt, int bufsz)
     return pint_racache_buf_resize(bufcnt, bufsz);
 }
 
-int pint_racache_initialize(void)
+int pint_racache_read_count(void)
+{
+    return racache.readcnt;
+}
+
+int pint_racache_set_read_count(int readcnt)
+{
+    racache.readcnt = readcnt;
+    return 0;
+}
+
+int pint_racache_pinned(void)
+{
+    return racache.pinned;
+}
+
+int pint_racache_set_pinned(int pinned)
+{
+    racache.pinned = pinned;
+    return 0;
+}
+
+int pint_racache_initialize(int bufcnt, int bufsz, int readcnt, int pinned)
 {
     int ret = -1;
 
     if (!RACACHE_INITIALIZED())
     {
+        if (bufcnt >= 0)
+        {
+            racache.bufcnt = bufcnt;
+        }
+        if (bufsz >= 0)
+        {
+            racache.bufsz = bufsz;
+        }
+        if (readcnt >= 0)
+        {
+            racache.readcnt = readcnt;
+        }
+        if (pinned >= 0)
+        {
+            racache.pinned = pinned;
+        }
         if (racache_buf_init(&racache) < 0)
         {
             return -1;
@@ -116,15 +163,16 @@ int pint_racache_initialize(void)
                      "initalized.  returning success\n");
         ret = 0;
     }
-    return 0;
+    return ret;
 }
 
-/* reset an individual buffer */
+/* reset a file */
 static void racache_init_file(racache_file_t *file)
 {
-    /* do not init vp, id, buff_sz 
-     * this will be used to reinit buff struct */
     memset(&file->refn, 0, sizeof(PVFS_object_ref));
+
+    /* eventually want a way to pass this in from the file */
+    file->readcnt = racache.readcnt;
 
     INIT_QLIST_HEAD(&file->hash_link);
     INIT_QLIST_HEAD(&file->buff_list);
@@ -133,7 +181,7 @@ static void racache_init_file(racache_file_t *file)
 /* reset an individual buffer */
 static void racache_init_buff(racache_buffer_t *buff)
 {
-    /* do not init vp, id, buff_sz 
+    /* do not init vp, id, buff_sz, readcnt
      * this will be used to reinit buff struct */
     buff->valid = 0;
     buff->being_freed = 0;
@@ -152,6 +200,12 @@ static void racache_init_buff(racache_buffer_t *buff)
 static int racache_buf_init(racache_t *racache)
 {
     int i = 0;
+
+    if (racache->bufcnt * racache->bufsz == 0)
+    {
+        /* racache turned off */
+        return 0;
+    }
     
     racache->buffarray =
                 (racache_buffer_t *)malloc(sizeof(racache_buffer_t) * 
@@ -163,34 +217,55 @@ static int racache_buf_init(racache_t *racache)
     for(i = 0; i < racache->bufcnt; i++)
     {
         void *vp;
+        int page_size = sysconf(_SC_PAGESIZE);
+
         /* init the buffer struct - not vp */
         racache_init_buff(&racache->buffarray[i]);
 
         /* allocate buffer memory */
-        posix_memalign(&vp,
-                       sysconf(_SC_PAGESIZE),
-                       racache->bufsz);
+        posix_memalign(&vp, page_size, racache->bufsz);
         if (!vp)
         {
             free(racache->buffarray);
             return -1;
         }
-        if (lock_mem)
+        if (racache->pinned && lock_mem)
         {
             int ret = 0;
             int cnt = 0;
+            int numpg = racache->bufsz / page_size;
+            int *tp = vp;
             
-            do {
+            /* dummy write to buffer to ensure it is in RAM */
+            while (tp && numpg--)
+            {
+                *tp = 0;
+                tp += (page_size / sizeof(int));
+            }
+
+            /* lock the buffer pages */
+            do
+            {
                 ret = mlock(vp, racache->bufsz);
             } while (ret && errno == EAGAIN && cnt++ < 10);
+
+            /* check for mlock() failure */
             if (ret == -1)
             {
+                int ti = i - 1;
+                while (0 <= ti--)
+                {
+                    /* bailing on pinned mem - unlock previous buffs */
+                    munlock(racache->buffarray[ti].buffer, racache->bufsz);
+                    /* if this fails not much we can do */
+                }
                 gossip_err("locking memory failed, proceeding without it\n");
                 lock_mem = 0; /* don't try to lock memory any more */
             }
         }
 
         racache->buffarray[i].buff_sz = racache->bufsz;
+        racache->buffarray[i].readcnt = racache->readcnt;
         racache->buffarray[i].buffer = vp;
         racache->buffarray[i].buff_id = i;
 
@@ -238,7 +313,7 @@ static void racache_buf_cull(racache_t *racache)
         else
         {
             /* this buffer is finished so close it up */
-            if (lock_mem)
+            if (racache->pinned && lock_mem)
             {
                 int ret = 0;
                 int cnt = 0;
@@ -290,7 +365,7 @@ int pint_racache_finish_resize(racache_buffer_t *buff)
         return -1;
     }
 
-    if (lock_mem)
+    if (racache.pinned && lock_mem)
     {
         int ret = 0;
         int cnt = 0;
@@ -391,6 +466,18 @@ static racache_buffer_t *racache_buf_get(racache_file_t *racache_file)
     }
     /* wipes non-permanent fields and inits lists */
     racache_init_buff(buff);
+    /* set file read count */
+    if (racache_file->readcnt >= 0 &&
+        racache_file->readcnt <= PVFS2_MAX_RACACHE_READCNT)
+    {
+        /* set from value attached to file */
+        buff->readcnt = racache_file->readcnt;
+    }
+    else
+    {
+        /* set from default value */
+        buff->readcnt = pint_racache_read_count();
+    }
     /* put at tail of lru list */
     qlist_add_tail(&buff->buff_lru, &racache.buff_lru);
     /* add to this file's buffer list */
@@ -421,8 +508,8 @@ int pint_racache_get_block(PVFS_object_ref refn,
     racache_file_t *racache_file = NULL;
     racache_buffer_t *buff = NULL;
 
-    gossip_debug(GOSSIP_RACACHE_DEBUG, "Checking racache"
-                 " for %d bytes at offset %lu\n",
+    gossip_debug(GOSSIP_RACACHE_DEBUG, "Checking racache for"
+                 " %d bytes at offset %lu\n",
                  (int)len, (unsigned long)offset);
 
     if (RACACHE_INITIALIZED())
@@ -523,6 +610,7 @@ int pint_racache_get_block(PVFS_object_ref refn,
             if (!buff)
             {
                 gen_mutex_unlock(&racache.mutex);
+                /* This forces a regular io read in post_io_request */
                 return RACACHE_NONE;
             }
             buff->file = racache_file;
@@ -577,14 +665,18 @@ int pint_racache_get_block(PVFS_object_ref refn,
                          "adding new file rec to hash table\n");
             qhash_add(racache.hash_table, &refn, &rcfile->hash_link);
 
-            buff = racache_buf_get(rcfile);
             gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_get_block "
-                         "getting a buffer %d\n", buff->buff_id);
+                        "calling racache_buf_get\n");
+            buff = racache_buf_get(rcfile);
             if (!buff)
             {
+                gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_get_block "
+                        "no buffer returned - returning NONE\n");
                 gen_mutex_unlock(&racache.mutex);
                 return RACACHE_NONE;
             }
+            gossip_debug(GOSSIP_RACACHE_DEBUG, "racache_get_block "
+                         "got buffer number %d\n", buff->buff_id);
                 
             buff->file = rcfile;
             buff->file_offset = pint_racache_buff_offset(offset);
@@ -592,6 +684,11 @@ int pint_racache_get_block(PVFS_object_ref refn,
 
             /* add request to waiting list */
             glink = (gen_link_t *)malloc(sizeof(gen_link_t));
+            if (!glink)
+            {
+                /* out of memory - try to keep going - skip ra */
+                return RACACHE_NONE;
+            }
             INIT_QLIST_HEAD(&glink->link);
             glink->payload = vfs_req;
             /* makes lists FIFO */
@@ -710,11 +807,14 @@ int pint_racache_finalize(void)
     racache_buffer_t *racache_buffer = NULL;
     struct qlist_head *vfs_link = NULL;
 
+    /* make sure we actually initialized */
     if (RACACHE_INITIALIZED())
     {
         gen_mutex_lock(&racache.mutex);
+        /* cyle each bucket of file hash table */
         for (i = 0; i < racache.hash_table->table_size; i++)
         {
+            /* cyle each file in the bucket */
             while((hash_link = qhash_search_and_remove_at_index(
                                                    racache.hash_table, i)))
             {
@@ -722,7 +822,8 @@ int pint_racache_finalize(void)
                                            racache_file_t,
                                            hash_link);
 
-                while ((buff_link = qlist_pop(&racache_file->buff_list)));
+                /* cycle each buffer linked to the file */
+                while ((buff_link = qlist_pop(&racache_file->buff_list)))
                 {
                     racache_buffer = qlist_entry(buff_link,
                                                  racache_buffer_t,
@@ -731,22 +832,44 @@ int pint_racache_finalize(void)
                                  "Freeing buffer %d with %d waiters\n",
                                  racache_buffer->buff_id,
                                  racache_buffer->vfs_cnt);
-                    while((vfs_link = qlist_pop(&racache_buffer->vfs_link)));
+                    /* remove each waiting request and free the links */
+                    while((vfs_link = qlist_pop(&racache_buffer->vfs_link)))
                     {
                         racache_buffer->vfs_cnt--;
                         /* don't worry about the vfs_request
                          * we don't deal with that here */
                         free(qlist_entry(vfs_link, gen_link_t, link));
-                    }
-                }
+                    } /* while vfs_link */
+                    /* don't free the racache_buffer struct - done below */
+                } /* while buff_link */
+                /* free the file struct */
                 free(racache_file);
             } /* while hash_link */
         } /* for i < table_size */
 
         ret = 0;
+        /* free the hash struct */
         qhash_finalize(racache.hash_table);
+        /* free buffers */
+        for (i = 0; i < racache.bufcnt; i++)
+        {
+            free(racache.buffarray[i].buffer);
+        }
+        /* this frees the array of buffer recs */
+        free(racache.buffarray);
+        /* free old buffers if we were in the middle of a resize */
+        if (racache.oldarray && racache.oldarray_cnt)
+        {
+            for (i = 0; i < racache.oldarray_cnt; i++)
+            {
+                if (racache.oldarray[i].buffer)
+                {
+                    free(racache.oldarray[i].buffer);
+                }
+            }
+            free(racache.oldarray);
+        }
         racache.hash_table = NULL; /* is this properly freed? */
-        free(racache.buffarray); /* this frees the array of buffer recs */
         gen_mutex_unlock(&racache.mutex);
 
         /* FIXME: race condition here */

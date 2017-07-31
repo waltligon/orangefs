@@ -437,8 +437,7 @@ static void init_connection_modify_qp(struct ibv_qp *qp,
     attr.qp_state = IBV_QPS_RTS;
     attr.sq_psn = 0;
     attr.max_rd_atomic = 1;
-    /* attr.timeout = 26;*/  /* 4.096us * 2^26 = 5 min */
-    attr.timeout = 22;  /* 4.096us * 2^22 = 17.1 secs */
+    attr.timeout = 14;      /* 4.096us * 2^14 = .0671 sec */
     attr.retry_cnt = 7;
     attr.rnr_retry = 7;
     debug(1, "%s: attr.timeout=%d, attr.retry_cnt=%d, attr.rnr_retry=%d", 
@@ -1003,6 +1002,35 @@ static const char *openib_wc_status_string(int status)
     return s;
 }
 
+/*
+ * Convert an IBV work completion status into a BMI error code.
+ */
+static int openib_wc_status_to_bmi(int status)
+{
+    int result = 0;
+
+    switch (status)
+    {
+        case IBV_WC_SUCCESS:
+            result = 0;
+            break;
+
+        case IBV_WC_RETRY_EXC_ERR:
+            debug(0, "%s: converting IBV_WC_RETRY_EXC_ERR to BMI_EHOSTUNREACH",
+                  __func__);
+            result = -BMI_EHOSTUNREACH;
+            break;
+
+        default:
+            warning("%s: unhandled wc status %s, error code unchanged",
+                    __func__, openib_wc_status_string(status));
+            result = status;
+            break;
+    }
+
+    return result;
+}
+
 #ifdef HAVE_IBV_GET_DEVICES
 static const char *openib_port_state_string(enum ibv_port_state state)
 {
@@ -1407,6 +1435,7 @@ int openib_ib_initialize(void)
     ib_device->func.prepare_cq_block = openib_prepare_cq_block;
     ib_device->func.ack_cq_completion_event = openib_ack_cq_completion_event;
     ib_device->func.wc_status_string = openib_wc_status_string;
+    ib_device->func.wc_status_to_bmi = openib_wc_status_to_bmi;
     ib_device->func.mem_register = openib_mem_register;
     ib_device->func.mem_deregister = openib_mem_deregister;
     ib_device->func.check_async_events = openib_check_async_events;

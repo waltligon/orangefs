@@ -1207,11 +1207,11 @@ static const configoption_t options[] =
     {"TreeThreshold", ARG_INT, tree_threshold, NULL,
         CTX_FILESYSTEM, "2"},
 
-    /* Specifies the default for initial number of servers to hold directory entries. */
+    /* Specifies the default for initial number of servers to hold directory entries. Note that this number cannot exceed 65535 (max value of a 16-bit unsigned integer). */
     {"DistrDirServersInitial", ARG_INT, distr_dir_servers_initial, NULL,
         CTX_FILESYSTEM, "1"},
 
-    /* Specifies the default for maximum number of servers to hold directory entries. */
+    /* Specifies the default for maximum number of servers to hold directory entries. Note that this number cannot exceed 65535 (max value of a 16-bit unsigned integer). */
     {"DistrDirServersMax", ARG_INT, distr_dir_servers_max, NULL,
         CTX_FILESYSTEM, "4"},
 
@@ -4435,7 +4435,10 @@ static host_alias_s *find_host_alias_ptr_by_alias(
             cur = PINT_llist_next(cur);
         }
     }
-    if(index) *index = ind - 1;
+    if(index)
+    {
+        *index = ind - 1;
+    }
     return ret;
 }
 
@@ -4751,8 +4754,8 @@ int PINT_config_get_meta_handle_extent_array(
 
         if (cur_fs)
         {
-            my_alias = PINT_config_get_host_alias_ptr(
-                config_s, config_s->host_id);
+            my_alias = PINT_config_get_host_alias_ptr(config_s,
+                                                      config_s->host_id);
             if (my_alias)
             {
                 cur = cur_fs->meta_handle_ranges;
@@ -4983,8 +4986,7 @@ static char *get_handle_range_str(struct server_configuration_s *config_s,
 
     if (config_s && config_s->host_id && fs)
     {
-        my_alias = PINT_config_get_host_alias_ptr(
-            config_s,config_s->host_id);
+        my_alias = PINT_config_get_host_alias_ptr(config_s, config_s->host_id);
         if (my_alias)
         {
             cur = (meta_handle_range ? fs->meta_handle_ranges :
@@ -5384,9 +5386,9 @@ int PINT_config_pvfs2_mkspace(struct server_configuration_s *config)
             }
 
             cur_meta_handle_range = PINT_config_get_meta_handle_range_str(
-                config, cur_fs);
+                            config, cur_fs);
             cur_data_handle_range = PINT_config_get_data_handle_range_str(
-                config, cur_fs);
+                            config, cur_fs);
 
             /*
               make sure have either a meta or data handle range (or

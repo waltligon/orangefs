@@ -103,6 +103,7 @@ typedef enum {
     SQ_WAITING_RTS_DONE_SEND_COMPLETION,
     SQ_WAITING_USER_TEST,
     SQ_CANCELLED,
+    SQ_ERROR,
 } sq_state_t;
 typedef enum {  /* bits *_USER_POST will be ORed */
     RQ_EAGER_WAITING_USER_POST = 0x1,
@@ -115,6 +116,7 @@ typedef enum {  /* bits *_USER_POST will be ORed */
     RQ_RTS_WAITING_USER_TEST = 0x80,
     RQ_WAITING_INCOMING = 0x100,
     RQ_CANCELLED = 0x200,
+    RQ_ERROR = 0x400,
 } rq_state_t;
 typedef enum {
     MSG_EAGER_SEND = 1,
@@ -143,6 +145,7 @@ static name_t sq_state_names[] = {
     entry(SQ_WAITING_RTS_DONE_SEND_COMPLETION),
     entry(SQ_WAITING_USER_TEST),
     entry(SQ_CANCELLED),
+    entry(SQ_ERROR),
     { 0, 0 }
 };
 static name_t rq_state_names[] = {
@@ -156,6 +159,7 @@ static name_t rq_state_names[] = {
     entry(RQ_RTS_WAITING_USER_TEST),
     entry(RQ_WAITING_INCOMING),
     entry(RQ_CANCELLED),
+    entry(RQ_ERROR),
     { 0, 0 }
 };
 static name_t msg_type_names[] = {
@@ -358,6 +362,7 @@ struct ib_device_func {
     void (*ack_cq_completion_event)(void);
     int (*check_cq)(struct bmi_ib_wc *wc);
     const char *(*wc_status_string)(int status);
+    int (*wc_status_to_bmi)(int status);
     int (*mem_register)(memcache_entry_t *c);
     void (*mem_deregister)(memcache_entry_t *c);
     int (*check_async_events)(void);

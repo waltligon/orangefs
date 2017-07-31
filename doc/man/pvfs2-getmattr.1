@@ -1,0 +1,46 @@
+.TH PVFS2-GETMATTR 1 2017-06-30
+.SH NAME
+\fBpvfs2-getmattr\fR \(en display file mirroring properties
+volumes
+.SH SYNOPSIS
+\fBpvfs2-getmattr\fR [\fB\-cmhf\fR] \fIfile\fR
+.SH DESCRIPTION
+The
+.B pvfs2-getmattr
+utility displays information about file mirroring for a given file.  If
+no options are specified, both the number of mirror copies and the
+mirroring mode will be displayed.
+.PP
+The options are as follows:
+.IP -c
+Retrieve the number of mirror copies.
+.IP -m
+Retrieve the mirroring mode.
+.IP -h
+Display synopsis.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate
+.IR pvfs2tab
+file
+.SH FILES
+.I /etc/passwd
+.PP
+.I /etc/pvfs2tab
+.SH EXAMPLES
+Display all mirroring properties for the file
+.IR /mnt/foo .
+.PP
+.RS 6n
+pvfs2-getmattr -f /mnt/foo
+.RE
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2-setmattr ( 1 ),
+.BR pvfs2tab ( 5 )

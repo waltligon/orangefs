@@ -39,6 +39,9 @@ typedef struct phys_server_desc
     int server_type;
 } phys_server_desc_s;
 
+/* note that the term bmi_address used here refers to the URL-like
+ * string, not the internal BMI_address type
+ */
 typedef struct host_alias_s
 {
     char *host_alias;
@@ -141,10 +144,13 @@ typedef struct distribution_configuration_s
 
 } distribution_configuration;
 
+/* note that the term bmi_address used here refers to the URL-like
+ * string, not the internal BMI_address type
+ */
 typedef struct server_configuration_s
 {
     char *host_id;                  /* bmi_address of this server */
-    int host_index;
+    int host_index;                 /* index in table of this server */
     char *server_alias;             /* command line server-alias parameter */
     int my_server_options;
     char *data_path;                /* path to data storage directory */
@@ -198,7 +204,7 @@ typedef struct server_configuration_s
                                        zero, use defaults */
     char *db_cache_type;
 
-    int db_max_size;                /* size of database map
+    long db_max_size;               /* size of database map
                                      */
     int trove_alt_aio_mode;         /* enables experimental alternative AIO
                                      * implementation for some types of 

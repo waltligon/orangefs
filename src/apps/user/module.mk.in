@@ -1,10 +1,12 @@
 DIR := src/apps/user
 
+ifeq ($(build_usrint),yes)
 USERSRC := \
 	$(DIR)/getmattr.c \
 	$(DIR)/ofs_rm.c \
 	$(DIR)/ofs_cp.c \
 	$(DIR)/ofs_graphite_driver.c \
+	$(DIR)/ofs_setdirhint.c \
 	$(DIR)/pvfs2-rm.c \
 	$(DIR)/setmattr.c
- 
+endif 

@@ -803,6 +803,8 @@ static PINT_sm_action set_dirdata_attr_setup(struct PINT_smcb *smcb, job_status_
     }
     memset(tree_setattr_req, 0, sizeof(*tree_setattr_req));
 
+    attr_p = &s_op->attr;
+
     PINT_SERVREQ_TREE_SETATTR_FILL(
         *tree_setattr_req,
         s_op->req->capability,

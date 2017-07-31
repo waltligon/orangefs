@@ -95,11 +95,20 @@ AC_DEFUN([AX_OPENSSL],
             AC_SUBST(OPENSSL_LDFLAGS)
 
             ax_lib=ssl
-            AC_CHECK_LIB($ax_lib, SSLv23_method,
+            AC_CHECK_LIB($ax_lib, TLS_method,
                 [link_ssl="yes";break], [link_ssl="no"])
             if test "x$link_ssl" = "xno"; then
-                AC_MSG_WARN(Could not link against lib$ax_lib !)
+                AC_CHECK_LIB($ax_lib, SSLv23_method,
+                [link_ssl="yes";break], [link_ssl="no"])
+                if test "x$link_ssl" = "xno"; then
+                    AC_MSG_WARN(Could not link against lib$ax_lib !)
+                else
+                    AC_DEFINE(HAVE_OPENSSL, ,
+                    [Define to 1 if OpenSSL is available])
+                fi  
             else
+                AC_DEFINE(HAVE_OPENSSL_1_1, ,
+                    [Define to 1 if OpenSSL >= 1.1 is available])
                 AC_DEFINE(HAVE_OPENSSL, ,
                     [Define to 1 if OpenSSL is available])
             fi
