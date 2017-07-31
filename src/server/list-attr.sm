@@ -135,6 +135,7 @@ static PINT_sm_action listattr_setup_getattr(
     struct PINT_server_op *getattr_op = NULL;
     struct PVFS_server_req *req = NULL;
     int i;
+    PVFS_credential dummy_credential; /* used for call to getattr */
 
     s_op->u.listattr.parallel_sms = 0;
     js_p->error_code = 0;
@@ -144,7 +145,6 @@ static PINT_sm_action listattr_setup_getattr(
      * a valid credential to pass along for creating a capability.
      */
     s_op->req->u.listattr.attrmask &= ~PVFS_ATTR_CAPABILITY;
-    PINT_init_credential(&s_op->u.listattr.credential);
 
     for(i=0; i<s_op->req->u.listattr.nhandles; i++)
     {
@@ -162,8 +162,10 @@ static PINT_sm_action listattr_setup_getattr(
             s_op->req->u.listattr.fs_id,
             js_p->error_code, req, LOCAL_OPERATION);
 
+        getattr_op->prelude_mask |= PRELUDE_PERM_CHECK_DONE;
+
         PINT_SERVREQ_GETATTR_FILL(*req, s_op->req->capability,
-            s_op->u.listattr.credential,
+            dummy_credential,
             s_op->req->u.listattr.fs_id,
             s_op->req->u.listattr.handles[i],
             s_op->req->u.listattr.attrmask,
@@ -262,8 +264,6 @@ static PINT_sm_action listattr_cleanup(struct PINT_smcb *smcb, job_status_s *js_
         free(s_op->u.listattr.ds_attr_a);
     if (s_op->u.listattr.errors)
         free(s_op->u.listattr.errors);
-
-    PINT_cleanup_credential(&s_op->u.listattr.credential);
 
     return(server_state_machine_complete(smcb));
 }

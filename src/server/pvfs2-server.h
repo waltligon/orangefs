@@ -162,6 +162,11 @@ typedef enum
     SERVER_CERTCACHE_INIT      = (1 << 23)
 } PINT_server_status_flag;
 
+typedef enum
+{
+    PRELUDE_PERM_CHECK_DONE    = (1<<0),
+} PINT_prelude_flag;
+
 struct PINT_server_create_op
 {
     const char **io_servers;
@@ -570,7 +575,6 @@ struct PINT_server_listattr_op
     PVFS_ds_attributes *ds_attr_a;
     PVFS_error *errors;
     int parallel_sms;
-    PVFS_credential credential; /* Dummy credential used for call to getattr */
 };
 
 /* this is used in both set_eattr, get_eattr and list_eattr */
@@ -684,6 +688,8 @@ typedef struct PINT_server_op
     PVFS_handle target_handle;
     PVFS_fs_id target_fs_id;
     PVFS_object_attr *target_object_attr;
+
+    PINT_prelude_flag prelude_mask;
 
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
