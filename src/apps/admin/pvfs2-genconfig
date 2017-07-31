@@ -601,6 +601,12 @@ sub emit_filesystem
     {
        print $target "\t\tDBMaxSize " . $opt_filesystem_dbmaxsize . "\n";
     }
+    else 
+    {  if ($opt_default_dbmaxsize)
+       {
+          print $target "\t\tDBMaxSize " . $opt_default_dbmaxsize . "\n";
+       }
+    }
     # only in special cases would someone want to sync data (failover comes to
     # mind)  The default thus should be to sync metadata but not sync data.  
     if ($opt_trovesync == 1) {
@@ -827,7 +833,8 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
      --storage     <STRING>            path to OrangeFS storage (data) directory.
      --metadata    <STRING>            path to OrangeFS metadata directory.
      --logfile     <STRING>            file to place server logging.
-     --dbmaxsize   <NUM>               LMDB specific; default database size for ALL databases.
+     --dbmaxsize   <NUM>               LMDB specific; default database size for ALL databases. If not specified,
+                                       the system default is 512MB.
      --server-dbmaxsize <NUM>          LMDB specific; default database size for this server; only valid
                                        when metaspec is also used.
      --filesystem-dbmaxsize <NUM>      LMDB specific; database size for filesystem-specific databases.
@@ -993,11 +1000,6 @@ PROTOCOL
     return \%port;
 }
 
-# In this subroutine, we are getting the dbmaxsize setting for the <Defaults> section 
-# of the config file.  When this option is set, the size of the collections and storage_attributes
-# databases will be set to this value.  If dbmaxsize is set within a <ServerOptions> section, then
-# the collections and storage_attributes databases for that server will now become this section's
-# dbmaxsize value. 
 sub get_default_dbmaxsize
 {
     my $dbmaxsize;

@@ -27,7 +27,7 @@
 #include "pint-util.h"
 #include "pint-event.h"
 #include "dist-dir-utils.h"
-#include "config-utils.h"
+#include "server-config-mgr.h"
 
 /*
 static char *lost_and_found_string = "lost+found";
@@ -143,7 +143,7 @@ int pvfs2_mkspace(char *data_path,
     struct stat meta_stat;
     struct stat data_stat;
 
-    struct server_configuration_s *config = PINT_get_server_config();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
 
     mkspace_print(verbose,"Data storage space     : %s\n",data_path);
     mkspace_print(verbose,"Metadata storage space : %s\n", meta_path);
