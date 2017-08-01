@@ -37,6 +37,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <fcntl.h>
 
 #include "pvfs2-internal.h"
 #include "realpath.h"

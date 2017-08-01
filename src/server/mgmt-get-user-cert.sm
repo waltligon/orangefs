@@ -200,7 +200,7 @@ static PINT_sm_action get_user_cert_keyreq_send_public_key(
     js_p->error_code = -PVFS_ENOSYS;
 #else
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct server_configuration_s *config = get_server_config_struct();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
     RSA *rsa;
     int enc_size;
 
@@ -380,7 +380,7 @@ static PINT_sm_action get_user_cert_gen_cert(
 {
 #ifdef ENABLE_SECURITY_CERT
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct server_configuration_s *config = get_server_config_struct();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
     X509 *xcert = NULL;
     PVFS_certificate *pcert;
     EVP_PKEY *keypair = NULL;
