@@ -326,24 +326,15 @@ static int PINT_eattr_verify_acl_access(PVFS_ds_keyval *key, PVFS_ds_keyval *val
     /* verify that the acl is formatted properly.  Right now
      * all we can do is make sure the size matches a non-zero
      * number of pvfs acl entries.  The remainder should be 1
-     * because the keyvals are padded with a null terminator
+     * because the keyvals are padded with a null terminator.
+     * hubcap.
      */
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-    /* Old PVFS2 ACL format */
-    if(val->buffer_sz == 0 || 
-       val->buffer_sz % sizeof(pvfs2_acl_entry) != 1)
-    {
-        return -PVFS_EINVAL;
-    }
-#else
-    /* New Posix compliant PVFS2 ACL format */
-    if(val->buffer_sz == 0 || 
+    if (val->buffer_sz == 0 || 
             (val->buffer_sz - sizeof(pvfs2_acl_header)) %
                 sizeof(pvfs2_acl_entry) != 0)
     {
         return -PVFS_EINVAL;
     }
-#endif
 
     return 0;
 }

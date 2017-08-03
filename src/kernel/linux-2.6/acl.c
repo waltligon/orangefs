@@ -40,154 +40,7 @@
  * Probably not in the fast-path though...
  */
 
-#ifdef PVFS_USE_OLD_ACL_FORMAT
 /*
- * PVFS2 ACL decode
- */
-static struct posix_acl *pvfs2_acl_decode(const void *value, size_t size)
-{
-    int n, count;
-    struct posix_acl *acl;
-    const char *end = (char *)value + size;
-
-    /* badness! */
-    if (!value) 
-    {
-        gossip_err("pvfs2_acl_decode: NULL buffers\n");
-        return NULL;
-    }
-    /* even more badness */
-    if (size < 0 || (size  % sizeof(pvfs2_acl_entry)) != 0)
-    {
-        gossip_err("pvfs2_acl_decode: Invalid value of size %d "
-                   "[should be a multiple of %d]\n",
-                   (int) size, (int) sizeof(pvfs2_acl_entry));
-        return ERR_PTR(-EINVAL);
-    }
-    count = size / sizeof(pvfs2_acl_entry);
-    /* No ACLs */
-    if (count == 0)
-    {
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_acl_decode: no acls!\n");
-        return NULL;
-    }
-    /* Allocate a posix acl structure */
-    acl = posix_acl_alloc(count, GFP_KERNEL);
-    if (!acl) 
-    {
-        gossip_err("pvfs2_acl_decode: Could not allocate acl!\n");
-        return ERR_PTR(-ENOMEM);
-    }
-    gossip_debug(GOSSIP_ACL_DEBUG, "acl decoded %zd bytes (%d acl entries)\n",
-                 size, count);
-    for (n = 0; n < count; n++) 
-    {
-        pvfs2_acl_entry *entry = (pvfs2_acl_entry *)value;
-
-        if ((char *) value + sizeof(pvfs2_acl_entry) > end)
-            goto fail;
-        
-        acl->a_entries[n].e_tag = bmitoh32(entry->p_tag);
-        acl->a_entries[n].e_perm = bmitoh32(entry->p_perm);
-        gossip_debug(GOSSIP_ACL_DEBUG, "Decoded acl entry %d "
-                "(p_tag %d, p_perm %d, p_id %d)\n",
-                n, acl->a_entries[n].e_tag, acl->a_entries[n].e_perm, 
-                bmitoh32(entry->p_id));
-        switch(acl->a_entries[n].e_tag) 
-        {
-            case ACL_USER_OBJ:
-            case ACL_GROUP_OBJ:
-            case ACL_MASK:
-            case ACL_OTHER:
-                acl->a_entries[n].e_id = ACL_UNDEFINED_ID;
-                value += sizeof(pvfs2_acl_entry);
-                break;
-
-            case ACL_USER:
-            case ACL_GROUP:
-                acl->a_entries[n].e_id =
-                        bmitoh32(entry->p_id);
-                value += sizeof(pvfs2_acl_entry);
-                break;
-
-            default:
-                gossip_err("pvfs2_acl_decode: bogus value of e_tag obtained %d\n",
-                        acl->a_entries[n].e_tag);
-                goto fail;
-        }
-    }
-    if (value != end)
-        goto fail;
-    return acl;
-
-fail:
-    posix_acl_release(acl);
-    gossip_err("pvfs2_acl_decode: returning EINVAL\n");
-    return ERR_PTR(-EINVAL);
-}
-
-/*
- * PVFS2 ACL encode 
- * What this does is encode the posix_acl structure
- * into little-endian bytefirst using the htobmi* macros
- * and stuffs it into a buffer for storage.
- */
-static void *pvfs2_acl_encode(const struct posix_acl *acl, size_t *size)
-{
-    char *e, *ptr;
-    size_t n;
-
-    *size = acl->a_count * sizeof(pvfs2_acl_entry);
-    gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_acl_encode: acl encoded %ld bytes "
-                 " (%d entries)\n", (long) *size, acl->a_count);
-    e = (char *)kmalloc(*size, GFP_KERNEL);
-    if (!e) 
-    {
-        gossip_err("pvfs2_acl_encode: Could not allocate %d bytes "
-                   "for acl encode\n", (int) *size);
-        return ERR_PTR(-ENOMEM);
-    }
-    ptr = e;
-    for (n = 0; n < acl->a_count; n++) 
-    {
-        pvfs2_acl_entry *entry = (pvfs2_acl_entry *)e;
-
-        entry->p_tag  = htobmi32(acl->a_entries[n].e_tag);
-        entry->p_perm = htobmi32(acl->a_entries[n].e_perm);
-        switch (acl->a_entries[n].e_tag) 
-        {
-            case ACL_USER:
-            case ACL_GROUP:
-                entry->p_id = htobmi32(acl->a_entries[n].e_id);
-                e += sizeof(pvfs2_acl_entry);
-                break;
-            case ACL_USER_OBJ:
-            case ACL_GROUP_OBJ:
-            case ACL_MASK:
-            case ACL_OTHER:
-                entry->p_id = htobmi32(ACL_UNDEFINED_ID);
-                e += sizeof(pvfs2_acl_entry);
-                break;
-
-            default:
-                gossip_err("pvfs2_acl_encode: bogus value of e_tag %d\n",
-                        acl->a_entries[n].e_tag);
-                goto fail;
-        }
-        gossip_debug(GOSSIP_ACL_DEBUG, "Encoded acl entry %zd "
-                "(p_tag %d, p_perm %d, p_id %d)\n",
-                n, acl->a_entries[n].e_tag, acl->a_entries[n].e_perm, 
-                acl->a_entries[n].e_id);
-    }
-    return (char *) ptr;
-fail:
-    kfree(ptr);
-    gossip_err("pvfs2_acl_encode: returning EINVAL\n");
-    return ERR_PTR(-EINVAL);
-}
-#endif /* PVFS_USE_OLD_ACL_FORMAT */
-
-/**
  * Routines that retrieve and/or set ACLs for PVFS2 files.
  */
 struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
@@ -238,14 +91,10 @@ struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
     /* if the key exists, convert it to an in-memory rep */
     if (ret > 0)
     {
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        acl = pvfs2_acl_decode(value, ret);
-#else
 #ifdef HAVE_POSIX_ACL_USER_NAMESPACE
         acl = posix_acl_from_xattr(&init_user_ns, value, ret);
 #else
         acl = posix_acl_from_xattr(value, ret);
-#endif
 #endif
     }
     else if (ret == -ENODATA || ret == -ENOSYS)
@@ -352,13 +201,6 @@ static int pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
     /* If we do have an access control list, then we need to encode that! */
     if (acl) 
     {
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        value = pvfs2_acl_encode(acl, &size);
-        if (IS_ERR(value))
-        {
-            return (int) PTR_ERR(value);
-        }
-#else
         value = (char *) kmalloc(PVFS_MAX_XATTR_VALUELEN, GFP_KERNEL);
         if (IS_ERR(value)) 
         {
@@ -377,7 +219,6 @@ static int pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
             error = size;
             goto errorout;
         }
-#endif
     }
     gossip_debug(GOSSIP_ACL_DEBUG,
                  "pvfs2_set_acl: name %s, value %p, size %zd, "
