@@ -164,9 +164,11 @@ INCLUDES := \
     src/common/gen-locks \
     src/common/events \
     src/client/usrint \
-    src/common/lmdb
+    src/common/lmdb \
+    src/server
 GENINCLUDES := \
-	include
+	include \
+	src/server
 else
 INCLUDES := \
     src/client/sysint \
@@ -188,11 +190,13 @@ INCLUDES := \
     src/io/dev \
     src/proto \
     src/common/mgmt \
-	src/common/hash \
-	src/common/llist \
-	src/common/token-utils
+    src/common/hash \
+    src/common/llist \
+    src/common/token-utils \
+    src/server
 GENINCLUDES := \
-	include
+	include \
+        src/server
 endif
 
 #################################################################
