@@ -698,9 +698,8 @@ AC_TRY_COMPILE(
         }
     ],
     [
-        int ret;
         const char *sc_t = NULL;
-	    ret = setfilecon("somepath", sc_t);
+        setfilecon("somepath", sc_t);
     ],
     [
        AC_MSG_RESULT(yes)
