@@ -38,6 +38,9 @@ typedef struct phys_server_desc_s
     int server_type;
 } phys_server_desc_t;
 
+/* note that the term bmi_address used here refers to the URL-like
+ * string, not the internal BMI_address type
+ */
 typedef struct host_alias_s
 {
     char *host_alias;        /* this is a traditional host name */
@@ -162,12 +165,15 @@ typedef struct distribution_config_s
 
 } distribution_config_t;
 
+/* note that the term bmi_address used here refers to the URL-like
+ * string, not the internal BMI_address type
+ */
 typedef struct server_configuration_s
 {
     PVFS_SID host_sid;              /* SID of this server */
     char *host_id;                  /* bmi_address of this server */
     /* V3 host_index is probably obsolete */
-    int host_index;
+    int host_index;                 /* index in table of this server */
     char *server_alias;             /* command line server-alias parameter */
     int my_server_options;
 

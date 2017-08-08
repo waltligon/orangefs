@@ -41,8 +41,8 @@ struct ucache_req_s
 
 struct ucache_copy_s
 {
-    void * cache_pos;
-    void * buff_pos;
+    void *cache_pos;
+    void *buff_pos;
     size_t size;
     uint16_t blk_index;
 };
@@ -65,16 +65,13 @@ void calc_copy_ops( off64_t offset,
                     struct ucache_req_s *ureq,
                     struct ucache_copy_s *ucop,
                     int copy_count,
-                    const struct iovec *vector
-);
+                    const struct iovec *vector);
 
 int calc_req_blk_cnt( uint64_t offset,
-                      size_t req_size
-);
+                      size_t req_size);
 
 size_t sum_iovec_lengths( size_t iovec_count,
-                          const struct iovec *vector
-);
+                          const struct iovec *vector);
 
 unsigned char read_full_block_into_ucache( pvfs_descriptor *pd,
                                            PVFS_size offset,
@@ -82,8 +79,7 @@ unsigned char read_full_block_into_ucache( pvfs_descriptor *pd,
                                            int req_index,
                                            uint64_t *fent_size,
                                            size_t *req_size,
-                                           int *req_blk_cnt
-);
+                                           int *req_blk_cnt);
 
 extern int iocommon_fsync(pvfs_descriptor *pvfs_info);
 
@@ -120,6 +116,12 @@ extern int iocommon_lookup_relative(const char *rel_path,
                                     char *error_path,
                                     int error_path_size);
 
+/* Helper function used to parse an ascii list of server
+ * numbers and create the required struct for a create
+ */
+extern int iocommon_parse_serverlist(char *serverlist,
+                                     struct PVFS_sys_server_list *slist,
+                                     PVFS_fs_id fsid);
 /*
  * Create a file via the PVFS system interface
  */
@@ -162,44 +164,44 @@ extern int iocommon_rmdir(const char *pathname, PVFS_object_ref *pdir);
 
 /* if dir(s) are NULL, assume name is absolute */
 extern int iocommon_rename(PVFS_object_ref *oldpdir,
-                         const char *oldname,
-                         PVFS_object_ref *newpdir,
-                         const char *newname);
+                           const char *oldname,
+                           PVFS_object_ref *newpdir,
+                           const char *newname);
 
 /* R/W Wrapper Functions, possibly utilizing user cache
  * do a blocking read or write
  */
 extern int iocommon_readorwrite(enum PVFS_io_type which,
-	                 pvfs_descriptor *pd,
-                         PVFS_size offset,
-                         size_t iovec_count,
-                         const struct iovec *vector);
+	                        pvfs_descriptor *pd,
+                                PVFS_size offset,
+                                size_t iovec_count,
+                                const struct iovec *vector);
 
 extern int iocommon_vreadorwrite(enum PVFS_io_type which,
-	                 PVFS_object_ref *por,
-                         PVFS_size offset,
-                         size_t count,
-                         const struct iovec *vector);
+	                         PVFS_object_ref *por,
+                                 PVFS_size offset,
+                                 size_t count,
+                                 const struct iovec *vector);
 
 extern int iocommon_ireadorwrite(enum PVFS_io_type which,
-                          pvfs_descriptor *pd,
-                          PVFS_size extra_offset,
-                          void *buf,
-                          PVFS_Request etype_req,
-                          PVFS_Request file_req,
-                          size_t count,
-                          PVFS_sys_op_id *ret_op_id,
-                          PVFS_sysresp_io *ret_resp,
-                          PVFS_Request *ret_memory_req);
+                                 pvfs_descriptor *pd,
+                                 PVFS_size extra_offset,
+                                 void *buf,
+                                 PVFS_Request etype_req,
+                                 PVFS_Request file_req,
+                                 size_t count,
+                                 PVFS_sys_op_id *ret_op_id,
+                                 PVFS_sysresp_io *ret_resp,
+                                 PVFS_Request *ret_memory_req);
 
 /* do a blocking read or write
  */
 extern int iocommon_readorwrite_nocache(enum PVFS_io_type which,
-		          PVFS_object_ref *por,
-                          PVFS_size offset,
-                          void *buf,
-                          PVFS_Request mem_req,
-                          PVFS_Request file_req);
+		                        PVFS_object_ref *por,
+                                        PVFS_size offset,
+                                        void *buf,
+                                        PVFS_Request mem_req,
+                                        PVFS_Request file_req);
 
 /*
  * Do a nonblocking read or write
@@ -210,15 +212,15 @@ extern int iocommon_readorwrite_nocache(enum PVFS_io_type which,
  * Note that the none of the PVFS_Requests are freed
  */
 extern int iocommon_ireadorwrite_nocache(enum PVFS_io_type which,
-		          pvfs_descriptor *pd,
-                          PVFS_size extra_offset,
-                          void *buf,
-                          PVFS_Request etype_req,
-                          PVFS_Request file_req,
-                          size_t count,
-		          PVFS_sys_op_id *ret_op_id,
-                          PVFS_sysresp_io *ret_resp,
-                          PVFS_Request *ret_memory_req);
+		                         pvfs_descriptor *pd,
+                                         PVFS_size extra_offset,
+                                         void *buf,
+                                         PVFS_Request etype_req,
+                                         PVFS_Request file_req,
+                                         size_t count,
+		                         PVFS_sys_op_id *ret_op_id,
+                                         PVFS_sysresp_io *ret_resp,
+                                         PVFS_Request *ret_memory_req);
 
 extern int iocommon_getattr(PVFS_object_ref obj,
                             PVFS_sys_attr *attr,
@@ -252,10 +254,10 @@ extern int iocommon_geteattr(pvfs_descriptor *pd,
                              int size);
 
 extern int iocommon_atomiceattr(pvfs_descriptor *pd,
-                                const char *key,
-                                void *old_val,
+                                const char *key_p,
+                                void *old_val_p,
                                 int old_valsize,
-                                void *new_val,
+                                void *new_val_p,
                                 int new_valsize,
                                 void *response,
                                 int respsize,
@@ -276,32 +278,32 @@ extern int iocommon_getmod(pvfs_descriptor *pd, mode_t *mode);
 extern int iocommon_chmod(pvfs_descriptor *pd, mode_t mode);
 
 extern int iocommon_make_directory(const char *pvfs_path,
-                            int mode,
-                            PVFS_object_ref *pdir);
+                                   int mode,
+                                   PVFS_object_ref *pdir);
 
 extern int iocommon_readlink(pvfs_descriptor *pd, char *buf, int size);
 
 extern int iocommon_symlink(const char *pvfs_path,
-                      const char *link_target,
-                      PVFS_object_ref *pdir);
+                            const char *link_target,
+                            PVFS_object_ref *pdir);
 
 extern int iocommon_getdents(pvfs_descriptor *pd,
-                      struct dirent *dirp,
-                      unsigned int count);
+                             struct dirent *dirp,
+                             unsigned int count);
 
 extern int iocommon_getdents64(pvfs_descriptor *pd,
-                      struct dirent64 *dirp,
-                      unsigned int count);
+                               struct dirent64 *dirp,
+                               unsigned int count);
 
 extern int iocommon_access(const char *pvfs_path,
-                      int mode,
-                      int flags,
-                      PVFS_object_ref *pdir);
+                           int mode,
+                           int flags,
+                           PVFS_object_ref *pdir);
 
 extern int iocommon_sendfile(int sockfd,
-                      pvfs_descriptor *pd,
-                      off64_t *offset,
-                      size_t count);
+                             pvfs_descriptor *pd,
+                             off64_t *offset,
+                             size_t count);
 
 
 /* Functions in this file generally define a label errorout

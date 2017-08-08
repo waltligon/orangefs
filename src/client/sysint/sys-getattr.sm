@@ -1959,41 +1959,25 @@ static PINT_sm_action getattr_acache_insert(struct PINT_smcb *smcb,
                          "PVFS_ATTR_DATA_SIZE is in mask. "
                          "Should cache size.\n",
                          __func__);
-            if(!(sm_p->getattr.attr.mask & PVFS_ATTR_META_UNSTUFFED))
-            {
-                gossip_debug(GOSSIP_ACACHE_DEBUG,
-                             "%s: caching stuffed file size\n",
-                             __func__);
-                /* stuffed file case */
-                sm_p->getattr.size = sm_p->getattr.attr.u.meta.stuffed_size;
-                tmp_size = &sm_p->getattr.size;
-                gossip_debug(GOSSIP_ACACHE_DEBUG,
-                             "%s: calculated stuffed logical size of %lld\n",
-                             __func__,
-                             lld(*tmp_size));
-            }
-            else
-            {
-                gossip_debug(GOSSIP_ACACHE_DEBUG,
-                             "%s: caching unstuffed file size\n",
-                             __func__);
-                /* compute size as requested */
-                assert(sm_p->getattr.attr.u.meta.dist);
-                assert(sm_p->getattr.attr.u.meta.dist->methods &&
+            gossip_debug(GOSSIP_ACACHE_DEBUG,
+                         "%s: caching file size\n",
+                         __func__);
+            /* compute size as requested */
+            assert(sm_p->getattr.attr.u.meta.dist);
+            assert(sm_p->getattr.attr.u.meta.dist->methods &&
                     sm_p->getattr.attr.u.meta.dist->methods->logical_file_size);
 
-                sm_p->getattr.size =
+            sm_p->getattr.size =
                    (sm_p->getattr.attr.u.meta.dist->methods->logical_file_size)(
                             sm_p->getattr.attr.u.meta.dist->params,
                             sm_p->getattr.attr.u.meta.dfile_count,
                             sm_p->getattr.size_array);
 
-                tmp_size = &sm_p->getattr.size;
-                gossip_debug(GOSSIP_GETATTR_DEBUG
-                             ,"getattr_acache_insert calculated"
-                              " unstuffed logical size of %lld\n"
-                             , lld(*tmp_size));
-            }
+            tmp_size = &sm_p->getattr.size;
+            gossip_debug(GOSSIP_GETATTR_DEBUG
+                         ,"getattr_acache_insert calculated"
+                          " logical size of %lld\n"
+                         , lld(*tmp_size));
         }
 
         if (sm_p->getattr.attr.objtype == PVFS_TYPE_DIRECTORY &&
