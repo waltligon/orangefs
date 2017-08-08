@@ -25,6 +25,7 @@
 
 #include "pvfs2.h"
 #include "str-utils.h"
+#include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
 
 #ifndef PVFS2_VERSION
@@ -561,8 +562,8 @@ int do_list(
         return -1;
     }
 
-    ref.handle = lk_response.ref.handle;
-    ref.fs_id = fs_id;
+    memset(&ref, 0, sizeof(ref));
+    PVFS_object_ref_copy(&ref, &lk_response.ref);
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
     if (PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
