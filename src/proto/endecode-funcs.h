@@ -201,7 +201,7 @@ static inline void decode_free (void *p) {
 	free(p);
 }
 #else
-#define decode_malloc(n) ((n) ? malloc(n) : 0)
+#define decode_malloc(n) (((n) != 0) ? malloc(n) : 0)
 #define decode_free(n) free(n)
 #endif
 

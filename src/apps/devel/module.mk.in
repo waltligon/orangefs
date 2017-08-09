@@ -16,8 +16,5 @@ MEMANALYSISGEN := \
     $(DIR)/mem_analysis_parser.c \
     $(DIR)/mem_analysis_parser.h
 
-# shut up warnings for problems from flex-2.5.33
-MODCFLAGS_$(DIR)/mem_analysis_scanner.c := -D__STDC_VERSION__=0
-
 .SECONDARY: $(MEMANALYSISGEN)
 

@@ -1,4 +1,6 @@
+#include <unistd.h>
 
+void yyerror(char *s);
 
 /* force malloc to not be redefined for mem_analysis */
 #define PVFS_MALLOC_REDEF_OVERRIDE 1

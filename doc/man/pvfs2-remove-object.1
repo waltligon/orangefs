@@ -1,0 +1,74 @@
+.TH PVFS2-REMOVE-OBJECT 1 2017-07-03
+.SH NAME
+\fBpvfs2-remove-object\fR \(en remove internal object from OrangeFS
+volume
+.SH SYNOPSIS
+\fBpvfs2-remove-object\fR [\fB\-hv\fR] [\fB\-f \fIfs_id\fR]
+[\fB\-o \fIhandle\fR] [\fB\-p \fIhandle \-d \fIentry_name\fR]
+.SH DESCRIPTION
+The
+.B pvfs2-remove-object
+removes an object from an OrangeFS volume by handle number.  This would
+be used to repair a corrupt file system.  Improper use of this utility
+could corrupt a file system.
+.PP
+The
+.B -p
+and
+.B -d
+options must be used together to remove a directory entry.
+.PP
+The options are as follows:
+.IP -h
+Display synopsis.
+.IP -v
+Print version number and exit.
+.IP -f
+Use
+.I fs_id
+as file system ID.
+.IP -o
+Remove the handle
+.IR handle .
+.IP -p
+Specify the parent handle
+.IR handle .
+.IP -p
+Specify the dirent name
+.IR entry_name .
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate
+.IR pvfs2tab
+file
+.SH FILES
+.I /etc/pvfs2tab
+.SH EXAMPLES
+Copy the file
+.I /etc/motd
+to
+.IR /mnt/bar .
+If
+.I /mnt
+is an OrangeFS volume, this will copy the file into OrangeFS.
+.PP
+.RS 6n
+pvfs2-cp /etc/motd /mnt/bar
+.RE
+.SH CAVEATS
+When
+.I dst_file
+is a directory the utility does not work.  In this respect it is
+different than the
+.BR cp ( 1 )
+utility.
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2-stat ( 1 ),
+.BR pvfs2tab ( 5 )

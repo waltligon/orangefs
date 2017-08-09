@@ -23,7 +23,7 @@ PVFS2_VERSION_SUB=6
 PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
 #PVFS2_VERSION_PRE="RC-$CONFIGURE_TIME"
-PVFS2_VERSION_PRE="REV-12845"
+PVFS2_VERSION_PRE="REV-12978"
 
 PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE-$PVFS2_VERSION_PRE
 AC_SUBST(PVFS2_VERSION)
@@ -699,9 +699,8 @@ AC_TRY_COMPILE(
         }
     ],
     [
-        int ret;
         const char *sc_t = NULL;
-	    ret = setfilecon("somepath", sc_t);
+        setfilecon("somepath", sc_t);
     ],
     [
        AC_MSG_RESULT(yes)
