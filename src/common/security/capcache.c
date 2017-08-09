@@ -25,6 +25,7 @@
 #include "murmur3.h"
 #include "gossip.h"
 #include "pvfs2-debug.h"
+#include "server-config-mgr.h"
 
 /* global variables */
 seccache_t *capcache = NULL;
@@ -306,7 +307,7 @@ int PINT_capcache_quick_sign(PVFS_capability * cap)
  */
 int PINT_capcache_init(void)
 {
-    struct server_configuration_s *config = PINT_get_server_config();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
 
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Initializing capability cache...\n");
 

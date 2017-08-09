@@ -22,6 +22,7 @@
 #include "pvfs2-dist-basic.h"
 #include "security-util.h"
 #include "pint-uid-map.h"
+#include "server-config-mgr.h"
 
 static int split_comp_fn(
         void *v_p,
@@ -1076,7 +1077,7 @@ static PINT_sm_action crdirent_update_metahandle_attrs(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char server_name[1024];
-    struct server_configuration_s *server_config = get_server_config_struct();
+    struct server_configuration_s *server_config = PINT_server_config_mgr_get_config();
     PVFS_object_attr *attr_p = NULL;
     int ret = -PVFS_EINVAL;
 
@@ -1112,7 +1113,7 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
     int i = 0;
     int ret = 0;
     char server_name[1024];
-    struct server_configuration_s *server_config = get_server_config_struct();
+    struct server_configuration_s *server_config = PINT_server_config_mgr_get_config();
 
     gossip_debug(GOSSIP_SETATTR_DEBUG, "setattr state: setattr_remote_dirdata_attr_setup_msgpair\n");
 

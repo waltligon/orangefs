@@ -1,0 +1,44 @@
+.TH PVFS2-SET-EVENTMASK 1 2017-07-06
+.SH NAME
+\fBpvfs2-set-eventmask\fR \(en enable and disable debug strings to log
+.SH SYNOPSIS
+\fBpvfs2-set-eventmask\fR [\fB\-m \fImount_point\fR] [\fB\-e \fIevents\fR]
+.SH DESCRIPTION
+The server contains many log strings which are categorized.  This
+utility sets which categories to log on the server.  The output will be
+into the configured server log file.
+.PP
+The options are as follows:
+.IP -h
+Display synopsis.  This includes a list of all possible mask strings.
+.IP -v
+Print version number and exit.
+.IP -m
+Specify the file system to operate on.
+.IP -s
+Specify the address of the server.  This option is used to change the
+mask only on a particular server instead of the entire cluster.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate
+.IR pvfs2tab
+file
+.SH FILES
+.I /etc/pvfs2tab
+.SH EXAMPLES
+Log IO errors.
+.PP
+.RS 6n
+pvfs2-set-debugmask -m /mnt io
+.RE
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2-set-eventmask ( 1 ),
+.BR pvfs2-set-mode ( 1 ),
+.BR pvfs2tab ( 5 )

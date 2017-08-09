@@ -1,0 +1,73 @@
+.TH PVFS2-MKDIR 1 2017-07-03
+.SH NAME
+\fBpvfs2-mkdir\fR \(en create directory in an OrangeFS volume
+.SH SYNOPSIS
+\fBpvfs2-mkdir\fR [\fB\-m \fImode\fR] [\fB\-i \fIinitial\fR]
+[\fB\-x \fImaximum\fR] [\fB\-s \fIsplit\fR] [\fB\-pVvh\fR]
+\fIdirectory\fR
+.SH DESCRIPTION
+The
+.B pvfs2-mkdir
+utility creates a directory in an OrangeFS volume at
+.IR directory .
+.PP
+The options are as follows:
+.IP -m
+Set permission mode as three or four digit octal number
+.IR mode .
+.IP -i
+Set initial number of dirdata handles.
+.IP -x
+Set maximum number of dirdata handles.
+.IP -s
+Set number of directory entries stored before split.
+.IP -p
+Create parent directories as needed within OrangeFS.
+.IP -V
+Display verbose messages.
+.IP -v
+Print version number and exit.
+.IP -h
+Display synopsis.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate
+.IR pvfs2tab
+file
+.SH FILES
+.I /etc/pvfs2tab
+.SH EXAMPLES
+Create a directory.
+.PP
+.RS 6n
+pvfs2-mkdir /mnt/foo
+.RE
+.PP
+Create a directory whose entries are always distributed across 4
+servers. In this case a split will never need to occur, so the split
+size is irrelevant.
+.PP
+.RS 6n
+pvfs2-mkdir -i 4 -x 4 /mnt/foo
+.RE
+.PP
+Create a directory whose entries initially reside on 1 server, but may
+eventually grow so that entries are distributed across 4 servers.  When
+any single server reaches the maximum of 10,000 directory entries,
+another of the available servers becomes active and entries are split
+across active servers, up to a maximum of 4 servers.
+.PP
+.RS 6n
+pvfs2-mkdir -i 1 -x 4 -s 10000 /mnt/foo
+.RE
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR mkdir ( 1 ),
+.BR pvfs2-touch ( 1 ),
+.BR pvfs2tab ( 5 )
