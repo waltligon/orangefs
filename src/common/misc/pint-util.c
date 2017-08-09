@@ -258,8 +258,10 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         dest->u.meta.sid_count = src->u.meta.sid_count;
         dest->u.meta.size = src->u.meta.size;
         dest->u.meta.mirror_mode = src->u.meta.mirror_mode;
+    #if 0
         dest->u.meta.stuffed = src->u.meta.stuffed;
         dest->u.meta.stuffed_size = src->u.meta.stuffed_size;
+    #endif
         dest->u.meta.flags = src->u.meta.flags;
         /**/
         break;
@@ -441,413 +443,6 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
 #undef FREEPACK
 
 /* V3 Add function that calls free_obj_attr then frees the attr itself */
-
-/* V3 Old versions - should be removed */
-#if 0
-int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
-{
-    int ret = -PVFS_ENOMEM;
-
-    if (dest && src)
-    {
-        if (src->mask & PVFS_ATTR_COMMON_UID)
-        {
-            dest->owner = src->owner;
-        }
-        if (src->mask & PVFS_ATTR_COMMON_GID)
-        {
-            dest->group = src->group;
-        }
-        if (src->mask & PVFS_ATTR_COMMON_PERM)
-        {
-            dest->perms = src->perms;
-        }
-        if (src->mask & PVFS_ATTR_COMMON_ATIME)
-        {
-            dest->atime = src->atime;
-        }
-        if (src->mask & PVFS_ATTR_COMMON_CTIME)
-        {
-            dest->ctime = src->ctime;
-        }
-        if (src->mask & PVFS_ATTR_COMMON_MTIME)
-        {
-            dest->mtime = src->mtime;
-        }
-        if (src->mask & PVFS_ATTR_COMMON_NTIME)
-        {
-            dest->ntime = src->ntime;
-        }
-        if (src->mask & PVFS_ATTR_COMMON_TYPE)
-        {
-            dest->objtype = src->objtype;
-        }
-        if (src->mask & PVFS_ATTR_DIR_DIRENT_COUNT)
-        {
-            dest->u.dir.dirent_count = src->u.dir.dirent_count;
-        }
-        if (src->mask & PVFS_ATTR_DISTDIR_ATTR)
-        {
-            PVFS_size dist_dir_bitmap_size, dirent_handles_array_size;
-
-            PINT_dist_dir_attr_copyto(dest->u.dir.dist_dir_attr,
-                                      src->u.dir.dist_dir_attr);
-
-            dist_dir_bitmap_size = src->u.dir.dist_dir_attr.bitmap_size *
-                sizeof(PVFS_dist_dir_bitmap_basetype);
-            if (dist_dir_bitmap_size)
-            {
-                if ((dest->mask & PVFS_ATTR_DISTDIR_ATTR) &&
-                    dest->u.dir.dist_dir_attr.dirdata_count > 0)
-                {
-                    if (dest->u.dir.dist_dir_bitmap)
-                    {
-                        free(dest->u.dir.dist_dir_bitmap);
-                        dest->u.dir.dist_dir_bitmap = NULL;
-                    }
-                }
-                dest->u.dir.dist_dir_bitmap = malloc(dist_dir_bitmap_size);
-                if (!dest->u.dir.dist_dir_bitmap)
-                {
-                    return ret;
-                }
-                memcpy(dest->u.dir.dist_dir_bitmap,
-                       src->u.dir.dist_dir_bitmap,
-                       dist_dir_bitmap_size);
-            }
-            else
-            {
-                dest->u.dir.dist_dir_bitmap = NULL;
-            }
-
-            dirent_handles_array_size = src->u.dir.dist_dir_attr.dirdata_count *
-                sizeof(PVFS_handle);
-
-            if (dirent_handles_array_size)
-            {
-                if ((dest->mask & PVFS_ATTR_DISTDIR_ATTR) &&
-                    dest->u.dir.dist_dir_attr.dirdata_count > 0)
-                {
-                    if (dest->u.dir.dirdata_handles)
-                    {
-                        free(dest->u.dir.dirdata_handles);
-                        dest->u.dir.dirdata_handles = NULL;
-                    }
-                }
-                dest->u.dir.dirdata_handles = malloc(dirent_handles_array_size);
-                if (!dest->u.dir.dirdata_handles)
-                {
-                    return ret;
-                }
-                memcpy(dest->u.dir.dirdata_handles,
-                       src->u.dir.dirdata_handles,
-                       dirent_handles_array_size);
-            }
-            else
-            {
-                dest->u.dir.dirdata_handles = NULL;
-            }
-            dest->u.dir.dist_dir_attr.dirdata_count =
-                            src->u.dir.dist_dir_attr.dirdata_count;
-        }
-
-        if((src->objtype == PVFS_TYPE_METAFILE) &&
-            (!(src->mask & PVFS_ATTR_META_UNSTUFFED)))
-        {
-            /* if this is a metafile, and does _not_ appear to be stuffed,
-             * then we should propigate the stuffed_size
-             */
-            dest->u.meta.stuffed_size = src->u.meta.stuffed_size;
-        }
-
-        if (src->mask & PVFS_ATTR_DIR_HINT)
-        {
-            dest->u.dir.hint.dfile_count = src->u.dir.hint.dfile_count;
-            dest->u.dir.hint.dist_name_len = src->u.dir.hint.dist_name_len;
-            if (dest->u.dir.hint.dist_name_len > 0)
-            {
-                dest->u.dir.hint.dist_name = strdup(src->u.dir.hint.dist_name);
-                if (dest->u.dir.hint.dist_name == NULL)
-                {
-                    return ret;
-                }
-            }
-            dest->u.dir.hint.dist_params_len = src->u.dir.hint.dist_params_len;
-            if (dest->u.dir.hint.dist_params_len > 0)
-            {
-                dest->u.dir.hint.dist_params 
-                        = strdup(src->u.dir.hint.dist_params);
-                if (dest->u.dir.hint.dist_params == NULL)
-                {
-                    free(dest->u.dir.hint.dist_name);
-                    return ret;
-                }
-            }
-        }
-
-        /*
-          NOTE:
-          we only copy the size out if we're actually a
-          datafile object.  sometimes the size field is
-          valid when the objtype is a metafile because
-          of different uses of the acache.  In this case
-          (namely, getattr), the size is stored in the
-          acache before this deep copy, so it's okay
-          that we're not copying here even though the
-          size mask bit is set.
-
-          if we don't do this trick, the metafile that
-          caches the size will have it's union data
-          overwritten with a bunk size.
-        */
-        if ((src->mask & PVFS_ATTR_DATA_SIZE) &&
-            (src->mask & PVFS_ATTR_COMMON_TYPE) &&
-            (src->objtype == PVFS_TYPE_DATAFILE))
-        {
-            dest->u.data.size = src->u.data.size;
-        }
-
-        if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
-            (src->objtype == PVFS_TYPE_METAFILE))
-        {      
-            if(src->mask & PVFS_ATTR_META_DFILES)
-            {
-                PVFS_size df_array_size = src->u.meta.dfile_count *
-                              sizeof(PVFS_handle);
-                PVFS_size sd_array_size = src->u.meta.sid_count *
-                              sizeof(PVFS_SID);
-                /* first copy handles */
-                if (df_array_size)
-                {
-                    if ((dest->mask & PVFS_ATTR_META_DFILES) &&
-                        dest->u.meta.dfile_count > 0)
-                    {
-                        if (dest->u.meta.dfile_array)
-                        {
-                            free(dest->u.meta.dfile_array);
-                            dest->u.meta.dfile_array = NULL;
-                        }
-                    }
-                    dest->u.meta.dfile_array = malloc(df_array_size);
-                    if (!dest->u.meta.dfile_array)
-                    {
-                        return ret;
-                    }
-                    memcpy(dest->u.meta.dfile_array,
-                           src->u.meta.dfile_array,
-                           df_array_size);
-                }
-                else
-                {
-                    dest->u.meta.dfile_array = NULL;
-                }
-                dest->u.meta.dfile_count = src->u.meta.dfile_count;
-                /* now copy sids */
-                if (sd_array_size)
-                {
-                    if ((dest->mask & PVFS_ATTR_META_DFILES) &&
-                        dest->u.meta.sid_count > 0)
-                    {
-                        if (dest->u.meta.sid_array)
-                        {
-                            free(dest->u.meta.sid_array);
-                            dest->u.meta.sid_array = NULL;
-                        }
-                    }
-                    dest->u.meta.sid_array = malloc(sd_array_size);
-                    if (!dest->u.meta.sid_array)
-                    {
-                        return ret;
-                    }
-                    memcpy(dest->u.meta.sid_array,
-                           src->u.meta.sid_array,
-                           sd_array_size);
-                }
-                else
-                {
-                    dest->u.meta.dfile_array = NULL;
-                }
-                dest->u.meta.dfile_count = src->u.meta.dfile_count;
-            }
-          /* V3 this should go away eventually */
-#if 0
-            if(src->mask & PVFS_ATTR_META_MIRROR_DFILES)
-            {
-                PVFS_size df_array_size = src->u.meta.dfile_count         *
-                                          src->u.meta.mirror_copies_count *
-                                          sizeof(PVFS_handle);
-
-                if (df_array_size)
-                {
-                    if (   (dest->mask & PVFS_ATTR_META_MIRROR_DFILES) 
-                        && (dest->u.meta.dfile_count > 0)
-                        && (dest->u.meta.mirror_copies_count > 0) )
-                    {
-                        if (dest->u.meta.mirror_dfile_array)
-                        {
-                            free(dest->u.meta.mirror_dfile_array);
-                            dest->u.meta.mirror_dfile_array = NULL;
-                        }
-                    }
-                    dest->u.meta.mirror_dfile_array = malloc(df_array_size);
-                    if (!dest->u.meta.mirror_dfile_array)
-                    {
-                        return ret;
-                    }
-                    memcpy(dest->u.meta.mirror_dfile_array,
-                           src->u.meta.mirror_dfile_array, df_array_size);
-                }
-                else
-                {
-                    dest->u.meta.mirror_dfile_array = NULL;
-                }
-                dest->u.meta.mirror_copies_count 
-                   = src->u.meta.mirror_copies_count;
-            }
-#endif
-
-            if(src->mask & PVFS_ATTR_META_DIST)
-            {
-                assert(src->u.meta.dist_size > 0);
-
-                if ((dest->mask & PVFS_ATTR_META_DIST) && dest->u.meta.dist)
-                {
-                    PINT_dist_free(dest->u.meta.dist);
-                }
-                dest->u.meta.dist = PINT_dist_copy(src->u.meta.dist);
-                if (dest->u.meta.dist == NULL)
-                {
-                    return ret;
-                }
-                dest->u.meta.dist_size = src->u.meta.dist_size;
-            }
-            memcpy(&dest->u.meta.hint,
-                   &src->u.meta.hint,
-                   sizeof(dest->u.meta.hint));
-        }
-
-        if (src->mask & PVFS_ATTR_SYMLNK_TARGET)
-        {
-            dest->u.sym.target_path_len = src->u.sym.target_path_len;
-            dest->u.sym.target_path = strdup(src->u.sym.target_path);
-            if (dest->u.sym.target_path == NULL)
-            {
-                return ret;
-            }
-        }
-
-        if (src->mask & PVFS_ATTR_CAPABILITY)
-        {
-            ret = PINT_copy_capability(&src->capability, &dest->capability);
-            if (ret < 0)
-            {
-                return ret;
-            }
-        }
-
-        dest->mask = src->mask;
-
-        ret = 0;
-    }
-    return ret;
-}
-
-void PINT_free_object_attr(PVFS_object_attr *attr)
-{
-    if (attr)
-    {
-        if (attr->mask & PVFS_ATTR_CAPABILITY)
-        {
-            if (attr->capability.signature)
-            {
-                free(attr->capability.signature);
-            }            
-            if (attr->capability.handle_array)
-            {
-                free(attr->capability.handle_array);
-            }            
-            if (attr->capability.issuer)
-            {
-                free(attr->capability.issuer);
-            }
-            memset(&attr->capability, 0, sizeof(PVFS_capability));
-        }
-        if (attr->mask & PVFS_ATTR_META_DFILES)
-        {
-            if (attr->u.meta.dfile_array)
-            {
-                free(attr->u.meta.dfile_array);
-                attr->u.meta.dfile_array = NULL;
-                if (attr->u.meta.sid_array)
-                {
-                    free(attr->u.meta.sid_array);
-                    attr->u.meta.sid_array = NULL;
-                }
-            }
-            /* V3 this should go away eventually */
-#if 0
-            if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
-            {
-                free(attr->u.meta.mirror_dfile_array);
-                attr->u.meta.mirror_dfile_array = NULL;
-            }
-#endif
-        }
-        if (attr->mask & PVFS_ATTR_META_DIST)
-        {
-            if (attr->u.meta.dist)
-            {
-                PINT_dist_free(attr->u.meta.dist);
-                attr->u.meta.dist = NULL;
-            }
-        }
-        if (attr->mask & PVFS_ATTR_SYMLNK_TARGET)
-        {
-            if ((attr->u.sym.target_path_len > 0) &&
-                attr->u.sym.target_path)
-            {
-                free(attr->u.sym.target_path);
-                attr->u.sym.target_path = NULL;
-            }
-        }
-        if ((attr->mask & PVFS_ATTR_DIR_HINT) || 
-            (attr->mask & PVFS_ATTR_DIR_DIRENT_COUNT))
-        {
-            if (attr->u.dir.hint.dist_name)
-            {
-                free(attr->u.dir.hint.dist_name);
-                attr->u.dir.hint.dist_name = NULL;
-            }
-            if (attr->u.dir.hint.dist_params)
-            {
-                free(attr->u.dir.hint.dist_params);
-                attr->u.dir.hint.dist_params = NULL;
-            }
-        }
-        if (attr->mask & PVFS_ATTR_DISTDIR_ATTR)
-        {   
-            if (attr->dist_dir_bitmap)
-            {   
-                if (attr->u.dir.dist_dir_bitmap)
-                {   
-                    free(attr->u.dir.dist_dir_bitmap);
-                    attr->u.dir.dist_dir_bitmap = NULL;
-                }
-                if (attr->u.dir.dirdata_handles)
-                {
-                    free(attr->u.dir.dirdata_handles);
-                    attr->u.dir.dirdata_handles = NULL;
-                }
-            }
-            if (attr->dirdata_handles)
-            {
-                free(attr->dirdata_handles);
-                attr->dirdata_handles = NULL;
-            }
-        }
-    }
-}
-#endif
 
 char *PINT_util_get_object_type(int objtype)
 {
@@ -1069,7 +664,7 @@ void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
     /* figure out how big this encoding will be first */
 
     tmp_size = 16; /* enumeration and list count */
-    for(i=0 ; i<x->server_list.count; i++)
+    for(i = 0; i < x->server_list.count; i++)
     {
         /* room for each server encoding */
         tmp_size +=
@@ -1091,7 +686,7 @@ void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
     encode_skip4(pptr, NULL);
     encode_int32_t(pptr, &x->server_list.count);
     encode_skip4(pptr, NULL);
-    for(i=0 ; i<x->server_list.count; i++)
+    for(i = 0; i < x->server_list.count; i++)
     {
         encode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
     }
@@ -1110,11 +705,11 @@ void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x)
     decode_skip4(pptr, NULL);
     if(x->server_list.count)
     {
-        x->server_list.servers =
-                 malloc(x->server_list.count*sizeof(*(x->server_list.servers)));
+        x->server_list.servers = malloc(x->server_list.count *
+                                        sizeof(*(x->server_list.servers)));
         assert(x->server_list.servers);
     }
-    for(i=0 ; i<x->server_list.count; i++)
+    for(i = 0 ; i < x->server_list.count; i++)
     {
         decode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
     }

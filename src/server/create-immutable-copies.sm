@@ -936,8 +936,6 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_MIRROR_DEBUG, "Target handle: %s\tTarget FS ID: %d\n",
                  PVFS_OID_str(&imm_p->metadata_handle),imm_p->fs_id);
     gossip_debug(GOSSIP_MIRROR_DEBUG, "dfile count: %d\n",imm_p->dfile_count);
-    gossip_debug(GOSSIP_MIRROR_DEBUG, "stuffed size: %d\n",
-                 sm_p->target_object_attr->u.meta.stuffed_size);
     gossip_debug(GOSSIP_MIRROR_DEBUG,"hint.flags: %llu\n",
                  llu(sm_p->target_object_attr->u.meta.flags));
     gossip_debug(GOSSIP_MIRROR_DEBUG,"dfile array P: %p\n",
