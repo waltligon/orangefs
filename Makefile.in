@@ -244,7 +244,7 @@ DEPLIBS += -lm @LIBS@ @THREAD_LIB@
 ULIBDEPLIBS := -lorangefs -lpvfs2 @UUID_LDFLAGS@ @UUID_LIB@
 OLIBDEPLIBS := -lpvfs2 @UUID_LDFLAGS@ @UUID_LIB@
 # Misc defines
-MMAP_RA_CACHE = @MMAP_RA_CACHE@
+RA_CACHE = @RA_CACHE@
 RESET_FILE_POS = @RESET_FILE_POS@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
 REDHAT_RELEASE = @REDHAT_RELEASE@
@@ -490,9 +490,9 @@ ifdef BUILD_ZOID
     CFLAGS += -D__STATIC_METHOD_BMI_ZOID__
 endif
 
-# enable mmap-readahead cache (unless disabled by configure)
-ifdef MMAP_RA_CACHE
-CFLAGS += @MMAP_RA_CACHE@
+# enable client-core readahead cache (unless disabled by configure)
+ifdef RA_CACHE
+CFLAGS += @RA_CACHE@
 endif
 
 # reset the file position pointer when a write call encounters errors (kernel only)
@@ -830,18 +830,42 @@ DEVELTOOLS := $(patsubst %.c,%, $(filter %.c, $(DEVELSRC)))
 # DEVELDEPENDS is a list of dependency files for development programs
 DEVELDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(DEVELSRC)))
 
+# malloc analysis tool, built for the build machine, not the
+# host machine, in the case of cross-compilation
+MEMANALYSISOBJS := $(patsubst %.c,%.o,$(MEMANALYSISSRC))
+MEMANALYSISDEPS := $(patsubst %.c,%.d,$(MEMANALYSISSRC))
+
+
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
+# NOTE: these items are now sorted in the order they appear in this
+# Makefile.in so that it is easy to verify that all depends are
+# included.  All of these items have been removed from CLEAN and
+# replaced with $(DEPENDS) so that the list need only be maintained here.
+#
 ifdef BUILD_BMI_ONLY
 DEPENDS := $(sort $(LIBBMIDEPENDS))
 else
-DEPENDS := $(sort $(LIBDEPENDS) $(ULIBDEPENDS) $(SERVERDEPENDS) \
-    $(SERVERBINDEPENDS) $(MISCDEPENDS) $(USERDEPENDS) \
-    $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) \
-    $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS) \
-    $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) \
-    $(POLICYCOMPDEPS) $(OLIBDEPENDS) )
+DEPENDS := $(sort $(LIBDEPENDS) \
+	              $(OLIBDEPENDS) \
+                  $(ULIBDEPENDS) \
+				  $(LIBBMIDEPENDS) \
+				  $(LIBTHREADEDDEPENDS) \
+                  $(ADMINDEPENDS) \
+				  $(USERDEPENDS) \
+				  $(UCACHEDDEPENDS) \
+				  $(ADMINDEPENDS_SERVER) \
+				  $(SERVERDEPENDS) \
+                  $(SERVERBINDEPENDS) \
+				  $(MISCDEPENDS) \
+				  $(KERNAPPDEPENDS) \
+                  $(VISDEPENDS) \
+				  $(VISMISCDEPENDS) \
+				  $(KARMADEPENDS) \
+				  $(FUSEDEPENDS) \
+                  $(STATECOMPDEPS) \
+				  $(DEVELDEPENDS))
 endif
 
 ####################################################################
@@ -877,7 +901,10 @@ statecompgen: $(STATECOMPGEN)
 policycompgen: $(POLICYCOMPGEN)
 
 # target for building development tools
-develtools: $(DEVELTOOLS)
+develtools: $(DEVELTOOLS) $(MEMANALYSIS)
+
+# this is needed for the make dist
+memanalysisgen: $(MEMANALYSISGEN)
 
 # Build linux-2.6 kernel module if requested.
 # Can't use the actual file target since we don't know how to figure out
@@ -1203,6 +1230,15 @@ $(POLICYCOMP): $(POLICYCOMPOBJS)
 	$(Q) "  BUILD_LD	$@"
 	$(E)$(BUILD_LD) -o $@ $(BUILD_LDFLAGS) $(POLICYCOMPOBJS) $(call modldflags,$<)
 
+# special rules to malloc analysis tool using build host compiler
+$(MEMANALYSISOBJS): %.o: %.c
+	$(Q) "  BUILD_CC	$@"
+	$(E)$(BUILD_CC) $(BUILD_CFLAGS) $< -c -o $@ $(call modcflags,$<)
+
+$(MEMANALYSIS): $(MEMANALYSISOBJS)
+	$(Q) "  BUILD_LD	$@"
+	$(E)$(BUILD_LD) -o $@ $(BUILD_LDFLAGS) $(MEMANALYSISOBJS) $(call modldflags,$<)
+
 # rule for generating cscope information
 cscope:
 	find @SRC_ABSOLUTE_TOP@ -iname "*.[ch]" -o -iname "*.sm" \
@@ -1245,27 +1281,33 @@ ifndef DIST_RELEASE
 endif
 
 # top rule for cleaning up tree
+# NOTE: all depends defs should be included in DEPENDS above
+# keep this list neat so we can veryify all the right things are
+# here
 clean:: 
 	$(Q) "  CLEAN"
-	$(E)rm -f $(LIBOBJS) $(LIBTHREADEDOBJS) \
+	$(E)rm -f   $(DEPENDS) \
+	            $(LIBOBJS) $(LIBTHREADEDOBJS) \
                 $(LIBPICOBJS) $(LIBTHREADEDPICOBJS) \
-                $(ULIBOBJS) $(OLIBOBJS) $(OLIBDEPENDS) \
-                $(ULIBPICOBJS) $(ULIBDEPENDS) $(OLIBPICOBJS) \
+                $(ULIBOBJS) $(ULIBPICOBJS) \
+				$(OLIBOBJS) $(OLIBPICOBJS) \
                 $(UCACHEDTOOLS) $(UCACHEDOBJS) \
-                $(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
-                $(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
-                $(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
-                $(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
-                $(USERTOOLS) $(USEROBJS) $(DEVELTOOLS) $(DEVELOBJS) \
+                $(SERVER) $(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
+                $(LIBRARIES) $(LIBRARIES_THREADED) \
+				$(ADMINTOOLS) $(ADMINOBJS) \
+                $(ADMINTOOLS_SERVER) $(ADMINOBJS_SERVER) \
+                $(USERTOOLS) $(USEROBJS) \
+				$(DEVELTOOLS) $(DEVELOBJS) \
                 $(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
-                $(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
-                $(VISMISCDEPENDS) $(KARMAOBJS) \
-                $(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) \
-                $(BMILIBRARIES) $(FUSEOBJS) \
-                $(VISMISCDEPENDS) $(KARMAOBJS) \
-                $(STATECOMP) $(STATECOMPOBJS) \
+                $(VISS) $(VISOBJS) \
+				$(VISMISCOBJS) \
+				$(KARMAOBJS) \
+                $(MEMANALYSIS) $(MEMANALYSISOBJS) $(MEMANALYSISDEPS) \
                 $(POLICYCOMP) $(POLICYCOMPOBJS) \
                 $(PYCGEN) $(PYCGEN_AUX) \
+				$(BMILIBRARIES) $(LIBBMIOBJS) \
+				$(FUSEOBJS) \
+				lib/libpvfs2-server.a\
                 src/server/pvfs2-server-server.o \
                 src/apps/karma/karma src/apps/fuse/pvfs2fuse \
                 src/server/simple.conf examples/fs.conf
@@ -1281,6 +1323,7 @@ endif
 ifndef DIST_RELEASE
 	$(E)rm -f $(STATECOMPGEN)
 	$(E)rm -f $(POLICYCOMPGEN) 
+	$(E)rm -f $(MEMANALYSISGEN)
 endif
 
 ifneq (,$(LINUX_KERNEL_SRC))
@@ -1494,7 +1537,7 @@ ifdef BUILD_FUSE
 endif
 
 	# install any development tools built
-	for i in $(notdir $(DEVELTOOLS)) ; do \
+	for i in $(notdir $(DEVELTOOLS) $(MEMANALYSIS)) ; do \
 		if [ -f $(srcdir)/src/apps/devel/$$i ]; then install -m 755 $(srcdir)/src/apps/devel/$$i $(bindir); fi;\
 	done
 

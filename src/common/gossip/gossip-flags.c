@@ -51,7 +51,7 @@ PVFS_DEBUG_MASK_DECL(GOSSIP_TROVE_OP_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_DIST_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_BMI_DEBUG_IB);
 PVFS_DEBUG_MASK_DECL(GOSSIP_DBPF_ATTRCACHE_DEBUG);
-PVFS_DEBUG_MASK_DECL(GOSSIP_MMAP_RCACHE_DEBUG);
+PVFS_DEBUG_MASK_DECL(GOSSIP_RACACHE_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_LOOKUP_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_REMOVE_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_GETATTR_DEBUG);
@@ -90,7 +90,6 @@ PVFS_DEBUG_MASK_DECL(GOSSIP_MIRROR_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_WIN_CLIENT_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_SECURITY_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_USRINT_DEBUG);
-PVFS_DEBUG_MASK_DECL(GOSSIP_RCACHE_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_SECCACHE_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_SIDCACHE_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_UNEXP_DEBUG);
@@ -129,7 +128,7 @@ const __keyword_mask_t s_keyword_mask_map[] =
     /* Debug the client name cache.  Only useful on the client. */
     { "ncache", {GOSSIP_NCACHE_DEBUG_INIT} },
     /* Debug read-ahead cache events.  Only useful on the client. */
-    { "mmaprcache", {GOSSIP_MMAP_RCACHE_DEBUG_INIT} },
+    { "racache", {GOSSIP_RACACHE_DEBUG_INIT} },
     /* Debug the attribute cache.  Only useful on the client. */
     { "acache", {GOSSIP_ACACHE_DEBUG_INIT} },
     /* Log/Debug distribution calls */
@@ -205,8 +204,6 @@ const __keyword_mask_t s_keyword_mask_map[] =
     { "seccache", {GOSSIP_SECCACHE_DEBUG_INIT} },
     /* Client User Interface */
     { "usrint", {GOSSIP_USRINT_DEBUG_INIT} },
-    /* rcache */
-    { "rcache", {GOSSIP_RCACHE_DEBUG_INIT} },
     /* Sidcache debugging */
     { "sidcache", {GOSSIP_SIDCACHE_DEBUG_INIT} },
     /* Everything except the periodic events.  Useful for debugging */

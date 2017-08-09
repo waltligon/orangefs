@@ -54,6 +54,7 @@
 
 int key_cnt; /* holds the Number of keys */
 
+/* s is a string that is printed, c is the counter value */
 #define PRINT_COUNTER(s, c) \
 do { \
     int j; \
@@ -209,13 +210,14 @@ int main(int argc, char **argv)
         key_cnt = MAX_KEY_CNT;
 	ret = PVFS_mgmt_perf_mon_list(cur_fs,
 				      &cred,
+                                      PINT_PERF_COUNTER,
 				      perf_matrix, 
 				      end_time_ms_array,
 				      addr_array,
 				      next_id_array,
 				      io_server_count, 
                                       &key_cnt,
-				      user_opts->history,
+				      &user_opts->history,
 				      NULL,
                                       NULL);
 	if (ret < 0)

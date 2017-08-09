@@ -618,7 +618,7 @@ static PINT_sm_action msgpairarray_complete_recv_send(struct PINT_smcb *smcb,
 
         if(msg_p->recv_status.error_code && msg_p->send_id != 0)
         {
-            /* we got a receive error, but send is still pending.  Cancel
+            /* we got a receive error, and send is still pending.  Cancel
              * the send
              */
             job_bmi_cancel(msg_p->send_id, mop->params.job_context);
@@ -640,7 +640,7 @@ static PINT_sm_action msgpairarray_complete_recv_send(struct PINT_smcb *smcb,
 
         if(msg_p->send_status.error_code && msg_p->recv_id != 0)
         {
-            /* we got a send error, but recv is still pending.  Cancel
+            /* we got a send error, and recv is still pending.  Cancel
              * the recv 
              */
             job_bmi_cancel(msg_p->recv_id, mop->params.job_context);
@@ -650,7 +650,7 @@ static PINT_sm_action msgpairarray_complete_recv_send(struct PINT_smcb *smcb,
         /* error - unexpected job completed */
         gossip_err("msgpairarray complete send/recv got bad user tag\n");
         break;
-    }
+    }/*end switch*/
 
     /* check if both operations have completed */
     if (msg_p->send_id || msg_p->recv_id)
@@ -849,7 +849,6 @@ static PINT_sm_action msgpairarray_complete_ack_flow (struct PINT_smcb *smcb,
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[mop->index];
-    int ret = -PVFS_EINVAL;
 
     switch (js_p->status_user_tag)
     {
@@ -893,7 +892,7 @@ static PINT_sm_action msgpairarray_complete_ack_flow (struct PINT_smcb *smcb,
             /* ack isn't finished so set timeout for ack and
              * deal with errors when its done - why not cancel if error?
              */
-            ret = job_reset_timeout(msg_p->ack_id, mop->params.job_timeout);
+            job_reset_timeout(msg_p->ack_id, mop->params.job_timeout);
         }
         if(msg_p->flow_status.error_code && msg_p->ack_id == 0)
         {
@@ -970,7 +969,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
     struct PVFS_server_resp *resp_p = NULL;
 
     /* we should get here on a SM_ACTION_COMPLETE so there should not be
-     * an error was was not handled by the previous state
+     * an error that was not handled by the previous state
      */
     js_p->error_code = 0;
 
@@ -981,6 +980,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
 
     assert(msg_p);
 
+    /* op_status error indicating a network issue; set by send/recv.  Go straight to retry */
     if (msg_p->op_status != 0)
     {
         char s[1024];
@@ -1000,6 +1000,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
          * failure.
          */
         msg_p->op_action = PVFS_MPA_RETRY;
+        goto retry_message;
     }
 
 
@@ -1016,13 +1017,22 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
     {
         /* Didn't decode right, keep decode error */
         PVFS_perror_gossip("msgpairarray decode error", ret);
-        msg_p->op_status = ret;
+        msg_p->op_status = js_p->error_code = ret;
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG,"%s:error code %d from PINT_serv_decode_resp, "
+                                          "from msgpair %d\n"
+                                         ,__func__
+                                         ,msg_p->op_status
+                                         ,mop->index);
+        goto cleanup;
     }
     else
     {
         /* if we've made it this far, the server response status is
          * meaningful, so we save it.  This should be a valid response
          * so we should not overwrite any error codes here.
+         */
+        /* At this point, resp_p will not be null; at a minimum, there
+         * will be an op and a status.
          */
         js_p->error_code = msg_p->op_status = resp_p->status;
 
@@ -1055,68 +1065,27 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
             /* nothing to do here */
         default :
             break;
-        }
-    }
+        }/*end switch*/
+    }/*end decode check*/
 
-    /* NOTE: we call the function associated with each message,
-     *       not just the one from the first array element.  so
-     *       there could in theory be different functions for each
-     *       message (to handle different types of messages all in
-     *       the same array).
-     */
     if (msg_p->comp_fn != NULL)
     {
-        PVFS_error err_stat;
-
         gossip_debug(GOSSIP_MIRROR_DEBUG,"\texecuting msg_p->comp_fn..\n");
-        /* If we call the completion function, store the result on
-         * a per message pair basis.  Also store some non-zero
-         * (failure) value in js_p->error_code if we see one.
-         */
-        err_stat = msg_p->comp_fn(smcb, resp_p, mop->index);
 
-        if (msg_p->op_status == 0)
-        {
-            js_p->error_code = msg_p->op_status = err_stat;
-        }
-        /* even if we see a failure, continue to process with the
-         * completion function. -- RobR
+        /* even though error_code and op_status were already set to resp_p->status,
+         * override their values with the result of the completion function.
+         * The completion function can choose to return the resp_p->status 
+         * or some other status meaningful to the request.
          */
-        msg_p->op_action = PVFS_MPA_OK;
+        js_p->error_code = msg_p->op_status = msg_p->comp_fn(smcb, resp_p, mop->index);
     }
-    else if( (msg_p->op_status != 0) && (resp_p == NULL) )
-    {
-        /* before we reference resp_p we need to catch the case where 
-         * PINT_serv_decode_resp didn't give us a struct. We error out
-         * the same without referencing resp_p */
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                     "%s: error code %d from PINT_serv_decode_resp, "
-                     "from server %d\n", __func__, msg_p->op_status, 
-                     mop->index);
-        js_p->error_code = msg_p->op_status;
-        /* V3 We may want to revisit retrying some of these errors
-         * with a replicant rather than just bailing out 
-         */
-        msg_p->op_action = PVFS_MPA_RETRY;
-    }
-    else if (resp_p->status != 0)
-    {
-        /* no comp_fn specified and status non-zero */
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                     "notice: msgpairarray_complete: error %d "
-                     "from server %d\n", resp_p->status, mop->index);
+   
+    msg_p->op_action = PVFS_MPA_OK;
 
-        /* save a non-zero status to return if we see one */
-        js_p->error_code = resp_p->status;
 
-        /* If we don't have a completion function, there is no point
-         * in continuing to process after seeing a failure.
-         */
-        /* V3 We may want to revisit retrying some of these errors
-         * with a replicant rather than just bailing out 
-         */
-        msg_p->op_action = PVFS_MPA_RETRY;
-    }
+cleanup:
+    /* cleanup capability */
+    PINT_cleanup_capability(&msg_p->req.capability);
 
     /* free all the resources that we used to send and receive. */
     ret = PINT_serv_free_msgpair_resources(&msg_p->encoded_req,
@@ -1125,34 +1094,28 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
                                            &msg_p->svr_addr,
                                            msg_p->max_resp_sz);
 
-    /* cleanup capability
-     * Maybe should be part of serv_free_msgpair_resources - V3
-     */
-    PINT_cleanup_capability(&msg_p->req.capability);
 
     if (ret)
     {
         PVFS_perror_gossip("Failed to free msgpair resources", ret);
         js_p->error_code = ret;
-        goto errorout;
     }
 
- /* Old code - but why don't we ever set complete to 1?
-  * This may be something we need to do, or may be obsolete - V3
-  */
-    /*
-     * mark that this msgpair has been completed and should not be
-     * retried in the case of possible future retries
-     */
+    memset(&msg_p->encoded_req,0,sizeof(msg_p->encoded_req));
+    msg_p->encoded_resp_p = NULL;
+    msg_p->max_resp_sz = 0;
+
+    /* msg-complete may not be needed anymore but doesn't hurt anything */
     msg_p->complete = 1;
 
+retry_message:
     if (msg_p->op_action == PVFS_MPA_RETRY)
     {
-        /* free up and zero out msg fields if we retry we will reallocate */
+        /* free up and zero out msg fields; if we retry we will reallocate */
         memset(&msg_p->encoded_req, 0, sizeof(msg_p->encoded_req));
         msg_p->encoded_resp_p = NULL;
         msg_p->max_resp_sz = 0;
-        /* keep any error code, ir we rewrite later, so be it */
+        /* keep any error code, if we rewrite later, so be it */
         /* js_p->error_code = 0; */
 
         /* Now we check the error codes, retry count, and if retries
@@ -1212,14 +1175,13 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
                 js_p->error_code = msg_p->op_status;
             }
         }
-    }
+    }/*end if retry*/
 
     if (js_p->error_code == MSGPAIRS_RETRY_REQ)
     {
         return SM_ACTION_COMPLETE; /* Go back and retry the message */
     }
 
-errorout:
     /* Last thing before message is complete is check for join */
     if (mop->join)
     {
@@ -1263,7 +1225,7 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
 {
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[mop->index];
     int ret = -PVFS_EINVAL;
-    unsigned long status_user_tag = 0;
+    //unsigned long status_user_tag = 0;
     struct PINT_decoded_msg decoded_msg;
     struct PVFS_server_resp *resp = NULL;
 
@@ -1272,7 +1234,7 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
 
     assert(js_p);
 
-    status_user_tag = (unsigned long)js_p->status_user_tag;
+    //status_user_tag = (unsigned long)js_p->status_user_tag;
 
     if (js_p->error_code)
     {

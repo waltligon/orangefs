@@ -74,7 +74,7 @@ void PINT_null_capability(PVFS_capability *cap)
     if (cap)
     {
         memset(cap, 0, sizeof(PVFS_capability));
-        cap->issuer = strdup("");
+        cap->issuer = PVFS2_BLANK_ISSUER;
     }
 }
 
@@ -154,14 +154,10 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
     if (src->issuer)
     {
         dest->issuer = strdup(src->issuer);
-    }
-    else
-    {
-        dest->issuer = strdup("");
-    }
-    if (!dest->issuer)
-    {
-        return -PVFS_ENOMEM;
+    	if (!dest->issuer)
+        {
+       	    return -PVFS_ENOMEM;
+        }
     }
 
     if (src->sig_size)
@@ -316,10 +312,13 @@ int PINT_copy_credential(const PVFS_credential *src, PVFS_credential *dest)
     dest->certificate.buf = NULL;
 #endif
 
-    dest->issuer = strdup(src->issuer);
-    if (!dest->issuer)
+    if (src->issuer)
     {
-        return -PVFS_ENOMEM;
+        dest->issuer = strdup(src->issuer);
+        if (!dest->issuer)
+        {
+            return -PVFS_ENOMEM;
+        }
     }
 
     if (src->sig_size)

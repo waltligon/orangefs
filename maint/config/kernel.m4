@@ -2006,6 +2006,29 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 		AC_MSG_RESULT(no)
 		)
 
+	dnl Check for copy_from_iter
+	AC_MSG_CHECKING(for iov_iter interface support)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/uio.h>
+		#ifdef HAVE_KCONFIG
+			#include <linux/kconfig.h>
+		#endif
+		#include <linux/fs.h>
+		],
+		[
+			void *addr;
+			size_t bytes;
+			struct iov_iter i;
+			size_t rc;
+
+			rc = copy_from_iter(addr, bytes, &i);
+		],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_IOV_ITER, 1, iov_iter interface is supported),
+		AC_MSG_RESULT(no)
+		)
+
 	dnl Check for nd_set_link
 	AC_MSG_CHECKING(for nd_set_link)
 	AC_TRY_COMPILE([
@@ -2554,7 +2577,7 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	dnl assume the old 4 param with struct inode
 	tmp_cflags=$CFLAGS
 	CFLAGS="$CFLAGS -Werror"
-	AC_MSG_CHECKING(for five-param xattr_handler.get)
+	AC_MSG_CHECKING(for xattr_handler.get with dentry, char, void, size_t and int)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#ifdef HAVE_KCONFIG
@@ -2571,7 +2594,35 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	    x.get = get_xattr_h;
 	],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_XATTR_HANDLER_GET_FIVE_PARAM, 1, [Define if kernel xattr_handle get function has dentry as first parameter and a fifth parameter]),
+	AC_DEFINE(HAVE_XATTR_HANDLER_GET_2_6_33, 1, [Define if kernel xattr_handle get function args are dentry, char, void, size_t, int]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+        dnl 4.4 has changed some xattr_handler args again...
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for xattr_handler.get with xattr_handler, dentry, char, void, size_t)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
+		#include <linux/dcache.h>
+		#include <linux/xattr.h>
+		static struct xattr_handler x;
+		static int get_xattr_h(const struct xattr_handler *handler,
+                                      struct dentry *dentry,
+                                      const char *name,
+                                      void *buffer,
+                                      size_t size)
+		{ return 0; }
+	], 
+	[ 
+	    x.get = get_xattr_h;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_XATTR_HANDLER_GET_4_4, 1, [Define if kernel xattr_handle get function args are xattr_handler, dentry, char, void and size_t]),
 	AC_MSG_RESULT(no)
 	)
         CFLAGS=$tmp_cflags
@@ -2582,7 +2633,7 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	dnl assume the old 5 param with struct inode
 	tmp_cflags=$CFLAGS
 	CFLAGS="$CFLAGS -Werror"
-	AC_MSG_CHECKING(for six-param xattr_handler.set)
+	AC_MSG_CHECKING(for xattr_handler.set with dentry, char, void, size_t, int, int)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#ifdef HAVE_KCONFIG
@@ -2599,7 +2650,36 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
 	    x.set = set_xattr_h;
 	],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_XATTR_HANDLER_SET_SIX_PARAM, 1, [Define if kernel xattr_handle set function has dentry as first parameter and a sixth parameter]),
+	AC_DEFINE(HAVE_XATTR_HANDLER_SET_2_6_33, 1, [Define if kernel xattr_handle set function args are dentry, char, void, size_t, int, int]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+        dnl 4.4 has changed some xattr_handler args again...
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for xattr_handler.set with xattr_handler, dentry, char, void, size_t, int)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
+		#include <linux/dcache.h>
+		#include <linux/xattr.h>
+		static struct xattr_handler x;
+		static int set_xattr_h(const struct xattr_handler *handler,
+                                       struct dentry *dentry,
+                                       const char *name,
+                                       const void *buffer,
+                                       size_t size,
+                                       int flags)
+		{ return 0; }
+	], 
+	[ 
+	    x.set = set_xattr_h;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_XATTR_HANDLER_SET_4_4, 1, [Define if kernel xattr_handle set function args are xattr_handler, dentry, char, void, size_t, int]),
 	AC_MSG_RESULT(no)
 	)
         CFLAGS=$tmp_cflags
@@ -2927,6 +3007,38 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         AC_MSG_RESULT(no)
         )
         CFLAGS=$tmp_cflags 
+
+        dnl direct_IO arguments changed several times between 2.6
+        dnl and 4.7.
+        dnl
+        dnl commit d8d3d94 ditched the iov and nr_segs arguments in
+        dnl favor of iter.
+        dnl
+        dnl commit 22c6186 removed rw. Fedora was like this at 4.1.6-201.
+        dnl
+        dnl commit c8b8e32 got rid of the offset argument.
+        dnl
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+        AC_MSG_CHECKING(for commit 22c6186 flavored direct_IO)
+        AC_TRY_COMPILE([
+          #define __KERNEL__
+          #ifdef HAVE_KCONFIG
+          #include <linux/kconfig.h>
+          #endif
+          #include <linux/fs.h>
+          struct address_space_operations a;
+          ssize_t d(struct kiocb *a, struct iov_iter *b, loff_t c)
+          { return 0; }
+        ],
+        [
+          a.direct_IO = d;
+        ],
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(C_22c6186_FLAVORED_DIO, 1, [commit 22c6186 flavored direct_IO]),
+        AC_MSG_RESULT(no)
+        )
+        CFLAGS=$tmp_cflags
 
         dnl permission function pointer in the inode_operations struct now
         dnl takes three params with the third being an unsigned int (circa

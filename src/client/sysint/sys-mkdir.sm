@@ -17,21 +17,12 @@
 #include <assert.h>
 
 #include "client-state-machine.h"
-#include "pvfs2-debug.h"
-#include "job.h"
-#include "gossip.h"
-#include "str-utils.h"
-#include "pint-cached-config.h"
-#include "PINT-reqproto-encode.h"
-#include "pint-util.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
 #include "sid.h"
 #include "pvfs2-dist-simple-stripe.h"
 #include "dist-dir-utils.h"
 #include "client-capcache.h"
-
-extern job_context_id pint_client_sm_context;
 
 enum
 {
@@ -349,7 +340,6 @@ static int mkdir_msg_comp_fn(void *v_p,
 
     /* get local uid for indexing */
     local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
-
     if (local_uid == (PVFS_uid) -1)
     {
         local_uid = PINT_util_getuid();
@@ -357,7 +347,7 @@ static int mkdir_msg_comp_fn(void *v_p,
         PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
                       sizeof(PVFS_uid), &local_uid);
     }
-
+ 
     if (local_uid != (PVFS_uid) -1)
     {
         ret = PINT_client_capcache_update(sm_p->object_ref,
@@ -366,6 +356,13 @@ static int mkdir_msg_comp_fn(void *v_p,
                      "PINT_client_capcache_update returned %d\n",
                      __func__, ret);
     }
+
+    /* invalidate the acache entry for the parent object, since a successful
+     * mkdir has now changed the timestamps on the parent's dirdata handle, 
+     * invalidating the timestamps stored with the parent.
+     */
+    PINT_acache_invalidate(sm_p->object_ref);
+
 
     return 0;
 }

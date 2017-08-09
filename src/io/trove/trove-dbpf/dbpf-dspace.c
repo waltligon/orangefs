@@ -477,7 +477,7 @@ static int remove_one_handle(TROVE_object_ref ref,
     }
     else if (ret != 0)
     {
-        gossip_err("TROVE:DBPF:Berkeley DB dbpf_dspace_remove");
+        gossip_err("TROVE:DBPF: dbpf_dspace_remove");
         ret = -ret;
         goto return_error;
     }
@@ -1199,7 +1199,7 @@ int dbpf_dspace_attr_set(struct dbpf_collection *coll_p,
     ret = dbpf_db_put(coll_p->ds_db, &key, &data);
     if (ret != 0)
     {
-        gossip_err("TROVE:DBPF:Berkeley DB dspace_db->put setattr");
+        gossip_err("TROVE:DBPF: dspace dbpf_db_put setattr");
         return -ret;
     }
 
@@ -1248,7 +1248,7 @@ int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
     {
         if (ret != TROVE_ENOENT)
         {
-            gossip_err("TROVE:DBPF:Berkeley DB DB->get");
+            gossip_err("TROVE:DBPF: dspace dbpf_db_get");
         }
         return -ret;
     }

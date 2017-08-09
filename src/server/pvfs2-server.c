@@ -25,6 +25,7 @@
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 
+#include "pvfs2-internal.h"
 #include "bmi.h"
 #include "gossip.h"
 #include "job.h"
@@ -43,11 +44,12 @@
 #include "id-generator.h"
 #include "job-time-mgr.h"
 #include "pint-cached-config.h"
-#include "pvfs2-internal.h"
+/* #include "pvfs2-internal.h" */
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-event.h"
 #include "pint-util.h"
-#include "pint-malloc.h"
+/* #include "pint-malloc.h" */
+#include "pint-sysint-utils.h"
 #include "pint-uid-mgmt.h"
 #include "pint-security.h"
 #include "security-util.h"
@@ -390,8 +392,7 @@ int main(int argc, char **argv)
 #endif
 
     /* kick off timer for expired jobs */
-    ret = server_state_machine_alloc_noreq(
-                    PVFS_SERV_JOB_TIMER, &(tmp_op));
+    ret = server_state_machine_alloc_noreq(PVFS_SERV_JOB_TIMER, &(tmp_op));
     if (ret == 0)
     {
         ret = server_state_machine_start_noreq(tmp_op);
@@ -1325,20 +1326,71 @@ static int server_initialize_subsystems(
     }
 
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
-    /* Initialize performance counters */
-    if(!(*server_status_flag & SERVER_PERF_COUNTER_INIT))
+    /* history size should be in server config too */
+    PINT_server_pc = PINT_perf_initialize(PINT_PERF_COUNTER,
+                                          server_keys, 
+                                          server_perf_start_rollover);
+
+    PINT_server_tpc = PINT_perf_initialize(PINT_PERF_TIMER,
+                                           server_tkeys, 
+                                           server_perf_start_rollover);
+    if(!PINT_server_pc || !PINT_server_tpc)
     {
-        /* hist size should be in server config too */
-        PINT_server_pc = PINT_perf_initialize(server_keys);
-        if(!PINT_server_pc)
+        gossip_err("Error initializing performance counters.\n");
+        return(ret);
+    }
+    if (server_config.perf_update_interval > 0)
+    {
+        ret = PINT_perf_set_info(PINT_server_pc,
+                                 PINT_PERF_UPDATE_INTERVAL, 
+                                 server_config.perf_update_interval);
+        if (ret < 0)
+        {
+            gossip_err("Error PINT_perf_set_info (update interval)\n");
+            return(ret);
+        }
+        ret = PINT_perf_set_info(PINT_server_tpc,
+                                 PINT_PERF_UPDATE_INTERVAL, 
+                                 server_config.perf_update_interval);
+        if (ret < 0)
+        {
+            gossip_err("Error PINT_perf_set_info (update interval)\n");
+            return(ret);
+        }
+    }
+    if (server_config.perf_update_history > 0)
+    {
+        ret = PINT_perf_set_info(PINT_server_pc,
+                                 PINT_PERF_UPDATE_HISTORY, 
+                                 server_config.perf_update_history);
+        if (ret < 0)
+        {
+            gossip_err("Error PINT_perf_set_info (update history)\n");
+            return(ret);
+        }
+        ret = PINT_perf_set_info(PINT_server_tpc,
+                                 PINT_PERF_UPDATE_HISTORY, 
+                                 server_config.perf_update_history);
+        if (ret < 0)
+        {
+            gossip_err("Error PINT_perf_set_info (update history)\n");
+            return(ret);
+        }
+    }
+    /* if history_size is greater than 1, start the rollover SM */
+    if (PINT_server_pc->running)
+    {
+        ret = server_perf_start_rollover(PINT_server_pc, PINT_server_tpc);
+#if 0
+        struct PINT_smcb *tmp_op = NULL;
+        ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
+                                               &(tmp_op));
+        if (ret == 0)
         {
             gossip_err("Error initializing performance counters.\n");
             return(ret);
         }
-
-        ret = PINT_perf_set_info(PINT_server_pc,
-                                 PINT_PERF_UPDATE_INTERVAL, 
-                                 server_config.perf_update_interval);
+#endif
         if (ret < 0)
         {
             gossip_err("Error PINT_perf_set_info (update interval)\n");
@@ -1662,7 +1714,7 @@ static void reload_config(void)
     if (PINT_parse_config(&sighup_server_config,
                           fs_conf,
                           s_server_options.server_alias,
-                          PARSE_CONFIG_SERVER) < 0)
+                          PARSE_CONFIG_SERVER) == 1)
     {
         gossip_err("Error: Please check your config files.\n");
         gossip_err("Error: SIGHUP unable to update configuration.\n");
@@ -1685,7 +1737,16 @@ static void reload_config(void)
         gossip_set_debug_mask(1,
                 PVFS_debug_eventlog_to_mask(orig_server_config->event_logging));
 
-        orig_filesystems = server_config.file_systems;
+        /* Modify the TurnOffTimeouts feature */
+        gossip_err("%s:Changing original bypass_timeout_check(%d) to (%d)\n"
+                  ,__func__
+                  ,orig_server_config->bypass_timeout_check
+                  ,sighup_server_config.bypass_timeout_check);
+        orig_server_config->bypass_timeout_check = sighup_server_config.bypass_timeout_check;
+     
+
+        orig_filesystems = orig_server_config->file_systems;
+
         /* Loop and update all stored file systems */
         while(orig_filesystems)
         {
@@ -1715,7 +1776,7 @@ static void reload_config(void)
             }
             if(!found_matching_config)
             {
-                gossip_err("Error: SIGHUP unable to update configuration"
+                gossip_err("Error: SIGHUP unable to update configuration. "
                            "Matching configuration not found.\n");
                 break;
             }
@@ -2018,6 +2079,7 @@ static int server_shutdown(PINT_server_status_flag status,
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting performance "
                      "interface     [   ...   ]\n");
         PINT_perf_finalize(PINT_server_pc);
+        PINT_perf_finalize(PINT_server_tpc);
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         performance "
                      "interface     [ stopped ]\n");
     }
@@ -2488,6 +2550,13 @@ int server_state_machine_start(PINT_smcb *smcb, job_status_s *js_p)
                          PINT_HINT_GET_HANDLE(s_op->req->hints),
                          s_op->req->op);
         s_op->resp.op = s_op->req->op;
+
+        /* start request timer 
+         * if we are not tracking this request we will never call end
+         * this is not a problem so pretty much call this for all
+         * normal requests
+         */
+        PINT_perf_timer_start(&s_op->start_time);
     }
 
     s_op->addr = s_op->unexp_bmi_buff.addr;
@@ -2888,6 +2957,104 @@ static int generate_shm_key_hint(int* server_index)
      */
     srand((unsigned int)time(NULL));
     return(rand());
+}
+
+/* server_perf_start_rollover
+ * This functions starts the performance counter rollover timer for the
+ * server - it is server specific and thus is here not in misc
+ */
+int server_perf_start_rollover(struct PINT_perf_counter *pc,
+                               struct PINT_perf_counter *tpc)
+{
+    int ret = 0;
+    struct PINT_smcb *tmp_op = NULL;
+    struct PINT_server_op *s_op = NULL;
+
+    if (!pc)
+    {
+        gossip_err("server_perf_start_rollover called with NULL pc\n");
+        return -1;
+    }
+    pc->running = 1;
+
+    ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
+                                           &(tmp_op));
+    if (ret != 0)
+    {
+        gossip_err("server_perf_start_rollover failed to alloc SM\n");
+        return ret;
+    }
+
+    s_op = PINT_sm_frame(tmp_op, PINT_FRAME_CURRENT);
+    s_op->u.perf_update.pc = pc;
+    s_op->u.perf_update.tpc = tpc;
+
+    ret = server_state_machine_start_noreq(tmp_op);
+
+    return ret;
+}
+
+/* These functions are for managing the keyval buffers in the state
+ * machines.  They use the generic field "free_val" to record which
+ * buffers do NOT need to be freed - presumable because they are freed
+ * elsewhere.
+ */
+
+void keep_keyval_buffers(struct PINT_server_op *s_op, int buf)
+{   
+    if (buf >= KEYVAL && buf < s_op->keyval_count)
+    {   
+        s_op->free_val |= 0x1 << (buf + 1);
+    }
+}
+            
+void free_keyval_buffers(struct PINT_server_op *s_op)
+{
+    int i = 0;
+            
+    /* free_val is a bitmap of buffers that are not to be
+     * freed because they are referenced elsewhere
+     */     
+    if (!(s_op->free_val & KEYVAL))
+    {
+        if (s_op->val.buffer)
+        {
+            free(s_op->val.buffer);
+        }
+    }       
+                     
+    memset(&(s_op->val), 0, sizeof(s_op->val));
+    memset(&(s_op->key), 0, sizeof(s_op->key));
+        
+    if (s_op->val_a)
+    {   
+        for (i = 0; i < s_op->keyval_count; i++)
+        {
+            if (!(s_op->free_val & (0x1 << (i + 1))))
+            {
+                if (s_op->val_a[i].buffer)
+                {
+                    free(s_op->val_a[i].buffer);
+                }
+            }
+            s_op->val_a[i].buffer = NULL;
+        }
+        free(s_op->val_a);
+        s_op->val_a = NULL;
+    }
+    
+    if (s_op->key_a)
+    {
+        free(s_op->key_a);
+        s_op->key_a = NULL;
+    }   
+    if (s_op->error_a)
+    {
+        free(s_op->error_a);
+        s_op->error_a = NULL;
+    }
+
+    s_op->free_val = 0;
 }
 
 /*

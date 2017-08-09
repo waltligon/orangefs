@@ -20,8 +20,6 @@
 #include "PINT-reqproto-encode.h"
 #include "sid.h"
 
-extern job_context_id pint_client_sm_context;
-
 static int del_eattr_comp_fn(void *v_p,
                              struct PVFS_server_resp *resp_p,
                              int i);

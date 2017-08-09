@@ -328,63 +328,90 @@ static inline int convert_to_internal_xattr_flags(int setxattr_flags)
 }
 
 int pvfs2_xattr_set_trusted(
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
-    struct dentry *dentry, 
+#ifdef HAVE_XATTR_HANDLER_SET_4_4
+                            const struct xattr_handler *handler,
+                            struct dentry *dentry,
+                            const char *name,
+                            const void *buffer,
+                            size_t size,
+                            int flags);
+#elif defined(HAVE_XATTR_HANDLER_SET_2_6_33)
+                            struct dentry *dentry,
+                            const char *name,
+                            const void *buffer,
+                            size_t size,
+                            int flags,
+                            int handler_flags);
 #else
-    struct inode *inode, 
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-    const char *name, 
-    const void *buffer, 
-    size_t size, 
-    int flags
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
-    , int handler_flags
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-    );
-
-int pvfs2_xattr_get_trusted(
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-    struct dentry *dentry,
-#else
-    struct inode *inode,
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-    const char *name, 
-    void *buffer, 
-    size_t size
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-    , int handler_flags
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-    );
+                            struct inode *inode,
+                            const char *name,
+                            const void *buffer,
+                            size_t size,
+                            int flags);
+#endif
 
 int pvfs2_xattr_set_default(
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
-    struct dentry *dentry, 
+#ifdef HAVE_XATTR_HANDLER_SET_4_4
+                            const struct xattr_handler *handler,
+                            struct dentry *dentry,
+                            const char *name,
+                            const void *buffer,
+                            size_t size,
+                            int flags);
+#elif defined(HAVE_XATTR_HANDLER_SET_2_6_33)
+                            struct dentry *dentry,
+                            const char *name,
+                            const void *buffer,
+                            size_t size,
+                            int flags,
+                            int handler_flags);
 #else
-    struct inode *inode, 
-#endif /*HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-    const char *name, 
-    const void *buffer, 
-    size_t size, 
-    int flags
-#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
-    , int handler_flags
-#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
-    );
+                            struct inode *inode,
+                            const char *name,
+                            const void *buffer,
+                            size_t size,
+                            int flags);
+#endif
+
+int pvfs2_xattr_get_trusted(
+#ifdef HAVE_XATTR_HANDLER_GET_4_4
+                            const struct xattr_handler *handler,
+                            struct dentry *dentry,
+                            const char *name,
+                            void *buffer,
+                            size_t size);
+#elif defined(HAVE_XATTR_HANDLER_GET_2_6_33)
+                            struct dentry *dentry,
+                            const char *name,
+                            void *buffer,
+                            size_t size,
+                            int handler_flags);
+#else
+                            struct inode *inode,
+                            const char *name,
+                            void *buffer,
+                            size_t size);
+#endif
 
 int pvfs2_xattr_get_default(
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-    struct dentry *dentry,
+#ifdef HAVE_XATTR_HANDLER_GET_4_4
+                            const struct xattr_handler *handler,
+                            struct dentry *dentry,
+                            const char *name,
+                            void *buffer,
+                            size_t size);
+#elif defined(HAVE_XATTR_HANDLER_GET_2_6_33)
+                            struct dentry *dentry,
+                            const char *name,
+                            void *buffer,
+                            size_t size,
+                            int handler_flags);
 #else
-    struct inode *inode,
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-    const char *name, 
-    void *buffer, 
-    size_t size
-#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
-    , int handler_flags
-#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
-    );
-
+                            struct inode *inode,
+                            const char *name,
+                            void *buffer,
+                            size_t size);
+#endif
 
 #endif
 
@@ -726,6 +753,9 @@ static inline int is_root_handle(struct inode *inode)
                k2s(&(PVFS2_SB(inode->i_sb)->root_khandle),s1),
                k2s(get_khandle_from_ino(inode),s2));
 
+  kfree(s1);
+  kfree(s2);
+
   if (PVFS_khandle_cmp(&(PVFS2_SB(inode->i_sb)->root_khandle),
                        get_khandle_from_ino(inode)))
     return 0;
@@ -743,6 +773,9 @@ static inline int match_handle(PVFS_khandle resp_handle, struct inode *inode)
                __func__,
                k2s(&resp_handle,s1),
                k2s(get_khandle_from_ino(inode),s2));
+
+  kfree(s1);
+  kfree(s2);
 
   if (PVFS_khandle_cmp(&resp_handle, get_khandle_from_ino(inode)))
     return 0;
@@ -1004,8 +1037,8 @@ void mask_blocked_signals(sigset_t *orig_sigset);
 
 void unmask_blocked_signals(sigset_t *orig_sigset);
 
-#ifdef USE_MMAP_RA_CACHE
-int pvfs2_flush_mmap_racache(struct inode *inode);
+#ifdef USE_RA_CACHE
+int pvfs2_flush_racache(struct inode *inode);
 #endif
 
 int pvfs2_unmount_sb(struct super_block *sb);
@@ -1039,7 +1072,7 @@ extern struct inode_operations pvfs2_file_inode_operations;
 extern struct file_operations pvfs2_file_operations;
 extern struct inode_operations pvfs2_symlink_inode_operations;
 extern struct inode_operations pvfs2_dir_inode_operations;
-extern struct file_operations pvfs2_dir_operations;
+extern const struct file_operations pvfs2_dir_operations;
 extern struct dentry_operations pvfs2_dentry_operations;
 extern struct file_operations pvfs2_devreq_file_operations;
 
@@ -1050,25 +1083,24 @@ extern wait_queue_head_t pvfs2_bufmap_init_waitq;
  ************************************/
 #define add_op_to_request_list(op)                           \
 do {                                                         \
+    spin_lock(&pvfs2_request_list_lock);                     \
     spin_lock(&op->lock);                                    \
     set_op_state_waiting(op);                                \
-                                                             \
-    spin_lock(&pvfs2_request_list_lock);                     \
     list_add_tail(&op->list, &pvfs2_request_list);           \
-    spin_unlock(&pvfs2_request_list_lock);                   \
     spin_unlock(&op->lock);                                  \
+    spin_unlock(&pvfs2_request_list_lock);                   \
     wake_up_interruptible(&pvfs2_request_list_waitq);        \
 } while(0)
 
 #define add_priority_op_to_request_list(op)                  \
 do {                                                         \
+    spin_lock(&pvfs2_request_list_lock);                     \
     spin_lock(&op->lock);                                    \
     set_op_state_waiting(op);                                \
                                                              \
-    spin_lock(&pvfs2_request_list_lock);                     \
     list_add(&op->list, &pvfs2_request_list);                \
-    spin_unlock(&pvfs2_request_list_lock);                   \
     spin_unlock(&op->lock);                                  \
+    spin_unlock(&pvfs2_request_list_lock);                   \
     wake_up_interruptible(&pvfs2_request_list_waitq);        \
 } while(0)
 
@@ -1157,20 +1189,20 @@ do {                                                      \
 #define get_suid_flag(inode)                              \
 (PVFS2_SB(inode->i_sb)->mnt_options.suid)
 
-#ifdef USE_MMAP_RA_CACHE
-#define clear_inode_mmap_ra_cache(inode) \
+#ifdef USE_RA_CACHE
+#define clear_inode_ra_cache(inode) \
 do { \
   char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL); \
   gossip_debug(GOSSIP_INODE_DEBUG, \
-               "calling clear_inode_mmap_ra_cache on %s\n", \
+               "calling clear_inode_ra_cache on %s\n", \
                k2s(get_khandle_from_ino(inode),s)); \
   kfree(s); \
-  pvfs2_flush_mmap_racache(inode); \
-  gossip_debug(GOSSIP_INODE_DEBUG, "clear_inode_mmap_ra_cache finished\n"); \
+  pvfs2_flush_racache(inode); \
+  gossip_debug(GOSSIP_INODE_DEBUG, "clear_inode_ra_cache finished\n"); \
 } while(0)
 #else
-#define clear_inode_mmap_ra_cache(inode)
-#endif /* USE_MMAP_RA_CACHE */
+#define clear_inode_ra_cache(inode)
+#endif /* USE_RA_CACHE */
 
 #define add_pvfs2_sb(sb)                                             \
 do {                                                                 \

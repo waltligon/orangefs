@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef HAVE_MALLOC_H
-#include <malloc.h>
+/* #include <malloc.h> */
 #endif
 #include <errno.h>
 #include <assert.h>
@@ -26,6 +26,7 @@
 #include <unistd.h>
 #endif
 
+#include "pvfs2-internal.h"
 #include "acache.h"
 #include "ncache.h"
 #include "pint-cached-config.h"
@@ -46,7 +47,6 @@ enum {
 };
 
 gen_mutex_t mt_config = GEN_MUTEX_INITIALIZER;
-extern job_context_id pint_client_sm_context;
 
 static int server_fetch_config_comp_fn(void *v_p,
                                        struct PVFS_server_resp *resp_p,
@@ -710,7 +710,6 @@ static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
     int i, count, ret = 0, fs_conf_failed = 0, fs_conf_size_mismatch = 0;
     char **sha1_fs_digests = NULL;
     size_t digest_len;
-    PVFS_fs_id fsid;
     int* indexes = sm_p->fetch_config.result_indexes;
 
     count = sm_p->fetch_config.result_count;
@@ -720,7 +719,7 @@ static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
         goto out;
     }
 
-    fsid = sm_p->u.get_config.mntent->fs_id;
+    //fsid = sm_p->u.get_config.mntent->fs_id;
     sha1_fs_digests = (char **) calloc(count, sizeof(char *));
     if (sha1_fs_digests == NULL)
     {

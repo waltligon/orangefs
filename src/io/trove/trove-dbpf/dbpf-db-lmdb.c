@@ -390,7 +390,9 @@ int dbpf_db_cursor_get(struct dbpf_cursor *dbc, struct dbpf_data *key,
     struct dbpf_data *val, int op, size_t maxkeylen)
 {
     MDB_val db_key, db_data;
-    int db_op, r;
+    /* The variable db_op is set to 0 to silence a compiler warning claming
+     * that we never set it even though we do for all possible values of op. */
+    int db_op = 0, r;
     switch (op) {
     case DBPF_DB_CURSOR_NEXT:
         db_op = MDB_NEXT;

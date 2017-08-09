@@ -261,6 +261,9 @@ enum PVFS_sys_layout_algorithm
     /* order the datafiles based on the list specified */
     PVFS_SYS_LAYOUT_LOCAL = 5
 };
+#define PVFS_SYS_LAYOUT_NULL 0
+#define PVFS_SYS_LAYOUT_MAX 5
+#define PVFS_SYS_LAYOUT_DEFAULT_ALGORITHM PVFS_SYS_LAYOUT_ROUND_ROBIN
 #define PVFS_SYS_LAYOUT_DEFAULT NULL
 
 /* The list of datafile servers that can be passed into PVFS_sys_create
@@ -495,33 +498,39 @@ typedef struct
  PVFS_ATTR_SYS_CTIME | PVFS_ATTR_SYS_MTIME | \
  PVFS_ATTR_SYS_NTIME | PVFS_ATTR_SYS_TYPE)
 
-#define PVFS_ATTR_SYS_ALL_NOHINTSIZE                      \
-(PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET |    \
+#define PVFS_ATTR_SYS_ALL            \
+(PVFS_ATTR_SYS_COMMON_ALL |          \
+ PVFS_ATTR_SYS_SIZE |                \
+ PVFS_ATTR_SYS_LNK_TARGET |          \
+ PVFS_ATTR_SYS_DFILE_COUNT |         \
+ PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
+ PVFS_ATTR_SYS_DISTDIR_ATTR |        \
+ PVFS_ATTR_SYS_DIR_HINT |            \
+ PVFS_ATTR_SYS_DIRENT_COUNT |        \
+ PVFS_ATTR_SYS_BLKSIZE)
+
+
+#define PVFS_ATTR_SYS_ALL_NOHINT PVFS_ATTR_SYS_ALL
+
+#define PVFS_ATTR_SYS_ALL_NOSIZE                   \
+(PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
  PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT | \
  PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
  PVFS_ATTR_SYS_DISTDIR_ATTR | \
- PVFS_ATTR_SYS_CAPABILITY | \
- PVFS_ATTR_SYS_BLKSIZE)
+ PVFS_ATTR_SYS_DIRENT_COUNT | \
+ PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
 
-#define PVFS_ATTR_SYS_ALL_NOSIZE                        \
-(PVFS_ATTR_SYS_ALL_NOHINTSIZE | PVFS_ATTR_SYS_DIR_HINT)
-
-#define PVFS_ATTR_SYS_ALL_NOHINT                   \
-(PVFS_ATTR_SYS_ALL_NOHINTSIZE | PVFS_ATTR_SYS_SIZE)
-
-#define PVFS_ATTR_SYS_ALL                           \
-(PVFS_ATTR_SYS_ALL_NOHINT | PVFS_ATTR_SYS_DIR_HINT) \
-
-#define PVFS_ATTR_SYS_ALL_VALID                    \
-(PVFS_ATTR_SYS_ALL | PVFS_ATTR_SYS_CAPABILITY |    \
- PVFS_ATTR_SYS_FASTEST | PVFS_ATTR_SYS_LATEST)      \
-
-#define PVFS_ATTR_SYS_ALL_SETABLE             \
+#define PVFS_ATTR_SYS_ALL_SETABLE \
 (PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
 
 #define PVFS_ATTR_SYS_ALL_TIMES \
 (PVFS_ATTR_SYS_ALL_SETABLE |    \
  PVFS_ATTR_SYS_ATIME_SET | PVFS_ATTR_SYS_MTIME_SET)
+
+ #define PVFS_ATTR_SYS_ALL_VALID                    \
+  (PVFS_ATTR_SYS_ALL | PVFS_ATTR_SYS_CAPABILITY |    \
+   PVFS_ATTR_SYS_FASTEST | PVFS_ATTR_SYS_LATEST)      \
+
 
 /* Extended attribute flags */
 #define PVFS_XATTR_CREATE  0x1
@@ -574,7 +583,7 @@ typedef struct PVFS_object_ref_s
  */
 #define PVFS_object_ref_init(oref, sid_count) \
 do { \
-    if (dst->sid_count != 0 || dst->sid_array != NULL) \
+    if ((oref)->sid_count != 0 || (oref)->sid_array != NULL) \
     { \
         gossip_err("tried to init a non empty PVFS_object_ref\n"); \
         break; \
@@ -757,15 +766,18 @@ typedef uint64_t PVFS_dist_dir_hash_type;
 enum PVFS_server_param
 {
     PVFS_SERV_PARAM_INVALID = 0,
-    PVFS_SERV_PARAM_GOSSIP_MASK = 1, /* gossip debugging on or off */
-    PVFS_SERV_PARAM_FSID_CHECK = 2,  /* verify that an fsid is ok */
-    PVFS_SERV_PARAM_ROOT_CHECK = 3,  /* verify existance of root handle */
-    PVFS_SERV_PARAM_MODE = 4,        /* change the current server mode */
-    PVFS_SERV_PARAM_EVENT_ENABLE = 5,    /* event enable */
-    PVFS_SERV_PARAM_EVENT_DISABLE = 6, /* event disable */
-    PVFS_SERV_PARAM_SYNC_META = 7,   /* metadata sync flags */
-    PVFS_SERV_PARAM_SYNC_DATA = 8,   /* file data sync flags */
-    PVFS_SERV_PARAM_DROP_CACHES = 9
+    PVFS_SERV_PARAM_GOSSIP_MASK = 1,       /* gossip debugging on or off */
+    PVFS_SERV_PARAM_FSID_CHECK = 2,        /* verify that an fsid is ok */
+    PVFS_SERV_PARAM_ROOT_CHECK = 3,        /* verify existance of root handle */
+    PVFS_SERV_PARAM_MODE = 4,              /* change the current server mode */
+    PVFS_SERV_PARAM_PERF_HISTORY = 5,      /* set counter history size */
+    PVFS_SERV_PARAM_PERF_INTERVAL = 6,     /* set counter interval time */
+    PVFS_SERV_PARAM_EVENT_ENABLE = 7,      /* event enable */
+    PVFS_SERV_PARAM_EVENT_DISABLE = 8,     /* event disable */
+    PVFS_SERV_PARAM_SYNC_META = 9,         /* metadata sync flags */
+    PVFS_SERV_PARAM_SYNC_DATA = 10,        /* file data sync flags */
+    PVFS_SERV_PARAM_DROP_CACHES = 11,
+    PVFS_SERV_PARAM_TURN_OFF_TIMEOUTS = 12 /* set bypass_timeout_check */
 };
 
 enum PVFS_mgmt_param_type
@@ -803,7 +815,8 @@ enum PVFS_server_mode
 
 #ifdef PVFS_USE_OLD_ACL_FORMAT
 /* OLD PVFS ACL Format - a null terminated array of these */
-typedef struct {
+typedef struct
+{
     int32_t  p_tag;
     uint32_t p_perm;
     uint32_t p_id;
@@ -811,13 +824,15 @@ typedef struct {
 #else
 /* PVFS2 ACL structures - Matches Linux ACL EA structures */
 /* matches POSIX ACL-XATTR format */
-typedef struct {
+typedef struct
+{
     int16_t  p_tag;
     uint16_t p_perm;
     uint32_t p_id;
 } pvfs2_acl_entry;
 
-typedef struct {
+typedef struct
+{
     uint32_t p_version;
     pvfs2_acl_entry p_entries[0];
 } pvfs2_acl_header;
@@ -1280,7 +1295,7 @@ struct profiler
 #define PVFS2_SECURITY_TIMEOUT_MIN   5
 #define PVFS2_SECURITY_TIMEOUT_MAX   (10*365*24*60*60)   /* ten years */
 
-extern const char PVFS2_BLANK_ISSUER[];
+extern char PVFS2_BLANK_ISSUER[];
 
 typedef unsigned char *PVFS_cert_data;
 

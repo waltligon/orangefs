@@ -24,8 +24,7 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "sid.h"
-
-extern job_context_id pint_client_sm_context;
+#include "pvfs2-types-debug.h"
 
 static int setattr_msg_comp_fn(void *v_p,
                                struct PVFS_server_resp *resp_p,
@@ -289,24 +288,16 @@ static PINT_sm_action setattr_cleanup(struct PINT_smcb *smcb,
                                       job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr attr;
 
     sm_p->error_code = js_p->error_code;
 
-    /* either update acache or invalidate depending on if we were successful
-     * or not 
+    /* Since we just updated attributes (most of the time we are updating timestamps) 
+     * for this object, we must invalidate it's acache entry.  We do not do partial 
+     * updates anymore.
      */
     if(sm_p->error_code == 0)
     {
-        PINT_CONVERT_ATTR(&attr, &sm_p->u.setattr.sys_attr, 0);
-#if 0 /* Don't cache size_array. */
-        PINT_acache_update(sm_p->object_ref, &attr, NULL, NULL);
-#endif
-        PINT_acache_update(sm_p->object_ref, &attr, NULL);
-    }
-    else
-    {
-        PINT_acache_invalidate(sm_p->object_ref);
+       PINT_acache_invalidate(sm_p->object_ref);
     }
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);

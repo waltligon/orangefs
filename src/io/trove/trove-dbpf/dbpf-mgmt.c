@@ -83,7 +83,6 @@ static int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
 static int dbpf_db_create(char *dbname);
-static int dbpf_mkpath(char *pathname, mode_t mode);
 
 static struct server_configuration_s *server_cfg;
 

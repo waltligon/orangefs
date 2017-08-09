@@ -34,8 +34,6 @@
 #define IO_ATTR_MASKS (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|\
                        PVFS_ATTR_CAPABILITY)
 
-extern job_context_id pint_client_sm_context;
-
 enum
 {
     IO_NO_DATA = 132,

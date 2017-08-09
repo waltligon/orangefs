@@ -42,8 +42,6 @@
   - remove the actual object specified
 */
 
-extern job_context_id pint_client_sm_context;
-
 enum
 {
     RMDIRENT_RETRY = 1,

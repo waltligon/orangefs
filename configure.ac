@@ -18,10 +18,10 @@ dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=3
 PVFS2_VERSION_MINOR=0
-PVFS2_VERSION_SUB=4
+PVFS2_VERSION_SUB=5
 PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
-PVFS2_VERSION_PRE="-$CONFIGURE_TIME"
+PVFS2_VERSION_PRE="-DEVEL-$CONFIGURE_TIME"
 
 PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE$PVFS2_VERSION_PRE
 AC_SUBST(PVFS2_VERSION)
@@ -441,16 +441,15 @@ AC_ARG_ENABLE(perf-counters,
 fi]
 ,)
 
-dnl a mechanism to turn on mmap-readahead caching (for kernel interface)
-MMAP_RA_CACHE=""
-AC_ARG_ENABLE(mmap-racache,
-[  --enable-mmap-racache   **EXPERIMENTAL** Enables mmap-readahead in kernel 
-                          interface],
+dnl a mechanism to turn on readahead caching (for kernel interface)
+RA_CACHE=""
+AC_ARG_ENABLE(racache,
+[  --enable-racache   **EXPERIMENTAL** Enables readahead in kernel interface],
 [if test "x$enableval" = "xyes" ; then
-MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
+RA_CACHE="-DUSE_RA_CACHE"
 fi]
 ,)
-AC_SUBST(MMAP_RA_CACHE)
+AC_SUBST(RA_CACHE)
 
 dnl a mechanism that resets the file position pointer when an error occurs whether
 dnl or not any bytes were written (kernel interface only).
@@ -458,8 +457,9 @@ RESET_FILE_POS=""
 AC_ARG_ENABLE(reset-file-pos,
 [  --enable-reset-file-pos Resets file position pointer in kernel interface upon error],
 [if test "x$enableval" = "xyes" ; then
-RESET_FILE_POS="-DRESET_FILE_POS"
-fi]
+    RESET_FILE_POS="-DRESET_FILE_POS"
+ fi
+]
 ,)
 AC_SUBST(RESET_FILE_POS)
 
@@ -499,14 +499,21 @@ test_for_karma()
 }
 
 dnl optionally disable building the karma gui
+dnl AC_ARG_ENABLE(karma,
+dnl [  --disable-karma         Disables optional gui.  (Enabled by default)],
+dnl [ if test "x$enableval" = "xyes" ; then
+dnl       test_for_karma
+dnl    fi
+dnl ],
+dnl [test_for_karma]
+dnl )
+
 AC_ARG_ENABLE(karma,
-[  --disable-karma         Disables optional gui.  (Enabled by default)],
+[  --enable-karma          Enables optional gui.  (Disabled by default)],
 [ if test "x$enableval" = "xyes" ; then
       test_for_karma
-   fi
-],
-[test_for_karma]
-)
+  fi
+])
 
 dnl NOTE: removing the linux-gnu host check for now; we may want to put it back
 dnl before releaseing any code, though...  -Phil
@@ -1052,9 +1059,9 @@ fi
 dnl shared or static client library
 AC_ARG_ENABLE(threaded,
     [  --disable-threaded      Do not build threaded client library],
-    [if "x$THREADED_KMOD_HELPER = xyes" ; then
+    [if test "x$THREADED_KMOD_HELPER" = "xyes" ; then
          build_threaded=yes
-         AC_MSG_WARN([Ignoring --disable-threaded in favor of --enable-threaded-kmod-heaper.])
+         AC_MSG_WARN([Ignoring --disable-threaded in favor of --enable-threaded-kmod-helper.])
      else
          build_threaded=$enableval
      fi
@@ -1180,6 +1187,22 @@ fi],
 [AC_DEFINE(PVFS_MALLOC_REDEF, 1,
       [Should we redefine malloc.])
 MALLOC_REDEF=1
+])
+
+dnl Method to disable malloc debug
+AC_ARG_ENABLE(malloc-debug,
+[  --disable-malloc-debug  Do not compile in malloc debug tracing],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_MALLOC_DEBUG, 1,
+      [Should we compile in malloc debug tracing.])
+   MALLOC_DEBUG=1
+else
+   AC_DEFINE(PVFS_MALLOC_DEBUG, 0,
+      [Should we compile in malloc debug tracing.])
+fi],
+[AC_DEFINE(PVFS_MALLOC_DEBUG, 1,
+      [Should we compile in malloc debug tracing.])
+MALLOC_DEBUG=1
 ])
 
 dnl Method to disable malloc checking a magic number
@@ -2002,10 +2025,10 @@ else
    AC_MSG_RESULT([PVFS2 configured for the 2.4.x kernel module      : yes])
 fi
 
-if test "x$MMAP_RA_CACHE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
-   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      :  no])
+if test "x$RA_CACHE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
+   AC_MSG_RESULT([PVFS2 configured for using the ra-cache           :  no])
 else
-   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      : yes])
+   AC_MSG_RESULT([PVFS2 configured for using the ra-cache           : yes])
 fi
 
 if test "x$RESET_FILE_POS" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then

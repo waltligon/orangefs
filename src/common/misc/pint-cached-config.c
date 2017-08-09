@@ -34,6 +34,7 @@
 #include "quickhash.h"
 #include "extent-utils.h"
 #include "pint-cached-config.h"
+#include "pvfs2-server.h"
 
 /* really old linux distributions (jazz's RHEL 3) don't have this(!?) */
 #ifndef HOST_NAME_MAX
@@ -328,7 +329,7 @@ int PINT_cached_config_handle_load_mapping(
         cur_config_fs_cache->data_server_cursor =
                         cur_config_fs_cache->fs->data_handle_ranges;
         cur_config_fs_cache->data_local_alias =
-                        config->host_id;
+                        config->host_id; /* the URL-like string bmi_address */
         /* find handle mapping of local host */
         if (cur_config_fs_cache->data_local_alias)
         {
@@ -652,7 +653,7 @@ int PINT_cached_config_map_servers(
 
     assert(inout_num_datafiles);
 
-    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fs_id));
+    hash_link = qhash_search(PINT_fsid_config_cache_table, &(fsid));
     if(!hash_link)
     {
         gossip_err("Failed to find a file system matching fsid: %d\n", fs_id);

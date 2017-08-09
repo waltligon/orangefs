@@ -254,7 +254,7 @@ void print_dspace( struct dbpf_data key, struct dbpf_data val )
         strcpy(ntimeStr, "");
     }
 
-    printf("(%s)(%d) -> ", PVFS_OID_str(k), key.size);
+    printf("(%s)(%zu) -> ", PVFS_OID_str(k), key.len);
 
     print_ds_type( v->type );
 
@@ -278,7 +278,7 @@ void print_dspace( struct dbpf_data key, struct dbpf_data val )
             printf("(dirent_count: %llu)"
                    "(tree_height: %d)(dirdata_count: %d)(sid_count: %d)"
                    "(bitmap_size: %d)(split_size: %d)(server_no: %d)"
-                   "(branch_level: %d) (%d)\n",
+                   "(branch_level: %d) (%zu)\n",
                     llu(v->u.directory.dirent_count),
                     v->u.directory.tree_height,
                     v->u.directory.dirdata_count,
@@ -287,7 +287,7 @@ void print_dspace( struct dbpf_data key, struct dbpf_data val )
                     v->u.directory.split_size,
                     v->u.directory.server_no,
                     v->u.directory.branch_level,
-                    val.size);
+                    val.len);
             break;
 
         case PVFS_TYPE_DATAFILE:
@@ -334,7 +334,7 @@ void print_keyval( struct dbpf_data key, struct dbpf_data val )
         {
             PVFS_handle *handle = val.data;
             printf("(%s)(%zu) -> ", k->key, key.len);
-            while ((char *)handle - (char *)val.data < val.size)
+            while ((char *)handle - (char *)val.data < val.len)
             {
                 printf("(%s)", PVFS_OID_str(handle));
                 handle++;
@@ -472,7 +472,7 @@ void print_keyval( struct dbpf_data key, struct dbpf_data val )
                     printf("(%s)", PVFS_OID_str(handle));
                     handle++;
                 }
-                printf(" (%d)\n", val.size);
+                printf(" (%zu)\n", val.len);
             }
             /* dist directory bitmap */
             else if( strncmp(k->key, "/ddb", 5) == 0 )
@@ -486,7 +486,7 @@ void print_keyval( struct dbpf_data key, struct dbpf_data val )
                     c = ((unsigned char *)val.data + i);
                     printf(" %02x %02x %02x %02x", c[3], c[2], c[1], c[0]);
                 }
-                printf(" (%d)\n", val.size);
+                printf(" (%zu)\n", val.len);
             }
             else if (key.len == 17)
             {
@@ -562,9 +562,9 @@ void print_collection_attr( struct dbpf_data key, struct dbpf_data val )
         else
             printf("(%llu) (%zu)\n", llu(vu), val.len);
     }
-    else if (val.size == 16)
+    else if (val.len == 16)
     {
-        printf("(%s) (%d)\n", PVFS_OID_str((PVFS_OID *)val.data), val.size);
+        printf("(%s) (%zu)\n", PVFS_OID_str((PVFS_OID *)val.data), val.len);
     }
     else
     {

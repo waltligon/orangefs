@@ -28,7 +28,7 @@
 #include "pint-util.h"
 #include "security-util.h"
 
-const char PVFS2_BLANK_ISSUER[] = "";
+char PVFS2_BLANK_ISSUER[] = "";
 
 /* defined later */
 static int check_req_size(struct PVFS_server_req *req);
@@ -1480,6 +1480,22 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                                  decode_free(
                                        resp->u.listattr.attr[i].capability.signature);
                              }
+                             if (resp->u.listattr.attr[i].objtype ==
+                                 PVFS_TYPE_DIRDATA)
+                             {
+                                 decode_free(
+                                       resp->u.listattr.attr[i].u.dirdata.dist_dir_bitmap);
+                                 decode_free(
+                                       resp->u.listattr.attr[i].u.dirdata.dirdata_handles);
+                             }
+                             if (resp->u.listattr.attr[i].objtype ==
+                                 PVFS_TYPE_DIRECTORY)
+                             {
+                                 decode_free(
+                                       resp->u.listattr.attr[i].u.dir.dist_dir_bitmap);
+                                 decode_free(
+                                       resp->u.listattr.attr[i].u.dir.dirdata_handles);
+                             }
                          }/*end for*/
                          decode_free(resp->u.listattr.attr);
                      }/*end if attr*/
@@ -1592,14 +1608,14 @@ static int check_resp_size(struct PVFS_server_resp *resp)
 
 static void zero_capability(PVFS_capability *cap)
 {
-    cap->issuer = (char *) PVFS2_BLANK_ISSUER;
+    cap->issuer = PVFS2_BLANK_ISSUER;
     cap->sig_size = 0;
     cap->num_handles = 0;
 }
 
 static void zero_credential(PVFS_credential *cred)
 {
-    cred->issuer = (char *) PVFS2_BLANK_ISSUER;
+    cred->issuer = PVFS2_BLANK_ISSUER;
     cred->num_groups = 0;
     cred->sig_size = 0;
 }
