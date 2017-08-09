@@ -135,7 +135,7 @@ static PINT_sm_action listattr_setup_getattr(
     struct PINT_server_op *getattr_op = NULL;
     struct PVFS_server_req *req = NULL;
     int i;
-    PVFS_credential dummy_credential; /* used for call to getattr */
+    PVFS_credential dummy_credential={0}; /* used for call to getattr */
 
     s_op->u.listattr.parallel_sms = 0;
     js_p->error_code = 0;
