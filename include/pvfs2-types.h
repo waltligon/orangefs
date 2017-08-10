@@ -261,6 +261,9 @@ enum PVFS_sys_layout_algorithm
     /* order the datafiles based on the list specified */
     PVFS_SYS_LAYOUT_LOCAL = 5
 };
+#define PVFS_SYS_LAYOUT_NULL 0
+#define PVFS_SYS_LAYOUT_MAX 5
+#define PVFS_SYS_LAYOUT_DEFAULT_ALGORITHM PVFS_SYS_LAYOUT_ROUND_ROBIN
 #define PVFS_SYS_LAYOUT_DEFAULT NULL
 
 /* The list of datafile servers that can be passed into PVFS_sys_create
@@ -1292,7 +1295,7 @@ struct profiler
 #define PVFS2_SECURITY_TIMEOUT_MIN   5
 #define PVFS2_SECURITY_TIMEOUT_MAX   (10*365*24*60*60)   /* ten years */
 
-extern const char PVFS2_BLANK_ISSUER[];
+extern char PVFS2_BLANK_ISSUER[];
 
 typedef unsigned char *PVFS_cert_data;
 

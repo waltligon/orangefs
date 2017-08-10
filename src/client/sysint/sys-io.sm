@@ -178,7 +178,7 @@ machine pvfs2_client_io_sm
     state inspect_attr
     {
         run io_inspect_attr;
-        success => unstuff_needed_check;
+        success => io_datafile_setup_msgpairs;
         IO_ATIME_UPDATE => io_atime_setattr_xfer_msgpair;
         default => io_cleanup;
     }
@@ -186,9 +186,9 @@ machine pvfs2_client_io_sm
     state io_atime_setattr_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        default => unstuff_needed_check;
+        default => io_datafile_setup_msgpair;
     }
-
+/*
     state unstuff_needed_check
     {
         run io_unstuff_needed_check;
@@ -211,7 +211,7 @@ machine pvfs2_client_io_sm
         success => io_datafile_setup_msgpairs;
         default => io_cleanup;
     }
-
+*/
     state io_datafile_setup_msgpairs
     {
         run io_datafile_setup_msgpairs;

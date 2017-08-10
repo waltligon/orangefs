@@ -193,8 +193,11 @@ struct PVFS_metafile_attr_s
     /* This is a placeholder for volatile file size 64-bit */
     PVFS_size size;        /* file size, volatile, may be wrong */   
 
+/* removed during layout merge */
+#if 0
     uint32_t stuffed;      /* is object currently stuffed */
     uint32_t stuffed_size; /* threshold size of unstuffing */
+#endif
 
     uint64_t flags;        /* bit field for flags such as IMMUTABLE */
 };
@@ -213,8 +216,10 @@ static inline void encode_PVFS_metafile_attr(char **pptr,
 
     encode_PINT_dist(pptr, (PINT_dist **)&x->dist);
     encode_uint32_t(pptr, &x->mirror_mode);             
+#if 0
     encode_uint32_t(pptr, &x->stuffed);                
     encode_uint32_t(pptr, &x->stuffed_size);          
+#endif
     encode_uint32_t(pptr, &x->dfile_count);          
     encode_uint32_t(pptr, &x->sid_count);           
     encode_skip4(pptr,);                           
@@ -243,8 +248,10 @@ static inline void decode_PVFS_metafile_attr(char **pptr,
     decode_PINT_dist(pptr, &(x)->dist);                                 
     (x)->dist_size = PINT_DIST_PACK_SIZE((x)->dist);                    
     decode_uint32_t(pptr, &(x)->mirror_mode);                           
+#if 0
     decode_uint32_t(pptr, &(x)->stuffed);                               
     decode_uint32_t(pptr, &(x)->stuffed_size);                          
+#endif
     decode_uint32_t(pptr, &(x)->dfile_count);                           
     decode_uint32_t(pptr, &(x)->sid_count);                             
     decode_skip4(pptr,);
@@ -283,32 +290,67 @@ struct PVFS_datafile_attr_s
 typedef struct PVFS_datafile_attr_s PVFS_datafile_attr;
 endecode_fields_1(PVFS_datafile_attr, PVFS_size, size);
 
+/* this is only for layouts used as directory hints to
+ * prevent some of the conversion back and forth between
+ * strings and BMI_addr_t that goes on otherwise
+ */
+struct PVFS_dirhint_server_list_s
+{
+    int32_t count;
+    int32_t bufsize;
+    char *servers;
+};
+typedef struct PVFS_dirhint_server_list_s PVFS_dirhint_server_list;
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+endecode_fields_3(PVFS_dirhint_server_list,
+        int32_t, count,
+        int32_t, bufsize,
+        string, servers);
+#endif
+
+struct PVFS_dirhint_layout_s
+{
+    enum PVFS_sys_layout_algorithm algorithm;
+    PVFS_dirhint_server_list server_list;
+};
+typedef struct PVFS_dirhint_layout_s PVFS_dirhint_layout;
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+endecode_fields_2(PVFS_dirhint_layout,
+        uint32_t, algorithm,
+        PVFS_dirhint_server_list, server_list);
+#endif
+
 /* extended hint attributes for a directory object */
 struct PVFS_directory_hint_s
 {
-    uint32_t  dist_name_len;
+    uint32_t            dist_name_len;
     /* what is the distribution name? */
-    char     *dist_name;
+    char               *dist_name;
     /* what are the distribution parameters? */
-    uint32_t  dist_params_len;
-    char     *dist_params;
+    uint32_t            dist_params_len;
+    char               *dist_params;
     /* how many dfiles ought to be used */
-    uint32_t  dfile_count;
-    uint32_t  dfile_sid_count;
+    uint32_t            dfile_count;
+    uint32_t            dfile_sid_count;
+    /* how servers are selected */
+    PVFS_dirhint_layout layout;
 };
 typedef struct PVFS_directory_hint_s PVFS_directory_hint;
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
-endecode_fields_8(
+endecode_fields_9(
         PVFS_directory_hint,
         uint32_t, dist_name_len,
         skip4,,
-        string, dist_name,
+        string,   dist_name,
         uint32_t, dist_params_len,
         skip4,,
-        string, dist_params,
+        string,   dist_params,
         uint32_t, dfile_count,
-        uint32_t, dfile_sid_count);
+        uint32_t, dfile_sid_count,
+        PVFS_dirhint_layout, layout);
 #endif
 
 /* attributes specific to directory objects */

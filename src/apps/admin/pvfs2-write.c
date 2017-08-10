@@ -114,7 +114,7 @@ int main (int argc, char ** argv)
 	return(-1);
     }
     memset(&src, 0, sizeof(src));
-    memset(&dest, 0, sizeof(src));
+    memset(&dest, 0, sizeof(dest));
 
     resolve_filename(&dest,  user_opts->destfile );
 
@@ -127,6 +127,15 @@ int main (int argc, char ** argv)
 
     ret = generic_open(&dest, &credentials, user_opts->num_datafiles, user_opts->strip_size,
                        NULL, OPEN_DEST);
+
+    printf("\n\ndest.u.pvfs2.ref.handle(%s)\n"
+               "dest.u.pvfs2.ref.fs_id(%d)\n"
+               "dest.u.pvfs2.ref.sid_count(%d)\n"
+          ,PVFS_OID_str(&dest.u.pvfs2.ref.handle)
+          ,dest.u.pvfs2.ref.fs_id
+          ,dest.u.pvfs2.ref.sid_count);
+    printf("dest.u.pvfs2.ref.sid_array[0](%s)\n\n"
+          ,PVFS_SID_str(&dest.u.pvfs2.ref.sid_array[0]));
 
     if (ret < 0)
     {
@@ -344,6 +353,9 @@ static size_t generic_write(file_object *dest, char *buffer,
     PVFS_sysresp_io resp_io;
     int ret;
 
+    printf("Entering generic_write...\n");
+
+
     if (dest->fs_type == UNIX_FILE)
 	return(write(dest->u.ufs.fd, buffer, count));
     else
@@ -355,6 +367,7 @@ static size_t generic_write(file_object *dest, char *buffer,
 	    PVFS_perror("PVFS_Request_contiguous", ret);
 	    return(ret);
 	}
+        printf("Calling PVFS_sys_write...\n");
 	ret = PVFS_sys_write(dest->u.pvfs2.ref, file_req, offset,
 		buffer, mem_req, credentials, &resp_io, hints);
 	if (ret == 0) 
@@ -415,6 +428,9 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
     char *entry_name;		    /* name of the pvfs2 file */
     char str_buf[PVFS_NAME_MAX];    /* basename of pvfs2 file */
  
+
+    printf("Entering generic_open\n");
+
     if (obj->fs_type == UNIX_FILE)
     {
         memset(&stat_buf, 0, sizeof(struct stat));
@@ -457,6 +473,7 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
     }
     else
     {
+        printf("pvfs2_path is (%s)\n",obj->u.pvfs2.pvfs2_path);
 	entry_name = str_buf;
 	/* it's a PVFS2 file */
 	if (strcmp(obj->u.pvfs2.pvfs2_path, "/") == 0)
@@ -483,6 +500,9 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
 		PVFS_perror("PVFS_sys_lookup", ret);
 		return (-1);
 	    }
+
+            printf("Made it through PVFS_sys_lookup for (%s)\n",obj->u.pvfs2.pvfs2_path);
+
             PVFS_object_ref_copy(&parent_ref, &resp_lookup.ref);
 
 	    while (!PINT_string_next_segment(srcname, &segp, &segstate))
@@ -506,6 +526,7 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
 			"creation on %s\n", obj->u.pvfs2.user_path);
 		return(-1);
 	    }
+            printf("Calling PINT_lookup_parent for (%s)\n",obj->u.pvfs2.pvfs2_path);
 	    ret = PINT_lookup_parent(obj->u.pvfs2.pvfs2_path, 
                                      obj->u.pvfs2.fs_id, credentials,
                                      &parent_ref);
@@ -517,6 +538,12 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
 	    else /* parent lookup succeeded. if the pvfs2 path is just a
 		    directory, use basename of src for the new file */
 	    {
+                printf("PINT_lookup_parent was successful(%d)\n"
+                       "parent handle(%s) sid-count(%d)\n"
+                       ,ret
+                       ,PVFS_OID_str(&parent_ref.handle)
+                       ,parent_ref.sid_count);
+
 		int len = strlen(obj->u.pvfs2.pvfs2_path);
 		if (obj->u.pvfs2.pvfs2_path[len - 1] == '/')
 		{
@@ -535,11 +562,13 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
 		    }
 		    strncat(obj->u.pvfs2.pvfs2_path, prev_segp, PVFS_NAME_MAX);
 		    entry_name = prev_segp;
+                    printf("entry name is (%s)\n",entry_name);
 		}
 	    }
 	}
 
 	memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
+        printf("Calling PVFS_sys_ref_lookup\n");
 	ret = PVFS_sys_ref_lookup(parent_ref.fs_id, entry_name,
                                   parent_ref, credentials, &resp_lookup,
                                   PVFS2_LOOKUP_LINK_FOLLOW, hints);
@@ -618,6 +647,7 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
                     new_dist=NULL;
                 }
             
+                printf("\nCalling PVFS_sys_create for (%s)\n",entry_name);
 		ret = PVFS_sys_create(entry_name, parent_ref, 
                                       obj->u.pvfs2.attr, credentials,
                                       new_dist, &resp_create, NULL, hints);

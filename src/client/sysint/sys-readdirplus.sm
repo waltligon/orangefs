@@ -1051,29 +1051,21 @@ static PINT_sm_action readdirplus_cleanup(struct PINT_smcb *smcb,
         {
             if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DIST )
             {
-                if(obj_attr_i->mask & PVFS_ATTR_META_UNSTUFFED)
-                {
-                    PVFS_size (*logical_file_size)(void* params,
-                                                   uint32_t num_handles,
-                                                   PVFS_size *psizes) = NULL;
-                    /* compute the file size */
-                    assert(sm_p->u.readdirplus.size_array[i]);
-                    logical_file_size = 
+                PVFS_size (*logical_file_size)(void* params,
+                                               uint32_t num_handles,
+                                               PVFS_size *psizes) = NULL;
+                /* compute the file size */
+                assert(sm_p->u.readdirplus.size_array[i]);
+                logical_file_size = 
                             obj_attr_i->u.meta.dist->methods->logical_file_size;
-                    assert(logical_file_size);
-                    assert(obj_attr_i->u.meta.dist->params);
+                assert(logical_file_size);
+                assert(obj_attr_i->u.meta.dist->params);
 
-                    resp_attr_i->size = logical_file_size(
+                resp_attr_i->size = logical_file_size(
                                           obj_attr_i->u.meta.dist->params,
                                           obj_attr_i->u.meta.dfile_count,
                                           sm_p->u.readdirplus.size_array[i]);
 
-                }
-                else
-                {
-                    /* size for stuffed case */
-                    resp_attr_i->size = obj_attr_i->u.meta.stuffed_size;
-                }
                 resp_attr_i->mask |= PVFS_ATTR_SYS_SIZE;
             }
             if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DFILES) 
@@ -1081,15 +1073,6 @@ static PINT_sm_action readdirplus_cleanup(struct PINT_smcb *smcb,
                 resp_attr_i->dfile_count = obj_attr_i->u.meta.dfile_count;
                 resp_attr_i->mask |= PVFS_ATTR_SYS_DFILE_COUNT;
             }
-/* V3 remove */
-#if 0
-            if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_MIRROR_DFILES)
-            {
-                resp_attr_i->mirror_copies_count =
-                                    obj_attr_i->u.meta.mirror_copies_count;
-                resp_attr_i->mask |= PVFS_ATTR_SYS_MIRROR_COPIES_COUNT;
-            }
-#endif
         }
         else if (resp_attr_i->objtype == PVFS_TYPE_DIRECTORY)
         {

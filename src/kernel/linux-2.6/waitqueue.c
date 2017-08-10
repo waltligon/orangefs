@@ -179,63 +179,90 @@ retry_servicing:
 
     BUG_ON(ret != op->downcall.status);
     /* retry if operation has not been serviced and if requested */
-    if (!op_state_serviced(op) && op->downcall.status == -EAGAIN)
-    {
-        gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2: tag %llu (%s) -- operation to be retried (%d attempt)\n", 
-                llu(op->tag), op_name, op->attempts + 1);
+    if (!op_state_serviced(op) && op->downcall.status == -EAGAIN) {
+        gossip_debug(GOSSIP_WAIT_DEBUG,
+             "pvfs2: tag %llu (%s) -- operation to be retried (%d attempt)\n", 
+             llu(op->tag),
+             op_name,
+             op->attempts + 1);
 
-        if (!op->uses_shared_memory)
-        {
-           /* this operation doesn't use the shared memory system */
+        if (!op->uses_shared_memory) {
            goto retry_servicing;
         }
 
         /* op uses shared memory */
-        if (get_bufmap_init() == 0)
-        {
-            /* This operation uses the shared memory system AND the system is not yet ready.     */
-            /* This situation occurs when the client-core is restarted AND there were operations */
-            /* waiting to be processed or were already in process.                               */
-            gossip_debug(GOSSIP_WAIT_DEBUG,"uses_shared_memory is true.\n");
-            gossip_debug(GOSSIP_WAIT_DEBUG,"Client core in-service status(%d).\n",is_daemon_in_service());
-            gossip_debug(GOSSIP_WAIT_DEBUG,"bufmap_init:%d.\n",get_bufmap_init());
-            gossip_debug(GOSSIP_WAIT_DEBUG,"operation's state is 0x%0x.\n",op->op_state);
+        if (get_bufmap_init() == 0) {
+            /*
+             * This operation uses the shared memory system AND the
+             * system is not yet ready. This situation occurs when
+             * the client-core is restarted AND there were operations
+             * waiting to be processed or were already in process.
+             */
+            gossip_debug(GOSSIP_WAIT_DEBUG, "uses_shared_memory is true.\n");
+            gossip_debug(GOSSIP_WAIT_DEBUG,
+                         "Client core in-service status(%d).\n",
+                         is_daemon_in_service());
+            gossip_debug(GOSSIP_WAIT_DEBUG,
+                         "bufmap_init:%d.\n",
+                         get_bufmap_init());
+            gossip_debug(GOSSIP_WAIT_DEBUG,
+                         "operation's state is 0x%0x.\n",
+                         op->op_state);
 
-            /* let process sleep for a few seconds so shared memory system can be initialized. */
-            /* ligon: removed irqsave and irqrestore from the spinlocks. it is okay if a hardware interrupt occurs.*/
+            /*
+             * let process sleep for a few seconds so shared memory system
+             * can be initialized.
+             * ligon: removed irqsave and irqrestore from the spinlocks.
+             * it is okay if a hardware interrupt occurs.
+             */
             spin_lock(&op->lock);
             add_wait_queue(&pvfs2_bufmap_init_waitq, &wait_entry);
             spin_unlock(&op->lock);
 
             set_current_state(TASK_INTERRUPTIBLE);
 
-            /* Wait for pvfs_bufmap_initialize() to wake me up within the allotted time. */
-            ret=schedule_timeout(MSECS_TO_JIFFIES(1000 * PVFS2_BUFMAP_WAIT_TIMEOUT_SECS));
+            /*
+             * Wait for pvfs_bufmap_initialize() to wake me up within the
+             * allotted time.
+             */
+            ret = schedule_timeout
+                    (MSECS_TO_JIFFIES(1000 * PVFS2_BUFMAP_WAIT_TIMEOUT_SECS));
 
-            gossip_debug(GOSSIP_WAIT_DEBUG,"Value returned from schedule_timeout:%d.\n",ret);
-            gossip_debug(GOSSIP_WAIT_DEBUG,"Is shared memory available? (%d).\n",get_bufmap_init());
+            gossip_debug(GOSSIP_WAIT_DEBUG,
+                         "Value returned from schedule_timeout:%d:\n",
+                         ret);
+            gossip_debug(GOSSIP_WAIT_DEBUG,
+                         "Is shared memory available? (%d).\n",
+                         get_bufmap_init());
 
-            /* ligon: removing irqsave and irqrestore from spinlocks.  it is okay if a hardware interrupt occurs. */
             spin_lock(&op->lock);
             remove_wait_queue(&pvfs2_bufmap_init_waitq, &wait_entry);
             spin_unlock(&op->lock);
 
-            if (get_bufmap_init() == 0)
-            {
-               gossip_err("%s:The shared memory system has not started in %d seconds after the "
-                          "client core restarted.  Aborting user's request(%s).\n"
-                         ,__func__
-                         ,PVFS2_BUFMAP_WAIT_TIMEOUT_SECS
-                         ,get_opname_string(op));
+            if (get_bufmap_init() == 0) {
+               gossip_err("%s:The shared memory system has not started in %d "
+                          "seconds after the client core restarted. "
+                          "Aborting user's request(%s).\n",
+                          __func__,
+                          PVFS2_BUFMAP_WAIT_TIMEOUT_SECS,
+                         get_opname_string(op));
                return(-EIO);
             }
 
-            /* Return to the calling function and re-populate a shared memory buffer. */
+            /*
+             * Return to the calling function and re-populate a shared
+             * memory buffer.
+             */
             return(-EAGAIN);
-        }/*endif*/
-    }/*endif*/
+        }
+    }
 
-    gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2: service_operation %s returning: %d for %p.\n", op_name, ret, op);
+    gossip_debug(GOSSIP_WAIT_DEBUG,
+                 "%s: %s returning: %d for %p.\n",
+                 __func__,
+                 op_name,
+                 ret,
+                 op);
     return(ret);
 }
 

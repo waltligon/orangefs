@@ -776,6 +776,16 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
                                        &attr_status,
                                        &sm_p->getattr.size,
                                        &size_status);
+
+    gossip_err("%s:object_ref.handle(%s)\n",__func__,PVFS_OID_str(&object_ref.handle));
+    gossip_err("%s:sm_p->getattr.attr.u.meta.sid_count(%d)\n"
+              ,__func__
+              ,sm_p->getattr.attr.u.meta.sid_count);
+    gossip_err("%s:sm_p->getattr.attr.u.meta.sid_array[0](%s)\n"
+              ,__func__
+              ,sm_p->getattr.attr.u.meta.sid_count == 0 ? "sid count is zero" : PVFS_SID_str(&sm_p->getattr.attr.u.meta.sid_array[0]));
+
+
     if(ret < 0 || attr_status < 0)
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG,
@@ -1117,12 +1127,28 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = getattr_object_getattr_comp_fn;
 
+    gossip_err("%s:object_ref.handle(%s)\n"
+               "   object_ref.fs_id(%d)\n"
+               "   object_ref.sid_count(%d)\n"
+              ,__func__
+              ,PVFS_OID_str(&object_ref.handle)
+              ,object_ref.fs_id
+              ,object_ref.sid_count);
+
+    gossip_err("%s:msg_p->sid_array[0]=%s\n", __func__,PVFS_SID_str(&msg_p->sid_array[0]));
+
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    gossip_err("%s:sm_p->getattr.attr.objtype(%d)\n"
+               "   sm_p->getattr.attr.u.meta.sid_count(%d)\n"
+               ,__func__
+               ,sm_p->getattr.attr.objtype
+               ,sm_p->getattr.attr.u.meta.sid_count);
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
@@ -1959,41 +1985,25 @@ static PINT_sm_action getattr_acache_insert(struct PINT_smcb *smcb,
                          "PVFS_ATTR_DATA_SIZE is in mask. "
                          "Should cache size.\n",
                          __func__);
-            if(!(sm_p->getattr.attr.mask & PVFS_ATTR_META_UNSTUFFED))
-            {
-                gossip_debug(GOSSIP_ACACHE_DEBUG,
-                             "%s: caching stuffed file size\n",
-                             __func__);
-                /* stuffed file case */
-                sm_p->getattr.size = sm_p->getattr.attr.u.meta.stuffed_size;
-                tmp_size = &sm_p->getattr.size;
-                gossip_debug(GOSSIP_ACACHE_DEBUG,
-                             "%s: calculated stuffed logical size of %lld\n",
-                             __func__,
-                             lld(*tmp_size));
-            }
-            else
-            {
-                gossip_debug(GOSSIP_ACACHE_DEBUG,
-                             "%s: caching unstuffed file size\n",
-                             __func__);
-                /* compute size as requested */
-                assert(sm_p->getattr.attr.u.meta.dist);
-                assert(sm_p->getattr.attr.u.meta.dist->methods &&
+            gossip_debug(GOSSIP_ACACHE_DEBUG,
+                         "%s: caching file size\n",
+                         __func__);
+            /* compute size as requested */
+            assert(sm_p->getattr.attr.u.meta.dist);
+            assert(sm_p->getattr.attr.u.meta.dist->methods &&
                     sm_p->getattr.attr.u.meta.dist->methods->logical_file_size);
 
-                sm_p->getattr.size =
+            sm_p->getattr.size =
                    (sm_p->getattr.attr.u.meta.dist->methods->logical_file_size)(
                             sm_p->getattr.attr.u.meta.dist->params,
                             sm_p->getattr.attr.u.meta.dfile_count,
                             sm_p->getattr.size_array);
 
-                tmp_size = &sm_p->getattr.size;
-                gossip_debug(GOSSIP_GETATTR_DEBUG
-                             ,"getattr_acache_insert calculated"
-                              " unstuffed logical size of %lld\n"
-                             , lld(*tmp_size));
-            }
+            tmp_size = &sm_p->getattr.size;
+            gossip_debug(GOSSIP_GETATTR_DEBUG
+                         ,"getattr_acache_insert calculated"
+                          " logical size of %lld\n"
+                         , lld(*tmp_size));
         }
 
         if (sm_p->getattr.attr.objtype == PVFS_TYPE_DIRECTORY &&

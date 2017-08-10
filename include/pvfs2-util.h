@@ -51,6 +51,7 @@ int PVFS_util_gen_credential(const char *user,
                              const char *keypath,
                              const char *certpath,
                              PVFS_credential *cred);
+
 int PVFS_util_refresh_credential(PVFS_credential *cred);
 
 /* NOTE: for backwards compatibility only. 
@@ -68,14 +69,15 @@ int PVFS_util_init_defaults(void);
 
 /* client side config file / option management */
 const PVFS_util_tab* PVFS_util_parse_pvfstab(const char* tabfile);
+
 void PINT_release_pvfstab(void);
 int PVFS_util_resolve(const char* local_path,
                       PVFS_fs_id* out_fs_id,
                       char* out_fs_path,
                       int out_fs_path_max);
+
 int PVFS_util_resolve_absolute(const char* local_path);
 int PVFS_util_get_default_fsid(PVFS_fs_id* out_fs_id);
-
 int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent);
 int PVFS_util_remove_internal_mntent(struct PVFS_sys_mntent *mntent);
 

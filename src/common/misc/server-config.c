@@ -4685,7 +4685,10 @@ static host_alias_t *find_host_alias_ptr_by_alias(
             cur = PINT_llist_next(cur);
         }
     }
-    if(index) *index = ind - 1;
+    if(index)
+    {
+        *index = ind - 1;
+    }
     return ret;
 }
 #endif
@@ -4856,6 +4859,7 @@ char *PINT_config_get_host_alias_ptr(struct server_configuration_s *config_s,
  *even if this call fails half way into it, a PINT_config_release
  *call should properly de-alloc all consumed memory.
  */
+
 static int cache_config_files(struct server_configuration_s *config_s,
                               char *global_config_filename)
 {

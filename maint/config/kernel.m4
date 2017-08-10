@@ -3008,6 +3008,38 @@ dnl newer 3.3 kernels and above use d_make_root instead of d_alloc_root
         )
         CFLAGS=$tmp_cflags 
 
+        dnl direct_IO arguments changed several times between 2.6
+        dnl and 4.7.
+        dnl
+        dnl commit d8d3d94 ditched the iov and nr_segs arguments in
+        dnl favor of iter.
+        dnl
+        dnl commit 22c6186 removed rw. Fedora was like this at 4.1.6-201.
+        dnl
+        dnl commit c8b8e32 got rid of the offset argument.
+        dnl
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+        AC_MSG_CHECKING(for commit 22c6186 flavored direct_IO)
+        AC_TRY_COMPILE([
+          #define __KERNEL__
+          #ifdef HAVE_KCONFIG
+          #include <linux/kconfig.h>
+          #endif
+          #include <linux/fs.h>
+          struct address_space_operations a;
+          ssize_t d(struct kiocb *a, struct iov_iter *b, loff_t c)
+          { return 0; }
+        ],
+        [
+          a.direct_IO = d;
+        ],
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(C_22c6186_FLAVORED_DIO, 1, [commit 22c6186 flavored direct_IO]),
+        AC_MSG_RESULT(no)
+        )
+        CFLAGS=$tmp_cflags
+
         dnl permission function pointer in the inode_operations struct now
         dnl takes three params with the third being an unsigned int (circa
         dnl 2.6.38

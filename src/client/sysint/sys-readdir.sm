@@ -23,7 +23,6 @@
 #include "pint-sysint-utils.h"
 #include "PINT-reqproto-encode.h"
 #include "ncache.h"
-#include "rcache.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "sid.h"
@@ -280,10 +279,15 @@ static int readdir_msg_comp_fn(void *v_p,
     /* if it's from the last dirdata of the msg_array */
     if(index == (sm_p->readdir.num_dirdata_needed - 1))
     {
+        PVFS_ds_position tmp_dirdata_index = 0;
+
         /* convert servresp_readdir response to a sysresp_readdir obj */
-        *(sm_p->readdir_state.token) = resp_p->u.readdir.token;
-        sm_p->readdir_state.pos_token = resp_p->u.readdir.token;
-        sm_p->readdir.pos_token = resp_p->u.readdir.token;
+        tmp_dirdata_index = sm_p->readdir.dirdata_index & 0x000000ff;
+        tmp_dirdata_index = tmp_dirdata_index << 48;
+
+        *(sm_p->readdir_state.token) = tmp_dirdata_index + resp_p->u.readdir.token;
+        sm_p->readdir_state.pos_token = *(sm_p->readdir_state.token);
+        sm_p->readdir.pos_token = *(sm_p->readdir_state.token);
         *(sm_p->readdir_state.directory_version) =
                          resp_p->u.readdir.directory_version;
         sm_p->readdir_state.dirdata_index = sm_p->readdir.dirdata_index;
@@ -416,26 +420,23 @@ static PINT_sm_action readdir_init(struct PINT_smcb *smcb,
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int dirdata_index = 0;
-    int ret = -1;
     
     gossip_debug(GOSSIP_READDIR_DEBUG, "readdir state: init\n");
 
     *(sm_p->readdir_state.dirent_outcount) = 0;
     sm_p->readdir.num_dirdata_needed = 0;
                     
-    if(sm_p->readdir_state.pos_token != PVFS_READDIR_START) /* get dirdata_index from rcache */
+    if(sm_p->readdir_state.pos_token != PVFS_READDIR_START)
     {
-        ret = PINT_rcache_get_cached_index(
-                              &sm_p->object_ref,
-                              sm_p->readdir_state.pos_token,
-                              &dirdata_index);
-        if(ret < 0)
-        {    
-            gossip_err("invalid readdir cache content!! \n");
-            return ret;
-        }
+        /* We need to strip out the dirdata index from the token.
+         * The token looks like:
+         *     16 bits dirdata index
+         *     16 bits session id (managed by trove)
+         *     32 bits position (managed by trove)
+         */
+        dirdata_index = sm_p->readdir_state.pos_token >> 48;
+        sm_p->readdir_state.pos_token = sm_p->readdir_state.pos_token & 0x00ffffff;
         gossip_debug(GOSSIP_READDIR_DEBUG,
-                "*** get cached index from rcache, "
                 "[handle %s, token %llu, dirdata_index %d]\n",
                 PVFS_OID_str(&sm_p->object_ref.handle),
                 llu(sm_p->readdir_state.pos_token),
@@ -750,7 +751,7 @@ static PINT_sm_action readdir_cleanup(struct PINT_smcb *smcb,
                                       job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i = 0, ret = -1;
+    int i = 0;
     PVFS_object_ref tmp_ref;
     gossip_debug(GOSSIP_READDIR_DEBUG, "readdir state: cleanup\n");
     memset(&tmp_ref, 0, sizeof(tmp_ref));
@@ -770,25 +771,6 @@ static PINT_sm_action readdir_cleanup(struct PINT_smcb *smcb,
                 (const PVFS_object_ref *) &(tmp_ref),
                 (const PVFS_object_ref *) &(sm_p->object_ref));
         }
-
-
-        /* update rcache if necessary */
-        if(sm_p->readdir_state.dirent_limit ==
-              *(sm_p->readdir_state.dirent_outcount))
-        {
-            ret = PINT_rcache_insert(&sm_p->object_ref, 
-                                     *(sm_p->readdir_state.token),
-                                     sm_p->readdir_state.dirdata_index);
-            assert(ret == 0);
-
-            gossip_debug(GOSSIP_READDIR_DEBUG, 
-                    "*** insert entry into rcache, "
-                    "[handle %s, token %llu, dirdata_index %d]\n",
-                    PVFS_OID_str(&sm_p->object_ref.handle),
-                    llu(*(sm_p->readdir_state.token)),
-                    sm_p->readdir.dirdata_index);
-        }
-
     }
 
     if (sm_p->getattr.keep_size_array && sm_p->getattr.size_array)

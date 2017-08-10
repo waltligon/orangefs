@@ -234,7 +234,8 @@ PVFS_error PVFS_isys_create(char *object_name,
 
     /* save the original attribute passed in. since create does it's own
      * retries we need the original attribute available on retries */
-    PINT_copy_object_attr(&(sm_p->u.create.store_attr), &(sm_p->u.create.attr));
+    PINT_copy_object_attr(&(sm_p->u.create.store_attr),
+                          &(sm_p->u.create.attr));
 
     sm_p->u.create.stored_error_code = 0;
     sm_p->u.create.retry_count = 0;
@@ -273,22 +274,17 @@ PVFS_error PVFS_isys_create(char *object_name,
     if(layout)
     {
         /* make sure it is a supported layout */
-        switch(layout->algorithm)
+        if ((layout->algorithm <= PVFS_SYS_LAYOUT_NULL) ||
+            (layout->algorithm > PVFS_SYS_LAYOUT_MAX))
         {
-            /* these are valid */
-            case PVFS_SYS_LAYOUT_ROUND_ROBIN:
-            case PVFS_SYS_LAYOUT_RANDOM:
-            case PVFS_SYS_LAYOUT_LIST:
-                break;
-            /* anything else is not */
-            default:
-                return(-PVFS_EINVAL);
+            return(-PVFS_EINVAL);
         }
 
         sm_p->u.create.layout.algorithm = layout->algorithm;
         if(layout->algorithm == PVFS_SYS_LAYOUT_LIST)
         {
-            sm_p->u.create.layout.server_list.count = layout->server_list.count;
+            sm_p->u.create.layout.server_list.count =
+                    layout->server_list.count;
             sm_p->u.create.layout.server_list.servers =
                     malloc(layout->server_list.count * sizeof(PVFS_BMI_addr_t));
             if(!sm_p->u.create.layout.server_list.servers)
@@ -302,7 +298,10 @@ PVFS_error PVFS_isys_create(char *object_name,
     }
     else
     {
-        sm_p->u.create.layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
+        /* we check for dir hint in another state and
+         * then set default if there is no other layout
+         */
+        sm_p->u.create.layout.algorithm = PVFS_SYS_LAYOUT_NULL;
     }
 
     /* If the user specifies a distribution use that
@@ -325,6 +324,11 @@ PVFS_error PVFS_isys_create(char *object_name,
     }
     else
     {
+        /* leave NULL for now we will check if there is
+         * a dir hint and if no then get the deffault
+         */
+        sm_p->u.create.dist = NULL;
+#if 0
         /* Get the default distribution */
         sm_p->u.create.dist = get_default_distribution(sm_p->parent_ref.fs_id);
         if (!sm_p->u.create.dist)
@@ -332,6 +336,7 @@ PVFS_error PVFS_isys_create(char *object_name,
             PINT_smcb_free(smcb);
             return -PVFS_ENOMEM;
         }
+#endif
     }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Creating file %s under %s, %d\n",
@@ -401,6 +406,9 @@ static int create_comp_fn(void *v_p,
     {
         return resp_p->status;
     }
+
+
+    gossip_err("%s:resp_p->u.create.stuffed(%d)\n",__func__,resp_p->u.create.stuffed);
 
 /* There really isn't anything to do any more - the rest of this stuff
  * is not needed any more - BUT if we want to return creation times from
@@ -505,6 +513,9 @@ static PINT_sm_action create_init(struct PINT_smcb *smcb, job_status_s *js_p)
     /* set up to read the attributes of the parent,
      * which must be a directory 
      */
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->parent_ref,
                                (PVFS_ATTR_COMMON_NOTIME |
@@ -524,7 +535,6 @@ static PINT_sm_action create_init(struct PINT_smcb *smcb, job_status_s *js_p)
                                         &tmp_id,
                                         pint_client_sm_context);
     }    
-
    return SM_ACTION_COMPLETE;
 }
 
@@ -541,6 +551,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
     PINT_dist *current_dist; 
+    int set_new_dist = 0;
     int ret = 0;
     int num_dfiles_requested = 0;
     int tmp_i;
@@ -566,6 +577,17 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         sm_p->u.create.attr.group = attr->group;
         /* note that permission checking is left to server even in this case */
     }
+
+#ifdef ENABLE_SECURITY_CERT
+    /* we need to know the correct owner group in cert. mode */
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "adding gid hint: %d\n", 
+                             sm_p->u.create.attr.group);
+    PVFS_hint_add(&sm_p->hints, 
+                  PVFS_HINT_OWNER_GID_NAME, 
+                  sizeof(uint32_t),
+                  &sm_p->u.create.attr.group);
+#endif
+
     /* !!! change more later */
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_parent_getattr: [%p] "
                  "dirdata_server_count = %d "
@@ -602,43 +624,35 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
 
     current_dist = sm_p->u.create.dist;
     /* If we have an overriding distribution for this directory honor that */
-    if (attr->u.dir.hint.dist_name_len > 0)
+
+    if (!current_dist && attr->u.dir.hint.dist_name_len > 0)
     {
-        /* switch it only if it is different! */
-        if (strcmp(attr->u.dir.hint.dist_name, current_dist->dist_name))
+        PINT_dist *new_dist = NULL;
+        new_dist = PINT_dist_create(attr->u.dir.hint.dist_name);
+        if (new_dist)
         {
-            PINT_dist *new_dist = NULL;
-            new_dist = PINT_dist_create(attr->u.dir.hint.dist_name);
-            if (new_dist)
-            {
-                gossip_debug(GOSSIP_CLIENT_DEBUG,
-                         "Overridding distribution name to %s instead of %s\n",
-                         attr->u.dir.hint.dist_name,
-                         current_dist->dist_name);
-                PINT_dist_free(current_dist);
-                sm_p->u.create.dist = new_dist;
-                current_dist = new_dist;
-            }
-            else
-            {
-                gossip_debug(
-                    GOSSIP_CLIENT_DEBUG,
-                    "Could not override distribution name with %s "
-                    "instead of %s\n",
-                    attr->u.dir.hint.dist_name,
-                    current_dist->dist_name);
-            }
+            gossip_debug(GOSSIP_CLIENT_DEBUG,
+                         "Setting distribution to %s\n",
+                         attr->u.dir.hint.dist_name);
+            PINT_dist_free(current_dist);
+            sm_p->u.create.dist = new_dist;
+            current_dist = new_dist;
         }
-        else {
-            gossip_debug(
-                GOSSIP_CLIENT_DEBUG,
-                "retaining current distribution name %s\n",
-                current_dist->dist_name);
+        else
+        {
+            gossip_debug(GOSSIP_CLIENT_DEBUG,
+                         "ran out of memory creating distribution\n");
+            js_p->error_code = -PVFS_EINVAL;
+            return SM_ACTION_COMPLETE;
         }
+        set_new_dist = 1;
     }
 
-    /* okay, we might need to override some dist params as well */
-    if (attr->u.dir.hint.dist_params_len > 0)
+    /* okay, we might need to override some dist params as well 
+     * even if distribution is default parameters may be 
+     * specifide in the dir hint
+     */
+    if (set_new_dist && attr->u.dir.hint.dist_params_len > 0)
     {
         /* We have a series of comma separated key:val strings */
         char **key, **val;
@@ -720,6 +734,23 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
             free(key);
             free(val);
         }
+    }
+
+
+    /* GET Default distribution here
+     * This code is from Trunk
+     */
+
+    if (!current_dist)
+    {
+        /* set to default distribution */
+        sm_p->u.create.dist = get_default_distribution(sm_p->parent_ref.fs_id);
+        if (!sm_p->u.create.dist)
+        {
+            PINT_smcb_free(smcb);
+            return -PVFS_ENOMEM;
+        }
+        current_dist = sm_p->u.create.dist;
     }
 
     /* Replication for metadata is always set in the configuration for
@@ -895,6 +926,10 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     sm_p->object_ref.sid_count = sm_p->u.create.metadata_sid_count;
     sm_p->object_ref.sid_array = sm_p->u.create.metadata_sid_array;
 
+    gossip_err("%s:sm_p->object_ref.sid_array[0]=(%s)\n"
+              ,__func__
+              ,PVFS_SID_str(&sm_p->object_ref.sid_array[0]));
+
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
@@ -945,8 +980,11 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
                                     /* sm_p->u.create.datafile_sid_count; */
     msg_p->req.u.create.attr.u.meta.size         = 0;
     msg_p->req.u.create.attr.u.meta.mirror_mode  = 0;
+    /* removed during layout merge */
+#if 0
     msg_p->req.u.create.attr.u.meta.stuffed      = 0;
     msg_p->req.u.create.attr.u.meta.stuffed_size = 0;
+#endif
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret < 0)
@@ -991,6 +1029,10 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
 
     /* find the hash value and the dist dir bucket */
     dirdata_hash = PINT_encrypt_dirdata(sm_p->u.create.object_name);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create: encrypt dirent %s into hash value %llu.\n", 
+                 sm_p->u.create.object_name,
+                 llu(dirdata_hash));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create: encrypt dirent %s into hash value %llu.\n", 
@@ -1012,6 +1054,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
             PINT_find_dist_dir_bucket(dirdata_hash,
                    &sm_p->getattr.attr.u.dir.dist_dir_attr,
                    sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+
     dirdata_sid_index = dirdata_server_index *
                         sm_p->getattr.attr.u.dir.dist_dir_attr.sid_count;
 
@@ -1046,7 +1089,8 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                 sm_p->parent_ref.sid_array,   /* back ptr to dir */
                 sm_p->hints);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,"create: msg_p->req.op(%d)\n",msg_p->req.op);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create: msg_p->req.op(%d)\n",msg_p->req.op);
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
@@ -1108,8 +1152,10 @@ static PINT_sm_action create_crdirent_failure(struct PINT_smcb *smcb,
         {
             local_uid = PINT_util_getuid();
 
-            PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
-                          sizeof(PVFS_uid), &local_uid);
+            PVFS_hint_add(&sm_p->hints,
+                          PVFS_HINT_LOCAL_UID_NAME,
+                          sizeof(PVFS_uid),
+                          &local_uid);
         }
 
         PINT_client_capcache_invalidate(sm_p->object_ref, local_uid);
@@ -1117,10 +1163,12 @@ static PINT_sm_action create_crdirent_failure(struct PINT_smcb *smcb,
         /* set up new getattr */
         PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                    sm_p->object_ref,
-                                   PVFS_ATTR_DISTDIR_ATTR,
+                                   PVFS_ATTR_COMMON_ALL |
+                                           PVFS_ATTR_DIR_HINT |
+                                           PVFS_ATTR_CAPABILITY |
+                                           PVFS_ATTR_DISTDIR_ATTR,
                                    PVFS_TYPE_DIRECTORY,
                                    0);
-
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -1151,7 +1199,31 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     if (sm_p->error_code == 0)
     {
         /* fill in outgoing response fields */
+        /* Must allocate space for SIDS and copy from object_ref
+         * since the sm_p structure goes away
+         */
+                 
         sm_p->u.create.create_resp->ref = sm_p->object_ref;
+        sm_p->u.create.create_resp->ref.sid_array = NULL;
+        
+        sm_p->u.create.create_resp->ref.sid_array=calloc(sm_p->object_ref.sid_count,
+                                                         sizeof(*sm_p->object_ref.sid_array));
+        if (sm_p->u.create.create_resp->ref.sid_array == NULL)
+        {
+           gossip_err("%s: Error allocating memory for sid array.\n",__func__);
+           js_p->error_code = -PVFS_ENOMEM;
+           return SM_ACTION_COMPLETE;
+        }
+        memcpy(sm_p->u.create.create_resp->ref.sid_array
+              ,sm_p->object_ref.sid_array
+              ,sm_p->object_ref.sid_count * sizeof(*sm_p->object_ref.sid_array));
+        gossip_err("%s:create_resp->ref.handle(%s) sid-count(%d)\n"
+                  ,__func__
+                  ,PVFS_OID_str(&sm_p->u.create.create_resp->ref.handle)
+                  ,sm_p->u.create.create_resp->ref.sid_count);
+        gossip_err("%s:create_resp->ref.sid[0](%s)\n"
+                  ,__func__
+                  ,PVFS_SID_str(&sm_p->u.create.create_resp->ref.sid_array[0]));
 
         /* V3 is this safe? we are saving a pointer to two object refs -
          * where are these allocated and freed?
@@ -1170,6 +1242,8 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
         sm_p->u.create.attr.u.meta.sid_array =
                                        sm_p->u.create.metadata_sid_array;
 
+/* removed during layout merge */
+#if 0
         if(sm_p->u.create.stuffed)
         {
             gossip_debug(GOSSIP_CLIENT_DEBUG, "created stuffed file\n");
@@ -1180,6 +1254,7 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
             gossip_debug(GOSSIP_CLIENT_DEBUG, "created un-stuffed file\n");
             sm_p->u.create.attr.mask |= PVFS_ATTR_META_UNSTUFFED;
         }
+#endif
 
         if(sm_p->u.create.dist)
         {
@@ -1188,7 +1263,6 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
                             PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
             sm_p->u.create.attr.mask |= PVFS_ATTR_META_DIST;
         }
-
 
         /* we only insert a cache entry if the entire create succeeds,
          * set size to 0 
@@ -1209,7 +1283,8 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
-             (sm_p->u.create.retry_count < sm_p->msgarray_op.params.retry_limit))
+             (sm_p->u.create.retry_count <
+              sm_p->msgarray_op.params.retry_limit))
     {
         sm_p->u.create.stored_error_code = 0;
         sm_p->u.create.retry_count++;

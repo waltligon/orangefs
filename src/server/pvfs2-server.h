@@ -124,12 +124,15 @@ enum
 {
     DIST_NAME_KEY          = 0,
     DIST_PARAMS_KEY        = 1,
-    DEFAULT_NUM_DFILES_KEY = 2,
-    NUM_SPECIAL_KEYS       = 3, /* not an index */
-    METAFILE_HINT_KEY      = 3,
-    MIRROR_COPIES_KEY      = 4,
-    MIRROR_HANDLES_KEY     = 5,
-    MIRROR_STATUS_KEY      = 6,
+    NUM_DFILES_KEY         = 2,
+    DEFAULT_NUM_DFILES_KEY = 2, /* alias ? */
+    LAYOUT_KEY             = 3,
+    SERVER_LIST_KEY        = 4,
+    NUM_SPECIAL_KEYS       = 5, /* not an index */
+    METAFILE_HINT_KEY      = 5,
+    MIRROR_COPIES_KEY      = 6,
+    MIRROR_HANDLES_KEY     = 7,
+    MIRROR_STATUS_KEY      = 8,
 };
 
 typedef enum
@@ -1042,6 +1045,14 @@ extern void getattr_free(struct PINT_server_op *s_op);
 struct server_configuration_s *get_server_config_struct(void);
 int server_perf_start_rollover(struct PINT_perf_counter *pc,
                                struct PINT_perf_counter *tpc);
+
+/* keyval management prototypes */
+void free_keyval_buffers(struct PINT_server_op *s_op);
+void keep_keyval_buffers(struct PINT_server_op *s_op, int buf);
+/* this macro is used in keyval management to represent the key and val
+ * pointers of the s_op
+ */
+#define KEYVAL -1
 
 /* exported state machine resource reclamation function */
 int server_post_unexpected_recv(void);
