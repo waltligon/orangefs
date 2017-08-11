@@ -229,6 +229,30 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
     do { if (x) { free(x); (x) = NULL; } \
     } while (0)
 
+#define CLRPACK(o,s,oc) do {                                          \
+    if (dest->u.o == NULL || dest->u.s == NULL)                       \
+    {                                                                 \
+        if (dest->u.o != NULL) { free(dest->u.o); }                   \
+        if (dest->u.s != NULL) { free(dest->u.s); }                   \
+    }                                                                 \
+    else                                                              \
+    {                                                                 \
+        if (dest->u.s == (PVFS_SID *)(dest->u.o + dest->u.oc))        \
+        {                                                             \
+            /* OIDs and SIDs are packed */                            \
+            free(dest->u.o);                                          \
+            dest->u.s = NULL;                                         \
+        }                                                             \
+        else                                                          \
+        {                                                             \
+            /* not packed */                                          \
+            free(dest->u.o);                                          \
+            free(dest->u.s);                                          \
+        }                                                             \
+    }                                                                 \
+} while (0)
+
+
 int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
 {
     int ret = -PVFS_EINVAL;
@@ -252,9 +276,8 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
     case PVFS_TYPE_METAFILE:
         CLRFIELD(dest->u.meta.dist);
         dest->u.meta.dist_size = src->u.meta.dist_size;
-        CLRFIELD(dest->u.meta.dfile_array);
+        CLRPACK(meta.dfile_array, meta.sid_array, meta.dfile_count);
         dest->u.meta.dfile_count = src->u.meta.dfile_count;
-        CLRFIELD(dest->u.meta.sid_array);
         dest->u.meta.sid_count = src->u.meta.sid_count;
         dest->u.meta.size = src->u.meta.size;
         dest->u.meta.mirror_mode = src->u.meta.mirror_mode;
@@ -336,6 +359,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
     return 0;
 }
 #undef CLRFIELD
+#undef CLRPACK
 
 /* PINT_copy_object_attr
  * This is the main attrib copy routine, use this most of the time
