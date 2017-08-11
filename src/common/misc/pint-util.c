@@ -229,7 +229,6 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
     do { if (x) { free(x); (x) = NULL; } \
     } while (0)
 
-
 #define CLRPACK(o,s,oc) do {                                          \
     if (dest->u.o == NULL || dest->u.s == NULL)                       \
     {                                                                 \
