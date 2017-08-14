@@ -1418,7 +1418,9 @@ install_doc:
 	install -m 644 $(srcdir)/doc/man/*.5 $(mandir)/man5
 	gzip -f ${mandir}/man1/pvfs2*.1
 	gzip -f ${mandir}/man5/pvfs2*.5
+	ln -fs pvfs2-getmattr.1.gz $(mandir)/man1/getmattr.1.gz
 	ln -fs pvfs2-ls.1.gz $(mandir)/man1/pvfs2-lsplus.1.gz
+	ln -fs pvfs2-setmattr.1.gz $(mandir)/man1/setmattr.1.gz
 
 ifdef BUILD_BMI_ONLY
 install:: all
@@ -1490,7 +1492,6 @@ endif
 	install -m 755 src/apps/admin/pvfs2-config $(bindir)
 	@# if we ever auto-generate genconfig, remove the $(srcdir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(bindir)
-	install -m 755 $(srcdir)/src/apps/admin/pvfs2-config-convert $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-getmattr $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-setmattr $(bindir)
 ifdef BUILD_KARMA
