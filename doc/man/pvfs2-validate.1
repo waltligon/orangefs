@@ -1,0 +1,54 @@
+.TH PVFS2-VALIDATE 1 2017-08-11
+.SH NAME
+\fBpvfs2-validate\fR \(en recursively check a directory or file for problems
+.SH SYNOPSIS
+\fBpvfs2-validate\fR [\fB\-Vvharsfc\fR] \fB\-d \fIpvfs2_directory\fR
+.SH DESCRIPTION
+The
+.B pvfs2-validate
+utility checks for various problems in the file system.
+.PP
+The options are as follows:
+.IP -h
+Display synopsis.
+.IP -d
+Specifies the directory or file to check.
+.IP -c
+Check for stranded objects.  This requires that
+.I -d
+refers to the root directory.
+.IP -s
+Check for bad practice in symbolic links.
+.IP -f
+Check for bad practice in object names.
+.IP -F
+Stop after confirming consistent configuration.
+.IP -V
+Display verbose messages.
+.IP -v
+Print version number and exit.
+.IP -a
+(NOT IMPLEMENTED) Fix all problems found.
+.IP -r
+(NOT IMPLEMENTED) Run in interactive mode.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.SH EXIT STATUS
+The
+.B pvfs2-check-server
+utility exits 0 on success and with the sum of the following conditions
+on failure: 1 if file system errors corrected, 2 if the system should be
+rebooted, and 4 if file system errors were not corrected.
+.SH EXAMPLES
+Check that servers have consistent configuration.
+.RS 6n
+pvfs2-validate -F -d /mnt
+.RE
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2-check-server ( 1 )
