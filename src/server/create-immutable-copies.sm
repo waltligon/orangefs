@@ -383,7 +383,7 @@ static PINT_sm_action inspect_source_info (struct PINT_smcb *smcb,
     struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
     PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
     char server_name[SERVER_NAME_MAX] = {0};
-    server_configuration_s *config = get_server_config_struct();
+    server_configuration_s *config = PINT_server_config_mgr_get_config();
     int ret = 0;
     int i;
 
@@ -872,7 +872,7 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb,
     int i;
 
     PVFS_handle_extent_array data_handle_ext_array;
-    server_configuration_s *config = get_server_config_struct();
+    server_configuration_s *config = PINT_server_config_mgr_get_config();
 
     js_p->error_code = 0;
 
@@ -997,7 +997,7 @@ static PINT_sm_action setup_datahandle_copies (struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_MIRROR_DEBUG, "Executing setup_datahandle_copies...\n");
     struct PINT_server_op *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-    server_configuration_s *config = get_server_config_struct();
+    server_configuration_s *config = PINT_server_config_mgr_get_config();
     int i, j, k;
     
     js_p->error_code = 0;
@@ -1076,7 +1076,7 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
     gossip_debug(GOSSIP_MIRROR_DEBUG, "Executing copy_data....\n");
     struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
     PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-    server_configuration_s *config = get_server_config_struct();
+    server_configuration_s *config = PINT_server_config_mgr_get_config();
     filesystem_configuration_s *fs = PINT_config_find_fs_id( config, 
         imm_p->fs_id);
     int ret = 0;
@@ -2135,3 +2135,13 @@ struct PINT_server_req_params pvfs2_create_immutable_copies_params =
 	.get_object_ref = PINT_get_object_ref_copies,
 	.state_machine = &pvfs2_create_immutable_copies_sm
 };
+
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */

@@ -65,7 +65,7 @@ static void dyn_destroy_function(struct CRYPTO_dynlock_value*, const char*,
 
 
 /*
-  analogous to 'get_server_config_struct' in pvfs2-server.c -- only an
+  analogous to 'PINT_get_server_config' in config-utils.c -- only an
   fs_id is required since any client may know about different server
   configurations during run-time
 */

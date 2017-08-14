@@ -1,5 +1,6 @@
 DIR := src/apps/user
 
+ifeq ($(build_usrint),yes)
 USERSRC := \
 	$(DIR)/getmattr.c \
 	$(DIR)/ofs_rm.c \
@@ -8,4 +9,4 @@ USERSRC := \
 	$(DIR)/ofs_setdirhint.c \
 	$(DIR)/pvfs2-rm.c \
 	$(DIR)/setmattr.c
- 
+endif 

@@ -1,49 +1,50 @@
-.\" Process this file with
-.\" groff -man -Tascii foo.1
-.\"
-.TH PVFS2-SET-SYNC 1 "July 2005"  PVFS2 "PVFS2 Manuals"
+.TH PVFS2-SET-SYNC 1 2017-07-13
 .SH NAME
-pvfs2-set-sync \- Change meta and data sync flags of a pvfs2-server
+\fBpvfs2-set-sync\fR \(en set server synchronization parameters
 .SH SYNOPSIS
-.B pvfs2-set-sync
-.I -m mount_point -M [0|1] -D [0|1]
-
+\fBpvfs2-set-sync\fR \fB\-m \fImount_point\fR [\fB\-D \fIdata\fR]
+[\fB\-M \fImetadata\fR]
 .SH DESCRIPTION
-Changes the behavior of all  
-.B pvfs2-servers
-within a given file system with respect to when they synchronize metadata and
-file data
-
-.SH OPTIONS
+The
+.I pvfs2-set-sync
+utility is used to set whether data or metadata is implicity
+synchronized to permanent storage on the server.
+.PP
+The options are as follows:
 .IP -m
-Modify settings for the servers associated with 
-.I mount_point
-
-.IP -M
-can be  
-.I 1 
-(indicates that metadata should be synchronized after every operation), or
-.I 0 
-(indicates that metadata should be synchronized only when requested)
-
+Specify the file system to operate on.
 .IP -D
-can be  
-.I 1 
-(indicates that file data should be synchronized after every operation), or 
-.I 0 
-(indicates that file data should be synchronized only when requested)
-
+Specify whether file data is implicitly synchronized.  A setting of
+.I 0
+means off an
+.I 1
+means on.
+.IP -M
+Specify whether metadata is implicitly synchronized.  A setting of
+.I 0
+means off an
+.I 1
+means on.
 .SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
 .IP PVFS2TAB_FILE
-If set, the full pathname for an alternate 
+If set, the full pathname for an alternate
 .IR pvfs2tab
 file
-
+.SH FILES
+.I /etc/pvfs2tab
+.SH EXAMPLES
+Synchronize metadata but not data.
+.PP
+.RS 6n
+pvfs2-set-sync -m /mnt -D 0 -M 1
+.RE
 .SH BUGS
-Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
-.SH AUTHOR
-The PVFS2 development team (pvfs2-developers@beowulf-underground.org)
-.SH "SEE ALSO"
-.BR pvfs2-server (1),
-.BR pvfs2-genconfig (1)
-
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2-set-mode ( 1 ),
+.BR pvfs2tab ( 5 )
