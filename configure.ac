@@ -1867,9 +1867,9 @@ AC_OUTPUT(include/pvfs2.h
 Makefile
 module.mk
 src/apps/admin/module.mk
-src/apps/admin/lmdb/module.mk
 src/apps/admin/pvfs2-config
 src/apps/devel/module.mk
+src/apps/devel/lmdb/module.mk
 src/apps/karma/module.mk
 src/apps/vis/module.mk
 src/apps/fuse/module.mk
