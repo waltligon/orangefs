@@ -1148,7 +1148,7 @@ endif # BUILD_JNI
 	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # bison and yacc
-%.c: %.y
+%.c %.h: %.y
 	$(Q) "  BISON		$@"
 	$(E)$(BISON) -d $< -o $@
 
