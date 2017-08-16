@@ -671,7 +671,6 @@ all::
 
 # this is how we pull build information from all of the project
 #    subdirectories, make sure to catch top level module.mk as well
-include module.mk
 include $(patsubst %, %/module.mk, $(MODULES))
 
 ################################################################

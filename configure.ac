@@ -1865,7 +1865,6 @@ dnl output final version of top level makefile and subdirectory
 dnl    makefile includes
 AC_OUTPUT(include/pvfs2.h
 Makefile
-module.mk
 src/apps/admin/module.mk
 src/apps/admin/pvfs2-config
 src/apps/devel/module.mk
