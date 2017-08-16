@@ -50,8 +50,6 @@
 
 #include "pvfs2-util.h"
 
-#include "src/common/security/getugroups.h"
-
 typedef struct {
     const char *user;
     const char *group;
