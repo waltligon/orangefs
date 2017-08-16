@@ -801,9 +801,7 @@ int main(int argc, char **argv)
     }
 #else /* !HAVE_GETGROUPLIST */
 
-    ngroups = sizeof(groups) / sizeof(*groups);
-    ngroups = getugroups(ngroups, groups, pwd->pw_name, cred_gid);
-    CHECK_ERROR_BOOL((ngroups != -1), main_default_group, "warning: unable to "
+    CHECK_ERROR_BOOL(1, main_default_group, "warning: unable to "
         "get group list for user %s: %s\n", pwd->pw_name, strerror(errno));
 
 #endif /* HAVE_GETGROUPLIST */
