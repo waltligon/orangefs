@@ -438,7 +438,8 @@ static int sign_credential(PVFS_credential *cred,
     EVP_PKEY *privkey = NULL;
     const EVP_MD *md = NULL;
     EVP_MD_CTX mdctx = {0}, emptyctx = {0};
-    int err, ret;
+    int err;
+    int ret=EXIT_FAILURE;
 
     /* set timeout */
     cred->timeout = (PVFS_time)(time(NULL) + timeout);
