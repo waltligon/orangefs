@@ -107,23 +107,22 @@
 /* internal attribute masks for metadata objects */
 #define PVFS_ATTR_META_DIST          (1 << 12)
 #define PVFS_ATTR_META_DFILES        (1 << 25)   /* includes sids */
-#define PVFS_ATTR_META_MIRROR_DFILES (0)         /* remove */
+#define PVFS_ATTR_META_MIRROR_MODE   (1 << 17)   /* writable */
+#define PVFS_ATTR_META_FLAGS         (1 << 13)   /* writable */
 
 #define PVFS_ATTR_META_ALL                             \
         (PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES | \
-        PVFS_ATTR_META_MIRROR_DFILES | PVFS_ATTR_COMMON_ALL)
-
-#define PVFS_ATTR_META_UNSTUFFED     (1 << 13)
-
+        PVFS_ATTR_META_FLAGS | PVFS_ATTR_COMMON_ALL)
 
 /* internal attribute masks for datafile objects */
-#define PVFS_ATTR_DATA_SIZE          (1 << 20)   /* replace with latest bit */
+#define PVFS_ATTR_DATA_SIZE          (1 << 20)   /* size of a DFILE
+                                                  * replace with latest bit */
 
 #define PVFS_ATTR_DATA_ALL \
              (PVFS_ATTR_DATA_SIZE | PVFS_ATTR_TIME_ALL)
 
 /* internal attribute masks for symlink objects */
-#define PVFS_ATTR_SYMLNK_TARGET      (1 << 24)
+#define PVFS_ATTR_SYMLNK_TARGET      (1 << 19)   /* writable */
 
 #define PVFS_ATTR_SYMLNK_ALL \
              (PVFS_ATTR_SYMLNK_TARGET | PVFS_ATTR_COMMON_ALL)
@@ -131,7 +130,7 @@
 /* internal attribute masks for directory objects */
 #define PVFS_ATTR_DIR_DIRENT_COUNT   (1 << 26)   /* replace with latest bit */
 #define PVFS_ATTR_DIR_DIRDATA        (1 << 14)   /* includes sids */
-#define PVFS_ATTR_DIR_HINT           (1 << 27)
+#define PVFS_ATTR_DIR_HINT           (1 << 22)   /* writable */
 
 #define PVFS_ATTR_DIR_ALL \
              (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT | \
@@ -144,10 +143,10 @@
 /* internal attribute mask for distributed directory information */
 /* this may be in the meta or dirdata area depending on objtype */
 /* This includes the bitmap and dirdata handles/sids info */
-#define PVFS_ATTR_DISTDIR_ATTR       (1 << 21)    /* remove */
+#define PVFS_ATTR_DISTDIR_ATTR       (1 << 21)    /* writable */
 
 /* internal attribute mask for capability objects */
-#define PVFS_ATTR_CAPABILITY         (1 << 30)
+#define PVFS_ATTR_CAPABILITY         (1 << 18)
 
 /* attributes that do not change once set */
 /* needs to be renamed */
@@ -187,17 +186,9 @@ struct PVFS_metafile_attr_s
     uint32_t sid_count;
 
     uint32_t mirror_mode;
-    //PVFS_handle *mirror_dfile_array; /* V3 remove this replaced by sids */
-    //uint32_t mirror_copies_count;    /* V3 replaced with sid_count */
 
     /* This is a placeholder for volatile file size 64-bit */
     PVFS_size size;        /* file size, volatile, may be wrong */   
-
-/* removed during layout merge */
-#if 0
-    uint32_t stuffed;      /* is object currently stuffed */
-    uint32_t stuffed_size; /* threshold size of unstuffing */
-#endif
 
     uint64_t flags;        /* bit field for flags such as IMMUTABLE */
 };
@@ -216,10 +207,6 @@ static inline void encode_PVFS_metafile_attr(char **pptr,
 
     encode_PINT_dist(pptr, (PINT_dist **)&x->dist);
     encode_uint32_t(pptr, &x->mirror_mode);             
-#if 0
-    encode_uint32_t(pptr, &x->stuffed);                
-    encode_uint32_t(pptr, &x->stuffed_size);          
-#endif
     encode_uint32_t(pptr, &x->dfile_count);          
     encode_uint32_t(pptr, &x->sid_count);           
     encode_skip4(pptr,);                           
@@ -245,13 +232,12 @@ static inline void decode_PVFS_metafile_attr(char **pptr,
 {
     int dfiles_i, sid_i;                                                
 
+#if 0
     decode_PINT_dist(pptr, &(x)->dist);                                 
     (x)->dist_size = PINT_DIST_PACK_SIZE((x)->dist);                    
-    decode_uint32_t(pptr, &(x)->mirror_mode);                           
-#if 0
-    decode_uint32_t(pptr, &(x)->stuffed);                               
-    decode_uint32_t(pptr, &(x)->stuffed_size);                          
 #endif
+    decode_PINT_dist(pptr, &(x)->dist, &(x)->dist_size);                                 
+    decode_uint32_t(pptr, &(x)->mirror_mode);                           
     decode_uint32_t(pptr, &(x)->dfile_count);                           
     decode_uint32_t(pptr, &(x)->sid_count);                             
     decode_skip4(pptr,);
@@ -323,6 +309,7 @@ endecode_fields_2(PVFS_dirhint_layout,
 #endif
 
 /* extended hint attributes for a directory object */
+/* these are local defaults that control creates */
 struct PVFS_directory_hint_s
 {
     uint32_t            dist_name_len;
