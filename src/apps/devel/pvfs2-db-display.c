@@ -535,9 +535,9 @@ void print_keyval( struct dbpf_data key, struct dbpf_data val )
             break;
 
         case DBPF_COUNT_TYPE:
-            printf("()(%zu) -> (%llu) (%zu)\n",
+            printf("()(%zu) -> (%u) (%zu)\n",
                    key.len,
-                   llu(*(uint64_t *)val.data),
+                   (*(uint32_t *)val.data),
                    val.len);
             break;
 
