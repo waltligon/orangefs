@@ -473,7 +473,7 @@ int PINT_acache_update(
     PVFS_object_attr *attr, /**< attributes to copy into cache */
     PVFS_size* size)        /**< logical file size (NULL if not available) */
 {
-    struct acache_payload* tmp_payload = NULL;
+    struct acache_payload *tmp_payload = NULL;
     uint32_t save_mask;
     int ret = -1;
 
@@ -501,7 +501,9 @@ int PINT_acache_update(
         return -PVFS_ENOMEM;
     }
 
-    tmp_payload->refn = refn;
+    //tmp_payload->refn = refn;
+    PVFS_object_ref_copy(&tmp_payload->refn,&refn);
+
     /* copy attrs into payload, excluding capability and size_array */
     save_mask = attr->mask;
     /* Don't cache size_array (indicated by PVFS_ATTR_DIR_DIRENT_COUNT). */
