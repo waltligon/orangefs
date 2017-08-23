@@ -3403,7 +3403,7 @@ static struct bmi_method_addr *rdma_alloc_method_addr(rdma_connection_t *c,
                                 (bmi_size_t) sizeof(*rdma_map));
     rdma_map = map->method_data;
     rdma_map->c = c;
-    rdma_map->hostname = hostname;
+    rdma_map->hostname = strdup(hostname);
     rdma_map->port = port;
     rdma_map->reconnect_flag = reconnect_flag;
     rdma_map->ref_count = 1;
@@ -3517,6 +3517,7 @@ static struct bmi_method_addr *BMI_rdma_method_addr_lookup(const char *id)
          */
         map = rdma_alloc_method_addr(0, hostname, port, 1);
         /* but don't call bmi_method_addr_reg_callback! */
+        free(hostname);
     }
 
     return map;
