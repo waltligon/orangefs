@@ -437,7 +437,16 @@ static int sign_credential(PVFS_credential *cred,
     struct stat stats;
     EVP_PKEY *privkey = NULL;
     const EVP_MD *md = NULL;
-    EVP_MD_CTX mdctx = {0}, emptyctx = {0};
+
+    EVP_MD_CTX *tmp_mdctx = NULL;
+#ifdef HAVE_OPENSSL_1_1
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+    tmp_mdctx = mdctx;
+#else
+    EVP_MD_CTX mdctx = {0};
+    tmp_mdctx = &mdctx;
+#endif
+
     int err;
     int ret=EXIT_FAILURE;
 
@@ -471,33 +480,33 @@ static int sign_credential(PVFS_credential *cred,
     CHECK_NULL(cred->signature, sign_error, "error: out of memory\n");
 
     md = EVP_sha1();
-    EVP_MD_CTX_init(&mdctx);
+    EVP_MD_CTX_init(tmp_mdctx);
 
     /* sign credential; an unsigned credential will result 
        if errors occur */
 
-    ret = EVP_SignInit_ex(&mdctx, md, NULL);
-    ret &= EVP_SignUpdate(&mdctx, &cred->userid, sizeof(PVFS_uid));
-    ret &= EVP_SignUpdate(&mdctx, &cred->num_groups, sizeof(uint32_t));
+    ret = EVP_SignInit_ex(tmp_mdctx, md, NULL);
+    ret &= EVP_SignUpdate(tmp_mdctx, &cred->userid, sizeof(PVFS_uid));
+    ret &= EVP_SignUpdate(tmp_mdctx, &cred->num_groups, sizeof(uint32_t));
     if (cred->num_groups)
     {
-        ret &= EVP_SignUpdate(&mdctx, cred->group_array, 
+        ret &= EVP_SignUpdate(tmp_mdctx, cred->group_array, 
             cred->num_groups * sizeof(PVFS_gid));
     }
     if (cred->issuer)
     {
-        ret &= EVP_SignUpdate(&mdctx, cred->issuer, 
+        ret &= EVP_SignUpdate(tmp_mdctx, cred->issuer, 
             strlen(cred->issuer) * sizeof(char));
     }
-    ret &= EVP_SignUpdate(&mdctx, &cred->timeout, sizeof(PVFS_time));
+    ret &= EVP_SignUpdate(tmp_mdctx, &cred->timeout, sizeof(PVFS_time));
     CHECK_ERROR_BOOL(ret, sign_error, "security_error:\n");
 
-    ret = EVP_SignFinal(&mdctx, cred->signature, &cred->sig_size, privkey);
+    ret = EVP_SignFinal(tmp_mdctx, cred->signature, &cred->sig_size, privkey);
     CHECK_ERROR_BOOL(ret, sign_error, "security_error:\n");
 
     ret = EXIT_SUCCESS;
 
-    goto sign_exit;
+    goto sign_exit
 
 sign_error:
 
@@ -518,10 +527,7 @@ sign_error:
 
 sign_exit: 
 
-    if (memcmp(&mdctx, &emptyctx, sizeof(mdctx)) != 0)
-    {
-        EVP_MD_CTX_cleanup(&mdctx);
-    }
+    EVP_MD_CTX_free(tmp_mdctx);
 
     if (privkey != NULL)
     {

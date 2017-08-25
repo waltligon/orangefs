@@ -411,7 +411,14 @@ static void hash_capability(const PVFS_capability *cap, char *mdstr)
 int PINT_sign_capability(PVFS_capability *cap, PVFS_time *force_timeout)
 {
     const struct server_configuration_s *config;
-    EVP_MD_CTX mdctx;
+    EVP_MD_CTX *tmp_mdctx=NULL;
+#ifdef HAVE_OPENSSL_1_1
+    EVP_MD_CTX *mdctx=EVP_MD_CTX_new();
+    tmp_mdctx = mdctx;
+#else
+    EVP_MD_CTX mdctx={0};
+    tmp_mdctx = &mdctx;
+#endif
     const EVP_MD *md = NULL;
 #if 0
     char mdstr[2*SHA_DIGEST_LENGTH+1];
@@ -445,37 +452,38 @@ int PINT_sign_capability(PVFS_capability *cap, PVFS_time *force_timeout)
        cap->timeout = PINT_util_get_current_time() + config->capability_timeout;
     }
 
-    if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_RSA)
+//    if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_RSA)
+    if ( EVP_PKEY_base_id(security_privkey) == EVP_PKEY_RSA )
     {
         md = EVP_sha1();
     }
     else
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsupported key type %u\n",
-                     security_privkey->type);
+                     EVP_PKEY_base_id(security_privkey));
         return -1;
     }
 
-    EVP_MD_CTX_init(&mdctx);
+    EVP_MD_CTX_init(tmp_mdctx);
 
-    ret = EVP_SignInit_ex(&mdctx, md, NULL);
+    ret = EVP_SignInit_ex(tmp_mdctx, md, NULL);
     if (!ret)
     {
         PINT_security_error(__func__, -PVFS_ESECURITY);
-        EVP_MD_CTX_cleanup(&mdctx);
+        EVP_MD_CTX_free(tmp_mdctx);
         return -1;
     }
 
-    ret = EVP_SignUpdate(&mdctx, 
+    ret = EVP_SignUpdate(tmp_mdctx, 
                          cap->issuer, 
                          strlen(cap->issuer) * sizeof(char));
-    ret &= EVP_SignUpdate(&mdctx, &cap->fsid, sizeof(PVFS_fs_id));
-    ret &= EVP_SignUpdate(&mdctx, &cap->timeout, sizeof(PVFS_time));
-    ret &= EVP_SignUpdate(&mdctx, &cap->op_mask, sizeof(uint32_t));
-    ret &= EVP_SignUpdate(&mdctx, &cap->num_handles, sizeof(uint32_t));
+    ret &= EVP_SignUpdate(tmp_mdctx, &cap->fsid, sizeof(PVFS_fs_id));
+    ret &= EVP_SignUpdate(tmp_mdctx, &cap->timeout, sizeof(PVFS_time));
+    ret &= EVP_SignUpdate(tmp_mdctx, &cap->op_mask, sizeof(uint32_t));
+    ret &= EVP_SignUpdate(tmp_mdctx, &cap->num_handles, sizeof(uint32_t));
     if (cap->num_handles)
     {
-        ret &= EVP_SignUpdate(&mdctx, 
+        ret &= EVP_SignUpdate(tmp_mdctx, 
                               cap->handle_array, 
                               cap->num_handles * sizeof(PVFS_handle));
     }
@@ -484,22 +492,22 @@ int PINT_sign_capability(PVFS_capability *cap, PVFS_time *force_timeout)
     {
         PINT_security_error(__func__, -PVFS_ESECURITY);
 
-        EVP_MD_CTX_cleanup(&mdctx);
+        EVP_MD_CTX_destroy(tmp_mdctx);
         return -1;
     }
 
-    ret = EVP_SignFinal(&mdctx, 
+    ret = EVP_SignFinal(tmp_mdctx, 
                         cap->signature, &cap->sig_size, 
                         security_privkey);
     if (!ret)
     {
         PINT_security_error(__func__, -PVFS_ESECURITY);
 
-        EVP_MD_CTX_cleanup(&mdctx);
+        EVP_MD_CTX_destroy(tmp_mdctx);
         return -1;
     }
 
-    EVP_MD_CTX_cleanup(&mdctx);
+    EVP_MD_CTX_destroy(tmp_mdctx);
 
 #if 0
     hash_capability(cap, mdstr);
@@ -565,7 +573,16 @@ int PINT_verify_capability(const PVFS_capability *cap)
 #if 0
     char mdstr[2*SHA_DIGEST_LENGTH+1];
 #endif
-    EVP_MD_CTX mdctx;
+
+    EVP_MD_CTX *tmp_mdctx = NULL;
+#ifdef HAVE_OPENSSL_1_1 
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+    tmp_mdctx = mdctx;
+#else
+    EVP_MD_CTX mdctx = {0};
+    tmp_mdctx = &mdctx;
+#endif
+
     const EVP_MD *md = NULL;
     EVP_PKEY *pubkey;
     int ret;
@@ -625,6 +642,20 @@ int PINT_verify_capability(const PVFS_capability *cap)
         return 0;
     }
 #endif
+
+#ifdef HAVE_OPENSSL_1_1 
+//    if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_RSA)
+    if ( EVP_PKEY_base_id(pubkey) == EVP_PKEY_RSA )
+    {
+        md = EVP_sha1();
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsupported key type %u\n",
+                     EVP_PKEY_base_id(pubkey));
+        return 0;
+    }
+#else
     if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_RSA)
     {
         md = EVP_sha1();
@@ -635,26 +666,27 @@ int PINT_verify_capability(const PVFS_capability *cap)
                      pubkey->type);
         return 0;
     }
+#endif
 
-    EVP_MD_CTX_init(&mdctx);
-    ret = EVP_VerifyInit_ex(&mdctx, md, NULL);
-    ret &= EVP_VerifyUpdate(&mdctx, 
+    EVP_MD_CTX_init(tmp_mdctx);
+    ret = EVP_VerifyInit_ex(tmp_mdctx, md, NULL);
+    ret &= EVP_VerifyUpdate(tmp_mdctx, 
                             cap->issuer,
                             strlen(cap->issuer) * sizeof(char));
-    ret &= EVP_VerifyUpdate(&mdctx, &cap->fsid, sizeof(PVFS_fs_id));
-    ret &= EVP_VerifyUpdate(&mdctx, &cap->timeout, sizeof(PVFS_time));
-    ret &= EVP_VerifyUpdate(&mdctx, &cap->op_mask, sizeof(uint32_t));
-    ret &= EVP_VerifyUpdate(&mdctx, &cap->num_handles,
+    ret &= EVP_VerifyUpdate(tmp_mdctx, &cap->fsid, sizeof(PVFS_fs_id));
+    ret &= EVP_VerifyUpdate(tmp_mdctx, &cap->timeout, sizeof(PVFS_time));
+    ret &= EVP_VerifyUpdate(tmp_mdctx, &cap->op_mask, sizeof(uint32_t));
+    ret &= EVP_VerifyUpdate(tmp_mdctx, &cap->num_handles,
                             sizeof(uint32_t));
     if (cap->num_handles)
     {
-        ret &= EVP_VerifyUpdate(&mdctx, 
+        ret &= EVP_VerifyUpdate(tmp_mdctx, 
                                 cap->handle_array,
                                 cap->num_handles * sizeof(PVFS_handle));
     }
     if (ret)
     {
-        ret = EVP_VerifyFinal(&mdctx, cap->signature, cap->sig_size, 
+        ret = EVP_VerifyFinal(tmp_mdctx, cap->signature, cap->sig_size, 
                               pubkey);
     }
 
@@ -663,7 +695,7 @@ int PINT_verify_capability(const PVFS_capability *cap)
         PINT_security_error("Capability verify", -PVFS_ESECURITY);
     }
     
-    EVP_MD_CTX_cleanup(&mdctx);
+    EVP_MD_CTX_free(tmp_mdctx);
 
     return (ret == 1);
 }
@@ -742,7 +774,16 @@ static void hash_credential(const PVFS_credential *cred, char *mdstr)
 int PINT_sign_credential(PVFS_credential *cred)
 {
     const struct server_configuration_s *config;
-    EVP_MD_CTX mdctx;
+
+    EVP_MD_CTX *tmp_mdctx = NULL;
+#ifdef HAVE_OPENSSL_1_1
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+    tmp_mdctx = mdctx;
+#else
+    EVP_MD_CTX mdctx = {0};
+    tmp_mdctx = &mdctx;
+#endif
+
     const EVP_MD *md = NULL;
 #if 0
     char mdstr[2*SHA_DIGEST_LENGTH+1];
@@ -782,6 +823,20 @@ int PINT_sign_credential(PVFS_credential *cred)
         }
     }
 
+
+#ifdef HAVE_OPENSSL_1_1
+//    if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_RSA)
+    if ( EVP_PKEY_base_id(security_privkey) == EVP_PKEY_RSA )
+    {
+        md = EVP_sha1();
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsupported key type %u\n",
+                     EVP_PKEY_base_id(security_privkey));
+        return -1;
+    }
+#else
     if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_RSA)
     {
         md = EVP_sha1();
@@ -792,33 +847,34 @@ int PINT_sign_credential(PVFS_credential *cred)
                      security_privkey->type);
         return -1;
     }
+#endif
     
-    EVP_MD_CTX_init(&mdctx);
+    EVP_MD_CTX_init(tmp_mdctx);
     
-    ret = EVP_SignInit_ex(&mdctx, md, NULL);
-    ret &= EVP_SignUpdate(&mdctx, &cred->userid, sizeof(PVFS_uid));
-    ret &= EVP_SignUpdate(&mdctx, &cred->num_groups, sizeof(uint32_t));
+    ret = EVP_SignInit_ex(tmp_mdctx, md, NULL);
+    ret &= EVP_SignUpdate(tmp_mdctx, &cred->userid, sizeof(PVFS_uid));
+    ret &= EVP_SignUpdate(tmp_mdctx, &cred->num_groups, sizeof(uint32_t));
     if (cred->num_groups)
     {
-        ret &= EVP_SignUpdate(&mdctx, cred->group_array, 
+        ret &= EVP_SignUpdate(tmp_mdctx, cred->group_array, 
                               cred->num_groups * sizeof(PVFS_gid));
     }
     if (cred->issuer)
     {
-        ret &= EVP_SignUpdate(&mdctx, cred->issuer, 
+        ret &= EVP_SignUpdate(tmp_mdctx, cred->issuer, 
                               strlen(cred->issuer) * sizeof(char));
     }
-    ret &= EVP_SignUpdate(&mdctx, &cred->timeout, sizeof(PVFS_time));
+    ret &= EVP_SignUpdate(tmp_mdctx, &cred->timeout, sizeof(PVFS_time));
     if (!ret)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "SignUpdate failure\n");
-        EVP_MD_CTX_cleanup(&mdctx);
+        EVP_MD_CTX_free(tmp_mdctx);
         return -1;
     }
     
-    ret = EVP_SignFinal(&mdctx, cred->signature, &cred->sig_size,
+    ret = EVP_SignFinal(tmp_mdctx, cred->signature, &cred->sig_size,
                         security_privkey);
-    EVP_MD_CTX_cleanup(&mdctx);
+    EVP_MD_CTX_free(tmp_mdctx);
     if (!ret)
     {
         PINT_security_error(__func__, -PVFS_ESECURITY);
@@ -849,7 +905,15 @@ int PINT_verify_credential(const PVFS_credential *cred)
     char mdstr[2*SHA_DIGEST_LENGTH+1];
 #endif
 
-    EVP_MD_CTX mdctx;
+    EVP_MD_CTX *tmp_mdctx = NULL;
+#ifdef HAVE_OPENSSL_1_1
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+    tmp_mdctx = mdctx;
+#else
+    EVP_MD_CTX mdctx = {0};
+    tmp_mdctx = &mdctx;
+#endif
+
     const EVP_MD *md = NULL;
     EVP_PKEY *pubkey;
     char sigbuf[16];
@@ -953,6 +1017,19 @@ int PINT_verify_credential(const PVFS_credential *cred)
     }
 #endif /* ENABLE_SECURITY_CERT */
 
+#ifdef HAVE_OPENSSL_1_1
+//    if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_RSA)
+    if ( EVP_PKEY_base_id(pubkey) == EVP_PKEY_RSA )
+    {
+        md = EVP_sha1();
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsupported key type %u\n",
+                     EVP_PKEY_base_id(pubkey));
+        return 0;
+    }
+#else
     if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_RSA)
     {
         md = EVP_sha1();
@@ -963,25 +1040,26 @@ int PINT_verify_credential(const PVFS_credential *cred)
                      pubkey->type);
         return 0;
     }
+#endif
 
-    EVP_MD_CTX_init(&mdctx);
-    ret = EVP_VerifyInit_ex(&mdctx, md, NULL);
-    ret &= EVP_VerifyUpdate(&mdctx, &cred->userid, sizeof(PVFS_uid));
-    ret &= EVP_VerifyUpdate(&mdctx, &cred->num_groups, sizeof(uint32_t));
+    EVP_MD_CTX_init(tmp_mdctx);
+    ret = EVP_VerifyInit_ex(tmp_mdctx, md, NULL);
+    ret &= EVP_VerifyUpdate(tmp_mdctx, &cred->userid, sizeof(PVFS_uid));
+    ret &= EVP_VerifyUpdate(tmp_mdctx, &cred->num_groups, sizeof(uint32_t));
     if (cred->num_groups)
     {
-        ret &= EVP_VerifyUpdate(&mdctx, cred->group_array,
+        ret &= EVP_VerifyUpdate(tmp_mdctx, cred->group_array,
                                 cred->num_groups * sizeof(PVFS_gid));
     }
     if (cred->issuer)
     {
-        ret &= EVP_VerifyUpdate(&mdctx, cred->issuer,
+        ret &= EVP_VerifyUpdate(tmp_mdctx, cred->issuer,
                                 strlen(cred->issuer) * sizeof(char));
     }
-    ret &= EVP_VerifyUpdate(&mdctx, &cred->timeout, sizeof(PVFS_time));
+    ret &= EVP_VerifyUpdate(tmp_mdctx, &cred->timeout, sizeof(PVFS_time));
     if (ret)
     {
-        ret = EVP_VerifyFinal(&mdctx, cred->signature, cred->sig_size, pubkey);
+        ret = EVP_VerifyFinal(tmp_mdctx, cred->signature, cred->sig_size, pubkey);
     }
 
     if (ret != 1)
@@ -989,7 +1067,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
         PINT_security_error(__func__, -PVFS_ESECURITY);
     }
 
-    EVP_MD_CTX_cleanup(&mdctx);
+    EVP_MD_CTX_free(tmp_mdctx);
 
 #ifdef ENABLE_SECURITY_CERT
     EVP_PKEY_free(pubkey);
