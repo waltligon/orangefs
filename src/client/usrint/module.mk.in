@@ -41,3 +41,12 @@ SRC := \
 
 LIBSRC += $(SRC)
 
+#gcc 7.1.1 includes -Wnonnull-compare when -Wall is used.  For the
+#usrint compile, the nonnull-compare is triggered because many of
+#the coreutils functions are defined with __nonnull attribute.  
+#In many places within the usrint code, we look for nonnull
+#values, which triggers this warning.  We will turn this off
+#when we compile usrint.
+
+MODCFLAGS_$(DIR)/posix.c := -Wno-nonnull-compare
+MODCFLAGS_$(DIR)/stdio.c := -Wno-nonnull-compare

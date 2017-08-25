@@ -12,5 +12,7 @@ STATECOMPGEN := \
     $(DIR)/parser.c \
     $(DIR)/parser.h \
 
+$(DIR)/scanner.c: $(DIR)/parser.h
+
 .SECONDARY: $(STATECOMPGEN)
 

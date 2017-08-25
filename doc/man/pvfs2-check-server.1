@@ -1,0 +1,59 @@
+.TH PVFS2-CHECK-SERVER 1 2017-07-03
+.SH NAME
+\fBpvfs2-check-server\fR \(en check to see if a server is responding
+.SH SYNOPSIS
+\fBpvfs2-check-server\fR [\fB\-h \fIserver\fR] [\fB\-f \fIfsname\fR]
+[\fB\-n \fIproto\fR] [\fB\-p \fIport\fR]
+.SH DESCRIPTION
+The
+.B pvfs2-check-server
+utility ensures that the server at
+.I server
+on port
+.I port
+protocol
+.I proto
+serving the file system named
+.I fsname
+is running.
+This utility does not require or consult the
+.I /etc/pvfs2tab
+file.  There is no output if successful.
+.PP
+The options are as follows:
+.IP -h
+Specify the host name to connect to.
+.IP -f
+Specify the name of the file system to check.  Generally this is
+.IR orangefs .
+.IP -n
+Specify the protocol to use.  Generally either
+.I tcp
+or
+.IR ib .
+.IP -p
+Specify the port number to use.  With
+.I tcp
+this is generally 3334 and with
+.I ib
+this is generally 3335.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.SH EXIT STATUS
+The
+.B pvfs2-check-server
+utility exits 0 on succes and non-zero on failure.
+.SH EXAMPLES
+Check that a server is running.
+.RS 6n
+pvfs2-check-server -h localhost -f orangefs -n tcp -p 3334
+.RE
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2-ping ( 1 )
+.BR pvfs2-validate ( 1 )

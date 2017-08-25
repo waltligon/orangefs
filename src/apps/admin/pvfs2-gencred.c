@@ -50,8 +50,6 @@
 
 #include "pvfs2-util.h"
 
-#include "src/common/security/getugroups.h"
-
 typedef struct {
     const char *user;
     const char *group;
@@ -440,7 +438,8 @@ static int sign_credential(PVFS_credential *cred,
     EVP_PKEY *privkey = NULL;
     const EVP_MD *md = NULL;
     EVP_MD_CTX mdctx = {0}, emptyctx = {0};
-    int err, ret;
+    int err;
+    int ret=EXIT_FAILURE;
 
     /* set timeout */
     cred->timeout = (PVFS_time)(time(NULL) + timeout);
@@ -801,9 +800,7 @@ int main(int argc, char **argv)
     }
 #else /* !HAVE_GETGROUPLIST */
 
-    ngroups = sizeof(groups) / sizeof(*groups);
-    ngroups = getugroups(ngroups, groups, pwd->pw_name, cred_gid);
-    CHECK_ERROR_BOOL((ngroups != -1), main_default_group, "warning: unable to "
+    CHECK_ERROR_BOOL(1, main_default_group, "warning: unable to "
         "get group list for user %s: %s\n", pwd->pw_name, strerror(errno));
 
 #endif /* HAVE_GETGROUPLIST */

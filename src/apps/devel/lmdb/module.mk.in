@@ -1,6 +1,6 @@
-DIR := src/apps/admin/lmdb
+DIR := src/apps/devel/lmdb
 
-ADMINSRC += \
+DEVELSRC += \
 	$(DIR)/mdb_copy.c \
 	$(DIR)/mdb_dump.c \
 	$(DIR)/mdb_load.c \

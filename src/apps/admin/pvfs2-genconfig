@@ -49,6 +49,9 @@ my $opt_default_flow_buffer_size = '';
 my $opt_default_flow_buffer_count = '';
 my $opt_dist_name = '';
 my $opt_dist_params = '';
+my $opt_default_dbmaxsize = '';
+my $opt_server_dbmaxsize = '';
+my $opt_filesystem_dbmaxsize = '';
 
 # reserved handle ranges
 my $opt_res_io_ranges = undef;
@@ -286,24 +289,9 @@ sub emit_security
     
     # if securitycert or cafile used, use cert-based options
     $seccertflag = defined($opt_security_cert) || defined($opt_ca_file);
-
     if ($seckeyflag || $seccertflag || $opt_trusted == 1)
     {
-        print $target "\n\t<Security>\n";
-        if ($seckeyflag || $seccertflag)
-        {
-           print $target "\t\tTurnOffTimeouts no\n";
-        }
-        else
-        {
-           print $target "\t\tTurnOffTimeouts yes\n";
-        }
-    }
-    else
-    {
-        print $target "\n\t<Security>\n";
-        print $target "\t\tTurnOffTimeouts yes\n";
-        print $target "\t</Security>\n";
+        print $target "\t<Security>\n";
     }
 
     if ($opt_trusted == 1)
@@ -441,6 +429,23 @@ sub emit_defaults
         print $target "\tTCPBindSpecific yes\n";
     }
 
+    if ($opt_default_dbmaxsize)
+    {
+       print $target "\n\tDBMaxSize " . $opt_default_dbmaxsize . "\n";
+    }
+
+    # Do not turn off timeouts if key or cert based security is enabled.
+    unless(defined($opt_security_key) || defined($opt_keystore) || defined($opt_security_cert) || defined($opt_ca_file) || $opt_trusted == 1)
+    {
+        # TurnOffTimeouts always defaults to yes and applies to all servers.
+        # Either they are on or off.  This is only temporary until we correct
+        # all areas of the code that should check for invalid  timeouts.
+        print $target "\n\t<Security>\n";
+        print $target "\t\tTurnOffTimeouts yes\n";
+        print $target "\t</Security>\n";
+    }
+    
+
     # if --metaspec is used, security options are done per-server
     # otherwise do them here
     if (!defined($opt_metaspec))
@@ -521,7 +526,7 @@ sub emit_filesystem
     $step = $total_num_handles_available->copy();
     $step->bdiv($total_ranges);
 
-    print $target "\n<Filesystem>\n";
+    print $target "\n<FileSystem>\n";
     print $target "\tName $name\n";
     print $target "\tID $fs_id\n";
     print $target "\tRootHandle $root_handle\n";
@@ -600,6 +605,11 @@ sub emit_filesystem
 
     print $target "\t<StorageHints>\n";
 
+    if ($opt_filesystem_dbmaxsize)
+    {
+       print $target "\t\tDBMaxSize " . $opt_filesystem_dbmaxsize . "\n";
+    }
+
     # only in special cases would someone want to sync data (failover comes to
     # mind)  The default thus should be to sync metadata but not sync data.  
     if ($opt_trovesync == 1) {
@@ -640,7 +650,7 @@ sub emit_filesystem
 
     emit_distribution($target, $opt_dist_name, $opt_dist_params);
 
-    print $target "</Filesystem>\n";
+    print $target "</FileSystem>\n";
 }
 
 sub emit_serveropts
@@ -655,6 +665,11 @@ sub emit_serveropts
         print $target "\tDataStorageSpace $endpoint->{STORAGE}\n";
         print $target "\tMetadataStorageSpace $endpoint->{METASTORAGE}\n";
         print $target "\tLogFile $endpoint->{LOGFILE}\n";
+
+        if ($opt_server_dbmaxsize)
+        {
+           print $target "\tDBMaxSize " . $opt_server_dbmaxsize . "\n";
+        }
 
         emit_security($target, $alias);
 
@@ -821,6 +836,12 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
      --storage     <STRING>            path to OrangeFS storage (data) directory.
      --metadata    <STRING>            path to OrangeFS metadata directory.
      --logfile     <STRING>            file to place server logging.
+     --dbmaxsize   <NUM>               LMDB specific; size of storage_attributes and collections databases. 
+                                       If not specified, default is 512MB.
+     --server-dbmaxsize <NUM>          LMDB specific; size of storage_attributes and collections databases 
+                                       for a specific server; only valid when metaspec is used; default is 512MB.
+     --filesystem-dbmaxsize <NUM>      LMDB specific; size of collection_attributes, dataspace_attributes, 
+                                       and keyval databases; default is 512MB.
      --notrovesync                     sync metadata only upon request
      --server-job-timeout <NUM>        server job timeout value (seconds)
      --client-job-timeout <NUM>        server job timeout value (seconds)
@@ -981,6 +1002,17 @@ PROTOCOL
     }
 
     return \%port;
+}
+
+sub get_default_dbmaxsize
+{
+    my $dbmaxsize;
+    if ($opt_default_dbmaxsize) {
+        $dbmaxsize = $opt_default_dbmaxsize;
+    } else {
+        $dbmaxsize = ''; 
+    }
+    return $dbmaxsize;
 }
 
 sub get_logging
@@ -1907,6 +1939,7 @@ GetOptions('protocol=s' => \$opt_protocol,
     'ioservers=s'   => \$opt_ioservers,
     'metaservers=s' => \$opt_metaservers,
     'logfile=s'     => \$opt_logfile,
+    'dbmaxsize=i'   => \$opt_default_dbmaxsize,
     'logging=s'     => \$opt_logging,
     'tracing'       => \$opt_tracing,
     'logstamp=s'    => \$opt_logstamp,
@@ -1932,6 +1965,8 @@ GetOptions('protocol=s' => \$opt_protocol,
     'trove-method=s' => \$opt_trovemethod,
     'iospec=s'      => \$opt_iospec,
     'metaspec=s'    => \$opt_metaspec,
+    'server-dbmaxsize=i' => \$opt_server_dbmaxsize,
+    'filesystem-dbmaxsize=i' => \$opt_filesystem_dbmaxsize,
     'dist-name=s'   => \$opt_dist_name,
     'dist-params=s' => \$opt_dist_params,
     'spec-usage!'   => \$show_specusage,
@@ -2150,7 +2185,7 @@ if (!$opt_quiet) {
     }
 }
 
-
+my $default_dbmaxsize = get_default_dbmaxsize();
 my $logging = get_logging();
 my $tracing = get_tracing();
 my $logstamp = get_logstamp();
@@ -2233,5 +2268,3 @@ if (!$opt_quiet && defined($opt_security_cert))
 # End:
 #  
 # vim: ts=8 sts=4 sw=4 expandtab
-
-

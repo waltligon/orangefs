@@ -1,0 +1,47 @@
+.TH PVFS2-RM 1 2017-08-14
+.SH NAME
+\fBpvfs2-rm\fR \(en remove files
+.SH SYNOPSIS
+\fBpvfs2-rm\fR [\fB\-rf\fR] \fIpvfs2_filename[s]\fR
+.SH DESCRIPTION
+The
+.B pvfs2-rm
+utilitiy deletes files in an OrangeFS volume.
+.PP
+The options are as follows:
+.IP -r
+Recursively delete all files in a directory tree.
+.IP -f
+Force deletion even if the current user does not own the file.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate
+.IR pvfs2tab
+file
+.SH FILES
+.I /etc/pvfs2tab
+.SH EXAMPLES
+Remove the file
+.IR /mnt/foo .
+.PP
+.RS 6n
+pvfs2-rm /mnt/foo
+.RE
+.PP
+Remove the directory
+.I /mnt/foo
+and all files and directories within it.
+.PP
+.RS 6n
+pvfs2-rm -r /mnt/foo
+.RE
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR rm ( 1 ),
+.BR pvfs2tab ( 5 )

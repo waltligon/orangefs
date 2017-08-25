@@ -36,7 +36,7 @@
 #include "state-machine.h"
 #include "pint-event.h"
 #include "pint-perf-counter.h"
-
+#include "server-config-mgr.h"
 
 extern job_context_id server_job_context;
 
@@ -161,6 +161,11 @@ typedef enum
     SERVER_CREDCACHE_INIT      = (1 << 22),
     SERVER_CERTCACHE_INIT      = (1 << 23)
 } PINT_server_status_flag;
+
+typedef enum
+{
+    PRELUDE_PERM_CHECK_DONE    = (1<<0),
+} PINT_prelude_flag;
 
 struct PINT_server_create_op
 {
@@ -684,6 +689,8 @@ typedef struct PINT_server_op
     PVFS_fs_id target_fs_id;
     PVFS_object_attr *target_object_attr;
 
+    PINT_prelude_flag prelude_mask;
+
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
 
@@ -729,7 +736,7 @@ typedef struct PINT_server_op
 #define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb, __s_op, __handle, __fs_id, __location, __req, __task_id) \
     do { \
       char server_name[1024]; \
-      struct server_configuration_s *server_config = get_server_config_struct(); \
+      struct server_configuration_s *server_config = PINT_server_config_mgr_get_config(); \
       __s_op = malloc(sizeof(struct PINT_server_op)); \
       if(!__s_op) { return -PVFS_ENOMEM; } \
       memset(__s_op, 0, sizeof(struct PINT_server_op)); \
@@ -921,7 +928,6 @@ extern void mkdir_free(struct PINT_server_op *s_op);
 extern void getattr_free(struct PINT_server_op *s_op);
 
 /* Exported Prototypes */
-struct server_configuration_s *get_server_config_struct(void);
 int server_perf_start_rollover(struct PINT_perf_counter *pc,
                                struct PINT_perf_counter *tpc);
 
