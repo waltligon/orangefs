@@ -1411,6 +1411,14 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                               resp->u.unstuff.attr.u.meta.mirror_dfile_array);
                     }
 #endif
+                    if (resp->u.unstuff.attr.capability.signature)
+                    {
+                       decode_free(resp->u.unstuff.attr.capability.signature);
+                    }
+                    if (resp->u.unstuff.attr.capability.handle_array)
+                    {
+                       decode_free(resp->u.unstuff.attr.capability.handle_array);
+                    }
                     break;
 
                 case PVFS_SERV_MGMT_EVENT_MON:
