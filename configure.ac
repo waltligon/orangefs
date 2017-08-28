@@ -283,10 +283,10 @@ AC_SUBST(DATABASE_BACKEND)
 AC_SUBST(NEED_BERKELEY_DB)
 AC_SUBST(NEED_LMDB))
 
-AC_ARG_ENABLE(internal-lmdb,
-[  --enable-internal-lmdb        Enable the internal LMDB library.],
-WANT_INTERNAL_LMDB=yes,
-WANT_INTERNAL_LMDB=no)
+AC_ARG_ENABLE(external-lmdb,
+[  --enable-external-lmdb        Enable linking against an external LMDB library.],
+WANT_INTERNAL_LMDB=no,
+WANT_INTERNAL_LMDB=yes)
 AC_SUBST(WANT_INTERNAL_LMDB)
 
 dnl locate OpenSSL libraries
