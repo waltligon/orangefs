@@ -2275,6 +2275,8 @@ struct PVFS_servreq_listattr
     uint32_t    attrmask;  /* mask of desired attributes */
     uint32_t    nhandles; /* number of handles */
     PVFS_handle *handles; /* handle of target object */
+    int32_t     sid_count;
+    PVFS_SID    *sid_array;
 };
 endecode_fields_3a_struct(
     PVFS_servreq_listattr,
