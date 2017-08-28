@@ -270,15 +270,24 @@ then
 elif test "${withval}" = "lmdb"
 then
     DATABASE_BACKEND=lmdb
+    NEED_LMDB=yes
 else
     AC_MSG_ERROR(database backend ${withval} invalid)
 fi
 AC_SUBST(DATABASE_BACKEND)
-AC_SUBST(NEED_BERKELEY_DB),
+AC_SUBST(NEED_BERKELEY_DB)
+AC_SUBST(NEED_LMDB),
 DATABASE_BACKEND=bdb
 NEED_BERKELEY_DB=yes
 AC_SUBST(DATABASE_BACKEND)
-AC_SUBST(NEED_BERKELEY_DB))
+AC_SUBST(NEED_BERKELEY_DB)
+AC_SUBST(NEED_LMDB))
+
+AC_ARG_ENABLE(internal-lmdb,
+[  --enable-internal-lmdb        Enable the internal LMDB library.],
+WANT_INTERNAL_LMDB=yes,
+WANT_INTERNAL_LMDB=no)
+AC_SUBST(WANT_INTERNAL_LMDB)
 
 dnl locate OpenSSL libraries
 AX_OPENSSL
@@ -1468,6 +1477,19 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
 	   [AX_BERKELEY_DB("")])
 fi
 dnl end of NEED_BERKELEY_DB section
+
+if test "x$NEED_LMDB" = "xyes" -a \
+   "x$WANT_INTERNAL_LMDB" = "xno" ; then
+    AC_ARG_WITH(lmdb,
+           [  --with-lmdb=<dir>         Location of installed LMDB package (default=/usr)],
+    	   [],
+	   [])
+    AC_CHECK_LIB(lmdb, mdb_version,
+           [],
+           [AC_MSG_ERROR("Cannot link against LMDB library.")])
+fi
+dnl end of NEED_LMDB section
+
 
 if test "x$BUILD_SERVER" = "x1"; then
 	dnl check if -lrt is required

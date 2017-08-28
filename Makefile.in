@@ -115,6 +115,7 @@ ifdef V
 endif
 LINUX_KERNEL_SRC = @LINUX_KERNEL_SRC@
 LINUX24_KERNEL_SRC = @LINUX24_KERNEL_SRC@
+WANT_INTERNAL_LMDB = @WANT_INTERNAL_LMDB@
 
 ifeq ($(QUIET_COMPILE),1)
   # say a one-line description of the action, do not echo the command
