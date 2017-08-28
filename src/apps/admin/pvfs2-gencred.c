@@ -506,7 +506,7 @@ static int sign_credential(PVFS_credential *cred,
 
     ret = EXIT_SUCCESS;
 
-    goto sign_exit
+    goto sign_exit;
 
 sign_error:
 
