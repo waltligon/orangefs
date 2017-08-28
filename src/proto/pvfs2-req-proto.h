@@ -164,7 +164,8 @@ do {                                             \
  */
 
 /* max size of layout information - may include explicit server list */
-#define PVFS_REQ_LIMIT_LAYOUT             4096
+                                          /* from pvfs2-types.h */
+#define PVFS_REQ_LIMIT_LAYOUT             PVFS_SYS_LIMIT_LAYOUT
 /* max size of opaque distribution parameters */
 #define PVFS_REQ_LIMIT_DIST_BYTES         1024
 /* max size of each configuration file transmitted to clients.
@@ -206,7 +207,7 @@ do {                                             \
 /* max number of events returned by mgmt event mon op */
 #define PVFS_REQ_LIMIT_MGMT_EVENT_MON_COUNT 2048
 /* max number of handles returned by any operation using an array of handles */
-#define PVFS_REQ_LIMIT_HANDLES_COUNT 1024
+#define PVFS_REQ_LIMIT_HANDLES_COUNT PVFS_SYS_LIMIT_HANDLES_COUNT
 /* typical numb er of SIDs per handle, there are this number times the
  * number of handles PLUS the handles that can be sent
  * adjust both this ratio and the handles count to get something
@@ -240,13 +241,13 @@ do {                                             \
 /* max number of keys or key/value pairs to set or get in an operation */
 #define PVFS_REQ_LIMIT_EATTR_LIST       PVFS_MAX_XATTR_LISTLEN 
 /* max size of security signature (in bytes) */
-#define PVFS_REQ_LIMIT_SIGNATURE 512
+#define PVFS_REQ_LIMIT_SIGNATURE        PVFS_SYS_LIMIT_SIGNATURE
 /* max number of groups in credential array */
-#define PVFS_REQ_LIMIT_GROUPS 32
+#define PVFS_REQ_LIMIT_GROUPS           PVFS_SYS_LIMIT_GROUPS
 /* max size of credential/capability issuer (in bytes) */
-#define PVFS_REQ_LIMIT_ISSUER 128
+#define PVFS_REQ_LIMIT_ISSUER           PVFS_SYS_LIMIT_ISSUER
 /* max size of a certificate buffer (in bytes) */
-#define PVFS_REQ_LIMIT_CERT 8192
+#define PVFS_REQ_LIMIT_CERT             PVFS_SYS_LIMIT_CERT
 /* max size of a certificate private key (in bytes) */
 #define PVFS_REQ_LIMIT_SECURITY_KEY 8192
 /* max size of userid/password for cert request (in bytes) */
