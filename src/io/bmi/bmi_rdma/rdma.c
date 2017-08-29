@@ -278,10 +278,10 @@ static struct bmi_method_addr *rdma_alloc_method_addr(rdma_connection_t *c,
                                                       int port,
                                                       int reconnect_flag);
 
-static rdma_connection_t *rdma_new_connection(struct rdma_conn *conn_info,
+static rdma_connection_t *rdma_new_connection(struct rdma_conn_info *conn_info,
                                               int is_server);
 
-static rdma_connection_t *alloc_connection(struct rdma_conn *conn_info);
+static rdma_connection_t *alloc_connection(struct rdma_conn_info *conn_info);
 
 static void alloc_eager_bufs(rdma_connection_t *c);
 
@@ -302,7 +302,7 @@ static void build_conn_params(struct rdma_conn_param *params);
 
 static void rdma_close_connection(rdma_connection_t *c);
 
-static struct rdma_conn *alloc_conn_info(struct rdma_cm_id *id, int port);
+static struct rdma_conn_info *alloc_conn_info(struct rdma_cm_id *id, int port);
 
 static int rdma_client_event_loop(struct rdma_event_channel *ec,
                                   rdma_method_addr_t *rdma_map,
@@ -340,13 +340,10 @@ static int return_active_nic_handle(struct rdma_device_priv *rd,
 static void cleanup_rdma_context(void);
 
 
-/* structure to hold RDMA connection info passed to the accept thread */
 /*
- * TODO: do I even need all of this anymore? Isn't the point of rdma_cm to
- *       avoid having to pass info back and forth in order to setup the
- *       connection?
+ * RDMA connection info passed to rdma_new_connection.
  */
-struct rdma_conn
+struct rdma_conn_info
 {
     struct rdma_cm_id *id;  /* connection identifier */
     int port;               /* peer's port number */
@@ -3538,7 +3535,7 @@ static struct bmi_method_addr *BMI_rdma_method_addr_lookup(const char *id)
  * Returns:
  *  Pointer to new connection structure on success, NULL on failure
  */
-static rdma_connection_t *rdma_new_connection(struct rdma_conn *conn_info,
+static rdma_connection_t *rdma_new_connection(struct rdma_conn_info *conn_info,
                                               int is_server)
 {
     rdma_connection_t *c = NULL;
@@ -3636,7 +3633,7 @@ error_out:
  * Returns:
  *  Pointer to new connection.
  */
-static rdma_connection_t *alloc_connection(struct rdma_conn *conn_info)
+static rdma_connection_t *alloc_connection(struct rdma_conn_info *conn_info)
 {
     rdma_connection_t *c = bmi_rdma_malloc(sizeof(*c));
     c->conn_info = conn_info;
@@ -4075,10 +4072,10 @@ static void rdma_close_connection(rdma_connection_t *c)
  * Returns:
  *  Pointer to a new rdma_conn structure.
  */
-static struct rdma_conn *alloc_conn_info(struct rdma_cm_id *id,
-                                         int port)
+static struct rdma_conn_info *alloc_conn_info(struct rdma_cm_id *id,
+                                              int port)
 {
-    struct rdma_conn *conn_info;
+    struct rdma_conn_info *conn_info;
     int port_str_len;
     size_t max_peer_len;
 
@@ -4153,7 +4150,7 @@ static int rdma_client_event_loop(struct rdma_event_channel *ec,
     struct rdma_cm_event *event = NULL;
     struct rdma_cm_event event_copy;
     struct rdma_conn_param conn_param;
-    struct rdma_conn *conn_info;
+    struct rdma_conn_info *conn_info;
     int ret = -1;
     static int already_printed = 0;
     rdma_connection_t *c = NULL;
@@ -4676,7 +4673,7 @@ void *rdma_server_listener_thread(void *arg)
 void *rdma_server_accept_client_thread(void *arg)
 {
     rdma_connection_t *c;
-    struct rdma_conn *rc;
+    struct rdma_conn_info *conn_info;
     struct rdma_cm_id *conn_id;
     int ret;
 
@@ -4689,13 +4686,13 @@ void *rdma_server_accept_client_thread(void *arg)
     }
 
     conn_id = (struct rdma_cm_id *) arg;
-    rc = alloc_conn_info(conn_id, -1);
+    conn_info = alloc_conn_info(conn_id, -1);
 
     gen_mutex_lock(&interface_mutex);
 
     debug(0, "%s: calling rdma_new_connection for peername=%s on channel=%d",
-          __func__, rc->peername, rc->id->channel->fd);
-    c = rdma_new_connection(rc, 1);
+          __func__, conn_info->peername, conn_info->id->channel->fd);
+    c = rdma_new_connection(conn_info, 1);
     if (!c)
     {
         error_xerrno(EINVAL, "%s: rdma_new_connection failed", __func__);
@@ -4704,7 +4701,7 @@ void *rdma_server_accept_client_thread(void *arg)
     debug(0, "%s: returned from rdma_new_connection", __func__);
 
     /* associate the new connection with the id */
-    rc->id->context = (void *) c;
+    conn_info->id->context = (void *) c;
 
     /* TODO: do I need to build the connection/context here? */
     //struct rdma_conn_param conn_param;
@@ -4713,20 +4710,20 @@ void *rdma_server_accept_client_thread(void *arg)
     /* TODO: do I need to do pre-connection stuff here? */
 
     /* TODO: do I need to pass any connection parameters? */
-    //ret = rdma_accept(rc->id, &conn_param);
-    ret = rdma_accept(rc->id, NULL);
+    //ret = rdma_accept(conn_info->id, &conn_param);
+    ret = rdma_accept(conn_info->id, NULL);
     if (ret)
     {
         warning("%s: rdma_accept(): %s", __func__, strerror(errno));
-        free(rc);       /* TODO: do this here? */
+        free(conn_info);       /* TODO: do this here? */
     }
 
 out:
     gen_mutex_unlock(&interface_mutex);
 
-    /* TODO: should I free rc and rc->hostname here? are they still needed?
-     *       what about the id? how long is an rdma_cm_id needed? when do I
-     *       destroy it?
+    /* TODO: should I free conn_info and conn_info->hostname here? are they
+     *       still needed? what about the id? how long is an rdma_cm_id needed?
+     *       when do I destroy it?
      */
 
     return NULL;
