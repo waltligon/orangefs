@@ -278,11 +278,10 @@ static struct bmi_method_addr *rdma_alloc_method_addr(rdma_connection_t *c,
                                                       int port,
                                                       int reconnect_flag);
 
-static rdma_connection_t *rdma_new_connection(struct rdma_cm_id *id,
-                                              const char *peername,
+static rdma_connection_t *rdma_new_connection(struct rdma_conn *conn_info,
                                               int is_server);
 
-static rdma_connection_t *alloc_connection(const char *peername);
+static rdma_connection_t *alloc_connection(struct rdma_conn *conn_info);
 
 static void alloc_eager_bufs(rdma_connection_t *c);
 
@@ -302,6 +301,8 @@ static void build_conn_params(struct rdma_conn_param *params);
 //static void rdma_drain_qp(rdma_connect_t *c);
 
 static void rdma_close_connection(rdma_connection_t *c);
+
+static struct rdma_conn *alloc_conn_info(struct rdma_cm_id *id, int port);
 
 static int rdma_client_event_loop(struct rdma_event_channel *ec,
                                   rdma_method_addr_t *rdma_map,
@@ -350,7 +351,7 @@ struct rdma_conn
     struct rdma_cm_id *id;  /* connection identifier */
     int port;               /* peer's port number */
     char *hostname;         /* peer's addr */
-    char peername[2048];
+    char *peername;         /* combination of hostname and port number */
 };
 
 /*
@@ -639,7 +640,7 @@ static int check_cq(void)
                       __func__,
                       llu(wc.id),
                       wc_status_string(wc.status),
-                      bh->c->peername);
+                      bh->c->conn_info->peername);
 
                 if (bh)
                 {
@@ -648,12 +649,12 @@ static int check_cq(void)
                     {
                         debug(0,
                               "%s: ignoring send error on cancelled conn to %s",
-                              __func__, bh->c->peername);
+                              __func__, bh->c->conn_info->peername);
                     }
                     else
                     {
                         debug(0, "%s: send error on non-cancelled conn to %s",
-                              __func__, c->peername);
+                              __func__, c->conn_info->peername);
 
                         sq = bh->sq;
                         if (sq)
@@ -672,7 +673,7 @@ static int check_cq(void)
                         llu(wc.id),
                         wc_opcode_string(wc.opcode),
                         wc_status_string(wc.status),
-                        bh->c->peername);
+                        bh->c->conn_info->peername);
             }
             continue;
         }
@@ -697,7 +698,7 @@ static int check_cq(void)
 
             debug(2, "%s: recv from %s len %d type %s credit %d",
                   __func__,
-                  bh->c->peername,
+                  bh->c->conn_info->peername,
                   byte_len,
                   msg_type_name(mh_common.type),
                   mh_common.credit);
@@ -779,7 +780,7 @@ static int check_cq(void)
 
                 debug(2, "%s: send to %s completed locally: sq %p -> %s",
                       __func__,
-                      bh->c->peername,
+                      bh->c->conn_info->peername,
                       sq,
                       sq_state_name(sq->state.send));
             }
@@ -805,7 +806,7 @@ static int check_cq(void)
 
                 debug(2, "%s: send to %s completed locally: rq %p -> %s",
                       __func__,
-                      bh->c->peername,
+                      bh->c->conn_info->peername,
                       rq,
                       rq_state_name(rq->state.recv));
             }
@@ -1049,7 +1050,7 @@ static struct buf_head *get_eager_buf(rdma_connection_t *c)
         if (!bh)
         {
             error("%s: empty eager_send_buf_free list, peer %s",
-                  __func__, c->peername);
+                  __func__, c->conn_info->peername);
             c->send_credit++;
             return NULL;
         }
@@ -1100,7 +1101,7 @@ static void post_sr(const struct buf_head *bh,
 
     debug(4, "%s: %s bh %d len %u wr %d/%d",
           __func__,
-          c->peername,
+          c->conn_info->peername,
           bh->num,
           len,
           rd->num_unsignaled_sends,
@@ -1191,7 +1192,7 @@ static void post_sr_rdmaw(struct rdma_work *sq,
 
         debug(0, "%s: chunk to %s remote addr %llx rkey %x",
               __func__,
-              c->peername,
+              c->conn_info->peername,
               llu(sr.wr.rdma.remote_addr),
               sr.wr.rdma.rkey);
 
@@ -1302,7 +1303,7 @@ static void post_rr(const rdma_connection_t *c,
     };
     struct ibv_recv_wr *bad_wr;
 
-    debug(4, "%s: %s bh %d", __func__, c->peername, bh->num);
+    debug(4, "%s: %s bh %d", __func__, c->conn_info->peername, bh->num);
 
     ret = ibv_post_recv(rc->qp, &rr, &bad_wr);
     if (ret)
@@ -1348,7 +1349,7 @@ static void repost_rr(rdma_connection_t *c,
         }
         bh->sq = NULL;
         debug(2, "%s: return %d credits to %s",
-              __func__, c->return_credit, c->peername);
+              __func__, c->return_credit, c->conn_info->peername);
         msg_header_init(&mh_common, c, MSG_CREDIT);
         ptr = bh->buf;
         encode_msg_header_common_t(&ptr, &mh_common);
@@ -1392,7 +1393,7 @@ static void encourage_send_waiting_buffer(struct rdma_work *sq)
     if (!bh)
     {
         debug(2, "%s: sq %p no free send buffers to %s",
-              __func__, sq, c->peername);
+              __func__, sq, c->conn_info->peername);
         return;
     }
     sq->bh = bh;
@@ -1880,7 +1881,7 @@ static void encourage_rts_done_waiting_buffer(struct rdma_work *sq)
     if (!bh)
     {
         debug(2, "%s: sq %p no free send buffers to %s",
-              __func__, sq, c->peername);
+              __func__, sq, c->conn_info->peername);
         return;
     }
     sq->bh = bh;
@@ -1923,7 +1924,7 @@ static void send_bye(rdma_connection_t *c)
     bh = get_eager_buf(c);
     if (!bh)
     {
-        debug(2, "%s: no free send buffers to %s", __func__, c->peername);
+        debug(2, "%s: no free send buffers to %s", __func__, c->conn_info->peername);
         /* if no messages available, let garbage collection on server deal */
         return;
     }
@@ -1964,7 +1965,7 @@ static int send_cts(struct rdma_work *rq)
     debug(2, "%s: rq %p from %s mopid %llx len %lld",
           __func__,
           rq,
-          rq->c->peername,
+          rq->c->conn_info->peername,
           llu(rq->rts_mop_id),
           lld(rq->buflist.tot_len));
 
@@ -1972,7 +1973,7 @@ static int send_cts(struct rdma_work *rq)
     if (!bh)
     {
         debug(2, "%s: rq %p no free send buffers to %s",
-              __func__, rq, c->peername);
+              __func__, rq, c->conn_info->peername);
         return 1;
     }
     rq->bh = bh;
@@ -2100,7 +2101,7 @@ static int post_send(bmi_op_id_t *id,
           __func__,
           sq,
           (long long) total_size,
-          rdma_map->c->peername);
+          rdma_map->c->conn_info->peername);
 
     /*
      * For a single buffer, store it inside the sq directly, else save
@@ -2692,7 +2693,7 @@ static int test_sq(struct rdma_work *sq,
                   __func__,
                   sq,
                   lld(sq->buflist.tot_len),
-                  sq->c->peername);
+                  sq->c->conn_info->peername);
 
             *outid = sq->mop->op_id;
             *err = 0;
@@ -2856,7 +2857,7 @@ static int test_rq(struct rdma_work *rq,
                   __func__,
                   rq,
                   lld(rq->actual_len),
-                  rq->c->peername);
+                  rq->c->conn_info->peername);
 
             *err = 0;
             *size = rq->actual_len;
@@ -3371,7 +3372,7 @@ static const char *BMI_rdma_rev_lookup(struct bmi_method_addr *meth)
     }
     else
     {
-        return rdma_map->c->peername;
+        return rdma_map->c->conn_info->peername;
     }
 }
 
@@ -3505,11 +3506,8 @@ static struct bmi_method_addr *BMI_rdma_method_addr_lookup(const char *id)
     }
     gen_mutex_unlock(&interface_mutex);
 
-    if (map)
-    {
-        free(hostname);  /* found it */
-    }
-    else
+    /* if we didn't find it, create a new one */
+    if (!map)
     {
         /* Allocate a new method_addr and set the reconnect flag; we will be
          * acting as a client for this connection and will be responsible for
@@ -3517,8 +3515,9 @@ static struct bmi_method_addr *BMI_rdma_method_addr_lookup(const char *id)
          */
         map = rdma_alloc_method_addr(0, hostname, port, 1);
         /* but don't call bmi_method_addr_reg_callback! */
-        free(hostname);
     }
+
+    free(hostname);
 
     return map;
 }
@@ -3531,15 +3530,15 @@ static struct bmi_method_addr *BMI_rdma_method_addr_lookup(const char *id)
  *  Build new connection.
  *
  * Params:
- *  [in] id - RDMA CM identifier new connection will be associated with
- *  [in] peername - remote peername for the connection
+ *  [in] conn_info - provides information about the new connection, such as:
+ *      conn_info->id - RDMA CM identifier connection will be associated with
+ *      conn_info->peername - remote peername for the connection
  *  [in] is_server - 0=client, 1=server
  *
  * Returns:
  *  Pointer to new connection structure on success, NULL on failure
  */
-static rdma_connection_t *rdma_new_connection(struct rdma_cm_id *id,
-                                              const char *peername,
+static rdma_connection_t *rdma_new_connection(struct rdma_conn *conn_info,
                                               int is_server)
 {
     rdma_connection_t *c = NULL;
@@ -3553,20 +3552,20 @@ static rdma_connection_t *rdma_new_connection(struct rdma_cm_id *id,
     if (is_server)
     {
         debug(4, "%s: [SERVER] starting, peername=%s, channel=%d",
-              __func__, peername, id->channel->fd);
+              __func__, conn_info->peername, conn_info->id->channel->fd);
     }
     else
     {
         debug(4, "%s: [CLIENT] starting, peername=%s, channel=%d",
-              __func__, peername, id->channel->fd);
+              __func__, conn_info->peername, conn_info->id->channel->fd);
     }
 
-    c = alloc_connection(peername);
+    c = alloc_connection(conn_info);
 
     /* build connection priv */
     rc = bmi_rdma_malloc(sizeof(*rc));
     c->priv = rc;
-    rc->id = id;
+    rc->id = conn_info->id;
 
     ret = register_memory(c);
     if (ret)
@@ -3582,7 +3581,7 @@ static rdma_connection_t *rdma_new_connection(struct rdma_cm_id *id,
      * states; after allocation it is ready to post receives
      */
     debug(0, "%s: calling rdma_create_qp", __func__);
-    ret = rdma_create_qp(id, rd->nic_pd, &attr);
+    ret = rdma_create_qp(conn_info->id, rd->nic_pd, &attr);
     if (ret)
     {
         error("%s: rdma_create_qp failed", __func__);
@@ -3598,7 +3597,7 @@ static rdma_connection_t *rdma_new_connection(struct rdma_cm_id *id,
      *      opensm configuration to a file.
      */
 
-    rc->qp = id->qp;
+    rc->qp = conn_info->id->qp;
 
     VALGRIND_MAKE_MEM_DEFINED(&attr, sizeof(&attr));
     VALGRIND_MAKE_MEM_DEFINED(&rc->qp->qp_num, sizeof(rc->qp->qp_num));
@@ -3632,15 +3631,15 @@ error_out:
  *  Allocate and initialize a new connection structure.
  *
  * Params:
- *  [in] peername - remote peername for the connection
+ *  [in] conn_info - information to store inside the new connection structure
  *
  * Returns:
  *  Pointer to new connection.
  */
-static rdma_connection_t *alloc_connection(const char *peername)
+static rdma_connection_t *alloc_connection(struct rdma_conn *conn_info)
 {
     rdma_connection_t *c = bmi_rdma_malloc(sizeof(*c));
-    c->peername = strdup(peername);
+    c->conn_info = conn_info;
 
     alloc_eager_bufs(c);
 
@@ -3955,7 +3954,7 @@ static void rdma_close_connection(rdma_connection_t *c)
     struct rdma_cm_event event_copy;
     struct rdma_event_channel *channel = NULL;
 
-    debug(2, "%s: closing connection to %s", __func__, c->peername);
+    debug(2, "%s: closing connection to %s", __func__, c->conn_info->peername);
     c->closed = 1;
     if (c->refcnt != 0)
     {
@@ -4051,9 +4050,79 @@ static void rdma_close_connection(rdma_connection_t *c)
         rdma_map->c = NULL;
     }
 
-    free(c->peername);
+    free(c->conn_info->peername);
+    free(c->conn_info->hostname);
+    free(c->conn_info);
     qlist_del(&c->list);
     free(c);
+}
+
+/*
+ * alloc_conn_info()
+ *
+ * Description:
+ *  Allocate a new structure to hold information about a connection, and fill
+ *  it based on the provided id and port number.
+ *
+ * Params:
+ *  [in] id   - RDMA CM identifier; also provides access to the peer's hostname
+ *              and port number (if needed)
+ *  [in] port - peer's port number (if this is -1, the caller is a server and
+ *              the client's port number will be determined from the id;
+ *              otherwise, the caller is a client and provides the server's
+ *              known listening port number)
+ *
+ * Returns:
+ *  Pointer to a new rdma_conn structure.
+ */
+static struct rdma_conn *alloc_conn_info(struct rdma_cm_id *id,
+                                         int port)
+{
+    struct rdma_conn *conn_info;
+    int port_str_len;
+    size_t max_peer_len;
+
+    conn_info = bmi_rdma_malloc(sizeof(*conn_info));
+    if (!conn_info)
+    {
+        warning("%s: unable to malloc conn_info, errno=%d", __func__, errno);
+        //sleep(30);
+        return NULL;    /* TODO: more appropriate error handling? */
+    }
+
+    conn_info->id = id;
+
+    conn_info->hostname = bmi_rdma_malloc(INET_ADDRSTRLEN);
+    inet_ntop(AF_INET,
+              (const void *) &id->route.addr.dst_sin.sin_addr,
+              conn_info->hostname,
+              INET_ADDRSTRLEN);
+
+    if (port < 0)
+    {
+        conn_info->port = ntohs(id->route.addr.dst_sin.sin_port);
+    }
+    else
+    {
+        conn_info->port = port;
+    }
+
+    /*
+     * Calculate space needed for peername and allocate it.
+     * NOTE: The first snprintf() call returns the number of characters in
+     * the string representation of the port number.
+     */
+    port_str_len = snprintf(NULL, 0, "%d", conn_info->port);
+    max_peer_len = strlen(conn_info->hostname) + port_str_len + 2;
+    /* 2 extra = 1 for colon and 1 for null character */
+    conn_info->peername = bmi_rdma_malloc(max_peer_len);
+    snprintf(conn_info->peername,
+             max_peer_len,
+             "%s:%d",
+             conn_info->hostname,
+             conn_info->port);
+
+    return conn_info;
 }
 
 /*
@@ -4084,7 +4153,7 @@ static int rdma_client_event_loop(struct rdma_event_channel *ec,
     struct rdma_cm_event *event = NULL;
     struct rdma_cm_event event_copy;
     struct rdma_conn_param conn_param;
-    char peername[2048];
+    struct rdma_conn *conn_info;
     int ret = -1;
     static int already_printed = 0;
     rdma_connection_t *c = NULL;
@@ -4111,16 +4180,13 @@ retry_resolve:
         }
         else if (event_copy.event == RDMA_CM_EVENT_ROUTE_RESOLVED)
         {
-            sprintf(peername,
-                    "%s:%d",
-                    inet_ntoa(event_copy.id->route.addr.dst_sin.sin_addr),
-                    rdma_map->port);
+            conn_info = alloc_conn_info(event_copy.id, rdma_map->port);
 
             debug(0,
                 "%s: calling rdma_new_connection for peername=%s on channel=%d",
-                __func__, peername, event_copy.id->channel->fd);
-            
-            rdma_map->c = rdma_new_connection(event_copy.id, peername, 0);
+                __func__, conn_info->peername, event_copy.id->channel->fd);
+
+            rdma_map->c = rdma_new_connection(conn_info, 0);
             if (!rdma_map->c)
             {
                 error_xerrno(EINVAL,
@@ -4148,7 +4214,7 @@ retry_connect:
                 else
                 {
                     warning("%s: connect to server %s: %s",
-                            __func__, peername, strerror(errno));
+                            __func__, conn_info->peername, strerror(errno));
                     rdma_close_connection(rdma_map->c);
                     rdma_map->c = NULL;
                     return -EINVAL; /* TODO: more appropriate error? */
@@ -4164,7 +4230,7 @@ retry_connect:
             c = (rdma_connection_t *) event_copy.id->context;
             /* TODO: make sure c == rdma_map->c? */
 
-            debug(4, "%s: connected, peername=%s", __func__, c->peername);
+            debug(4, "%s: connected, peername=%s", __func__, c->conn_info->peername);
             break;
         }
         else if (event_copy.event == RDMA_CM_EVENT_ADDR_ERROR)
@@ -4279,7 +4345,7 @@ static int rdma_client_connect(rdma_method_addr_t *rdma_map,
     }
 
     debug(0, "%s: new id=%llu, fd=%d\n",
-          __func__, llu(int64_from_ptr(conn_id)), conn_id->channel->fd); 
+          __func__, llu(int64_from_ptr(conn_id)), conn_id->channel->fd);
 
     ret = rdma_resolve_addr(conn_id, NULL, addrinfo->ai_dst_addr, timeout_ms);
     if (ret)
@@ -4457,8 +4523,7 @@ void *rdma_server_listener_thread(void *arg)
     rdma_connection_t *c = NULL;
     int ret = 0;
     int timeout_ms = 2000;  /* TODO: test this, it may be too long */
-    struct rdma_conn *rc;
-    //struct rdma_cm_id *conn_id;
+    struct rdma_cm_id *conn_id;
     gen_thread_t thread;
     struct pollfd listener;
 
@@ -4521,63 +4586,22 @@ void *rdma_server_listener_thread(void *arg)
             debug(0, "%s: CONNECT_REQUEST: id = %llu",
                   __func__, llu(event_copy.id));
 
-#if 1 /* TODO: can we get rid of rc? */
-            rc = (struct rdma_conn *) bmi_rdma_malloc(sizeof(*rc));
-            if (!rc)
-            {
-                warning("%s: unable to malloc rc, errno=%d",
-                        __func__, errno);
-                sleep(30);
-                continue;
-            }
-
-            rc->id = event_copy.id;     /* id for new connection */
-            rc->hostname = strdup(
-                            inet_ntoa(rc->id->route.addr.dst_sin.sin_addr));
-            rc->port = ntohs(rc->id->route.addr.dst_sin.sin_port);
-            sprintf(rc->peername, "%s:%d", rc->hostname, rc->port);
+            conn_id = event_copy.id;
 
             debug(0,
-                "%s: starting rdma_server_accept_client_thread for channel=%d",
-                __func__, rc->id->channel->fd);
+                "%s: starting rdma_server_accept_client_thread for id=%llu, channel=%d",
+                __func__, llu(int64_from_ptr(conn_id)), conn_id->channel->fd);
 
             /* start a thread to accept the new client connection */
             if (pthread_create(&thread,
                                NULL,
                                &rdma_server_accept_client_thread,
-                               rc))
+                               conn_id))
             {
                 warning("%s: unable to create accept_client thread, errno=%d",
                         __func__, errno);
-                free(rc);
+                free(conn_id);
             }
-#else
-//            conn_id = (struct rdma_cm_id *) bmi_rdma_malloc(sizeof(*conn_id));
-//            if (!conn_id)
-//            {
-//                warning("%s: unable to malloc conn_id, errno=%d",
-//                        __func__, errno);
-//                sleep(30);
-//                continue;
-//            }
-//
-//            conn_id = event_copy.id;
-//
-//            debug(0,
-//                "%s: starting rdma_server_accept_client_thread for channel=%d",
-//                __func__, conn_id->channel->fd);
-//
-//            /* start a thread to accept the new client connection */
-//            if (pthread_create(&thread,
-//                               NULL,
-//                               &rdma_server_accept_client_thread,
-//                               conn_id))
-//            {
-//                warning("%s: unable to create accept_client thread, errno=%d",
-//                        __func__, errno);
-//                free(conn_id);
-//            }
-#endif
         }
         else if (event_copy.event == RDMA_CM_EVENT_ESTABLISHED)
         {
@@ -4595,13 +4619,10 @@ void *rdma_server_listener_thread(void *arg)
              * case and the peer will be responsible for maintaining the
              * connection
              */
-            //c->remote_map = rdma_alloc_method_addr(c, rc->hostname, rc->port, 0);
-            /* TODO: THIS IS ONLY TEMPORARY! Need to move the info stored
-             *       in struct rdma_conn into rdma_connection_t */
             c->remote_map = rdma_alloc_method_addr(c,
-                        inet_ntoa(event_copy.id->route.addr.dst_sin.sin_addr),
-                        ntohs(event_copy.id->route.addr.dst_sin.sin_port),
-                        0);
+                                                   c->conn_info->hostname,
+                                                   c->conn_info->port,
+                                                   0);
 
             /* register this address with the method control layer */
             c->bmi_addr = bmi_method_addr_reg_callback(c->remote_map);
@@ -4614,7 +4635,7 @@ void *rdma_server_listener_thread(void *arg)
             }
 
             debug(0, "%s: accepted new connection from %s at server",
-                  __func__, c->peername);
+                  __func__, c->conn_info->peername);
 
             /* TODO: cleanup rc? */
         }
@@ -4656,21 +4677,25 @@ void *rdma_server_accept_client_thread(void *arg)
 {
     rdma_connection_t *c;
     struct rdma_conn *rc;
+    struct rdma_cm_id *conn_id;
     int ret;
 
     debug(0, "%s: starting", __func__);
+
     if (!arg)
     {
         error("%s: no id passed", __func__);
         return NULL;
     }
-    rc = (struct rdma_conn *) arg;
+
+    conn_id = (struct rdma_cm_id *) arg;
+    rc = alloc_conn_info(conn_id, -1);
 
     gen_mutex_lock(&interface_mutex);
 
     debug(0, "%s: calling rdma_new_connection for peername=%s on channel=%d",
           __func__, rc->peername, rc->id->channel->fd);
-    c = rdma_new_connection(rc->id, rc->peername, 1);
+    c = rdma_new_connection(rc, 1);
     if (!c)
     {
         error_xerrno(EINVAL, "%s: rdma_new_connection failed", __func__);

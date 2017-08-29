@@ -44,7 +44,7 @@ typedef struct
 
     /* connection management */
     struct bmi_method_addr *remote_map;
-    char *peername;  /* string representation of remote_map */
+    struct rdma_conn *conn_info;
 
     /* per-connection buffers */
     void *eager_send_buf_contig;    /* bounce bufs, for short sends */
