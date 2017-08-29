@@ -3987,10 +3987,6 @@ static void rdma_close_connection(rdma_connection_t *c)
     if (rc->qp)
     {
         rdma_destroy_qp(rc->id);
-        if (rc->qp != NULL)
-        {
-            error("%s: rdma_destroy_qp failed", __func__);
-        }
     }
 
     /* destroy the memory regions */
@@ -4023,7 +4019,7 @@ static void rdma_close_connection(rdma_connection_t *c)
               channel->fd);
 
         ret = rdma_destroy_id(rc->id);
-        if (ret < 0)
+        if (ret)
         {
             error_errno("%s: rdma_destroy_id failed", __func__);
         }
