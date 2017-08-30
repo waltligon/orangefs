@@ -4024,8 +4024,11 @@ static void rdma_close_connection(rdma_connection_t *c)
             error_errno("%s: rdma_destroy_id failed", __func__);
         }
 
-        //rdma_destroy_event_channel(channel);
-        //channel = NULL;
+        /* only destroy the event channel if we are a client */
+        if (!rdma_device->listen_id)
+        {
+            rdma_destroy_event_channel(channel);
+        }
     }
 
     free(rc);
