@@ -288,10 +288,12 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_key_data tmp_pubkey_buf, tmp_privkey_buf, pkeybuf;
-    RSA *rsa_pubkey, *rsa_privkey;
+    RSA *rsa_pubkey=NULL, *rsa_privkey=NULL;
     unsigned char pwddata[PVFS_REQ_LIMIT_USERID_PWD], *penc_key;
     int flen, tmp_privkey_len, bufrem, maxflen, elen;
     EVP_PKEY *keypair;
+    int ret=0;
+    BIGNUM *BN_exponent = NULL;
 
     /* load public key from data received from the server */
     tmp_pubkey_buf = sm_p->u.mgmt_get_user_cert.public_key.buf;
@@ -361,8 +363,18 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
     }
 
     /* generate RSA keypair */
-    rsa_privkey = RSA_generate_key(PVFS_USER_CERT_KEY_SIZE, RSA_F4, NULL, NULL);
-    if (rsa_privkey == NULL || !EVP_PKEY_assign_RSA(keypair, rsa_privkey))
+//    rsa_privkey = RSA_generate_key(PVFS_USER_CERT_KEY_SIZE, RSA_F4, NULL, NULL);
+//    if (rsa_privkey == NULL || !EVP_PKEY_assign_RSA(keypair, rsa_privkey))
+    BN_exponent = BN_new();
+    if (BN_exponent == NULL)
+    {
+    }
+    ret=BN_set_word(BN_exponent,RSA_F4);
+    if (ret==0)
+    {
+    }
+    ret=RSA_generate_key_ex(rsa_privkey, PVFS_USER_CERT_KEY_SIZE, BN_exponent, NULL);
+    if ( ret==0 || rsa_privkey==NULL || !EVP_PKEY_assign_RSA(keypair, rsa_privkey) )
     {
         GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: could not "
                           "assign keypair", -PVFS_ESECURITY);
@@ -371,9 +383,11 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
         if (rsa_privkey != NULL)
         {
             RSA_free(rsa_privkey);
+            BN_free(BN_exponent);
         }
         return SM_ACTION_COMPLETE;
     }
+    BN_free(BN_exponent);
 
     /* copy key to buffer */
     tmp_privkey_buf = NULL;
