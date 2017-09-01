@@ -61,6 +61,7 @@
 #ifdef ENABLE_CERTCACHE
 #include "certcache.h"
 #endif
+#include "server-config-mgr.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -203,10 +204,6 @@ static int precreate_pool_count(
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
 
-struct server_configuration_s *PINT_get_server_config(void)
-{
-    return &server_config;
-}
 
 int main(int argc, char **argv)
 {
@@ -265,6 +262,9 @@ int main(int argc, char **argv)
     }
 
     server_status_flag |= SERVER_CONFIG_INIT;
+
+    /* set server_config pointer */
+    PINT_server_config_mgr_set_config(&server_config);
 
     if (!PINT_config_is_valid_configuration(&server_config))
     {
@@ -948,8 +948,9 @@ static int server_initialize_subsystems(
             return(ret);
         }
 
-        /* XXX: This is really the same for all collections, yet is specified
-         * separately. */
+        /* This function sets the server_cfg for the system and cfg_fs for the coll_id,
+         * within the trove subsystem
+         */
         ret = trove_collection_set_fs_config(cur_fs->coll_id, &server_config);
         if (ret < 0) {
             gossip_err("Error setting filesystem configuration in Trove\n");
@@ -1617,7 +1618,7 @@ static void reload_config(void)
     else /* Successful load of config */
     {
         /* Get the current server configuration and update global items */
-        orig_server_config = get_server_config_struct();
+        orig_server_config =  PINT_server_config_mgr_get_config();
         if (orig_server_config->event_logging)
         {
             free(orig_server_config->event_logging);
@@ -2239,13 +2240,6 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 
     if(argc - total_arguments > 2)
     {
-        /* Assume user is passing in a server.conf.  Bit of a hack here to
-         * support server.conf files in the old format by appending the
-         * server.conf options onto the fs.conf.
-         */
-        gossip_err("The two config file format is no longer supported.  "
-                   "Generate a single fs.conf that uses the new format with the "
-                   "pvfs2-config-convert script.\n\n");
         goto parse_cmd_line_args_failure;
     }
 
@@ -2642,11 +2636,6 @@ int server_state_machine_terminate(
     return SM_ACTION_TERMINATE;
 }
 
-struct server_configuration_s *get_server_config_struct(void)
-{
-    return &server_config;
-}
-
 /* server_op_get_machine()
  * 
  * looks up the state machine for the op * given and returns it, or
@@ -2842,7 +2831,7 @@ static int precreate_pool_initialize(int server_index)
     int handle_count = 0;
     int fs_count = 0;
     unsigned int types_to_pool = 0;
-    struct server_configuration_s *user_opts = get_server_config_struct();
+    struct server_configuration_s *user_opts = PINT_server_config_mgr_get_config();
     assert(user_opts);
 
     /* iterate through list of file systems */
@@ -3214,7 +3203,7 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
     struct PINT_smcb *tmp_smcb = NULL;
     struct PINT_server_op *s_op;
     int ret, index = 0;
-    struct server_configuration_s *user_opts = get_server_config_struct();
+    struct server_configuration_s *user_opts = PINT_server_config_mgr_get_config();
 
     assert(user_opts);
     PVFS_ds_type_to_int(type, &index);

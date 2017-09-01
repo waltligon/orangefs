@@ -839,7 +839,8 @@ static int graphite_connect(char *graphite_addr)
                 (struct sockaddr*) &serv_addr,
                 sizeof(struct sockaddr))) < 0)
     {
-         printf("failed to connect to socket, connect returned: %s\n", strerror(errno));
+         printf("failed to connect to socket, connect returned: %s\n",
+                strerror(errno));
          return -3;
     }
 

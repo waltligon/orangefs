@@ -1253,7 +1253,7 @@ endecode_fields_3a_struct(
     uint32_t, dirent_count,
     PVFS_dirent, dirent_array);
 #define extra_size_PVFS_servresp_readdir \
-  roundup8(PVFS_REQ_LIMIT_DIRENT_COUNT * (PVFS_NAME_MAX + 1 + 8))
+  (PVFS_REQ_LIMIT_DIRENT_COUNT * sizeof(PVFS_dirent))
 
 /* getconfig ***************************************************/
 /* - retrieves initial configuration information from server */

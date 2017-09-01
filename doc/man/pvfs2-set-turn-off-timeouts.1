@@ -1,0 +1,43 @@
+.TH PVFS2-SET-TURN-OFF-TIMEOUTS 1 2017-08-07
+.SH NAME
+\fBpvfs2-set-turn-off-timeouts\fR \(en disable security timeout verification in server
+.SH SYNOPSIS
+\fBpvfs2-set-turn-off-timeouts\fR [\fB\-m \fIfilesystem mount point\fR] [\fB\-t \fIyes|no\fR]
+.SH DESCRIPTION
+This program disables capability and credential timeout verification in
+the server.  This affects all servers.  Timeout verification cannot be
+disabled if certificate or key security is enabled.
+.PP
+The options are as follows:
+.IP -m
+Specify the file system to operate on.
+.IP -t
+Specify
+.I yes
+to enable
+and
+.I no
+to disable timeout verification.
+.I
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate
+.IR pvfs2tab
+file
+.SH FILES
+.I /etc/pvfs2tab
+.SH EXAMPLES
+Disable timeout verification
+.PP
+.RS 6n
+pvfs2-set-turn-off-timeouts -m /mnt -t no
+.RE
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2tab ( 5 )

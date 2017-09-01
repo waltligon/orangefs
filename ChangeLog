@@ -4,7 +4,25 @@ OrangeFS Release ChangeLog
 -----------------------
 orangefs-2.9.x (Subversion Branch v.2.9.x)
 http://dev.orangefs.org/svn/orangefs/branches/v.2.9.x
-up to rev 12770 in trunk
+up to rev 12977 in trunk
+
+
+New functionality:
+	1.  Added support for Oracle Linux 7.3 with one caveat:  Cannot use
+	    OrangeFS as the backing filesystem for a user-defined loop device.
+	    Support will be forth coming.
+
+	2.  Added support for large LMDB databases using DBMaxSize config
+	    parameter.  Please visit http://dev.orangefs.org/twiki.
+
+	3.  Added scripts in the examples/profile.d directory that can be placed in 
+	    /etc/profile.d.  These scripts add OrangeFS locations to
+	    LIBRARY_PATH, C_INCLUDE_PATH, AND LD_LIBRARY_PATH.
+
+	4.  Added support for Fedora 26.
+
+	5.  On going work to create an OrangeFS rpm that will be accepted by
+	    Fedora.
 
 
 * - Server  
@@ -17,14 +35,37 @@ up to rev 12770 in trunk
 	* - Fixed capability errors that may occur during mkdir.
 	* - Correctly populate the position token during a readdir operation
 	    to prevent overrun of dirdata index bits.
+	* - Correct the max size calculation for a readdir response.
+	* - On some platforms, issuing a pvfs2-ls would cause one or more
+	    pvfs2-server processes to segfault due to an invalid parameter
+	    sent to the server when list-attr was called.  This problem
+	    was discovered when the code is compiled using the Fedora-specific
+	    rpm requirements.
 
 * - Clients
 	* - Client Core
 		* - Enhanced the readahead cache with multiple readahead
 		    buffers.
 		* - Corrected double-free bug in readahead code
+		* - Corrected additional problems with readahead code
+		    and removes memory leaks identified by Valgrind.
+		* - Enhanced the remount procedure to handle new 
+		    PVFS2_VFS_OP_FEATURES request.
 
 	* - All Clients
+		* - Dual license OrangeFS JNI and Hadoop clients under both the
+		    LGPL version 2.1 and Apache License version 2.  Added
+		    Omnibond to the Copyright in source files where
+		    appropriate.
+		* - Corrected readdir token processing that periodically
+		    caused directory entries to be ignored.
+		* - Enhanced error message in msgpairarray_completion_fn.
+
+* - BMI
+	* - InfiniBand protocol
+		* - Improved IB's ability to report a lost connection, allowing
+		    the system interface to recover the connection.  Needed
+		    for failover.
 
 
 

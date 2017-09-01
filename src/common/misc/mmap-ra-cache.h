@@ -19,6 +19,8 @@
 #define PVFS2_DEFAULT_RACACHE_READCNT (4)
 #define PVFS2_MAX_RACACHE_READCNT     (16)
 
+#define PVFS2_DEFAULT_RACACHE_PINNED  (1)
+
 #define PVFS2_RACACHE_READSZ_NOVALUE  -1
 
 /* racache_status values */
@@ -69,6 +71,7 @@ typedef struct racache_s
     int    bufcnt;                     /* number of buffers in the cache */
     int    bufsz;                      /* size of each buffer */
     int    readcnt;                    /* default readahead count */
+    int    pinned;                     /* true if using pinned memory */
     struct qlist_head buff_free;       /* list of free buffers */
     struct qlist_head buff_lru;        /* lru list of buffers int use */
     struct qhash_table *hash_table;    /* file name index to find buffers */
@@ -99,15 +102,20 @@ int pint_racache_buff_size(void);
 
 int pint_racache_read_count(void);
 
+int pint_racache_pinned(void);
+
 int pint_racache_set_read_count(int readcnt);
 
 int pint_racache_set_buff_count(int bufcnt);
 
 int pint_racache_set_buff_size(int bufsz);
 
+int pint_racache_set_pinned(int pinned);
+
 int pint_racache_set_buff_count_size(int bufcnt, int bufsz);
 
-int pint_racache_initialize(void);
+/* pass -1 to not modify the compiled in defaults */
+int pint_racache_initialize(int bufcnt, int bufsz, int readcnt, int pinned);
 
 int pint_racache_buf_resize(int bufcnt, int bufsz);
 

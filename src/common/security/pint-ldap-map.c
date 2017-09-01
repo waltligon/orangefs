@@ -27,6 +27,7 @@
 #include "server-config.h"
 #include "pint-security.h"
 #include "cert-util.h"
+#include "server-config-mgr.h"
 
 /* global LDAP connection handle */
 static LDAP *ldap = NULL;
@@ -95,7 +96,7 @@ int PINT_ldap_initialize(void)
 {
     char *passwd = NULL;
     int version, ret;
-    struct server_configuration_s *config = PINT_get_server_config();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
 
     /* lock the mutex */
     gen_mutex_lock(&ldap_mutex);
@@ -299,7 +300,7 @@ int PINT_ldap_map_credential(PVFS_credential *cred,
                              uint32_t *num_groups,
                              PVFS_gid *group_array)
 {
-    struct server_configuration_s *config = PINT_get_server_config();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
     X509 *xcert = NULL;
     X509_NAME *xsubject;
     char subject[512], *base = NULL, name[256],
@@ -557,7 +558,7 @@ PINT_ldap_map_user_exit:
 int PINT_ldap_authenticate(const char *userid,
                            const char *password)
 {
-    struct server_configuration_s *config = PINT_get_server_config();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
     LDAP *ldap2 = NULL;
     char *base = NULL, filter[512], *dn = NULL;
     int ldapret, ret = -PVFS_EINVAL, scope = LDAP_SCOPE_SUBTREE, version;
