@@ -3950,6 +3950,7 @@ static void rdma_close_connection(rdma_connection_t *c)
     struct rdma_cm_event *event = NULL;
     struct rdma_cm_event event_copy;
     struct rdma_event_channel *channel = NULL;
+    int is_server;
 
     debug(2, "%s: closing connection to %s", __func__, c->conn_info->peername);
     c->closed = 1;
@@ -3959,29 +3960,46 @@ static void rdma_close_connection(rdma_connection_t *c)
         return;
     }
 
-    /* disconnect (also transfers associated QP to error state */
-    //rdma_disconnect(rc->id);
+    /* disconnect if we are a server; client has already done this */
+    if (rdma_device->listen_id)
+    {
+        /* server */
+        is_server = 1;
+        rdma_disconnect(rc->id);
+        /* this also transfers the associated QP to the error state */
+    }
+    else
+    {
+        /* client */
+        is_server = 0;
 
 #if 0
-    /* TODO: is this loop necessary? do we need to wait for the event? */
-    /* wait for disconnected event */
-    while (rdma_get_cm_event(rc->id->channel, &event) == 0)
-    {
-        memcpy(&event_copy, event, sizeof(*event));
-        rdma_ack_cm_event(event);
-
-        /* TODO: I think maybe I should be checking for this in the
-         *       server_listener_thread and client_event_loop instead */
-        if (event_copy.event == RDMA_CM_EVENT_DISCONNECTED)
+        /* TODO: is this loop necessary? do we need to wait for the event? */
+        /* NOTE: we only do this on the client because the server is already
+         *       checking for this event in the listener_thread */
+        /* wait for disconnected event */
+        while (rdma_get_cm_event(rc->id->channel, &event) == 0)
         {
-            break;
-        }
+            memcpy(&event_copy, event, sizeof(*event));
+            rdma_ack_cm_event(event);
 
-        /* TODO: should I compare event_copy.id and rc->id to make sure
-         *       what we expected is actually what disconnected?
-         */
-    }
+            if (event_copy.event == RDMA_CM_EVENT_DISCONNECTED)
+            {
+                debug(4, "%s: received event: %s",
+                      __func__, rdma_event_str(event_copy.event));
+
+                /* TODO: something... */
+                break;
+            }
+
+            /* TODO: should I compare event_copy.id and rc->id to make sure
+             *       what we expected is actually what disconnected?
+             */
+
+            debug(0, "%s: waiting for DISCONNECTED...\n", __func__);
+        }
 #endif
+    }
 
     /* destroy the queue pair */
     if (rc->qp)
@@ -4025,7 +4043,7 @@ static void rdma_close_connection(rdma_connection_t *c)
         }
 
         /* only destroy the event channel if we are a client */
-        if (!rdma_device->listen_id)
+        if (!is_server)
         {
             rdma_destroy_event_channel(channel);
         }
