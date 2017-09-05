@@ -71,6 +71,13 @@ struct CRYPTO_dynlock_value
 };
 
 
+#ifdef HAVE_OPENSSL_1_1
+#   define PVFS_EVP_MD_CTX_FREE(ctx) EVP_MD_CTX_free((ctx))
+#else
+#   define PVFS_EVP_MD_CTX_FREE(ctx) EVP_MD_CTX_cleanup((ctx))
+#endif
+
+
 /* thread-safe OpenSSL helper functions */
 static int setup_threading(void);
 static void cleanup_threading(void);
@@ -485,7 +492,7 @@ int PINT_sign_capability(PVFS_capability *cap, PVFS_time *force_timeout)
     if (!ret)
     {
         PINT_security_error(__func__, -PVFS_ESECURITY);
-        EVP_MD_CTX_free(tmp_mdctx);
+        PVFS_EVP_MD_CTX_FREE(tmp_mdctx);
         return -1;
     }
 
@@ -506,8 +513,7 @@ int PINT_sign_capability(PVFS_capability *cap, PVFS_time *force_timeout)
     if (!ret)
     {
         PINT_security_error(__func__, -PVFS_ESECURITY);
-
-        EVP_MD_CTX_destroy(tmp_mdctx);
+        PVFS_EVP_MD_CTX_FREE(tmp_mdctx);
         return -1;
     }
 
@@ -517,12 +523,11 @@ int PINT_sign_capability(PVFS_capability *cap, PVFS_time *force_timeout)
     if (!ret)
     {
         PINT_security_error(__func__, -PVFS_ESECURITY);
-
-        EVP_MD_CTX_destroy(tmp_mdctx);
+        PVFS_EVP_MD_CTX_FREE(tmp_mdctx);
         return -1;
     }
 
-    EVP_MD_CTX_destroy(tmp_mdctx);
+    PVFS_EVP_MD_CTX_FREE(tmp_mdctx);
 
 #if 0
     hash_capability(cap, mdstr);
@@ -710,7 +715,7 @@ int PINT_verify_capability(const PVFS_capability *cap)
         PINT_security_error("Capability verify", -PVFS_ESECURITY);
     }
     
-    EVP_MD_CTX_free(tmp_mdctx);
+    PVFS_EVP_MD_CTX_FREE(tmp_mdctx);
 
     return (ret == 1);
 }
@@ -883,13 +888,13 @@ int PINT_sign_credential(PVFS_credential *cred)
     if (!ret)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "SignUpdate failure\n");
-        EVP_MD_CTX_free(tmp_mdctx);
+        PVFS_EVP_MD_CTX_FREE(tmp_mdctx);
         return -1;
     }
     
     ret = EVP_SignFinal(tmp_mdctx, cred->signature, &cred->sig_size,
                         security_privkey);
-    EVP_MD_CTX_free(tmp_mdctx);
+    PVFS_EVP_MD_CTX_FREE(tmp_mdctx);
     if (!ret)
     {
         PINT_security_error(__func__, -PVFS_ESECURITY);
@@ -1082,7 +1087,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
         PINT_security_error(__func__, -PVFS_ESECURITY);
     }
 
-    EVP_MD_CTX_free(tmp_mdctx);
+    PVFS_EVP_MD_CTX_FREE(tmp_mdctx);
 
 #ifdef ENABLE_SECURITY_CERT
     EVP_PKEY_free(pubkey);
@@ -1125,7 +1130,7 @@ static int setup_threading(void)
     }
 
 #ifndef CRYPTO_THREADID_set_callback
-    CRYPTO_SET_ID_CALLBACK(NULL);
+    CRYPTO_SET_ID_CALLBACK(ID_FUNCTION);
 #endif
     CRYPTO_set_locking_callback(locking_function);
     CRYPTO_set_dynlock_create_callback(dyn_create_function);

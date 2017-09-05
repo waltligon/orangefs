@@ -526,8 +526,11 @@ sign_error:
     cred->sig_size = 0;
 
 sign_exit: 
-
+#ifdef HAVE_OPENSSL_1_1
     EVP_MD_CTX_free(tmp_mdctx);
+#else
+    EVP_MD_CTX_cleanup(tmp_mdctx);
+#endif
 
     if (privkey != NULL)
     {
