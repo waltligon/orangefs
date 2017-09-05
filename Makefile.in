@@ -1302,6 +1302,7 @@ clean::
                 $(VISS) $(VISOBJS) \
 				$(VISMISCOBJS) \
 				$(KARMAOBJS) \
+				$(STATECOMP) $(STATECOMPOBJS) $(STATECOMPGEN) \
                 $(MEMANALYSIS) $(MEMANALYSISOBJS) $(MEMANALYSISDEPS) \
                 $(POLICYCOMP) $(POLICYCOMPOBJS) \
                 $(PYCGEN) $(PYCGEN_AUX) \
@@ -1396,7 +1397,7 @@ endif
 nodep:; @:
 
 # default rule for generating dependency files
-%.d: %.c | $(PYCGEN)
+%.d: %.c $(STATECOMP) | $(PYCGEN)
 	$(Q) "  DEP		$@"
 	$(E)CC="$(CC)" $(srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(DB_CFLAGS) $(call modcflags,$<) $< > $@
 

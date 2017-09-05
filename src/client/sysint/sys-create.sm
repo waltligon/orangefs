@@ -408,8 +408,6 @@ static int create_comp_fn(void *v_p,
     }
 
 
-    gossip_err("%s:resp_p->u.create.stuffed(%d)\n",__func__,resp_p->u.create.stuffed);
-
 /* There really isn't anything to do any more - the rest of this stuff
  * is not needed any more - BUT if we want to return creation times from
  * the new object we would need to get them here and stash them in the

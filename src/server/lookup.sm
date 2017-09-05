@@ -579,7 +579,7 @@ static PINT_sm_action lookup_setup_getattr_request(
    getattr_op->u.getattr.handle     = s_op->resp.u.lookup_path.handle_array[ s_op->u.lookup.array_index ];
    getattr_op->u.getattr.attrmask   = PVFS_ATTR_META_DIST          |
                                       PVFS_ATTR_META_DFILES        |
-                                      PVFS_ATTR_META_MIRROR_DFILES |
+                                      PVFS_ATTR_META_MIRROR_MODE   |
                                       PVFS_ATTR_CAPABILITY;
    getattr_op->u.getattr.credential = s_op->req->u.lookup_path.credential;
 

@@ -438,6 +438,9 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                  */
                 if (attr->mask & PVFS_ATTR_DATA_SIZE)
                 {
+
+/* stuffed going away - may want some code here later */
+#if 0
                     /* is the file stuffed? */
                     if(!(attr->mask & PVFS_ATTR_META_UNSTUFFED))
                     {
@@ -449,6 +452,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                             "detected stuffed file.\n");
                         return(0);
                     }
+#endif
                     /* if caller asked for the latest size and time
                      * stamps, then we need
                      * to jump to the datafile_getattr state, which
@@ -833,7 +837,6 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     if (sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE)
     {
         trimmed_mask &= (PVFS_ATTR_META_ALL |
-                         PVFS_ATTR_META_UNSTUFFED |
                          PVFS_ATTR_DATA_SIZE |
                          PVFS_ATTR_COMMON_ALL);
     }
@@ -1190,8 +1193,8 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     int ret = -PVFS_EINVAL;
     PVFS_object_attr *attr = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
-    uint64_t mirror_retry = (sm_p->getattr.attr.mask &
-                             PVFS_ATTR_META_MIRROR_DFILES);
+    uint64_t mirror_retry = (sm_p->getattr.attr.mask /* &
+                                  PVFS_ATTR_META_MIRROR_DFILES */);
 #if 0
     int i = 0;
     PVFS_handle *handles;

@@ -18,7 +18,7 @@ dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=3
 PVFS2_VERSION_MINOR=0
-PVFS2_VERSION_SUB=5
+PVFS2_VERSION_SUB=6
 PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
 PVFS2_VERSION_PRE="-DEVEL-$CONFIGURE_TIME"
@@ -444,7 +444,7 @@ fi]
 dnl a mechanism to turn on readahead caching (for kernel interface)
 RA_CACHE=""
 AC_ARG_ENABLE(racache,
-[  --enable-racache   **EXPERIMENTAL** Enables readahead in kernel interface],
+[  --enable-racache        Enables readahead in the Client Core ],
 [if test "x$enableval" = "xyes" ; then
 RA_CACHE="-DUSE_RA_CACHE"
 fi]

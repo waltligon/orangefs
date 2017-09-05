@@ -248,7 +248,7 @@ nested machine pvfs2_get_attr_with_prelude_sm
     }
 }
 
-machine pvfs2_get_attr_sm
+nested machine pvfs2_get_attr_sm
 {
     state work
     {
@@ -794,10 +794,10 @@ static PINT_sm_action getattr_read_datafile_handles(struct PINT_smcb *smcb,
             PVFS_OID_str(&s_op->u.getattr.handle),
             (int)s_op->u.getattr.fs_id);
 
-        /*If we hit an error the DIST & DFILES are no longer valid*/
+        /* If we hit an error the DIST & DFILES are no longer valid */
         respattr->mask &= ~PVFS_ATTR_META_DIST;
         respattr->mask &= ~PVFS_ATTR_META_DFILES;
-        respattr->mask &= ~PVFS_ATTR_META_MIRROR_DFILES;
+        respattr->mask &= ~PVFS_ATTR_META_MIRROR_MODE;
         
         js_p->error_code = -PVFS_EOVERFLOW;
         return SM_ACTION_COMPLETE;
@@ -1491,7 +1491,7 @@ static PINT_sm_action getattr_datafile_handles_safety_check(
              */
             s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
             s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
-            s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_MIRROR_DFILES;
+            s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_MIRROR_MODE;
 
             js_p->error_code = -PVFS_EIO;
             return SM_ACTION_COMPLETE;
@@ -1916,7 +1916,6 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
                                                  job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    long int dfile_count = 0;
 
     if (js_p->error_code != 0 && js_p->error_code != -TROVE_ENOENT)
     {
@@ -1943,10 +1942,12 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
 
             s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len = 
                             s_op->val_a[DIST_NAME_KEY].read_sz;
+            KEEP_BUFFER(DIST_NAME_KEY);
         }
         else
         {
             s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len = 0;
+            s_op->resp.u.getattr.attr.u.dir.hint.dist_name = NULL;
         }            
 /*        s_op->val_a[DIST_NAME_KEY].buffer = NULL; */
 
@@ -1960,18 +1961,23 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
 
             s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len = 
                             s_op->val_a[DIST_PARAMS_KEY].read_sz;
+            KEEP_BUFFER(DIST_PARAMS_KEY);
         }
         else
         {
             s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len = 0;
+            s_op->resp.u.getattr.attr.u.dir.hint.dist_params = NULL;
         }
+/*
         if (s_op->val_a[DIST_PARAMS_KEY].buffer)
         {
-/*           s_op->val_a[DIST_PARAMS_KEY].buffer = NULL; */
+            s_op->val_a[DIST_PARAMS_KEY].buffer = NULL; 
         }
+*/
 
         if (s_op->error_a[DEFAULT_NUM_DFILES_KEY] == 0)
         {
+            long int dfile_count = 0;
             char *endptr = NULL;
             gossip_debug(GOSSIP_SERVER_DEBUG,
                          "val_a[DEFAULT_NUM_DFILES_KEY] %p read_sz = %d\n", 
@@ -2032,13 +2038,16 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
             /* force the dfile_count */
             s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = 
                   s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count;
+            KEEP_BUFFER(SERVER_LIST_KEY);
         }
         else
         {
             s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count = 0;
             s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize = 0;
+            s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers = NULL;
         }            
 
+        s_op->free_val = 1; /* free everything that is not KEEP_BUF */
         free_keyval_buffers(s_op);
 
         gossip_debug(GOSSIP_SERVER_DEBUG, "getattr: dir hint dfile_count: %d\n",
