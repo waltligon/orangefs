@@ -197,11 +197,11 @@ do {                                             \
 /* max count of dirent handles associated with a directory */
 #define PVFS_REQ_LIMIT_DIRENT_FILE_COUNT 1024
 /* max number of handles for which we return attributes */
-#define PVFS_REQ_LIMIT_LISTATTR 60
+#define PVFS_REQ_LIMIT_LISTATTR PVFS_SYS_LIMIT_LISTATTR
 /* max count of directory entries per readdir request */
 #define PVFS_REQ_LIMIT_DIRENT_COUNT 512
 /* max count of directory entries per readdirplus request */
-#define PVFS_REQ_LIMIT_DIRENT_COUNT_READDIRPLUS PVFS_REQ_LIMIT_LISTATTR
+#define PVFS_REQ_LIMIT_DIRENT_COUNT_READDIRPLUS PVFS_SYS_LIMIT_LISTATTR
 /* max number of perf metrics returned by mgmt perf mon op */
 #define PVFS_REQ_LIMIT_MGMT_PERF_MON_COUNT 16
 /* max number of events returned by mgmt event mon op */
