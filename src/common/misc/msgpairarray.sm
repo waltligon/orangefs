@@ -265,6 +265,12 @@ static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
             gossip_err("count mismatch from pjmp in MPA\n");
         }
 
+        gossip_err("%s:submop->total-size(%d)\n"
+                  ,__func__
+                  ,submop->total_size);
+
+        mop->total_size += submop->total_size;
+
         /* What if there more multiple return codes? */
         /* send all return codes to caller */
         js_p->error_code = error_code;
@@ -1062,7 +1068,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
             if (msg_p->msgdir == PVFS_IO_WRITE)
             {
                 /* bytes written comes from write ack */
-                mop->total_size += resp_p->u.write_completion.total_completed;
+                mop->total_size = resp_p->u.write_completion.total_completed;
                 gossip_err("%s:mop->total_size(%d):resp->total_completed(%d)\n"
                           ,__func__,mop->total_size,(int)resp_p->u.write_completion.total_completed);
             }

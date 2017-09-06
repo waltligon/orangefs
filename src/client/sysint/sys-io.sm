@@ -2111,6 +2111,9 @@ static PINT_sm_action io_analyze_results(struct PINT_smcb *smcb,
 
         /* total size is calculated by MPA */
         sm_p->u.io.total_size = sm_p->msgarray_op.total_size;
+        gossip_err("%s:sm_p->msgarray_op.total_size(%d)\n"
+                  ,__func__
+                  ,sm_p->msgarray_op.total_size);
         gossip_debug(GOSSIP_IO_DEBUG, "total size is %d\n",
                      (int)sm_p->u.io.total_size);
 
