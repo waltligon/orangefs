@@ -90,7 +90,11 @@ static DOTCONF_CB(get_sid);
 static DOTCONF_CB(get_address_list);
 static DOTCONF_CB(get_type_list);
 static DOTCONF_CB(get_attribute_list);
+
+#if 0
 static DOTCONF_CB(check_this_server);
+#endif
+
 #ifdef USE_TRUSTED
 static DOTCONF_CB(get_trusted_portlist);
 static DOTCONF_CB(get_trusted_network);
@@ -175,7 +179,10 @@ static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
 
 /* internal helper functions */
+#if 0
 static int is_valid_alias(PINT_llist * host_aliases, char *str);
+#endif
+
 static int is_valid_host(host_alias_t *host);
 static void free_host_alias(void *ptr);
 static int compare_fs_id(void *a, void *b);
@@ -568,7 +575,7 @@ static const configoption_t options[] =
     /* Defines the server alias for the server specific options that
      * are to be set within the ServerOptions context.
      */
-    {"Server", ARG_STR, check_this_server, NULL, CTX_SERVER_OPTIONS, NULL},
+//    {"Server", ARG_STR, check_this_server, NULL, CTX_SERVER_OPTIONS, NULL},
 
     /* This groups options specific to a file system.  An OrangeFS server may manage
      * more than one file system, so a config file may have more than
@@ -1930,6 +1937,7 @@ DOTCONF_CB(enter_server_options_context)
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = CTX_SERVER_OPTIONS;
+    config_s->my_server_options = 1;
 
     return PINT_dotconf_set_defaults(cmd->configfile, CTX_SERVER_OPTIONS);
 }
@@ -1938,11 +1946,12 @@ DOTCONF_CB(exit_server_options_context)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = CTX_GLOBAL;
+    config_s->configuration_context = CTX_SERVERDEF;
     config_s->my_server_options = 0;
     return NULL;
 }
 
+#if 0
 DOTCONF_CB(check_this_server)
 {
     struct server_configuration_s *config_s =
@@ -1965,6 +1974,7 @@ DOTCONF_CB(check_this_server)
     }
     return NULL;
 }
+#endif
 
 DOTCONF_CB(enter_distribution_context)
 {
@@ -4302,6 +4312,7 @@ static int is_valid_host(host_alias_t *host)
     return 1; /* true, it is valid */
 }
 
+#if 0
 /* This function checks to see of the alias pointed to by str is already
  * present on the list of aliases pointed to by host_aliases.
  */
@@ -4334,6 +4345,7 @@ static int is_valid_alias(PINT_llist * host_aliases, char *str)
     }
     return ret; /* false, it is not valid (not found) */
 }
+#endif
 
 static int is_populated_filesystem_configuration(
         struct filesystem_configuration_s *fs)
