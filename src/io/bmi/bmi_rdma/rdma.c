@@ -4250,7 +4250,7 @@ retry_connect:
                            "resolving a server address. If your servers have "
                            "both ethernet and IB interfaces, make sure you "
                            "are using the IB device name in your config and "
-                           "tab files.");
+                           "tab files.\n");
             }
 
             return -BMI_EHOSTNTFD;
@@ -4272,13 +4272,27 @@ retry_connect:
 
             return event_copy.status;
         }
+        else if (event_copy.event == RDMA_CM_EVENT_REJECTED)
+        {
+            error("%s: got event %s: status=%d (%s)",
+                  __func__,
+                  rdma_event_str(event_copy.event),
+                  event_copy.status,
+                  strerror(-event_copy.status));
+
+            if (rdma_map->c)
+            {
+                /* clean up so that later retries know to try to reconnect */
+                rdma_close_connection(rdma_map->c);
+            }
+
+            return -BMI_ECONNREFUSED;
+        }
         else
         {
             error("%s: rdma_get_cm_event() found unhandled event %s",
                   __func__, rdma_event_str(event_copy.event));
         }
-
-        /* TODO: retry to connect if RDMA_CM_EVENT_REJECTED? */
     }
 
     return 0;
@@ -4373,17 +4387,7 @@ static int rdma_client_connect(rdma_method_addr_t *rdma_map,
 
 error_out:
 
-    if (ec)
-    {
-        if (conn_id)
-        {
-            rdma_destroy_id(conn_id);
-            conn_id = NULL;
-        }
-
-        rdma_destroy_event_channel(ec);
-        ec = NULL;
-    }
+    /* NOTE: the id and event channel are cleaned up in rdma_close_connection */
 
     if (addrinfo)
     {
