@@ -5513,6 +5513,14 @@ static int BMI_rdma_finalize(void)
         }
     }
 
+    /* destroy QPs and other connection structures */
+    while (rdma_device->connection.next != &rdma_device->connection)
+    {
+        rdma_connection_t *c =
+                (rdma_connection_t *) rdma_device->connection.next;
+        rdma_close_connection(c);
+    }
+
     /* if server, stop listening */
     if (rdma_device->listen_id)
     {
@@ -5539,14 +5547,6 @@ static int BMI_rdma_finalize(void)
 
         free(rdma_map->hostname);
         free(rdma_device->listen_addr);
-    }
-
-    /* destroy QPs and other connection structures */
-    while (rdma_device->connection.next != &rdma_device->connection)
-    {
-        rdma_connection_t *c =
-                (rdma_connection_t *) rdma_device->connection.next;
-        rdma_close_connection(c);
     }
 
     memcache_shutdown(rdma_device->memcache);
