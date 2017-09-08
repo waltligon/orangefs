@@ -270,11 +270,14 @@ PVFS_error PVFS_isys_getattr(PVFS_object_ref ref,
                   sizeof(PVFS_handle),
                   &ref.handle);
 
+    gossip_err("%s: incoming attrmask(0x%0x)\n",__func__,attrmask);
+
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                ref,
                                PVFS_util_sys_to_object_attr_mask(attrmask),
                                PVFS_TYPE_NONE,
                                0);
+    gossip_err("%s: translated attrmask(0x%0x)\n",__func__,sm_p->getattr.req_attrmask);
 
     return PINT_client_state_machine_post(smcb, op_id, user_ptr);
 }
@@ -348,6 +351,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
      * then we can make a copy of the retrieved attribute for later
      * caching.
      */
+    gossip_err("%s:resp_p->u.getattr.attr.mask(0x%0x)\n",__func__,resp_p->u.getattr.attr.mask);
     PINT_copy_object_attr(&sm_p->getattr.attr,
                           &resp_p->u.getattr.attr);
 
@@ -432,37 +436,19 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                              "getattr_object_getattr_comp_fn: "
                              "%d datafiles.\n", attr->u.meta.dfile_count);
                 
-                /* if we need the size, that should be the only time we're 
-                 * going to have to do a full data file fetch. 
-                 * (that's expensive)
+                /* if caller asked for the latest size and time
+                 * stamps, then we need
+                 * to jump to the datafile_getattr state, which
+                 * will retrieve the datafile sizes for us.
+                 * NOTE:  if the file size was retrieved using the "fast" method,
+                 * meaning that the file size is approximate, it will have been
+                 * copied into the getattr structure in the PINT_copy step above.
                  */
-                if (attr->mask & PVFS_ATTR_DATA_SIZE)
-                {
-
-/* stuffed going away - may want some code here later */
-#if 0
-                    /* is the file stuffed? */
-                    if(!(attr->mask & PVFS_ATTR_META_UNSTUFFED))
-                    {
-                        /* we can compute the size without doing any more
-                         * getattr requests
-                         */
-                        gossip_debug(GOSSIP_GETATTR_DEBUG,
-                            "getattr_object_getattr_comp_fn: "
-                            "detected stuffed file.\n");
-                        return(0);
-                    }
-#endif
-                    /* if caller asked for the latest size and time
-                     * stamps, then we need
-                     * to jump to the datafile_getattr state, which
-                     * will retrieve the datafile sizes for us.
-                     */
-                    if (sm_p->getattr.req_attrmask & PVFS_ATTR_LATEST)
-                    {
-                        return GETATTR_NEED_DATAFILE_ATTRS;
-                    }
-                }
+                 gossip_err("%s:sm_p->getattr.req_attrmask(0x%08x)\n",__func__,sm_p->getattr.req_attrmask);
+                 if (sm_p->getattr.req_attrmask & PVFS_ATTR_LATEST)
+                 {
+                     return GETATTR_NEED_DATAFILE_ATTRS;
+                 }
             }
             return 0;
         case PVFS_TYPE_DIRECTORY:

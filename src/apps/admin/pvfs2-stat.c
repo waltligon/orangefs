@@ -253,7 +253,11 @@ static int do_stat(const char             * pszFile,
    ref = lk_response.ref;
 
    ret = PVFS_sys_getattr(ref, 
-                          PVFS_ATTR_SYS_ALL_NOHINT,
+                          /*for now, we want to always gather the data size by
+                           *accessing the datafile.  The "fastest" logic is not
+                           *present yet.
+                           */
+                          (PVFS_ATTR_SYS_ALL_VALID ^ PVFS_ATTR_SYS_FASTEST),
                           credentials, 
                           &getattr_response,
                           NULL);
