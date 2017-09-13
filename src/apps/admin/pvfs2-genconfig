@@ -1294,9 +1294,9 @@ sub rdma_get_port
         $port = $opt_rdmaport;
     } elsif (!$opt_iospec) {
         if (!$opt_quiet) {
-            print $OUT "Choose an RDMA port for the servers to listen on. \n";
-            print $OUT "Script assumes that all servers will use the same port number.\n";
-            $port = prompt_num("Enter port number [Default is 1]: ","1");
+            print $OUT "Choose a TCP/IP port for the servers to listen on for RDMA communications.\n";
+            print $OUT "Note that this script assumes that all servers will use the same port number.\n";
+            $port = prompt_num("Enter port number [Default is 3335]: ","3335");
         }
     }
     return $port;
