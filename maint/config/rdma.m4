@@ -26,7 +26,7 @@ AC_DEFUN([AX_RDMA],
 	if test -z "$withval" -o "$withval" = yes ; then
 		AC_MSG_ERROR([Option --with-rdma-libs requires path to RDMA libraries.])
 	elif test "$withval" != no ; then
-		RDMA_LIBDIR="withval"
+		RDMA_LIBDIR="$withval"
 	fi
 	)
 	dnl If supplied the incls and libs explicitly, use them, else populate them
