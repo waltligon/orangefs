@@ -1743,23 +1743,18 @@ struct PVFS_servresp_readdir
     /* array of directory entries */
     PVFS_dirent *dirent_array;
     uint32_t dirent_count;   /* # of entries retrieved */
-    PVFS_SID *sid_array;
-    uint32_t sid_count;
     uint64_t directory_version;
 };
-endecode_fields_3a1a_struct(
+endecode_fields_3a_struct(
     PVFS_servresp_readdir,
     PVFS_ds_position, token,
     uint64_t, directory_version,
     skip4,,
     uint32_t, dirent_count,
-    PVFS_dirent, dirent_array,
-    skip4,,
-    uint32_t, sid_count,
-    PVFS_SID, sid_array);
+    PVFS_dirent, dirent_array);
 #define extra_size_PVFS_servresp_readdir \
-           (roundup8(PVFS_REQ_LIMIT_DIRENT_COUNT * (PVFS_NAME_MAX + 1 + 8)) + \
-            PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID))
+           (roundup8(PVFS_REQ_LIMIT_DIRENT_COUNT * (sizeof(PVFS_dirent) + \
+              PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID))))
 
 /* getconfig ***************************************************/
 /* - retrieves initial configuration information from server */

@@ -129,19 +129,13 @@ static PINT_sm_action readdir_iterate_on_entries(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
     }
-    s_op->resp.u.readdir.sid_count = s_op->metasidcnt *
-                                     s_op->req->u.readdir.dirent_count;
-
 
     kv_array_size = (s_op->req->u.readdir.dirent_count *
                      sizeof(PVFS_ds_keyval));
 
-    s_op->u.readdir.keyval_db_entries = (PVFS_ID *) malloc(
-                    OSASZ(s_op->req->u.readdir.dirent_count, s_op->metasidcnt));
-
     memory_size = (2 * kv_array_size +
-                   OSASZ(s_op->req->u.readdir.dirent_count,
-                         s_op->resp.u.readdir.sid_count));
+                   s_op->req->u.readdir.dirent_count *
+                  (sizeof(PVFS_dirent) + SASZ(s_op->metasidcnt)));
 
     memory_buffer = malloc(memory_size);
     if (!memory_buffer)
@@ -159,23 +153,12 @@ static PINT_sm_action readdir_iterate_on_entries(struct PINT_smcb *smcb,
 
     s_op->resp.u.readdir.dirent_array = (PVFS_dirent *)memory_buffer;
 
-    memory_buffer += s_op->req->u.readdir.dirent_count *
-                     sizeof(PVFS_dirent);
-
-    s_op->resp.u.readdir.sid_array = (PVFS_SID *)memory_buffer;
-
-/* V3 move to func decl */
-    PVFS_ID *buffer_location = s_op->u.readdir.keyval_db_entries;
-
     for (j = 0; j < s_op->req->u.readdir.dirent_count; j++)
     {
-    	s_op->key_a[j].buffer = s_op->resp.u.readdir.dirent_array[j].d_name;
     	s_op->key_a[j].buffer_sz = PVFS_NAME_MAX;
-        //TJS: Change this to dump into the keyval_db_entries
-    	s_op->val_a[j].buffer = &(buffer_location);
-    	s_op->val_a[j].buffer_sz = s_op->metasidcnt + 1;
-
-        buffer_location += s_op->metasidcnt + 1;
+        s_op->key_a[j].buffer = s_op->resp.u.readdir.dirent_array[j].d_name;
+    	s_op->val_a[j].buffer_sz = OSASZ(1, s_op->metasidcnt);
+    	s_op->val_a[j].buffer = &s_op->resp.u.readdir.dirent_array[j].handle;
     }
 
     gossip_debug(
@@ -226,7 +209,7 @@ static PINT_sm_action readdir_setup_resp(struct PINT_smcb *smcb,
         PVFS_perror_gossip("readdir_setup_resp failed: ", js_p->error_code);
         return SM_ACTION_COMPLETE;
     }
-
+#if 0
 /* V3 move to func decl */
 
     /* Iterates over entries retrieved from database and copies them
@@ -236,6 +219,11 @@ static PINT_sm_action readdir_setup_resp(struct PINT_smcb *smcb,
     {
         /* Get the handle from the appropriate entry in the keyval
          * temporary place holder */
+#if 0
+        s_op->resp.u.readdir.dirent_array[j].d_name = 
+                s_op->u.readdir.keyval_db_entries[j * (s_op->metasidcnt)].d_name;
+#endif
+
         s_op->resp.u.readdir.dirent_array[j].handle = 
                 s_op->u.readdir.keyval_db_entries[j * (s_op->metasidcnt + 1)].oid;
 
@@ -247,12 +235,12 @@ static PINT_sm_action readdir_setup_resp(struct PINT_smcb *smcb,
         }
         
     }
+#endif
 
     s_op->resp.u.readdir.directory_version =
                     s_op->u.readdir.directory_version;
 
     s_op->resp.u.readdir.dirent_count = js_p->count;
-    s_op->resp.u.readdir.sid_count = s_op->metasidcnt;
 
     /*
      * Although, this is not as important to get ls

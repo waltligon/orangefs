@@ -338,9 +338,11 @@ static int readdir_msg_comp_fn(void *v_p,
         *sm_p->readdir_state.sid_array = (PVFS_SID *)malloc(sid_array_len);
         assert(*sm_p->readdir_state.sid_array);
 
+#if 0
         memcpy(*sm_p->readdir_state.sid_array,
                resp_p->u.readdir.sid_array,
                sid_array_len);
+#endif
     }
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "*** Got %d directory entries "
@@ -452,8 +454,11 @@ static PINT_sm_action readdir_init(struct PINT_smcb *smcb,
 
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->object_ref,
+/*
                                PVFS_ATTR_DIR_ALL | PVFS_ATTR_CAPABILITY |
-                                                   PVFS_ATTR_DISTDIR_ATTR,
+                               PVFS_ATTR_DISTDIR_ATTR | PVFS_ATTR_LATEST,
+*/
+                               PVFS_ATTR_READ_ALL_LATEST,
                                PVFS_TYPE_DIRECTORY,
                                0);
 

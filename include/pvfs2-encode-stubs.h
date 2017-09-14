@@ -42,6 +42,10 @@
 #else  /* __PINT_REQPROTO_ENCODE_FUNCS_C */
 
 /* dummy declarations to turn off functions */
+#define encode_here_string(t2,x1) struct endecode_fake_struct
+#define decode_here_string(t2,x1) struct endecode_fake_struct
+#define encode_uint32_t(t1,x1) struct endecode_fake_struct
+#define decode_uint32_t(t1,x1) struct endecode_fake_struct
 #define endecode_fields_1(n,t1,x1) struct endecode_fake_struct
 #define endecode_fields_1_struct(n,t1,x1) struct endecode_fake_struct
 #define endecode_fields_2(n,t1,x1,t2,x2) struct endecode_fake_struct
