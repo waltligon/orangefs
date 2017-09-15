@@ -659,24 +659,12 @@ void dbpf_collection_deregister(struct dbpf_collection *entry);
 /* function for mapping db errors to trove errors */
 PVFS_error dbpf_db_error_to_trove_error(int db_error_value);
 
-#define DBPF_OPEN   open
-#define DBPF_WRITE  write
-#define DBPF_LSEEK  lseek
-#define DBPF_READ   read
-#define DBPF_CLOSE  close
-#define DBPF_UNLINK unlink
-#define DBPF_SYNC   fdatasync
-#define DBPF_RESIZE ftruncate
-#define DBPF_FSTAT  fstat
-#define DBPF_ACCESS access
-#define DBPF_FCNTL  fcntl
-
 #define DBPF_AIO_SYNC_IF_NECESSARY(dbpf_op_ptr, fd, ret)  \
 do {                                                      \
     int tmp_ret, tmp_errno;                               \
     if (dbpf_op_ptr->flags & TROVE_SYNC)                  \
     {                                                     \
-        if ((tmp_ret = DBPF_SYNC(fd)) != 0)               \
+        if ((tmp_ret = fdatasync(fd)) != 0)               \
         {                                                 \
             tmp_errno = errno;                            \
             ret = -trove_errno_to_trove_error(tmp_errno); \
@@ -695,7 +683,7 @@ do {                                                     \
     int tmp_ret, tmp_errno;                              \
     if (dbpf_op_ptr->flags & TROVE_SYNC)                 \
     {                                                    \
-        if ((tmp_ret = DBPF_SYNC(fd)) != 0)              \
+        if ((tmp_ret = fdatasync(fd)) != 0)              \
         {                                                \
             tmp_errno = errno;                           \
             gossip_err("[fd = %d] SYNC failed: %s\n",    \

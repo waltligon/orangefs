@@ -51,6 +51,10 @@
     keep_keyval_buffers(s_op, buf);
 
 
+/* This was moved to src/server/pvfs2-server.c so it is
+ * visible across the server code
+ */
+#if 0
 /* These are defined in src/common/misc/pvfs2-internal.h
  * This table SHOULD be defined using macros not the strings
  * See Trove_Common_Keys in src/server/pvfs2-server.c
@@ -69,6 +73,7 @@ PINT_server_trove_keys_s Trove_Special_Keys[] =
     {"user.pvfs2.mirror.handles", SPECIAL_MIRROR_HANDLES_KEYLEN},
     {"user.pvfs2.mirror.status" , SPECIAL_MIRROR_STATUS_KEYLEN},
 };
+#endif
 
 enum
 {
@@ -1719,8 +1724,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
     if (js_p->error_code == -TROVE_ENOENT)
     {
         gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     "getattr: no DIST_DIR_ATTR key present, "
-                     "not getting DIR_HINTS! \n");
+        "getattr: no DIST_DIR_ATTR key present, not getting DIR_HINTS! \n");
         return SM_ACTION_COMPLETE;
     }
 
@@ -2017,9 +2021,15 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
             /* no error, so set the count from the list */
             /* list should be in the buffer of the k/v read */
             s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count = 
-                    atoi(s_op->val_a[SERVER_LIST_KEY].buffer);
+                    strtol(s_op->val_a[SERVER_LIST_KEY].buffer,
+                    NULL,
+                    10);
+            /* WBL
+             * should this be s_op->val_a[SERVER_LIST_KEY].read_sz ? 
+             * instead of strlen(buffer) and if not, should it be
+             * strlen + 1 ? */
             s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize = 
-                    strlen(s_op->val_a[SERVER_LIST_KEY].buffer);
+                    strlen(s_op->val_a[SERVER_LIST_KEY].buffer) + 1;
             /* force the dfile_count */
             s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = 
                   s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count;

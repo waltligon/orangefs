@@ -395,7 +395,7 @@ int iocommon_parse_serverlist(char *serverlist,
         errno = EINVAL;
         return -1;
     }
-    slist->count = atoi(tok);
+    slist->count = strtol(tok, NULL, 10);
 /* V3 cleanup */
 #if 0
     PINT_cached_config_count_servers(fsid, PINT_SERVER_TYPE_IO, &count);
@@ -443,9 +443,16 @@ int iocommon_parse_serverlist(char *serverlist,
         return ret;
     }
     for (i = 0; i < slist->count; i++)
-    {
+    {   
+        int tokval;
         tok = strtok_r(NULL, ":", &save_ptr);
-        if (!tok || atoi(tok) < 0 || atoi(tok) >= count)
+        if (!tok)
+        {
+            errno = EINVAL;
+            return -1;
+        }
+        tokval = strtol(tok, NULL, 10);
+        if (tokval < 0 || tokval >= count)
         {
             free(slist->servers);
             slist->servers = NULL;
@@ -453,7 +460,7 @@ int iocommon_parse_serverlist(char *serverlist,
             errno = EINVAL;
             return -1;
         }
-        slist->servers[i] = server_array[atoi(tok)];
+        slist->servers[i] = server_array[tokval];
     }
     free(server_array);
     return 0;

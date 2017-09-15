@@ -118,7 +118,7 @@ enum
  *
  * WBL V3 Uncomment this declaration if it doesn't cause problems
  */
-/* extern PINT_server_trove_keys_s Trove_Special_Keys[]; */
+extern PINT_server_trove_keys_s Trove_Special_Keys[];
 /* optional; user-settable keys */
 enum 
 {

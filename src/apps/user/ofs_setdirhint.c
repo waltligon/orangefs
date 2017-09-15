@@ -133,6 +133,7 @@ int main(int argc, char **argv)
                 else if (ret < 0)
                 {
                     perror("dist name");
+                    return ret;
                 }
             }
             if (user_opts.dist_params)
@@ -155,12 +156,13 @@ int main(int argc, char **argv)
                 user_opts.layout <= PVFS_SYS_LAYOUT_MAX)
             {
                 char layout_str[10];
-                sprintf(layout_str, "%05d", user_opts.layout);
+                int slen;
+                slen = snprintf(layout_str, 10, "%05d", user_opts.layout);
                 ret = fsetxattr(fd,
-                               "user.pvfs2.layout",
-                               layout_str,
-                               strlen(layout_str) + 1,
-                               flags);
+                                "user.pvfs2.layout",
+                                layout_str,
+                                slen + 1,
+                                flags);
                 if (ret == 0 && user_opts.verbose)
                 {
                     fprintf(stderr, "Layout set to %d\n", user_opts.layout);
@@ -168,6 +170,7 @@ int main(int argc, char **argv)
                 else if (ret < 0)
                 {
                     perror("layout");
+                    return ret;
                 }
             }
             if (user_opts.layout == PVFS_SYS_LAYOUT_LIST &&
@@ -184,6 +187,7 @@ int main(int argc, char **argv)
                 if (!layout)
                 {
                     perror("create_layout");
+                    return ret;
                 }
                 eattr_str = (char *)malloc(PVFS_SYS_LIMIT_LAYOUT);
                 ret = pvfs_layout_string(layout,
@@ -194,7 +198,7 @@ int main(int argc, char **argv)
                     perror("layout_string");
                     return ret;
                 }
-                strsz = strlen(eattr_str);
+                strsz = strlen(eattr_str) + 1;
                 ret = fsetxattr(fd,
                                 "user.pvfs2.server_list",
                                 eattr_str,
@@ -208,6 +212,7 @@ int main(int argc, char **argv)
                 else if (ret < 0)
                 {
                     perror("server list");
+                    return ret;
                 }
                 user_opts.num_dfiles = layout->server_list.count;
                 pvfs_release_layout(layout);
@@ -216,12 +221,16 @@ int main(int argc, char **argv)
             if (user_opts.num_dfiles > 0)
             {
                 char num_dfiles_str[10];
-                sprintf(num_dfiles_str, "%05d", user_opts.num_dfiles);
+                int slen;
+                slen = snprintf(num_dfiles_str,
+                                10,
+                                "%05d",
+                                user_opts.num_dfiles);
                 ret = fsetxattr(fd,
-                               "user.pvfs2.num_dfiles",
-                               num_dfiles_str,
-                               strlen(num_dfiles_str) + 1,
-                               flags);
+                                "user.pvfs2.num_dfiles",
+                                num_dfiles_str,
+                                slen + 1,
+                                flags);
                 if (ret == 0 && user_opts.verbose)
                 {
                     fprintf(stderr, "Number of dfiles set to %d\n",
