@@ -910,14 +910,6 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
             assert(attr->u.meta.dist_size > 0);
             assert(attr->u.meta.dfile_array);
             assert(attr->u.meta.dfile_count > 0);
-/* V3 remove */
-#if 0
-            if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
-            {
-                assert(attr->u.meta.mirror_dfile_array);
-                assert(attr->u.meta.mirror_copies_count);
-            }
-#endif
             break;
         case PVFS_TYPE_DIRECTORY:
             js_p->error_code = -PVFS_EISDIR;
@@ -971,7 +963,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
                                    attr->u.meta.dfile_array,
                                    attr->u.meta.dfile_count,
                                    attr->u.meta.sid_array,
-                                   attr->u.meta.sid_count,
+                                   attr->u.meta.sid_count + 1,
                                    sm_p->u.io.datafile_index_array,
                                    &target_datafile_count,
                                    sio_array); 
@@ -1061,7 +1053,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->retry_count = 0;
 
-        msg_p->sid_count = attr->u.meta.sid_count / attr->u.meta.dfile_count;
+        msg_p->sid_count = (attr->u.meta.sid_count + 1) / attr->u.meta.dfile_count;
         msg_p->sid_index = 0;
         msg_p->sid_array = &attr->u.meta.sid_array[
                       msg_p->sid_count * sm_p->u.io.datafile_index_array[i]];
@@ -3296,7 +3288,7 @@ static int io_find_target_datafiles(PVFS_Request mem_req,
          */
         tmp_result.bytemax = max_unexp_payload + 1;
         tmp_result.segmax = 1;
-        
+
         tmp_result.offset_array = &offsets;
         tmp_result.size_array = &sizes;
         total_bytes = 0;

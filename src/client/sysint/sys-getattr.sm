@@ -351,11 +351,11 @@ static int getattr_object_getattr_comp_fn(void *v_p,
      * then we can make a copy of the retrieved attribute for later
      * caching.
      */
-    gossip_err("%s:resp_p->u.getattr.attr.mask(0x%0x)\n",__func__,resp_p->u.getattr.attr.mask);
     PINT_copy_object_attr(&sm_p->getattr.attr,
                           &resp_p->u.getattr.attr);
 
     attr = &sm_p->getattr.attr;  /* returned atributes */
+
 
     /* if the ref_type mask is set to a non-zero value (!PVFS_TYPE_NONE)
      * a -PVFS_error will be triggered if the
