@@ -113,7 +113,8 @@ enum PVFS_server_op
   || (x) == PVFS_SERV_MGMT_REMOVE_DIRENT)
 
 #define PVFS_REQ_COPY_CAPABILITY(__cap, __req) \
-    assert(PINT_copy_capability(&(__cap), &((__req).capability)) == 0)
+    { int rc = PINT_copy_capability(&(__cap), &((__req).capability)); \
+    assert(rc == 0); }
 
 /******************************************************************/
 /* This struct ised used to control the way the server passes requests
@@ -458,12 +459,12 @@ do {                                                                       \
 struct PVFS_servresp_create
 {
     PVFS_capability capability;
-    int32_t stuffed;
+    PVFS_object_attr metafile_attrs;
 };
 endecode_fields_2_struct(
     PVFS_servresp_create,
     PVFS_capability, capability,
-    int32_t, stuffed);
+    PVFS_object_attr, metafile_attrs);
 #define extra_size_PVFS_servresp_create extra_size_PVFS_capability
 
 /* batch_create *********************************************************/
@@ -1821,7 +1822,7 @@ struct PVFS_servreq_mirror
    int i;                                                \
    decode_PVFS_handle(pptr,&(x)->src_handle);            \
    decode_PVFS_fs_id(pptr,&(x)->fs_id);                  \
-   decode_PINT_dist(pptr,&(x)->dist);                    \
+   decode_PINT_dist(pptr,&(x)->dist,NULL);               \
    decode_uint32_t(pptr,&(x)->bsize);                    \
    decode_uint32_t(pptr,&(x)->src_server_nr);            \
    decode_uint32_t(pptr,&(x)->dst_count);                \
@@ -2019,7 +2020,7 @@ struct PVFS_servreq_io
     decode_enum(pptr, &(x)->flow_type);                            \
     decode_uint32_t(pptr, &(x)->server_nr);                        \
     decode_uint32_t(pptr, &(x)->server_ct);                        \
-    decode_PINT_dist(pptr, &(x)->io_dist);                         \
+    decode_PINT_dist(pptr, &(x)->io_dist, NULL);                   \
     decode_PINT_Request(pptr, &(x)->file_req);                     \
     PINT_request_decode((x)->file_req); /* unpacks the pointers */ \
     decode_PVFS_offset(pptr, &(x)->file_req_offset);               \
@@ -2149,7 +2150,7 @@ struct PVFS_servreq_small_io
     decode_uint32_t(pptr, &(x)->sid_count); \
     (x)->sid_array = (*pptr); \
     (*pptr) += (x)->sid_count * sizeof(PVFS_SID); \
-    decode_PINT_dist(pptr, &(x)->dist); \
+    decode_PINT_dist(pptr, &(x)->dist, NULL); \
     decode_PINT_Request(pptr, &(x)->file_req); \
     PINT_request_decode((x)->file_req); /* unpacks the pointers */ \
     decode_PVFS_offset(pptr, &(x)->file_req_offset); \

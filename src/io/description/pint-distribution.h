@@ -87,7 +87,10 @@ struct PINT_dist_s {
 };
 
 /* Macros to encode/decode distributions for sending requests */
-#define PINT_DIST_PACK_SIZE(d) (roundup8(sizeof(*(d))) + \
+
+/* compute encoded size of PINT_dist */
+#define PINT_DIST_PACK_SIZE(d) (((d)->dist_name[0] == 0) ? 8 : \
+                                roundup8(sizeof(*(d))) + \
                                 roundup8((d)->name_size) + \
                                 roundup8((d)->param_size))
 
@@ -108,21 +111,21 @@ do { PINT_dist *px = *(x); \
 
 /* If we convert req endecode macros to inlines add const support */
 
-static inline void encode_PINT_dist(char **pptr, PINT_dist **x)
+static inline void encode_PINT_dist(char **pptr, PINT_dist **dist)
 {
-    if (*x == NULL || (*x)->dist_name[0] == '\0') /* no name, no dist */
+    if (*dist == NULL || (*dist)->dist_name[0] == '\0') /* no name, no dist */
     {
         **pptr = '\0';
         *pptr += 8;  /* align to 8 */
         return;
     }
-    encode_string(pptr, (const char **)&(*x)->dist_name); 
-    if (!(*x)->methods)
+    encode_string(pptr, (const char **)&(*dist)->dist_name); 
+    if (!(*dist)->methods)
     { 
 	gossip_err("%s: encode_PINT_dist: methods is null\n", __func__); 
 	exit(1); 
     } 
-    ((*x)->methods->encode_lebf) (pptr, (*x)->params); 
+    ((*dist)->methods->encode_lebf) (pptr, (*dist)->params); 
     align8(pptr); 
 }
 
@@ -150,15 +153,19 @@ do { PINT_dist tmp_dist; \
 } while (0)
 #endif
 
-static inline int decode_PINT_dist(char **pptr, PINT_dist **x) 
+static inline int decode_PINT_dist(char **pptr, PINT_dist **dist, uint32_t *size) 
 {
     PINT_dist tmp_dist = {0}; 
     decode_string(pptr, &tmp_dist.dist_name); 
     if (tmp_dist.dist_name[0] == 0)
     {
-        /* empty string for distribution name */
-        *x = NULL;
-        *pptr += 8;  /* align to 8 */
+        /* empty string, has 8 bytes of zero */
+        *dist = NULL;
+        if (size)
+        {
+            *size = 8;
+        }
+        /* no need to align to 8, decode_string does that */
         return -1;
     }
     tmp_dist.params = 0; 
@@ -171,19 +178,24 @@ static inline int decode_PINT_dist(char **pptr, PINT_dist **x)
 	exit(1); 
     } 
     /* later routines assume dist is a big contiguous thing, do so */ 
-    *x = decode_malloc(PINT_DIST_PACK_SIZE(&tmp_dist)); 
-    if (!*x)
+    *dist = decode_malloc(PINT_DIST_PACK_SIZE(&tmp_dist)); 
+    if (!*dist)
     {
         /* out of memory */
         return -1;
     }
-    memcpy(*x, &tmp_dist, sizeof(PINT_dist)); 
+    memcpy(*dist, &tmp_dist, sizeof(PINT_dist)); 
 
-    (*x)->dist_name = (char *)(*x) + roundup8(sizeof(PINT_dist)); 
-    memcpy((*x)->dist_name, tmp_dist.dist_name, tmp_dist.name_size); 
+    (*dist)->dist_name = (char *)*dist + roundup8(sizeof(PINT_dist)); 
+    memcpy((*dist)->dist_name, tmp_dist.dist_name, tmp_dist.name_size); 
 
-    (*x)->params = (void *)((*x)->dist_name + roundup8((*x)->name_size)); 
-    ((*x)->methods->decode_lebf) (pptr, (*x)->params); 
+    (*dist)->params = (void *)((*dist)->dist_name + roundup8((*dist)->name_size)); 
+    ((*dist)->methods->decode_lebf) (pptr, (*dist)->params); 
+
+    if (size)
+    {
+        *size = PINT_DIST_PACK_SIZE(&tmp_dist);
+    }
 
     align8(pptr); 
     return 0;
@@ -195,13 +207,13 @@ static inline int decode_PINT_dist(char **pptr, PINT_dist **x)
 #endif
 
 /* Return a cloned copy of the distribution registered for name*/
-PINT_dist* PINT_dist_create(const char *name);
+PINT_dist *PINT_dist_create(const char *name);
 
 /* Deallocate resources in a PINT_dist */
 int PINT_dist_free(PINT_dist *dist);
 
 /* Return a cloned copy of dist */
-PINT_dist* PINT_dist_copy(const PINT_dist *dist);
+PINT_dist *PINT_dist_copy(const PINT_dist *dist);
 
 /* Makes a memcpy of the distribution parameters in buf.
  * buf must be allocated to the correct size */

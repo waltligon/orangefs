@@ -582,6 +582,8 @@ static PINT_sm_action getattr_interpret(
         return(SM_ACTION_COMPLETE);
     }
 
+/* this file is going away - not extracting it now */
+#if 0
     if(s_op->resp.u.unstuff.attr.mask & PVFS_ATTR_META_UNSTUFFED)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
@@ -589,6 +591,7 @@ static PINT_sm_action getattr_interpret(
         js_p->error_code = 0;
         return(SM_ACTION_COMPLETE);
     }
+#endif
 
 /*
   gossip_err("Attributes show file as stuffed.\n");

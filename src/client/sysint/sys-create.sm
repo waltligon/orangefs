@@ -1193,6 +1193,20 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     {
         /* fill in outgoing response fields */
         sm_p->u.create.create_resp->ref = sm_p->object_ref;
+        sm_p->u.create.create_resp->ref.sid_array = NULL;
+
+        sm_p->u.create.create_resp->ref.sid_array=calloc(sm_p->object_ref.sid_count,
+                                                         sizeof(*sm_p->object_ref.sid_array));
+        if (sm_p->u.create.create_resp->ref.sid_array == NULL)
+        {
+           gossip_err("%s: Error allocating memory for sid array.\n",__func__);
+           js_p->error_code = -PVFS_ENOMEM;
+           return SM_ACTION_COMPLETE;
+        }
+        memcpy(sm_p->u.create.create_resp->ref.sid_array
+              ,sm_p->object_ref.sid_array
+              ,sm_p->object_ref.sid_count * sizeof(*sm_p->object_ref.sid_array));
+
 
         /* V3 is this safe? we are saving a pointer to two object refs -
          * where are these allocated and freed?

@@ -777,9 +777,9 @@ out:
  *
  * returns 0 on success, -errno on failure
  */
-static int lebf_decode_req(void *input_buffer,
+static int lebf_decode_req(void *input_buffer, /* decoding from this buff */
                            int input_size,
-                           struct PINT_decoded_msg *target_msg,
+                           struct PINT_decoded_msg *target_msg, /* decoding to this */
                            PVFS_BMI_addr_t target_addr)
 {
     int ret = 0;
@@ -887,9 +887,9 @@ static int lebf_decode_req(void *input_buffer,
  *
  * returns 0 on success, -errno on failure
  */
-static int lebf_decode_resp(void *input_buffer,
+static int lebf_decode_resp(void *input_buffer, /* decoding from this buff */
                             int input_size,
-                            struct PINT_decoded_msg *target_msg,
+                            struct PINT_decoded_msg *target_msg, /* decoding to this */
                             PVFS_BMI_addr_t target_addr)
 {
     int ret = 0;

@@ -583,8 +583,9 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
         /* skip if the file is stuffed */
          if (sm_p->u.readdirplus.obj_attr_array[i].objtype ==
                      PVFS_TYPE_METAFILE &&
-             (sm_p->u.readdirplus.obj_attr_array[i].mask &
-                     PVFS_ATTR_META_UNSTUFFED))
+             /* unstuffed going away */        
+             0 /*(sm_p->u.readdirplus.obj_attr_array[i].mask &
+                     PVFS_ATTR_META_UNSTUFFED)*/ )
          {
              if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_ALL)
              {
@@ -625,8 +626,9 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
         /* skip if the file is stuffed */
          if (sm_p->u.readdirplus.obj_attr_array[i].objtype ==
                      PVFS_TYPE_METAFILE &&
-             (sm_p->u.readdirplus.obj_attr_array[i].mask &
-                     PVFS_ATTR_META_UNSTUFFED))
+             /* unstuffed going away */        
+             0 /*(sm_p->u.readdirplus.obj_attr_array[i].mask &
+                     PVFS_ATTR_META_UNSTUFFED)*/ )
          {
              int j;
              /* TODO are these REALLY asserts, or bad error checking */

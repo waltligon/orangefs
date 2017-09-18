@@ -216,7 +216,7 @@ void PINT_dist_encode(void *buffer, PINT_dist *dist)
 void PINT_dist_decode(PINT_dist **dist, void *buffer)
 {
     char *tmpbuf = (char *)buffer;
-    decode_PINT_dist(&tmpbuf, dist);
+    decode_PINT_dist(&tmpbuf, dist, NULL);
 }
 
 void PINT_dist_dump(PINT_dist *dist)
