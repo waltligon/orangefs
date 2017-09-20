@@ -1298,12 +1298,19 @@ static PINT_sm_action rename_cleanup(struct PINT_smcb *smcb,
        PINT_acache_invalidate(replaced_ref);
     }
 
+    /* cleanup stored capabilities */
+    PINT_cleanup_capability(&sm_p->u.rename.caps[0]);
+    PINT_cleanup_capability(&sm_p->u.rename.caps[1]);
+    PINT_cleanup_capability(&sm_p->parent_capability);
 
-
+    /* cleanup stored attributes */
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
+    /* cleanup msgpairarray */ 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+
     PINT_SET_OP_COMPLETE;
+
     return SM_ACTION_TERMINATE;
 }
 

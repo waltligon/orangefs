@@ -118,7 +118,7 @@ enum
  *
  * WBL V3 Uncomment this declaration if it doesn't cause problems
  */
-/* extern PINT_server_trove_keys_s Trove_Special_Keys[]; */
+extern PINT_server_trove_keys_s Trove_Special_Keys[];
 /* optional; user-settable keys */
 enum 
 {
@@ -173,14 +173,6 @@ typedef enum
 #define SERVER_CLIENT_INIT \
             SERVER_BMI_CLIENT_INIT | SERVER_TROVE_INIT | SERVER_FILESYS_INIT |\
             SERVER_FLOW_INIT | SERVER_CACHED_CONFIG_INIT
-
-typedef enum
-{   
-    PRELUDE_SCHEDULER_DONE     = (1 << 0),
-    PRELUDE_GETATTR_DONE       = (1 << 1),
-    PRELUDE_PERM_CHECK_DONE    = (1 << 2),
-    PRELUDE_LOCAL_CALL         = (1 << 3),
-} PINT_prelude_flag;
 
 struct PINT_server_create_op
 {
@@ -742,8 +734,6 @@ typedef struct PINT_server_op
     PVFS_fs_id target_fs_id;
     PVFS_object_attr *target_object_attr;
 
-    PINT_prelude_flag prelude_mask;
-
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
     
@@ -826,9 +816,6 @@ do {                                                                        \
       {                                                                     \
           __location = LOCAL_OPERATION;                                     \
           __req = __s_op->req;                                              \
-          __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE  |                  \
-                                 PRELUDE_PERM_CHECK_DONE |                  \
-                                 PRELUDE_LOCAL_CALL;                        \
       }                                                                     \
       else                                                                  \
       {                                                                     \
@@ -1004,7 +991,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
 /* server side state machines */
 extern struct PINT_state_machine_s pvfs2_mirror_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_call_msgpairarray_sm;
-extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_with_prelude_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_create_immutable_copies_sm;
@@ -1014,6 +1001,7 @@ extern struct PINT_state_machine_s pvfs2_pjmp_set_attr_work_sm;
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_set_attr_with_prelude_sm;
+extern struct PINT_state_machine_s pvfs2_get_attr_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_sm;

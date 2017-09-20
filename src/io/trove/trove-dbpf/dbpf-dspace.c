@@ -374,13 +374,13 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
 }
 
 static int dbpf_dspace_remove_list(TROVE_coll_id coll_id,
-                              TROVE_handle* handle_array,
-                              TROVE_ds_state *error_array,
-                              int count,
-                              TROVE_ds_flags flags,
-                              void *user_ptr,
-                              TROVE_context_id context_id,
-                              TROVE_op_id *out_op_id_p)
+                                   TROVE_handle* handle_array,
+                                   TROVE_ds_state *error_array,
+                                   int count,
+                                   TROVE_ds_flags flags,
+                                   void *user_ptr,
+                                   TROVE_context_id context_id,
+                                   TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_collection *coll_p = NULL;
@@ -460,8 +460,8 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
-static int remove_one_handle(TROVE_object_ref ref, 
-                             struct dbpf_collection* coll_p)
+static int remove_one_handle(TROVE_object_ref ref,
+                             struct dbpf_collection *coll_p)
 {
     int count = 0;
     int ret = -TROVE_EINVAL;
@@ -542,7 +542,7 @@ static int dbpf_dspace_remove_list_op_svc(struct dbpf_op *op_p)
         if(op_p->u.d_remove_list.error_p)
         {
             op_p->u.d_remove_list.error_p[i] = 
-                           remove_one_handle(ref, op_p->coll_p);
+                            remove_one_handle(ref, op_p->coll_p);
         }
         else
         {
@@ -596,9 +596,10 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     return DBPF_OP_COMPLETE;
 }
 
-int PINT_dbpf_dspace_remove_keyval(
-    dbpf_cursor *dbc, TROVE_handle handle, TROVE_keyval_s *key,
-    TROVE_keyval_s *val)
+int PINT_dbpf_dspace_remove_keyval(dbpf_cursor *dbc,
+                                   TROVE_handle handle,
+                                   TROVE_keyval_s *key,
+                                   TROVE_keyval_s *val)
 {
     int ret;
     ret = dbpf_db_cursor_del(dbc);
@@ -706,8 +707,11 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         data.data = &attr;
         data.len = sizeof(attr);
 
-        ret = dbpf_db_cursor_get(dbc, &key, &data, DBPF_DB_CURSOR_SET_RANGE,
-            sizeof dummy_handle);
+        ret = dbpf_db_cursor_get(dbc,
+                                 &key,
+                                 &data,
+                                 DBPF_DB_CURSOR_SET_RANGE,
+                                 sizeof dummy_handle);
         if (ret == TROVE_ENOENT)
         {
             goto return_ok;
@@ -730,8 +734,11 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         data.data = &attr;
         data.len = sizeof(attr);
 
-        ret = dbpf_db_cursor_get(dbc, &key, &data, DBPF_DB_CURSOR_FIRST,
-            sizeof(TROVE_handle));
+        ret = dbpf_db_cursor_get(dbc,
+                                 &key,
+                                 &data,
+                                 DBPF_DB_CURSOR_FIRST,
+                                 sizeof(TROVE_handle));
         if (ret == TROVE_ENOENT)
         {
             goto return_ok;
@@ -739,8 +746,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         else if (ret != 0)
         {
             ret = -ret;
-            gossip_err("failed to set cursor position: %llu\n",
-                       llu(*op_p->u.d_iterate_handles.position_p));
+            gossip_err("failed to set cursor position at handle: %s\n",
+                   PVFS_OID_str((TROVE_handle *)op_p->u.d_iterate_handles.position_p));
             goto return_error;
         }
     }
@@ -755,8 +762,11 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 
     while(i < *op_p->u.d_iterate_handles.count_p)
     {
-        ret = dbpf_db_cursor_get(dbc, &key, &data, DBPF_DB_CURSOR_NEXT,
-            sizeof dummy_handle);
+        ret = dbpf_db_cursor_get(dbc,
+                                 &key,
+                                 &data,
+                                 DBPF_DB_CURSOR_NEXT,
+                                 sizeof dummy_handle);
         if(ret == TROVE_ENOENT)
         {
             goto return_ok;
@@ -780,8 +790,11 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     data.data = &attr;
     data.len = sizeof(attr);
 
-    ret = dbpf_db_cursor_get(dbc, &key, &data, DBPF_DB_CURSOR_NEXT,
-        sizeof dummy_handle);
+    ret = dbpf_db_cursor_get(dbc,
+                             &key,
+                             &data,
+                             DBPF_DB_CURSOR_NEXT,
+                             sizeof dummy_handle);
     if (ret == TROVE_ENOENT)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- notfound\n");

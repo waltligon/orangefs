@@ -1414,6 +1414,15 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 }
 #endif
                 break;
+                if (resp->u.unstuff.attr.capability.signature)
+                {
+                   decode_free(resp->u.unstuff.attr.capability.signature);
+                }
+                if (resp->u.unstuff.attr.capability.handle_array)
+                {
+                   decode_free(resp->u.unstuff.attr.capability.handle_array);
+                }
+                break;
 
             case PVFS_SERV_MGMT_EVENT_MON:
                 decode_free(resp->u.mgmt_event_mon.event_array);

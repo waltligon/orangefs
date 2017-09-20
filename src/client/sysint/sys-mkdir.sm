@@ -75,9 +75,7 @@ machine pvfs2_client_mkdir_sm
     state mkdir_msg_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-/*        success => mkdir_seteattr_setup_msgpair; */
         success => mkdir_setattr_setup_msgpair;
-/*        success => cleanup; */
         default => mkdir_msg_failure;
     }
 
@@ -208,6 +206,12 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
         return ret;
     }
 
+    /* This does not seem right - this says that the mask must contain
+     * all of the flags in ALL_SETABLE but could also contain others
+     * is that really what we want?
+     * Or do we want to say all of the bits in mask are also in
+     * ALL_SETABLE?  that would be ((mask & ~ALL_SETABLE) == 0)
+     */
     if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) != PVFS_ATTR_SYS_ALL_SETABLE)
     {
         gossip_lerr("PVFS_isys_mkdir() failure: invalid attribute mask %d, "
@@ -237,10 +241,13 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     PINT_init_sysint_credential(sm_p->cred_p, credential);
 
     sm_p->u.mkdir.object_name = object_name;
+    
     PVFS_util_copy_sys_attr(&sm_p->u.mkdir.sys_attr, &attr);
+
     sm_p->u.mkdir.mkdir_resp = resp;
     sm_p->u.mkdir.stored_error_code = 0;
     sm_p->u.mkdir.retry_count = 0;
+
 
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints,
@@ -347,8 +354,7 @@ static int mkdir_msg_comp_fn(void *v_p,
         PVFS_hint_add(&sm_p->hints, PVFS_HINT_LOCAL_UID_NAME,
                       sizeof(PVFS_uid), &local_uid);
     }
- 
-    if (local_uid != (PVFS_uid) -1)
+    else  /* (local_uid != (PVFS_uid) -1) */
     {
         ret = PINT_client_capcache_update(sm_p->object_ref,
                   local_uid, &resp_p->u.mkdir.capability);
@@ -357,12 +363,28 @@ static int mkdir_msg_comp_fn(void *v_p,
                      __func__, ret);
     }
 
+/* WBL - REVIEW this - can we update attr without size array?
+ * can we avoid the following invalidation - what at the
+ * consequences of being a little out of date?  how much
+ * performance do we lose?  Can we pass new timestamps back
+ * so we can update cache rather then invalidate?  Is this the right
+ * place to invalidate anyway, this is the return of the mkdir not the
+ * crdirent, which would have updated the parent's stimestamp.
+ */
+
+#if 0 /* Don't cache size_array. */
+    PINT_acache_update(sm_p->object_ref, &attr, NULL, NULL);
+#endif
+
     /* invalidate the acache entry for the parent object, since a successful
      * mkdir has now changed the timestamps on the parent's dirdata handle, 
      * invalidating the timestamps stored with the parent.
      */
     PINT_acache_invalidate(sm_p->object_ref);
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "*** Got newly created dir handle %s\n",
+                 PVFS_OID_str(sm_p->u.mkdir.metadata_handle));
 
     return 0;
 }
