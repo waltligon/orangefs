@@ -2918,7 +2918,7 @@ static int BMI_ib_finalize(void)
     ib_device = NULL;
 
     gen_mutex_unlock(&interface_mutex);
-    debug(0, "BMI_tcp_finalize: IB module finalized.");
+    debug(0, "BMI_ib_finalize: IB module finalized.");
     return 0;
 }
 

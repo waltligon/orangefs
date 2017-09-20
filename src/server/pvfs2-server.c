@@ -48,6 +48,7 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-event.h"
 #include "pint-util.h"
+#include "client-state-machine.h"
 /* #include "pint-malloc.h" */
 #include "pint-sysint-utils.h"
 #include "pint-uid-mgmt.h"
@@ -1553,21 +1554,24 @@ static int server_check_if_root_directory_created( void )
 /* V3 */
 #if 0
         /*
-           check if root handle is in our handle range for this fs.
-           if it is, we're responsible for creating it on disk when
-           creating the storage space
+         * check if root handle is in our handle range for this fs.
+         * if it is, we're responsible for creating it on disk when
+         * creating the storage space
          */
         root_handle = cur_fs->root_handle;
 
-        ret = PINT_cached_config_get_server_name( handle_server,
-                BMI_MAX_ADDR_LEN-1, root_handle, cur_fs->coll_id);
+        ret = PINT_cached_config_get_server_name(handle_server,
+                                                 BMI_MAX_ADDR_LEN-1,
+                                                 root_handle,
+                                                 cur_fs->coll_id);
+
         if ((ret == 0) && (strcmp(handle_server, server_config.host_id) == 0))
 #endif
         if (is_root_srv)
         {
-            /* we own this handle, hurrah! now look if we have a
-             * DIST_DIR_ATTR keyval record, we want one.
-             */
+            /* we own this handle, hurrah! 
+             * now look if we have a DIST_DIR_ATTR keyval
+             * record, we want one. */
             key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
             key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
             val.buffer_sz = sizeof(PVFS_dist_dir_attr);
@@ -1610,13 +1614,22 @@ static int server_check_if_root_directory_created( void )
                 tmp_sop = PINT_sm_frame(tmp_op, PINT_FRAME_CURRENT);
                 tmp_sop->target_fs_id = cur_fs->coll_id;
                 tmp_sop->target_handle = root_handle;
+
+                tmp_sop->msgarray_op.params.job_context =
+                                     server_job_context;
+                tmp_sop->msgarray_op.params.job_timeout =
+                                     server_config.client_job_bmi_timeout;
+                tmp_sop->msgarray_op.params.retry_limit = 10;
+                tmp_sop->msgarray_op.params.retry_delay =
+                                     server_config.client_retry_delay_ms;
+
                 ret = server_state_machine_start_noreq(tmp_op);
 
                 if (ret < 0)
                 {
                     PVFS_perror_gossip("Error: failed to start root directory "
-                            "creation noreq state machine.\n",
-                            ret);
+                                       "creation noreq state machine.\n",
+                                       ret);
                     PINT_smcb_free(tmp_op);
                     return ret;
                 }
@@ -1756,7 +1769,8 @@ static void reload_config(void)
                   ,__func__
                   ,orig_server_config->bypass_timeout_check
                   ,sighup_server_config.bypass_timeout_check);
-        orig_server_config->bypass_timeout_check = sighup_server_config.bypass_timeout_check;
+        orig_server_config->bypass_timeout_check =
+                            sighup_server_config.bypass_timeout_check;
      
 
         orig_filesystems = orig_server_config->file_systems;
@@ -1896,7 +1910,9 @@ static void reload_config(void)
         /* The set_info call grabs the interface_mutex, so we are
          * basically using that to lock this resource
          */
-        BMI_set_info(0, BMI_TRUSTED_CONNECTION, (void *) &server_config);
+        BMI_set_info(0,
+                     BMI_TRUSTED_CONNECTION,
+                     (void *) &server_config);
 #endif
         PINT_config_release(&sighup_server_config); /* Free memory */
     }
@@ -2556,13 +2572,16 @@ int server_state_machine_start(PINT_smcb *smcb, job_status_s *js_p)
                      PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
                      PINT_HINT_GET_REQUEST_ID(s_op->req->hints),
                      PINT_HINT_GET_RANK(s_op->req->hints));
-        PINT_EVENT_START(PINT_sm_event_id, server_controlling_pid,
-                         NULL, &s_op->event_id,
+        PINT_EVENT_START(PINT_sm_event_id,
+                         server_controlling_pid,
+                         NULL,
+                         &s_op->event_id,
                          PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
                          PINT_HINT_GET_REQUEST_ID(s_op->req->hints),
                          PINT_HINT_GET_RANK(s_op->req->hints),
                          PINT_HINT_GET_HANDLE(s_op->req->hints),
                          s_op->req->op);
+
         s_op->resp.op = s_op->req->op;
 
         /* start request timer 
