@@ -282,7 +282,7 @@ static int readdir_msg_comp_fn(void *v_p,
         PVFS_ds_position tmp_dirdata_index = 0;
 
         /* convert servresp_readdir response to a sysresp_readdir obj */
-        tmp_dirdata_index = sm_p->readdir.dirdata_index & 0x000000ff;
+        tmp_dirdata_index = sm_p->readdir.dirdata_index & 0x0ffff;
         tmp_dirdata_index = tmp_dirdata_index << 48;
 
         *(sm_p->readdir_state.token) = tmp_dirdata_index + resp_p->u.readdir.token;
@@ -726,87 +726,6 @@ readdir_msg_return:
     free(tmp_dirent_limit_array);
     free(tmp_dirdata_index_array);
     return SM_ACTION_COMPLETE;
-}
-
-static int readdir_msg_comp_fn(void *v_p,
-                               struct PVFS_server_resp *resp_p,
-                               int index)
-{
-    PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-    
-    gossip_debug(GOSSIP_READDIR_DEBUG, "readdir_msg_comp_fn\n");
-    gossip_debug(GOSSIP_READDIR_DEBUG, "dirdata readdir[%d] got response %d\n",
-                 index, resp_p->status);
-
-    assert(resp_p->op == PVFS_SERV_READDIR);
-    assert(index < sm_p->readdir.num_dirdata_needed);
-
-    if (resp_p->status != 0)
-    {
-	return resp_p->status;
-    }
-
-    /* if it's from the last dirdata of the msg_array */
-    if(index == (sm_p->readdir.num_dirdata_needed - 1))
-    {
-        PVFS_ds_position tmp_dirdata_index = 0;
-
-        /* convert servresp_readdir response to a sysresp_readdir obj */
-        tmp_dirdata_index = sm_p->readdir.dirdata_index & 0x0ffff;
-        tmp_dirdata_index = tmp_dirdata_index << 48;
-
-        *(sm_p->readdir_state.token) = tmp_dirdata_index + resp_p->u.readdir.token;
-        sm_p->readdir_state.pos_token = *(sm_p->readdir_state.token);
-        sm_p->readdir.pos_token = *(sm_p->readdir_state.token);
-        *(sm_p->readdir_state.directory_version) =
-            resp_p->u.readdir.directory_version;
-        sm_p->readdir_state.dirdata_index = sm_p->readdir.dirdata_index;
-                
-        gossip_debug(GOSSIP_READDIR_DEBUG, 
-                "*** update token value to %llu from dirdata readdir[%d]\n",
-                llu(sm_p->readdir.pos_token), index);
-    }
-                
-    gossip_debug(GOSSIP_READDIR_DEBUG, 
-            "*** receiving readdir response [%d] with resp->dirent_count=%d when dirent_outcount = %d\n", 
-            index,  resp_p->u.readdir.dirent_count, *(sm_p->readdir_state.dirent_outcount));
-
-    if (resp_p->u.readdir.dirent_count > 0)
-    {
-        int dirent_array_offset, dirent_array_len;
-
-        if(*(sm_p->readdir_state.dirent_outcount) == 0)
-        {
-            int dirent_array_len_total =
-                (sizeof(PVFS_dirent) * (sm_p->readdir_state.dirent_limit));
-
-            /* this dirent_array MUST be freed by caller */
-            *(sm_p->readdir_state.dirent_array) =
-                (PVFS_dirent *) malloc(dirent_array_len_total);
-            assert(*(sm_p->readdir_state.dirent_array));
-        }
-
-        dirent_array_offset =
-            (*(sm_p->readdir_state.dirent_outcount));
-        dirent_array_len =
-            (sizeof(PVFS_dirent) * resp_p->u.readdir.dirent_count);
-
-        memcpy(*(sm_p->readdir_state.dirent_array) + dirent_array_offset,
-               resp_p->u.readdir.dirent_array, dirent_array_len);
-    }
-    /* update dirent_outcount */
-    *(sm_p->readdir_state.dirent_outcount) +=
-        resp_p->u.readdir.dirent_count;
-
-    gossip_debug(GOSSIP_READDIR_DEBUG, "*** Got %d directory entries "
-                 "[version %lld, index = %d, dirent_outcount = %d]\n",
-                 resp_p->u.readdir.dirent_count,
-                 lld(resp_p->u.readdir.directory_version),
-                 index,
-                 *(sm_p->readdir_state.dirent_outcount) );
-
-    return 0;
 }
 
 static PINT_sm_action readdir_msg_done(
