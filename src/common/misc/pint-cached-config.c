@@ -34,7 +34,10 @@
 #include "quickhash.h"
 #include "extent-utils.h"
 #include "pint-cached-config.h"
+
+#if defined(__PVFS2_SERVER__)
 #include "pvfs2-server.h"
+#endif
 
 /* really old linux distributions (jazz's RHEL 3) don't have this(!?) */
 #ifndef HOST_NAME_MAX

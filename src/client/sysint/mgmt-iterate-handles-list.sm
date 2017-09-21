@@ -13,6 +13,7 @@
  */
 
 #include <string.h>
+#include <assert.h>
 
 #include "client-state-machine.h"
 #include "pvfs2-types.h"

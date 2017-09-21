@@ -10,28 +10,17 @@
 #define __PINT_SYSINT_UTILS_H
 
 #include <stdio.h>
-#include <string.h>
 #ifdef WIN32
 #include "wincommon.h"
 #else
 #include <sys/time.h>
 #endif
-#include <errno.h>
-#include <assert.h>
 
 #include "pvfs2-types.h"
-#include "pvfs2-attr.h"
-#include "gossip.h"
-#include "job.h"
-#include "bmi.h"
 #include "pvfs2-sysint.h"
-#include "gen-locks.h"
 #include "pint-cached-config.h"
 #include "pint-perf-counter.h"
 #include "pvfs2-sysint.h"
-
-#include "trove.h"
-#include "client-state-machine.h"
 #include "server-config.h"
 
 int PINT_server_get_config(struct server_configuration_s *config,
