@@ -1099,7 +1099,7 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
         credential,
         vfs_request->in_upcall.req.readdirplus.mask,
         &vfs_request->response.readdirplus,
-        &vfs_request->op_id, (void *)vfs_request, hints);
+        &vfs_request->op_id, hints, (void *)vfs_request);
     vfs_request->hints = hints;
 
     if (credential)
@@ -2558,17 +2558,17 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
                   "--- check_for_speculative found exist buffer"
                   "- Do not issue a spec read\n");
             break;
+        /* in these two cases we are no longer processing readaheadss
+         * either because the buffers are busy or there is an error
+         * so we jump to fast_exit, free the rareq and go
+         */
         case RACACHE_NONE:
             /* no buffers available so no more readahead */
             gossip_debug(GOSSIP_RACACHE_DEBUG,
                          "--- check_for_speculative buffer NA\n");
-            PVFS_hint_free(rareq->hints);
-            free (rareq);
             goto fast_exit;
         default:
             gossip_err("unexpected return from pint_racache_get_block");
-            PVFS_hint_free(rareq->hints);
-            free (rareq);
             goto fast_exit;
         } /* end switch */
     } /* end for loop */
@@ -4270,8 +4270,9 @@ static inline PVFS_error handle_unexp_vfs_request(vfs_request_t *vfs_request)
     }
 
     if (remount_complete == REMOUNT_NOTCOMPLETED &&
-        (vfs_request->in_upcall.type != PVFS2_VFS_OP_FS_MOUNT) && 
-        (vfs_request->in_upcall.type != PVFS2_VFS_OP_CANCEL) )
+        (vfs_request->in_upcall.type != PVFS2_VFS_OP_FS_MOUNT) &&
+        (vfs_request->in_upcall.type != PVFS2_VFS_OP_CANCEL) &&
+        (vfs_request->in_upcall.type != PVFS2_VFS_OP_FEATURES) )
     {
         gossip_debug(
             GOSSIP_CLIENTCORE_DEBUG, "Got an upcall operation of "
@@ -4446,7 +4447,7 @@ static inline PVFS_error handle_unexp_vfs_request(vfs_request_t *vfs_request)
 #else
             vfs_request->out_downcall.resp.features.features = 0;
 #endif
-            vfs_request->out_downcall.status = ret;
+            vfs_request->out_downcall.status = 0;
             vfs_request->out_downcall.type = vfs_request->in_upcall.type;
             vfs_request->op_id = -1;
             ret = 0;

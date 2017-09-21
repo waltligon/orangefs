@@ -1,3 +1,8 @@
+/*
+ * (C) 2017 Clemson University.
+ *
+ * See LICENSE in src/client/jni directory.
+ */
 #ifndef LIBPVFS2JNI_COMMON_H
 #define LIBPVFS2JNI_COMMON_H
 

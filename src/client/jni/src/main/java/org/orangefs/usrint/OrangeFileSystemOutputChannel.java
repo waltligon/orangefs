@@ -1,3 +1,8 @@
+/*
+ * (C) 2017 Clemson University.
+ *
+ * See LICENSE in src/client/jni directory.
+ */
 package org.orangefs.usrint;
 
 import org.apache.commons.logging.Log;

@@ -124,7 +124,7 @@ int pint_racache_initialize(void)
         gossip_debug(GOSSIP_RACACHE_DEBUG, "readahead cache already "
                      "initalized.  returning success\n");
     }
-    return 0;
+    return ret;
 }
 
 /* reset a file */
