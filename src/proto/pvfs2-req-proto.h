@@ -1777,7 +1777,7 @@ endecode_fields_3a1a_struct(
     uint32_t, sid_count,
     PVFS_SID, sid_array);
 #define extra_size_PVFS_servresp_readdir \
-           (PVFS_REQ_LIMIT_DIRENT_COUNT * sizeof(PVFS_dirent) +
+           (PVFS_REQ_LIMIT_DIRENT_COUNT * sizeof(PVFS_dirent) + \
             PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID))
 
 /* getconfig ***************************************************/
