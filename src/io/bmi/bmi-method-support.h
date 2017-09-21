@@ -180,9 +180,9 @@ struct bmi_method_ops
 /*
  * This structure is somewhat optional.  TCP and GM use the elements in
  * here extensively, but IB, MX, Portals only use the bits required by
- * the generic BMI layer.  Those are op_id and addr.  Everything else is
- * ignored.  Would be nice to push most of method_op down into TCP and GM
- * so other BMI implementations do not need to drag around the unused fields.
+ * the generic BMI layer. Everything else is ignored.  Would be nice to
+ * push most of method_op down into TCP and GM so other BMI
+ * implementations do not need to drag around the unused fields.
  */
 struct method_op
 {
