@@ -127,6 +127,29 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	)
 	CFLAGS=$tmp_cflags
 
+        dnl in later 4.4 kernels a "user namespace" parameter was added to 
+        dnl posix_acl_valid... 
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -O2"
+	AC_MSG_CHECKING(for namespace parameter in posix_acl_valid) 
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#ifdef HAVE_KCONFIG
+		#include <linux/kconfig.h>
+		#endif
+		#include <linux/fs.h>
+		#include <linux/posix_acl_xattr.h>
+	], [
+		struct posix_acl A;
+		posix_acl_valid(&init_user_ns, &A);
+
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_POSIX_ACL_VALID_USER_NAMESPACE, 1, Define if the user namespace has been added to posix_acl_valid),
+	AC_MSG_RESULT(no)
+    )
+	CFLAGS=$tmp_cflags
+
         dnl in 3.8 a "user namespace" parameter was added to 
         dnl posix_acl_from_xattr... 
 	tmp_cflags=$CFLAGS
