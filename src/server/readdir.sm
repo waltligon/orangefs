@@ -191,7 +191,9 @@ static PINT_sm_action readdir_iterate_on_entries(struct PINT_smcb *smcb,
 static PINT_sm_action readdir_setup_resp(struct PINT_smcb *smcb,
                                          job_status_s *js_p)
 {
+#if 0
     int j, k;
+#endif
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TREADDIR, &s_op->start_time);
@@ -287,7 +289,14 @@ static int perm_readdir(PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(readdir);
+static inline int PINT_get_object_ref_readdir(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    *fs_id = req->u.readdir.fs_id;
+    *handle = req->u.readdir.dirdata_handle;
+    return 0;
+}
+
 
 struct PINT_server_req_params pvfs2_readdir_params =
 {

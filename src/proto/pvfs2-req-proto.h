@@ -1701,40 +1701,38 @@ endecode_fields_2a_struct(
 
 struct PVFS_servreq_readdir
 {
-    PVFS_handle handle;            /* handle of dir metadata */
-    PVFS_handle dirent_handle;     /* handle of directory bucket */
+    PVFS_handle dirdata_handle;    /* dirdata handle of directory bucket */
     PVFS_fs_id fs_id;              /* file system */
     PVFS_ds_position token;        /* dir offset */
     uint32_t dirent_count;         /* desired # of entries */
 };
+
 endecode_fields_5_struct(
     PVFS_servreq_readdir,
-    PVFS_handle, handle,
+    PVFS_handle, dirdata_handle,
     PVFS_fs_id, fs_id,
     uint32_t, dirent_count,
     skip4,,
     PVFS_ds_position, token);
 
-#define PINT_SERVREQ_READDIR_FILL(__req,                \
-                                  __cap,                \
-                                  __fsid,               \
-                                  __handle,             \
-                                  __dirent_handle,      \
-                                  __token,              \
-                                  __dirent_count,       \
-                                  __hints)              \
-do {                                                    \
-    memset(&(__req), 0, sizeof(__req));                 \
-    (__req).op = PVFS_SERV_READDIR;                     \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;                \
-    (__req).ctrl.type = PVFS_REQ_PRIMARY;               \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));        \
-    (__req).hints = (__hints);                          \
-    (__req).u.readdir.fs_id = (__fsid);                 \
-    (__req).u.readdir.handle = (__handle);              \
-    (__req).u.readdir.dirent_handle = (__dirent_handle);\
-    (__req).u.readdir.token = (__token);                \
-    (__req).u.readdir.dirent_count = (__dirent_count);  \
+#define PINT_SERVREQ_READDIR_FILL(__req,                   \
+                                  __cap,                   \
+                                  __fsid,                  \
+                                  __dirdata_handle,        \
+                                  __token,                 \
+                                  __dirent_count,          \
+                                  __hints)                 \
+do {                                                       \
+    memset(&(__req), 0, sizeof(__req));                    \
+    (__req).op = PVFS_SERV_READDIR;                        \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                   \
+    (__req).ctrl.type = PVFS_REQ_PRIMARY;                  \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));            \
+    (__req).hints = (__hints);                             \
+    (__req).u.readdir.fs_id = (__fsid);                    \
+    (__req).u.readdir.dirdata_handle = (__dirdata_handle); \
+    (__req).u.readdir.token = (__token);                   \
+    (__req).u.readdir.dirent_count = (__dirent_count);     \
 } while (0);
 
 struct PVFS_servresp_readdir
@@ -1753,8 +1751,12 @@ endecode_fields_3a_struct(
     uint32_t, dirent_count,
     PVFS_dirent, dirent_array);
 #define extra_size_PVFS_servresp_readdir \
-           (roundup8(PVFS_REQ_LIMIT_DIRENT_COUNT * (sizeof(PVFS_dirent) + \
-              PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID))))
+           (roundup8(PVFS_REQ_LIMIT_DIRENT_COUNT * (PVFS_NAME_MAX + 1 + 8)))
+#if 0
+#define extra_size_PVFS_servresp_readdir \
+           (roundup8(PVFS_REQ_LIMIT_DIRENT_COUNT * \
+                      (sizeof(PVFS_dirent) + extra_size_PVFS_dirent)))
+#endif
 
 /* getconfig ***************************************************/
 /* - retrieves initial configuration information from server */

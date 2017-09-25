@@ -716,10 +716,13 @@ typedef struct PVFS_dirent_s
 {
     char d_name[PVFS_NAME_MAX + 1];
     PVFS_handle handle;
+#if 0
     uint32_t     sid_count;
     PVFS_SID    *sid_array;
+#endif
 } PVFS_dirent;
 
+#if 0
 static inline void encode_PVFS_dirent(char **pptr,
                         const PVFS_dirent *x)
 {
@@ -754,12 +757,13 @@ static inline void defree_PVFS_dirent(PVFS_dirent *x)
     free((x)->sid_array);
 }
 
-#if 0
+#define extra_size_PVFS_dirent (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID))
+#endif
+
 endecode_fields_2(
     PVFS_dirent,
     here_string, d_name,
     PVFS_handle, handle);
-#endif
 
 /* Distributed directory attributes struct
  * will be stored in keyval space under DIST_DIR_ATTR
