@@ -164,14 +164,14 @@ static PINT_sm_action readdir_iterate_on_entries(struct PINT_smcb *smcb,
     gossip_debug(
                 GOSSIP_READDIR_DEBUG, " - iterating keyvals: [%s,%d], "
                 "\n\ttoken=%llu, count=%d\n",
-                PVFS_OID_str(&s_op->u.readdir.dirent_handle),
+                PVFS_OID_str(&s_op->req->u.readdir.dirdata_handle),
                 s_op->req->u.readdir.fs_id,
                 llu(s_op->req->u.readdir.token),
                 s_op->req->u.readdir.dirent_count);
 
     ret = job_trove_keyval_iterate(
                 s_op->req->u.readdir.fs_id,
-                s_op->u.readdir.dirent_handle,
+                s_op->req->u.readdir.dirdata_handle,
                 s_op->req->u.readdir.token,
                 s_op->key_a,
                 s_op->val_a,
@@ -191,9 +191,7 @@ static PINT_sm_action readdir_iterate_on_entries(struct PINT_smcb *smcb,
 static PINT_sm_action readdir_setup_resp(struct PINT_smcb *smcb,
                                          job_status_s *js_p)
 {
-#if 0
-    int j, k;
-#endif
+    int i;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TREADDIR, &s_op->start_time);
@@ -211,33 +209,15 @@ static PINT_sm_action readdir_setup_resp(struct PINT_smcb *smcb,
         PVFS_perror_gossip("readdir_setup_resp failed: ", js_p->error_code);
         return SM_ACTION_COMPLETE;
     }
-#if 0
-/* V3 move to func decl */
 
-    /* Iterates over entries retrieved from database and copies them
-     * to appropriate locations in response struct
-     */
-    for (j = 0; j < s_op->req->u.readdir.dirent_count; j++)
+    for (i = 0; i < s_op->req->u.readdir.dirent_count; i++)
     {
-        /* Get the handle from the appropriate entry in the keyval
-         * temporary place holder */
-#if 0
-        s_op->resp.u.readdir.dirent_array[j].d_name = 
-                s_op->u.readdir.keyval_db_entries[j * (s_op->metasidcnt)].d_name;
-#endif
-
-        s_op->resp.u.readdir.dirent_array[j].handle = 
-                s_op->u.readdir.keyval_db_entries[j * (s_op->metasidcnt + 1)].oid;
-
-        /* Copy SIDs from appropriate index in keval temporary store into
-            response buffer */
-        for(k = 0; k < s_op->metasidcnt; k++){
-            s_op->resp.u.readdir.sid_array[(j * s_op->metasidcnt) + k] =
-                s_op->u.readdir.keyval_db_entries[j * (s_op->metasidcnt + 1) + 1 + k].sid;
-        }
-        
+        gossip_debug(GOSSIP_READDIR_DEBUG,
+                     "dirent: %s:%s:%s\n",
+                     s_op->resp.u.readdir.dirent_array[i].d_name,
+                     PVFS_OID_str(&s_op->resp.u.readdir.dirent_array[i].handle),
+                     PVFS_SID_str((PVFS_SID *) &s_op->resp.u.readdir.dirent_array[i].handle + 1));
     }
-#endif
 
     s_op->resp.u.readdir.directory_version =
                     s_op->u.readdir.directory_version;

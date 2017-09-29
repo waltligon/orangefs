@@ -184,7 +184,7 @@ struct PVFS_metafile_attr_s
     /* list of sids */
     /* V3 there are dfile_count * (sid_count + 1) sids */
     PVFS_SID *sid_array;
-    uint32_t sid_count;
+    int32_t sid_count;
 
     uint32_t mirror_mode;
     //PVFS_handle *mirror_dfile_array; /* V3 remove this replaced by sids */
@@ -221,7 +221,7 @@ static inline void encode_PVFS_metafile_attr(char **pptr,
     encode_uint32_t(pptr, &x->stuffed_size);          
 #endif
     encode_uint32_t(pptr, &x->dfile_count);          
-    encode_uint32_t(pptr, &x->sid_count);           
+    encode_int32_t(pptr, &x->sid_count);           
     encode_skip4(pptr,);                           
 
     for (dfiles_i = 0; dfiles_i < x->dfile_count; dfiles_i++)         
@@ -253,7 +253,7 @@ static inline void decode_PVFS_metafile_attr(char **pptr,
     decode_uint32_t(pptr, &(x)->stuffed_size);                          
 #endif
     decode_uint32_t(pptr, &(x)->dfile_count);                           
-    decode_uint32_t(pptr, &(x)->sid_count);                             
+    decode_int32_t(pptr, &(x)->sid_count);                             
     decode_skip4(pptr,);
 
     (x)->dfile_array = decode_malloc(                                   
@@ -333,7 +333,7 @@ struct PVFS_directory_hint_s
     char               *dist_params;
     /* how many dfiles ought to be used */
     uint32_t            dfile_count;
-    uint32_t            dfile_sid_count;
+    int32_t             dfile_sid_count;
     /* how servers are selected */
     PVFS_dirhint_layout layout;
 };
@@ -349,7 +349,7 @@ endecode_fields_9(
         skip4,,
         string,   dist_params,
         uint32_t, dfile_count,
-        uint32_t, dfile_sid_count,
+        int32_t,  dfile_sid_count,
         PVFS_dirhint_layout, layout);
 #endif
 
