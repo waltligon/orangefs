@@ -1,0 +1,21 @@
+.TH PVFS2-FSCK 1 2017-08-18
+.SH NAME
+\fBpvfs2-fsck\fR \(en check and correct file system errors
+.SH SYNOPSIS
+\fBpvfs2-fsck\fR
+.SH DESCRIPTION
+The
+.B pvfs2-fsck
+utility checks for and corrects some file systtem errors.  It should
+only be used by experienced system administrators.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2-check-server ( 1 ),
+.BR pvfs2-validate ( 1 )

@@ -174,6 +174,11 @@ typedef enum
             SERVER_BMI_CLIENT_INIT | SERVER_TROVE_INIT | SERVER_FILESYS_INIT |\
             SERVER_FLOW_INIT | SERVER_CACHED_CONFIG_INIT
 
+typedef enum
+{
+    PRELUDE_PERM_CHECK_DONE    = (1<<0),
+} PINT_prelude_flag;
+
 struct PINT_server_create_op
 {
 /* V3 */
@@ -733,6 +738,8 @@ typedef struct PINT_server_op
     PVFS_handle target_handle;
     PVFS_fs_id target_fs_id;
     PVFS_object_attr *target_object_attr;
+
+    PINT_prelude_flag prelude_mask;
 
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;

@@ -323,6 +323,16 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 
     s_op->target_object_attr = &s_op->attr;
 
+    if (s_op->prelude_mask & PRELUDE_PERM_CHECK_DONE)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "(%p) %s (prelude sm) perm check already done... "
+                     "skipping.\n", s_op,
+                     PINT_map_server_op_to_string(s_op->req->op));
+
+        return SM_ACTION_COMPLETE;
+    }
+
     PINT_debug_capability(&s_op->req->capability, "Received");
 
     if (s_op->target_fs_id != PVFS_FS_ID_NULL)

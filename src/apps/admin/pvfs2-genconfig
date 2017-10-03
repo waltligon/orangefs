@@ -290,6 +290,10 @@ sub emit_security
     
     # if securitycert or cafile used, use cert-based options
     $seccertflag = defined($opt_security_cert) || defined($opt_ca_file);
+    if ($seckeyflag || $seccertflag || $opt_trusted == 1)
+    {
+        print $target "\t<Security>\n";
+    }
 
     if ($opt_trusted == 1)
     {
@@ -444,13 +448,17 @@ sub emit_defaults
        print $target "\n\tDBMaxSize " . $opt_default_dbmaxsize . "\n";
     }
 
+    # Do not turn off timeouts if key or cert based security is enabled.
+    unless(defined($opt_security_key) || defined($opt_keystore) || defined($opt_security_cert) || defined($opt_ca_file) || $opt_trusted == 1)
+    {
+        # TurnOffTimeouts always defaults to yes and applies to all servers.
+        # Either they are on or off.  This is only temporary until we correct
+        # all areas of the code that should check for invalid  timeouts.
+        print $target "\n\t<Security>\n";
+        print $target "\t\tTurnOffTimeouts yes\n";
+        print $target "\t</Security>\n";
+    }
     
-    # TurnOffTimeouts always defaults to yes and applies to all servers.
-    # Either they are on or off.  This is only temporary until we correct
-    # all areas of the code that should check for invalid  timeouts.
-    print $target "\n\t<Security>\n";
-    print $target "\t\tTurnOffTimeouts yes\n";
-    print $target "\t</Security>\n";
 
     # if --metaspec is used, security options are done per-server
     # otherwise do them here
@@ -2301,11 +2309,27 @@ if($opt_metaspec)
     get_specs($META_ENDPOINT, $opt_metaspec);
 
     $bmi_module = join(',', (map { "bmi_" . $_ } get_all_protocols()));
+    print "\tBMIModules $bmi_module\n";
 }
 else
 {
     my $portmap = get_protocol();
     $bmi_module = join(',', map("bmi_" . $_, keys (%{$portmap})));
+    if ($bmi_module =~ ",")
+    {
+# Warn about potential slowness if using a "fast" network along with
+# TCP.  Polling with timeout in BMI is implemented by sequentially asking
+# each device to poll for half of the timeout.  This leads to a fixed 5 ms
+# delay in the TCP device before the IB device can be queried, for instance.
+# When traffic will only appear on one device, suggest that TCP be disabled.
+# But leave TCP as default on, certainly, as that is what most people want.
+        print "You have selected to use a fast network interface, but\n";
+        print "have not disabled TCP.  The way this is currently\n";
+        print "implemented will lead to rather slow response times on\n";
+        print "the fast interface.\n";
+        print "\n";
+
+    }
 
     $default_storage = get_storage();
     $default_meta_storage = get_meta_storage();
@@ -2508,5 +2532,3 @@ if (!$opt_quiet && defined($opt_security_cert))
 # End:
 #  
 # vim: ts=8 sts=4 sw=4 expandtab
-
-

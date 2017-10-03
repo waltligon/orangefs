@@ -336,7 +336,8 @@ static const configoption_t options[] =
     /* Prevent the server from issuing an error whenever a capability or 
      * credential expires.  In this case, the client provides the only 
      * mechanism determining when a capability or credential needs to be 
-     * regenerated.  
+     * regenerated.  This option is only valid within the Defaults
+     * context; either the entire system is using timeouts or it is not.  
      */
     {"TurnOffTimeouts", ARG_STR, get_turn_off_timeouts, NULL,
         CTX_SECURITY, "yes"}, 
@@ -1107,7 +1108,13 @@ static const configoption_t options[] =
     {"DBCacheType", ARG_STR, get_db_cache_type, NULL,
         CTX_STORAGEHINTS, "sys"},
 
-    /* LMDB: maximum size of database map
+    /* LMDB: when specified in the Defaults context, DBMaxSize specifies
+     * the size of the storage_attributes and collections databases.  When
+     * specified in the StorageHints context, DBMaxsize specifies the
+     * size of the collection_attributes, dataspace_attributes, and keyval
+     * databases.  DBMaxSize can also be specified in the ServerOptions
+     * context to override the Defaults value on a per server basis.  Default
+     * is 512MB if not specified.
      */
     {"DBMaxSize", ARG_STR, get_db_max_size, NULL,
         CTX_DEFAULTS|CTX_STORAGEHINTS|CTX_SERVER_OPTIONS,"536870912"},
