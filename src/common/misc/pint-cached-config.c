@@ -463,7 +463,7 @@ int PINT_cached_config_get_server(PVFS_fs_id fs_id,
  */
 int PINT_cached_config_server_local(const PVFS_SID *sid)
 {
-    server_configuration_t *config = get_server_config_struct();
+    server_configuration_t *config = PINT_server_config_mgr_get_config();
     return (!PVFS_SID_cmp(sid, &config->host_sid));
 }
 #endif

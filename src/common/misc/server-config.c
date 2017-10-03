@@ -269,8 +269,7 @@ static const configoption_t options[] =
      */
     {"</Defaults>",ARG_NONE, exit_defaults_context,NULL,CTX_DEFAULTS,NULL},
 
-    /* Options specified within the Security context are used to configure
-     * settings related to key- or certificate-based security options.
+     /* settings related to key- or certificate-based security options.
      * These options are ignored if security mode is not compiled in.
      */
     {"<Security>", ARG_NONE, enter_security_context, NULL,
@@ -1110,8 +1109,8 @@ static const configoption_t options[] =
 
     /* LMDB: maximum size of database map
      */
-    {"DBMaxSize", ARG_INT, get_db_max_size, NULL,
-        CTX_STORAGEHINTS,"536870912"},
+    {"DBMaxSize", ARG_STR, get_db_max_size, NULL,
+        CTX_DEFAULTS|CTX_STORAGEHINTS|CTX_SERVER_OPTIONS,"536870912"},
 
     /* This option specifies a parameter name to be passed to the 
      * distribution to be used.  This option should be immediately
@@ -3007,13 +3006,76 @@ DOTCONF_CB(get_db_max_size)
 {
     struct server_configuration_s *config_s = 
                     (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = (struct filesystem_configuration_s *)
+                    PINT_llist_head(config_s->file_systems);
+    long int ret=0;
+    char *errptr=NULL;
+    char *error_msg=NULL;
+    size_t *tmp_db_max_size=NULL;
 
-    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
-       config_s->my_server_options == 0)
+    /* DBMaxSize within the <Defaults> context or the <ServerOptions> context applies to
+     * the sizes of the collections.db and storage_attributes.db.  DBMaxSize within the 
+     * <StorageHints> context applies to the sizes of the collection_attributes.db, 
+     * dataspace_attributes.db, and keyval.db.  DBMaxSize is not valid in any other context.
+     */
+
+    /* In which context are we? */
+    switch(config_s->configuration_context)
     {
-        return NULL;
+       case CTX_DEFAULTS:
+       {
+            tmp_db_max_size = &config_s->db_max_size;
+            break;
+       }
+       case CTX_STORAGEHINTS:
+       {
+            fs_conf = (struct filesystem_configuration_s *)PINT_llist_head(config_s->file_systems);
+            tmp_db_max_size = &fs_conf->db_max_size;
+            break;
+       }
+       case CTX_SERVER_OPTIONS:
+       {
+            if ( config_s->my_server_options != 0 )
+            {
+               tmp_db_max_size = &config_s->db_max_size;
+            }
+            else
+            {
+               return NULL;
+            }
+            break;
+       }
+       default:
+       {
+            /*This should never happen, but just in case....*/
+            error_msg=calloc(256,sizeof(char));
+            if (error_msg)
+            {
+                sprintf(error_msg,"DBMaxSize unsupported in this context : (%d)\n"
+                                 ,config_s->configuration_context);
+            }
+            return(error_msg?error_msg:"Error allocating memory(get_db_max_size)\n");
+       }
+    }/*end switch*/
+
+    /* convert input string to a positive, size_t value. On 32-bit machines,
+     * size_t is 32 bits.  On 64-bit machines, size_t is 64 bits.  In either
+     * case, a long int will represent the appropriate size.
+     */
+    ret=strtol(cmd->data.str,&errptr,10);
+    if ((ret<=0) || (*errptr != '\0') || (errno==ERANGE)) 
+    {
+       error_msg=calloc(256,sizeof(char));
+       if (error_msg)
+       {
+          sprintf(error_msg,"DBMAXsize must be a numerical value between 0 and %ld : (%s)\n"
+                           ,LONG_MAX,cmd->data.str);
+       }
+       return (error_msg?error_msg:"Error allocating memory(get_db_max_size)\n");
     }
-    config_s->db_max_size = cmd->data.value;
+
+    *tmp_db_max_size = (size_t)ret;
+
     return NULL;
 }
 
@@ -3720,6 +3782,27 @@ DOTCONF_CB(get_turn_off_timeouts)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+
+    /* TurnOffTimeouts can only reside within the <Security> context
+     * of the <Defaults> context.  Either all servers are using timeouts
+     * or they are not.
+     */
+    switch (config_s->prev_context)
+    {
+       case 0:
+       {
+          return NULL;
+       }
+       case CTX_DEFAULTS:
+       {
+            break;
+       }
+       default:
+       {
+            return("TurnOffTimeouts is ONLY valid within <Security> section of <Defaults> context.\n");
+       }
+    }/*end switch*/
+
 
 #if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
     /* You cannot turn off timeouts if using enhanced security */

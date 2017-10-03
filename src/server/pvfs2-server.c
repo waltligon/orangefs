@@ -38,6 +38,7 @@
 #include "state-machine.h"
 #include "mkspace.h"
 #include "server-config.h"
+#include "server-config-mgr.h"
 #include "quicklist.h"
 #include "pint-dist-utils.h"
 #include "pint-perf-counter.h"
@@ -294,6 +295,9 @@ int main(int argc, char **argv)
     }
 
     server_status_flag |= SERVER_CONFIG_INIT;
+
+    /* set server_config pointer */
+    PINT_server_config_mgr_set_config(&server_config);
 
     if (!PINT_config_is_valid_configuration(&server_config))
     {
@@ -1054,8 +1058,9 @@ static int server_initialize_subsystems(
                 return(ret);
             }
 
-            /* XXX: This is really the same for all collections, yet is
-             * specified separately. */
+            /* This function sets the server_cfg for the system and cfg_fs for the
+             * coll_id, within the trove subsystem
+             */
             ret = trove_collection_set_fs_config(cur_fs->coll_id, &server_config);
             if (ret < 0)
             {
@@ -1750,7 +1755,7 @@ static void reload_config(void)
     else /* Successful load of config */
     {
         /* Get the current server configuration and update global items */
-        orig_server_config = get_server_config_struct();
+        orig_server_config = PINT_server_config_mgr_get_config();
         if (orig_server_config->event_logging)
         {
             free(orig_server_config->event_logging);
@@ -2786,11 +2791,6 @@ int server_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *js_p)
             "server_state_machine_terminate %p\n",smcb);
     PINT_smcb_free(smcb);
     return SM_ACTION_TERMINATE;
-}
-
-struct server_configuration_s *get_server_config_struct(void)
-{
-    return &server_config;
 }
 
 /* server_op_get_machine()

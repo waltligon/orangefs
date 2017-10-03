@@ -40,6 +40,7 @@
 #include "pint-security.h"
 #include "security-hash.h"
 #include "security-util.h"
+#include "server-config-mgr.h"
 
 #ifdef ENABLE_SECURITY_CERT
 #include "pint-cert.h"
@@ -108,7 +109,7 @@ static int load_public_keys(const char*);
  */
 int PINT_security_initialize(void)
 {
-    const struct server_configuration_s *config = get_server_config_struct();
+    const struct server_configuration_s *config = PINT_server_config_mgr_get_config();
     int ret;
 #ifdef ENABLE_SECURITY_KEY
     PINT_llist_p host_aliases;
@@ -427,7 +428,7 @@ int PINT_sign_capability(PVFS_capability *cap, PVFS_time *force_timeout)
         return -1;
     }
 
-    config = PINT_get_server_config();
+    config = PINT_server_config_mgr_get_config();
 
     /* cap->issuer is set in get-attr.sm in the server. */
 
@@ -515,7 +516,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
                                      PVFS_handle *handle_array)
 {
     int ret = -PVFS_EINVAL;
-    struct server_configuration_s *config = get_server_config_struct();
+    server_configuration_s *config = PINT_server_config_mgr_get_config();
 
     ret = PINT_init_capability(capability);
     if (ret < 0)
@@ -561,7 +562,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
  */
 int PINT_verify_capability(const PVFS_capability *cap)
 {
-    struct server_configuration_s *config = PINT_get_server_config();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
 #if 0
     char mdstr[2*SHA_DIGEST_LENGTH+1];
 #endif
@@ -757,7 +758,7 @@ int PINT_sign_credential(PVFS_credential *cred)
         return -1;
     }
 
-    config = get_server_config_struct();
+    config = PINT_server_config_mgr_get_config();
     
     cred->issuer = (char *) malloc(strlen(config->server_alias) + 3);
     if (cred->issuer == NULL)
@@ -843,7 +844,7 @@ int PINT_sign_credential(PVFS_credential *cred)
  */
 int PINT_verify_credential(const PVFS_credential *cred)
 {
-    struct server_configuration_s *config = PINT_get_server_config();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
 
 #if 0
     char mdstr[2*SHA_DIGEST_LENGTH+1];

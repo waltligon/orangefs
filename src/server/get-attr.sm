@@ -1176,10 +1176,9 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     
     respattr->capability.fsid = s_op->u.getattr.fs_id;
 
-    config = get_server_config_struct();
+    config = PINT_server_config_mgr_get_config();
     respattr->capability.issuer = 
-                    (char *) malloc(strlen(config->server_alias) + 3);
-
+        (char *) malloc(strlen(config->server_alias) + 3);
     if (respattr->capability.issuer == NULL)
     {
         js_p->error_code = -PVFS_ENOMEM;
