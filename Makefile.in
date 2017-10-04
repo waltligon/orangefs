@@ -211,7 +211,7 @@ endif
 # for compiling and linking unless otherwise noted
 CC = @CC@ -std=gnu89
 LD = @CC@
-BUILD_CC = @BUILD_CC@
+BUILD_CC = @BUILD_CC@ -std=gnu89
 BUILD_LD = @BUILD_CC@
 BUILD_CFLAGS = -I$(srcdir)/src/common/misc -I$(srcdir) @BUILD_CFLAGS@
 BUILD_CFLAGS += -I$(srcdir)/src/common/sidcache
