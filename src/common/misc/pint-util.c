@@ -248,6 +248,8 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
             /* not packed */                                          \
             free(dest->u.o);                                          \
             free(dest->u.s);                                          \
+            dest->u.o = NULL;                                         \
+            dest->u.s = NULL;                                         \
         }                                                             \
     }                                                                 \
 } while (0)
@@ -321,8 +323,9 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         dest->u.dir.dist_dir_attr.branch_level =
                 src->u.dir.dist_dir_attr.branch_level;
         CLRFIELD(dest->u.dir.dist_dir_bitmap);
-        CLRFIELD(dest->u.dir.dirdata_handles);
-        CLRFIELD(dest->u.dir.dirdata_sids);
+        CLRPACK(dir.dirdata_handles,
+                dir.dirdata_sids,
+                dir.dist_dir_attr.dirdata_count);
         /**/
         break;
     case PVFS_TYPE_DIRDATA:
@@ -343,8 +346,9 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         dest->u.dirdata.dist_dir_attr.branch_level =
                 src->u.dirdata.dist_dir_attr.branch_level;
         CLRFIELD(dest->u.dirdata.dist_dir_bitmap);
-        CLRFIELD(dest->u.dirdata.dirdata_handles);
-        CLRFIELD(dest->u.dirdata.dirdata_sids);
+        CLRPACK(dirdata.dirdata_handles,
+                dirdata.dirdata_sids,
+                dirdata.dist_dir_attr.dirdata_count);
         /**/
         break;
     case PVFS_TYPE_SYMLINK:
