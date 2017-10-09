@@ -807,7 +807,7 @@ static PINT_sm_action lookup_read_directory_entry(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PVFS_dist_dir_hash_type dirdata_hash;
-    server_configuration_s *config = get_server_config_struct();
+    server_configuration_s *config = PINT_server_config_mgr_get_config();
     char dirdata_server_name[1024];
 
     /* find the segment that we should look up in the directory */

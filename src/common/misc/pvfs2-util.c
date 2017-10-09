@@ -52,9 +52,6 @@ void debug_gencred(char *args[]);
 #ifndef ENABLE_SECURITY_MODE
 #include <pwd.h>
 #include <grp.h>
-#ifndef HAVE_GETGROUPLIST
-#include "getugroups.h"
-#endif
 #endif
 
 #ifdef HAVE_MNTENT_H
@@ -583,14 +580,9 @@ static int PINT_gen_unsigned_credential(const char *user, const char *group,
 
 #else /* !HAVE_GETGROUPLIST */
 
-    ngroups = sizeof(groups)/sizeof(*groups);
-    ngroups = getugroups(ngroups, groups, pwd.pw_name, gid);
-    if (ngroups == -1)
-    {
-        gossip_err("Warning: unable to get group list for user %s - using "
-                   "default\n", pwd.pw_name);
-        goto pvfs2_util_default_group;
-    }
+    gossip_err("Warning: unable to get group list for user %s - using "
+               "default\n", pwd.pw_name);
+    goto pvfs2_util_default_group;
 
 #endif /* HAVE_GETGROUPLIST */
 

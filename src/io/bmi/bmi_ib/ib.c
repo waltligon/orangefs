@@ -2670,7 +2670,6 @@ void *ib_tcp_server_process_client_thread(void *arg)
 {
     ib_connection_t *c;
     struct tcp_conn *tc;
-    int ret;
 
     debug(0, "%s: starting", __func__);
     if (!arg)
@@ -2708,7 +2707,6 @@ void *ib_tcp_server_process_client_thread(void *arg)
 
     debug(0, "%s: accepted new connection %s at server", 
           __func__, c->peername);
-    ret = 1;
 
   out:
     gen_mutex_unlock(&interface_mutex);

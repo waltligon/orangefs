@@ -1,0 +1,53 @@
+.TH PVFS2-XATTR 1 2017-08-14
+.SH NAME
+\fBpvfs2-xattr\fR \(en set or view extended attributes
+.SH SYNOPSIS
+\fBpvfs2-xattr\fR [\fB\-s\fR] [\fB\-k\fI key\fR]
+[\fB\-v\fI val\fR] [\fB\-t\fR] \fIfilename\fR
+.SH DESCRIPTION
+The
+.B pvfs2-xattr
+utility either sets or creates extended attributes.  The
+.I -s
+and
+.I -t
+options are mutually exclusive.
+.PP
+The options are as follows:
+.IP -s
+Set an extended attribute
+.IP -k
+Specify the key.  This must start with the prefix
+.IR user. .
+.IP -v
+Specify the value.
+.IP -t
+Display an extended attribute.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate
+.IR pvfs2tab
+file
+.SH FILES
+.I /etc/pvfs2tab
+.SH EXAMPLES
+Set an attribute on
+.IR /mnt/foo .
+.PP
+.RS 6n
+pvfs2-xattr -s -k user.a -v bar /mnt/foo
+.RE
+Display the same attribute on the same file.
+.PP
+.RS 6n
+pvfs2-xattr -k user.a -t /mnt/foo
+.RE
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2tab ( 5 )
