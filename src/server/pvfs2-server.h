@@ -387,7 +387,9 @@ struct PINT_server_crdirent_op
     PVFS_ds_keyval_handle_info keyval_handle_info;
     int dir_attr_update_required;
     PVFS_object_attr dirdata_attr;
+    PVFS_object_attr metahandle_attr;
     PVFS_ds_attributes dirdata_ds_attr;
+    PVFS_ds_attributes metahandle_ds_attr;
 
     /* index of node to receive directory entries when a split is necessary. */
     int split_node;
