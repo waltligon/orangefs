@@ -869,20 +869,22 @@ static PINT_sm_action crdirent_update_local_metahandle_timestamp(
     PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
     PVFS_ds_attributes *ds_attr = NULL;
 
-    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
-
     PVFS_ds_attr_to_object_attr(&s_op->u.crdirent.metahandle_ds_attr,
                                 &s_op->u.crdirent.metahandle_attr);
     s_op->u.crdirent.metahandle_attr.mask =
         PVFS_ATTR_COMMON_ALL | PVFS_ATTR_META_ALL;
  
-    /* Must take ATIME out of the mask or it will be reset to the
-     * current time when stored. */
-    s_op->u.crdirent.metahandle_attr.mask &= ~PVFS_ATTR_COMMON_ATIME;
-    PVFS_object_attr_overwrite_setable(tmp_attr_ptr,
-                                       &s_op->u.crdirent.metahandle_attr);
+    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
+
+    /* The only thing we need to change is CTIME, so all we have to
+     * do is set that flag in the representation of the attributes
+     * we want to change. */
+    tmp_attr.mask = PVFS_ATTR_COMMON_CTIME;
+
+    PVFS_object_attr_overwrite_setable(&s_op->u.crdirent.metahandle_attr,
+                                       tmp_attr_ptr);
     ds_attr = &(s_op->u.crdirent.metahandle_ds_attr);
-    PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
+    PVFS_object_attr_to_ds_attr(&s_op->u.crdirent.metahandle_attr, ds_attr);
  
     ret = job_trove_dspace_setattr(
         s_op->u.crdirent.fs_id, s_op->u.crdirent.new_handle,
