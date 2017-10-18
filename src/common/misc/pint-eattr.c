@@ -327,7 +327,6 @@ static int PINT_eattr_verify_acl_access(PVFS_ds_keyval *key, PVFS_ds_keyval *val
      * all we can do is make sure the size matches a non-zero
      * number of pvfs acl entries.  The remainder should be 1
      * because the keyvals are padded with a null terminator.
-     * hubcap.
      */
     if (val->buffer_sz == 0 || 
             (val->buffer_sz - sizeof(pvfs2_acl_header)) %
