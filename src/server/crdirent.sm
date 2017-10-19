@@ -815,23 +815,51 @@ static PINT_sm_action crdirent_update_metahandle_timestamp(
         /* remote */
 
         PINT_sm_msgpair_state *msg_p = NULL;
+        PVFS_handle *capability_handles = NULL;
+        PVFS_object_attr tmp_attr;
 
         PINT_msgpair_init(&s_op->msgarray_op);
         msg_p = &s_op->msgarray_op.msgpair;
         PINT_serv_init_msgarray_params(s_op, s_op->u.crdirent.fs_id);
+ 
+        /* This memory will be freed in either crdirent_cleanup or
+         * crdirent_find_split_entries by PINT_cleanup_capability. */
+        capability_handles =
+              malloc(sizeof(PVFS_handle));
+        if (! capability_handles)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        capability_handles[0] =
+                s_op->u.crdirent.new_handle;
+        ret = PINT_server_to_server_capability(&s_op->u.crdirent.capability,
+                 s_op->u.crdirent.fs_id,
+                 1,
+                 capability_handles);
+        if (ret != 0)
+        {
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
+        }
+
+        /* The only thing we need to change is CTIME, so all we have to
+         * do is set that flag in the representation of the attributes
+         * we want to change. */
+        memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
+        tmp_attr.mask = PVFS_ATTR_COMMON_CTIME;
 
         /* Capability was initialized earlier. */
         PINT_SERVREQ_SETATTR_FILL(
             msg_p->req,
-            s_op->req->capability,
+            s_op->u.crdirent.capability,
             s_op->req->u.crdirent.credential,
             s_op->u.crdirent.fs_id,
             s_op->u.crdirent.new_handle,
             PVFS_TYPE_METAFILE,
-            s_op->attr,
+            tmp_attr,
             PVFS_ATTR_COMMON_CTIME,
             s_op->req->hints);
-        PINT_copy_object_attr(&(msg_p->req).u.setattr.attr, &(s_op->attr));
 
         msg_p->fs_id = s_op->u.crdirent.fs_id;
         msg_p->handle = s_op->u.crdirent.new_handle;
@@ -874,11 +902,10 @@ static PINT_sm_action crdirent_update_local_metahandle_timestamp(
     s_op->u.crdirent.metahandle_attr.mask =
         PVFS_ATTR_COMMON_ALL | PVFS_ATTR_META_ALL;
  
-    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
-
     /* The only thing we need to change is CTIME, so all we have to
      * do is set that flag in the representation of the attributes
      * we want to change. */
+    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
     tmp_attr.mask = PVFS_ATTR_COMMON_CTIME;
 
     PVFS_object_attr_overwrite_setable(&s_op->u.crdirent.metahandle_attr,
@@ -1518,6 +1545,10 @@ static PINT_sm_action crdirent_find_split_entries(
             js_p->error_code = ret;
             return SM_ACTION_COMPLETE;
         }
+
+        /* If we created a capability in crdirent_update_metahandle_timestamp
+         * we need to clean it up first. */
+        PINT_cleanup_capability(&s_op->u.crdirent.capability);
 
         /* This memory will be freed in crdirent_cleanup
            by PINT_cleanup_capability. */
