@@ -409,8 +409,6 @@ static int check_acls(void *acl_buf,
         return -PVFS_EINVAL;
     }
 
-    /* keyval for ACLs includes a \0. so subtract the thingie */
-    acl_size--;
 #ifndef PVFS_USE_OLD_ACL_FORMAT
     /* remove header when calculating size */
     acl_size -= sizeof(pvfs2_acl_header);
