@@ -400,23 +400,32 @@ static void client_segfault_handler(int signum)
     abort();
 }
 
+/*
+ * /usr/include/uuid/uuid.h:typedef unsigned char uuid_t[16];
+ *
+ * uuid_t is an unsigned char[16] array and thus passes by reference.
+ *
+ * Unique identifier for an object on a PVFS3 file system  128-bit
+ * typedef struct {uuid_t u;} PVFS_OID __attribute__ ((__aligned__ (8)));
+ * typedef PVFS_OID PVFS_handle;
+ */
 static void pvfs2_khandle_from_handle(PVFS_handle *handle,
                                PVFS_khandle *khandle)
 {
-  struct ihash ihandle;
+  //struct ihash ihandle;
 
-  memset(khandle, 0, sizeof(PVFS_handle));
+  memset(khandle, 0, sizeof(PVFS_khandle));
 
-  ihandle.ino = *handle;
+  //ihandle.ino = *handle;
 
-  khandle->u[0] = ihandle.u[0];
-  khandle->u[1] = ihandle.u[1];
-  khandle->u[2] = ihandle.u[2];
-  khandle->u[3] = ihandle.u[3];
-  khandle->u[12] = ihandle.u[4];
-  khandle->u[13] = ihandle.u[5];
-  khandle->u[14] = ihandle.u[6];
-  khandle->u[15] = ihandle.u[7];
+  khandle->u[0] = handle->u[0];
+  khandle->u[1] = handle->u[1];
+  khandle->u[2] = handle->u[2];
+  khandle->u[3] = handle->u[3];
+  khandle->u[12] = handle->u[4];
+  khandle->u[13] = handle->u[5];
+  khandle->u[14] = handle->u[6];
+  khandle->u[15] = handle->u[7];
 }
 
 static void client_core_sig_handler(int signum)
@@ -664,8 +673,13 @@ static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
                 vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
             &(vfs_request->in_upcall.req.lookup.parent_refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.lookup.parent_refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.lookup.parent_refn.fs_id;
 
     ret = PVFS_isys_ref_lookup(
@@ -719,8 +733,13 @@ static PVFS_error post_create_request(vfs_request_t *vfs_request)
                  vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
         &(vfs_request->in_upcall.req.create.parent_refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.create.parent_refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.create.parent_refn.fs_id;
 
     ret = PVFS_isys_create(
@@ -772,8 +791,13 @@ static PVFS_error post_symlink_request(vfs_request_t *vfs_request)
                  vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
         &(vfs_request->in_upcall.req.sym.parent_refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.sym.parent_refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.sym.parent_refn.fs_id;
 
     ret = PVFS_isys_symlink(
@@ -822,8 +846,14 @@ static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
                  vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
                   &(vfs_request->in_upcall.req.getattr.refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.getattr.refn.khandle.u),
+           sizeof(refn.handle));
+
     refn.fs_id = vfs_request->in_upcall.req.getattr.refn.fs_id;
 
     ret = PVFS_isys_getattr(
@@ -870,8 +900,13 @@ static PVFS_error post_setattr_request(vfs_request_t *vfs_request)
                                    vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
                        &(vfs_request->in_upcall.req.setattr.refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.setattr.refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.setattr.refn.fs_id;
 
     ret = PVFS_isys_setattr(refn,
@@ -917,8 +952,14 @@ static PVFS_error post_remove_request(vfs_request_t *vfs_request)
                  vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
         &(vfs_request->in_upcall.req.remove.parent_refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.remove.parent_refn.khandle.u),
+           sizeof(refn.handle));
+
     refn.fs_id = vfs_request->in_upcall.req.remove.parent_refn.fs_id;
 
     ret = PVFS_isys_remove(
@@ -965,8 +1006,13 @@ static PVFS_error post_mkdir_request(vfs_request_t *vfs_request)
                  vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
         &(vfs_request->in_upcall.req.mkdir.parent_refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.mkdir.parent_refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.mkdir.parent_refn.fs_id;
 
     ret = PVFS_isys_mkdir(
@@ -1014,8 +1060,13 @@ static PVFS_error post_readdir_request(vfs_request_t *vfs_request)
                  vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
         &(vfs_request->in_upcall.req.readdir.refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.readdir.refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.readdir.refn.fs_id;
 
     ret = PVFS_isys_readdir(
@@ -1063,8 +1114,13 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
                  vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
         &(vfs_request->in_upcall.req.readdirplus.refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.readdirplus.refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.readdirplus.refn.fs_id;
 
     ret = PVFS_isys_readdirplus(
@@ -1122,12 +1178,22 @@ static PVFS_error post_rename_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn1.handle = pvfs2_khandle_to_ino(
             &(vfs_request->in_upcall.req.rename.old_parent_refn.khandle));
+*/
+    memcpy(&(refn1.handle),
+           &(vfs_request->in_upcall.req.rename.old_parent_refn.khandle.u),
+           sizeof(refn1.handle));
     refn1.fs_id = vfs_request->in_upcall.req.rename.old_parent_refn.fs_id;
 
+/*
     refn2.handle = pvfs2_khandle_to_ino(
             &(vfs_request->in_upcall.req.rename.new_parent_refn.khandle));
+*/
+    memcpy(&(refn2.handle),
+           &(vfs_request->in_upcall.req.rename.new_parent_refn.khandle.u),
+           sizeof(refn2.handle));
     refn2.fs_id = vfs_request->in_upcall.req.rename.new_parent_refn.fs_id;
 
     ret = PVFS_isys_rename(
@@ -1176,8 +1242,13 @@ static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
             vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
             &(vfs_request->in_upcall.req.truncate.refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.truncate.refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.truncate.refn.fs_id;
 
     ret = PVFS_isys_truncate(
@@ -1258,8 +1329,13 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
                                    vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
             &(vfs_request->in_upcall.req.getxattr.refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.getxattr.refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.getxattr.refn.fs_id;
 
     /* Remember to free these up */
@@ -1319,8 +1395,13 @@ static PVFS_error post_setxattr_request(vfs_request_t *vfs_request)
                                    vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
             &(vfs_request->in_upcall.req.setxattr.refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.setxattr.refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.setxattr.refn.fs_id;
 
     ret = PVFS_isys_seteattr_list(
@@ -1375,8 +1456,13 @@ static PVFS_error post_removexattr_request(vfs_request_t *vfs_request)
                                    vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
             &(vfs_request->in_upcall.req.removexattr.refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.removexattr.refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.removexattr.refn.fs_id;
 
     ret = PVFS_isys_deleattr(
@@ -1465,8 +1551,13 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
                                    vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
             &(vfs_request->in_upcall.req.listxattr.refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.listxattr.refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.listxattr.refn.fs_id;
 
     ret = PVFS_isys_listeattr(
@@ -1773,9 +1864,13 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
     int tmp_param = -1;
     int tmp_subsystem = -1;
     unsigned int tmp_perf_val;
+/*
     uint64_t mask = 0;
     uint64_t mask1 = 0;
     uint64_t mask2 = 0;
+*/
+
+    PVFS_debug_mask mask = GOSSIP_NO_DEBUG;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a param request for op %d\n",
@@ -1851,7 +1946,12 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             tmp_param = TCACHE_RECLAIM_PERCENTAGE;
             tmp_subsystem = CAPCACHE;
             break;
-        /* These next few case statements return without falling through */
+        /* These next few case statements return without falling through  */
+        /*                                                                */
+        /* I think we don't even need PVFS2_PARAM_REQUEST_OP_CLIENT_DEBUG */
+        /* for version 3, we'll see... I made it compile, but it is       */
+        /* nonsense, I think...                                           */
+        
         case PVFS2_PARAM_REQUEST_OP_CLIENT_DEBUG:
             gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                          "Got request to SET the client debug mask...\n");
@@ -1863,11 +1963,12 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
 
             ret=gossip_set_debug_mask(1,mask);
             gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-                         "Value of new debug mask is %0x.\n",
-                         (unsigned int)gossip_debug_mask);
+                         "Value of new debug mask is %llu.\n",
+                         llu(gossip_debug_mask.mask1));
 
             vfs_request->out_downcall.status = 0;
-            vfs_request->out_downcall.resp.param.u.value64=mask;
+            vfs_request->out_downcall.resp.param.u.value64 =
+                gossip_debug_mask.mask1;
             return(0);
 
 	/*
@@ -1876,18 +1977,19 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
 	 * version of the kernel module sends over two values. When
 	 * working with a 2.x client, mask1 is always 0. When working 
 	 * with 3.x either mask1 or mask2 may have values.
+	 *
+	 * OK. It is changed, and it compiles, it must work <g> ...
 	 */
 	case PVFS2_PARAM_REQUEST_OP_TWO_MASK_VALUES:
 		sscanf(vfs_request->in_upcall.req.param.s_value,
 		       "%llx %llx",
-			(unsigned long long *)&mask1,
-			(unsigned long long *)&mask2);
-		mask = mask2;
+			(unsigned long long *)&mask.mask1,
+			(unsigned long long *)&mask.mask2);
 		gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
 			     "Got request to SET the client debug mask to "
-			     ":%llx:\n",
-			     (unsigned long long)mask2);
-		ret=gossip_set_debug_mask(1,mask);
+			     "mask1:%llu: mask2:%llu:\n",
+			     llu(mask.mask1), llu(mask.mask2));
+		ret = gossip_set_debug_mask(1, mask);
 
 		return(0);
 		break;
@@ -2300,8 +2402,13 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request,
                                    vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
                   &(vfs_request->in_upcall.req.io.refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.io.refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.io.refn.fs_id;
 
     /* save a ptr to the buff struct we are reading */
@@ -2444,8 +2551,13 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
     }
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
                         &(vfs_request->in_upcall.req.io.refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.io.refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.io.refn.fs_id;
 
     /* We need a request struct in order to search for
@@ -2626,8 +2738,13 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
             free(s);
 
             /* compat */
+/*
             refn.handle = pvfs2_khandle_to_ino(
                           &(vfs_request->in_upcall.req.io.refn.khandle));
+*/
+            memcpy(&(refn.handle),
+                   &(vfs_request->in_upcall.req.io.refn.khandle.u),
+                   sizeof(refn.handle));
             refn.fs_id = vfs_request->in_upcall.req.io.refn.fs_id;
 
             /* call buffer management to find a buffer */
@@ -2778,8 +2895,13 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
                      "vfs_request = %p\n", vfs_request);
         free(s);
 
+/*
         refn.handle = pvfs2_khandle_to_ino(
                       &(vfs_request->in_upcall.req.io.refn.khandle));
+*/
+        memcpy(&(refn.handle),
+               &(vfs_request->in_upcall.req.io.refn.khandle.u),
+               sizeof(refn.handle));
         refn.fs_id = vfs_request->in_upcall.req.io.refn.fs_id;
 
         pint_racache_flush(refn);
@@ -2823,8 +2945,14 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
                                    vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
                   &(vfs_request->in_upcall.req.io.refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.io.refn.khandle.u),
+           sizeof(refn.handle));
+
     refn.fs_id = vfs_request->in_upcall.req.io.refn.fs_id;
 
     iotype = (vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ) ?
@@ -3014,8 +3142,13 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
                                        vfs_request->in_upcall.gid);
 
         /* compat */
+/*
         refn.handle = pvfs2_khandle_to_ino(
                         &(vfs_request->in_upcall.req.iox.refn.khandle));
+*/
+        memcpy(&(refn.handle),
+               &(vfs_request->in_upcall.req.iox.refn.khandle.u),
+               sizeof(refn.handle));
         refn.fs_id = vfs_request->in_upcall.req.iox.refn.fs_id;
     
         /* post the I/O */
@@ -3096,8 +3229,13 @@ static PVFS_error service_mmap_ra_flush_request(vfs_request_t *vfs_request)
     free(s);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
                     &(vfs_request->in_upcall.req.ra_cache_flush.refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.ra_cache_flush.refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.ra_cache_flush.refn.fs_id;
 
     pint_racache_flush(refn);
@@ -3159,8 +3297,13 @@ static PVFS_error post_fsync_request(vfs_request_t *vfs_request)
                                    vfs_request->in_upcall.gid);
 
     /* compat */
+/*
     refn.handle = pvfs2_khandle_to_ino(
                     &(vfs_request->in_upcall.req.fsync.refn.khandle));
+*/
+    memcpy(&(refn.handle),
+           &(vfs_request->in_upcall.req.fsync.refn.khandle.u),
+           sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.fsync.refn.fs_id;
 
     ret = PVFS_isys_flush(refn,
@@ -3271,7 +3414,6 @@ static long encode_dirents(pvfs2_readdir_response_t *ptr,
     int i; 
     char *buf = (char *) ptr;
     char **pptr = &buf;
-    struct ihash s;
 
     ptr->token = readdir->token;
     ptr->directory_version = readdir->directory_version;
@@ -3285,14 +3427,10 @@ static long encode_dirents(pvfs2_readdir_response_t *ptr,
     for (i = 0; i < readdir->pvfs_dirent_outcount; i++) 
     {
         enc_string(pptr, &readdir->dirent_array[i].d_name);
-        /* format the handle as a khandle */
-        s.ino = readdir->dirent_array[i].handle; 
-        *(unsigned int *) *pptr = s.slice[0];
-        *pptr += 4;
-	memset((void *)*pptr, 0, 8);
-        *pptr += 8;
-        *(unsigned int *) *pptr = s.slice[1];
-        *pptr += 4;
+        memcpy(*pptr,
+               &(readdir->dirent_array[i].handle), 
+               sizeof(readdir->dirent_array[i].handle));
+        *pptr += sizeof(readdir->dirent_array[i].handle);
     }
     return ((unsigned long) *pptr - (unsigned long) ptr);
 }
@@ -3584,12 +3722,20 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                                                    vfs_request->in_upcall.gid);
 
                     /* Turn the parent khandle in the upcall into a handle. */
+/*
                     refn1.handle = pvfs2_khandle_to_ino(
                          &(vfs_request->in_upcall.req.create.parent_refn.khandle));
+*/
+                    memcpy(&(refn1.handle),
+                           &(vfs_request->in_upcall.req.create.parent_refn.khandle.u),
+                           sizeof(refn1.handle));
+
                     refn1.fs_id =
                          vfs_request->in_upcall.req.create.parent_refn.fs_id;
+/*
                     refn1.__pad1 = 
                          vfs_request->in_upcall.req.create.parent_refn.__pad1;
+*/
 
                     /* Obtain the handle of the target object. */
                     refn2 = perform_lookup_on_create_error(
@@ -3615,7 +3761,10 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                         free(credential);
                     }
 
+                    if (!PVFS_OID_cmp(&refn2.handle, &PVFS_HANDLE_NULL))
+/*
                     if (refn2.handle == PVFS_HANDLE_NULL)
+*/
                     {
                         gossip_debug(
                             GOSSIP_CLIENTCORE_DEBUG, "Overwriting error "
@@ -3779,7 +3928,10 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
             }
             else
             {
+/*
                 PVFS_handle root_handle;
+*/
+                PVFS_object_ref root_handle;
                 /*
                  * ungracefully ask bmi to drop connections on cancellation so
                  * that the server will immediately know that a cancellation
@@ -3806,13 +3958,19 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                  * before sending success response we need to resolve the root
                  * handle, given the previously resolved fs_id
                  */
+                ret =
+                  PINT_cached_config_get_root_ref(
+                    vfs_request->mntent->fs_id,
+                    &root_handle);
+/*
                 ret = PINT_cached_config_get_root_handle(
                                             vfs_request->mntent->fs_id,
                                             &root_handle);
+*/
                 if (ret)
                 {
-                    gossip_err("Failed to retrieve root handle for "
-                               "resolved fs_id %d\n", vfs_request->mntent->fs_id);
+                    gossip_err("Failed to retrieve root handle for resolved "
+                               "fs_id %d\n", vfs_request->mntent->fs_id);
                     gossip_err(
                         "Failed to mount via host %s\n",
                         vfs_request->in_upcall.req.fs_mount.pvfs2_config_server);
@@ -3823,8 +3981,13 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                 }
                     
                 gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+/*
                              "FS mount got root handle %llu on fs id %d\n",
                              llu(root_handle), vfs_request->mntent->fs_id);
+*/
+                             "FS mount got root handle %s on fs id %d\n",
+                             PVFS_OID_str(&root_handle.handle),
+                             vfs_request->mntent->fs_id);
 
                 vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_MOUNT;
                 vfs_request->out_downcall.status = 0;
@@ -3834,9 +3997,14 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
 //hubcap                    root_handle;
 
                 /* compat 2 */
+/*
                 pvfs2_khandle_from_handle(
                       &root_handle,
                       &(vfs_request->out_downcall.resp.fs_mount.root_khandle));
+*/
+                memcpy(&(vfs_request->out_downcall.resp.fs_mount.root_khandle),
+                       &root_handle.handle,
+                       sizeof(root_handle.handle));
 
                 vfs_request->out_downcall.resp.fs_mount.id =
                                                  dynamic_mount_id++;
@@ -5053,7 +5221,10 @@ int main(int argc, char **argv)
     int ret = 0, i = 0;
     time_t start_time;
     struct tm *local_time = NULL;
+/*
     uint64_t debug_mask = GOSSIP_NO_DEBUG;
+*/
+    PVFS_debug_mask debug_mask = GOSSIP_NO_DEBUG;
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
     struct sigaction segv_action;
