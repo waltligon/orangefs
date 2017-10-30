@@ -122,8 +122,7 @@ nested machine pvfs2_crdirent_work_sm
     state update_metahandle_timestamp_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => get_dirent_count;
-        default => return;
+        default => get_dirent_count;
     }
 
     state get_dirent_count
@@ -928,6 +927,15 @@ static PINT_sm_action crdirent_get_dirent_count(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t tmp_id;
+
+    /* If there was an error updating CTIME just write an
+     * error message to the log and go on. */
+    if (js_p->error_code != 0)
+    {
+        gossip_err("Error %d updating CTIME on handle %llu.\n",
+                    js_p->error_code, llu(s_op->u.crdirent.new_handle));
+        js_p->error_code = 0;
+    }
 
     ret = job_trove_keyval_get_handle_info(
         s_op->u.crdirent.fs_id,
