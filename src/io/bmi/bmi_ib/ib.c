@@ -2197,7 +2197,7 @@ static struct bmi_method_addr *ib_alloc_method_addr(ib_connection_t *c,
     map = bmi_alloc_method_addr(bmi_ib_method_id, (bmi_size_t) sizeof(*ibmap));
     ibmap = map->method_data;
     ibmap->c = c;
-    ibmap->hostname = hostname;
+    ibmap->hostname = strdup(hostname);
     ibmap->port = port;
     ibmap->reconnect_flag = reconnect_flag;
     ibmap->ref_count = 1;
@@ -2280,19 +2280,18 @@ static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
     }
     gen_mutex_unlock(&interface_mutex);
 
-    if (map)
+    /* if we didn't find it, create a new one */
+    if (!map)
     {
-        free(hostname);  /* found it */
-    }
-    else
-    {
-        /* set reconnect flag on this addr; we will be acting as a client
-         * for this connection and will be responsible for making sure that
-         * the connection is established
+        /* Allocate a new method_addr and set reconnect flag; we will be
+         * acting as a client for this connection and will be responsible for
+         * making sure that the connection is established
          */
         map = ib_alloc_method_addr(0, hostname, port, 1);  /* alloc new one */
         /* but don't call bmi_method_addr_reg_callback! */
     }
+
+    free(hostname);
 
     return map;
 }
