@@ -465,8 +465,8 @@ int client_state_machine_terminate(
 
         PINT_EVENT_END(PINT_client_sys_event_id, pint_client_pid, NULL, sm_p->event_id, 0);
 
-        PVFS_hint_free(sm_p->hints);
-        sm_p->hints = NULL;
+        PVFS_hint_free(&sm_p->hints);
+        //RAL sm_p->hints = NULL;
 
         gossip_debug(GOSSIP_CLIENT_DEBUG, 
                 "add smcb %p to completion list\n", smcb);
@@ -548,8 +548,8 @@ PVFS_error PINT_client_state_machine_post(
     if (!smcb)
     {
         /* give back the hint added above */
-        PVFS_hint_free( sm_p->hints );
-        sm_p->hints = NULL;
+        PVFS_hint_free( &sm_p->hints );
+        //RAL sm_p->hints = NULL;
         return ret;
     }
 
@@ -572,8 +572,8 @@ PVFS_error PINT_client_state_machine_post(
         gen_mutex_unlock(&test_mutex);
 
         /* give back the hint added above */
-        PVFS_hint_free( sm_p->hints );
-        sm_p->hints = NULL;
+        PVFS_hint_free( &sm_p->hints );
+        //RAL sm_p->hints = NULL;
 
         return sm_ret;
     }
@@ -628,8 +628,8 @@ PVFS_error PINT_client_state_machine_release(PINT_smcb * smcb)
 
     if( sm_p )
     {
-        PVFS_hint_free( sm_p->hints );
-        sm_p->hints = NULL;
+        PVFS_hint_free( &sm_p->hints );
+        //RAL sm_p->hints = NULL;
     }
 
     PINT_smcb_set_complete(smcb);
@@ -637,7 +637,7 @@ PVFS_error PINT_client_state_machine_release(PINT_smcb * smcb)
     PINT_id_gen_safe_unregister(sm_p->sys_op_id);
 
     /* free the internal hint list */
-    PVFS_hint_free(sm_p->hints);
+    PVFS_hint_free(&sm_p->hints);
 
     PINT_smcb_free(smcb);
     return 0;
@@ -1162,8 +1162,8 @@ static void PINT_sys_release_smcb(PINT_smcb *smcb)
     {
         cred_p = sm_p->cred_p;
         /* free the hint if sm_p isn't null */
-        PVFS_hint_free( sm_p->hints );
-        sm_p->hints = NULL;
+        PVFS_hint_free( &sm_p->hints );
+        //RAL sm_p->hints = NULL;
     }
 
     if (PINT_smcb_op(smcb) && cred_p)
