@@ -1398,9 +1398,14 @@ static ssize_t do_readv_writev(struct rw_options *rw)
 		      rw->dest.address.nr_segs,
 		      rw->dest.address.iov->iov_len);
 	ret = generic_write_checks(&iocb, &iter);
+        /* if ret is zero, then there were zero bytes to write.  If ret < 0, then
+         * we have a true error.
+         */
         if (ret <= 0)
-        {
-            gossip_err("%s: failed generic argument checks 1.\n", rw->fnstr);
+        {   if (ret < 0)
+            {
+               gossip_err("%s: failed generic argument checks #1. ret(%d)\n", rw->fnstr,(int)ret);
+            }
             goto out;
         }
 	if (file->f_flags & O_APPEND)
@@ -1411,7 +1416,7 @@ static ssize_t do_readv_writev(struct rw_options *rw)
 
         if (ret != 0)
         {
-            gossip_err("%s: failed generic argument checks 2.\n", rw->fnstr);
+            gossip_err("%s: failed generic argument checks #2.\n", rw->fnstr);
             goto out;
         }
 

@@ -4091,7 +4091,10 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                 }
             }
             else {
-                PVFS_perror_gossip("getxattr: ", *error_code);
+                if ( *error_code != -PVFS_ENOENT )
+                {
+                   PVFS_perror_gossip("getxattr: ", *error_code);
+                }
             }
             /* free up the memory allocate to response.geteattr */
             free(vfs_request->response.geteattr.val_array[0].buffer);
