@@ -2327,8 +2327,7 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request,
         /* failure - remove things allocated here */
         PVFS_Request_free(&vfs_request->mem_req);
         PVFS_Request_free(&vfs_request->file_req);
-        PVFS_hint_free(vfs_request->hints);
-        vfs_request->hints = NULL;
+        PVFS_hint_free(&vfs_request->hints);
         return ret;
     }
 
@@ -2509,8 +2508,7 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
                 /* failed to post for some reason so let's try
                  * to clean up the left over memory
                  */
-                PVFS_hint_free(rareq->hints);
-                rareq->hints = NULL;
+                PVFS_hint_free(&rareq->hints);
                 free(rareq);
             }
             /* malloc a new phantom request for the next buffer */
@@ -2554,8 +2552,7 @@ static PVFS_error check_for_speculative(vfs_request_t *vfs_request,
 fast_exit:
     gossip_debug(GOSSIP_RACACHE_DEBUG,
                  "--- CHECK_for_speculative freeing unused phantom req NA\n");
-    PVFS_hint_free(rareq->hints);
-    rareq->hints = NULL;
+    PVFS_hint_free(&rareq->hints);
     free (rareq);
     return ret;
 }
@@ -3054,8 +3051,7 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
             PINT_client_io_cancel(vfs_request->op_ids[j]);
             PVFS_Request_free(&vfs_request->mem_req_a[j]);
             PVFS_Request_free(&vfs_request->file_req_a[j]);
-            PVFS_hint_free(vfs_request->hints);
-            vfs_request->hints = NULL;
+            PVFS_hint_free(&vfs_request->hints);
         }
         free(vfs_request->in_upcall.trailer_buf);
         vfs_request->in_upcall.trailer_buf = NULL;
@@ -3466,7 +3462,7 @@ static PVFS_error cancel_readahead_request(vfs_request_t *vfs_request)
                 {
                     gossip_debug(GOSSIP_RACACHE_DEBUG,
                              "--- Free cancelled speculative vfs_request\n");
-                    PVFS_hint_free(vl->hints);
+                    PVFS_hint_free(&vl->hints);
                     free(vl);
                 }
                 else
@@ -3900,8 +3896,7 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
 
                     PVFS_Request_free(&vfs_request->mem_req);
                     PVFS_Request_free(&vfs_request->file_req);
-                    PVFS_hint_free(vfs_request->hints);
-                    vfs_request->hints = NULL;
+                    PVFS_hint_free(&vfs_request->hints);
                     gossip_debug(GOSSIP_RACACHE_DEBUG,
                                  "vfs_request = %p waiters = %d\n",
                                  vfs_request, buff->vfs_cnt);
@@ -3994,8 +3989,7 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                                   vfs_request, iotype);
                         PVFS_Request_free(&vfs_request->mem_req);
                         PVFS_Request_free(&vfs_request->file_req);
-                        PVFS_hint_free(vfs_request->hints);
-                        vfs_request->hints = NULL;
+                        PVFS_hint_free(&vfs_request->hints);
                     }
                     vfs_request->out_downcall.resp.io.amt_complete =
                             (size_t)vfs_request->response.io.total_completed;
@@ -4004,8 +3998,7 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                 /* RA_CACHE disabled so do this */
                 PVFS_Request_free(&vfs_request->mem_req);
                 PVFS_Request_free(&vfs_request->file_req);
-                PVFS_hint_free(vfs_request->hints);
-                vfs_request->hints = NULL;
+                PVFS_hint_free(&vfs_request->hints);
 
                 vfs_request->out_downcall.resp.io.amt_complete =
                         (size_t)vfs_request->response.io.total_completed;
@@ -4053,8 +4046,7 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
             {
                 PVFS_Request_free(&vfs_request->mem_req_a[j]);
                 PVFS_Request_free(&vfs_request->file_req_a[j]);
-                PVFS_hint_free(vfs_request->hints);
-                vfs_request->hints = NULL;
+                PVFS_hint_free(&vfs_request->hints);
             }
             free(vfs_request->mem_req_a);
             free(vfs_request->file_req_a);
@@ -4099,7 +4091,10 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                 }
             }
             else {
-                PVFS_perror_gossip("getxattr: ", *error_code);
+                if ( *error_code != -PVFS_ENOENT )
+                {
+                   PVFS_perror_gossip("getxattr: ", *error_code);
+                }
             }
             /* free up the memory allocate to response.geteattr */
             free(vfs_request->response.geteattr.val_array[0].buffer);
@@ -4206,8 +4201,7 @@ static inline PVFS_error repost_unexp_vfs_request(
 #ifdef USE_RA_CACHE
     if (vfs_request->is_readahead_speculative)
     {
-        // PVFS_hint_free(vfs_request->hints);
-        // vfs_request->hints = NULL;
+        // PVFS_hint_free(&vfs_request->hints);
         gossip_err("Tried to repost speculative request from %s\n",
                    completion_handle_desc);
         /* do not repost a speculative read */
@@ -4225,8 +4219,7 @@ static inline PVFS_error repost_unexp_vfs_request(
 
     PINT_dev_release_unexpected(&vfs_request->info);
     PINT_sys_release(vfs_request->op_id);
-    PVFS_hint_free(vfs_request->hints);
-    vfs_request->hints = NULL;
+    PVFS_hint_free(&vfs_request->hints);
     /* wipe the vfs_request here before we resubmit */
     memset(vfs_request, 0, sizeof(vfs_request_t));
 
@@ -4882,8 +4875,7 @@ static PVFS_error process_vfs_requests(void)
                             gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                                          "--- Free speculative vl\n");
                             /* clean up */
-                            PVFS_hint_free(vl->hints);
-                            vl->hints = NULL;
+                            PVFS_hint_free(&vl->hints);
                             vl->racache_buff = NULL;
                             gossip_debug(GOSSIP_RACACHE_DEBUG, "Free vl = %p\n", vl);
                             free(vl);
@@ -4937,8 +4929,7 @@ static PVFS_error process_vfs_requests(void)
                             gossip_debug(GOSSIP_RACACHE_DEBUG,
                                          "--- Free speculative vfs_request\n");
                             /* clean up */
-                            PVFS_hint_free(vfs_request->hints);
-                            vfs_request->hints = NULL;
+                            PVFS_hint_free(&vfs_request->hints);
                             vfs_request->racache_buff = NULL;
                             gossip_debug(GOSSIP_RACACHE_DEBUG, "Free vfs_request = %p\n", vl);
                             free(vfs_request);
@@ -5402,22 +5393,19 @@ int main(int argc, char **argv)
         struct PINT_perf_counter *ac_pcnt = PINT_acache_get_pc();
         PINT_smcb *ac_smcb = ac_pcnt->smcb;
         PINT_client_sm *ac_sm_p = PINT_sm_frame(ac_smcb, PINT_FRAME_CURRENT);
-        PVFS_hint_free(ac_sm_p->hints);
-        ac_sm_p->hints = NULL;
+        PVFS_hint_free(&ac_sm_p->hints);
         PINT_smcb_free(ac_smcb);
     }{
         struct PINT_perf_counter *nc_pcnt = PINT_ncache_get_pc();
         PINT_smcb *nc_smcb = nc_pcnt->smcb;
         PINT_client_sm *nc_sm_p = PINT_sm_frame(nc_smcb, PINT_FRAME_CURRENT);
-        PVFS_hint_free(nc_sm_p->hints);
-        nc_sm_p->hints = NULL;
+        PVFS_hint_free(&nc_sm_p->hints);
         PINT_smcb_free(nc_smcb);
     }{
         struct PINT_perf_counter *capc_pcnt = PINT_client_capcache_get_pc();
         PINT_smcb *capc_smcb = capc_pcnt->smcb;
         PINT_client_sm *capc_sm_p = PINT_sm_frame(capc_smcb, PINT_FRAME_CURRENT);
-        PVFS_hint_free(capc_sm_p->hints);
-        capc_sm_p->hints = NULL;
+        PVFS_hint_free(&capc_sm_p->hints);
         PINT_smcb_free(capc_smcb);
     }
 
@@ -6378,7 +6366,7 @@ inline static void fill_hints(vfs_request_t *req)
 
     if (req->hints != NULL)
     {
-        PVFS_hint_free(req->hints);
+        PVFS_hint_free(&req->hints);
     }
 
     /* add uid hint for client capcache functionality */
