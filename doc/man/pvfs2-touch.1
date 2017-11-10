@@ -1,17 +1,21 @@
-.TH PVFS2-DROP-CACHES 1 2017-07-03
+.TH PVFS2-TOUCH 1 2017-08-11
 .SH NAME
-\fBpvfs2-drop-caches\fR \(en flush I/O cache on OrangeFS servers
+\fBpvfs2-touch\fR \(en create files
 .SH SYNOPSIS
-\fBpvfs2-drop-caches\fR [\fB\-m \fIfs_mount_point\fR]
+\fBpvfs2-touch\fR [\fB\-lr\fR] \fIpvfs2_filename[s]\fR
 .SH DESCRIPTION
 The
-.B pvfs2-drop-caches
-utility requests that each OrangeFS server flush the operating system
-I/O cache.
+.B pvfs2-touch
+utility creates empty files.  It does not update modification and access
+times on extant files as
+.BR touch ( 1 )
+does.
 .PP
 The options are as follows:
-.IP -m
-Specify the file system to operate on.
+.IP -l
+Use list layout.
+.IP -r
+Use random layout.
 .SH ENVIRONMENT
 .IP PVFS2_DEBUGFILE
 If set to the path of a local file, redirect debug output to it.
@@ -24,7 +28,17 @@ If set, the full pathname for an alternate
 file
 .SH FILES
 .I /etc/pvfs2tab
+.SH EXAMPLES
+Create the empty file
+.IR /mnt/foo .
+.PP
+.RS 6n
+pvfs2-touch /mnt/foo
+.RE
 .SH BUGS
 Please submit bug reports to pvfs2-developers@beowulf-underground.org
 .SH SEE ALSO
+.BR touch ( 1 ),
+.BR pvfs2-viewdist ( 1 ),
+.BR pvfs2-write ( 1 ),
 .BR pvfs2tab ( 5 )

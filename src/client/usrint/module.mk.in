@@ -48,4 +48,5 @@ LIBSRC += $(SRC)
 #values, which triggers this warning.  We will turn this off
 #when we compile usrint.
 
-GCC_CFLAGS += -Wno-nonnull-compare
+MODCFLAGS_$(DIR)/posix.c := -Wno-nonnull-compare
+MODCFLAGS_$(DIR)/stdio.c := -Wno-nonnull-compare

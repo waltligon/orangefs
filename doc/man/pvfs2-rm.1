@@ -1,17 +1,18 @@
-.TH PVFS2-DROP-CACHES 1 2017-07-03
+.TH PVFS2-RM 1 2017-08-14
 .SH NAME
-\fBpvfs2-drop-caches\fR \(en flush I/O cache on OrangeFS servers
+\fBpvfs2-rm\fR \(en remove files
 .SH SYNOPSIS
-\fBpvfs2-drop-caches\fR [\fB\-m \fIfs_mount_point\fR]
+\fBpvfs2-rm\fR [\fB\-rf\fR] \fIpvfs2_filename[s]\fR
 .SH DESCRIPTION
 The
-.B pvfs2-drop-caches
-utility requests that each OrangeFS server flush the operating system
-I/O cache.
+.B pvfs2-rm
+utilitiy deletes files in an OrangeFS volume.
 .PP
 The options are as follows:
-.IP -m
-Specify the file system to operate on.
+.IP -r
+Recursively delete all files in a directory tree.
+.IP -f
+Force deletion even if the current user does not own the file.
 .SH ENVIRONMENT
 .IP PVFS2_DEBUGFILE
 If set to the path of a local file, redirect debug output to it.
@@ -24,7 +25,23 @@ If set, the full pathname for an alternate
 file
 .SH FILES
 .I /etc/pvfs2tab
+.SH EXAMPLES
+Remove the file
+.IR /mnt/foo .
+.PP
+.RS 6n
+pvfs2-rm /mnt/foo
+.RE
+.PP
+Remove the directory
+.I /mnt/foo
+and all files and directories within it.
+.PP
+.RS 6n
+pvfs2-rm -r /mnt/foo
+.RE
 .SH BUGS
 Please submit bug reports to pvfs2-developers@beowulf-underground.org
 .SH SEE ALSO
+.BR rm ( 1 ),
 .BR pvfs2tab ( 5 )

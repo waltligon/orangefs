@@ -1,0 +1,22 @@
+.TH PVFS2-SET-PERF-INTERVAL 1 2017-08-18
+.SH NAME
+\fBpvfs2-set-perf-interval\fR \(en set performance monitoring parameters
+.SH SYNOPSIS
+\fBpvfs2-set-perf-interval\fR
+.SH DESCRIPTION
+The
+.B pvfs2-set-perf-interval
+utility is part of the performance monitoring system.  It only be used
+by experienced system administrators.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2-perf-mon-example ( 1 ),
+.BR pvfs2-perf-mon-snmp ( 1 ),
+.BR pvfs2-set-perf-history ( 1 )

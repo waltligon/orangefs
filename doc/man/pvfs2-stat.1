@@ -1,17 +1,18 @@
-.TH PVFS2-DROP-CACHES 1 2017-07-03
+.TH PVFS2-STAT 1 2017-08-09
 .SH NAME
-\fBpvfs2-drop-caches\fR \(en flush I/O cache on OrangeFS servers
+\fBpvfs2-stat\fR \(en display file attributes
 .SH SYNOPSIS
-\fBpvfs2-drop-caches\fR [\fB\-m \fIfs_mount_point\fR]
+\fBpvfs2-stat\fR [\fB\-LV\fR] \fIFILE\fR
 .SH DESCRIPTION
 The
-.B pvfs2-drop-caches
-utility requests that each OrangeFS server flush the operating system
-I/O cache.
+.B pvfs2-stat
+utility displays the attributes of the specified files.
 .PP
 The options are as follows:
-.IP -m
-Specify the file system to operate on.
+.IP -L
+Follow symbolic links.
+.IP -V
+Print version number and exit.
 .SH ENVIRONMENT
 .IP PVFS2_DEBUGFILE
 If set to the path of a local file, redirect debug output to it.
@@ -23,8 +24,18 @@ If set, the full pathname for an alternate
 .IR pvfs2tab
 file
 .SH FILES
+.I /etc/passwd
+.PP
 .I /etc/pvfs2tab
+.SH EXAMPLES
+Display attributes for the file
+.IR /mnt/foo .
+.PP
+.RS 6n
+pvfs2-stat /mnt/foo
+.RE
 .SH BUGS
 Please submit bug reports to pvfs2-developers@beowulf-underground.org
 .SH SEE ALSO
+.BR stat ( 1 ),
 .BR pvfs2tab ( 5 )

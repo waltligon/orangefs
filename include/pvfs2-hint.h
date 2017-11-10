@@ -44,7 +44,7 @@ int PVFS_hint_replace(PVFS_hint *hint,
 
 int PVFS_hint_copy(PVFS_hint old_hint, PVFS_hint *new_hint);
 
-void PVFS_hint_free(PVFS_hint hint);
+void PVFS_hint_free(PVFS_hint *hint);
 
 /* check to see if a hint has already been added */
 int PVFS_hint_check(PVFS_hint *hints, const char *name);

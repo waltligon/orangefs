@@ -2240,13 +2240,6 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 
     if(argc - total_arguments > 2)
     {
-        /* Assume user is passing in a server.conf.  Bit of a hack here to
-         * support server.conf files in the old format by appending the
-         * server.conf options onto the fs.conf.
-         */
-        gossip_err("The two config file format is no longer supported.  "
-                   "Generate a single fs.conf that uses the new format with the "
-                   "pvfs2-config-convert script.\n\n");
         goto parse_cmd_line_args_failure;
     }
 
@@ -2602,7 +2595,7 @@ int server_state_machine_complete(PINT_smcb *smcb)
     /* release the decoding of the unexpected request */
     if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
-        PVFS_hint_free(s_op->decoded.stub_dec.req.hints);
+        PVFS_hint_free(&s_op->decoded.stub_dec.req.hints);
 
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
