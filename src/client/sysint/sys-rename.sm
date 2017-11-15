@@ -1046,6 +1046,8 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_object_attr *attr = NULL;
+    PVFS_dist_dir_hash_type hash;
+    int dirdata_index;
 
     /* look at the result of the dest getattr and make sure everything looks
      * ok before we continue
@@ -1108,6 +1110,27 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
+
+    /* Determine the correct dirent handle for the new name. */
+    hash = PINT_encrypt_dirdata(sm_p->u.rename.entries[1]);
+    /* gossip hash */
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "%s: encrypt dirent %s into hash value %llu.\n",
+            __func__, sm_p->u.rename.entries[1],
+            llu(hash));
+
+    dirdata_index = PINT_find_dist_dir_bucket(hash,
+            &sm_p->u.rename.parent_attr[1].dist_dir_attr,
+            sm_p->u.rename.parent_attr[1].dist_dir_bitmap);
+    /* stash dirent_handle */
+    sm_p->u.rename.dirent_handle[1] =
+        sm_p->u.rename.parent_attr[1].dirdata_handles[dirdata_index];
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "%s: selecting dirdata_servers[%d]=%llu"
+            " as the dirent_handle for dirent %s.\n",
+            __func__, dirdata_index,
+            llu(sm_p->u.rename.parent_attr[1].dirdata_handles[dirdata_index]),
+            sm_p->u.rename.entries[1]);
 
     /*
       here, we're exhanging the existing dirent under the 'new' parent
