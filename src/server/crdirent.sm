@@ -855,7 +855,7 @@ static PINT_sm_action crdirent_update_metahandle_timestamp(
             s_op->req->u.crdirent.credential,
             s_op->u.crdirent.fs_id,
             s_op->u.crdirent.new_handle,
-            PVFS_TYPE_METAFILE,
+            PVFS_TYPE_NONE,
             tmp_attr,
             PVFS_ATTR_COMMON_CTIME,
             s_op->req->hints);
