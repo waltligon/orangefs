@@ -2,9 +2,9 @@
 
 OrangeFS Release ChangeLog
 -----------------------
-orangefs-2.9.x (Subversion Branch v.2.9.x)
+orangefs-2.9.7 (Subversion Branch v.2.9.x)
 http://dev.orangefs.org/svn/orangefs/branches/v.2.9.x
-up to rev 13107 in trunk
+up to rev 13115 in trunk
 
 
 New functionality:
@@ -19,7 +19,8 @@ New functionality:
 	    /etc/profile.d.  These scripts add OrangeFS locations to
 	    LIBRARY_PATH, C_INCLUDE_PATH, AND LD_LIBRARY_PATH.
 
-	4.  Added support for Fedora 26.
+	4.  Added support for Fedora 26.  Certificate security is not yet
+	    compatible with OpenSSL 1.1 but work is in progress.
 
 	5.  Official OrangeFS rpm is in the Fedora distribution.  The rpm will
 	    be in either Fedora 27 or Fedora 28.  The rpm will also be in
