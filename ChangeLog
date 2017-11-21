@@ -4,7 +4,7 @@ OrangeFS Release ChangeLog
 -----------------------
 orangefs-2.9.7 (Subversion Branch v.2.9.x)
 http://dev.orangefs.org/svn/orangefs/branches/v.2.9.x
-up to rev 13115 in trunk
+up to rev 13122 in trunk
 
 
 New functionality:
@@ -13,7 +13,7 @@ New functionality:
 	    Support will be forth coming.
 
 	2.  Added support for large LMDB databases using DBMaxSize config
-	    parameter.  Please visit http://dev.orangefs.org/twiki.
+	    parameter.  
 
 	3.  Added scripts in the examples/profile.d directory that can be placed in 
 	    /etc/profile.d.  These scripts add OrangeFS locations to
