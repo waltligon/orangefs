@@ -55,7 +55,7 @@ PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op)
             case PVFS2_VFS_OP_TRUNCATE:
                 fsid = op->upcall.req.truncate.refn.fs_id;
                 break;
-            case PVFS2_VFS_OP_MMAP_RA_FLUSH:
+            case PVFS2_VFS_OP_RA_FLUSH:
                 fsid = op->upcall.req.ra_cache_flush.refn.fs_id;
                 break;
             case PVFS2_VFS_OP_FS_UMOUNT:
@@ -687,7 +687,8 @@ int pvfs2_flush_inode(struct inode *inode)
     {
         gossip_debug(GOSSIP_UTILS_DEBUG,
                      "pvfs2_flush_inode skipping setattr()\n");
-        return 0;
+        ret = 0;
+        goto skip;
     }
         
     memset(s,0,HANDLESTRINGSIZE);
@@ -697,6 +698,8 @@ int pvfs2_flush_inode(struct inode *inode)
                  inode->i_mode);
 
     ret = pvfs2_inode_setattr(inode, &wbattr);
+
+skip:
     kfree(s);
     return ret;
 }
@@ -2033,8 +2036,8 @@ int pvfs2_fill_handle(struct inode *inode, struct file_handle *fhandle)
 
 #endif /* HAVE_FILL_HANDLE_INODE_OPERATIONS */
 
-#ifdef USE_MMAP_RA_CACHE
-int pvfs2_flush_mmap_racache(struct inode *inode)
+#ifdef USE_RA_CACHE
+int pvfs2_flush_racache(struct inode *inode)
 {
     int ret = -EINVAL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
@@ -2043,25 +2046,25 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
     char *s2 = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL);
 
     gossip_debug(GOSSIP_UTILS_DEBUG,
-                 "pvfs2_flush_mmap_racache %s: Handle is %s | fs_id %d\n",
-                 k2s(get_khandle_from_ino(inode),s),
-                 k2s(&(pvfs2_inode->refn.khandle),s),
+                 "pvfs2_flush_racache %s: Handle is %s | fs_id %d\n",
+                 k2s(get_khandle_from_ino(inode),s1),
+                 k2s(&(pvfs2_inode->refn.khandle),s2),
                  pvfs2_inode->refn.fs_id);
 
     kfree(s1);
     kfree(s2);
 
-    new_op = op_alloc(PVFS2_VFS_OP_MMAP_RA_FLUSH);
+    new_op = op_alloc(PVFS2_VFS_OP_RA_FLUSH);
     if (!new_op)
     {
         return -ENOMEM;
     }
     new_op->upcall.req.ra_cache_flush.refn = pvfs2_inode->refn;
 
-    ret = service_operation(new_op, "pvfs2_flush_mmap_racache",
+    ret = service_operation(new_op, "pvfs2_flush_racache",
                       get_interruptible_flag(inode));
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_mmap_racache got return "
+    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_racache got return "
                 "value of %d\n",ret);
 
     op_release(new_op);

@@ -85,7 +85,8 @@ static int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
 static int dbpf_db_create(char *dbname);
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
-static struct server_configuration_s *server_cfg;
+struct server_configuration_s *server_cfg=NULL;
+filesystem_configuration_s *cfg_fs=NULL;
 
 int dbpf_collection_getinfo(TROVE_coll_id coll_id,
                             TROVE_context_id context_id,
@@ -266,7 +267,25 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
 static int dbpf_collection_set_fs_config(TROVE_method_id method_id,
         TROVE_coll_id coll_id, struct server_configuration_s *cfg)
 {
+    PINT_llist *cur = cfg->file_systems;
+    filesystem_configuration_s *cur_fs = PINT_llist_head(cur);
+
+    /* set filesystem configuration pointer */
+    cfg_fs = NULL;
+    do
+    {
+       if (cur_fs->coll_id == coll_id)
+       {
+          cfg_fs = cur_fs;
+          break;
+       }
+       cur = PINT_llist_next(cur);
+       cur_fs = PINT_llist_head(cur);
+    }
+    while(cur_fs != NULL);
+
     server_cfg = cfg;
+
     return 0;
 }
 
@@ -1850,6 +1869,7 @@ static int dbpf_db_create(char *dbname)
 {
     dbpf_db *db;
     int r;
+
     r = dbpf_db_open(dbname, 0, &db, 1, server_cfg);
     if (r)
     {

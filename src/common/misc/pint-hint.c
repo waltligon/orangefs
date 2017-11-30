@@ -168,6 +168,66 @@ PINT_hint_get_info_by_name(const char *name)
     return NULL;
 }
 
+int PVFS_hint_add(
+    PVFS_hint *hint,
+    const char *name,
+    int length,
+    void *value)
+{
+    int ret;
+    const struct PINT_hint_info *info;
+    PINT_hint *new_hint;
+
+    info = PINT_hint_get_info_by_name(name);
+    if(info)
+    {
+        ret = PINT_hint_check(hint, info->type);
+        if(ret == -PVFS_EEXIST)
+        {
+            return ret;
+        }
+    }
+
+    new_hint = malloc(sizeof(PINT_hint));
+    if (!new_hint)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    new_hint->length = length;
+    new_hint->value = malloc(new_hint->length);
+    if(!new_hint->value)
+    {
+        free(new_hint);
+        return -PVFS_ENOMEM;
+    }
+    memcpy(new_hint->value, value, length);
+    
+    if(info)
+    {
+        new_hint->type_string = NULL;
+        new_hint->type = info->type;
+        new_hint->flags = info->flags;
+        new_hint->encode = info->encode;
+        new_hint->decode = info->decode;
+    }
+    else
+    {
+        new_hint->type = PINT_HINT_UNKNOWN;
+        new_hint->type_string = strdup(name);
+
+        /* always transfer unknown hints */
+        new_hint->flags = PINT_HINT_TRANSFER;
+        new_hint->encode = encode_func_string;
+        new_hint->decode = decode_func_string;
+    }
+
+    new_hint->next = *hint;
+    *hint = new_hint;
+
+    return 0;
+}
+
 int PVFS_hint_add_internal(
     PVFS_hint *hint,
     enum PINT_hint_type type,
@@ -268,66 +328,6 @@ int PVFS_hint_replace_internal(
         }
     }
     return -PVFS_ENOENT;
-}
-
-int PVFS_hint_add(
-    PVFS_hint *hint,
-    const char *name,
-    int length,
-    void *value)
-{
-    int ret;
-    const struct PINT_hint_info *info;
-    PINT_hint *new_hint;
-
-    info = PINT_hint_get_info_by_name(name);
-    if(info)
-    {
-        ret = PINT_hint_check(hint, info->type);
-        if(ret == -PVFS_EEXIST)
-        {
-            return ret;
-        }
-    }
-
-    new_hint = malloc(sizeof(PINT_hint));
-    if (!new_hint)
-    {
-        return -PVFS_ENOMEM;
-    }
-
-    new_hint->length = length;
-    new_hint->value = malloc(new_hint->length);
-    if(!new_hint->value)
-    {
-        free(new_hint);
-        return -PVFS_ENOMEM;
-    }
-    memcpy(new_hint->value, value, length);
-    
-    if(info)
-    {
-        new_hint->type_string = NULL;
-        new_hint->type = info->type;
-        new_hint->flags = info->flags;
-        new_hint->encode = info->encode;
-        new_hint->decode = info->decode;
-    }
-    else
-    {
-        new_hint->type = PINT_HINT_UNKNOWN;
-        new_hint->type_string = strdup(name);
-
-        /* always transfer unknown hints */
-        new_hint->flags = PINT_HINT_TRANSFER;
-        new_hint->encode = encode_func_string;
-        new_hint->decode = decode_func_string;
-    }
-
-    new_hint->next = *hint;
-    *hint = new_hint;
-
-    return 0;
 }
 
 int PVFS_hint_check(PVFS_hint *hints, const char *name)
@@ -500,10 +500,10 @@ int PVFS_hint_copy(PVFS_hint old_hint, PVFS_hint *new_hint)
     return 0;
 }
 
-void PVFS_hint_free(PVFS_hint hint)
+void PVFS_hint_free(PVFS_hint *hint)
 {
-    PINT_hint * act = hint;
-    PINT_hint * old;
+    PINT_hint *act = *hint;
+    PINT_hint *old;
 
     while(act != NULL)
     {
@@ -518,6 +518,8 @@ void PVFS_hint_free(PVFS_hint hint)
         }
         free(old);
     }
+    /* set the original hint list pointer to null */
+    *hint = NULL;
 }
 
 /*
@@ -527,10 +529,10 @@ void PVFS_hint_free(PVFS_hint hint)
  */
 int PVFS_hint_import_env(PVFS_hint *out_hint)
 {
-    char * env;
-    char * env_copy;
-    char * save_ptr = NULL;
-    char * aktvar;
+    char *env;
+    char *env_copy;
+    char *save_ptr = NULL;
+    char *aktvar;
     char name[PVFS_HINT_MAX_NAME_LENGTH];
     int len;
     const struct PINT_hint_info *info;
@@ -617,7 +619,7 @@ int PVFS_hint_import_env(PVFS_hint *out_hint)
         if(ret < 0)
         {
             /* hint parsing failed */
-            PVFS_hint_free(hint);
+            PVFS_hint_free(&hint);
             free(env_copy);
             return ret;
         }

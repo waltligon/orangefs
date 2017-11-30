@@ -554,7 +554,7 @@ static int open_fd(
     }
 #endif
 
-    *fd = DBPF_OPEN(filename, flags, mode);
+    *fd = open(filename, flags, mode);
 
 #ifdef HAVE_FCNTL_F_NOCACHE
     if(type == DBPF_FD_DIRECT_WRITE || type == DBPF_FD_DIRECT_READ)
@@ -696,7 +696,7 @@ static void* unlink_bstream(void *context)
     
         tmp_st = qlist_entry(tmp_item, struct file_struct, list_link);
         time(&start_time);
-        ret = DBPF_UNLINK(tmp_st->pathname);
+        ret = unlink(tmp_st->pathname);
         gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, 
             "Unlinked filename: (ret=%d, errno=%d, elapsed-time=%ld(secs) )\n%s\n", 
             ret, errno, (time(NULL) - start_time), tmp_st->pathname);
@@ -714,7 +714,7 @@ static void close_fd(
 {
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
         "dbpf_open_cache closing fd %d of type %d\n", fd, type);
-    DBPF_CLOSE(fd);
+    close(fd);
 }
 
 void clear_stranded_bstreams(TROVE_coll_id coll_id)

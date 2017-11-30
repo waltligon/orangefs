@@ -115,6 +115,7 @@ ifdef V
 endif
 LINUX_KERNEL_SRC = @LINUX_KERNEL_SRC@
 LINUX24_KERNEL_SRC = @LINUX24_KERNEL_SRC@
+WANT_INTERNAL_LMDB = @WANT_INTERNAL_LMDB@
 
 ifeq ($(QUIET_COMPILE),1)
   # say a one-line description of the action, do not echo the command
@@ -164,9 +165,11 @@ INCLUDES := \
     src/common/gen-locks \
     src/common/events \
     src/client/usrint \
-    src/common/lmdb
+    src/common/lmdb \
+    src/server
 GENINCLUDES := \
-	include
+	include \
+	src/server
 else
 INCLUDES := \
     src/client/sysint \
@@ -188,11 +191,13 @@ INCLUDES := \
     src/io/dev \
     src/proto \
     src/common/mgmt \
-	src/common/hash \
-	src/common/llist \
-	src/common/token-utils
+    src/common/hash \
+    src/common/llist \
+    src/common/token-utils \
+    src/server
 GENINCLUDES := \
-	include
+	include \
+        src/server
 endif
 
 #################################################################
@@ -215,7 +220,7 @@ SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@ @LDAP_LDFLAGS@
 DATABASE_BACKEND = @DATABASE_BACKEND@
 DB_CFLAGS = @DB_CFLAGS@
 DB_LIB = @DB_LIB@
-LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
+LDSHARED = $(CC) -shared $(LDFLAGS)
 PICFLAGS = -fPIC
 # Libraries - rt libs tend to depend on other libs so they go first
 LIBS += -lpvfs2
@@ -236,7 +241,7 @@ DEPLIBS += -lm @LIBS@ @THREAD_LIB@
 ULIBDEPLIBS := -lorangefs -lpvfs2
 OLIBDEPLIBS := -lpvfs2
 # Misc defines
-MMAP_RA_CACHE = @MMAP_RA_CACHE@
+RA_CACHE = @RA_CACHE@
 RESET_FILE_POS = @RESET_FILE_POS@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
 REDHAT_RELEASE = @REDHAT_RELEASE@
@@ -479,9 +484,9 @@ ifdef BUILD_ZOID
     CFLAGS += -D__STATIC_METHOD_BMI_ZOID__
 endif
 
-# enable mmap-readahead cache (unless disabled by configure)
-ifdef MMAP_RA_CACHE
-CFLAGS += @MMAP_RA_CACHE@
+# enable client-core readahead cache (unless disabled by configure)
+ifdef RA_CACHE
+CFLAGS += @RA_CACHE@
 endif
 
 # reset the file position pointer when a write call encounters errors (kernel only)
@@ -667,7 +672,6 @@ all::
 
 # this is how we pull build information from all of the project
 #    subdirectories, make sure to catch top level module.mk as well
-include module.mk
 include $(patsubst %, %/module.mk, $(MODULES))
 
 ################################################################
@@ -812,18 +816,42 @@ DEVELTOOLS := $(patsubst %.c,%, $(filter %.c, $(DEVELSRC)))
 # DEVELDEPENDS is a list of dependency files for development programs
 DEVELDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(DEVELSRC)))
 
+# malloc analysis tool, built for the build machine, not the
+# host machine, in the case of cross-compilation
+MEMANALYSISOBJS := $(patsubst %.c,%.o,$(MEMANALYSISSRC))
+MEMANALYSISDEPS := $(patsubst %.c,%.d,$(MEMANALYSISSRC))
+
+
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
+# NOTE: these items are now sorted in the order they appear in this
+# Makefile.in so that it is easy to verify that all depends are
+# included.  All of these items have been removed from CLEAN and
+# replaced with $(DEPENDS) so that the list need only be maintained here.
+#
 ifdef BUILD_BMI_ONLY
 DEPENDS := $(sort $(LIBBMIDEPENDS))
 else
-DEPENDS := $(sort $(LIBDEPENDS) $(ULIBDEPENDS) $(SERVERDEPENDS) \
-    $(SERVERBINDEPENDS) $(MISCDEPENDS) $(USERDEPENDS) \
-    $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) \
-    $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS) \
-    $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) \
-	$(OLIBDEPENDS))
+DEPENDS := $(sort $(LIBDEPENDS) \
+	              $(OLIBDEPENDS) \
+                  $(ULIBDEPENDS) \
+				  $(LIBBMIDEPENDS) \
+				  $(LIBTHREADEDDEPENDS) \
+                  $(ADMINDEPENDS) \
+				  $(USERDEPENDS) \
+				  $(UCACHEDDEPENDS) \
+				  $(ADMINDEPENDS_SERVER) \
+				  $(SERVERDEPENDS) \
+                  $(SERVERBINDEPENDS) \
+				  $(MISCDEPENDS) \
+				  $(KERNAPPDEPENDS) \
+                  $(VISDEPENDS) \
+				  $(VISMISCDEPENDS) \
+				  $(KARMADEPENDS) \
+				  $(FUSEDEPENDS) \
+                  $(STATECOMPDEPS) \
+				  $(DEVELDEPENDS))
 endif
 
 ####################################################################
@@ -852,7 +880,10 @@ kernapps: $(KERNAPPS) $(KERNAPPSTHR)
 statecompgen: $(STATECOMPGEN)
 
 # target for builging development tools
-develtools: $(DEVELTOOLS)
+develtools: $(DEVELTOOLS) $(MEMANALYSIS)
+
+# this is needed for the make dist
+memanalysisgen: $(MEMANALYSISGEN)
 
 # Build linux-2.6 kernel module if requested.
 # Can't use the actual file target since we don't know how to figure out
@@ -923,7 +954,7 @@ lib/libbmi.a: $(LIBBMIOBJS)
 lib/libbmi.so: $(LIBBMIPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libbmi.so -o $@ $(LIBBMIPICOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libbmi.so.$(SO_FULLVER) -o $@ $(LIBBMIPICOBJS) $(DEPLIBS)
 endif
 
 # rule for building the pvfs2 library
@@ -942,13 +973,13 @@ lib/libpvfs2-threaded.a: $(LIBTHREADEDOBJS)
 lib/libpvfs2.so: $(LIBPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libpvfs2.so -o $@ $(LIBPICOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libpvfs2.so.$(SO_FULLVER) -o $@ $(LIBPICOBJS) $(DEPLIBS)
 
 # rule for building the shared pvfs2 _multithreaded_ library
 lib/libpvfs2-threaded.so: $(LIBTHREADEDPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-threaded.so -o $@ $(LIBTHREADEDPICOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-threaded.so.$(SO_FULLVER) -o $@ $(LIBTHREADEDPICOBJS) $(DEPLIBS)
 
 # rule for building the orangefs library
 lib/liborangefs.a: $(OLIBOBJS)
@@ -960,7 +991,7 @@ lib/liborangefs.a: $(OLIBOBJS)
 lib/liborangefs.so: $(OLIBPICOBJS) lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,liborangefs.so,-z,interpose,-Bsymbolic -o $@ $(OLIBPICOBJS) $(OLIBDEPLIBS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,liborangefs.so.$(SO_FULLVER),-z,interpose,-Bsymbolic -o $@ $(OLIBPICOBJS) $(OLIBDEPLIBS) $(DEPLIBS)
 
 # rule for building the ofs library
 lib/libofs.a: $(ULIBOBJS)
@@ -972,7 +1003,7 @@ lib/libofs.a: $(ULIBOBJS)
 lib/libofs.so: $(ULIBPICOBJS) lib/liborangefs.so lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs.so,-z,interpose,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libofs.so.$(SO_FULLVER),-z,interpose,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
 # ifeq ($(build_symbolic),yes)
 # rule for building the shared ofs library
@@ -1117,7 +1148,7 @@ endif # BUILD_JNI
 	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # bison and yacc
-%.c: %.y
+%.c %.h: %.y
 	$(Q) "  BISON		$@"
 	$(E)$(BISON) -d $< -o $@
 
@@ -1169,6 +1200,15 @@ $(STATECOMP): $(STATECOMPOBJS)
 	$(Q) "  BUILD_LD	$@"
 	$(E)$(BUILD_LD) -o $@ $(BUILD_LDFLAGS) $(STATECOMPOBJS) $(call modldflags,$<)
 
+# special rules to malloc analysis tool using build host compiler
+$(MEMANALYSISOBJS): %.o: %.c
+	$(Q) "  BUILD_CC	$@"
+	$(E)$(BUILD_CC) $(BUILD_CFLAGS) $< -c -o $@ $(call modcflags,$<)
+
+$(MEMANALYSIS): $(MEMANALYSISOBJS)
+	$(Q) "  BUILD_LD	$@"
+	$(E)$(BUILD_LD) -o $@ $(BUILD_LDFLAGS) $(MEMANALYSISOBJS) $(call modldflags,$<)
+
 # rule for generating cscope information
 cscope:
 	find @SRC_ABSOLUTE_TOP@ -iname "*.[ch]" -o -iname "*.sm" \
@@ -1211,25 +1251,32 @@ ifndef DIST_RELEASE
 endif
 
 # top rule for cleaning up tree
+# NOTE: all depends defs should be included in DEPENDS above
+# keep this list neat so we can veryify all the right things are
+# here
 clean:: 
 	$(Q) "  CLEAN"
-	$(E)rm -f $(LIBOBJS) $(LIBTHREADEDOBJS) \
+	$(E)rm -f   $(DEPENDS) \
+	            $(LIBOBJS) $(LIBTHREADEDOBJS) \
                 $(LIBPICOBJS) $(LIBTHREADEDPICOBJS) \
-                $(ULIBOBJS) $(OLIBOBJS) $(OLIBDEPENDS) \
-                $(ULIBPICOBJS) $(ULIBDEPENDS) $(OLIBPICOBJS) \
+                $(ULIBOBJS) $(ULIBPICOBJS) \
+				$(OLIBOBJS) $(OLIBPICOBJS) \
                 $(UCACHEDTOOLS) $(UCACHEDOBJS) \
-                $(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
-                $(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
-                $(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
-                $(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
-                $(USERTOOLS) $(USEROBJS) $(DEVELTOOLS) $(DEVELOBJS) \
+                $(SERVER) $(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
+                $(LIBRARIES) $(LIBRARIES_THREADED) \
+				$(ADMINTOOLS) $(ADMINOBJS) \
+                $(ADMINTOOLS_SERVER) $(ADMINOBJS_SERVER) \
+                $(USERTOOLS) $(USEROBJS) \
+				$(DEVELTOOLS) $(DEVELOBJS) \
                 $(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
-                $(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
-                $(VISMISCDEPENDS) $(KARMAOBJS) \
-                $(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) \
-                $(BMILIBRARIES) $(FUSEOBJS) \
-                $(VISMISCDEPENDS) $(KARMAOBJS) \
-                $(STATECOMP) $(STATECOMPOBJS) \
+                $(VISS) $(VISOBJS) \
+				$(VISMISCOBJS) \
+				$(KARMAOBJS) \
+				$(STATECOMP) $(STATECOMPOBJS) $(STATECOMPGEN) \
+                $(MEMANALYSIS) $(MEMANALYSISOBJS) $(MEMANALYSISDEPS) \
+				$(BMILIBRARIES) $(LIBBMIOBJS) \
+				$(FUSEOBJS) \
+				lib/libpvfs2-server.a\
                 src/server/pvfs2-server-server.o \
                 src/apps/karma/karma src/apps/fuse/pvfs2fuse \
                 src/server/simple.conf examples/fs.conf
@@ -1244,6 +1291,7 @@ endif
 
 ifndef DIST_RELEASE
 	$(E)rm -f $(STATECOMPGEN)
+	$(E)rm -f $(MEMANALYSISGEN)
 endif
 
 ifneq (,$(LINUX_KERNEL_SRC))
@@ -1315,7 +1363,7 @@ endif
 nodep:; @:
 
 # default rule for generating dependency files
-%.d: %.c
+%.d: %.c $(STATECOMP)
 	$(Q) "  DEP		$@"
 	$(E)CC="$(CC)" $(srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(DB_CFLAGS) $(call modcflags,$<) $< > $@
 
@@ -1370,6 +1418,9 @@ install_doc:
 	install -m 644 $(srcdir)/doc/man/*.5 $(mandir)/man5
 	gzip -f ${mandir}/man1/pvfs2*.1
 	gzip -f ${mandir}/man5/pvfs2*.5
+	ln -fs pvfs2-getmattr.1.gz $(mandir)/man1/getmattr.1.gz
+	ln -fs pvfs2-ls.1.gz $(mandir)/man1/pvfs2-lsplus.1.gz
+	ln -fs pvfs2-setmattr.1.gz $(mandir)/man1/setmattr.1.gz
 
 ifdef BUILD_BMI_ONLY
 install:: all
@@ -1378,7 +1429,7 @@ install:: all
 	install -m 644 $(srcdir)/src/io/bmi/bmi-types.h $(includedir)
 
 	install -d $(libdir)
-	install -m 755 lib/*.* $(libdir)
+	install -m 644 lib/*.* $(libdir)
 else
 install:: all install_doc
 	install -d $(includedir)
@@ -1399,23 +1450,27 @@ install:: all install_doc
 	install -d $(libdir)
 ifneq (,$(LIBRARIES_STATIC))
 	for i in $(notdir $(LIBRARIES_STATIC)) ; do \
-	    install -m 755 lib/$$i $(libdir) ;\
+	    install -m 644 lib/$$i $(libdir) ;\
 	done
 ifneq (,$(KERNAPPSTHR))
 	for i in $(notdir $(LIBRARIES_THREADED_STATIC)) ; do \
-	    install -m 755 lib/$$i $(libdir) ;\
+	    install -m 644 lib/$$i $(libdir) ;\
 	done
 endif
 endif
 ifneq (,$(LIBRARIES_SHARED))
+# liborangefsposix.so is a linker script
 	for i in $(notdir $(LIBRARIES_SHARED)) ; do \
-	    install -m 755 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
-	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
-	    $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
+	    case $$i in \
+	    liborangefsosix.so) install -m 644 lib/$$i $(libdir) ;;\
+	    *) install -m 755 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
+	       $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
+	       $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;;\
+	    esac ;\
 	done
 ifneq (,$(KERNAPPSTHR))
 	for i in $(notdir $(LIBRARIES_THREADED_SHARED)) ; do \
-	    install -m 755 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
+	    install -m 644 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
 	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
 	   $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
 	done
@@ -1429,7 +1484,9 @@ endif
 
 	install -d $(bindir)
 	install -m 755 $(ADMINTOOLS) $(bindir)
+ifeq ($(build_usrint),yes)
 	install -m 755 $(USERTOOLS) $(bindir)
+endif
 ifdef BUILD_UCACHE
 	install -d $(sbindir)
 	install -m 755 $(UCACHEDTOOLS) $(sbindir)
@@ -1439,7 +1496,6 @@ endif
 	install -m 755 src/apps/admin/pvfs2-config $(bindir)
 	@# if we ever auto-generate genconfig, remove the $(srcdir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(bindir)
-	install -m 755 $(srcdir)/src/apps/admin/pvfs2-config-convert $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-getmattr $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-setmattr $(bindir)
 ifdef BUILD_KARMA
@@ -1451,8 +1507,8 @@ ifdef BUILD_FUSE
 endif
 
 	# install any development tools built
-	for i in $(notdir $(DEVELTOOLS)) ; do \
-		if [ -f $(srcdir)/src/apps/devel/$$i ]; then install -m 755 $(srcdir)/src/apps/devel/$$i $(bindir); fi;\
+	for i in $(DEVELTOOLS) $(MEMANALYSIS) ; do \
+		if [ -f $$i ]; then install -m 755 $$i $(bindir); fi;\
 	done
 
 	install -d $(sbindir)

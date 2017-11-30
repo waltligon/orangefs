@@ -276,8 +276,7 @@ static const configoption_t options[] =
      */
     {"</Defaults>",ARG_NONE, exit_defaults_context,NULL,CTX_DEFAULTS,NULL},
 
-    /* Options specified within the Security context are used to configure
-     * settings related to key- or certificate-based security options.
+     /* settings related to key- or certificate-based security options.
      * These options are ignored if security mode is not compiled in.
      */
     {"<Security>", ARG_NONE, enter_security_context, NULL,
@@ -344,7 +343,8 @@ static const configoption_t options[] =
     /* Prevent the server from issuing an error whenever a capability or 
      * credential expires.  In this case, the client provides the only 
      * mechanism determining when a capability or credential needs to be 
-     * regenerated.  
+     * regenerated.  This option is only valid within the Defaults
+     * context; either the entire system is using timeouts or it is not.  
      */
     {"TurnOffTimeouts", ARG_STR, get_turn_off_timeouts, NULL,
         CTX_SECURITY, "yes"}, 
@@ -1106,10 +1106,16 @@ static const configoption_t options[] =
     {"DBCacheType", ARG_STR, get_db_cache_type, NULL,
         CTX_STORAGEHINTS, "sys"},
 
-    /* LMDB: maximum size of database map
+    /* LMDB: when specified in the Defaults context, DBMaxSize specifies
+     * the size of the storage_attributes and collections databases.  When
+     * specified in the StorageHints context, DBMaxsize specifies the
+     * size of the collection_attributes, dataspace_attributes, and keyval
+     * databases.  DBMaxSize can also be specified in the ServerOptions
+     * context to override the Defaults value on a per server basis.  Default
+     * is 512MB if not specified.
      */
-    {"DBMaxSize", ARG_INT, get_db_max_size, NULL,
-        CTX_STORAGEHINTS,"536870912"},
+    {"DBMaxSize", ARG_STR, get_db_max_size, NULL,
+        CTX_DEFAULTS|CTX_STORAGEHINTS|CTX_SERVER_OPTIONS,"536870912"},
 
     /* This option specifies a parameter name to be passed to the 
      * distribution to be used.  This option should be immediately
@@ -1207,11 +1213,11 @@ static const configoption_t options[] =
     {"TreeThreshold", ARG_INT, tree_threshold, NULL,
         CTX_FILESYSTEM, "2"},
 
-    /* Specifies the default for initial number of servers to hold directory entries. */
+    /* Specifies the default for initial number of servers to hold directory entries. Note that this number cannot exceed 65535 (max value of a 16-bit unsigned integer). */
     {"DistrDirServersInitial", ARG_INT, distr_dir_servers_initial, NULL,
         CTX_FILESYSTEM, "1"},
 
-    /* Specifies the default for maximum number of servers to hold directory entries. */
+    /* Specifies the default for maximum number of servers to hold directory entries. Note that this number cannot exceed 65535 (max value of a 16-bit unsigned integer). */
     {"DistrDirServersMax", ARG_INT, distr_dir_servers_max, NULL,
         CTX_FILESYSTEM, "4"},
 
@@ -2898,13 +2904,76 @@ DOTCONF_CB(get_db_max_size)
 {
     struct server_configuration_s *config_s = 
                     (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = (struct filesystem_configuration_s *)
+                    PINT_llist_head(config_s->file_systems);
+    long int ret=0;
+    char *errptr=NULL;
+    char *error_msg=NULL;
+    size_t *tmp_db_max_size=NULL;
 
-    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
-       config_s->my_server_options == 0)
+    /* DBMaxSize within the <Defaults> context or the <ServerOptions> context applies to
+     * the sizes of the collections.db and storage_attributes.db.  DBMaxSize within the 
+     * <StorageHints> context applies to the sizes of the collection_attributes.db, 
+     * dataspace_attributes.db, and keyval.db.  DBMaxSize is not valid in any other context.
+     */
+
+    /* In which context are we? */
+    switch(config_s->configuration_context)
     {
-        return NULL;
+       case CTX_DEFAULTS:
+       {
+            tmp_db_max_size = &config_s->db_max_size;
+            break;
+       }
+       case CTX_STORAGEHINTS:
+       {
+            fs_conf = (struct filesystem_configuration_s *)PINT_llist_head(config_s->file_systems);
+            tmp_db_max_size = &fs_conf->db_max_size;
+            break;
+       }
+       case CTX_SERVER_OPTIONS:
+       {
+            if ( config_s->my_server_options != 0 )
+            {
+               tmp_db_max_size = &config_s->db_max_size;
+            }
+            else
+            {
+               return NULL;
+            }
+            break;
+       }
+       default:
+       {
+            /*This should never happen, but just in case....*/
+            error_msg=calloc(256,sizeof(char));
+            if (error_msg)
+            {
+                sprintf(error_msg,"DBMaxSize unsupported in this context : (%d)\n"
+                                 ,config_s->configuration_context);
+            }
+            return(error_msg?error_msg:"Error allocating memory(get_db_max_size)\n");
+       }
+    }/*end switch*/
+
+    /* convert input string to a positive, size_t value. On 32-bit machines,
+     * size_t is 32 bits.  On 64-bit machines, size_t is 64 bits.  In either
+     * case, a long int will represent the appropriate size.
+     */
+    ret=strtol(cmd->data.str,&errptr,10);
+    if ((ret<=0) || (*errptr != '\0') || (errno==ERANGE)) 
+    {
+       error_msg=calloc(256,sizeof(char));
+       if (error_msg)
+       {
+          sprintf(error_msg,"DBMAXsize must be a numerical value between 0 and %ld : (%s)\n"
+                           ,LONG_MAX,cmd->data.str);
+       }
+       return (error_msg?error_msg:"Error allocating memory(get_db_max_size)\n");
     }
-    config_s->db_max_size = cmd->data.value;
+
+    *tmp_db_max_size = (size_t)ret;
+
     return NULL;
 }
 
@@ -3424,6 +3493,27 @@ DOTCONF_CB(get_turn_off_timeouts)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
 
+    /* TurnOffTimeouts can only reside within the <Security> context
+     * of the <Defaults> context.  Either all servers are using timeouts
+     * or they are not.
+     */
+    switch (config_s->prev_context)
+    {
+       case 0:
+       {
+          return NULL;
+       }
+       case CTX_DEFAULTS:
+       {
+            break;
+       }
+       default:
+       {
+            return("TurnOffTimeouts is ONLY valid within <Security> section of <Defaults> context.\n");
+       }
+    }/*end switch*/
+
+
 #if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
     /* You cannot turn off timeouts if using enhanced security */
     config_s->bypass_timeout_check = 0;
@@ -3939,14 +4029,14 @@ void PINT_config_release(struct server_configuration_s *config_s)
         /* free all filesystem objects */
         if (config_s->file_systems)
         {
-            PINT_llist_free(config_s->file_systems,free_filesystem);
+            PINT_llist_free(config_s->file_systems, free_filesystem);
             config_s->file_systems = NULL;
         }
 
         /* free all host alias objects */
         if (config_s->host_aliases)
         {
-            PINT_llist_free(config_s->host_aliases,free_host_alias);
+            PINT_llist_free(config_s->host_aliases, free_host_alias);
             config_s->host_aliases = NULL;
         }
 
@@ -4084,16 +4174,14 @@ static int root_handle_in_meta_range(struct server_configuration_s *config,
                 break;
             }
 
-            extent_list = PINT_create_extent_list(
-                cur_h_mapping->handle_range);
+            extent_list = PINT_create_extent_list(cur_h_mapping->handle_range);
             if (!extent_list)
             {
                 gossip_err("Failed to create extent list.\n");
                 break;
             }
 
-            ret = PINT_handle_in_extent_list(
-                extent_list,fs->root_handle);
+            ret = PINT_handle_in_extent_list(extent_list, fs->root_handle);
             PINT_release_extent_list(extent_list);
             if (ret == 1)
             {
@@ -4171,8 +4259,8 @@ static void free_filesystem(void *ptr)
         fs->file_system_name = NULL;
 
         /* free all handle ranges */
-        PINT_llist_free(fs->meta_handle_ranges,free_host_handle_mapping);
-        PINT_llist_free(fs->data_handle_ranges,free_host_handle_mapping);
+        PINT_llist_free(fs->meta_handle_ranges, free_host_handle_mapping);
+        PINT_llist_free(fs->data_handle_ranges, free_host_handle_mapping);
 
         /* if the optional hints are used, free them */
         if (fs->attr_cache_keywords)
@@ -4437,7 +4525,10 @@ static host_alias_s *find_host_alias_ptr_by_alias(
             cur = PINT_llist_next(cur);
         }
     }
-    if(index) *index = ind - 1;
+    if(index)
+    {
+        *index = ind - 1;
+    }
     return ret;
 }
 
@@ -4753,8 +4844,8 @@ int PINT_config_get_meta_handle_extent_array(
 
         if (cur_fs)
         {
-            my_alias = PINT_config_get_host_alias_ptr(
-                config_s, config_s->host_id);
+            my_alias = PINT_config_get_host_alias_ptr(config_s,
+                                                      config_s->host_id);
             if (my_alias)
             {
                 cur = cur_fs->meta_handle_ranges;
@@ -4985,8 +5076,7 @@ static char *get_handle_range_str(struct server_configuration_s *config_s,
 
     if (config_s && config_s->host_id && fs)
     {
-        my_alias = PINT_config_get_host_alias_ptr(
-            config_s,config_s->host_id);
+        my_alias = PINT_config_get_host_alias_ptr(config_s, config_s->host_id);
         if (my_alias)
         {
             cur = (meta_handle_range ? fs->meta_handle_ranges :
@@ -5221,7 +5311,7 @@ int PINT_config_trim_filesystems_except(
             cur = PINT_llist_next(cur);
         }
 
-        PINT_llist_free(config_s->file_systems,free_filesystem);
+        PINT_llist_free(config_s->file_systems, free_filesystem);
         config_s->file_systems = new_fs_list;
 
         if (PINT_llist_count(config_s->file_systems) == 1)
@@ -5348,8 +5438,7 @@ static int is_root_handle_in_my_range(struct server_configuration_s *config,
                     break;
                 }
 
-                ret = PINT_handle_in_extent_list(
-                    extent_list,fs->root_handle);
+                ret = PINT_handle_in_extent_list(extent_list, fs->root_handle);
                 PINT_release_extent_list(extent_list);
                 if (ret == 1)
                 {
@@ -5387,9 +5476,9 @@ int PINT_config_pvfs2_mkspace(struct server_configuration_s *config)
             }
 
             cur_meta_handle_range = PINT_config_get_meta_handle_range_str(
-                config, cur_fs);
+                            config, cur_fs);
             cur_data_handle_range = PINT_config_get_data_handle_range_str(
-                config, cur_fs);
+                            config, cur_fs);
 
             /*
               make sure have either a meta or data handle range (or

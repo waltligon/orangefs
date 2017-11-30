@@ -1,4 +1,8 @@
 /*
+
+
+
+
  * (C) 2001 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
@@ -1394,9 +1398,14 @@ static ssize_t do_readv_writev(struct rw_options *rw)
 		      rw->dest.address.nr_segs,
 		      rw->dest.address.iov->iov_len);
 	ret = generic_write_checks(&iocb, &iter);
+        /* if ret is zero, then there were zero bytes to write.  If ret < 0, then
+         * we have a true error.
+         */
         if (ret <= 0)
-        {
-            gossip_err("%s: failed generic argument checks 1.\n", rw->fnstr);
+        {   if (ret < 0)
+            {
+               gossip_err("%s: failed generic argument checks #1. ret(%d)\n", rw->fnstr,(int)ret);
+            }
             goto out;
         }
 	if (file->f_flags & O_APPEND)
@@ -1407,7 +1416,7 @@ static ssize_t do_readv_writev(struct rw_options *rw)
 
         if (ret != 0)
         {
-            gossip_err("%s: failed generic argument checks 2.\n", rw->fnstr);
+            gossip_err("%s: failed generic argument checks #2. ret(%d)\n", rw->fnstr,(int)ret);
             goto out;
         }
 
@@ -3338,7 +3347,9 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
 /** Called to notify the module that there are no more references to
  *  this file (i.e. no processes have it open).
  *
- *  \note Not called when each file is closed.
+ *  This function is called when the LAST instance of a given file is
+ *  closed but NOT on every close (unless every file is opened once
+ *  and then cloased).
  */
 int pvfs2_file_release(
     struct inode *inode,
@@ -3350,7 +3361,7 @@ int pvfs2_file_release(
     pvfs2_flush_inode(inode);
 
     /*
-      remove all associated inode pages from the page cache and mmap
+      remove all associated inode pages from the page cache and 
       readahead cache (if any); this forces an expensive refresh of
       data for the next caller of mmap (or 'get_block' accesses)
     */
@@ -3358,7 +3369,7 @@ int pvfs2_file_release(
         file->f_dentry->d_inode->i_mapping &&
         mapping_nrpages(&file->f_dentry->d_inode->i_data))
     {
-        clear_inode_mmap_ra_cache(file->f_dentry->d_inode);
+        clear_inode_ra_cache(file->f_dentry->d_inode);
         truncate_inode_pages(file->f_dentry->d_inode->i_mapping, 0);
     }
     return 0;

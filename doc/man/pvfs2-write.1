@@ -1,0 +1,47 @@
+.TH PVFS2-WRITE 1 2017-08-11
+.SH NAME
+\fBpvfs2-write\fR \(en create files
+.SH SYNOPSIS
+\fBpvfs2-write\fR [\fB\-s\fI strip_size\fR] [\fB\-n\fI num_datafiles\fR]
+[\fB\-b\fI buffer_size in bytes\fR] \fIdest_file file_size\fR
+.SH DESCRIPTION
+The
+.B pvfs2-write
+utility creates files which contain only zero bytes.
+.PP
+The options are as follows:
+.IP -s
+Specify strip size.
+.IP -n
+Specify number of datafiles.
+.IP -b
+Specify buffer size.
+.IP -t
+Display timing information.
+.IP -v
+Display synopsis.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate
+.IR pvfs2tab
+file
+.SH FILES
+.I /etc/pvfs2tab
+.SH EXAMPLES
+Create a one megabyte file
+.IR /mnt/foo .
+.PP
+.RS 6n
+pvfs2-write /mnt/foo 1048576
+.RE
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2-touch ( 1 ),
+.BR pvfs2-viewdist ( 1 ),
+.BR pvfs2tab ( 5 )

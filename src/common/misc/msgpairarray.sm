@@ -224,11 +224,13 @@ static PINT_sm_action msgpairarray_post(
                 msg_p->enc_type = ENCODING_SUPPORTED_MIN;
             }
 
-          try_next_encoding:
+        try_next_encoding:
             assert(ENCODING_IS_VALID(msg_p->enc_type));
 
-            ret = PINT_encode(&msg_p->req, PINT_ENCODE_REQ,
-                              &msg_p->encoded_req, msg_p->svr_addr,
+            ret = PINT_encode(&msg_p->req,
+                              PINT_ENCODE_REQ,
+                              &msg_p->encoded_req,
+                              msg_p->svr_addr,
                               msg_p->enc_type);
             if (ret != 0)
             {
@@ -250,12 +252,13 @@ static PINT_sm_action msgpairarray_post(
             }
 
             /* calculate max response msg size and allocate space */
-            msg_p->max_resp_sz = PINT_encode_calc_max_size(
-                PINT_ENCODE_RESP, msg_p->req.op, msg_p->enc_type);
+            msg_p->max_resp_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP,
+                                                           msg_p->req.op,
+                                                           msg_p->enc_type);
 
-
-            msg_p->encoded_resp_p = BMI_memalloc(
-                msg_p->svr_addr, msg_p->max_resp_sz, BMI_RECV);
+            msg_p->encoded_resp_p = BMI_memalloc(msg_p->svr_addr,
+                                                 msg_p->max_resp_sz,
+                                                 BMI_RECV);
 
             if (msg_p->encoded_resp_p == NULL)
             {
@@ -533,14 +536,16 @@ static PINT_sm_action msgpairarray_completion_fn(
         {
             char s[1024];
             PVFS_strerror_r(msg_p->op_status, s, sizeof(s));
-            server_string = PINT_cached_config_map_addr(
-                msg_p->fs_id, msg_p->svr_addr, &server_type);
+            server_string = PINT_cached_config_map_addr(msg_p->fs_id,
+                                                        msg_p->svr_addr,
+                                                        &server_type);
             if(!server_string)
             {
                 server_string = BMI_addr_rev_lookup(msg_p->svr_addr);
             }
 
-            gossip_err("Warning: msgpair failed to %s, will retry: %s\n", server_string, s);
+            gossip_err("Warning: msgpair failed to %s, will retry: %s\n",
+                       server_string, s);
                        
             ++need_retry;
             continue;
@@ -555,86 +560,100 @@ static PINT_sm_action msgpairarray_completion_fn(
         if (ret != 0)
         {
             PVFS_perror_gossip("msgpairarray decode error", ret);
-            msg_p->op_status = ret;
+            msg_p->op_status = js_p->error_code = ret;
+            gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                         "%s: error code %d from PINT_serv_decode_resp, "
+                                              "from server %d\n"
+                                             , __func__, msg_p->op_status, i);
+
+            goto cleanup;
         }
         else
         {
             /* if we've made it this far, the server response status is
              * meaningful, so we save it.
              */
-            msg_p->op_status = resp_p->status;
-        }
+            switch(resp_p->status)
+            {
+               case 0:
+               {
+                  msg_p->op_status = 0;
+                  if ( msg_p->comp_fn )
+                  {
+                     break; /*execute the comp fn*/
+                  }
+                  else
+                  {
+                     goto cleanup; /*bypass the comp fn*/
+                  }
+               }
+               default:
+               {
+                  /* if resp_p->status is non-zero, then only the header of the
+                   * the response is actually decoded.  However, if there is 
+                   * a msgpair-defined completion function, then allow that 
+                   * function to execute, just in case the non-zero status has
+                   * a special meaning to the particular request being processed.
+                   */
+                  if ( msg_p->comp_fn )
+                  {
+                      break; /*execute comp fn*/
+                  }
+                  else
+                  {
+                     js_p->error_code = msg_p->op_status = resp_p->status;
+                     gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                                  "notice: msgpairarray_complete: error %d "
+                                                       "from server %d\n"
+                                                      ,resp_p->status, i);
+                     goto cleanup; /*bypass the comp fn*/
+                  }
+               }/*end default*/
+            }/*end switch*/
+         }/*end if decode error*/
 
-        /* NOTE: we call the function associated with each message,
+
+
+        /* NOTE: we call the completion function associated with each message,
          *       not just the one from the first array element.  so
          *       there could in theory be different functions for each
          *       message (to handle different types of messages all in
          *       the same array).
          */
-        if (msg_p->comp_fn != NULL)
+        gossip_debug(GOSSIP_MIRROR_DEBUG,"\texecuting msg_p->comp_fn..\n");
+        /* If we call the completion function, store the result on
+         * a per message pair basis.  Also store some non-zero
+         * (failure) value in js_p->error_code if we see one.
+         */
+        msg_p->op_status = msg_p->comp_fn(smcb, resp_p, i);
+        if (msg_p->op_status != 0)
         {
-            gossip_debug(GOSSIP_MIRROR_DEBUG,"\texecuting msg_p->comp_fn..\n");
-            /* If we call the completion function, store the result on
-             * a per message pair basis.  Also store some non-zero
-             * (failure) value in js_p->error_code if we see one.
-             */
-            msg_p->op_status = msg_p->comp_fn(smcb, resp_p, i);
-            if (msg_p->op_status != 0)
-            {
-                js_p->error_code = msg_p->op_status;
-            }
-
-            /* even if we see a failure, continue to process with the
-             * completion function. -- RobR
-             */
-        }
-        else if( (msg_p->op_status != 0) && (resp_p == NULL) )
-        {
-            /* before we reference resp_p we need to catch the case where 
-             * PINT_serv_decode_resp didn't give us a struct. We error out
-             * the same without referencing resp_p */
-            gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                         "%s: error code %d from PINT_serv_decode_resp, "
-                         "from server %d\n", __func__, msg_p->op_status, i);
             js_p->error_code = msg_p->op_status;
-            break;
         }
-        else if (resp_p->status != 0)
-        {
-            /* no comp_fn specified and status non-zero */
-            gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                         "notice: msgpairarray_complete: error %d "
-                         "from server %d\n", resp_p->status, i);
 
-            /* save a non-zero status to return if we see one */
-            js_p->error_code = resp_p->status;
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                     "op_status(%d) msgpair(%d)\n",msg_p->op_status,i);
 
-            /* If we don't have a completion function, there is no point
-             * in continuing to process after seeing a failure.
-             */
-            if (js_p->error_code)
-            {
-                break;
-            }
-        }
+
+cleanup:
+        /* cleanup capability */
+        PINT_cleanup_capability(&msg_p->req.capability);
 
         /* free all the resources that we used to send and receive. */
-        ret = PINT_serv_free_msgpair_resources(
-            &msg_p->encoded_req, msg_p->encoded_resp_p, &decoded_resp,
-            &msg_p->svr_addr, msg_p->max_resp_sz);
+        ret = PINT_serv_free_msgpair_resources(&msg_p->encoded_req,
+                                               msg_p->encoded_resp_p,
+                                               &decoded_resp,
+                                               &msg_p->svr_addr,
+                                               msg_p->max_resp_sz);
         if (ret)
         {
             PVFS_perror_gossip("Failed to free msgpair resources", ret);
             js_p->error_code = ret;
-            return SM_ACTION_COMPLETE;
         }
 
-        memset(&msg_p->encoded_req,0,sizeof(msg_p->encoded_req));
+        memset(&msg_p->encoded_req, 0, sizeof(msg_p->encoded_req));
         msg_p->encoded_resp_p = NULL;
         msg_p->max_resp_sz = 0;
-
-        /* cleanup capability */
-        PINT_cleanup_capability(&msg_p->req.capability);
 
         /*
           mark that this msgpair has been completed and should not be
@@ -644,26 +663,27 @@ static PINT_sm_action msgpairarray_completion_fn(
 
         gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair %d "
                      "marked complete\n", __func__, smcb, i);
-    }/*end for*/
+    }/* end for each msgpair */
 
-    if (need_retry) {
+    if (need_retry)
+    {
         /*
          * We only retry msgpairs that are not yet complete.  Factor
          * of two since they are pairs.  If over the count, do not
          * retry, just return one of the error codes.
          */
         mop->params.comp_ct = 0;
-        js_p->error_code = 0;
-        for (i=0; i < mop->count; i++) {
-
+        for (i = 0; i < mop->count; i++)
+        {
             PINT_sm_msgpair_state *msg_p = &mop->msgarray[i];
 
             if (msg_p->complete)
                 continue;
 
             if (msg_p->retry_flag == PVFS_MSGPAIR_RETRY
-             && PVFS_ERROR_CLASS(-msg_p->op_status) == PVFS_ERROR_BMI
-             && msg_p->retry_count < mop->params.retry_limit) {
+                && PVFS_ERROR_CLASS(-msg_p->op_status) == PVFS_ERROR_BMI
+                && msg_p->retry_count < mop->params.retry_limit)
+            {
 
                 ++msg_p->retry_count;
                 mop->params.comp_ct += 2;
@@ -688,11 +708,16 @@ static PINT_sm_action msgpairarray_completion_fn(
 
             } else {
                 char s[1024];
-                server_string = PINT_cached_config_map_addr(
-                    msg_p->fs_id, msg_p->svr_addr, &server_type);
+                server_string = PINT_cached_config_map_addr(msg_p->fs_id,
+                                                            msg_p->svr_addr,
+                                                            &server_type);
                 if(!server_string)
                 {
-                    server_string = "[UNKNOWN]";
+                    server_string = BMI_addr_rev_lookup(msg_p->svr_addr);
+                    if (!server_string)
+                    {
+                        server_string = "[UNKNOWN]";
+                    }
                 }
                 PVFS_strerror_r(msg_p->op_status, s, sizeof(s));
                 gossip_err_unless_quiet("*** %s: msgpair to server %s failed: %s\n",
@@ -702,7 +727,7 @@ static PINT_sm_action msgpairarray_completion_fn(
                     gossip_err_unless_quiet("*** No retries requested.\n");
                 }
                 else if(PVFS_ERROR_CLASS(-msg_p->op_status) !=
-                    PVFS_ERROR_BMI)
+                        PVFS_ERROR_BMI)
                 {
                     gossip_err_unless_quiet("*** Non-BMI failure.\n");
                 }
@@ -714,8 +739,8 @@ static PINT_sm_action msgpairarray_completion_fn(
                     js_p->error_code = msg_p->op_status;
             }
 
-        }
-    }
+        }/*end for*/
+    }/*end if retry*/
     return SM_ACTION_COMPLETE;
 }
 
@@ -731,12 +756,10 @@ static PINT_sm_action msgpairarray_done(
  * helper functions used in conjunction with state machine defined above
  */
 
-int PINT_msgpairarray_init(
-    PINT_sm_msgarray_op *op,
-    int count)
+int PINT_msgpairarray_init(PINT_sm_msgarray_op *op, int count)
 {
     op->msgarray = (PINT_sm_msgpair_state *)malloc(
-        count * sizeof(PINT_sm_msgpair_state));
+                    count * sizeof(PINT_sm_msgpair_state));
     if(!op->msgarray)
     {
         return -PVFS_ENOMEM;
@@ -748,8 +771,7 @@ int PINT_msgpairarray_init(
 }
 
 /* we pass in a pointer to the array so that we can set it to NULL */
-void PINT_msgpairarray_destroy(
-    PINT_sm_msgarray_op *op)
+void PINT_msgpairarray_destroy(PINT_sm_msgarray_op *op)
 {
     if(op->msgarray && (&op->msgpair) != op->msgarray)
     {
@@ -798,8 +820,9 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
 
             if (fs_id != PVFS_FS_ID_NULL)
             {
-                server_string = PINT_cached_config_map_addr(
-                    fs_id, *svr_addr_p, &server_type);
+                server_string = PINT_cached_config_map_addr(fs_id,
+                                                            *svr_addr_p,
+                                                            &server_type);
                 gossip_err("   Server: %s.\n", server_string);
             }
             else
@@ -826,10 +849,10 @@ int PINT_serv_free_msgpair_resources(
     if (encoded_req_p && decoded_resp_p && svr_addr_p)
     {
         PINT_encode_release(encoded_req_p, PINT_ENCODE_REQ);
-        memset(encoded_req_p,0,sizeof(*encoded_req_p));
+        memset(encoded_req_p, 0, sizeof(*encoded_req_p));
 
         PINT_decode_release(decoded_resp_p, PINT_DECODE_RESP);
-        memset(decoded_resp_p,0,sizeof(*decoded_resp_p));
+        memset(decoded_resp_p, 0, sizeof(*decoded_resp_p));
 
         BMI_memfree(*svr_addr_p, encoded_resp_p, max_resp_sz, BMI_RECV);
         encoded_resp_p = NULL;
@@ -846,8 +869,7 @@ int PINT_serv_free_msgpair_resources(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_serv_msgpairarray_resolve_addrs(
-    PINT_sm_msgarray_op *mop)
+int PINT_serv_msgpairarray_resolve_addrs(PINT_sm_msgarray_op *mop)
 {
     int i = 0;
     int ret = -PVFS_EINVAL;
@@ -859,8 +881,9 @@ int PINT_serv_msgpairarray_resolve_addrs(
             PINT_sm_msgpair_state *msg_p = &mop->msgarray[i];
             assert(msg_p);
 
-            ret = PINT_cached_config_map_to_server(
-                &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+            ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
+                                                   msg_p->handle,
+                                                   msg_p->fs_id);
 
             if (ret != 0)
             {

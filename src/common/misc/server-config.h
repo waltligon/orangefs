@@ -39,6 +39,9 @@ typedef struct phys_server_desc
     int server_type;
 } phys_server_desc_s;
 
+/* note that the term bmi_address used here refers to the URL-like
+ * string, not the internal BMI_address type
+ */
 typedef struct host_alias_s
 {
     char *host_alias;
@@ -124,6 +127,9 @@ typedef struct filesystem_configuration_s
     int32_t directio_thread_num;
     int32_t directio_ops_per_queue;
     int32_t directio_timeout;
+
+    /* size used to create keyval, dataspace, and collection_attributes databases. LMDB only.*/
+    size_t db_max_size;
 } filesystem_configuration_s;
 
 typedef struct distribution_param_configuration_s
@@ -141,10 +147,13 @@ typedef struct distribution_configuration_s
 
 } distribution_configuration;
 
+/* note that the term bmi_address used here refers to the URL-like
+ * string, not the internal BMI_address type
+ */
 typedef struct server_configuration_s
 {
     char *host_id;                  /* bmi_address of this server */
-    int host_index;
+    int host_index;                 /* index in table of this server */
     char *server_alias;             /* command line server-alias parameter */
     int my_server_options;
     char *data_path;                /* path to data storage directory */
@@ -198,8 +207,9 @@ typedef struct server_configuration_s
                                        zero, use defaults */
     char *db_cache_type;
 
-    int db_max_size;                /* size of database map
-                                     */
+    size_t db_max_size;             /* size used for collections and storage_attributes databases */
+                                    /* Applies to LMDB only.                                      */
+                                    
     int trove_alt_aio_mode;         /* enables experimental alternative AIO
                                      * implementation for some types of 
                                      * operations 
@@ -337,8 +347,6 @@ int PINT_config_get_fs_key(
     PVFS_fs_id fs_id,
     char ** key,
     int * length);
-
-struct server_configuration_s *PINT_get_server_config(void);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 int PINT_config_pvfs2_mkspace(

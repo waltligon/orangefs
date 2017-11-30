@@ -27,6 +27,7 @@
 #include "pint-util.h"
 #include "pint-event.h"
 #include "dist-dir-utils.h"
+#include "server-config-mgr.h"
 
 /*
 static char *lost_and_found_string = "lost+found";
@@ -116,6 +117,7 @@ static void get_handle_extent_from_ranges(
 }
 #endif
 
+
 int pvfs2_mkspace(char *data_path,
                   char *meta_path,
                   char *collection,
@@ -140,6 +142,8 @@ int pvfs2_mkspace(char *data_path,
     struct stat root_stat;
     struct stat meta_stat;
     struct stat data_stat;
+
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
 
     mkspace_print(verbose,"Data storage space     : %s\n",data_path);
     mkspace_print(verbose,"Metadata storage space : %s\n", meta_path);
@@ -223,6 +227,9 @@ int pvfs2_mkspace(char *data_path,
             return -1;
         }
 
+        /* set the config pointer and filesystem pointer inside of trove */
+        ret = trove_collection_set_fs_config(coll_id, config);
+
         ret = trove_storage_create(TROVE_METHOD_DBPF, data_path, meta_path, NULL, &op_id);
         if (ret != 1)
         {
@@ -247,6 +254,9 @@ int pvfs2_mkspace(char *data_path,
                   data_path);
     mkspace_print(verbose,"info: created metadata storage space '%s'.\n",
                   meta_path);
+
+    /* set the config pointer and filesystem pointer inside of trove */
+    ret = trove_collection_set_fs_config(coll_id, config);
 
     /* try to look up collection used to store file system */
     ret = trove_collection_lookup(TROVE_METHOD_DBPF,
@@ -414,6 +424,8 @@ int pvfs2_mkspace(char *data_path,
 
         /* set root directory dspace attributes */
         memset(&attr, 0, sizeof(TROVE_ds_attributes_s));
+        attr.fs_id = coll_id;
+        attr.handle = new_root_handle;
         attr.uid = getuid();
         attr.gid = getgid();
         attr.mode = 0777;
@@ -426,7 +438,9 @@ int pvfs2_mkspace(char *data_path,
                                    &attr,
                                    TROVE_SYNC,
                                    NULL,
-            trove_context, &op_id, NULL);
+                                   trove_context,
+                                   &op_id,
+                                   NULL);
 
         while (ret == 0)
         {

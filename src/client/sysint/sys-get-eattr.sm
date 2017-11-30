@@ -218,28 +218,7 @@ static PINT_sm_action get_eattr_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action get_eattr_cleanup(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-		"get_eattr state: get_eattr_cleanup\n");
-    /* free the array malloc'd above */
-    free(sm_p->u.geteattr.size_array);
-    sm_p->error_code  = js_p->error_code;
-    if(sm_p->error_code != 0)
-    {
-        PINT_acache_invalidate(sm_p->object_ref);
-    }
-
-    PINT_SET_OP_COMPLETE;
-    return SM_ACTION_TERMINATE;
-}
-
-static int get_eattr_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int i)
+static int get_eattr_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
 {
     int j = 0;
     int ret = 0;
@@ -252,6 +231,11 @@ static int get_eattr_comp_fn(
 
     /* only posted one msgpair */
     assert(i==0);
+
+    /* now, msgpairarray does not set the op_status with resp_p->status
+     * BEFORE entering into this completion function.  So, we do it now.
+     */
+    sm_p->msgarray_op.msgarray[i].op_status = resp_p->status;
 
     /* if this particular request was successful, then store the server
      * response and let the caller sort it out */
@@ -347,6 +331,24 @@ static int get_eattr_comp_fn(
 	}
     }
     return ret;
+}
+
+static PINT_sm_action get_eattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+		"get_eattr state: get_eattr_cleanup\n");
+    /* free the array malloc'd above */
+    free(sm_p->u.geteattr.size_array);
+    sm_p->error_code  = js_p->error_code;
+    if(sm_p->error_code != 0)
+    {
+        PINT_acache_invalidate(sm_p->object_ref);
+    }
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 /*

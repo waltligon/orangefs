@@ -72,6 +72,10 @@ typedef struct
     char *logtype;
     char *events;
     char *keypath;
+    char *readahead_size;
+    char *readahead_count;
+    char *readahead_readcnt;
+    char *readahead_pinned;
 } options_t;
 
 static void client_sig_handler(int signum);
@@ -459,6 +463,30 @@ static int monitor_pvfs2_client(options_t *opts)
                 arg_list[arg_index+1] = opts->perf_history_size;
                 arg_index+=2;
             }
+            if(opts->readahead_size)
+            {
+                arg_list[arg_index] = "--readahead-size";
+                arg_list[arg_index+1] = opts->readahead_size;
+                arg_index+=2;
+            }
+            if(opts->readahead_count)
+            {
+                arg_list[arg_index] = "--readahead-count";
+                arg_list[arg_index+1] = opts->readahead_count;
+                arg_index+=2;
+            }
+            if(opts->readahead_readcnt)
+            {
+                arg_list[arg_index] = "--readahead-readcnt";
+                arg_list[arg_index+1] = opts->readahead_readcnt;
+                arg_index+=2;
+            }
+            if(opts->readahead_pinned)
+            {
+                arg_list[arg_index] = "--readahead-pinned";
+                arg_list[arg_index+1] = opts->readahead_pinned;
+                arg_index+=2;
+            }
             if(opts->gossip_mask)
             {
                 arg_list[arg_index] = "--gossip-mask";
@@ -549,6 +577,12 @@ static void print_help(char *progname)
     printf("--capcache-reclaim-percentage=LIMIT capability cache reclaim percentage\n");
     printf("--perf-time-interval-secs=SECONDS length of perf counter intervals\n");
     printf("--perf-history-size=VALUE     number of perf counter intervals to maintain\n");
+#ifdef USE_RA_CACHE
+    printf("--readahead-size=VALUE        size of readahead buffers\n");
+    printf("--readahead-count=VALUE       number of readahead buffers\n");
+    printf("--readahead-readcnt=VALUE     number of buffers to read ahead\n");
+    printf("--readahead-pinned=VALUE      use pinned buffers T(1) or F(0)\n");
+#endif
     printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
     printf("-p PATH, --path PATH          execute pvfs2-client at "
            "PATH\n");
@@ -592,6 +626,12 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"desc-size",1,0,0},
         {"perf-time-interval-secs",1,0,0},
         {"perf-history-size",1,0,0},
+#ifdef USE_RA_CACHE
+        {"readahead-size",1,0,0},
+        {"readahead-count",1,0,0},
+        {"readahead-readcnt",1,0,0},
+        {"readahead-pinned",1,0,0},
+#endif
         {"gossip-mask",1,0,0},
         {"path",1,0,0},
         {"logstamp",1,0,0},
@@ -661,87 +701,88 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("acache-hard-limit", cur_option) == 0)
                 {
                     opts->acache_hard_limit = optarg;
-                    break;
                 }
                 else if (strcmp("acache-soft-limit", cur_option) == 0)
                 {
                     opts->acache_soft_limit = optarg;
-                    break;
                 }
                 else if (strcmp("acache-reclaim-percentage", cur_option) == 0)
                 {
                     opts->acache_reclaim_percentage = optarg;
-                    break;
                 }
                 else if (strcmp("ncache-hard-limit", cur_option) == 0)
                 {
                     opts->ncache_hard_limit = optarg;
-                    break;
                 }
                 else if (strcmp("ncache-soft-limit", cur_option) == 0)
                 {
                     opts->ncache_soft_limit = optarg;
-                    break;
                 }
                 else if (strcmp("ncache-reclaim-percentage", cur_option) == 0)
                 {
                     opts->ncache_reclaim_percentage = optarg;
-                    break;
                 }
                 else if (strcmp("ccache-hard-limit", cur_option) == 0)
                 {
                     opts->ccache_hard_limit = optarg;
-                    break;
                 }
                 else if (strcmp("ccache-soft-limit", cur_option) == 0)
                 {
                     opts->ccache_soft_limit = optarg;
-                    break;
                 }
                 else if (strcmp("ccache-reclaim-percentage", cur_option) == 0)
                 {
                     opts->ccache_reclaim_percentage = optarg;
-                    break;
                 }
                 else if (strcmp("capcache-hard-limit", cur_option) == 0)
                 {
                     opts->capcache_hard_limit = optarg;
-                    break;
                 }
                 else if (strcmp("capcache-soft-limit", cur_option) == 0)
                 {
                     opts->capcache_soft_limit = optarg;
-                    break;
                 }
                 else if (strcmp("capcache-reclaim-percentage", cur_option) == 0)
                 {
                     opts->capcache_reclaim_percentage = optarg;
-                    break;
                 }
                 else if (strcmp("desc-count", cur_option) == 0) 
                 {
                     opts->dev_buffer_count = optarg;
-                    break;
                 }
                 else if (strcmp("desc-size", cur_option) == 0)
                 {
                     opts->dev_buffer_size = optarg;
-                    break;
                 }
                 else if (strcmp("perf-time-interval-secs", cur_option) == 0)
                 {
                     opts->perf_time_interval_secs = optarg;
-                    break;
                 }
                 else if (strcmp("perf-history-size", cur_option) == 0)
                 {
                     opts->perf_history_size = optarg;
-                    break;
                 }
+#ifdef USE_RA_CACHE
+                else if (strcmp("readahead-size", cur_option) == 0)
+                {
+                    opts->readahead_size = optarg;
+                }
+                else if (strcmp("readahead-count", cur_option) == 0)
+                {
+                    opts->readahead_count = optarg;
+                }
+                else if (strcmp("readahead-readcnt", cur_option) == 0)
+                {
+                    opts->readahead_readcnt = optarg;
+                }
+                else if (strcmp("readahead-pinned", cur_option) == 0)
+                {
+                    opts->readahead_pinned = optarg;
+                }
+#endif
                 else if (strcmp("gossip-mask", cur_option) == 0)
                 {
                     opts->gossip_mask = optarg;
-                    break;
                 }
                 else if (strcmp("events", cur_option) == 0)
                 {

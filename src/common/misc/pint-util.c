@@ -228,9 +228,9 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
         if (src->mask & PVFS_ATTR_DIR_HINT)
         {
             dest->u.dir.hint.dfile_count = 
-                src->u.dir.hint.dfile_count;
+                    src->u.dir.hint.dfile_count;
             dest->u.dir.hint.dist_name_len =
-                src->u.dir.hint.dist_name_len;
+                    src->u.dir.hint.dist_name_len;
             if (dest->u.dir.hint.dist_name_len > 0)
             {
                 dest->u.dir.hint.dist_name = strdup(src->u.dir.hint.dist_name);
@@ -240,14 +240,29 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 }
             }
             dest->u.dir.hint.dist_params_len =
-                src->u.dir.hint.dist_params_len;
+                    src->u.dir.hint.dist_params_len;
             if (dest->u.dir.hint.dist_params_len > 0)
             {
-                dest->u.dir.hint.dist_params 
-                        = strdup(src->u.dir.hint.dist_params);
+                dest->u.dir.hint.dist_params =
+                        strdup(src->u.dir.hint.dist_params);
                 if (dest->u.dir.hint.dist_params == NULL)
                 {
                     free(dest->u.dir.hint.dist_name);
+                    return ret;
+                }
+            }
+            dest->u.dir.hint.layout.algorithm =
+                    src->u.dir.hint.layout.algorithm;
+            dest->u.dir.hint.layout.server_list.count =
+                    src->u.dir.hint.layout.server_list.count;
+            dest->u.dir.hint.layout.server_list.bufsize =
+                    src->u.dir.hint.layout.server_list.bufsize;
+            if (dest->u.dir.hint.layout.server_list.bufsize)
+            {
+                dest->u.dir.hint.layout.server_list.servers =
+                        strdup(src->u.dir.hint.layout.server_list.servers);
+                if (dest->u.dir.hint.layout.server_list.servers == NULL)
+                {
                     return ret;
                 }
             }
@@ -374,6 +389,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
         if (src->mask & PVFS_ATTR_CAPABILITY)
         {
+            PINT_cleanup_capability(&dest->capability);
             ret = PINT_copy_capability(&src->capability, &dest->capability);
             if (ret < 0)
             {
@@ -402,7 +418,8 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
             {
                 free(attr->capability.handle_array);
             }            
-            if (attr->capability.issuer)
+            if (attr->capability.issuer &&
+                (attr->capability.issuer != PVFS2_BLANK_ISSUER))
             {
                 free(attr->capability.issuer);
             }
@@ -453,6 +470,11 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
             {
                 free(attr->u.dir.hint.dist_params);
                 attr->u.dir.hint.dist_params = NULL;
+            }
+            if (attr->u.dir.hint.layout.server_list.servers)
+            {
+                free(attr->u.dir.hint.layout.server_list.servers);
+                attr->u.dir.hint.layout.server_list.servers = NULL;
             }
         }
         if (attr->mask & PVFS_ATTR_DISTDIR_ATTR)
@@ -691,7 +713,7 @@ void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
     /* figure out how big this encoding will be first */
 
     tmp_size = 16; /* enumeration and list count */
-    for(i=0 ; i<x->server_list.count; i++)
+    for(i = 0; i < x->server_list.count; i++)
     {
         /* room for each server encoding */
         tmp_size += encode_PVFS_BMI_addr_t_size_check(&(x)->server_list.servers[i]);
@@ -712,7 +734,7 @@ void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
     encode_skip4(pptr, NULL);
     encode_int32_t(pptr, &x->server_list.count);
     encode_skip4(pptr, NULL);
-    for(i=0 ; i<x->server_list.count; i++)
+    for(i = 0; i < x->server_list.count; i++)
     {
         encode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
     }
@@ -731,10 +753,11 @@ void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x)
     decode_skip4(pptr, NULL);
     if(x->server_list.count)
     {
-        x->server_list.servers = malloc(x->server_list.count*sizeof(*(x->server_list.servers)));
+        x->server_list.servers = malloc(x->server_list.count *
+                                        sizeof(*(x->server_list.servers)));
         assert(x->server_list.servers);
     }
-    for(i=0 ; i<x->server_list.count; i++)
+    for(i = 0 ; i < x->server_list.count; i++)
     {
         decode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
     }
@@ -1058,12 +1081,7 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
         return -PVFS_EACCES;
     }
 
-    /* keyval for ACLs includes a \0. so subtract the thingie */
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-    acl_size--;
-#else
     acl_size -= sizeof(pvfs2_acl_header);
-#endif
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
                 "PINT_check_acls: read keyval size "
                 " %d (%d acl entries)\n",
@@ -1090,24 +1108,14 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
 
     for (i = 0; i < count; i++)
     {
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        pa = (pvfs2_acl_entry *) acl_buf + i;
-#else
         pa = &(((pvfs2_acl_header *)acl_buf)->p_entries[i]);
-#endif
         /* 
            NOTE: Remember that keyval is encoded as lebf,
            so convert it to host representation 
         */
-#ifdef PVFS_USE_OLD_ACL_FORMT
-        pe.p_tag  = bmitoh32(pa->p_tag);
-        pe.p_perm = bmitoh32(pa->p_perm);
-        pe.p_id   = bmitoh32(pa->p_id);
-#else
         pe.p_tag  = bmitoh16(pa->p_tag);
         pe.p_perm = bmitoh16(pa->p_perm);
         pe.p_id   = bmitoh32(pa->p_id);
-#endif
         pa = &pe;
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded ACL entry %d "
             "(p_tag %d, p_perm %d, p_id %d)\n",
@@ -1163,26 +1171,16 @@ mask:
     for (; i < count; i++)
     {
         pvfs2_acl_entry me;
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        pvfs2_acl_entry *mask_obj = (pvfs2_acl_entry *) acl_buf + i;
-#else
         pvfs2_acl_entry *mask_obj =
                 &(((pvfs2_acl_header *)acl_buf)->p_entries[i]);
-#endif
         
         /* 
           NOTE: Again, since pvfs2_acl_entry is in lebf, we need to
           convert it to host endian format
          */
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        me.p_tag  = bmitoh32(mask_obj->p_tag);
-        me.p_perm = bmitoh32(mask_obj->p_perm);
-        me.p_id   = bmitoh32(mask_obj->p_id);
-#else
         me.p_tag  = bmitoh16(mask_obj->p_tag);
         me.p_perm = bmitoh16(mask_obj->p_perm);
         me.p_id   = bmitoh32(mask_obj->p_id);
-#endif
         mask_obj = &me;
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded (mask) ACL entry %d "
             "(p_tag %d, p_perm %d, p_id %d)\n",

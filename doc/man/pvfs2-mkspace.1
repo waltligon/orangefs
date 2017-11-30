@@ -1,0 +1,68 @@
+.TH PVFS2-MKSPACE 1 2017-07-03
+.SH NAME
+\fBpvfs2-mkspace\fR \(en create storage space for OrangeFS server
+.SH SYNOPSIS
+\fBpvfs2-mkspace\fR [\fB\-adDhvV\fR] [\fB\-c \fIname\fR]
+[\fB\-i \fIid\fR] [\fB\-r \fIhandle\fR] [\fB\-M \fIrange\fR]
+[\fB\-N \fIrange\fR] [\fB\--data-space path\fR]
+[\fB\--meta-space path\fR] \fIdirectory\fR
+.SH DESCRIPTION
+The
+.B pvfs2-mkspace
+utility creates an OrangeFS volume with a single collection or adds a
+new collection to an existing storage space.  It should be used after
+changing the storage configuration of a server which has already been
+initialized.
+.PP
+The options are as follows:
+.IP -a
+Add a collection instead of creating a new storage space.
+.IP -d
+Use all default options.  The default options can be seen with
+.BR -h .
+.IP -D
+Remove (permanently) the storage space.
+.IP -h
+Display synopsis.
+.IP -v
+Print version number and exit.
+.IP -V
+Display verbose messages.
+.IP -c
+Use
+.I name
+as the collection name.
+.IP -i
+Use
+.I id
+as file system ID.
+.IP -r
+Use
+.I handle
+as the root handle.
+.IP -M
+Use
+.I range
+as the metadata handle range.
+.IP -N
+Use
+.I range
+as the data handle range.
+.IP --data-space
+Use
+.I path
+as the path to the data space.
+.IP --meta-space
+Use
+.I path
+as the path to the metadata space.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2tab ( 5 )

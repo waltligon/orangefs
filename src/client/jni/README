@@ -1,5 +1,8 @@
-# (C) 2015 Clemson University
-# See COPYING in top-level directory.
+/*
+ * (C) 2017 Clemson University.
+ *
+ * See LICENSE in src/client/jni directory.
+ */
 ===============================================================================
 Brief Documentation - OrangeFS JNI and Hadoop Client
 

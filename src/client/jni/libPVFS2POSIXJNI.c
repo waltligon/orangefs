@@ -1,9 +1,8 @@
 /*
- * (C) 2011 Clemson University
+ * (C) 2017 Clemson University.
  *
- * See COPYING in top-level directory.
+ * See LICENSE in src/client/jni directory.
  */
-
 #include "libPVFS2JNI_common.h"
 #include <dirent.h>
 #include <errno.h>
@@ -1184,7 +1183,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_openWithHints(JNIEnv *env, jobject obj,
         if(hint)
         {
             ret = open(cpath, (int) flags | O_HINTS, (mode_t) mode, hint);
-            PVFS_hint_free(hint);
+            PVFS_hint_free(&hint);
         }
         else
         {

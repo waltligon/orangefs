@@ -23,6 +23,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-types-debug.h"
 
 /*
  * Now included from client-state-machine.h
@@ -139,7 +140,10 @@ PVFS_error PVFS_isys_setattr(
     PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
-    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &ref.handle);
+    PVFS_hint_add(&sm_p->hints,
+                  PVFS_HINT_HANDLE_NAME,
+                  sizeof(PVFS_handle),
+                  &ref.handle);
 
     ret = PVFS_util_copy_sys_attr(&sm_p->u.setattr.sys_attr, &attr);
     if(ret < 0)
@@ -233,16 +237,15 @@ static PINT_sm_action setattr_msg_setup_msgpair(
     objtype = ((sm_p->u.setattr.sys_attr.mask & PVFS_ATTR_SYS_TYPE) ? 
          sm_p->u.setattr.sys_attr.objtype : PVFS_TYPE_NONE);
 
-    PINT_SERVREQ_SETATTR_FILL(
-        msg_p->req,
-        sm_p->getattr.attr.capability,
-        *sm_p->cred_p,
-        sm_p->object_ref.fs_id,
-        sm_p->object_ref.handle,
-        objtype,
-        sm_p->u.setattr.sys_attr,
-        0,
-        sm_p->hints);
+    PINT_SERVREQ_SETATTR_FILL(msg_p->req,
+                              sm_p->getattr.attr.capability,
+                              *sm_p->cred_p,
+                              sm_p->object_ref.fs_id,
+                              sm_p->object_ref.handle,
+                              objtype,
+                              sm_p->u.setattr.sys_attr,
+                              0,
+                              sm_p->hints);
 
     /* clients should not be able to mess with dfile and distribution
      * information here.  Those parameters should only be set at create time.
@@ -257,6 +260,9 @@ static PINT_sm_action setattr_msg_setup_msgpair(
     gossip_debug(
             GOSSIP_CLIENT_DEBUG, "setattr attr mask sent to server: 0x%x\n",
             (int)sm_p->u.setattr.sys_attr.mask);
+
+
+    PINT_attrmask_print(GOSSIP_ACACHE_DEBUG,sm_p->u.setattr.sys_attr.mask);
 
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
@@ -282,24 +288,16 @@ static PINT_sm_action setattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr attr;
 
     sm_p->error_code = js_p->error_code;
 
-    /* either update acache or invalidate depending on if we were successful
-     * or not 
+    /* Since we just updated attributes (most of the time we are updating timestamps) 
+     * for this object, we must invalidate it's acache entry.  We do not do partial 
+     * updates anymore.
      */
     if(sm_p->error_code == 0)
     {
-        PINT_CONVERT_ATTR(&attr, &sm_p->u.setattr.sys_attr, 0);
-#if 0 /* Don't cache size_array. */
-        PINT_acache_update(sm_p->object_ref, &attr, NULL, NULL);
-#endif
-        PINT_acache_update(sm_p->object_ref, &attr, NULL);
-    }
-    else
-    {
-        PINT_acache_invalidate(sm_p->object_ref);
+       PINT_acache_invalidate(sm_p->object_ref);
     }
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);

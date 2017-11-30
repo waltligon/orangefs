@@ -200,9 +200,10 @@ static PINT_sm_action get_user_cert_keyreq_send_public_key(
     js_p->error_code = -PVFS_ENOSYS;
 #else
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct server_configuration_s *config = get_server_config_struct();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
     RSA *rsa;
     int enc_size;
+    unsigned char *enc_buf = NULL;
 
     /* check fs_id */
     js_p->error_code = -PVFS_EINVAL;
@@ -237,12 +238,22 @@ static PINT_sm_action get_user_cert_keyreq_send_public_key(
 
     /* write public key to buffer */
     enc_size = 
-        i2d_RSAPublicKey(rsa, 
-            &s_op->resp.u.mgmt_get_user_cert_keyreq.public_key.buf);
+        i2d_RSAPublicKey(rsa,&enc_buf); 
 
     if (enc_size > 0)
     {
         s_op->resp.u.mgmt_get_user_cert_keyreq.public_key.buf_size = enc_size;
+        s_op->resp.u.mgmt_get_user_cert_keyreq.public_key.buf = calloc(enc_size,sizeof(unsigned char));
+        if (s_op->resp.u.mgmt_get_user_cert_keyreq.public_key.buf == NULL)
+        {
+           gossip_err("%s:unable to allocate memory for CA public key.\n",__func__);
+           js_p->error_code = -PVFS_ENOMEM;
+           OPENSSL_free(enc_buf);
+           return SM_ACTION_COMPLETE;
+        }
+        memcpy(s_op->resp.u.mgmt_get_user_cert_keyreq.public_key.buf,enc_buf,enc_size);
+        OPENSSL_free(enc_buf);
+
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: encoded public key for "
                      "user cert key request (%d bytes)\n", __func__, enc_size);
     }
@@ -380,7 +391,7 @@ static PINT_sm_action get_user_cert_gen_cert(
 {
 #ifdef ENABLE_SECURITY_CERT
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct server_configuration_s *config = get_server_config_struct();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
     X509 *xcert = NULL;
     PVFS_certificate *pcert;
     EVP_PKEY *keypair = NULL;

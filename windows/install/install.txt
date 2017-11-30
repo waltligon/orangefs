@@ -1,4 +1,4 @@
-OrangeFS 2.9.4 * May 25, 2016
+OrangeFS 2.9.5 * May 25, 2016
 
 Installing the OrangeFS Windows Client
 --------------------------------------

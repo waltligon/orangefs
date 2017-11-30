@@ -25,6 +25,7 @@
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 
+#include "pvfs2-internal.h"
 #include "bmi.h"
 #include "gossip.h"
 #include "job.h"
@@ -42,11 +43,12 @@
 #include "id-generator.h"
 #include "job-time-mgr.h"
 #include "pint-cached-config.h"
-#include "pvfs2-internal.h"
+/* #include "pvfs2-internal.h" */
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-event.h"
 #include "pint-util.h"
-#include "pint-malloc.h"
+#include "client-state-machine.h"
+/* #include "pint-malloc.h" */
 #include "pint-uid-mgmt.h"
 #include "pint-security.h"
 #include "security-util.h"
@@ -59,6 +61,7 @@
 #ifdef ENABLE_CERTCACHE
 #include "certcache.h"
 #endif
+#include "server-config-mgr.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -129,17 +132,31 @@ static char startup_cwd[PATH_MAX+1];
  */
 PINT_server_trove_keys_s Trove_Common_Keys[] =
 {
-    {ROOT_HANDLE_KEYSTR, ROOT_HANDLE_KEYLEN},
-    {DIRECTORY_ENTRY_KEYSTR, DIRECTORY_ENTRY_KEYLEN},
-    {DATAFILE_HANDLES_KEYSTR, DATAFILE_HANDLES_KEYLEN},
-    {METAFILE_DIST_KEYSTR, METAFILE_DIST_KEYLEN},
-    {SYMLINK_TARGET_KEYSTR, SYMLINK_TARGET_KEYLEN},
-    {METAFILE_LAYOUT_KEYSTR, METAFILE_LAYOUT_KEYLEN},
-    {NUM_DFILES_REQ_KEYSTR, NUM_DFILES_REQ_KEYLEN},
-    {DIST_DIR_ATTR_KEYSTR, DIST_DIR_ATTR_KEYLEN},
-    {DIST_DIRDATA_BITMAP_KEYSTR, DIST_DIRDATA_BITMAP_KEYLEN},
+    {ROOT_HANDLE_KEYSTR,          ROOT_HANDLE_KEYLEN},
+    {DIRECTORY_ENTRY_KEYSTR,      DIRECTORY_ENTRY_KEYLEN},
+    {DATAFILE_HANDLES_KEYSTR,     DATAFILE_HANDLES_KEYLEN},
+    {METAFILE_DIST_KEYSTR,        METAFILE_DIST_KEYLEN},
+    {SYMLINK_TARGET_KEYSTR,       SYMLINK_TARGET_KEYLEN},
+    {METAFILE_LAYOUT_KEYSTR,      METAFILE_LAYOUT_KEYLEN},
+    {NUM_DFILES_REQ_KEYSTR,       NUM_DFILES_REQ_KEYLEN},
+    {DIST_DIR_ATTR_KEYSTR,        DIST_DIR_ATTR_KEYLEN},
+    {DIST_DIRDATA_BITMAP_KEYSTR,  DIST_DIRDATA_BITMAP_KEYLEN},
     {DIST_DIRDATA_HANDLES_KEYSTR, DIST_DIRDATA_HANDLES_KEYLEN},
 };
+
+PINT_server_trove_keys_s Trove_Special_Keys[] =
+{
+    {SPECIAL_DIST_NAME_STRING     , SPECIAL_DIST_NAME_KEYLEN},
+    {SPECIAL_DIST_PARAMS_STRING   , SPECIAL_DIST_PARAMS_KEYLEN},
+    {SPECIAL_NUM_DFILES_STRING    , SPECIAL_NUM_DFILES_KEYLEN},
+    {SPECIAL_LAYOUT_STRING        , SPECIAL_LAYOUT_KEYLEN},
+    {SPECIAL_SERVER_LIST_STRING   , SPECIAL_SERVER_LIST_KEYLEN},
+    {SPECIAL_METAFILE_HINT_STRING , SPECIAL_METAFILE_HINT_KEYLEN},
+    {SPECIAL_MIRROR_COPIES_STRING , SPECIAL_MIRROR_COPIES_KEYLEN},
+    {SPECIAL_MIRROR_HANDLES_STRING, SPECIAL_MIRROR_HANDLES_KEYLEN},
+    {SPECIAL_MIRROR_STATUS_STRING , SPECIAL_MIRROR_STATUS_KEYLEN},
+};
+
 
 /* These three are used continuously in our wait loop.  They could be
  * relatively large, so rather than allocate them on the stack, we'll
@@ -187,10 +204,6 @@ static int precreate_pool_count(
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
 
-struct server_configuration_s *PINT_get_server_config(void)
-{
-    return &server_config;
-}
 
 int main(int argc, char **argv)
 {
@@ -249,6 +262,9 @@ int main(int argc, char **argv)
     }
 
     server_status_flag |= SERVER_CONFIG_INIT;
+
+    /* set server_config pointer */
+    PINT_server_config_mgr_set_config(&server_config);
 
     if (!PINT_config_is_valid_configuration(&server_config))
     {
@@ -932,8 +948,9 @@ static int server_initialize_subsystems(
             return(ret);
         }
 
-        /* XXX: This is really the same for all collections, yet is specified
-         * separately. */
+        /* This function sets the server_cfg for the system and cfg_fs for the coll_id,
+         * within the trove subsystem
+         */
         ret = trove_collection_set_fs_config(cur_fs->coll_id, &server_config);
         if (ret < 0) {
             gossip_err("Error setting filesystem configuration in Trove\n");
@@ -1410,39 +1427,56 @@ static int server_check_if_root_directory_created( void )
         }
 
         /*
-           check if root handle is in our handle range for this fs.
-           if it is, we're responsible for creating it on disk when
-           creating the storage space
+         * check if root handle is in our handle range for this fs.
+         * if it is, we're responsible for creating it on disk when
+         * creating the storage space
          */
         root_handle = cur_fs->root_handle;
 
-        ret = PINT_cached_config_get_server_name( handle_server,
-                BMI_MAX_ADDR_LEN-1, root_handle, cur_fs->coll_id);
+        ret = PINT_cached_config_get_server_name(handle_server,
+                                                 BMI_MAX_ADDR_LEN-1,
+                                                 root_handle,
+                                                 cur_fs->coll_id);
+
         if( ret == 0 && strcmp(handle_server, server_config.host_id) == 0 )
         {
-            /* we own this handle, hurrah! now look if we have a DIST_DIR_ATTR keyval
+            /* we own this handle, hurrah! 
+             * now look if we have a DIST_DIR_ATTR keyval
              * record, we want one. */
             key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
             key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
             val.buffer_sz = sizeof(PVFS_dist_dir_attr);
             val.buffer = &dist_dir_attr;
 
-            ret = job_trove_keyval_read(cur_fs->coll_id, root_handle,
-                    &key, &val,
-                    0, NULL, NULL, 0,
-                    &js, &j_id, server_job_context,
-                    NULL);
+            ret = job_trove_keyval_read(cur_fs->coll_id,
+                                        root_handle,
+                                        &key,
+                                        &val,
+                                        0,
+                                        NULL,
+                                        NULL,
+                                        0,
+                                        &js,
+                                        &j_id,
+                                        server_job_context,
+                                        NULL);
             while(ret == 0)
             {
-                ret = job_test(j_id, &outcount, NULL, &js,
-                        PVFS2_SERVER_DEFAULT_TIMEOUT_MS, server_job_context);
+                ret = job_test(j_id,
+                               &outcount,
+                               NULL,
+                               &js,
+                               PVFS2_SERVER_DEFAULT_TIMEOUT_MS,
+                               server_job_context);
             }
 
             if(js.error_code != 0)
             {
                 /* launch root-dir-create noreq state machine */
-                   ret = server_state_machine_alloc_noreq(
-                   PVFS_SERV_MGMT_CREATE_ROOT_DIR, &(tmp_op));
+                ret = server_state_machine_alloc_noreq(
+                                       PVFS_SERV_MGMT_CREATE_ROOT_DIR,
+                                       &(tmp_op));
+
                 if (ret < 0)
                 {
                     return ret;
@@ -1451,13 +1485,22 @@ static int server_check_if_root_directory_created( void )
                 tmp_sop = PINT_sm_frame(tmp_op, PINT_FRAME_CURRENT);
                 tmp_sop->target_fs_id = cur_fs->coll_id;
                 tmp_sop->target_handle = root_handle;
+
+                tmp_sop->msgarray_op.params.job_context =
+                                     server_job_context;
+                tmp_sop->msgarray_op.params.job_timeout =
+                                     server_config.client_job_bmi_timeout;
+                tmp_sop->msgarray_op.params.retry_limit = 10;
+                tmp_sop->msgarray_op.params.retry_delay =
+                                     server_config.client_retry_delay_ms;
+
                 ret = server_state_machine_start_noreq(tmp_op);
 
                 if (ret < 0)
                 {
                     PVFS_perror_gossip("Error: failed to start root directory "
-                            "creation noreq state machine.\n",
-                            ret);
+                                       "creation noreq state machine.\n",
+                                       ret);
                     PINT_smcb_free(tmp_op);
                     return ret;
                 }
@@ -1563,8 +1606,10 @@ static void reload_config(void)
     gossip_debug(GOSSIP_SERVER_DEBUG, "Reloading configuration %s\n",
                  fs_conf);
     /* We received a SIGHUP. Update configuration in place */
-    if (PINT_parse_config(&sighup_server_config, fs_conf,
-                          s_server_options.server_alias, 1) == 1)
+    if (PINT_parse_config(&sighup_server_config,
+                          fs_conf,
+                          s_server_options.server_alias,
+                          1) == 1)
     {
         gossip_err("Error: Please check your config files.\n");
         gossip_err("Error: SIGHUP unable to update configuration.\n");
@@ -1573,24 +1618,28 @@ static void reload_config(void)
     else /* Successful load of config */
     {
         /* Get the current server configuration and update global items */
-        orig_server_config = get_server_config_struct();
+        orig_server_config =  PINT_server_config_mgr_get_config();
         if (orig_server_config->event_logging)
         {
             free(orig_server_config->event_logging);
         }
         
         /* Copy the new logging mask into the current server configuration */
-        orig_server_config->event_logging = strdup(sighup_server_config.event_logging);
+        orig_server_config->event_logging =
+                            strdup(sighup_server_config.event_logging);
         
         /* Reset the debug mask */
-        gossip_set_debug_mask(1, PVFS_debug_eventlog_to_mask(orig_server_config->event_logging));
+        gossip_set_debug_mask(
+               1,
+               PVFS_debug_eventlog_to_mask(orig_server_config->event_logging));
 
         /* Modify the TurnOffTimeouts feature */
         gossip_err("%s:Changing original bypass_timeout_check(%d) to (%d)\n"
                   ,__func__
                   ,orig_server_config->bypass_timeout_check
                   ,sighup_server_config.bypass_timeout_check);
-        orig_server_config->bypass_timeout_check = sighup_server_config.bypass_timeout_check;
+        orig_server_config->bypass_timeout_check =
+                            sighup_server_config.bypass_timeout_check;
      
 
         orig_filesystems = orig_server_config->file_systems;
@@ -1648,15 +1697,18 @@ static void reload_config(void)
             hup_fs->root_squash_netmasks = tmp_int_ptr;
 
             tmp_value = orig_fs->root_squash_exceptions_count;
-            orig_fs->root_squash_exceptions_count = hup_fs->root_squash_exceptions_count;
+            orig_fs->root_squash_exceptions_count =
+                                 hup_fs->root_squash_exceptions_count;
             hup_fs->root_squash_exceptions_count = tmp_value;
 
             tmp_ptr = orig_fs->root_squash_exceptions_hosts;
-            orig_fs->root_squash_exceptions_hosts = hup_fs->root_squash_exceptions_hosts;
+            orig_fs->root_squash_exceptions_hosts =
+                                 hup_fs->root_squash_exceptions_hosts;
             hup_fs->root_squash_exceptions_hosts = tmp_ptr;
 
             tmp_int_ptr = orig_fs->root_squash_exceptions_netmasks;
-            orig_fs->root_squash_exceptions_netmasks = hup_fs->root_squash_exceptions_netmasks;
+            orig_fs->root_squash_exceptions_netmasks =
+                                 hup_fs->root_squash_exceptions_netmasks;
             hup_fs->root_squash_exceptions_netmasks = tmp_int_ptr;
 
             /* Update all squashing. Prelude is only place to accesses
@@ -1705,7 +1757,8 @@ static void reload_config(void)
         server_config.network_enabled = sighup_server_config.network_enabled;
 
         tmp_value = server_config.allowed_networks_count;
-        server_config.allowed_networks_count = sighup_server_config.allowed_networks_count;
+        server_config.allowed_networks_count =
+                              sighup_server_config.allowed_networks_count;
         sighup_server_config.allowed_networks_count = tmp_value;
 
         tmp_ptr = server_config.allowed_networks;
@@ -1726,15 +1779,17 @@ static void reload_config(void)
         /* The set_info call grabs the interface_mutex, so we are
          * basically using that to lock this resource
          */
-        BMI_set_info(0, BMI_TRUSTED_CONNECTION, (void *) &server_config);
+        BMI_set_info(0,
+                     BMI_TRUSTED_CONNECTION,
+                     (void *) &server_config);
 #endif
         PINT_config_release(&sighup_server_config); /* Free memory */
     }
 }
 
-static int server_shutdown(
-    PINT_server_status_flag status,
-    int ret, int siglevel)
+static int server_shutdown(PINT_server_status_flag status,
+                           int ret,
+                           int siglevel)
 {
     if (siglevel == SIGSEGV)
     {
@@ -2185,13 +2240,6 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 
     if(argc - total_arguments > 2)
     {
-        /* Assume user is passing in a server.conf.  Bit of a hack here to
-         * support server.conf files in the old format by appending the
-         * server.conf options onto the fs.conf.
-         */
-        gossip_err("The two config file format is no longer supported.  "
-                   "Generate a single fs.conf that uses the new format with the "
-                   "pvfs2-config-convert script.\n\n");
         goto parse_cmd_line_args_failure;
     }
 
@@ -2344,8 +2392,16 @@ int server_state_machine_start(
          */
         ret = PINT_smcb_set_op(smcb, s_op->req->op);
         s_op->op = s_op->req->op;
-        PVFS_hint_add(&s_op->req->hints, PVFS_HINT_SERVER_ID_NAME, sizeof(uint32_t), &server_config.host_index);
-        PVFS_hint_add(&s_op->req->hints, PVFS_HINT_OP_ID_NAME,     sizeof(uint32_t), &s_op->req->op);
+
+        PVFS_hint_add(&s_op->req->hints,
+                      PVFS_HINT_SERVER_ID_NAME,
+                      sizeof(uint32_t),
+                      &server_config.host_index);
+
+        PVFS_hint_add(&s_op->req->hints,
+                      PVFS_HINT_OP_ID_NAME,    
+                      sizeof(uint32_t),
+                      &s_op->req->op);
     }
     else
     {
@@ -2365,13 +2421,16 @@ int server_state_machine_start(
                      PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
                      PINT_HINT_GET_REQUEST_ID(s_op->req->hints),
                      PINT_HINT_GET_RANK(s_op->req->hints));
-        PINT_EVENT_START(PINT_sm_event_id, server_controlling_pid,
-                         NULL, &s_op->event_id,
+        PINT_EVENT_START(PINT_sm_event_id,
+                         server_controlling_pid,
+                         NULL,
+                         &s_op->event_id,
                          PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
                          PINT_HINT_GET_REQUEST_ID(s_op->req->hints),
                          PINT_HINT_GET_RANK(s_op->req->hints),
                          PINT_HINT_GET_HANDLE(s_op->req->hints),
                          s_op->req->op);
+
         s_op->resp.op = s_op->req->op;
 
         /* start request timer 
@@ -2407,8 +2466,8 @@ int server_state_machine_start(
  * returns 0 on success, -PVFS_error on failure
  */
 int server_state_machine_alloc_noreq(
-    enum PVFS_server_op op,
-    struct PINT_smcb **new_op)
+        enum PVFS_server_op op,
+        struct PINT_smcb **new_op)
 {
     int ret = -PVFS_EINVAL;
 
@@ -2418,11 +2477,12 @@ int server_state_machine_alloc_noreq(
     if (new_op)
     {
         PINT_server_op *tmp_op;
-        ret = PINT_smcb_alloc(new_op, op, 
-                sizeof(struct PINT_server_op),
-                server_op_state_get_machine,
-                server_state_machine_terminate,
-                server_job_context);
+        ret = PINT_smcb_alloc(new_op,
+                              op, 
+                              sizeof(struct PINT_server_op),
+                              server_op_state_get_machine,
+                              server_state_machine_terminate,
+                              server_job_context);
         if (ret < 0)
         {
             gossip_lerr("Error: failed to allocate SMCB "
@@ -2525,25 +2585,30 @@ int server_state_machine_complete(PINT_smcb *smcb)
 
     if(s_op->req)
     {
-        PINT_EVENT_END(PINT_sm_event_id, server_controlling_pid,
-                       NULL, s_op->event_id, 0);
+        PINT_EVENT_END(PINT_sm_event_id,
+                       server_controlling_pid,
+                       NULL,
+                       s_op->event_id,
+                       0);
     }
 
     /* release the decoding of the unexpected request */
     if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
-        PVFS_hint_free(s_op->decoded.stub_dec.req.hints);
+        PVFS_hint_free(&s_op->decoded.stub_dec.req.hints);
 
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
 
-    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,"server_state_machine_complete: smcb op code (%d).\n"
-                                      ,s_op->op);
-    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,"server_state_machine_complete: "
-                                       "s_op->unexp_bmi_buff.buffer (%p) "
-                                       "\tNULL(%s).\n"
-                                      ,s_op->unexp_bmi_buff.buffer
-                                      ,s_op->unexp_bmi_buff.buffer ? "NO" : "YES");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
+                  "server_state_machine_complete: smcb op code (%d).\n"
+                  ,s_op->op);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
+                  "server_state_machine_complete: "
+                  "s_op->unexp_bmi_buff.buffer (%p) "
+                  "\tNULL(%s).\n", 
+                  s_op->unexp_bmi_buff.buffer,
+                  s_op->unexp_bmi_buff.buffer ? "NO" : "YES");
 
     /* BMI_unexpected_free MUST execute BEFORE BMI_set_info, because BMI_set_info will */
     /* remove the addr info from the cur_ref_list if BMI_DEC_ADDR_REF causes the ref   */
@@ -2569,11 +2634,6 @@ int server_state_machine_terminate(
             "server_state_machine_terminate %p\n",smcb);
     PINT_smcb_free(smcb);
     return SM_ACTION_TERMINATE;
-}
-
-struct server_configuration_s *get_server_config_struct(void)
-{
-    return &server_config;
 }
 
 /* server_op_get_machine()
@@ -2621,9 +2681,9 @@ static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id coll_id)
 #ifndef GOSSIP_DISABLE_DEBUG
 
 /* sampson: new capability-based version */
-void PINT_server_access_debug(PINT_server_op * s_op,
+void PINT_server_access_debug(PINT_server_op *s_op,
                               int64_t debug_mask,
-                              const char * format,
+                              const char *format,
                               ...)
 {
     static char pint_access_buffer[GOSSIP_BUF_SIZE];
@@ -2771,7 +2831,7 @@ static int precreate_pool_initialize(int server_index)
     int handle_count = 0;
     int fs_count = 0;
     unsigned int types_to_pool = 0;
-    struct server_configuration_s *user_opts = get_server_config_struct();
+    struct server_configuration_s *user_opts = PINT_server_config_mgr_get_config();
     assert(user_opts);
 
     /* iterate through list of file systems */
@@ -2904,9 +2964,13 @@ static int precreate_pool_initialize(int server_index)
                     }
     
                     /* prepare the job interface to use this pool */
-                    ret = job_precreate_pool_register_server(host, t,
-                        cur_fs->coll_id, pool_handle, handle_count,
-                        user_opts->precreate_batch_size);
+                    ret = job_precreate_pool_register_server(
+                                             host,
+                                             t,
+                                             cur_fs->coll_id,
+                                             pool_handle,
+                                             handle_count,
+                                             user_opts->precreate_batch_size);
     
                     /* launch sm to take care of refilling */
                     /* the refiller will only actually launch if the batch count
@@ -3139,7 +3203,7 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
     struct PINT_smcb *tmp_smcb = NULL;
     struct PINT_server_op *s_op;
     int ret, index = 0;
-    struct server_configuration_s *user_opts = get_server_config_struct();
+    struct server_configuration_s *user_opts = PINT_server_config_mgr_get_config();
 
     assert(user_opts);
     PVFS_ds_type_to_int(type, &index);
@@ -3202,6 +3266,69 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
     }
 
     return(0);
+}
+
+/* THese functions are for managing the keyval buffers in the state
+ * machines.  They use the generic field "free_val" to record which
+ * buffers do NOT need to be freed - presumable because they are freed
+ * elsewhere.
+ */
+
+void keep_keyval_buffers(struct PINT_server_op *s_op, int buf)
+{
+    if (buf >= KEYVAL && buf < s_op->keyval_count)
+    {   
+        s_op->free_val |= 0x1 << (buf + 1);
+    }       
+}
+            
+void free_keyval_buffers(struct PINT_server_op *s_op)
+{                           
+    int i = 0;
+            
+    /* free_val is a bitmap of buffers that are not to be
+     * freed because they are referenced elsewhere
+     */     
+    if (!(s_op->free_val & KEYVAL))
+    {       
+        if (s_op->val.buffer)
+        {
+            free(s_op->val.buffer);
+        }
+    }       
+                    
+    memset(&(s_op->val), 0, sizeof(s_op->val));
+    memset(&(s_op->key), 0, sizeof(s_op->key));
+        
+    if (s_op->val_a)
+    {   
+        for (i = 0; i < s_op->keyval_count; i++)
+        {
+            if (!(s_op->free_val & (0x1 << (i + 1))))
+            {
+                if (s_op->val_a[i].buffer)
+                {
+                    free(s_op->val_a[i].buffer);
+                }
+            }
+            s_op->val_a[i].buffer = NULL;
+        }
+        free(s_op->val_a);
+        s_op->val_a = NULL;
+    }
+
+    if (s_op->key_a)
+    {
+        free(s_op->key_a);
+        s_op->key_a = NULL;
+    }
+    if (s_op->error_a)
+    {
+        free(s_op->error_a);
+        s_op->error_a = NULL;
+    }
+
+    s_op->free_val = 0;
 }
 
 /*

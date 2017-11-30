@@ -753,6 +753,9 @@ static inline int is_root_handle(struct inode *inode)
                k2s(&(PVFS2_SB(inode->i_sb)->root_khandle),s1),
                k2s(get_khandle_from_ino(inode),s2));
 
+  kfree(s1);
+  kfree(s2);
+
   if (PVFS_khandle_cmp(&(PVFS2_SB(inode->i_sb)->root_khandle),
                        get_khandle_from_ino(inode)))
     return 0;
@@ -770,6 +773,9 @@ static inline int match_handle(PVFS_khandle resp_handle, struct inode *inode)
                __func__,
                k2s(&resp_handle,s1),
                k2s(get_khandle_from_ino(inode),s2));
+
+  kfree(s1);
+  kfree(s2);
 
   if (PVFS_khandle_cmp(&resp_handle, get_khandle_from_ino(inode)))
     return 0;
@@ -1031,8 +1037,8 @@ void mask_blocked_signals(sigset_t *orig_sigset);
 
 void unmask_blocked_signals(sigset_t *orig_sigset);
 
-#ifdef USE_MMAP_RA_CACHE
-int pvfs2_flush_mmap_racache(struct inode *inode);
+#ifdef USE_RA_CACHE
+int pvfs2_flush_racache(struct inode *inode);
 #endif
 
 int pvfs2_unmount_sb(struct super_block *sb);
@@ -1077,25 +1083,24 @@ extern wait_queue_head_t pvfs2_bufmap_init_waitq;
  ************************************/
 #define add_op_to_request_list(op)                           \
 do {                                                         \
+    spin_lock(&pvfs2_request_list_lock);                     \
     spin_lock(&op->lock);                                    \
     set_op_state_waiting(op);                                \
-                                                             \
-    spin_lock(&pvfs2_request_list_lock);                     \
     list_add_tail(&op->list, &pvfs2_request_list);           \
-    spin_unlock(&pvfs2_request_list_lock);                   \
     spin_unlock(&op->lock);                                  \
+    spin_unlock(&pvfs2_request_list_lock);                   \
     wake_up_interruptible(&pvfs2_request_list_waitq);        \
 } while(0)
 
 #define add_priority_op_to_request_list(op)                  \
 do {                                                         \
+    spin_lock(&pvfs2_request_list_lock);                     \
     spin_lock(&op->lock);                                    \
     set_op_state_waiting(op);                                \
                                                              \
-    spin_lock(&pvfs2_request_list_lock);                     \
     list_add(&op->list, &pvfs2_request_list);                \
-    spin_unlock(&pvfs2_request_list_lock);                   \
     spin_unlock(&op->lock);                                  \
+    spin_unlock(&pvfs2_request_list_lock);                   \
     wake_up_interruptible(&pvfs2_request_list_waitq);        \
 } while(0)
 
@@ -1184,20 +1189,20 @@ do {                                                      \
 #define get_suid_flag(inode)                              \
 (PVFS2_SB(inode->i_sb)->mnt_options.suid)
 
-#ifdef USE_MMAP_RA_CACHE
-#define clear_inode_mmap_ra_cache(inode) \
+#ifdef USE_RA_CACHE
+#define clear_inode_ra_cache(inode) \
 do { \
   char *s = kzalloc(HANDLESTRINGSIZE, GFP_KERNEL); \
   gossip_debug(GOSSIP_INODE_DEBUG, \
-               "calling clear_inode_mmap_ra_cache on %s\n", \
+               "calling clear_inode_ra_cache on %s\n", \
                k2s(get_khandle_from_ino(inode),s)); \
   kfree(s); \
-  pvfs2_flush_mmap_racache(inode); \
-  gossip_debug(GOSSIP_INODE_DEBUG, "clear_inode_mmap_ra_cache finished\n"); \
+  pvfs2_flush_racache(inode); \
+  gossip_debug(GOSSIP_INODE_DEBUG, "clear_inode_ra_cache finished\n"); \
 } while(0)
 #else
-#define clear_inode_mmap_ra_cache(inode)
-#endif /* USE_MMAP_RA_CACHE */
+#define clear_inode_ra_cache(inode)
+#endif /* USE_RA_CACHE */
 
 #define add_pvfs2_sb(sb)                                             \
 do {                                                                 \

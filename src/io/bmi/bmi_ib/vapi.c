@@ -335,7 +335,7 @@ static void init_connection_modify_qp(VAPI_qp_hndl_t qp,
     attr.qp_state = VAPI_RTS;
     attr.sq_psn = 0;
     attr.ous_dst_rd_atom = 0;
-    attr.timeout = 26;  /* 4.096us * 2^26 = 5 min */
+    attr.timeout = 14;      /* 4.096us * 2^14 = .0671 sec */
     attr.retry_count = 20;
     attr.rnr_retry = 20;
     ret = VAPI_modify_qp(vd->nic_handle, qp, &attr, &mask, &cap);
@@ -662,6 +662,34 @@ static const char *vapi_wc_status_string(int status)
     return VAPI_wc_status_sym(status);
 }
 
+/*
+ * Convert a VAPI work completion status into a BMI error code.
+ */
+static int vapi_wc_status_to_bmi(int status)
+{
+    int result = 0;
+
+    switch (status)
+    {
+        case VAPI_SUCCESS:
+            result = 0;
+            break;
+
+        case VAPI_RETRY_EXC_ERR:
+            debug(0, "%s: converting VAPI_RETRY_EXC_ERR to BMI_EHOSTUNREACH",
+                  __func__);
+            result = -BMI_EHOSTUNREACH;
+            break;
+
+        default:
+            warning("%s: unhandled wc status %s, error code unchanged",
+                    __func__, vapi_wc_status_string(status));
+            break;
+    }
+
+    return result;
+}
+
 #define CASE(e)  case e: s = #e; break
 static const char *vapi_port_state_string(IB_port_state_t state)
 {
@@ -914,6 +942,7 @@ int vapi_ib_initialize(void)
     ib_device->func.prepare_cq_block = vapi_prepare_cq_block;
     ib_device->func.ack_cq_completion_event = vapi_ack_cq_completion_event;
     ib_device->func.wc_status_string = vapi_wc_status_string;
+    ib_device->func.wc_status_to_bmi = vapi_wc_status_to_bmi;
     ib_device->func.mem_register = vapi_mem_register;
     ib_device->func.mem_deregister = vapi_mem_deregister;
     ib_device->func.check_async_events = vapi_check_async_events;

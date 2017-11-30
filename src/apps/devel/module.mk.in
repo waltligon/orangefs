@@ -1,5 +1,20 @@
 DIR := src/apps/devel
 
-DEVELSRC := \
-	$(DIR)/pvfs2-db-display.c \
-	$(DIR)/pvfs2-remove-prealloc.c 
+DEVELSRC += \
+    $(DIR)/pvfs2-db-display.c \
+    $(DIR)/pvfs2-remove-prealloc.c
+
+MEMANALYSIS := $(DIR)/mem_analysis
+
+MEMANALYSISSRC := \
+    $(DIR)/mem_analysis.c \
+    $(DIR)/mem_analysis_parser.c \
+    $(DIR)/mem_analysis_scanner.c
+
+MEMANALYSISGEN := \
+    $(DIR)/mem_analysis_scanner.c \
+    $(DIR)/mem_analysis_parser.c \
+    $(DIR)/mem_analysis_parser.h
+
+.SECONDARY: $(MEMANALYSISGEN)
+

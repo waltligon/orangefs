@@ -236,6 +236,7 @@ PVFS_error PVFS_isys_symlink(
     sm_p->u.sym.stored_error_code = 0;
     sm_p->u.sym.retry_count = 0;
     sm_p->object_ref = parent_ref;
+    sm_p->parent_ref = parent_ref;
     PVFS_hint_copy(hints, &sm_p->hints);
 
     gossip_debug(
@@ -420,6 +421,9 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
         return SM_ACTION_COMPLETE;
     }
 
+
+    PINT_debug_capability(&sm_p->getattr.attr.capability,"symlink dspace create");
+
     PINT_SERVREQ_BATCH_CREATE_FILL(
         msg_p->req,
         sm_p->getattr.attr.capability,
@@ -549,7 +553,8 @@ static PINT_sm_action getattr_new_metafile_init(
     temp.fs_id = sm_p->object_ref.fs_id;
     
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: grabbing cap for meta\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: grabbing cap for meta  "
+                                      "handle(%llu)\n",llu(temp.handle));
 
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
@@ -692,6 +697,12 @@ static PINT_sm_action symlink_cleanup(
         PINT_ncache_update((const char*) sm_p->u.sym.link_name,
                            (const PVFS_object_ref*) &symlink_ref,
                            (const PVFS_object_ref*) &(sm_p->object_ref));
+
+        /* Invalidate the symlink's parent from the acache, because
+         * creating a symlink entry modifies the timestamps on the
+         * directory.
+         */
+        PINT_acache_invalidate(sm_p->parent_ref);
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.sym.retry_count < sm_p->msgarray_op.params.retry_limit))

@@ -1,4 +1,5 @@
 dnl **************************************************************
+dnl
 dnl PVFS2 AUTOCONF SCRIPT
 dnl
 dnl Process this file with autoconf to produce a configure script.
@@ -18,7 +19,7 @@ dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=2
 PVFS2_VERSION_MINOR=9
-PVFS2_VERSION_SUB=5
+PVFS2_VERSION_SUB=7
 PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
 PVFS2_VERSION_PRE="-DEVEL-$CONFIGURE_TIME"
@@ -269,15 +270,24 @@ then
 elif test "${withval}" = "lmdb"
 then
     DATABASE_BACKEND=lmdb
+    NEED_LMDB=yes
 else
     AC_MSG_ERROR(database backend ${withval} invalid)
 fi
 AC_SUBST(DATABASE_BACKEND)
-AC_SUBST(NEED_BERKELEY_DB),
+AC_SUBST(NEED_BERKELEY_DB)
+AC_SUBST(NEED_LMDB),
 DATABASE_BACKEND=bdb
 NEED_BERKELEY_DB=yes
 AC_SUBST(DATABASE_BACKEND)
-AC_SUBST(NEED_BERKELEY_DB))
+AC_SUBST(NEED_BERKELEY_DB)
+AC_SUBST(NEED_LMDB))
+
+AC_ARG_ENABLE(external-lmdb,
+[  --enable-external-lmdb        Enable linking against an external LMDB library.],
+WANT_INTERNAL_LMDB=no,
+WANT_INTERNAL_LMDB=yes)
+AC_SUBST(WANT_INTERNAL_LMDB)
 
 dnl locate OpenSSL libraries
 AX_OPENSSL
@@ -439,16 +449,15 @@ AC_ARG_ENABLE(perf-counters,
 fi]
 ,)
 
-dnl a mechanism to turn on mmap-readahead caching (for kernel interface)
-MMAP_RA_CACHE=""
-AC_ARG_ENABLE(mmap-racache,
-[  --enable-mmap-racache   **EXPERIMENTAL** Enables mmap-readahead in kernel 
-                          interface],
+dnl a mechanism to turn on readahead caching (for kernel interface)
+RA_CACHE=""
+AC_ARG_ENABLE(racache,
+[  --enable-racache        Enables readahead in the Client Core ],
 [if test "x$enableval" = "xyes" ; then
-MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
+RA_CACHE="-DUSE_RA_CACHE"
 fi]
 ,)
-AC_SUBST(MMAP_RA_CACHE)
+AC_SUBST(RA_CACHE)
 
 dnl a mechanism that resets the file position pointer when an error occurs whether
 dnl or not any bytes were written (kernel interface only).
@@ -498,6 +507,15 @@ test_for_karma()
 }
 
 dnl optionally disable building the karma gui
+dnl AC_ARG_ENABLE(karma,
+dnl [  --disable-karma         Disables optional gui.  (Enabled by default)],
+dnl [ if test "x$enableval" = "xyes" ; then
+dnl       test_for_karma
+dnl    fi
+dnl ],
+dnl [test_for_karma]
+dnl )
+
 AC_ARG_ENABLE(karma,
 [  --enable-karma          Enables optional gui.  (Disabled by default)],
 [ if test "x$enableval" = "xyes" ; then
@@ -689,9 +707,8 @@ AC_TRY_COMPILE(
         }
     ],
     [
-        int ret;
         const char *sc_t = NULL;
-	    ret = setfilecon("somepath", sc_t);
+        setfilecon("somepath", sc_t);
     ],
     [
        AC_MSG_RESULT(yes)
@@ -1174,6 +1191,22 @@ fi],
 MALLOC_REDEF=1
 ])
 
+dnl Method to disable malloc debug
+AC_ARG_ENABLE(malloc-debug,
+[  --disable-malloc-debug  Do not compile in malloc debug tracing],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_MALLOC_DEBUG, 1,
+      [Should we compile in malloc debug tracing.])
+   MALLOC_DEBUG=1
+else
+   AC_DEFINE(PVFS_MALLOC_DEBUG, 0,
+      [Should we compile in malloc debug tracing.])
+fi],
+[AC_DEFINE(PVFS_MALLOC_DEBUG, 1,
+      [Should we compile in malloc debug tracing.])
+MALLOC_DEBUG=1
+])
+
 dnl Method to disable malloc checking a magic number
 AC_ARG_ENABLE(malloc-magic,
 [  --disable-malloc-magic  Do not have malloc check a magic number],
@@ -1444,6 +1477,19 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
 	   [AX_BERKELEY_DB("")])
 fi
 dnl end of NEED_BERKELEY_DB section
+
+if test "x$NEED_LMDB" = "xyes" -a \
+   "x$WANT_INTERNAL_LMDB" = "xno" ; then
+    AC_ARG_WITH(lmdb,
+           [  --with-lmdb=<dir>         Location of installed LMDB package (default=/usr)],
+    	   [],
+	   [])
+    AC_CHECK_LIB(lmdb, mdb_version,
+           [],
+           [AC_MSG_ERROR("Cannot link against LMDB library.")])
+fi
+dnl end of NEED_LMDB section
+
 
 if test "x$BUILD_SERVER" = "x1"; then
 	dnl check if -lrt is required
@@ -1841,11 +1887,10 @@ dnl output final version of top level makefile and subdirectory
 dnl    makefile includes
 AC_OUTPUT(include/pvfs2.h
 Makefile
-module.mk
 src/apps/admin/module.mk
-src/apps/admin/lmdb/module.mk
 src/apps/admin/pvfs2-config
 src/apps/devel/module.mk
+src/apps/devel/lmdb/module.mk
 src/apps/karma/module.mk
 src/apps/vis/module.mk
 src/apps/fuse/module.mk
@@ -1968,10 +2013,10 @@ else
    AC_MSG_RESULT([PVFS2 configured for the 2.4.x kernel module      : yes])
 fi
 
-if test "x$MMAP_RA_CACHE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
-   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      :  no])
+if test "x$RA_CACHE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
+   AC_MSG_RESULT([PVFS2 configured for using the ra-cache           :  no])
 else
-   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      : yes])
+   AC_MSG_RESULT([PVFS2 configured for using the ra-cache           : yes])
 fi
 
 if test "x$RESET_FILE_POS" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
@@ -2095,26 +2140,6 @@ fi # end of BMI/PVFS config display
 
 if test "x$WARN_ABOUT_HOSTNAMES" = "xyes" ; then
    AC_MSG_RESULT(WARNING: gethostbyname is not supported on this machine: ALL ADDRESSES MUST BE IN DOT NOTATION.)
-fi
-
-
-dnl
-dnl Warn about potential slowness if using a "fast" network along with
-dnl TCP.  Polling with timeout in BMI is implemented by sequentially asking
-dnl each device to poll for half of the timeout.  This leads to a fixed 5 ms
-dnl delay in the TCP device before the IB device can be queried, for instance.
-dnl When traffic will only appear on one device, suggest that TCP be disabled.
-dnl But leave TCP as default on, certainly, as that is what most people want.
-dnl
-if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
-	x$BUILD_OPENIB = x1 -o x$BUILD_PORTALS = x1 -o x$BUILD_ZOID = x1 ; then
-    if test x$BUILD_BMI_TCP = x1 ; then
-	AC_MSG_WARN([You have selected to build $PKGSTR to use a "fast" network
-		    interface, but have not disabled TCP.  The way this is
-		    currently implemented will lead to rather slow response
-		    times on the fast interface.  Suggest you configure with
-		    "--without-bmi-tcp" for the best performance.])
-    fi
 fi
 
 if test x$HAVE_DB_OLD = x1; then

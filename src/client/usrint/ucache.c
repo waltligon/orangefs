@@ -1,5 +1,5 @@
-/* 
- * (C) 2011 Clemson University
+/*
+ * (C) 2017 Clemson University and Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -13,7 +13,7 @@
  */
 #include <pvfs2-config.h>
 #include <gen-locks.h>
-#include <malloc.h>
+/* #include <malloc.h> */
 #include "usrint.h"
 #include "posix-ops.h"
 #include "openfile-util.h"

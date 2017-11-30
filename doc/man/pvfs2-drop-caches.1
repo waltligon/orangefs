@@ -1,0 +1,30 @@
+.TH PVFS2-DROP-CACHES 1 2017-07-03
+.SH NAME
+\fBpvfs2-drop-caches\fR \(en flush I/O cache on OrangeFS servers
+.SH SYNOPSIS
+\fBpvfs2-drop-caches\fR [\fB\-m \fIfs_mount_point\fR]
+.SH DESCRIPTION
+The
+.B pvfs2-drop-caches
+utility requests that each OrangeFS server flush the operating system
+I/O cache.
+.PP
+The options are as follows:
+.IP -m
+Specify the file system to operate on.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate
+.IR pvfs2tab
+file
+.SH FILES
+.I /etc/pvfs2tab
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2tab ( 5 )

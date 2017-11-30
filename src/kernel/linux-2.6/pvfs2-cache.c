@@ -117,8 +117,8 @@ char *get_opname_string(pvfs2_kernel_op_t *new_op)
             return "OP_STATFS";
         else if (type == PVFS2_VFS_OP_TRUNCATE)
             return "OP_TRUNCATE";
-        else if (type == PVFS2_VFS_OP_MMAP_RA_FLUSH)
-            return "OP_MMAP_RA_FLUSH";
+        else if (type == PVFS2_VFS_OP_RA_FLUSH)
+            return "OP_RA_FLUSH";
         else if (type == PVFS2_VFS_OP_FS_MOUNT)
             return "OP_FS_MOUNT";
         else if (type == PVFS2_VFS_OP_FS_UMOUNT)
@@ -143,6 +143,8 @@ char *get_opname_string(pvfs2_kernel_op_t *new_op)
             return "OP_FSKEY";
         else if (type == PVFS2_VFS_OP_FILE_IOX)
             return "OP_FILE_IOX";
+        else if (type == PVFS2_VFS_OP_FEATURES)
+            return "OP_FEATURES";
     }
     return "OP_UNKNOWN?";
 }
