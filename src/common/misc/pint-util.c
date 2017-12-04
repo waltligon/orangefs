@@ -668,6 +668,7 @@ int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x)
     addr_str = BMI_addr_rev_lookup(*x);
     return(encode_string_size_check(&addr_str));
 }
+
 #ifndef WIN32
 inline
 #endif
@@ -676,6 +677,14 @@ void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x)
     char *addr_string;
     decode_string(pptr, &addr_string);
     BMI_addr_lookup(x, addr_string);
+}
+
+#ifndef WIN32
+inline
+#endif
+void defree_PVFS_BMI_addr_t(PVFS_BMI_addr_t *x)
+{
+    defree_string(x);
 }
 
 #ifndef WIN32
@@ -738,6 +747,19 @@ void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x)
     {
         decode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
     }
+}
+
+#ifndef WIN32
+inline
+#endif
+void defree_PVFS_sys_layout(struct PVFS_sys_layout_s *x)
+{
+    int i;
+    for(i = 0 ; i < x->server_list.count; i++)
+    {
+        defree_PVFS_BMI_addr_t(&(x)->server_list.servers[i]);
+    }
+    free(x->server_list.servers);
 }
 
 char *PINT_util_guess_alias(void)

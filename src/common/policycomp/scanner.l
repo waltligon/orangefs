@@ -68,14 +68,15 @@ static int comment_caller;
 
 %}
 
+/* avoid a warning since we do not use yyunput() */
+%option nounput
+%option never-interactive
+
 id              [_a-zA-Z][_0-9a-zA-Z]*
 int             [0-9][0-9]*
 
 %x              CODE
 %x              COMMENT
-
-/* avoid a warning since we do not use yyunput() */
-%option nounput
 
 %%
 

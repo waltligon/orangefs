@@ -359,9 +359,11 @@
         PINT_sm_msgpair_state *msg_p = NULL;
         PVFS_dist_dir_hash_type dirdata_hash;
         int dirdata_server_index;
+    #if 0
         struct server_configuration_s *server_config = NULL;
         struct filesystem_configuration_s* cur_fs = NULL;
         int metasidcnt = 0;
+    #endif
 
         /* NOTE: we remove the dirent first because this gets the object
          * out of the system fastest.
@@ -374,10 +376,12 @@
         /*
          * Find metadata replication factor from configuration
          */
+    #if 0
         server_config = PINT_get_server_config_struct(sm_p->parent_ref.fs_id);
         cur_fs = PINT_config_find_fs_id(server_config,sm_p->parent_ref.fs_id);
         metasidcnt = cur_fs->metadata_replication_factor;
         PINT_put_server_config_struct(server_config);
+    #endif
 
 
         /* keep a copy of the parent's capability */
@@ -400,6 +404,8 @@
 
         PINT_msgpair_init(&sm_p->msgarray_op);
         msg_p = &sm_p->msgarray_op.msgpair;
+
+        /* SID COUNT AND ARRAY MAY BE WRONG - CHECK IT!! */
 
         PINT_SERVREQ_RMDIRENT_FILL(
                      msg_p->req,

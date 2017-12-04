@@ -406,11 +406,8 @@ static inline void defree_PVFS_servreq_create(struct PVFS_servreq_create *x)
 }
 #endif
 
-/* V3 ECQ: Can we delete the layout part of this macro? */
-/* V3 ECQ: Is this correct wrt handles and sids? */
 #define extra_size_PVFS_servreq_create \
      (extra_size_PVFS_object_attr + \
-      extra_size_PVFS_sys_layout + \
       extra_size_PVFS_credential + \
       (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
       (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID))) 

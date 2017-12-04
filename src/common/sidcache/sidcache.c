@@ -2833,7 +2833,7 @@ int SID_add(const PVFS_SID *sid,
 #endif
 
     /* if bmi_addr is zero, should register with BMI */
-    if (cval->bmi_addr == 0);
+    if (cval->bmi_addr == 0)
     {
         /* enter url into BMI to get BMI addr */
         ret = BMI_addr_lookup(&cval->bmi_addr, cval->url);

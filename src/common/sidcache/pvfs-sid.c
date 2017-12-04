@@ -9,7 +9,7 @@
  *  Functions for accessing SIDcache
  */
 
-
+#include <db.h>
 
 #include "gossip.h"
 #include "pvfs2-debug.h"
@@ -194,22 +194,19 @@ static int PVFS_SID_count_server(int *count, struct SID_type_s stype)
         get_flags = DB_FIRST;
     }
     else 
-    #if 0
-    if (stype.fsid)
     {
-    #endif
         key.data = &stype;
         key.size = sizeof(stype);
         get_flags = DB_SET_RANGE;
-    #if 0
     }
-    else
-    {
-        key.data = &(stype.server_type);
-        key.size = sizeof(stype.server_type);
-        get_flags = DB_SET_RANGE;
-    }
-    #endif
+
+    /******************************************
+     * Old version can delete
+     * key.data = &(stype.server_type);
+     * key.size = sizeof(stype.server_type);
+     * get_flags = DB_SET_RANGE;
+     */
+
     key.ulen = sizeof(struct SID_type_s);
     key.flags = DB_DBT_USERMEM;
     *count = 0;

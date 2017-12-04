@@ -750,7 +750,7 @@ int pint_racache_finalize(void)
                                            racache_file_t,
                                            hash_link);
 
-                while ((buff_link = qlist_pop(&racache_file->buff_list)));
+                while ((buff_link = qlist_pop(&racache_file->buff_list)))
                 {
                     racache_buffer = qlist_entry(buff_link,
                                                  racache_buffer_t,
@@ -759,7 +759,7 @@ int pint_racache_finalize(void)
                                  "Freeing buffer %d with %d waiters\n",
                                  racache_buffer->buff_id,
                                  racache_buffer->vfs_cnt);
-                    while((vfs_link = qlist_pop(&racache_buffer->vfs_link)));
+                    while((vfs_link = qlist_pop(&racache_buffer->vfs_link)))
                     {
                         racache_buffer->vfs_cnt--;
                         /* don't worry about the vfs_request

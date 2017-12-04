@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <string.h>
 #ifndef WIN32
+#include <sys/sysmacros.h>
 #include <inttypes.h>
 #include <sys/ioctl.h>
 #include <sys/poll.h>
@@ -955,7 +956,8 @@ static int setup_dev_entry(const char *dev_name)
     }
 
     /* if we hit this point, then we need to create a new device file */
-    ret = mknod(dev_name, (S_IFCHR | S_IRUSR | S_IWUSR),
+    ret = mknod(dev_name,
+                (S_IFCHR | S_IRUSR | S_IWUSR),
                 makedev(majornum, 0));
     if (ret != 0)
     {

@@ -32,7 +32,7 @@ static int digest(const char *digest_name,
                   const void *buf, const size_t buf_len,
                   char **output, size_t *output_len)
 {
-    EVP_MD_CTX mdctx;
+    EVP_MD_CTX *mdctx;
     const EVP_MD *md;
     unsigned int digest_len;
     void *digest_value;
@@ -60,10 +60,13 @@ static int digest(const char *digest_name,
      * the digests don't define cleanup callbacks and init is just
      * a memset.
      */
+#if 0
     memset(&mdctx, 0, sizeof(mdctx));
     EVP_DigestInit(&mdctx, md);
-    EVP_DigestUpdate(&mdctx, buf, buf_len);
-    EVP_DigestFinal(&mdctx, digest_value, &digest_len);
+#endif
+    mdctx = EVP_MD_CTX_new();
+    EVP_DigestUpdate(mdctx, buf, buf_len);
+    EVP_DigestFinal(mdctx, digest_value, &digest_len);
 
     if (output)
         *output = digest_value;
