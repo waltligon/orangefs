@@ -428,18 +428,6 @@ void __PINT_server_config_mgr_put_config(struct server_configuration_s *config_s
     }
 }
 
-/* V3 is this even used anywhere */
-/*
-#if 0
-*/
-int PINT_server_config_mgr_get_abs_min_handle_recycle_time(void)
-{
-    return s_min_handle_recycle_timeout_in_sec;
-}
-/*
-#endif
-*/
-
 static int hash_fsid(const void *key, int table_size)
 {
     const PVFS_fs_id fs_id = *((const PVFS_fs_id *)key);

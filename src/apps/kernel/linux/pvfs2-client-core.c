@@ -270,7 +270,6 @@ static struct qhash_table *s_ops_in_progress_table = NULL;
 
 static void parse_args(int argc, char **argv, options_t *opts);
 static void print_help(char *progname);
-static void reset_acache_timeout(void);
 #ifndef GOSSIP_DISABLE_DEBUG
 static char *get_vfs_op_name_str(int op_type);
 #endif
@@ -278,7 +277,6 @@ static int setup_credential_cache(options_t *s_opts);
 static int set_ccache_parameters(options_t *s_opts);
 static int set_acache_parameters(options_t* s_opts);
 static void set_device_parameters(options_t *s_opts);
-static void reset_ncache_timeout(void);
 static int set_ncache_parameters(options_t* s_opts);
 static int set_capcache_parameters(options_t* s_opts);
 static void finalize_perf_items(int n, ... );
@@ -1756,9 +1754,6 @@ static PVFS_error service_fs_umount_request(vfs_request_t *vfs_request)
     else
     {
         gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "FS umount ok\n");
-
-        reset_acache_timeout();
-        reset_ncache_timeout();
 
         vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_UMOUNT;
         vfs_request->out_downcall.status = 0;
@@ -3951,8 +3946,6 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                                      "cancel mode enabled\n");
                     }
                 }
-                reset_acache_timeout();
-                reset_ncache_timeout();
 
                 /*
                  * before sending success response we need to resolve the root
@@ -6070,95 +6063,6 @@ static void parse_args(int argc, char **argv, options_t *opts)
     if (!opts->logtype)
     {
         opts->logtype = "file";
-    }
-}
-
-static void reset_acache_timeout(void)
-{
-    int min_stored_timeout = 0, max_acache_timeout_ms = 0;
-
-    min_stored_timeout =
-                PINT_server_config_mgr_get_abs_min_handle_recycle_time();
-
-    /*
-      if all file systems have been unmounted, this value will be -1,
-      so don't do anything in that case
-    */
-    if (min_stored_timeout != -1)
-    {
-        /*
-          determine the new maximum acache timeout value based on server
-          handle recycle times and what the user specified on the command
-          line.  if they differ then reset the entire acache to be sure
-          there are no entries in the cache that could exceed the new
-          timeout.
-        */
-        max_acache_timeout_ms = PVFS_util_min((min_stored_timeout * 1000),
-                                              s_opts.acache_timeout);
-
-        if (max_acache_timeout_ms != s_opts.acache_timeout)
-        {
-            gossip_debug(
-                GOSSIP_CLIENTCORE_DEBUG, "Resetting acache timeout to %d"
-                " milliseconds\n (based on new dynamic configuration "
-                "handle recycle time value)\n", max_acache_timeout_ms);
-
-            PINT_acache_finalize();
-            PINT_acache_initialize();
-            PINT_perf_set_info(PINT_acache_get_pc(),
-                               PINT_PERF_UPDATE_HISTORY,
-                               s_opts.perf_history_size);
-            s_opts.acache_timeout = max_acache_timeout_ms;
-            set_acache_parameters(&s_opts);
-        }
-    }
-    else
-    {
-        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "All file systems "
-                     "unmounted. Not resetting the acache.\n");
-    }
-}
-
-static void reset_ncache_timeout(void)
-{
-    int min_stored_timeout = 0, max_ncache_timeout_ms = 0;
-
-    min_stored_timeout =
-        PINT_server_config_mgr_get_abs_min_handle_recycle_time();
-
-    /*
-      if all file systems have been unmounted, this value will be -1,
-      so don't do anything in that case
-    */
-    if (min_stored_timeout != -1)
-    {
-        /*
-          determine the new maximum ncache timeout value based on server
-          handle recycle times and what the user specified on the command
-          line.  if they differ then reset the entire ncache to be sure
-          there are no entries in the cache that could exceed the new
-          timeout.
-        */
-        max_ncache_timeout_ms = PVFS_util_min(
-            (min_stored_timeout * 1000), s_opts.ncache_timeout);
-
-        if (max_ncache_timeout_ms != s_opts.ncache_timeout)
-        {
-            gossip_debug(
-                GOSSIP_CLIENTCORE_DEBUG, "Resetting ncache timeout to %d"
-                " milliseconds\n (based on new dynamic configuration "
-                "handle recycle time value)\n", max_ncache_timeout_ms);
-
-            PINT_ncache_finalize();
-            PINT_ncache_initialize();
-            s_opts.ncache_timeout = max_ncache_timeout_ms;
-            set_ncache_parameters(&s_opts);
-        }
-    }
-    else
-    {
-        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "All file systems "
-                     "unmounted. Not resetting the ncache.\n");
     }
 }
 
