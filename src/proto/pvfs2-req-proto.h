@@ -1755,12 +1755,9 @@ endecode_fields_3a_struct(
     skip4,,
     uint32_t, dirent_count,
     PVFS_dirent, dirent_array);
-#if 0
 #define extra_size_PVFS_servresp_readdir \
-           (roundup8(PVFS_REQ_LIMIT_DIRENT_COUNT * (PVFS_NAME_MAX + 1 + 8)))
-#endif
-#define extra_size_PVFS_servresp_readdir \
-           (roundup8(PVFS_REQ_LIMIT_DIRENT_COUNT * extra_size_PVFS_dirent))
+           (roundup8(PVFS_REQ_LIMIT_DIRENT_COUNT * \
+                      ((PVFS_NAME_MAX + 1 + 8) + PVFS_REQ_LIMIT_SIDS_RATIO * sizeof(PVFS_SID))))
 
 /* getconfig ***************************************************/
 /* - retrieves initial configuration information from server */

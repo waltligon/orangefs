@@ -756,8 +756,10 @@ static inline void defree_PVFS_dirent(PVFS_dirent *x)
 }
 #endif
 
+/* 
 #define extra_size_PVFS_dirent \
       ((PVFS_NAME_MAX + 1) + PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID))
+*/
 
 #if 0
 endecode_fields_2(

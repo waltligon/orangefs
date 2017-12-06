@@ -1224,7 +1224,7 @@ $(STATECOMP): $(STATECOMPOBJS)
 # special rules to build policy compiler using build host compiler
 $(POLICYCOMPOBJS): %.o: %.c
 	$(Q) "  BUILD_CC	$@"
-	$(E)$(BUILD_CC) $(BUILD_CFLAGS) $< -c -o $@ $(call modcflags,$<)
+	$(E)$(BUILD_CC) $(BUILD_CFLAGS) $(DB_CFLAGS) $< -c -o $@ $(call modcflags,$<)
 
 $(POLICYCOMP): $(POLICYCOMPOBJS)
 	$(Q) "  BUILD_LD	$@"
