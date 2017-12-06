@@ -412,7 +412,6 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
                                                        msg_p->req.op,
                                                        msg_p->enc_type);
 
-
         msg_p->encoded_resp_p = BMI_memalloc(msg_p->svr_addr,
                                              msg_p->max_resp_sz,
                                              BMI_RECV);
@@ -1030,7 +1029,8 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
         /* Didn't decode right, keep decode error */
         PVFS_perror_gossip("msgpairarray decode error", ret);
         msg_p->op_status = js_p->error_code = ret;
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG,"%s:error code %d from PINT_serv_decode_resp, "
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                     "%s:error code %d from PINT_serv_decode_resp, "
                                           "from msgpair %d\n"
                                          ,__func__
                                          ,msg_p->op_status
@@ -1113,7 +1113,7 @@ cleanup:
         js_p->error_code = ret;
     }
 
-    memset(&msg_p->encoded_req,0,sizeof(msg_p->encoded_req));
+    memset(&msg_p->encoded_req, 0, sizeof(msg_p->encoded_req));
     msg_p->encoded_resp_p = NULL;
     msg_p->max_resp_sz = 0;
 

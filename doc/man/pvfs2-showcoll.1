@@ -1,0 +1,40 @@
+.TH PVFS2-showcoll 1 2017-08-14
+.SH NAME
+\fBpvfs2-showcoll\fR \(en show server storage collection
+.SH SYNOPSIS
+\fBpvfs2-mkspace\fR [\fB\-s data_storage_space\fR]
+[\fB\-m metadata storage space\fR] [\fB\-c collection_name\fR]
+[\fB\-d dspace_handle\fR] [\fB\-vkh\fR] 
+.SH DESCRIPTION
+The
+.B pvfs2-showcoll
+utility displays the configuration of a particular storage collection.
+This utility operates directly on the storage database and does not
+utilize the server.
+.PP
+The options are as follows:
+.IP -s
+Specify the path to the data storage space.
+.IP -m
+Specify the path to the metadata storage space.
+.IP -c
+Specify the name of the collection.  Without this option, a list of
+collections available will be displayed.
+.IP -d
+Specify the dspace handle to display.
+.IP -v
+Enable verbose output.
+.IP -k
+Display data in keyval spaces.
+.IP -h
+Display synopsis.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2tab ( 5 )

@@ -13,7 +13,6 @@
 #include <string.h>
 #include <getopt.h>
 #include <errno.h>
-#include <db.h>
 
 #include "pvfs2-types.h"
 #include "trove-types.h"
@@ -537,7 +536,7 @@ void print_keyval( struct dbpf_data key, struct dbpf_data val )
         case DBPF_COUNT_TYPE:
             printf("()(%zu) -> (%llu) (%zu)\n",
                    key.len,
-                   llu(*(uint64_t *)val.data),
+                   llu(*(uint32_t *)val.data),
                    val.len);
             break;
 

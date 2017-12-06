@@ -1414,7 +1414,6 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
                    ,PVFS_SID_str(&s_op->resp.u.lookup_path.sid_array[i]));
    }
 
-
     return SM_ACTION_COMPLETE;
 }
 

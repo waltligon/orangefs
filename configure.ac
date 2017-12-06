@@ -272,15 +272,24 @@ then
 elif test "${withval}" = "lmdb"
 then
     DATABASE_BACKEND=lmdb
+    NEED_LMDB=yes
 else
     AC_MSG_ERROR(database backend ${withval} invalid)
 fi
 AC_SUBST(DATABASE_BACKEND)
-AC_SUBST(NEED_BERKELEY_DB),
+AC_SUBST(NEED_BERKELEY_DB)
+AC_SUBST(NEED_LMDB),
 DATABASE_BACKEND=bdb
 NEED_BERKELEY_DB=yes
 AC_SUBST(DATABASE_BACKEND)
-AC_SUBST(NEED_BERKELEY_DB))
+AC_SUBST(NEED_BERKELEY_DB)
+AC_SUBST(NEED_LMDB))
+
+AC_ARG_ENABLE(external-lmdb,
+[  --enable-external-lmdb        Enable linking against an external LMDB library.],
+WANT_INTERNAL_LMDB=no,
+WANT_INTERNAL_LMDB=yes)
+AC_SUBST(WANT_INTERNAL_LMDB)
 
 dnl locate OpenSSL libraries
 AX_OPENSSL
@@ -694,9 +703,8 @@ AC_TRY_COMPILE(
         }
     ],
     [
-        int ret;
         const char *sc_t = NULL;
-	    ret = setfilecon("somepath", sc_t);
+        setfilecon("somepath", sc_t);
     ],
     [
        AC_MSG_RESULT(yes)
@@ -1484,6 +1492,19 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
 fi
 dnl end of NEED_BERKELEY_DB section
 
+if test "x$NEED_LMDB" = "xyes" -a \
+   "x$WANT_INTERNAL_LMDB" = "xno" ; then
+    AC_ARG_WITH(lmdb,
+           [  --with-lmdb=<dir>         Location of installed LMDB package (default=/usr)],
+    	   [],
+	   [])
+    AC_CHECK_LIB(lmdb, mdb_version,
+           [],
+           [AC_MSG_ERROR("Cannot link against LMDB library.")])
+fi
+dnl end of NEED_LMDB section
+
+
 if test "x$BUILD_SERVER" = "x1"; then
 	dnl check if -lrt is required
 	AX_CHECK_NEEDS_LIBRT
@@ -1880,11 +1901,10 @@ dnl output final version of top level makefile and subdirectory
 dnl    makefile includes
 AC_OUTPUT(include/pvfs2.h
 Makefile
-module.mk
 src/apps/admin/module.mk
-src/apps/admin/lmdb/module.mk
 src/apps/admin/pvfs2-config
 src/apps/devel/module.mk
+src/apps/devel/lmdb/module.mk
 src/apps/karma/module.mk
 src/apps/vis/module.mk
 src/apps/fuse/module.mk
@@ -2147,26 +2167,6 @@ fi # end of BMI/PVFS config display
 
 if test "x$WARN_ABOUT_HOSTNAMES" = "xyes" ; then
    AC_MSG_RESULT(WARNING: gethostbyname is not supported on this machine: ALL ADDRESSES MUST BE IN DOT NOTATION.)
-fi
-
-
-dnl
-dnl Warn about potential slowness if using a "fast" network along with
-dnl TCP.  Polling with timeout in BMI is implemented by sequentially asking
-dnl each device to poll for half of the timeout.  This leads to a fixed 5 ms
-dnl delay in the TCP device before the IB device can be queried, for instance.
-dnl When traffic will only appear on one device, suggest that TCP be disabled.
-dnl But leave TCP as default on, certainly, as that is what most people want.
-dnl
-if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
-	x$BUILD_OPENIB = x1 -o x$BUILD_PORTALS = x1 -o x$BUILD_ZOID = x1 ; then
-    if test x$BUILD_BMI_TCP = x1 ; then
-	AC_MSG_WARN([You have selected to build $PKGSTR to use a "fast" network
-		    interface, but have not disabled TCP.  The way this is
-		    currently implemented will lead to rather slow response
-		    times on the fast interface.  Suggest you configure with
-		    "--without-bmi-tcp" for the best performance.])
-    fi
 fi
 
 if test x$HAVE_DB_OLD = x1; then

@@ -233,7 +233,7 @@ static struct options *parse_args(int argc, char* argv[])
         {
             fprintf(stderr,"Error: History is required.\n");
         }
-        if(!(tmp_opts->history <= 0))
+        if(tmp_opts->history <= 0)
         {
             fprintf(stderr,"Error: History is must be greater than 0.\n");
         }

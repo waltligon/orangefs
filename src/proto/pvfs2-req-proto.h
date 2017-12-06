@@ -10,6 +10,8 @@
 #ifndef __PVFS2_REQ_PROTO_H
 #define __PVFS2_REQ_PROTO_H
 
+#include <assert.h>
+
 #include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
@@ -1767,7 +1769,7 @@ endecode_fields_3a1a_struct(
     uint32_t, sid_count,
     PVFS_SID, sid_array);
 #define extra_size_PVFS_servresp_readdir \
-           (roundup8(PVFS_REQ_LIMIT_DIRENT_COUNT * (PVFS_NAME_MAX + 1 + 8)) + \
+           (PVFS_REQ_LIMIT_DIRENT_COUNT * sizeof(PVFS_dirent) + \
             PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID))
 
 /* getconfig ***************************************************/

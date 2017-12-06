@@ -1,6 +1,6 @@
 DIR := src/apps/admin
 
-ADMINSRC := \
+ADMINSRC += \
 	$(DIR)/pvfs2-set-debugmask.c \
 	$(DIR)/pvfs2-set-mode.c \
 	$(DIR)/pvfs2-set-perf-history.c \

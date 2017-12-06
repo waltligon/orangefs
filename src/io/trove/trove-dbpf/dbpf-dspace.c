@@ -320,7 +320,7 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
     int i;
     int j;
 
-    for(i=0; i<op_p->u.d_create_list.count; i++)
+    for(i = 0; i < op_p->u.d_create_list.count; i++)
     {
         new_handle = op_p->u.d_create_list.handle_array[i];
 

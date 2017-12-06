@@ -110,6 +110,8 @@ struct bmi_optimistic_buffer_info {
     enum BMI_io_type rw;
 };
 
+#define BMI_SUCCESS 0
+
 #define BMI_ERROR_BIT  (1 << 30)
 #define BMI_NON_ERRNO_ERROR_BIT (1 << 29)
 #define BMIE(num) (num|BMI_ERROR_BIT)
@@ -191,6 +193,7 @@ struct bmi_optimistic_buffer_info {
 
 /** default bmi error translation function */
 int bmi_errno_to_pvfs(int error);
+const char *bmi_status_string(int status);
 
 #endif /* __BMI_TYPES_H */
 

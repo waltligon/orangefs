@@ -28,6 +28,7 @@
 #include "pint-util.h"
 #include "pint-event.h"
 #include "dist-dir-utils.h"
+#include "server-config-mgr.h"
 
 #define DEFAULT_ROOTDIR_TREE_HEIGHT 1
 #define DEFAULT_ROOTDIR_DIRDATA_COUNT 1
@@ -130,22 +131,23 @@ if (1)
 #endif
 
 /** pvfs2_mkspace
- *
- * Procedure is as follows:
- *   - First create the storage space using Trove, check for conditions
- *     like already exists
- *   - Create the collection (file system record)
- *   - Set attributes on the collection (with Root Handle)
- *   - If we are supposed to create the root dir then
- *      - create the dspace for the dir
- *      - set attributes on the dspace
- *      - add attributes to keyval for
- *            dirdata handle
- *            dirdata count
- *            dirdata attributes
- *      - create a dspace for the dirdata
- *      - set attributes on the dirdata
+  *
+  * Procedure is as follows:
+  *   - First create the storage space using Trove, check for conditions
+  *     like already exists
+  *   - Create the collection (file system record)
+  *   - Set attributes on the collection (with Root Handle)
+  *   - If we are supposed to create the root dir then
+  *      - create the dspace for the dir
+  *      - set attributes on the dspace
+  *      - add attributes to keyval for
+  *            dirdata handle
+  *            dirdata count
+  *            dirdata attributes
+  *      - create a dspace for the dirdata
+  *      - set attributes on the dirdata
  */
+
 
 int pvfs2_mkspace(char *data_path,
                   char *meta_path,
@@ -176,6 +178,8 @@ int pvfs2_mkspace(char *data_path,
     struct stat root_stat;
     struct stat meta_stat;
     struct stat data_stat;
+
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
 
     mkspace_print(verbose, "Data storage space     : %s\n", data_path);
     mkspace_print(verbose, "Metadata storage space : %s\n", meta_path);
@@ -255,6 +259,9 @@ int pvfs2_mkspace(char *data_path,
             return -1;
         }
 
+        /* set the config pointer and filesystem pointer inside of trove */
+        ret = trove_collection_set_fs_config(coll_id, config);
+
         ret = trove_storage_create(TROVE_METHOD_DBPF,
                                    data_path,
                                    meta_path,
@@ -290,6 +297,9 @@ int pvfs2_mkspace(char *data_path,
     mkspace_print(verbose,
                   "info: created config storage space '%s'.\n",
                   config_path);
+
+    /* set the config pointer and filesystem pointer inside of trove */
+    ret = trove_collection_set_fs_config(coll_id, config);
 
     /* try to look up collection used to store file system */
     ret = trove_collection_lookup(TROVE_METHOD_DBPF,

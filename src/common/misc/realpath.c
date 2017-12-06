@@ -37,6 +37,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <fcntl.h>
 
 #include "pvfs2-internal.h"
 #include "realpath.h"
@@ -169,7 +170,8 @@ int PINT_realpath(
         }
         else
         {
-            n = syscall(SYS_readlink, resolved_path, link_path, PATH_MAX);
+            n = syscall(SYS_readlinkat, AT_FDCWD, resolved_path, link_path,
+                    PATH_MAX);
 #if 0
             /* this doesn't work, a syscall should certainly work */
             n = glibc_ops.readlink(resolved_path, link_path, PATH_MAX);

@@ -32,10 +32,15 @@ static int digest(const char *digest_name,
                   const void *buf, const size_t buf_len,
                   char **output, size_t *output_len)
 {
+#ifdef HAVE_OPENSSL_1_1
     EVP_MD_CTX *mdctx;
+#else
+    EVP_MD_CTX mdctx;
+#endif
     const EVP_MD *md;
     unsigned int digest_len;
     void *digest_value;
+
 
     if (!digest_name)
     {
@@ -52,14 +57,15 @@ static int digest(const char *digest_name,
     {
         return -PVFS_ENOMEM;
     }
-
-    /* Instead of checking for different versions of openssl with
-     * #ifdefds (nasty nasty ifdefs), we just skip calling 
-     * EVP_MD_CTX_init/cleanup (0.9.7 has them, 0.9.6 doesn't), 
-     * since in our case (md5 and sha1),
-     * the digests don't define cleanup callbacks and init is just
-     * a memset.
-     */
+    /*
+     * OpenSSL 1.1 does not allow assignment to mdctx on the stack. Must allocate with new and free functions instead.
+    */
+#ifdef HAVE_OPENSSL_1_1
+    mdctx=EVP_MD_CTX_new();
+    EVP_DigestInit(mdctx, md);
+    EVP_DigestUpdate(mdctx, buf, buf_len);
+    EVP_DigestFinal(mdctx, digest_value, &digest_len);
+#else
 #if 0
     memset(&mdctx, 0, sizeof(mdctx));
     EVP_DigestInit(&mdctx, md);
@@ -67,11 +73,14 @@ static int digest(const char *digest_name,
     mdctx = EVP_MD_CTX_new();
     EVP_DigestUpdate(mdctx, buf, buf_len);
     EVP_DigestFinal(mdctx, digest_value, &digest_len);
-
+#endif
     if (output)
         *output = digest_value;
     if (output_len)
         *output_len = digest_len;
+#ifdef OPENSSL_1_1
+    EVP_MD_CTX_free(mdctx);
+#endif
     return 0;
 }
 

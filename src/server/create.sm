@@ -323,6 +323,11 @@ static int create_local_datafiles(struct PINT_smcb *smcb, job_status_s *js_p)
     /* deliberately not setting SYNC flag, because both the attrs and
      * keyvals will be synced in later states
      */
+    /* this looks wrong, data_handle_array is in the position for
+     * the list of new handles, while s_op->u.create.handle_array_local
+     * is in the list of handles produced (an output)  I think these
+     * are backwoards - WBL
+     */
     ret = job_trove_dspace_create_list(s_op->req->u.create.fs_id,
                                        data_handle_array,
                                        s_op->u.create.handle_array_local,

@@ -232,7 +232,7 @@ static PINT_sm_action tree_communicate_partition_handles(
     struct PVFS_server_req *this_req = s_op->req;
     int num_partitions, num_files_per_server;
     int i,j;
-    struct server_configuration_s *config = get_server_config_struct();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
     int ret = -PVFS_EINVAL;
     struct PVFS_server_req *req = NULL;
     PVFS_capability capability;

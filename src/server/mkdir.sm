@@ -280,7 +280,6 @@ static PINT_sm_action mkdir_create_dirdata(struct PINT_smcb *smcb,
                     NULL);
 
     s_op->u.mkdir.saved_attr = &msg_p->req.u.mkdir.attr;
-    s_op->u.mkdir.saved_capability = &msg_p->req.capability;
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
@@ -602,7 +601,7 @@ static PINT_sm_action mkdir_setup_response(
 
     /* clean up objects */
     PINT_free_object_attr(s_op->u.mkdir.saved_attr);
-    PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
+    PINT_cleanup_capability(&s_op->u.mkdir.server_to_server_capability);
 
     PINT_cleanup_capability(&(*getattr_op->req).capability);
     free(getattr_op);

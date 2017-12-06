@@ -143,6 +143,10 @@ static PINT_sm_action rmdirent_get_dist_dir_attr(
     PVFS_object_attr_from_ds_attr(&s_op->u.rmdirent.dirdata_attr,
                                   &s_op->u.rmdirent.dirdata_ds_attr);
     s_op->u.rmdirent.dirdata_attr.mask = PVFS_ATTR_COMMON_ALL;
+    /* Must erase ATIME or it will be reset to the current time below,
+     * which should not be done when removing a directory entry per
+     * POSIX. */
+    s_op->u.rmdirent.dirdata_attr.mask &= ~PVFS_ATTR_COMMON_ATIME;
  
     /* set up key and value structures for reading the dist_dir_attr */
     s_op->key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
@@ -396,9 +400,6 @@ static PINT_sm_action rmdirent_update_directory_attr(struct PINT_smcb *smcb,
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
     dspace_attr = &s_op->attr;
-    dspace_attr->mask |= (PVFS_ATTR_COMMON_ATIME |
-                          PVFS_ATTR_COMMON_MTIME |
-                          PVFS_ATTR_COMMON_CTIME);
 
     PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
 

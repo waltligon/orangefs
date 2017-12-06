@@ -34,7 +34,10 @@
 #include "quickhash.h"
 #include "extent-utils.h"
 #include "pint-cached-config.h"
+
+#if defined(__PVFS2_SERVER__)
 #include "pvfs2-server.h"
+#endif
 
 /* really old linux distributions (jazz's RHEL 3) don't have this(!?) */
 #ifndef HOST_NAME_MAX
@@ -460,7 +463,7 @@ int PINT_cached_config_get_server(PVFS_fs_id fs_id,
  */
 int PINT_cached_config_server_local(const PVFS_SID *sid)
 {
-    server_configuration_t *config = get_server_config_struct();
+    server_configuration_t *config = PINT_server_config_mgr_get_config();
     return (!PVFS_SID_cmp(sid, &config->host_sid));
 }
 #endif
