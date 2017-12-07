@@ -429,6 +429,11 @@ void print_stats(const PVFS_object_ref *ref,
       {
          fprintf(stdout, "  Size          : 4096\n");
       }
+      else if ((attr->size == 0) &&
+              (attr->objtype & PVFS_TYPE_SYMLINK))
+      {
+         fprintf(stdout, "  Size          : %zu\n",strlen(attr->link_target));
+      }
       else
       {
          fprintf(stdout, "  Size          : %lld\n",      lld(attr->size));
