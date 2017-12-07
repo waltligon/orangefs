@@ -168,7 +168,7 @@ int main(int argc, char **argv)
             return(-1);
         }
         if (user_opts->server_addr &&
-                (BMI_addr_lookup (&server_addr, user_opts->server_addr) == 0))
+            (BMI_addr_lookup(&server_addr, user_opts->server_addr, NULL) == 0))
         {
             /* set up single server */
             addr_array = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t));

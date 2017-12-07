@@ -2861,10 +2861,10 @@ static int BMI_ib_set_info(int option,
 }
 
 #ifdef OPENIB
-extern int openib_ib_initialize(void);
+extern int openib_ib_initialize(char *options);
 #endif
 #ifdef VAPI
-extern int vapi_ib_initialize(void);
+extern int vapi_ib_initialize(char *options);
 #endif
 
 /*
@@ -2872,7 +2872,8 @@ extern int vapi_ib_initialize(void);
  */
 static int BMI_ib_initialize(struct bmi_method_addr *listen_addr, 
                              int method_id,
-                             int init_flags)
+                             int init_flags,
+                             char *options)
 {
     int ret;
 
@@ -2895,12 +2896,12 @@ static int BMI_ib_initialize(struct bmi_method_addr *listen_addr,
     /* try, in order, OpenIB then VAPI; set up function pointers */
     ret = 1;
 #ifdef OPENIB
-    ret = openib_ib_initialize();
+    ret = openib_ib_initialize(options);
 #endif
 #ifdef VAPI
     if (ret)
     {
-        ret = vapi_ib_initialize();
+        ret = vapi_ib_initialize(options);
     }
 #endif
     if (ret)

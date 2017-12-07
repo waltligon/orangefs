@@ -849,7 +849,8 @@ static int server_initialize_subsystems(
 
     ret = BMI_initialize(server_config.bmi_modules, 
                          server_config.host_id,
-                         bmi_flags);
+                         bmi_flags,
+                         server_config.bmi_opts);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: BMI_initialize", ret);

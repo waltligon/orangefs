@@ -699,7 +699,7 @@ void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x)
 {
     char *addr_string;
     decode_string(pptr, &addr_string);
-    BMI_addr_lookup(x, addr_string);
+    BMI_addr_lookup(x, addr_string, NULL);
 }
 
 #ifndef WIN32

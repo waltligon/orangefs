@@ -61,7 +61,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    if (BMI_initialize("bmi_tcp",NULL,0))
+    if (BMI_initialize("bmi_tcp",NULL,0,NULL))
     {
         fprintf(stderr, "BMI_initialize failure.\n");
         return(-1);

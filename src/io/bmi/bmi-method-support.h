@@ -69,7 +69,7 @@ struct bmi_method_ops
 {
     const char *method_name;
     int flags;
-    int (*initialize) (bmi_method_addr_p, int, int);
+    int (*initialize) (bmi_method_addr_p, int, int, char *);
     int (*finalize) (void);
     int (*set_info) (int, void *);
     int (*get_info) (int, void *);
