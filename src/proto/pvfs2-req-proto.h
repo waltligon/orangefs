@@ -211,12 +211,7 @@ do {                                             \
  * adjust both this ratio and the handles count to get something
  * reasonable - be aware that too many will make requests huge
  */
-/* ECQ: PVFS_REQ_LIMIT_SIDS_RATIO 1 is not acceptable. Using this for
- *      now to make progress until I figure out what to do about it. */
-#define PVFS_REQ_LIMIT_SIDS_RATIO 1
-/*
 #define PVFS_REQ_LIMIT_SIDS_RATIO 3
-*/
 #define PVFS_REQ_LIMIT_SIDS_COUNT (PVFS_REQ_LIMIT_HANDLES_COUNT * \
                                    PVFS_REQ_LIMIT_SIDS_RATIO)
 /* max number of handles that can be created at once using batch create */
