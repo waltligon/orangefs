@@ -147,11 +147,13 @@ static PINT_sm_action readdir_iterate_on_entries(struct PINT_smcb *smcb,
     */
     kv_array_size = (s_op->req->u.readdir.dirent_count *
                      sizeof(PVFS_ds_keyval));
+
     dirent_array_size = s_op->req->u.readdir.dirent_count * sizeof(PVFS_dirent);
 
     memory_size = 2 * kv_array_size +
                   dirent_array_size +
-                  OSASZ(s_op->req->u.readdir.dirent_count, s_op->metasidcnt);
+                  OSASZ(s_op->req->u.readdir.dirent_count, s_op->metasidcnt) +
+                  SASZ(s_op->req->u.readdir.dirent_count * s_op->metasidcnt);
 
     memory_buffer = malloc(memory_size);
     if (!memory_buffer)
@@ -170,7 +172,10 @@ static PINT_sm_action readdir_iterate_on_entries(struct PINT_smcb *smcb,
     s_op->resp.u.readdir.dirent_array = (PVFS_dirent *)memory_buffer;
     memory_buffer += dirent_array_size;
 
-    s_op->u.readdir.keyval_db_entries = (PVFS_ID *) memory_buffer;
+    s_op->u.readdir.keyval_db_entries = (PVFS_ID *)memory_buffer;
+    memory_buffer += OSASZ(s_op->req->u.readdir.dirent_count, s_op->metasidcnt);
+
+    s_op->resp.u.readdir.sid_array = (PVFS_SID *)memory_buffer;
 
     buffer_location = s_op->u.readdir.keyval_db_entries;
     for (j = 0; j < s_op->req->u.readdir.dirent_count; j++)
@@ -236,26 +241,24 @@ static PINT_sm_action readdir_setup_resp(struct PINT_smcb *smcb,
     id_ptr = (PVFS_ID *) s_op->u.readdir.keyval_db_entries;
     for (i = 0; i < s_op->req->u.readdir.dirent_count; i++)
     {
-        /* Seems silly to repeat the same number in every dirent, but
-         * it needs to be there so the encoding/decoding functions can
-         * get to the number. */
-        s_op->resp.u.readdir.dirent_array[i].sid_count = s_op->metasidcnt;
         /* Get the handle from the appropriate entry in the keyval
          * temporary place holder */
         s_op->resp.u.readdir.dirent_array[i].handle = (PVFS_handle) id_ptr->oid;
         id_ptr += 1;
 
-        /* Set up pointer to SIDs */
-        s_op->resp.u.readdir.dirent_array[i].sid_array = &(id_ptr->sid);
+        /* Copy SIDs from appropriate index in keyval temporary store
+           into response buffer. */
+        memcpy(&(s_op->resp.u.readdir.sid_array[i * s_op->metasidcnt]),
+               &(id_ptr->sid), s_op->metasidcnt * sizeof(PVFS_SID));
         id_ptr += s_op->metasidcnt;
 
         gossip_debug(GOSSIP_READDIR_DEBUG,
                      "dirent: %s:%s:%d:%s\n",
                      s_op->resp.u.readdir.dirent_array[i].d_name,
                      PVFS_OID_str(&s_op->resp.u.readdir.dirent_array[i].handle),
-                     s_op->resp.u.readdir.dirent_array[i].sid_count,
+                     s_op->resp.u.readdir.sid_count,
                      PVFS_SID_str((PVFS_SID *)
-                             &s_op->resp.u.readdir.dirent_array[i].sid_array[0]));
+                          &s_op->resp.u.readdir.sid_array[i*s_op->metasidcnt]));
     }
 
     s_op->resp.u.readdir.directory_version =

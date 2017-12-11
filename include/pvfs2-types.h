@@ -716,57 +716,12 @@ typedef struct PVFS_dirent_s
 {
     char d_name[PVFS_NAME_MAX + 1];
     PVFS_handle handle;
-    int32_t     sid_count;
-    PVFS_SID    *sid_array;
 } PVFS_dirent;
 
-#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
-static inline void encode_PVFS_dirent(char **pptr,
-                        const PVFS_dirent *x)
-{
-    int i;
-    encode_here_string((pptr), &(x)->d_name);
-    encode_PVFS_handle((pptr), &(x)->handle);
-    encode_int32_t((pptr), &(x)->sid_count);
-    for (i = 0; i < (x)->sid_count; i++)
-    {
-        encode_PVFS_SID((pptr), &(x)->sid_array[i]);
-    }
-}
-
-static inline void decode_PVFS_dirent(char **pptr,
-                        PVFS_dirent *x)
-{
-    int i;
-    decode_here_string((pptr), &(x)->d_name);
-    decode_PVFS_handle((pptr), &(x)->handle);
-    decode_int32_t((pptr), &(x)->sid_count);
-
-    (x)->sid_array = (PVFS_SID *) malloc(
-                  SASZ((x)->sid_count)+0);
-    for (i = 0; i < (x)->sid_count; i++)
-    {
-        decode_PVFS_SID((pptr), &(x)->sid_array[i]);
-    }
-}
-
-static inline void defree_PVFS_dirent(PVFS_dirent *x)
-{
-    free((x)->sid_array);
-}
-#endif
-
-/* 
-#define extra_size_PVFS_dirent \
-      ((PVFS_NAME_MAX + 1) + PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID))
-*/
-
-#if 0
 endecode_fields_2(
     PVFS_dirent,
     here_string, d_name,
     PVFS_handle, handle);
-#endif
 
 /* Distributed directory attributes struct
  * will be stored in keyval space under DIST_DIR_ATTR
