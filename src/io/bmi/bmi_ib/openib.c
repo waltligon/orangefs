@@ -24,6 +24,17 @@
 
 #include "ib.h"
 
+/* IB uses the LID, RoCE uses the GID */
+union nic_id {
+    uint16_t lid;
+    union ibv_gid gid;
+};
+
+enum transport_type {
+    IB,
+    ROCE
+};
+
 /*
  * OpenIB-private device-wide state.
  */
@@ -31,8 +42,8 @@ struct openib_device_priv {
     struct ibv_context *ctx;  /* context used to reference everything */
     struct ibv_cq *nic_cq;  /* single completion queue for all QPs */
     struct ibv_pd *nic_pd;  /* single protection domain for all memory/QP */
-    uint16_t nic_lid;  /* local id (nic) */
     int nic_port; /* port number */
+    union nic_id nic_id;
     struct ibv_comp_channel *channel;
 
     /* max values as reported by NIC */
@@ -60,6 +71,8 @@ struct openib_device_priv {
      */
     unsigned int num_unsignaled_sends;
     unsigned int max_unsignaled_sends;
+    
+    enum transport_type transport_type;
 };
 
 /*
@@ -74,7 +87,7 @@ struct openib_connection_priv {
      * unsigned int num_unsignaled_wr;
      */
     /* ib remote params */
-    uint16_t remote_lid;
+    union nic_id remote_id;
     uint32_t remote_qp_num;
 };
 
@@ -95,7 +108,7 @@ static int exchange_data(int sock,
                          size_t len);
 static void init_connection_modify_qp(struct ibv_qp *qp,
                                       uint32_t remote_qp_num, 
-                                      int remote_lid);
+                                      union nic_id remote_id);
 static void openib_post_rr(const ib_connection_t *c, 
                            struct buf_head *bh);
 int parse_bmi_opts_get_ib_port(char *options);
@@ -133,8 +146,11 @@ static int openib_new_connection(ib_connection_t *c,
      * alignment issues.
      */
     struct {
-	uint32_t lid;
-	uint32_t qp_num;
+        union {
+            uint32_t lid;
+            uint8_t gid[16];
+        } id;
+        uint32_t qp_num;
     } ch_in, ch_out;
 
     /* build new connection/context */
@@ -258,7 +274,15 @@ static int openib_new_connection(ib_connection_t *c,
     }
 
     /* exchange data, converting info to network order and back */
-    ch_out.lid = htobmi32(od->nic_lid);
+    if (od->transport_type == IB)
+    {
+        ch_out.id.lid = htobmi32(od->nic_id.lid);
+    }
+    else
+    {
+        /* RoCE */
+        memcpy(ch_out.id.gid, &od->nic_id.gid, 16);
+    }
     ch_out.qp_num = htobmi32(oc->qp->qp_num);
 
     debug(0, "%s: calling exchange data", __func__);
@@ -269,12 +293,20 @@ static int openib_new_connection(ib_connection_t *c,
         goto out;
     }
 
-    oc->remote_lid = bmitoh32(ch_in.lid);
+    if (od->transport_type == IB)
+    {
+        oc->remote_id.lid = bmitoh32(ch_in.id.lid);
+    }
+    else
+    {
+        /* RoCE */
+        memcpy(oc->remote_id.gid.raw, ch_in.id.gid, 16);
+    }
     oc->remote_qp_num = bmitoh32(ch_in.qp_num);
 
     /* bring the two QPs up to RTR */
     debug(0, "%s: calling init_connection_modify_qp", __func__);
-    init_connection_modify_qp(oc->qp, oc->remote_qp_num, oc->remote_lid);
+    init_connection_modify_qp(oc->qp, oc->remote_qp_num, oc->remote_id);
 
     /* post initial RRs and RRs for acks */
     debug(0, "%s: entering for loop for openib_post_rr", __func__);
@@ -370,7 +402,7 @@ static int exchange_data(int sock,
  */
 static void init_connection_modify_qp(struct ibv_qp *qp, 
                                       uint32_t remote_qp_num,
-                                      int remote_lid)
+                                      union nic_id remote_id)
 {
     struct openib_device_priv *od = ib_device->priv;
     int ret;
@@ -407,7 +439,6 @@ static void init_connection_modify_qp(struct ibv_qp *qp,
     memset(&attr, 0, sizeof(attr));
     attr.qp_state = IBV_QPS_RTR;
     attr.max_dest_rd_atomic = 1;
-    attr.ah_attr.dlid = remote_lid;
     attr.ah_attr.port_num = od->nic_port;
     if (od->active_mtu > IBV_MTU) 
     {
@@ -417,10 +448,23 @@ static void init_connection_modify_qp(struct ibv_qp *qp,
     {
         attr.path_mtu = IBV_MTU;
     }
+    debug(1, "%s: attr.path_mtu=%d", __func__, attr.path_mtu);
     attr.rq_psn = 0;
     attr.dest_qp_num = remote_qp_num;
     attr.min_rnr_timer = 31;
-    debug(1, "%s: attr.path_mtu=%d", __func__, attr.path_mtu);
+    
+    if (od->transport_type == IB)
+    {
+        attr.ah_attr.dlid = remote_id.lid;
+    }
+    else
+    {
+        /* RoCE */
+        memcpy(&attr.ah_attr.grh.dgid, remote_id.gid.raw, 16);
+        attr.ah_attr.is_global = 1;
+        attr.ah_attr.grh.sgid_index = 0;
+    }
+
     ret = ibv_modify_qp(qp, &attr, mask);
     if (ret)
     {
@@ -1291,12 +1335,29 @@ static int return_active_nic_handle(struct openib_device_priv* od,
                 error("%s: ibv_open_device", __func__);
                 return -ENOSYS;
             }
+
             ret = ibv_query_port(ctx, od->nic_port, hca_port_attr);
- 
             if (ret)
             {
                 error_xerrno(ret, "%s: ibv_query_port", __func__);
                 return -ENOSYS;
+            }
+
+            if (hca_port_attr->link_layer == IBV_LINK_LAYER_INFINIBAND)
+            {
+                /* use lid */
+                od->transport_type = IB;
+                od->nic_id.lid = hca_port_attr->lid;
+            }
+            else if (hca_port_attr->link_layer == IBV_LINK_LAYER_ETHERNET)
+            {
+                /* use gid */
+                od->transport_type = ROCE;
+                ret = ibv_query_gid(ctx, od->nic_port, 0, &od->nic_id.gid);
+                if (ret)
+                {
+                    gossip_err("%s: ibv_query_gid failed\n", __func__);
+                }
             }
 
             if (hca_port_attr->state != IBV_PORT_ACTIVE)
@@ -1486,9 +1547,7 @@ int openib_ib_initialize(char *options)
     }
 #endif
 
-    od->nic_lid = hca_port_attr.lid;
-
-   /* Query the device for the max_ requests and such */
+    /* Query the device for the max_ requests and such */
     ret = ibv_query_device(od->ctx, &hca_cap);
     if (ret)
     {
@@ -1526,7 +1585,7 @@ int openib_ib_initialize(char *options)
     {
         cqe_num = hca_cap.max_cq;
         warning("%s: hardly enough completion queue entries %d, hoping for %d",
-                __func__, hca_cap.max_cq, cqe_num);
+                __func__, hca_cap.max_cq, IBV_NUM_CQ_ENTRIES);
     }
 
     /* Allocate a Protection Domain (global) */
