@@ -61,13 +61,13 @@ machine pvfs2_create_sm
     state write_metafile_attribs
     {
         run write_metafile_attribs;
-        success => setobj_attribs_debug;
+        success => setup_resp;
         default => remove_keyvals;
     }
 
-    state setobj_attribs_debug
+    state setup_resp
     {
-        run setobj_attribs_debug;
+        run setup_resp;
         default => setup_final_response;
     }
 
@@ -323,6 +323,11 @@ static int create_local_datafiles(struct PINT_smcb *smcb, job_status_s *js_p)
     /* deliberately not setting SYNC flag, because both the attrs and
      * keyvals will be synced in later states
      */
+    /* this looks wrong, data_handle_array is in the position for
+     * the list of new handles, while s_op->u.create.handle_array_local
+     * is in the list of handles produced (an output)  I think these
+     * are backwoards - WBL
+     */
     ret = job_trove_dspace_create_list(s_op->req->u.create.fs_id,
                                        data_handle_array,
                                        s_op->u.create.handle_array_local,
@@ -375,6 +380,11 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
     s_op->key_a[0].buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
 
+/* V3 WHY is this buffer pointed to req and not resp (as it is in trunk)?
+ * Maybe we don't need to pass these handles/sids back because the client
+ * already has them?  IOn which case why are we looking them up at all?
+ * Investigate!!!
+ */
     s_op->val_a[0].buffer_sz = OSASZ(s_op->req->u.create.datafile_count,
                                      s_op->req->u.create.sid_count);
     s_op->val_a[0].buffer = s_op->req->u.create.datafile_handles;
@@ -435,7 +445,9 @@ static PINT_sm_action write_metafile_attribs(struct PINT_smcb *smcb,
     uint32_t num_groups;
 #endif
 
+    /* we will build new metafile attribs in the attr field of s_op */
     dspace_a_p = &s_op->attr;
+    /* this points to the attributes passed with the request */
     a_p = &s_op->req->u.create.attr;
 
     /*
@@ -513,12 +525,11 @@ static PINT_sm_action write_metafile_attribs(struct PINT_smcb *smcb,
                                    &j_id,
                                    server_job_context,
                                    s_op->req->hints);
-
     return ret;
 }
 
-static PINT_sm_action setobj_attribs_debug(struct PINT_smcb *smcb,
-                                           job_status_s *js_p)
+static PINT_sm_action setup_resp(struct PINT_smcb *smcb,
+                                        job_status_s *js_p)
 {    
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -530,7 +541,93 @@ static PINT_sm_action setobj_attribs_debug(struct PINT_smcb *smcb,
                           "create: new metadata handle: %s.\n",
                           PVFS_OID_str(&s_op->req->u.create.handle));
     }
- 
+
+    /* Copy attributes from the s_op's attribes (the ones written to Trove)
+     * into the attributes being sent back in the reply.  Should we just
+     * copy all of the attributes?
+     */
+    /* NOTE:  Distribution was sent from the client in the
+     * original request structure, so there's no need to
+     * send the same information back.
+     */
+    if (s_op->attr.owner >= 0)
+    {
+        s_op->resp.u.create.metafile_attrs.owner = s_op->attr.owner;
+        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_COMMON_UID;
+    }
+
+    if (s_op->attr.group >= 0)
+    {
+        s_op->resp.u.create.metafile_attrs.group = s_op->attr.group;
+        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_COMMON_GID;
+    }
+
+    if (s_op->attr.perms)
+    {
+        s_op->resp.u.create.metafile_attrs.perms = s_op->attr.perms;
+        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_COMMON_PERM;
+    }
+
+    if (s_op->attr.ntime)
+    {
+        s_op->resp.u.create.metafile_attrs.ntime = s_op->attr.ntime;
+        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_COMMON_NTIME;
+    }
+
+    if (s_op->attr.atime)
+    {
+        s_op->resp.u.create.metafile_attrs.atime = s_op->attr.atime;
+        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_COMMON_ATIME;
+    }
+    if (s_op->attr.mtime)
+    {
+        /* Must "un-version" mtime before sending back to client:
+         * When the mtime is stored in dspace in the setobj_attribs state,
+         * the mtime is "versioned", i.e., the time, given in seconds since
+         * the Epoch, is modified using PINT_util_mktime_version().
+         */
+        s_op->resp.u.create.metafile_attrs.mtime =
+                            PINT_util_mkversion_time(s_op->attr.mtime);
+        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_COMMON_MTIME;
+    }
+
+    if (s_op->attr.ctime)
+    {
+        s_op->resp.u.create.metafile_attrs.ctime = s_op->attr.ctime;
+        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_COMMON_CTIME;
+    }
+
+    if (s_op->attr.objtype)
+    {
+        s_op->resp.u.create.metafile_attrs.objtype = s_op->attr.objtype;
+        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_COMMON_TYPE;
+    }
+
+    if (s_op->resp.u.create.metafile_attrs.u.meta.dist_size &&
+        s_op->resp.u.create.metafile_attrs.u.meta.dist)
+    {
+        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_META_DIST;
+    }
+
+    if (s_op->resp.u.create.metafile_attrs.u.meta.dfile_count &&
+        s_op->resp.u.create.metafile_attrs.u.meta.dfile_array)
+    {
+        s_op->resp.u.create.metafile_attrs.mask |= PVFS_ATTR_META_DFILES;
+    }
+
+    s_op->resp.u.create.metafile_attrs.u.meta.size = 0;
+    s_op->resp.u.create.metafile_attrs.u.meta.flags = 0;
+
+    /* don't need to return handle, was passed from client */
+#if 0
+    if (js_p->error_code == 0)
+    {
+         PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
+                           "create: new metadata handle: %llu.\n",
+                           llu(s_op->resp.u.create.metafile_handle));
+    }
+#endif
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -681,6 +778,8 @@ static PINT_sm_action cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     {
         free(s_op->u.create.handle_array_local);
     }
+
+    PINT_free_object_attr(&s_op->attr);
 
     return(server_state_machine_complete(smcb));
 }

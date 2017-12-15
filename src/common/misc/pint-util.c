@@ -229,6 +229,32 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
     do { if (x) { free(x); (x) = NULL; } \
     } while (0)
 
+#define CLRPACK(o,s,oc) do {                                          \
+    if (dest->u.o == NULL || dest->u.s == NULL)                       \
+    {                                                                 \
+        if (dest->u.o != NULL) { free(dest->u.o); }                   \
+        if (dest->u.s != NULL) { free(dest->u.s); }                   \
+    }                                                                 \
+    else                                                              \
+    {                                                                 \
+        if (dest->u.s == (PVFS_SID *)(dest->u.o + dest->u.oc))        \
+        {                                                             \
+            /* OIDs and SIDs are packed */                            \
+            free(dest->u.o);                                          \
+            dest->u.s = NULL;                                         \
+        }                                                             \
+        else                                                          \
+        {                                                             \
+            /* not packed */                                          \
+            free(dest->u.o);                                          \
+            free(dest->u.s);                                          \
+            dest->u.o = NULL;                                         \
+            dest->u.s = NULL;                                         \
+        }                                                             \
+    }                                                                 \
+} while (0)
+
+
 int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
 {
     int ret = -PVFS_EINVAL;
@@ -252,9 +278,8 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
     case PVFS_TYPE_METAFILE:
         CLRFIELD(dest->u.meta.dist);
         dest->u.meta.dist_size = src->u.meta.dist_size;
-        CLRFIELD(dest->u.meta.dfile_array);
+        CLRPACK(meta.dfile_array, meta.sid_array, meta.dfile_count);
         dest->u.meta.dfile_count = src->u.meta.dfile_count;
-        CLRFIELD(dest->u.meta.sid_array);
         dest->u.meta.sid_count = src->u.meta.sid_count;
         dest->u.meta.size = src->u.meta.size;
         dest->u.meta.mirror_mode = src->u.meta.mirror_mode;
@@ -298,8 +323,9 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         dest->u.dir.dist_dir_attr.branch_level =
                 src->u.dir.dist_dir_attr.branch_level;
         CLRFIELD(dest->u.dir.dist_dir_bitmap);
-        CLRFIELD(dest->u.dir.dirdata_handles);
-        CLRFIELD(dest->u.dir.dirdata_sids);
+        CLRPACK(dir.dirdata_handles,
+                dir.dirdata_sids,
+                dir.dist_dir_attr.dirdata_count);
         /**/
         break;
     case PVFS_TYPE_DIRDATA:
@@ -320,8 +346,9 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         dest->u.dirdata.dist_dir_attr.branch_level =
                 src->u.dirdata.dist_dir_attr.branch_level;
         CLRFIELD(dest->u.dirdata.dist_dir_bitmap);
-        CLRFIELD(dest->u.dirdata.dirdata_handles);
-        CLRFIELD(dest->u.dirdata.dirdata_sids);
+        CLRPACK(dirdata.dirdata_handles,
+                dirdata.dirdata_sids,
+                dirdata.dist_dir_attr.dirdata_count);
         /**/
         break;
     case PVFS_TYPE_SYMLINK:
@@ -336,6 +363,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
     return 0;
 }
 #undef CLRFIELD
+#undef CLRPACK
 
 /* PINT_copy_object_attr
  * This is the main attrib copy routine, use this most of the time
@@ -352,6 +380,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
     }
     else
     {
+        PINT_cleanup_capability(&dest->capability);
         PINT_copy_capability(&src->capability, &dest->capability);
     }
     return ret;

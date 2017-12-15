@@ -17,7 +17,7 @@
 #include "orange.h"
 
 /* optional parameters, filled in by parse_args() */
-struct rm_options
+struct user_options
 {
     char *dist_name;
     char *dist_params;
@@ -39,7 +39,7 @@ struct layout_table_s
 };
 
 static int translate_layout(char *layout);
-static int parse_args(int argc, char **argv, struct rm_options *user_opts_p);
+static int parse_args(int argc, char **argv, struct user_options *user_opts_p);
 static void usage(int argc, char **argv);
 
 int main(int argc, char **argv)
@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     FTSENT *node;
     int flags = 0;
     unsigned char error_seen = 0;
-    struct rm_options user_opts =
+    struct user_options user_opts =
                       {NULL, NULL, 0, 0, NULL, 0, 0, 0, 0, 0, NULL};
     
     /* look at command line arguments */
@@ -133,6 +133,7 @@ int main(int argc, char **argv)
                 else if (ret < 0)
                 {
                     perror("dist name");
+                    return ret;
                 }
             }
             if (user_opts.dist_params)
@@ -155,12 +156,13 @@ int main(int argc, char **argv)
                 user_opts.layout <= PVFS_SYS_LAYOUT_MAX)
             {
                 char layout_str[10];
-                sprintf(layout_str, "%05d", user_opts.layout);
+                int slen;
+                slen = snprintf(layout_str, 10, "%05d", user_opts.layout);
                 ret = fsetxattr(fd,
-                               "user.pvfs2.layout",
-                               layout_str,
-                               strlen(layout_str) + 1,
-                               flags);
+                                "user.pvfs2.layout",
+                                layout_str,
+                                slen + 1,
+                                flags);
                 if (ret == 0 && user_opts.verbose)
                 {
                     fprintf(stderr, "Layout set to %d\n", user_opts.layout);
@@ -168,6 +170,7 @@ int main(int argc, char **argv)
                 else if (ret < 0)
                 {
                     perror("layout");
+                    return ret;
                 }
             }
             if (user_opts.layout == PVFS_SYS_LAYOUT_LIST &&
@@ -184,17 +187,18 @@ int main(int argc, char **argv)
                 if (!layout)
                 {
                     perror("create_layout");
+                    return ret;
                 }
-                eattr_str = (char *)malloc(PVFS_REQ_LIMIT_LAYOUT);
+                eattr_str = (char *)malloc(PVFS_SYS_LIMIT_LAYOUT);
                 ret = pvfs_layout_string(layout,
                                          eattr_str,
-                                         PVFS_REQ_LIMIT_LAYOUT);
+                                         PVFS_SYS_LIMIT_LAYOUT);
                 if (ret != 0)
                 {
                     perror("layout_string");
                     return ret;
                 }
-                strsz = strlen(eattr_str);
+                strsz = strlen(eattr_str) + 1;
                 ret = fsetxattr(fd,
                                 "user.pvfs2.server_list",
                                 eattr_str,
@@ -208,6 +212,7 @@ int main(int argc, char **argv)
                 else if (ret < 0)
                 {
                     perror("server list");
+                    return ret;
                 }
                 user_opts.num_dfiles = layout->server_list.count;
                 pvfs_release_layout(layout);
@@ -216,12 +221,16 @@ int main(int argc, char **argv)
             if (user_opts.num_dfiles > 0)
             {
                 char num_dfiles_str[10];
-                sprintf(num_dfiles_str, "%05d", user_opts.num_dfiles);
+                int slen;
+                slen = snprintf(num_dfiles_str,
+                                10,
+                                "%05d",
+                                user_opts.num_dfiles);
                 ret = fsetxattr(fd,
-                               "user.pvfs2.num_dfiles",
-                               num_dfiles_str,
-                               strlen(num_dfiles_str) + 1,
-                               flags);
+                                "user.pvfs2.num_dfiles",
+                                num_dfiles_str,
+                                slen + 1,
+                                flags);
                 if (ret == 0 && user_opts.verbose)
                 {
                     fprintf(stderr, "Number of dfiles set to %d\n",
@@ -265,7 +274,10 @@ int main(int argc, char **argv)
         case FTS_NSOK : /* no stat ok */
         case FTS_ERR :  /* error */
         default:
-            fprintf(stderr, "%s: %s is not a directory, or symbolic link\n", argv[0], node->fts_path);
+            fprintf(stderr,
+                    "%s: %s is not a directory, or symbolic link\n",
+                    argv[0],
+                    node->fts_path);
             usage(argc, argv);
             ret = -1;
             goto main_out;
@@ -327,7 +339,7 @@ static int translate_layout(char *layout)
  *
  * Returns 0 on success and exits with EXIT_FAILURE on failure.
  */
-static int parse_args(int argc, char **argv, struct rm_options *user_opts_p)
+static int parse_args(int argc, char **argv, struct user_options *user_opts_p)
 {
     int one_opt = 0;
     char flags[] = "vVdirfhD:p:n:l:L:";
@@ -449,18 +461,18 @@ static int parse_args(int argc, char **argv, struct rm_options *user_opts_p)
 
 static void usage(int argc, char **argv)
 {
-    fprintf(stderr, "Usage: %s [-?vVidrf] pvfs2_filename[s]\n", argv[0]);
-    fprintf(stderr, "\t-h\thelp - print this message\n");
-    fprintf(stderr, "\t-v\tverbose - print informative messages\n");
-    fprintf(stderr, "\t-V\tVersion - print Version info\n");
-    fprintf(stderr, "\t-i\tinteractive - ask before removing each item\n");
-    fprintf(stderr, "\t-D\tdist_name - string name of distribution\n");
-    fprintf(stderr, "\t-p\tdist_params - string list K:V+K:V ...\n");
-    fprintf(stderr, "\t-n\tnum_dfiles - int number of dfiles\n");
-    fprintf(stderr, "\t-l\tlayout - int layout number\n");
-    fprintf(stderr, "\t-L\tserver_list - string : list of server numbers \n");
-    fprintf(stderr, "\t-d\tdebug - print debugging info\n");
-    fprintf(stderr, "\t-r\trecursive - remove directories and their contents\n");
+    fprintf(stderr, "Usage: %s [-hVvdirDpnlL] pvfs2 dir name[s]\n", argv[0]);
+    fprintf(stderr, "\t-h, --help - print this message\n");
+    fprintf(stderr, "\t-V, --Version - print Version info\n");
+    fprintf(stderr, "\t-v, --verbose - print informative messages\n");
+    fprintf(stderr, "\t-d, --debug - print debugging info\n");
+    fprintf(stderr, "\t-i, --interactive - ask before setting each item\n");
+    fprintf(stderr, "\t-r, --recursive - set subdirectories\n");
+    fprintf(stderr, "\t-D, --dist_name - string name of distribution\n");
+    fprintf(stderr, "\t-p, --dist_params - string list K:V+K:V ...\n");
+    fprintf(stderr, "\t-n, --num_datafiles - int number of dfiles\n");
+    fprintf(stderr, "\t-l, --layout - int(string) layout number(name)\n");
+    fprintf(stderr, "\t-L, --server_list - string list of server numbers \n");
 }
 
 /*

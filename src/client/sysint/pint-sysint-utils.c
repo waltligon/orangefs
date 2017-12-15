@@ -65,7 +65,7 @@ static void dyn_destroy_function(struct CRYPTO_dynlock_value*, const char*,
 
 
 /*
-  analogous to 'get_server_config_struct' in pvfs2-server.c -- only an
+  analogous to 'PINT_get_server_config' in config-utils.c -- only an
   fs_id is required since any client may know about different server
   configurations during run-time
 */
@@ -363,39 +363,38 @@ int PINT_client_security_finalize(void)
 }
 
 #endif /* HAVE_OPENSSL */
-   
+ 
 /* client only routine to start a timer for perf counters */
+/* should add an smcb pointer to the perf_counter and put
+ * its timer there - makes shutting down easier
+ */
 int client_perf_start_rollover(struct PINT_perf_counter *pc,
                                struct PINT_perf_counter *tpc)
 {
     int ret = 0;
-    PINT_smcb *tmpsmcb = NULL;
-    PINT_client_sm *tmptimer_sm_p = NULL;
+    PINT_client_sm *sm_p;
     
 
-    PINT_smcb_alloc(&tmpsmcb,
+    PINT_smcb_alloc(&(pc->smcb),
                     PVFS_CLIENT_PERF_COUNT_TIMER,
                     sizeof(struct PINT_client_sm),
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
-                 /* s_client_dev_context); */
-    if (!tmpsmcb)
+    if (!pc->smcb)
     {
-        /* finalize_perf_items(0); */
         return(-PVFS_ENOMEM);
     }
 
-    tmptimer_sm_p = PINT_sm_frame(tmpsmcb, PINT_FRAME_CURRENT);
-    tmptimer_sm_p->u.perf_count_timer.pc = pc;
-    tmptimer_sm_p->u.perf_count_timer.tpc = tpc;
+    sm_p = PINT_sm_frame(pc->smcb, PINT_FRAME_CURRENT);
+    sm_p->u.perf_count_timer.pc = pc;
+    sm_p->u.perf_count_timer.tpc = tpc;
     pc->running = 1;
 
-    ret = PINT_client_state_machine_post(tmpsmcb, NULL, NULL);
+    ret = PINT_client_state_machine_post(pc->smcb, NULL, NULL);
     if (ret < 0)
     {
-        gossip_lerr("Error posting acache timer.\n");
-        /* finalize_perf_items(1, tmpsmcb); */
+        gossip_lerr("Error posting cache timer.\n");
         return(ret);
     }
     return 0;

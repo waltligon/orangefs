@@ -295,7 +295,7 @@ static int readdir_msg_comp_fn(void *v_p,
         PVFS_ds_position tmp_dirdata_index = 0;
 
         /* convert servresp_readdir response to a sysresp_readdir obj */
-        tmp_dirdata_index = sm_p->readdir.dirdata_index & 0x000000ff;
+        tmp_dirdata_index = sm_p->readdir.dirdata_index & 0x0ffff;
         tmp_dirdata_index = tmp_dirdata_index << 48;
 
         *(sm_p->readdir_state.token) = tmp_dirdata_index + resp_p->u.readdir.token;
@@ -380,7 +380,8 @@ static PINT_sm_action readdir_init(struct PINT_smcb *smcb,
          *     32 bits position (managed by trove)
          */
         dirdata_index = sm_p->readdir_state.pos_token >> 48;
-        sm_p->readdir_state.pos_token = sm_p->readdir_state.pos_token & 0x00ffffff;
+        sm_p->readdir_state.pos_token = sm_p->readdir_state.pos_token &
+                                        0x0000ffffffffffff;
         gossip_debug(GOSSIP_READDIR_DEBUG,
                 "[handle %s, token %llu, dirdata_index %d]\n",
                 PVFS_OID_str(&sm_p->object_ref.handle),

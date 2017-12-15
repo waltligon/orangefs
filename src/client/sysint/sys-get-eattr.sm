@@ -262,7 +262,7 @@ static int get_eattr_comp_fn(void *v_p,
      */
     if (i == (sm_p->msgarray_op.count - 1))
     {
-	for (j=0; j < sm_p->msgarray_op.count; j++)
+	for (j = 0; j < sm_p->msgarray_op.count; j++)
 	{
 	    if (sm_p->msgarray_op.msgarray[j].op_status != 0)
 	    {

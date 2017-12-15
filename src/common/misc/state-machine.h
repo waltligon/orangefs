@@ -10,6 +10,7 @@
 #include "pvfs2-internal.h"
 #include "job.h"
 #include "quicklist.h"
+#include "server-config-mgr.h"
 
 /* STATE-MACHINE.H
  *
@@ -57,7 +58,7 @@ enum PINT_state_code {
 do {                                                             \
    PINT_sm_msgpair_params *mpp = &sm_p->msgarray_op.params;      \
    struct server_configuration_s *server_config =                \
-        get_server_config_struct();                              \
+        PINT_server_config_mgr_get_config();                     \
    mpp->job_context = server_job_context;                        \
    if (server_config)                                            \
    {                                                             \

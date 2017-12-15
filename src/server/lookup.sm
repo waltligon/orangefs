@@ -393,11 +393,6 @@ static PINT_sm_action lookup_read_object_metadata(
 
     start_index = ((s_op->u.lookup.array_index) * (s_op->metasidcnt));
     end_index   = start_index + s_op->metasidcnt;
-    gossip_err("%s:start_index(%d) end_index(%d) lookup_path.sid_count(%d)\n"
-              ,__func__
-              ,start_index
-              ,end_index
-              ,s_op->resp.u.lookup_path.sid_count);
     for (i=start_index,j=1; i<end_index; i++,j++)
     {
         s_op->resp.u.lookup_path.sid_array[i] = s_op->u.lookup.keyval_temp_store[j].sid;
@@ -579,7 +574,7 @@ static PINT_sm_action lookup_setup_getattr_request(
    getattr_op->u.getattr.handle     = s_op->resp.u.lookup_path.handle_array[ s_op->u.lookup.array_index ];
    getattr_op->u.getattr.attrmask   = PVFS_ATTR_META_DIST          |
                                       PVFS_ATTR_META_DFILES        |
-                                      PVFS_ATTR_META_MIRROR_DFILES |
+                                      PVFS_ATTR_META_MIRROR_MODE   |
                                       PVFS_ATTR_CAPABILITY;
    getattr_op->u.getattr.credential = s_op->req->u.lookup_path.credential;
 
@@ -1359,26 +1354,6 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
             s_op, GOSSIP_ACCESS_DEBUG, "path: %s, lookup failed\n", 
             s_op->req->u.lookup_path.path);
     }
-
-
-    gossip_err("%s:PVFS_servresp_lookup_path\n"
-               "\thandle_count(%d) handle(%s)\n"
-               "\tattr_count(%d)\n"
-               "\tsid_count(%d)\n"
-              ,__func__
-              ,s_op->resp.u.lookup_path.handle_count
-              ,s_op->resp.u.lookup_path.handle_count>0 ? PVFS_OID_str(&s_op->resp.u.lookup_path.handle_array[0]) : "none"
-              ,s_op->resp.u.lookup_path.attr_count
-              ,s_op->resp.u.lookup_path.sid_count);
-
-   int i;
-   for (i=0; i<s_op->resp.u.lookup_path.sid_count; i++)
-   {
-      gossip_err("%s:sid[%d]=(%s)\n"
-                ,__func__
-                ,i
-                ,PVFS_SID_str(&s_op->resp.u.lookup_path.sid_array[i]));
-   }
 
 
     return SM_ACTION_COMPLETE;

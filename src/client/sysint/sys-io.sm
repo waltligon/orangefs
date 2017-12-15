@@ -3974,6 +3974,8 @@ static int unstuff_needed(PVFS_Request mem_req,
     PVFS_offset first_unstuffed_offset = 0;
     PINT_request_file_data fake_file_data;
 
+/* unstuffed going away */
+#if 0
     gossip_debug(GOSSIP_IO_DEBUG,
                  "sys-io checking to see if file should be unstuffed.\n");
 
@@ -3986,6 +3988,7 @@ static int unstuff_needed(PVFS_Request mem_req,
                      "sys-io detected file is already unstuffed.\n");
         return(0);
     }
+#endif
 
     /* calculate maximum logical file offset from the callers's parameters */
     /* file request is tiled, so we only need to know the beginning file

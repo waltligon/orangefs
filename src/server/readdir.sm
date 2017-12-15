@@ -129,11 +129,11 @@ static PINT_sm_action readdir_iterate_on_entries(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    if (s_op->metasidcnt > PVFS_REQ_LIMIT_SIDS_COUNT)
+    if (s_op->metasidcnt > PVFS_REQ_LIMIT_SIDS_RATIO)
     {
         gossip_err(
-         "Configured number of SIDs is greater than %d (PVFS_REQ_LIMIT_SIDS_COUNT)\n",
-          PVFS_REQ_LIMIT_SIDS_COUNT);
+         "Configured number of SIDs is greater than %d (PVFS_REQ_LIMIT_SIDS_RATIO)\n",
+          PVFS_REQ_LIMIT_SIDS_RATIO);
         js_p->error_code = -PVFS_EINVAL;
     }
 

@@ -18,6 +18,7 @@
 #include "server-config.h"
 #include "id-generator.h"
 #include "sid.h"
+#include "server-config-mgr.h"
 
 #define PFI()                                                                \
     do                                                                       \
@@ -248,7 +249,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
 
     PFI();
 
-    server_config_p = get_server_config_struct();
+    server_config_p = PINT_server_config_mgr_get_config();
     gossip_ldebug(GOSSIP_UNEXP_DEBUG,
                   "server_config_p->host_index = %d\n",
                   server_config_p->host_index);

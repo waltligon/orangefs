@@ -10,11 +10,18 @@
 #include "quickhash.h"
 #include "pvfs2-internal.h"
 
-#define PVFS2_DEFAULT_RACACHE_BUFSZ  (2 * 1024 * 1024)
-#define PVFS2_MAX_RACACHE_BUFSZ      (256 * 1024 * 1024)
+#define PVFS2_DEFAULT_RACACHE_BUFSZ   (2 * 1024 * 1024)
+#define PVFS2_MAX_RACACHE_BUFSZ       (256 * 1024 * 1024)
 
-#define PVFS2_DEFAULT_RACACHE_BUFCNT (32)
-#define PVFS2_MAX_RACACHE_BUFCNT     (256)
+#define PVFS2_DEFAULT_RACACHE_BUFCNT  (32)
+#define PVFS2_MAX_RACACHE_BUFCNT      (256)
+
+#define PVFS2_DEFAULT_RACACHE_READCNT (4)
+#define PVFS2_MAX_RACACHE_READCNT     (16)
+
+#define PVFS2_DEFAULT_RACACHE_PINNED  (1)
+
+#define PVFS2_RACACHE_READSZ_NOVALUE  -1
 
 /* racache_status values */
 #define RACACHE_NONE          0
@@ -35,6 +42,7 @@ typedef struct racache_file_s
     struct qlist_head hash_link; /* hash table link */
     PVFS_object_ref refn;
     struct qlist_head buff_list; /* list of buffers for this file in cache */
+    PVFS_size readcnt;
 } racache_file_t;
 
 /* one for each buffer in cache */
@@ -51,6 +59,7 @@ typedef struct racache_buffer_s
     PVFS_size file_offset;
     PVFS_size data_sz;
     PVFS_size buff_sz;
+    PVFS_size readcnt;
     char *buffer;          /* this is a buffer used to read and hold ra data */
     struct racache_file_s *file;
 } racache_buffer_t;
@@ -59,14 +68,16 @@ typedef struct racache_buffer_s
 typedef struct racache_s
 {
     gen_mutex_t mutex;
-    int    bufcnt;                 /* number of buffers in the cache */
-    int    bufsz;                  /* size of each buffer */
-    struct qlist_head buff_free;   /* list of free buffers */
-    struct qlist_head buff_lru;    /* lru list of buffers int use */
-    struct qhash_table *hash_table;/* file name index to find buffers for file */
+    int    bufcnt;                     /* number of buffers in the cache */
+    int    bufsz;                      /* size of each buffer */
+    int    readcnt;                    /* default readahead count */
+    int    pinned;                     /* true if using pinned memory */
+    struct qlist_head buff_free;       /* list of free buffers */
+    struct qlist_head buff_lru;        /* lru list of buffers int use */
+    struct qhash_table *hash_table;    /* file name index to find buffers */
     struct racache_buffer_s *buffarray;/* array of bufcnt buffer structs */
     struct racache_buffer_s *oldarray; /* temp storage of buffs after resize */
-    int    oldarray_cnt;               /* number of original bufs in oldarray */
+    int    oldarray_cnt;               /* count of original bufs in oldarray */
     int    oldarray_rem;               /* number of busy bufs in oldarray */
     int    oldarray_sz;                /* size of busy bufs in oldarray */
 } racache_t;
@@ -89,13 +100,22 @@ int pint_racache_buff_count(void);
 
 int pint_racache_buff_size(void);
 
+int pint_racache_read_count(void);
+
+int pint_racache_pinned(void);
+
+int pint_racache_set_read_count(int readcnt);
+
 int pint_racache_set_buff_count(int bufcnt);
 
 int pint_racache_set_buff_size(int bufsz);
 
+int pint_racache_set_pinned(int pinned);
+
 int pint_racache_set_buff_count_size(int bufcnt, int bufsz);
 
-int pint_racache_initialize(void);
+/* pass -1 to not modify the compiled in defaults */
+int pint_racache_initialize(int bufcnt, int bufsz, int readcnt, int pinned);
 
 int pint_racache_buf_resize(int bufcnt, int bufsz);
 

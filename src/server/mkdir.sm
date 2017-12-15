@@ -191,7 +191,6 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
                  "%llu\n\tmtime is %llu\n", llu(ds_attr->mtime),
                  llu(PINT_util_mkversion_time(ds_attr->mtime)));
 
-
     ret = job_trove_dspace_setattr(s_op->u.mkdir.fs_id,
                                    s_op->u.mkdir.handle,
                                    ds_attr, 
@@ -232,7 +231,8 @@ static PINT_sm_action mkdir_create_dirdata(struct PINT_smcb *smcb,
             "  s_op->req->u.mkdir.attr: [owner = %d, group = %d\n\t"
             "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
             "ctime = %llu ]\n",
-            s_op->req->u.mkdir.attr.owner, s_op->req->u.mkdir.attr.group, s_op->req->u.mkdir.attr.perms,
+            s_op->req->u.mkdir.attr.owner, s_op->req->u.mkdir.attr.group,
+            s_op->req->u.mkdir.attr.perms,
             s_op->req->u.mkdir.attr.objtype, llu(s_op->req->u.mkdir.attr.atime),
             llu(PINT_util_mkversion_time(s_op->req->u.mkdir.attr.mtime)),
             llu(s_op->req->u.mkdir.attr.ctime));
@@ -242,9 +242,12 @@ static PINT_sm_action mkdir_create_dirdata(struct PINT_smcb *smcb,
     dirdata_attr.objtype = PVFS_TYPE_DIRDATA;
     PINT_dist_dir_attr_copyto(dirdata_attr.u.dirdata.dist_dir_attr,
                               s_op->req->u.mkdir.attr.u.dir.dist_dir_attr);
-    dirdata_attr.u.dirdata.dirdata_handles = s_op->req->u.mkdir.attr.u.dir.dirdata_handles;
-    dirdata_attr.u.dirdata.dirdata_sids = s_op->req->u.mkdir.attr.u.dir.dirdata_sids;
-    dirdata_attr.u.dirdata.dist_dir_bitmap = s_op->req->u.mkdir.attr.u.dir.dist_dir_bitmap;
+    dirdata_attr.u.dirdata.dirdata_handles =
+                              s_op->req->u.mkdir.attr.u.dir.dirdata_handles;
+    dirdata_attr.u.dirdata.dirdata_sids =
+                              s_op->req->u.mkdir.attr.u.dir.dirdata_sids;
+    dirdata_attr.u.dirdata.dist_dir_bitmap =
+                              s_op->req->u.mkdir.attr.u.dir.dist_dir_bitmap;
     dirdata_attr.mask = PVFS_ATTR_COMMON_ALL;
     dirdata_attr.mask |= PVFS_ATTR_DISTDIR_ATTR;
 
@@ -262,22 +265,21 @@ static PINT_sm_action mkdir_create_dirdata(struct PINT_smcb *smcb,
     msg_p = &s_op->msgarray_op.msgpair;
     PINT_serv_init_msgarray_params(s_op, s_op->u.mkdir.fs_id);
 
-    PINT_SERVREQ_TREE_SETATTR_FILL(msg_p->req,
-                                   s_op->req->capability,
-                                   s_op->req->u.mkdir.credential,
-                                   s_op->u.mkdir.fs_id,
-                                   PVFS_TYPE_DIRDATA,
-                                   dirdata_attr,
-                                   0, /* caller_handle_index */
-                                   s_op->req->u.mkdir.attr.u.dir.dist_dir_attr.dirdata_count,
-                                   s_op->req->u.mkdir.attr.u.dir.dirdata_handles,
-                                   s_op->req->u.mkdir.attr.u.dir.dist_dir_attr.sid_count,
-                                   s_op->req->u.mkdir.attr.u.dir.dirdata_sids,
-                                   NULL);
+    PINT_SERVREQ_TREE_SETATTR_FILL(
+                    msg_p->req,
+                    s_op->req->capability,
+                    s_op->req->u.mkdir.credential,
+                    s_op->u.mkdir.fs_id,
+                    PVFS_TYPE_DIRDATA,
+                    dirdata_attr,
+                    0, /* caller_handle_index */
+                    s_op->req->u.mkdir.attr.u.dir.dist_dir_attr.dirdata_count,
+                    s_op->req->u.mkdir.attr.u.dir.dirdata_handles,
+                    s_op->req->u.mkdir.attr.u.dir.dist_dir_attr.sid_count,
+                    s_op->req->u.mkdir.attr.u.dir.dirdata_sids,
+                    NULL);
 
-    /* save objects so they can be freed */
     s_op->u.mkdir.saved_attr = &msg_p->req.u.mkdir.attr;
-    s_op->u.mkdir.saved_capability = &msg_p->req.capability;
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
@@ -289,6 +291,7 @@ static PINT_sm_action mkdir_create_dirdata(struct PINT_smcb *smcb,
     msg_p->comp_fn = tree_setattr_comp_fn;
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+
     if (ret)
     {
         gossip_err("Failed to map dirdata server address\n");
@@ -314,22 +317,20 @@ static int tree_setattr_comp_fn(void *v_p,
 }
 #endif
 
-/* V3 SIDs will get added to the handles, possibly the bitmap too, and
- * the attr should be moved into the dspace record
- */
-/** writes 2 keyvals for the new directory - the bitmap and the handles
- * of the dirdata objects
- * ADD BACKPOINTER V3
+/** writes 3 keyvals for the new directory - the bitmap, the handles
+ * of the dirdata objects and the parent PLUS dirhint keyvals
  */
 static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
                                           job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *attr;
+    PVFS_object_attr *pattr;
     int ret = -1;
     job_id_t j_id;
+    int k = 0;
+    int slen; /* length of conversion strings */
 
-    /* total 3 keyvals,
+    /* total 3 static keyvals every dir has:
      * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES, PARENT */
     int keyval_count = 3;
 
@@ -338,8 +339,34 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
     PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
     s_op->u.mkdir.saved_capability = NULL;
 */
+    pattr = &s_op->req->u.mkdir.attr;
 
-    attr = &s_op->req->u.mkdir.attr;
+    /* we need to know how many attributes we are going to set 
+     * before we can allocated the key_a and val_a arrays
+     */
+    if (pattr->mask & PVFS_ATTR_DIR_HINT)
+    {
+        if (pattr->u.dir.hint.dfile_count > 0)
+        {
+            keyval_count++;
+        }
+        if (pattr->u.dir.hint.dist_name_len > 0)
+        {
+            keyval_count++;
+        }
+        if (pattr->u.dir.hint.dist_params_len > 0)
+        {
+            keyval_count++;
+        }
+        if (pattr->u.dir.hint.layout.algorithm > 0)
+        {
+            keyval_count++;
+        }
+        if (pattr->u.dir.hint.layout.server_list.count > 0)
+        {
+            keyval_count++;
+        }
+    }
 
     s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
     if(!s_op->key_a)
@@ -361,23 +388,110 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
     s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
 
-    s_op->val_a[0].buffer_sz = attr->u.dir.dist_dir_attr.bitmap_size * 
+    s_op->val_a[0].buffer_sz = pattr->u.dir.dist_dir_attr.bitmap_size * 
                                sizeof(PVFS_dist_dir_bitmap_basetype);
-    s_op->val_a[0].buffer = attr->u.dir.dist_dir_bitmap;
+    s_op->val_a[0].buffer = pattr->u.dir.dist_dir_bitmap;
+    keep_keyval_buffers(s_op, 0);
 
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
     s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
 
-    s_op->val_a[1].buffer_sz = OSASZ(attr->u.dir.dist_dir_attr.dirdata_count,
-                                     attr->u.dir.dist_dir_attr.sid_count);
-    s_op->val_a[1].buffer = attr->u.dir.dirdata_handles;
+    s_op->val_a[1].buffer_sz = OSASZ(pattr->u.dir.dist_dir_attr.dirdata_count,
+                                     pattr->u.dir.dist_dir_attr.sid_count);
+    s_op->val_a[1].buffer = pattr->u.dir.dirdata_handles;
+    keep_keyval_buffers(s_op, 1);
 
     s_op->key_a[2].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
     s_op->key_a[2].buffer = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
 
     s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.mkdir.sid_count);
     s_op->val_a[2].buffer = s_op->req->u.mkdir.parent;
+    keep_keyval_buffers(s_op, 2);
 
+    /* set up directory hint attributes */
+    k = 3;
+    if (pattr->mask & PVFS_ATTR_DIR_HINT)
+    {
+        if (pattr->u.dir.hint.dfile_count > 0)
+        {
+            /* convert to string */
+            s_op->key_a[k].buffer = Trove_Special_Keys[NUM_DFILES_KEY].key;
+            s_op->key_a[k].buffer_sz = Trove_Special_Keys[NUM_DFILES_KEY].size;
+
+            s_op->val_a[k].buffer = (void *)malloc(10);
+            if (!s_op->val_a[k].buffer)
+            {
+                js_p->error_code = -PVFS_ENOMEM;
+                return SM_ACTION_COMPLETE;
+            }
+            slen = snprintf(s_op->val_a[k].buffer,
+                            10,
+                            "%05d",
+                            pattr->u.dir.hint.dfile_count);
+            s_op->val_a[k].buffer_sz = slen + 1;
+            k++;
+        }
+        if (pattr->u.dir.hint.dist_name_len > 0)
+        {
+            s_op->key_a[k].buffer = Trove_Special_Keys[DIST_NAME_KEY].key;
+            s_op->key_a[k].buffer_sz = Trove_Special_Keys[DIST_NAME_KEY].size;
+
+            s_op->val_a[k].buffer = pattr->u.dir.hint.dist_name;
+            s_op->val_a[k].buffer_sz = pattr->u.dir.hint.dist_name_len;
+            keep_keyval_buffers(s_op, k);
+            k++;
+        }
+        if (pattr->u.dir.hint.dist_params_len > 0)
+        {
+            s_op->key_a[k].buffer = Trove_Special_Keys[DIST_PARAMS_KEY].key;
+            s_op->key_a[k].buffer_sz = Trove_Special_Keys[DIST_PARAMS_KEY].size;
+
+            s_op->val_a[k].buffer = pattr->u.dir.hint.dist_params;
+            s_op->val_a[k].buffer_sz = pattr->u.dir.hint.dist_params_len;
+            keep_keyval_buffers(s_op, k);
+            k++;
+        }
+        if (pattr->u.dir.hint.layout.algorithm > 0)
+        {
+            /* convert to string */
+            s_op->key_a[k].buffer = Trove_Special_Keys[LAYOUT_KEY].key;
+            s_op->key_a[k].buffer_sz = Trove_Special_Keys[LAYOUT_KEY].size;
+
+            s_op->val_a[k].buffer = (void *)malloc(10);
+            if (!s_op->val_a[k].buffer)
+            {
+                js_p->error_code = -PVFS_ENOMEM;
+                return SM_ACTION_COMPLETE;
+            }
+            slen = snprintf(s_op->val_a[k].buffer,
+                            10,
+                            "%05d",
+                            pattr->u.dir.hint.layout.algorithm);
+            s_op->val_a[k].buffer_sz = slen + 1;
+            k++;
+        }
+        if (pattr->u.dir.hint.layout.server_list.count > 0)
+        {
+            s_op->key_a[k].buffer = Trove_Special_Keys[SERVER_LIST_KEY].key;
+            s_op->key_a[k].buffer_sz = Trove_Special_Keys[SERVER_LIST_KEY].size;
+
+            s_op->val_a[k].buffer = pattr->u.dir.hint.layout.server_list.servers;
+            s_op->val_a[k].buffer_sz = pattr->u.dir.hint.layout.server_list.bufsize;
+            keep_keyval_buffers(s_op, k);
+            k++;
+        }
+    }
+    if (k != keyval_count)
+    {
+        gossip_lerr("error building args for new dir attributes\n");
+    }
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, 
+            "  writing dist-dir-struct keyvals for meta handle: %s "
+            "\t with server_no=%d and branch_level=%d \n", 
+            PVFS_OID_str(&s_op->u.mkdir.handle),
+            pattr->u.dir.dist_dir_attr.server_no,
+            pattr->u.dir.dist_dir_attr.branch_level);
 
     ret = job_trove_keyval_write_list(
                                   s_op->req->u.mkdir.fs_id,
@@ -487,7 +601,7 @@ static PINT_sm_action mkdir_setup_response(
 
     /* clean up objects */
     PINT_free_object_attr(s_op->u.mkdir.saved_attr);
-    PINT_cleanup_capability(s_op->u.mkdir.saved_capability);
+    PINT_cleanup_capability(&s_op->u.mkdir.server_to_server_capability);
 
     PINT_cleanup_capability(&(*getattr_op->req).capability);
     free(getattr_op);
@@ -513,21 +627,9 @@ static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
  * Synopsis: free memory - can be called from outside this source file.
  *
  */
-void mkdir_free(
-        struct PINT_server_op *s_op)
+void mkdir_free(struct PINT_server_op *s_op)
 {
-    if (s_op->key_a)
-    {
-        free(s_op->key_a);
-    }
-    if (s_op->val_a)
-    {
-        free(s_op->val_a);
-    }
-    if (s_op->error_a)
-    {
-        free(s_op->error_a);
-    }
+    free_keyval_buffers(s_op);
 }
 
 /*
@@ -628,7 +730,11 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
                                    s_op->req->u.mkdir.dist_dir_servers_initial,
                                    s_op->req->u.mkdir.dist_dir_split_size);
 
-    assert(ret == 0);
+    if(ret != 0)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
 
     PINT_debug_dist_dir_attr(GOSSIP_MKDIR_DEBUG, a_p->u.dir.dist_dir_attr);
     PINT_debug_dist_dir_bitmap(GOSSIP_MKDIR_DEBUG, a_p->u.dir.dist_dir_attr,

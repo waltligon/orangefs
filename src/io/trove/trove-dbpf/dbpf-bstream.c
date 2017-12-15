@@ -602,7 +602,7 @@ static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
     }
     got_fd = 1;
 
-    ret = DBPF_SYNC(tmp_ref.fd);
+    ret = fdatasync(tmp_ref.fd);
     if (ret != 0)
     {
         ret = -trove_errno_to_trove_error(errno);
@@ -1402,7 +1402,7 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
         return ret;
     }
 
-    ret = DBPF_RESIZE(open_ref.fd, tmpsize);
+    ret = ftruncate(open_ref.fd, tmpsize);
     if(ret < 0)
     {
         return(ret);

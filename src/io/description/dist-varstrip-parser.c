@@ -17,7 +17,7 @@
 
 static int strips_parse_elem(char* inp, const PVFS_offset *prev_offset,
                              const PVFS_size *prev_size, unsigned *server_nr,
-                             PVFS_offset *offset, PVFS_size *size);
+                             PVFS_offset *offset, PVFS_size *size, char **saveptr);
 
 static PINT_dist_strips* strips_alloc_mem(const char* inp);
 
@@ -35,7 +35,7 @@ void PINT_dist_strips_free_mem(PINT_dist_strips **strips)
 static int strips_parse_elem(
     char* inp, const PVFS_offset *prev_offset,
     const PVFS_size *prev_size, unsigned *server_nr,
-    PVFS_offset *offset, PVFS_size *size)
+    PVFS_offset *offset, PVFS_size *size, char **saveptr)
 {
     char *s_server, *s_size;
     unsigned i_server;
@@ -43,11 +43,11 @@ static int strips_parse_elem(
 
     if (prev_offset != NULL && prev_size != NULL) 
     {
-        s_server = strtok(NULL, ":");
+        s_server = strtok_r(NULL, ":", saveptr);
     }
     else
     {
-        s_server = strtok(inp, ":");
+        s_server = strtok_r(inp, ":", saveptr);
     }
 
     if (s_server != NULL)
@@ -69,7 +69,7 @@ static int strips_parse_elem(
         *offset = 0;
     }
 
-    s_size = strtok(NULL, ";");
+    s_size = strtok_r(NULL, ";", saveptr);
     if (s_size != NULL)
     {
 #ifdef WIN32
@@ -147,6 +147,7 @@ int PINT_dist_strips_parse(
     PVFS_size *prev_size   = NULL;
     PVFS_offset *prev_offset = NULL;
     int i;
+    char *saveptr = NULL;
 
     *count = 0;
     *strips = 0;
@@ -183,7 +184,7 @@ int PINT_dist_strips_parse(
         switch (
             strips_parse_elem(
                 inp, prev_offset, prev_size, &(strips_elem->server_nr),
-                &(strips_elem->offset), &(strips_elem->size)))
+                &(strips_elem->offset), &(strips_elem->size), &saveptr))
         {
             case 0:     
                 /* do next element */

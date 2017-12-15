@@ -1,39 +1,47 @@
-.\" Process this file with
-.\" groff -man -Tascii foo.1
-.\"
-.TH PVFS2-SET-MODE 1 "SEPTEMBER 2003"  PVFS2 "PVFS2 Manuals"
+.TH PVFS2-SET-MODE 1 2017-07-06
 .SH NAME
-pvfs2-set-mode \- Change the mode of a PVFS2 volume
+\fBpvfs2-set-mode\fR \(en set server mode
 .SH SYNOPSIS
-.B pvfs2-set-mode
-.I -m mount_point <MODE>
-
+\fBpvfs2-set-mode\fR [\fB\-s \fIserver\fR] [\fB\-m \fImount_point\fR]
+\fImode\fR
 .SH DESCRIPTION
-Changes the operating mode of a PVFS2 volume. 
-
-.SH OPTIONS
+The
+.I pvfs2-set-mode
+utility is used to change the mode of the server.
+.PP
+The modes are as follows:
+.IP admin
+Read-only access to be used when running
+.BR pvfs2-fsck ( 1 ) \& .
+.IP normal
+Normal operation.
+.PP
+The options are as follows:
+.IP -s
+Specify the address of the server.  This option is used to change the
+mask only on a particular server instead of the entire cluster.
 .IP -m
-send a mode-change message to all servers responsible for 
-.I mount_point
-.IP <MODE>
-can as of this writing only be "normal" and "admin".  In "admin" mode, the
-PVFS2 volume becomes read-only.  Typically, this is used before running
-.B pvfs2-fsck
-on the volume.
-
+Specify the file system to operate on.
 .SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
 .IP PVFS2TAB_FILE
-If set, the full pathname for an alternate 
+If set, the full pathname for an alternate
 .IR pvfs2tab
 file
-
+.SH FILES
+.I /etc/pvfs2tab
+.SH EXAMPLES
+Put server into admin mode.
+.PP
+.RS 6n
+pvfs2-set-mode -m /mnt admin
+.RE
 .SH BUGS
-Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
-.SH AUTHOR
-The PVFS2 development team (pvfs2-developers@beowulf-underground.org)
-.SH "SEE ALSO"
-.BR pvfs2-server (1),
-.BR pvfs2-statfs (1)
-.BR pvfs2-ping (1)
-.BR pvfs2-cp (1)
-.BR pvfs2-genconfig (1)
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2-set-sync ( 1 ),
+.BR pvfs2tab ( 5 )

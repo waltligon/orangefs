@@ -1,7 +1,7 @@
 /*
- * (C) 2012 Clemson University
- * 
- * See COPYING in top-level directory.
+ * (C) 2017 Clemson University
+ *
+ * See LICENSE in src/client/hadoop/orangefs-hadoop1 directory.
  */
 package org.apache.hadoop.fs.ofs;
 

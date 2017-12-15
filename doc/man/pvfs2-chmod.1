@@ -1,0 +1,56 @@
+.TH PVFS2-CHMOD 1 2017-07-03
+.SH NAME
+\fBpvfs2-chmod\fR \(en modify permissions on files in OrangeFS volumes
+.SH SYNOPSIS
+\fBpvfs2-chmod\fR [\fB\-v\fR] \fImode filename(s)\fR
+.SH DESCRIPTION
+The
+.B pvfs2-chmod
+utility modifies the permission bits on the OrangeFS files specified.
+The
+.I mode
+is specified as a three or four digit octal number in the conventional
+manner.
+.PP
+The options are as follows:
+.IP -v
+Print version number and exit.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate
+.IR pvfs2tab
+file
+.SH FILES
+.I /etc/pvfs2tab
+.SH EXAMPLES
+Prevent other users from accessing a file.
+.PP
+.RS 6n
+pvfs2-chmod 600 /mnt/foo
+.RE
+.PP
+Allow the owner and users in the file's group to read and modify the
+file and other users to only read the file.
+.PP
+.RS 6n
+pvfs2-chmod 664 /mnt/foo
+.RE
+.SH CAVEATS
+This utility does not support symbolic permissions like the
+.BR chmod ( 1 )
+utility.
+.PP
+Note that because OrangeFS is a network file system, any user with
+access to the network may be able to circumvent file permissions.
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR chmod ( 1 ),
+.BR pvfs2-chown ( 1 ),
+.BR pvfs2-stat ( 1 ),
+.BR pvfs2tab ( 5 )

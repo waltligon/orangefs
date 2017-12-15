@@ -1,0 +1,38 @@
+.TH PVFS2-GET-UID 1 2017-07-03
+.SH NAME
+\fBpvfs2-get-uid\fR \(en display lower-level information about an
+OrangeFS file system
+.SH SYNOPSIS
+\fBpvfs2-get-uid\fR [\fB\-s \fIserver\fR] [\fB\-t \fIhistory\fR]
+[\fB\-f \fIfs_id\fR]
+.SH DESCRIPTION
+The
+.B pvfs2-get-uid
+performs the pvfs2-get-uid function.
+.PP
+The options are as follows:
+.IP -s
+Specify the s option.
+Specify the file system to operate on.
+.IP -t
+Specify the t option.
+.IP -f
+Specify the f option.
+.IP -h
+Display synopsis.
+.SH ENVIRONMENT
+.IP PVFS2_DEBUGFILE
+If set to the path of a local file, redirect debug output to it.
+.IP PVFS2_DEBUGMASK
+Set the OrangeFS debug mask.  Possible masks are documented in
+.BR pvfs2-set-debugmask ( 1 ) \& .
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate
+.IR pvfs2tab
+file
+.SH FILES
+.I /etc/pvfs2tab
+.SH BUGS
+Please submit bug reports to pvfs2-developers@beowulf-underground.org
+.SH SEE ALSO
+.BR pvfs2tab ( 5 )

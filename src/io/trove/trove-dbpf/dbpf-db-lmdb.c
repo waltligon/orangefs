@@ -16,6 +16,8 @@
 
 #include "server-config.h"
 
+extern filesystem_configuration_s *cfg_fs;
+
 struct dbpf_db {
     MDB_env *env;
     MDB_dbi dbi;
@@ -124,12 +126,14 @@ int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
     *db = malloc(sizeof **db);
     if (!*db)
     {
+        gossip_err("%s:Error allocating space\n",__func__);
         return db_error(errno);
     }
 
     r = mdb_env_create(&(*db)->env);
     if (r)
     {
+        gossip_err("%s:Error creating environment\n",__func__);
         mdb_env_close((*db)->env);
         free(*db);
         return db_error(r);
@@ -137,7 +141,20 @@ int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
 
     if (cfg)
     {
-        r = mdb_env_set_mapsize((*db)->env, cfg->db_max_size);
+        if ( strstr(name,COLLECTIONS_DBNAME) || strstr(name,STO_ATTRIB_DBNAME) )
+        {
+           /* use value found in Defaults/ServerOptions section of config file for
+            * collections.db and storage_attributes.db
+           */ 
+           r = mdb_env_set_mapsize((*db)->env, cfg->db_max_size);
+        }
+        else 
+        {
+            /* use value found in StorageHints section of current filesystem
+             * for all other databases.
+             */
+            r = mdb_env_set_mapsize((*db)->env, cfg_fs->db_max_size);
+        }
     }
     else
     {

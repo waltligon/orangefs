@@ -197,6 +197,10 @@ static PINT_sm_action crdirent_get_dist_dir_attr(struct PINT_smcb *smcb,
     PVFS_objecct_attr_from_ds_attr(&s_op->u.crdirent.dirdata_attr,
                                    &s_op->u.crdirent.dirdata_ds_attr);
     s_op->u.crdirent.dirdata_attr.mask = PVFS_ATTR_COMMON_ALL;
+    /* Must erase ATIME or it will be reset to the current time below,
+     * which should not be done when creating a directory entry per
+     * POSIX. */
+    s_op->u.crdirent.dirdata_attr.mask &= ~PVFS_ATTR_COMMON_ATIME;
 
     /* set up key and value structures for reading the dist_dir_attr */
     s_op->key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;

@@ -10,6 +10,8 @@
 #ifndef __PVFS2_REQ_PROTO_H
 #define __PVFS2_REQ_PROTO_H
 
+#include <assert.h>
+
 #include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
@@ -113,7 +115,8 @@ enum PVFS_server_op
   || (x) == PVFS_SERV_MGMT_REMOVE_DIRENT)
 
 #define PVFS_REQ_COPY_CAPABILITY(__cap, __req) \
-    assert(PINT_copy_capability(&(__cap), &((__req).capability)) == 0)
+    { int rc = PINT_copy_capability(&(__cap), &((__req).capability)); \
+    assert(rc == 0); }
 
 /******************************************************************/
 /* This struct ised used to control the way the server passes requests
@@ -163,7 +166,8 @@ do {                                             \
  */
 
 /* max size of layout information - may include explicit server list */
-#define PVFS_REQ_LIMIT_LAYOUT             4096
+                                          /* from pvfs2-types.h */
+#define PVFS_REQ_LIMIT_LAYOUT             PVFS_SYS_LIMIT_LAYOUT
 /* max size of opaque distribution parameters */
 #define PVFS_REQ_LIMIT_DIST_BYTES         1024
 /* max size of each configuration file transmitted to clients.
@@ -195,17 +199,17 @@ do {                                             \
 /* max count of dirent handles associated with a directory */
 #define PVFS_REQ_LIMIT_DIRENT_FILE_COUNT 1024
 /* max number of handles for which we return attributes */
-#define PVFS_REQ_LIMIT_LISTATTR 60
+#define PVFS_REQ_LIMIT_LISTATTR PVFS_SYS_LIMIT_LISTATTR
 /* max count of directory entries per readdir request */
 #define PVFS_REQ_LIMIT_DIRENT_COUNT 512
 /* max count of directory entries per readdirplus request */
-#define PVFS_REQ_LIMIT_DIRENT_COUNT_READDIRPLUS PVFS_REQ_LIMIT_LISTATTR
+#define PVFS_REQ_LIMIT_DIRENT_COUNT_READDIRPLUS PVFS_SYS_LIMIT_LISTATTR
 /* max number of perf metrics returned by mgmt perf mon op */
 #define PVFS_REQ_LIMIT_MGMT_PERF_MON_COUNT 16
 /* max number of events returned by mgmt event mon op */
 #define PVFS_REQ_LIMIT_MGMT_EVENT_MON_COUNT 2048
 /* max number of handles returned by any operation using an array of handles */
-#define PVFS_REQ_LIMIT_HANDLES_COUNT 1024
+#define PVFS_REQ_LIMIT_HANDLES_COUNT PVFS_SYS_LIMIT_HANDLES_COUNT
 /* typical numb er of SIDs per handle, there are this number times the
  * number of handles PLUS the handles that can be sent
  * adjust both this ratio and the handles count to get something
@@ -239,13 +243,13 @@ do {                                             \
 /* max number of keys or key/value pairs to set or get in an operation */
 #define PVFS_REQ_LIMIT_EATTR_LIST       PVFS_MAX_XATTR_LISTLEN 
 /* max size of security signature (in bytes) */
-#define PVFS_REQ_LIMIT_SIGNATURE 512
+#define PVFS_REQ_LIMIT_SIGNATURE        PVFS_SYS_LIMIT_SIGNATURE
 /* max number of groups in credential array */
-#define PVFS_REQ_LIMIT_GROUPS 32
+#define PVFS_REQ_LIMIT_GROUPS           PVFS_SYS_LIMIT_GROUPS
 /* max size of credential/capability issuer (in bytes) */
-#define PVFS_REQ_LIMIT_ISSUER 128
+#define PVFS_REQ_LIMIT_ISSUER           PVFS_SYS_LIMIT_ISSUER
 /* max size of a certificate buffer (in bytes) */
-#define PVFS_REQ_LIMIT_CERT 8192
+#define PVFS_REQ_LIMIT_CERT             PVFS_SYS_LIMIT_CERT
 /* max size of a certificate private key (in bytes) */
 #define PVFS_REQ_LIMIT_SECURITY_KEY 8192
 /* max size of userid/password for cert request (in bytes) */
@@ -458,12 +462,12 @@ do {                                                                       \
 struct PVFS_servresp_create
 {
     PVFS_capability capability;
-    int32_t stuffed;
+    PVFS_object_attr metafile_attrs;
 };
 endecode_fields_2_struct(
     PVFS_servresp_create,
     PVFS_capability, capability,
-    int32_t, stuffed);
+    PVFS_object_attr, metafile_attrs);
 #define extra_size_PVFS_servresp_create extra_size_PVFS_capability
 
 /* batch_create *********************************************************/
@@ -1219,6 +1223,14 @@ do {                                             \
     PINT_CONVERT_ATTR(&(__req).u.setattr.attr, &(__attr), __extra_amask);\
 } while (0)
 
+    /*
+     * converting attr and modifying it in a FILL macro is bad form
+     * moving this back into the state machines for this and mkdir
+    (__attr).objtype = (__objtype);                                       \
+    (__attr).mask |= PVFS_ATTR_SYS_TYPE;                                  \
+    PINT_CONVERT_ATTR(&(__req).u.setattr.attr, &(__attr), __extra_amask); \
+     */
+
 /* lookup path ************************************************/
 /* - looks up as many elements of the specified path as possible */
 struct PVFS_servreq_lookup_path
@@ -1468,6 +1480,15 @@ do {                                                       \
     (__attr).mask   |= PVFS_ATTR_SYS_TYPE;                 \
     PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);\
 } while (0)
+
+    /* calling a convert in a fill macro is bad form - it prevents
+     * accessing all of the attr fields plus it obsfucates.
+     * I am moving these back to the state machines both here and
+     * in setattr
+    (__attr).objtype = PVFS_TYPE_DIRECTORY;                          \
+    (__attr).mask   |= PVFS_ATTR_COMMON_TYPE;                        \
+    PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);          \
+     */
 
 struct PVFS_servresp_mkdir
 {
@@ -1827,7 +1848,7 @@ struct PVFS_servreq_mirror
    int i;                                                \
    decode_PVFS_handle(pptr,&(x)->src_handle);            \
    decode_PVFS_fs_id(pptr,&(x)->fs_id);                  \
-   decode_PINT_dist(pptr,&(x)->dist);                    \
+   decode_PINT_dist(pptr,&(x)->dist,NULL);               \
    decode_uint32_t(pptr,&(x)->bsize);                    \
    decode_uint32_t(pptr,&(x)->src_server_nr);            \
    decode_uint32_t(pptr,&(x)->dst_count);                \
@@ -2025,7 +2046,7 @@ struct PVFS_servreq_io
     decode_enum(pptr, &(x)->flow_type);                            \
     decode_uint32_t(pptr, &(x)->server_nr);                        \
     decode_uint32_t(pptr, &(x)->server_ct);                        \
-    decode_PINT_dist(pptr, &(x)->io_dist);                         \
+    decode_PINT_dist(pptr, &(x)->io_dist, NULL);                   \
     decode_PINT_Request(pptr, &(x)->file_req);                     \
     PINT_request_decode((x)->file_req); /* unpacks the pointers */ \
     decode_PVFS_offset(pptr, &(x)->file_req_offset);               \
@@ -2155,7 +2176,7 @@ struct PVFS_servreq_small_io
     decode_int32_t(pptr, &(x)->sid_count); \
     (x)->sid_array = (*pptr); \
     (*pptr) += (x)->sid_count * sizeof(PVFS_SID); \
-    decode_PINT_dist(pptr, &(x)->dist); \
+    decode_PINT_dist(pptr, &(x)->dist, NULL); \
     decode_PINT_Request(pptr, &(x)->file_req); \
     PINT_request_decode((x)->file_req); /* unpacks the pointers */ \
     decode_PVFS_offset(pptr, &(x)->file_req_offset); \
@@ -2273,6 +2294,8 @@ struct PVFS_servreq_listattr
     uint32_t    attrmask;  /* mask of desired attributes */
     uint32_t    nhandles; /* number of handles */
     PVFS_handle *handles; /* handle of target object */
+    int32_t     sid_count;
+    PVFS_SID    *sid_array;
 };
 endecode_fields_3a_struct(
     PVFS_servreq_listattr,

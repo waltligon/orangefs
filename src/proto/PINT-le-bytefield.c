@@ -777,9 +777,9 @@ out:
  *
  * returns 0 on success, -errno on failure
  */
-static int lebf_decode_req(void *input_buffer,
+static int lebf_decode_req(void *input_buffer, /* decoding from this buff */
                            int input_size,
-                           struct PINT_decoded_msg *target_msg,
+                           struct PINT_decoded_msg *target_msg, /* decoding to this */
                            PVFS_BMI_addr_t target_addr)
 {
     int ret = 0;
@@ -887,9 +887,9 @@ static int lebf_decode_req(void *input_buffer,
  *
  * returns 0 on success, -errno on failure
  */
-static int lebf_decode_resp(void *input_buffer,
+static int lebf_decode_resp(void *input_buffer, /* decoding from this buff */
                             int input_size,
-                            struct PINT_decoded_msg *target_msg,
+                            struct PINT_decoded_msg *target_msg, /* decoding to this */
                             PVFS_BMI_addr_t target_addr)
 {
     int ret = 0;
@@ -1411,6 +1411,14 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                               resp->u.unstuff.attr.u.meta.mirror_dfile_array);
                     }
 #endif
+                    if (resp->u.unstuff.attr.capability.signature)
+                    {
+                       decode_free(resp->u.unstuff.attr.capability.signature);
+                    }
+                    if (resp->u.unstuff.attr.capability.handle_array)
+                    {
+                       decode_free(resp->u.unstuff.attr.capability.handle_array);
+                    }
                     break;
 
                 case PVFS_SERV_MGMT_EVENT_MON:

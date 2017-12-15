@@ -37,7 +37,10 @@
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
 
-static uint32_t readdir_session = 0;
+/* modified type from uint32_t, since we only need 16 bits with
+ * the new layout of the position token.
+ */
+static uint16_t readdir_session = 0;
 
 extern int synccount;
 
