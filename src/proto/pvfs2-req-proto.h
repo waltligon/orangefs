@@ -1742,7 +1742,7 @@ struct PVFS_servresp_readdir
     PVFS_dirent *dirent_array;
     uint32_t dirent_count;   /* # of entries retrieved */
     PVFS_SID *sid_array;
-    uint32_t sid_count;
+    int32_t sid_count;
     uint64_t directory_version;
 };
 endecode_fields_3a1a_struct(
@@ -1753,7 +1753,7 @@ endecode_fields_3a1a_struct(
     uint32_t, dirent_count,
     PVFS_dirent, dirent_array,
     skip4,,
-    uint32_t, sid_count,
+    int32_t, sid_count,
     PVFS_SID, sid_array);
 #define extra_size_PVFS_servresp_readdir \
            ((PVFS_REQ_LIMIT_DIRENT_COUNT *  sizeof(PVFS_dirent)) + \

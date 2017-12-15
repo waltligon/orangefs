@@ -681,8 +681,8 @@ typedef struct
 {
     PVFS_dirent      **dirent_array;
     uint32_t         *dirent_outcount;
-    PVFS_SID         **sid_array;
-    int32_t          *sid_count;
+    PVFS_SID         *sid_array;
+    int32_t          sid_count;
     PVFS_ds_position *token;
     uint64_t         *directory_version;
     PVFS_ds_position pos_token;     /* input/output parameter */

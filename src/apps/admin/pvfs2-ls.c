@@ -531,7 +531,7 @@ int do_list(
     PVFS_ds_position token;
     uint64_t dir_version = 0;
     double begin = 0., end;
-    subdir *current, *head = NULL, *tail = NULL;
+    subdir *current, *head = NULL /*, *tail = NULL */;
 
     name = start;
 
@@ -655,7 +655,7 @@ int do_list(
 
         for(i = 0; i < rdplus_response.pvfs_dirent_outcount; i++)
         {
-            PVFS_sys_attr *attr;
+//            PVFS_sys_attr *attr;
 
             cur_file = rdplus_response.dirent_array[i].d_name;
             cur_handle = rdplus_response.dirent_array[i].handle;

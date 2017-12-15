@@ -120,11 +120,9 @@ static PINT_sm_action readdir_iterate_on_entries(struct PINT_smcb *smcb,
       - dirent_count * metadata_sid_count SIDs
     */
 
-    /* TJS: make sure this is where we get the config for metadata replication */
     ret = PINT_cached_config_get_metadata_sid_count(
                                          s_op->req->u.readdir.fs_id, 
                                          &(s_op->metasidcnt));
-
     if (ret)
     {
         js_p->error_code = -PVFS_EINVAL;
@@ -238,6 +236,8 @@ static PINT_sm_action readdir_setup_resp(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    s_op->resp.u.readdir.sid_count = s_op->metasidcnt;
+
     id_ptr = (PVFS_ID *) s_op->u.readdir.keyval_db_entries;
     for (i = 0; i < s_op->req->u.readdir.dirent_count; i++)
     {
@@ -288,6 +288,7 @@ static PINT_sm_action readdir_cleanup(struct PINT_smcb *smcb,
         s_op->val_a = NULL;
         s_op->resp.u.readdir.dirent_array = NULL;
         s_op->u.readdir.keyval_db_entries = NULL;
+        s_op->resp.u.readdir.sid_array = NULL;
     }
     return(server_state_machine_complete(smcb));
 }
