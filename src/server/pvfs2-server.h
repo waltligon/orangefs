@@ -647,7 +647,7 @@ struct PINT_server_tree_communicate_op
     int handle_array_local_count;
     int handle_array_remote_count;
     int handle_index;
-    uint32_t sid_count; /* V3 FIXME */
+    int32_t sid_count; /* V3 FIXME */
     PVFS_SID *sid_array; /* V3 FIXME */
 };
 

@@ -200,12 +200,12 @@ struct PINT_client_create_sm
     PVFS_sys_layout layout;
 
     PVFS_handle *metadata_handle;
-    int metadata_sid_count;
+    int32_t metadata_sid_count;
     PVFS_SID *metadata_sid_array;
 
     int datafile_count;
     PVFS_handle *datafile_handles;
-    int datafile_sid_count;
+    int32_t datafile_sid_count;
     PVFS_SID *datafile_sid_array;
 
     int stuffed;
@@ -213,7 +213,7 @@ struct PINT_client_create_sm
 
     int dirent_file_count;
     PVFS_handle *dirent_handle;
-    int dirent_sid_count;
+    int32_t dirent_sid_count;
     PVFS_SID *dirent_sid_array;
 
     PVFS_handle handles[2];
@@ -233,12 +233,12 @@ struct PINT_client_mkdir_sm
     int stored_error_code;
 
     PVFS_handle *metadata_handle;
-    int metadata_sid_count;
+    int32_t metadata_sid_count;
     PVFS_SID *metadata_sid_array;
 
     int dirdata_count;
     PVFS_handle *dirdata_handles;
-    int dirdata_sid_count;
+    int32_t dirdata_sid_count;
     PVFS_SID *dirdata_sid_array;
 
     PVFS_capability capability;
@@ -397,7 +397,7 @@ struct PINT_client_readdir_sm
 {
     PVFS_ds_position pos_token;         /* in/out parameter */
     int dirent_limit;                   /* input parameter */
-    int meta_sid_count;                 /* input parameter */
+    int32_t meta_sid_count;             /* input parameter */
     int dirdata_index;                  /* in/out parameter */
     PVFS_sysresp_readdir *readdir_resp; /* in/out parameter*/
 
@@ -681,8 +681,8 @@ typedef struct
 {
     PVFS_dirent      **dirent_array;
     uint32_t         *dirent_outcount;
-    PVFS_SID         **sid_array;
-    uint32_t         *sid_count;
+    PVFS_SID         *sid_array;
+    int32_t          sid_count;
     PVFS_ds_position *token;
     uint64_t         *directory_version;
     PVFS_ds_position pos_token;     /* input/output parameter */

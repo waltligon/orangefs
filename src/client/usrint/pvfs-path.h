@@ -89,7 +89,7 @@ typedef struct PVFS_path_s
     char *pvfs_path;    /* if we resove, this points to the pvfs portion */
     PVFS_fs_id fs_id;   /* if we resolve this is the fs_id */
     PVFS_handle handle ;/* if we look up a pvfs object, this is the last one */
-    uint32_t sid_count; /* if we look up a pvfs object, this is the last one */
+    int32_t sid_count;  /* if we look up a pvfs object, this is the last one */
     PVFS_SID *sid_array;/* if we look up a pvfs object, this is the last one */
     char *filename;     /* this is the path left after the object */
     uint64_t magic;     /* contains a magic to id the struct a flags */
