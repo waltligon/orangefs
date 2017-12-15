@@ -92,7 +92,7 @@ static PINT_sm_action readdir_iterate_on_entries(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    int j = 0, memory_size = 0, kv_array_size = 0, dirent_array_size;
+    int j = 0, memory_size = 0, kv_array_size = 0, dirent_array_size = 0;
     char *memory_buffer = NULL;
     PVFS_ID *buffer_location = NULL;
     job_id_t j_id;

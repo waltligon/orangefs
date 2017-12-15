@@ -27,7 +27,6 @@
 #include <errno.h>
 #endif
 #include <pvfs3-handle.h>
-#include <stdlib.h>
 
 #ifndef INT32_MAX
 /* definition taken from stdint.h */
@@ -722,7 +721,6 @@ typedef struct PVFS_dirent_s
     char d_name[PVFS_NAME_MAX + 1];
     PVFS_handle handle;
 } PVFS_dirent;
-
 endecode_fields_2(
     PVFS_dirent,
     here_string, d_name,
