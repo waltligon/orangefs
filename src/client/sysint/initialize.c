@@ -222,7 +222,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     client_status_flag |= CLIENT_ENCODER_INIT;
     
     /* initialize bmi and the bmi session identifier */
-    ret = BMI_initialize(NULL,NULL,0);
+    ret = BMI_initialize(NULL, NULL, 0, NULL);
     if (ret < 0)
     {
         gossip_lerr("BMI initialize failure\n");

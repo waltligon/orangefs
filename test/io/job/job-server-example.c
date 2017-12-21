@@ -48,7 +48,7 @@ int main(int argc, char **argv)
 
 
 	/* start the BMI interface */
-	ret = BMI_initialize("bmi_tcp", "tcp://NULL:3414", BMI_INIT_SERVER);
+	ret = BMI_initialize("bmi_tcp", "tcp://NULL:3414", BMI_INIT_SERVER, NULL);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_initialize failure.\n");

@@ -179,6 +179,7 @@ typedef struct server_configuration_s
     char *event_logging;
     int enable_events;
     char *bmi_modules;              /* BMI modules                      */
+    char *bmi_opts;                 /* BMI options                      */
     char *flow_modules;             /* Flow modules                     */
 
     int tcp_buffer_size_receive;    /* Size of TCP receive buffer, is set

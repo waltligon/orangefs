@@ -95,7 +95,7 @@ static void init_connection_modify_qp(VAPI_qp_hndl_t qp,
 static void vapi_post_rr(const ib_connection_t *c, struct buf_head *bh);
 static void __attribute__((noreturn,format(printf,2,3)))
   error_verrno(int ecode, const char *fmt, ...);
-int vapi_ib_initialize(void);
+int vapi_ib_initialize(char *options);
 static void vapi_ib_finalize(void);
 
 /*
@@ -901,7 +901,7 @@ static int vapi_check_async_events(void)
 /*
  * VAPI-specific startup.
  */
-int vapi_ib_initialize(void)
+int vapi_ib_initialize(char *options)
 {
     int ret, flags;
     u_int32_t num_hcas;
