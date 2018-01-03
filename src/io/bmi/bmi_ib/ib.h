@@ -352,7 +352,7 @@ struct ib_device_func {
     int (*new_connection)(ib_connection_t *c, int sock, int is_server);
     void (*close_connection)(ib_connection_t *c);
     void (*drain_qp)(ib_connection_t *c);
-    int (*ib_initialize)(void);
+    int (*ib_initialize)(char *options);
     void (*ib_finalize)(void);
     void (*post_sr)(const struct buf_head *bh, u_int32_t len);
     void (*post_rr)(const ib_connection_t *c, struct buf_head *bh);

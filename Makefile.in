@@ -221,7 +221,7 @@ SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@ @LDAP_LDFLAGS@
 DATABASE_BACKEND = @DATABASE_BACKEND@
 DB_CFLAGS = @DB_CFLAGS@
 DB_LIB = @DB_LIB@
-LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
+LDSHARED = $(CC) -shared $(LDFLAGS)
 PICFLAGS = -fPIC
 # Libraries - rt libs tend to depend on other libs so they go first
 LIBS += -lpvfs2
@@ -965,7 +965,7 @@ lib/libbmi.a: $(LIBBMIOBJS)
 lib/libbmi.so: $(LIBBMIPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libbmi.so -o $@ $(LIBBMIPICOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libbmi.so.$(SO_FULLVER) -o $@ $(LIBBMIPICOBJS) $(DEPLIBS)
 endif
 
 # rule for building the pvfs2 library
@@ -984,13 +984,13 @@ lib/libpvfs2-threaded.a: $(LIBTHREADEDOBJS)
 lib/libpvfs2.so: $(LIBPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libpvfs2.so -o $@ $(LIBPICOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libpvfs2.so.$(SO_FULLVER) -o $@ $(LIBPICOBJS) $(DEPLIBS)
 
 # rule for building the shared pvfs2 _multithreaded_ library
 lib/libpvfs2-threaded.so: $(LIBTHREADEDPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-threaded.so -o $@ $(LIBTHREADEDPICOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-threaded.so.$(SO_FULLVER) -o $@ $(LIBTHREADEDPICOBJS) $(DEPLIBS)
 
 # rule for building the orangefs library
 lib/liborangefs.a: $(OLIBOBJS)
@@ -1002,7 +1002,7 @@ lib/liborangefs.a: $(OLIBOBJS)
 lib/liborangefs.so: $(OLIBPICOBJS) lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,liborangefs.so,-z,interpose,-Bsymbolic -o $@ $(OLIBPICOBJS) $(OLIBDEPLIBS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,liborangefs.so.$(SO_FULLVER),-z,interpose,-Bsymbolic -o $@ $(OLIBPICOBJS) $(OLIBDEPLIBS) $(DEPLIBS)
 
 # rule for building the ofs library
 lib/libofs.a: $(ULIBOBJS)
@@ -1014,7 +1014,7 @@ lib/libofs.a: $(ULIBOBJS)
 lib/libofs.so: $(ULIBPICOBJS) lib/liborangefs.so lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs.so,-z,interpose,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libofs.so.$(SO_FULLVER),-z,interpose,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
 # ifeq ($(build_symbolic),yes)
 # rule for building the shared ofs library
@@ -1470,10 +1470,14 @@ ifneq (,$(KERNAPPSTHR))
 endif
 endif
 ifneq (,$(LIBRARIES_SHARED))
+# liborangefsposix.so is a linker script
 	for i in $(notdir $(LIBRARIES_SHARED)) ; do \
-	    install -m 644 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
-	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
-	    $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
+	    case $$i in \
+	    liborangefsosix.so) install -m 644 lib/$$i $(libdir) ;;\
+	    *) install -m 755 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
+	       $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
+	       $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;;\
+	    esac ;\
 	done
 ifneq (,$(KERNAPPSTHR))
 	for i in $(notdir $(LIBRARIES_THREADED_SHARED)) ; do \
@@ -1514,8 +1518,8 @@ ifdef BUILD_FUSE
 endif
 
 	# install any development tools built
-	for i in $(notdir $(DEVELTOOLS) $(MEMANALYSIS)) ; do \
-		if [ -f $(srcdir)/src/apps/devel/$$i ]; then install -m 755 $(srcdir)/src/apps/devel/$$i $(bindir); fi;\
+	for i in $(DEVELTOOLS) $(MEMANALYSIS) ; do \
+		if [ -f $$i ]; then install -m 755 $$i $(bindir); fi;\
 	done
 
 	install -d $(sbindir)

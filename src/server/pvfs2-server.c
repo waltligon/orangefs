@@ -849,7 +849,8 @@ static int server_initialize_subsystems(
 
     ret = BMI_initialize(server_config.bmi_modules, 
                          server_config.host_id,
-                         bmi_flags);
+                         bmi_flags,
+                         server_config.bmi_opts);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: BMI_initialize", ret);
@@ -2595,7 +2596,7 @@ int server_state_machine_complete(PINT_smcb *smcb)
     /* release the decoding of the unexpected request */
     if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
-        PVFS_hint_free(s_op->decoded.stub_dec.req.hints);
+        PVFS_hint_free(&s_op->decoded.stub_dec.req.hints);
 
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }

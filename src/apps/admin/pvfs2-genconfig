@@ -108,6 +108,8 @@ my $IO_ENDPOINT   = 0x2;
 my $OUT = undef;
 my $term = undef;
 
+my $fs_conf_path = '';
+
 # script path (just dir)
 my $script_dir = $FindBin::Bin;
 # OrangeFS root installation path
@@ -237,7 +239,7 @@ sub parse_hostlist
 
         # if we've got a component that has {..}, then expand.
         # match the prefix (hostname) and curly brackets
-        if($comp =~ /([^{]+){([^}]+)}(.*)$/)
+        if($comp =~ /([^{]+)\{([^}]+)\}(.*)$/)
         {
             my $prefix = $1;
             my $ranges = $2;
@@ -2064,15 +2066,20 @@ my $output_target = undef;
 if ($using_stdout) {
     $output_target = \*STDOUT;
 }
-elsif (@ARGV != 1)
-{
-    die "Bad arguments.  Use -h for help.\n";
-}
 else
 {
-    unless (open(FILEOUT, ">", $ARGV[0]))
+    if (@ARGV != 1)
     {
-        die "Can't open specified file $ARGV[0]: $!\n";
+        my $default_path = "$fs_path/etc/orangefs.conf";
+        $fs_conf_path = prompt_word("Enter the config file location [Default is $default_path]: ", "$default_path");
+    }
+    else
+    {
+        $fs_conf_path = $ARGV[0];
+    }
+    unless (open(FILEOUT, ">", $fs_conf_path))
+    {
+        die "Can't open specified file $fs_conf_path: $!\n";
     }
     $output_target = \*FILEOUT;
 }
@@ -2106,11 +2113,27 @@ if($opt_metaspec)
     get_specs($META_ENDPOINT, $opt_metaspec);
 
     $bmi_module = join(',', (map { "bmi_" . $_ } get_all_protocols()));
+    print "\tBMIModules $bmi_module\n";
 }
 else
 {
     my $portmap = get_protocol();
     $bmi_module = join(',', map("bmi_" . $_, keys (%{$portmap})));
+    if ($bmi_module =~ ",")
+    {
+# Warn about potential slowness if using a "fast" network along with
+# TCP.  Polling with timeout in BMI is implemented by sequentially asking
+# each device to poll for half of the timeout.  This leads to a fixed 5 ms
+# delay in the TCP device before the IB device can be queried, for instance.
+# When traffic will only appear on one device, suggest that TCP be disabled.
+# But leave TCP as default on, certainly, as that is what most people want.
+        print "You have selected to use a fast network interface, but\n";
+        print "have not disabled TCP.  The way this is currently\n";
+        print "implemented will lead to rather slow response times on\n";
+        print "the fast interface.\n";
+        print "\n";
+
+    }
 
     $default_storage = get_storage();
     $default_meta_storage = get_meta_storage();
@@ -2261,11 +2284,11 @@ if ($using_stdout == 0)
 
     my $req_limit = 65536;
 
-    if(-s $ARGV[0] > $req_limit)
+    if(-s $fs_conf_path > $req_limit)
     {
-        my $size = (-s $ARGV[0]);
+        my $size = (-s $fs_conf_path);
         print STDERR
-"Warning: Generated config file: " . $ARGV[0] . "\n" .
+"Warning: Generated config file: " . $fs_conf_path . "\n" .
 "has size: $size, which is larger than the current OrangeFS request: $req_limit\n" .
 "Increase the value of PVFS_REQ_LIMIT_CONFIG_FILE_BYTES in src/proto/pvfs2-req-proto.h\n";
     }

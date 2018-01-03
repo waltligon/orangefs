@@ -33,7 +33,7 @@ int main(int argc, char **argv)
     }
 
     /* start the BMI interface */
-    ret = BMI_initialize("bmi_tcp", NULL, 0);
+    ret = BMI_initialize("bmi_tcp", NULL, 0, NULL);
     if(ret < 0)
     {
 	    fprintf(stderr, "BMI_initialize failure.\n");

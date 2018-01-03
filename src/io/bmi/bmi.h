@@ -34,8 +34,9 @@ struct BMI_unexpected_info
 };
 
 int BMI_initialize(const char *method_list,
-		   const char *listen_addr,
-		   int flags);
+                   const char *listen_addr,
+                   int flags,
+                   char *options);
 
 int BMI_finalize(void);
 
@@ -127,7 +128,8 @@ int BMI_get_info(BMI_addr_t addr,
 		 void *inout_parameter);
 
 int BMI_addr_lookup(BMI_addr_t * new_addr,
-		    const char *id_string);
+                    const char *id_string,
+                    char *bmi_opts);
 
 const char* BMI_addr_rev_lookup(BMI_addr_t addr);
 

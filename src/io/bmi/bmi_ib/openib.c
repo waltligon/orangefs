@@ -14,6 +14,7 @@
 #include <src/io/bmi/bmi-byteswap.h>  /* bmitoh64 */
 #include <src/common/misc/pvfs2-internal.h>  /* llu */
 #include <infiniband/verbs.h>
+#include <ctype.h>
 
 #ifdef HAVE_VALGRIND_H
 #include <memcheck.h>
@@ -23,6 +24,17 @@
 
 #include "ib.h"
 
+/* IB uses the LID, RoCE uses the GID */
+union nic_id {
+    uint16_t lid;
+    union ibv_gid gid;
+};
+
+enum transport_type {
+    IB,
+    ROCE
+};
+
 /*
  * OpenIB-private device-wide state.
  */
@@ -30,8 +42,8 @@ struct openib_device_priv {
     struct ibv_context *ctx;  /* context used to reference everything */
     struct ibv_cq *nic_cq;  /* single completion queue for all QPs */
     struct ibv_pd *nic_pd;  /* single protection domain for all memory/QP */
-    uint16_t nic_lid;  /* local id (nic) */
     int nic_port; /* port number */
+    union nic_id nic_id;
     struct ibv_comp_channel *channel;
 
     /* max values as reported by NIC */
@@ -59,6 +71,8 @@ struct openib_device_priv {
      */
     unsigned int num_unsignaled_sends;
     unsigned int max_unsignaled_sends;
+    
+    enum transport_type transport_type;
 };
 
 /*
@@ -73,7 +87,7 @@ struct openib_connection_priv {
      * unsigned int num_unsignaled_wr;
      */
     /* ib remote params */
-    uint16_t remote_lid;
+    union nic_id remote_id;
     uint32_t remote_qp_num;
 };
 
@@ -83,7 +97,7 @@ struct openib_connection_priv {
  */
 
 /* constants used to initialize infiniband device */
-static const int IBV_PORT = 1;
+static const int DEFAULT_IBV_PORT = 1;
 static const unsigned int IBV_NUM_CQ_ENTRIES = 1024;
 static const int IBV_MTU = IBV_MTU_1024;  /* dmtu, 1k good for mellanox */
 
@@ -94,10 +108,11 @@ static int exchange_data(int sock,
                          size_t len);
 static void init_connection_modify_qp(struct ibv_qp *qp,
                                       uint32_t remote_qp_num, 
-                                      int remote_lid);
+                                      union nic_id remote_id);
 static void openib_post_rr(const ib_connection_t *c, 
                            struct buf_head *bh);
-int openib_ib_initialize(void);
+int parse_bmi_opts_get_ib_port(char *options);
+int openib_ib_initialize(char *options);
 static void openib_ib_finalize(void);
 
 
@@ -131,8 +146,11 @@ static int openib_new_connection(ib_connection_t *c,
      * alignment issues.
      */
     struct {
-	uint32_t lid;
-	uint32_t qp_num;
+        union {
+            uint32_t lid;
+            uint8_t gid[16];
+        } id;
+        uint32_t qp_num;
     } ch_in, ch_out;
 
     /* build new connection/context */
@@ -256,7 +274,15 @@ static int openib_new_connection(ib_connection_t *c,
     }
 
     /* exchange data, converting info to network order and back */
-    ch_out.lid = htobmi32(od->nic_lid);
+    if (od->transport_type == IB)
+    {
+        ch_out.id.lid = htobmi32(od->nic_id.lid);
+    }
+    else
+    {
+        /* RoCE */
+        memcpy(ch_out.id.gid, &od->nic_id.gid, 16);
+    }
     ch_out.qp_num = htobmi32(oc->qp->qp_num);
 
     debug(0, "%s: calling exchange data", __func__);
@@ -267,12 +293,20 @@ static int openib_new_connection(ib_connection_t *c,
         goto out;
     }
 
-    oc->remote_lid = bmitoh32(ch_in.lid);
+    if (od->transport_type == IB)
+    {
+        oc->remote_id.lid = bmitoh32(ch_in.id.lid);
+    }
+    else
+    {
+        /* RoCE */
+        memcpy(oc->remote_id.gid.raw, ch_in.id.gid, 16);
+    }
     oc->remote_qp_num = bmitoh32(ch_in.qp_num);
 
     /* bring the two QPs up to RTR */
     debug(0, "%s: calling init_connection_modify_qp", __func__);
-    init_connection_modify_qp(oc->qp, oc->remote_qp_num, oc->remote_lid);
+    init_connection_modify_qp(oc->qp, oc->remote_qp_num, oc->remote_id);
 
     /* post initial RRs and RRs for acks */
     debug(0, "%s: entering for loop for openib_post_rr", __func__);
@@ -368,7 +402,7 @@ static int exchange_data(int sock,
  */
 static void init_connection_modify_qp(struct ibv_qp *qp, 
                                       uint32_t remote_qp_num,
-                                      int remote_lid)
+                                      union nic_id remote_id)
 {
     struct openib_device_priv *od = ib_device->priv;
     int ret;
@@ -405,7 +439,6 @@ static void init_connection_modify_qp(struct ibv_qp *qp,
     memset(&attr, 0, sizeof(attr));
     attr.qp_state = IBV_QPS_RTR;
     attr.max_dest_rd_atomic = 1;
-    attr.ah_attr.dlid = remote_lid;
     attr.ah_attr.port_num = od->nic_port;
     if (od->active_mtu > IBV_MTU) 
     {
@@ -415,10 +448,23 @@ static void init_connection_modify_qp(struct ibv_qp *qp,
     {
         attr.path_mtu = IBV_MTU;
     }
+    debug(1, "%s: attr.path_mtu=%d", __func__, attr.path_mtu);
     attr.rq_psn = 0;
     attr.dest_qp_num = remote_qp_num;
     attr.min_rnr_timer = 31;
-    debug(1, "%s: attr.path_mtu=%d", __func__, attr.path_mtu);
+    
+    if (od->transport_type == IB)
+    {
+        attr.ah_attr.dlid = remote_id.lid;
+    }
+    else
+    {
+        /* RoCE */
+        memcpy(&attr.ah_attr.grh.dgid, remote_id.gid.raw, 16);
+        attr.ah_attr.is_global = 1;
+        attr.ah_attr.grh.sgid_index = 0;
+    }
+
     ret = ibv_modify_qp(qp, &attr, mask);
     if (ret)
     {
@@ -1245,14 +1291,15 @@ static int openib_check_async_events(void)
  * 	od* : preallocated from openib_ib_initialize
  * 	ctx* : allocated by ibv_open_device inside this func, but located 
  * 		at od->ctx
- * 	hca_port* : hca_port attributes
+ * 	hca_port_attr* : hca_port attributes
  * Returns :
  * 	od* : possibly filled out by ibv_query_port
  * 	ret : 0 on good, !0 on failure (FATAL)
- * 	hca_port : queried, comes in empty
+ * 	hca_port_attr : queried, comes in empty
  */
-static int return_active_nic_handle (struct openib_device_priv* od, 
-                                     struct ibv_port_attr * hca_port)
+static int return_active_nic_handle(struct openib_device_priv* od,
+                                    int ib_port,
+                                    struct ibv_port_attr *hca_port_attr)
 {	
     int ret = 0, i=0;
     struct ibv_device *nic_handle = NULL;
@@ -1263,7 +1310,8 @@ static int return_active_nic_handle (struct openib_device_priv* od,
     /* make this configurable once we decide how 
      * adding more than one HCA REALLY complicates the configuable
      * nature that we had discussed */
-    od->nic_port = IBV_PORT;
+    od->nic_port = ib_port;
+    debug(0, "%s: od->nic_port = %d\n", __func__, od->nic_port);
 
     hca_list = ibv_get_device_list(&num_devs);
 	
@@ -1287,17 +1335,34 @@ static int return_active_nic_handle (struct openib_device_priv* od,
                 error("%s: ibv_open_device", __func__);
                 return -ENOSYS;
             }
-            ret = ibv_query_port(ctx, od->nic_port, hca_port );
- 
+
+            ret = ibv_query_port(ctx, od->nic_port, hca_port_attr);
             if (ret)
             {
                 error_xerrno(ret, "%s: ibv_query_port", __func__);
                 return -ENOSYS;
             }
 
-            if (hca_port->state != IBV_PORT_ACTIVE)
+            if (hca_port_attr->link_layer == IBV_LINK_LAYER_INFINIBAND)
+            {
+                /* use lid */
+                od->transport_type = IB;
+                od->nic_id.lid = hca_port_attr->lid;
+            }
+            else if (hca_port_attr->link_layer == IBV_LINK_LAYER_ETHERNET)
+            {
+                /* use gid */
+                od->transport_type = ROCE;
+                ret = ibv_query_gid(ctx, od->nic_port, 0, &od->nic_id.gid);
+                if (ret)
+                {
+                    gossip_err("%s: ibv_query_gid failed\n", __func__);
+                }
+            }
+
+            if (hca_port_attr->state != IBV_PORT_ACTIVE)
             {	
-                /* in this case, continue, delete old hca_port info */
+                /* in this case, continue, delete old hca_port_attr info */
                 ret = ibv_close_device(od->ctx);  /* not sure if this breaks */
                 if (ret)
                 {
@@ -1305,7 +1370,7 @@ static int return_active_nic_handle (struct openib_device_priv* od,
                     return -ENOSYS;
                 }
 		
-                memset(hca_port,0,sizeof(struct ibv_port_attr));
+                memset(hca_port_attr, 0, sizeof(struct ibv_port_attr));
                 warning("%s: found an inactive device/port",__func__);
 		
                 /* if we get to num_devs, no valid devices found */
@@ -1320,8 +1385,8 @@ static int return_active_nic_handle (struct openib_device_priv* od,
             /* if we get here, we had a valid device found, done searching */
             else 
             {
-                od->max_mtu = hca_port->max_mtu;
-                od->active_mtu = hca_port->active_mtu;
+                od->max_mtu = hca_port_attr->max_mtu;
+                od->active_mtu = hca_port_attr->active_mtu;
                 break; 	
             }
         }
@@ -1335,9 +1400,63 @@ static int return_active_nic_handle (struct openib_device_priv* od,
 }
 
 /*
+ * Parses the IB device port out of the BMI options string.
+ *
+ * Returns port number, either user-specified or default. 
+ */
+int parse_bmi_opts_get_ib_port(char *options)
+{
+    char *cp;
+    char *end_ptr;
+    int ib_port;
+
+    if (!options)
+    {
+        warning("%s: no options given; using default port: %d",
+                __func__, DEFAULT_IBV_PORT);
+        return DEFAULT_IBV_PORT; 
+    }
+
+    cp = strstr(options, "ib_port");
+    if (!cp)
+    {
+        warning("%s: no ib_port option specified; using default: %d",
+                __func__, DEFAULT_IBV_PORT);
+        return DEFAULT_IBV_PORT;
+    }
+
+    cp += strlen("ib_port");
+    for (; isspace(*cp); cp++);     /* skip whitespace */
+    if (*cp != '=')
+    {
+        warning("%s: malformed ib_port option; using default: %d",
+                __func__, DEFAULT_IBV_PORT);
+        return DEFAULT_IBV_PORT;
+    }
+    else
+    {
+        for (++cp; isspace(*cp); cp++); /* skip '=' and whitespace */
+
+        /* convert string represenation of port number into an integer */
+        ib_port = strtol(cp, &end_ptr, 10);
+        if (end_ptr != cp && (*end_ptr == '\0' || end_ptr[0] == ','))
+        {
+            /* valid */
+            return ib_port;
+        }
+        else
+        {
+            warning("%s: malformed ib_port option; using default: %d", 
+                    __func__, DEFAULT_IBV_PORT);
+            return DEFAULT_IBV_PORT;
+        }
+    }
+}
+
+/*
  * Startup, once per application.
  */
-int openib_ib_initialize(void)
+int openib_ib_initialize(char *options)
 {
     int flags, ret = 0;
 #ifdef HAVE_IBV_GET_DEVICES
@@ -1346,8 +1465,9 @@ int openib_ib_initialize(void)
 #endif /* HAVE_IBV_GET_DEVICES */
     int cqe_num; /* local variables, mainly for debug */
     struct openib_device_priv *od;
-    struct ibv_port_attr hca_port;
+    struct ibv_port_attr hca_port_attr;
     struct ibv_device_attr hca_cap;
+    int ib_port;
 
     od = bmi_ib_malloc(sizeof(*od));
     ib_device->priv = od;
@@ -1369,7 +1489,14 @@ int openib_ib_initialize(void)
     }
     VALGRIND_MAKE_MEM_DEFINED(ctx, sizeof(*ctx));
     od->ctx = ctx;
-    od->nic_port = IBV_PORT;  /* maybe let this be configurable */
+    if (options)
+    {
+        od->nic_port = parse_bmi_opts_get_ib_port(options);
+    }
+    else
+    {
+        od->nic_port = DEFAULT_IBV_PORT;
+    }
 
     if (!od->ctx) 
     {
@@ -1403,16 +1530,24 @@ int openib_ib_initialize(void)
     }
     VALGRIND_MAKE_MEM_DEFINED(&hca_cap, sizeof(hca_cap));
 #else
-    ret = return_active_nic_handle(od, &hca_port);
+    if (options)
+    {
+        ib_port = parse_bmi_opts_get_ib_port(options);
+    }
+    else
+    {
+        debug(0, "%s: using default IB port: %d", __func__, DEFAULT_IBV_PORT);
+        ib_port = DEFAULT_IBV_PORT;
+    }
+
+    ret = return_active_nic_handle(od, ib_port, &hca_port_attr);
     if (ret)
     {
         return -ENOSYS;
     }
 #endif
 
-    od->nic_lid = hca_port.lid;
-
-   /* Query the device for the max_ requests and such */
+    /* Query the device for the max_ requests and such */
     ret = ibv_query_device(od->ctx, &hca_cap);
     if (ret)
     {

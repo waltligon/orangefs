@@ -342,6 +342,10 @@ static PINT_sm_action crdirent_get_dist_dir_attr(
     PVFS_ds_attr_to_object_attr(&s_op->u.crdirent.dirdata_ds_attr,
                                 &s_op->u.crdirent.dirdata_attr);
     s_op->u.crdirent.dirdata_attr.mask = PVFS_ATTR_COMMON_ALL;
+    /* Must erase ATIME or it will be reset to the current time below,
+     * which should not be done when creating a directory entry per
+     * POSIX. */
+    s_op->u.crdirent.dirdata_attr.mask &= ~PVFS_ATTR_COMMON_ATIME;
 
     /* set up key and value structures for reading the dist_dir_attr */
     s_op->key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
@@ -741,9 +745,9 @@ static PINT_sm_action crdirent_update_directory_attr(
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
     dspace_attr = &s_op->u.crdirent.dirdata_attr;
-    dspace_attr->mask |= (PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_MTIME | PVFS_ATTR_COMMON_CTIME);
 
     /* map owner/group from credential if necessary */
+    /* This should always be true due to crdirent_get_dist_dir_attr. */
     if (dspace_attr->mask & (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID) &&
         (dspace_attr->owner == PVFS_UID_MAX || dspace_attr->group == PVFS_GID_MAX))
     {

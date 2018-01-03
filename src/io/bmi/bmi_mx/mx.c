@@ -958,7 +958,10 @@ bmx_open_endpoint(mx_endpoint_t *ep, uint32_t board, uint32_t ep_id)
 /* The listen_addr is our method if we are a server. It is NULL for a
  * client. The other params are NULL/0 for the client as well. */
 static int
-BMI_mx_initialize(bmi_method_addr_p listen_addr, int method_id, int init_flags)
+BMI_mx_initialize(bmi_method_addr_p listen_addr,
+                  int method_id,
+                  int init_flags,
+                  char *options)
 {
         int             i       = 0;
         int             ret     = 0;

@@ -699,7 +699,7 @@ void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x)
 {
     char *addr_string;
     decode_string(pptr, &addr_string);
-    BMI_addr_lookup(x, addr_string);
+    BMI_addr_lookup(x, addr_string, NULL);
 }
 
 #ifndef WIN32
@@ -1081,12 +1081,7 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
         return -PVFS_EACCES;
     }
 
-    /* keyval for ACLs includes a \0. so subtract the thingie */
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-    acl_size--;
-#else
     acl_size -= sizeof(pvfs2_acl_header);
-#endif
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
                 "PINT_check_acls: read keyval size "
                 " %d (%d acl entries)\n",
@@ -1113,24 +1108,14 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
 
     for (i = 0; i < count; i++)
     {
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        pa = (pvfs2_acl_entry *) acl_buf + i;
-#else
         pa = &(((pvfs2_acl_header *)acl_buf)->p_entries[i]);
-#endif
         /* 
            NOTE: Remember that keyval is encoded as lebf,
            so convert it to host representation 
         */
-#ifdef PVFS_USE_OLD_ACL_FORMT
-        pe.p_tag  = bmitoh32(pa->p_tag);
-        pe.p_perm = bmitoh32(pa->p_perm);
-        pe.p_id   = bmitoh32(pa->p_id);
-#else
         pe.p_tag  = bmitoh16(pa->p_tag);
         pe.p_perm = bmitoh16(pa->p_perm);
         pe.p_id   = bmitoh32(pa->p_id);
-#endif
         pa = &pe;
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded ACL entry %d "
             "(p_tag %d, p_perm %d, p_id %d)\n",
@@ -1186,26 +1171,16 @@ mask:
     for (; i < count; i++)
     {
         pvfs2_acl_entry me;
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        pvfs2_acl_entry *mask_obj = (pvfs2_acl_entry *) acl_buf + i;
-#else
         pvfs2_acl_entry *mask_obj =
                 &(((pvfs2_acl_header *)acl_buf)->p_entries[i]);
-#endif
         
         /* 
           NOTE: Again, since pvfs2_acl_entry is in lebf, we need to
           convert it to host endian format
          */
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        me.p_tag  = bmitoh32(mask_obj->p_tag);
-        me.p_perm = bmitoh32(mask_obj->p_perm);
-        me.p_id   = bmitoh32(mask_obj->p_id);
-#else
         me.p_tag  = bmitoh16(mask_obj->p_tag);
         me.p_perm = bmitoh16(mask_obj->p_perm);
         me.p_id   = bmitoh32(mask_obj->p_id);
-#endif
         mask_obj = &me;
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded (mask) ACL entry %d "
             "(p_tag %d, p_perm %d, p_id %d)\n",

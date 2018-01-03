@@ -158,7 +158,8 @@ static int global_flags;
 
 static int activate_method(const char *name, 
                            const char *listen_addr, 
-                           int flags);
+                           int flags,
+                           char *options);
 static void bmi_addr_drop(ref_st_p tmp_ref);
 static void bmi_addr_force_drop(ref_st_p ref, ref_list_p ref_list);
 static void bmi_check_forget_list(void);
@@ -177,7 +178,8 @@ static void bmi_check_addr_force_drop (void);
  */
 int BMI_initialize(const char *method_list,
                    const char *listen_addr,
-                   int flags)
+                   int flags,
+                   char *options)
 {
     int ret = -1;
     int i = 0, j = 0;
@@ -320,7 +322,10 @@ int BMI_initialize(const char *method_list,
                          "BMI_initialize: Activating %s with %s\n", 
                          requested_methods[i], this_addr); 
 
-            ret = activate_method(requested_methods[i], this_addr, flags);
+            ret = activate_method(requested_methods[i],
+                                  this_addr,
+                                  flags,
+                                  options);
             if (ret < 0)
             {
                 ret = bmi_errno_to_pvfs(ret);
@@ -1825,7 +1830,8 @@ int BMI_query_addr_range (BMI_addr_t addr,
  *  \return 0 on success, -errno on failure.
  */
 int BMI_addr_lookup(BMI_addr_t * new_addr,
-                    const char *id_string)
+                    const char *id_string,
+                    char *bmi_opts)
 {
     ref_st_p new_ref = NULL;
     bmi_method_addr_p meth_addr = NULL;
@@ -1897,7 +1903,10 @@ int BMI_addr_lookup(BMI_addr_t * new_addr,
             if (!strncmp(id_string, name, strlen(name)))
             {
                 gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "\tActivating method\n");
-                ret = activate_method(known_method_table[i]->method_name, 0, 0);
+                ret = activate_method(known_method_table[i]->method_name,
+                                      0,
+                                      0,
+                                      bmi_opts);
                 if (ret < 0)
                 {
                     failed = 1;
@@ -2365,7 +2374,8 @@ static int grow_method_usage (struct method_usage_t ** p,
 static int
 activate_method(const char *name, 
                 const char *listen_addr, 
-                int flags)
+                int flags,
+                char *options)
 {
     int i, ret;
     void *x;
@@ -2462,7 +2472,7 @@ activate_method(const char *name,
                  "flags=%d\n",
                  listen_addr, active_method_count-1, flags); 
 
-    ret = meth->initialize(new_addr, active_method_count - 1, flags);
+    ret = meth->initialize(new_addr, active_method_count - 1, flags, options);
     if (ret < 0) 
     {
         gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,

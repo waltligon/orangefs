@@ -502,7 +502,7 @@ int PINT_cached_config_get_next_meta(PVFS_fs_id fsid,
 
     if (meta_addr != NULL)
     {
-        ret = BMI_addr_lookup(meta_addr, meta_server_bmi_str);
+        ret = BMI_addr_lookup(meta_addr, meta_server_bmi_str, NULL);
     }
     else
     {
@@ -547,7 +547,8 @@ static int PINT_cached_config_get_extents(
         server_list = PINT_llist_next(server_list);
 
         ret = BMI_addr_lookup(&tmp_addr,
-                              cur_mapping->alias_mapping->bmi_address);
+                              cur_mapping->alias_mapping->bmi_address,
+                              NULL);
         if(ret < 0)
         {
             return ret;
@@ -649,7 +650,8 @@ int PINT_cached_config_map_servers(
         {
             /* lookup addresses */
             ret = BMI_addr_lookup(&addr_array[0],
-                                  cur_config_cache->data_local_alias);
+                                  cur_config_cache->data_local_alias,
+                                  NULL);
             if (!ret)
             {
                 struct host_handle_mapping_s *mapping;
@@ -722,7 +724,8 @@ int PINT_cached_config_map_servers(
         {
             /* lookup addresses */
             ret = BMI_addr_lookup(&addr_array[df],
-                                  sv->alias_mapping->bmi_address);
+                                  sv->alias_mapping->bmi_address,
+                                  NULL);
             if (ret)
             {
                 return ret;
@@ -807,7 +810,8 @@ int PINT_cached_config_map_servers(
             assert(sv);
             /* lookup addresses */
             ret = BMI_addr_lookup(&addr_array[df],
-                                  sv->alias_mapping->bmi_address);
+                                  sv->alias_mapping->bmi_address,
+                                  NULL);
             /* no one uses this but we get it anyway */
             if(handle_extent_array)
             {
@@ -1656,7 +1660,7 @@ static int cache_server_array(PVFS_fs_id fsid)
                 tmp_server = PINT_llist_next(tmp_server);
                 server_bmi_str = cur_mapping->alias_mapping->bmi_address;
 
-                ret = BMI_addr_lookup(&tmp_bmi_addr, server_bmi_str);
+                ret = BMI_addr_lookup(&tmp_bmi_addr, server_bmi_str, NULL);
                 if (ret < 0)
                 {
                     return(ret);
@@ -1936,7 +1940,8 @@ static int load_handle_lookup_table(
                     = cur_mapping->alias_mapping->bmi_address;
                 ret = BMI_addr_lookup(
                     &cur_config_fs_cache->handle_lookup_table[table_offset].server_addr,                 
-                    cur_config_fs_cache->handle_lookup_table[table_offset].server_name);
+                    cur_config_fs_cache->handle_lookup_table[table_offset].server_name,
+                    NULL);
                 if(ret < 0)
                 {
                     free(cur_config_fs_cache->handle_lookup_table);
