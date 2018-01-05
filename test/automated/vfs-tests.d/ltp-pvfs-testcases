@@ -6,7 +6,8 @@ asyncio02 asyncio02
 chdir02 chdir02
 chown01 chown01
 close08 close08
-creat09 creat09
+# Removed from LTP
+#creat09 creat09
 dup01 dup01
 dup02 dup02
 dup03 dup03
@@ -16,16 +17,19 @@ fchown01 fchown01
 fcntl02 fcntl02
 fcntl03 fcntl03
 fcntl04 fcntl04
-fcntl07 fcntl07
+# Merged with unsupported test
+#fcntl07 fcntl07
 fcntl08 fcntl08
 fpathconf01 fpathconf01
 fstat01 fstat01
 fstatfs01 fstatfs01
 fsync01 fsync01
 lseek01 lseek01
-lseek02 lseek02
-lseek03 lseek03
-lseek05 lseek05
+# merged with unsupported test
+#lseek02 lseek02
+# Removed from LTP
+#lseek03 lseek03
+#lseek05 lseek05
 lstat02 lstat02
 mkdir01 mkdir01
 mkdir08 mkdir08
@@ -60,10 +64,12 @@ chmod01 symlink01 -T chmod01
 utime01 symlink01 -T utime01
 rename01 symlink01 -T rename01
 open01 symlink01 -T open01
-abort01 ulimit -c 1024;abort01
+# No longer compatible with OrangeFS
+#abort01 abort01
 access02 access02
 access04 access04
-access05 access05
+# Removed from LTP
+#access05 access05
 chdir01 chdir01
 chdir01A symlink01 -T chdir01
 chdir03 chdir03
@@ -106,7 +112,8 @@ fdatasync01 fdatasync01
 fdatasync02 fdatasync02
 fstat02 fstat02
 fstat03 fstat03
-fstat04 fstat04
+# Removed from LTP
+#fstat04 fstat04
 fstat05 fstat05
 #fstatfs02 fstatfs02 #This test fails on SLES11 SP3 for reasons not related to OrangeFS
 fsync03 fsync03
@@ -127,10 +134,11 @@ link06 link06
 link07 link07
 llseek01 llseek01
 llseek02 llseek02
-lseek06 lseek06
+# Removed from LTP
+#lseek06 lseek06
 lseek07 lseek07
-lseek08 lseek08
-lseek09 lseek09
+#lseek08 lseek08
+#lseek09 lseek09
 lstat01 lstat01
 lstat03 lstat03
 mallopt01 mallopt01
@@ -182,7 +190,7 @@ ptrace02 ptrace02
 ptrace03 ptrace03
 pwrite01 pwrite01
 pwrite02 pwrite02
-pwrite03 pwrite03
+#pwrite03 pwrite03
 pwrite04 pwrite04
 read02 read02
 read04 read04
@@ -229,9 +237,10 @@ sysinfo02 sysinfo02
 truncate01 truncate01
 truncate02 truncate02
 truncate03 truncate03
-truncate04 truncate04
-umask02 umask02
-umask03 umask03
+# Removed from LTP
+#truncate04 truncate04
+#umask02 umask02
+#umask03 umask03
 uname01 uname01
 uname02 uname02
 uname03 uname03
@@ -244,7 +253,8 @@ utime03 utime03
 utime04 utime04
 utime05 utime05
 utime06 utime06
-write02 write02
+# Removed from LTP
+#write02 write02
 write03 write03
 write05 write05
 writev02 writev02

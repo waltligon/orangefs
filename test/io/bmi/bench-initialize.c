@@ -175,12 +175,12 @@ int bench_initialize_bmi_interface(
 
     if (flags & BMI_INIT_SERVER)
     {
-	ret = BMI_initialize(method, local_address, flags);
+	ret = BMI_initialize(method, local_address, flags, NULL);
     }
     else
     {
 
-	ret = BMI_initialize(NULL, NULL, 0);
+	ret = BMI_initialize(NULL, NULL, 0, NULL);
     }
     if (ret < 0)
     {
@@ -345,7 +345,7 @@ int bench_initialize_bmi_addresses_client(
 	{
 	    return (-1);
 	}
-	ret = BMI_addr_lookup(&server_array[i], bmi_server_name);
+	ret = BMI_addr_lookup(&server_array[i], bmi_server_name, NULL);
 	if (ret < 0)
 	{
 	    return (-1);

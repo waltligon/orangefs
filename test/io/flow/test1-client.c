@@ -55,7 +55,7 @@ int main(
     gossip_set_debug_mask(0, GOSSIP_FLOW_PROTO_DEBUG | GOSSIP_BMI_DEBUG_TCP);
 
     /* start up BMI */
-    ret = BMI_initialize("bmi_tcp", NULL, 0);
+    ret = BMI_initialize("bmi_tcp", NULL, 0, NULL);
     if (ret < 0)
     {
 	fprintf(stderr, "BMI init failure.\n");
@@ -78,7 +78,7 @@ int main(
     }
 
     /* send some random crap to the other side to start up communication */
-    ret = BMI_addr_lookup(&server_addr, "tcp://localhost:3335");
+    ret = BMI_addr_lookup(&server_addr, "tcp://localhost:3335", NULL);
     if (ret < 0)
     {
 	fprintf(stderr, "BMI lookup failure.\n");

@@ -142,6 +142,7 @@ typedef struct
     int readahead_count;
     int readahead_readcnt;
     int readahead_pinned;
+    char *bmi_opts;
 } options_t;
 
 /*
@@ -1586,6 +1587,11 @@ static inline int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
                                                               
     mntent->encoding = PVFS2_ENCODING_DEFAULT;                      
     mntent->flowproto = FLOWPROTO_DEFAULT;                   
+
+    if (s_opts.bmi_opts)
+    {
+        mntent->bmi_opts = strdup(s_opts.bmi_opts);
+    }
                                                            
     /* also fill in the fs_id for umount */               
     if (!mount)                                           
@@ -3785,7 +3791,8 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
 
                 if (BMI_addr_lookup(
                              &tmp_addr, 
-                             vfs_request->mntent->the_pvfs_config_server) == 0)
+                             vfs_request->mntent->the_pvfs_config_server,
+                             NULL) == 0)
                 {
                     if (BMI_set_info(tmp_addr,
                                      BMI_FORCEFUL_CANCEL_MODE,
@@ -5517,6 +5524,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"child",0,0,0},
         {"events",1,0,0},
         {"keypath",1,0,0},
+        {"bmi-opts",1,0,0},
         {0,0,0,0}
     };
 
@@ -5818,6 +5826,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("keypath", cur_option) == 0)
                 {
                     opts->keypath = optarg;
+                }
+                else if (strcmp("bmi-opts", cur_option) == 0)
+                {
+                    opts->bmi_opts = optarg;
                 }
                 break;
             case 'h':
