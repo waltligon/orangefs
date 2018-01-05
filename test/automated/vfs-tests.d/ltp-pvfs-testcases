@@ -64,7 +64,8 @@ chmod01 symlink01 -T chmod01
 utime01 symlink01 -T utime01
 rename01 symlink01 -T rename01
 open01 symlink01 -T open01
-abort01 abort01
+# No longer compatible with OrangeFS
+#abort01 abort01
 access02 access02
 access04 access04
 # Removed from LTP
