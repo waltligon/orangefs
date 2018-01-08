@@ -83,10 +83,10 @@ objectClass: olcSchemaConfig
 cn: schema
 
 #include: file:///etc/openldap/schema/core.ldif
-include: __SCHEMADIR__/core.ldif
-include: __SCHEMADIR__/cosine.ldif
-include: __SCHEMADIR__/inetorgperson.ldif
-include: __SCHEMADIR__/nis.ldif
+include: file://__SCHEMADIR__/core.ldif
+include: file://__SCHEMADIR__/cosine.ldif
+include: file://__SCHEMADIR__/inetorgperson.ldif
+include: file://__SCHEMADIR__/nis.ldif
 
 #
 # Frontend settings
@@ -137,10 +137,10 @@ dn: olcDatabase=monitor,cn=config
 objectClass: olcDatabaseConfig
 olcDatabase: monitor
 olcAccess: to * by dn.base="gidNumber=0+uidNumber=0,cn=peercred,cn=external,c
- n=auth" read by dn.base="cn=Manager, "__DC__" read by * none
+ n=auth" read by dn.base="cn=Manager,__SUFFIX__" read by * none
 
 #
-# Backend database definitions
+# Backend LMDB database definitions
 #
 
 dn: olcDatabase=mdb,cn=config
@@ -151,9 +151,9 @@ olcDbMaxSize: 1073741824
 #olcSuffix: dc=my-domain,dc=com
 olcSuffix: __SUFFIX__
 #olcRootDN: cn=Manager,dc=my-domain,dc=com
-olcRootDN: cn=Manager,__DC__
-olcRootPW: secret
+olcRootDN: cn=admin,__SUFFIX__
+olcRootPW: __ADMINPW__
 #olcDbDirectory:	/var/lib/ldap
-olcDbDirectory:	__DATADIR__
+olcDbDirectory:	__DBDIR__
 olcDbIndex: objectClass eq,pres
 olcDbIndex: ou,cn,mail,surname,givenname eq,pres,sub
