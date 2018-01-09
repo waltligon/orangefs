@@ -7,9 +7,9 @@ dn: cn=config
 objectClass: olcGlobal
 cn: config
 #olcArgsFile: /var/run/openldap/slapd.args
-olcArgsFile: __ARGSDIR__
+olcArgsFile: __ARGSDIR__/slapd.args
 #olcPidFile: /var/run/openldap/slapd.pid
-olcPidFile: __PIDDIR__
+olcPidFile: __PIDDIR__/slapd.pid
 #
 # TLS settings
 #

@@ -1,18 +1,19 @@
 #!/bin/bash
 # pvfs2-ldap-create-slapd-ldif.sh
-# Create a new slapd conf file in ldif format, add it to the system, and then
-# start the slapd server.
+# Create a new slapd conf file in ldif format, add it to the sldapd server, and then
+# start it.
 
 usage ()
 {
-    echo "USAGE: $0 [-h] [-c] [-i openldap installation directory] [-p pid directory] [-d data dir] [-m mod dir] [-s suffix dn]"
+    echo "USAGE: $0 [-h] [-c] -i <slapd.d dir> -p <pid dir> -a <arguments dir> -s <schema dir> -d <data dir> -x <suffix dn>"
     echo "    -h: help"
-    echo "    -c: output ldif server config file only (to ./slapd.ldif)"
-    echo "    -i: openldap installation directory; default is /usr" 
-    echo "    -p: location where pid file is located when slapd is started"
-    echo "    -d: location where database files should be created"
-    echo "    -m: location where modules are kept (optional)"
-    echo "    -s: suffix dn: base (topmost) dn of tree, default based on hostname, e.g. clemson.edu => 'dc=clemson,dc=edu' "
+    echo "    -c: only output ldif server config file (to ./slapd.ldif)"
+    echo "    -i: location of the slapd.d directory"
+    echo "    -p: location where pid file should be created  when slapd is started"
+    echo "    -a: location where argument file will be found when slapd is started"
+    echo "    -s: location of schema ldif files installed with ldap"
+    echo "    -d: location where user data directory should be created"
+    echo "    -x: ldap suffix for your directory tree, e.g., clemson.edu => 'dc=clemson,dc=edu' "
 }
 
 randpw ()
@@ -26,25 +27,35 @@ randpw ()
     echo $pass
 }
 
-while getopts "chi:f:p:d:m:a:s:w:" option
+required_parameters="i:p:a:s:d:x:"
+optional_parameters="ch"
+all_parameters="$optional_parameters$required_parameters"
+
+echo "all_parameters is ($all_parameters)"
+echo "length of required_parameters is (${#required_parameters})"
+
+while getopts "$all_parameters" option
 do
     case $option in
         c)
             confonly=yes
         ;;
-        f)
-            conffile=$OPTARG
+        i)
+            slapddir=$OPTARG
         ;;
         p)
-            pidfile=$OPTARG
+            piddir=$OPTARG
         ;;
+	a)
+	    argdir=$OPTARG
+	;;
+	s)
+	    schemadir=$OPTARG
+	;;
         d)
             datadir=$OPTARG
         ;;
-        m)
-            moddir=$OPTARG
-        ;;
-        s)
+        x)
             #lowercase
             suffix=${OPTARG,}
         ;;
@@ -54,6 +65,75 @@ do
         ;;
     esac
 done
+
+#No options were entered on the command line
+if [[ $OPTIND == 1 ]]
+then
+   usage
+   exit 1
+fi
+
+echo "OPTIND is $OPTIND"
+
+#do we have missing required parameters?
+if [[ $OPTIND < '${#required_parameters}' ]]
+then
+   echo "We have missing parameters...."
+   missing_parm_message=`echo "Missing parameters:"`
+   echo $missing_parm_message
+   if [[ ! $slapddir ]]
+   then
+      newline=`echo " "`
+      missing_parm_message="$missing_parm_message$newline   slapd.d directory"
+      echo $missing_parm_message
+   fi
+   exit 1
+fi
+   
+
+if [[ ! $slapddir ]]
+then
+   echo "slapd.d directory location is required."
+else
+   echo "slapd.d directory ($slapddir)"
+fi
+
+if [[ ! $piddir ]]
+then
+   echo "pid file directory location is required."
+else
+   echo "pid directory ($piddir)"
+fi
+
+if [[ ! $argdir ]]
+then
+   echo "arg file directory location is required."
+else
+   echo "arg directory ($argdir)"
+fi
+
+if [[ ! $schemadir ]]
+then
+   echo "schema directory location is required."
+else
+   echo "schema directory ($schemadir)"
+fi
+
+if [[ ! $datadir ]]
+then
+   echo "user data directory is required."
+else
+   echo "user data directory ($datadir)"
+fi
+
+if [[ ! $suffix ]]
+then
+   echo "suffix definition is required."
+else
+   echo "suffix definition ($suffix)"
+fi
+
+exit 1
 
 # defaults
 if [ ! $conffile ]; then
