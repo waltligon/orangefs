@@ -76,6 +76,7 @@ typedef struct
     char *readahead_count;
     char *readahead_readcnt;
     char *readahead_pinned;
+    char *bmi_opts;
 } options_t;
 
 static void client_sig_handler(int signum);
@@ -522,6 +523,12 @@ static int monitor_pvfs2_client(options_t *opts)
                 arg_list[arg_index++] = "--keypath";
                 arg_list[arg_index++] = opts->keypath;
             }
+            if (opts->bmi_opts)
+            {
+                arg_list[arg_index] = "--bmi-opts";
+                arg_list[arg_index+1] = opts->bmi_opts;
+                arg_index+=2;
+            }
 
             if(opts->verbose)
             {
@@ -592,6 +599,7 @@ static void print_help(char *progname)
     printf("--logtype=file|syslog         specify writing logs to file or syslog\n");
     printf("--events=EVENTS               enable tracing of certain EVENTS\n");
     printf("--keypath=PATH                path to credential key file\n");
+    printf("--bmi-opts=\"OPTIONS\"          comma-seperated options string to pass to bmi\n");
 }
 
 static void parse_args(int argc, char **argv, options_t *opts)
@@ -637,6 +645,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"logstamp",1,0,0},
         {"events",1,0,0},
         {"keypath",1,0,0},
+        {"bmi-opts",1,0,0},
         {0,0,0,0}
     };
 
@@ -791,6 +800,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("keypath", cur_option) == 0)
                 {
                     opts->keypath = optarg;
+                }
+                else if (strcmp("bmi-opts", cur_option) == 0)
+                {
+                    opts->bmi_opts = optarg;
                 }
 
                 break;

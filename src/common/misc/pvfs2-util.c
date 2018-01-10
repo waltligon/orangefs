@@ -107,6 +107,8 @@ static PVFS_util_tab s_stat_tab_array[PVFS2_MAX_TABFILES];
 static int s_stat_tab_count = 0;
 static gen_mutex_t s_stat_tab_mutex = GEN_MUTEX_INITIALIZER;
 
+static int PINT_util_parse_mnt_opts(const char *opts,
+                                    struct PVFS_sys_mntent *mntent);
 static int parse_flowproto_string(const char *input,
                                   enum PVFS_flowproto_type *flowproto);
 
@@ -114,6 +116,7 @@ static int parse_encoding_string(const char *cp,
                                  enum PVFS_encoding_type *et);
 
 static int parse_num_dfiles_string(const char* cp, int* num_dfiles);
+static int parse_bmi_opts_string(char *cp, char **bmi_opts);
 
 #ifndef ENABLE_SECURITY_MODE
 static int PINT_is_idnum(const char *str);
@@ -165,6 +168,7 @@ struct PVFS_sys_mntent* PVFS_util_gen_mntent(char* config_server,
 
     tmp_ent->flowproto = FLOWPROTO_DEFAULT;
     tmp_ent->encoding = PVFS2_ENCODING_DEFAULT;
+    tmp_ent->bmi_opts = NULL;
 
     return(tmp_ent);
 }
@@ -845,6 +849,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
         *tmp = 0;
         mntent->mnt_opts = strdup("rw");
         mntent->fs_id = PVFS_FS_ID_NULL;
+        mntent->bmi_opts = NULL;
         return &s_stat_tab_array[0];
     }
 
@@ -1127,50 +1132,13 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             strcpy(current_tab->mntent_array[i].mnt_opts,
                    PINT_FSTAB_OPTS(tmp_ent));
 
-            /* find out if a particular flow protocol was specified */
-            if ((PINT_fstab_entry_hasopt(tmp_ent, "flowproto")))
+            /* parse the specified mount options */
+            ret = PINT_util_parse_mnt_opts(
+                                    current_tab->mntent_array[i].mnt_opts,
+                                    &(current_tab->mntent_array[i]));
+            if (ret)
             {
-                ret = parse_flowproto_string(PINT_FSTAB_OPTS(tmp_ent),
-                                             &(current_tab->
-                                               mntent_array[i].flowproto));
-                if (ret < 0)
-                {
-                    goto error_exit;
-                }
-            }
-            else
-            {
-                current_tab->mntent_array[i].flowproto =
-                                        FLOWPROTO_DEFAULT;
-            }
-
-            /* pick an encoding to use with the server */
-            current_tab->mntent_array[i].encoding = PVFS2_ENCODING_DEFAULT;
-            cp = PINT_fstab_entry_hasopt(tmp_ent, "encoding");
-            if (cp)
-            {
-                ret = parse_encoding_string(
-                                    cp,
-                                    &current_tab->mntent_array[i].encoding);
-                if (ret < 0)
-                {
-                    goto error_exit;
-                }
-            }
-
-            /* find out if a particular num dfiles was specified */
-            current_tab->mntent_array[i].default_num_dfiles = 0;
-            cp = PINT_fstab_entry_hasopt(tmp_ent, "num_dfiles");
-            if (cp)
-            {
-                ret = parse_num_dfiles_string(
-                    cp,
-                    &(current_tab->mntent_array[i].default_num_dfiles));
-
-                if (ret < 0)
-                {
-                    goto error_exit;
-                }
+                goto error_exit;
             }
 
             /* increment number of pvfs records found */
@@ -1223,10 +1191,92 @@ error_exit:
             free(me->pvfs_fs_name);
             me->pvfs_fs_name = NULL;
         }
+
+        if (me->bmi_opts)
+        {
+            free(me->bmi_opts);
+            me->bmi_opts = NULL;
+        }
     }
     PINT_fstab_close(mnt_fp);
     gen_mutex_unlock(&s_stat_tab_mutex);
     return (NULL);
+}
+
+/* PINT_util_parse_mnt_opts()
+ *
+ * Parses opts string looking for specific mount options and fills in the
+ * mntent structure accordingly.
+ *
+ * Returns 0 on success, -PVFS_EINVAL on failure. 
+ */
+static int PINT_util_parse_mnt_opts(const char *opts,
+                                    struct PVFS_sys_mntent *mntent)
+{
+    char *cp;
+    int ret;
+
+    /* find out if a particular flow protocol was specified */
+    cp = strstr(opts, "flowproto");
+    if (cp)
+    {
+        ret = parse_flowproto_string(cp, &(mntent->flowproto));
+        if (ret < 0)
+        {
+            return ret;
+        }
+    }
+    else
+    {
+        mntent->flowproto = FLOWPROTO_DEFAULT;
+    }
+
+    /* pick an encoding to use with the server */
+    cp = strstr(opts, "encoding");
+    if (cp)
+    {
+        ret = parse_encoding_string(cp, &(mntent->encoding));
+        if (ret < 0)
+        {
+            return ret;
+        }
+    }
+    else
+    {
+        mntent->encoding = PVFS2_ENCODING_DEFAULT;
+    }
+
+    /* find out if a particular num dfiles was specified */
+    cp = strstr(opts, "num_dfiles");
+    if (cp)
+    {
+        ret = parse_num_dfiles_string(cp, &(mntent->default_num_dfiles));
+        if (ret < 0)
+        {
+            return ret;
+        }
+    }
+    else
+    {
+        mntent->default_num_dfiles = 0;
+    }
+
+    /* find out if any bmi-specific options were specified */
+    cp = strstr(opts, "bmi_opts");
+    if (cp)
+    {
+        ret = parse_bmi_opts_string(cp, &(mntent->bmi_opts));
+        if (ret < 0)
+        {
+            return ret;
+        }
+    }
+    else
+    {
+        mntent->bmi_opts = NULL;
+    }
+
+    return 0;
 }
 
 /* PVFS_util_get_default_fsid()
@@ -2024,6 +2074,11 @@ void PVFS_util_free_mntent(
             free(mntent->the_pvfs_config_server);
             mntent->the_pvfs_config_server = NULL;
         }
+        if (mntent->bmi_opts)
+        {
+            free(mntent->bmi_opts);
+            mntent->bmi_opts = NULL;
+        }
 
         mntent->flowproto = 0;
         mntent->encoding = 0;
@@ -2102,6 +2157,16 @@ int PVFS_util_copy_mntent(
             }
         }
 
+        if (src_mntent->bmi_opts)
+        {
+            dest_mntent->bmi_opts = strdup(src_mntent->bmi_opts);
+            if (!dest_mntent->bmi_opts)
+            {
+                ret = -PVFS_ENOMEM;
+                goto error_exit;
+            }
+        }
+
         dest_mntent->flowproto = src_mntent->flowproto;
         dest_mntent->encoding = src_mntent->encoding;
         dest_mntent->fs_id = src_mntent->fs_id;
@@ -2142,6 +2207,12 @@ int PVFS_util_copy_mntent(
     {
         free(dest_mntent->mnt_opts);
         dest_mntent->mnt_opts = NULL;
+    }
+
+    if (dest_mntent->bmi_opts)
+    {
+        free(dest_mntent->bmi_opts);
+        dest_mntent->bmi_opts = NULL;
     }
     return ret;
 }
@@ -2441,7 +2512,7 @@ static int parse_num_dfiles_string(const char* cp, int* num_dfiles)
 
     parsed_value = strtol(cp, &end_ptr, 10);
 
-    /* If a numerica value was found, continue
+    /* If a numerical value was found, continue
        else, report an error */
     if (end_ptr != cp)
     {
@@ -2454,6 +2525,57 @@ static int parse_num_dfiles_string(const char* cp, int* num_dfiles)
         return -PVFS_EINVAL;
     }
 
+    return 0;
+}
+
+/* parse_bmi_opts_string()
+ *
+ * Gets the BMI options string specified as an option in the tab file.
+ *
+ * Returns 0 on success, -PVFS_EINVAL on failure.
+ */
+static int parse_bmi_opts_string(char *input, char **bmi_opts)
+{
+    char *cp = NULL;
+    char *closing_quote = NULL;
+
+    cp = input + strlen("bmi_opts");
+
+    /* Skip optional spacing */
+    for (; isspace(*cp); cp++);
+
+    if (*cp != '=')
+    {
+        gossip_err("Error: %s: malformed bmi_opts option in tab file.\n",
+                   __func__);
+        return -PVFS_EINVAL;
+    }
+
+    /* Skip optional spacing */
+    for (++cp; isspace(*cp); cp++);
+
+    if (*cp != '"')
+    {
+        gossip_err("Error: %s: malformed bmi_opts option in tab file.\n",
+                   __func__);
+        return -PVFS_EINVAL;
+    }
+
+    cp++;   /* skip the opening quotation mark */
+    *bmi_opts = strdup(cp);
+    closing_quote = strchr(*bmi_opts, '"');
+    if (closing_quote == NULL ||
+           (*(closing_quote + 1) != '\0' && *(closing_quote + 1) != ','))
+    {
+        gossip_err("Error: %s: malformed bmi_opts options in tab file.\n",
+                   __func__);
+        return -PVFS_EINVAL;
+    }
+
+    *closing_quote = '\0';  /* remove closing quotation mark */
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: bmi_opts=\"%s\"\n",
+                 __func__, *bmi_opts);
     return 0;
 }
 

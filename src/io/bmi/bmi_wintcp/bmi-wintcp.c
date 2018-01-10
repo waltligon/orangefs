@@ -96,7 +96,8 @@ int inet_aton(const char *cp, struct in_addr *inp)
 /* function prototypes */
 int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
                        int method_id,
-                       int init_flags);
+                       int init_flags,
+                       char *options);
 int BMI_tcp_finalize(void);
 int BMI_tcp_set_info(int option,
                      void *inout_parameter);
@@ -459,7 +460,8 @@ static HANDLE bmi_tcp_pid;
  */
 int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
                        int method_id,
-                       int init_flags)
+                       int init_flags,
+                       char *options)
 {
 
     int ret = -1, err;

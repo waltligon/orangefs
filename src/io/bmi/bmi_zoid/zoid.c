@@ -426,8 +426,10 @@ zoid_err_to_bmi(int err)
 
 /* Invoked on BMI_initialize.  */
 static int
-BMI_zoid_initialize(bmi_method_addr_p listen_addr, int method_id,
-		    int init_flags)
+BMI_zoid_initialize(bmi_method_addr_p listen_addr,
+                    int method_id,
+                    int init_flags,
+                    char *options)
 {
 #if 0
     fprintf(stderr, "Invoked zoid_initialize\n");

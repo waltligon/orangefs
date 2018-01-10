@@ -1041,7 +1041,8 @@ static PINT_sm_action create_parent_getattr_inspect(
                     }
                     ret = BMI_addr_lookup(
                              &sm_p->u.create.layout.server_list.servers[s],
-                             taddr);
+                             taddr,
+                             NULL);
                     if (ret)
                     {
                         js_p->error_code = ret;
