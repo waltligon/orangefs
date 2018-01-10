@@ -31,9 +31,6 @@ required_parameters="i:p:a:s:d:x:"
 optional_parameters="ch"
 all_parameters="$optional_parameters$required_parameters"
 
-echo "all_parameters is ($all_parameters)"
-echo "length of required_parameters is (${#required_parameters})"
-
 while getopts "$all_parameters" option
 do
     case $option in
@@ -73,67 +70,70 @@ then
    exit 1
 fi
 
-echo "OPTIND is $OPTIND"
-
 #do we have missing required parameters?
-if [[ $OPTIND < '${#required_parameters}' ]]
+if (( OPTIND < ${#required_parameters} ))
 then
-   echo "We have missing parameters...."
-   missing_parm_message=`echo "Missing parameters:"`
-   echo $missing_parm_message
+   echo "Missing parameters:"
    if [[ ! $slapddir ]]
    then
-      newline=`echo " "`
-      missing_parm_message="$missing_parm_message$newline   slapd.d directory"
-      echo $missing_parm_message
+      echo "   slapd.d directory"
    fi
+   if [[ ! $piddir ]]
+   then
+      echo "   pid directory"
+   fi
+   if [[ ! $argdir ]]
+   then
+      echo "   arg directory"
+   fi
+   if [[ ! $schemadir ]]
+   then
+      echo "   schema directory"
+   fi
+   if [[ ! $datadir ]]
+   then
+      echo "   user data directory"
+   fi
+   if [[ ! $suffix ]]
+   then
+      echo "   suffix definition"
+   fi
+   echo
+   usage
    exit 1
 fi
+
+#check validity of parameters
+if [[ ! -d $slapddir ]]
+then
+   echo "slapd.d directory ($slapddir) is invalid"
+fi
+if [[ ! -d $piddir ]]
+then
+   echo "pid directory ($piddir) is invalid"
+fi
+if [[ ! -d $argdir ]]
+then
+   echo "arg directory ($argdir) is invalid"
+fi
+if [[ ! -d $schemadir ]]
+then
+   echo "schema directory ($schemadir) is invalid"
+fi
+if [[ ! -d $datadir ]]
+then
+   echo "user data directory ($datadir) is invalid"
+fi
+
+#to check the validity of the given suffix
+# use ${suffix%,dc=*} until no more matches, then
+# use ${suffix%dc=*}.  If that doesn't result in a 
+# null string, then the information entered is incorrectly
+# formatted.
+
+
    
 
-if [[ ! $slapddir ]]
-then
-   echo "slapd.d directory location is required."
-else
-   echo "slapd.d directory ($slapddir)"
-fi
-
-if [[ ! $piddir ]]
-then
-   echo "pid file directory location is required."
-else
-   echo "pid directory ($piddir)"
-fi
-
-if [[ ! $argdir ]]
-then
-   echo "arg file directory location is required."
-else
-   echo "arg directory ($argdir)"
-fi
-
-if [[ ! $schemadir ]]
-then
-   echo "schema directory location is required."
-else
-   echo "schema directory ($schemadir)"
-fi
-
-if [[ ! $datadir ]]
-then
-   echo "user data directory is required."
-else
-   echo "user data directory ($datadir)"
-fi
-
-if [[ ! $suffix ]]
-then
-   echo "suffix definition is required."
-else
-   echo "suffix definition ($suffix)"
-fi
-
-exit 1
 
 # defaults
 if [ ! $conffile ]; then
