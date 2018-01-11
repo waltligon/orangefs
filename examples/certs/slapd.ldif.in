@@ -151,9 +151,8 @@ olcDbMaxSize: 1073741824
 #olcSuffix: dc=my-domain,dc=com
 olcSuffix: __SUFFIX__
 #olcRootDN: cn=Manager,dc=my-domain,dc=com
-olcRootDN: cn=admin,__SUFFIX__
-olcRootPW: __ADMINPW__
-#olcDbDirectory:	/var/lib/ldap
+olcRootDN: cn=Manager,__SUFFIX__
+olcRootPW: secret
 olcDbDirectory:	__DBDIR__
 olcDbIndex: objectClass eq,pres
 olcDbIndex: ou,cn,mail,surname,givenname eq,pres,sub

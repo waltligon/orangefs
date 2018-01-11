@@ -107,84 +107,65 @@ fi
 if [[ ! -d $slapddir ]]
 then
    echo "slapd.d directory ($slapddir) is invalid"
+   validityerr=1
 fi
 if [[ ! -d $piddir ]]
 then
    echo "pid directory ($piddir) is invalid"
+   validityerr=1
 fi
 if [[ ! -d $argdir ]]
 then
    echo "arg directory ($argdir) is invalid"
+   validityerr=1
 fi
 if [[ ! -d $schemadir ]]
 then
    echo "schema directory ($schemadir) is invalid"
+   validityerr=1
 fi
 if [[ ! -d $datadir ]]
 then
    echo "user data directory ($datadir) is invalid"
+   validityerr=1
 fi
 
-#to check the validity of the given suffix
-# use ${suffix%,dc=*} until no more matches, then
-# use ${suffix%dc=*}.  If that doesn't result in a 
-# null string, then the information entered is incorrectly
-# formatted.
+#parse the suffix, checking to see if the format is correct.
+#looking for dc=xxxxx[,dc=xxxxx]*
+#
+beforeComma="x"
+afterComma=$suffix
+while [ $afterComma != $beforeComma ]
+do
+   beforeComma=${afterComma%%,*}
+   if [ ! `echo $beforeComma | grep  ^dc=*` ]
+   then
+      echo "suffix($suffix) format is invalid ($beforeComma)"
+      afterComma=$beforeComma
+      validityerr=1
+   else
+      afterComma=${afterComma#$beforeComma,*}
+   fi
+done
 
-
-   
-
-
-# defaults
-if [ ! $conffile ]; then
-    conffile=`grep ^configfile= $initscript | cut -d= -f2`
-fi
-confdir=`dirname $conffile`
-
-if [ ! $pidfile ]; then
-    pidfile=`grep ^slapd_pidfile= $initscript | cut -d= -f2`
-fi
-rundir=`dirname $pidfile`
-
-if [ ! $datadir ]; then
-    datadir=/var/lib/ldap
+if [ $validityerr ]
+then
+   exit 1
 fi
 
-if [ ! $moddir ]; then
-    if [ -d /usr/lib64/openldap ]; then
-       moddir=/usr/lib64/openldap
-    else
-       moddir=/usr/lib/openldap
-    fi
+echo "all is good"
+exit 1
+
+# write the slapd.conf file
+echo -n "Writing ldap conf file in ldif format... "
+sed "s%__CONFDIR__%${confdir}%;s%__RUNDIR__%${rundir}%;s%__DATADIR__%${datadir}%;s%__MODDIR__%${moddir}%;s%__SUFFIX__%${suffix}%" slapd.ldif.in > slapd.ldif
+
+if [ $? -eq 0 ]; then
+    echo "ok"
 fi
 
-# sanity check
-if [ ! \( -f $initscript -a -d $datadir \) ]; then
-    echo "Could not locate LDAP files/directories... exiting"
-    exit 1
-fi
-
-if [ ! $suffix ]; then
-    # generate based on hostname
-    hn=`hostname -f 2> /dev/null`
-    if [ ! $hn ]; then
-         hn=`hostname 2> /dev/null`
-         if [ ! $hn ]; then
-             echo "Error: could not retrieve hostname... exiting"
-             exit 1
-         fi
-    fi
-    # lowercase
-    hn=${hn,}
-    suffix="dc=${hn/./,dc=}"
-fi
-
-#if [ ! $admindn ]; then
-#    admindn="cn=admin,$suffix"
-#fi
-
-if [ ! $adminpw ]; then
-    adminpw="ldappwd"
+if [ $confonly ]; then
+   exit 0
 fi
 
 # locate slappasswd
@@ -204,17 +185,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# write the slapd.conf file
-echo -n "Writing conf. file... "
-sed "s%__CONFDIR__%${confdir}%;s%__RUNDIR__%${rundir}%;s%__DATADIR__%${datadir}%;s%__MODDIR__%${moddir}%;s%__SUFFIX__%${suffix}%" slapd.ldif.in > slapd.ldif
-
-if [ $? -eq 0 ]; then
-    echo "ok"
-fi
-
-if [ $confonly ]; then
-   exit 0
-fi
 
 chmod 644 slapd.conf
 if [ $? -ne 0 ]; then
