@@ -171,10 +171,8 @@ typedef struct PVFS_sysresp_io_s PVFS_sysresp_io;
 struct PVFS_sysresp_readdir_s
 {
     PVFS_ds_position token;
-    PVFS_dirent *dirent_array; /* V3 should SIDs be in dirent */
+    PVFS_dirent *dirent_array;
     uint32_t pvfs_dirent_outcount;
-    PVFS_SID *sid_array;       /* and not in a distinct array */
-    uint32_t sid_count;
     uint64_t directory_version;
 };
 typedef struct PVFS_sysresp_readdir_s PVFS_sysresp_readdir;

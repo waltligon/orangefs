@@ -530,9 +530,9 @@ static int lebf_encode_req(struct PVFS_server_req *req,
     encode_PVFS_credential((p), &(&req->u.create)->credential);
     encode_PVFS_object_attr((p), &(&req->u.create)->attr);
     encode_PVFS_fs_id((p), &(&req->u.create)->fs_id);
-    encode_uint32_t((p), &(&req->u.create)->sid_count);
+    encode_int32_t((p), &(&req->u.create)->sid_count);
     encode_uint32_t((p), &(&req->u.create)->datafile_count);
-    encode_uint32_t((p), &(&req->u.create)->datafile_sid_count);
+    encode_int32_t((p), &(&req->u.create)->datafile_sid_count);
     encode_PVFS_handle((p), &(&req->u.create)->handle);
     for (i = 0; i < (&req->u.create)->sid_count; i++)
     {                                                                      

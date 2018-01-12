@@ -36,7 +36,7 @@ struct PVFS_ds_metadata_attr_s
     PVFS_size size;        /* global file size, volatile */
     uint32_t dfile_count;
     uint32_t dist_size;
-    uint32_t sid_count;    /* sids per dfile */
+    int32_t sid_count;     /* sids per dfile */
     uint32_t mirror_mode;  /* sync model for replication */
     uint64_t flags;        /* various hint modes */
 };
