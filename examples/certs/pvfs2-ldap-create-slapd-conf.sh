@@ -107,27 +107,27 @@ fi
 if [[ ! -d $slapddir ]]
 then
    echo "slapd.d directory ($slapddir) is invalid"
-   validityerr=1
+   validity_err=1
 fi
 if [[ ! -d $piddir ]]
 then
    echo "pid directory ($piddir) is invalid"
-   validityerr=1
+   validity_err=1
 fi
 if [[ ! -d $argdir ]]
 then
    echo "arg directory ($argdir) is invalid"
-   validityerr=1
+   validity_err=1
 fi
 if [[ ! -d $schemadir ]]
 then
    echo "schema directory ($schemadir) is invalid"
-   validityerr=1
+   validity_err=1
 fi
 if [[ ! -d $datadir ]]
 then
    echo "user data directory ($datadir) is invalid"
-   validityerr=1
+   validity_err=1
 fi
 
 #parse the suffix, checking to see if the format is correct.
@@ -142,32 +142,61 @@ do
    then
       echo "suffix($suffix) format is invalid ($beforeComma)"
       afterComma=$beforeComma
-      validityerr=1
+      validity_err=1
    else
       afterComma=${afterComma#$beforeComma,*}
    fi
 done
 
-if [ $validityerr ]
+if [ $validity_err ]
 then
    exit 1
 fi
 
-echo "all is good"
-exit 1
-
 # write the slapd.conf file
-echo -n "Writing ldap conf file in ldif format... "
-sed "s%__CONFDIR__%${confdir}%;s%__RUNDIR__%${rundir}%;s%__DATADIR__%${datadir}%;s%__MODDIR__%${moddir}%;s%__SUFFIX__%${suffix}%" slapd.ldif.in > slapd.ldif
+echo -n "Writing slapd.ldif ... "
+	sed "s%__ARGSDIR__%${argdir}%;s%__PIDDIR__%${piddir}%;s%__SCHEMADIR__%${schemadir}%;s%__SUFFIX__%${suffix}%;s%__DBDIR__%${datadir}%" slapd.ldif.in > slapd.ldif
 
 if [ $? -eq 0 ]; then
-    echo "ok"
+    echo "[ok]"
 fi
 
 if [ $confonly ]; then
    exit 0
 fi
 
+check_with_systemctl()
+{
+   if [ `systemctl list-units --type=service --all | grep slapd.*active` ]
+   then
+       systemctl stop slapd 
+   fi
+}
+
+check_with_service()
+{
+  echo "hello world"
+}
+
+
+
+#Should we check the slapd service using systemctl or /sbin/service?
+if [ `which systemctl 2> /dev/null` ]
+then
+    echo "stopping service using systemctl"
+    if [ `systemctl list-units --type=service --all | grep -q slapd.*active` ]
+    then
+       echo "issuing stop ..."
+       systemctl stop slapd.service
+    fi
+else
+   echo "trying /sbin/server"
+fi
+   
+
+
+
+exit 0
 # locate slappasswd
 slappasswd=`which slappasswd 2> /dev/null`
 if [ ! $slappasswd ]; then
