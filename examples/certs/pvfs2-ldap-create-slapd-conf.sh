@@ -159,43 +159,56 @@ echo -n "Writing slapd.ldif ... "
 
 if [ $? -eq 0 ]; then
     echo "[ok]"
+else
+    echo "[Error ($?) generating file]"
+    exit 1
 fi
 
 if [ $confonly ]; then
    exit 0
 fi
 
-check_with_systemctl()
-{
-   if [ `systemctl list-units --type=service --all | grep slapd.*active` ]
-   then
-       systemctl stop slapd 
-   fi
-}
-
-check_with_service()
-{
-  echo "hello world"
-}
-
-
-
-#Should we check the slapd service using systemctl or /sbin/service?
+#Should we check the slapd service using systemctl(rhel7) or /sbin/service(<rhel7)?
+#Then, shutdown the service....
+echo -n "Stopping slapd service ... "
 if [ `which systemctl 2> /dev/null` ]
 then
-    echo "stopping service using systemctl"
-    if [ `systemctl list-units --type=service --all | grep -q slapd.*active` ]
+    use_systemctl=1
+    slapd_service=`systemctl list-units --all --type=service | grep slapd`
+    if [[ ! "$slapd_service" ]]
     then
-       echo "issuing stop ..."
-       systemctl stop slapd.service
+       echo "[Service not defined]"
+    else
+       if `systemctl stop slapd.service > /dev/null`
+       then
+          echo "[ok]"
+       else
+          echo "[Unrecoverable error ($?)]"
+          exit 1
+       fi
     fi
 else
-   echo "trying /sbin/server"
+   use_service=1
+   slapd_service=`/sbin/service slapd status`
+   if [[ "$slapd_service" == *unrecognized* ]]
+   then
+      echo "[Service not defined]"
+   else
+      if [[ "$slapd_service" == *running* ]]
+      then 
+         if `/sbin/service slapd stop > /dev/null`
+         then
+            echo "[ok]"
+         else
+            echo "[Unrecoverable error($?)]"
+            exit 1
+         fi
+      else
+         echo "[ok]"
+      fi
+   fi
 fi
    
-
-
-
 exit 0
 # locate slappasswd
 slappasswd=`which slappasswd 2> /dev/null`
