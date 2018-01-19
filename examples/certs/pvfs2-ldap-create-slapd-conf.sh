@@ -3,17 +3,21 @@
 # Create a new slapd conf file in ldif format, add it to the sldapd server, and then
 # start it.
 
+mv=`which mv`
+cp=`which cp`
+
 usage ()
 {
-    echo "USAGE: $0 [-h] [-c] -i <slapd.d dir> -p <pid dir> -a <arguments dir> -s <schema dir> -d <data dir> -x <suffix dn>"
+    echo "USAGE: $0 [-h] [-c] -e <etc dir> -i <slapd.d dir> -p <pid dir> -a <arguments dir> -s <schema dir> -d <data dir> -x <suffix dn>"
     echo "    -h: help"
     echo "    -c: only output ldif server config file (to ./slapd.ldif)"
-    echo "    -i: location of the slapd.d directory"
-    echo "    -p: location where pid file should be created  when slapd is started"
-    echo "    -a: location where argument file will be found when slapd is started"
-    echo "    -s: location of schema ldif files installed with ldap"
-    echo "    -d: location where user data directory should be created"
-    echo "    -x: ldap suffix for your directory tree, e.g., clemson.edu => 'dc=clemson,dc=edu' "
+    echo "    -e: location of openldap under an etc directroy (EX: /etc/openldap)"
+    echo "    -i: location of the slapd.d directory (EX: /etc/openldap/slapd.d)"
+    echo "    -p: location where pid file should be created (EX: /var/run/openldap)"
+    echo "    -a: location where argument file will be found (EX: /var/run/openldap)"
+    echo "    -s: location of schema ldif files installed with ldap (EX: /etc/openldap/schema)"
+    echo "    -d: location where user data directory should be created (EX: /var/run/openldap)"
+    echo "    -x: ldap suffix for your directory tree (EX: 'dc=clemson,dc=edu')"
 }
 
 randpw ()
@@ -27,7 +31,7 @@ randpw ()
     echo $pass
 }
 
-required_parameters="i:p:a:s:d:x:"
+required_parameters="e:i:p:a:s:d:x:"
 optional_parameters="ch"
 all_parameters="$optional_parameters$required_parameters"
 
@@ -36,6 +40,9 @@ do
     case $option in
         c)
             confonly=yes
+        ;;
+        e)
+            etcdir=$OPTARG	
         ;;
         i)
             slapddir=$OPTARG
@@ -74,6 +81,10 @@ fi
 if (( OPTIND < ${#required_parameters} ))
 then
    echo "Missing parameters:"
+   if [[ ! $etcdir ]]
+   then
+      echo "   etc directory"
+   fi
    if [[ ! $slapddir ]]
    then
       echo "   slapd.d directory"
@@ -104,6 +115,11 @@ then
 fi
 
 #check validity of parameters
+if [[ ! -d $etcdir ]]
+then
+   echo "etc directory ($etcdir) is invalid"
+   validity_err=1
+fi
 if [[ ! -d $slapddir ]]
 then
    echo "slapd.d directory ($slapddir) is invalid"
@@ -169,7 +185,7 @@ if [ $confonly ]; then
 fi
 
 #Should we check the slapd service using systemctl(rhel7) or /sbin/service(<rhel7)?
-#Then, shutdown the service....
+#Then, shutdown the service using the appropriate command ....
 echo -n "Stopping slapd service ... "
 if [ `which systemctl 2> /dev/null` ]
 then
@@ -208,6 +224,40 @@ else
       fi
    fi
 fi
+   
+#Moving slapd config file to the slapd.d directory.  But first, save
+#a copy of slapd.ldif, if one already exists.
+if [ -f ${etcdir}/slapd.ldif ]
+then
+   echo -n "Saving a copy of ${etcdir}/slapd.ldif ... "
+   if `$mv ${etcdir}/slapd.ldif ${etcdir}/slapd.ldif.save &> /dev/null`
+   then
+      echo "[ok]"
+   else
+      echo "[Unrecoverable error ($?)]"
+      exit 1
+   fi
+fi
+
+echo -n "Copying slapd.ldif to ${etcdir} ... "
+if `$cp slapd.ldif ${etcdir} &> /dev/null`
+then
+   echo "[ok]"
+else
+   echo "[Unrecoverable error ($?)]"
+fi
+
+#Add configuration to slapd server
+echo -n "Using slapadd to create ldif structure in $slapddir ... "
+if `slapadd -n 0 -F $slapddir -l ${etcdir}/slapd.ldif &> /dev/null`
+then
+   echo "[ok]"
+else
+   echo "[Unrecoverable error ($?)]"
+fi
+
+#Start the slapd server, using the new configuration file, slapd.ldif
+
    
 exit 0
 # locate slappasswd
