@@ -5,6 +5,8 @@
 
 mv=`which mv`
 cp=`which cp`
+slapadd=`which slapadd`
+groups=`which groups`
 
 usage ()
 {
@@ -245,18 +247,51 @@ then
    echo "[ok]"
 else
    echo "[Unrecoverable error ($?)]"
+   exit 1
 fi
 
 #Add configuration to slapd server
 echo -n "Using slapadd to create ldif structure in $slapddir ... "
-if `slapadd -n 0 -F $slapddir -l ${etcdir}/slapd.ldif &> /dev/null`
+if `$slapadd -n 0 -F $slapddir -l ${etcdir}/slapd.ldif &> /dev/null`
 then
    echo "[ok]"
 else
    echo "[Unrecoverable error ($?)]"
+   exit 1
+fi
+
+#if using systemctl, the owner of the slapd.d directory and its 
+#contents must be ldap with group ldap
+if [ $use_systemctl ]
+then
+   echo -n "Checking owner and group of slapd.d directory ... "
+   if `${groups} ldap | grep ldap.*ldap &> /dev/null`
+   then
+      if `chown -R ldap:ldap ${etcdir}/slapd.d`
+      then
+          echo "[ok]"
+      else
+          echo "[Unrecoverable error ($?)]"
+          exit 1
+      fi
+   else
+      echo "[ldap user and/or group does not exist]"
+      exit 1
+   fi
 fi
 
 #Start the slapd server, using the new configuration file, slapd.ldif
+if [ $use_systemctl ]
+then
+   echo -n "Starting slapd service ... "
+   if `systemctl start slapd.service &> /dev/null`
+   then
+      echo "[ok]"
+   else
+      echo "[Unrecoverable error ... try systemctl status slapd]"
+      exit 1
+   fi
+fi
 
    
 exit 0
