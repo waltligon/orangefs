@@ -278,7 +278,7 @@ static void post_sr_rdmaw(struct rdma_work *sq,
                           msg_header_cts_t *mh_cts,
                           void *mh_cts_buf);
 
-static void post_rr(const rdma_connection_t *c,
+static void post_rr(rdma_connection_t *c,
                     struct buf_head *bh);
 
 static void repost_rr(rdma_connection_t *c,
@@ -650,6 +650,16 @@ static int check_cq(void)
                             sq->state.send = SQ_ERROR;
                             sq->mop->error_code = wc.status;
                         }
+                        bh->c->refcnt--;
+                        debug(4, "%s: decremented refcnt to %d; id: %ld (%s)",
+                              __func__,
+                              bh->c->refcnt,
+                              wc.id,
+                              bh->c->conn_info->peername);
+                        if (bh->c->closed || bh->c->cancelled)
+                        {
+                            rdma_close_connection(bh->c);
+                        }
                         break;
                     }
                 }
@@ -662,7 +672,19 @@ static int check_cq(void)
                         wc_opcode_string(wc.opcode),
                         wc_status_string(wc.status),
                         bh->c->conn_info->peername);
+
+                bh->c->refcnt--;
+                debug(4, "%s: decremented refcnt to %d; id: %ld (%s)",
+                      __func__,
+                      bh->c->refcnt,
+                      wc.id,
+                      bh->c->conn_info->peername);
+                if (bh->c->closed || bh->c->cancelled)
+                {
+                    rdma_close_connection(bh->c);
+                }
             }
+
             continue;
         }
 
@@ -679,6 +701,14 @@ static int check_cq(void)
                 continue;
             }
             ptr = bh->buf;
+
+            bh->c->refcnt--;
+            debug(4, "%s: decremented refcnt to %d; id: %ld (%s)",
+                  __func__, bh->c->refcnt, wc.id, bh->c->conn_info->peername);
+            if (bh->c->closed || bh->c->cancelled)
+            {
+                rdma_close_connection(bh->c);
+            }
 
             VALGRIND_MAKE_MEM_DEFINED(ptr, byte_len);
             decode_msg_header_common_t(&ptr, &mh_common);
@@ -708,6 +738,14 @@ static int check_cq(void)
              * to signal memory unpin etc. */
             sq = ptr_from_int64(wc.id);
 
+            sq->c->refcnt--;
+            debug(4, "%s: decremented refcnt to %d; id: %ld (%s)",
+                  __func__, sq->c->refcnt, wc.id, sq->c->conn_info->peername);
+            if (sq->c->closed || sq->c->cancelled)
+            {
+                rdma_close_connection(sq->c);
+            }
+
             sq->state.send = SQ_WAITING_RTS_DONE_BUFFER;
 
             memcache_deregister(rdma_device->memcache, &sq->buflist);
@@ -723,6 +761,14 @@ static int check_cq(void)
             if (!bh)
             {
                 continue;
+            }
+
+            bh->c->refcnt--;
+            debug(4, "%s: decremented refcnt to %d; id: %ld (%s)",
+                  __func__, bh->c->refcnt, wc.id, bh->c->conn_info->peername);
+            if (bh->c->closed || bh->c->cancelled)
+            {
+                rdma_close_connection(bh->c);
             }
 
             sq = bh->sq;
@@ -1073,7 +1119,7 @@ static void post_sr(const struct buf_head *bh,
         .length = len,
         .lkey = rc->eager_send_mr->lkey,
     };
-    struct ibv_send_wr sr=
+    struct ibv_send_wr sr =
     {
         .next = NULL,
         .wr_id = int64_from_ptr(bh),
@@ -1104,6 +1150,9 @@ static void post_sr(const struct buf_head *bh,
         ++rd->num_unsignaled_sends;
     }
 
+    c->refcnt++;
+    debug(4, "%s: incremented refcnt to %d; id: %ld (%s)",
+          __func__, c->refcnt, sr.wr_id, c->conn_info->peername);
     ret = ibv_post_send(rc->qp, &sr, &bad_wr);
     if (ret < 0)
     {
@@ -1249,6 +1298,9 @@ static void post_sr_rdmaw(struct rdma_work *sq,
             sr.send_flags = 0;
         }
 
+        c->refcnt++;
+        debug(4, "%s: incremented refcnt to %d; id: %ld (%s)",
+              __func__, c->refcnt, sr.wr_id, c->conn_info->peername);
         ret = ibv_post_send(rc->qp, &sr, &bad_wr);
         if (ret < 0)
         {
@@ -1271,7 +1323,7 @@ static void post_sr_rdmaw(struct rdma_work *sq,
  * Returns:
  *  none
  */
-static void post_rr(const rdma_connection_t *c,
+static void post_rr(rdma_connection_t *c,
                     struct buf_head *bh)
 {
     struct rdma_connection_priv *rc = c->priv;
@@ -1293,6 +1345,9 @@ static void post_rr(const rdma_connection_t *c,
 
     debug(4, "%s: %s bh %d", __func__, c->conn_info->peername, bh->num);
 
+    c->refcnt++;
+    debug(4, "%s: incremented refcnt to %d; id: %ld (%s)",
+          __func__, c->refcnt, rr.wr_id, c->conn_info->peername);
     ret = ibv_post_recv(rc->qp, &rr, &bad_wr);
     if (ret)
     {
@@ -1604,7 +1659,6 @@ static struct rdma_work *alloc_new_recv(rdma_connection_t *c,
     struct rdma_work *rq = bmi_rdma_malloc(sizeof(*rq));
     rq->type = BMI_RECV;
     rq->c = c;
-    ++rq->c->refcnt;
     rq->bh = bh;
     rq->mop = 0;    /* until user posts for it */
     rq->rts_mop_id = 0;
@@ -2149,7 +2203,6 @@ static int post_send(bmi_op_id_t *id,
 
     sq->bmi_tag = tag;
     sq->c = rdma_map->c;
-    ++sq->c->refcnt;
     sq->is_unexpected = is_unexpected;
     qlist_add_tail(&sq->list, &rdma_device->sendq);
 
@@ -2667,7 +2720,6 @@ static int test_sq(struct rdma_work *sq,
                    void **user_ptr,
                    int complete)
 {
-    rdma_connection_t *c;
     int ret = 0;
 
     debug(7, "%s (in): sq %p complete %d",
@@ -2694,15 +2746,8 @@ static int test_sq(struct rdma_work *sq,
 
             qlist_del(&sq->list);
             id_gen_fast_unregister(sq->mop->op_id);
-            c = sq->c;
             free(sq->mop);
             free(sq);
-            --c->refcnt;
-
-            if (c->closed || c->cancelled)
-            {
-                rdma_close_connection(c);
-            }
 
             ret = 1;
             goto out;
@@ -2739,15 +2784,8 @@ static int test_sq(struct rdma_work *sq,
 
         qlist_del(&sq->list);
         id_gen_fast_unregister(sq->mop->op_id);
-        c = sq->c;
         free(sq->mop);
         free(sq);
-        --c->refcnt;
-
-        if (c->closed || c->cancelled)
-        {
-            rdma_close_connection(c);
-        }
 
         ret = 1;
         goto out;
@@ -2769,10 +2807,8 @@ static int test_sq(struct rdma_work *sq,
 
             qlist_del(&sq->list);
             id_gen_fast_unregister(sq->mop->op_id);
-            c = sq->c;
             free(sq->mop);
             free(sq);
-            --c->refcnt;
 
             ret = 1;
             goto out;
@@ -2831,7 +2867,6 @@ static int test_rq(struct rdma_work *rq,
                    void **user_ptr,
                    int complete)
 {
-    rdma_connection_t *c;
     int ret = 0;
 
     debug(7, "%s: rq %p complete %d", __func__, rq, complete);
@@ -2862,14 +2897,7 @@ static int test_rq(struct rdma_work *rq,
             }
 
             qlist_del(&rq->list);
-            c = rq->c;
             free(rq);
-            --c->refcnt;
-
-            if (c->closed || c->cancelled)
-            {
-                rdma_close_connection(c);
-            }
 
             ret = 1;
             goto out;
@@ -2914,14 +2942,7 @@ static int test_rq(struct rdma_work *rq,
         }
 
         qlist_del(&rq->list);
-        c = rq->c;
         free(rq);
-        --c->refcnt;
-
-        if (c->closed || c->cancelled)
-        {
-            rdma_close_connection(c);
-        }
 
         ret = 1;
         goto out;
@@ -2945,10 +2966,8 @@ static int test_rq(struct rdma_work *rq,
 
                 qlist_del(&rq->list);
                 id_gen_fast_unregister(rq->mop->op_id);
-                c = rq->c;
                 free(rq->mop);
                 free(rq);
-                --c->refcnt;
 
                 ret = 1;
                 goto out;
@@ -3155,12 +3174,6 @@ restart:
             n = 1;
             qlist_del(&rq->list);
             free(rq);
-            --c->refcnt;
-
-            if (c->closed || c->cancelled)
-            {
-                rdma_close_connection(c);
-            }
 
             goto out;
         }
@@ -3265,7 +3278,7 @@ static int BMI_rdma_cancel(bmi_op_id_t id,
         /*
          * In response to a cancel, forcibly close the connection.  Don't send
          * a bye message first since it may be the case that the peer is dead
-         * anyway.  Do not close the connetion until all the sq/rq on it have
+         * anyway.  Do not close the connection until all the sq/rq on it have
          * gone away.
          */
         struct qlist_head *l;
@@ -3679,6 +3692,8 @@ static void alloc_eager_bufs(rdma_connection_t *c)
     {
         struct buf_head *ebs = &c->eager_send_buf_head_contig[i];
         struct buf_head *ebr = &c->eager_recv_buf_head_contig[i];
+        debug(4, "ebs %02d id %lu", i, (uint64_t) ebs);
+        debug(4, "ebr %02d id %lu", i, (uint64_t) ebr);
 
         INIT_QLIST_HEAD(&ebs->list);
         INIT_QLIST_HEAD(&ebr->list);
@@ -3945,11 +3960,6 @@ static void rdma_close_connection(rdma_connection_t *c)
 
     debug(2, "%s: closing connection to %s", __func__, c->conn_info->peername);
     c->closed = 1;
-    if (c->refcnt != 0)
-    {
-        debug(1, "%s: refcnt non-zero %d, delaying free", __func__, c->refcnt);
-        return;
-    }
 
     /* disconnect if we are a server; client has already done this */
     if (rdma_device->listen_id)
@@ -3964,11 +3974,11 @@ static void rdma_close_connection(rdma_connection_t *c)
         /* client */
         is_server = 0;
 
-#if 0
+#if 1
         /* TODO: is this loop necessary? do we need to wait for the event? */
+        /* wait for disconnected event */
         /* NOTE: we only do this on the client because the server is already
          *       checking for this event in the listener_thread */
-        /* wait for disconnected event */
         while (rdma_get_cm_event(rc->id->channel, &event) == 0)
         {
             memcpy(&event_copy, event, sizeof(*event));
@@ -3982,14 +3992,23 @@ static void rdma_close_connection(rdma_connection_t *c)
                 /* TODO: something... */
                 break;
             }
+            else
+            {
+                debug(4, "%s: received unhandled event: %s",
+                      __func__, rdma_event_str(event_copy.event));
+            }
 
             /* TODO: should I compare event_copy.id and rc->id to make sure
              *       what we expected is actually what disconnected?
              */
-
-            debug(0, "%s: waiting for DISCONNECTED...\n", __func__);
         }
 #endif
+    }
+
+    if (c->refcnt != 0)
+    {
+        debug(1, "%s: refcnt non-zero %d, delaying free", __func__, c->refcnt);
+        return;
     }
 
     /* destroy the queue pair */
@@ -5488,6 +5507,7 @@ static int BMI_rdma_finalize(void)
 {
     struct rdma_event_channel *channel = NULL;
     struct rdma_connection_priv *rc = NULL;
+    int i = 0;
 
     gen_mutex_lock(&interface_mutex);
 
@@ -5508,6 +5528,16 @@ static int BMI_rdma_finalize(void)
             /* Send BYE message to servers, then disconnect */
             send_bye(c);
             rdma_disconnect(rc->id);
+
+            /* wait until all outstanding requests have been flushed */ 
+            while (c->refcnt != 0)
+            {
+                debug(4, "%s: refcnt for %s is %d",
+                      __func__, c->conn_info->peername, c->refcnt);
+                debug(4, "%s: calling check_cq to reap FLUSH_ERRS [%d]",
+                      __func__, i++);
+                check_cq();
+            }
             /* TODO: handle RDMA_CM_EVENT_DISCONNECTED event that will be
              * generated by rdma_disconnect() somewhere, not here though */
         }
@@ -5557,7 +5587,7 @@ static int BMI_rdma_finalize(void)
     rdma_device = NULL;
 
     gen_mutex_unlock(&interface_mutex);
-    debug(0, "BMI_rdma_finalize: RDMA module finalized.");
+    debug(0, "BMI_rdma_finalize: RDMA module finalized");
     return 0;
 }
 
