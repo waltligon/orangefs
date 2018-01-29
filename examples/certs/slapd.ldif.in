@@ -105,8 +105,8 @@ olcDatabase: frontend
 #		Allow authenticated users read access
 #		Allow anonymous users to authenticate
 #
-olcAccess: to dn.base="" by * read
-olcAccess: to dn.base="cn=Subschema" by * read
+#olcAccess: to dn.base="" by * read
+#olcAccess: to dn.base="cn=Subschema" by * read
 #olcAccess: to *
 #	by self write
 #	by users read

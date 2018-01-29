@@ -8,6 +8,7 @@ cp=`which cp`
 slapadd=`which slapadd`
 groups=`which groups`
 
+
 usage ()
 {
     echo "USAGE: $0 [-h] [-c] -e <etc dir> -i <slapd.d dir> -p <pid dir> -a <arguments dir> -s <schema dir> -d <data dir> -x <suffix dn>"
@@ -20,17 +21,6 @@ usage ()
     echo "    -s: location of schema ldif files installed with ldap (EX: /etc/openldap/schema)"
     echo "    -d: location where user data directory should be created (EX: /var/run/openldap)"
     echo "    -x: ldap suffix for your directory tree (EX: 'dc=clemson,dc=edu')"
-}
-
-randpw ()
-{
-    chars="abcdefghijklmnopqrstuvwxyz0123456789"
-    for ((i=0; $i < 10; i++))
-    do        
-        pass+=${chars:$(($RANDOM % 36)):1}
-    done
-    
-    echo $pass
 }
 
 required_parameters="e:i:p:a:s:d:x:"
@@ -72,7 +62,7 @@ do
     esac
 done
 
-#No options were entered on the command line
+#Were ANY options enterd on the command line?
 if [[ $OPTIND == 1 ]]
 then
    usage
@@ -171,9 +161,15 @@ then
    exit 1
 fi
 
+
+#Define the root DN and its password
+olcRootDN="cn=Manager,${suffix}"
+olcRootPW="secret"
+
+
 # write the slapd.conf file
 echo -n "Writing slapd.ldif ... "
-	sed "s%__ARGSDIR__%${argdir}%;s%__PIDDIR__%${piddir}%;s%__SCHEMADIR__%${schemadir}%;s%__SUFFIX__%${suffix}%;s%__DBDIR__%${datadir}%" slapd.ldif.in > slapd.ldif
+sed "s%__ARGSDIR__%${argdir}%;s%__PIDDIR__%${piddir}%;s%__SCHEMADIR__%${schemadir}%;s%__SUFFIX__%${suffix}%;s%__DBDIR__%${datadir}%" slapd.ldif.in > slapd.ldif
 
 if [ $? -eq 0 ]; then
     echo "[ok]"
@@ -228,11 +224,12 @@ else
 fi
    
 #Moving slapd config file to the slapd.d directory.  But first, save
-#a copy of slapd.ldif, if one already exists.
+#a copy of slapd.ldif, if it already exists.
 if [ -f ${etcdir}/slapd.ldif ]
 then
-   echo -n "Saving a copy of ${etcdir}/slapd.ldif ... "
-   if `$mv ${etcdir}/slapd.ldif ${etcdir}/slapd.ldif.save &> /dev/null`
+   backupLDIF=`mktemp ${etcdir}/slapd.ldif.XXX-backup`
+   echo -n "Creating backup ($backupLDIF) of ${etcdir}/slapd.ldif ... "
+   if `$mv ${etcdir}/slapd.ldif ${backupLDIF} &> /dev/null`
    then
       echo "[ok]"
    else
@@ -249,6 +246,36 @@ else
    echo "[Unrecoverable error ($?)]"
    exit 1
 fi
+
+
+
+#Saving contents of slapd.d
+backupDir=`mktemp -d ${slapddir}.XXX-backup`
+echo -n "Creating backup($backupDir) of slapd.d directory ... "
+if `$mv ${slapddir} ${backupDir} &> /dev/null`
+then
+   echo "[ok]"
+else
+   echo "[Unrecoverabel error ($?)]"
+   exit 1
+fi
+ 
+#Recreating slapd.d directory
+echo -n "Creating ${slapddir} with ldap as user and group ... "
+if `mkdir ${slapddir} &> /dev/null`
+then
+   if `chown ldap:ldap ${slapddir}`
+   then
+      echo "[ok]"
+   else
+      echo "[Unrecoverable error ($?)]"
+      exit 1
+   fi
+else
+   echo "[Unrecoverable error ($?)]"
+   exit 1
+fi
+
 
 #Add configuration to slapd server
 echo -n "Using slapadd to create ldif structure in $slapddir ... "
@@ -294,90 +321,10 @@ then
 fi
 
    
-exit 0
-# locate slappasswd
-slappasswd=`which slappasswd 2> /dev/null`
-if [ ! $slappasswd ]; then
-    slappasswd=/usr/sbin/slappasswd
-    if [ ! -f $slappasswd ]; then
-        echo "Error: could not locate slappasswd; ensure on PATH... exiting"
-        exit 1
-    fi
-fi
-
-# get encrypted root password
-encpwd=`${slappasswd} -s $adminpw`
-if [ $? -ne 0 ]; then
-    echo "Error: could not get password hash... exiting"
-    exit 1
-fi
-
-
-chmod 644 slapd.conf
-if [ $? -ne 0 ]; then
-   echo "Warning: could not chmod slapd.conf"
-fi
-
-# shut down slapd if necessary
-ps -e | grep -q slapd &> /dev/null
-if [ $? -eq 0 ]; then
-    echo "Shutting down slapd"
-    $initscript stop
-    sleep 2
-fi
-
-# copy configuration file
-if [ -f $conffile ]; then
-    echo "Backing up existing $conffile to ${conffile}.bak"
-    cp -p $conffile ${conffile}.bak
-fi
-cp -p slapd.conf $conffile
-if [ $? -ne 0 ]; then
-    echo "Error copying to $conffile... exiting"
-    exit 1
-fi
-
-# back up configuration dir
-if [ -d $confdir/slapd.d ]; then
-    echo "Renaming $confdir/slapd.d to $confdir/slapd.d.bak"
-    mv $confdir/slapd.d $confdir/slapd.d.bak
-fi
-
-# start slapd using init script
-$initscript start
-
-sleep 2
-
-#containers=(`echo $suffix | sed 's/,/ /g'`)
-#for ((i = ${#containers[*]}-1; i >= 0; i--)); do
-#    cname=${containers[$i]#*=}
-#    ctype=${containers[$i]%=*}
-
-    # echo "${containers[$i]: $ctype $cname"
-
-#    case $ctype in
-#        dc) 
-#            class="domain"
-#        ;;
-#        l)
-#            class="locality"
-#        ;;
-#        o)
-#            class="organization"
-#        ;;
-#        ou)
-#            class="organizationalUnit"
-#        ;;
-#        *)
-#            echo "Error: cannot create top level container; use only dc, l, o and ou... exiting"
-#            exit 1
-#        ;;
-#    esac  
-
-# create topmost base containers
+#Adding the suffix dn
 dname=${suffix#*=}
 dname=${dname%%,*}
-ldapadd -D "$admindn" -w "$adminpw" -x <<_EOF
+ldapadd -D "$olcRootDN" -w "$olcRootPW" -x <<_EOF
 dn: $suffix
 dc: $dname
 objectClass: domain
@@ -388,7 +335,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # create user and group containers
-ldapadd -D "$admindn" -w "$adminpw" -x <<_EOF
+ldapadd -D "$olcRootDN" -w "$olcRootPW" -x <<_EOF
 dn: ou=Users,$suffix
 ou: Users
 objectClass: organizationalUnit
@@ -402,9 +349,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# create a user to represent root (not LDAP admin) 
-# use random password
-ldapadd -D "$admindn" -w "$adminpw" -x <<_EOF
+
+# create a user to represent root (not LDAP database manager) 
+ldapadd -D "$olcRootDN" -w "$olcRootPW" -x <<_EOF
 dn: cn=root,ou=Users,$suffix
 cn: root
 uid: root
@@ -415,10 +362,11 @@ sn: root
 uidNumber: 0
 gidNumber: 0
 homeDirectory: /root
-userPassword: `randpw`
+userPassword: root
 _EOF
 if [ $? -ne 0 ]; then
     echo "Error: could not create cn=root,ou=Users,${suffix}... exiting"
     exit 1
 fi
 
+exit 0
