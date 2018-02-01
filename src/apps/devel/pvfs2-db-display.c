@@ -48,6 +48,11 @@ void print_help(char *progname);
 void print_ds_type( PVFS_ds_type type );
 int process_args(int argc, char ** argv);
 
+PVFS_time PINT_util_mkversion_time(PVFS_time version)
+{
+    return (PVFS_time)(version >> 32);
+}
+
 int main( int argc, char **argv )
 {
     dbpf_db *db_p = NULL;
@@ -226,6 +231,11 @@ void print_dspace( struct dbpf_data key, struct dbpf_data val )
     {
 
         r_mtime = (time_t) v->mtime;
+        r_mtime = PINT_util_mkversion_time(r_mtime);
+        if (r_mtime == 0)
+        {
+            r_mtime = (time_t) v->mtime;
+        }
 
         ctime_r(&r_mtime, mtimeStr);
 
