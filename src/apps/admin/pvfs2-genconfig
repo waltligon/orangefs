@@ -74,9 +74,9 @@ my $default_logfile = undef;
 my $bmi_module = undef;
 
 my $opt_gen_key = 0;
-my $opt_distrdir_servers_initial = undef;
-my $opt_distrdir_servers_max = undef;
-my $opt_distrdir_split_size = undef;
+my $opt_distrdir_servers_initial = 1;
+my $opt_distrdir_servers_max = 1;
+my $opt_distrdir_split_size = 100;
 
 # key-based security options 
 my $opt_security_key = undef;
@@ -558,22 +558,17 @@ sub emit_filesystem
     print $target "\tFileStuffing $stuffing\n";
 
     my $meta_count = scalar(get_aliases($META_ENDPOINT));
-    print "opt_distrdir_servers_initial is $opt_distrdir_servers_initial\n";
     if ($opt_distrdir_servers_initial)
     {
-        print "1\n";
         die "\n*** error: distrdir-servers-initial must be between 1 and the number of metadata servers"
             if ($opt_distrdir_servers_initial lt 1 || $opt_distrdir_servers_initial gt $meta_count);
 
-        print "2\n";
         print $target "\tDistrDirServersInitial $opt_distrdir_servers_initial\n";
     }
     else
     {
-        print "3\n";
         print $target "\tDistrDirServersInitial 1\n";
     }
-#    print $target "\tDistrDirServersMax $meta_count\n";
     if ($opt_distrdir_servers_max)
     {
         die "\n*** error: distrdir-servers-max must be between distrdir-servers-initial and the number of metadata servers"
