@@ -558,7 +558,6 @@ sub emit_filesystem
     print $target "\tFileStuffing $stuffing\n";
 
     my $meta_count = scalar(get_aliases($META_ENDPOINT));
-    print "opt_distrdir_servers_initial is $opt_distrdir_servers_initial\n";
     if ($opt_distrdir_servers_initial)
     {
         print "1\n";
