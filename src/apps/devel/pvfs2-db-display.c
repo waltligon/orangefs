@@ -19,6 +19,7 @@
 #include "pvfs2-storage.h"
 #include "pvfs2-internal.h"
 #include "trove-dbpf/dbpf.h"
+#include "pint-util.h"
 
 #define COLLECTION_FILE         "collections.db"
 #define STORAGE_FILE            "storage_attributes.db"
@@ -47,11 +48,6 @@ void print_collection_attr( struct dbpf_data key, struct dbpf_data val );
 void print_help(char *progname);
 void print_ds_type( PVFS_ds_type type );
 int process_args(int argc, char ** argv);
-
-PVFS_time PINT_util_mkversion_time(PVFS_time version)
-{
-    return (PVFS_time)(version >> 32);
-}
 
 int main( int argc, char **argv )
 {
