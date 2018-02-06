@@ -2149,7 +2149,9 @@ static int bmip_set_info(int option, void *param)
  * bmip_method_addr_lookup.
  */
 static int bmip_initialize(struct bmi_method_addr *listen_addr,
-			   int method_id, int init_flags)
+                           int method_id,
+                           int init_flags,
+                           char *options)
 {
     int ret = -ENODEV, numint;
 

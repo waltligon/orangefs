@@ -248,8 +248,8 @@ static PINT_sm_action mgmt_create_root_dir_check_for_request(
 #ifdef ENABLE_SECURITY_CERT
     X509 *xcert = NULL;
     PVFS_certificate *cert = NULL;
-#endif
     int ret = -1;
+#endif
 
     assert(s_op);
 
@@ -318,18 +318,6 @@ static PINT_sm_action mgmt_create_root_dir_check_for_request(
 #endif
 
     PINT_sign_credential(&s_op->u.mgmt_create_root_dir.credential);
-
-    ret = PINT_server_to_server_capability(
-                                &s_op->u.mgmt_create_root_dir.capability,
-                                s_op->target_fs_id,
-                                0,
-                                NULL);
-    if (ret < 0)
-    {
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
-
 
     return SM_ACTION_COMPLETE;
 }
@@ -1133,8 +1121,9 @@ static PINT_sm_action crdirent_lost_and_found_setup_msgpair(
         /* first, free the one we have already been using */
         PINT_cleanup_capability(&s_op->u.mgmt_create_root_dir.capability);
 
-        /* create new handle array with target handle and dirdata handles */
-        num_handles = s_op->attr.dist_dir_attr.num_servers + 1;
+        /* create new handle array with target handle, metadata handle,
+         * and dirdata handles */
+        num_handles = s_op->attr.dist_dir_attr.num_servers + 2;
         handle_array = (PVFS_handle *) malloc(num_handles *
                                               sizeof(PVFS_handle));
         if (handle_array == NULL)
@@ -1144,7 +1133,8 @@ static PINT_sm_action crdirent_lost_and_found_setup_msgpair(
             return SM_ACTION_COMPLETE;
         }
         handle_array[0] = s_op->target_handle;
-        memcpy((handle_array + 1),
+        handle_array[1] = s_op->u.mgmt_create_root_dir.lost_and_found_handle;
+        memcpy((handle_array + 2),
                s_op->attr.dirdata_handles,
                s_op->attr.dist_dir_attr.num_servers * sizeof(PVFS_handle));
 

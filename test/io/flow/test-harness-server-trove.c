@@ -92,7 +92,7 @@ int main(
     PINT_dist_initialize(NULL);
 
     /* start up BMI */
-    ret = BMI_initialize("bmi_tcp", "tcp://NULL:3335", BMI_INIT_SERVER);
+    ret = BMI_initialize("bmi_tcp", "tcp://NULL:3335", BMI_INIT_SERVER, NULL);
     if (ret < 0)
     {
 	fprintf(stderr, "BMI init failure.\n");

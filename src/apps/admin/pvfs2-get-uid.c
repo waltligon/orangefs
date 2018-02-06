@@ -91,7 +91,9 @@ int main(int argc, char *argv[])
 
         for (i = 0; i < prog_opts->server_count; i ++)
         {
-            ret = BMI_addr_lookup(&server_addr, prog_opts->server_list[i]);
+            ret = BMI_addr_lookup(&server_addr,
+                                  prog_opts->server_list[i],
+                                  NULL);
             if (ret < 0)
             {
                 PVFS_perror("BMI_addr_lookup", ret);

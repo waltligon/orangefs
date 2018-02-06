@@ -94,7 +94,7 @@ int main(
     method[4+len] = '\0';
 
     /* initialize local interface (default options) */
-    ret = BMI_initialize(method, user_opts->hostid, BMI_INIT_SERVER);
+    ret = BMI_initialize(method, user_opts->hostid, BMI_INIT_SERVER, NULL);
     if (ret < 0)
     {
 	errno = -ret;
