@@ -2,6 +2,50 @@
 
 OrangeFS Release ChangeLog
 -----------------------
+Development 2.9.8
+orangefs-2.9.7 (Subversion Branch v.2.9.x)
+http://dev.orangefs.org/svn/orangefs/branches/v.2.9.x
+up to rev 13181
+
+New functionality:
+	1.  Added RoCE v1 support to our IB suite.
+
+
+* - Server 
+	1.  Fixed problems with crdirent and rename when using
+	    distributed directories.
+	2.  Fixed intermittent problems with updating timestamps.
+
+* - Clients
+	1.  pvfs2-stat.c
+		When the object is a symlink, we now display the string length
+		of the target in the size field, making the output consistent
+		with the linux kernel.  Corrected call to sys-lookup so that
+		symbolic links are followed correctly when -L is specified on
+		the command line.
+	2.  System Interface
+		1.  Fixed problems with crdirent and rename when using distributed
+		    directories.
+		2.  Fixed intermittent problems with updating timestamps.
+
+* - BMI
+	1.  Part of adding RoCE v1 support was to make the IB port used for
+	    communication configurable.
+
+* - Software Infrastructure
+
+* - Testing
+	1.  Generic tests, #467 and #477, of the xfstest suite were removed from our
+	    testing because we do not support the functionality.
+
+	2.  Updated our testing to use version 20170929 of LTP.  Updated
+	    the list of testcases to be used.
+
+* - Kernel Module
+
+
+
+
 orangefs-2.9.7 (Subversion Branch v.2.9.x)
 http://dev.orangefs.org/svn/orangefs/branches/v.2.9.x
 up to rev 13115 in trunk
