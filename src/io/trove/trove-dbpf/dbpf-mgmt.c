@@ -839,7 +839,10 @@ int dbpf_storage_remove(char *data_path,
     {
         perror("failure removing config directory");
         ret = -trove_errno_to_trove_error(errno);
+#if 0
+        ret = -trove_errno_to_trove_error(errno);
         goto storage_remove_failure;
+#endif
     }
 
     DBPF_GET_META_DIRNAME(path_name, PATH_MAX, meta_path);
@@ -848,7 +851,10 @@ int dbpf_storage_remove(char *data_path,
     {
         perror("failure removing metadata directory");
         ret = -trove_errno_to_trove_error(errno);
+#if 0
+        ret = -trove_errno_to_trove_error(errno);
         goto storage_remove_failure;
+#endif
     }
 
     DBPF_GET_DATA_DIRNAME(path_name, PATH_MAX, data_path);
@@ -857,11 +863,19 @@ int dbpf_storage_remove(char *data_path,
     {
         perror("failure removing data directory");
         ret = -trove_errno_to_trove_error(errno);
+#if 0
+        ret = -trove_errno_to_trove_error(errno);
         goto storage_remove_failure;
+#endif
+    }
+
+    if (ret < 0)
+    {
+        return ret;
     }
 
     gossip_debug(GOSSIP_TROVE_DEBUG,
-                 "databases for storage space removed.\n");
+                 "All databases for storage space removed.\n");
 
     return 1;
 
@@ -1013,7 +1027,7 @@ int dbpf_collection_create(char *collname,
     ret = mkdir(path_name, 0755);
     if (ret != 0 && strcmp(sto_p->config_path, sto_p->meta_path))
     {
-	gossip_err("mkdir failed on metadata collection directory %s\n",
+	gossip_err("mkdir failed on configuration collection directory %s\n",
 		   path_name);
 	return -trove_errno_to_trove_error(errno);
     }
@@ -1351,9 +1365,18 @@ int dbpf_collection_remove(char *collname,
 			  sto_p->meta_path, db_data.coll_id);
     if (rmdir(path_name) != 0)
     {
-		gossip_err("failure removing metadata collection directory\n");
-		ret = -trove_errno_to_trove_error(errno);
-		goto collection_remove_failure;
+	gossip_err("failure removing metadata collection directory\n");
+	ret = -trove_errno_to_trove_error(errno);
+	goto collection_remove_failure;
+    }
+
+    DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,
+			  sto_p->config_path, db_data.coll_id);
+    if (rmdir(path_name) != 0)
+    {
+	gossip_err("failure removing configuration collection directory\n");
+	ret = -trove_errno_to_trove_error(errno);
+	goto collection_remove_failure;
     }
 
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,

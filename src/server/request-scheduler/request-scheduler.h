@@ -1,5 +1,4 @@
-/*
- * (C) 2001 Clemson University and The University of Chicago
+/* * (C) 2001 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
  */
@@ -36,12 +35,9 @@ enum PINT_server_sched_policy
 };
 
 /* setup and teardown */
-int PINT_req_sched_initialize(
-    void);
+int PINT_req_sched_initialize(void);
 
-int PINT_req_sched_finalize(
-    void);
-
+int PINT_req_sched_finalize(void);
 int PINT_timer_queue_finalize(void);
 
 

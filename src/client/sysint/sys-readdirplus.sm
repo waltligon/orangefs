@@ -682,7 +682,8 @@ static int readdirplus_fetch_attrs_comp_fn(void *v_p,
                                            int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
 
     gossip_debug(GOSSIP_LISTATTR_DEBUG,
                  "readdirplus_fetch_attrs_comp_fn called\n");
@@ -773,7 +774,8 @@ static int readdirplus_fetch_sizes_comp_fn(void *v_p,
                                            int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
 
     gossip_debug(GOSSIP_LISTATTR_DEBUG,
                  "readdirplus_fetch_sizes_comp_fn called\n");

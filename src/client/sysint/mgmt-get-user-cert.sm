@@ -529,7 +529,8 @@ static int public_key_comp_fn(void* v_p,
 				              int i)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     int j, ret = 0;
 
     /* if successful, copy public key */
@@ -585,7 +586,8 @@ static int userid_pwd_comp_fn(void* v_p,
 				              int i)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     PVFS_certificate *resp_cert, *sm_cert;
     int ret;
 

@@ -211,6 +211,7 @@ static void lebf_initialize(void)
             case PVFS_SERV_RMDIRENT:
                 req.u.rmdirent.entry = tmp_name;
                 reqsize = extra_size_PVFS_servreq_rmdirent;
+                respsize = extra_size_PVFS_servresp_rmdirent;
                 break;
             case PVFS_SERV_CHDIRENT:
                 req.u.chdirent.entry = tmp_name;

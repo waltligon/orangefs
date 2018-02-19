@@ -711,7 +711,8 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
 {
     int i = 0;
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb->parent_smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     int current_seg_index = sm_p->u.lookup.contexts[ sm_p->u.lookup.current_context ].current_segment;
     PVFS_object_ref last_resolved_refn;

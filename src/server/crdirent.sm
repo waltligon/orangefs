@@ -578,6 +578,13 @@ static PINT_sm_action crdirent_write_directory_entry(struct PINT_smcb *smcb,
      */
     keyval_flags |= TROVE_NOOVERWRITE;
 
+    /* WBL - I really don't like this - we are automagically updated
+     * something in the keyval, and it isn't clear at al where and when
+     * this happens - understood that it is a little more efficient.
+     * in V3 we keep dirent count in the dspace - we read the dspace
+     * first anyway, and write it back anyway so it is no slower than
+     * this.  I'm leaving this for the moment, but it needs to go!
+     */
     /* We also want to keep track of the keyval entries added on this
      * handle, which allows us to get the size of the directory later
      */

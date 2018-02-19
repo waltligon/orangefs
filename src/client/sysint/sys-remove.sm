@@ -1,772 +1,780 @@
-    /* 
-     * (C) 2003 Clemson University and The University of Chicago 
-     *
-     * See COPYING in top-level directory.
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface routines for removing an object and its
+ *  associated directory entry.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "pint-util.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+#include "pint-cached-config.h"
+#include "PINT-reqproto-encode.h"
+#include "ncache.h"
+#include "pvfs2-internal.h"
+#include "sid.h"
+#include "dist-dir-utils.h"
+
+/*
+  PVFS_{i}sys_remove takes the following steps:
+
+  - rmdirent the entry from the parent directory
+  - getattr on the object to be removed
+  - if the object is a directory
+    - check if the dir is empty
+    - if so, continue
+    - if not, crdirent the previously rmdirent'd
+      entry and return -PVFS_ENOTEMPTY
+  - if the object is a metafile
+    - remove all associated data files
+  - remove the actual object specified
+*/
+
+enum
+{
+    RMDIRENT_RETRY = 1,
+    RMDIRENT_RETRY_NEED_GETATTR,
+    CRDIRENT_RETRY,
+    RETURN_STORED_ERROR_CODE
+};
+
+static int remove_rmdirent_comp_fn(void *v_p,
+                                   struct PVFS_server_resp *resp_p,
+                                   int i);
+static int remove_crdirent_comp_fn(void *v_p,
+                                   struct PVFS_server_resp *resp_p,
+                                   int i);
+
+#define PRINT_REMOVE_WARNING()                                        \
+do {                                                                  \
+    gossip_err("WARNING: PVFS_sys_remove() encountered an error "     \
+               "which may lead to\n  inconsistent state.\n");         \
+    gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");\
+} while(0)
+
+%%
+
+machine pvfs2_client_remove_sm
+{
+    state init
+    {
+        run remove_init;
+        default => rmdirent_get_capability;
+    }
+    
+    state rmdirent_get_capability
+    {
+        jump pvfs2_client_getattr_sm;
+        success => rmdirent_setup_msgpair;
+        default => rmdirent_retry_or_fail;
+    }
+
+    state rmdirent_setup_msgpair
+    {
+        run remove_rmdirent_setup_msgpair;
+        success => rmdirent_xfer_msgpair;
+        default => rmdirent_retry_or_fail;
+    }
+
+    state rmdirent_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => do_remove;
+        default => rmdirent_retry_or_fail;
+    }
+
+    state rmdirent_retry_or_fail
+    {
+        run remove_rmdirent_retry_or_fail;
+        RMDIRENT_RETRY => rmdirent_timer;
+        RMDIRENT_RETRY_NEED_GETATTR => rmdirent_getattr_setup;
+        default => cleanup;
+    }
+
+    state rmdirent_getattr_setup
+    {
+        run remove_getattr_setup;
+        default => rmdirent_get_capability;
+    }  
+
+    /* successfully removed dirent no go remove the guts */
+        
+    state do_remove
+    {
+        jump pvfs2_client_remove_helper_sm;
+        default => check_error_code;
+    }
+
+    state check_error_code
+    {
+        run remove_check_error_code;
+        success => cleanup;
+        RETURN_STORED_ERROR_CODE => cleanup;
+        default => getattr_setup;
+    }
+
+    state rmdirent_timer
+    {
+        run remove_generic_timer;
+        default => rmdirent_get_capability;
+    }
+
+    /* if we remove the dirent, but fail to remove the rest
+     * we apparently put the dirent back.  Probably should
+     * drop this and use scrubber to get the missed stuff.
      */
-
-    /** \file
-     *  \ingroup sysint
-     *
-     *  PVFS2 system interface routines for removing an object and its
-     *  associated directory entry.
-     */
-
-    #include <string.h>
-    #include <assert.h>
-
-    #include "client-state-machine.h"
-    #include "pint-util.h"
-    #include "pvfs2-debug.h"
-    #include "job.h"
-    #include "gossip.h"
-    #include "str-utils.h"
-    #include "pint-cached-config.h"
-    #include "PINT-reqproto-encode.h"
-    #include "ncache.h"
-    #include "pvfs2-internal.h"
-    #include "sid.h"
-    #include "dist-dir-utils.h"
-
-    /*
-      PVFS_{i}sys_remove takes the following steps:
-
-      - rmdirent the entry from the parent directory
-      - getattr on the object to be removed
-      - if the object is a directory
-        - check if the dir is empty
-        - if so, continue
-        - if not, crdirent the previously rmdirent'd
-          entry and return -PVFS_ENOTEMPTY
-      - if the object is a metafile
-        - remove all associated data files
-      - remove the actual object specified
-    */
-
-    enum
+    state getattr_setup
     {
-        RMDIRENT_RETRY = 1,
-        RMDIRENT_RETRY_NEED_GETATTR,
-        CRDIRENT_RETRY,
-        RETURN_STORED_ERROR_CODE
-    };
-
-    static int remove_rmdirent_comp_fn(void *v_p,
-                                       struct PVFS_server_resp *resp_p,
-                                       int i);
-    static int remove_crdirent_comp_fn(void *v_p,
-                                       struct PVFS_server_resp *resp_p,
-                                       int i);
-
-    #define PRINT_REMOVE_WARNING()                                        \
-    do {                                                                  \
-        gossip_err("WARNING: PVFS_sys_remove() encountered an error "     \
-                   "which may lead to\n  inconsistent state.\n");         \
-        gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");\
-    } while(0)
-
-    %%
-
-    machine pvfs2_client_remove_sm
+        run remove_getattr_setup;
+        default => parent_getattr;
+    }   
+    
+    state parent_getattr
     {
-        state init
-        {
-            run remove_init;
-            default => rmdirent_get_capability;
-        }
-        
-        state rmdirent_get_capability
-        {
-            jump pvfs2_client_getattr_sm;
-            success => rmdirent_setup_msgpair;
-            default => rmdirent_retry_or_fail;
-        }
-
-        state rmdirent_setup_msgpair
-        {
-            run remove_rmdirent_setup_msgpair;
-            success => rmdirent_xfer_msgpair;
-            default => rmdirent_retry_or_fail;
-        }
-
-        state rmdirent_xfer_msgpair
-        {
-            jump pvfs2_msgpairarray_sm;
-            success => do_remove;
-            default => rmdirent_retry_or_fail;
-        }
-
-        state rmdirent_retry_or_fail
-        {
-            run remove_rmdirent_retry_or_fail;
-            RMDIRENT_RETRY => rmdirent_timer;
-            RMDIRENT_RETRY_NEED_GETATTR => rmdirent_getattr_setup;
-            default => cleanup;
-        }
-
-        state rmdirent_getattr_setup
-        {
-            run remove_getattr_setup;
-            default => rmdirent_get_capability;
-        }   
-            
-        state do_remove
-        {
-            jump pvfs2_client_remove_helper_sm;
-            default => check_error_code;
-        }
-
-        state check_error_code
-        {
-            run remove_check_error_code;
-            success => cleanup;
-            RETURN_STORED_ERROR_CODE => cleanup;
-            default => getattr_setup;
-        }
-
-        state crdirent_timer
-        {
-            run remove_generic_timer;
-            default => getattr_setup;
-        }
-
-        state rmdirent_timer
-        {
-            run remove_generic_timer;
-            default => rmdirent_get_capability;
-        }
-
-        state getattr_setup
-        {
-            run remove_getattr_setup;
-            default => parent_getattr;
-        }   
-        
-        state parent_getattr
-        {
-            jump pvfs2_client_getattr_sm;
-            success => crdirent_setup_msgpair;
-            default => cleanup;
-        }
-
-        state crdirent_setup_msgpair
-        {
-            run remove_crdirent_setup_msgpair;
-            success => crdirent_xfer_msgpair;
-            default => crdirent_retry_or_fail;
-        }
-
-        state crdirent_xfer_msgpair
-        {
-            jump pvfs2_msgpairarray_sm;
-            success => cleanup;
-            default => crdirent_retry_or_fail;
-        }
-
-        state crdirent_retry_or_fail
-        {
-            run remove_crdirent_retry_or_fail;
-            CRDIRENT_RETRY => crdirent_timer;
-            default => cleanup;
-        }
-
-        state cleanup
-        {
-            run remove_cleanup;
-            default => terminate;
-        }
+        jump pvfs2_client_getattr_sm;
+        success => crdirent_setup_msgpair;
+        default => cleanup;
     }
 
-    %%
-
-    /** Initiate removal of an object and its directory entry.
-     */
-    PVFS_error PVFS_isys_remove(char *object_name,
-                                PVFS_object_ref parent_ref, 
-                                const PVFS_credential *credential,
-                                PVFS_sys_op_id *op_id,
-                                PVFS_hint hints,
-                                void *user_ptr)
+    state crdirent_setup_msgpair
     {
-        PVFS_error ret = -PVFS_EINVAL;
-        PINT_smcb *smcb = NULL;
-        PINT_client_sm *sm_p = NULL;
-
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_remove entered\n");
-
-        if (!PVFS_OID_cmp(&parent_ref.handle, &PVFS_HANDLE_NULL) ||
-            (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
-            (object_name == NULL))
-        {
-            gossip_err("invalid (NULL) required argument\n");
-            return ret;
-        }
-
-        PINT_smcb_alloc(&smcb,
-                        PVFS_SYS_REMOVE,
-                        sizeof(struct PINT_client_sm),
-                        client_op_state_get_machine,
-                        client_state_machine_terminate,
-                        pint_client_sm_context);
-        if (smcb == NULL)
-        {
-            return -PVFS_ENOMEM;
-        }
-        sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-        PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-        PINT_init_sysint_credential(sm_p->cred_p, credential);
-
-        sm_p->u.remove.object_name = object_name;
-        sm_p->parent_ref  = parent_ref;
-        sm_p->u.remove.stored_error_code = 0;
-
-        PVFS_hint_copy(hints, &sm_p->hints);
-        PVFS_hint_add(&sm_p->hints,
-                      PVFS_HINT_HANDLE_NAME,
-                      sizeof(PVFS_handle),
-                      &parent_ref.handle);
-
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "Trying to remove entry %s under %s,%d\n",
-                     object_name, PVFS_OID_str(&parent_ref.handle),
-                     parent_ref.fs_id);
-
-        /* NOTE: This state machine previously 
-         * multiplied the default job timeout
-         * by five to allow for potentially long
-         * sync delays.  We instead now set
-         * the default client BMI timeout higher
-         * for all operations: if a sync can 
-         * go slow then so can any other arbitrary
-         * operation queued behind it. -PHC
-         */
-        
-        return PINT_client_state_machine_post(smcb,
-                                              op_id,
-                                              user_ptr);
+        run remove_crdirent_setup_msgpair;
+        success => crdirent_xfer_msgpair;
+        default => crdirent_retry_or_fail;
     }
 
-    /** Remove an object and its directory entry.
-     */
-    PVFS_error PVFS_sys_remove(char *object_name,
-                               PVFS_object_ref parent_ref, 
-                               const PVFS_credential *credential,
-                               PVFS_hint hints)
+    state crdirent_xfer_msgpair
     {
-        PVFS_error ret = -PVFS_EINVAL, error = 0;
-        PVFS_sys_op_id op_id;
-
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove entered\n");
-
-        ret = PVFS_isys_remove(object_name,
-                               parent_ref,
-                               credential,
-                               &op_id,
-                               hints,
-                               NULL);
-        if (ret)
-        {
-            PVFS_perror_gossip("PVFS_isys_remove call", ret);
-            error = ret;
-        }
-        else if (!ret && op_id != -1)
-        {
-            ret = PVFS_sys_wait(op_id, "remove", &error);
-            if (ret)
-            {
-                PVFS_perror_gossip("PVFS_sys_wait call", ret);
-                error = ret;
-            }
-            PINT_sys_release(op_id);
-        }
-        return error;
+        jump pvfs2_msgpairarray_sm;
+        success => cleanup;
+        default => crdirent_retry_or_fail;
     }
 
-    /* <===================== COMPLETION FUNCTIONS =========================> */
-
-    static int remove_rmdirent_comp_fn(void *v_p,
-                                       struct PVFS_server_resp *resp_p,
-                                       int index)
+    state crdirent_retry_or_fail
     {
-        PINT_smcb *smcb = v_p;
-        PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-
-        assert(resp_p->op == PVFS_SERV_RMDIRENT);
-
-        if (resp_p->status == 0)
-        {
-            assert(PVFS_OID_cmp(&resp_p->u.rmdirent.entry_handle,
-                                &PVFS_HANDLE_NULL));
-            assert(sm_p->parent_ref.fs_id != PVFS_FS_ID_NULL);
-
-            /* pull handle out of response, also copy in fs_id from before */
-            sm_p->object_ref.fs_id     = sm_p->parent_ref.fs_id;
-            sm_p->object_ref.handle    = resp_p->u.rmdirent.entry_handle;
-            sm_p->object_ref.sid_count = resp_p->u.rmdirent.sid_count;
-            sm_p->object_ref.sid_array =
-                             (PVFS_SID *)malloc(resp_p->u.rmdirent.sid_count *
-                             sizeof(PVFS_SID));
-            memcpy(sm_p->object_ref.sid_array,
-                   resp_p->u.rmdirent.sid_array,
-                   resp_p->u.rmdirent.sid_count * sizeof(PVFS_SID));
-
-            gossip_debug(GOSSIP_CLIENT_DEBUG,
-                         "  remove_rmdirent_comp_fn: metafile handle = %s\n",
-                         PVFS_OID_str(&sm_p->object_ref.handle));
-        }
-        return resp_p->status;
+        run remove_crdirent_retry_or_fail;
+        CRDIRENT_RETRY => crdirent_timer;
+        default => cleanup;
     }
 
-    static int remove_crdirent_comp_fn(void *v_p,
-                                       struct PVFS_server_resp *resp_p,
-                                       int index)
+    state crdirent_timer
     {
-        assert(resp_p->op == PVFS_SERV_CRDIRENT);
-
-        if (resp_p->status == 0)
-        {
-            gossip_debug(GOSSIP_CLIENT_DEBUG,
-                         "  remove_crdirent_comp_fn: OK\n");
-        }
-        return resp_p->status;
+        run remove_generic_timer;
+        default => getattr_setup;
     }
 
-    /* <==================== STATE ACTION FUNCTIONS ========================> */
-
-    static PINT_sm_action remove_init(struct PINT_smcb *smcb,
-                                      job_status_s *js_p)
+    /* all returns here */
+    state cleanup
     {
-        struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: init\n");
-
-        PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
-                                   sm_p->parent_ref,
-                                   PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_HINT |
-                                                     PVFS_ATTR_CAPABILITY |
-                                                     PVFS_ATTR_DISTDIR_ATTR,
-                                   PVFS_TYPE_DIRECTORY,
-                                   0);
-
-        assert(js_p->error_code == 0);
-        return SM_ACTION_COMPLETE;
+        run remove_cleanup;
+        default => terminate;
     }
+}
 
-    static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
-                                                        job_status_s *js_p)
+%%
+
+/** Initiate removal of an object and its directory entry.
+ */
+PVFS_error PVFS_isys_remove(char *object_name,
+                            PVFS_object_ref parent_ref, 
+                            const PVFS_credential *credential,
+                            PVFS_sys_op_id *op_id,
+                            PVFS_hint hints,
+                            void *user_ptr)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_remove entered\n");
+
+    if (!PVFS_OID_cmp(&parent_ref.handle, &PVFS_HANDLE_NULL) ||
+        (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
+        (object_name == NULL))
     {
-        struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-        int ret = -PVFS_EINVAL;
-        PINT_sm_msgpair_state *msg_p = NULL;
-        PVFS_dist_dir_hash_type dirdata_hash;
-        int dirdata_server_index;
-    #if 0
-        struct server_configuration_s *server_config = NULL;
-        struct filesystem_configuration_s* cur_fs = NULL;
-        int metasidcnt = 0;
-    #endif
-
-        /* NOTE: we remove the dirent first because this gets the object
-         * out of the system fastest.
-         */
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "remove state: rmdirent_setup_msgpair\n");
-
-        js_p->error_code = 0;
-
-        /*
-         * Find metadata replication factor from configuration
-         */
-    #if 0
-        server_config = PINT_get_server_config_struct(sm_p->parent_ref.fs_id);
-        cur_fs = PINT_config_find_fs_id(server_config,sm_p->parent_ref.fs_id);
-        metasidcnt = cur_fs->metadata_replication_factor;
-        PINT_put_server_config_struct(server_config);
-    #endif
-
-
-        /* keep a copy of the parent's capability */
-        PINT_copy_capability(&sm_p->getattr.attr.capability,
-                             &sm_p->parent_capability);
-
-        /* find the hash value and the dist dir bucket */
-        dirdata_hash = PINT_encrypt_dirdata(sm_p->u.remove.object_name);
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "remove: encrypt dirent %s into hash value %llu.\n",
-                sm_p->u.remove.object_name,
-                llu(dirdata_hash));
-
-        dirdata_server_index = PINT_find_dist_dir_bucket(dirdata_hash,
-                        &sm_p->getattr.attr.u.dir.dist_dir_attr,
-                        sm_p->getattr.attr.u.dir.dist_dir_bitmap);
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "remove: selecting bucket No.%d from dist_dir_bitmap.\n",
-                     dirdata_server_index);
-
-        PINT_msgpair_init(&sm_p->msgarray_op);
-        msg_p = &sm_p->msgarray_op.msgpair;
-
-        /* SID COUNT AND ARRAY MAY BE WRONG - CHECK IT!! */
-
-        PINT_SERVREQ_RMDIRENT_FILL(
-                     msg_p->req,
-                     sm_p->parent_capability,  /* parent only for cap and fs_id */
-                     sm_p->parent_ref.fs_id,
-                     sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
-                     sm_p->parent_ref.sid_count, /* should be dirdata_sids */
-                     sm_p->parent_ref.sid_array, /* should be dirdata_sids */
-                     sm_p->u.remove.object_name,
-                     sm_p->hints);
-
-        gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing RMDIRENT on %s "
-              "under %s,%d from dirdata server %s\n",
-              sm_p->u.remove.object_name,
-              PVFS_OID_str(&sm_p->parent_ref.handle),
-              sm_p->parent_ref.fs_id,
-              PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
-                                               dirdata_server_index])
-              );
-
-        msg_p->msgclass = PVFS_IO_METADATA;
-        msg_p->msgdir = PVFS_IO_WRITE;
-        msg_p->fs_id = sm_p->parent_ref.fs_id;
-        /* send to dirdata server */
-        msg_p->handle =
-                sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
-        msg_p->sid_count = sm_p->parent_ref.sid_count; /* should be dirdata_sids */
-        msg_p->sid_index = 0;
-        msg_p->sid_array = sm_p->parent_ref.sid_array; /* should be dirdata_sids */
-        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
-        msg_p->comp_fn = remove_rmdirent_comp_fn;
-
-        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
-        if (ret)
-        {
-            gossip_err("Failed to map directory server address\n");
-            js_p->error_code = ret;
-        }
-
-        gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing RMDIRENT on %s "
-                     "under %s,%d\n", sm_p->u.remove.object_name,
-                     PVFS_OID_str(&sm_p->parent_ref.handle),
-                     sm_p->parent_ref.fs_id);
-
-        PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
-        return SM_ACTION_COMPLETE;
-    }
-
-    static PINT_sm_action remove_getattr_setup(struct PINT_smcb *smcb,
-                                               job_status_s *js_p)
-    {
-        struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-        
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "remove state: getattr_setup\n");
-        
-        sm_p->u.remove.stored_error_code = js_p->error_code;
-        js_p->error_code = 0;
-         
-        /* clear getattr */
-        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
-                     
-        PINT_SM_GETATTR_STATE_FILL(
-            sm_p->getattr, 
-            sm_p->parent_ref,
-            PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_HINT |
-                    PVFS_ATTR_CAPABILITY | PVFS_ATTR_DISTDIR_ATTR,
-            PVFS_TYPE_DIRECTORY,
-            0);
-
-        return SM_ACTION_COMPLETE;
-    }           
-
-    static PINT_sm_action remove_crdirent_setup_msgpair(struct PINT_smcb *smcb,
-                                                        job_status_s *js_p)
-    {
-        struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-        PVFS_object_attr *attr = NULL;
-        int ret = -PVFS_EINVAL;
-        PINT_sm_msgpair_state *msg_p = NULL;
-        PVFS_dist_dir_hash_type dirdata_hash;
-        int dirdata_server_index;
-        int dirdata_sid_index;
-
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "remove state: crdirent_setup_msgpair\n");
-
-        attr = &sm_p->getattr.attr;
-        assert(attr);
-        
-        /* find the hash value and the dist dir bucket */
-        dirdata_hash = PINT_encrypt_dirdata(sm_p->u.remove.object_name);
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "remove: encrypt dirent %s into hash value %llu.\n",
-                     sm_p->u.remove.object_name,
-                     llu(dirdata_hash));
-                
-        dirdata_server_index =
-                PINT_find_dist_dir_bucket(dirdata_hash,
-                        &sm_p->getattr.attr.u.dir.dist_dir_attr,
-                        sm_p->getattr.attr.u.dir.dist_dir_bitmap);
-        dirdata_sid_index = dirdata_server_index * sm_p->parent_ref.sid_count;
-
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "remove: selecting bucket No.%d from dist_dir_bitmap.\n",
-                     dirdata_server_index);
-
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "remove: dirdata_handle: %s\n",
-                PVFS_OID_str(&attr->u.dir.dirdata_handles[dirdata_server_index]));
-
-        PINT_msgpair_init(&sm_p->msgarray_op);
-        msg_p = &sm_p->msgarray_op.msgpair;
-
-        PINT_SERVREQ_CRDIRENT_FILL(
-                              msg_p->req,
-                              sm_p->parent_capability,
-                              *sm_p->cred_p,
-                              sm_p->parent_ref.fs_id,
-                              attr->u.dir.dirdata_handles[dirdata_server_index],
-                              sm_p->parent_ref.sid_count,
-                              &attr->u.dir.dirdata_sids[dirdata_sid_index],
-                              sm_p->u.remove.object_name,
-                              sm_p->object_ref.handle,
-                              sm_p->object_ref.sid_array,
-                              sm_p->object_ref.sid_count,
-                              sm_p->parent_ref.handle,
-                              sm_p->parent_ref.sid_array,
-                              sm_p->hints);
-
-        gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing CRDIRENT of %s (%s,%d) "
-                     "under %s,%d with dirdata %s\n",
-                     sm_p->u.remove.object_name,
-                     PVFS_OID_str(&sm_p->object_ref.handle),
-                     sm_p->object_ref.fs_id,
-                     PVFS_OID_str(&sm_p->parent_ref.handle),
-                     sm_p->parent_ref.fs_id,
-                     PVFS_OID_str(&attr->u.dir.dirdata_handles[dirdata_server_index])
-                     );
-
-        msg_p->msgclass = PVFS_IO_METADATA;
-        msg_p->msgdir = PVFS_IO_WRITE;
-        msg_p->fs_id = sm_p->parent_ref.fs_id;
-        /* send to dirdata server */
-        msg_p->handle = attr->u.dir.dirdata_handles[dirdata_server_index];
-        msg_p->sid_count = sm_p->parent_ref.sid_count;
-        msg_p->sid_index = 0;
-        msg_p->sid_array = &attr->u.dir.dirdata_sids[dirdata_sid_index];
-        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
-        msg_p->comp_fn = remove_crdirent_comp_fn;
-
-        ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
-        if (ret)
-        {
-            gossip_err("Failed to map directory server address\n");
-            js_p->error_code = ret;
-        }
-
-        gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing CRDIRENT of %s (%s,%d) "
-                    "under %s,%d\n", sm_p->u.remove.object_name,
-                    PVFS_OID_str(&sm_p->object_ref.handle),
-                    sm_p->object_ref.fs_id,
-                    PVFS_OID_str(&sm_p->parent_ref.handle),
-                    sm_p->parent_ref.fs_id);
-
-        PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
-        return SM_ACTION_COMPLETE;
-    }
-
-    static PINT_sm_action remove_check_error_code(struct PINT_smcb *smcb,
-                                                  job_status_s *js_p)
-    {
-        struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-        char buf[64] = {0};
-
-        PVFS_strerror_r(js_p->error_code, buf, 64);
-        gossip_debug(GOSSIP_REMOVE_DEBUG, "remove_check_error_code got %s "
-                     "(%d)\n", buf, js_p->error_code);
-        /*
-          separate error codes which are ok to return to the caller at
-          this point without trying to undo what we've done and retry the
-          removal
-        */
-        switch(js_p->error_code)
-        {
-            case -PVFS_ENOTEMPTY:
-                /* let the error pass through for the crdirent cleanup */
-                break;
-            case -PVFS_EINVAL:
-            case -PVFS_ENOMEM:
-                /* don't undo after these errors */
-                sm_p->u.remove.stored_error_code = js_p->error_code;
-                js_p->error_code = RETURN_STORED_ERROR_CODE;
-                break;
-        }
-        return SM_ACTION_COMPLETE;
-    }
-
-    static PINT_sm_action remove_cleanup(struct PINT_smcb *smcb,
-                                         job_status_s *js_p)
-    {
-        struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: cleanup\n");
-
-        sm_p->error_code = (sm_p->u.remove.stored_error_code ?
-                            sm_p->u.remove.stored_error_code :
-                            js_p->error_code);
-
-        PINT_cleanup_capability(&sm_p->parent_capability);
-
-        /* NOTE: acache is invalidated by remove_helper now */
-        
-        /* The ncache invalidate must be done from this function, because the 
-         * remove_helper may not  have all the information needed
-         */
-        PINT_ncache_invalidate((const char*) sm_p->u.remove.object_name,
-                               (const PVFS_object_ref*) &(sm_p->parent_ref));
-
-        PINT_msgpairarray_destroy(&sm_p->msgarray_op);
-        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
-
-        PINT_SET_OP_COMPLETE;
-        return SM_ACTION_TERMINATE;
-    }
-
-    static PINT_sm_action remove_generic_timer(struct PINT_smcb *smcb,
-                                               job_status_s *js_p)
-    {
-        struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-        int ret = -PVFS_EINVAL;
-        job_id_t tmp_id;
-
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: generic_timer\n");
-
-        ret = job_req_sched_post_timer(sm_p->msgarray_op.params.retry_delay,
-                                       smcb,
-                                       0,
-                                       js_p,
-                                       &tmp_id,
-                                       pint_client_sm_context);
-
+        gossip_err("invalid (NULL) required argument\n");
         return ret;
     }
 
-    static PINT_sm_action remove_crdirent_retry_or_fail(struct PINT_smcb *smcb,
-                                                        job_status_s *js_p)
+    PINT_smcb_alloc(&smcb,
+                    PVFS_SYS_REMOVE,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
+    if (smcb == NULL)
     {
-        struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "remove state: crdirent_retry_or_fail\n");
-
-        /* try again if we get a dirdata mismatch. */
-        if (js_p->error_code == -PVFS_EAGAIN &&
-            sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit)
-        {
-            sm_p->u.remove.retry_count++;
-
-            gossip_debug(GOSSIP_CLIENT_DEBUG,
-                    "  received -PVFS_EAGAIN, wrong dirdata server or revoked capability,\n  will do getattr and retry crdirent (attempt number %d)!\n",
-                    sm_p->u.remove.retry_count);
-
-            /* clear acache content */
-            PINT_acache_invalidate(sm_p->parent_ref);
-
-            js_p->error_code = CRDIRENT_RETRY;
-            return SM_ACTION_COMPLETE;
-        }
-
-        /* try again (up to a point) if we get a comm. failure. */
-        if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
-            (sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit))
-        {
-            sm_p->u.remove.retry_count++;
-            js_p->error_code = CRDIRENT_RETRY;
-            return SM_ACTION_COMPLETE;
-        }
-
-        if ((js_p->error_code == -PVFS_EEXIST) &&
-            (sm_p->u.remove.retry_count > 0))
-        {
-            /* assume everything worked out ok and we got the right
-             * directory entry back.  there was just a transient network
-             * problem along the way
-             */
-            js_p->error_code = 0;
-            return SM_ACTION_COMPLETE;
-        }
-
-        sm_p->u.remove.stored_error_code = js_p->error_code;
-
-        gossip_err("Error: failed to replace directory during "
-                "remove recovery: entry %s for object %s.\n",
-                sm_p->u.remove.object_name,
-                PVFS_OID_str(&sm_p->object_ref.handle));
-        PVFS_perror_gossip("crdirent", js_p->error_code);
-
-        PRINT_REMOVE_WARNING();
-        return SM_ACTION_COMPLETE;
+        return -PVFS_ENOMEM;
     }
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
 
-    static PINT_sm_action remove_rmdirent_retry_or_fail(struct PINT_smcb *smcb,
-                                                        job_status_s *js_p)
+    sm_p->u.remove.object_name = object_name;
+    sm_p->parent_ref  = parent_ref;
+    sm_p->u.remove.stored_error_code = 0;
+
+    PVFS_hint_copy(hints, &sm_p->hints);
+    PVFS_hint_add(&sm_p->hints,
+                  PVFS_HINT_HANDLE_NAME,
+                  sizeof(PVFS_handle),
+                  &parent_ref.handle);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "Trying to remove entry %s under %s,%d\n",
+                 object_name, PVFS_OID_str(&parent_ref.handle),
+                 parent_ref.fs_id);
+
+    /* NOTE: This state machine previously 
+     * multiplied the default job timeout
+     * by five to allow for potentially long
+     * sync delays.  We instead now set
+     * the default client BMI timeout higher
+     * for all operations: if a sync can 
+     * go slow then so can any other arbitrary
+     * operation queued behind it. -PHC
+     */
+    
+    return PINT_client_state_machine_post(smcb,
+                                          op_id,
+                                          user_ptr);
+}
+
+/** Remove an object and its directory entry.
+ */
+PVFS_error PVFS_sys_remove(char *object_name,
+                           PVFS_object_ref parent_ref, 
+                           const PVFS_credential *credential,
+                           PVFS_hint hints)
+{
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove entered\n");
+
+    ret = PVFS_isys_remove(object_name,
+                           parent_ref,
+                           credential,
+                           &op_id,
+                           hints,
+                           NULL);
+    if (ret)
     {
-        struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "remove state: rmdirent_retry_or_fail\n");
-
-        /* try again if we get a dirdata mismatch. */
-        if (js_p->error_code == -PVFS_EAGAIN &&
-            sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit)
-        {
-            sm_p->u.remove.retry_count++;
-
-            gossip_debug(GOSSIP_CLIENT_DEBUG,
-                    "  received -PVFS_EAGAIN, wrong dirdata server, will do getattr and retry rmdirent!\n");
-
-            /* clear acache content */
-            PINT_acache_invalidate(sm_p->parent_ref);
-
-            js_p->error_code = RMDIRENT_RETRY_NEED_GETATTR;
-            return SM_ACTION_COMPLETE;
-        }
-
-        /* try again (up to a point) if we get a comm. failure. */
-        if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
-            (sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit))
-        {
-            sm_p->u.remove.retry_count++;
-            js_p->error_code = RMDIRENT_RETRY;
-            return SM_ACTION_COMPLETE;
-        }
-
-        if ((js_p->error_code == -PVFS_ENOENT) &&
-            (sm_p->u.remove.retry_count > 0))
-        {
-            /* this is a tricky error case.  Server reports ENOENT, but
-             * this is not the first time we attempted the rmdirent.  It
-             * may be the case that it is reporting ENOENT because one of
-             * the earlier retries possibly completed.  We will treat this
-             * as success, but put out an error message.  This could
-             * strand objects, or remove non-empty directories, for
-             * example.
-             */
-            gossip_err("Warning: Received ENOENT on retry to remove entry %s.\n",
-                       sm_p->u.remove.object_name);
-
-            PRINT_REMOVE_WARNING();
-            js_p->error_code = -PVFS_ENOENT;
-            return SM_ACTION_COMPLETE;
-        }
-
-        /* other errors are preserved and passed along to the next state */
-        return SM_ACTION_COMPLETE;
+        PVFS_perror_gossip("PVFS_isys_remove call", ret);
+        error = ret;
     }
+    else if (!ret && op_id != -1)
+    {
+        ret = PVFS_sys_wait(op_id, "remove", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+        PINT_sys_release(op_id);
+    }
+    return error;
+}
+
+/* <===================== COMPLETION FUNCTIONS =========================> */
+
+static int remove_rmdirent_comp_fn(void *v_p,
+                                   struct PVFS_server_resp *resp_p,
+                                   int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
+
+    assert(resp_p->op == PVFS_SERV_RMDIRENT);
+
+    if (resp_p->status == 0)
+    {
+        assert(PVFS_OID_cmp(&resp_p->u.rmdirent.entry_handle,
+                            &PVFS_HANDLE_NULL));
+        assert(sm_p->parent_ref.fs_id != PVFS_FS_ID_NULL);
+
+        /* pull handle out of response, also copy in fs_id from before */
+        sm_p->object_ref.fs_id     = sm_p->parent_ref.fs_id;
+        sm_p->object_ref.handle    = resp_p->u.rmdirent.entry_handle;
+        sm_p->object_ref.sid_count = resp_p->u.rmdirent.sid_count;
+        sm_p->object_ref.sid_array =
+                         (PVFS_SID *)malloc(resp_p->u.rmdirent.sid_count *
+                         sizeof(PVFS_SID));
+        memcpy(sm_p->object_ref.sid_array,
+               resp_p->u.rmdirent.sid_array,
+               resp_p->u.rmdirent.sid_count * sizeof(PVFS_SID));
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "  remove_rmdirent_comp_fn: metafile handle = %s\n",
+                     PVFS_OID_str(&sm_p->object_ref.handle));
+    }
+    return resp_p->status;
+}
+
+static int remove_crdirent_comp_fn(void *v_p,
+                                   struct PVFS_server_resp *resp_p,
+                                   int index)
+{
+    assert(resp_p->op == PVFS_SERV_CRDIRENT);
+
+    if (resp_p->status == 0)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "  remove_crdirent_comp_fn: OK\n");
+    }
+    return resp_p->status;
+}
+
+/* <==================== STATE ACTION FUNCTIONS ========================> */
+
+static PINT_sm_action remove_init(struct PINT_smcb *smcb,
+                                  job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: init\n");
+
+    PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
+                               sm_p->parent_ref,
+                               PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_HINT |
+                                                 PVFS_ATTR_CAPABILITY |
+                                                 PVFS_ATTR_DISTDIR_ATTR,
+                               PVFS_TYPE_DIRECTORY,
+                               0);
+
+    assert(js_p->error_code == 0);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_dist_dir_hash_type dirdata_hash;
+    int dirdata_server_index;
+#if 0
+    struct server_configuration_s *server_config = NULL;
+    struct filesystem_configuration_s* cur_fs = NULL;
+    int metasidcnt = 0;
+#endif
+
+    /* NOTE: we remove the dirent first because this gets the object
+     * out of the system fastest.
+     */
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove state: rmdirent_setup_msgpair\n");
+
+    js_p->error_code = 0;
 
     /*
-     * Local variables:
-     *  mode: c
-     *  c-indent-level: 4
-     *  c-basic-offset: 4
-     * End:
-     *
-     * vim: ft=c ts=8 sts=4 sw=4 expandtab
+     * Find metadata replication factor from configuration
      */
+#if 0
+    server_config = PINT_get_server_config_struct(sm_p->parent_ref.fs_id);
+    cur_fs = PINT_config_find_fs_id(server_config,sm_p->parent_ref.fs_id);
+    metasidcnt = cur_fs->metadata_replication_factor;
+    PINT_put_server_config_struct(server_config);
+#endif
+
+
+    /* keep a copy of the parent's capability */
+    PINT_copy_capability(&sm_p->getattr.attr.capability,
+                         &sm_p->parent_capability);
+
+    /* find the hash value and the dist dir bucket */
+    dirdata_hash = PINT_encrypt_dirdata(sm_p->u.remove.object_name);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "remove: encrypt dirent %s into hash value %llu.\n",
+            sm_p->u.remove.object_name,
+            llu(dirdata_hash));
+
+    dirdata_server_index = PINT_find_dist_dir_bucket(dirdata_hash,
+                    &sm_p->getattr.attr.u.dir.dist_dir_attr,
+                    sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove: selecting bucket No.%d from dist_dir_bitmap.\n",
+                 dirdata_server_index);
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
+
+    /* SID COUNT AND ARRAY MAY BE WRONG - CHECK IT!! */
+
+    PINT_SERVREQ_RMDIRENT_FILL(
+                 msg_p->req,
+                 sm_p->parent_capability,  /* parent only for cap and fs_id */
+                 sm_p->parent_ref.fs_id,
+                 sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
+                 sm_p->parent_ref.sid_count, /* should be dirdata_sids */
+                 sm_p->parent_ref.sid_array, /* should be dirdata_sids */
+                 sm_p->u.remove.object_name,
+                 sm_p->hints);
+
+    gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing RMDIRENT on %s "
+          "under %s,%d from dirdata server %s\n",
+          sm_p->u.remove.object_name,
+          PVFS_OID_str(&sm_p->parent_ref.handle),
+          sm_p->parent_ref.fs_id,
+          PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
+                                           dirdata_server_index])
+          );
+
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
+    msg_p->fs_id = sm_p->parent_ref.fs_id;
+    /* send to dirdata server */
+    msg_p->handle =
+            sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
+    msg_p->sid_count = sm_p->parent_ref.sid_count; /* should be dirdata_sids */
+    msg_p->sid_index = 0;
+    msg_p->sid_array = sm_p->parent_ref.sid_array; /* should be dirdata_sids */
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    msg_p->comp_fn = remove_rmdirent_comp_fn;
+
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+    if (ret)
+    {
+        gossip_err("Failed to map directory server address\n");
+        js_p->error_code = ret;
+    }
+
+    gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing RMDIRENT on %s "
+                 "under %s,%d\n", sm_p->u.remove.object_name,
+                 PVFS_OID_str(&sm_p->parent_ref.handle),
+                 sm_p->parent_ref.fs_id);
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action remove_getattr_setup(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove state: getattr_setup\n");
+    
+    sm_p->u.remove.stored_error_code = js_p->error_code;
+    js_p->error_code = 0;
+     
+    /* clear getattr */
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+                 
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr, 
+        sm_p->parent_ref,
+        PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_HINT |
+                PVFS_ATTR_CAPABILITY | PVFS_ATTR_DISTDIR_ATTR,
+        PVFS_TYPE_DIRECTORY,
+        0);
+
+    return SM_ACTION_COMPLETE;
+}           
+
+static PINT_sm_action remove_crdirent_setup_msgpair(struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr = NULL;
+    int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_dist_dir_hash_type dirdata_hash;
+    int dirdata_server_index;
+    int dirdata_sid_index;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove state: crdirent_setup_msgpair\n");
+
+    attr = &sm_p->getattr.attr;
+    assert(attr);
+    
+    /* find the hash value and the dist dir bucket */
+    dirdata_hash = PINT_encrypt_dirdata(sm_p->u.remove.object_name);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove: encrypt dirent %s into hash value %llu.\n",
+                 sm_p->u.remove.object_name,
+                 llu(dirdata_hash));
+            
+    dirdata_server_index =
+            PINT_find_dist_dir_bucket(dirdata_hash,
+                    &sm_p->getattr.attr.u.dir.dist_dir_attr,
+                    sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    dirdata_sid_index = dirdata_server_index * sm_p->parent_ref.sid_count;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove: selecting bucket No.%d from dist_dir_bitmap.\n",
+                 dirdata_server_index);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove: dirdata_handle: %s\n",
+            PVFS_OID_str(&attr->u.dir.dirdata_handles[dirdata_server_index]));
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
+
+    PINT_SERVREQ_CRDIRENT_FILL(
+                          msg_p->req,
+                          sm_p->parent_capability,
+                          *sm_p->cred_p,
+                          sm_p->parent_ref.fs_id,
+                          attr->u.dir.dirdata_handles[dirdata_server_index],
+                          sm_p->parent_ref.sid_count,
+                          &attr->u.dir.dirdata_sids[dirdata_sid_index],
+                          sm_p->u.remove.object_name,
+                          sm_p->object_ref.handle,
+                          sm_p->object_ref.sid_array,
+                          sm_p->object_ref.sid_count,
+                          sm_p->parent_ref.handle,
+                          sm_p->parent_ref.sid_array,
+                          sm_p->hints);
+
+    gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing CRDIRENT of %s (%s,%d) "
+                 "under %s,%d with dirdata %s\n",
+                 sm_p->u.remove.object_name,
+                 PVFS_OID_str(&sm_p->object_ref.handle),
+                 sm_p->object_ref.fs_id,
+                 PVFS_OID_str(&sm_p->parent_ref.handle),
+                 sm_p->parent_ref.fs_id,
+                 PVFS_OID_str(&attr->u.dir.dirdata_handles[dirdata_server_index])
+                 );
+
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
+    msg_p->fs_id = sm_p->parent_ref.fs_id;
+    /* send to dirdata server */
+    msg_p->handle = attr->u.dir.dirdata_handles[dirdata_server_index];
+    msg_p->sid_count = sm_p->parent_ref.sid_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = &attr->u.dir.dirdata_sids[dirdata_sid_index];
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    msg_p->comp_fn = remove_crdirent_comp_fn;
+
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+    if (ret)
+    {
+        gossip_err("Failed to map directory server address\n");
+        js_p->error_code = ret;
+    }
+
+    gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing CRDIRENT of %s (%s,%d) "
+                "under %s,%d\n", sm_p->u.remove.object_name,
+                PVFS_OID_str(&sm_p->object_ref.handle),
+                sm_p->object_ref.fs_id,
+                PVFS_OID_str(&sm_p->parent_ref.handle),
+                sm_p->parent_ref.fs_id);
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action remove_check_error_code(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    char buf[64] = {0};
+
+    PVFS_strerror_r(js_p->error_code, buf, 64);
+    gossip_debug(GOSSIP_REMOVE_DEBUG, "remove_check_error_code got %s "
+                 "(%d)\n", buf, js_p->error_code);
+    /*
+      separate error codes which are ok to return to the caller at
+      this point without trying to undo what we've done and retry the
+      removal
+    */
+    switch(js_p->error_code)
+    {
+        case -PVFS_ENOTEMPTY:
+            /* let the error pass through for the crdirent cleanup */
+            break;
+        case -PVFS_EINVAL:
+        case -PVFS_ENOMEM:
+            /* don't undo after these errors */
+            sm_p->u.remove.stored_error_code = js_p->error_code;
+            js_p->error_code = RETURN_STORED_ERROR_CODE;
+            break;
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action remove_cleanup(struct PINT_smcb *smcb,
+                                     job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: cleanup\n");
+
+    sm_p->error_code = (sm_p->u.remove.stored_error_code ?
+                        sm_p->u.remove.stored_error_code :
+                        js_p->error_code);
+
+    PINT_cleanup_capability(&sm_p->parent_capability);
+
+    /* NOTE: acache is invalidated by remove_helper now */
+    
+    /* The ncache invalidate must be done from this function, because the 
+     * remove_helper may not  have all the information needed
+     */
+    PINT_ncache_invalidate((const char*) sm_p->u.remove.object_name,
+                           (const PVFS_object_ref*) &(sm_p->parent_ref));
+
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
+}
+
+static PINT_sm_action remove_generic_timer(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t tmp_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: generic_timer\n");
+
+    ret = job_req_sched_post_timer(sm_p->msgarray_op.params.retry_delay,
+                                   smcb,
+                                   0,
+                                   js_p,
+                                   &tmp_id,
+                                   pint_client_sm_context);
+
+    return ret;
+}
+
+static PINT_sm_action remove_crdirent_retry_or_fail(struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove state: crdirent_retry_or_fail\n");
+
+    /* try again if we get a dirdata mismatch. */
+    if (js_p->error_code == -PVFS_EAGAIN &&
+        sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit)
+    {
+        sm_p->u.remove.retry_count++;
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                "  received -PVFS_EAGAIN, wrong dirdata server or revoked capability,\n  will do getattr and retry crdirent (attempt number %d)!\n",
+                sm_p->u.remove.retry_count);
+
+        /* clear acache content */
+        PINT_acache_invalidate(sm_p->parent_ref);
+
+        js_p->error_code = CRDIRENT_RETRY;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* try again (up to a point) if we get a comm. failure. */
+    if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
+        (sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit))
+    {
+        sm_p->u.remove.retry_count++;
+        js_p->error_code = CRDIRENT_RETRY;
+        return SM_ACTION_COMPLETE;
+    }
+
+    if ((js_p->error_code == -PVFS_EEXIST) &&
+        (sm_p->u.remove.retry_count > 0))
+    {
+        /* assume everything worked out ok and we got the right
+         * directory entry back.  there was just a transient network
+         * problem along the way
+         */
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+
+    sm_p->u.remove.stored_error_code = js_p->error_code;
+
+    gossip_err("Error: failed to replace directory during "
+            "remove recovery: entry %s for object %s.\n",
+            sm_p->u.remove.object_name,
+            PVFS_OID_str(&sm_p->object_ref.handle));
+    PVFS_perror_gossip("crdirent", js_p->error_code);
+
+    PRINT_REMOVE_WARNING();
+    return SM_ACTION_COMPLETE;
+}
+
+
+static PINT_sm_action remove_rmdirent_retry_or_fail(struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove state: rmdirent_retry_or_fail\n");
+
+    /* try again if we get a dirdata mismatch. */
+    if (js_p->error_code == -PVFS_EAGAIN &&
+        sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit)
+    {
+        sm_p->u.remove.retry_count++;
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                "  received -PVFS_EAGAIN, wrong dirdata server, will do getattr and retry rmdirent!\n");
+
+        /* clear acache content */
+        PINT_acache_invalidate(sm_p->parent_ref);
+
+        js_p->error_code = RMDIRENT_RETRY_NEED_GETATTR;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* try again (up to a point) if we get a comm. failure. */
+    if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
+        (sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit))
+    {
+        sm_p->u.remove.retry_count++;
+        js_p->error_code = RMDIRENT_RETRY;
+        return SM_ACTION_COMPLETE;
+    }
+
+    if ((js_p->error_code == -PVFS_ENOENT) &&
+        (sm_p->u.remove.retry_count > 0))
+    {
+        /* this is a tricky error case.  Server reports ENOENT, but
+         * this is not the first time we attempted the rmdirent.  It
+         * may be the case that it is reporting ENOENT because one of
+         * the earlier retries possibly completed.  We will treat this
+         * as success, but put out an error message.  This could
+         * strand objects, or remove non-empty directories, for
+         * example.
+         */
+        gossip_err("Warning: Received ENOENT on retry to remove entry %s.\n",
+                   sm_p->u.remove.object_name);
+
+        PRINT_REMOVE_WARNING();
+        js_p->error_code = -PVFS_ENOENT;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* other errors are preserved and passed along to the next state */
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

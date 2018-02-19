@@ -913,16 +913,20 @@ struct PVFS_servreq_tree_getattr
     uint32_t attrmask;
     uint32_t handle_count;
     PVFS_handle *handle_array;
+    uint32_t sid_count;
+    PVFS_SID *sid_array;
 };
-endecode_fields_5a_struct(
+endecode_fields_4a1a_struct(
     PVFS_servreq_tree_getattr,
-    PVFS_fs_id, fs_id,
     uint32_t, caller_handle_index,
     uint32_t, retry_msgpair_at_leaf,
     PVFS_credential, credential,
     uint32_t, attrmask,
     uint32_t, handle_count,
-    PVFS_handle, handle_array);
+    PVFS_handle, handle_array,
+    PVFS_fs_id, fs_id,
+    uint32_t, sid_count,
+    PVFS_SID, sid_array);
 #define extra_size_PVFS_servreq_tree_getattr \
     ((PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
      extra_size_PVFS_credential)
@@ -934,6 +938,8 @@ endecode_fields_5a_struct(
                                        __caller_handle_index,   \
                                        __handle_count,          \
                                        __handle_array,          \
+                                       __sid_count,             \
+                                       __sid_array,             \
                                        __amask,                 \
                                        __retry_msgpair_at_leaf, \
                                        __hints)                 \
@@ -943,7 +949,7 @@ do {                                                            \
     (__req).ctrl.mode = PVFS_REQ_TREE;                          \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                       \
     (__req).hints = (__hints);                                  \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));              \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                 \
     (__req).u.tree_getattr.credential = (__cred);               \
     (__req).u.tree_getattr.fs_id = (__fsid);                    \
     (__req).u.tree_getattr.caller_handle_index =                \
@@ -951,6 +957,9 @@ do {                                                            \
     (__req).u.tree_getattr.handle_count =                       \
                                   (__handle_count);             \
     (__req).u.tree_getattr.handle_array = (__handle_array);     \
+    (__req).u.tree_getattr.sid_count =                          \
+                                  (__sid_count);                \
+    (__req).u.tree_getattr.sid_array = (__sid_array);           \
     (__req).u.tree_getattr.attrmask = (__amask);                \
     (__req).u.tree_getattr.retry_msgpair_at_leaf =              \
                                   (__retry_msgpair_at_leaf);    \

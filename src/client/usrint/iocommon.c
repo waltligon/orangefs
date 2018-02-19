@@ -1646,7 +1646,7 @@ int iocommon_remove (const char *path,
     }
 
     /* should check to see if any process has file open */
-    /* but at themoment we don't have a way to do that */
+    /* but at the moment we don't have a way to do that */
     errno = 0;
     rc = PVFS_sys_remove(file, parent_ref, credential, PVFS_HINT_NULL);
     IOCOMMON_CHECK_ERR(rc);
