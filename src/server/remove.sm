@@ -733,8 +733,8 @@ static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
                                   0,
                                   attr_p->u.dir.dist_dir_attr.dirdata_count,
                                   attr_p->u.dir.dirdata_handles,
-                                  0,    /* V3 sid count */
-                                  NULL, /* V3 sid array */
+                                  attr_p->u.dir.dist_dir_attr.sid_count,
+                                  attr_p->u.dir.dirdata_sids,
                                   s_op->req->hints);
 
     return SM_ACTION_COMPLETE;
