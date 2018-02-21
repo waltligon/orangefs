@@ -83,6 +83,7 @@ struct PVFS_sys_mntent
     enum PVFS_encoding_type encoding;   /**< wire data encoding */
     PVFS_fs_id fs_id; /**< fs id, filled in by system interface when it looks up the fs */
     int32_t default_num_dfiles; /**< Default number of dfiles mount option value */
+    char *bmi_opts; /**< Comma-separated list of BMI options */
     int32_t integrity_check; /**< Check to determine whether the mount process must perform the integrity checks on the config files */
     /* the following fields are included for convenience;
      * useful if the file system is "mounted" */

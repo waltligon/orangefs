@@ -1183,7 +1183,7 @@ Java_org_orangefs_usrint_PVFS2POSIXJNI_openWithHints(JNIEnv *env, jobject obj,
         if(hint)
         {
             ret = open(cpath, (int) flags | O_HINTS, (mode_t) mode, hint);
-            PVFS_hint_free(hint);
+            PVFS_hint_free(&hint);
         }
         else
         {

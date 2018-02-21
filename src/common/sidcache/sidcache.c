@@ -2761,7 +2761,7 @@ int SID_add(const PVFS_SID *sid,
     if (cval->bmi_addr == 0)
     {
         /* enter url into BMI to get BMI addr */
-        ret = BMI_addr_lookup(&cval->bmi_addr, cval->url);
+        ret = BMI_addr_lookup(&cval->bmi_addr, cval->url, NULL);
         if (ret != 0 && ret != -BMI_NOTINITIALIZED)
         {
              return ret;

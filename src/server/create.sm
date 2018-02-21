@@ -191,7 +191,7 @@ static int create_local_datafiles(struct PINT_smcb *smcb, job_status_s *js_p)
         return(SM_ACTION_COMPLETE);
     }
 
-    ret = BMI_addr_lookup(&myaddr, config->host_id);
+    ret = BMI_addr_lookup(&myaddr, config->host_id, NULL);
     if(ret != 0)
     {
         /* we can't get our own address? */

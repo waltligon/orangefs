@@ -79,7 +79,7 @@ int main(
 
 
     /* initialize local interface (default options) */
-    ret = BMI_initialize("bmi_gm", user_opts->hostid, BMI_INIT_SERVER);
+    ret = BMI_initialize("bmi_gm", user_opts->hostid, BMI_INIT_SERVER, NULL);
     if (ret < 0)
     {
 	errno = -ret;

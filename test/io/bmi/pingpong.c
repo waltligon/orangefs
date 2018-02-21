@@ -121,9 +121,9 @@ int main(int argc, char **argv)
 
         /* initialize local interface (default options) */
         if (opts->which == SERVER)
-            ret = BMI_initialize(opts->method, opts->hostid, BMI_INIT_SERVER);
+            ret = BMI_initialize(opts->method, opts->hostid, BMI_INIT_SERVER, NULL);
         else
-            ret = BMI_initialize(NULL, NULL, 0);
+            ret = BMI_initialize(NULL, NULL, 0, NULL);
 
         if (ret < 0) {
                 errno = -ret;
@@ -236,7 +236,7 @@ static int do_server(struct options *opts, bmi_context_id *context)
         if (max_bytes > MAX_BYTES) max_bytes = MAX_BYTES;
 
         if (opts->test == UNEXPECTED) {
-                ret = BMI_addr_lookup(&server_addr, opts->hostid);
+                ret = BMI_addr_lookup(&server_addr, opts->hostid, NULL);
                 if (ret < 0) {
                         errno = -ret;
                         perror("BMI_addr_lookup");
@@ -431,7 +431,7 @@ static int do_client(struct options *opts, bmi_context_id *context)
 #endif
 
         /* get a bmi_addr for the server */
-        ret = BMI_addr_lookup(&peer_addr, opts->hostid);
+        ret = BMI_addr_lookup(&peer_addr, opts->hostid, NULL);
         if (ret < 0) {
                 errno = -ret;
                 perror("BMI_addr_lookup");

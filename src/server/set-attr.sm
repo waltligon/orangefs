@@ -1014,12 +1014,17 @@ static PINT_sm_action setattr_setobj_attribs(struct PINT_smcb *smcb,
 
     /* setattr changes metadata, and thus inherently sets CTIME
      * set the flag here and PVFS_object_attr_overwrite_setable will
-     * take care of the rest. 
+     * take care of the rest. If all the did was access the file,
+     * don't set the CTIME flag.
      */
     if ((a_p->objtype == PVFS_TYPE_METAFILE) ||
         (a_p->objtype == PVFS_TYPE_DIRECTORY))
     {
-        a_p->mask |= PVFS_ATTR_COMMON_CTIME;
+        if ((a_p->mask & PVFS_ATTR_COMMON_UID)  ||
+            (a_p->mask & PVFS_ATTR_COMMON_GID)  ||
+            (a_p->mask & PVFS_ATTR_COMMON_PERM) ||
+            (a_p->mask & PVFS_ATTR_COMMON_MTIME))
+               a_p->mask |= PVFS_ATTR_COMMON_CTIME;
     }
 
     /* if the object is a symbolic link, check to make sure that the request

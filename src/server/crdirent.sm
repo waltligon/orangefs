@@ -75,6 +75,34 @@ nested machine pvfs2_crdirent_work_sm
     state write_directory_entry
     {
         run crdirent_write_directory_entry;
+        success => update_directory_attr;
+        default => return;
+    }
+
+    state update_directory_attr
+    {
+        run crdirent_update_directory_attr;
+        success => update_metahandle_timestamp;
+        default => return;
+    }
+
+    state update_metahandle_timestamp
+    {
+        run crdirent_update_metahandle_timestamp;
+        REMOTE_METAHANDLE => update_metahandle_timestamp_xfer_msgpair;
+        success => update_local_metahandle_timestamp;
+        default => return;
+    }
+
+    state update_local_metahandle_timestamp
+    {
+        run crdirent_update_local_metahandle_timestamp;
+        default => check_for_split;
+    }
+
+    state update_metahandle_timestamp_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
         success => check_for_split;
         default => return;
     }
@@ -595,6 +623,212 @@ static PINT_sm_action crdirent_write_directory_entry(struct PINT_smcb *smcb,
                                  &j_id,
                                  server_job_context,
                                  s_op->req->hints);
+
+    return ret;
+}
+
+static PINT_sm_action crdirent_update_directory_attr(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t j_id;
+    PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
+    PVFS_object_attr *dspace_attr = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
+    PVFS_uid uid;
+    PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
+    uint32_t num_groups;
+
+    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
+    dspace_attr = &s_op->u.crdirent.dirdata_attr;
+
+    /* map owner/group from credential if necessary */
+    /* This should always be true due to crdirent_get_dist_dir_attr. */
+    if (dspace_attr->mask & (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID) &&
+        (dspace_attr->owner == PVFS_UID_MAX || dspace_attr->group == PVFS_GID_MAX))
+    {
+        js_p->error_code = PINT_map_credential(&s_op->req->u.crdirent.credential,
+                                               &uid, &num_groups, group_array);
+
+        if (js_p->error_code != 0)
+        {
+            gossip_err("%s: could not map credential: %d\n", __func__,
+                         js_p->error_code);
+            return SM_ACTION_COMPLETE;
+        }
+
+        /* map owner from credential */
+        if (dspace_attr->mask & PVFS_ATTR_COMMON_UID &&
+            dspace_attr->owner == PVFS_UID_MAX)
+        {
+            dspace_attr->owner = uid;
+        }
+
+        /* map primary group from credential */
+        if (dspace_attr->mask & PVFS_ATTR_COMMON_GID &&
+            dspace_attr->group == PVFS_GID_MAX)
+        {
+            dspace_attr->group = group_array[0];
+        }
+    }
+
+    PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
+    ds_attr = &(s_op->u.crdirent.dirdata_ds_attr);
+    PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
+
+    /* update timestamps for the dirdata handle. */
+    ret = job_trove_dspace_setattr(
+        s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.dirdata_handle,
+        ds_attr,
+        TROVE_SYNC,
+        smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, " crdirent: update timestamp, type is %d\n ",
+                     ds_attr->type);
+    return ret;
+}
+
+static PINT_sm_action crdirent_update_metahandle_timestamp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+
+    /* Determine whether the metadata handle is on the local server. */
+    if (PINT_cached_config_server_local(&s_op->req->u.crdirent.new_sid_array[0]))
+    {
+        /* local */
+        job_id_t tmp_id;
+
+        /* Need to retrieve dspace for the new object's metahandle.
+         * We will then update the timestamp info. */
+        gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
+                     "for metadata handle %s\n",
+                     PVFS_OID_str(&s_op->req->u.crdirent.new_handle));
+
+        memset(&(s_op->u.crdirent.metahandle_ds_attr), 0,
+               sizeof(PVFS_ds_attributes));
+        ret = job_trove_dspace_getattr(
+            s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.new_handle, smcb,
+            &(s_op->u.crdirent.metahandle_ds_attr),
+            0, js_p, &tmp_id, server_job_context, s_op->req->hints);
+
+        return ret;
+    }
+    else
+    {
+        /* remote */
+
+        PINT_sm_msgpair_state *msg_p = NULL;
+        PVFS_handle *capability_handles = NULL;
+        PVFS_object_attr tmp_attr;
+
+        PINT_msgpair_init(&s_op->msgarray_op);
+        msg_p = &s_op->msgarray_op.msgpair;
+        PINT_serv_init_msgarray_params(s_op, s_op->req->u.crdirent.fs_id);
+
+        /* If we created a capability in crdirent_update_metahandle_timestamp
+         * we need to clean it up first. */
+        PINT_cleanup_capability(&s_op->u.crdirent.capability);
+
+        /* This memory will be freed in either crdirent_cleanup or
+         * crdirent_find_split_entries by PINT_cleanup_capability. */
+        capability_handles =
+              malloc(sizeof(PVFS_handle));
+        if (! capability_handles)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        capability_handles[0] =
+                s_op->req->u.crdirent.new_handle;
+        ret = PINT_server_to_server_capability(&s_op->u.crdirent.capability,
+                 s_op->req->u.crdirent.fs_id,
+                 1,
+                 capability_handles);
+        if (ret != 0)
+        {
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
+        }
+        /* The only thing we need to change is CTIME, so all we have to
+         * do is set that flag in the representation of the attributes
+         * we want to change. */
+        memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
+        tmp_attr.mask = PVFS_ATTR_COMMON_CTIME;
+
+        /* Capability was initialized earlier. */
+        PINT_SERVREQ_SETATTR_FILL(
+            msg_p->req,
+            s_op->u.crdirent.capability,
+            s_op->req->u.crdirent.credential,
+            s_op->req->u.crdirent.fs_id,
+            s_op->req->u.crdirent.new_handle,
+            s_op->req->u.crdirent.sid_count,
+            s_op->req->u.crdirent.new_sid_array,
+            PVFS_TYPE_NONE,
+            tmp_attr,
+            PVFS_ATTR_COMMON_CTIME,
+            s_op->req->hints);
+
+        msg_p->fs_id = s_op->req->u.crdirent.fs_id;
+        msg_p->handle = s_op->req->u.crdirent.new_handle;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = NULL;
+
+        ret = PVFS_SID_get_addr(
+            &msg_p->svr_addr, &s_op->req->u.crdirent.new_sid_array[0]);
+
+        if (ret)
+        {
+            gossip_err("Failed to map dirdata server address\n");
+            js_p->error_code = ret;
+        }
+
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+            "setting timestamps for handle %s\n",
+            PVFS_OID_str(&msg_p->handle));
+
+        PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+        js_p->error_code = REMOTE_METAHANDLE;
+        return SM_ACTION_COMPLETE;
+    }
+
+   return ret;
+}
+
+static PINT_sm_action crdirent_update_local_metahandle_timestamp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t j_id;
+    int ret = -1;
+
+    PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
+    PVFS_ds_attributes *ds_attr = NULL;
+
+    PVFS_ds_attr_to_object_attr(&s_op->u.crdirent.metahandle_ds_attr,
+                                &s_op->u.crdirent.metahandle_attr);
+    s_op->u.crdirent.metahandle_attr.mask =
+        PVFS_ATTR_COMMON_ALL | PVFS_ATTR_META_ALL;
+
+    /* The only thing we need to change is CTIME, so all we have to
+     * do is set that flag in the representation of the attributes
+     * we want to change. */
+    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
+    tmp_attr.mask = PVFS_ATTR_COMMON_CTIME;
+
+    PVFS_object_attr_overwrite_setable(&s_op->u.crdirent.metahandle_attr,
+                                       tmp_attr_ptr);
+    ds_attr = &(s_op->u.crdirent.metahandle_ds_attr);
+    PVFS_object_attr_to_ds_attr(&s_op->u.crdirent.metahandle_attr, ds_attr);
+
+    ret = job_trove_dspace_setattr(
+        s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.new_handle,
+        ds_attr,
+        TROVE_SYNC,
+        smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }

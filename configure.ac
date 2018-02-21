@@ -19,7 +19,7 @@ dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=3
 PVFS2_VERSION_MINOR=0
-PVFS2_VERSION_SUB=6
+PVFS2_VERSION_SUB=7
 PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
 PVFS2_VERSION_PRE="-DEVEL-$CONFIGURE_TIME"

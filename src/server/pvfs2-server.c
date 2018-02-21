@@ -873,6 +873,7 @@ static int server_initialize_subsystems(
     PVFS_fs_id orig_fsid=0;
     PVFS_ds_flags init_flags = 0;
     int bmi_flags = 0;
+    char *bmi_opts = NULL;
     int server_index;
 
     if(!(*server_status_flag & SERVER_EVENT_INIT) && 
@@ -928,6 +929,7 @@ static int server_initialize_subsystems(
             bmi_flags = 0;
             modules = NULL;
             listen_addrs = NULL;
+            bmi_opts = NULL;
         }
         else
         {
@@ -950,6 +952,7 @@ static int server_initialize_subsystems(
 
             modules = server_config.bmi_modules;
             listen_addrs = server_config.host_id;
+            bmi_opts = server_config.bmi_opts;
 
             gossip_debug(GOSSIP_SERVER_DEBUG,
                          "Passing %s as BMI listen address.\n",
@@ -957,7 +960,7 @@ static int server_initialize_subsystems(
 
         }
 
-        ret = BMI_initialize(modules, listen_addrs, bmi_flags);
+        ret = BMI_initialize(modules, listen_addrs, bmi_flags, bmi_opts);
         if (ret < 0)
         {
             PVFS_perror_gossip("Error: BMI_initialize", ret);
@@ -2745,7 +2748,7 @@ int server_state_machine_complete(PINT_smcb *smcb)
     /* release the decoding of the unexpected request */
     if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
-        PVFS_hint_free(s_op->decoded.stub_dec.req.hints);
+        PVFS_hint_free(&s_op->decoded.stub_dec.req.hints);
 
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }

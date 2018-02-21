@@ -217,7 +217,7 @@ main_out:
     free(user_opts);
     free(buffer);
 
-    PVFS_hint_free(hints);
+    PVFS_hint_free(&hints);
     return(ret);
 }
 

@@ -43,7 +43,7 @@ int main(int argc, char **argv)
 	gossip_set_debug_mask(0, 0);
 
 	/* start the BMI interface */
-	ret = BMI_initialize("bmi_tcp", NULL, 0);
+	ret = BMI_initialize("bmi_tcp", NULL, 0, NULL);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_initialize failure.\n");
@@ -74,7 +74,7 @@ int main(int argc, char **argv)
 	}
 
 	/* lookup the server to get a BMI style address for it */
-	ret = BMI_addr_lookup(&server_addr, "tcp://localhost:3414");
+	ret = BMI_addr_lookup(&server_addr, "tcp://localhost:3414", NULL);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_addr_lookup failure.\n");
