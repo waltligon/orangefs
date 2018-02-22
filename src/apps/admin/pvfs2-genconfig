@@ -74,6 +74,9 @@ my $default_logfile = undef;
 my $bmi_module = undef;
 
 my $opt_gen_key = 0;
+my $opt_distrdir_servers_initial = undef;
+my $opt_distrdir_servers_max = undef;
+my $opt_distrdir_split_size = undef;
 
 # key-based security options 
 my $opt_security_key = undef;
@@ -107,6 +110,8 @@ my $ROOT_ENDPOINT = 0x4;
 
 my $OUT = undef;
 my $term = undef;
+
+my $fs_conf_path = '';
 
 # script path (just dir)
 my $script_dir = $FindBin::Bin;
@@ -237,7 +242,7 @@ sub parse_hostlist
 
         # if we've got a component that has {..}, then expand.
         # match the prefix (hostname) and curly brackets
-        if($comp =~ /([^{]+){([^}]+)}(.*)$/)
+        if($comp =~ /([^{]+)\{([^}]+)\}(.*)$/)
         {
             my $prefix = $1;
             my $ranges = $2;
@@ -580,10 +585,41 @@ sub emit_filesystem
     print $target "\tFileStuffing $stuffing\n";
 
     my $meta_count = scalar(get_aliases($META_ENDPOINT));
-    print $target "\tDistrDirServersInitial 1\n";
+    if ($opt_distrdir_servers_initial)
+    {
+        print "1\n";
+        die "\n*** error: distrdir-servers-initial must be between 1 and the number of metadata servers"
+            if ($opt_distrdir_servers_initial lt 1 || $opt_distrdir_servers_initial gt $meta_count);
+
+        print "2\n";
+        print $target "\tDistrDirServersInitial $opt_distrdir_servers_initial\n";
+    }
+    else
+    {
+        print "3\n";
+        print $target "\tDistrDirServersInitial 1\n";
+    }
 #    print $target "\tDistrDirServersMax $meta_count\n";
-    print $target "\tDistrDirServersMax 1\n";
-    print $target "\tDistrDirSplitSize 100\n";
+    if ($opt_distrdir_servers_max)
+    {
+        die "\n*** error: distrdir-servers-max must be between distrdir-servers-initial and the number of metadata servers"
+            if ($opt_distrdir_servers_max lt $opt_distrdir_servers_initial || $opt_distrdir_servers_max gt $meta_count);
+
+        print $target "\tDistrDirServersMax $opt_distrdir_servers_max\n";
+    }
+    else
+    {
+        print $target "\tDistrDirServersMax 1\n";
+    }
+    if ($opt_distrdir_split_size)
+    {
+        print $target "\tDistrDirSplitSize $opt_distrdir_split_size\n";
+    }
+    else
+    {
+        print $target "\tDistrDirSplitSize 100\n";
+    }
+
     print $target "\t<StorageHints>\n";
 
     if ($opt_filesystem_dbmaxsize)
@@ -852,6 +888,9 @@ Usage: orangefs-genconfig [OPTIONS] <fs.conf>
      --dist-params <STRING>            datafile distribution parameters in form:
                                           <param_name>:<param_value>[,<param_name>:<param_value>...]
                                        see documentation for distribution information
+     --distrdir-servers-initial <NUM>    initial number of servers for a distributed directory
+     --distrdir-servers-max <NUM>        maximum number of servers for a distributed directory
+     --distrdir-split-size  <NUM>        number of directory entries on a server before splitting
      --trusted     <0|1>               indicate whether trusted connection options need to be emitted
      --genkey                          optionally generates a secret key for the 
                                        filesystem(s).
@@ -2190,6 +2229,9 @@ GetOptions('protocol=s' => \$opt_protocol,
     'filesystem-dbmaxsize=i' => \$opt_filesystem_dbmaxsize,
     'dist-name=s'   => \$opt_dist_name,
     'dist-params=s' => \$opt_dist_params,
+    'distrdir-servers-initial=i' => \$opt_distrdir_servers_initial,
+    'distrdir-servers-max=i' => \$opt_distrdir_servers_max,
+    'distrdir-split-size=i' => \$opt_distrdir_split_size,
     'spec-usage!'   => \$show_specusage,
     'genkey!'       => \$opt_gen_key,
     'securitykey',  => \$opt_security_key,
@@ -2262,15 +2304,20 @@ if ($using_stdout)
 {
     $output_target = \*STDOUT;
 }
-elsif (@ARGV != 1)
-{
-    die "Bad arguments.  Use -h for help.\n";
-}
 else
 {
-    unless (open(FILEOUT, ">", $ARGV[0]))
+    if (@ARGV != 1)
     {
-        die "Can't open specified file $ARGV[0]: $!\n";
+        my $default_path = "$fs_path/etc/orangefs.conf";
+        $fs_conf_path = prompt_word("Enter the config file location [Default is $default_path]: ", "$default_path");
+    }
+    else
+    {
+        $fs_conf_path = $ARGV[0];
+    }
+    unless (open(FILEOUT, ">", $fs_conf_path))
+    {
+        die "Can't open specified file $fs_conf_path: $!\n";
     }
     $output_target = \*FILEOUT;
 }
@@ -2500,11 +2547,11 @@ if ($using_stdout == 0)
 
     my $req_limit = 65536;
 
-    if(-s $ARGV[0] > $req_limit)
+    if(-s $fs_conf_path > $req_limit)
     {
-        my $size = (-s $ARGV[0]);
+        my $size = (-s $fs_conf_path);
         print STDERR
-"Warning: Generated config file: " . $ARGV[0] . "\n" .
+"Warning: Generated config file: " . $fs_conf_path . "\n" .
 "has size: $size, which is larger than the current OrangeFS request: $req_limit\n" .
 "Increase the value of PVFS_REQ_LIMIT_CONFIG_FILE_BYTES in src/proto/pvfs2-req-proto.h\n";
     }

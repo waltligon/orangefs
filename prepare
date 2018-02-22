@@ -1,5 +1,8 @@
 #!/bin/sh
 
+command -v aclocal >/dev/null 2>&1 || \
+ { echo >&2 "you need to install automake"; exit 1; }
+
 if aclocal -I ./maint/config && autoheader && autoconf ; then
 	echo "configure script successfully regenerated"
 else

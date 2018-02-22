@@ -39,7 +39,7 @@ int main(
     gossip_set_debug_mask(1, GOSSIP_BMI_DEBUG_ALL);
 
     /* initialize local interface */
-    ret = BMI_initialize("bmi_tcp", "tcp://localhost:3380", BMI_INIT_SERVER);
+    ret = BMI_initialize("bmi_tcp", "tcp://localhost:3380", BMI_INIT_SERVER, NULL);
     if (ret < 0)
     {
 	errno = -ret;
@@ -56,7 +56,7 @@ int main(
     }
 
     /* get a bmi_addr for the server */
-    ret = BMI_addr_lookup(&server_addr, "tcp://localhost:3381");
+    ret = BMI_addr_lookup(&server_addr, "tcp://localhost:3381", NULL);
     if (ret < 0)
     {
 	errno = -ret;

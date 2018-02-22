@@ -186,8 +186,9 @@ int main(int argc, char **argv)
                  * a list of server aliases from the config file.
                  */
                 rc = BMI_addr_lookup(
-                    &layout.server_list.servers[tmp_server_index],
-                    tmp_server);
+                        &layout.server_list.servers[tmp_server_index],
+                        tmp_server,
+                        NULL);
                 if(rc < 0)
                 {
                     PVFS_perror("BMI_addr_lookup", rc);

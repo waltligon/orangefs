@@ -218,7 +218,8 @@ PVFS_error PVFS_mgmt_setparam_single(PVFS_fs_id fs_id,
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t addr;
 
-    if (server_addr_str && (BMI_addr_lookup(&addr, server_addr_str) == 0))
+    if (server_addr_str &&
+            (BMI_addr_lookup(&addr, server_addr_str, NULL) == 0))
     {
         ret = PVFS_mgmt_setparam_list(fs_id,
                                       credential,

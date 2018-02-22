@@ -88,19 +88,6 @@ typedef int64_t PVFS_id_gen_t;
 /** Opaque value representing a destination address. */
 typedef int64_t PVFS_BMI_addr_t;
 
-/* Windows - inline functions can't be exported */
-#ifdef WIN32
-void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x);
-int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x);
-void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x);
-void defree_PVFS_BMI_addr_t(PVFS_BMI_addr_t *x);
-#else
-inline void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x);
-inline int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x);
-inline void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x);
-inline void defree_PVFS_BMI_addr_t(PVFS_BMI_addr_t *x);
-#endif
-
 #define encode_PVFS_error encode_int32_t
 #define decode_PVFS_error decode_int32_t
 #define defree_PVFS_error defree_int32_t
@@ -298,15 +285,6 @@ typedef struct PVFS_sys_layout_s
 } PVFS_sys_layout;
 #define extra_size_PVFS_sys_layout PVFS_SYS_LIMIT_LAYOUT
 
-#ifdef WIN32
-void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x);
-void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
-void defree_PVFS_sys_layout(struct PVFS_sys_layout_s *x);
-#else
-inline void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x);
-inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
-inline void defree_PVFS_sys_layout(struct PVFS_sys_layout_s *x);
-#endif
 
 /* predefined special values for types */
 #define PVFS_CONTEXT_NULL   ((PVFS_context_id)-1)
@@ -818,15 +796,6 @@ enum PVFS_server_mode
     PVFS_SERVER_ADMIN_MODE = 2        /* administrative mode */
 };
 
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-/* OLD PVFS ACL Format - a null terminated array of these */
-typedef struct
-{
-    int32_t  p_tag;
-    uint32_t p_perm;
-    uint32_t p_id;
-} pvfs2_acl_entry;
-#else
 /* PVFS2 ACL structures - Matches Linux ACL EA structures */
 /* matches POSIX ACL-XATTR format */
 typedef struct
@@ -841,7 +810,6 @@ typedef struct
     uint32_t p_version;
     pvfs2_acl_entry p_entries[0];
 } pvfs2_acl_header;
-#endif
 
 /* These defines match that of the POSIX defines */
 #define PVFS2_ACL_UNDEFINED_ID   (-1)

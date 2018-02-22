@@ -133,7 +133,7 @@ do {                                                    \
 
 /* convenience and back compatibility */
 #define PVFS_object_attr_to_ds_attr(__oa, __dsa)        \
-        PVFS_ds_attr_from_PVFS_object_attr((__dsa), (__oa))
+        PVFS_ds_attr_from_object_attr((__dsa), (__oa))
 
 #define PVFS_ds_attr_to_object_attr(__dsa, __oa)        \
         PVFS_object_attr_from_ds_attr((__oa), (__dsa))

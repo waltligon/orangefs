@@ -651,98 +651,6 @@ char *PINT_util_bytes2str(unsigned char *bytes, char *output, size_t count)
 
 }
 
-#ifndef WIN32
-inline
-#endif
-void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x)
-{
-    const char *addr_str;
-
-    addr_str = BMI_addr_rev_lookup(*x);
-    encode_string(pptr, &addr_str);
-}
-
-/* determines how much protocol space a BMI_addr_t encoding will consume */
-#ifndef WIN32
-inline
-#endif
-int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x)
-{
-    const char *addr_str;
-    addr_str = BMI_addr_rev_lookup(*x);
-    return(encode_string_size_check(&addr_str));
-}
-#ifndef WIN32
-inline
-#endif
-void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x)
-{
-    char *addr_string;
-    decode_string(pptr, &addr_string);
-    BMI_addr_lookup(x, addr_string);
-}
-
-#ifndef WIN32
-inline
-#endif
-void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
-{
-    int tmp_size;
-    int i;
-
-    /* figure out how big this encoding will be first */
-
-    tmp_size = 16; /* enumeration and list count */
-    for(i = 0; i < x->server_list.count; i++)
-    {
-        /* room for each server encoding */
-        tmp_size +=
-               encode_PVFS_BMI_addr_t_size_check(&(x)->server_list.servers[i]);
-    }
-
-    if(tmp_size > PVFS_REQ_LIMIT_LAYOUT)
-    {
-        /* don't try to encode everything.  Just set pptr too high so that
-         * we hit error condition in encode function
-         */
-        gossip_err("Error: layout too large to encode in request protocol.\n");
-        *(pptr) += extra_size_PVFS_servreq_create + 1;
-        return;
-    }
-
-    /* otherwise we are in business */
-    encode_enum(pptr, &x->algorithm);
-    encode_skip4(pptr, NULL);
-    encode_int32_t(pptr, &x->server_list.count);
-    encode_skip4(pptr, NULL);
-    for(i = 0; i < x->server_list.count; i++)
-    {
-        encode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
-    }
-}
-
-#ifndef WIN32
-inline
-#endif
-void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x)
-{
-    int i;
-
-    decode_enum(pptr, &x->algorithm);
-    decode_skip4(pptr, NULL);
-    decode_int32_t(pptr, &x->server_list.count);
-    decode_skip4(pptr, NULL);
-    if(x->server_list.count)
-    {
-        x->server_list.servers = malloc(x->server_list.count *
-                                        sizeof(*(x->server_list.servers)));
-        assert(x->server_list.servers);
-    }
-    for(i = 0 ; i < x->server_list.count; i++)
-    {
-        decode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
-    }
-}
 
 char *PINT_util_guess_alias(void)
 {
@@ -1062,12 +970,7 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
         return -PVFS_EACCES;
     }
 
-    /* keyval for ACLs includes a \0. so subtract the thingie */
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-    acl_size--;
-#else
     acl_size -= sizeof(pvfs2_acl_header);
-#endif
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
                 "PINT_check_acls: read keyval size "
                 " %d (%d acl entries)\n",
@@ -1094,24 +997,14 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
 
     for (i = 0; i < count; i++)
     {
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        pa = (pvfs2_acl_entry *) acl_buf + i;
-#else
         pa = &(((pvfs2_acl_header *)acl_buf)->p_entries[i]);
-#endif
         /* 
            NOTE: Remember that keyval is encoded as lebf,
            so convert it to host representation 
         */
-#ifdef PVFS_USE_OLD_ACL_FORMT
-        pe.p_tag  = bmitoh32(pa->p_tag);
-        pe.p_perm = bmitoh32(pa->p_perm);
-        pe.p_id   = bmitoh32(pa->p_id);
-#else
         pe.p_tag  = bmitoh16(pa->p_tag);
         pe.p_perm = bmitoh16(pa->p_perm);
         pe.p_id   = bmitoh32(pa->p_id);
-#endif
         pa = &pe;
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded ACL entry %d "
             "(p_tag %d, p_perm %d, p_id %d)\n",
@@ -1167,26 +1060,16 @@ mask:
     for (; i < count; i++)
     {
         pvfs2_acl_entry me;
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        pvfs2_acl_entry *mask_obj = (pvfs2_acl_entry *) acl_buf + i;
-#else
         pvfs2_acl_entry *mask_obj =
                 &(((pvfs2_acl_header *)acl_buf)->p_entries[i]);
-#endif
         
         /* 
           NOTE: Again, since pvfs2_acl_entry is in lebf, we need to
           convert it to host endian format
          */
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        me.p_tag  = bmitoh32(mask_obj->p_tag);
-        me.p_perm = bmitoh32(mask_obj->p_perm);
-        me.p_id   = bmitoh32(mask_obj->p_id);
-#else
         me.p_tag  = bmitoh16(mask_obj->p_tag);
         me.p_perm = bmitoh16(mask_obj->p_perm);
         me.p_id   = bmitoh32(mask_obj->p_id);
-#endif
         mask_obj = &me;
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded (mask) ACL entry %d "
             "(p_tag %d, p_perm %d, p_id %d)\n",

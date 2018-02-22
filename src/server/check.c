@@ -84,7 +84,23 @@ int PINT_get_capabilities(void *acl_buf,
         return 0;
     }
 
-    /* if acls are present then use them */
+    /*
+     * Check for an ACL before looking at the regular permissions.
+     * If someone has an ACL that gives them read or write or execute
+     * on an object, give them credit for it.
+     *
+     * check_acls can return EINVAL if an ACL seems fishy somehow.
+     * check_acls can return EACCES if the ACL fails to give the needed access. 
+     * check_acls produces gossip messages whenever it returns either
+     * EINVAL or EACCES.
+     *
+     * check_acls will return 0 to indicate that we can add the
+     * appropriate capability twinkie to the op_mask.
+     *
+     * The 0 return code is the only return code from check_acls we'll
+     * act on here.
+     */
+
     if (acl_size > 0)
     {
         if (acl_buf == NULL)
@@ -93,10 +109,6 @@ int PINT_get_capabilities(void *acl_buf,
             return -PVFS_EINVAL;
         }
 
-        /* nlmills: errors are ignored on purpose. we don't want to
-           give anyone free access.
-        */
-
         ret = check_acls(acl_buf,
                          acl_size,
                          attr,
@@ -104,14 +116,8 @@ int PINT_get_capabilities(void *acl_buf,
                          group_array,
                          num_groups,
                          PVFS2_ACL_READ);
-        if (ret > 0)
-        {
+        if (ret == 0)
             *op_mask |= PINT_CAP_READ;
-        }
-        else if (ret < 0)
-        {
-            return ret;
-        }
 
         ret = check_acls(acl_buf,
                          acl_size,
@@ -120,14 +126,8 @@ int PINT_get_capabilities(void *acl_buf,
                          group_array,
                          num_groups,
                          PVFS2_ACL_WRITE);
-        if (ret > 0)
-        {
+        if (ret == 0)
             *op_mask |= PINT_CAP_WRITE;
-        }
-        else if (ret < 0)
-        {
-            return ret;
-        }
 
         ret = check_acls(acl_buf,
                          acl_size,
@@ -136,69 +136,44 @@ int PINT_get_capabilities(void *acl_buf,
                          group_array,
                          num_groups,
                          PVFS2_ACL_EXECUTE);
-        if (ret > 0)
-        {
+        if (ret == 0)
             *op_mask |= PINT_CAP_EXEC;
-        }
-        else if (ret < 0)
-        {
-            return ret;
-        }
     }
-    /* otherwise fall back to standard UNIX permissions */
-    else
-    {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
-                     "PINT_get_capabilities: ACL unavailable, "
-                     "using UNIX permissions\n");
         
-        if (num_groups == 0 || !(attr->mask & PVFS_ATTR_COMMON_GID))
-        {
-            gossip_err("%s: no groups or PVFS_ATTR_COMMON_GID not set\n", 
-                       __func__);
-            return -PVFS_EINVAL;
-        }
+    if (num_groups == 0 || !(attr->mask & PVFS_ATTR_COMMON_GID)) {
+      gossip_err("%s: no groups or PVFS_ATTR_COMMON_GID not set\n", __func__);
+      return -PVFS_EINVAL;
+    }
 
-        /* see if the user is a member of the object's group */
-        active_group = group_array[0];
-        for (i = 0; i < num_groups; i++)
-        {
-            if (group_array[i] == attr->group)
-            {
-                active_group = group_array[i];
-                break;
-            }
-        }
+    /* see if the user is a member of the object's group */
+    active_group = group_array[0];
+    for (i = 0; i < num_groups; i++) {
+       if (group_array[i] == attr->group) {
+         active_group = group_array[i];
+         break;
+       }
+    }
 
-        ret = check_mode(READ_ACCESS, userid, active_group, attr);
-        if (ret > 0)
-        {
-            *op_mask |= PINT_CAP_READ;
-        }
-        else if (ret < 0)
-        {
-            return ret;
-        }
+    /* Check standard UNIX permissions.  */ 
+    ret = check_mode(READ_ACCESS, userid, active_group, attr);
+    if (ret > 0) {
+      *op_mask |= PINT_CAP_READ;
+    } else if (ret < 0) {
+      return ret;
+    }
 
-        ret = check_mode(WRITE_ACCESS, userid, active_group, attr);
-        if (ret > 0)
-        {
-            *op_mask |= PINT_CAP_WRITE;
-        }
-        else if (ret < 0)
-        {
-            return ret;
-        }
+    ret = check_mode(WRITE_ACCESS, userid, active_group, attr);
+    if (ret > 0) {
+      *op_mask |= PINT_CAP_WRITE;
+    } else if (ret < 0) {
+      return ret;
+    }
 
-        ret = check_mode(EXEC_ACCESS, userid, active_group, attr);
-        if (ret > 0)
-        {
-            *op_mask |= PINT_CAP_EXEC;
-        }
-        else if (ret < 0)
-        {
-            return ret;
-        }
+    ret = check_mode(EXEC_ACCESS, userid, active_group, attr);
+    if (ret > 0) {
+      *op_mask |= PINT_CAP_EXEC;
+    } else if (ret < 0) {
+      return ret;
     }
 
     /* only the owner can set attributes */
@@ -415,9 +390,7 @@ static int check_acls(void *acl_buf,
                       uint32_t num_groups, 
                       int want)
 {
-#ifndef PVFS_USE_OLD_ACL_FORMAT
     pvfs2_acl_header *ph;
-#endif
     pvfs2_acl_entry pe, *pa;
     int i = 0, j = 0, found = 0, count = 0;
 
@@ -432,19 +405,14 @@ static int check_acls(void *acl_buf,
         return -PVFS_EINVAL;
     }
 
-    /* keyval for ACLs includes a \0. so subtract the thingie */
-    acl_size--;
-#ifndef PVFS_USE_OLD_ACL_FORMAT
     /* remove header when calculating size */
     acl_size -= sizeof(pvfs2_acl_header);
-#endif
     /* if the acl format doesn't look valid, then return an error rather than
      * asserting; we don't want the server to crash due to an invalid keyval
      */
     if ((acl_size % sizeof(pvfs2_acl_entry)) != 0)
     {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: invalid acls on object\n",
-                     __func__);
+        gossip_err("%s: invalid acls on object\n", __func__);
         return -PVFS_EINVAL;
     }
     count = acl_size / sizeof(pvfs2_acl_entry);
@@ -456,18 +424,12 @@ static int check_acls(void *acl_buf,
                  __func__, uid, group_array[0], want);
 
 
-#ifndef PVFS_USE_OLD_ACL_FORMAT
     /* point to header */
     ph = (pvfs2_acl_header *) acl_buf;
-#endif
 
     for (i = 0; i < count; i++)
     {
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        pa = (pvfs2_acl_entry *) acl_buf + i;
-#else        
         pa = &(ph->p_entries[i]);
-#endif
         /* 
            NOTE: Remember that keyval is encoded as lebf, so convert it 
            to host representation 
@@ -550,11 +512,7 @@ mask:
     i = i + 1;
     for (; i < count; i++)
     {
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        pvfs2_acl_entry me, *mask_obj = (pvfs2_acl_entry *) acl_buf + i;
-#else
         pvfs2_acl_entry me, *mask_obj = &(ph->p_entries[i]);        
-#endif
         /* 
          * NOTE: Again, since pvfs2_acl_entry is in lebf, we need to
          * convert it to host endian format

@@ -1550,8 +1550,8 @@ ifdef BUILD_FUSE
 endif
 
 	# install any development tools built
-	for i in $(notdir $(DEVELTOOLS) $(MEMANALYSIS)) ; do \
-		if [ -f $(srcdir)/src/apps/devel/$$i ]; then install -m 755 $(srcdir)/src/apps/devel/$$i $(bindir); fi;\
+	for i in $(DEVELTOOLS) $(MEMANALYSIS) ; do \
+		if [ -f $$i ]; then install -m 755 $$i $(bindir); fi;\
 	done
 
 	install -d $(sbindir)

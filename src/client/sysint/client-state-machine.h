@@ -478,8 +478,8 @@ struct PINT_client_rename_sm
     char *entries[2];                /* old/new entry names */
     PVFS_object_ref parent_refns[2]; /* old/new parent refns */
     PVFS_object_ref refns[2];        /* old/new entry object refns */
+    PVFS_object_attr parent_attr[2]; /* old/new parent attrs */
     PVFS_ds_type types[2];           /* old/new object types */
-    PVFS_capability caps[2];         /* old/new capabilities */
     PVFS_handle dirdata_handle[2];   /* old/new dirdata handles */
     PVFS_handle dirent_handle[2];    /* old/new dirent handles for parent dirs */
     PVFS_SID *dirdata_sids[2];       /* old/new dirdata sids */

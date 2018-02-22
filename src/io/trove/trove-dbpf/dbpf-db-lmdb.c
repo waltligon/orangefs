@@ -48,6 +48,8 @@ static int db_error(int e)
     case MDB_MAP_FULL:
         gossip_err("XXX lmdb map full\n");
         return TROVE_ENOMEM;
+    case MDB_KEYEXIST:
+        return TROVE_EEXIST;
     }
     /* XXX: This is a dirty hack. */
     return DBPF_ERROR_UNKNOWN;

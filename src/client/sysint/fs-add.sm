@@ -162,7 +162,9 @@ PVFS_error PVFS_isys_fs_add(struct PVFS_sys_mntent *mntent,
     /* make sure BMI knows how to handle this method, else fail quietly */
     for(i = 0; i < mntent->num_pvfs_config_servers; i++)
     {
-        ret = BMI_addr_lookup(&test_addr, mntent->pvfs_config_servers[i]);
+        ret = BMI_addr_lookup(&test_addr,
+                              mntent->pvfs_config_servers[i],
+                              mntent->bmi_opts);
         if (ret == 0)
         {
             /* Bail out when first valid BMI method is found */
@@ -175,7 +177,9 @@ PVFS_error PVFS_isys_fs_add(struct PVFS_sys_mntent *mntent,
        do
        {
           gossip_err("%s:Retrying BMI_addr_lookup for %s.\n",__func__,mntent->pvfs_config_servers[i]);
-          ret = BMI_addr_lookup(&test_addr, mntent->pvfs_config_servers[i]);
+          ret = BMI_addr_lookup(&test_addr,
+                                mntent->pvfs_config_servers[i],
+                                mntent->bmi_opts);
           if (ret == 0)
           {
              try_again=0;
@@ -504,7 +508,8 @@ static PINT_sm_action fs_add_parent_cleanup(struct PINT_smcb *smcb,
      * the connection.
      */
     ret = BMI_addr_lookup(&addr,
-                          sm_p->u.get_config.mntent->the_pvfs_config_server);
+                          sm_p->u.get_config.mntent->the_pvfs_config_server,
+                          NULL);
     if (ret == 0 && 
         sm_p->u.get_config.config->tcp_buffer_size_send != 0 &&
         sm_p->u.get_config.config->tcp_buffer_size_receive != 0)

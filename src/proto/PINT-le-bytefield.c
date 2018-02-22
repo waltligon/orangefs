@@ -406,7 +406,7 @@ static void lebf_initialize(void)
     }
 
     /* clean up stuff just used for initialization */
-    PVFS_hint_free(req.hints);
+    PVFS_hint_free(&req.hints);
     free(tmp_dist.dist_name);
     free(tmp_name);
     initializing_sizes = 0;
