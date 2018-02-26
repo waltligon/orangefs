@@ -636,16 +636,18 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
 
     PINT_null_capability(&capability);
 
+    /* this runs on the local machine - no sids needed? */
     PINT_SERVREQ_TREE_GETATTR_FILL(*req,
-        capability,
-        s_op->req->u.remove.credential,
-        s_op->req->u.remove.fs_id,
-        0,
-        attr_p->u.dir.dist_dir_attr.dirdata_count,
-        attr_p->u.dir.dirdata_handles,
-        PVFS_ATTR_DIR_DIRENT_COUNT, /* only interested in dirent_count */
-        0,
-        s_op->req->hints);
+                                   capability,
+                                   s_op->req->u.remove.credential,
+                                   s_op->req->u.remove.fs_id,
+                                   0,
+                                   attr_p->u.dir.dist_dir_attr.dirdata_count,
+                                   attr_p->u.dir.dirdata_handles,
+                                   /* only interested in dirent_count */
+                                   PVFS_ATTR_DIR_DIRENT_COUNT,
+                                   0,
+                                   s_op->req->hints);
 
     PINT_cleanup_capability(&capability);
 
