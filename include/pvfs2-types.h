@@ -88,16 +88,6 @@ typedef int64_t PVFS_id_gen_t;
 /** Opaque value representing a destination address. */
 typedef int64_t PVFS_BMI_addr_t;
 
-/* these are redefining function defs which crashes
- * horribly.  The defs for these funcs is in pint-util.c
- */
-#if 0
-#define encode_PVFS_BMI_addr_t encode_int64_t
-#define decode_PVFS_BMI_addr_t decode_int64_t
-#define defree_PVFS_BMI_addr_t defree_int64_t
-#endif
-
-#if 0
 /* Windows - inline functions can't be exported */
 #ifdef WIN32
 void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x);
@@ -109,7 +99,6 @@ inline void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x);
 inline int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x);
 inline void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x);
 inline void defree_PVFS_BMI_addr_t(PVFS_BMI_addr_t *x);
-#endif
 #endif
 
 /* this stuff is all good, if out of place */
@@ -886,15 +875,6 @@ enum PVFS_server_mode
     PVFS_SERVER_ADMIN_MODE = 2        /* administrative mode */
 };
 
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-/* OLD PVFS ACL Format - a null terminated array of these */
-typedef struct
-{
-    int32_t  p_tag;
-    uint32_t p_perm;
-    uint32_t p_id;
-} pvfs2_acl_entry;
-#else
 /* PVFS2 ACL structures - Matches Linux ACL EA structures */
 /* matches POSIX ACL-XATTR format */
 typedef struct
@@ -909,7 +889,6 @@ typedef struct
     uint32_t p_version;
     pvfs2_acl_entry p_entries[0];
 } pvfs2_acl_header;
-#endif
 
 /* These defines match that of the POSIX defines */
 #define PVFS2_ACL_UNDEFINED_ID   (-1)

@@ -96,6 +96,7 @@ static DOTCONF_CB(get_trusted_portlist);
 static DOTCONF_CB(get_trusted_network);
 #endif
 static DOTCONF_CB(get_bmi_module_list);
+static DOTCONF_CB(get_bmi_opts);
 static DOTCONF_CB(get_flow_module_list);
 
 static DOTCONF_CB(get_root_squash);
@@ -902,6 +903,19 @@ static const configoption_t options[] =
      * in either the Defaults or ServerOptions contexts.
      */
     {"BMIModules",ARG_LIST, get_bmi_module_list,NULL, CTX_DEFAULTS,NULL},
+
+    /* Specifies an options string to be passed to BMI upon initialization.
+     * The format of the string is a comma-separated list of options.
+     * Currently, the only available option is:
+     *
+     * <c>ib_port=N</c>, where <c>N</c> is the IB device port to use for
+     * communication (default port is <c>1</c> if not specified).
+     *
+     * For example:
+     *
+     * <c>BMIOpts ib_port=2</c>
+     */
+    {"BMIOpts", ARG_STR, get_bmi_opts, NULL, CTX_DEFAULTS, NULL}, 
 
     /* List the flow modules to load when the server is started.  The modules
      * available for loading currently are:
@@ -2616,6 +2630,29 @@ DOTCONF_CB(get_bmi_module_list)
     }
     config_s->bmi_modules = strdup(buf);
     return NULL;
+}
+
+DOTCONF_CB(get_bmi_opts)
+{
+    struct server_configuration_s *config_s =
+            (struct server_configuration_s *)cmd->context;
+
+    if (config_s->bmi_opts)
+    {
+        free(config_s->bmi_opts);
+    }
+
+    if (cmd->data.str)
+    {
+        config_s->bmi_opts = strdup(cmd->data.str);
+    }
+    else
+    {
+        config_s->bmi_opts = NULL;
+    }
+
+    return NULL;
+
 }
 
 #ifdef USE_TRUSTED
@@ -4375,6 +4412,12 @@ void PINT_config_release(struct server_configuration_s *config_s)
         {
             free(config_s->user_cert_dn);
             config_s->user_cert_dn = NULL;
+        }
+
+        if (config_s->bmi_opts)
+        {
+            free(config_s->bmi_opts);
+            config_s->bmi_opts = NULL;
         }
     } /*end if config_s*/
 }

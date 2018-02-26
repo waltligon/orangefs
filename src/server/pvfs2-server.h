@@ -416,8 +416,10 @@ struct PINT_server_crdirent_op
 #endif
     PVFS_ds_keyval_handle_info keyval_handle_info;
     PVFS_object_attr dirdata_attr;
+    PVFS_object_attr metahandle_attr;
     PVFS_ds_attributes dirdata_ds_attr;
     PVFS_ID *keyval_temp_store;
+    PVFS_ds_attributes metahandle_ds_attr;
 
     /* index of node to receive directory entries when a split is necessary. */
     int split_node;
@@ -648,7 +650,7 @@ struct PINT_server_tree_communicate_op
     int handle_array_local_count;
     int handle_array_remote_count;
     int handle_index;
-    uint32_t sid_count; /* V3 FIXME */
+    int32_t sid_count; /* V3 FIXME */
     PVFS_SID *sid_array; /* V3 FIXME */
 };
 

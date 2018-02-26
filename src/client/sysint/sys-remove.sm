@@ -109,7 +109,7 @@ machine pvfs2_client_remove_sm
         default => rmdirent_get_capability;
     }  
 
-    /* successfully removed dirent no go remove the guts */
+    /* successfully removed dirent now go remove the guts */
         
     state do_remove
     {

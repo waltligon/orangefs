@@ -2197,7 +2197,7 @@ static struct bmi_method_addr *ib_alloc_method_addr(ib_connection_t *c,
     map = bmi_alloc_method_addr(bmi_ib_method_id, (bmi_size_t) sizeof(*ibmap));
     ibmap = map->method_data;
     ibmap->c = c;
-    ibmap->hostname = hostname;
+    ibmap->hostname = strdup(hostname);
     ibmap->port = port;
     ibmap->reconnect_flag = reconnect_flag;
     ibmap->ref_count = 1;
@@ -2280,19 +2280,18 @@ static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
     }
     gen_mutex_unlock(&interface_mutex);
 
-    if (map)
+    /* if we didn't find it, create a new one */
+    if (!map)
     {
-        free(hostname);  /* found it */
-    }
-    else
-    {
-        /* set reconnect flag on this addr; we will be acting as a client
-         * for this connection and will be responsible for making sure that
-         * the connection is established
+        /* Allocate a new method_addr and set reconnect flag; we will be
+         * acting as a client for this connection and will be responsible for
+         * making sure that the connection is established
          */
         map = ib_alloc_method_addr(0, hostname, port, 1);  /* alloc new one */
         /* but don't call bmi_method_addr_reg_callback! */
     }
+
+    free(hostname);
 
     return map;
 }
@@ -2670,7 +2669,6 @@ void *ib_tcp_server_process_client_thread(void *arg)
 {
     ib_connection_t *c;
     struct tcp_conn *tc;
-    int ret;
 
     debug(0, "%s: starting", __func__);
     if (!arg)
@@ -2708,7 +2706,6 @@ void *ib_tcp_server_process_client_thread(void *arg)
 
     debug(0, "%s: accepted new connection %s at server", 
           __func__, c->peername);
-    ret = 1;
 
   out:
     gen_mutex_unlock(&interface_mutex);
@@ -2864,10 +2861,10 @@ static int BMI_ib_set_info(int option,
 }
 
 #ifdef OPENIB
-extern int openib_ib_initialize(void);
+extern int openib_ib_initialize(char *options);
 #endif
 #ifdef VAPI
-extern int vapi_ib_initialize(void);
+extern int vapi_ib_initialize(char *options);
 #endif
 
 /*
@@ -2875,7 +2872,8 @@ extern int vapi_ib_initialize(void);
  */
 static int BMI_ib_initialize(struct bmi_method_addr *listen_addr, 
                              int method_id,
-                             int init_flags)
+                             int init_flags,
+                             char *options)
 {
     int ret;
 
@@ -2898,12 +2896,12 @@ static int BMI_ib_initialize(struct bmi_method_addr *listen_addr,
     /* try, in order, OpenIB then VAPI; set up function pointers */
     ret = 1;
 #ifdef OPENIB
-    ret = openib_ib_initialize();
+    ret = openib_ib_initialize(options);
 #endif
 #ifdef VAPI
     if (ret)
     {
-        ret = vapi_ib_initialize();
+        ret = vapi_ib_initialize(options);
     }
 #endif
     if (ret)

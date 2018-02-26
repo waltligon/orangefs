@@ -205,16 +205,21 @@ static int do_stat(const char             * pszFile,
                    const struct options   * opts)
 {
    int                  ret = 0;
-   PVFS_sysresp_lookup  lk_response;
-   PVFS_object_ref      ref;
-   PVFS_sysresp_getattr getattr_response;
+   PVFS_sysresp_lookup  lk_response = {};
+   PVFS_object_ref      ref = {};
+   PVFS_sysresp_getattr getattr_response = {};
+   PVFS_fs_id           symlink_target_fs_id = 0;
+   char                 symlink_target_path[PVFS_NAME_MAX] = {};
+   char                 error_string[256] = {0};
 
-   /* Initialize memory */
-   memset(&lk_response,      0, sizeof(lk_response));
-   memset(&ref,              0, sizeof(ref));
-   memset(&getattr_response, 0, sizeof(getattr_response));
-   
-
+   lk_response.error_path = calloc(1,PVFS_NAME_MAX);
+   if ( !lk_response.error_path )
+   {
+      printf("Error allocating memory for error_path\n");
+      return(-PVFS_ENOMEM); 
+   }
+   lk_response.error_path_size = PVFS_NAME_MAX;  
+ 
    /* Do we want to follow if the file is a symbolic link */
    if(opts->nFollowLink)
    {
@@ -224,6 +229,47 @@ static int do_stat(const char             * pszFile,
                             &lk_response, 
                             PVFS2_LOOKUP_LINK_FOLLOW,
                             NULL);
+     if (ret == -PVFS_ENOTPVFS)
+     {
+        /* At this point, the target of the symlink was defined with an
+         * absolute path, so we must "resolve" the path to determine if
+         * it is a PVFS path.  If so, then we execute another lookup,
+         * and so on and so on and so on.
+         */
+next_target:
+        ret = PVFS_util_resolve(lk_response.error_path,
+                                &symlink_target_fs_id, 
+                                symlink_target_path, 
+                                PVFS_NAME_MAX);
+        if (ret)
+        {
+           sprintf(error_string,"Cannot follow symbolic link. Target path[%s] is NOT in an OrangeFS filesystem",lk_response.error_path);
+           perror(error_string);
+           printf("Run pvfs2-stat without the -L option to see information about the symbolic link\n");
+           return(-1);
+        }
+
+        memset(&lk_response.ref,0,sizeof(lk_response.ref));
+        memset(lk_response.error_path,0,PVFS_NAME_MAX);
+
+        ret = PVFS_sys_lookup(symlink_target_fs_id,
+                              symlink_target_path,
+                              (PVFS_credential *)credentials,
+                              &lk_response,
+                              PVFS2_LOOKUP_LINK_FOLLOW,
+                              NULL);
+        if (ret == -PVFS_ENOTPVFS)
+        {
+           printf("Following another symbolic link [%s]\n",symlink_target_path);
+
+           goto next_target;
+        }
+        if (ret < 0)
+        {
+            printf("Error(%d) looking up target path (%s)\n",ret,symlink_target_path);
+            return (-1);
+        }
+     }
    }
    else
    {
@@ -443,7 +489,12 @@ void print_stats(const PVFS_object_ref *ref,
       {
          fprintf(stdout, "  Size          : 4096\n");
       }
-      else 
+      else if ((attr->size == 0) &&
+              (attr->objtype & PVFS_TYPE_SYMLINK))
+      {
+         fprintf(stdout, "  Size          : %zu\n",strlen(attr->link_target));
+      }
+      else
       {
          fprintf(stdout, "  Size          : %lld\n",      lld(attr->size));
       }
