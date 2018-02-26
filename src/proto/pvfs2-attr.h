@@ -42,6 +42,9 @@
 
 /* New simpler mask system, built on old system */
 
+#define PVFS_ATTR_DEFAULT \
+             PVFS_ATTR_READ_ALL_LATEST
+
 #define PVFS_ATTR_READ_ALL \
              PVFS_ATTR_READ_ALL_FASTEST 
 
@@ -59,6 +62,9 @@
              PVFS_ATTR_CAPABILITY  | PVFS_ATTR_META_ALL | \
              PVFS_ATTR_DIR_ALL     | PVFS_ATTR_DATA_ALL | \
              PVFS_ATTR_SYMLNK_ALL  | PVFS_ATTR_DIRDATA_ALL)
+
+#define PVFS_ATTR_READ_LATEST \
+            (PVFS_ATTR_COMMON_ALL  | PVFS_ATTR_LATEST) \
 
 #define PVFS_ATTR_FASTEST            (1 << 15)
 #define PVFS_ATTR_LATEST             (1 << 16)
@@ -176,12 +182,17 @@ struct PVFS_metafile_attr_s
     PINT_dist *dist;
     uint32_t dist_size;  /* not sent across wire, each side may be diff */
 
+    /* Normally there are (dfile_count * (sid_count + 1)) 
+     * oids+sids in one buffer with the oids before the
+     * sids.  dfile_array points to the start of the
+     * buffer and sid_array points to the address where
+     * the sids start.
+     */
     /* list of datafiles */
     uint32_t dfile_count;
     PVFS_handle *dfile_array;
 
     /* list of sids */
-    /* V3 there are dfile_count * (sid_count + 1) sids */
     PVFS_SID *sid_array;
     int32_t sid_count;
 
@@ -224,13 +235,19 @@ static inline void encode_PVFS_metafile_attr(char **pptr,
 }
 
 /* This decodes OIDs and SIDs into a contiguous array to make it easier
- * to write to the database
+ * to write to the database.
+ * Some attrs may not have these filled in, so dfile_count and 
+ * sid_count are zero and there is nothing to decode.
+ * If there appear to be oids and/or sids in the attr but we
+ * have a problem decoding we try to go ahead and decode them
+ * in order to make debugging easier.
  */
 
 static inline void decode_PVFS_metafile_attr(char **pptr,
                                              PVFS_metafile_attr *x)
 {
-    int dfiles_i, sid_i;                                                
+    int dfiles_i, sid_i; 
+    PVFS_OID scratch_buf; /* only used when we can't allocate mem */
 
 #if 0
     decode_PINT_dist(pptr, &(x)->dist);                                 
@@ -242,21 +259,73 @@ static inline void decode_PVFS_metafile_attr(char **pptr,
     decode_int32_t(pptr, &(x)->sid_count);                             
     decode_skip4(pptr,);
 
-    (x)->dfile_array = decode_malloc(                                   
-                       OSASZ((x)->dfile_count, (x)->sid_count));        
+    x->dfile_array = decode_malloc(OSASZ(x->dfile_count, x->sid_count)); 
 
-    (x)->sid_array = (PVFS_SID *)&((x)->dfile_array[(x)->dfile_count]); 
+    if (!x->dfile_array)
+    {
+        if (x->dfile_count)
+        {
+            /* error allocating memory */
+            gossip_err("%s: Error allocating memory for dfile refs\n",
+                       __func__);
+            gossip_err("%s: dfile_count %d sid_count %d\n", 
+                       __func__, x->dfile_count, x->sid_count);
+        }
+        x->sid_array = NULL;
+    }
+    else
+    {
+        if (!x->sid_count)
+        {
+            gossip_err("%s: sid_count is 0, oids without sids\n", __func__);
+            x->sid_array = NULL;
+        }
+        else
+        {
+            x->sid_array = (PVFS_SID *)&(x->dfile_array[x->dfile_count]); 
+        }
+    }
 
-    for (dfiles_i = 0; dfiles_i < (x)->dfile_count; dfiles_i++)         
+    for (dfiles_i = 0; dfiles_i < x->dfile_count; dfiles_i++)         
     {                                                                   
-	decode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);          
+        if (x->dfile_array)
+        {
+            decode_PVFS_handle(pptr, &x->dfile_array[dfiles_i]);          
+        }
+        else /* error condition */
+        {
+            decode_PVFS_handle(pptr, (PVFS_OID *)&scratch_buf);          
+        }
     }                                                                   
 
-    for (sid_i = 0; sid_i < (x)->dfile_count * (x)->sid_count; sid_i++) 
+    for (sid_i = 0; sid_i < (x->dfile_count * x->sid_count); sid_i++) 
     {                                                                   
-	decode_PVFS_SID(pptr, &(x)->sid_array[sid_i]);                  
-    }                                                                   
+        if (x->dfile_array)
+        {
+            decode_PVFS_SID(pptr, &x->sid_array[sid_i]);                  
+        }
+        else /* error condition */
+        {
+            decode_PVFS_SID(pptr, (PVFS_SID *)&scratch_buf);          
+        }
+    }
+
     decode_uint64_t(pptr, &(x)->flags);                        
+    
+    if ((x->dfile_array == NULL) || 
+        (x->dfile_count == 0) || 
+        (x->sid_count == 0))
+    {
+        /* indicate there are no oids/sids in this attr record */
+        if (x->dfile_array)
+        {
+            free(x->dfile_array);
+        }
+        x->dfile_array = NULL;
+        x->dfile_count = 0;
+        x->sid_array = NULL;
+        x->sid_count = 0;
+    }
 }
 
 #define defree_PVFS_metafile_attr(x) \

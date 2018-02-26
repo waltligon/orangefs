@@ -7,8 +7,9 @@
 #ifndef __PVFS2_TYPES_DEBUG_H
 #define __PVFS2_TYPES_DEBUG_H
 
-/* This file defined PINT_attrmask_print(), a useful debugging tool for
- * printing the contents of attrmasks.
+/* This file defines PINT_attrmask_print(), a useful debugging tool for
+ * printing the contents of attrmasks.  Prints with gossip and only if
+ * the provided PVFS_debug_mask is provided (must be set in gossip)
  */
 
 #include "gossip.h"

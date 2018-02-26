@@ -19,6 +19,15 @@
 #include "statecomp.h"
 #include "parser.h"
 
+/*
+ * we're never interactive, so avoid isatty call that sometimes
+ * fails due to occassional improper ioctl command mappings --
+ * these can cause an infinite loop in statecomp execution.
+ * NOTE these don't work since flex 2.6.1 - need command line arg
+ */
+#define YY_ALWAYS_INTERACTIVE 0
+#define YY_NEVER_INTERACTIVE 1
+
 /* No push/pop of scanner state. */
 #define YY_STACK_USED 0
 
@@ -51,13 +60,14 @@ static int comment_caller;
 
 %}
 
+/* avoid a warning since we do not use yyunput() */
+%option nounput
+%option never-interactive
+
 id          [_a-zA-Z][_0-9a-zA-Z]*
 
 %x		CODE
 %x		COMMENT
-
-/* avoid a warning since we do not use yyunput() */
-%option nounput
 
 %%
 

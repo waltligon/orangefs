@@ -107,7 +107,9 @@ machine pvfs2_client_remove_sm
     {
         run remove_getattr_setup;
         default => rmdirent_get_capability;
-    }   
+    }  
+
+    /* successfully removed dirent now go remove the guts */
         
     state do_remove
     {
@@ -123,18 +125,16 @@ machine pvfs2_client_remove_sm
         default => getattr_setup;
     }
 
-    state crdirent_timer
-    {
-        run remove_generic_timer;
-        default => getattr_setup;
-    }
-
     state rmdirent_timer
     {
         run remove_generic_timer;
         default => rmdirent_get_capability;
     }
 
+    /* if we remove the dirent, but fail to remove the rest
+     * we apparently put the dirent back.  Probably should
+     * drop this and use scrubber to get the missed stuff.
+     */
     state getattr_setup
     {
         run remove_getattr_setup;
@@ -169,6 +169,13 @@ machine pvfs2_client_remove_sm
         default => cleanup;
     }
 
+    state crdirent_timer
+    {
+        run remove_generic_timer;
+        default => getattr_setup;
+    }
+
+    /* all returns here */
     state cleanup
     {
         run remove_cleanup;
@@ -231,10 +238,14 @@ PVFS_error PVFS_isys_remove(char *object_name,
                  object_name, PVFS_OID_str(&parent_ref.handle),
                  parent_ref.fs_id);
 
-    /* NOTE: This state machine previously multiplied the default job timeout
-     * by five to allow for potentially long sync delays.  We instead now set
-     * the default client BMI timeout higher for all operations: if a sync can 
-     * go slow then so can any other arbitrary operation queued behind it. -PHC
+    /* NOTE: This state machine previously 
+     * multiplied the default job timeout
+     * by five to allow for potentially long
+     * sync delays.  We instead now set
+     * the default client BMI timeout higher
+     * for all operations: if a sync can 
+     * go slow then so can any other arbitrary
+     * operation queued behind it. -PHC
      */
     
     return PINT_client_state_machine_post(smcb,
@@ -285,7 +296,8 @@ static int remove_rmdirent_comp_fn(void *v_p,
                                    int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
 
     assert(resp_p->op == PVFS_SERV_RMDIRENT);
 
@@ -299,7 +311,12 @@ static int remove_rmdirent_comp_fn(void *v_p,
         sm_p->object_ref.fs_id     = sm_p->parent_ref.fs_id;
         sm_p->object_ref.handle    = resp_p->u.rmdirent.entry_handle;
         sm_p->object_ref.sid_count = resp_p->u.rmdirent.sid_count;
-        sm_p->object_ref.sid_array = resp_p->u.rmdirent.sid_array;
+        sm_p->object_ref.sid_array =
+                         (PVFS_SID *)malloc(resp_p->u.rmdirent.sid_count *
+                         sizeof(PVFS_SID));
+        memcpy(sm_p->object_ref.sid_array,
+               resp_p->u.rmdirent.sid_array,
+               resp_p->u.rmdirent.sid_count * sizeof(PVFS_SID));
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "  remove_rmdirent_comp_fn: metafile handle = %s\n",
@@ -350,6 +367,11 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index;
+#if 0
+    struct server_configuration_s *server_config = NULL;
+    struct filesystem_configuration_s* cur_fs = NULL;
+    int metasidcnt = 0;
+#endif
 
     /* NOTE: we remove the dirent first because this gets the object
      * out of the system fastest.
@@ -359,34 +381,47 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
 
     js_p->error_code = 0;
 
+    /*
+     * Find metadata replication factor from configuration
+     */
+#if 0
+    server_config = PINT_get_server_config_struct(sm_p->parent_ref.fs_id);
+    cur_fs = PINT_config_find_fs_id(server_config,sm_p->parent_ref.fs_id);
+    metasidcnt = cur_fs->metadata_replication_factor;
+    PINT_put_server_config_struct(server_config);
+#endif
+
+
     /* keep a copy of the parent's capability */
     PINT_copy_capability(&sm_p->getattr.attr.capability,
                          &sm_p->parent_capability);
 
     /* find the hash value and the dist dir bucket */
     dirdata_hash = PINT_encrypt_dirdata(sm_p->u.remove.object_name);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove: encrypt dirent %s into hash value %llu.\n",
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "remove: encrypt dirent %s into hash value %llu.\n",
             sm_p->u.remove.object_name,
             llu(dirdata_hash));
 
-    dirdata_server_index =
-        PINT_find_dist_dir_bucket(dirdata_hash,
-            &sm_p->getattr.attr.u.dir.dist_dir_attr,
-            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove: selecting bucket No.%d from dist_dir_bitmap.\n",
-            dirdata_server_index);
+    dirdata_server_index = PINT_find_dist_dir_bucket(dirdata_hash,
+                    &sm_p->getattr.attr.u.dir.dist_dir_attr,
+                    sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove: selecting bucket No.%d from dist_dir_bitmap.\n",
+                 dirdata_server_index);
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
+    /* SID COUNT AND ARRAY MAY BE WRONG - CHECK IT!! */
+
     PINT_SERVREQ_RMDIRENT_FILL(
                  msg_p->req,
-                 sm_p->parent_capability,
+                 sm_p->parent_capability,  /* parent only for cap and fs_id */
                  sm_p->parent_ref.fs_id,
-                 sm_p->parent_ref.handle,
-                 sm_p->parent_ref.sid_count,
-                 sm_p->parent_ref.sid_array,
                  sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
+                 sm_p->parent_ref.sid_count, /* should be dirdata_sids */
+                 sm_p->parent_ref.sid_array, /* should be dirdata_sids */
                  sm_p->u.remove.object_name,
                  sm_p->hints);
 
@@ -404,10 +439,10 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     /* send to dirdata server */
     msg_p->handle =
-        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
-    msg_p->sid_count = sm_p->parent_ref.sid_count;
+            sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
+    msg_p->sid_count = sm_p->parent_ref.sid_count; /* should be dirdata_sids */
     msg_p->sid_index = 0;
-    msg_p->sid_array = sm_p->parent_ref.sid_array;
+    msg_p->sid_array = sm_p->parent_ref.sid_array; /* should be dirdata_sids */
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = remove_rmdirent_comp_fn;
 

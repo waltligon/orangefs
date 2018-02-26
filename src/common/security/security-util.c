@@ -198,6 +198,18 @@ void PINT_debug_capability(const PVFS_capability *cap, const char *prefix)
     char sig_buf[16], mask_buf[16];
     int i;
 
+    if (!cap)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "capability pointer is NULL\n");
+        return;
+    }
+
+    if (!cap->issuer)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "capability issuer is NULL\n");
+        return;
+    }
+
     if (strlen(cap->issuer) == 0)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "%s null capability\n", prefix);

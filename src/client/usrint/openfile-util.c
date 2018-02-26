@@ -119,6 +119,9 @@ typedef struct pvfs_shmcontrol_s
     uint32_t fd_table_count;
 } pvfs_shmcontrol_t;
 
+/* 0 means this interface is not in a usable state */
+int pvfs_usrint_available = 0;
+
 static pvfs_shmcontrol_t *shmctrl = NULL;
 static char shmobjpath[50];
 static int shmobj = -1;
@@ -514,6 +517,10 @@ static void pvfs_desc_free(int desc, struct qlist_head *pool)
     int merged = 0;
     int at_end = 0;
 
+    if (!shmctrl)
+    {
+        return;
+    }
     /* FIXME: this should depend on which pool we are looking at */
     if (desc < 0 || desc >= shmctrl->descriptor_pool_size)
     {
@@ -626,6 +633,10 @@ static void path_index_return(char *path)
     int size = 0;
     int offset;
 
+    if (!shmctrl)
+    {
+        return;
+    }
     if (path < shmctrl->path_table ||
         path > shmctrl->path_table + shmctrl->path_table_size)
     {
@@ -696,6 +707,10 @@ static char *path_index_find(int size)
 {
     char *rval;
     index_rec_t *seg;
+    if (!shmctrl)
+    {
+        return NULL;
+    }
     if (path_index.next == &path_index)
     {
         /* free list is empty */
@@ -784,6 +799,7 @@ static void cleanup_usrint_internal(void)
         glibc_ops.unlink(shmobjpath);
     }
     /* clear globals */
+    pvfs_usrint_available = 0;
     shmobj = -1;
     shmctrl = NULL;
     descriptor_table = NULL;
@@ -1196,12 +1212,17 @@ static int init_usrint_internal(void)
     pvfs_initializing_flag = 0;
     gen_mutex_unlock(&rec_mutex);
     /* make sure errors in here don't carry out */
+    pvfs_usrint_available = 1;
     errno = errno_in;
     return 0;
 }
 
 static void parent_fork_begin(void)
 {
+    if (!shmctrl)
+    {
+        return;
+    }
     init_debug("Parent preparing to fork\n");
     gen_mutex_lock(&shmctrl->shmctrl_lock);
     shmctrl->shmctrl_copy = 1;
@@ -1210,6 +1231,10 @@ static void parent_fork_begin(void)
 
 static void parent_fork_end(void)
 {
+    if (!shmctrl)
+    {
+        return;
+    }
     gen_mutex_lock(&shmctrl->shmctrl_lock);
     while (shmctrl->shmctrl_copy)
     {

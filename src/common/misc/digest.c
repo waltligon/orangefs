@@ -66,10 +66,13 @@ static int digest(const char *digest_name,
     EVP_DigestUpdate(mdctx, buf, buf_len);
     EVP_DigestFinal(mdctx, digest_value, &digest_len);
 #else
+#if 0
     memset(&mdctx, 0, sizeof(mdctx));
     EVP_DigestInit(&mdctx, md);
-    EVP_DigestUpdate(&mdctx, buf, buf_len);
-    EVP_DigestFinal(&mdctx, digest_value, &digest_len);
+#endif
+    mdctx = EVP_MD_CTX_new();
+    EVP_DigestUpdate(mdctx, buf, buf_len);
+    EVP_DigestFinal(mdctx, digest_value, &digest_len);
 #endif
     if (output)
         *output = digest_value;

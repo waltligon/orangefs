@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <string.h>
 #ifndef WIN32
+#include <sys/sysmacros.h>
 #include <inttypes.h>
 #include <sys/ioctl.h>
 #include <sys/poll.h>
@@ -87,7 +88,7 @@ int PINT_dev_initialize(
 #ifdef __linux__
     int ret = -1;
     char *debug_string = getenv("PVFS2_KMODMASK");
-    PVFS_debug_mask debug_mask = {0, 0};
+    PVFS_debug_mask debug_mask = GOSSIP_NO_DEBUG;
     dev_mask_info_t mask_info;
     dev_mask2_info_t mask2_info;
     int upstream_kmod = 0;
@@ -166,8 +167,8 @@ int PINT_dev_initialize(
     if (ret < 0)
     {
         gossip_err("Error: ioctl() PVFS_DEV_DEBUG failure (kernel debug mask to"
-                   " %llx, %llx)\n"
-                  ,llu(debug_mask.mask1), llu(debug_mask.mask2));
+                   " %llx %llx)\n",
+                   llu(debug_mask.mask1), llu(debug_mask.mask2));
         close(pdev_fd);
         return -(PVFS_ENODEV|PVFS_ERROR_DEV);
     }
@@ -255,8 +256,8 @@ out:
     if (ret < 0)
     {
         gossip_err("Error: ioctl() PVFS_DEV_DEBUG failure (client debug mask to"
-                   " %llx, %llx)\n"
-                  ,llu(gossip_debug_mask.mask1), llu(gossip_debug_mask.mask2));
+                   " %llx %llx)\n",
+                   llu(gossip_debug_mask.mask1), llu(gossip_debug_mask.mask2));
         close(pdev_fd);
         return -(PVFS_ENODEV|PVFS_ERROR_DEV);
     }
@@ -299,7 +300,7 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
     void *ptr = NULL;
     int ioctl_cmd[2] = {PVFS_DEV_MAP, 0};
     int debug_on = 0;
-    PVFS_debug_mask debug_mask = {0, 0};
+    PVFS_debug_mask debug_mask = GOSSIP_NO_DEBUG;
 
     for (i = 0; i < ndesc; i++)
     {
@@ -959,7 +960,8 @@ static int setup_dev_entry(const char *dev_name)
     }
 
     /* if we hit this point, then we need to create a new device file */
-    ret = mknod(dev_name, (S_IFCHR | S_IRUSR | S_IWUSR),
+    ret = mknod(dev_name,
+                (S_IFCHR | S_IRUSR | S_IWUSR),
                 makedev(majornum, 0));
     if (ret != 0)
     {

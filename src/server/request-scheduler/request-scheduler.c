@@ -90,6 +90,9 @@ struct req_sched_element
     enum PVFS_server_mode mode; /* the mode to change to */
 };
 
+/* server modes are defined in include/pvfs2-types.h
+ * currently there are 2 modes: normal and admin
+ */
 
 /* hash table */
 static struct qhash_table *req_sched_table;
@@ -766,7 +769,7 @@ int PINT_req_sched_unpost(req_sched_id in_id, void **returned_user_ptr)
  */
 int PINT_req_sched_release(req_sched_id in_completed_id,
                            void *in_user_ptr,
-                           req_sched_id * out_id)
+                           req_sched_id *out_id)
 {
     struct req_sched_element *tmp_element = NULL;
     struct req_sched_list *tmp_list = NULL;

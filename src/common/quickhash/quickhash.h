@@ -160,7 +160,8 @@ static inline struct qhash_head *qhash_first(struct qhash_table *table)
     {
         if (!qlist_empty(&(table->array[index])))
         {
-            return &(table->array[index]);
+            qhash_unlock(&table->lock);
+            return table->array[index].next;
         }
     }
     qhash_unlock(&table->lock);

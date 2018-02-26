@@ -443,7 +443,8 @@ static int rename_parent_getattr_comp_fn(void *v_p,
                                          int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     PVFS_object_attr *attr;
     PVFS_dist_dir_hash_type hash;
     int dirdata_index, i;
@@ -543,7 +544,8 @@ static int rename_lookups_comp_fn(void *v_p,
                                   int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_lookups_comp_fn\n");
 
@@ -659,12 +661,13 @@ static int rename_rmdirent_comp_fn(void *v_p,
                                    int index)
 {
     PINT_smcb *smcb = v_p;
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
 #ifdef WIN32
     PINT_client_sm *sm_p =
-        PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+        PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
 #else
     PINT_client_sm *sm_p __attribute__((unused)) =
-        PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+        PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
 #endif
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_rmdirent_comp_fn\n");
 
@@ -1030,7 +1033,7 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].handle,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].sid_count,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].sid_array,
-          sm_p->u.rename.dirdata_handle[sm_p->u.rename.rmdirent_index],
+          /* sm_p->u.rename.dirdata_handle[sm_p->u.rename.rmdirent_index], */
           sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index],
           sm_p->hints);
 
@@ -1043,6 +1046,10 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
     /* FIX THIS !!!! 
      * It seems like we don't need this, but suspect it is needed to
      * select which dir bucket the target entry is in
+     *
+     * If the dirdata handles are in parent_refns, then what is this
+     * field for?  There was confusion in rename, but this field is
+     * several places in this code - but not sure what for.  WBL
      */
     /* sm_p->u.rename.dirdata_handle[sm_p->u.rename.rmdirent_index]; */
 

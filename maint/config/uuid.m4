@@ -18,6 +18,10 @@ dnl library.  We use find to search for potential candidates and then
 dnl test until a working one is found.  Finally, if these are installed
 dnl from a package we warn if they (.h .so) are not from the same package.
 dnl
+dnl Speaking of packages II have found this in util-linux, util-linux-ng,
+dnl and in libuuid + libuuid-devel  At this time in history is is not
+dnl clear where is the best place to find it, depending on your distro..
+dnl
 AC_DEFUN([AX_UUID],
 [
     uuidpath=ifelse([$1], ,,$1)
@@ -174,10 +178,10 @@ AC_DEFUN([AX_UUID],
 
     dnl report result
     if test "x$LIBUUID" = "xnotfound" ; then
-        AC_MSG_ERROR(could not find UUID libraries)
+        AC_MSG_ERROR("could not find UUID libraries - might need to install packages util-linux(-ng) or libuuid and libuuid-devel")
     fi
     if test "x$UIDDOTH" = "xnotfound" ; then
-        AC_MSG_ERROR(could not find UUID libraries)
+        AC_MSG_ERROR("could not find UUID libraries - might need to install packages util-linux(-ng) or libuuid and libuuid-devel")
     fi
     AC_MSG_RESULT(yes)
 

@@ -141,7 +141,7 @@ int main(int argc, char **argv)
                     user_opts->ksize) == 0)
         {
             fprintf(stderr,
-                    "Not permitted to set key meta hin with this tool\n");
+                    "Not permitted to set key meta hint with this tool\n");
             return -1;
         }
         if (user_opts->op == SET)

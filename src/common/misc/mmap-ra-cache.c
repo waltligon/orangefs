@@ -820,7 +820,6 @@ int pint_racache_finalize(void)
                                            racache_file_t,
                                            hash_link);
 
-                /* cycle each buffer linked to the file */
                 while ((buff_link = qlist_pop(&racache_file->buff_list)))
                 {
                     racache_buffer = qlist_entry(buff_link,
@@ -830,7 +829,6 @@ int pint_racache_finalize(void)
                                  "Freeing buffer %d with %d waiters\n",
                                  racache_buffer->buff_id,
                                  racache_buffer->vfs_cnt);
-                    /* remove each waiting request and free the links */
                     while((vfs_link = qlist_pop(&racache_buffer->vfs_link)))
                     {
                         racache_buffer->vfs_cnt--;

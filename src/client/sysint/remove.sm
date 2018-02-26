@@ -61,6 +61,7 @@ nested machine pvfs2_client_remove_helper_sm
         default => remove_helper_cleanup;
     }
 
+    /* set up a tree remove for datafiles */
     state datafile_remove_setup_msgpair
     {
         run remove_datafile_remove_setup_msgpair;
@@ -81,6 +82,7 @@ nested machine pvfs2_client_remove_helper_sm
         default => remove_helper_cleanup;
     }
     
+    /* set up to issue a remove for the object in sm_p */
     state object_remove_setup_msgpair
     {
         run remove_object_remove_setup_msgpair;

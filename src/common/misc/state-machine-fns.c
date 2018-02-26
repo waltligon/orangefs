@@ -126,8 +126,8 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
                                          job_status_s *r)
 {
     PINT_sm_action retval;
-    const char * state_name;
-    const char * machine_name;
+    const char *state_name;
+    const char *machine_name;
     int children_started = 0;
 
     if (!(smcb) ||
