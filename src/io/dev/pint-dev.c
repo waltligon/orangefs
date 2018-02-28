@@ -820,10 +820,11 @@ int PINT_dev_write_list(
     if (ret == bytes_to_write) {
       return(0);
     } else {
-      gossip_err("%s: tried to write :%d: bytes, writev returned :%d:\n",
+      gossip_err("%s: tried to write :%d: bytes, rc:%d: errno:%d:\n",
                  __func__,
                  bytes_to_write,
-                 ret);
+                 ret,
+                 errno);
       return(-(PVFS_EIO|PVFS_ERROR_DEV));   
     }
 }

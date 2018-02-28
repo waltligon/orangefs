@@ -399,15 +399,6 @@ static void client_segfault_handler(int signum)
     abort();
 }
 
-/*
- * /usr/include/uuid/uuid.h:typedef unsigned char uuid_t[16];
- *
- * uuid_t is an unsigned char[16] array and thus passes by reference.
- *
- * Unique identifier for an object on a PVFS3 file system  128-bit
- * typedef struct {uuid_t u;} PVFS_OID __attribute__ ((__aligned__ (8)));
- * typedef PVFS_OID PVFS_handle;
- */
 static void pvfs2_khandle_from_handle(PVFS_handle *handle,
                                PVFS_khandle *khandle)
 {
@@ -854,6 +845,13 @@ static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
            sizeof(refn.handle));
 
     refn.fs_id = vfs_request->in_upcall.req.getattr.refn.fs_id;
+
+    refn.sid_count = *(int32_t *)vfs_request->in_upcall.trailer_buf;
+    /* this mallocs four bytes more than we need... */
+    refn.sid_array = malloc(vfs_request->in_upcall.trailer_size);
+    memcpy(refn.sid_array,
+           vfs_request->in_upcall.trailer_buf + sizeof(int32_t),
+           refn.sid_count * sizeof(uuid_t));
 
     ret = PVFS_isys_getattr(
             refn,
@@ -1714,12 +1712,16 @@ static PVFS_error post_fs_mount_request(vfs_request_t *vfs_request)
         "Got an fs mount request for host:\n  %s\n",
         vfs_request->in_upcall.req.fs_mount.pvfs2_config_server);
 
-    ret = generate_upcall_mntent(vfs_request->mntent, &vfs_request->in_upcall, 1);
+    ret = generate_upcall_mntent(vfs_request->mntent,
+				&vfs_request->in_upcall,
+				1);
     if (ret < 0)
     {
         goto failed;
     }
-    ret = PVFS_isys_fs_add(vfs_request->mntent, &vfs_request->op_id, (void*)vfs_request);
+    ret = PVFS_isys_fs_add(vfs_request->mntent,
+			&vfs_request->op_id,
+			(void*)vfs_request);
 
 failed:
     if(ret < 0)
@@ -4002,6 +4004,27 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                        &root_handle.handle,
                        sizeof(root_handle.handle));
 
+                /* copy sid_count and sid_array in to the trailer_buf. */
+                vfs_request->out_downcall.trailer_size = 
+                        root_handle.sid_count *
+			  sizeof(*root_handle.sid_array) +
+			  sizeof(root_handle.sid_count);
+                vfs_request->out_downcall.trailer_buf = 
+                        malloc(vfs_request->out_downcall.trailer_size);
+                if (vfs_request->out_downcall.trailer_buf == NULL) {
+                    gossip_err("%s: case:%d: trailer malloc failed.\n",
+                               __func__, PVFS2_VFS_OP_FS_MOUNT);
+                    *error_code = -PVFS_ENOMEM;
+                    break;
+                }
+                memcpy(vfs_request->out_downcall.trailer_buf,
+                       &root_handle.sid_count,
+                       sizeof(root_handle.sid_count));
+                memcpy(vfs_request->out_downcall.trailer_buf +
+                           sizeof(root_handle.sid_count),
+                       root_handle.sid_array,
+                       root_handle.sid_count * sizeof(*root_handle.sid_array));
+
                 vfs_request->out_downcall.resp.fs_mount.id =
                                                  dynamic_mount_id++;
             }
@@ -4352,6 +4375,8 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
 
     vfs_request->out_downcall.status = *error_code;
     vfs_request->out_downcall.type = vfs_request->in_upcall.type;
+
+gossip_err("%s: *** tag:%lu:***** downcall.resp.getattr.attributes.objtype:%d:\n", __func__, vfs_request->info.tag, vfs_request->out_downcall.resp.getattr.attributes.objtype);
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s exit: op %s error code: %d\n",
                  __func__, get_vfs_op_name_str(vfs_request->out_downcall.type),
@@ -4731,6 +4756,7 @@ static PVFS_error write_downcall(vfs_request_t *vfs_request)
         total_size += vfs_request->out_downcall.trailer_size;
     }
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Writing Downcall\n");
+gossip_err("%s: *** tag:%lu:***** downcall.resp.getattr.attributes.objtype:%d:\n", __func__, vfs_request->info.tag, vfs_request->out_downcall.resp.getattr.attributes.objtype);
     ret = write_device_response(buffer_list,
                                 size_list,
                                 list_size,
@@ -4739,6 +4765,10 @@ static PVFS_error write_downcall(vfs_request_t *vfs_request)
                                 &vfs_request->op_id,
                                 &vfs_request->jstat,
                                 s_client_dev_context);
+
+    if ((vfs_request->out_downcall.trailer_size != 0) &&
+	(vfs_request->out_downcall.type != PVFS2_VFS_OP_READDIR))
+            free(vfs_request->out_downcall.trailer_buf);
     return ret;
 }
 
