@@ -466,6 +466,16 @@ int PINT_cached_config_server_local(const PVFS_SID *sid)
     server_configuration_t *config = PINT_server_config_mgr_get_config();
     return (!PVFS_SID_cmp(sid, &config->host_sid));
 }
+
+/* PINT_cached_config_get_local_SID(PVFS_SID *sid)
+ *
+ * Copies the local SID into the provided buffer
+ */
+void PINT_cached_config_get_local_SID(PVFS_SID *sid)
+{
+    server_configuration_t *config = PINT_server_config_mgr_get_config();
+    PVFS_SID_cpy(sid, &config->host_sid);
+}
 #endif
 
 /* V3 becomes SID cache function */

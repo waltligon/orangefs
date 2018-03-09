@@ -194,18 +194,9 @@ PVFS_error PVFS_isys_readdir(PVFS_object_ref ref,
     sm_p->readdir_state.dirent_array = &resp->dirent_array;
     sm_p->readdir_state.dirent_outcount = &resp->pvfs_dirent_outcount;
 
-    /* Determine how many sids exist per handle so we can determine
-       how much memory to allocate for sid_array. Note that this
-       assumes a system-wide setting for this number. If this
-       number becomes a configurable value then we will have to either
-       determine the max number that could apply in the file system
-       or wait until the response is received for the first readdir
-       request to determine how much memory to allocate. */
-    ret = PINT_cached_config_get_metadata_sid_count(
-                                         ref.fs_id,
-                                         &(sm_p->readdir_state.sid_count));
+    sm_p->readdir_state.sid_count = sm_p->readdir.meta_sid_count;
     sm_p->readdir_state.sid_array = (PVFS_SID *) malloc(
-                SASZ(pvfs_dirent_incount * sm_p->readdir_state.sid_count));
+                SASZ(pvfs_dirent_incount * sm_p->readdir.meta_sid_count));
 
     sm_p->readdir_state.token = &resp->token;
     sm_p->readdir_state.directory_version = &resp->directory_version;
@@ -276,6 +267,7 @@ static int readdir_msg_comp_fn(void *v_p,
     PINT_smcb *smcb = v_p;
     PINT_smcb *parent_smcb = smcb->parent_smcb;
     PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
+    int i, sids_per_handle;
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir_msg_comp_fn\n");
     gossip_debug(GOSSIP_CLIENT_DEBUG, "dirdata readdir[%d] got response %d\n",
@@ -329,6 +321,9 @@ static int readdir_msg_comp_fn(void *v_p,
             assert(*(sm_p->readdir_state.dirent_array));
         }
 
+        /* sid_count in the response it the total number of sids sent. */
+        sids_per_handle = resp_p->u.readdir.sid_count / resp_p->u.readdir.dirent_count;
+
         int dirent_array_offset =
                     (*(sm_p->readdir_state.dirent_outcount));
         int dirent_array_len =
@@ -336,13 +331,12 @@ static int readdir_msg_comp_fn(void *v_p,
 
         memcpy(*(sm_p->readdir_state.dirent_array) + dirent_array_offset,
                resp_p->u.readdir.dirent_array, dirent_array_len);
-    }
 
-    memcpy(&sm_p->readdir_state.sid_array[
-                   *sm_p->readdir_state.dirent_outcount *
-                   sm_p->readdir_state.sid_count],
-           resp_p->u.readdir.sid_array,
-           SASZ(sm_p->readdir_state.sid_count));
+        memcpy(&sm_p->readdir_state.sid_array[
+                       *sm_p->readdir_state.dirent_outcount * sids_per_handle],
+               resp_p->u.readdir.sid_array,
+               SASZ(resp_p->u.readdir.dirent_count * sids_per_handle));
+    }
 
     /* update dirent_outcount */
     *(sm_p->readdir_state.dirent_outcount) +=
@@ -354,6 +348,17 @@ static int readdir_msg_comp_fn(void *v_p,
                  lld(resp_p->u.readdir.directory_version),
                  (sm_p->readdir.dirdata_index),
                  *(sm_p->readdir_state.dirent_outcount) );
+
+    for (i = 0; i < resp_p->u.readdir.dirent_count; i++)
+    {
+        gossip_debug(GOSSIP_READDIR_DEBUG,
+                     "dirent: %s:%s:%d:%s\n",
+                     resp_p->u.readdir.dirent_array[i].d_name,
+                     PVFS_OID_str(&resp_p->u.readdir.dirent_array[i].handle),
+                     resp_p->u.readdir.sid_count,
+                     PVFS_SID_str((PVFS_SID *)
+                          &resp_p->u.readdir.sid_array[i*sids_per_handle]));
+    }
 
     return 0;
 }
@@ -470,7 +475,7 @@ static PINT_sm_action readdir_finish_partial_read(
     msg_p->fs_id = sm_p->getattr.object_ref.fs_id;
     msg_p->handle = sm_p->getattr.attr.u.dir.dirdata_handles[
                                       sm_p->readdir_state.dirdata_index];
-    msg_p->sid_count = 1;
+    msg_p->sid_count = sm_p->getattr.attr.u.dir.dist_dir_attr.sid_count;
     msg_p->sid_index = 0;
     msg_p->sid_array =
            &sm_p->getattr.attr.u.dir.dirdata_sids[

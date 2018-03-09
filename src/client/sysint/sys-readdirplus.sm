@@ -34,6 +34,18 @@ enum {
     NO_WORK = 1
 };
 
+struct handle_to_index {
+    PVFS_handle handle;
+    PVFS_SID *sid_array;
+    int handle_index;/* index into the dirent array itself */
+    int aux_index; /* used to store the ordinality of the dfile handles */
+};
+
+struct handle_partition_element {
+    PVFS_handle handle;
+    PVFS_SID *sid_array;
+};
+
 static int readdirplus_fetch_attrs_comp_fn(void *v_p,
                                            struct PVFS_server_resp *resp_p,
                                            int index);
@@ -118,6 +130,8 @@ PVFS_error PVFS_isys_readdirplus(PVFS_object_ref ref,
     PVFS_error ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
     PINT_smcb *smcb = NULL;
+    struct server_configuration_s *server_config = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_readdirplus entered\n");
 
@@ -151,11 +165,26 @@ PVFS_error PVFS_isys_readdirplus(PVFS_object_ref ref,
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credential(sm_p->cred_p, credential);
+
+    sm_p->u.readdirplus.readdirplus_resp = resp;
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
+
     /* point sm dirent array and outcount to the readdirplus response field */
     sm_p->readdir_state.dirent_array = &resp->dirent_array;
     sm_p->readdir_state.dirent_outcount = &resp->pvfs_dirent_outcount;
+
+    /*
+     * Find metadata replication factor from configuration
+     */
+    server_config = PINT_get_server_config_struct(ref.fs_id);
+    cur_fs = PINT_config_find_fs_id(server_config, ref.fs_id);
+    sm_p->readdir_state.sid_count = cur_fs->metadata_replication_factor;
+    PINT_put_server_config_struct(server_config);
+
+    sm_p->readdir_state.sid_array = (PVFS_SID *) malloc(
+                 SASZ(pvfs_dirent_incount * sm_p->u.readdirplus.meta_sid_count));
+
     sm_p->readdir_state.token = &resp->token;
     sm_p->readdir_state.directory_version = &resp->directory_version;
 
@@ -166,12 +195,12 @@ PVFS_error PVFS_isys_readdirplus(PVFS_object_ref ref,
 
     /* We store the object attr mask in the sm structure */
     sm_p->u.readdirplus.attrmask = PVFS_util_sys_to_object_attr_mask(attrmask);
-    sm_p->u.readdirplus.readdirplus_resp = resp;
+
     sm_p->u.readdirplus.svr_count = 0;
     sm_p->u.readdirplus.size_array = NULL;
     sm_p->u.readdirplus.nhandles = 0;
     sm_p->u.readdirplus.obj_attr_array = NULL;
-    sm_p->u.readdirplus.server_addresses = NULL;
+    sm_p->u.readdirplus.contact_sids = NULL;
     sm_p->u.readdirplus.handle_count = NULL;
     sm_p->u.readdirplus.handles = NULL;
 
@@ -265,15 +294,15 @@ static int get_handle_index(struct handle_to_index *input_handle_array,
     return -1;
 }
 
-/* This checks to see if svr_addr exists in the svr_addr_array
+/* This checks to see if sid exists in the svr_addr_array
  * If so it returns 0, and returns the first index if svr_index
  * is non-NULL.  If not in the array, array is NULL or size of the
  * array is 0 it returns 1
  */
 
-static int is_unique_server(PVFS_BMI_addr_t svr_addr,
+static int is_unique_server(PVFS_SID sid,
                             int svr_count, 
-                            PVFS_BMI_addr_t *svr_addr_array,
+                            PVFS_SID *svr_addr_array,
                             int *svr_index)
 {
     int i, ret;
@@ -285,7 +314,7 @@ static int is_unique_server(PVFS_BMI_addr_t svr_addr,
     }
     for (i = 0; i < svr_count; i++)
     {
-        if (svr_addr_array[i] == svr_addr)
+        if (! PVFS_SID_cmp(&svr_addr_array[i], &sid))
         {
             if (svr_index)
             {
@@ -302,7 +331,7 @@ out:
 }
 
 static int destroy_partition_handles(int *svr_count,
-                                     PVFS_BMI_addr_t **svr_addr_array,
+                                     PVFS_SID **svr_addr_array,
                                      int **per_server_handle_count,
                                      PVFS_handle ***per_server_handles)
 {
@@ -350,118 +379,80 @@ static int destroy_partition_handles(int *svr_count,
 
 static int create_partition_handles(PVFS_fs_id fsid,
                                     int input_handle_count, 
+                                    int32_t sid_count,
                                     struct handle_to_index *input_handle_array,
                                     int *svr_count,
-                                    PVFS_BMI_addr_t **svr_addr_array,
+                                    PVFS_SID  **svr_addr_array,
                                     int **per_server_handle_count,
                                     PVFS_handle ***per_server_handles)
 {
     int i, err = 0;
-    PVFS_BMI_addr_t tmp_svr_addr;
 
-    memset(&tmp_svr_addr, 0, sizeof(PVFS_BMI_addr_t));
     *svr_count = 0;
     *svr_addr_array = NULL;
     *per_server_handle_count = NULL;
     *per_server_handles =  NULL;
 
-    do {
-        for (i = 0; i < input_handle_count; i++) 
-        {
-            int ret = 0;
-/* V3 removing for compile - this func probably needs a complete
- * re-write
- */
-#if 0
-            ret = PINT_cached_config_map_to_server(&tmp_svr_addr,
-                                             input_handle_array[i].handle,
-                                             fsid);
-#endif
-            if (ret)
-            {
-                gossip_err("Failed to map server address\n");
-                err = ret;
-                break;
-            }
-            /* unique server address */
-            if (is_unique_server(tmp_svr_addr,
-                                 *svr_count,
-                                 *svr_addr_array,
-                                 NULL) == 1) 
-            {
-                (*svr_count)++;
-                *svr_addr_array = (PVFS_BMI_addr_t *) 
-                        realloc(*svr_addr_array,
-                                (*svr_count) * sizeof(PVFS_BMI_addr_t));
-                if (*svr_addr_array == NULL)
-                {
-                    gossip_err("Could not allocate server address\n");
-                    err = -PVFS_ENOMEM;
-                    break;
-                }
-                (*svr_addr_array)[(*svr_count) - 1] = tmp_svr_addr;
-            }
-        }
-        if (i != input_handle_count)
-        {
-            break;
-        }
-        *per_server_handle_count = (int *) calloc(*svr_count, sizeof(int));
-        if (*per_server_handle_count == NULL)
-        {
-            err = -PVFS_ENOMEM;
-            break;
-        }
-        *per_server_handles = (PVFS_handle **)calloc(*svr_count,
-                                                     sizeof(PVFS_handle *));
-        if (*per_server_handles == NULL)
-        {
-            err = -PVFS_ENOMEM;
-            break;
-        }
-        for (i = 0; i < input_handle_count; i++) 
-        {
-            int svr_index = 0;
-            int ret = 0;
-/* V3 removed for compile - needs totaly rewrite */
-#if 0
-            ret = PINT_cached_config_map_to_server(&tmp_svr_addr,
-                                             input_handle_array[i].handle,
-                                             fsid);
-#endif
-
-            if( ret != 0 )
-            {
-                gossip_debug(GOSSIP_CLIENT_DEBUG,
-                             "%s: failure mapping handle to server\n",
-                             __func__);
-                return ret;
-            }
-
-            /* unique server address to find index */
-            is_unique_server(tmp_svr_addr,
+    /* Build a list of unique servers that occur in the list of handles */
+    for (i = 0; i < input_handle_count; i++) 
+    {
+        /* unique server address */
+        if (is_unique_server(input_handle_array[i].sid_array[0],
                              *svr_count,
                              *svr_addr_array,
-                             &svr_index); 
-            (*per_server_handle_count)[svr_index]++;
-            (*per_server_handles)[svr_index] = (PVFS_handle *) 
-                               realloc((*per_server_handles)[svr_index], 
-                                       (*per_server_handle_count)[svr_index] *
-                                        sizeof(PVFS_handle));
-            if ((*per_server_handles)[svr_index] == NULL)
-            {
-                err = -PVFS_ENOMEM;
-                break;
-            }
-            (*per_server_handles)[svr_index]
-                                 [(*per_server_handle_count)[svr_index] - 1] =
-                                        input_handle_array[i].handle;
-        }
-        if (i != input_handle_count)
+                             NULL) == 1) 
         {
+            (*svr_count)++;
+            *svr_addr_array = (PVFS_SID *) 
+                    realloc(*svr_addr_array,
+                            (*svr_count) * sizeof(PVFS_SID));
+            if (*svr_addr_array == NULL)
+            {
+                gossip_err("Could not allocate server address\n");
+                return(-PVFS_ENOMEM);
+            }
+            (*svr_addr_array)[(*svr_count) - 1] = input_handle_array[i].sid_array[0];
+        }
+    }
+
+    *per_server_handle_count = (int *) calloc(*svr_count, sizeof(int));
+    if (*per_server_handle_count == NULL)
+    {
+        gossip_err("Could not allocate per-server handle count\n");
+        return(-PVFS_ENOMEM);
+    }
+    *per_server_handles = (PVFS_handle **)calloc(*svr_count,
+                                                 sizeof(PVFS_handle *));
+    if (*per_server_handles == NULL)
+    {
+        gossip_err("Could not allocate per-server handles\n");
+        return(-PVFS_ENOMEM);
+    }
+
+    /* Group handles by server. */
+    for (i = 0; i < input_handle_count; i++) 
+    {
+        int svr_index = 0;
+
+        /* unique server address to find index */
+        is_unique_server(input_handle_array[i].sid_array[0],
+                         *svr_count,
+                         *svr_addr_array,
+                         &svr_index); 
+        (*per_server_handle_count)[svr_index]++;
+        (*per_server_handles)[svr_index] = (PVFS_handle *) 
+                           realloc((*per_server_handles)[svr_index], 
+                                   (*per_server_handle_count)[svr_index] *
+                                    sizeof(PVFS_handle));
+        if ((*per_server_handles)[svr_index] == NULL)
+        {
+            err = -PVFS_ENOMEM;
             break;
         }
-    } while (0);
+        (*per_server_handles)[svr_index]
+                             [(*per_server_handle_count)[svr_index] - 1] =
+                                    input_handle_array[i].handle;
+    }
     return err;
 }
 
@@ -493,7 +484,7 @@ static int list_of_meta_servers(PINT_client_sm *sm_p)
     }
 
     sm_p->u.readdirplus.svr_count = 0;
-    sm_p->u.readdirplus.server_addresses = NULL;
+    sm_p->u.readdirplus.contact_sids = NULL;
     sm_p->u.readdirplus.handles = NULL;
     sm_p->u.readdirplus.handle_count = NULL;
     sm_p->u.readdirplus.nhandles = readdirplus_resp->pvfs_dirent_outcount;
@@ -541,18 +532,23 @@ static int list_of_meta_servers(PINT_client_sm *sm_p)
     {
         sm_p->u.readdirplus.input_handle_array[i].handle = 
                 readdirplus_resp->dirent_array[i].handle;
+        sm_p->u.readdirplus.input_handle_array[i].sid_array =
+                &sm_p->readdir_state.sid_array[i * sm_p->readdir_state.sid_count];
         sm_p->u.readdirplus.input_handle_array[i].handle_index = i;
         /* aux index is not used for meta handles */
         sm_p->u.readdirplus.input_handle_array[i].aux_index = -1;
     }
 
+
+
     ret = create_partition_handles(sm_p->object_ref.fs_id,
                             sm_p->u.readdirplus.nhandles,
+                            sm_p->readdir_state.sid_count,
                             sm_p->u.readdirplus.input_handle_array,
-                            /* number of servers */
+                            /* number of servers to contact */
                             &sm_p->u.readdirplus.svr_count,
-                            /* array of server addresses */
-                            &sm_p->u.readdirplus.server_addresses,
+                            /* array of sids to contact */
+                            &sm_p->u.readdirplus.contact_sids,
                             /* array of counts of handles to each server */
                             &sm_p->u.readdirplus.handle_count,
                             /* actual per-server handle array */
@@ -567,7 +563,7 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
     int i, ret, nhandles;
 
     sm_p->u.readdirplus.svr_count = 0;
-    sm_p->u.readdirplus.server_addresses = NULL;
+    sm_p->u.readdirplus.contact_sids = NULL;
     sm_p->u.readdirplus.handles = NULL;
     sm_p->u.readdirplus.handle_count = NULL;
 
@@ -580,12 +576,9 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
           i < sm_p->u.readdirplus.readdirplus_resp->pvfs_dirent_outcount;
           i++) 
      {
-        /* skip if the file is stuffed */
+        /* skip if this is not a metafile. */
          if (sm_p->u.readdirplus.obj_attr_array[i].objtype ==
-                     PVFS_TYPE_METAFILE &&
-             /* unstuffed going away */        
-             0 /*(sm_p->u.readdirplus.obj_attr_array[i].mask &
-                     PVFS_ATTR_META_UNSTUFFED)*/ )
+                     PVFS_TYPE_METAFILE)
          {
              if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_ALL)
              {
@@ -623,12 +616,9 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
           i < sm_p->u.readdirplus.readdirplus_resp->pvfs_dirent_outcount;
           i++) 
      {
-        /* skip if the file is stuffed */
+        /* skip if this is not a metafile */
          if (sm_p->u.readdirplus.obj_attr_array[i].objtype ==
-                     PVFS_TYPE_METAFILE &&
-             /* unstuffed going away */        
-             0 /*(sm_p->u.readdirplus.obj_attr_array[i].mask &
-                     PVFS_ATTR_META_UNSTUFFED)*/ )
+                     PVFS_TYPE_METAFILE)
          {
              int j;
              /* TODO are these REALLY asserts, or bad error checking */
@@ -652,6 +642,8 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
              {
                  sm_p->u.readdirplus.input_handle_array[nhandles].handle = 
                     sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_array[j];
+                 sm_p->u.readdirplus.input_handle_array[nhandles].sid_array =
+                    &sm_p->u.readdirplus.obj_attr_array[i].u.meta.sid_array[j * sm_p->u.readdirplus.obj_attr_array[i].u.meta.sid_count];
                  sm_p->u.readdirplus.input_handle_array[nhandles].handle_index = i;
                  sm_p->u.readdirplus.input_handle_array[nhandles].aux_index = j;
                  nhandles++;
@@ -661,11 +653,12 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
 
      ret = create_partition_handles(sm_p->object_ref.fs_id,
                             sm_p->u.readdirplus.nhandles,
+                            sm_p->readdir_state.sid_count,
                             sm_p->u.readdirplus.input_handle_array,
-                            /* number of servers */
+                            /* number of servers to contact */
                             &sm_p->u.readdirplus.svr_count,
-                            /* array of server addresses */
-                            &sm_p->u.readdirplus.server_addresses,
+                            /* array of sids to contact */
+                            &sm_p->u.readdirplus.contact_sids,
                             /* array of counts of handles to each server */
                             &sm_p->u.readdirplus.handle_count,
                             /* actual per-server handle array */
@@ -756,7 +749,7 @@ static int readdirplus_fetch_attrs_comp_fn(void *v_p,
         }
         /* destroy scratch space.. we need to reuse them in phase 2 */
         destroy_partition_handles(&sm_p->u.readdirplus.svr_count, 
-                                  &sm_p->u.readdirplus.server_addresses,
+                                  &sm_p->u.readdirplus.contact_sids,
                                   &sm_p->u.readdirplus.handle_count,
                                   &sm_p->u.readdirplus.handles);
 
@@ -904,12 +897,35 @@ static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(
         msg_p->msgdir = PVFS_IO_READ;
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = PVFS_HANDLE_NULL;
-        msg_p->sid_count = 0;
-        msg_p->sid_index = 1;
-        msg_p->sid_array = NULL;
+
+        /* Can't depend on sids being interchangeable for reading because
+         * we have grouped handles by SID. Different handles may not
+         * share all the same SIDs. Really need to experiment with
+         * different methods of grouping and handling failover. */
+        msg_p->sid_count = 1;
+        msg_p->sid_index = 0;
+        msg_p->sid_array = &sm_p->u.readdirplus.contact_sids[i];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = readdirplus_fetch_attrs_comp_fn;
-        msg_p->svr_addr = sm_p->u.readdirplus.server_addresses[i];
+
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr,
+                                &sm_p->u.readdirplus.contact_sids[i]);
+        if (ret < 0)
+        {
+            /* This will cause encode to fail if not resolved
+             * In current (devel) version we assume all servers are known
+             * rendering this a true error - but eventually we will need to
+             * have resolution code
+             */
+            gossip_err("PVFS_sys_readdirplus: failed to look up SID\n");
+            /* V3 how to handle failure here ?
+             * If we have to do a SID lookup we need to have SM block on
+             * that action, or call a nested SM or something
+             *
+             * Should return a SM error code, call a lookup SM, then resume
+             */
+        }
+
     }
     /* immediate return. next state jumps to msgpairarray machine */
     js_p->error_code = 0;
@@ -979,13 +995,34 @@ static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
         msg_p->msgdir = PVFS_IO_READ;
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = PVFS_HANDLE_NULL;
-        msg_p->sid_count = 0;
-        msg_p->sid_index = 1;
-        msg_p->sid_array = NULL;
+
+        /* Can't depend on sids being interchangeable for reading because
+         * we have grouped handles by SID. Different handles may not
+         * share all the same SIDs. Really need to experiment with
+         * different methods of grouping and handling failover. */
+        msg_p->sid_count = 1;
+        msg_p->sid_index = 0;
+        msg_p->sid_array = &sm_p->u.readdirplus.contact_sids[i];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = readdirplus_fetch_sizes_comp_fn;
-        msg_p->svr_addr = sm_p->u.readdirplus.server_addresses[i];
 
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr,
+                                &sm_p->u.readdirplus.contact_sids[i]);
+        if (ret < 0)
+        {
+            /* This will cause encode to fail if not resolved
+             * In current (devel) version we assume all servers are known
+             * rendering this a true error - but eventually we will need to
+             * have resolution code
+             */
+            gossip_err("PVFS_sys_readdirplus: failed to look up SID\n");
+            /* V3 how to handle failure here ?
+             * If we have to do a SID lookup we need to have SM block on
+             * that action, or call a nested SM or something
+             *
+             * Should return a SM error code, call a lookup SM, then resume
+             */
+        }
     }
     /* immediate return. next state jumps to msgpairarray machine */
     js_p->error_code = 0;
@@ -1098,7 +1135,7 @@ static PINT_sm_action readdirplus_cleanup(struct PINT_smcb *smcb,
     }
 
     destroy_partition_handles(&sm_p->u.readdirplus.svr_count, 
-                              &sm_p->u.readdirplus.server_addresses,
+                              &sm_p->u.readdirplus.contact_sids,
                               &sm_p->u.readdirplus.handle_count,
                               &sm_p->u.readdirplus.handles);
 

@@ -236,8 +236,6 @@ static PINT_sm_action readdir_setup_resp(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    s_op->resp.u.readdir.sid_count = s_op->metasidcnt;
-
     id_ptr = (PVFS_ID *) s_op->u.readdir.keyval_db_entries;
     for (i = 0; i < s_op->req->u.readdir.dirent_count; i++)
     {
@@ -265,6 +263,10 @@ static PINT_sm_action readdir_setup_resp(struct PINT_smcb *smcb,
                     s_op->u.readdir.directory_version;
 
     s_op->resp.u.readdir.dirent_count = js_p->count;
+
+    /* Fill in sid_count with the total number of sids being sent.
+     * This is to simplify encoding and decoding. */
+    s_op->resp.u.readdir.sid_count = s_op->metasidcnt * js_p->count;
 
     /*
      * Although, this is not as important to get ls

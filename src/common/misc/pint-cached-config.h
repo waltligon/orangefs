@@ -48,6 +48,8 @@ int PINT_cached_config_get_server(
 int PINT_cached_config_server_local(
                 const PVFS_SID *sid);
 
+void PINT_cached_config_get_local_SID(PVFS_SID *sid);
+
 /* This appears to be obsolete */
 #if 0
 int PINT_cached_config_get_next_meta(

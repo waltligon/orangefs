@@ -136,6 +136,7 @@ static PINT_sm_action listattr_setup_getattr(
     struct PVFS_server_req *req = NULL;
     int i;
     PVFS_credential dummy_credential={0}; /* used for call to getattr */
+    PVFS_SID local_sid;
 
     s_op->u.listattr.parallel_sms = 0;
     js_p->error_code = 0;
@@ -158,8 +159,9 @@ static PINT_sm_action listattr_setup_getattr(
             continue;
         }
 
+        PINT_cached_config_get_local_SID(&local_sid);
         PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, getattr_op,
-            s_op->req->u.listattr.sid_array[i*s_op->req->u.listattr.sid_count],
+            local_sid,
             s_op->req->u.listattr.fs_id,
             js_p->error_code, req, LOCAL_OPERATION);
 

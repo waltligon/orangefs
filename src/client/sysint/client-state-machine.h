@@ -404,25 +404,31 @@ struct PINT_client_readdir_sm
     int num_dirdata_needed; /* tmp parameter */
 };
 
+#if 0
 struct handle_to_index {
     PVFS_handle handle;
+    PVFS_boolean handle_processed;
+    PVFS_SID *sid_array;
     int handle_index;/* index into the dirent array itself */
     int aux_index; /* used to store the ordinality of the dfile handles */
 };
+#endif
 
 struct PINT_client_readdirplus_sm
 {
     PVFS_ds_position pos_token;         /* input parameter */
     int dirent_limit;                   /* input parameter */
-    uint32_t attrmask;                    /* input parameter */
+    int32_t meta_sid_count;             /* input parameter */
+    uint32_t attrmask;                  /* input parameter */
     PVFS_sysresp_readdirplus *readdirplus_resp; /* in/out parameter*/
+
     /* scratch variables */
     int nhandles;  
     int svr_count;
     PVFS_size        **size_array;
     PVFS_object_attr *obj_attr_array;
     struct handle_to_index *input_handle_array;
-    PVFS_BMI_addr_t *server_addresses;
+    PVFS_SID *contact_sids;
     int  *handle_count;
     PVFS_handle     **handles;
 };

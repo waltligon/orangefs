@@ -229,6 +229,7 @@ static void lebf_initialize(void)
             case PVFS_SERV_READDIR:
                 resp.u.readdir.directory_version = 0;
                 resp.u.readdir.dirent_count = 0;
+                resp.u.readdir.sid_count = 0;
                 respsize = extra_size_PVFS_servresp_readdir;
                 break;
             case PVFS_SERV_FLUSH:
@@ -1324,10 +1325,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     break;
                 }
                 
-                case PVFS_SERV_READDIR:
-                    decode_free(resp->u.readdir.dirent_array);
-                    break;
-
                 case PVFS_SERV_MGMT_PERF_MON:
                     decode_free(resp->u.mgmt_perf_mon.perf_array);
                     break;
@@ -1545,6 +1542,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                            resp->u.mgmt_get_user_cert_keyreq.public_key.buf);
                     break;
 
+                case PVFS_SERV_READDIR:
                 case PVFS_SERV_GETCONFIG:
                 case PVFS_SERV_REMOVE:
                 case PVFS_SERV_MGMT_REMOVE_OBJECT:

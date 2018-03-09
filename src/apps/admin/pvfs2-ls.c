@@ -523,15 +523,15 @@ int do_list(
     char *name = NULL, *cur_file = NULL;
     PVFS_handle cur_handle;
     PVFS_sysresp_lookup lk_response;
-/*    PVFS_sysresp_readdirplus rdplus_response; */
-    PVFS_sysresp_readdir rdplus_response;
+    PVFS_sysresp_readdirplus rdplus_response;
+/*    PVFS_sysresp_readdir rdplus_response; */
     PVFS_sysresp_getattr getattr_response;
     PVFS_credential credentials;
     PVFS_object_ref ref;
     PVFS_ds_position token;
     uint64_t dir_version = 0;
     double begin = 0., end;
-    subdir *current, *head = NULL /*, *tail = NULL */;
+    subdir *current, *head = NULL, *tail = NULL;
 
     name = start;
 
@@ -615,12 +615,12 @@ int do_list(
     do
     {
         memset(&rdplus_response, 0, sizeof(PVFS_sysresp_readdirplus));
-/*        ret = PVFS_sys_readdirplus( */
-        ret = PVFS_sys_readdir(
+        ret = PVFS_sys_readdirplus(
+/*        ret = PVFS_sys_readdir( */
                 ref, token,
                 MAX_NUM_DIRENTS, &credentials,
-/*                (opts->list_long) ?
-                PVFS_ATTR_SYS_ALL : PVFS_ATTR_SYS_ALL_NOSIZE, */
+                (opts->list_long) ?
+                PVFS_ATTR_SYS_ALL : PVFS_ATTR_SYS_ALL_NOSIZE,
                 &rdplus_response,
                 NULL);
         if(ret < 0)
@@ -655,18 +655,19 @@ int do_list(
 
         for(i = 0; i < rdplus_response.pvfs_dirent_outcount; i++)
         {
-//            PVFS_sys_attr *attr;
+            PVFS_sys_attr *attr;
 
             cur_file = rdplus_response.dirent_array[i].d_name;
             cur_handle = rdplus_response.dirent_array[i].handle;
 
             print_entry(cur_file, cur_handle, fs_id,
-/*                    &rdplus_response.attr_array[i],
-                    rdplus_response.stat_err_array[i], */
+                    &rdplus_response.attr_array[i],
+                    rdplus_response.stat_err_array[i],
+/*
                     NULL, 0,
+*/
                     opts, entry_buffer);
 
-#if 0
             attr = &rdplus_response.attr_array[i];
             if(attr->objtype == PVFS_TYPE_DIRECTORY && opts->list_recursive)
             {
@@ -698,7 +699,6 @@ int do_list(
                     tail = current;
                 }
             }
-#endif
         }
         token = rdplus_response.token;
 
@@ -706,7 +706,6 @@ int do_list(
         {
             free(rdplus_response.dirent_array);
             rdplus_response.dirent_array = NULL;
-#if 0
             free(rdplus_response.stat_err_array);
             rdplus_response.stat_err_array = NULL;
             for (i = 0; i < rdplus_response.pvfs_dirent_outcount; i++) {
@@ -717,7 +716,6 @@ int do_list(
             }
             free(rdplus_response.attr_array);
             rdplus_response.attr_array = NULL;
-#endif
         }
 
     } while (token != PVFS_ITERATE_END);
@@ -731,7 +729,6 @@ int do_list(
     {
         free(rdplus_response.dirent_array);
         rdplus_response.dirent_array = NULL;
-#if 0
         free(rdplus_response.stat_err_array);
         rdplus_response.stat_err_array = NULL;
         for (i = 0; i < rdplus_response.pvfs_dirent_outcount; i++) {
@@ -742,7 +739,6 @@ int do_list(
         }
         free(rdplus_response.attr_array);
         rdplus_response.attr_array = NULL;
-#endif
     }
 
     if (opts->list_recursive)

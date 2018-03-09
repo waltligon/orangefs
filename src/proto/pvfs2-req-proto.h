@@ -1766,6 +1766,7 @@ struct PVFS_servresp_readdir
     int32_t sid_count;
     uint64_t directory_version;
 };
+#if 0
 endecode_fields_3a1a_struct(
     PVFS_servresp_readdir,
     PVFS_ds_position, token,
@@ -1776,11 +1777,63 @@ endecode_fields_3a1a_struct(
     skip4,,
     int32_t, sid_count,
     PVFS_SID, sid_array);
+#endif
 #define extra_size_PVFS_servresp_readdir \
            ((PVFS_REQ_LIMIT_DIRENT_COUNT *  sizeof(PVFS_dirent)) + \
            (PVFS_REQ_LIMIT_DIRENT_COUNT * PVFS_REQ_LIMIT_SIDS_RATIO * \
                                           sizeof(PVFS_SID)))
 
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+static inline void encode_PVFS_servresp_readdir(char **pptr,
+                                                struct PVFS_servresp_readdir *x)
+{
+    int i;
+    encode_PVFS_ds_position((pptr), &(x)->token);
+    encode_uint64_t((pptr), &(x)->directory_version);
+    encode_skip4((pptr),);
+    encode_uint32_t((pptr), &(x)->dirent_count);
+    encode_int32_t((pptr), &(x)->sid_count);
+    for (i = 0; i < (x)->dirent_count; i++)
+    {
+        encode_PVFS_dirent((pptr), &(x)->dirent_array[i]);
+    }
+    for (i = 0; i < (x)->dirent_count * (x)->sid_count; i++)
+    {
+        encode_PVFS_SID((pptr), &(x)->sid_array[i]);
+    }
+}
+
+static inline void decode_PVFS_servresp_readdir(char **pptr,
+                                                struct PVFS_servresp_readdir *x)
+{
+    int i;
+    decode_PVFS_ds_position((pptr), &(x)->token);
+    decode_uint64_t((pptr), &(x)->directory_version);
+    decode_skip4((pptr),);
+    decode_uint32_t((pptr), &(x)->dirent_count);
+    decode_int32_t((pptr), &(x)->sid_count);
+
+    (x)->dirent_array = decode_malloc(
+                  (x)->dirent_count * sizeof(PVFS_dirent) +
+                  OSASZ((x)->dirent_count,(x)->sid_count));
+
+    (x)->sid_array = (PVFS_SID *)((x)->dirent_array + (x)->dirent_count);
+
+    for (i = 0; i < (x)->dirent_count; i++)
+    {
+        decode_PVFS_dirent((pptr), &(x)->dirent_array[i]);
+    }
+    for (i = 0; i < ((x)->dirent_count * (x)->sid_count); i++)
+    {
+        decode_PVFS_SID((pptr), &(x)->sid_array[i]);
+    }
+}
+
+static inline void defree_PVFS_servresp_readdir(struct PVFS_servresp_readdir *x)
+{
+    decode_free((x)->dirent_array);
+}
+#endif
 /* getconfig ***************************************************/
 /* - retrieves initial configuration information from server */
 
