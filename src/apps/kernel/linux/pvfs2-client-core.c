@@ -282,6 +282,7 @@ static int set_ncache_parameters(options_t* s_opts);
 static int set_capcache_parameters(options_t* s_opts);
 static void finalize_perf_items(int n, ... );
 inline static void fill_hints(vfs_request_t *req);
+inline static void ofs3_to_ofs2_attr(PVFS_sys_attr *, struct PVFS_sys_kattr *);
 
 #ifdef USE_RA_CACHE
 static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request,
@@ -846,9 +847,23 @@ static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
 
     refn.fs_id = vfs_request->in_upcall.req.getattr.refn.fs_id;
 
+    /*
+     * Several Orangefs3 attributes are outside of the protocol
+     * specification from the perspective of the upstream kernel
+     * module. Those that need to travel back and forth to the kernel
+     * module as trailer baggage to keep from getting lost. The attributes
+     * in the trailer for a getattr are sid_count and sid_array.
+     */
+
     refn.sid_count = *(int32_t *)vfs_request->in_upcall.trailer_buf;
-    /* this mallocs four bytes more than we need... */
-    refn.sid_array = malloc(vfs_request->in_upcall.trailer_size);
+
+    refn.sid_array = malloc(refn.sid_count * sizeof(*refn.sid_array));
+    if (refn.sid_array == NULL)
+    {
+        gossip_err("%s: malloc failed.\n", __func__);
+        ret = -PVFS_ENOMEM;
+        goto out;
+    }
     memcpy(refn.sid_array,
            vfs_request->in_upcall.trailer_buf + sizeof(int32_t),
            refn.sid_count * sizeof(uuid_t));
@@ -862,6 +877,7 @@ static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
             vfs_request->hints,
             (void *)vfs_request);
 
+out:
     if (credential)
     {
         PINT_cleanup_credential(credential);
@@ -3826,8 +3842,12 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
             {
                 PVFS_sys_attr *attr = &vfs_request->response.getattr.attr;
 
+/*
                 vfs_request->out_downcall.resp.getattr.attributes =
                         vfs_request->response.getattr.attr;
+*/
+                ofs3_to_ofs2_attr(&vfs_request->response.getattr.attr,
+                        &vfs_request->out_downcall.resp.getattr.attributes);
 
                 gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                         "object type = %d\n", attr->objtype);
@@ -4004,11 +4024,31 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                        &root_handle.handle,
                        sizeof(root_handle.handle));
 
-                /* copy sid_count and sid_array in to the trailer_buf. */
+		/*
+		 * These important attributes are outside of the protocol
+		 * specification from the perspective of the upstream
+		 * kernel module:
+		 *
+		 * PVFS_object_ref ref.sid_count
+		 * PVFS_object_ref ref.sid_array
+		 * PVFS_sys_attr attr.ntime
+		 * PVFS_sys_attr attr.stuffed
+		 *
+		 * Any that need to can ride quietly back and forth in
+		 * the trailer to keep from getting lost.
+		 */
+
+                /*
+		 * Pretty much always send the sid_count and sid_array
+		 * in the trailer_buf.
+		 *
+                 * Calculate the size of the trailer baggage and
+                 * allocate space for it and store the values.
+                 */
                 vfs_request->out_downcall.trailer_size = 
+                        sizeof(root_handle.sid_count) +
                         root_handle.sid_count *
-			  sizeof(*root_handle.sid_array) +
-			  sizeof(root_handle.sid_count);
+			  sizeof(*root_handle.sid_array);
                 vfs_request->out_downcall.trailer_buf = 
                         malloc(vfs_request->out_downcall.trailer_size);
                 if (vfs_request->out_downcall.trailer_buf == NULL) {
@@ -4017,9 +4057,11 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
                     *error_code = -PVFS_ENOMEM;
                     break;
                 }
+
                 memcpy(vfs_request->out_downcall.trailer_buf,
                        &root_handle.sid_count,
                        sizeof(root_handle.sid_count));
+
                 memcpy(vfs_request->out_downcall.trailer_buf +
                            sizeof(root_handle.sid_count),
                        root_handle.sid_array,
@@ -6533,6 +6575,34 @@ static int get_mac(void)
     mac |= (iface.ifr_hwaddr.sa_data[2] & 0xff) << 8;
     mac |= (iface.ifr_hwaddr.sa_data[3] & 0xff) << 8;
     return mac;
+}
+
+/*
+ * orangefs2 PVFS_sys_kattr lacks orangfs3 PVFS_sys_attr's ntime and
+ * stuffed fields.
+ */
+inline static void ofs3_to_ofs2_attr(PVFS_sys_attr *ofs3_attr,
+                         struct PVFS_sys_kattr *ofs2_attr)
+{
+    ofs2_attr->owner = ofs3_attr->owner;
+    ofs2_attr->group = ofs3_attr->group;
+    ofs2_attr->perms = ofs3_attr->perms;
+    ofs2_attr->atime = ofs3_attr->atime;
+    ofs2_attr->mtime = ofs3_attr->mtime;
+    ofs2_attr->ctime = ofs3_attr->ctime;
+    ofs2_attr->size = ofs3_attr->size;
+    ofs2_attr->link_target = ofs3_attr->link_target;
+    ofs2_attr->dfile_count = ofs3_attr->dfile_count;
+    ofs2_attr->distr_dir_servers_initial = ofs3_attr->distr_dir_servers_initial;
+    ofs2_attr->distr_dir_split_size = ofs3_attr->distr_dir_split_size;
+    ofs2_attr->mirror_copies_count = ofs3_attr->mirror_copies_count;
+    ofs2_attr->dist_name = ofs3_attr->dist_name;
+    ofs2_attr->dist_params = ofs3_attr->dist_params;
+    ofs2_attr->dirent_count = ofs3_attr->dirent_count;
+    ofs2_attr->objtype = ofs3_attr->objtype;
+    ofs2_attr->flags = ofs3_attr->flags;
+    ofs2_attr->mask = ofs3_attr->mask;
+    ofs2_attr->blksize = ofs3_attr->blksize;
 }
 
 /* calls the pvfs2-gencred app to generate a credential */

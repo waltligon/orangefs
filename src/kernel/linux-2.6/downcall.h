@@ -47,7 +47,7 @@ typedef struct
 
 typedef struct
 {
-    PVFS_sys_attr attributes;
+    struct PVFS_sys_kattr attributes;
     char link_target[PVFS2_NAME_LEN];
 } pvfs2_getattr_response_t;
 

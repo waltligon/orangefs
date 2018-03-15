@@ -45,6 +45,7 @@ struct PVFS_sys_attr_s
     PVFS_time atime;
     PVFS_time mtime;
     PVFS_time ctime;
+    PVFS_time ntime;
     PVFS_size size;
     PVFS2_ALIGN_VAR(char *, link_target);/**< NOTE: caller must free if valid */
     PVFS2_ALIGN_VAR(int32_t, dfile_count);
@@ -60,9 +61,65 @@ struct PVFS_sys_attr_s
     uint32_t mask;
     PVFS_size blksize;
     uint32_t stuffed;
-    PVFS_time ntime;
 };
 typedef struct PVFS_sys_attr_s PVFS_sys_attr;
+
+/*
+ * Orangefs3 PVFS_sys_attr differs from Orangefs2 PVFS_sys_attr.
+ * The Orangefs2 version is written into the protocol for the
+ * upstream kernel module.
+ *
+ * Orangefs3 client-core is the point of translation between these
+ * two versions of PVFS_sys_attr.
+ *
+ * struct PVFS_sys_kattr is a renamed Orangefs2 PVFS_sys_attr, and
+ * we'll use it in the translations.
+ *
+ * So... instead of direct structure assignment:
+ *
+ *        vfs_request->out_downcall.resp.getattr.attributes =
+ *                      vfs_request->response.getattr.attr;
+ *
+ * ... we'll change the attributes element of pvfs2_getattr_response_t
+ * to PVFS_sys_kattr and then:
+ *
+ *        vfs_request->out_downcall.resp.getattr.attributes.owner =
+ *                      vfs_request->response.getattr.attr.owner;
+ *
+ * ... for all the relevant fields.
+ *
+ * Today the difference between Orangefs3 PVFS_sys_attr and Orangefs2
+ * PVFS_sys_attr is:
+ *
+ * ntime
+ * stuffed
+ *
+ * They will be worked into the trailer to keep from getting lost.
+ */
+
+struct PVFS_sys_kattr
+{
+    PVFS_uid owner;
+    PVFS_gid group;
+    PVFS2_ALIGN_VAR(PVFS_permissions, perms);
+    PVFS_time atime;
+    PVFS_time mtime;
+    PVFS_time ctime;
+    PVFS_size size;
+    PVFS2_ALIGN_VAR(char *, link_target);/**< NOTE: caller must free if valid */
+    PVFS2_ALIGN_VAR(int32_t, dfile_count);
+    PVFS2_ALIGN_VAR(int32_t, distr_dir_servers_initial);
+    PVFS2_ALIGN_VAR(int32_t, distr_dir_servers_max);
+    PVFS2_ALIGN_VAR(int32_t, distr_dir_split_size);
+    PVFS2_ALIGN_VAR(uint32_t, mirror_copies_count);
+    PVFS2_ALIGN_VAR(char *, dist_name);  /**< NOTE: caller must free if valid */
+    PVFS2_ALIGN_VAR(char *, dist_params);/**< NOTE: caller must free if valid */
+    PVFS_size dirent_count;
+    PVFS_ds_type objtype;
+    PVFS_flags flags;
+    uint32_t mask;
+    PVFS_size blksize;
+};
 
 /* this helper function assumes attr is a pointer to a PVFS_sys_attr
  * struct.  It first frees any of the internal pointers (link target
