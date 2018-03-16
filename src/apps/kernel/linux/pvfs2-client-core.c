@@ -673,6 +673,29 @@ static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
            sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.lookup.parent_refn.fs_id;
 
+    /* sids */
+    if (vfs_request->in_upcall.trailer_size == 0) {
+        gossip_err("%s: no trailer, no sids, tag:%llu:\n",
+          __func__,
+          lld(vfs_request->info.tag));
+        ret = -PVFS_EINVAL;
+        goto out;
+    }
+
+    refn.sid_count = *(int32_t *)vfs_request->in_upcall.trailer_buf;
+
+    refn.sid_array = malloc(refn.sid_count * sizeof(*refn.sid_array));
+    if (refn.sid_array == NULL)
+    {
+        gossip_err("%s: malloc failed.\n", __func__);
+        ret = -PVFS_ENOMEM;
+        goto out;
+    }
+    memcpy(refn.sid_array,
+           vfs_request->in_upcall.trailer_buf + sizeof(int32_t),
+           refn.sid_count * sizeof(uuid_t));
+    /* end sids */
+
     ret = PVFS_isys_ref_lookup(
             vfs_request->in_upcall.req.lookup.parent_refn.fs_id,
             vfs_request->in_upcall.req.lookup.d_name,
@@ -684,6 +707,7 @@ static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
             vfs_request->hints,
             (void *)vfs_request);
 
+out:
     if (credential)
     {
         PINT_cleanup_credential(credential);
@@ -733,6 +757,38 @@ static PVFS_error post_create_request(vfs_request_t *vfs_request)
            sizeof(refn.handle));
     refn.fs_id = vfs_request->in_upcall.req.create.parent_refn.fs_id;
 
+    /* sids */
+    if (vfs_request->in_upcall.trailer_size == 0) {
+        gossip_err("%s: no trailer, no sids, tag:%llu:\n",
+          __func__,
+          lld(vfs_request->info.tag));
+        ret = -PVFS_EINVAL;
+        goto out;
+    }
+
+    refn.sid_count = *(int32_t *)vfs_request->in_upcall.trailer_buf;
+
+    refn.sid_array = malloc(refn.sid_count * sizeof(*refn.sid_array));
+    if (refn.sid_array == NULL)
+    {
+        gossip_err("%s: malloc failed.\n", __func__);
+        ret = -PVFS_ENOMEM;
+        goto out;
+    }
+    memcpy(refn.sid_array,
+           vfs_request->in_upcall.trailer_buf + sizeof(int32_t),
+           refn.sid_count * sizeof(uuid_t));
+    /* sids end */
+
+    /*
+     * The upstream kernel module (that is, Orangefs2) has a different
+     * idea about the value of PVFS_ATTR_SYS_ALL_SETABLE. The sys-create
+     * state machine will choke if we don't set the mask to
+     * Orangefs3's value.
+     */
+    vfs_request->in_upcall.req.create.attributes.mask =
+      PVFS_ATTR_SYS_ALL_SETABLE;
+
     ret = PVFS_isys_create(
             vfs_request->in_upcall.req.create.d_name,
             refn,
@@ -745,6 +801,7 @@ static PVFS_error post_create_request(vfs_request_t *vfs_request)
             vfs_request->hints,
             (void *)vfs_request);
 
+out:
     if (credential)
     {
         PINT_cleanup_credential(credential);
@@ -817,7 +874,7 @@ static PVFS_error post_symlink_request(vfs_request_t *vfs_request)
 
 static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
 {
-    PVFS_error ret = -PVFS_EINVAL;
+    PVFS_error ret;
     PVFS_credential *credential;
     char *s;
     PVFS_object_ref refn;
@@ -854,6 +911,14 @@ static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
      * module as trailer baggage to keep from getting lost. The attributes
      * in the trailer for a getattr are sid_count and sid_array.
      */
+
+    if (vfs_request->in_upcall.trailer_size == 0) {
+        gossip_err("%s: no trailer, no sids, tag:%llu:\n",
+          __func__,
+          lld(vfs_request->info.tag));
+        ret = -PVFS_EINVAL;
+        goto out;
+    }
 
     refn.sid_count = *(int32_t *)vfs_request->in_upcall.trailer_buf;
 
@@ -4418,8 +4483,6 @@ static inline void package_downcall_members(vfs_request_t *vfs_request,
     vfs_request->out_downcall.status = *error_code;
     vfs_request->out_downcall.type = vfs_request->in_upcall.type;
 
-gossip_err("%s: *** tag:%lu:***** downcall.resp.getattr.attributes.objtype:%d:\n", __func__, vfs_request->info.tag, vfs_request->out_downcall.resp.getattr.attributes.objtype);
-
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s exit: op %s error code: %d\n",
                  __func__, get_vfs_op_name_str(vfs_request->out_downcall.type),
                  vfs_request->out_downcall.status);
@@ -4798,7 +4861,6 @@ static PVFS_error write_downcall(vfs_request_t *vfs_request)
         total_size += vfs_request->out_downcall.trailer_size;
     }
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Writing Downcall\n");
-gossip_err("%s: *** tag:%lu:***** downcall.resp.getattr.attributes.objtype:%d:\n", __func__, vfs_request->info.tag, vfs_request->out_downcall.resp.getattr.attributes.objtype);
     ret = write_device_response(buffer_list,
                                 size_list,
                                 list_size,
