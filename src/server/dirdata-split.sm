@@ -447,7 +447,7 @@ static PINT_sm_action crdirent_backout_dirdata_attrs(struct PINT_smcb *smcb,
 static PINT_sm_action crdirent_send_server_attrs(struct PINT_smcb *smcb,
                                                  job_status_s *js_p,
                                                  PVFS_handle handle,
-                                                 uint32_t sid_count,
+                                                 int32_t sid_count,
                                                  PVFS_SID *sid_array,
                                                  PVFS_ds_type type,
                                                  PVFS_object_attr *attr_p)

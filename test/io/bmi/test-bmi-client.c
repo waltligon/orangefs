@@ -92,7 +92,7 @@ int main(
     method[4+len] = '\0';
 
     /* initialize local interface */
-    ret = BMI_initialize(NULL, NULL, 0);
+    ret = BMI_initialize(NULL, NULL, 0, NULL);
     if (ret < 0)
     {
 	errno = -ret;
@@ -109,7 +109,7 @@ int main(
     }
 
     /* get a bmi_addr for the server */
-    ret = BMI_addr_lookup(&server_addr, user_opts->hostid);
+    ret = BMI_addr_lookup(&server_addr, user_opts->hostid, NULL);
     if (ret < 0)
     {
 	errno = -ret;

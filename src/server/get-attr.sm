@@ -144,8 +144,6 @@ nested machine pvfs2_get_attr_work_sm
         default => read_metafile_distribution;
     }
 
-    /* V3 End of old states */
-
     state read_metafile_distribution
     {
         run getattr_read_metafile_distribution;
@@ -1176,10 +1174,9 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     
     respattr->capability.fsid = s_op->u.getattr.fs_id;
 
-    config = get_server_config_struct();
+    config = PINT_server_config_mgr_get_config();
     respattr->capability.issuer = 
-                    (char *) malloc(strlen(config->server_alias) + 3);
-
+        (char *) malloc(strlen(config->server_alias) + 3);
     if (respattr->capability.issuer == NULL)
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -1262,14 +1259,14 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
     }
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "-  retrieved attrs: [owner = %d, group = %d\n\t"
-                 "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
-                 "ctime = %llu, dist_size = %d, dirent_count = %d]\n",
+                 "Handle %s \n\t"
+                 "retrieved attrs: [type = %d, owner = %d, group = %d, perms = %o, \n\t"
+                 "atime = %llu, mtime = %llu, ctime = %llu,  \n\t"
+                 "dist_size = %d, dirent_count = %d]\n",
+                 PVFS_OID_str(&s_op->u.getattr.handle), respattr->objtype,
                  respattr->owner, respattr->group, respattr->perms,
-                 respattr->objtype, llu(respattr->atime),
-                 llu(respattr->mtime), llu(respattr->ctime),
-                 (int)respattr->u.meta.dist_size,
-                 (int)respattr->u.dir.dirent_count);
+                 llu(respattr->atime), llu(respattr->mtime), llu(respattr->ctime),
+                 (int)respattr->u.meta.dist_size, (int)respattr->u.dir.dirent_count);
 
     switch (respattr->objtype)
     {

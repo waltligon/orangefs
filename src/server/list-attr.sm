@@ -135,11 +135,18 @@ static PINT_sm_action listattr_setup_getattr(
     struct PINT_server_op *getattr_op = NULL;
     struct PVFS_server_req *req = NULL;
     int i;
+    PVFS_credential dummy_credential={0}; /* used for call to getattr */
 
     s_op->u.listattr.parallel_sms = 0;
     js_p->error_code = 0;
 
-    for(i=0; i<s_op->req->u.listattr.nhandles; i++)
+    /* Make sure that the attrmask that came from userland does
+     * not specify PVFS_ATTR_CAPABILITY, because we don't have
+     * a valid credential to pass along for creating a capability.
+     */
+    s_op->req->u.listattr.attrmask &= ~PVFS_ATTR_CAPABILITY;
+
+    for(i = 0; i < s_op->req->u.listattr.nhandles; i++)
     {
         if(s_op->u.listattr.errors[i])
         {
@@ -151,13 +158,25 @@ static PINT_sm_action listattr_setup_getattr(
             continue;
         }
 
-        PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, getattr_op,
+        PINT_CREATE_SUBORDINATE_SERVER_FRAME(
+            smcb,
+            getattr_op,
             s_op->req->u.listattr.sid_array[i*s_op->req->u.listattr.sid_count],
             s_op->req->u.listattr.fs_id,
-            js_p->error_code, req, LOCAL_OPERATION);
+            js_p->error_code,
+            req,
+            LOCAL_OPERATION);
 
-        PINT_SERVREQ_GETATTR_FILL(*req, s_op->req->capability,
-            s_op->req->u.getattr.credential,
+        getattr_op->op = PVFS_SERV_GETATTR;
+
+        getattr_op->prelude_mask |= PRELUDE_PERM_CHECK_DONE;
+
+        getattr_op->prelude_mask |= PRELUDE_NO_SCHEDULE;
+
+        PINT_SERVREQ_GETATTR_FILL(
+            *req,
+            s_op->req->capability,
+            dummy_credential,
             s_op->req->u.listattr.fs_id,
             s_op->req->u.listattr.handles[i],
             s_op->req->u.listattr.attrmask,
@@ -167,8 +186,8 @@ static PINT_sm_action listattr_setup_getattr(
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-        "listattr: set up %d parallel nested getattr machines.\n", 
-        s_op->u.listattr.parallel_sms);
+                 "listattr: set up %d parallel nested getattr machines.\n", 
+                 s_op->u.listattr.parallel_sms);
 
     if(s_op->u.listattr.parallel_sms > 0)
     {
@@ -202,25 +221,31 @@ static PINT_sm_action listattr_interpret_getattrs(struct PINT_smcb *smcb,
     assert(s_op->op == PVFS_SERV_LISTATTR);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-        "listattr: trying to interpret results from %d nested parallel getattr machines.\n", 
-        s_op->u.listattr.parallel_sms);
+                 "listattr: trying to interpret results from %d"
+                 "nested parallel getattr machines.\n", 
+                 s_op->u.listattr.parallel_sms);
 
     /* gather results */
-    for(i=0; i<s_op->u.listattr.parallel_sms; i++)
+    for(i = 0; i < s_op->u.listattr.parallel_sms; i++)
     {
-        getattr_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
-            &remaining);
-        gossip_debug(GOSSIP_SERVER_DEBUG, "getattr_op is %s.\n",(getattr_op ? "okay" : "NULL"));
-        gossip_debug(GOSSIP_SERVER_DEBUG, "listattr: nested sm returned error code: %d\n", tmp_err);
-        gossip_debug(GOSSIP_SERVER_DEBUG, "s_op is %p \t getattr_op is %p\n",s_op,getattr_op );
+        getattr_op = PINT_sm_pop_frame(smcb,
+                                       &task_id,
+                                       &tmp_err, 
+                                       &remaining);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "getattr_op is %s.\n",
+                    (getattr_op ? "okay" : "NULL"));
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "listattr: nested sm returned error code: %d\n", tmp_err);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "s_op is %p \t getattr_op is %p\n",
+                     s_op, getattr_op );
         /* match it up with the correct array entry */
-        for(j=0; j<s_op->req->u.listattr.nhandles; j++)
+        for(j = 0; j < s_op->req->u.listattr.nhandles; j++)
         {
             if(!PVFS_OID_cmp(&s_op->req->u.listattr.handles[j],
                              &getattr_op->u.getattr.handle))
             {
                 PINT_copy_object_attr(&s_op->u.listattr.attr_a[j],
-                                    &getattr_op->resp.u.getattr.attr);
+                                      &getattr_op->resp.u.getattr.attr);
                 s_op->u.listattr.errors[j] = tmp_err;
                 break;
             }

@@ -28,6 +28,8 @@
          PVFS_ATTR_SYS_BLKSIZE | PVFS_ATTR_SYS_LNK_TARGET |\
          PVFS_ATTR_SYS_DIRENT_COUNT)
 
+extern int pvfs_usrint_available;
+
 int pvfs_ucache_enabled(void);
 
 extern int pvfs_sys_init(void);

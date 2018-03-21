@@ -153,7 +153,7 @@ do { PINT_dist tmp_dist; \
 } while (0)
 #endif
 
-static inline void  decode_PINT_dist(char **pptr, PINT_dist **dist, uint32_t *size) 
+static inline int decode_PINT_dist(char **pptr, PINT_dist **dist, uint32_t *size) 
 {
     PINT_dist tmp_dist = {0}; 
     decode_string(pptr, &tmp_dist.dist_name); 
@@ -166,7 +166,7 @@ static inline void  decode_PINT_dist(char **pptr, PINT_dist **dist, uint32_t *si
             *size = 8;
         }
         /* no need to align to 8, decode_string does that */
-        return;
+        return -1;
     }
     tmp_dist.params = 0; 
     tmp_dist.methods = 0; 
@@ -174,11 +174,16 @@ static inline void  decode_PINT_dist(char **pptr, PINT_dist **dist, uint32_t *si
     PINT_dist_lookup(&tmp_dist); 
     if (!tmp_dist.methods)
     { 
-	gossip_err("%s: decode_PINT_dist: methods is null\n", __func__); 
+	gossip_err("%s: methods is null\n", __func__); 
 	exit(1); 
     } 
     /* later routines assume dist is a big contiguous thing, do so */ 
     *dist = decode_malloc(PINT_DIST_PACK_SIZE(&tmp_dist)); 
+    if (!*dist)
+    {
+        /* out of memory */
+        return -1;
+    }
     memcpy(*dist, &tmp_dist, sizeof(PINT_dist)); 
 
     (*dist)->dist_name = (char *)*dist + roundup8(sizeof(PINT_dist)); 
@@ -193,6 +198,7 @@ static inline void  decode_PINT_dist(char **pptr, PINT_dist **dist, uint32_t *si
     }
 
     align8(pptr); 
+    return 0;
 }
 
 #define defree_PINT_dist(x) do { \
@@ -201,13 +207,13 @@ static inline void  decode_PINT_dist(char **pptr, PINT_dist **dist, uint32_t *si
 #endif
 
 /* Return a cloned copy of the distribution registered for name*/
-PINT_dist* PINT_dist_create(const char *name);
+PINT_dist *PINT_dist_create(const char *name);
 
 /* Deallocate resources in a PINT_dist */
 int PINT_dist_free(PINT_dist *dist);
 
 /* Return a cloned copy of dist */
-PINT_dist* PINT_dist_copy(const PINT_dist *dist);
+PINT_dist *PINT_dist_copy(const PINT_dist *dist);
 
 /* Makes a memcpy of the distribution parameters in buf.
  * buf must be allocated to the correct size */

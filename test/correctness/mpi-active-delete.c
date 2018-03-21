@@ -118,6 +118,10 @@ int main(
     	fprintf(stderr, "Calling MPI_Abort and returning success (0). Ugly, but effective.\n");
     	MPI_Abort(MPI_COMM_WORLD, 0);
 
+    	fprintf(stderr, "Successfully completed %d of %d iterations.\n", i,iterations);
+    	fprintf(stderr, "Calling MPI_Abort and returning success (0). Ugly, but effective.\n");
+    	MPI_Abort(MPI_COMM_WORLD, 0);
+
 
     }
     /* Children will read and recreate files forever until parent aborts*/

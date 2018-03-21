@@ -20,6 +20,7 @@
 #include "murmur3.h"
 #include "gossip.h"
 #include "pvfs2-debug.h"
+#include "server-config-mgr.h"
 
 /* error-checking macros */
 #define CHECK_RET(__err)    if ((__err)) return (__err)
@@ -200,7 +201,7 @@ static void PINT_credcache_debug(const char * prefix,
  */
 int PINT_credcache_init(void)
 {
-    struct server_configuration_s *config = PINT_get_server_config();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
 
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Initializing credential cache...\n");
 

@@ -528,7 +528,7 @@ static PINT_sm_action mkdir_setup_getattr_request(
     int ret;
     PVFS_capability capability;
 
-    getattr_op = calloc(1,sizeof(*getattr_op));
+    getattr_op = calloc(1, sizeof(*getattr_op));
     if ( !getattr_op )
     {
        js_p->error_code = -PVFS_ENOMEM;
@@ -538,6 +538,7 @@ static PINT_sm_action mkdir_setup_getattr_request(
     PINT_null_capability(&capability);
 
     getattr_op->req = &getattr_op->decoded.stub_dec.req;        
+
     PINT_SERVREQ_GETATTR_FILL(*getattr_op->req,
                               capability,
                               s_op->req->u.mkdir.credential,
@@ -547,12 +548,10 @@ static PINT_sm_action mkdir_setup_getattr_request(
                               NULL);
 
     PINT_cleanup_capability(&capability);
-/*
-    getattr_op->u.getattr.fs_id      = s_op->req->u.mkdir.fs_id;
-    getattr_op->u.getattr.handle     = s_op->u.mkdir.handle;
-    getattr_op->u.getattr.attrmask   = PVFS_ATTR_READ_ALL_FASTEST;
-    getattr_op->u.getattr.credential = s_op->req->u.mkdir.credential;
-*/
+
+    getattr_op->op = PVFS_SERV_GETATTR;
+
+    getattr_op->prelude_mask |= PRELUDE_NO_SCHEDULE;
 
     ret = PINT_sm_push_frame(smcb, 0, getattr_op);
     if ( ret < 0 )
@@ -575,9 +574,8 @@ static PINT_sm_action mkdir_setup_getattr_request(
  *  Check the results and prepare to return attributes to the client.
  *
  */
-static PINT_sm_action mkdir_setup_response(
-        struct PINT_smcb *smcb,
-        job_status_s *js_p)
+static PINT_sm_action mkdir_setup_response(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
 {
     struct PINT_server_op *getattr_op;
     struct PINT_server_op *s_op;
@@ -586,7 +584,11 @@ static PINT_sm_action mkdir_setup_response(
     int ret;
     PVFS_object_attr *resp_attr;
 
-    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
+    getattr_op = PINT_sm_pop_frame(smcb,
+                             &task_id,
+                             &js_p->error_code,
+                             &remaining);
+
     resp_attr = &(getattr_op->resp.u.getattr.attr);
 
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);

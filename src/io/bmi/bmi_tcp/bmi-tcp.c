@@ -58,8 +58,9 @@ static int sc_test_busy = 0;
 
 /* function prototypes */
 int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
-		       int method_id,
-		       int init_flags);
+                       int method_id,
+                       int init_flags,
+                       char *options);
 
 int BMI_tcp_finalize(void);
 
@@ -494,7 +495,8 @@ static pid_t bmi_tcp_pid;
  */
 int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
                        int method_id,
-                       int init_flags)
+                       int init_flags,
+                       char *options)
 {
     int ret = -1;
     int tmp_errno = bmi_tcp_errno_to_pvfs(-ENOSYS);

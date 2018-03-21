@@ -502,9 +502,9 @@ int PVFS_hint_copy(PVFS_hint old_hint, PVFS_hint *new_hint)
     return 0;
 }
 
-void PVFS_hint_free(PVFS_hint hint)
+void PVFS_hint_free(PVFS_hint *hint)
 {
-    PINT_hint *act = hint;
+    PINT_hint *act = *hint;
     PINT_hint *old;
 
     while(act != NULL)
@@ -520,6 +520,8 @@ void PVFS_hint_free(PVFS_hint hint)
         }
         free(old);
     }
+    /* set the original hint list pointer to null */
+    *hint = NULL;
 }
 
 /*
@@ -619,7 +621,7 @@ int PVFS_hint_import_env(PVFS_hint *out_hint)
         if(ret < 0)
         {
             /* hint parsing failed */
-            PVFS_hint_free(hint);
+            PVFS_hint_free(&hint);
             free(env_copy);
             return ret;
         }

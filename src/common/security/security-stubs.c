@@ -20,6 +20,7 @@
 
 #include "pint-security.h"
 #include "security-util.h"
+#include "server-config-mgr.h"
 
 int PINT_security_initialize(void)
 {
@@ -40,7 +41,7 @@ int PINT_init_capability(PVFS_capability *cap)
 
 int PINT_sign_capability(PVFS_capability *cap, PVFS_time *force_timeout)
 {
-    const struct server_configuration_s *config = get_server_config_struct();
+    const struct server_configuration_s *config = PINT_server_config_mgr_get_config();
 
     
     /* if we want to set a particular timeout, send in a value for
@@ -68,7 +69,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
                                      PVFS_handle *handle_array)
 {   
     int ret = -PVFS_EINVAL;
-    server_configuration_t *config = get_server_config_struct();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
         
     ret = PINT_init_capability(capability);
     if (ret < 0)
@@ -99,7 +100,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
 
 int PINT_verify_capability(const PVFS_capability *cap)
 {
-    struct server_configuration_s *config = get_server_config_struct();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
 
     if (!cap)
     {
@@ -136,7 +137,7 @@ int PINT_sign_credential(PVFS_credential *cred)
 {
     const struct server_configuration_s *config;
 
-    config = get_server_config_struct();
+    config = PINT_server_config_mgr_get_config();
     assert(config && config->server_alias);
     
     if (cred->issuer == NULL)
@@ -156,7 +157,7 @@ int PINT_sign_credential(PVFS_credential *cred)
 
 int PINT_verify_credential(const PVFS_credential *cred)
 {
-    struct server_configuration_s *config = get_server_config_struct();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
 
     if (!cred)
     {

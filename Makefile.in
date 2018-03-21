@@ -116,6 +116,7 @@ ifdef V
 endif
 LINUX_KERNEL_SRC = @LINUX_KERNEL_SRC@
 LINUX24_KERNEL_SRC = @LINUX24_KERNEL_SRC@
+WANT_INTERNAL_LMDB = @WANT_INTERNAL_LMDB@
 
 ifeq ($(QUIET_COMPILE),1)
   # say a one-line description of the action, do not echo the command
@@ -166,9 +167,11 @@ INCLUDES := \
     src/common/events \
     src/common/sidcache \
     src/client/usrint \
-    src/common/lmdb
+    src/common/lmdb \
+    src/server
 GENINCLUDES := \
-	include
+	include \
+	src/server
 else
 INCLUDES := \
     src/server \
@@ -192,11 +195,13 @@ INCLUDES := \
     src/io/dev \
     src/proto \
     src/common/mgmt \
-	src/common/hash \
-	src/common/llist \
-	src/common/token-utils
+    src/common/hash \
+    src/common/llist \
+    src/common/token-utils \
+    src/server
 GENINCLUDES := \
-	include
+	include \
+        src/server
 endif
 
 #################################################################
@@ -206,7 +211,7 @@ endif
 # for compiling and linking unless otherwise noted
 CC = @CC@ -std=gnu89
 LD = @CC@
-BUILD_CC = @BUILD_CC@
+BUILD_CC = @BUILD_CC@ -std=gnu89
 BUILD_LD = @BUILD_CC@
 BUILD_CFLAGS = -I$(srcdir)/src/common/misc -I$(srcdir) @BUILD_CFLAGS@
 BUILD_CFLAGS += -I$(srcdir)/src/common/sidcache
@@ -223,7 +228,7 @@ SERVER_LDFLAGS += @UUID_LDFLAGS@
 DATABASE_BACKEND = @DATABASE_BACKEND@
 DB_CFLAGS = @DB_CFLAGS@
 DB_LIB = @DB_LIB@
-LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
+LDSHARED = $(CC) -shared $(LDFLAGS)
 PICFLAGS = -fPIC
 # Libraries - rt libs tend to depend on other libs so they go first
 LIBS += -lpvfs2
@@ -680,7 +685,6 @@ all::
 
 # this is how we pull build information from all of the project
 #    subdirectories, make sure to catch top level module.mk as well
-include module.mk
 include $(patsubst %, %/module.mk, $(MODULES))
 
 ################################################################
@@ -975,7 +979,7 @@ lib/libbmi.a: $(LIBBMIOBJS)
 lib/libbmi.so: $(LIBBMIPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libbmi.so -o $@ $(LIBBMIPICOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libbmi.so.$(SO_FULLVER) -o $@ $(LIBBMIPICOBJS) $(DEPLIBS)
 endif
 
 # rule for building the pvfs2 library
@@ -994,13 +998,13 @@ lib/libpvfs2-threaded.a: $(LIBTHREADEDOBJS)
 lib/libpvfs2.so: $(LIBPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libpvfs2.so -o $@ $(LIBPICOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libpvfs2.so.$(SO_FULLVER) -o $@ $(LIBPICOBJS) $(DEPLIBS)
 
 # rule for building the shared pvfs2 _multithreaded_ library
 lib/libpvfs2-threaded.so: $(LIBTHREADEDPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-threaded.so -o $@ $(LIBTHREADEDPICOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-threaded.so.$(SO_FULLVER) -o $@ $(LIBTHREADEDPICOBJS) $(DEPLIBS)
 
 # rule for building the orangefs library
 lib/liborangefs.a: $(OLIBOBJS)
@@ -1012,7 +1016,7 @@ lib/liborangefs.a: $(OLIBOBJS)
 lib/liborangefs.so: $(OLIBPICOBJS) lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,liborangefs.so,-z,interpose,-Bsymbolic -o $@ $(OLIBPICOBJS) $(OLIBDEPLIBS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,liborangefs.so.$(SO_FULLVER),-z,interpose,-Bsymbolic -o $@ $(OLIBPICOBJS) $(OLIBDEPLIBS) $(DEPLIBS)
 
 # rule for building the ofs library
 lib/libofs.a: $(ULIBOBJS)
@@ -1024,7 +1028,7 @@ lib/libofs.a: $(ULIBOBJS)
 lib/libofs.so: $(ULIBPICOBJS) lib/liborangefs.so lib/libpvfs2.so
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs.so,-z,interpose,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libofs.so.$(SO_FULLVER),-z,interpose,-Bsymbolic -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
 # ifeq ($(build_symbolic),yes)
 # rule for building the shared ofs library
@@ -1224,7 +1228,7 @@ $(STATECOMP): $(STATECOMPOBJS)
 # special rules to build policy compiler using build host compiler
 $(POLICYCOMPOBJS): %.o: %.c
 	$(Q) "  BUILD_CC	$@"
-	$(E)$(BUILD_CC) $(BUILD_CFLAGS) $< -c -o $@ $(call modcflags,$<)
+	$(E)$(BUILD_CC) $(BUILD_CFLAGS) $(DB_CFLAGS) $< -c -o $@ $(call modcflags,$<)
 
 $(POLICYCOMP): $(POLICYCOMPOBJS)
 	$(Q) "  BUILD_LD	$@"
@@ -1458,7 +1462,9 @@ install_doc:
 	install -m 644 $(srcdir)/doc/man/*.5 $(mandir)/man5
 	gzip -f ${mandir}/man1/pvfs2*.1
 	gzip -f ${mandir}/man5/pvfs2*.5
+	ln -fs pvfs2-getmattr.1.gz $(mandir)/man1/getmattr.1.gz
 	ln -fs pvfs2-ls.1.gz $(mandir)/man1/pvfs2-lsplus.1.gz
+	ln -fs pvfs2-setmattr.1.gz $(mandir)/man1/setmattr.1.gz
 
 ifdef BUILD_BMI_ONLY
 install:: all
@@ -1496,10 +1502,14 @@ ifneq (,$(KERNAPPSTHR))
 endif
 endif
 ifneq (,$(LIBRARIES_SHARED))
+# liborangefsposix.so is a linker script
 	for i in $(notdir $(LIBRARIES_SHARED)) ; do \
-	    install -m 644 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
-	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
-	    $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
+	    case $$i in \
+	    liborangefsosix.so) install -m 644 lib/$$i $(libdir) ;;\
+	    *) install -m 755 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
+	       $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
+	       $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;;\
+	    esac ;\
 	done
 ifneq (,$(KERNAPPSTHR))
 	for i in $(notdir $(LIBRARIES_THREADED_SHARED)) ; do \
@@ -1529,7 +1539,6 @@ endif
 	install -m 755 src/apps/admin/pvfs2-config $(bindir)
 	@# if we ever auto-generate genconfig, remove the $(srcdir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(bindir)
-	install -m 755 $(srcdir)/src/apps/admin/pvfs2-config-convert $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-getmattr $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-setmattr $(bindir)
 ifdef BUILD_KARMA
@@ -1541,8 +1550,8 @@ ifdef BUILD_FUSE
 endif
 
 	# install any development tools built
-	for i in $(notdir $(DEVELTOOLS) $(MEMANALYSIS)) ; do \
-		if [ -f $(srcdir)/src/apps/devel/$$i ]; then install -m 755 $(srcdir)/src/apps/devel/$$i $(bindir); fi;\
+	for i in $(DEVELTOOLS) $(MEMANALYSIS) ; do \
+		if [ -f $$i ]; then install -m 755 $$i $(bindir); fi;\
 	done
 
 	install -d $(sbindir)

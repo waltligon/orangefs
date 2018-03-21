@@ -2,15 +2,86 @@
 
 OrangeFS Release ChangeLog
 -----------------------
-orangefs-2.9.x (Subversion Branch v.2.9.x)
+Development 2.9.8
+orangefs-2.9.7 (Subversion Branch v.2.9.x)
 http://dev.orangefs.org/svn/orangefs/branches/v.2.9.x
-up to rev 12840 in trunk
+up to rev 13181
+
+New functionality:
+	1.  Added RoCE v1 support to our IB suite.
+
+
+* - Server 
+	1.  Fixed problems with crdirent and rename when using
+	    distributed directories.
+	2.  Fixed intermittent problems with updating timestamps.
+
+* - Clients
+	1.  pvfs2-stat.c
+		When the object is a symlink, we now display the string length
+		of the target in the size field, making the output consistent
+		with the linux kernel.  Corrected call to sys-lookup so that
+		symbolic links are followed correctly when -L is specified on
+		the command line.
+	2.  System Interface
+		1.  Fixed problems with crdirent and rename when using distributed
+		    directories.
+		2.  Fixed intermittent problems with updating timestamps.
+
+* - BMI
+	1.  Part of adding RoCE v1 support was to make the IB port used for
+	    communication configurable.
+
+* - Software Infrastructure
+
+* - Testing
+	1.  Generic tests, #467 and #477, of the xfstest suite were removed from our
+	    testing because we do not support the functionality.
+
+	2.  Updated our testing to use version 20170929 of LTP.  Updated
+	    the list of testcases to be used.
+
+* - Kernel Module
+
+
+
+
+orangefs-2.9.7 (Subversion Branch v.2.9.x)
+http://dev.orangefs.org/svn/orangefs/branches/v.2.9.x
+up to rev 13115 in trunk
 
 
 New functionality:
 	1.  Added support for Oracle Linux 7.3 with one caveat:  Cannot use
 	    OrangeFS as the backing filesystem for a user-defined loop device.
 	    Support will be forth coming.
+
+	2.  Added support for large LMDB databases using DBMaxSize config
+	    parameter.  
+
+	3.  Added scripts in the examples/profile.d directory that can be placed in 
+	    /etc/profile.d.  These scripts add OrangeFS locations to
+	    LIBRARY_PATH, C_INCLUDE_PATH, AND LD_LIBRARY_PATH.
+
+	4.  Added support for Fedora 26.  Certificate security is not yet
+	    compatible with OpenSSL 1.1 but work is in progress.
+
+	5.  Official OrangeFS rpm is in the Fedora distribution.  The rpm will
+	    be in either Fedora 27 or Fedora 28.  The rpm will also be in
+	    their EPEL repository, allowing other RHEL distributions to access
+	    it.
+
+	6.  Added --with-lmdb to the configure script, so you can specify the
+	    location of your LMDB installation.  Otherwise, LMDB delivered
+	    with OrangeFS will be used.  NOTE: Either way, to use LMDB instead
+	    of Berkely DB, you must specify --with-db-backend=lmdb on the
+	    configure line.
+
+	7.  pvfs2-genconfig will ask you where you want to put the server config 
+	    file, with the default being the <installation directory>/etc/orangefs.conf.
+	    You can still put the server config filename directly on the command line.
+
+	8.  ACL processing is now done as specified by POSIX.
 
 
 * - Server  
@@ -24,6 +95,14 @@ New functionality:
 	* - Correctly populate the position token during a readdir operation
 	    to prevent overrun of dirdata index bits.
 	* - Correct the max size calculation for a readdir response.
+	* - On some platforms, issuing a pvfs2-ls would cause one or more
+	    pvfs2-server processes to segfault due to an invalid parameter
+	    sent to the server when list-attr was called.  This problem
+	    was discovered when the code is compiled using the Fedora-specific
+	    rpm requirements.
+	* - Made atime on directories more POSIX complient, i.e., we do not
+	    update atime on a directory when an entry is created or removed.
+	* - Don't update ctime on file access (xfstests generic/003).
 
 * - Clients
 	* - Client Core
@@ -34,6 +113,11 @@ New functionality:
 		    and removes memory leaks identified by Valgrind.
 		* - Enhanced the remount procedure to handle new 
 		    PVFS2_VFS_OP_FEATURES request.
+		* - Corrected problem where client-core went into an infinite
+		    loop when a file create operation detected that the file
+		    already exists and hints were recreated for a call to
+		    lookup.  It was the hints processing that was in the
+		    infinite loop.
 
 	* - All Clients
 		* - Dual license OrangeFS JNI and Hadoop clients under both the
@@ -50,7 +134,16 @@ New functionality:
 		    the system interface to recover the connection.  Needed
 		    for failover.
 
+	* - Added warning to pvfs2-genconfig when multiple BMI modules are
+	    activated in the server config file.  This warning indicates that 
+	    having more than one BMI module enabled at runtime will degrade 
+	    performance.  NOTE:  You can safely compile multiple BMI modules 
+	    at configure time, but you don't want to activate multiple modules 
+	    in your server config file, unless your situation demands it.
 
+* - Software Infrastructure
+	* - Improved Makefile processing for parallel make.
+	* - Get prepare to fail more gracefully if automake is not installed.
 
 
 orangefs-2.9.6 (Subversion Branch v.2.9.6)

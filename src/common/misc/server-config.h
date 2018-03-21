@@ -143,6 +143,9 @@ typedef struct filesystem_configuration_s
     int32_t directio_ops_per_queue;
     int32_t directio_timeout;
 
+    /* size used to create keyval, dataspace, and collection_attributes databases. LMDB only.*/
+    size_t db_max_size;
+
     int32_t split_mem_limit;
 
     int32_t default_distr_dir_servers_initial;
@@ -200,6 +203,7 @@ typedef struct server_configuration_s
     char *event_logging;
     int enable_events;
     char *bmi_modules;              /* BMI modules                      */
+    char *bmi_opts;                 /* BMI options                      */
     char *flow_modules;             /* Flow modules                     */
 
     int tcp_buffer_size_receive;    /* Size of TCP receive buffer, is set
@@ -232,15 +236,17 @@ typedef struct server_configuration_s
     int db_cache_size_bytes;      /* cache size to use in berkeley db */
                                   /*   if zero, use defaults */
     char *db_cache_type;
-    long db_max_size;             /* size of database map
-                                   */
-    int trove_alt_aio_mode;       /* enables experimental alternative AIO
-                                   * implementation for some types of 
-                                   * operations 
-                                   */
-    int trove_max_concurrent_io;  /* allow the number of aio operations to
-                                   * be configurable.
-                                   */
+
+    size_t db_max_size;             /* size used for collections and storage_attributes databases */
+                                    /* Applies to LMDB only.                                      */
+                                    
+    int trove_alt_aio_mode;         /* enables experimental alternative AIO
+                                     * implementation for some types of 
+                                     * operations 
+                                     */
+    int trove_max_concurrent_io;    /* allow the number of aio operations to
+                                     * be configurable.
+                                     */
     int trove_method;
 	
     char *keystore_path;          /* location of trusted server public keys */
@@ -272,10 +278,11 @@ typedef struct server_configuration_s
     int credential_timeout;          /* credential timeout in seconds */
     int capability_timeout;          /* capability timeout in seconds */
 
-    int bypass_timeout_check;        /* Correlates to TurnOffTimeouts in server conf file */
-                                     /* Only applies to a server.                         */
-                                     /* 1 = don't check for timeout                       */
-                                     /* 0 = check for timeout                             */
+    int bypass_timeout_check;        /* Correlates to TurnOffTimeouts */
+                                     /* in server conf file           */
+                                     /* Only applies to a server.     */
+                                     /* 1 = don't check for timeout   */
+                                     /* 0 = check for timeout         */
 
     int credcache_timeout;           /* credential cache timeout in seconds */
     int capcache_timeout;            /* capability cache timeout in seconds */

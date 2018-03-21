@@ -170,6 +170,8 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
+                 smcb, __func__);
 
     gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing msgpairarray_init...\n");
     gossip_debug(GOSSIP_MIRROR_DEBUG,"\tbase frame:%d\tframe count:%d\n"
@@ -216,6 +218,8 @@ static PINT_sm_action msgpairarray_fork(struct PINT_smcb *smcb,
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
+                 smcb, __func__);
     for(i = 0; i < mop->count; i++)
     {
         PINT_sm_msgarray_op *submop;
@@ -234,6 +238,8 @@ static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
+                 smcb, __func__);
     for(i = 0; i < mop->count; i++)
     {
         PINT_sm_msgarray_op *submop;
@@ -282,6 +288,8 @@ static PINT_sm_action msgpairarray_done(struct PINT_smcb *smcb,
 {
     int task_id, error_code, remaining;
     /* can we pop this before we return? */
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
+                 smcb, __func__);
     PVFS_perror_gossip_verbose();
     PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining);
     return SM_ACTION_COMPLETE;
@@ -686,6 +694,8 @@ static PINT_sm_action msgpairarray_post_ack_flow (struct PINT_smcb *smcb,
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[js_p->status_user_tag];
     int ret = -PVFS_EINVAL;
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
+                 smcb, __func__);
 
     /* First decode the server response */
     ret = io_process_message_recv(mop, js_p);
@@ -848,6 +858,8 @@ static PINT_sm_action msgpairarray_complete_ack_flow (struct PINT_smcb *smcb,
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[mop->index];
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
+                 smcb, __func__);
 
     switch (js_p->status_user_tag)
     {
@@ -972,10 +984,10 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
      */
     js_p->error_code = 0;
 
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: "
-                 "completion_fn\n", smcb);
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
+                 smcb, __func__);
     gossip_debug(GOSSIP_MIRROR_DEBUG,
-                 "Executing msgpairarray_completion_fn..\n");
+                 "Executing msgpairarray_complete_msg.\n");
 
     assert(msg_p);
 
@@ -1068,7 +1080,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
         }/*end switch*/
     }/*end decode check*/
 
-    if (msg_p->comp_fn != NULL)
+    if (msg_p->comp_fn != NULL && resp_p != NULL)
     {
         gossip_debug(GOSSIP_MIRROR_DEBUG,"\texecuting msg_p->comp_fn..\n");
 
@@ -1205,7 +1217,7 @@ static PINT_sm_action msgpairarray_failure (struct PINT_smcb *smcb,
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[mop->index];
 
-    gossip_err("Failure in MsgPairArray %d\n", msg_p->op_status);
+    gossip_err("%s: Failure in MsgPairArray %d\n", __func__, msg_p->op_status);
     /* something failed - free up anything we can make sure return codes
      * are good and then terminate
      */
@@ -1245,7 +1257,9 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
             gossip_debug(GOSSIP_IO_DEBUG, "%s: entered with error: %s\n",
                          __func__, buf);
         }
-        return js_p->error_code;
+        /* attempt to free resources */
+        goto free_resources;
+        /*return js_p->error_code;*/
     }
 
     /* decode the response from the server */
@@ -1258,7 +1272,9 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
             buf[sizeof(buf)-1] = '\0';
             gossip_debug(GOSSIP_IO_DEBUG, "%s: failed: %s\n", __func__, buf);
         }
-        return ret;
+        /* attempt to free resources */
+        goto free_resources;
+        /*return ret;*/
     }
 
     /* save the datafile size */
@@ -1280,6 +1296,7 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
         break;
     }
 
+free_resources:
     /* now we can destroy I/O request response resources */
     ret = PINT_serv_free_msgpair_resources(&msg_p->encoded_req,
                                            msg_p->encoded_resp_p,
@@ -1297,6 +1314,10 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
         return ret;
     }
 
+    if (js_p->error_code)
+    {
+        ret = js_p->error_code;
+    }
     return ret;
 }
 
@@ -1817,26 +1838,29 @@ int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
                                      PVFS_BMI_addr_t *svr_addr_p,
                                      int max_resp_sz)
 {
-    int ret = -PVFS_EINVAL;
+    int ret = 0;
 
-    if (encoded_req_p &&
-        encoded_resp_p &&
-        decoded_msg_p &&
-        svr_addr_p)
+    if (encoded_req_p)
     {
         PINT_encode_release(encoded_req_p, PINT_ENCODE_REQ);
         memset(encoded_req_p, 0, sizeof(*encoded_req_p));
-
+    }
+    if (encoded_resp_p)
+    {
+        /* did we used to do this?  why no more? */
+    }
+    if (decoded_msg_p)
+    {
         /* this should release the msg struct but not the resp buffer
          * it points to
          */
         PINT_decode_release(decoded_msg_p, PINT_DECODE_RESP);
         memset(decoded_msg_p, 0, sizeof(*decoded_msg_p));
-
-        BMI_memfree(*svr_addr_p, encoded_resp_p, max_resp_sz, BMI_RECV);
+    }
+    if (svr_addr_p)
+    {
+        ret = BMI_memfree(*svr_addr_p, encoded_resp_p, max_resp_sz, BMI_RECV);
         encoded_resp_p = NULL;
-
-        ret = 0;
     }
     return ret;
 }

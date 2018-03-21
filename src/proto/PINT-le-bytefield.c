@@ -211,6 +211,7 @@ static void lebf_initialize(void)
             case PVFS_SERV_RMDIRENT:
                 req.u.rmdirent.entry = tmp_name;
                 reqsize = extra_size_PVFS_servreq_rmdirent;
+                respsize = extra_size_PVFS_servresp_rmdirent;
                 break;
             case PVFS_SERV_CHDIRENT:
                 req.u.chdirent.entry = tmp_name;
@@ -406,7 +407,7 @@ static void lebf_initialize(void)
     }
 
     /* clean up stuff just used for initialization */
-    PVFS_hint_free(req.hints);
+    PVFS_hint_free(&req.hints);
     free(tmp_dist.dist_name);
     free(tmp_name);
     initializing_sizes = 0;
@@ -530,9 +531,9 @@ static int lebf_encode_req(struct PVFS_server_req *req,
     encode_PVFS_credential((p), &(&req->u.create)->credential);
     encode_PVFS_object_attr((p), &(&req->u.create)->attr);
     encode_PVFS_fs_id((p), &(&req->u.create)->fs_id);
-    encode_uint32_t((p), &(&req->u.create)->sid_count);
+    encode_int32_t((p), &(&req->u.create)->sid_count);
     encode_uint32_t((p), &(&req->u.create)->datafile_count);
-    encode_uint32_t((p), &(&req->u.create)->datafile_sid_count);
+    encode_int32_t((p), &(&req->u.create)->datafile_sid_count);
     encode_PVFS_handle((p), &(&req->u.create)->handle);
     for (i = 0; i < (&req->u.create)->sid_count; i++)
     {                                                                      
@@ -1039,255 +1040,255 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 
         switch (req->op)
         {
-            case PVFS_SERV_CREATE:
-                decode_free(req->u.create.credential.group_array);
-                decode_free(req->u.create.credential.signature);
+        case PVFS_SERV_CREATE:
+            decode_free(req->u.create.credential.group_array);
+            decode_free(req->u.create.credential.signature);
 #ifdef ENABLE_SECURITY_CERT
-                decode_free(req->u.create.credential.certificate.buf);
+            decode_free(req->u.create.credential.certificate.buf);
 #endif
-                if (req->u.create.attr.mask & PVFS_ATTR_META_DIST)
+            if (req->u.create.attr.mask & PVFS_ATTR_META_DIST)
+            {
+                decode_free(req->u.create.attr.u.meta.dist);
+            }
+            /* V3 remove this:
+            if (req->u.create.layout.server_list.servers)
+            {
+                decode_free(req->u.create.layout.server_list.servers); 
+            }
+            if (req->u.create.datafile_handles)
+            {
+                decode_free(req->u.create.datafile_handles);
+            }
+            */
+            /* all of the OIDs and SIDs arrays are malloced with 1
+             * call - sid_array points to the buffer
+             */
+            if (req->u.create.sid_array)
+            {
+                decode_free(req->u.create.sid_array);
+            }
+            break;
+
+        case PVFS_SERV_BATCH_CREATE:
+            /* decode_free(
+                req->u.batch_create.handle_extent_array.extent_array); */
+            break;
+
+        case PVFS_SERV_IO:
+            decode_free(req->u.io.io_dist);
+            decode_free(req->u.io.file_req);
+            break;
+
+        case PVFS_SERV_SMALL_IO:
+            decode_free(req->u.small_io.dist);
+            decode_free(req->u.small_io.file_req);
+            break;
+
+        case PVFS_SERV_MIRROR:
+            decode_free(req->u.mirror.dist);
+            decode_free(req->u.mirror.dst_handle);
+            decode_free(req->u.mirror.wcIndex);
+            break;
+
+        case PVFS_SERV_MKDIR:
+            decode_free(req->u.mkdir.credential.group_array);
+            decode_free(req->u.mkdir.credential.signature);
+#ifdef ENABLE_SECURITY_CERT
+            decode_free(req->u.mkdir.credential.certificate.buf);
+#endif
+            if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DIST)
+            {
+                decode_free(req->u.mkdir.attr.u.meta.dist);
+            }
+            if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DFILES)
+            {
+                decode_free(req->u.mkdir.attr.u.meta.dfile_array);
+            }
+            if (req->u.mkdir.attr.mask & PVFS_ATTR_CAPABILITY)
+            {
+                decode_free(req->u.mkdir.attr.capability.handle_array);
+                decode_free(req->u.mkdir.attr.capability.signature);
+            }
+            break;
+
+        case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
+            decode_free(req->u.mgmt_dspace_info_list.handle_array);
+            break;
+
+        case PVFS_SERV_SETATTR:
+            decode_free(req->u.setattr.credential.group_array);
+            decode_free(req->u.setattr.credential.signature);
+#ifdef ENABLE_SECURITY_CERT
+            decode_free(req->u.setattr.credential.certificate.buf);
+#endif
+            if (req->u.setattr.attr.mask & PVFS_ATTR_META_DIST)
+            {
+                decode_free(req->u.setattr.attr.u.meta.dist);
+            }
+            if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
+            {
+                decode_free(req->u.setattr.attr.u.meta.dfile_array);
+            }
+            if (req->u.setattr.attr.mask & PVFS_ATTR_DISTDIR_ATTR)
+            {
+                if(req->u.setattr.attr.u.dir.dist_dir_bitmap)
                 {
-                    decode_free(req->u.create.attr.u.meta.dist);
+                    decode_free(req->u.setattr.attr.u.dir.dist_dir_bitmap);
+                    req->u.setattr.attr.u.dir.dist_dir_bitmap = NULL;
                 }
-                /* V3 remove this:
-                if (req->u.create.layout.server_list.servers)
+                if(req->u.setattr.attr.u.dir.dirdata_handles)
                 {
-                    decode_free(req->u.create.layout.server_list.servers); 
+                    decode_free(req->u.setattr.attr.u.dir.dirdata_handles);
+                    req->u.setattr.attr.u.dir.dirdata_handles = NULL;
                 }
-                if (req->u.create.datafile_handles)
-                {
-                    decode_free(req->u.create.datafile_handles);
-                }
-                */
-                /* all of the OIDs and SIDs arrays are malloced with 1
-                 * call - sid_array points to the buffer
-                 */
-                if (req->u.create.sid_array)
-                {
-                    decode_free(req->u.create.sid_array);
-                }
-                break;
+            }
+            break;
 
-            case PVFS_SERV_BATCH_CREATE:
-                /* decode_free(
-                    req->u.batch_create.handle_extent_array.extent_array); */
-                break;
-
-            case PVFS_SERV_IO:
-                decode_free(req->u.io.io_dist);
-                decode_free(req->u.io.file_req);
-                break;
-
-            case PVFS_SERV_SMALL_IO:
-                decode_free(req->u.small_io.dist);
-                decode_free(req->u.small_io.file_req);
-                break;
-
-            case PVFS_SERV_MIRROR:
-                decode_free(req->u.mirror.dist);
-                decode_free(req->u.mirror.dst_handle);
-                decode_free(req->u.mirror.wcIndex);
-                break;
-
-            case PVFS_SERV_MKDIR:
-                decode_free(req->u.mkdir.credential.group_array);
-                decode_free(req->u.mkdir.credential.signature);
+        case PVFS_SERV_TREE_REMOVE:
+            decode_free(req->u.tree_remove.handle_array);
+            decode_free(req->u.tree_remove.credential.group_array);
+            decode_free(req->u.tree_remove.credential.signature);
 #ifdef ENABLE_SECURITY_CERT
-                decode_free(req->u.mkdir.credential.certificate.buf);
+            decode_free(req->u.tree_remove.credential.certificate.buf);
 #endif
-                if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DIST)
-                {
-                    decode_free(req->u.mkdir.attr.u.meta.dist);
-                }
-                if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DFILES)
-                {
-                    decode_free(req->u.mkdir.attr.u.meta.dfile_array);
-                }
-                if (req->u.mkdir.attr.mask & PVFS_ATTR_CAPABILITY)
-                {
-                    decode_free(req->u.mkdir.attr.capability.handle_array);
-                    decode_free(req->u.mkdir.attr.capability.signature);
-                }
-                break;
+            break;
 
-            case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
-                decode_free(req->u.mgmt_dspace_info_list.handle_array);
-                break;
-
-            case PVFS_SERV_SETATTR:
-                decode_free(req->u.setattr.credential.group_array);
-                decode_free(req->u.setattr.credential.signature);
+        case PVFS_SERV_TREE_GET_FILE_SIZE:
+            decode_free(req->u.tree_get_file_size.handle_array);
+            decode_free(req->u.tree_get_file_size.credential.group_array);
+            decode_free(req->u.tree_get_file_size.credential.signature);
 #ifdef ENABLE_SECURITY_CERT
-                decode_free(req->u.setattr.credential.certificate.buf);
+            decode_free(req->u.tree_get_file_size.credential.certificate.buf);
 #endif
-                if (req->u.setattr.attr.mask & PVFS_ATTR_META_DIST)
-                {
-                    decode_free(req->u.setattr.attr.u.meta.dist);
-                }
-                if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
-                {
-                    decode_free(req->u.setattr.attr.u.meta.dfile_array);
-                }
-                if (req->u.setattr.attr.mask & PVFS_ATTR_DISTDIR_ATTR)
-                {
-                    if(req->u.setattr.attr.u.dir.dist_dir_bitmap)
-                    {
-                        decode_free(req->u.setattr.attr.u.dir.dist_dir_bitmap);
-                        req->u.setattr.attr.u.dir.dist_dir_bitmap = NULL;
-                    }
-                    if(req->u.setattr.attr.u.dir.dirdata_handles)
-                    {
-                        decode_free(req->u.setattr.attr.u.dir.dirdata_handles);
-                        req->u.setattr.attr.u.dir.dirdata_handles = NULL;
-                    }
-                }
-                break;
+            break;
 
-            case PVFS_SERV_TREE_REMOVE:
-                decode_free(req->u.tree_remove.handle_array);
-                decode_free(req->u.tree_remove.credential.group_array);
-                decode_free(req->u.tree_remove.credential.signature);
+        case PVFS_SERV_TREE_GETATTR:
+            decode_free(req->u.tree_getattr.handle_array);
+            decode_free(req->u.tree_getattr.credential.group_array);
+            decode_free(req->u.tree_getattr.credential.signature);
 #ifdef ENABLE_SECURITY_CERT
-                decode_free(req->u.tree_remove.credential.certificate.buf);
+            decode_free(req->u.tree_getattr.credential.certificate.buf);
 #endif
-                break;
+            break;
 
-            case PVFS_SERV_TREE_GET_FILE_SIZE:
-                decode_free(req->u.tree_get_file_size.handle_array);
-                decode_free(req->u.tree_get_file_size.credential.group_array);
-                decode_free(req->u.tree_get_file_size.credential.signature);
+        case PVFS_SERV_TREE_SETATTR:
+            decode_free(req->u.tree_setattr.handle_array);
+            PINT_free_object_attr(&req->u.tree_setattr.attr);
+            decode_free(req->u.tree_setattr.credential.group_array);
+            decode_free(req->u.tree_setattr.credential.signature);
 #ifdef ENABLE_SECURITY_CERT
-                decode_free(req->u.tree_get_file_size.credential.certificate.buf);
+            decode_free(req->u.tree_setattr.credential.certificate.buf);
 #endif
-                break;
+            break;
 
-            case PVFS_SERV_TREE_GETATTR:
-                decode_free(req->u.tree_getattr.handle_array);
-                decode_free(req->u.tree_getattr.credential.group_array);
-                decode_free(req->u.tree_getattr.credential.signature);
+        case PVFS_SERV_LISTATTR:
+            if (req->u.listattr.handles)
+            {
+                decode_free(req->u.listattr.handles);
+            }
+            break;
+
+        case PVFS_SERV_GETATTR:
+            decode_free(req->u.getattr.credential.group_array);
+            decode_free(req->u.getattr.credential.signature);
 #ifdef ENABLE_SECURITY_CERT
-                decode_free(req->u.tree_getattr.credential.certificate.buf);
+            decode_free(req->u.getattr.credential.certificate.buf);
 #endif
-                break;
+            break;
 
-            case PVFS_SERV_TREE_SETATTR:
-                decode_free(req->u.tree_setattr.handle_array);
-                PINT_free_object_attr(&req->u.tree_setattr.attr);
-                decode_free(req->u.tree_setattr.credential.group_array);
-                decode_free(req->u.tree_setattr.credential.signature);
+        case PVFS_SERV_SETEATTR:
+            decode_free(req->u.seteattr.key);
+            decode_free(req->u.seteattr.val);
+            break;
+
+        case PVFS_SERV_GETEATTR:
+            decode_free(req->u.geteattr.key);
+            decode_free(req->u.geteattr.valsz);
+            break;
+            
+        case PVFS_SERV_ATOMICEATTR:
+            decode_free(req->u.atomiceattr.key);
+            decode_free(req->u.atomiceattr.old_val);
+            decode_free(req->u.atomiceattr.new_val);
+            break;
+
+        case PVFS_SERV_UNSTUFF:
+            decode_free(req->u.unstuff.credential.group_array);
+            decode_free(req->u.unstuff.credential.signature);
 #ifdef ENABLE_SECURITY_CERT
-                decode_free(req->u.tree_setattr.credential.certificate.buf);
+            decode_free(req->u.unstuff.credential.certificate.buf);
 #endif
-                break;
+            break;
 
-            case PVFS_SERV_LISTATTR:
-                if (req->u.listattr.handles)
-                {
-                    decode_free(req->u.listattr.handles);
-                }
-                break;
-
-            case PVFS_SERV_GETATTR:
-                decode_free(req->u.getattr.credential.group_array);
-                decode_free(req->u.getattr.credential.signature);
+        case PVFS_SERV_LOOKUP_PATH:
+            decode_free(req->u.lookup_path.credential.group_array);
+            decode_free(req->u.lookup_path.credential.signature);
 #ifdef ENABLE_SECURITY_CERT
-                decode_free(req->u.getattr.credential.certificate.buf);
+            decode_free(req->u.lookup_path.credential.certificate.buf);
 #endif
-                break;
+            break;
 
-            case PVFS_SERV_SETEATTR:
-                decode_free(req->u.seteattr.key);
-                decode_free(req->u.seteattr.val);
-                break;
-
-            case PVFS_SERV_GETEATTR:
-                decode_free(req->u.geteattr.key);
-                decode_free(req->u.geteattr.valsz);
-                break;
-                
-            case PVFS_SERV_ATOMICEATTR:
-                decode_free(req->u.atomiceattr.key);
-                decode_free(req->u.atomiceattr.old_val);
-                decode_free(req->u.atomiceattr.new_val);
-                break;
-
-            case PVFS_SERV_UNSTUFF:
-                decode_free(req->u.unstuff.credential.group_array);
-                decode_free(req->u.unstuff.credential.signature);
+        case PVFS_SERV_CRDIRENT:
+            decode_free(req->u.crdirent.credential.group_array);
+            decode_free(req->u.crdirent.credential.signature);
 #ifdef ENABLE_SECURITY_CERT
-                decode_free(req->u.unstuff.credential.certificate.buf);
+            decode_free(req->u.crdirent.credential.certificate.buf);
 #endif
-                break;
+            break;
 
-            case PVFS_SERV_LOOKUP_PATH:
-                decode_free(req->u.lookup_path.credential.group_array);
-                decode_free(req->u.lookup_path.credential.signature);
+        case PVFS_SERV_REMOVE:
+            decode_free(req->u.remove.credential.group_array);
+            decode_free(req->u.remove.credential.signature);
 #ifdef ENABLE_SECURITY_CERT
-                decode_free(req->u.lookup_path.credential.certificate.buf);
+            decode_free(req->u.remove.credential.certificate.buf);
 #endif
-                break;
+            break;
 
-            case PVFS_SERV_CRDIRENT:
-                decode_free(req->u.crdirent.credential.group_array);
-                decode_free(req->u.crdirent.credential.signature);
-#ifdef ENABLE_SECURITY_CERT
-                decode_free(req->u.crdirent.credential.certificate.buf);
-#endif
-                break;
+        case PVFS_SERV_MGMT_SPLIT_DIRENT:
+            decode_free(req->u.mgmt_split_dirent.entry_handles);
+            decode_free(req->u.mgmt_split_dirent.entry_names);
+            break;
 
-            case PVFS_SERV_REMOVE:
-                decode_free(req->u.remove.credential.group_array);
-                decode_free(req->u.remove.credential.signature);
-#ifdef ENABLE_SECURITY_CERT
-                decode_free(req->u.remove.credential.certificate.buf);
-#endif
-                break;
-
-            case PVFS_SERV_MGMT_SPLIT_DIRENT:
-                decode_free(req->u.mgmt_split_dirent.entry_handles);
-                decode_free(req->u.mgmt_split_dirent.entry_names);
-                break;
-
-            case PVFS_SERV_GETCONFIG:
-            case PVFS_SERV_MGMT_REMOVE_OBJECT:
-            case PVFS_SERV_MGMT_REMOVE_DIRENT:
-            case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
-            case PVFS_SERV_RMDIRENT:
-            case PVFS_SERV_CHDIRENT:
-            case PVFS_SERV_TRUNCATE:
-            case PVFS_SERV_READDIR:
-            case PVFS_SERV_FLUSH:
-            case PVFS_SERV_MGMT_SETPARAM:
-            case PVFS_SERV_MGMT_NOOP:
-            case PVFS_SERV_STATFS:
-            case PVFS_SERV_MGMT_ITERATE_HANDLES:
-            case PVFS_SERV_MGMT_PERF_MON:
-            case PVFS_SERV_MGMT_EVENT_MON:
-            case PVFS_SERV_MGMT_GET_UID:
-            case PVFS_SERV_MGMT_GET_DIRENT:
-            case PVFS_SERV_DELEATTR:
-            case PVFS_SERV_LISTEATTR:
-            case PVFS_SERV_BATCH_REMOVE:
-            case PVFS_SERV_IMM_COPIES:
+        case PVFS_SERV_GETCONFIG:
+        case PVFS_SERV_MGMT_REMOVE_OBJECT:
+        case PVFS_SERV_MGMT_REMOVE_DIRENT:
+        case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
+        case PVFS_SERV_RMDIRENT:
+        case PVFS_SERV_CHDIRENT:
+        case PVFS_SERV_TRUNCATE:
+        case PVFS_SERV_READDIR:
+        case PVFS_SERV_FLUSH:
+        case PVFS_SERV_MGMT_SETPARAM:
+        case PVFS_SERV_MGMT_NOOP:
+        case PVFS_SERV_STATFS:
+        case PVFS_SERV_MGMT_ITERATE_HANDLES:
+        case PVFS_SERV_MGMT_PERF_MON:
+        case PVFS_SERV_MGMT_EVENT_MON:
+        case PVFS_SERV_MGMT_GET_UID:
+        case PVFS_SERV_MGMT_GET_DIRENT:
+        case PVFS_SERV_DELEATTR:
+        case PVFS_SERV_LISTEATTR:
+        case PVFS_SERV_BATCH_REMOVE:
+        case PVFS_SERV_IMM_COPIES:
 /* V3 - no longer needed */
 #if 0
-            case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
+        case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
 #endif
-            case PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ:
-            case PVFS_SERV_MGMT_GET_USER_CERT:
-              /*nothing to free*/
-                  break;
-            case PVFS_SERV_INVALID:
-            case PVFS_SERV_WRITE_COMPLETION:
-            case PVFS_SERV_PERF_UPDATE:
-            case PVFS_SERV_PRECREATE_POOL_REFILLER:
-            case PVFS_SERV_JOB_TIMER:
-            case PVFS_SERV_GET_CONFIG:
-            case PVFS_SERV_PROTO_ERROR:
-            case PVFS_SERV_NUM_OPS:  /* sentinel */
-                gossip_lerr("%s: invalid request operation %d.\n",
-                  __func__, req->op);
-                break;
+        case PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ:
+        case PVFS_SERV_MGMT_GET_USER_CERT:
+          /*nothing to free*/
+              break;
+        case PVFS_SERV_INVALID:
+        case PVFS_SERV_WRITE_COMPLETION:
+        case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_PRECREATE_POOL_REFILLER:
+        case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_GET_CONFIG:
+        case PVFS_SERV_PROTO_ERROR:
+        case PVFS_SERV_NUM_OPS:  /* sentinel */
+            gossip_lerr("%s: invalid request operation %d.\n",
+              __func__, req->op);
+            break;
         }
     }
     else if (input_type == PINT_DECODE_RESP)
@@ -1298,66 +1299,68 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
         {
             switch (resp->op)
             {                
-                case PVFS_SERV_LOOKUP_PATH: 
+            case PVFS_SERV_LOOKUP_PATH: 
+            {
+                struct PVFS_servresp_lookup_path *lookup =
+                                                  &resp->u.lookup_path;
+
+                if (lookup->handle_count > 0 && lookup->handle_array)
                 {
-                    struct PVFS_servresp_lookup_path *lookup = &resp->u.lookup_path;
-                    if ( lookup->handle_count > 0 && lookup->handle_array )
-                    {
-                     decode_free(lookup->handle_array);
-                    }
-                    if ( lookup->sid_count > 0 && lookup->sid_array )
-                    {
-                       decode_free(lookup->sid_array);
-                    }
+                    decode_free(lookup->handle_array);
+                }
+                if (lookup->sid_count > 0 && lookup->sid_array)
+                {
+                    decode_free(lookup->sid_array);
+                }
 #if 0
 /* Memory allocated by decoding PVFS_object_attr is now released by
  * the defree_PVFS_object_attr macro in pvfs2-attr.h */
-                    if ( lookup->attr_count > 0 && lookup->attr_array )
-                    {
-                       for (i=0; i<lookup->attr_count; i++)
-                       {
-                           defree_PVFS_object_attr(&lookup->attr_array[i]);
-                       }
-                       decode_free(lookup->attr_array);
-                    }
-#endif
-                    break;
+                if ( lookup->attr_count > 0 && lookup->attr_array )
+                {
+                   for (i=0; i<lookup->attr_count; i++)
+                   {
+                       defree_PVFS_object_attr(&lookup->attr_array[i]);
+                   }
+                   decode_free(lookup->attr_array);
                 }
-                
-                case PVFS_SERV_READDIR:
-                    decode_free(resp->u.readdir.dirent_array);
-                    break;
+#endif
+                break;
+            }
+            
+            case PVFS_SERV_READDIR:
+                decode_free(resp->u.readdir.dirent_array);
+                break;
 
-                case PVFS_SERV_MGMT_PERF_MON:
-                    decode_free(resp->u.mgmt_perf_mon.perf_array);
-                    break;
+            case PVFS_SERV_MGMT_PERF_MON:
+                decode_free(resp->u.mgmt_perf_mon.perf_array);
+                break;
 
-                case PVFS_SERV_MGMT_ITERATE_HANDLES:
-                    decode_free(resp->u.mgmt_iterate_handles.handle_array);
-                    break;
-                
-                case PVFS_SERV_BATCH_CREATE:
-                    /* decode_free(resp->u.batch_create.handle_array); */
-                    break;
-                
-                case PVFS_SERV_CREATE:
+            case PVFS_SERV_MGMT_ITERATE_HANDLES:
+                decode_free(resp->u.mgmt_iterate_handles.handle_array);
+                break;
+            
+            case PVFS_SERV_BATCH_CREATE:
+                /* decode_free(resp->u.batch_create.handle_array); */
+                break;
+            
+            case PVFS_SERV_CREATE:
 /* V3 we might need to put this back */
 #if 0                
-                    if (resp->u.create.metafile_attrs.mask &
-                        PVFS_ATTR_CAPABILITY )
+                if (resp->u.create.metafile_attrs.mask &
+                    PVFS_ATTR_CAPABILITY )
 #endif
-                    {
-                        decode_free(resp->u.create.capability.signature);
-                        decode_free(resp->u.create.capability.handle_array);
-                        /* V3 remove this:
-                        decode_free(resp->u.create.datafile_handles); */
-                    }
-                    break;
+                {
+                    decode_free(resp->u.create.capability.signature);
+                    decode_free(resp->u.create.capability.handle_array);
+                    /* V3 remove this:
+                    decode_free(resp->u.create.datafile_handles); */
+                }
+                break;
 
-                case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
-                    decode_free(
-                           resp->u.mgmt_dspace_info_list.dspace_info_array);
-                    break;
+            case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
+                decode_free(
+                       resp->u.mgmt_dspace_info_list.dspace_info_array);
+                break;
 
                 case PVFS_SERV_GETATTR:
 #if 0
@@ -1371,224 +1374,227 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                        decode_free(resp->u.getattr.attr.u.meta.dfile_array);
                     }
 //#if 0
-                    if (resp->u.getattr.attr.mask &
-                        PVFS_ATTR_META_MIRROR_DFILES)
-                    {
-                       decode_free
-                        (resp->u.getattr.attr.u.meta.mirror_dfile_array);
-                    }
-//#endif
-                    if (resp->u.getattr.attr.mask & PVFS_ATTR_CAPABILITY)
-                    {
-                        decode_free(
-                               resp->u.getattr.attr.capability.handle_array);
-                        decode_free(resp->u.getattr.attr.capability.signature);
-                    }
-                    if (resp->u.getattr.attr.mask & PVFS_ATTR_DISTDIR_ATTR)
-                    {
-                       decode_free
-                        (resp->u.getattr.attr.u.dir.dist_dir_bitmap);
-                       decode_free
-                        (resp->u.getattr.attr.u.dir.dirdata_handles);
-                    }
-#endif
-                    break;
-
-                case PVFS_SERV_UNSTUFF:
-                    if (resp->u.unstuff.attr.mask & PVFS_ATTR_META_DIST)
-                    {
-                        decode_free(resp->u.unstuff.attr.u.meta.dist);
-                    }
-                    if (resp->u.unstuff.attr.mask & PVFS_ATTR_META_DFILES)
-                    {
-                        decode_free(resp->u.unstuff.attr.u.meta.dfile_array);
-                    }
-#if 0
-                    if (resp->u.unstuff.attr.mask 
-                         & PVFS_ATTR_META_MIRROR_DFILES)
-                    {
-                         decode_free(
-                              resp->u.unstuff.attr.u.meta.mirror_dfile_array);
-                    }
-#endif
-                    if (resp->u.unstuff.attr.capability.signature)
-                    {
-                       decode_free(resp->u.unstuff.attr.capability.signature);
-                    }
-                    if (resp->u.unstuff.attr.capability.handle_array)
-                    {
-                       decode_free(resp->u.unstuff.attr.capability.handle_array);
-                    }
-                    break;
-
-                case PVFS_SERV_MGMT_EVENT_MON:
-                    decode_free(resp->u.mgmt_event_mon.event_array);
-                    break;
-
-                case PVFS_SERV_GETEATTR:
-                    /* need a loop here?  WBL */
-                    if (resp->u.geteattr.val)
-                    {
-                        decode_free(resp->u.geteattr.val);
-                    }
-                    break;
-                case PVFS_SERV_ATOMICEATTR:
-                    /* need a loop here? */
-                    if (resp->u.atomiceattr.err)
-                    {
-                        decode_free(resp->u.atomiceattr.err);
-                    }
-                    if (resp->u.atomiceattr.ret_val)
-                    {
-                        decode_free(resp->u.atomiceattr.ret_val);
-                    }
-                    break;
-                case PVFS_SERV_LISTEATTR:
-                    /* need a loop here? */
-                    if (resp->u.listeattr.key)
-                    {
-                        decode_free(resp->u.listeattr.key);
-                    }
-                    break;
-                case PVFS_SERV_LISTATTR:
+                if (resp->u.getattr.attr.mask &
+                    PVFS_ATTR_META_MIRROR_DFILES)
                 {
-                     int i;
-                     if (resp->u.listattr.error)
-                     {
-                         decode_free(resp->u.listattr.error);
-                     }
-                     if (resp->u.listattr.attr)
-                     {
-                         for (i = 0; i < resp->u.listattr.nhandles; i++)
-                         {
-                             if (resp->u.listattr.attr[i].mask &
-                                 PVFS_ATTR_META_DIST)
-                             {
-                                 decode_free(resp->u.listattr.attr[i].u.meta.dist);
-                             }
-                             if (resp->u.listattr.attr[i].mask &
-                                 PVFS_ATTR_META_DFILES)
-                             {
-                                 decode_free(
-                                   resp->u.listattr.attr[i].u.meta.dfile_array);
-                             }
-#if 0
-                             if(resp->u.listattr.attr[i].mask &
-                                 PVFS_ATTR_META_MIRROR_DFILES)
-                             {
-                                 decode_free(
-                                       resp->u.listattr.attr[i].u.meta.mirror_dfile_array);
-                             }
-#endif
-                             if (resp->u.listattr.attr[i].mask & 
-                                 PVFS_ATTR_CAPABILITY)
-                             {
-                                 decode_free(
-                                       resp->u.listattr.attr[i].capability.handle_array);
-                                 decode_free(
-                                       resp->u.listattr.attr[i].capability.signature);
-                             }
-                             if (resp->u.listattr.attr[i].objtype ==
-                                 PVFS_TYPE_DIRDATA)
-                             {
-                                 decode_free(
-                                       resp->u.listattr.attr[i].u.dirdata.dist_dir_bitmap);
-                                 decode_free(
-                                       resp->u.listattr.attr[i].u.dirdata.dirdata_handles);
-                             }
-                             if (resp->u.listattr.attr[i].objtype ==
-                                 PVFS_TYPE_DIRECTORY)
-                             {
-                                 decode_free(
-                                       resp->u.listattr.attr[i].u.dir.dist_dir_bitmap);
-                                 decode_free(
-                                       resp->u.listattr.attr[i].u.dir.dirdata_handles);
-                             }
-                         }/*end for*/
-                         decode_free(resp->u.listattr.attr);
-                     }/*end if attr*/
-                     break;
-                }/*end case*/
-
-                case PVFS_SERV_MIRROR:
-                    decode_free(resp->u.mirror.bytes_written);
-                    decode_free(resp->u.mirror.write_status_code);
-                    break;
-
-                case PVFS_SERV_TREE_REMOVE:
-                    decode_free(resp->u.tree_remove.status);
-                    break;
-
-                case PVFS_SERV_TREE_GET_FILE_SIZE:
-                    decode_free(resp->u.tree_get_file_size.size);
-                    decode_free(resp->u.tree_get_file_size.error);
-                    break;
-
-                case PVFS_SERV_TREE_GETATTR:
-                    decode_free(resp->u.tree_getattr.attr);
-                    decode_free(resp->u.tree_getattr.error);
-                    break;
-
-                case PVFS_SERV_TREE_SETATTR:
-                    decode_free(resp->u.tree_setattr.status);
-                    break;
-
-                case PVFS_SERV_MGMT_GET_UID:
-                    decode_free(resp->u.mgmt_get_uid.uid_info_array);
-                    break;
-                case PVFS_SERV_MGMT_GET_USER_CERT:
-                    decode_free(resp->u.mgmt_get_user_cert.cert.buf); 
-                    break;
-
-                case PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ:
+                   decode_free
+                    (resp->u.getattr.attr.u.meta.mirror_dfile_array);
+                }
+//#endif
+                if (resp->u.getattr.attr.mask & PVFS_ATTR_CAPABILITY)
+                {
                     decode_free(
-                           resp->u.mgmt_get_user_cert_keyreq.public_key.buf);
-                    break;
+                            resp->u.getattr.attr.capability.handle_array);
+                    decode_free(resp->u.getattr.attr.capability.signature);
+                }
+                if (resp->u.getattr.attr.mask & PVFS_ATTR_DISTDIR_ATTR)
+                {
+                    decode_free(
+                            resp->u.getattr.attr.u.dir.dist_dir_bitmap);
+                    decode_free(
+                            resp->u.getattr.attr.u.dir.dirdata_handles);
+                }
+#endif
+                break;
 
-                case PVFS_SERV_GETCONFIG:
-                case PVFS_SERV_REMOVE:
-                case PVFS_SERV_MGMT_REMOVE_OBJECT:
-                case PVFS_SERV_MGMT_REMOVE_DIRENT:
-                case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
-                case PVFS_SERV_IO:
-                case PVFS_SERV_SMALL_IO:
-                case PVFS_SERV_SETATTR:
-                case PVFS_SERV_SETEATTR:
-                case PVFS_SERV_DELEATTR:
-                case PVFS_SERV_CRDIRENT:
-                case PVFS_SERV_RMDIRENT:
-                case PVFS_SERV_CHDIRENT:
-                case PVFS_SERV_TRUNCATE:
-                case PVFS_SERV_MKDIR:
-                case PVFS_SERV_FLUSH:
-                case PVFS_SERV_MGMT_SETPARAM:
-                case PVFS_SERV_MGMT_NOOP:
-                case PVFS_SERV_STATFS:
-                case PVFS_SERV_WRITE_COMPLETION:
-                case PVFS_SERV_PROTO_ERROR:
-                case PVFS_SERV_BATCH_REMOVE:
-                case PVFS_SERV_IMM_COPIES:
-                case PVFS_SERV_MGMT_GET_DIRENT:
+            case PVFS_SERV_UNSTUFF:
+                if (resp->u.unstuff.attr.mask & PVFS_ATTR_META_DIST)
+                {
+                    decode_free(resp->u.unstuff.attr.u.meta.dist);
+                }
+                if (resp->u.unstuff.attr.mask & PVFS_ATTR_META_DFILES)
+                {
+                    decode_free(resp->u.unstuff.attr.u.meta.dfile_array);
+                }
+#if 0
+                if (resp->u.unstuff.attr.mask 
+                     & PVFS_ATTR_META_MIRROR_DFILES)
+                {
+                     decode_free(
+                          resp->u.unstuff.attr.u.meta.mirror_dfile_array);
+                }
+#endif
+                break;
+                if (resp->u.unstuff.attr.capability.signature)
+                {
+                   decode_free(resp->u.unstuff.attr.capability.signature);
+                }
+                if (resp->u.unstuff.attr.capability.handle_array)
+                {
+                   decode_free(resp->u.unstuff.attr.capability.handle_array);
+                }
+                break;
+
+            case PVFS_SERV_MGMT_EVENT_MON:
+                decode_free(resp->u.mgmt_event_mon.event_array);
+                break;
+
+            case PVFS_SERV_GETEATTR:
+                /* need a loop here?  WBL */
+                if (resp->u.geteattr.val)
+                {
+                    decode_free(resp->u.geteattr.val);
+                }
+                break;
+            case PVFS_SERV_ATOMICEATTR:
+                /* need a loop here? */
+                if (resp->u.atomiceattr.err)
+                {
+                    decode_free(resp->u.atomiceattr.err);
+                }
+                if (resp->u.atomiceattr.ret_val)
+                {
+                    decode_free(resp->u.atomiceattr.ret_val);
+                }
+                break;
+            case PVFS_SERV_LISTEATTR:
+                /* need a loop here? */
+                if (resp->u.listeattr.key)
+                {
+                    decode_free(resp->u.listeattr.key);
+                }
+                break;
+            case PVFS_SERV_LISTATTR:
+            {
+                 int i;
+                 if (resp->u.listattr.error)
+                 {
+                     decode_free(resp->u.listattr.error);
+                 }
+                 if (resp->u.listattr.attr)
+                 {
+                     for (i = 0; i < resp->u.listattr.nhandles; i++)
+                     {
+                         if (resp->u.listattr.attr[i].mask &
+                             PVFS_ATTR_META_DIST)
+                         {
+                             decode_free(resp->u.listattr.attr[i].u.meta.dist);
+                         }
+                         if (resp->u.listattr.attr[i].mask &
+                             PVFS_ATTR_META_DFILES)
+                         {
+                             decode_free(
+                               resp->u.listattr.attr[i].u.meta.dfile_array);
+                         }
+#if 0
+                         if(resp->u.listattr.attr[i].mask &
+                             PVFS_ATTR_META_MIRROR_DFILES)
+                         {
+                             decode_free(
+                                   resp->u.listattr.attr[i].u.meta.mirror_dfile_array);
+                         }
+#endif
+                         if (resp->u.listattr.attr[i].mask & 
+                             PVFS_ATTR_CAPABILITY)
+                         {
+                             decode_free(
+                                   resp->u.listattr.attr[i].capability.handle_array);
+                             decode_free(
+                                   resp->u.listattr.attr[i].capability.signature);
+                         }
+                         if (resp->u.listattr.attr[i].objtype ==
+                             PVFS_TYPE_DIRDATA)
+                         {
+                             decode_free(
+                                   resp->u.listattr.attr[i].u.dirdata.dist_dir_bitmap);
+                             decode_free(
+                                   resp->u.listattr.attr[i].u.dirdata.dirdata_handles);
+                         }
+                         if (resp->u.listattr.attr[i].objtype ==
+                             PVFS_TYPE_DIRECTORY)
+                         {
+                             decode_free(
+                                       resp->u.listattr.attr[i].u.dir.dist_dir_bitmap);
+                             decode_free(
+                                       resp->u.listattr.attr[i].u.dir.dirdata_handles);
+                         }
+                     }/*end for*/
+                     decode_free(resp->u.listattr.attr);
+                 }/*end if attr*/
+                 break;
+            }/*end case*/
+
+            case PVFS_SERV_MIRROR:
+                decode_free(resp->u.mirror.bytes_written);
+                decode_free(resp->u.mirror.write_status_code);
+                break;
+
+            case PVFS_SERV_TREE_REMOVE:
+                decode_free(resp->u.tree_remove.status);
+                break;
+
+            case PVFS_SERV_TREE_GET_FILE_SIZE:
+                decode_free(resp->u.tree_get_file_size.size);
+                decode_free(resp->u.tree_get_file_size.error);
+                break;
+
+            case PVFS_SERV_TREE_GETATTR:
+                decode_free(resp->u.tree_getattr.attr);
+                decode_free(resp->u.tree_getattr.error);
+                break;
+
+            case PVFS_SERV_TREE_SETATTR:
+                decode_free(resp->u.tree_setattr.status);
+                break;
+
+            case PVFS_SERV_MGMT_GET_UID:
+                decode_free(resp->u.mgmt_get_uid.uid_info_array);
+                break;
+            case PVFS_SERV_MGMT_GET_USER_CERT:
+                decode_free(resp->u.mgmt_get_user_cert.cert.buf); 
+                break;
+
+            case PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ:
+                decode_free(
+                       resp->u.mgmt_get_user_cert_keyreq.public_key.buf);
+                break;
+            case PVFS_SERV_RMDIRENT:
+                decode_free(resp->u.rmdirent.sid_array);
+                break;
+
+            case PVFS_SERV_GETCONFIG:
+            case PVFS_SERV_REMOVE:
+            case PVFS_SERV_MGMT_REMOVE_OBJECT:
+            case PVFS_SERV_MGMT_REMOVE_DIRENT:
+            case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
+            case PVFS_SERV_IO:
+            case PVFS_SERV_SMALL_IO:
+            case PVFS_SERV_SETATTR:
+            case PVFS_SERV_SETEATTR:
+            case PVFS_SERV_DELEATTR:
+            case PVFS_SERV_CRDIRENT:
+            case PVFS_SERV_CHDIRENT:
+            case PVFS_SERV_TRUNCATE:
+            case PVFS_SERV_MKDIR:
+            case PVFS_SERV_FLUSH:
+            case PVFS_SERV_MGMT_SETPARAM:
+            case PVFS_SERV_MGMT_NOOP:
+            case PVFS_SERV_STATFS:
+            case PVFS_SERV_WRITE_COMPLETION:
+            case PVFS_SERV_PROTO_ERROR:
+            case PVFS_SERV_BATCH_REMOVE:
+            case PVFS_SERV_IMM_COPIES:
+            case PVFS_SERV_MGMT_GET_DIRENT:
 /* V3 - no longer needed */
 #if 0
-                case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
+            case PVFS_SERV_MGMT_CREATE_ROOT_DIR:
 #endif
-                case PVFS_SERV_MGMT_SPLIT_DIRENT:
-                    /*nothing to free */
-                    break;
-                case PVFS_SERV_INVALID:
-                case PVFS_SERV_PERF_UPDATE:
-                case PVFS_SERV_PRECREATE_POOL_REFILLER:
-                case PVFS_SERV_JOB_TIMER:
-                case PVFS_SERV_GET_CONFIG:
-                case PVFS_SERV_NUM_OPS:  /* sentinel */
-                    gossip_lerr("%s: invalid response operation %d.\n",
-                                __func__, resp->op);
-                    break;
-            }
-        }
-    }
-}
+            case PVFS_SERV_MGMT_SPLIT_DIRENT:
+                /*nothing to free */
+                break;
+            case PVFS_SERV_INVALID:
+            case PVFS_SERV_PERF_UPDATE:
+            case PVFS_SERV_PRECREATE_POOL_REFILLER:
+            case PVFS_SERV_JOB_TIMER:
+            case PVFS_SERV_GET_CONFIG:
+            case PVFS_SERV_NUM_OPS:  /* sentinel */
+                gossip_lerr("%s: invalid response operation %d.\n",
+                            __func__, resp->op);
+                break;
+            }/*end switch*/
+        }/*end if*/
+    }/*end else if*/
+}/*end lebf_decode_release*/
 
 static int check_req_size(struct PVFS_server_req *req)
 {

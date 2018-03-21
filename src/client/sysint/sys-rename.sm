@@ -443,7 +443,8 @@ static int rename_parent_getattr_comp_fn(void *v_p,
                                          int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     PVFS_object_attr *attr;
     PVFS_dist_dir_hash_type hash;
     int dirdata_index, i;
@@ -503,8 +504,8 @@ static int rename_parent_getattr_comp_fn(void *v_p,
                 i, PVFS_OID_str(&attr->u.dir.dirdata_handles[i]));
     }
 
-    /* Copy capability */
-    PINT_copy_capability(&attr->capability, &sm_p->u.rename.caps[index]);
+    /* Copy attr */
+    PINT_copy_object_attr(&sm_p->u.rename.parent_attr[index], attr);
 
     /*
       calculate the dirdata handle -- 'old' or 'new' based on index;
@@ -543,7 +544,8 @@ static int rename_lookups_comp_fn(void *v_p,
                                   int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_lookups_comp_fn\n");
 
@@ -659,12 +661,13 @@ static int rename_rmdirent_comp_fn(void *v_p,
                                    int index)
 {
     PINT_smcb *smcb = v_p;
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
 #ifdef WIN32
     PINT_client_sm *sm_p =
-        PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+        PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
 #else
     PINT_client_sm *sm_p __attribute__((unused)) =
-        PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+        PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
 #endif
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_rmdirent_comp_fn\n");
 
@@ -842,11 +845,9 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
                        &sm_p->u.rename.parent_refns[1].handle)))
     {   
         gossip_debug(GOSSIP_CLIENT_DEBUG, "rename: copied identical "
-                     "capability\n");
-        PINT_copy_capability(&sm_p->u.rename.caps[0],
-                             &sm_p->u.rename.caps[1]);
-        sm_p->u.rename.dirdata_handle[1] =
-                sm_p->u.rename.dirdata_handle[0];
+                     "parent attrs\n");
+        PINT_copy_object_attr(&sm_p->u.rename.parent_attr[1],
+                              &sm_p->u.rename.parent_attr[0]);
 
     }
 
@@ -869,7 +870,7 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
                      sm_p->u.rename.parent_refns[i].fs_id);
 
         PINT_SERVREQ_LOOKUP_PATH_FILL(msg_p->req,
-                                      sm_p->u.rename.caps[i],
+                                      sm_p->u.rename.parent_attr[i].capability,
                                       *sm_p->cred_p,
                                       sm_p->u.rename.entries[i],
                                       sm_p->u.rename.parent_refns[i].fs_id,
@@ -923,6 +924,8 @@ static PINT_sm_action rename_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_dist_dir_hash_type hash;
+    int dirdata_index;
 
     js_p->error_code = 0;
 
@@ -932,13 +935,34 @@ static PINT_sm_action rename_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
+    /* Determine the correct dirent handle for the new name. */
+    hash = PINT_encrypt_dirdata(sm_p->u.rename.entries[1]);
+    /* gossip hash */
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "%s: encrypt dirent %s into hash value %llu.\n",
+            __func__, sm_p->u.rename.entries[1],
+            llu(hash));
+
+    dirdata_index = PINT_find_dist_dir_bucket(hash, 
+            &sm_p->u.rename.parent_attr[1].u.dir.dist_dir_attr,
+            sm_p->u.rename.parent_attr[1].u.dir.dist_dir_bitmap);
+    /* stash dirent_handle */
+    sm_p->u.rename.dirent_handle[1] =
+        sm_p->u.rename.parent_attr[1].u.dir.dirdata_handles[dirdata_index];
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "%s: selecting dirdata_servers[%d]=%s"
+            " as the dirent_handle for dirent %s.\n",
+            __func__, dirdata_index,
+            PVFS_OID_str(&sm_p->u.rename.parent_attr[1].u.dir.dirdata_handles[dirdata_index]),
+            sm_p->u.rename.entries[1]);
+
     /*
       hook the 'old' handle up to the new parent with the 'new_entry'
       name -- on success we will have 2 dirents pointing to the same
       metafile; only update the mtime and ctime, leaving atime as 0
     */
     PINT_SERVREQ_CRDIRENT_FILL(msg_p->req,
-                               sm_p->u.rename.caps[1],
+                               sm_p->u.rename.parent_attr[1].capability,
                                *sm_p->cred_p,
                                sm_p->u.rename.parent_refns[1].fs_id,
                                sm_p->u.rename.dirdata_handle[1],
@@ -1004,12 +1028,12 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
     */
     PINT_SERVREQ_RMDIRENT_FILL(
           msg_p->req,
-          sm_p->u.rename.caps[sm_p->u.rename.rmdirent_index],
+          sm_p->u.rename.parent_attr[sm_p->u.rename.rmdirent_index].capability,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].fs_id,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].handle,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].sid_count,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].sid_array,
-          sm_p->u.rename.dirdata_handle[sm_p->u.rename.rmdirent_index],
+          /* sm_p->u.rename.dirdata_handle[sm_p->u.rename.rmdirent_index], */
           sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index],
           sm_p->hints);
 
@@ -1022,6 +1046,10 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
     /* FIX THIS !!!! 
      * It seems like we don't need this, but suspect it is needed to
      * select which dir bucket the target entry is in
+     *
+     * If the dirdata handles are in parent_refns, then what is this
+     * field for?  There was confusion in rename, but this field is
+     * several places in this code - but not sure what for.  WBL
      */
     /* sm_p->u.rename.dirdata_handle[sm_p->u.rename.rmdirent_index]; */
 
@@ -1080,6 +1108,8 @@ static PINT_sm_action rename_chdirent_setup_msgpair(struct PINT_smcb *smcb,
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_object_attr *attr = NULL;
+    PVFS_dist_dir_hash_type hash;
+    int dirdata_index;
 
     /* look at the result of the dest getattr and make sure everything looks
      * ok before we continue
@@ -1144,13 +1174,34 @@ static PINT_sm_action rename_chdirent_setup_msgpair(struct PINT_smcb *smcb,
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
+    /* Determine the correct dirent handle for the new name. */
+    hash = PINT_encrypt_dirdata(sm_p->u.rename.entries[1]);
+    /* gossip hash */
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "%s: encrypt dirent %s into hash value %llu.\n",
+            __func__, sm_p->u.rename.entries[1],
+            llu(hash));
+
+    dirdata_index = PINT_find_dist_dir_bucket(hash,
+            &sm_p->u.rename.parent_attr[1].u.dir.dist_dir_attr,
+            sm_p->u.rename.parent_attr[1].u.dir.dist_dir_bitmap);
+    /* stash dirent_handle */
+    sm_p->u.rename.dirent_handle[1] =
+        sm_p->u.rename.parent_attr[1].u.dir.dirdata_handles[dirdata_index];
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "%s: selecting dirdata_servers[%d]=%s"
+            " as the dirent_handle for dirent %s.\n",
+            __func__, dirdata_index,
+            PVFS_OID_str(&sm_p->u.rename.parent_attr[1].u.dir.dirdata_handles[dirdata_index]),
+            sm_p->u.rename.entries[1]);
+
     /*
       here, we're exhanging the existing dirent under the 'new' parent
       refn that matches the 'new entry' with the 'old' -- on success
       we will have 2 dirents pointing to the same metafile
     */
     PINT_SERVREQ_CHDIRENT_FILL(msg_p->req,
-                               sm_p->u.rename.caps[1],
+                               sm_p->u.rename.parent_attr[1].capability,
                                sm_p->u.rename.parent_refns[1].fs_id,
                                sm_p->u.rename.parent_refns[1].handle,
                                sm_p->u.rename.parent_refns[1].sid_count,
@@ -1222,7 +1273,7 @@ static PINT_sm_action rename_check_for_remove(struct PINT_smcb *smcb,
 
     if (sm_p->u.rename.target_dirent_exists)
     {
-        PINT_copy_capability(&sm_p->u.rename.caps[1],
+        PINT_copy_capability(&sm_p->u.rename.parent_attr[1].capability,
                              &sm_p->parent_capability);
         PVFS_hint_replace(&sm_p->hints, PVFS_HINT_HANDLE_NAME,
                           sizeof(PVFS_handle),
@@ -1295,8 +1346,8 @@ static PINT_sm_action rename_cleanup(struct PINT_smcb *smcb,
     }
 
     /* cleanup stored capabilities */
-    PINT_cleanup_capability(&sm_p->u.rename.caps[0]);
-    PINT_cleanup_capability(&sm_p->u.rename.caps[1]);
+    PINT_cleanup_capability(&sm_p->u.rename.parent_attr[0].capability);
+    PINT_cleanup_capability(&sm_p->u.rename.parent_attr[1].capability);
     PINT_cleanup_capability(&sm_p->parent_capability);
 
     /* cleanup stored attributes */

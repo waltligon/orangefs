@@ -189,7 +189,6 @@ PVFS_DEBUG_MASK(GOSSIP_SETATTR_SECURITY_DEBUG);
 #define __DEBUG_ALL_INIT ((uint64_t) -1) , ((uint64_t) -1)
 PVFS_DEBUG_MASK(__DEBUG_ALL);
 
-/* These are kmod mask items, disjoint from server and client */
 
 #define GOSSIP_SUPER_DEBUG            ((uint64_t)1 << 0)
 #define GOSSIP_INODE_DEBUG            ((uint64_t)1 << 1)

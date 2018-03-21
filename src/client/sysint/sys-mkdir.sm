@@ -816,6 +816,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
         PINT_find_dist_dir_bucket(dirdata_hash,
             &sm_p->getattr.attr.u.dir.dist_dir_attr,
             sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+
     dirdata_sid_index = dirdata_server_index *
                         sm_p->getattr.attr.u.dir.dist_dir_attr.sid_count;
 

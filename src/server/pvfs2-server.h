@@ -36,7 +36,7 @@
 #include "pint-event.h"
 #include "server-config.h"
 #include "pint-perf-counter.h"
-
+#include "server-config-mgr.h"
 
 extern job_context_id server_job_context;
 
@@ -173,6 +173,12 @@ typedef enum
 #define SERVER_CLIENT_INIT \
             SERVER_BMI_CLIENT_INIT | SERVER_TROVE_INIT | SERVER_FILESYS_INIT |\
             SERVER_FLOW_INIT | SERVER_CACHED_CONFIG_INIT
+
+typedef enum
+{
+    PRELUDE_PERM_CHECK_DONE    = (1<<0),
+    PRELUDE_NO_SCHEDULE        = (1<<1),
+} PINT_prelude_flag;
 
 struct PINT_server_create_op
 {
@@ -410,8 +416,10 @@ struct PINT_server_crdirent_op
 #endif
     PVFS_ds_keyval_handle_info keyval_handle_info;
     PVFS_object_attr dirdata_attr;
+    PVFS_object_attr metahandle_attr;
     PVFS_ds_attributes dirdata_ds_attr;
     PVFS_ID *keyval_temp_store;
+    PVFS_ds_attributes metahandle_ds_attr;
 
     /* index of node to receive directory entries when a split is necessary. */
     int split_node;
@@ -442,13 +450,13 @@ struct PINT_server_setattr_op
 
 struct PINT_server_rmdirent_op
 {
-    PVFS_handle dirdata_handle;
-    PVFS_handle entry_handle; /* holds handle of dirdata object,
-                               * removed entry */
-    PVFS_SID *sid_array;
+/*    PVFS_handle dirdata_handle; */
+    PVFS_handle *entry_handle; /* holds handle of dirent object,
+                                * removed entry */
+    PVFS_SID *sid_array;       /* holds sids of dirent object */
     PVFS_size dirent_count;
-    PVFS_object_attr dirdata_attr;
-    PVFS_ds_attributes dirdata_ds_attr;
+/*    PVFS_object_attr dirdata_attr; */
+    PVFS_ds_attributes dirdata_ds_attr; 
 };
 
 struct PINT_server_chdirent_op
@@ -642,7 +650,7 @@ struct PINT_server_tree_communicate_op
     int handle_array_local_count;
     int handle_array_remote_count;
     int handle_index;
-    uint32_t sid_count; /* V3 FIXME */
+    int32_t sid_count; /* V3 FIXME */
     PVFS_SID *sid_array; /* V3 FIXME */
 };
 
@@ -734,6 +742,8 @@ typedef struct PINT_server_op
     PVFS_fs_id target_fs_id;
     PVFS_object_attr *target_object_attr;
 
+    PINT_prelude_flag prelude_mask;
+
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
     
@@ -787,41 +797,41 @@ typedef struct PINT_server_op
 } PINT_server_op;
 
 /* V3 call to server_local needs a propoer argument */
-#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb,                        \
-                                             __s_op,                        \
-                                             __sid,                         \
-                                             __fs_id,                       \
-                                             __location,                    \
-                                             __req,                         \
-                                             __task_id)                     \
-do {                                                                        \
-      struct server_configuration_s *__config = get_server_config_struct(); \
-      __s_op = (PINT_server_op *)malloc(sizeof(struct PINT_server_op));     \
-      if(!__s_op)                                                           \
-      {                                                                     \
-          gossip_err("%s:Error allocating subordinate server frame\n"       \
-                    ,__func__);                                             \
-          return -PVFS_ENOMEM;                                              \
-      }                                                                     \
-      memset(__s_op, 0, sizeof(struct PINT_server_op));                     \
-      __s_op->req = &__s_op->decoded.stub_dec.req;                          \
-      PINT_sm_push_frame(__smcb, __task_id, __s_op);                        \
-      if (__location != REMOTE_OPERATION &&                                 \
-           (__location == LOCAL_OPERATION ||                                \
-             (!PVFS_SID_is_null(&(__sid)) &&                                \
-              !PVFS_SID_cmp(&(__sid),&(__config->host_sid))                 \
-             )                                                              \
-           )                                                                \
-         )                                                                  \
-      {                                                                     \
-          __location = LOCAL_OPERATION;                                     \
-          __req = __s_op->req;                                              \
-      }                                                                     \
-      else                                                                  \
-      {                                                                     \
-        memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op));       \
-        PINT_serv_init_msgarray_params(__s_op, __fs_id);                    \
-      }                                                                     \
+#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb,                                \
+                                             __s_op,                                \
+                                             __sid,                                 \
+                                             __fs_id,                               \
+                                             __location,                            \
+                                             __req,                                 \
+                                             __task_id)                             \
+do {                                                                                \
+      struct server_configuration_s *__config = PINT_server_config_mgr_get_config();\
+      __s_op = (PINT_server_op *)malloc(sizeof(struct PINT_server_op));             \
+      if(!__s_op)                                                                   \
+      {                                                                             \
+          gossip_err("%s:Error allocating subordinate server frame\n"               \
+                    ,__func__);                                                     \
+          return -PVFS_ENOMEM;                                                      \
+      }                                                                             \
+      memset(__s_op, 0, sizeof(struct PINT_server_op));                             \
+      __s_op->req = &__s_op->decoded.stub_dec.req;                                  \
+      PINT_sm_push_frame(__smcb, __task_id, __s_op);                                \
+      if (__location != REMOTE_OPERATION &&                                         \
+           (__location == LOCAL_OPERATION ||                                        \
+             (!PVFS_SID_is_null(&(__sid)) &&                                        \
+              !PVFS_SID_cmp(&(__sid),&(__config->host_sid))                         \
+             )                                                                      \
+           )                                                                        \
+         )                                                                          \
+      {                                                                             \
+          __location = LOCAL_OPERATION;                                             \
+          __req = __s_op->req;                                                      \
+      }                                                                             \
+      else                                                                          \
+      {                                                                             \
+        memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op));               \
+        PINT_serv_init_msgarray_params(__s_op, __fs_id);                            \
+      }                                                                             \
 } while (0)
 
 #define PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(__s_op) \
@@ -1030,7 +1040,6 @@ extern void getattr_free(struct PINT_server_op *s_op);
 
 /* V3 */
 /* Exported Prototypes */
-struct server_configuration_s *get_server_config_struct(void);
 int server_perf_start_rollover(struct PINT_perf_counter *pc,
                                struct PINT_perf_counter *tpc);
 

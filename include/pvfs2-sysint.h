@@ -83,6 +83,7 @@ struct PVFS_sys_mntent
     enum PVFS_encoding_type encoding;   /**< wire data encoding */
     PVFS_fs_id fs_id; /**< fs id, filled in by system interface when it looks up the fs */
     int32_t default_num_dfiles; /**< Default number of dfiles mount option value */
+    char *bmi_opts; /**< Comma-separated list of BMI options */
     int32_t integrity_check; /**< Check to determine whether the mount process must perform the integrity checks on the config files */
     /* the following fields are included for convenience;
      * useful if the file system is "mounted" */
@@ -171,10 +172,8 @@ typedef struct PVFS_sysresp_io_s PVFS_sysresp_io;
 struct PVFS_sysresp_readdir_s
 {
     PVFS_ds_position token;
-    PVFS_dirent *dirent_array; /* V3 should SIDs be in dirent */
+    PVFS_dirent *dirent_array;
     uint32_t pvfs_dirent_outcount;
-    PVFS_SID *sid_array;       /* and not in a distinct array */
-    uint32_t sid_count;
     uint64_t directory_version;
 };
 typedef struct PVFS_sysresp_readdir_s PVFS_sysresp_readdir;

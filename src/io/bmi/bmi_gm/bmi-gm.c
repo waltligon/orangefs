@@ -44,8 +44,9 @@ static unsigned int bmi_gm_reserved_ports[BMI_GM_MAX_PORTS] =
 
 /* function prototypes */
 int BMI_gm_initialize(bmi_method_addr_p listen_addr,
-		      int method_id,
-		      int init_flags);
+                      int method_id,
+                      int init_flags,
+                      char *options);
 int BMI_gm_finalize(void);
 int BMI_gm_set_info(int option,
 		    void *inout_parameter);
@@ -427,8 +428,9 @@ static int io_buffers_exhausted(void);
  * returns 0 on success, -errno on failure
  */
 int BMI_gm_initialize(bmi_method_addr_p listen_addr,
-		      int method_id,
-		      int init_flags)
+                      int method_id,
+                      int init_flags,
+                      char *options)
 {
     gm_status_t gm_ret;
     unsigned int rec_tokens = 0;

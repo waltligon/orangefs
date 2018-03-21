@@ -16,8 +16,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include <policyeval.h>
-#include <policycomp.h>
+#include "policyeval.h"
+#include "policycomp.h"
+#include "codegen.h"
 
 #ifdef WIN32
 #define _STDLIB_H  /* mark stdlib.h included */

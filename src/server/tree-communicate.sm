@@ -222,9 +222,11 @@ static PINT_sm_action tree_communicate_partition_handles(
                                                   struct PINT_smcb *smcb
                                                  ,job_status_s *js_p
                                                  ,int num_data_files
+                                                 ,int num_sids
                                                  ,PVFS_fs_id fs_id
                                                  ,enum PVFS_server_op operation
-                                                 ,PVFS_handle *handle_array)
+                                                 ,PVFS_handle *handle_array
+                                                 ,PVFS_SID *sid_array)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *tree_communicate_s_op =
@@ -232,7 +234,7 @@ static PINT_sm_action tree_communicate_partition_handles(
     struct PVFS_server_req *this_req = s_op->req;
     int num_partitions, num_files_per_server;
     int i,j;
-    struct server_configuration_s *config = get_server_config_struct();
+    struct server_configuration_s *config = PINT_server_config_mgr_get_config();
     int ret = -PVFS_EINVAL;
     struct PVFS_server_req *req = NULL;
     PVFS_capability capability;
@@ -266,7 +268,7 @@ static PINT_sm_action tree_communicate_partition_handles(
          * see if one matches the local sid.  If so, use the local sid to
          * calculate/retrieve the size of the datafile.
          */
-        for (j = 0; j < s_op->req->u.tree_get_file_size.sid_count; j++)
+        for (j = 0; j < num_sids; j++)
         {
             /* j is looping through the number of sids per object,
              * a datafile object in this case, 
@@ -276,8 +278,7 @@ static PINT_sm_action tree_communicate_partition_handles(
              * the sids for one datafile; the first group contains sids for the
              * first datafile, and so on.
              */
-            if (PINT_cached_config_server_local(
-                        &s_op->req->u.tree_get_file_size.sid_array[j * i] ))
+            if (PINT_cached_config_server_local( &sid_array[(i * num_sids) + j] ))
             {
                /* we found a local sid, so put handle on the local list */
                gossip_debug(GOSSIP_SERVER_DEBUG,
@@ -300,7 +301,7 @@ static PINT_sm_action tree_communicate_partition_handles(
             }            
         }/*end for each sid*/
 
-        if ( j == s_op->req->u.tree_get_file_size.sid_count )
+        if ( j == num_sids )
         {
            /* we did NOT find a local sid within the sid group,
             * so all sids must represent remote servers.
@@ -635,6 +636,10 @@ static PINT_sm_action tree_communicate_partition_handles(
                         num_data_files_for_this_server,
                         &s_op->u.tree_communicate.handle_array_remote[
                                                      i * num_files_per_server],
+                        /* sid_count this_req->u.tree_getattr.sid_count, */
+                        s_op->u.tree_communicate.sid_count, /* FIXME */
+                        /* sid_array this_req->u.tree_getattr.sid_array, */
+                        s_op->u.tree_communicate.sid_array, /* FIXME */
                         this_req->u.tree_getattr.attrmask,
                         this_req->u.tree_getattr.retry_msgpair_at_leaf,
                         s_op->req->hints);
@@ -734,9 +739,11 @@ static PINT_sm_action tree_setattr_setup(struct PINT_smcb *smcb,
                                 smcb,
                                 js_p,
                                 s_op->req->u.tree_setattr.handle_count,
+                                s_op->req->u.tree_setattr.sid_count,
                                 s_op->req->u.tree_setattr.fs_id,
                                 PVFS_SERV_TREE_SETATTR,
-                                s_op->req->u.tree_setattr.handle_array));
+                                s_op->req->u.tree_setattr.handle_array,
+                                s_op->req->u.tree_setattr.sid_array));
 }
 
 static int tree_setattr_comp_fn(void *v_p,
@@ -968,7 +975,7 @@ static PINT_sm_action tree_remove_setup(struct PINT_smcb *smcb,
 
     /* allocate response arrays */
     s_op->resp.u.tree_remove.status = (int32_t *)
-        calloc(s_op->req->u.tree_remove.handle_count, sizeof(int32_t));
+                calloc(s_op->req->u.tree_remove.handle_count, sizeof(int32_t));
     if (! s_op->resp.u.tree_remove.status)
     {
         gossip_err("tree_remove: failed to allocate array\n");
@@ -980,9 +987,11 @@ static PINT_sm_action tree_remove_setup(struct PINT_smcb *smcb,
                                        smcb,
                                        js_p,
                                        s_op->req->u.tree_remove.handle_count,
+                                       s_op->req->u.tree_remove.sid_count,
                                        s_op->req->u.tree_remove.fs_id,
                                        PVFS_SERV_TREE_REMOVE,
-                                       s_op->req->u.tree_remove.handle_array));
+                                       s_op->req->u.tree_remove.handle_array,
+                                       s_op->req->u.tree_remove.sid_array));
 }
 
 static int tree_remove_comp_fn(void *v_p, 
@@ -1243,9 +1252,11 @@ static PINT_sm_action tree_get_file_size_setup(struct PINT_smcb *smcb,
                              smcb,
                              js_p,
                              s_op->req->u.tree_get_file_size.num_data_files,
+                             s_op->req->u.tree_get_file_size.sid_count,
                              s_op->req->u.tree_get_file_size.fs_id,
                              PVFS_SERV_TREE_GET_FILE_SIZE,
-                             s_op->req->u.tree_get_file_size.handle_array));
+                             s_op->req->u.tree_get_file_size.handle_array,
+                             s_op->req->u.tree_get_file_size.sid_array));
 }
 
 static int tree_get_file_size_comp_fn(void *v_p,
@@ -1519,23 +1530,24 @@ static PINT_sm_action tree_getattr_setup(struct PINT_smcb *smcb,
         calloc(s_op->req->u.tree_getattr.handle_count, sizeof(PVFS_error));
     s_op->resp.u.tree_getattr.attr = (PVFS_object_attr *)
         calloc(s_op->req->u.tree_getattr.handle_count,
-               sizeof(PVFS_object_attr)); 
+               sizeof(PVFS_object_attr));
 
-    if (! s_op->resp.u.tree_getattr.error || 
+    if (! s_op->resp.u.tree_getattr.error ||
         ! s_op->resp.u.tree_getattr.attr)
     {
         gossip_err("tree_getattr: failed to allocate arrays\n");
-        js_p->error_code = -PVFS_ENOMEM; 
+        js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
-    }   
-        
-    return (tree_communicate_partition_handles(
-                             smcb,
-                             js_p,
-                             s_op->req->u.tree_getattr.handle_count,
-                             s_op->req->u.tree_getattr.fs_id,
-                             PVFS_SERV_TREE_GETATTR,
-                             s_op->req->u.tree_getattr.handle_array));
+    }
+
+    return (tree_communicate_partition_handles(smcb,
+                                               js_p,
+                                               s_op->req->u.tree_getattr.handle_count,
+                                               s_op->req->u.tree_getattr.sid_count,
+                                               s_op->req->u.tree_getattr.fs_id,
+                                               PVFS_SERV_TREE_GETATTR,
+                                               s_op->req->u.tree_getattr.handle_array,
+                                               s_op->req->u.tree_getattr.sid_array));
 }
 
 static int tree_getattr_comp_fn(void *v_p,

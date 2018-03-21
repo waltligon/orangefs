@@ -55,7 +55,7 @@ int main(int argc, char **argv)
 
 	/* TODO: this is temporary; just pulling in BMI and flow symbols that are
 	 * needed for job library */
-	ret = BMI_initialize("bogus", NULL, 0);
+	ret = BMI_initialize("bogus", NULL, 0, NULL);
 	if(ret > -1)
 	{
 		fprintf(stderr, "BMI_initialize() succeeded when it shouldn't have.\n");

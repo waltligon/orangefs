@@ -248,6 +248,8 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
             /* not packed */                                          \
             free(dest->u.o);                                          \
             free(dest->u.s);                                          \
+            dest->u.o = NULL;                                         \
+            dest->u.s = NULL;                                         \
         }                                                             \
     }                                                                 \
 } while (0)
@@ -321,8 +323,9 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         dest->u.dir.dist_dir_attr.branch_level =
                 src->u.dir.dist_dir_attr.branch_level;
         CLRFIELD(dest->u.dir.dist_dir_bitmap);
-        CLRFIELD(dest->u.dir.dirdata_handles);
-        CLRFIELD(dest->u.dir.dirdata_sids);
+        CLRPACK(dir.dirdata_handles,
+                dir.dirdata_sids,
+                dir.dist_dir_attr.dirdata_count);
         /**/
         break;
     case PVFS_TYPE_DIRDATA:
@@ -343,8 +346,9 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         dest->u.dirdata.dist_dir_attr.branch_level =
                 src->u.dirdata.dist_dir_attr.branch_level;
         CLRFIELD(dest->u.dirdata.dist_dir_bitmap);
-        CLRFIELD(dest->u.dirdata.dirdata_handles);
-        CLRFIELD(dest->u.dirdata.dirdata_sids);
+        CLRPACK(dirdata.dirdata_handles,
+                dirdata.dirdata_sids,
+                dirdata.dist_dir_attr.dirdata_count);
         /**/
         break;
     case PVFS_TYPE_SYMLINK:
@@ -647,6 +651,7 @@ char *PINT_util_bytes2str(unsigned char *bytes, char *output, size_t count)
 
 }
 
+
 #ifndef WIN32
 inline
 #endif
@@ -668,6 +673,7 @@ int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x)
     addr_str = BMI_addr_rev_lookup(*x);
     return(encode_string_size_check(&addr_str));
 }
+
 #ifndef WIN32
 inline
 #endif
@@ -675,7 +681,15 @@ void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x)
 {
     char *addr_string;
     decode_string(pptr, &addr_string);
-    BMI_addr_lookup(x, addr_string);
+    BMI_addr_lookup(x, addr_string, NULL);
+}
+
+#ifndef WIN32
+inline
+#endif
+void defree_PVFS_BMI_addr_t(PVFS_BMI_addr_t *x)
+{
+    defree_string(x);
 }
 
 #ifndef WIN32
@@ -738,6 +752,19 @@ void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x)
     {
         decode_PVFS_BMI_addr_t(pptr, &(x)->server_list.servers[i]);
     }
+}
+
+#ifndef WIN32
+inline
+#endif
+void defree_PVFS_sys_layout(struct PVFS_sys_layout_s *x)
+{
+    int i;
+    for(i = 0 ; i < x->server_list.count; i++)
+    {
+        defree_PVFS_BMI_addr_t(&(x)->server_list.servers[i]);
+    }
+    free(x->server_list.servers);
 }
 
 char *PINT_util_guess_alias(void)
@@ -1058,12 +1085,7 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
         return -PVFS_EACCES;
     }
 
-    /* keyval for ACLs includes a \0. so subtract the thingie */
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-    acl_size--;
-#else
     acl_size -= sizeof(pvfs2_acl_header);
-#endif
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
                 "PINT_check_acls: read keyval size "
                 " %d (%d acl entries)\n",
@@ -1090,24 +1112,14 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
 
     for (i = 0; i < count; i++)
     {
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        pa = (pvfs2_acl_entry *) acl_buf + i;
-#else
         pa = &(((pvfs2_acl_header *)acl_buf)->p_entries[i]);
-#endif
         /* 
            NOTE: Remember that keyval is encoded as lebf,
            so convert it to host representation 
         */
-#ifdef PVFS_USE_OLD_ACL_FORMT
-        pe.p_tag  = bmitoh32(pa->p_tag);
-        pe.p_perm = bmitoh32(pa->p_perm);
-        pe.p_id   = bmitoh32(pa->p_id);
-#else
         pe.p_tag  = bmitoh16(pa->p_tag);
         pe.p_perm = bmitoh16(pa->p_perm);
         pe.p_id   = bmitoh32(pa->p_id);
-#endif
         pa = &pe;
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded ACL entry %d "
             "(p_tag %d, p_perm %d, p_id %d)\n",
@@ -1163,26 +1175,16 @@ mask:
     for (; i < count; i++)
     {
         pvfs2_acl_entry me;
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        pvfs2_acl_entry *mask_obj = (pvfs2_acl_entry *) acl_buf + i;
-#else
         pvfs2_acl_entry *mask_obj =
                 &(((pvfs2_acl_header *)acl_buf)->p_entries[i]);
-#endif
         
         /* 
           NOTE: Again, since pvfs2_acl_entry is in lebf, we need to
           convert it to host endian format
          */
-#ifdef PVFS_USE_OLD_ACL_FORMAT
-        me.p_tag  = bmitoh32(mask_obj->p_tag);
-        me.p_perm = bmitoh32(mask_obj->p_perm);
-        me.p_id   = bmitoh32(mask_obj->p_id);
-#else
         me.p_tag  = bmitoh16(mask_obj->p_tag);
         me.p_perm = bmitoh16(mask_obj->p_perm);
         me.p_id   = bmitoh32(mask_obj->p_id);
-#endif
         mask_obj = &me;
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded (mask) ACL entry %d "
             "(p_tag %d, p_perm %d, p_id %d)\n",

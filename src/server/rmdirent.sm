@@ -25,10 +25,12 @@ machine pvfs2_rmdirent_sm
     state prelude
     {
         jump pvfs2_prelude_sm;
-        success => get_dirdata_attr;
+/*        success => get_dirdata_attr; */
+        success => get_bitmap;
         default => final_response;
     }
 
+/* REMOVE 
     state get_dirdata_attr
     {
         run rmdirent_get_dirdata_attr;
@@ -42,6 +44,7 @@ machine pvfs2_rmdirent_sm
         success => get_bitmap;
         default => setup_resp;
     }
+*/
 
     state get_bitmap
     {
@@ -90,6 +93,10 @@ machine pvfs2_rmdirent_sm
 
 %%
 
+#if 0
+/* We should not need this function, because prelude should have
+ * read the dspace for us already.
+ */
 static PINT_sm_action rmdirent_get_dirdata_attr(struct PINT_smcb *smcb,
                                                 job_status_s *js_p)
 {       
@@ -99,14 +106,14 @@ static PINT_sm_action rmdirent_get_dirdata_attr(struct PINT_smcb *smcb,
     memset(&(s_op->u.rmdirent.dirdata_ds_attr), 0, sizeof(PVFS_ds_attributes));
     /* TJS: Figure out where fs_id lives in this s_op */
     ret = PINT_cached_config_get_metadata_sid_count(
-                                         s_op->req->u.readdir.fs_id, 
+                                         s_op->req->u.rmdirent.fs_id, 
                                          &(s_op->metasidcnt));
     gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
                  "for dirdata handle %s\n",
-                 PVFS_OID_str(&s_op->req->u.rmdirent.dirent_handle));         
+                 PVFS_OID_str(&s_op->req->u.rmdirent.handle));         
 
     ret = job_trove_dspace_getattr(s_op->target_fs_id,
-                                   s_op->req->u.rmdirent.dirent_handle,
+                                   s_op->req->u.rmdirent.handle,
                                    smcb,
                                    &(s_op->u.rmdirent.dirdata_ds_attr),
                                    0,
@@ -118,6 +125,10 @@ static PINT_sm_action rmdirent_get_dirdata_attr(struct PINT_smcb *smcb,
     return ret;
 }   
 
+/*
+ * DIST_DIR_DATA stuff is all in dspace (ds_attr) and does not
+ * need to be read here
+ */
 static PINT_sm_action rmdirent_get_dist_dir_attr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -132,6 +143,10 @@ static PINT_sm_action rmdirent_get_dist_dir_attr(
     PVFS_object_attr_from_ds_attr(&s_op->u.rmdirent.dirdata_attr,
                                   &s_op->u.rmdirent.dirdata_ds_attr);
     s_op->u.rmdirent.dirdata_attr.mask = PVFS_ATTR_COMMON_ALL;
+    /* Must erase ATIME or it will be reset to the current time below,
+     * which should not be done when removing a directory entry per
+     * POSIX. */
+    s_op->u.rmdirent.dirdata_attr.mask &= ~PVFS_ATTR_COMMON_ATIME;
  
     /* set up key and value structures for reading the dist_dir_attr */
     s_op->key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
@@ -150,12 +165,12 @@ static PINT_sm_action rmdirent_get_dist_dir_attr(
                  "  trying to read dist_dir_attr (coll_id = %d, "
                  "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
                  s_op->req->u.rmdirent.fs_id,
-                 PVFS_OID_str(&s_op->req->u.rmdirent.dirent_handle),
+                 PVFS_OID_str(&s_op->req->u.rmdirent.handle),
                  (char *)s_op->key.buffer, s_op->key.buffer_sz,
                  s_op->val.buffer, s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(s_op->req->u.rmdirent.fs_id,
-                                s_op->req->u.rmdirent.dirent_handle,
+                                s_op->req->u.rmdirent.handle,
                                 &s_op->key,
                                 &s_op->val,
                                 0,
@@ -169,6 +184,7 @@ static PINT_sm_action rmdirent_get_dist_dir_attr(
 
     return ret;
 }
+#endif
 
 static PINT_sm_action rmdirent_get_bitmap(struct PINT_smcb *smcb,
                                           job_status_s *js_p)
@@ -178,37 +194,38 @@ static PINT_sm_action rmdirent_get_bitmap(struct PINT_smcb *smcb,
     PVFS_object_attr *attr_p;
     job_id_t j_id;
     
-    attr_p = &s_op->attr;
+    attr_p = &s_op->attr; /* This should be the dirdata attributes */
     
     if(js_p->error_code == -TROVE_ENOENT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
             "rmdirent: no DIST_DIR_ATTR key present in dirdata handle!!\n");
-        attr_p->u.dir.dist_dir_bitmap = NULL;
-        attr_p->u.dir.dirdata_handles = NULL;
+        attr_p->u.dirdata.dist_dir_bitmap = NULL;
+        attr_p->u.dirdata.dirdata_handles = NULL;
         return SM_ACTION_COMPLETE;
     }   
     
-    assert(attr_p->u.dir.dist_dir_attr.dirdata_count > 0);
+    assert(attr_p->objtype == PVFS_TYPE_DIRDATA &&
+           attr_p->u.dirdata.dist_dir_attr.dirdata_count > 0);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "rmdirent: get dist-dir-attr for dirdata handle %s "
             "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
-            PVFS_OID_str(&s_op->req->u.rmdirent.dirent_handle),
-            attr_p->u.dir.dist_dir_attr.tree_height,
-            attr_p->u.dir.dist_dir_attr.dirdata_count,
-            attr_p->u.dir.dist_dir_attr.bitmap_size,
-            attr_p->u.dir.dist_dir_attr.split_size,
-            attr_p->u.dir.dist_dir_attr.server_no,
-            attr_p->u.dir.dist_dir_attr.branch_level);
+            PVFS_OID_str(&s_op->req->u.rmdirent.handle),
+            attr_p->u.dirdata.dist_dir_attr.tree_height,
+            attr_p->u.dirdata.dist_dir_attr.dirdata_count,
+            attr_p->u.dirdata.dist_dir_attr.bitmap_size,
+            attr_p->u.dirdata.dist_dir_attr.split_size,
+            attr_p->u.dirdata.dist_dir_attr.server_no,
+            attr_p->u.dirdata.dist_dir_attr.branch_level);
 
     /* allocate space for dirdata bitmap */
-    attr_p->u.dir.dirdata_handles = NULL;
-    attr_p->u.dir.dist_dir_bitmap =
-        malloc(attr_p->u.dir.dist_dir_attr.bitmap_size *
-                sizeof(PVFS_dist_dir_bitmap_basetype));
-    if(!attr_p->u.dir.dist_dir_bitmap)
+    attr_p->u.dirdata.dirdata_handles = NULL;
+    attr_p->u.dirdata.dist_dir_bitmap =
+            malloc(attr_p->u.dirdata.dist_dir_attr.bitmap_size *
+                   sizeof(PVFS_dist_dir_bitmap_basetype));
+    if(!attr_p->u.dirdata.dist_dir_bitmap)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
@@ -225,23 +242,22 @@ static PINT_sm_action rmdirent_get_bitmap(struct PINT_smcb *smcb,
         free(s_op->val.buffer);
     }
 
-    s_op->val.buffer = attr_p->u.dir.dist_dir_bitmap;
-    s_op->val.buffer_sz =
-        attr_p->u.dir.dist_dir_attr.bitmap_size *
-        sizeof(PVFS_dist_dir_bitmap_basetype);
-    s_op->free_val = 0; /* will be freed in PINT_free_object_attr*/
+    s_op->val.buffer = attr_p->u.dirdata.dist_dir_bitmap;
+    s_op->val.buffer_sz = attr_p->u.dirdata.dist_dir_attr.bitmap_size *
+                          sizeof(PVFS_dist_dir_bitmap_basetype);
+    s_op->free_val = 0; /* will be freed in PINT_free_object_attr */
 
     js_p->error_code = 0;
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "  trying to read dirdata bitmap (coll_id = %d, "
                  "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
                  s_op->req->u.rmdirent.fs_id,
-                 PVFS_OID_str(&s_op->req->u.rmdirent.dirent_handle),
+                 PVFS_OID_str(&s_op->req->u.rmdirent.handle),
                  (char *)s_op->key.buffer, s_op->key.buffer_sz,
                  s_op->val.buffer, s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(s_op->req->u.rmdirent.fs_id,
-                                s_op->req->u.rmdirent.dirent_handle,
+                                s_op->req->u.rmdirent.handle,
                                 &s_op->key,
                                 &s_op->val,
                                 0,    /* flags */
@@ -277,9 +293,9 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
     
     /* gossip bitmap, since jump from get_bitmap*/
     gossip_debug(GOSSIP_SERVER_DEBUG, "rmdirent: dist_dir_bitmap as:\n");
-    for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
+    for(i = attr_p->u.dirdata.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
     {       
-        unsigned char *c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
+        unsigned char *c = (unsigned char *)(attr_p->u.dirdata.dist_dir_bitmap + i);
         gossip_debug(GOSSIP_SERVER_DEBUG,
                 " i=%d : %02x %02x %02x %02x\n",
                 i, c[3], c[2], c[1], c[0]);
@@ -298,16 +314,15 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
             s_op->req->u.rmdirent.entry,
             llu(dirdata_hash));
             
-    dirdata_server_index =
-        PINT_find_dist_dir_bucket(dirdata_hash,
-            &attr_p->u.dir.dist_dir_attr,
-            attr_p->u.dir.dist_dir_bitmap);
+    dirdata_server_index = PINT_find_dist_dir_bucket(
+            dirdata_hash,
+            &attr_p->u.dirdata.dist_dir_attr,
+            attr_p->u.dirdata.dist_dir_bitmap);
     gossip_debug(GOSSIP_SERVER_DEBUG,
         "rmdirent: selecting bucket No.%d from dist_dir_bitmap.\n",
             dirdata_server_index);
             
-    if(dirdata_server_index !=
-            attr_p->u.dir.dist_dir_attr.server_no)
+    if(dirdata_server_index != attr_p->u.dirdata.dist_dir_attr.server_no)
     {       
         gossip_debug(GOSSIP_SERVER_DEBUG,
              "rmdirent: error: WRONG dirdata object for the dirent! Returning error.\n");    
@@ -323,28 +338,42 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
     }           
     
     /* start removing entry */
-    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "rmdirent entry: %s\n",
-        s_op->req->u.rmdirent.entry);
+    PINT_ACCESS_DEBUG(s_op,
+                      GOSSIP_ACCESS_DEBUG,
+                      "rmdirent entry: %s\n",
+                      s_op->req->u.rmdirent.entry);
         
     /* set up key and structure for keyval remove */
     s_op->key.buffer = s_op->req->u.rmdirent.entry;
     s_op->key.buffer_sz = strlen(s_op->req->u.rmdirent.entry) + 1;
 
-
-    /* TJS: remove returns data from db, so need to take metadata-size 
-     * This buffer doesn't actually get allocated anywhere in this 
-     * state machine, so not sure how to make it contiguous with 
-     * sid array */
-
-    s_op->val.buffer = &s_op->u.rmdirent.entry_handle;
+    /* keyval_remove returns the removed dirent */
+    ret = PINT_cached_config_get_metadata_sid_count(
+                                         s_op->req->u.rmdirent.fs_id,
+                                         &(s_op->metasidcnt));
+    
+    if (s_op->metasidcnt < 1)
+    {
+        /* This is seriously messed up and maybe should be an assert
+         * but maybe it is possible this happens because of locallized
+         * garbage and we can continue to the next request.  So we
+         * will try returning an error code here.  This is not a
+         * very good code for this.
+         */
+        js_p->error_code = -PVFS_ENORECVR;
+        return SM_ACTION_COMPLETE;
+    }
 
     s_op->val.buffer_sz = sizeof(PVFS_handle) +
-                          sizeof(PVFS_SID) * 
-                          s_op->metasidcnt;
+                          (sizeof(PVFS_SID) * 
+                           s_op->metasidcnt);
+
+    s_op->u.rmdirent.entry_handle = malloc(s_op->val.buffer_sz);
+    s_op->val.buffer = s_op->u.rmdirent.entry_handle;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  removing entry %s from dirdata "
                  "object (handle = %s)\n", s_op->req->u.rmdirent.entry,
-                 PVFS_OID_str(&s_op->u.rmdirent.dirdata_handle));
+                 PVFS_OID_str(&s_op->req->u.rmdirent.handle));
 
     /* set the sync flag */
     flags = TROVE_SYNC;
@@ -355,7 +384,7 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
     flags |= TROVE_KEYVAL_HANDLE_COUNT | TROVE_KEYVAL_DIRECTORY_ENTRY;
 
     ret = job_trove_keyval_remove(s_op->req->u.rmdirent.fs_id,
-                                  s_op->u.rmdirent.dirdata_handle,
+                                  s_op->req->u.rmdirent.handle,
                                   &s_op->key, 
                                   &s_op->val,
                                   flags,
@@ -370,29 +399,37 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
     return ret;
 }
 
+/* I don't understand the Chinease fire drill with the attribute buffers.
+ * We are not chaning any attributes here, only taking a blank buffer and
+ * copying around before converting to DS attribs. Since that is all we
+ * really need to do (convert) I'm taking out this overwrite stuff.  WBL
+ */
 static PINT_sm_action rmdirent_update_directory_attr(struct PINT_smcb *smcb,
                                                      job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t j_id;
-    PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
     PVFS_object_attr *dspace_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
 
+    /*
+    PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
-    dspace_attr = &s_op->u.rmdirent.dirdata_attr;
-    dspace_attr->mask |= (PVFS_ATTR_COMMON_ATIME |
-                          PVFS_ATTR_COMMON_MTIME |
-                          PVFS_ATTR_COMMON_CTIME);
+    */
 
+    dspace_attr = &s_op->attr;
+
+    /*
     PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
+    */
+
     ds_attr = &(s_op->u.rmdirent.dirdata_ds_attr);
-    PVFS_ds_attr_from_object_attr(ds_attr, tmp_attr_ptr);
+    PVFS_ds_attr_from_object_attr(ds_attr, dspace_attr);
 
     /* setting dspace */
     ret = job_trove_dspace_setattr(s_op->req->u.rmdirent.fs_id,
-                                   s_op->req->u.rmdirent.dirent_handle,
+                                   s_op->req->u.rmdirent.handle,
                                    ds_attr,
                                    TROVE_SYNC,
                                    smcb,
@@ -447,12 +484,14 @@ static PINT_sm_action rmdirent_setup_resp(
     /* Set the handle if it was removed */
     if(js_p->error_code == 0)
     {
-        /*
-          we return the handle from the directory entry in the
-          response
-        */
-        s_op->resp.u.rmdirent.entry_handle =
-            s_op->u.rmdirent.entry_handle;
+        /* We return the handle from the directory entry in the
+         * response
+         */
+        s_op->resp.u.rmdirent.entry_handle = s_op->u.rmdirent.entry_handle[0];
+        s_op->resp.u.rmdirent.sid_count = s_op->metasidcnt;
+        s_op->resp.u.rmdirent.sid_array =
+                             (PVFS_SID *)&s_op->u.rmdirent.entry_handle[1];
+
         gossip_debug(GOSSIP_SERVER_DEBUG,
                      "  succeeded; returning handle %s in response\n",
                      PVFS_OID_str(&s_op->resp.u.rmdirent.entry_handle));
@@ -474,6 +513,7 @@ static PINT_sm_action rmdirent_cleanup(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     
+    free(s_op->u.rmdirent.entry_handle);
     PINT_free_object_attr(&s_op->attr);
     return(server_state_machine_complete(smcb));
 }
@@ -482,8 +522,8 @@ static int perm_rmdirent(PINT_server_op *s_op)
 {
     int ret;
 
-    if (s_op->req->capability.op_mask & PINT_CAP_WRITE &&
-        s_op->req->capability.op_mask & PINT_CAP_EXEC)
+    if ((s_op->req->capability.op_mask & PINT_CAP_WRITE) &&
+        (s_op->req->capability.op_mask & PINT_CAP_EXEC))
     {
         ret = 0;
     }

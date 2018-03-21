@@ -775,6 +775,10 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    /* V3 - is sm_p->getattr.attr supposed to be empty at this point
+     * This call makes sure it is
+     */
+    PINT_free_object_attr(&sm_p->getattr.attr);
     ret = PINT_acache_get_cached_entry(object_ref,
                                        &sm_p->getattr.attr,
                                        &attr_status,

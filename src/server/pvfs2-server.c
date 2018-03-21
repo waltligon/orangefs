@@ -38,6 +38,7 @@
 #include "state-machine.h"
 #include "mkspace.h"
 #include "server-config.h"
+#include "server-config-mgr.h"
 #include "quicklist.h"
 #include "pint-dist-utils.h"
 #include "pint-perf-counter.h"
@@ -294,6 +295,9 @@ int main(int argc, char **argv)
     }
 
     server_status_flag |= SERVER_CONFIG_INIT;
+
+    /* set server_config pointer */
+    PINT_server_config_mgr_set_config(&server_config);
 
     if (!PINT_config_is_valid_configuration(&server_config))
     {
@@ -869,6 +873,7 @@ static int server_initialize_subsystems(
     PVFS_fs_id orig_fsid=0;
     PVFS_ds_flags init_flags = 0;
     int bmi_flags = 0;
+    char *bmi_opts = NULL;
     int server_index;
 
     if(!(*server_status_flag & SERVER_EVENT_INIT) && 
@@ -924,6 +929,7 @@ static int server_initialize_subsystems(
             bmi_flags = 0;
             modules = NULL;
             listen_addrs = NULL;
+            bmi_opts = NULL;
         }
         else
         {
@@ -946,6 +952,7 @@ static int server_initialize_subsystems(
 
             modules = server_config.bmi_modules;
             listen_addrs = server_config.host_id;
+            bmi_opts = server_config.bmi_opts;
 
             gossip_debug(GOSSIP_SERVER_DEBUG,
                          "Passing %s as BMI listen address.\n",
@@ -953,7 +960,7 @@ static int server_initialize_subsystems(
 
         }
 
-        ret = BMI_initialize(modules, listen_addrs, bmi_flags);
+        ret = BMI_initialize(modules, listen_addrs, bmi_flags, bmi_opts);
         if (ret < 0)
         {
             PVFS_perror_gossip("Error: BMI_initialize", ret);
@@ -1054,8 +1061,9 @@ static int server_initialize_subsystems(
                 return(ret);
             }
 
-            /* XXX: This is really the same for all collections, yet is
-             * specified separately. */
+            /* This function sets the server_cfg for the system and cfg_fs for the
+             * coll_id, within the trove subsystem
+             */
             ret = trove_collection_set_fs_config(cur_fs->coll_id, &server_config);
             if (ret < 0)
             {
@@ -1750,7 +1758,7 @@ static void reload_config(void)
     else /* Successful load of config */
     {
         /* Get the current server configuration and update global items */
-        orig_server_config = get_server_config_struct();
+        orig_server_config = PINT_server_config_mgr_get_config();
         if (orig_server_config->event_logging)
         {
             free(orig_server_config->event_logging);
@@ -2371,13 +2379,6 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 
     if(argc - total_arguments > 2)
     {
-        /* Assume user is passing in a server.conf.  Bit of a hack here to
-         * support server.conf files in the old format by appending the
-         * server.conf options onto the fs.conf.
-         */
-        gossip_err("The two config file format is no longer supported.  "
-                   "Generate a single fs.conf that uses the new format with the "
-                   "pvfs2-config-convert script.\n\n");
         goto parse_cmd_line_args_failure;
     }
 
@@ -2747,7 +2748,7 @@ int server_state_machine_complete(PINT_smcb *smcb)
     /* release the decoding of the unexpected request */
     if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
-        PVFS_hint_free(s_op->decoded.stub_dec.req.hints);
+        PVFS_hint_free(&s_op->decoded.stub_dec.req.hints);
 
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
@@ -2786,11 +2787,6 @@ int server_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *js_p)
             "server_state_machine_terminate %p\n",smcb);
     PINT_smcb_free(smcb);
     return SM_ACTION_TERMINATE;
-}
-
-struct server_configuration_s *get_server_config_struct(void)
-{
-    return &server_config;
 }
 
 /* server_op_get_machine()
