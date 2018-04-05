@@ -194,7 +194,7 @@ pwrite02 pwrite02
 pwrite04 pwrite04
 read02 read02
 read04 read04
-readdir02 readdir02
+#readdir02 readdir02
 readlink01A symlink01 -T readlink01
 readlink01 readlink01
 readlink03 readlink03
