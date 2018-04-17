@@ -106,14 +106,17 @@ static void get_cert_subject(const PVFS_certificate *cert,
 static ASN1_UTCTIME *get_expiration(const PVFS_certificate *cert)
 {
     X509 *xcert = NULL;
-    ASN1_UTCTIME *certexp;    
+    ASN1_UTCTIME *certexp = NULL;
+    ASN1_STRING *notAfter = NULL;
 
     if (PINT_cert_to_X509(cert, &xcert) != 0)
     {
         return 0;
     }
 
-    certexp = M_ASN1_UTCTIME_dup(X509_get_notAfter(xcert));
+    notAfter = (ASN1_STRING *)X509_get_notAfter(xcert);
+    certexp  = (ASN1_UTCTIME *)(ASN1_STRING_dup(notAfter));
+    //certexp = M_ASN1_UTCTIME_dup(X509_get_notAfter(xcert));
 
     X509_free(xcert);
 
@@ -237,7 +240,8 @@ static void PINT_certcache_cleanup_data(certcache_data_t *certdata)
 {
     if (certdata->expiration != NULL)
     {
-        M_ASN1_UTCTIME_free(certdata->expiration);
+        //M_ASN1_UTCTIME_free(certdata->expiration);
+	ASN1_STRING_free((ASN1_STRING *)certdata->expiration);
     }
     if (certdata->group_array != NULL)
     {
