@@ -19,6 +19,7 @@
 #include "pvfs2-storage.h"
 #include "pvfs2-internal.h"
 #include "trove-dbpf/dbpf.h"
+#include "pint-util.h"
 
 #define COLLECTION_FILE         "collections.db"
 #define STORAGE_FILE            "storage_attributes.db"
@@ -226,6 +227,11 @@ void print_dspace( struct dbpf_data key, struct dbpf_data val )
     {
 
         r_mtime = (time_t) v->mtime;
+        r_mtime = PINT_util_mkversion_time(r_mtime);
+        if (r_mtime == 0)
+        {
+            r_mtime = (time_t) v->mtime;
+        }
 
         ctime_r(&r_mtime, mtimeStr);
 

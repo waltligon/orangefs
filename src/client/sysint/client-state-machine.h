@@ -446,8 +446,8 @@ struct PINT_client_rename_sm
     PVFS_object_ref parent_refns[2]; /* old/new input parent refns */
 
     PVFS_object_ref refns[2];        /* old/new object refns */
+    PVFS_object_attr parent_attr[2]; /* old/new parent attrs */
     PVFS_ds_type types[2];           /* old/new object types */
-    PVFS_capability caps[2];         /* old/new capabilities */
     PVFS_handle dirent_handle[2];    /* old/new dirent handles for parent dirs */
     int retry_count;
     int stored_error_code;
