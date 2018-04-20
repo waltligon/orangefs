@@ -214,7 +214,7 @@ rename09 rename09
 rename10 rename10
 rename14 rename14
 rmdir01 rmdir01
-rmdir02 rmdir02
+#rmdir02 rmdir02
 rmdir03A symlink01 -T rmdir03
 stat01 stat01
 stat02 stat02
@@ -252,7 +252,7 @@ utime02 utime02
 utime03 utime03
 utime04 utime04
 utime05 utime05
-utime06 utime06
+#utime06 utime06
 # Removed from LTP
 #write02 write02
 write03 write03
