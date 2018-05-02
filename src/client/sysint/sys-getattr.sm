@@ -1105,6 +1105,7 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
 
     /* setup the msgpair to do a getattr operation */
     PINT_SERVREQ_GETATTR_FILL(msg_p->req,
+                              PVFS_REQ_OTHER,
                               capability,
                               *sm_p->cred_p,
                               object_ref.fs_id,
@@ -1743,6 +1744,7 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
 
         PINT_SERVREQ_GETATTR_FILL(
                     msg_p->req,
+                    PVFS_REQ_DIRDATA,
                     capability,
                     *sm_p->cred_p,
                     sm_p->getattr.object_ref.fs_id,

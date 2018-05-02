@@ -31,6 +31,7 @@ enum
 
 %%
 
+/* SM for dealing with dirdata's */
 nested machine pvfs2_directory_set_dirdata_attr_work_sm
 {
     state set_dirdata_attr
@@ -53,7 +54,7 @@ nested machine pvfs2_directory_set_dirdata_attr_work_sm
     }
 }
 
-
+/* main SM for setattr */
 nested machine pvfs2_set_attr_work_sm
 {
     state verify_attribs
@@ -67,6 +68,7 @@ nested machine pvfs2_set_attr_work_sm
         default => work_cleanup;
     }
 
+/* setattr metafile */
     state write_metafile_datafile_handles_if_required
     {
         run setattr_write_metafile_datafile_handles_if_required;
@@ -81,6 +83,7 @@ nested machine pvfs2_set_attr_work_sm
         default => work_cleanup;
     }
 
+/* setattr symlink */
     state write_symlink_target_if_required
     {
         run setattr_write_symlink_target_if_required;
@@ -88,6 +91,7 @@ nested machine pvfs2_set_attr_work_sm
         default => work_cleanup;
     }
 
+/* setattr directory */
     state directory_set_dirdata_attrs
     {
         jump pvfs2_directory_set_dirdata_attr_work_sm;
@@ -122,6 +126,9 @@ nested machine pvfs2_set_attr_work_sm
     }
 }
 
+/* run setattr with prelude, without response
+ * IOW for internal calls on the server
+ */
 machine pvfs2_set_attr_with_prelude_sm
 {
     state prelude
@@ -138,6 +145,7 @@ machine pvfs2_set_attr_with_prelude_sm
     }
 }
 
+/* normal SM for setattr called for a request */
 machine pvfs2_set_attr_sm
 {
     state work
@@ -999,7 +1007,7 @@ static PINT_sm_action setattr_setobj_attribs(struct PINT_smcb *smcb,
     if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
     {
         PVFS_time orig_mtime = a_p->mtime;
-        a_p->mtime = PINT_util_mktime_version(orig_mtime);
+        a_p->mtime = orig_mtime;
         gossip_debug(GOSSIP_SETATTR_DEBUG, "setting version "
                      "to %llu\n\tmtime is %llu\n",
                      llu(a_p->mtime), llu(orig_mtime));

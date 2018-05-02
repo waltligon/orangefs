@@ -1662,6 +1662,7 @@ DOTCONF_CB(enter_serverdef_context)
     config_s->new_host = (host_alias_t *)malloc(sizeof(host_alias_t));
     config_s->new_host->server_type = PINT_llist_new();
     config_s->configuration_context = CTX_SERVERDEF;
+    config_s->my_server_options = 0;
     return NULL;
 }
 
@@ -1696,7 +1697,7 @@ DOTCONF_CB(exit_serverdef_context)
                            &config_s->new_host->host_sid);
     if (ret != 0)
     {
-        return "Error: server SID is not a propoer UUID\n";
+        return "Error: server SID is not a proper UUID\n";
     }
 
     /* add main record to SID cache */
@@ -1958,7 +1959,7 @@ DOTCONF_CB(exit_server_options_context)
 {
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = CTX_GLOBAL;
+    config_s->configuration_context = CTX_SERVERDEF;
     config_s->my_server_options = 0;
     return NULL;
 }
@@ -3323,6 +3324,12 @@ DOTCONF_CB(get_alias)
     }
 
     config_s->new_host->host_alias = strdup(cmd->data.str);
+    
+    if(config_s->server_alias &&
+       strcmp(config_s->server_alias, cmd->data.str) == 0)
+    {
+        config_s->my_server_options = 1; /* enables override options */
+    }
 
     return NULL;
 }
@@ -5418,11 +5425,6 @@ int PINT_config_pvfs2_mkspace(struct server_configuration_s *config)
     PVFS_SID *root_sid_array = NULL;
     int root_sid_count = 0;
 
-    /* V3 obsolete - no more handle ranges */
-#if 0
-    char *cur_meta_handle_range = NULL, *cur_data_handle_range = NULL;
-#endif
-
     filesystem_configuration_t *cur_fs = NULL;
 
     if (config)
@@ -5475,11 +5477,6 @@ int PINT_config_pvfs2_mkspace(struct server_configuration_s *config)
                                 root_dirdata_handle,
                                 root_sid_array,
                                 root_sid_count,
-/* V3 nolonger used */
-#if 0
-                                cur_meta_handle_range, /* V3 fix this */
-                                cur_data_handle_range, /* V3 fix this */
-#endif
                                 create_collection_only,
                                 1);
 

@@ -468,7 +468,7 @@ static PINT_sm_action write_metafile_attribs(struct PINT_smcb *smcb,
     dspace_a_p->atime =
             dspace_a_p->ctime =
                       dspace_a_p->ntime = PINT_util_get_current_time();
-    dspace_a_p->mtime = PINT_util_mktime_version(dspace_a_p->ntime);
+    dspace_a_p->mtime = dspace_a_p->ntime;
 
 #ifdef ENABLE_SECURITY_CERT
     /*                                                              

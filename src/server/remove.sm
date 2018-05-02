@@ -626,6 +626,7 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
 
     PINT_SERVREQ_TREE_GETATTR_FILL(
                         *req,
+                        PVFS_REQ_DIRDATA,
                         capability,
                         s_op->req->u.remove.credential,
                         s_op->req->u.remove.fs_id,
@@ -1027,6 +1028,7 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(
     PINT_serv_init_msgarray_params(s_op, s_op->req->u.remove.fs_id);
 
     PINT_SERVREQ_TREE_SETATTR_FILL(msg_p->req,
+                                   PVFS_REQ_DIRDATA,
                                    s_op->req->capability,
                                    s_op->req->u.remove.credential,
                                    s_op->req->u.remove.fs_id,

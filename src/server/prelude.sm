@@ -61,8 +61,11 @@ static int permit_operation(PVFS_fs_id fsid,
                             enum PINT_server_req_access_type access_type,
                             PVFS_BMI_addr_t client_addr);
 
+#if 0
 #define CREATE_DATA_OBJECT 1
 #define CREATE_DIRDATA_OBJECT 2
+#endif
+#define CREATE_OBJECT 21
 
 %%
 
@@ -84,28 +87,40 @@ nested machine pvfs2_prelude_work_sm
     state validate
     {
         run prelude_validate;
+        CREATE_OBJECT => create_object_if_allowed;
+/*
         CREATE_DATA_OBJECT => create_data_object_if_allowed;
         CREATE_DIRDATA_OBJECT => create_dirdata_object_if_allowed;
+*/
         default => return;
     }
 
-    state create_data_object_if_allowed
+    state create_object_if_allowed
     {
-        run prelude_create_data_object_if_allowed;
+        run prelude_create_object_if_allowed;
         success => write_new_object_attr;
         default => return;
     }
 
+/*
     state create_dirdata_object_if_allowed
     {
         run prelude_create_dirdata_object_if_allowed;
         success => write_new_object_attr;
         default => return;
     }
+*/
 
     state write_new_object_attr
     {
         run prelude_write_new_object_attr;
+        success => write_new_object_keyval;
+        default => return;
+    }
+
+    state write_new_object_keyval
+    {
+        run prelude_write_new_object_keyval;
         success => validate;
         default => return;
     }
@@ -270,6 +285,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     PVFS_error error_code = 0;
     DECLARE_PROFILER(profiler);
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "validating geattr\n");
+
     /* Profile validate operation */
     INIT_PROFILER(profiler);
     START_PROFILER(profiler);
@@ -282,6 +299,72 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     /* RAL:  Need to re-visit this logic.  Should we always create the DATAFILE
      *       dspace record, regardless of operation?
      */ 
+    if (error_code == ENOENT)
+    {
+        /* probably a new object, try to create the object */
+        s_op->ds_attr.fs_id = s_op->target_fs_id;
+        s_op->ds_attr.handle = s_op->target_handle;
+        create_object = 1;
+        js_p->error_code = 0;
+        switch (s_op->req->op)
+        {
+        /* datafile object specific */
+        case PVFS_SERV_IO :
+        case PVFS_SERV_SMALL_IO :
+        case PVFS_SERV_TRUNCATE :
+            s_op->ds_attr.u.datafile.b_size = 0;
+            s_op->ds_attr.type = PVFS_TYPE_DATAFILE;
+            break;
+        /* dirdata object specific */
+        case PVFS_SERV_CRDIRENT :
+        case PVFS_SERV_RMDIRENT :
+        case PVFS_SERV_CHDIRENT :
+            s_op->ds_attr.type = PVFS_TYPE_DIRDATA;
+            s_op->ds_attr.u.dirdata.dirent_count = 0;
+            break;
+        /* either data or dirdata */
+        case PVFS_SERV_GETATTR :
+        case PVFS_SERV_SETATTR :
+        case PVFS_SERV_LISTATTR :
+        case PVFS_SERV_GETEATTR :
+        case PVFS_SERV_SETEATTR :
+        case PVFS_SERV_DELEATTR :
+        case PVFS_SERV_LISTEATTR :
+        case PVFS_SERV_ATOMICEATTR :
+            if (s_op->req->ctrl.sub == PVFS_REQ_DATAFILE)
+            {
+                s_op->ds_attr.type = PVFS_TYPE_DATAFILE;
+                s_op->ds_attr.u.datafile.b_size = 0;
+            }
+            else if (s_op->req->ctrl.sub == PVFS_REQ_DIRDATA)
+            {
+                s_op->ds_attr.type = PVFS_TYPE_DIRDATA;
+                s_op->ds_attr.u.dirdata.dirent_count = 0;
+            }
+            else
+            {
+                gossip_err("Prelude asked to create object of unknown type\n");
+                create_object = 0;
+                js_p->error_code = ENOENT;
+            }
+            break;
+        /* normal ops where the object is not expected to exist
+         * beforehand
+         */
+        case PVFS_SERV_CREATE :
+        case PVFS_SERV_MKDIR :
+            create_object = 0;
+            js_p->error_code = 0;
+            break;
+        default:
+                gossip_err("Prelude has request of unexpected op\n");
+                create_object = 0;
+                js_p->error_code = ENOENT;
+            break;
+        }
+    }
+
+#if 0
     if (error_code == ENOENT && (s_op->req->op == PVFS_SERV_IO || 
                                  s_op->req->op == PVFS_SERV_GETATTR))
     {
@@ -307,6 +390,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         create_object = 1;
         js_p->error_code = 0;
     }
+#endif
 
     /*
      * first we translate the dspace attributes into a more convenient
@@ -533,6 +617,9 @@ complete:
      */
     if (js_p->error_code == 0 && create_object == 1)
     {
+        js_p->error_code = CREATE_OBJECT;
+    }
+#if 0
         if (s_op->attr.objtype == PVFS_TYPE_DATAFILE)
         {
             js_p->error_code = CREATE_DATA_OBJECT;
@@ -542,49 +629,68 @@ complete:
             js_p->error_code = CREATE_DIRDATA_OBJECT;
         }
     }
+#endif
     return SM_ACTION_COMPLETE;
 }
 
-/* if opcode is appropriate (IO or GETATTR) and we have a proper capability
+/* if opcode is appropriate and we have a proper capability
  * then we create the object - a DFILE with the approporiate
  * attributes
  */
-static PINT_sm_action prelude_create_data_object_if_allowed(
+//static PINT_sm_action prelude_create_data_object_if_allowed(
+static PINT_sm_action prelude_create_object_if_allowed(
                                                        struct PINT_smcb *smcb,
                                                        job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    //int ret;
+    int ret;
     job_id_t tmp_id;
 
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "creating missing object\n");
+#if 0
     /* RAL:  revisit the operations allowed to create a DATAFILE dspace record
      */ 
     switch (s_op->req->op)
     {
+    /* data object specific */
     case PVFS_SERV_IO :
+    case PVFS_SERV_SMALL_IO :
+    case PVFS_SERV_TRUNCATE :
+    /* either data or dirdata */
     case PVFS_SERV_GETATTR :
+    case PVFS_SERV_SETATTR :
+    case PVFS_SERV_GETEATTR :
+    case PVFS_SERV_SETEATTR :
+    case PVFS_SERV_DELEATTR :
+    case PVFS_SERV_LISTEATTR :
+    case PVFS_SERV_ATOMICEATTR :
+#endif
         /* setup and post dspace create job */
-        job_trove_dspace_create(s_op->target_fs_id,
-                                s_op->target_handle,
-                                PVFS_TYPE_DATAFILE,
-                                NULL, /* hint */
-                                0,    /* flags */
-                                smcb, /* user_ptr */
-                                0,    /* status_user_tag */
-                                js_p,
-                                &tmp_id,
-                                server_job_context,
-                                s_op->req->hints);
-        return SM_ACTION_DEFERRED;
+        ret = job_trove_dspace_create(s_op->target_fs_id,
+                                      s_op->target_handle,
+                                      s_op->attr.objtype,
+                                      //PVFS_TYPE_DATAFILE,
+                                      NULL, /* hint */
+                                      0,    /* flags */
+                                      smcb, /* user_ptr */
+                                      0,    /* status_user_tag */
+                                      js_p,
+                                      &tmp_id,
+                                      server_job_context,
+                                      s_op->req->hints);
+        return ret;
+#if 0
     default :
         break;
     }
 
     return SM_ACTION_COMPLETE;
+#endif
 }
 
-/* if opcode is appropriate (SETATTR) and we have a proper capability
+#if 0
+/* if opcode is appropriate and we have a proper capability
  * then we create the object - a DIRDATA with the approporiate
  * attributes
  */
@@ -593,31 +699,47 @@ static PINT_sm_action prelude_create_dirdata_object_if_allowed(
                                                        job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    //int ret;
+    int ret;
     job_id_t tmp_id;
 
+#if 0
     switch (s_op->req->op)
     {
+    /* data object specific */
+    case PVFS_SERV_CRDIRENT :
+    case PVFS_SERV_RMDIRENT :
+    case PVFS_SERV_CHDIRENT :
+    /* either data or dirdata */
+    case PVFS_SERV_GETATTR :
     case PVFS_SERV_SETATTR :
+    case PVFS_SERV_GETEATTR :
+    case PVFS_SERV_SETEATTR :
+    case PVFS_SERV_DELEATTR :
+    case PVFS_SERV_LISTEATTR :
+    case PVFS_SERV_ATOMICEATTR :
+#endif
         /* setup and post dirdata create job */
-        job_trove_dspace_create(s_op->target_fs_id,
-                                s_op->target_handle,
-                                PVFS_TYPE_DIRDATA,
-                                NULL, /* hint */
-                                0,    /* flags */
-                                smcb, /* user_ptr */
-                                0,    /* status_user_tag */
-                                js_p,
-                                &tmp_id,
-                                server_job_context,
-                                s_op->req->hints);
-        return SM_ACTION_DEFERRED;
+        ret = job_trove_dspace_create(s_op->target_fs_id,
+                                      s_op->target_handle,
+                                      PVFS_TYPE_DIRDATA,
+                                      NULL, /* hint */
+                                      0,    /* flags */
+                                      smcb, /* user_ptr */
+                                      0,    /* status_user_tag */
+                                      js_p,
+                                      &tmp_id,
+                                      server_job_context,
+                                      s_op->req->hints);
+        return ret;
+#if 0
     default :
         break;
     }
 
     return SM_ACTION_COMPLETE;
+#endif
 }
+#endif
 
 static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
                                                     job_status_s *js_p)
@@ -625,43 +747,169 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
     time_t current_time;
-    //int ret;
+    int ret;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "writing attributes for new object\n");
 
     js_p->error_code = 0;
 
+#if 0
     /* RAL:  revisit if operation type is necessary */
     switch (s_op->req->op)
     {
     case PVFS_SERV_IO :
     case PVFS_SERV_GETATTR :
     case PVFS_SERV_SETATTR :
-        /* initialize the time members */
-        current_time = time(NULL);
-        s_op->ds_attr.atime = current_time;
+#endif
 
-        /* RAL:  Do we want to continue this versioning stuff? */
-        s_op->ds_attr.mtime = PINT_util_mktime_version(current_time);
+    /* initialize the time members */
+    current_time = time(NULL);
+    s_op->ds_attr.atime = current_time;
+    s_op->ds_attr.mtime = current_time;
+    s_op->ds_attr.ctime = current_time;
+    s_op->ds_attr.ntime = current_time;
 
-        s_op->ds_attr.ctime = current_time;
-        s_op->ds_attr.ntime = current_time;
+    /* s_op->ds_attr.type = ; already done */
+    s_op->ds_attr.fs_id =  s_op->target_fs_id;
+    s_op->ds_attr.handle = s_op->target_handle;
+    s_op->ds_attr.uid = s_op->attr.owner;
+    s_op->ds_attr.gid = s_op->attr.group;
+    s_op->ds_attr.mode = s_op->attr.perms;
 
-        /* post dspace setattr job */
-        job_trove_dspace_setattr(s_op->target_fs_id,
-                                 s_op->target_handle,
-                                 &(s_op->ds_attr),
-                                 TROVE_SYNC, /* flags */
-                                 smcb,       /* user_ptr */
-                                 0,          /* status_user_tag */
-                                 js_p,
-                                 &tmp_id,
-                                 server_job_context,
-                                 s_op->req->hints);
-        return SM_ACTION_DEFERRED;
+    switch (s_op->ds_attr.type)
+    {
+    case PVFS_TYPE_DIRDATA :
+        s_op->ds_attr.u.dirdata.dirent_count = 0; /* new object no items */
+        s_op->ds_attr.u.dirdata.tree_height = 
+                           s_op->attr.u.dirdata.dist_dir_attr.tree_height;
+        s_op->ds_attr.u.dirdata.dirdata_count = 
+                           s_op->attr.u.dirdata.dist_dir_attr.dirdata_count;
+        s_op->ds_attr.u.dirdata.sid_count = 
+                           s_op->attr.u.dirdata.dist_dir_attr.sid_count;
+        s_op->ds_attr.u.dirdata.bitmap_size = 
+                           s_op->attr.u.dirdata.dist_dir_attr.bitmap_size;
+        s_op->ds_attr.u.dirdata.split_size = 
+                           s_op->attr.u.dirdata.dist_dir_attr.split_size;
+        s_op->ds_attr.u.dirdata.server_no = 
+                           s_op->attr.u.dirdata.dist_dir_attr.server_no;
+        /* s_op->ds_attr.u.dirdata.branch_level = ; already done */
+
+        break;
+    case PVFS_TYPE_DATAFILE :
+        /* s_op->ds_attr.u.wdatafile.b_size = ; already done */
+
+    default:
+        break;
+    }
+
+    /* post dspace setattr job */
+    ret = job_trove_dspace_setattr(s_op->target_fs_id,
+                                   s_op->target_handle,
+                                   &(s_op->ds_attr),
+                                   TROVE_SYNC, /* flags */
+                                   smcb,       /* user_ptr */
+                                   0,          /* status_user_tag */
+                                   js_p,
+                                   &tmp_id,
+                                   server_job_context,
+                                   s_op->req->hints);
+    return ret;
+#if 0
     default :
         break;
     }
 
     return SM_ACTION_COMPLETE;
+#endif
+}
+
+static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
+                                                      job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i = 0;
+    PVFS_object_attr *pattr;
+    int ret = -1;
+    job_id_t j_id;
+    int k = 0;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "writing keyvals for new object\n");
+
+    /* total 3 static keyvals every dirdata has:
+     * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES, PARENT */
+    int keyval_count = 3;
+
+    pattr = &s_op->req->u.mkdir.attr;
+
+    s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    if(!s_op->key_a)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    ZEROMEM(s_op->key_a, (sizeof(PVFS_ds_keyval) * keyval_count));
+
+    s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    if(!s_op->val_a)
+    {
+        free(s_op->key_a);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    ZEROMEM(s_op->val_a, (sizeof(PVFS_ds_keyval) * keyval_count));
+
+    s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
+    s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
+
+    s_op->val_a[0].buffer_sz = pattr->u.dir.dist_dir_attr.bitmap_size *
+                               sizeof(PVFS_dist_dir_bitmap_basetype);
+    s_op->val_a[0].buffer = pattr->u.dir.dist_dir_bitmap;
+    keep_keyval_buffers(s_op, 0);
+
+    s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
+    s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
+
+    s_op->val_a[1].buffer_sz = OSASZ(pattr->u.dir.dist_dir_attr.dirdata_count,
+                                     pattr->u.dir.dist_dir_attr.sid_count);
+    s_op->val_a[1].buffer = pattr->u.dir.dirdata_handles;
+    keep_keyval_buffers(s_op, 1);
+
+    s_op->key_a[2].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
+    s_op->key_a[2].buffer = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
+
+    s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.mkdir.sid_count);
+    s_op->val_a[2].buffer = s_op->req->u.mkdir.parent;
+    keep_keyval_buffers(s_op, 2);
+
+    if (k != keyval_count)
+    {
+        gossip_lerr("error building args for new dir attributes\n");
+    }
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG,
+                 "  writing dist-dir-struct keyvals for dirdata: %s "
+                 "\t with server_no=%d and branch_level=%d \n",
+                 PVFS_OID_str(&s_op->u.mkdir.handle),
+                 pattr->u.dir.dist_dir_attr.server_no,
+                 pattr->u.dir.dist_dir_attr.branch_level);
+
+    i = s_op->u.mkdir.handle_index;
+
+    ret = job_trove_keyval_write_list(s_op->req->u.mkdir.fs_id,
+                                      s_op->req->u.mkdir.dirdata_handles[i],
+                                      s_op->key_a,
+                                      s_op->val_a,
+                                      keyval_count,
+                                      TROVE_SYNC, /* flags */
+                                      NULL,       /* vtag */
+                                      smcb,       /* user_ptr */
+                                      0,          /* status_user_tag */
+                                      js_p,
+                                      &j_id,
+                                      server_job_context,
+                                      s_op->req->hints);
+
+    return ret;
 }
 
 /******************* Helper Functions *******************/

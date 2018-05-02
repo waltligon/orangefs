@@ -617,7 +617,13 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
 {
     int ret = 0, i = 0; 
     FILE *dummy;
-    PVFS_debug_mask debug_mask = GOSSIP_NO_DEBUG;
+    PVFS_debug_mask debug_mask, old_debug_mask;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Initializing server\n");
+
+    old_debug_mask = PVFS_debug_eventlog_to_mask(server_config.event_logging);
+    debug_mask = GOSSIP_NO_DEBUG;
+    gossip_set_debug_mask(1, debug_mask);
     
     assert(server_config.logfile != NULL);
 
@@ -765,6 +771,9 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
     ret = server_setup_signal_handlers();
 
     *server_status_flag |= SERVER_SIGNAL_HANDLER_INIT;
+
+    debug_mask = old_debug_mask;
+    gossip_set_debug_mask(1, debug_mask);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "Initialization completed successfully.\n");

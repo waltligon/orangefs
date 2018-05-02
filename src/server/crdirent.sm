@@ -656,7 +656,9 @@ static PINT_sm_action crdirent_update_directory_attr(
         (dspace_attr->owner == PVFS_UID_MAX || dspace_attr->group == PVFS_GID_MAX))
     {
         js_p->error_code = PINT_map_credential(&s_op->req->u.crdirent.credential,
-                                               &uid, &num_groups, group_array);
+                                               &uid,
+                                               &num_groups,
+                                               group_array);
 
         if (js_p->error_code != 0)
         {
@@ -685,11 +687,16 @@ static PINT_sm_action crdirent_update_directory_attr(
     PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
 
     /* update timestamps for the dirdata handle. */
-    ret = job_trove_dspace_setattr(
-        s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.dirdata_handle,
-        ds_attr,
-        TROVE_SYNC,
-        smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
+    ret = job_trove_dspace_setattr(s_op->req->u.crdirent.fs_id, 
+                                   s_op->req->u.crdirent.dirdata_handle,
+                                   ds_attr,
+                                   TROVE_SYNC,
+                                   smcb, 
+                                   0, 
+                                   js_p, 
+                                   &j_id, 
+                                   server_job_context, 
+                                   s_op->req->hints);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, " crdirent: update timestamp, type is %d\n ",
                      ds_attr->type);
@@ -714,12 +721,18 @@ static PINT_sm_action crdirent_update_metahandle_timestamp(
                      "for metadata handle %s\n",
                      PVFS_OID_str(&s_op->req->u.crdirent.new_handle));
 
-        memset(&(s_op->u.crdirent.metahandle_ds_attr), 0,
+        memset(&(s_op->u.crdirent.metahandle_ds_attr),
+               0,
                sizeof(PVFS_ds_attributes));
-        ret = job_trove_dspace_getattr(
-            s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.new_handle, smcb,
-            &(s_op->u.crdirent.metahandle_ds_attr),
-            0, js_p, &tmp_id, server_job_context, s_op->req->hints);
+
+        ret = job_trove_dspace_getattr(s_op->req->u.crdirent.fs_id,
+                                       s_op->req->u.crdirent.new_handle, smcb,
+                                       &(s_op->u.crdirent.metahandle_ds_attr),
+                                       0,
+                                       js_p,
+                                       &tmp_id,
+                                       server_job_context,
+                                       s_op->req->hints);
 
         return ret;
     }
@@ -741,19 +754,19 @@ static PINT_sm_action crdirent_update_metahandle_timestamp(
 
         /* This memory will be freed in either crdirent_cleanup or
          * crdirent_find_split_entries by PINT_cleanup_capability. */
-        capability_handles =
-              malloc(sizeof(PVFS_handle));
+        capability_handles = malloc(sizeof(PVFS_handle));
+
         if (! capability_handles)
         {
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
         }
-        capability_handles[0] =
-                s_op->req->u.crdirent.new_handle;
+
+        capability_handles[0] = s_op->req->u.crdirent.new_handle;
         ret = PINT_server_to_server_capability(&s_op->u.crdirent.capability,
-                 s_op->req->u.crdirent.fs_id,
-                 1,
-                 capability_handles);
+                                               s_op->req->u.crdirent.fs_id,
+                                               1,
+                                               capability_handles);
         if (ret != 0)
         {
             js_p->error_code = ret;
@@ -766,26 +779,26 @@ static PINT_sm_action crdirent_update_metahandle_timestamp(
         tmp_attr.mask = PVFS_ATTR_COMMON_CTIME;
 
         /* Capability was initialized earlier. */
-        PINT_SERVREQ_SETATTR_FILL(
-            msg_p->req,
-            s_op->u.crdirent.capability,
-            s_op->req->u.crdirent.credential,
-            s_op->req->u.crdirent.fs_id,
-            s_op->req->u.crdirent.new_handle,
-            s_op->req->u.crdirent.sid_count,
-            s_op->req->u.crdirent.new_sid_array,
-            PVFS_TYPE_NONE,
-            tmp_attr,
-            PVFS_ATTR_COMMON_CTIME,
-            s_op->req->hints);
+        PINT_SERVREQ_SETATTR_FILL(msg_p->req,
+                                  PVFS_REQ_DIRDATA,
+                                  s_op->u.crdirent.capability,
+                                  s_op->req->u.crdirent.credential,
+                                  s_op->req->u.crdirent.fs_id,
+                                  s_op->req->u.crdirent.new_handle,
+                                  s_op->req->u.crdirent.sid_count,
+                                   s_op->req->u.crdirent.new_sid_array,
+                                  PVFS_TYPE_NONE,
+                                  tmp_attr,
+                                  PVFS_ATTR_COMMON_CTIME,
+                                  s_op->req->hints);
 
         msg_p->fs_id = s_op->req->u.crdirent.fs_id;
         msg_p->handle = s_op->req->u.crdirent.new_handle;
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = NULL;
 
-        ret = PVFS_SID_get_addr(
-            &msg_p->svr_addr, &s_op->req->u.crdirent.new_sid_array[0]);
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr,
+                                &s_op->req->u.crdirent.new_sid_array[0]);
 
         if (ret)
         {
@@ -794,8 +807,8 @@ static PINT_sm_action crdirent_update_metahandle_timestamp(
         }
 
         gossip_debug(GOSSIP_SERVER_DEBUG,
-            "setting timestamps for handle %s\n",
-            PVFS_OID_str(&msg_p->handle));
+                     "setting timestamps for handle %s\n",
+                     PVFS_OID_str(&msg_p->handle));
 
         PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
         js_p->error_code = REMOTE_METAHANDLE;
@@ -817,8 +830,9 @@ static PINT_sm_action crdirent_update_local_metahandle_timestamp(
 
     PVFS_ds_attr_to_object_attr(&s_op->u.crdirent.metahandle_ds_attr,
                                 &s_op->u.crdirent.metahandle_attr);
-    s_op->u.crdirent.metahandle_attr.mask =
-        PVFS_ATTR_COMMON_ALL | PVFS_ATTR_META_ALL;
+
+    s_op->u.crdirent.metahandle_attr.mask = PVFS_ATTR_COMMON_ALL |
+                                            PVFS_ATTR_META_ALL;
 
     /* The only thing we need to change is CTIME, so all we have to
      * do is set that flag in the representation of the attributes
@@ -828,14 +842,20 @@ static PINT_sm_action crdirent_update_local_metahandle_timestamp(
 
     PVFS_object_attr_overwrite_setable(&s_op->u.crdirent.metahandle_attr,
                                        tmp_attr_ptr);
+    
     ds_attr = &(s_op->u.crdirent.metahandle_ds_attr);
     PVFS_object_attr_to_ds_attr(&s_op->u.crdirent.metahandle_attr, ds_attr);
 
-    ret = job_trove_dspace_setattr(
-        s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.new_handle,
-        ds_attr,
-        TROVE_SYNC,
-        smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
+    ret = job_trove_dspace_setattr(s_op->req->u.crdirent.fs_id,
+                                   s_op->req->u.crdirent.new_handle,
+                                   ds_attr,
+                                   TROVE_SYNC,
+                                   smcb,
+                                   0,
+                                   js_p,
+                                   &j_id,
+                                   server_job_context,
+                                   s_op->req->hints);
 
     return ret;
 }
@@ -978,7 +998,7 @@ static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
     memset(ds_attr, 0, sizeof(PVFS_ds_attributes));
 
     dspace_attr->ctime = time(NULL);
-    dspace_attr->mtime = PINT_util_mktime_version(dspace_attr->ctime);
+    dspace_attr->mtime = dspace_attr->ctime;
 
     /* copy and convert format */
     PVFS_ds_attr_from_object_attr(ds_attr, dspace_attr);

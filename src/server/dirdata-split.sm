@@ -462,6 +462,7 @@ static PINT_sm_action crdirent_send_server_attrs(struct PINT_smcb *smcb,
 
     /* Capability was initialized earlier. */
     PINT_SERVREQ_SETATTR_FILL(msg_p->req,
+                              PVFS_REQ_DIRDATA,
                               s_op->u.crdirent.capability,
                               s_op->req->u.crdirent.credential,
                               s_op->req->u.crdirent.fs_id,
@@ -944,6 +945,7 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
         PINT_serv_init_msgarray_params(s_op, s_op->req->u.setattr.fs_id);
 
         PINT_SERVREQ_TREE_SETATTR_FILL(msg_p->req,
+                                       PVFS_REQ_DIRDATA,
                                        s_op->u.crdirent.capability,
                                        s_op->req->u.crdirent.credential,
                                        s_op->req->u.crdirent.fs_id,

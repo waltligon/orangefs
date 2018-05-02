@@ -175,6 +175,7 @@ static PINT_sm_action listattr_setup_getattr(
 
         PINT_SERVREQ_GETATTR_FILL(
             *req,
+            s_op->req->ctrl.sub,
             s_op->req->capability,
             dummy_credential,
             s_op->req->u.listattr.fs_id,

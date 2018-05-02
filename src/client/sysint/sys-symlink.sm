@@ -593,6 +593,7 @@ static PINT_sm_action symlink_setattr_setup_msgpair(struct PINT_smcb *smcb,
     sm_p->u.sym.sys_attr.perms = 0777;
 
     PINT_SERVREQ_SETATTR_FILL(msg_p->req,
+                              PVFS_REQ_OTHER,
                               sm_p->getattr.attr.capability,
                               *sm_p->cred_p,
                               sm_p->object_ref.fs_id,

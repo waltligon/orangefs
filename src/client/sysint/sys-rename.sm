@@ -787,6 +787,7 @@ static PINT_sm_action rename_parent_getattr_setup_msgpair_array(
                      sm_p->u.rename.parent_refns[i].fs_id);
 
         PINT_SERVREQ_GETATTR_FILL(msg_p->req,
+                                  PVFS_REQ_DIRDATA,
                                   capability,
                                   *sm_p->cred_p,
                                   sm_p->u.rename.parent_refns[i].fs_id,

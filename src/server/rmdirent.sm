@@ -400,7 +400,7 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
 }
 
 /* I don't understand the Chinease fire drill with the attribute buffers.
- * We are not chaning any attributes here, only taking a blank buffer and
+ * We are not changing any attributes here, only taking a blank buffer and
  * copying around before converting to DS attribs. Since that is all we
  * really need to do (convert) I'm taking out this overwrite stuff.  WBL
  */

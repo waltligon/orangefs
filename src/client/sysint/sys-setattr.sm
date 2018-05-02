@@ -241,6 +241,7 @@ static PINT_sm_action setattr_msg_setup_msgpair(struct PINT_smcb *smcb,
      * this time if they somehow get changed we'll have garbage on disk
      */
     PINT_SERVREQ_SETATTR_FILL(msg_p->req,
+                              PVFS_REQ_DATAFILE,
                               sm_p->getattr.attr.capability,
                               *sm_p->cred_p,
                               sm_p->object_ref.fs_id,

@@ -357,6 +357,7 @@ static PINT_sm_action tree_communicate_partition_handles(
                 
                     PINT_SERVREQ_SETATTR_FILL(
                                    *req,
+                                   s_op->req->ctrl.sub,
                                    s_op->req->capability,
                                    s_op->req->u.tree_setattr.credential,
                                    fs_id,
@@ -405,6 +406,7 @@ static PINT_sm_action tree_communicate_partition_handles(
             case PVFS_SERV_TREE_GET_FILE_SIZE:
                 PINT_SERVREQ_GETATTR_FILL(
                          *req,
+                         PVFS_REQ_DATAFILE,
                          s_op->req->capability,
                          this_req->u.tree_get_file_size.credential,
                          fs_id,
@@ -425,6 +427,7 @@ static PINT_sm_action tree_communicate_partition_handles(
             {
                 PINT_SERVREQ_GETATTR_FILL(
                     *req,
+                    s_op->req->ctrl.sub,
                     s_op->req->capability,
                     this_req->u.tree_getattr.credential,
                     fs_id,
@@ -547,6 +550,7 @@ static PINT_sm_action tree_communicate_partition_handles(
             case PVFS_SERV_TREE_SETATTR:
                 PINT_SERVREQ_TREE_SETATTR_FILL(
                                 msg_p->req,
+                                s_op->req->ctrl.sub,
                                 s_op->req->capability,
                                 this_req->u.tree_setattr.credential,
                                 fs_id,
@@ -629,6 +633,7 @@ static PINT_sm_action tree_communicate_partition_handles(
 
                 PINT_SERVREQ_TREE_GETATTR_FILL(
                         msg_p->req,
+                        s_op->req->ctrl.sub,
                         capability,
                         s_op->req->u.tree_getattr.credential,
                         fs_id,

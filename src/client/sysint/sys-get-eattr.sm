@@ -305,6 +305,7 @@ static PINT_sm_action get_eattr_setup_msgpair(struct PINT_smcb *smcb,
     msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_GETEATTR_FILL(msg_p->req,
+                               PVFS_REQ_OTHER,
                                capability,
                                sm_p->object_ref.fs_id,
                                sm_p->object_ref.handle,
