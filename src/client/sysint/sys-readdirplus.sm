@@ -580,11 +580,13 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
          if (sm_p->u.readdirplus.obj_attr_array[i].objtype ==
                      PVFS_TYPE_METAFILE)
          {
+/*
              if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_ALL)
              {
                  assert(sm_p->u.readdirplus.obj_attr_array[i].mask &
                         PVFS_ATTR_META_ALL);
              }
+*/
              nhandles +=
                      sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count;
              /* Allocate size_array here */
@@ -621,6 +623,13 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
                      PVFS_TYPE_METAFILE)
          {
              int j;
+
+gossip_debug(GOSSIP_LISTATTR_DEBUG,
+             "file %s, meta handle: %s\n",
+             sm_p->u.readdirplus.readdirplus_resp->dirent_array[i].d_name,
+             PVFS_OID_str(&sm_p->u.readdirplus.readdirplus_resp->dirent_array[i].handle));
+
+#if 0
              /* TODO are these REALLY asserts, or bad error checking */
              if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DIST)
              {
@@ -636,10 +645,14 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
                  assert(sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_array);
                  assert(sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count > 0);
              }
+#endif
+
              for (j = 0;
                   j < sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count;
                   j++) 
              {
+                 gossip_debug(GOSSIP_LISTATTR_DEBUG, "\tdata handle: %s\n",
+                        PVFS_OID_str(&sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_array[j]));
                  sm_p->u.readdirplus.input_handle_array[nhandles].handle = 
                     sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_array[j];
                  sm_p->u.readdirplus.input_handle_array[nhandles].sid_array =
@@ -675,7 +688,8 @@ static int readdirplus_fetch_attrs_comp_fn(void *v_p,
                                            int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
 
     gossip_debug(GOSSIP_LISTATTR_DEBUG,
                  "readdirplus_fetch_attrs_comp_fn called\n");
@@ -698,7 +712,7 @@ static int readdirplus_fetch_attrs_comp_fn(void *v_p,
                             sm_p->msgarray_op.msgarray[index].op_status;
         }
     }
-    else if (sm_p->msgarray_op.msgarray[index].op_status == 0)
+    else
     {
         /* fetch all errors from the servresp structure
          * and copy the object attributes
@@ -766,7 +780,8 @@ static int readdirplus_fetch_sizes_comp_fn(void *v_p,
                                            int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
 
     gossip_debug(GOSSIP_LISTATTR_DEBUG,
                  "readdirplus_fetch_sizes_comp_fn called\n");
