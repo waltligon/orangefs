@@ -75,7 +75,7 @@ static int digest(const char *digest_name,
         *output = digest_value;
     if (output_len)
         *output_len = digest_len;
-#ifdef OPENSSL_1_1
+#ifdef HAVE_OPENSSL_1_1
     EVP_MD_CTX_free(mdctx);
 #endif
     return 0;
