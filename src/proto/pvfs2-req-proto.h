@@ -1242,17 +1242,15 @@ do {                                             \
     (__req).u.setattr.handle = (__handle);       \
     (__req).u.setattr.sid_count = (__sid_count); \
     (__req).u.setattr.sid_array = (__sid_array); \
-    (__attr).objtype = (__objtype);              \
-    (__attr).mask |= PVFS_ATTR_SYS_TYPE;         \
-    PINT_CONVERT_ATTR(&(__req).u.setattr.attr, &(__attr), __extra_amask);\
+    PINT_copy_object_attr(&(__req).u.setattr.attr, &(__attr)); \
 } while (0)
 
     /*
      * converting attr and modifying it in a FILL macro is bad form
      * moving this back into the state machines for this and mkdir
-    (__attr).objtype = (__objtype);                                       \
-    (__attr).mask |= PVFS_ATTR_SYS_TYPE;                                  \
-    PINT_CONVERT_ATTR(&(__req).u.setattr.attr, &(__attr), __extra_amask); \
+     * (__attr).objtype = (__objtype);                                       \
+     * (__attr).mask |= PVFS_ATTR_SYS_TYPE;                                  \
+     * PINT_CONVERT_ATTR(&(__req).u.setattr.attr, &(__attr), __extra_amask); \
      */
 
 /* lookup path ************************************************/
@@ -1504,16 +1502,16 @@ do {                                                       \
             (__dist_dir_split_size);                       \
     (__attr).objtype = PVFS_TYPE_DIRECTORY;                \
     (__attr).mask   |= PVFS_ATTR_SYS_TYPE;                 \
-    PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);\
+    PINT_copy_object_attr(&(__req).u.mkdir.attr, &(__attr)); \
 } while (0)
 
     /* calling a convert in a fill macro is bad form - it prevents
      * accessing all of the attr fields plus it obsfucates.
      * I am moving these back to the state machines both here and
      * in setattr
-    (__attr).objtype = PVFS_TYPE_DIRECTORY;                          \
-    (__attr).mask   |= PVFS_ATTR_COMMON_TYPE;                        \
-    PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);          \
+     * (__attr).objtype = PVFS_TYPE_DIRECTORY;                          \
+     * (__attr).mask   |= PVFS_ATTR_COMMON_TYPE;                        \
+     * PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);          \
      */
 
 struct PVFS_servresp_mkdir

@@ -218,6 +218,8 @@ nested machine pvfs2_tree_getattr_work_sm
 
 %%
 
+/******************** ACTION FUNCTIONS *********************/
+
 static PINT_sm_action tree_communicate_partition_handles(
                                                   struct PINT_smcb *smcb
                                                  ,job_status_s *js_p
@@ -351,9 +353,9 @@ static PINT_sm_action tree_communicate_partition_handles(
             {
             case PVFS_SERV_TREE_SETATTR:
                 {
-                    PVFS_sys_attr dummy_sys_attr;
+                    PVFS_object_attr dummy_obj_attr;
                  
-                    memset(&dummy_sys_attr, 0, sizeof(PVFS_sys_attr));
+                    memset(&dummy_obj_attr, 0, sizeof(PVFS_object_attr));
                 
                     PINT_SERVREQ_SETATTR_FILL(
                                    *req,
@@ -365,15 +367,23 @@ static PINT_sm_action tree_communicate_partition_handles(
                                    0,    /* V3 sid count */
                                    NULL, /* V3 sid array */
                                    this_req->u.tree_setattr.objtype,
-                                   dummy_sys_attr,
+                                   dummy_obj_attr,
                                    0,
                                    s_op->req->hints);
 
                     /* copy to req->u.setattr.attr because of calling
                     * pvfs2_set_attr_work_sm next
                     */
+                    /* 
+                     * I'm pretty sure if we put this_req->u.tree_setattr.attr
+                     * in the macro above it will have the same effect
+                     * now that we have sys_attrs out of the way
+                     */
                     PINT_copy_object_attr(&req->u.setattr.attr,
                                           &this_req->u.tree_setattr.attr);
+                    /*
+                     * These two should go before the macro call ??
+                     */
                     req->u.setattr.attr.objtype = 
                                           this_req->u.tree_setattr.objtype;
                     req->u.setattr.attr.mask |= PVFS_ATTR_COMMON_TYPE;

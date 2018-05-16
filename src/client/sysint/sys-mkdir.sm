@@ -242,6 +242,13 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     PINT_init_sysint_credential(sm_p->cred_p, credential);
 
     sm_p->u.mkdir.object_name = object_name;
+
+    /*
+     * I really hate sys_attr's - I would really rather convert them to
+     * object_attr's right here and then work on with those.  Same for
+     * returning attrs- convert them right before returning if that's
+     * possible - tricky because of return struct we use.
+     */
     
     PVFS_util_copy_sys_attr(&sm_p->u.mkdir.sys_attr, &attr);
 
@@ -596,7 +603,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
      * to the other meta servers.
      */
     /* V3 TODO - Do we want to skip oid allocation if this
-     *           is a retry?
+     *           is a retry? - YES, I think so!
      */
     ret = PVFS_OBJ_gen_dir(sm_p->parent_ref.fs_id,
                            &sm_p->u.mkdir.metadata_handle,
@@ -632,10 +639,12 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
+    PINT_CONVERT_ATTR(&sm_p->u.mkdir.obj_attr, &sm_p->u.mkdir.sys_attr, 0);
+
     PINT_SERVREQ_MKDIR_FILL(msg_p->req,
                             sm_p->getattr.attr.capability,
                             *sm_p->cred_p,
-                            sm_p->u.mkdir.sys_attr,
+                            sm_p->u.mkdir.obj_attr,
                             sm_p->parent_ref.fs_id,
                             *sm_p->u.mkdir.metadata_handle, /* object */
                             sm_p->u.mkdir.metadata_sid_count,
@@ -722,7 +731,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
                                  sm_p->u.mkdir.dirdata_sid_count);
     if (ret != 0)
     {
-        gossip_err("Failed to initialize %d msgpairs\n",
+        gossip_err("mkdir: setattr failed to initialize %d msgpairs\n",
                    sm_p->u.mkdir.dirdata_sid_count);
         js_p->error_code = ret;
         return(SM_ACTION_COMPLETE);
@@ -731,15 +740,16 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
         PINT_SERVREQ_SETATTR_FILL(msg_p->req,
-                                  PVFS_REQ_DIRDATA, /* type of object we are setting */
+                                  PVFS_REQ_DIRDATA, /* type of obj bing set */
                                   sm_p->u.mkdir.capability,
                                   *sm_p->cred_p,
                                   sm_p->parent_ref.fs_id,
                                   sm_p->u.mkdir.dirdata_handles[i],
                                   sm_p->u.mkdir.dirdata_sid_count,
-                                  &sm_p->u.mkdir.dirdata_sid_array[i * sm_p->u.mkdir.dirdata_sid_count],
+                                  &sm_p->u.mkdir.dirdata_sid_array[i *
+                                              sm_p->u.mkdir.dirdata_sid_count],
                                   PVFS_TYPE_DIRDATA,
-                                  dummy_sys_attr,
+                                  dirdata_attr, /* dummy_sys_attr, */
                                   0,
                                   NULL);
 

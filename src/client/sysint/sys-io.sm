@@ -825,14 +825,14 @@ static PINT_sm_action io_inspect_attr(struct PINT_smcb *smcb,
     if(relatime_timeout >= 0 &&
        (sm_p->getattr.attr.atime + relatime_timeout) <= curtime)
     {
-        PVFS_sys_attr atime_update_attr;
+        PVFS_object_attr atime_update_attr;
         PINT_sm_msgpair_state *msg_p;
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "relatime logic dictates atime WILL BE updated!\n");
         memset(&atime_update_attr, 0, sizeof(atime_update_attr));
         atime_update_attr.atime = curtime;
-        atime_update_attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_ATIME_SET;
+        atime_update_attr.mask = PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_ATIME_SET;
 
         PINT_msgpair_init(&sm_p->msgarray_op);
         msg_p = &sm_p->msgarray_op.msgpair;
