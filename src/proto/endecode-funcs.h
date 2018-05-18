@@ -260,7 +260,8 @@ typedef uint8_t  u_int8_t;
 /* memory alloc and free, just for decoding */
 #if 0
 /* this is for debugging, if you want to see what is malloc'd */
-static inline void *decode_malloc (int n) {
+static inline void *decode_malloc (int n)
+{
 	void *p;
 	if (n>0)
 		p = malloc(n);
@@ -270,7 +271,8 @@ static inline void *decode_malloc (int n) {
 	return p;
 }
 /* this is for debugging, if you want to see what is free'd */
-static inline void decode_free (void *p) {
+static inline void decode_free (void *p)
+{
 	printf("decode free: %p\n",p);
 	free(p);
 }
@@ -926,6 +928,11 @@ static inline void defree_##name(sname *x) { \
     if (x->n1 > 0) decode_free(x->a1); \
 }
 
+#define endecode_fields_1a(name, t1, x1, tn1, n1, ta1, a1) \
+    endecode_fields_1a_generic(name, name, t1, x1, tn1, n1, ta1, a1)
+#define endecode_fields_1a_struct(name, t1, x1, tn1, n1, ta1, a1) \
+    endecode_fields_1a_generic(name, struct name, t1, x1, tn1, n1, ta1, a1)
+
 /* one field then two arrays */
 #define endecode_fields_1aa_generic(name, sname, t1, x1, tn1, n1, ta1, a1, ta2, a2) \
 static inline void encode_##name(char **pptr, const sname *x) { typeof(tn1) i; \
@@ -951,11 +958,6 @@ static inline void defree_##name(sname *x) { \
     if (x->n1 > 0) decode_free(x->a1); \
     if (x->n1 > 0) decode_free(x->a2); \
 }
-
-#define endecode_fields_1a(name, t1, x1, tn1, n1, ta1, a1) \
-    endecode_fields_1a_generic(name, name, t1, x1, tn1, n1, ta1, a1)
-#define endecode_fields_1a_struct(name, t1, x1, tn1, n1, ta1, a1) \
-    endecode_fields_1a_generic(name, struct name, t1, x1, tn1, n1, ta1, a1)
 
 #define endecode_fields_1aa(name, t1, x1, tn1, n1, ta1, a1, ta2, a2) \
     endecode_fields_1aa_generic(name, name, t1, x1, tn1, n1, ta1, a1, ta2, a2)

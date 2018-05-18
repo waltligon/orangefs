@@ -1024,7 +1024,7 @@ int pvfs_close(int fd)
 int pvfs_stat(const char *path, struct stat *buf)
 {
     gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_stat: called with %s\n", path);
-    return pvfs_stat_mask(path, buf, PVFS_ATTR_DEFAULT_MASK);
+    return pvfs_stat_mask(path, buf, PVFS_ATTR_SYS_ALL);
 }
 
 int pvfs_stat_mask(const char *path, struct stat *buf, uint32_t mask)
@@ -1054,7 +1054,7 @@ int pvfs_stat_mask(const char *path, struct stat *buf, uint32_t mask)
         goto errorout;
     }
     mask &= PVFS_ATTR_DEFAULT_MASK;
-    rc = iocommon_stat(pd, buf, mask);
+    rc = iocommon_stat(pd, buf, mask | PVFS_ATTR_SYS_COMMON_ALL);
     pvfs_close(pd->fd);
 
 errorout:
@@ -1095,7 +1095,7 @@ int pvfs_stat64(const char *path, struct stat64 *buf)
         pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
-    rc = iocommon_stat64(pd, buf, PVFS_ATTR_DEFAULT_MASK);
+    rc = iocommon_stat64(pd, buf, PVFS_ATTR_SYS_ALL);
     pvfs_close(pd->fd);
 
 errorout:
@@ -1133,7 +1133,7 @@ int pvfs_fstat_mask(int fd, struct stat *buf, uint32_t mask)
         return -1;
     }
     mask &= PVFS_ATTR_DEFAULT_MASK;
-    return iocommon_stat(pd, buf, mask);
+    return iocommon_stat(pd, buf, mask | PVFS_ATTR_SYS_COMMON_ALL);
 }
 
 /**
@@ -1155,7 +1155,7 @@ int pvfs_fstat64(int fd, struct stat64 *buf)
         errno = EBADF;
         return -1;
     }
-    return iocommon_stat64(pd, buf, PVFS_ATTR_DEFAULT_MASK);
+    return iocommon_stat64(pd, buf, PVFS_ATTR_SYS_ALL);
 }
 
 /**
@@ -1265,7 +1265,7 @@ int pvfs_fstatat64(int fd, const char *path, struct stat64 *buf, int flag)
             pvfs_close(pd2->fd);
             return rc;
         }
-        rc = iocommon_stat64(pd2, buf, PVFS_ATTR_DEFAULT_MASK);
+        rc = iocommon_stat64(pd2, buf, PVFS_ATTR_SYS_ALL);
         pvfs_close(pd2->fd);
     }
     return rc;
@@ -1308,7 +1308,7 @@ int pvfs_lstat_mask(const char *path, struct stat *buf, uint32_t mask)
         goto errorout;
     }
     mask &= PVFS_ATTR_DEFAULT_MASK;
-    rc = iocommon_stat(pd, buf, mask);
+    rc = iocommon_stat(pd, buf, mask | PVFS_ATTR_SYS_COMMON_ALL);
     pvfs_close(pd->fd);
 
 errorout:
@@ -1349,7 +1349,7 @@ int pvfs_lstat64(const char *path, struct stat64 *buf)
         pvfs_free_descriptor(pd->fd);
         goto errorout;
     }
-    rc = iocommon_stat64(pd, buf, PVFS_ATTR_DEFAULT_MASK);
+    rc = iocommon_stat64(pd, buf, PVFS_ATTR_SYS_ALL);
     pvfs_close(pd->fd);
 
 errorout:

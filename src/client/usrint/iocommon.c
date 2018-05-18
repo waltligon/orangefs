@@ -1345,7 +1345,7 @@ finish:
     errno = 0;
     /* descriptor and state mutex remains locked */
     rc = PVFS_sys_getattr(pd->s->pvfs_ref,
-                          PVFS_ATTR_SYS_ALL_NOHINT,
+                          PVFS_ATTR_SYS_ALL,
                           credential,
                           &attributes_resp,
                           NULL);
@@ -1503,7 +1503,7 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
             errno = 0;
             /* descriptor state mutex remains locked */
             rc = PVFS_sys_getattr(pd->s->pvfs_ref,
-                                  PVFS_ATTR_SYS_SIZE,
+                                  PVFS_ATTR_SYS_ALL,
                                   credential,
                                   &attributes_resp,
                                   NULL);
@@ -1631,7 +1631,7 @@ int iocommon_remove (const char *path,
 
     /* need to verify this is a file or symlink */
     errno = 0;
-    rc = iocommon_getattr(file_ref, &attr, PVFS_ATTR_SYS_TYPE);
+    rc = iocommon_getattr(file_ref, &attr, PVFS_ATTR_SYS_ALL_NOHINTSIZE);
     IOCOMMON_RETURN_ERR(rc);
 
     if ((attr.objtype == PVFS_TYPE_DIRECTORY) && !dirflag)
@@ -1646,7 +1646,7 @@ int iocommon_remove (const char *path,
     }
 
     /* should check to see if any process has file open */
-    /* but at themoment we don't have a way to do that */
+    /* but at the moment we don't have a way to do that */
     errno = 0;
     rc = PVFS_sys_remove(file, parent_ref, credential, PVFS_HINT_NULL);
     IOCOMMON_CHECK_ERR(rc);
@@ -2932,7 +2932,7 @@ int iocommon_getmod(pvfs_descriptor *pd, mode_t *mode)
     memset(&attr, 0, sizeof(attr));
 
     errno = 0;
-    rc = iocommon_getattr(pd->s->pvfs_ref, &attr, PVFS_ATTR_SYS_PERM);
+    rc = iocommon_getattr(pd->s->pvfs_ref, &attr, PVFS_ATTR_SYS_ALL_NOHINTSIZE);
     if (!rc)
     {
         *mode = attr.perms & 07777;
@@ -3027,16 +3027,14 @@ int iocommon_readlink(pvfs_descriptor *pd, char *buf, int size)
     if (!pd || pd->is_in_use != PVFS_FS)
     {
         errno = EBADF;
-        return -1;
+        rc = -1;
+        goto errorout;
     }
     /* Initialize any variables */
     memset(&attr, 0, sizeof(attr));
  
     errno = 0;
-    rc = iocommon_getattr(pd->s->pvfs_ref, &attr, PVFS_ATTR_SYS_TYPE | 
-                                                PVFS_ATTR_SYS_SIZE |
-                                                PVFS_ATTR_SYS_LNK_TARGET);
-    IOCOMMON_RETURN_ERR(rc);
+    rc = iocommon_getattr(pd->s->pvfs_ref, &attr, PVFS_ATTR_SYS_ALL);
 
     /* copy attributes into standard stat struct */
     if (attr.objtype == PVFS_TYPE_SYMLINK)
@@ -3377,7 +3375,7 @@ int iocommon_access(const char *pvfs_path,
 
     /* Get file atributes */
     errno = 0;
-    rc = iocommon_getattr(file_ref, &attr, PVFS_ATTR_SYS_COMMON_ALL);
+    rc = iocommon_getattr(file_ref, &attr, PVFS_ATTR_SYS_ALL);
     IOCOMMON_RETURN_ERR(rc);
 
     if (flags & AT_EACCESS)

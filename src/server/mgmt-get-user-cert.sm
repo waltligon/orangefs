@@ -237,8 +237,7 @@ static PINT_sm_action get_user_cert_keyreq_send_public_key(
     }
 
     /* write public key to buffer */
-    enc_size = 
-        i2d_RSAPublicKey(rsa,&enc_buf); 
+    enc_size = i2d_RSAPublicKey(rsa,&enc_buf); 
 
     if (enc_size > 0)
     {

@@ -15,7 +15,8 @@ typedef struct SID_cacheval_s
 {
     BMI_addr bmi_addr;
     int attr[SID_NUM_ATTR];
-    char url[0];
+    char *url;              /* space to be allocated */
+                            /* immediately following this struct */
 } SID_cacheval_t;
 
 struct SID_type_s

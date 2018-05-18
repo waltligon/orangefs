@@ -1246,6 +1246,15 @@ int fcloseall(void)
     int rc = 0;
 
     gossip_debug(GOSSIP_USRINT_DEBUG, "fcloseall\n");
+    /* check if the FS is still up */
+    if (pvfs_usrint_available == 0)
+    {
+        /* no, things have been shutdown, we can't do
+         * any more FS operations through this interface
+         * if the shmctrl has been unlinked.
+         */
+        return rc;
+    }
     /* these are not on the chain */
     fclose(stdin);
     fclose(stdout);

@@ -521,7 +521,7 @@ static const configoption_t options[] =
 
     /* Specfies one or more user attributes for a server
      *
-     *     Attribute {type-word} ...
+     *     Attribute {Key=Value} ...
      *
      * As an example:
      *

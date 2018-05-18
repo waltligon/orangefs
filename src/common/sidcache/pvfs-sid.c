@@ -9,7 +9,7 @@
  *  Functions for accessing SIDcache
  */
 
-
+#include <db.h>
 
 #include "gossip.h"
 #include "pvfs2-debug.h"

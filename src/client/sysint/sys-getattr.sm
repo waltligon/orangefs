@@ -775,6 +775,10 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    /* V3 - is sm_p->getattr.attr supposed to be empty at this point
+     * This call makes sure it is
+     */
+    PINT_free_object_attr(&sm_p->getattr.attr);
     ret = PINT_acache_get_cached_entry(object_ref,
                                        &sm_p->getattr.attr,
                                        &attr_status,
@@ -1651,9 +1655,9 @@ static PINT_sm_action getattr_datafile_getattr_cleanup(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
-/* We run this state if we are doing getattr on a directory AND we need
- * the up-to-date timestamps and total dirent count.  Unlike the
- * earlier request this sends multiple getattr requests to the dirdata
+/* We run this state if we are doing getattr on a direcotry AND we need
+ * the up-to-date timestamps and total dirdate count.  Unlink the
+ * earlier request this sends multiple getattr requests to the dirdate
  * objects (not the directory object) and only asks for the partial data
  * which will be combined afterwards.
  */

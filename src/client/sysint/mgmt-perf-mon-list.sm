@@ -196,7 +196,8 @@ static int perf_mon_list_comp_fn(void* v_p,
     int h = 0;
 #endif
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     int key_size = (sm_p->u.perf_mon_list.cnt_type == PINT_PERF_TIMER) ?
                            sizeof(struct PINT_perf_timer) : sizeof(int64_t);
 

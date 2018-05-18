@@ -280,11 +280,13 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_key_data tmp_pubkey_buf, tmp_privkey_buf, pkeybuf;
-    RSA *rsa_pubkey, *rsa_privkey;
+    PVFS_key_data tmp_pubkey_buf=NULL, tmp_privkey_buf=NULL, pkeybuf=NULL;
+    RSA *rsa_pubkey=NULL, *rsa_privkey=NULL;
     unsigned char pwddata[PVFS_REQ_LIMIT_USERID_PWD], *penc_key;
     int flen, tmp_privkey_len, bufrem, maxflen, elen;
     EVP_PKEY *keypair;
+    int ret=0;
+    BIGNUM *BN_exponent = NULL;
 
     /* load public key from data received from the server */
     tmp_pubkey_buf = sm_p->u.mgmt_get_user_cert.public_key.buf;
@@ -350,23 +352,78 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
         GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: could not "
                           "alloc keypair", -PVFS_ESECURITY);
         js_p->error_code = -PVFS_ENOMEM;
+        RSA_free(rsa_pubkey);
         return SM_ACTION_COMPLETE;
     }
 
     /* generate RSA keypair */
-    rsa_privkey = RSA_generate_key(PVFS_USER_CERT_KEY_SIZE, RSA_F4, NULL, NULL);
-    if (rsa_privkey == NULL || !EVP_PKEY_assign_RSA(keypair, rsa_privkey))
+       /* create rsa_privkey */
+    rsa_privkey = RSA_new();
+    if ( rsa_privkey == NULL )
+    {
+       GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: could not allocate rsa_privkey",
+                         -PVFS_ESECURITY);
+       RSA_free(rsa_pubkey);
+       EVP_PKEY_free(keypair);
+       js_p->error_code = -PVFS_ENOMEM;
+       return SM_ACTION_COMPLETE;
+    }
+       /* create exponent */
+    BN_exponent = BN_new();
+    if (BN_exponent == NULL)
+    {
+       GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: could not allocate BN_exponent",
+                         -PVFS_ESECURITY);
+       js_p->error_code = -PVFS_ENOMEM;
+       RSA_free(rsa_pubkey);
+       EVP_PKEY_free(keypair);
+       RSA_free(rsa_privkey);
+       return SM_ACTION_COMPLETE;
+    }
+       /* set the value of the exponent */
+    ret=BN_set_word(BN_exponent,RSA_F4);
+    if (ret==0)
+    {
+       GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: could not set exponent value",
+                         -PVFS_ESECURITY);
+       js_p->error_code = -PVFS_EINVAL;
+       RSA_free(rsa_pubkey);
+       EVP_PKEY_free(keypair);
+       RSA_free(rsa_privkey);
+       BN_free(BN_exponent);
+       return SM_ACTION_COMPLETE;
+    }
+       /* generate the private key */
+    ret=RSA_generate_key_ex(rsa_privkey, PVFS_USER_CERT_KEY_SIZE, BN_exponent, NULL);
+    if ( ret==0 )
+    {
+       GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: could not generate RSA private key",
+                         -PVFS_ESECURITY);
+       js_p->error_code = -PVFS_EINVAL;
+       RSA_free(rsa_pubkey);
+       EVP_PKEY_free(keypair);
+       RSA_free(rsa_privkey);
+       BN_free(BN_exponent);
+       return SM_ACTION_COMPLETE;
+    }
+       /* copy the private key to the keypair
+        * NOTE: description of this assign function says that when the keypair is freed, the rsa_privkey
+        * will also be freed.
+        */
+    ret=EVP_PKEY_assign_RSA(keypair,rsa_privkey);
+    if ( ret==0 )
     {
         GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: could not "
-                          "assign keypair", -PVFS_ESECURITY);
+                          "assign keypair from rsa_privkey", -PVFS_ESECURITY);
         js_p->error_code = -PVFS_EINVAL;
+        RSA_free(rsa_pubkey);
         EVP_PKEY_free(keypair);
-        if (rsa_privkey != NULL)
-        {
-            RSA_free(rsa_privkey);
-        }
+        RSA_free(rsa_privkey);
+        BN_free(BN_exponent);
         return SM_ACTION_COMPLETE;
     }
+       /* clean up from generating the private key and keypair */
+    BN_free(BN_exponent);
 
     /* copy key to buffer */
     tmp_privkey_buf = NULL;
@@ -376,8 +433,10 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
     {
         GET_USER_CERT_ERR("get_user_cert_encrypt_pwd_and_key: could not "
                           "write user private key to buffer", -PVFS_ESECURITY);
-        js_p->error_code = -PVFS_ESECURITY;        
-        RSA_free(rsa_privkey);
+        js_p->error_code = -PVFS_ESECURITY;      
+
+        /* this free should free the keypair and the rsa_privkey */
+        EVP_PKEY_free(keypair);  
 
         return SM_ACTION_COMPLETE;
     }
@@ -395,7 +454,7 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
                           "allocate encrypted key buffer", -PVFS_ENOMEM);
         js_p->error_code = -PVFS_ENOMEM;
         OPENSSL_free(tmp_privkey_buf);
-        RSA_free(rsa_privkey);
+        EVP_PKEY_free(keypair);
         RSA_free(rsa_pubkey);
 
         return SM_ACTION_COMPLETE;
@@ -418,7 +477,7 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
                               "encrypting private key", -PVFS_ESECURITY);
             js_p->error_code = -PVFS_ESECURITY;
             OPENSSL_free(tmp_privkey_buf);
-            RSA_free(rsa_privkey);
+            EVP_PKEY_free(keypair);
             RSA_free(rsa_pubkey);
 
             return SM_ACTION_COMPLETE;
@@ -443,8 +502,9 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
         js_p->error_code = -PVFS_ENOMEM;
     }
 
+    RSA_free(rsa_pubkey);
+    EVP_PKEY_free(keypair);
     OPENSSL_free(tmp_privkey_buf);
-    RSA_free(rsa_privkey);
 
     return SM_ACTION_COMPLETE;
 }
@@ -529,7 +589,8 @@ static int public_key_comp_fn(void* v_p,
 				              int i)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     int j, ret = 0;
 
     /* if successful, copy public key */
@@ -585,7 +646,8 @@ static int userid_pwd_comp_fn(void* v_p,
 				              int i)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     PVFS_certificate *resp_cert, *sm_cert;
     int ret;
 

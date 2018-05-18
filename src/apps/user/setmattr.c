@@ -115,25 +115,31 @@ static int parse_args(int argc, char **argv, struct options_t *my_args)
 
     /*no arguments*/
     if (argc == 1)
+    {
        usage();
+    }
 
     while((one_opt = getopt(argc, argv, flags)) != EOF)
     {
 	switch(one_opt)
         {
 	    case('c'):
-            {
-                for(j=0; j<strlen(optarg) && isdigit(optarg[j]); j++);
-                if (j==strlen(optarg)) 
+            {   for(j = 0; j < strlen(optarg) && isdigit(optarg[j]); j++)
+                {
+                    ; /* empty statement */
+                };
+                if (j == strlen(optarg)) 
                     my_args->copies = atoi(optarg);
                 else
                    usage();
                 break;
             }
             case('m'):
-            {
-                for(j=0; j<strlen(optarg) && isdigit(optarg[j]); j++);
-                if (j==strlen(optarg))
+            {   for(j = 0; j < strlen(optarg) && isdigit(optarg[j]); j++)
+                {
+                    ; /* empty statement */
+                }
+                if (j == strlen(optarg))
                    my_args->mode = atoi(optarg);
                 else
                    usage();

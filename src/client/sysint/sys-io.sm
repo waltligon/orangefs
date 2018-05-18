@@ -476,7 +476,8 @@ static int unstuff_comp_fn(void *v_p,
                            int i)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
 
     gossip_debug(GOSSIP_IO_DEBUG,
 		"unstuff/getattr completion fn: unstuff_comp_fn\n");
@@ -892,13 +893,14 @@ static int io_atime_setattr_comp_fn(void *v_p,
                                     int index)
 {
     PINT_smcb *smcb = v_p;
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
     PINT_client_sm *sm_p;
     PVFS_object_ref tmp_ref;
 
     static unsigned int counter=0;
     static unsigned int counter_max=10000;
 
-    sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
 
     tmp_ref.handle = sm_p->object_ref.handle;
     tmp_ref.fs_id = sm_p->object_ref.fs_id;

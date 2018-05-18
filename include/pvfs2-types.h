@@ -88,6 +88,19 @@ typedef int64_t PVFS_id_gen_t;
 /** Opaque value representing a destination address. */
 typedef int64_t PVFS_BMI_addr_t;
 
+/* Windows - inline functions can't be exported.  And, in gcc 5.3 and newer 
+ * inline functions must have a corresponding definition in a header file,
+ * so we are just removing the inlines here since the compiler will inline
+ * if it thinks it is advantageous.
+ * */
+void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x);
+int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x);
+void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x);
+void defree_PVFS_BMI_addr_t(PVFS_BMI_addr_t *x);
+
+/* this stuff is all good, if out of place */
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_error encode_int32_t
 #define decode_PVFS_error decode_int32_t
 #define defree_PVFS_error defree_int32_t
@@ -100,6 +113,7 @@ typedef int64_t PVFS_BMI_addr_t;
 #define encode_PVFS_id_gen_t encode_int64_t
 #define decode_PVFS_id_gen_t decode_int64_t
 #define defree_PVFS_id_gen_t defree_int64_t
+#endif
 
 /* Basic types used by communication subsystems. */
 typedef int32_t PVFS_msg_tag_t;
@@ -145,9 +159,11 @@ enum PVFS_encoding_type
 /** Unique identifier for an object on a PVFS3 file system */
 typedef PVFS_OID PVFS_handle;       /* 128-bit */
 
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_handle encode_PVFS_OID
 #define decode_PVFS_handle decode_PVFS_OID
 #define defree_PVFS_handle defree_PVFS_OID
+#endif
 
 /** Identifier for a specific PVFS2 file system; administrator
  *  must guarantee that these are unique in the context of all
@@ -157,12 +173,14 @@ typedef int32_t PVFS_fs_id;
 typedef uint64_t PVFS_ds_position;
 typedef int32_t PVFS_ds_flags;
 
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_fs_id encode_int32_t
 #define decode_PVFS_fs_id decode_int32_t
 #define defree_PVFS_fs_id defree_int32_t
 #define encode_PVFS_ds_position encode_uint64_t
 #define decode_PVFS_ds_position decode_uint64_t
 #define defree_PVFS_ds_position defree_uint64_t
+#endif
 
 /* Basic types used within metadata. */
 typedef uint32_t PVFS_uid;
@@ -172,6 +190,7 @@ typedef uint32_t PVFS_gid;
 typedef uint64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
 typedef uint64_t PVFS_flags;
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_uid encode_uint32_t
 #define decode_PVFS_uid decode_uint32_t
 #define defree_PVFS_uid defree_uint32_t
@@ -187,6 +206,7 @@ typedef uint64_t PVFS_flags;
 #define encode_PVFS_flags encode_uint64_t
 #define decode_PVFS_flags decode_uint64_t
 #define defree_PVFS_flags defree_uint64_t
+#endif
 
 /* V3 handle ranges defunct */
 #if 0
@@ -258,6 +278,15 @@ enum PVFS_sys_layout_algorithm
 /* For list layout this is the largest string encoding */
 #define PVFS_SYS_LIMIT_LAYOUT 4096
 
+/* these are redefining function defs which crashes
+ * horribly.  The defs for these funcs is in pint-util.c
+ */
+#if 0
+#define encode_PVFS_sys_layout_algorithm encode_enum
+#define decode_PVFS_sys_layout_algorithm decode_enum
+#define defree_PVFS_sys_layout_algorithm defree_enum
+#endif
+
 /* The list of datafile servers that can be passed into PVFS_sys_create
  * to specify the exact layout of a file.  The count parameter will override
  * the num_dfiles field in the attribute.
@@ -267,6 +296,14 @@ struct PVFS_sys_server_list
     int32_t count;
     PVFS_BMI_addr_t *servers;
 };
+
+#if 0
+endecode_fields_1a_struct(
+    PVFS_sys_server_list,
+    skip4,,
+    int32_t, count,
+    PVFS_BMI_addr_t, servers);
+#endif
 
 /* The server laout struct passed to PVFS_sys_create.  The algorithm
  * specifies how the servers are chosen to layout the file.  If the
@@ -283,8 +320,19 @@ typedef struct PVFS_sys_layout_s
      */
     struct PVFS_sys_server_list server_list;
 } PVFS_sys_layout;
+
+#if 0
+endecode_fields_2(
+    PVFS_sys_layout,
+    PVFS_sys_layout_algorithm, algorithm,
+    PVFS_sys_server_list, server_list);
+#endif
+
 #define extra_size_PVFS_sys_layout PVFS_SYS_LIMIT_LAYOUT
 
+void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x);
+void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
+void defree_PVFS_sys_layout(struct PVFS_sys_layout_s *x);
 
 /* predefined special values for types */
 #define PVFS_CONTEXT_NULL   ((PVFS_context_id)-1)
@@ -344,9 +392,11 @@ typedef enum
     PVFS_TYPE_INTERNAL =    (1 << 5)   /* for the server's private use */
 } PVFS_ds_type;
 
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_ds_type encode_enum
 #define decode_PVFS_ds_type decode_enum
 #define defree_PVFS_ds_type defree_enum
+#endif
 #define PVFS_DS_TYPE_COUNT      7      /* total number of DS types defined in
                                         * the PVFS_ds_type enum */
 
@@ -492,9 +542,21 @@ typedef struct
  PVFS_ATTR_SYS_DIRENT_COUNT |        \
  PVFS_ATTR_SYS_BLKSIZE)
 
+#define PVFS_ATTR_SYS_NOHINT ~(PVFS_ATTR_SYS_DIR_HINT)
 
-#define PVFS_ATTR_SYS_ALL_NOHINT PVFS_ATTR_SYS_ALL
+#define PVFS_ATTR_SYS_NOSIZE ~(PVFS_ATTR_SYS_SIZE)
 
+#define PVFS_ATTR_SYS_ALL_NOHINT \
+               (PVFS_ATTR_SYS_ALL & PVFS_ATTR_SYS_NOHINT)
+
+#define PVFS_ATTR_SYS_ALL_NOSIZE \
+               (PVFS_ATTR_SYS_ALL & PVFS_ATTR_SYS_NOSIZE)
+
+#define PVFS_ATTR_SYS_ALL_NOHINTSIZE \
+               (PVFS_ATTR_SYS_ALL & PVFS_ATTR_SYS_NOSIZE & \
+                PVFS_ATTR_SYS_NOHINT)
+
+#if 0
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
  PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT | \
@@ -502,18 +564,18 @@ typedef struct
  PVFS_ATTR_SYS_DISTDIR_ATTR | \
  PVFS_ATTR_SYS_DIRENT_COUNT | \
  PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
+#endif
 
 #define PVFS_ATTR_SYS_ALL_SETABLE \
-(PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
+               (PVFS_ATTR_SYS_COMMON_ALL - PVFS_ATTR_SYS_TYPE) 
 
-#define PVFS_ATTR_SYS_ALL_TIMES \
-(PVFS_ATTR_SYS_ALL_SETABLE |    \
- PVFS_ATTR_SYS_ATIME_SET | PVFS_ATTR_SYS_MTIME_SET)
+#define PVFS_ATTR_SYS_ALL_TIMES           \
+          (PVFS_ATTR_SYS_ALL_SETABLE |    \
+           PVFS_ATTR_SYS_ATIME_SET | PVFS_ATTR_SYS_MTIME_SET)
 
- #define PVFS_ATTR_SYS_ALL_VALID                    \
-  (PVFS_ATTR_SYS_ALL | PVFS_ATTR_SYS_CAPABILITY |    \
-   PVFS_ATTR_SYS_FASTEST | PVFS_ATTR_SYS_LATEST)      \
-
+#define PVFS_ATTR_SYS_ALL_VALID                         \
+     (PVFS_ATTR_SYS_ALL | PVFS_ATTR_SYS_CAPABILITY |    \
+      PVFS_ATTR_SYS_FASTEST | PVFS_ATTR_SYS_LATEST)     \
 
 /* Extended attribute flags */
 #define PVFS_XATTR_CREATE  0x1
@@ -736,12 +798,14 @@ typedef uint32_t PVFS_dist_dir_bitmap_basetype;
 typedef uint32_t *PVFS_dist_dir_bitmap;
 typedef uint64_t PVFS_dist_dir_hash_type;
 
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_dist_dir_bitmap_basetype encode_uint32_t
 #define decode_PVFS_dist_dir_bitmap_basetype decode_uint32_t
 #define defree_PVFS_dist_dir_bitmap_basetype defree_uint32_t
 #define encode_PVFS_dist_dir_hash_type encode_uint64_t
 #define decode_PVFS_dist_dir_hash_type decode_uint64_t
 #define defree_PVFS_dist_dir_hash_type defree_uint64_t
+#endif
 
 /** Predefined server parameters that can be manipulated at run-time
  *  through the mgmt interface.
@@ -783,12 +847,14 @@ struct PVFS_mgmt_setparam_value
     } u;
 };
 
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 encode_enum_union_4_struct(
     PVFS_mgmt_setparam_value, type, u,
     uint64_t,                value, PVFS_MGMT_PARAM_TYPE_UINT64,
     PVFS_debug_mask,    mask_value, PVFS_MGMT_PARAM_TYPE_MASK,
     string,           string_value, PVFS_MGMT_PARAM_TYPE_STRING,
     PVFS_handle,      handle_value, PVFS_MGMT_PARAM_TYPE_HANDLE);
+#endif
 
 enum PVFS_server_mode
 {

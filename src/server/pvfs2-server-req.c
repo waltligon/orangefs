@@ -48,7 +48,7 @@ extern struct PINT_server_req_params pvfs2_del_eattr_params;
 extern struct PINT_server_req_params pvfs2_list_eattr_params;
 extern struct PINT_server_req_params pvfs2_batch_create_params;
 extern struct PINT_server_req_params pvfs2_batch_remove_params;
-extern struct PINT_server_req_params pvfs2_unstuff_params;
+/* extern struct PINT_server_req_params pvfs2_unstuff_params; */
 extern struct PINT_server_req_params pvfs2_stuffed_create_params;
 extern struct PINT_server_req_params pvfs2_mirror_params;
 extern struct PINT_server_req_params pvfs2_create_immutable_copies_params;
@@ -107,7 +107,7 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 35 */ {PVFS_SERV_BATCH_CREATE, &pvfs2_batch_create_params},
     /* 36 */ {PVFS_SERV_BATCH_REMOVE, &pvfs2_batch_remove_params},
     /* 37 */ {PVFS_SERV_INVALID, NULL}, /* available */
-    /* 38 */ {PVFS_SERV_UNSTUFF, &pvfs2_unstuff_params},
+    /* 38 */ {PVFS_SERV_UNSTUFF, NULL /* &pvfs2_unstuff_params */},
     /* 39 */ {PVFS_SERV_MIRROR, &pvfs2_mirror_params},
     /* 40 */ {PVFS_SERV_IMM_COPIES, &pvfs2_create_immutable_copies_params},
     /* 41 */ {PVFS_SERV_TREE_REMOVE, &pvfs2_tree_remove_params},

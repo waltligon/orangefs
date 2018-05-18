@@ -408,11 +408,8 @@ static inline void defree_PVFS_servreq_create(struct PVFS_servreq_create *x)
 }
 #endif
 
-/* V3 ECQ: Can we delete the layout part of this macro? */
-/* V3 ECQ: Is this correct wrt handles and sids? */
 #define extra_size_PVFS_servreq_create \
      (extra_size_PVFS_object_attr + \
-      extra_size_PVFS_sys_layout + \
       extra_size_PVFS_credential + \
       (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
       (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID))) 
@@ -916,16 +913,20 @@ struct PVFS_servreq_tree_getattr
     uint32_t attrmask;
     uint32_t handle_count;
     PVFS_handle *handle_array;
+    uint32_t sid_count;
+    PVFS_SID *sid_array;
 };
-endecode_fields_5a_struct(
+endecode_fields_4a1a_struct(
     PVFS_servreq_tree_getattr,
-    PVFS_fs_id, fs_id,
     uint32_t, caller_handle_index,
     uint32_t, retry_msgpair_at_leaf,
     PVFS_credential, credential,
     uint32_t, attrmask,
     uint32_t, handle_count,
-    PVFS_handle, handle_array);
+    PVFS_handle, handle_array,
+    PVFS_fs_id, fs_id,
+    uint32_t, sid_count,
+    PVFS_SID, sid_array);
 #define extra_size_PVFS_servreq_tree_getattr \
     ((PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
      extra_size_PVFS_credential)
@@ -937,6 +938,8 @@ endecode_fields_5a_struct(
                                        __caller_handle_index,   \
                                        __handle_count,          \
                                        __handle_array,          \
+                                       __sid_count,             \
+                                       __sid_array,             \
                                        __amask,                 \
                                        __retry_msgpair_at_leaf, \
                                        __hints)                 \
@@ -946,7 +949,7 @@ do {                                                            \
     (__req).ctrl.mode = PVFS_REQ_TREE;                          \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                       \
     (__req).hints = (__hints);                                  \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));              \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                 \
     (__req).u.tree_getattr.credential = (__cred);               \
     (__req).u.tree_getattr.fs_id = (__fsid);                    \
     (__req).u.tree_getattr.caller_handle_index =                \
@@ -954,6 +957,9 @@ do {                                                            \
     (__req).u.tree_getattr.handle_count =                       \
                                   (__handle_count);             \
     (__req).u.tree_getattr.handle_array = (__handle_array);     \
+    (__req).u.tree_getattr.sid_count =                          \
+                                  (__sid_count);                \
+    (__req).u.tree_getattr.sid_array = (__sid_array);           \
     (__req).u.tree_getattr.attrmask = (__amask);                \
     (__req).u.tree_getattr.retry_msgpair_at_leaf =              \
                                   (__retry_msgpair_at_leaf);    \
@@ -1576,17 +1582,15 @@ do {                                                              \
 struct PVFS_servreq_rmdirent
 {
     char *entry;               /* name of entry to remove */
-    PVFS_handle handle;        /* metadata for split */
-    PVFS_handle dirent_handle; /* handle of directory bucket */
-    PVFS_fs_id fs_id;          /* file system */
-    int32_t sid_count;         /* reflexive - of bucket */
-    PVFS_SID *sid_array;       /* reflexive - of bucket */
+    PVFS_handle handle;        /* handle of dirdata */
+    PVFS_fs_id fs_id;          /* file system ID */
+    int32_t sid_count;         /* reflexive - of dirdata */
+    PVFS_SID *sid_array;       /* reflexive - of dirdata */
 };
-endecode_fields_4a_struct(
+endecode_fields_3a_struct(
     PVFS_servreq_rmdirent,
     string, entry,
     PVFS_handle, handle,
-    PVFS_handle, dirent_handle,
     PVFS_fs_id, fs_id,
     int32_t, sid_count,
     PVFS_SID, sid_array);
@@ -1594,22 +1598,18 @@ endecode_fields_4a_struct(
                     (roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES + 1) + \
                      (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID)))
 
-/* V3: The state machine doesn't use handle so we can get
-       rid of it. The sid_count and sid_array we need will
-       be for the dirent_handle. */
 #define PINT_SERVREQ_RMDIRENT_FILL(__req,                \
                                    __cap,                \
                                    __fsid,               \
                                    __handle,             \
                                    __sid_count,          \
                                    __sid_array,          \
-                                   __dirent_handle,      \
                                    __entry,              \
                                    __hints)              \
 do {                                                     \
     memset(&(__req), 0, sizeof(__req));                  \
     (__req).op = PVFS_SERV_RMDIRENT;                     \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;              \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                 \
     (__req).ctrl.type = PVFS_REQ_PRIMARY;                \
     PVFS_REQ_COPY_CAPABILITY((__cap), (__req));          \
     (__req).hints = (__hints);                           \
@@ -1617,7 +1617,6 @@ do {                                                     \
     (__req).u.rmdirent.handle = (__handle);              \
     (__req).u.rmdirent.sid_count = (__sid_count);        \
     (__req).u.rmdirent.sid_array = (__sid_array);        \
-    (__req).u.rmdirent.dirent_handle = (__dirent_handle);\
     (__req).u.rmdirent.entry = (__entry);                \
 } while (0);
 

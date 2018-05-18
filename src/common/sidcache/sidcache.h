@@ -79,9 +79,9 @@ extern void SID_cacheval_init(SID_cacheval_t **cacheval_t);
  * Returns 0 on success, otherwise -1 is returned
  */
 extern int SID_cacheval_alloc(SID_cacheval_t **cacheval_t,
-                              int sid_attributes[], 
-                              BMI_addr sid_bmi,
-                              char *sid_url);
+                              const int sid_attributes[], 
+                              const BMI_addr sid_bmi,
+                              const char *sid_url);
 
 /*
  * This function clean up a SID_cacheval_t struct by freeing the dynamically
