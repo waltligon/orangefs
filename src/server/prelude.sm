@@ -769,12 +769,23 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
     s_op->ds_attr.ctime = current_time;
     s_op->ds_attr.ntime = current_time;
 
+    /* I'm pretty sure that s_op->attr has nothing in it - its failure
+     * is what started us down this path - so we need a better/more
+     * reliable place to get this data from.
+     */
+
     /* s_op->ds_attr.type = ; already done */
     s_op->ds_attr.fs_id =  s_op->target_fs_id;
     s_op->ds_attr.handle = s_op->target_handle;
+    /*
     s_op->ds_attr.uid = s_op->attr.owner;
     s_op->ds_attr.gid = s_op->attr.group;
     s_op->ds_attr.mode = s_op->attr.perms;
+    */
+    s_op->ds_attr.uid = s_op->req.u.setattr.attr.owner;
+    s_op->ds_attr.gid = s_op->req.u.setattr.attr.group;
+    s_op->ds_attr.mode = s_op->req.u.setattr.attr.perms;
+
 
     switch (s_op->ds_attr.type)
     {

@@ -3357,6 +3357,11 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
     } u;
 };
+
+/* These are called in src/proto/PINT-le-bytefield.c to encode/decode
+ * the request header, then a switch is used to select which op is
+ * to be used and encodes/decodes specifically for that OP
+ */
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 /* insert padding to ensure the union starts on an aligned boundary */
 static inline void encode_PVFS_server_req(char **pptr,
