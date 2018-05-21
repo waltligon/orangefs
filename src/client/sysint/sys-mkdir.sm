@@ -711,7 +711,11 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: setattr_setup_msgpair\n");
 
+    memset(&dummy_sys_attr, 0, sizeof(PVFS_sys_attr));
     memset(&dirdata_attr, 0, sizeof(PVFS_object_attr));
+
+    /* we need the masks to reflect what is really in the attr */
+
     dirdata_attr.objtype = PVFS_TYPE_DIRDATA;
     ret = PINT_init_dist_dir_state(&dirdata_attr.u.dirdata.dist_dir_attr,
                                    &dirdata_attr.u.dirdata.dist_dir_bitmap,
@@ -725,7 +729,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
     dirdata_attr.u.dirdata.dirdata_sids = sm_p->u.mkdir.dirdata_sid_array;
     dirdata_attr.mask = PVFS_ATTR_DISTDIR_ATTR;
 
-    memset(&dummy_sys_attr, 0, sizeof(PVFS_sys_attr));
+    /* sm_p->getattr has more complete set of attrs, start with that */
 
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op,
                                  sm_p->u.mkdir.dirdata_sid_count);
@@ -737,6 +741,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
         return(SM_ACTION_COMPLETE);
     }
 
+    /* send a msgpair for each dirdata */
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
         PINT_SERVREQ_SETATTR_FILL(msg_p->req,
@@ -753,7 +758,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
                                   0,
                                   NULL);
 
-        PINT_copy_object_attr(&msg_p->req.u.setattr.attr, &dirdata_attr);
+        PINT_copy_object_attr(&msg_p->req.u.setattr.attr, &dirdata_attr); /* duplicate in req */
         msg_p->msgclass = PVFS_IO_METADATA;
         msg_p->msgdir = PVFS_IO_WRITE;
         msg_p->fs_id = sm_p->parent_ref.fs_id;
