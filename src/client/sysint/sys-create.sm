@@ -56,6 +56,8 @@ static PINT_dist* get_default_distribution(PVFS_fs_id fs_id);
 
 machine pvfs2_client_create_sm
 {
+    /* setup to getattr parent */
+
     state init
     {
         run create_init;
@@ -76,6 +78,8 @@ machine pvfs2_client_create_sm
         default => cleanup;
     }
 
+    /* set up to create the metafile */
+
     state create_setup_msgpair
     {
         run create_create_setup_msgpair;
@@ -89,6 +93,8 @@ machine pvfs2_client_create_sm
         success => crdirent_setup_msgpair;
         default => cleanup;
     }
+
+    /* set up to make the dirent for new file */
 
     state crdirent_setup_msgpair
     {
@@ -111,12 +117,16 @@ machine pvfs2_client_create_sm
         default => delete_handles_setup_msgpair_array;
     }
 
+    /* read attrs with cap etc */
+
     state crdirent_getattr
     {   
         jump pvfs2_client_getattr_sm;
         success => crdirent_setup_msgpair;
         default => crdirent_failure;
     }              
+
+    /* undo what we can on an error */
         
     state delete_handles_setup_msgpair_array
     {
@@ -130,6 +140,8 @@ machine pvfs2_client_create_sm
         jump pvfs2_msgpairarray_sm;
         default => cleanup;
     }
+
+    /* final cleanup */
 
     state cleanup
     {
@@ -886,9 +898,9 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     sm_p->u.create.attr.mask &= PVFS_ATTR_NOTIME_SET;
     sm_p->u.create.attr.mask |= PVFS_ATTR_TIME_ALL;
     sm_p->u.create.attr.atime = sm_p->u.create.attr.ctime =
-                sm_p->u.create.attr.ntime = PINT_util_get_current_time();
-    sm_p->u.create.attr.mtime = 
-                PINT_util_mktime_version(sm_p->u.create.attr.ntime);
+                                sm_p->u.create.attr.mtime = 
+                                sm_p->u.create.attr.ntime = 
+                                PINT_util_get_current_time();
 
 #if 0
     /* creating one metadata object OID and SIDs */

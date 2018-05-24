@@ -782,9 +782,9 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
     s_op->ds_attr.gid = s_op->attr.group;
     s_op->ds_attr.mode = s_op->attr.perms;
     */
-    s_op->ds_attr.uid = s_op->req.u.setattr.attr.owner;
-    s_op->ds_attr.gid = s_op->req.u.setattr.attr.group;
-    s_op->ds_attr.mode = s_op->req.u.setattr.attr.perms;
+    s_op->ds_attr.uid = s_op->req->u.setattr.attr.owner;
+    s_op->ds_attr.gid = s_op->req->u.setattr.attr.group;
+    s_op->ds_attr.mode = s_op->req->u.setattr.attr.perms;
 
 
     switch (s_op->ds_attr.type)

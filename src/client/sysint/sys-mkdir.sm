@@ -697,6 +697,7 @@ static PINT_sm_action mkdir_msg_failure(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+/* send a setattr to each new dirdata to set up data */
 static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
                                                   job_status_s *js_p)
 {
@@ -704,15 +705,15 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
     int ret = -PVFS_EINVAL;
-    PVFS_sys_attr dummy_sys_attr;
     PVFS_object_attr dirdata_attr;
 
     /* NOTE: any memory allocated here will be free'd in the cleanup function */
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: setattr_setup_msgpair\n");
 
-    memset(&dummy_sys_attr, 0, sizeof(PVFS_sys_attr));
     memset(&dirdata_attr, 0, sizeof(PVFS_object_attr));
+
+    PINT_copy_object_attr(&dirdata_attr, &sm_p->u.mkdir.obj_attr);
 
     /* we need the masks to reflect what is really in the attr */
 
@@ -728,8 +729,6 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
     dirdata_attr.u.dirdata.dirdata_handles = sm_p->u.mkdir.dirdata_handles;
     dirdata_attr.u.dirdata.dirdata_sids = sm_p->u.mkdir.dirdata_sid_array;
     dirdata_attr.mask = PVFS_ATTR_DISTDIR_ATTR;
-
-    /* sm_p->getattr has more complete set of attrs, start with that */
 
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op,
                                  sm_p->u.mkdir.dirdata_sid_count);
@@ -757,8 +756,8 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
                                   dirdata_attr, /* dummy_sys_attr, */
                                   0,
                                   NULL);
-
-        PINT_copy_object_attr(&msg_p->req.u.setattr.attr, &dirdata_attr); /* duplicate in req */
+        /* this is done in the FILL macro */
+        /* PINT_copy_object_attr(&msg_p->req.u.setattr.attr, &dirdata_attr); */
         msg_p->msgclass = PVFS_IO_METADATA;
         msg_p->msgdir = PVFS_IO_WRITE;
         msg_p->fs_id = sm_p->parent_ref.fs_id;
