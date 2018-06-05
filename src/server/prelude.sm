@@ -892,11 +892,6 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
     s_op->val_a[2].buffer = s_op->req->u.mkdir.parent;
     keep_keyval_buffers(s_op, 2);
 
-    if (k != keyval_count)
-    {
-        gossip_lerr("error building args for new dir attributes\n");
-    }
-
     gossip_debug(GOSSIP_MKDIR_DEBUG,
                  "  writing dist-dir-struct keyvals for dirdata: %s "
                  "\t with server_no=%d and branch_level=%d \n",
