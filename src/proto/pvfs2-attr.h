@@ -40,6 +40,19 @@
  * implement if we think it is important - WBL
  */
 
+/* 6/18 version - we are adding flags for all attr fields to indicate
+ * if the field in question is valid or not.  We have dealt with majic
+ * appearing and disapperaing attributes enough to show the need.  We
+ * still encode and decode the whole thing - interpretation is on each
+ * end
+ */
+
+typedef uint64_t PVFS_object_attrmask;
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#define encode_PVFS_object_attrmask encode_uint64_t
+#define decode_PVFS_object_attrmask decode_uint64_t
+#endif
+
 /* New simpler mask system, built on old system */
 
 #define PVFS_ATTR_DEFAULT \
@@ -66,8 +79,8 @@
 #define PVFS_ATTR_READ_LATEST \
             (PVFS_ATTR_COMMON_ALL  | PVFS_ATTR_LATEST) \
 
-#define PVFS_ATTR_FASTEST            (1 << 15)
-#define PVFS_ATTR_LATEST             (1 << 16)
+#define PVFS_ATTR_FASTEST            (1ULL << 51)
+#define PVFS_ATTR_LATEST             (1ULL << 52)
 
 /* latest and fastest refer to atime, mtime, ctime, file size
  * and dirent_count.  Fastest returns the value stored in the
@@ -80,18 +93,19 @@
  */
 
 /* internal attribute masks, common to all obj types */
-#define PVFS_ATTR_COMMON_UID         (1 << 0)
-#define PVFS_ATTR_COMMON_GID         (1 << 1)
-#define PVFS_ATTR_COMMON_PERM        (1 << 2)
-#define PVFS_ATTR_COMMON_ATIME       (1 << 3)
-#define PVFS_ATTR_COMMON_CTIME       (1 << 4)
-#define PVFS_ATTR_COMMON_MTIME       (1 << 5)
-#define PVFS_ATTR_COMMON_NTIME       (1 << 6)
-#define PVFS_ATTR_COMMON_TYPE        (1 << 7)
-#define PVFS_ATTR_COMMON_ATIME_SET   (1 << 8)
-#define PVFS_ATTR_COMMON_CTIME_SET   (1 << 9)
-#define PVFS_ATTR_COMMON_MTIME_SET   (1 << 10)
-#define PVFS_ATTR_COMMON_NTIME_SET   (1 << 11)
+#define PVFS_ATTR_COMMON_UID         (1ULL << 0)
+#define PVFS_ATTR_COMMON_GID         (1ULL << 1)
+#define PVFS_ATTR_COMMON_PERM        (1ULL << 2)
+#define PVFS_ATTR_COMMON_ATIME       (1ULL << 3)
+#define PVFS_ATTR_COMMON_CTIME       (1ULL << 4)
+#define PVFS_ATTR_COMMON_MTIME       (1ULL << 5)
+#define PVFS_ATTR_COMMON_NTIME       (1ULL << 6)
+#define PVFS_ATTR_COMMON_TYPE        (1ULL << 7)
+#define PVFS_ATTR_COMMON_ATIME_SET   (1ULL << 8)
+#define PVFS_ATTR_COMMON_CTIME_SET   (1ULL << 9)
+#define PVFS_ATTR_COMMON_MTIME_SET   (1ULL << 10)
+#define PVFS_ATTR_COMMON_NTIME_SET   (1ULL << 11)
+
 
 #define PVFS_ATTR_COMMON_NOTIME                           \
         (PVFS_ATTR_COMMON_UID  | PVFS_ATTR_COMMON_GID   | \
@@ -111,48 +125,98 @@
          PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_MTIME)
 
 /* internal attribute masks for metadata objects */
-#define PVFS_ATTR_META_DIST          (1 << 12)
-#define PVFS_ATTR_META_DFILES        (1 << 25)   /* includes sids */
-#define PVFS_ATTR_META_MIRROR_MODE   (1 << 17)   /* writable */
-#define PVFS_ATTR_META_FLAGS         (1 << 13)   /* writable */
+#define PVFS_ATTR_META_DIST          (1ULL << 12)
+#define PVFS_ATTR_META_DIST_SIZE     (1ULL << 13)
+#define PVFS_ATTR_META_DFILES        (1ULL << 14)   /* includes sids */
+#define PVFS_ATTR_META_DFILE_COUNT   (1ULL << 15)     /* buff */
+#define PVFS_ATTR_META_SID_COUNT     (1ULL << 16)     /* buff */
+#define PVFS_ATTR_META_MIRROR_MODE   (1ULL << 17)   /* writable *???? */
+#define PVFS_ATTR_META_SIZE          (1ULL << 18)     /* writable */
+#define PVFS_ATTR_META_FLAGS         (1ULL << 19)   /* writable */
 
 #define PVFS_ATTR_META_ALL                             \
         (PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES | \
         PVFS_ATTR_META_FLAGS | PVFS_ATTR_COMMON_ALL)
 
 /* internal attribute masks for datafile objects */
-#define PVFS_ATTR_DATA_SIZE          (1 << 20)   /* size of a DFILE
+#define PVFS_ATTR_DATA_SIZE          (1ULL << 20)   /* size of a DFILE
                                                   * replace with latest bit */
 
 #define PVFS_ATTR_DATA_ALL \
              (PVFS_ATTR_DATA_SIZE | PVFS_ATTR_TIME_ALL)
 
 /* internal attribute masks for symlink objects */
-#define PVFS_ATTR_SYMLNK_TARGET      (1 << 19)   /* writable */
+#define PVFS_ATTR_SYMLNK_TARGET      (1ULL << 21)   /* writable */
 
 #define PVFS_ATTR_SYMLNK_ALL \
              (PVFS_ATTR_SYMLNK_TARGET | PVFS_ATTR_COMMON_ALL)
 
 /* internal attribute masks for directory objects */
-#define PVFS_ATTR_DIR_DIRENT_COUNT   (1 << 26)   /* replace with latest bit */
-#define PVFS_ATTR_DIR_DIRDATA        (1 << 14)   /* includes sids */
-#define PVFS_ATTR_DIR_HINT           (1 << 22)   /* writable */
+#define PVFS_ATTR_DIR_DIRENT_COUNT         (1ULL << 22)  
+
+#define PVFS_ATTR_DIR_HINT_DIST_NAME_LEN   (1ULL << 23)   /* buff */
+#define PVFS_ATTR_DIR_HINT_DIST_PARAMS_LEN (1ULL << 24)   /* buff */
+#define PVFS_ATTR_DIR_HINT_DFILE_COUNT     (1ULL << 25)
+#define PVFS_ATTR_DIR_HINT_SID_COUNT       (1ULL << 26)
+#define PVFS_ATTR_DIR_HINT_LAYOUT          (1ULL << 27)
+
+#define PVFS_ATTR_DIR_TREE_HEIGHT          (1ULL << 28)
+#define PVFS_ATTR_DIR_DIRDATA_COUNT        (1ULL << 29)   /* buff */
+#define PVFS_ATTR_DIR_SID_COUNT            (1ULL << 30)
+#define PVFS_ATTR_DIR_BITMAP_SIZE          (1ULL << 31)   /* buff */
+#define PVFS_ATTR_DIR_SPLIT_SIZE           (1ULL << 32)
+#define PVFS_ATTR_DIR_SERVER_NO            (1ULL << 33)
+#define PVFS_ATTR_DIR_BRANCH_LEVEL         (1ULL << 34)
+
+#define PVFS_ATTR_DIR_DIRDATA              (1ULL << 35)   /* includes sids */
+#define PVFS_ATTR_DIR_HINT                 (1ULL << 36)   /* writable */
+
+#define PVFS_ATTR_DIR_HINT_ALL \
+    (PVFS_ATTR_DIR_HINT_DIST_NAME_LEN | PVFS_ATTR_DIR_HINT_DIST_PARAMS_LEN | \
+    PVFS_ATTR_DIR_HINT_DFILE_COUNT | PVFS_ATTR_DIR_HINT_SID_COUNT | \
+    PVFS_ATTR_DIR_HINT_LAYOUT)
 
 #define PVFS_ATTR_DIR_ALL \
-             (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT | \
-              PVFS_ATTR_DIR_DIRDATA | PVFS_ATTR_DISTDIR_ATTR | \
-              PVFS_ATTR_COMMON_ALL)
+    (PVFS_ATTR_DIR_HINT_ALL | PVFS_ATTR_DIR_DIRENT_COUNT | \
+    PVFS_ATTR_DIR_TREE_HEIGHT | PVFS_ATTR_DIR_DIRDATA_COUNT | \
+    PVFS_ATTR_DIR_SID_COUNT | PVFS_ATTR_DIR_BITMAP_SIZE | \
+    PVFS_ATTR_DIR_SPLIT_SIZE | PVFS_ATTR_DIR_SERVER_NO | \
+    PVFS_ATTR_DIR_BRANCH_LEVEL | PVFS_ATTR_DIR_DIRDATA)
 
 #define PVFS_ATTR_DIRDATA_ALL \
              (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_TIME_ALL)
 
+#define PVFS_ATTR_DIR_ALL_COMMON \
+             (PVFS_ATTR_DIR_ALL | PVFS_ATTR_COMMON_ALL)
+
 /* internal attribute mask for distributed directory information */
-/* this may be in the meta or dirdata area depending on objtype */
-/* This includes the bitmap and dirdata handles/sids info */
-#define PVFS_ATTR_DISTDIR_ATTR       (1 << 21)    /* writable */
+#define PVFS_ATTR_DIRDATA_DIRENT_COUNT   (1ULL << 37)
+
+#define PVFS_ATTR_DIRDATA_TREE_HEIGHT    (1ULL << 38)
+#define PVFS_ATTR_DIRDATA_DIRDATA_COUNT  (1ULL << 39) /* number of servers */
+#define PVFS_ATTR_DIRDATA_SID_COUNT      (1ULL << 40)
+#define PVFS_ATTR_DIRDATA_BITMAP_SIZE    (1ULL << 41)   /* buff */
+#define PVFS_ATTR_DIRDATA_SPLIT_SIZE     (1ULL << 42)
+#define PVFS_ATTR_DIRDATA_SERVER_NO      (1ULL << 43)
+#define PVFS_ATTR_DIRDATA_BRANCH_LEVEL   (1ULL << 44)
+
+/* I think we should have two of these, one for DIR and one for DIRDATA
+ * and neither should have this name (so we can find places we referred
+ * to it
+ */
+
+#define PVFS_ATTR_DISTDIR_ATTR  \
+        (PVFS_ATTR_DIRDATA_DIRENT_COUNT | PVFS_ATTR_DIRDATA_TREE_HEIGHT | \
+        PVFS_ATTR_DIRDATA_SID_COUNT | PVFS_ATTR_DIRDATA_BITMAP_SIZE | \
+        PVFS_ATTR_DIRDATA_SPLIT_SIZE | PVFS_ATTR_DIRDATA_SPLIT_SIZE | \
+        PVFS_ATTR_DIRDATA_SERVER_NO | PVFS_ATTR_DIRDATA_BRANCH_LEVEL)
 
 /* internal attribute mask for capability objects */
-#define PVFS_ATTR_CAPABILITY         (1 << 18)
+#define PVFS_ATTR_CAPABILITY             (1ULL << 45)
+
+#if 0
+#define PVFS_ATTR_DISTDIR_ATTR           (1ULL << 46)    /* writable */
+#endif
 
 /* attributes that do not change once set */
 /* needs to be renamed */
@@ -160,6 +224,69 @@
         (PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_META_DIST |          \
         PVFS_ATTR_META_DFILES  | PVFS_ATTR_META_MIRROR_DFILES | \
         PVFS_ATTR_META_UNSTUFFED)
+
+static inline void DEBUG_attr_mask(PVFS_object_attrmask mask);
+
+#if 1
+#define DATTRPRINT(fmt) printf(fmt);
+
+#define MASKDEBUG(field,fmt) \
+        do { if ((mask & field) == field) DATTRPRINT(fmt) } while (0)
+
+static inline void DEBUG_attr_mask(PVFS_object_attrmask mask)
+{
+    MASKDEBUG(PVFS_ATTR_COMMON_UID,               "UID\n");
+    MASKDEBUG(PVFS_ATTR_COMMON_GID,               "GID\n");
+    MASKDEBUG(PVFS_ATTR_COMMON_PERM,              "PERM\n");
+    MASKDEBUG(PVFS_ATTR_COMMON_ATIME,             "ATIME\n");
+    MASKDEBUG(PVFS_ATTR_COMMON_CTIME,             "CTIME\n");
+    MASKDEBUG(PVFS_ATTR_COMMON_MTIME,             "MTIME\n");
+    MASKDEBUG(PVFS_ATTR_COMMON_NTIME,             "NTIME\n");
+    MASKDEBUG(PVFS_ATTR_COMMON_TYPE,              "OBJ TYPE\n");
+    MASKDEBUG(PVFS_ATTR_COMMON_ATIME_SET,         "ATIME SET\n");
+    MASKDEBUG(PVFS_ATTR_COMMON_CTIME_SET,         "CTIME SET\n");
+    MASKDEBUG(PVFS_ATTR_COMMON_MTIME_SET,         "MTIME SET\n");
+    MASKDEBUG(PVFS_ATTR_META_DIST,                "META DIST\n");
+    MASKDEBUG(PVFS_ATTR_META_DIST_SIZE,           "META DIST SIZE\n");
+    MASKDEBUG(PVFS_ATTR_META_DFILES,              "META DFILES\n");
+    MASKDEBUG(PVFS_ATTR_META_DFILE_COUNT,         "META DFILE_COUNT\n");
+    MASKDEBUG(PVFS_ATTR_META_SID_COUNT,           "META SID_COUNT\n");
+    MASKDEBUG(PVFS_ATTR_META_MIRROR_MODE,         "META MIRROR\n");
+    MASKDEBUG(PVFS_ATTR_META_SIZE,                "META SIZE\n");
+    MASKDEBUG(PVFS_ATTR_META_FLAGS,               "META FLAGS\n");
+    MASKDEBUG(PVFS_ATTR_DATA_SIZE,                "DATA SIZE\n");
+    MASKDEBUG(PVFS_ATTR_SYMLNK_TARGET,            "SYMLINK TARGET\n");
+    MASKDEBUG(PVFS_ATTR_DIR_DIRENT_COUNT,         "DIR DIRENT COUNT\n");
+    MASKDEBUG(PVFS_ATTR_DIR_HINT_DIST_NAME_LEN,   "DIR HINT DIST NAME LEN\n");
+    MASKDEBUG(PVFS_ATTR_DIR_HINT_DIST_PARAMS_LEN, "DIR HINT DIST PARAMS LEN\n");
+    MASKDEBUG(PVFS_ATTR_DIR_HINT_DFILE_COUNT,     "DIR HINT DFILE COUNT\n");
+    MASKDEBUG(PVFS_ATTR_DIR_HINT_SID_COUNT,       "DIR HINT SID COUNT\n");
+    MASKDEBUG(PVFS_ATTR_DIR_HINT_LAYOUT,          "DIR HINT LAYOUT\n");
+    MASKDEBUG(PVFS_ATTR_DIR_TREE_HEIGHT,          "DIR TREE HEIGHT\n");
+    MASKDEBUG(PVFS_ATTR_DIR_DIRDATA_COUNT,        "DIR DIRDATA COUNT\n");
+    MASKDEBUG(PVFS_ATTR_DIR_SID_COUNT,            "DIR SID COUNT\n");
+    MASKDEBUG(PVFS_ATTR_DIR_BITMAP_SIZE,          "DIR BITMAP SIZE\n");
+    MASKDEBUG(PVFS_ATTR_DIR_SPLIT_SIZE,           "DIR SPLIT SIZE\n");
+    MASKDEBUG(PVFS_ATTR_DIR_SERVER_NO,            "DIR SERVER NO\n");
+    MASKDEBUG(PVFS_ATTR_DIR_BRANCH_LEVEL,         "DIR BRANCH LEVEL\n");
+    MASKDEBUG(PVFS_ATTR_DIR_DIRDATA,              "DIR DIRDATA\n");
+    MASKDEBUG(PVFS_ATTR_DIR_HINT,                 "DIR HINT\n");
+    MASKDEBUG(PVFS_ATTR_DIRDATA_DIRENT_COUNT,     "DIRDATA DIRENT COUNT\n");
+    MASKDEBUG(PVFS_ATTR_DIRDATA_TREE_HEIGHT,      "DIRDATA TREE HEIGHT\n");
+    MASKDEBUG(PVFS_ATTR_DIRDATA_DIRDATA_COUNT,    "DIRDATA DIRDATA COUNT\n");
+    MASKDEBUG(PVFS_ATTR_DIRDATA_SID_COUNT,        "DIRDATA SID COUNT\n");
+    MASKDEBUG(PVFS_ATTR_DIRDATA_BITMAP_SIZE,      "DIRDATA BItMAP SIZE\n");
+    MASKDEBUG(PVFS_ATTR_DIRDATA_SPLIT_SIZE,       "DIRDATA SPLIT SIZE\n");
+    MASKDEBUG(PVFS_ATTR_DIRDATA_SERVER_NO,        "DIRDATA SERVER NO\n");
+    MASKDEBUG(PVFS_ATTR_DIRDATA_BRANCH_LEVEL,     "DIRDATA BRANCH LEVEL\n");
+    MASKDEBUG(PVFS_ATTR_CAPABILITY,               "CAPABILITY\n");
+    MASKDEBUG(PVFS_ATTR_FASTEST,                  "FASTEST\n");
+    MASKDEBUG(PVFS_ATTR_LATEST,                   "LATEST\n");
+}
+
+#undef MASKDEBUG
+#undef DATTRPRINT
+#endif
 
 /* extended hint attributes for a metafile object  V3 */
 #if 0
@@ -174,6 +301,10 @@ endecode_fields_1(
     PVFS_flags, flags);
 #endif
 #endif
+
+/********************************************************************
+ *         METADATA ATTRIBUTES
+ ********************************************************************/
 
 /* attributes specific to metadata objects */
 struct PVFS_metafile_attr_s
@@ -336,6 +467,10 @@ do { \
 
 #endif
 
+/********************************************************************
+ *         DATAFILE ATTRIBUTES
+ ********************************************************************/
+
 /* attributes specific to datafile objects */
 struct PVFS_datafile_attr_s
 {
@@ -344,6 +479,10 @@ struct PVFS_datafile_attr_s
 };
 typedef struct PVFS_datafile_attr_s PVFS_datafile_attr;
 endecode_fields_1(PVFS_datafile_attr, PVFS_size, size);
+
+/********************************************************************
+ *         DIRECTORY ATTRIBUTES
+ ********************************************************************/
 
 /* this is only for layouts used as directory hints to
  * prevent some of the conversion back and forth between
@@ -505,6 +644,10 @@ do {                                        \
 
 #endif
 
+/********************************************************************
+ *         DIRDATA ATTRIBUTES
+ ********************************************************************/
+
 /* attributes specific to dirdata objects */
 struct PVFS_dirdata_attr_s
 {
@@ -600,6 +743,10 @@ do {                                    \
 
 #endif
 
+/********************************************************************
+ *         SYMLINK ATTRIBUTES
+ ********************************************************************/
+
 /* attributes specific to symlinks */
 struct PVFS_symlink_attr_s
 {
@@ -613,18 +760,22 @@ endecode_fields_3(
         skip4,,
         string, target_path);
 
+/********************************************************************
+ *         OBJECT ATTRIBUTES         
+ ********************************************************************/
+
 /* generic attributes; applies to all objects */
 struct PVFS_object_attr
 {
-    PVFS_ds_type objtype; /* defined in pvfs2-types.h */
-    uint32_t mask;          /* indicates which fields are currently valid */
-    PVFS_uid owner;         /* uid */
-    PVFS_gid group;         /* gid */
-    PVFS_permissions perms; /* mode */
-    PVFS_time atime;        /* access (read) time */
-    PVFS_time mtime;        /* modify (data) time */
-    PVFS_time ctime;        /* change (metadata) time */
-    PVFS_time ntime;        /* new (create) time */
+    PVFS_ds_type objtype;      /* defined in pvfs2-types.h */
+    PVFS_object_attrmask mask; /* indicates which fields are currently valid */
+    PVFS_uid owner;            /* uid */
+    PVFS_gid group;            /* gid */
+    PVFS_permissions perms;    /* mode */
+    PVFS_time atime;           /* access (read) time */
+    PVFS_time mtime;           /* modify (data) time */
+    PVFS_time ctime;           /* change (metadata) time */
+    PVFS_time ntime;           /* new (create) time */
     PVFS_capability capability;
 
     union

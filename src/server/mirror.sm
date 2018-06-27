@@ -193,7 +193,7 @@ static PINT_sm_action inspect_inputs(struct PINT_smcb *smcb, job_status_s *js_p)
                                       (int)s_op->attr.objtype);
     gossip_debug(GOSSIP_MIRROR_DEBUG, "\tdatafile size:%d\n", 
                                       (int)s_op->attr.u.data.size);
-    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tmask:%0x\n", s_op->attr.mask);
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tmask:%0lx\n", s_op->attr.mask);
     return SM_ACTION_COMPLETE;
 }/*end action inspect_inputs*/
 

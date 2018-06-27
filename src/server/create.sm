@@ -377,27 +377,26 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
     }
     ZEROMEM(s_op->val_a, sizeof((PVFS_ds_keyval) * keyval_count));
 
+    /* writing list of handles/sids for datafile handles and sids*/
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
     s_op->key_a[0].buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
 
-/* V3 WHY is this buffer pointed to req and not resp (as it is in trunk)?
- * Maybe we don't need to pass these handles/sids back because the client
- * already has them?  IOn which case why are we looking them up at all?
- * Investigate!!!
- */
     s_op->val_a[0].buffer_sz = OSASZ(s_op->req->u.create.datafile_count,
                                      s_op->req->u.create.sid_count);
     s_op->val_a[0].buffer = s_op->req->u.create.datafile_handles;
 
+    /* writing distribution for the metafile */
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
     s_op->key_a[1].buffer = Trove_Common_Keys[METAFILE_DIST_KEY].key;
 
     s_op->val_a[1].buffer_sz = s_op->req->u.create.attr.u.meta.dist_size;
     s_op->val_a[1].buffer = malloc(s_op->val_a[1].buffer_sz);
 
+    /* writing object parent handle and sids */
     s_op->key_a[2].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
     s_op->key_a[2].buffer = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
 
+    /* datafile handle and sids should be contiguous */
     s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.create.sid_count);
     s_op->val_a[2].buffer = s_op->req->u.create.parent;
 

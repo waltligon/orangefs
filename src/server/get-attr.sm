@@ -327,7 +327,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
 
     gossip_debug(
         GOSSIP_GETATTR_DEBUG,
-        "+  _DSPACE_ retrieved attrs: [mask = 0x%08x, owner = %d, group = %d\n\t"
+        "+  _DSPACE_ retrieved attrs: [mask = 0x%lx, owner = %d, group = %d\n\t"
         "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
         "ctime = %llu, ntime = %llu, dfile_count = %d, dist_size = %d]\n",
         respattr->mask,

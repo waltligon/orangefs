@@ -670,7 +670,6 @@ static PINT_sm_action prelude_create_object_if_allowed(
         ret = job_trove_dspace_create(s_op->target_fs_id,
                                       s_op->target_handle,
                                       s_op->attr.objtype,
-                                      //PVFS_TYPE_DATAFILE,
                                       NULL, /* hint */
                                       0,    /* flags */
                                       smcb, /* user_ptr */
@@ -842,7 +841,6 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
     PVFS_object_attr *pattr;
     int ret = -1;
     job_id_t j_id;
-    int k = 0;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "writing keyvals for new object\n");
 

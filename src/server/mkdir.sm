@@ -65,6 +65,7 @@ nested machine pvfs2_mkdir_work_sm
     }
 
     /* create local dirdata */
+    /* this loops to allow multiple local dirdata */
 
     state dirdata_create
     {
@@ -99,6 +100,8 @@ nested machine pvfs2_mkdir_work_sm
         jump pvfs2_get_attr_with_prelude_sm;
         default => setup_resp;
     }
+
+    /* create the response to the client */
 
     state setup_resp
     {
@@ -435,7 +438,7 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
-    job_id_t j;
+    job_id_t j_id;
     int i = 0;
 
     i = s_op->u.mkdir.handle_index - 1;
@@ -473,7 +476,7 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
                                   smcb,       /* user_ptr */
                                   0,          /* status_user_tag */
                                   js_p,
-                                  &j,
+                                  &j_id,
                                   server_job_context,
                                   s_op->req->hints);
 

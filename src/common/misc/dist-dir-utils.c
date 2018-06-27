@@ -67,7 +67,9 @@ static int dist_dir_calc_branch_level(
 
 /* init dir state function, set all parameters
  * server_no <- -1..(dirdata_count-1)
- * pre_dsg_num_server: pre-set a number of servers, used for known large directory. default value can be 1.
+ * pre_dsg_num_server: pre-set a number of servers,
+ *                     used for known large directory.
+  * default value can be 1.
  */
 
 int PINT_init_dist_dir_state(
@@ -84,10 +86,11 @@ int PINT_init_dist_dir_state(
 
 	assert(dist_dir_attr != NULL);
 
-	/* -1 <= server_no < dirdata_count && 0 < pre_dsg_num_server <= dirdata_count */
+	/* -1 <= server_no < dirdata_count &&
+         *  0 < pre_dsg_num_server <= dirdata_count */
 	assert(	(dirdata_count > 0) &&
-	 		(server_no >= -1) && /* metadata handle has server_no = -1 */
-			(server_no < dirdata_count));
+	 	(server_no >= -1) && /* metadata handle has server_no = -1 */
+		(server_no < dirdata_count));
 
 	if ((pre_dsg_num_server <= 0) ||
 		(pre_dsg_num_server > dirdata_count))

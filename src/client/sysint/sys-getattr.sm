@@ -1187,7 +1187,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
                  "%s: Are we mirroring? %s\n",__func__
                 ,(mirror_retry ? "YES" : "NO")); 
     gossip_debug(GOSSIP_MIRROR_DEBUG,
-                 "%s: attr.mask:0x%08x \tmirror_retry:0x%08x\n"
+                 "%s: attr.mask:0x%lx \tmirror_retry:0x%x\n"
                 ,__func__
                 ,sm_p->getattr.attr.mask
                 ,(unsigned int)mirror_retry);
@@ -2064,7 +2064,7 @@ static PINT_sm_action getattr_cleanup(struct PINT_smcb *smcb,
                  "(%p) getattr state: getattr_cleanup\n", sm_p);
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "%s: js_p->error_code:%d \tgetattr->attr.mask:0x%08x\n",
+                 "%s: js_p->error_code:%d \tgetattr->attr.mask:0x%lx\n",
                  __func__,
                  js_p->error_code,
                  getattr->attr.mask);

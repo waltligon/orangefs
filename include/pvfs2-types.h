@@ -781,6 +781,10 @@ endecode_fields_2(
 
 /* Distributed directory attributes struct
  * will be stored in keyval space under DIST_DIR_ATTR
+ * NOTE: this has changed for V3 - it is now stored as part
+ * of the dspace.  The variable size items are stored as
+ * keyval as they were before under DIST_DIR_BITMAP, and DFILE_HANDLES
+ * which includes both handles and sids.
  */
 typedef struct PVFS_dist_dir_attr_s
 {

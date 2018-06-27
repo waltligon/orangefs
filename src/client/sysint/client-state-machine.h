@@ -99,8 +99,15 @@ typedef struct PINT_sm_getattr_state
 
     /* request sys attrmask.  Some combination of
      * PVFS_ATTR_SYS_*
+     * Notes: Any field representing attributes and their mask must
+     * be in PVFS_object_ref format.  SYS_ATTR format should ONLY be
+     * used when passsing attributes to and from the user - IOW in
+     * the PVFS_SYS calls (system interface).  The DSATTR format should
+     * ONLY be used when reading/writing from/to disk.  The mask needs
+     * its own unique type, so we don't have to re-type it as I am
+     * doing now (32 bits-64 bits)
      */
-    uint32_t req_attrmask;
+    PVFS_object_attrmask req_attrmask;
     
     /*
      * Either from the acache or full getattr op, this is the resulting
@@ -417,7 +424,7 @@ struct PINT_client_readdirplus_sm
 {
     PVFS_ds_position pos_token;         /* input parameter */
     int dirent_limit;                   /* input parameter */
-    uint32_t attrmask;                    /* input parameter */
+    PVFS_object_attrmask attrmask;      /* input parameter */
     PVFS_sysresp_readdirplus *readdirplus_resp; /* in/out parameter*/
     /* scratch variables */
     int nhandles;  

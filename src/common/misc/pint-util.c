@@ -70,23 +70,32 @@ void PINT_time_diff(PINT_time_marker mark1,
                     double *out_utime_sec,
                     double *out_stime_sec)
 {
-    *out_wtime_sec = 
-        ((double)mark2.wtime.tv_sec +
-         (double)(mark2.wtime.tv_usec) / 1000000) -
-        ((double)mark1.wtime.tv_sec +
-         (double)(mark1.wtime.tv_usec) / 1000000);
+    if (out_wtime_sec)
+    {
+        *out_wtime_sec = 
+            ((double)mark2.wtime.tv_sec +
+             (double)(mark2.wtime.tv_usec) / 1000000) -
+            ((double)mark1.wtime.tv_sec +
+             (double)(mark1.wtime.tv_usec) / 1000000);
+    }
 
-    *out_stime_sec = 
-        ((double)mark2.stime.tv_sec +
-         (double)(mark2.stime.tv_usec) / 1000000) -
-        ((double)mark1.stime.tv_sec +
-         (double)(mark1.stime.tv_usec) / 1000000);
+    if (out_stime_sec)
+    {
+        *out_stime_sec = 
+            ((double)mark2.stime.tv_sec +
+             (double)(mark2.stime.tv_usec) / 1000000) -
+            ((double)mark1.stime.tv_sec +
+             (double)(mark1.stime.tv_usec) / 1000000);
+    }
 
-    *out_utime_sec = 
-        ((double)mark2.utime.tv_sec +
-         (double)(mark2.utime.tv_usec) / 1000000) -
-        ((double)mark1.utime.tv_sec +
-         (double)(mark1.utime.tv_usec) / 1000000);
+    if (out_utime_sec)
+    {
+        *out_utime_sec = 
+            ((double)mark2.utime.tv_sec +
+             (double)(mark2.utime.tv_usec) / 1000000) -
+            ((double)mark1.utime.tv_sec +
+             (double)(mark1.utime.tv_usec) / 1000000);
+    }
 }
 
 static int current_tag = 1;
@@ -134,22 +143,24 @@ PVFS_msg_tag_t PINT_util_get_next_tag(void)
  * arrays, strings, etc.
  */
 
-#define CPYFIELD(x,s)                     \
-    do { if ((s) > 0 && src->u.x) {       \
-        dest->u.x = malloc(s);            \
-        memcpy(dest->u.x, src->u.x, s); } \
+#define CPYFIELD(x,s,f)                         \
+    do { if (((src->mask & (f)) == (f)) &&      \
+             ((s) > 0) && (src->u.x)) {         \
+        dest->u.x = malloc(s);                  \
+        memcpy(dest->u.x, src->u.x, s); }       \
     } while (0)
 
 /* this macro is only for OID/SID arrays, we prefer these to be
  * allocated contiguouosly.  If the src has them packed, we simply copy
  * the src, otherwise we allocate space for both a copy in two chunks
  */
-#define PACKSID(o,s,oc,sc)                                                 \
+#define PACKSID(o,s,oc,sc,f)                                               \
     do {                                                                   \
-        if (src->u.s == (PVFS_SID *)(src->u.o + src->u.oc))                \
+        if (((src->mask & f) == f)   &&                                    \
+            (src->u.s == (PVFS_SID *)(src->u.o + src->u.oc)))              \
         {                                                                  \
             /* OIDs and SIDs are packed */                                 \
-            CPYFIELD(o, OSASZ(dest->u.oc, dest->u.sc));                    \
+            CPYFIELD(o, OSASZ(dest->u.oc, dest->u.sc), f);                 \
         }                                                                  \
         else                                                               \
         {                                                                  \
@@ -179,34 +190,46 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
         PACKSID(meta.dfile_array,
                 meta.sid_array,
                 meta.dfile_count,
-                meta.sid_count); 
+                meta.sid_count,
+                (PVFS_ATTR_META_DFILE_COUNT |
+                     PVFS_ATTR_META_SID_COUNT)); 
         break;
     case PVFS_TYPE_DATAFILE:
         break;
     case PVFS_TYPE_DIRECTORY:
         CPYFIELD(dir.hint.dist_name,
-                 dest->u.dir.hint.dist_name_len);
+                 dest->u.dir.hint.dist_name_len,
+                 PVFS_ATTR_DIR_HINT_DIST_NAME_LEN);
         CPYFIELD(dir.hint.dist_params,
-                 dest->u.dir.hint.dist_params_len);
+                 dest->u.dir.hint.dist_params_len,
+                 PVFS_ATTR_DIR_HINT_DIST_PARAMS_LEN);
         CPYFIELD(dir.dist_dir_bitmap,
                  (dest->u.dir.dist_dir_attr.bitmap_size *
-                        sizeof(PVFS_dist_dir_bitmap_basetype)));
+                        sizeof(PVFS_dist_dir_bitmap_basetype)),
+                 PVFS_ATTR_DIR_BITMAP_SIZE);
         PACKSID(dir.dirdata_handles,
                 dir.dirdata_sids,
                 dir.dist_dir_attr.dirdata_count,
-                dir.dist_dir_attr.sid_count); 
+                dir.dist_dir_attr.sid_count,
+                (PVFS_ATTR_DIR_DIRDATA_COUNT |
+                     PVFS_ATTR_DIR_SID_COUNT)); 
         break;
     case PVFS_TYPE_DIRDATA:
         CPYFIELD(dirdata.dist_dir_bitmap,
                  (dest->u.dirdata.dist_dir_attr.bitmap_size *
-                        sizeof(PVFS_dist_dir_bitmap_basetype)));
+                        sizeof(PVFS_dist_dir_bitmap_basetype)),
+                 PVFS_ATTR_DIRDATA_BITMAP_SIZE);
         PACKSID(dirdata.dirdata_handles,
                 dirdata.dirdata_sids,
                 dirdata.dist_dir_attr.dirdata_count,
-                dirdata.dist_dir_attr.sid_count); 
+                dirdata.dist_dir_attr.sid_count,
+                (PVFS_ATTR_DIRDATA_DIRDATA_COUNT |
+                     PVFS_ATTR_DIRDATA_SID_COUNT)); 
         break;
     case PVFS_TYPE_SYMLINK:
-        CPYFIELD(sym.target_path, dest->u.sym.target_path_len);
+        CPYFIELD(sym.target_path, 
+                 dest->u.sym.target_path_len,
+                 PVFS_ATTR_SYMLNK_TARGET);
         break;
     default :
         break;
@@ -254,7 +277,122 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
     }                                                                 \
 } while (0)
 
+#define copy_attr(attr, maskbit)                                    \
+do {                                                                \
+    if ((src->mask & maskbit) == maskbit)                           \
+    {                                                               \
+        dest->attr = src->attr;                                     \
+        src->mask |= maskbit;                                       \
+    }                                                               \
+} while (0)
 
+/* new mask oriented copy routines */
+int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
+{
+    int ret = -PVFS_EINVAL;
+
+    /* error if the pointers aren't valid */
+    if (!dest || !src)
+    {
+        return ret;
+    }
+
+    /* first clear the dest attr */
+    PINT_free_object_attr(dest);
+
+    copy_attr(objtype, PVFS_ATTR_COMMON_TYPE);
+    copy_attr(mask, 0);
+    copy_attr(owner, PVFS_ATTR_COMMON_UID);
+    copy_attr(group, PVFS_ATTR_COMMON_GID);
+    copy_attr(perms, PVFS_ATTR_COMMON_PERM);
+    copy_attr(atime, PVFS_ATTR_COMMON_ATIME);
+    copy_attr(mtime, PVFS_ATTR_COMMON_MTIME);
+    copy_attr(ctime, PVFS_ATTR_COMMON_CTIME);
+    copy_attr(ntime, PVFS_ATTR_COMMON_NTIME);
+    /* we do not do anything with time_set flags here */
+
+    switch(dest->objtype)
+    {
+    case PVFS_TYPE_METAFILE:
+        CLRFIELD(dest->u.meta.dist);
+
+        copy_attr(u.meta.dist_size, PVFS_ATTR_META_DIST_SIZE);
+
+        CLRPACK(meta.dfile_array, meta.sid_array, meta.dfile_count);
+
+        copy_attr(u.meta.dfile_count, PVFS_ATTR_META_DFILE_COUNT);
+        copy_attr(u.meta.sid_count, PVFS_ATTR_META_SID_COUNT);
+
+        copy_attr(u.meta.mirror_mode, PVFS_ATTR_META_MIRROR_MODE);
+        copy_attr(u.meta.size, PVFS_ATTR_META_SIZE);
+        copy_attr(u.meta.flags, PVFS_ATTR_META_FLAGS);
+        /**/
+        break;
+    case PVFS_TYPE_DATAFILE:
+        copy_attr(u.data.size, PVFS_ATTR_DATA_SIZE);
+        break;
+    case PVFS_TYPE_DIRECTORY:
+        copy_attr(u.dir.dirent_count, PVFS_ATTR_DIR_DIRENT_COUNT);
+        /* begin hints */
+        copy_attr(u.dir.hint.dist_name_len, PVFS_ATTR_DIR_HINT_DIST_NAME_LEN);
+
+        CLRFIELD(dest->u.dir.hint.dist_name);
+
+        copy_attr(u.dir.hint.dist_params_len, PVFS_ATTR_DIR_HINT_DIST_PARAMS_LEN);
+
+        CLRFIELD(dest->u.dir.hint.dist_params);
+
+        copy_attr(u.dir.hint.dfile_count, PVFS_ATTR_DIR_HINT_DFILE_COUNT);
+        copy_attr(u.dir.hint.dfile_sid_count, PVFS_ATTR_DIR_HINT_SID_COUNT);
+        copy_attr(u.dir.hint.layout, PVFS_ATTR_DIR_HINT_LAYOUT);
+        /* end hints */
+        /* begin dirdata */
+        copy_attr(u.dir.dist_dir_attr.tree_height, PVFS_ATTR_DIR_TREE_HEIGHT);
+        copy_attr(u.dir.dist_dir_attr.dirdata_count, PVFS_ATTR_DIR_DIRDATA_COUNT);
+        copy_attr(u.dir.dist_dir_attr.sid_count, PVFS_ATTR_DIR_SID_COUNT);
+        copy_attr(u.dir.dist_dir_attr.bitmap_size, PVFS_ATTR_DIR_BITMAP_SIZE);
+        copy_attr(u.dir.dist_dir_attr.split_size, PVFS_ATTR_DIR_SPLIT_SIZE);
+        copy_attr(u.dir.dist_dir_attr.server_no, PVFS_ATTR_DIR_SERVER_NO);
+        copy_attr(u.dir.dist_dir_attr.branch_level, PVFS_ATTR_DIR_BRANCH_LEVEL);
+        /* end dirdata */
+        CLRFIELD(dest->u.dir.dist_dir_bitmap);
+
+        CLRPACK(dir.dirdata_handles,
+                dir.dirdata_sids,
+                dir.dist_dir_attr.dirdata_count);
+        /**/
+        break;
+    case PVFS_TYPE_DIRDATA:
+        copy_attr(u.dirdata.dirent_count, PVFS_ATTR_DIRDATA_DIRENT_COUNT);
+        /* begin dirdata */
+        copy_attr(u.dirdata.dist_dir_attr.tree_height, PVFS_ATTR_DIRDATA_TREE_HEIGHT);
+        copy_attr(u.dirdata.dist_dir_attr.dirdata_count, PVFS_ATTR_DIRDATA_DIRDATA_COUNT);
+        copy_attr(u.dirdata.dist_dir_attr.sid_count, PVFS_ATTR_DIRDATA_SID_COUNT);
+        copy_attr(u.dirdata.dist_dir_attr.bitmap_size, PVFS_ATTR_DIRDATA_BITMAP_SIZE);
+        copy_attr(u.dirdata.dist_dir_attr.split_size, PVFS_ATTR_DIRDATA_SPLIT_SIZE);
+        copy_attr(u.dirdata.dist_dir_attr.server_no, PVFS_ATTR_DIRDATA_SERVER_NO);
+        copy_attr(u.dirdata.dist_dir_attr.branch_level, PVFS_ATTR_DIRDATA_BRANCH_LEVEL);
+        /* end dirdata */
+        CLRFIELD(dest->u.dirdata.dist_dir_bitmap);
+        CLRPACK(dirdata.dirdata_handles,
+                dirdata.dirdata_sids,
+                dirdata.dist_dir_attr.dirdata_count);
+        /**/
+        break;
+    case PVFS_TYPE_SYMLINK:
+        copy_attr(u.sym.target_path_len, PVFS_ATTR_SYMLNK_TARGET);
+        CLRFIELD(dest->u.sym.target_path);
+        /**/
+        break;
+    default :
+        break;
+    }
+    dest->mask = src->mask;
+    return 0;
+}
+
+#if 0
+/* old copy object fixed */
 int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
 {
     int ret = -PVFS_EINVAL;
@@ -283,10 +421,6 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         dest->u.meta.sid_count = src->u.meta.sid_count;
         dest->u.meta.size = src->u.meta.size;
         dest->u.meta.mirror_mode = src->u.meta.mirror_mode;
-    #if 0
-        dest->u.meta.stuffed = src->u.meta.stuffed;
-        dest->u.meta.stuffed_size = src->u.meta.stuffed_size;
-    #endif
         dest->u.meta.flags = src->u.meta.flags;
         /**/
         break;
@@ -362,6 +496,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
     dest->mask = src->mask;
     return 0;
 }
+#endif
 #undef CLRFIELD
 #undef CLRPACK
 

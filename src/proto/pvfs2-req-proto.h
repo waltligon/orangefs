@@ -1092,14 +1092,14 @@ struct PVFS_servreq_getattr
 {
     PVFS_handle handle;           /* handle of target object */
     PVFS_fs_id fs_id;             /* file system */
-    uint32_t attrmask;            /* mask of desired attributes */
+    uint64_t attrmask;            /* mask of desired attributes */
     PVFS_credential credential;   /* user credential */
 };
 endecode_fields_4_struct(
     PVFS_servreq_getattr,
+    uint64_t, attrmask,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
-    uint32_t, attrmask,
     PVFS_credential, credential);
 #define extra_size_PVFS_servreq_getattr extra_size_PVFS_credential
 
@@ -1140,18 +1140,18 @@ endecode_fields_1_struct(
 
 struct PVFS_servreq_unstuff
 {
-    PVFS_handle handle;         /* handle of target object */
-    PVFS_fs_id fs_id;           /* file system */
-    uint32_t attrmask;          /* mask of desired attributes */
-    PVFS_credential credential; /* credential used to get capability */
-    int32_t sid_count;          /* reflexive */
-    PVFS_SID *sid_array;        /* reflexive */
+    PVFS_handle handle;            /* handle of target object */
+    PVFS_fs_id fs_id;              /* file system */
+    PVFS_object_attrmask attrmask; /* mask of desired attributes */
+    PVFS_credential credential;    /* credential used to get capability */
+    int32_t sid_count;             /* reflexive */
+    PVFS_SID *sid_array;           /* reflexive */
 };
 endecode_fields_5a_struct(
     PVFS_servreq_unstuff,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
-    uint32_t, attrmask,
+    PVFS_object_attrmask, attrmask,
     PVFS_credential, credential,
     skip4,,
     int32_t, sid_count,
@@ -1261,7 +1261,7 @@ struct PVFS_servreq_lookup_path
     PVFS_fs_id fs_id;            /* file system */
     PVFS_handle handle; /* handle of path parent */
     /* mask of attribs to return with lookup results */
-    uint32_t attrmask;
+    PVFS_object_attrmask attrmask;
     PVFS_credential credential;
 };
 endecode_fields_6_struct(
@@ -1270,7 +1270,7 @@ endecode_fields_6_struct(
     PVFS_fs_id, fs_id,
     skip4,,
     PVFS_handle, handle,
-    uint32_t, attrmask,
+    PVFS_object_attrmask, attrmask,
     PVFS_credential, credential);
 #define extra_size_PVFS_servreq_lookup_path         \
                 (roundup8(PVFS_REQ_LIMIT_PATH_NAME_BYTES + 1) + \
@@ -2316,17 +2316,17 @@ struct PVFS_servresp_small_io
 
 struct PVFS_servreq_listattr
 {
-    PVFS_fs_id  fs_id;   /* file system */
-    uint32_t    attrmask;  /* mask of desired attributes */
-    uint32_t    nhandles; /* number of handles */
-    PVFS_handle *handles; /* handle of target object */
-    int32_t     sid_count;
-    PVFS_SID    *sid_array;
+    PVFS_fs_id              fs_id;     /* file system */
+    PVFS_object_attrmask    attrmask;  /* mask of desired attributes */
+    uint32_t                nhandles;  /* number of handles */
+    PVFS_handle             *handles;  /* handle of target object */
+    int32_t                 sid_count;
+    PVFS_SID                *sid_array;
 };
 endecode_fields_3a_struct(
     PVFS_servreq_listattr,
     PVFS_fs_id, fs_id,
-    uint32_t, attrmask,
+    PVFS_object_attrmask, attrmask,
     skip4,,
     uint32_t, nhandles,
     PVFS_handle, handles);

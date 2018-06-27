@@ -475,7 +475,7 @@ int PINT_acache_update(
     PVFS_size* size)        /**< logical file size (NULL if not available) */
 {
     struct acache_payload *tmp_payload = NULL;
-    uint32_t save_mask;
+    uint64_t save_mask;
     int ret = -1;
 
     gossip_debug(GOSSIP_ACACHE_DEBUG,
@@ -491,10 +491,8 @@ int PINT_acache_update(
         return (-PVFS_EINVAL);
     }
 
-    gossip_debug(GOSSIP_ACACHE_DEBUG,
-                 "%s: copying incoming acache payload, incoming mask is: %x\n",
-                 __func__,
-                 attr->mask);
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "%s: copying incoming acache payload,"
+                " incoming mask is: %lx\n", __func__, attr->mask);
 
     tmp_payload = (struct acache_payload*) calloc(1, sizeof(*tmp_payload));
     if(!tmp_payload)
@@ -558,7 +556,7 @@ int PINT_acache_update(
     }
 
     gossip_debug(GOSSIP_ACACHE_DEBUG,
-                "%s: copied input payload, mask of copied payload is: %x\n",
+                "%s: copied input payload, mask of copied payload is: %lx\n",
                 __func__,
                  tmp_payload->attr.mask);
 

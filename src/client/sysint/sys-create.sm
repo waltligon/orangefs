@@ -1144,7 +1144,7 @@ static PINT_sm_action create_crdirent_failure(struct PINT_smcb *smcb,
                      sm_p->u.create.retry_count);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "%s:sm_p->getattr.attr.mask(0x%0x)\n",
+                     "%s:sm_p->getattr.attr.mask(0x%0lx)\n",
                      __func__,
                      sm_p->getattr.attr.mask);
         

@@ -1059,19 +1059,23 @@ static PINT_sm_action setattr_setobj_attribs(struct PINT_smcb *smcb,
      */
     PVFS_object_attr_overwrite_setable(dspace_a_p, a_p);
 
-    gossip_debug(
-        GOSSIP_SETATTR_DEBUG,
-        "  WRITING attrs: [owner = %d, group = %d\n\t"
-        "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
-        "ctime = %llu | dfile_count = %d | dist_size = %d\n\t"
-        "handle = %s | S = %p | mask = %d]\n",
-        dspace_a_p->owner, dspace_a_p->group, dspace_a_p->perms,
-        dspace_a_p->objtype, llu(dspace_a_p->atime),
-        llu(PINT_util_mkversion_time(dspace_a_p->mtime)),
-        llu(dspace_a_p->ctime),
-        (int)dspace_a_p->u.meta.dfile_count,
-        (int)dspace_a_p->u.meta.dist_size,
-        PVFS_OID_str(&s_op->req->u.setattr.handle), s_op, a_p->mask);
+    gossip_debug(GOSSIP_SETATTR_DEBUG,
+                 "  WRITING attrs: [owner = %d, group = %d\n\t"
+                 "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
+                 "ctime = %llu | dfile_count = %d | dist_size = %d\n\t"
+                 "handle = %s | S = %p | mask = %lu]\n",
+                 dspace_a_p->owner, 
+                 dspace_a_p->group, 
+                 dspace_a_p->perms,
+                 dspace_a_p->objtype, 
+                 llu(dspace_a_p->atime),
+                 llu(PINT_util_mkversion_time(dspace_a_p->mtime)),
+                 llu(dspace_a_p->ctime),
+                 (int)dspace_a_p->u.meta.dfile_count,
+                 (int)dspace_a_p->u.meta.dist_size,
+                 PVFS_OID_str(&s_op->req->u.setattr.handle),
+                 s_op,
+                 a_p->mask);
 
     /* translate attrs to storage attr format */
     ds_attr = &(s_op->ds_attr);
@@ -1187,7 +1191,7 @@ static int perm_setattr(PINT_server_op *s_op)
 {
     /* permissions required for specified attributes
        if entries are added, update PERM_TABLE_COUNT above */
-    uint32_t perm_table[][2] = { {PVFS_ATTR_COMMON_UID, PERM_SETATTR},
+    uint64_t perm_table[][2] = { {PVFS_ATTR_COMMON_UID, PERM_SETATTR},
                                  {PVFS_ATTR_COMMON_GID, PERM_SETATTR},
                                  {PVFS_ATTR_COMMON_PERM, PERM_SETATTR},
                                  {PVFS_ATTR_META_DFILES, PERM_STATIC},
@@ -1215,7 +1219,7 @@ static int perm_setattr(PINT_server_op *s_op)
         return 0;
     }
 
-    gossip_debug(GOSSIP_SETATTR_DEBUG, "%s: attr mask = %08x\n", 
+    gossip_debug(GOSSIP_SETATTR_DEBUG, "%s: attr mask = %lx\n", 
                  __func__, req_attr->mask);
 
     /* check set attrs against perm table */
@@ -1227,13 +1231,13 @@ static int perm_setattr(PINT_server_op *s_op)
             if (perm_table[i][PERM_TABLE_PERM] == PERM_STATIC)
             {
                 /* static attributes can only be changed on new files */
-                gossip_err("%s: attempt to set static attribute 0x%x\n", __func__,
+                gossip_err("%s: attempt to set static attribute 0x0%lx\n", __func__,
                            perm_table[i][PERM_TABLE_ATTR]);
             }
             else if (!(s_op->req->capability.op_mask & perm_table[i][PERM_TABLE_PERM]))
             {
                 gossip_debug((GOSSIP_SETATTR_SECURITY_DEBUG), 
-                             "%s: no permissions to set attr 0x%x\n", __func__, 
+                             "%s: no permissions to set attr 0x0%lx\n", __func__, 
                              perm_table[i][PERM_TABLE_ATTR]);
                 return -PVFS_EACCES;
             }
