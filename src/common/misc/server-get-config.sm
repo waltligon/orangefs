@@ -79,6 +79,14 @@ machine pvfs2_server_get_config_sm
 
 /* <====================== HELPER FUNCTIONS =====================> */
 
+/* FUNCTION: server_parse_config
+ *
+ * This function (either version) sets  up some paths etc for upcomming
+ * parse and then goes ahead and parses the config, returning when it
+ * is complete.
+ *
+ * Be sure to check if edits need to be copied into both versions
+ */
 #ifdef WIN32
 static int server_parse_config(struct server_configuration_s *config,
                                char *fs_config_buf,
@@ -139,6 +147,7 @@ static int server_parse_config(struct server_configuration_s *config,
     if (rc && (bytes == fs_config_buf_size - 1))
     {
         server_alias = PINT_util_guess_alias();
+        /* This calls into the dotconf config file code */
         ret = PINT_parse_config(config,
                                 temp_file,
                                 server_alias,
@@ -154,7 +163,9 @@ static int server_parse_config(struct server_configuration_s *config,
 
     return ret;
 }
-#else
+
+#else   /* SECOND VERSION begins here. */
+
 static int server_parse_config(struct server_configuration_s *config,
                                char *fs_config_buf,
                                uint32_t fs_config_buf_size)
@@ -198,6 +209,7 @@ static int server_parse_config(struct server_configuration_s *config,
                   (fs_config_buf_size - 1)) == (fs_config_buf_size - 1))
         {
             server_alias = PINT_util_guess_alias();
+            /* This calls into the dotconf config file code */
             ret = PINT_parse_config(config,
                                     fs_template,
                                     server_alias,
@@ -329,8 +341,10 @@ static PINT_sm_action server_get_config_parse(struct PINT_smcb *smcb,
     int ret = -1;
     struct filesystem_configuration_s* cur_fs = NULL;
 
+    /* OK, go parse the config file */
     if(sm_p->u.get_config.config)
     {
+        /* this kicks off config file parsing */
         ret = server_parse_config(sm_p->u.get_config.config,
                                   sm_p->u.get_config.fs_config_buf,
                                   sm_p->u.get_config.fs_config_buf_size);
@@ -343,6 +357,9 @@ static PINT_sm_action server_get_config_parse(struct PINT_smcb *smcb,
         }
     }
 
+    /* parsed the file, but can't get info on it, something
+     * probably wrong
+     */
     if(sm_p->u.get_config.mntent->fs_id == PVFS_FS_ID_NULL)
     {
         cur_fs = PINT_config_find_fs_name(

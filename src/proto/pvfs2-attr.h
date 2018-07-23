@@ -51,6 +51,7 @@ typedef uint64_t PVFS_object_attrmask;
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_object_attrmask encode_uint64_t
 #define decode_PVFS_object_attrmask decode_uint64_t
+#define defree_PVFS_object_attrmask defree_uint64_t
 #endif
 
 /* New simpler mask system, built on old system */
@@ -106,15 +107,9 @@ typedef uint64_t PVFS_object_attrmask;
 #define PVFS_ATTR_COMMON_MTIME_SET   (1ULL << 10)
 #define PVFS_ATTR_COMMON_NTIME_SET   (1ULL << 11)
 
-
 #define PVFS_ATTR_COMMON_NOTIME                           \
         (PVFS_ATTR_COMMON_UID  | PVFS_ATTR_COMMON_GID   | \
          PVFS_ATTR_COMMON_PERM | PVFS_ATTR_COMMON_TYPE)
-
-#define PVFS_ATTR_COMMON_ALL                                \
-        (PVFS_ATTR_COMMON_NOTIME | PVFS_ATTR_COMMON_ATIME | \
-         PVFS_ATTR_COMMON_CTIME  | PVFS_ATTR_COMMON_MTIME | \
-         PVFS_ATTR_COMMON_NTIME)
 
 #define PVFS_ATTR_NOTIME_SET \
         ~(PVFS_ATTR_COMMON_ATIME_SET | PVFS_ATTR_COMMON_NTIME_SET | \
@@ -123,6 +118,11 @@ typedef uint64_t PVFS_object_attrmask;
 #define PVFS_ATTR_TIME_ALL \
         (PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_NTIME | \
          PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_MTIME)
+
+#define PVFS_ATTR_COMMON_ALL                               \
+        (PVFS_ATTR_COMMON_UID   | PVFS_ATTR_COMMON_GID   | \
+         PVFS_ATTR_COMMON_PERM  | PVFS_ATTR_COMMON_TYPE  | \
+         PVFS_ATTR_TIME_ALL)
 
 /* internal attribute masks for metadata objects */
 #define PVFS_ATTR_META_DIST          (1ULL << 12)
@@ -134,9 +134,12 @@ typedef uint64_t PVFS_object_attrmask;
 #define PVFS_ATTR_META_SIZE          (1ULL << 18)     /* writable */
 #define PVFS_ATTR_META_FLAGS         (1ULL << 19)   /* writable */
 
-#define PVFS_ATTR_META_ALL                             \
-        (PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES | \
-        PVFS_ATTR_META_FLAGS | PVFS_ATTR_COMMON_ALL)
+#define PVFS_ATTR_META_ALL                                       \
+        (PVFS_ATTR_META_DIST      | PVFS_ATTR_META_DIST_SIZE   | \
+         PVFS_ATTR_META_DFILES    | PVFS_ATTR_META_DFILE_COUNT | \
+         PVFS_ATTR_META_SID_COUNT | PVFS_ATTR_META_MIRROR_MODE | \
+         PVFS_ATTR_META_SIZE      | PVFS_ATTR_META_FLAGS       | \
+         PVFS_ATTR_COMMON_ALL)
 
 /* internal attribute masks for datafile objects */
 #define PVFS_ATTR_DATA_SIZE          (1ULL << 20)   /* size of a DFILE

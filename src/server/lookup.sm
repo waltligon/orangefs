@@ -297,7 +297,7 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
 
     gossip_debug(GOSSIP_LOOKUP_DEBUG,
                  " STARTING LOOKUP REQUEST "
-                 "(path:%s)(fs_id:%d)(handle:%s)(attrmask:0x%0x)"
+                 "(path:%s)(fs_id:%d)(handle:%s)(attrmask:0x%0lx)"
                  "(# of segments:%u)\n",
                  s_op->req->u.lookup_path.path,
                  s_op->req->u.lookup_path.fs_id,

@@ -230,6 +230,7 @@ typedef struct server_configuration_s
     int configuration_context;
     host_alias_t *new_host;       /* temp spot for a new host alias   */
     PINT_llist *host_aliases;     /* ptrs are type host_alias_t       */
+        /* This calls into the dotconf config file code */
     PINT_llist *file_systems;     /* ptrs are type */
                                   /*   filesystem_configuration_t     */
     distribution_config_t default_dist_config;  /* distribution conf  */
@@ -330,26 +331,6 @@ char *PINT_config_get_host_addr_ptr(
 char *PINT_config_get_host_alias_ptr(
         struct server_configuration_s *config_s,
         char *bmi_address);
-
-/* V3 obsolete */
-#if 0
-char *PINT_config_get_meta_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs);
-
-int PINT_config_get_meta_handle_extent_array(
-    struct server_configuration_s *config_s,
-    PVFS_fs_id fs_id,
-    PVFS_handle_extent_array *extent_array);
-
-char *PINT_config_get_data_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs);
-
-char *PINT_config_get_merged_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs);
-#endif
 
 int PINT_config_is_valid_configuration(
         struct server_configuration_s *config_s);

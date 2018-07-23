@@ -444,7 +444,7 @@ const char *PINT_dotconf_set_defaults(configfile_t *configfile,
              configfile->config_options[mod][opt_idx].name[0];
              opt_idx++)
         {
-            option = & configfile->config_options[mod][opt_idx];
+            option = &(configfile->config_options[mod][opt_idx]);
             if(option && (context & option->context) && option->default_value)
             {
                 /* set up the command structure (contextchecker wants this) */
@@ -725,6 +725,9 @@ static void PINT_dotconf_free_command(command_t *command)
     free(command->data.list);
 }
 
+/*
+ * parse one line in buffer and update configfile 
+ */
 const char *PINT_dotconf_handle_command(configfile_t * configfile,
                                         char *buffer)
 {
@@ -843,6 +846,7 @@ const char *PINT_dotconf_handle_command(configfile_t * configfile,
     return error;
 }
 
+#if 0
 const char *PINT_dotconf_command_loop_until_error(configfile_t *configfile)
 {
     char buffer[CFG_BUFSIZE];
@@ -857,6 +861,7 @@ const char *PINT_dotconf_command_loop_until_error(configfile_t *configfile)
     }
     return NULL;
 }
+#endif
 
 int PINT_dotconf_command_loop(configfile_t *configfile)
 {

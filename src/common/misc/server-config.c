@@ -541,18 +541,18 @@ static const configoption_t options[] =
      * Suppose the Option name is X, its default value is Y,
      * and one wishes to override the option for a server to Y'.
      *
-     * <p style="margin-bottom: 0pt;"><c>&lt;Defaults&gt;</c></p>
-     * <p class="normal_indent_1" style="margin-bottom: 0pt;"><c>..</c></p>
-     * <p class="normal_indent_2" style="margin-bottom: 0pt;"><c>X Y</c></p>
-     * <p class="normal_indent_1" style="margin-bottom: 0pt;"><c>..</c></p>
-     * <p style="margin-bottom: 0pt;"><c>&lt;/Defaults&gt;</c></p>
+     * Defaults
+     * ..
+     * X Y
+     * ..
+     * /Defaults
      *
-     * <p style="margin-bottom: 0pt;"><c>&lt;ServerOptions&gt;</c></p>
-     * <p class="normal_indent_1" style="margin-bottom: 0pt;"><c>Server {</c><i>server alias</i><c>}</c></p>
-     * <p class="normal_indent_1" style="margin-bottom: 0pt;"><c>..</c></p>
-     * <p class="normal_indent_1" style="margin-bottom: 0pt;"><c>X Y'</c></p>
-     * <p class="normal_indent_1" style="margin-bottom: 0pt;"><c>..</c></p>
-     * <p style="margin-bottom: 0pt;"><c>&lt;/ServerOptions&gt;</c></p>
+     * ServerOptions
+     * Server {server alias}
+     * ..
+     * X Y'
+     * ..
+     * /ServerOptions
      *
      * The ServerOptions context REQUIRES the Server option specify
      * the server alias, which sets the remaining options specified
@@ -1238,11 +1238,17 @@ static const configoption_t options[] =
     {"TreeThreshold", ARG_INT, tree_threshold, NULL,
         CTX_FILESYSTEM, "2"},
 
-    /* Specifies the default for initial number of servers to hold directory entries. Note that this number cannot exceed 65535 (max value of a 16-bit unsigned integer). */
+    /* Specifies the default for initial number of servers to hold directory
+     * entries. Note that this number cannot exceed 65535
+     * (max value of a 16-bit unsigned integer). 
+     */
     {"DistrDirServersInitial", ARG_INT, distr_dir_servers_initial, NULL,
         CTX_FILESYSTEM, "1"},
 
-    /* Specifies the default for maximum number of servers to hold directory entries. Note that this number cannot exceed 65535 (max value of a 16-bit unsigned integer). */
+    /* Specifies the default for maximum number of servers to hold directory
+     * entries. Note that this number cannot exceed
+     * 65535 (max value of a 16-bit unsigned integer). 
+     */
     {"DistrDirServersMax", ARG_INT, distr_dir_servers_max, NULL,
         CTX_FILESYSTEM, "4"},
 
@@ -1256,13 +1262,18 @@ static const configoption_t options[] =
 /*
  * Function: PINT_parse_config
  *
- * Params:   struct server_configuration_s*,
+ * Params:   struct server_configuration_s* config_obj - 
+ *                                    in-mem configuration target for all
  *           global_config_filename - common config file for all servers
  *                                    and clients
  *           server_alias_name      - alias (if any) provided for this server
  *                                    client side can provide to check
  *                                    for a local server
  *           server_flag            - true if running on a server
+ *
+ * Called by server_parse_config in src/common/misc/server-get-config.c
+ *           in the path to start up config file parsing. Top level for config
+ *           file processing.
  *
  * Returns:  0 on success; 1 on failure
  *
@@ -1299,7 +1310,10 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
         config_s->server_alias = NULL;
     }
 
-    /* set some global defaults for optional parameters */
+    /* set some global defaults for optional parameters 
+     * these MUST have a value so they are thought of as hard-wired defaults 
+    /* last two should have pre-defined alias like the others
+     */
     config_s->logstamp_type = GOSSIP_LOGSTAMP_DEFAULT;
     config_s->server_job_bmi_timeout = PVFS2_SERVER_JOB_BMI_TIMEOUT_DEFAULT;
     config_s->server_job_flow_timeout = PVFS2_SERVER_JOB_FLOW_TIMEOUT_DEFAULT;
@@ -1322,7 +1336,8 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
                                      NULL,
                                      0,
                                      options,
-                                     (void *)config_s, 
+                                     /* this is recorded in configfile */
+                                     (void *)config_s,
                                      CASE_INSENSITIVE);
     if (!configfile)
     {
@@ -1330,10 +1345,16 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
                    config_s->fs_config_filename);
         return 1;
     }
+    /* set up linked to funcs etc used in parsing 
+     */
     config_s->private_data = configfile;
     configfile->errorhandler = (dotconf_errorhandler_t)errorhandler;
     configfile->contextchecker = (dotconf_contextchecker_t)contextchecker;
     
+    /* apparently this is where the rest of the parser is launched 
+     * after this is mostly error checking and running some special
+     * options
+     */
     if(PINT_dotconf_command_loop(configfile) == 0)
     {
         /* NOTE: dotconf error handler will log message */
@@ -1772,7 +1793,10 @@ DOTCONF_CB(enter_filesystem_context)
 
     fs_conf = (struct filesystem_configuration_s *)
                         malloc(sizeof(struct filesystem_configuration_s));
-    assert(fs_conf); /* TODO: replace this with error handleing */
+    if (fs_conf == NULL)
+    {
+        return "Error allocating space for a filesystem config.";
+    }
     memset(fs_conf, 0, sizeof(struct filesystem_configuration_s));
 
     /* fill any fs defaults here */

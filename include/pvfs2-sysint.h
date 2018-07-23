@@ -36,6 +36,8 @@ enum PVFS_sys_setinfo_opt
 /** Holds a non-blocking system interface operation handle. */
 typedef PVFS_id_gen_t PVFS_sys_op_id;
 
+/** This is a sys_attr because it is sent between the client 
+  * and ther server.  Mask is 32bit for now. **/
 /** Describes attributes for a file, directory, or symlink. */
 struct PVFS_sys_attr_s
 {
@@ -305,6 +307,7 @@ PVFS_error PVFS_sys_lookup(
     int32_t follow_link,
     PVFS_hint hints);
 
+/** sysint interfaces for getattr mask is 32bit for now **/
 PVFS_error PVFS_isys_getattr(
     PVFS_object_ref ref,
     uint32_t attrmask,

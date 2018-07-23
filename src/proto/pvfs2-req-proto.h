@@ -922,7 +922,7 @@ struct PVFS_servreq_tree_getattr
     uint32_t caller_handle_index;
     uint32_t retry_msgpair_at_leaf;
     PVFS_credential credential;
-    uint32_t attrmask;
+    PVFS_object_attrmask attrmask;
     uint32_t handle_count;
     PVFS_handle *handle_array;
     uint32_t sid_count;
