@@ -88,18 +88,15 @@ typedef int64_t PVFS_id_gen_t;
 /** Opaque value representing a destination address. */
 typedef int64_t PVFS_BMI_addr_t;
 
-/* Windows - inline functions can't be exported */
-#ifdef WIN32
+/* Windows - inline functions can't be exported.  And, in gcc 5.3 and newer 
+ * inline functions must have a corresponding definition in a header file,
+ * so we are just removing the inlines here since the compiler will inline
+ * if it thinks it is advantageous.
+ * */
 void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x);
 int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x);
 void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x);
 void defree_PVFS_BMI_addr_t(PVFS_BMI_addr_t *x);
-#else
-inline void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x);
-inline int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x);
-inline void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x);
-inline void defree_PVFS_BMI_addr_t(PVFS_BMI_addr_t *x);
-#endif
 
 /* this stuff is all good, if out of place */
 
@@ -333,19 +330,9 @@ endecode_fields_2(
 
 #define extra_size_PVFS_sys_layout PVFS_SYS_LIMIT_LAYOUT
 
-/* we need an encode/decode setup for layouts.
- */
-#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
-#ifdef WIN32
 void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x);
 void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
 void defree_PVFS_sys_layout(struct PVFS_sys_layout_s *x);
-#else
-inline void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x);
-inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
-inline void defree_PVFS_sys_layout(struct PVFS_sys_layout_s *x);
-#endif
-#endif
 
 /* predefined special values for types */
 #define PVFS_CONTEXT_NULL   ((PVFS_context_id)-1)
