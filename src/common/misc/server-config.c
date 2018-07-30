@@ -1312,7 +1312,7 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
 
     /* set some global defaults for optional parameters 
      * these MUST have a value so they are thought of as hard-wired defaults 
-    /* last two should have pre-defined alias like the others
+     * last two should have pre-defined alias like the others
      */
     config_s->logstamp_type = GOSSIP_LOGSTAMP_DEFAULT;
     config_s->server_job_bmi_timeout = PVFS2_SERVER_JOB_BMI_TIMEOUT_DEFAULT;
