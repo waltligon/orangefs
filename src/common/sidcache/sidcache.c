@@ -1570,9 +1570,14 @@ int SID_type_store(PVFS_SID *sid, FILE *outpfile)
                                 DB_SET);
 
     /* halt on error or DB_NOTFOUND */
-    if (ret == 0)
+    if (ret == 0 || ret == DB_NOTFOUND)
     {
         fprintf(outpfile, "\t\tType ");
+    }
+    else
+    {
+        fprintf(outpfile, "ERROR not DB_NOTFOUND finding types\n");
+        return ret;
     }
     while(ret == 0)
     {
@@ -1581,17 +1586,18 @@ int SID_type_store(PVFS_SID *sid, FILE *outpfile)
         fprintf(outpfile, "%s ", buff);
         tbuf.server_type = 0;
         tbuf.fsid = 0;
-        /* should have been reset by get */
+        /* should have been set by previous get */
         ret = SID_index_cursor->get(SID_index_cursor,
                                     &type_sid_key,
                                     &type_sid_val,
-                                    DB_NEXT);
+                                    DB_NEXT_DUP);
     }
 
     fprintf(outpfile, "\n");
     /* Normal return should be DB_NOTFOUND, 0 is no error */
     if (ret != 0 && ret != DB_NOTFOUND)
     {
+        fprintf(outpfile, "ERROR not DB_NOTFOUND saving types\n");
         return ret;
     }
     return 0;
@@ -1699,6 +1705,8 @@ int SID_cache_store(DBC *cursorp,
         else
         {
             /* report an error */
+            fprintf(outpfile,"\tERROR val.data empty after get\n");
+            return -1;
         }
     
         PVFS_SID_cpy(&tmp_sid, (PVFS_SID *)key.data);
@@ -1713,7 +1721,8 @@ int SID_cache_store(DBC *cursorp,
             fprintf(outpfile,"\t\tAlias %s\n", alias);
         }
         fprintf(outpfile,"\t\tSID %s\n", tmp_sid_str);
-        fprintf(outpfile,"\t\tAddress %s\n", tmp_sid_attrs->url);
+        fprintf(outpfile,"\t\tAddress %s(%lld)\n",
+                tmp_sid_attrs->url, lld(tmp_sid_attrs->bmi_addr));
 
 /* V3 old version */
 #if 0
@@ -2689,7 +2698,7 @@ int SID_save(const char *path)
 //    int fnlen;
     PVFS_fs_id fsid __attribute__ ((unused)) = PVFS_FS_ID_NULL;
 
-    if (!path)
+    if (!path || !path[0])
     {
 #if 0
         /* figure out the path to the cached data file */
@@ -2700,14 +2709,15 @@ int SID_save(const char *path)
         strncat(filename, "/SIDcache", fnlen + 1);
         PINT_server_config_mgr_put_config(srv_conf);
 #endif
+        outpfile = stderr; /* debugging goes to stderr */
     }
     else
     {
         filename = (char *)path;
+        /* Opening the file to dump the contents of the database to */
+        outpfile = fopen(filename, "w");
     }
 
-    /* Opening the file to dump the contents of the database to */
-    outpfile = fopen(filename, "w");
     if(!outpfile)
     {
         gossip_err("Error opening dump file in SID_save function\n");

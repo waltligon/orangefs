@@ -538,30 +538,50 @@ void print_stats(const PVFS_object_ref *ref,
    if(attr->mask & PVFS_ATTR_SYS_ATIME)
    {
       time_t a_tmp = attr->atime;
-      sprintf(a_time, "%s", ctime((const time_t *)&a_tmp));
-      a_time[strlen(a_time)-1] = 0;
-      fprintf(stdout, "  atime         : %llu (%s)\n", llu(attr->atime), a_time);
+      char *ts = ctime((const time_t *)&a_tmp);
+      if (ts)
+      {
+          sprintf(a_time, "%s", ts);
+          a_time[strlen(a_time)-1] = 0;
+          fprintf(stdout, "  atime         : %llu (%s)\n",
+                  llu(attr->atime), a_time);
+      }
    }
    if(attr->mask & PVFS_ATTR_SYS_MTIME)
    {
       time_t m_tmp = attr->mtime;
-      sprintf(m_time, "%s", ctime((const time_t *)&m_tmp));
-      m_time[strlen(m_time)-1] = 0;
-      fprintf(stdout, "  mtime         : %llu (%s)\n", llu(attr->mtime), m_time);
+      char *ts = ctime((const time_t *)&m_tmp);
+      if (ts)
+      {
+          sprintf(m_time, "%s", ts);
+          m_time[strlen(m_time)-1] = 0;
+          fprintf(stdout, "  mtime         : %llu (%s)\n",
+                  llu(attr->mtime), m_time);
+      }
    }
    if(attr->mask & PVFS_ATTR_SYS_CTIME)
    {
       time_t c_tmp = attr->ctime;
-      sprintf(c_time, "%s", ctime((const time_t *)&c_tmp));
-      c_time[strlen(c_time)-1] = 0;
-      fprintf(stdout, "  ctime         : %llu (%s)\n", llu(attr->ctime), c_time);
+      char *ts = ctime((const time_t *)&c_tmp);
+      if (ts)
+      {
+          sprintf(c_time, "%s", ts);
+          c_time[strlen(c_time)-1] = 0;
+          fprintf(stdout, "  ctime         : %llu (%s)\n",
+                  llu(attr->ctime), c_time);
+      }
    }
    if(attr->mask & PVFS_ATTR_SYS_NTIME)
    {
       time_t n_tmp = attr->ntime;
-      sprintf(n_time, "%s", ctime((const time_t *)&n_tmp));
-      n_time[strlen(n_time)-1] = 0;
-      fprintf(stdout, "  ntime         : %llu (%s)\n", llu(attr->ntime), n_time);
+      char *ts = ctime((const time_t *)&n_tmp);
+      if (ts)
+      {
+          sprintf(n_time, "%s", ts);
+          n_time[strlen(n_time)-1] = 0;
+          fprintf(stdout, "  ntime         : %llu (%s)\n",
+                  llu(attr->ntime), n_time);
+      }
    }
    
    /* dfile_count is only valid for a file. For a given file, it tells how many

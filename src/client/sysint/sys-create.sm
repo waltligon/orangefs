@@ -1039,11 +1039,6 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                  sm_p->u.create.object_name,
                  llu(dirdata_hash));
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "create: encrypt dirent %s into hash value %llu.\n", 
-                 sm_p->u.create.object_name,
-                 llu(dirdata_hash));
-
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create: dist_dir_bitmap:\n");
     for(i = sm_p->getattr.attr.u.dir.dist_dir_attr.bitmap_size - 1;
         i >= 0;
@@ -1073,29 +1068,62 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                  __func__,
                  PVFS_OID_str(&sm_p->parent_ref.handle),
                  sm_p->u.create.object_name,
-                 PVFS_OID_str(&sm_p->object_ref.handle));
+                 PVFS_OID_str(sm_p->u.create.metadata_handle));
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_CRDIRENT_FILL(
-                msg_p->req,
-                sm_p->getattr.attr.capability,
-                *sm_p->cred_p,
-                sm_p->parent_ref.fs_id,
-    /* target */sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
-                sm_p->parent_ref.sid_count,
-    /* target */&sm_p->getattr.attr.u.dir.dirdata_sids[dirdata_sid_index],
-                sm_p->u.create.object_name,   /* item inserted into dir */
-                sm_p->object_ref.handle,      /* item inserted into dir */
-                sm_p->object_ref.sid_array,   /* item inserted into dir */
-                sm_p->object_ref.sid_count, 
-                sm_p->parent_ref.handle,      /* back ptr to dir */
-                sm_p->parent_ref.sid_array,   /* back ptr to dir */
-                sm_p->hints);
+              msg_p->req,
+              sm_p->getattr.attr.capability,
+              *sm_p->cred_p,
+              sm_p->parent_ref.fs_id,
+ /* target */ sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
+              sm_p->parent_ref.sid_count,
+ /* target */ &sm_p->getattr.attr.u.dir.dirdata_sids[dirdata_sid_index],
+              sm_p->u.create.object_name,        /* item inserted into dir */
+              *sm_p->u.create.metadata_handle,   /* item inserted into dir */
+              sm_p->u.create.metadata_sid_array, /* item inserted into dir */
+              sm_p->u.create.metadata_sid_count, 
+              sm_p->parent_ref.handle,           /* back ptr to dir */
+              sm_p->parent_ref.sid_array,        /* back ptr to dir */
+              sm_p->hints);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "create: msg_p->req.op(%d)\n",msg_p->req.op);
+                 "create(crdirent): fsid(%d)\n",
+                 sm_p->parent_ref.fs_id);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create(crdirent): dirdata handle(%s)\n",
+                 PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles
+                                    [dirdata_server_index]));
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create(crdirent): parent sid count(%d)\n",
+                 sm_p->parent_ref.sid_count);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create(crdirent): dirdata sid(%s)\n",
+                 PVFS_SID_str(&sm_p->getattr.attr.u.dir.dirdata_sids
+                                    [dirdata_sid_index]));
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create(crdirent): object name(%s)\n",
+                 sm_p->u.create.object_name);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create(crdirent): object handle(%s)\n",
+                 PVFS_OID_str(sm_p->u.create.metadata_handle));
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create(crdirent): object sid(%s)\n",
+                 PVFS_SID_str(&sm_p->u.create.metadata_sid_array[0]));
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create(crdirent): sid count(%d)\n",
+                 sm_p->u.create.metadata_sid_count);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create(crdirent): parent handle(%s)\n",
+                 PVFS_OID_str(&sm_p->parent_ref.handle));
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create(crdirent): parent sid(%s)\n",
+                 PVFS_SID_str(&sm_p->parent_ref.sid_array[0]));
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create(crdirent): msg_p->req.op(%d)\n",msg_p->req.op);
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;

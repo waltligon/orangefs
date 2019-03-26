@@ -14,7 +14,7 @@ typedef int64_t BMI_addr; /* equivalent to PVFS_BMI_adddr_t */
 typedef struct SID_cacheval_s
 {
     BMI_addr bmi_addr;
-    int attr[SID_NUM_ATTR];
+    int attr[SID_NUM_ATTR]; /* user defined attributes */
     char *url;              /* space to be allocated */
                             /* immediately following this struct */
 } SID_cacheval_t;

@@ -1007,7 +1007,7 @@ static PINT_sm_action setattr_setobj_attribs(struct PINT_smcb *smcb,
     if (a_p->mask & PVFS_ATTR_COMMON_MTIME_SET)
     {
         PVFS_time orig_mtime = a_p->mtime;
-        a_p->mtime = orig_mtime;
+        a_p->mtime = PINT_util_mktime_version(orig_mtime);
         gossip_debug(GOSSIP_SETATTR_DEBUG, "setting version "
                      "to %llu\n\tmtime is %llu\n",
                      llu(a_p->mtime), llu(orig_mtime));

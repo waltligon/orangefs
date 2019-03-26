@@ -220,10 +220,13 @@ static PINT_sm_action msgpairarray_fork(struct PINT_smcb *smcb,
     int i = 0;
     gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
                  smcb, __func__);
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray forking off SMCBs: %s\n",
+                 smcb, __func__);
     for(i = 0; i < mop->count; i++)
     {
         PINT_sm_msgarray_op *submop;
         submop = (PINT_sm_msgarray_op *)malloc(sizeof(PINT_sm_msgarray_op));
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) SMCB %d forking\n", smcb, i);
         submop->params = mop->params;
         submop->count = mop->count;
         submop->index = i;
@@ -275,7 +278,7 @@ static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
         /* send all return codes to caller */
         js_p->error_code = error_code;
 
-        /* everything important in the submops are held elsewhere 
+        /* everything important in the submops should be held elsewhere 
          * free the memory allocated berfore the PJMP 
          */
         free(submop);
@@ -357,6 +360,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
      */
     if (msg_p->encoded_resp_p == NULL)
     {
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "msg_p->encoded_resp_p != NULL");
         if (msg_p->fs_id != PVFS_FS_ID_NULL)
         {
             server_config = PINT_server_config_mgr_get_config(msg_p->fs_id);
@@ -422,7 +426,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
             return SM_ACTION_COMPLETE;
         }
         local_enc_and_alloc = 1;
-    }
+    } /*  if (msg_p->encoded_resp_p == NULL)  */
 
     session_tag = PINT_util_get_next_tag();
 
@@ -430,7 +434,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     /*function can pass it to the caller of msgpairarray.               */
     msg_p->session_tag = session_tag;
 
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair %d: "
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair index %d: "
                  "posting recv\n", __func__, smcb, i);
 
     /* post receive of response; job_id stored in recv_id */
@@ -505,7 +509,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     assert(ret == 0);
     mop->params.recv_ct++;
 
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair %d: "
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair index %d: "
                  "posting send\n", __func__, smcb, i);
 
     /* post send of request; job_id stored in send_id */
@@ -664,7 +668,7 @@ static PINT_sm_action msgpairarray_complete_recv_send(struct PINT_smcb *smcb,
     {
         /* still more jobs need to complete */
         gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                     "  msgpairarray send/recv: %d operations remain\n",
+                     "     msgpairarray send/recv: %d operations remain\n",
                      MPA_SUM_CT);
         js_p->error_code = 0;
         return SM_ACTION_DEFERRED;
@@ -672,15 +676,19 @@ static PINT_sm_action msgpairarray_complete_recv_send(struct PINT_smcb *smcb,
 
     /* all jobs completed */
     gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                 "  msgpairarray send/recv: all operations complete\n");
+                 "     msgpairarray send/recv: all operations complete\n");
 
     if (msg_p->msgclass == PVFS_IO_IO)
     {
         js_p->error_code = REQ_COMPLETE;
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                 "     msgclass is PVFS_IO_IO: request is complete\n");
     }
     else
     {
         js_p->error_code = MSGPAIRS_COMPLETE;
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                 "     msgclass is NOT PVFS_IO_IO: msgpairs complete\n");
     }
     return SM_ACTION_COMPLETE;
 }

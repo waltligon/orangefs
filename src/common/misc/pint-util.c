@@ -277,6 +277,10 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
     }                                                                 \
 } while (0)
 
+/* This macro first checks to see if the maskbit is present in the
+ * source mask, and if it does it copies the attribute and sets the
+ * maskbit for the destination
+ */
 #define copy_attr(attr, maskbit)                                    \
 do {                                                                \
     if ((src->mask & maskbit) == maskbit)                           \
@@ -286,6 +290,10 @@ do {                                                                \
     }                                                               \
 } while (0)
 
+/* this routine copies all of the known scalar fields in the attribute
+ * and sets the mask accordingly.  The source must have the
+ * mask set corrrectly.
+ */
 /* new mask oriented copy routines */
 int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
 {
@@ -638,7 +646,8 @@ char *PINT_util_get_object_type(int objtype)
  */
 void PINT_util_get_current_timeval(struct timeval *tv)
 {
-    gettimeofday(tv, NULL);
+    if (gettimeofday(tv, NULL) != 0)
+        perror("PINT_util_get_current_timeval");
 }
 
 int PINT_util_get_timeval_diff(struct timeval *tv_start, struct timeval *tv_end)
@@ -655,7 +664,7 @@ PVFS_time PINT_util_get_current_time(void)
     struct timeval t = {0,0};
     PVFS_time current_time = 0;
 
-    gettimeofday(&t, NULL);
+    PINT_util_get_current_timeval(&t);
     current_time = (PVFS_time)t.tv_sec;
     return current_time;
 }
@@ -668,7 +677,7 @@ PVFS_time PINT_util_get_time_ms(void)
     struct timeval t = {0,0};
     PVFS_time current_time = 0;
 
-    gettimeofday(&t, NULL);
+    PINT_util_get_current_timeval(&t);
     current_time = ((PVFS_time)t.tv_sec) * 1000 + t.tv_usec / 1000;
     return current_time;
 }
@@ -681,7 +690,7 @@ PVFS_time PINT_util_get_time_us(void)
     struct timeval t = {0,0};
     PVFS_time current_time = 0;
 
-    gettimeofday(&t, NULL);
+    PINT_util_get_current_timeval(&t);
     current_time = ((PVFS_time)t.tv_sec) * 1000000 + t.tv_usec;
     return current_time;
 }
@@ -701,19 +710,33 @@ void PINT_util_parse_timeval(struct timeval tv, char *str)
     return;
 }
 
+/* These functions were experimental for creating a versioned
+ * representation of time stamps so that time values could
+ * be updated asynchronously.  For now we are turning this off
+ * and will treat time as the binary value provided by the OS
+ * and library.  This can be turned back on later, though
+ * it should be clear that this will probably require adding
+ * this function in places added since this time.
+ */
 PVFS_time PINT_util_mktime_version(PVFS_time time)
 {
+    return time;
+#if 0
     struct timeval t = {0,0};
     PVFS_time version = (time << 32);
 
-    gettimeofday(&t, NULL);
+    PINT_util_get_current_timeval(&t);
     version |= (PVFS_time)t.tv_usec;
     return version;
+#endif
 }
 
 PVFS_time PINT_util_mkversion_time(PVFS_time version)
 {
+    return version;
+#if 0
     return (PVFS_time)(version >> 32);
+#endif
 }
 
 struct timespec PINT_util_get_abs_timespec(int microsecs)
@@ -721,7 +744,7 @@ struct timespec PINT_util_get_abs_timespec(int microsecs)
     struct timeval now, add, result;
     struct timespec tv;
 
-    gettimeofday(&now, NULL);
+    PINT_util_get_current_timeval(&now);
     add.tv_sec = (microsecs / 1e6);
     add.tv_usec = (microsecs % 1000000);
 #ifdef WIN32

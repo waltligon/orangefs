@@ -179,12 +179,15 @@ typedef uint64_t PVFS_object_attrmask;
     PVFS_ATTR_DIR_HINT_DFILE_COUNT | PVFS_ATTR_DIR_HINT_SID_COUNT | \
     PVFS_ATTR_DIR_HINT_LAYOUT)
 
+//dir.dist_dir_attr.dirdata_count
+
 #define PVFS_ATTR_DIR_ALL \
     (PVFS_ATTR_DIR_HINT_ALL | PVFS_ATTR_DIR_DIRENT_COUNT | \
     PVFS_ATTR_DIR_TREE_HEIGHT | PVFS_ATTR_DIR_DIRDATA_COUNT | \
     PVFS_ATTR_DIR_SID_COUNT | PVFS_ATTR_DIR_BITMAP_SIZE | \
     PVFS_ATTR_DIR_SPLIT_SIZE | PVFS_ATTR_DIR_SERVER_NO | \
-    PVFS_ATTR_DIR_BRANCH_LEVEL | PVFS_ATTR_DIR_DIRDATA)
+    PVFS_ATTR_DIR_BRANCH_LEVEL | PVFS_ATTR_DIR_DIRDATA | \
+    PVFS_ATTR_COMMON_ALL)
 
 #define PVFS_ATTR_DIRDATA_ALL \
              (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_TIME_ALL)
@@ -228,7 +231,17 @@ typedef uint64_t PVFS_object_attrmask;
         PVFS_ATTR_META_DFILES  | PVFS_ATTR_META_MIRROR_DFILES | \
         PVFS_ATTR_META_UNSTUFFED)
 
-static inline void DEBUG_attr_mask(PVFS_object_attrmask mask);
+/**************************************
+ * Code for debugging attribute masks
+ **************************************/
+static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask, 
+                                     char *fn,
+                                     int lno);
+
+#define DEBUG_attr_mask(m)                             \
+        do {                                           \
+            __DEBUG_ATTR_MASK(m, __FILE__, __LINE__);  \
+        } while (0)
 
 #if 1
 #define DATTRPRINT(fmt) printf(fmt);
@@ -236,8 +249,13 @@ static inline void DEBUG_attr_mask(PVFS_object_attrmask mask);
 #define MASKDEBUG(field,fmt) \
         do { if ((mask & field) == field) DATTRPRINT(fmt) } while (0)
 
-static inline void DEBUG_attr_mask(PVFS_object_attrmask mask)
+static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask,
+                                     char *filename,
+                                     int lineno)
 {
+    DATTRPRINT("DEBUG_attr_mask in src/proto/pvfs2-attr.c");
+    printf("Source file %s line %d\n", filename, lineno);
+
     MASKDEBUG(PVFS_ATTR_COMMON_UID,               "UID\n");
     MASKDEBUG(PVFS_ATTR_COMMON_GID,               "GID\n");
     MASKDEBUG(PVFS_ATTR_COMMON_PERM,              "PERM\n");
