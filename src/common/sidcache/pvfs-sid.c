@@ -294,7 +294,7 @@ static int PVFS_SID_get_server(PVFS_BMI_addr_t *bmi_addr,
                                uint32_t flag)
 {
     int ret = 0;
-    DBT key, val;
+    DBT key, val; /* used for DB query */
     PVFS_SID sidval;
     SID_cacheval_t *temp_cacheval;
 
@@ -351,30 +351,42 @@ static int PVFS_SID_get_server(PVFS_BMI_addr_t *bmi_addr,
         return(ret);
     }
 
-    /* This allocates memory for temp_cacheval */
-    ret = SID_cache_get(SID_db, &sidval, &temp_cacheval);
-    if(ret)
-    {
-        return(ret);
-    }
-
+    /* no point in the cacheval unless we are going for the bmi_addr
+     * so only bother with this get if we are
+     */
     if (bmi_addr)
     {
+        /* This allocates memory for temp_cacheval */
+        ret = SID_cache_get(SID_db, &sidval, &temp_cacheval);
+        if(ret)
+        {
+            return(ret);
+        }
+
         *bmi_addr = temp_cacheval->bmi_addr;
+        free(temp_cacheval);
     }
     if (sid)
     {
         *sid = sidval;
     }
-    free(temp_cacheval);
     return(ret);
 }
 
+/* These routines are used when finding servers of a given type
+ * _first involves finding the first such server, as defined by
+ * type DB, and next is for find the next as with a cursor.
+ * DB_set_range involves non-eq matches and as such really has
+ * no meaning here so it is changed to DB_FIRST.  The tricky bit
+ * is the use of multiple types in stype as there really isn't a
+ * way to compare these.  Is this needed?  In fact, DB does not
+ * do this, so unless we do it manually, probably not.
+ */
 int PVFS_SID_get_server_first(PVFS_BMI_addr_t *bmi_addr,
                               PVFS_SID *sid,
                               struct SID_type_s stype)
 {
-    return PVFS_SID_get_server(bmi_addr, sid, stype, DB_SET_RANGE);
+    return PVFS_SID_get_server(bmi_addr, sid, stype, DB_FIRST);
 }
 
 int PVFS_SID_get_server_next(PVFS_BMI_addr_t *bmi_addr,
@@ -463,12 +475,14 @@ static int PVFS_SID_get_server_n(PVFS_BMI_addr_t *bmi_addr,
     return 0;
 }
 
+/* Again, SET_RANGE is wrong
+ */
 int PVFS_SID_get_server_first_n(PVFS_BMI_addr_t *bmi_addr,
                                 PVFS_SID *sid,
                                 int *n,
                                 struct SID_type_s stype)
 {
-    return PVFS_SID_get_server_n(bmi_addr, sid, n, stype, DB_SET_RANGE);
+    return PVFS_SID_get_server_n(bmi_addr, sid, n, stype, DB_FIRST);
 }
 
 int PVFS_SID_get_server_next_n(PVFS_BMI_addr_t *bmi_addr,
