@@ -1,0 +1,12 @@
+*.pdf
+distributions
+storage-interface
+pvfs2-client
+request-design
+pvfs2-trove-usage
+trove-dbpf
+fs-semantics
+handle-allocator
+concepts
+bmi-design
+flow-design

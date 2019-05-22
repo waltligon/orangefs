@@ -1,0 +1,15 @@
+Makefile
+Module.markers
+modules.order
+pvfs2.ko
+.*.o.cmd
+Module.symvers
+.*.ko.cmd
+pvfs2.mod.c
+.tmp_versions
+pvfs2.ko.unsigned
+.pvfs2.ko.unsigned.cmd
+.ctf
+.pvfs2.sdtstub.o.d
+pvfs2.sdtstub.s
+pvfs2.sdtstub.S
