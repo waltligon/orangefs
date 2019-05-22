@@ -20,18 +20,19 @@
 #include "pvfs2-mgmt.h"
 #include "pvfs2-internal.h"
 
-#define HISTORY 5
-#define FREQUENCY 3
+#define HISTORY 10
+#define FREQUENCY 5
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
 #endif
 
-#define MAX_KEY_CNT 18
+#define MAX_KEY_CNT 23
 /* macros for accessing data returned from server */
 #define VALID_FLAG(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + key_cnt] != 0.0)
 #define ID(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + key_cnt])
 #define START_TIME(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + key_cnt])
+
 #define READ(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 0])
 #define WRITE(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 1])
 #define METADATA_READ(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 2])
@@ -40,16 +41,21 @@
 #define KEYVAL_OPS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 5])
 #define SCHEDULE(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 6])
 #define REQUESTS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 7])
-#define SMALL_READS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 8])
-#define SMALL_WRITES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 9])
-#define FLOW_READS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 10])
-#define FLOW_WRITES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 11])
-#define CREATES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 12])
-#define REMOVES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 13])
-#define MKDIRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 14])
-#define RMDIRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 15])
-#define GETATTRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 16])
-#define SETATTRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 17])
+#define IOREAD(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 8])
+#define IOWRITE(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 9])
+#define SMALL_READS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 10])
+#define SMALL_WRITES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 11])
+#define FLOW_READS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 12])
+#define FLOW_WRITES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 13])
+#define CREATES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 14])
+#define REMOVES(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 15])
+#define MKDIRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 16])
+#define RMDIRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 17])
+#define GETATTRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 18])
+#define SETATTRS(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 19])
+#define IO(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 20])
+#define SMALLIO(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 21])
+#define READDIR(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 22])
 
 int key_cnt; /* holds the Number of keys */
 
