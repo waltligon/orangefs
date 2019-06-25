@@ -100,8 +100,18 @@ static PINT_sm_action setparam_work(struct PINT_smcb *smcb, job_status_s *js_p)
         }
 
         case PVFS_SERV_PARAM_GOSSIP_MASK:
+            gossip_log("Gossip debug mask modified by setparam\n");
             gossip_get_debug_mask(&tmp_on, &tmp_mask);
-            gossip_set_debug_mask(1, s_op->req->u.mgmt_setparam.value.u.mask_value);
+            gossip_set_debug_mask(1,
+                             s_op->req->u.mgmt_setparam.value.u.mask_value);
+            if (gossip_debug_on)
+            {
+                gossip_log("Gossip debug turned on\n");
+            }
+            else
+            {
+                gossip_log("Gossip debug turned off\n");
+            }
             js_p->error_code = 0;
             return SM_ACTION_COMPLETE;
 

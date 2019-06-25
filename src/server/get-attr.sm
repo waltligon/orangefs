@@ -287,6 +287,8 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *respattr = NULL;
 
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+
     js_p->error_code = 0;
 
     /*
@@ -330,18 +332,6 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             llu(s_op->attr.mtime), llu(respattr->mtime));
     }
 #endif
-
-    gossip_debug(
-        GOSSIP_GETATTR_DEBUG,
-        "+  _DSPACE_ retrieved attrs: [mask = 0x%lx, owner = %d, group = %d\n\t"
-        "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
-        "ctime = %llu, ntime = %llu, dfile_count = %d, dist_size = %d]\n",
-        respattr->mask,
-        respattr->owner, respattr->group, respattr->perms,
-        respattr->objtype, llu(respattr->atime),
-        llu(respattr->mtime), llu(respattr->ctime),llu(respattr->ntime),
-        (int)respattr->u.meta.dfile_count,
-        (int)respattr->u.meta.dist_size);
 
     /*
      * weed out the attr mask of the response based on what the client
@@ -410,10 +400,26 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                respattr->mask &= ~(PVFS_ATTR_META_MIRROR_DFILES);
             }
     #endif
+
+
+            gossip_debug(
+                GOSSIP_GETATTR_DEBUG,
+                "+  _DSPACE_ retrieved attrs: [mask = 0x%lx, owner = %d, "
+                "group = %d\n\t"
+                "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
+                "ctime = %llu, ntime = %llu, dfile_count = %d, sid_count = %d, "
+                "dist_size = %d]\n",
+                respattr->mask,
+                respattr->owner, respattr->group, respattr->perms,
+                respattr->objtype, llu(respattr->atime),
+                llu(respattr->mtime), llu(respattr->ctime),llu(respattr->ntime),
+                (int)respattr->u.meta.dfile_count,
+                (int)respattr->u.meta.sid_count,
+                (int)respattr->u.meta.dist_size);
+
             respattr->mask |= PVFS_ATTR_META_ALL;
             js_p->error_code = STATE_METAFILE;
             break;
-
 
         case PVFS_TYPE_DATAFILE:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: datafile\n");
@@ -439,6 +445,10 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
         case PVFS_TYPE_DIRECTORY:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: directory\n");
 
+            /* We need some of this error checking back, but the bit
+             * flipping going on does not seem right.  Need a careful
+             * review of this.
+             */
 #if 0
             /* check for Distdir struct */
             if (s_op->u.getattr.attrmask & PVFS_ATTR_DISTDIR_ATTR)
@@ -513,10 +523,24 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                 assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
             }
 #endif
+            gossip_debug(
+                GOSSIP_GETATTR_DEBUG,
+                "+  _DSPACE_ retrieved attrs: [mask = 0x%lx, owner = %d, "
+                "group = %d\n\t"
+                "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
+                "ctime = %llu, ntime = %llu, dfile_count = %d, sid_count = %d, "
+                "dirent_count = %d]\n",
+                respattr->mask,
+                respattr->owner, respattr->group, respattr->perms,
+                respattr->objtype, llu(respattr->atime),
+                llu(respattr->mtime),llu(respattr->ctime),llu(respattr->ntime),
+                (int)respattr->u.dir.dist_dir_attr.dirdata_count,
+                (int)respattr->u.dir.dist_dir_attr.sid_count,
+                (int)respattr->u.dir.dirent_count);
+
             respattr->mask |= PVFS_ATTR_DIR_ALL;
             js_p->error_code = STATE_DIR;
             break;
-
 
         case PVFS_TYPE_DIRDATA:
 #if 0
@@ -605,6 +629,8 @@ static PINT_sm_action getattr_read_symlink_target(struct PINT_smcb *smcb,
     int ret;
     job_id_t i;
     PVFS_object_attr *respattr = &(s_op->resp.u.getattr.attr);
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
 
     if (!(s_op->u.getattr.attrmask & PVFS_ATTR_SYMLNK_TARGET))
     {
@@ -769,6 +795,8 @@ static PINT_sm_action getattr_read_datafile_handles(struct PINT_smcb *smcb,
     job_id_t i;
     PVFS_object_attr *respattr;
 
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+
     respattr = &(s_op->resp.u.getattr.attr);
 
     assert(s_op->attr.objtype == PVFS_TYPE_METAFILE);
@@ -778,10 +806,18 @@ static PINT_sm_action getattr_read_datafile_handles(struct PINT_smcb *smcb,
     dfile_count = respattr->u.meta.dfile_count;
     sid_count = respattr->u.meta.sid_count;
 
+    /* don't know what this is supposed to be.  The req does not
+     * have a attrs, or a dfile count.  So I am modding this to
+     * at least print useful info;
+     */
     gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 " request has dfile_count of %d | dspace has %d\n",
-                 respattr->u.meta.dfile_count,
-                 respattr->u.meta.dfile_count);
+                 " response has dfile_count %d sid_count %d\n",
+                 dfile_count, sid_count);
+    /*
+     *           " request has dfile_count of %d | dspace has %d\n",
+     *           respattr->u.meta.dfile_count,
+     *           respattr->u.meta.dfile_count);
+     */
 
     /* verify that the retrieved dfile count is sane */
     if (!PVFS_REQ_LIMIT_DFILE_COUNT_IS_VALID(dfile_count))
@@ -869,6 +905,8 @@ static PINT_sm_action getattr_read_metafile_distribution(
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+
     assert(s_op->attr.objtype == PVFS_TYPE_METAFILE);
 
     js_p->error_code = 0;
@@ -930,6 +968,8 @@ static PINT_sm_action interpret_metafile_distribution(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *respattr = &(s_op->resp.u.getattr.attr);
     
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+
     if (js_p->error_code < 0)
     {
         return SM_ACTION_COMPLETE;
@@ -983,6 +1023,8 @@ static PINT_sm_action getattr_check_if_capability_required(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+
     /* errors fall through */
     if (js_p->error_code < 0)
     {
@@ -1011,6 +1053,8 @@ static PINT_sm_action getattr_read_acl(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
     int ret;
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (getattr sm) state: getattr_read_acl\n",
@@ -1069,6 +1113,8 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
 #ifdef ENABLE_CAPCACHE
     int insert_flag = 1;
 #endif
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
 
     if (js_p->error_code == -TROVE_ENOENT)
     {
@@ -1247,6 +1293,8 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *respattr = &(s_op->resp.u.getattr.attr);
 
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "  getattr_setup_resp: error_code = %d\n",
                  js_p->error_code);
@@ -1266,13 +1314,16 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "Handle %s \n\t"
-                 "retrieved attrs: [type = %d, owner = %d, group = %d, perms = %o, \n\t"
+                 "retrieved attrs: [type = %d, owner = %d, group = %d, "
+                 "perms = %o, \n\t"
                  "atime = %llu, mtime = %llu, ctime = %llu,  \n\t"
                  "dist_size = %d, dirent_count = %d]\n",
                  PVFS_OID_str(&s_op->u.getattr.handle), respattr->objtype,
                  respattr->owner, respattr->group, respattr->perms,
-                 llu(respattr->atime), llu(respattr->mtime), llu(respattr->ctime),
-                 (int)respattr->u.meta.dist_size, (int)respattr->u.dir.dirent_count);
+                 llu(respattr->atime), llu(respattr->mtime),
+                 llu(respattr->ctime),
+                 (int)respattr->u.meta.dist_size,
+                 (int)respattr->u.dir.dirent_count);
 
     switch (respattr->objtype)
     {
@@ -1340,13 +1391,15 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
 
         /* !!! may change later */
         gossip_debug(GOSSIP_GETATTR_DEBUG, " server returning "
-                     "dirent_count = %llu "
-                     "dirdata_servers_count = %d "
-                     "dfile_count = %d "
-                     "dist_name_len    = %d "
-                     "dist_params_len  = %d\n",
+                     "dirent_count           = %llu "
+                     "dirdata_oid_count      = %d "
+                     "dirdata_sid_count      = %d "
+                     "dfile_count(hint)      = %d "
+                     "dist_name_len(hint)    = %d "
+                     "dist_params_len(hint)  = %d\n",
                      llu(respattr->u.dir.dirent_count),
                      respattr->u.dir.dist_dir_attr.dirdata_count,
+                     respattr->u.dir.dist_dir_attr.sid_count,
                      respattr->u.dir.hint.dfile_count,
                      respattr->u.dir.hint.dist_name_len,
                      respattr->u.dir.hint.dist_params_len);
@@ -1441,6 +1494,8 @@ static PINT_sm_action getattr_cleanup(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+
     PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TGETATTR, &s_op->start_time);
     getattr_free(s_op);
     return(server_state_machine_complete(smcb));
@@ -1459,6 +1514,8 @@ static PINT_sm_action getattr_setup_op(struct PINT_smcb *smcb,
                                        job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
 
     memset(&s_op->resp.u.getattr.attr, 0, sizeof(PVFS_object_attr));
     s_op->resp.op = s_op->req->op;
@@ -1481,6 +1538,8 @@ static PINT_sm_action getattr_datafile_handles_safety_check(
         job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
 
     if ((js_p->error_code == 0) &&
         (s_op->u.getattr.attrmask & PVFS_ATTR_META_DFILES))
@@ -1518,6 +1577,8 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
     int ret;
     job_id_t tmp_id;
     PVFS_object_attr *attr;
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
 
     attr = &s_op->resp.u.getattr.attr;
 
@@ -1729,6 +1790,8 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
     PVFS_object_attr *attr_p;
     unsigned char *c;
 
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+
     /* wrapping up get_bitmap_and_dirdata_handles */
     if (js_p->error_code == -TROVE_ENOENT)
     {
@@ -1925,6 +1988,8 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
                                                  job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
 
     if (js_p->error_code != 0 && js_p->error_code != -TROVE_ENOENT)
     {

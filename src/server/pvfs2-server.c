@@ -144,7 +144,7 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {DIST_DIR_ATTR_KEYSTR,        DIST_DIR_ATTR_KEYLEN},
     {DIST_DIRDATA_BITMAP_KEYSTR,  DIST_DIRDATA_BITMAP_KEYLEN},
     {DIST_DIRDATA_HANDLES_KEYSTR, DIST_DIRDATA_HANDLES_KEYLEN},
-    {OBJECT_PARENT_KEYSTR, OBJECT_PARENT_KEYLEN},
+    {OBJECT_PARENT_KEYSTR,        OBJECT_PARENT_KEYLEN},
 };
 
 PINT_server_trove_keys_s Trove_Special_Keys[] =
@@ -308,6 +308,9 @@ int main(int argc, char **argv)
 
     /* reset gossip debug mask based on configuration settings */
     debug_mask = PVFS_debug_eventlog_to_mask(server_config.event_logging);
+
+    gossip_err("Config gossip debug flag %d\n", gossip_debug_on);
+
     gossip_set_debug_mask(1, debug_mask);
     gossip_set_logstamp(server_config.logstamp_type);
     gossip_debug(GOSSIP_SERVER_DEBUG, "Logging %s (mask %llu %llu)\n",
@@ -337,19 +340,15 @@ int main(int argc, char **argv)
     if (s_server_options.server_remove_storage_space ||
         s_server_options.server_create_storage_space)
     {
-        gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
         if(s_server_options.server_remove_storage_space)
         {
-            gossip_debug(GOSSIP_SERVER_DEBUG,
-                         "PVFS2 Server: storage space removed.\n");
+            gossip_log("PVFS2 Server: storage space removed.\n");
         }
         if(s_server_options.server_create_storage_space)
         {
-            gossip_debug(GOSSIP_SERVER_DEBUG,
-                         "PVFS2 Server: storage space created.\n");
+            gossip_log("PVFS2 Server: storage space created.\n");
         }
         gossip_debug(GOSSIP_SERVER_DEBUG, "Exiting.\n");
-        gossip_set_debug_mask(1, debug_mask);
         goto server_shutdown;
     }
 
@@ -456,11 +455,8 @@ int main(int argc, char **argv)
 
                 /* re-open log file to allow normal rotation */
                 gossip_reopen_file(server_config.logfile, "a");
-                gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
-                gossip_debug(GOSSIP_SERVER_DEBUG,
-                             "Re-opened log %s, continuing\n", 
-                             server_config.logfile);
-                gossip_set_debug_mask(1, debug_mask);
+                gossip_log("Re-opened log %s, continuing\n", 
+                           server_config.logfile);
                 signal_recvd_flag = 0; /* Reset the flag */
             }
             else
@@ -672,9 +668,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
         /* log starting message again so it appears in log file, not just
          * console
          */
-        gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-           "PVFS2 Server version %s starting.\n", PVFS2_VERSION);
+        gossip_log("PVFS2 Server version %s starting.\n", PVFS2_VERSION);
         debug_mask = PVFS_debug_eventlog_to_mask(server_config.event_logging);
         gossip_set_debug_mask(1, debug_mask);
     }
@@ -1727,14 +1721,8 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret)
  */
 static void hup_sighandler(int sig, siginfo_t *info, void *secret)
 {
-    PVFS_debug_mask debug_mask;
-    int debug_on;
-
     /* Let's make sure this message is printed out */
-    gossip_get_debug_mask(&debug_on, &debug_mask); /* Need to set back later */
-    gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG); /* Make sure debug set */
-    gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS2 received server: signal %d\n", sig);
-    gossip_set_debug_mask(debug_on, debug_mask); /* Set to original values */
+    gossip_log("PVFS2 received server: signal %d\n", sig);
 
     /* Set the flag so the next server loop picks it up and reloads config */
     signal_recvd_flag = sig;
@@ -1777,12 +1765,21 @@ static void reload_config(void)
         orig_server_config->event_logging =
                 strdup(sighup_server_config.event_logging);
         
+        gossip_log("Enabling gossip debug via config reload\n");
         /* Reset the debug mask */
         gossip_set_debug_mask(1,
                 PVFS_debug_eventlog_to_mask(orig_server_config->event_logging));
+        if (gossip_debug_on)
+        {
+            gossip_log("gossip debug turned on\n");
+        }
+        else
+        {
+            gossip_log("gossip debug turned off\n");
+        }
 
         /* Modify the TurnOffTimeouts feature */
-        gossip_err("%s:Changing original bypass_timeout_check(%d) to (%d)\n"
+        gossip_log("%s:Changing original bypass_timeout_check(%d) to (%d)\n"
                   ,__func__
                   ,orig_server_config->bypass_timeout_check
                   ,sighup_server_config.bypass_timeout_check);
@@ -1941,7 +1938,7 @@ static int server_shutdown(PINT_server_status_flag status,
 {
     if (siglevel == SIGSEGV)
     {
-        gossip_err("SIGSEGV: skipping cleanup; exit now!\n");
+        gossip_log("SIGSEGV: skipping cleanup; exit now!\n");
         exit(EXIT_FAILURE);
     }
 
@@ -2175,7 +2172,7 @@ static void server_sig_handler(int sig)
     {
         if (sig != SIGSEGV)
         {
-            gossip_err("PVFS2 server got signal %d "
+            gossip_log("PVFS2 server got signal %d "
                        "(server_status_flag: %d)\n",
                        sig, (int)server_status_flag);
         }
@@ -2203,19 +2200,19 @@ static void server_sig_handler(int sig)
 
 static void usage(int argc, char **argv)
 {
-    gossip_err("Usage: %s: [OPTIONS] <global_config_file> "
+    gossip_log("Usage: %s: [OPTIONS] <global_config_file> "
                "\n\n", argv[0]);
-    gossip_err("  -d, --foreground\t"
+    gossip_log("  -d, --foreground\t"
                "will keep server in the foreground\n");
-    gossip_err("  -f, --mkfs\t\twill cause server to "
+    gossip_log("  -f, --mkfs\t\twill cause server to "
                "create file system storage and exit\n");
-    gossip_err("  -h, --help\t\twill show this message\n");
-    gossip_err("  -r, --rmfs\t\twill cause server to "
+    gossip_log("  -h, --help\t\twill show this message\n");
+    gossip_log("  -r, --rmfs\t\twill cause server to "
                "remove file system storage and exit\n");
-    gossip_err("  -v, --version\t\toutput version information "
+    gossip_log("  -v, --version\t\toutput version information "
                "and exit\n");
-    gossip_err("  -p, --pidfile <file>\twrite process id to file\n");
-    gossip_err("  -a, --alias <alias>\tuse the specified alias for this node\n");
+    gossip_log("  -p, --pidfile <file>\twrite process id to file\n");
+    gossip_log("  -a, --alias <alias>\tuse the specified alias for this node\n");
 }
 
 static int server_parse_cmd_line_args(int argc, char **argv)

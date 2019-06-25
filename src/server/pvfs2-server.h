@@ -104,8 +104,8 @@ enum
     METAFILE_DIST_KEY        = 3,
     SYMLINK_TARGET_KEY       = 4,
     METAFILE_LAYOUT_KEY      = 5,
-    NUM_DFILES_REQ_KEY       = 6,       
-    DIST_DIR_ATTR_KEY        = 7,
+    NUM_DFILES_REQ_KEY       = 6, /* only used for unstuff - will remove */
+    DIST_DIR_ATTR_KEY        = 7, /* obsolete in V3 */
     DIST_DIRDATA_BITMAP_KEY  = 8,
     DIST_DIRDATA_HANDLES_KEY = 9,
     OBJECT_PARENT_KEY        = 10
@@ -124,8 +124,8 @@ enum
 {
     DIST_NAME_KEY          = 0,
     DIST_PARAMS_KEY        = 1,
-    NUM_DFILES_KEY         = 2,
-    DEFAULT_NUM_DFILES_KEY = 2, /* alias ? */
+    NUM_DFILES_KEY         = 2, /* these in get-attr and mkdir */
+    DEFAULT_NUM_DFILES_KEY = 2, /* alias ? This is supposed to be in config */
     LAYOUT_KEY             = 3,
     SERVER_LIST_KEY        = 4,
     NUM_SPECIAL_KEYS       = 5, /* not an index */

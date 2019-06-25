@@ -492,7 +492,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                     attr->u.dir.hint.dist_name_len,
                     attr->u.dir.hint.dist_params_len);
 
-                if(attr->mask & PVFS_ATTR_DISTDIR_ATTR)
+                if(1 /* && attr->mask & PVFS_ATTR_DISTDIR_ATTR */)
                 {
                     gossip_debug(GOSSIP_GETATTR_DEBUG,
                            "sys-getattr: dist-dir-attr "

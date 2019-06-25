@@ -247,6 +247,8 @@ int gossip_set_debug_mask(int debug_on, PVFS_debug_mask mask)
 
     gossip_debug_on = debug_on;
     gossip_debug_mask = mask;
+    fprintf(stderr, "debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
+    fprintf(stderr, "debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
     return 0;
 }
 

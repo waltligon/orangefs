@@ -80,6 +80,7 @@ do {                                                       \
 } while(0)
 
 #define gossip_err printk
+#define gossip_log printk
 #define gossip_lerr(format, f...)                  \
 do {                                               \
     gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
@@ -211,6 +212,7 @@ do {                                                       \
     gossip_debug(mask, "%s: " format, __func__ , ##f);     \
 } while(0)
 
+#define gossip_log gossip_err
 #define gossip_lerr(format, f...)                          \
 do {                                                       \
     gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
@@ -264,6 +266,7 @@ int gossip_err(const char *format, ...);
                                    gossip_isset(gossip_debug_mask, __m))
 #endif /* GOSSIP_DISABLE_DEBUG */
 
+#define gossip_log gossip_err
 #define gossip_lerr gossip_err
 
 #endif /* __GNUC__ */

@@ -119,18 +119,18 @@
 #define METAFILE_LAYOUT_KEYSTR        "ml\0"
 #define METAFILE_LAYOUT_KEYLEN        3
 
-#define NUM_DFILES_REQ_KEYSTR         "nd\0"
+#define NUM_DFILES_REQ_KEYSTR         "nd\0"   /* probably obsolete */
 #define NUM_DFILES_REQ_KEYLEN         3
 
-#define OBJECT_PARENT_KEYSTR    "pa\0"
-#define OBJECT_PARENT_KEYLEN    3
+#define OBJECT_PARENT_KEYSTR          "pa\0"
+#define OBJECT_PARENT_KEYLEN          3
 
 /* Optional xattrs have "user.pvfs2." as a prefix 
  * These are used to define the table Trove_Special_keys in
  * the file src/server/get-attr.sm
  */
 /* new keys for distributed directory, '/' makes sure no conflict with dirent names */
-#define DIST_DIR_ATTR_KEYSTR          "/dda\0"
+#define DIST_DIR_ATTR_KEYSTR          "/dda\0"   /* obsolete */
 #define DIST_DIR_ATTR_KEYLEN          5
 
 #define DIST_DIRDATA_HANDLES_KEYSTR   "/ddh\0"

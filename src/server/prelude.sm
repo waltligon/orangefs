@@ -150,6 +150,15 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     int ret;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    fprintf(stderr, "Prelude: gossip_debug_on = %d\n", gossip_debug_on);
+    fprintf(stderr, "SERVER_DEBUG 1 = %lud\n", GOSSIP_SERVER_DEBUG.mask1);
+    fprintf(stderr, "SERVER_DEBUG 2 = %lud\n", GOSSIP_SERVER_DEBUG.mask2);
+    fprintf(stderr, "debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
+    fprintf(stderr, "debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: req_sched\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
     gossip_debug(GOSSIP_MIRROR_DEBUG,
                  "Executing pvfs2_prelude_sm:prelude_setup...\n");
     gossip_debug(GOSSIP_MIRROR_DEBUG,
@@ -170,9 +179,13 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     s_op->access_type = PINT_server_req_get_access_type(s_op->req);
     s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Prelude gets fs_id = %d "
+                 "handle = %s\n access = %d sched = %d\n", 
+                 s_op->target_fs_id, PVFS_OID_str(&s_op->target_handle),
+                 s_op->access_type, s_op->sched_policy);
 
     /* add the user to the uid mgmt system */
-/* TODO: not currently supported w/new security system
+    /* TODO: not currently supported w/new security system
     ret = PINT_add_user_to_uid_mgmt(s_op->req->credentials.uid);
     if (ret != 0)
     {
@@ -194,9 +207,12 @@ static PINT_sm_action prelude_req_sched(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
 
-    gossip_debug(GOSSIP_MIRROR_DEBUG,
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: req_sched\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+    gossip_debug(GOSSIP_SERVER_DEBUG,
                  "Executing pvfs2_prelude_work_sm:prelude_req_sched\n");
-    gossip_debug(GOSSIP_MIRROR_DEBUG,
+    gossip_debug(GOSSIP_SERVER_DEBUG,
                  "\tbase_frame:%d\tframe_count:%d\n",
                  smcb->base_frame,smcb->frame_count);
     gossip_debug(GOSSIP_SERVER_DEBUG,
@@ -206,6 +222,10 @@ static PINT_sm_action prelude_req_sched(struct PINT_smcb *smcb,
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "request\n");
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_REQUESTS, 1, PINT_PERF_ADD);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "posting schedule for op type %d, "
+                 "fs_id is %d handle is %s\n", s_op->op, s_op->target_fs_id,
+                 PVFS_OID_str(&s_op->target_handle));
 
     if (s_op->prelude_mask & PRELUDE_NO_SCHEDULE)
     {
@@ -253,6 +273,8 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
      */
     if (!PVFS_OID_cmp(&s_op->target_handle, &PVFS_HANDLE_NULL))
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "Null handle - prelude bypass getattr\n");
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -288,16 +310,17 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     PVFS_error error_code = 0;
     DECLARE_PROFILER(profiler);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "validating geattr\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: req_sched\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+    gossip_debug(GOSSIP_SERVER_DEBUG, "validating getattr\n");
 
     /* Profile validate operation */
     INIT_PROFILER(profiler);
     START_PROFILER(profiler);
 
-
     /* Get the errno value to use for comparison */
     error_code = PVFS_get_errno_mapping(js_p->error_code);
-
 
     /* RAL:  Need to re-visit this logic.  Should we always create the DATAFILE
      *       dspace record, regardless of operation?
@@ -360,7 +383,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             js_p->error_code = 0;
             break;
         default:
-                gossip_err("Prelude has request of unexpected op\n");
+                gossip_err("Prelude has request of unknown op %d\n",
+                           s_op->req->op);
                 create_object = 0;
                 js_p->error_code = ENOENT;
             break;
@@ -650,6 +674,9 @@ static PINT_sm_action prelude_create_object_if_allowed(
     job_id_t tmp_id;
 
 
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: req_sched\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
     gossip_debug(GOSSIP_SERVER_DEBUG, "creating missing object\n");
 #if 0
     /* RAL:  revisit the operations allowed to create a DATAFILE dspace record
@@ -751,6 +778,9 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
     time_t current_time;
     int ret;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: req_sched\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
     gossip_debug(GOSSIP_SERVER_DEBUG, "writing attributes for new object\n");
 
     js_p->error_code = 0;
@@ -845,6 +875,9 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
     int ret = -1;
     job_id_t j_id;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: req_sched\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
     gossip_debug(GOSSIP_SERVER_DEBUG, "writing keyvals for new object\n");
 
     /* total 3 static keyvals every dirdata has:
@@ -863,7 +896,7 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
 
     s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
 
-    /* printf("$s\n", s_op->val_a); Salt's temporary debug pring - baybe conv to gossip */
+    /*gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals %s\n", s_op->val_a); */
 
     if(!s_op->val_a)
     {
@@ -881,7 +914,7 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
     s_op->val_a[0].buffer_sz = pattr->u.dir.dist_dir_attr.bitmap_size *
                                sizeof(PVFS_dist_dir_bitmap_basetype);
     s_op->val_a[0].buffer = pattr->u.dir.dist_dir_bitmap;
-    /* printf("$s\n", s_op->val_a); Walt's temp debug print - maybe conv to gossip */
+    /*gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals %s\n", s_op->val_a); */
     keep_keyval_buffers(s_op, 0);
 
 /*---------------------------------------------------------------------------*/
@@ -892,7 +925,7 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
     s_op->val_a[1].buffer_sz = OSASZ(pattr->u.dir.dist_dir_attr.dirdata_count,
                                      pattr->u.dir.dist_dir_attr.sid_count);
     s_op->val_a[1].buffer = pattr->u.dir.dirdata_handles;
-    /* printf("$s\n", s_op->val_a); Walt's temp debug print - maybe conv to gossip */
+    /*gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals %s\n", s_op->val_a);*/
     keep_keyval_buffers(s_op, 1);
 
 /*---------------------------------------------------------------------------*/
@@ -907,7 +940,7 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
 
     keep_keyval_buffers(s_op, 2);
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG,
+    gossip_debug(GOSSIP_SERVER_DEBUG,
                  "  writing dist-dir-struct keyvals for dirdata: %s "
                  "\t with server_no=%d and branch_level=%d \n",
                  PVFS_OID_str(&s_op->u.mkdir.handle),

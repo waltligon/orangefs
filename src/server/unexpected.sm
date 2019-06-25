@@ -286,10 +286,18 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
-
+                 
     s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
     smcb->op = s_op->req->op;
     s_op->op = s_op->req->op;
+
+    gossip_debug(GOSSIP_UNEXP_DEBUG, "Received a request with op=%d\n",
+                                     s_op->op);
+
+    if (s_op->op < 2 || s_op->op > PVFS_SERV_NUM_OPS)
+    {
+        PVFS_perror_gossip("Error: Bad request op", ret);
+    }
 
     PVFS_hint_add(&s_op->req->hints,
                   PVFS_HINT_SERVER_ID_NAME,
