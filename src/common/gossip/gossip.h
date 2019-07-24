@@ -111,6 +111,8 @@ int __gossip_debug(PVFS_debug_mask mask,
                    ...) __attribute__ ((format(printf, 3, 4)));
 int gossip_err(const char *format,
                ...) __attribute__ ((format(printf, 1, 2)));
+int gossip_log(const char *format,
+               ...) __attribute__ ((format(printf, 1, 2)));
 int __gossip_debug_va(PVFS_debug_mask mask,
                       char prefix,
                       const char *format,
@@ -212,7 +214,6 @@ do {                                                       \
     gossip_debug(mask, "%s: " format, __func__ , ##f);     \
 } while(0)
 
-#define gossip_log gossip_err
 #define gossip_lerr(format, f...)                          \
 do {                                                       \
     gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
@@ -240,6 +241,7 @@ int __gossip_debug_stub(PVFS_debug_mask mask,
                         char prefix,
                         const char *format,
                         ...);
+int gossip_log(const char *format, ...);
 int gossip_err(const char *format, ...);
 
 #ifdef GOSSIP_DISABLE_DEBUG
@@ -266,7 +268,6 @@ int gossip_err(const char *format, ...);
                                    gossip_isset(gossip_debug_mask, __m))
 #endif /* GOSSIP_DISABLE_DEBUG */
 
-#define gossip_log gossip_err
 #define gossip_lerr gossip_err
 
 #endif /* __GNUC__ */

@@ -420,7 +420,7 @@ char *PINT_dotconf_get_here_document(configfile_t *configfile,
 }
 
 const char *PINT_dotconf_invoke_command(configfile_t *configfile,
-                                        command_t * cmd)
+                                        command_t *cmd)
 {
     const char *error = 0;
 
@@ -438,12 +438,19 @@ const char *PINT_dotconf_set_defaults(configfile_t *configfile,
     int opt_idx = 0;
     int mod = 0;
 
+    /* This appears to loop over all of the options.  What's up
+     * with that?  Can we just process the options as the user gave
+     * them?  Yes a few require some ordering, but that we can do
+     * with contexts. WBL
+     */
     for (option = 0; configfile->config_options[mod] && !done; mod++)
     {
         for (opt_idx = 0;
              configfile->config_options[mod][opt_idx].name[0];
              opt_idx++)
         {
+            fprintf(stderr, "Set_defaults teration mod=%d opt_idx=%d\n",
+                    mod,opt_idx);
             option = &(configfile->config_options[mod][opt_idx]);
             if(option && (context & option->context) && option->default_value)
             {
@@ -459,6 +466,7 @@ const char *PINT_dotconf_set_defaults(configfile_t *configfile,
                     return error;
                 }
 
+                fprintf(stderr, "Invoke_command\n");
                 error = PINT_dotconf_invoke_command(configfile, &command);
                 PINT_dotconf_free_command(&command);
                 if(error)

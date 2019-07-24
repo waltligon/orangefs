@@ -67,6 +67,7 @@ static enum gossip_logstamp internal_logstamp = GOSSIP_LOGSTAMP_DEFAULT;
  */
 static int gossip_disable_stderr(void);
 static int gossip_disable_file(void);
+static int gossip_disable_syslog(void);
 
 static int gossip_debug_fp_va(FILE *fp,
                               char prefix,
@@ -76,8 +77,8 @@ static int gossip_debug_fp_va(FILE *fp,
 static int gossip_debug_syslog(char prefix,
                                const char *format,
                                va_list ap);
-static int gossip_err_syslog(const char *format, va_list ap);
-static int gossip_disable_syslog(void);
+static int gossip_msg(const char prefix, const char *format, va_list ap);
+static int gossip_msg_syslog(const char prefix, const char *format, va_list ap);
 
 
 /*****************************************************************
@@ -101,6 +102,9 @@ int gossip_enable_syslog(int priority)
 #else
 int gossip_enable_syslog(int priority)
 {
+    fprintf(stderr, "gossip_enable_syslog\n");
+    fprintf(stderr, "init debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
+    fprintf(stderr, "init debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
 
     /* keep up with the existing logging settings */
     int tmp_debug_on = gossip_debug_on;
@@ -118,6 +122,8 @@ int gossip_enable_syslog(int priority)
     gossip_debug_on = tmp_debug_on;
     gossip_debug_mask = tmp_debug_mask;
 
+    fprintf(stderr, "fini debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
+    fprintf(stderr, "fini debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
     return 0;
 }
 #endif
@@ -128,6 +134,9 @@ int gossip_enable_syslog(int priority)
  */
 int gossip_enable_stderr(void)
 {
+    fprintf(stderr, "gossip_enable_stderr\n");
+    fprintf(stderr, "init debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
+    fprintf(stderr, "init debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
 
     /* keep up with the existing logging settings */
     int tmp_debug_on = gossip_debug_on;
@@ -142,6 +151,8 @@ int gossip_enable_stderr(void)
     gossip_debug_on = tmp_debug_on;
     gossip_debug_mask = tmp_debug_mask;
 
+    fprintf(stderr, "fini debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
+    fprintf(stderr, "fini debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
     return 0;
 }
 
@@ -153,6 +164,9 @@ int gossip_enable_stderr(void)
  */
 int gossip_enable_file(const char *filename, const char *mode)
 {
+    fprintf(stderr, "gossip_enable_file\n");
+    fprintf(stderr, "init debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
+    fprintf(stderr, "init debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
 
     /* keep up with the existing logging settings */
     int tmp_debug_on = gossip_debug_on;
@@ -173,6 +187,8 @@ int gossip_enable_file(const char *filename, const char *mode)
     gossip_debug_on = tmp_debug_on;
     gossip_debug_mask = tmp_debug_mask;
 
+    fprintf(stderr, "fini debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
+    fprintf(stderr, "fini debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
     return 0;
 }
 
@@ -240,6 +256,10 @@ int gossip_get_debug_mask(int *debug_on, PVFS_debug_mask *mask)
  */
 int gossip_set_debug_mask(int debug_on, PVFS_debug_mask mask)
 {
+    fprintf(stderr, "gossip_set_debug_mask\n");
+    fprintf(stderr, "init debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
+    fprintf(stderr, "init debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
+
     if ((debug_on != 0) && (debug_on != 1))
     {
         return -EINVAL;
@@ -247,8 +267,9 @@ int gossip_set_debug_mask(int debug_on, PVFS_debug_mask mask)
 
     gossip_debug_on = debug_on;
     gossip_debug_mask = mask;
-    fprintf(stderr, "debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
-    fprintf(stderr, "debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
+
+    fprintf(stderr, "fini debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
+    fprintf(stderr, "fini debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
     return 0;
 }
 
@@ -350,6 +371,26 @@ int __gossip_debug_va(PVFS_debug_mask mask,
     return ret;
 }
 
+/** Logs a message.  This will print regardless of the
+ *  mask value and whether debugging is turned on or off, as long as some
+ *  logging facility has been enabled.
+ *
+ *  \return 0 on success, -errno on failure.
+ */
+int gossip_log(const char *format, ...)
+{
+    va_list ap;
+    int ret = -EINVAL;
+
+    va_start(ap, format);
+
+    ret = gossip_msg('L', format, ap);
+
+    va_end(ap);
+
+    return ret;
+}
+
 /** Logs a critical error message.  This will print regardless of the
  *  mask value and whether debugging is turned on or off, as long as some
  *  logging facility has been enabled.
@@ -361,33 +402,54 @@ int gossip_err(const char *format, ...)
     va_list ap;
     int ret = -EINVAL;
 
-    if (!gossip_facility)
-    {
-        return 0;
-    }
-
-    /* rip out the variable arguments */
     va_start(ap, format);
 
-    switch (gossip_facility)
-    {
-    case GOSSIP_STDERR:
-        ret = gossip_debug_fp_va(stderr, 'E', format, ap, internal_logstamp);
-        break;
-    case GOSSIP_FILE:
-        ret = gossip_debug_fp_va(internal_log_file, 'E', format, ap, internal_logstamp);
-        break;
-    case GOSSIP_SYSLOG:
-        ret = gossip_err_syslog(format, ap);
-        break;
-    default:
-        break;
-    }
+    ret = gossip_msg('E', format, ap);
 
     va_end(ap);
 
     return ret;
 }
+
+/** Generic message logging.  Pass a prefix to indicate type
+ *  \return 0 on success, -errno on failure.
+ */
+#ifdef WIN32
+/** just a stub on Windows
+ *  TODO: possibly add errors to Windows Event Log
+ */
+static int gossip_msg(const char prefix, const char *format, va_list ap)
+{
+    return 0;
+}
+#else
+static int gossip_msg(const char prefix, const char *format, va_list ap)
+{
+    int ret = -EINVAL;
+
+    if (!gossip_facility)
+    {
+        return 0;
+    }
+
+    switch (gossip_facility)
+    {
+    case GOSSIP_STDERR:
+        ret = gossip_debug_fp_va(stderr, prefix, format, ap, internal_logstamp);
+        break;
+    case GOSSIP_FILE:
+        ret = gossip_debug_fp_va(internal_log_file, prefix, format, ap, internal_logstamp);
+        break;
+    case GOSSIP_SYSLOG:
+        ret = gossip_msg_syslog(prefix, format, ap);
+        break;
+    default:
+        break;
+    }
+
+    return ret;
+}
+#endif
 
 #ifdef GOSSIP_ENABLE_BACKTRACE
 #  ifndef GOSSIP_BACKTRACE_DEPTH
@@ -577,7 +639,7 @@ static int gossip_debug_fp_va(FILE *fp,
     return 0;
 }
 
-/* gossip_err_syslog()
+/* gossip_msg_syslog()
  * 
  * error message function for the syslog logging facility
  *
@@ -587,12 +649,12 @@ static int gossip_debug_fp_va(FILE *fp,
 /** just a stub on Windows
  *  TODO: possibly add errors to Windows Event Log
  */
-static int gossip_err_syslog(const char *format, va_list ap)
+static int gossip_msg_syslog(const char prefix, const char *format, va_list ap)
 {
     return 0;
 }
 #else
-static int gossip_err_syslog(const char *format, va_list ap)
+static int gossip_msg_syslog(const char prefix, const char *format, va_list ap)
 {
     /* for syslog we have the opportunity to change the priority level
      * for errors
@@ -600,7 +662,7 @@ static int gossip_err_syslog(const char *format, va_list ap)
     int tmp_priority = internal_syslog_priority;
     internal_syslog_priority = LOG_ERR;
 
-    gossip_debug_syslog('E', format, ap);
+    gossip_debug_syslog(prefix, format, ap);
 
     internal_syslog_priority = tmp_priority;
 

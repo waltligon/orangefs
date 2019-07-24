@@ -214,7 +214,7 @@ int main(int argc, char **argv)
     /* Passed to server shutdown function */
     server_status_flag = SERVER_DEFAULT_INIT;
 
-    /* Set up out malloc wrapper by grabbing pointers to glibc malloc */
+    /* Set up our malloc wrapper by grabbing pointers to glibc malloc */
     init_glibc_malloc();
 
     /* Enable the gossip interface to send out stderr and set an
@@ -258,6 +258,7 @@ int main(int argc, char **argv)
     }
     server_status_flag |= SERVER_SID_INIT;
 
+    gossip_log("PINT_parse_config called from main\n");
     /* read the local config file first to get initial settings */
     /* code to handle older two config file format */
     ret = PINT_parse_config(&server_config,
@@ -271,6 +272,7 @@ int main(int argc, char **argv)
         ret = -PVFS_EINVAL;
         goto server_shutdown;
     }
+    gossip_log("PINT_parse_config complete\n");
 
     /* V3 retrieve aux and remote config files as needed 
      * not active just yet

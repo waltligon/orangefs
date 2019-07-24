@@ -2201,9 +2201,12 @@ DOTCONF_CB(get_event_logging_list)
     char buf[512] = {0};
     char *ptr = buf;
 
+    fprintf(stderr,"entering event_logging_list:%s\n", config_s->event_logging);
+
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
+        fprintf(stderr,"BAIL OUT event_logging_list\n");
         return NULL;
     }
     if (config_s->event_logging != NULL) 
@@ -2217,6 +2220,9 @@ DOTCONF_CB(get_event_logging_list)
         len += strlen(cmd->data.list[i]);
     }
     config_s->event_logging = strdup(buf);
+
+    fprintf(stderr,"complete event_logging_list:%s\n", config_s->event_logging);
+
     return NULL;
 }
 
@@ -4031,9 +4037,7 @@ DOTCONF_CB(enter_ldap_context)
 
     config_s->configuration_context = CTX_LDAP;
 
-    return PINT_dotconf_set_defaults(
-        cmd->configfile,
-        CTX_LDAP);
+    return PINT_dotconf_set_defaults(cmd->configfile, CTX_LDAP);
 }
 
 DOTCONF_CB(exit_ldap_context)
