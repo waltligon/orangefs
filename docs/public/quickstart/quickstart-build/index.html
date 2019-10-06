@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>OrangeFS Documentation</title>
+    
+      <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="generator" content="Hugo 0.42" />
+<title>Quickstart Source Build Guide :: OrangeFS Documentation</title>
+<link rel="shortcut icon" href="/images/favicon.png" type="image/x-icon" />
+<link href="/css/font-awesome.min.css" rel="stylesheet">
+<link href="/css/nucleus.css" rel="stylesheet">
+<link href="/theme-flex/style.css" rel="stylesheet">
+
+	<link href="/theme-flex/variant-blue.css" rel="stylesheet">
+
+<link rel="stylesheet" href="/css/bootstrap.min.css">
+<script src="/js/jquery-2.x.min.js"></script>
+<script type="text/javascript">
+      var baseurl = "\/";
+</script>
+<meta name="description" content="">
+
+
+
+    
+  </head>
+  <body data-url="/quickstart/quickstart-build/">
+    
+      <header>
+  <div class="logo">
+    
+	
+  
+    <a class="baselink" href="/">OrangeFS Documentation</a>
+  
+
+  </div>
+  <div class="burger"><a href="javascript:void(0);" style="font-size:15px;">&#9776;</a></div>
+</header>
+<article>
+  <aside>
+    <ul class="menu">
+    <li data-nav-id="/quickstart/" class="dd-item parent haschildren
+        ">
+      <div>
+      <a href="/quickstart/">Quickstart Guides</a>
+            <i class="fa fa-angle-down fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/quickstart/quickstart-package/" class="dd-item">
+        <div>
+          <a href="/quickstart/quickstart-package/">
+            Quickstart Package Installation Guide
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/quickstart/quickstart-build/" class="dd-item active">
+        <div>
+          <a href="/quickstart/quickstart-build/">
+            Quickstart Source Build Guide
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/build-configure/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/build-configure/">Build and Configure</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/build-configure/setup_security_build/" class="dd-item">
+        <div>
+          <a href="/build-configure/setup_security_build/">
+            Build Security Setup
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/build_orangefs/" class="dd-item">
+        <div>
+          <a href="/build-configure/build_orangefs/">
+            Build OrangeFS
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/configuring_ldap_for_identity_mapping/" class="dd-item">
+        <div>
+          <a href="/build-configure/configuring_ldap_for_identity_mapping/">
+            Configure LDAP
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/create_orangefs_configuration_file/" class="dd-item">
+        <div>
+          <a href="/build-configure/create_orangefs_configuration_file/">
+            OrangeFS Config File
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/results_of_build_and_configure/" class="dd-item">
+        <div>
+          <a href="/build-configure/results_of_build_and_configure/">
+            Results
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/add-servers/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/add-servers/">Add Server(s)</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/add-servers/copy_ofs_install_directory_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/copy_ofs_install_directory_servers/">
+            Copy OrangeFS Server Installation Directory
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/set_up_security_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/set_up_security_servers/">
+            Set up Server Security
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/server-startup/" class="dd-item">
+        <div>
+          <a href="/add-servers/server-startup/">
+            Server Startup
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/results_of_add_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/results_of_add_servers/">
+            Add Server(s) Results
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/nix-clients/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/nix-clients/">OrangeFS Clients</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/nix-clients/pvfs2tab-file/" class="dd-item">
+        <div>
+          <a href="/nix-clients/pvfs2tab-file/">
+            pvfs2tab
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/linux-kernel-module/" class="dd-item">
+        <div>
+          <a href="/nix-clients/linux-kernel-module/">
+            Linux Kernel Module
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/direct-interface/" class="dd-item">
+        <div>
+          <a href="/nix-clients/direct-interface/">
+            Linux Direct Interface
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/romio-interface/" class="dd-item">
+        <div>
+          <a href="/nix-clients/romio-interface/">
+            Linux ROMIO MPI Interface
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/advanced-linux-client-security/" class="dd-item">
+        <div>
+          <a href="/nix-clients/advanced-linux-client-security/">
+            Linux Client Advanced Security Modes
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/fuse-client/" class="dd-item">
+        <div>
+          <a href="/nix-clients/fuse-client/">
+            FUSE Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/hadoop_installation/" class="dd-item">
+        <div>
+          <a href="/nix-clients/hadoop_installation/">
+            Hadoop Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/windows-client/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/windows-client/">Windows Client</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/windows-client/preparing_for_installation_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/preparing_for_installation_windows/">
+            Preparing for Windows Installation
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/what_to_expect_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/what_to_expect_windows/">
+            What to Expect
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/running_the_installation_program_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/running_the_installation_program_windows/">
+            Installing the Software
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/manual_installation_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/manual_installation_windows/">
+            Manual Installation
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/uninstalling_the_client_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/uninstalling_the_client_windows/">
+            Uninstalling the Windows client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/winclient_use/" class="dd-item">
+        <div>
+          <a href="/windows-client/winclient_use/">
+            Using the Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/winclient_admin/" class="dd-item">
+        <div>
+          <a href="/windows-client/winclient_admin/">
+            Client Administration
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/configuration/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/configuration/">OrangeFS Configuration</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/configuration/admin_ofs_configuration_file/" class="dd-item">
+        <div>
+          <a href="/configuration/admin_ofs_configuration_file/">
+            OrangeFS Configuration File
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/configuration/orangefs_advanced_configuration/" class="dd-item">
+        <div>
+          <a href="/configuration/orangefs_advanced_configuration/">
+            Multiple File Systems
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/configuration/multiple_server_processes/" class="dd-item">
+        <div>
+          <a href="/configuration/multiple_server_processes/">
+            Multiple Server Processes
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+
+
+
+
+    </ul>
+    <section>
+    </section>
+  </aside>
+  <section class="page">
+    
+    <div class="nav-select">
+      <center>Navigation : 
+        <select onchange="javascript:location.href = this.value;">
+          
+    <option value="/quickstart/" >
+   Quickstart Guides</option> 
+      <option value="/quickstart/quickstart-package/" >- Quickstart Package Installation Guide</option>
+      <option value="/quickstart/quickstart-build/"  selected>- Quickstart Source Build Guide</option>
+  
+    <option value="/build-configure/" >
+   Build and Configure</option>
+    <option value="/add-servers/" >
+   Add Server(s)</option>
+    <option value="/nix-clients/" >
+   OrangeFS Clients</option>
+    <option value="/windows-client/" >
+   Windows Client</option>
+    <option value="/configuration/" >
+   OrangeFS Configuration</option>
+
+
+
+        </select>
+      </center>
+    </div>
+      <div>
+        <div class="searchbox">
+          <input data-search-input id="search-by" type="text" placeholder="Search...">
+        </div>
+        <script type="text/javascript" src="/js/lunr.min.js"></script>
+        <script type="text/javascript" src="/js/auto-complete.js"></script>
+        <link href="/css/auto-complete.css" rel="stylesheet">
+        <script type="text/javascript">
+          
+              var baseurl = "\/";
+          
+        </script>
+        <script type="text/javascript" src="/js/search.js"></script>
+      </div>
+    
+
+    <h1>Quickstart Source Build Guide</h1>
+    
+    
+    
+    
+
+<p>This topic provides an example of a complete installation of OrangeFS
+from source in a single procedure. It can also be used as a <em>Quick
+Start</em> reference for experienced users who wish to bypass the more
+detailed and segmented instructions in the earlier topics of this
+manual.</p>
+
+<p><strong>Notes   </strong>Most of the following steps require that you have root
+permissions.<br />
+ <br />
+ If your distro includes the OrangeFS kernel module, you may skip tasks
+related to building and installing the kernel module. To determine if
+your distro includes the OrangeFS kernel module, issue this command:
+modprobe orangefs <br />
+ <br />
+ You must install OrangeFS every time you update the kernel.</p>
+
+<h3 id="assumptions">Assumptions</h3>
+
+<p>The following assumptions apply to this example installation:</p>
+
+<ul>
+<li><p>Network protocol is TCP/IP</p></li>
+
+<li><p>Uses Default security mode</p></li>
+
+<li><p>Any firewall must be configured to allow clients and servers to
+communicate.</p></li>
+</ul>
+
+<h3 id="build-orangefs">Build OrangeFS</h3>
+
+<h3 id="prerequisites">Prerequisites</h3>
+
+<p>Prerequisites for RHEL, SUSE and Ubuntu are documented below.</p>
+
+<h4 id="rhel">RHEL</h4>
+
+<p>The system on which you build OrangeFS requires eight additional Linux
+software packages. Following are the names for these packages on a
+system running RHEL:</p>
+
+<hr />
+
+<ul>
+<li>gcc    -   bison           -   libattr-devel   -   perl</li>
+<li>flex   -   openssl-devel   -   kernel-devel    -   make
+<br /></li>
+</ul>
+
+<hr />
+
+<p>To automatically install these packages, enter the following command:</p>
+
+<p>yum -y install gcc flex bison openssl-devel libattr-devel kernel-devel
+perl make</p>
+
+<p> </p>
+
+<h4 id="suse">SUSE</h4>
+
+<p>Following are the names for the packages required on a system running
+SUSE:</p>
+
+<hr />
+
+<ul>
+<li>automake   -   bison   -   kernel-source   -   libopenssl-devel</li>
+<li>gcc        -   flex    -   kernel-syms     -   libattr-devel
+<br /></li>
+</ul>
+
+<hr />
+
+<p>To automatically install these packages, enter the following command
+using zypper:</p>
+
+<p>zypper install automake gcc bison flex kernel-source kernel-syms
+libopenssl-devel libattr-devel</p>
+
+<p> </p>
+
+<p>Additionally, for SUSE, you must prepare the kernel source using the
+following commands:</p>
+
+<p>cp /boot/config-`uname -r` /usr/src/linux-`uname -r | sed
+s/-[\d].*//`/.config<br />
+ cd /usr/src/linux-`uname -r | sed s/-[\d].*//`<br />
+ make oldconfig<br />
+ make modules_prepare<br />
+ make prepare<br />
+ ln -s /lib/modules/`uname -r`/build/Module.symvers
+/lib/modules/`uname -r`/source</p>
+
+<p><strong>Note     </strong>Ensure SELinux is set to &ldquo;permissive&rdquo; or &ldquo;disabled&rdquo;</p>
+
+<h4 id="ubuntu">Ubuntu</h4>
+
+<p>Following are the names for the packages required on a system running
+Ubuntu:</p>
+
+<hr />
+
+<ul>
+<li>automake          -   bison   -   libattr-devel</li>
+<li>build-essential   -   flex    -   libattrl
+<br /></li>
+</ul>
+
+<hr />
+
+<p>To automatically install these packages, enter the following command
+using apt:</p>
+
+<p>apt install automake build-essential bison flex libattr1 libattr1-dev</p>
+
+<h3 id="installation-steps">Installation Steps</h3>
+
+<p>To build OrangeFS, complete the following steps:</p>
+
+<ol>
+<li>Download and extract the OrangeFS software:</li>
+</ol>
+
+<ul>
+<li><p>Download the source from
+<a href="http://orangefs.com/download/">http://orangefs.com/download/</a>.</p></li>
+
+<li><p>Extract the source tar archive:</p></li>
+</ul>
+
+<p>tar -xzf orangefs-<em>version</em>.tar.gz</p>
+
+<ul>
+<li>Change Directory (cd) to the extracted directory:</li>
+</ul>
+
+<p>cd orangefs-<em>version</em></p>
+
+<ul>
+<li>Configure the OrangeFS installation location and the path of the
+system kernel:</li>
+</ul>
+
+<p><strong>Notes   </strong>If using a distro which includes the upstream OrangeFS
+kernel module, omit &ndash;with-kernel=kernel_path<br />
+ <br />
+ Every update will require rebuilding.</p>
+
+<p>./configure  &ndash;prefix=/opt/orangefs &ndash;with-kernel=kernel_path \<br />
+     &ndash;with-db-backend=lmdb</p>
+
+<p>where&hellip;</p>
+
+<p><em>kernel_path</em> = path to kernel source</p>
+
+<p>    RHEL Example: /lib/modules/`uname -r`/build<br />
+     SUSE Example: /lib/modules/`uname -r`/source<br />
+     Ubuntu 16.04 or earlier Example: /lib/modules/`uname -r`/build</p>
+
+<ol>
+<li>Build and install the software:</li>
+</ol>
+
+<p>make<br />
+ make install</p>
+
+<p>If using a distro which does not include the upstream OrangeFS kernel
+module, type the following additional commands:</p>
+
+<p>make kmod<br />
+ make kmod_prefix=/opt/orangefs kmod_install</p>
+
+<ol>
+<li>Create a server configuration file by running the automatic file
+generation program (pvfs2-genconfig) and answering the prompts.</li>
+</ol>
+
+<p>/opt/orangefs/bin/pvfs2-genconfig /opt/orangefs/etc/orangefs-server.conf</p>
+
+<p><strong>Notes   </strong>During the pvfs2-genconfig process: <br />
+ ● Use the directories you created in Step 3 for your storage and log
+file locations.<br />
+ ● Each host you specify should be the value returned by the hostname
+command.</p>
+
+<p>This places a server configuration file (named orangefs-server.conf in
+this example) in the etc directory.</p>
+
+<h2 id="add-clients-kernel-module"> Add Clients (Kernel Module)</h2>
+
+<ol>
+<li>To add the software required for an OrangeFS Linux client interface,
+Change Directory (cd) to /opt on the Client system and copy the
+/opt/orangefs directory from the Build system:</li>
+</ol>
+
+<p>scp -rp <em>hostname</em>:/opt/orangefs /opt</p>
+
+<p>where&hellip;</p>
+
+<p><em>hostname</em> = host name of the build system</p>
+
+<ol>
+<li>Insert the client kernel module.</li>
+</ol>
+
+<p>This module (pvfs2.ko) resides in the OrangeFS installation directory
+several directory layers deep. To insert the module without specifying a
+long path, include this find statement:   </p>
+
+<p>insmod ‘find /opt/orangefs -name pvfs2.ko‘</p>
+
+<p><strong>Note     </strong>If using a distro which includes OrangeFS, omit Step 2.</p>
+
+<ol>
+<li>Start the client process on each Client system:</li>
+</ol>
+
+<p>/opt/orangefs/sbin/pvfs2-client</p>
+
+<ol>
+<li>Create a directory in the Client system&rsquo;s /mnt directory through
+which the client will mount OrangeFS:</li>
+</ol>
+
+<p>mkdir /mnt/orangefs</p>
+
+<ol>
+<li>Determine the URL of the OrangeFS server you will mount.</li>
+</ol>
+
+<p>You can retrieve this information from the orangefs-server.conf file.
+For example, the first server URL listed in that file can be extracted
+with the following command:</p>
+
+<p>grep &ldquo;Alias &rdquo; /opt/orangefs/etc/orangefs-server.conf | awk &lsquo;{ print \$3
+}&rsquo; | head -n 1</p>
+
+<p>The format to use for server URL is protocol://hostname:port.</p>
+
+<p>Example:  tcp://server1:3334</p>
+
+<ol>
+<li>Create a file named pvfs2tab in the Client system&rsquo;s /etc directory
+that tells the system how to mount OrangeFS. Assign read access to
+the file.</li>
+</ol>
+
+<p>echo &ldquo;tcp://server1:3334/orangefs /mnt/orangefs pvfs2&rdquo; &gt;&gt;<br />
+ /etc/pvfs2tab</p>
+
+<h2 id="add-servers">Add Servers</h2>
+
+<ol>
+<li>To add the required software to an OrangeFS server, Change Directory
+(cd) to /opt on the Server system and copy the /opt/orangefs
+directory from the Build system:</li>
+</ol>
+
+<p>scp -rp <em>hostname</em>:/opt/orangefs /opt</p>
+
+<p>where&hellip;</p>
+
+<p><em>hostname</em> = host name of the build system</p>
+
+<ol>
+<li>Initialize the server storage space on each server:</li>
+</ol>
+
+<p>/opt/orangefs/sbin/pvfs2-server -f
+/opt/orangefs/etc/orangefs-server.conf -a &lt;alias name&gt;</p>
+
+<ol>
+<li>Start the server processes on each server:</li>
+</ol>
+
+<p>/opt/orangefs/sbin/pvfs2-server /opt/orangefs/etc/orangefs-server.conf
+-a &lt;alias name&gt;</p>
+
+<h2 id="mount-the-file-system">Mount the File System</h2>
+
+<p>Mount OrangeFS through the server URL you retrieved earlier:</p>
+
+<p>mount -t pvfs2 tcp://server1:3334/orangefs /mnt/orangefs</p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+
+    
+    
+        <div class="chevrons">
+    <div id="navigation">
+<a class="nav nav-prev" href="/quickstart/quickstart-package/" title="Quickstart Package Installation Guide"> <i class="fa fa-chevron-left"></i><label>Quickstart Package Installation Guide</label></a>
+    <a class="nav nav-next" href="/build-configure/" title="Build and Configure" style="margin-right: 0px;"><label>Build and Configure</label><i class="fa fa-chevron-right"></i></a></div>
+  </div>
+
+  </section>
+</article>
+
+<footer>
+
+<div class="footline">
+    
+
+    
+
+  
+
+
+	<div>
+
+
+  
+    <div id="image-table">
+    <table>
+        <tr>
+              <td style="padding:1px">
+              <a href="http://orangefs.com"> <img src="/OrangeFS_logo.gif" alt="OrangeFS" style="width:200px"></a>
+            </td>
+        </tr>
+    </table>
+</div>
+
+  
+
+
+
+	</div>
+</footer>
+
+<script src="/js/clipboard.min.js"></script>
+
+<link href="/css/featherlight.min.css" rel="stylesheet">
+<script src="/js/featherlight.min.js"></script>
+
+
+<script src="/js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+
+<script src="/theme-flex/script.js"></script>
+
+    
+
+    
+    
+
+    
+  </body>
+</html>

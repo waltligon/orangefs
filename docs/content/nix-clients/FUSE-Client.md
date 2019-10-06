@@ -23,7 +23,7 @@ Setting up a FUSE client involves four main steps on your Mac system:
 
 -   [Mount an OrangeFS Server](#Mount_an_OrangeFS_Server)
 
--   [Set up Security](FUSE_Client.htm#Set_Up_Security)
+-   [Set up Security](FUSE_Client.md)
 
 Install FUSE
 ------------
@@ -59,7 +59,7 @@ separately.
 Prior to installing OrangeFS, you must install gcc, flex, bison, make,
 and openssl-devel as described in [Additional Linux Software for the
 Build
-System](Preview_System_Requirements.htm#Additional_Linux_Software_For_The_Build_System).
+System](Preview_System_Requirements.md).
 
 ### Procedure
 
@@ -277,7 +277,7 @@ administrator to create the correct public/private key pair.
 OrangeFS keystore, copy the keystore to each server machine, then
 restart the servers before you will have access to the file system.  See
 [Setting up Key-Based Security
-Mode](Setting_Up_Key-Based_Security_Mode.htm) for more information.\
+Mode](Setting_Up_Key-Based_Security_Mode.md) for more information.\
  \
  If your Mac has a non-static IP address in your environment, you will
 have to regenerate a new public/private key pair each time the address
@@ -285,7 +285,7 @@ changes.\
  \
  The default security using UID and GID for file permissions is used in
 addition to the public/private key pair.  See [Using Default
-Security](FUSE_Client.htm#Using_Default_Security) above.
+Security](FUSE_Client.md) above.
 
  
 

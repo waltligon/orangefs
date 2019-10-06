@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>OrangeFS Documentation</title>
+    
+      <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="generator" content="Hugo 0.42" />
+<title>Linux ROMIO MPI Interface :: OrangeFS Documentation</title>
+<link rel="shortcut icon" href="/images/favicon.png" type="image/x-icon" />
+<link href="/css/font-awesome.min.css" rel="stylesheet">
+<link href="/css/nucleus.css" rel="stylesheet">
+<link href="/theme-flex/style.css" rel="stylesheet">
+
+	<link href="/theme-flex/variant-blue.css" rel="stylesheet">
+
+<link rel="stylesheet" href="/css/bootstrap.min.css">
+<script src="/js/jquery-2.x.min.js"></script>
+<script type="text/javascript">
+      var baseurl = "\/";
+</script>
+<meta name="description" content="">
+
+
+
+    
+  </head>
+  <body data-url="/nix-clients/romio-interface/">
+    
+      <header>
+  <div class="logo">
+    
+	
+  
+    <a class="baselink" href="/">OrangeFS Documentation</a>
+  
+
+  </div>
+  <div class="burger"><a href="javascript:void(0);" style="font-size:15px;">&#9776;</a></div>
+</header>
+<article>
+  <aside>
+    <ul class="menu">
+    <li data-nav-id="/quickstart/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/quickstart/">Quickstart Guides</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/quickstart/quickstart-package/" class="dd-item">
+        <div>
+          <a href="/quickstart/quickstart-package/">
+            Quickstart Package Installation Guide
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/quickstart/quickstart-build/" class="dd-item">
+        <div>
+          <a href="/quickstart/quickstart-build/">
+            Quickstart Source Build Guide
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/build-configure/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/build-configure/">Build and Configure</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/build-configure/setup_security_build/" class="dd-item">
+        <div>
+          <a href="/build-configure/setup_security_build/">
+            Build Security Setup
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/build_orangefs/" class="dd-item">
+        <div>
+          <a href="/build-configure/build_orangefs/">
+            Build OrangeFS
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/configuring_ldap_for_identity_mapping/" class="dd-item">
+        <div>
+          <a href="/build-configure/configuring_ldap_for_identity_mapping/">
+            Configure LDAP
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/create_orangefs_configuration_file/" class="dd-item">
+        <div>
+          <a href="/build-configure/create_orangefs_configuration_file/">
+            OrangeFS Config File
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/results_of_build_and_configure/" class="dd-item">
+        <div>
+          <a href="/build-configure/results_of_build_and_configure/">
+            Results
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/add-servers/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/add-servers/">Add Server(s)</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/add-servers/copy_ofs_install_directory_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/copy_ofs_install_directory_servers/">
+            Copy OrangeFS Server Installation Directory
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/set_up_security_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/set_up_security_servers/">
+            Set up Server Security
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/server-startup/" class="dd-item">
+        <div>
+          <a href="/add-servers/server-startup/">
+            Server Startup
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/results_of_add_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/results_of_add_servers/">
+            Add Server(s) Results
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/nix-clients/" class="dd-item parent haschildren
+        ">
+      <div>
+      <a href="/nix-clients/">OrangeFS Clients</a>
+            <i class="fa fa-angle-down fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/nix-clients/pvfs2tab-file/" class="dd-item">
+        <div>
+          <a href="/nix-clients/pvfs2tab-file/">
+            pvfs2tab
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/linux-kernel-module/" class="dd-item">
+        <div>
+          <a href="/nix-clients/linux-kernel-module/">
+            Linux Kernel Module
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/direct-interface/" class="dd-item">
+        <div>
+          <a href="/nix-clients/direct-interface/">
+            Linux Direct Interface
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/romio-interface/" class="dd-item active">
+        <div>
+          <a href="/nix-clients/romio-interface/">
+            Linux ROMIO MPI Interface
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/advanced-linux-client-security/" class="dd-item">
+        <div>
+          <a href="/nix-clients/advanced-linux-client-security/">
+            Linux Client Advanced Security Modes
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/fuse-client/" class="dd-item">
+        <div>
+          <a href="/nix-clients/fuse-client/">
+            FUSE Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/hadoop_installation/" class="dd-item">
+        <div>
+          <a href="/nix-clients/hadoop_installation/">
+            Hadoop Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/windows-client/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/windows-client/">Windows Client</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/windows-client/preparing_for_installation_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/preparing_for_installation_windows/">
+            Preparing for Windows Installation
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/what_to_expect_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/what_to_expect_windows/">
+            What to Expect
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/running_the_installation_program_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/running_the_installation_program_windows/">
+            Installing the Software
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/manual_installation_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/manual_installation_windows/">
+            Manual Installation
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/uninstalling_the_client_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/uninstalling_the_client_windows/">
+            Uninstalling the Windows client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/winclient_use/" class="dd-item">
+        <div>
+          <a href="/windows-client/winclient_use/">
+            Using the Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/winclient_admin/" class="dd-item">
+        <div>
+          <a href="/windows-client/winclient_admin/">
+            Client Administration
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/configuration/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/configuration/">OrangeFS Configuration</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/configuration/admin_ofs_configuration_file/" class="dd-item">
+        <div>
+          <a href="/configuration/admin_ofs_configuration_file/">
+            OrangeFS Configuration File
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/configuration/orangefs_advanced_configuration/" class="dd-item">
+        <div>
+          <a href="/configuration/orangefs_advanced_configuration/">
+            Multiple File Systems
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/configuration/multiple_server_processes/" class="dd-item">
+        <div>
+          <a href="/configuration/multiple_server_processes/">
+            Multiple Server Processes
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+
+
+
+
+    </ul>
+    <section>
+    </section>
+  </aside>
+  <section class="page">
+    
+    <div class="nav-select">
+      <center>Navigation : 
+        <select onchange="javascript:location.href = this.value;">
+          
+    <option value="/quickstart/" >
+   Quickstart Guides</option>
+    <option value="/build-configure/" >
+   Build and Configure</option>
+    <option value="/add-servers/" >
+   Add Server(s)</option>
+    <option value="/nix-clients/" >
+   OrangeFS Clients</option> 
+      <option value="/nix-clients/pvfs2tab-file/" >- pvfs2tab</option>
+      <option value="/nix-clients/linux-kernel-module/" >- Linux Kernel Module</option>
+      <option value="/nix-clients/direct-interface/" >- Linux Direct Interface</option>
+      <option value="/nix-clients/romio-interface/"  selected>- Linux ROMIO MPI Interface</option>
+      <option value="/nix-clients/advanced-linux-client-security/" >- Linux Client Advanced Security Modes</option>
+      <option value="/nix-clients/fuse-client/" >- FUSE Client</option>
+      <option value="/nix-clients/hadoop_installation/" >- Hadoop Client</option>
+  
+    <option value="/windows-client/" >
+   Windows Client</option>
+    <option value="/configuration/" >
+   OrangeFS Configuration</option>
+
+
+
+        </select>
+      </center>
+    </div>
+      <div>
+        <div class="searchbox">
+          <input data-search-input id="search-by" type="text" placeholder="Search...">
+        </div>
+        <script type="text/javascript" src="/js/lunr.min.js"></script>
+        <script type="text/javascript" src="/js/auto-complete.js"></script>
+        <link href="/css/auto-complete.css" rel="stylesheet">
+        <script type="text/javascript">
+          
+              var baseurl = "\/";
+          
+        </script>
+        <script type="text/javascript" src="/js/search.js"></script>
+      </div>
+    
+
+    <h1>Linux ROMIO MPI Interface</h1>
+    
+    
+    
+    
+
+<p>ROMIO is a particular implementation of the MPI-IO protocol, the open
+standard for data transfer to and from MPI.</p>
+
+<p>MPI, also an open standard, was created for researchers who needed a
+<em>message-passing interface</em> optimized for high performance parallel
+computing.</p>
+
+<p>Different working implementations for MPI, also called MPI libraries,
+exist. Two popular MPI libraries are MPICH from Argonne National
+Laboratory and Open MPI from a consortium of users including Oak Ridge
+National Laboratory.</p>
+
+<p>Different implementations of MPI-IO also exist. The ROMIO implementation
+includes support for OrangeFS. Therefore, any MPI library implementation
+that works with ROMIO, <em>such as MPICH and Open MPI</em>, can also work with
+OrangeFS.</p>
+
+<p>Setting up a ROMIO client involves one step, with options for
+configuring Open MPI or MPICH:</p>
+
+<ul>
+<li><p><a href="ROMIO_Interface.htm#Configuring_for_Linux">Configuring for Linux</a></p></li>
+
+<li><p><a href="ROMIO_Interface.htm#Install_OrangeFS_2.9_with_MPICH_3.0.4">Install OrangeFS 2.9 with MPICH
+3.0.4</a></p></li>
+
+<li><p><a href="ROMIO_Interface.htm#Install_OrangeFS_2.9_with_Open_MPI_1.6.5">Install OrangeFS 2.9 with Open MPI
+1.6.5</a></p></li>
+</ul>
+
+<h2 id="configuring-for-linux">Configuring for Linux</h2>
+
+<p>Both MPICH and Open MPI are packaged with ROMIO. Configuring either of
+these MPI implementations to access OrangeFS involves two areas:</p>
+
+<ul>
+<li><p>Adding OrangeFS installation files</p></li>
+
+<li><p>Linking programs to OrangeFS</p></li>
+</ul>
+
+<h4 id="adding-orangefs-installation-files">Adding OrangeFS Installation Files</h4>
+
+<p>To add the OrangeFS installation files to the MPI client system, Change
+Directory (cd) to /opt on the client and copy the /opt/orangefs
+directory from the build system:</p>
+
+<p>scp -r hostname:/opt/orangefs /opt</p>
+
+<p>where&hellip;</p>
+
+<p><em>hostname</em> = host name of the build system</p>
+
+<h4 id="linking-programs-to-orangefs">Linking Programs to OrangeFS</h4>
+
+<p>When you run your Open MPI or MPICH applications, link to OrangeFS by
+including the -lpvfs2 option.</p>
+
+<p>For example, to run a program called mytest, you would follow these
+steps:</p>
+
+<ol>
+<li>Compile and link the program to the pvfs2 library in your OrangeFS
+installation:</li>
+</ol>
+
+<p>cc mytest.c -o mytest -L /opt/orangefs/lib -L
+/<em>mpich2_install_dir</em>/lib -I /opt/orangefs/include -I
+/<em>mpich2_install_dir</em>/include  -lpvfs2 -lmpich</p>
+
+<p>where&hellip;</p>
+
+<p><em>mpich2_install_dir</em> = the name and path of your MPICH installation
+directory</p>
+
+<h2 id="other-operating-environments">Other Operating Environments</h2>
+
+<p>ROMIO can also run on Windows and Mac. Those platforms are less
+efficient for the high performance parallel computing that most ROMIO
+users seek in OrangeFS, so the above instructions focus on Linux client
+implementations only.</p>
+
+<ul>
+<li>To connect to OrangeFS from a Windows environment, consider using
+the <a href="WinClient_Intro.htm">Windows Client</a> developed specifically for
+OrangeFS.</li>
+<li>To connect to OrangeFS from a Mac environment, consider using
+<a href="FUSE_Client.htm">FUSE</a>.</li>
+</ul>
+
+<h2 id="install-orangefs-2-9-with-mpich-3-0-4">Install OrangeFS 2.9 with MPICH 3.0.4</h2>
+
+<p><strong>Notes   </strong>You must install OrangeFS on your storage nodes and the
+OrangeFS system must be online prior to performing these steps. If you
+have not completed this step, see the <a href="Installation_Guide.htm">Installation
+Guide</a> for instructions to complete this step
+before proceeding.<br />
+ <br />
+ For instructions on how to use MPICH, see <em><a href="http://www.mpich.org/static/downloads/3.0.4/mpich-3.0.4-userguide.pdf">MPICH User&rsquo;s
+Guide</a>.</em></p>
+
+<h3 id="secure-shell-ssh-without-passphrase">Secure Shell (SSH)—without Passphrase</h3>
+
+<p>You must configure all clients to support secure shell connections via
+SSH without passing a passphrase. For more information, see <a href="http://hortonworks.com/kb/generating-ssh-keys-for-passwordless-login/">Generating
+SSH Keys for Passwordless
+Login</a>,
+an article from the Hortonworks Knowledgebase.</p>
+
+<p>Prior to configuring MPICH, ensure that you have built shared libraries
+for OrangeFS:</p>
+
+<ol>
+<li>Run the same ./configure command you used when you installed
+OrangeFS, but add the following additional option:</li>
+</ol>
+
+<p>&ndash;enable-shared</p>
+
+<p>To configure OrangeFS to work with MPICH 3.0.4, complete the following
+steps:</p>
+
+<ol>
+<li>Run the following commands to remove references to methods included
+in MPICH that will cause errors during the ./configure stage.</li>
+</ol>
+
+<p><strong>Note     </strong>You will not be able to use the MPI/IO functions
+IReadContig and IWriteContig.</p>
+
+<p>sed -i s/ADIOI_PVFS2_IReadContig/NULL/  <br />
+ src/mpi/romio/adio/ad_pvfs2/ad_pvfs2.c<br />
+ sed -i s/ADIOI_PVFS2_IWriteContig/NULL/<br />
+ src/mpi/romio/adio/ad_pvfs2/ad_pvfs2.c</p>
+
+<ol>
+<li>Compile MPICH with &ndash;enable-shared option:</li>
+</ol>
+
+<p>./configure &ndash;prefix=/opt/mpich-3.0.4 &ndash;enable-romio &ndash;enable-shared
+&ndash;with-pvfs2=/opt/orangefs &ndash;with-file-system=pvfs2</p>
+
+<p>where&hellip;</p>
+
+<p><em>/opt/orangefs</em> = the location of your OrangeFS installation</p>
+
+<p><em>/opt/mpich-3.0.4</em> = the location of your MPICH installation</p>
+
+<p><strong>Note     </strong>You can remove the <em>&ndash;prefix</em> command to install
+to<em>/usr/local</em></p>
+
+<ol>
+<li>Make and install freshly compiled MPICH 3.0.4 with OrangeFS Support</li>
+</ol>
+
+<p>·sudo make all install</p>
+
+<ol>
+<li>Set LD_LIBRARY_PATH to point to the MPICH libs</li>
+</ol>
+
+<p>export LD_LIBRARY_PATH=/<em>opt/mpich-3.0.4</em>/lib:\$LD_LIBRARY_PATH</p>
+
+<p>where&hellip;</p>
+
+<p><em>opt/mpich-3.0.4</em> = the location of your MPICH installation</p>
+
+<h2 id="install-orangefs-2-9-with-open-mpi-1-6-5">Install OrangeFS 2.9 with Open MPI 1.6.5</h2>
+
+<p><strong>Notes   </strong>You must install OrangeFS on your storage nodes and the
+OrangeFS system must be online prior to performing these steps. If you
+have not completed this step, see the <a href="Installation_Guide.htm">Installation
+Guide</a> for instructions to complete this step
+before proceeding.<br />
+ <br />
+ OrangeFS 2.9.0 has been successfully tested with OpenMPI 1.8.3 on
+CentOS 7. No patches are necessary to run OrangeFS with OpenMPI 1.8.3.
+If you are using this version, skip steps 1 and 2 below, and change the
+OpenMPI version number in step 3.<br />
+ <br />
+ For instructions on how to use Open MPI, see <em><a href="http://www.open-mpi.org/">Open MPI: Open Source
+High Performance Computing</a>.</em></p>
+
+<h3 id="secure-shell-ssh-without-passphrase-1">Secure Shell (SSH)—without Passphrase</h3>
+
+<p>You must configure all clients to support secure shell connections via
+SSH without passing a passphrase. For more information, see <a href="http://hortonworks.com/kb/generating-ssh-keys-for-passwordless-login/">Generating
+SSH Keys for Passwordless
+Login</a>,
+an article from the Hortonworks Knowledgebase.</p>
+
+<p>Prior to configuring MPICH, ensure that you have built shared libraries
+for OrangeFS:</p>
+
+<ol>
+<li>Run the same ./configure command you used when you installed
+OrangeFS, but add the following additional option:</li>
+</ol>
+
+<p>&ndash;enable-shared</p>
+
+<p>To configure OrangeFS to work with Open MPI 1.6.5, complete the
+following steps.</p>
+
+<ol>
+<li>Patch the Open MPI 1.6.5 source to support OrangeFS: <br />
+ Patch the Open MPI installation using the openmpi-1.6.5-romio.patch
+file. This patch is available on the OrangeFS</li>
+</ol>
+
+<p>patch -p0 &lt; openmpi-1.6.5-romio.patch</p>
+
+<ol>
+<li>Run the following commands to remove references to methods included
+in Open MPI that will cause errors during the ./configure stage.</li>
+</ol>
+
+<p><strong>Note     </strong>You will not be able to use the MPI-IO functions
+IReadContig and IWriteContig.</p>
+
+<p>sed -e &rsquo;s/ADIOI_PVFS2_IReadContig/NULL/&rsquo; \<br />
+ -i ompi/mca/io/romio/romio/adio/ad_pvfs2/ad_pvfs2.c<br />
+ sed -e &rsquo;s/ADIOI_PVFS2_IWriteContig/NULL/&rsquo; \<br />
+ -i ompi/mca/io/romio/romio/adio/ad_pvfs2/ad_pvfs2.c</p>
+
+<ol>
+<li>Compile Open MPI with the &ndash;enable-shared and &ndash;with-pic options:</li>
+</ol>
+
+<p>./configure &ndash;prefix=/opt/openmpi-1.6.5 &ndash;enable-shared &ndash;with-pic
+&ndash;with-io-romio-flags=&ldquo;&ndash;with-pvfs2=/opt/orangefs
+&ndash;with-file-system=pvfs2&rdquo;</p>
+
+<p>where&hellip;</p>
+
+<p><em>/opt/orangefs</em> = the location of your OrangeFS installation</p>
+
+<p><em>/opt/openmpi-1.6.5</em> = the location of your Open MPI installation</p>
+
+<p><strong>Note     </strong>You can remove the <em>&ndash;prefix</em> command to install
+to<em>/usr/local</em></p>
+
+<ol>
+<li>Make and install freshly compiled Open MPI 1.6.5 with OrangeFS
+Support</li>
+</ol>
+
+<p>·sudo make all install</p>
+
+<ol>
+<li>Set LD_LIBRARY_PATH to point to the Open MPI libs</li>
+</ol>
+
+<p>export LD_LIBRARY_PATH=/opt/openmpi-1.6.5/lib:\$LD_LIBRARY_PATH</p>
+
+<p>where&hellip;</p>
+
+<p><em>/opt/orangefs</em> = the location of your OrangeFS installation</p>
+
+<p><em>/opt/openmpi-1.6.5</em> = the location of your Open MPI installation</p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+
+    
+    
+        <div class="chevrons">
+    <div id="navigation">
+<a class="nav nav-prev" href="/nix-clients/direct-interface/" title="Linux Direct Interface"> <i class="fa fa-chevron-left"></i><label>Linux Direct Interface</label></a>
+    <a class="nav nav-next" href="/nix-clients/advanced-linux-client-security/" title="Linux Client Advanced Security Modes" style="margin-right: 0px;"><label>Linux Client Advanced Security Modes</label><i class="fa fa-chevron-right"></i></a></div>
+  </div>
+
+  </section>
+</article>
+
+<footer>
+
+<div class="footline">
+    
+
+    
+
+  
+
+
+	<div>
+
+
+  
+    <div id="image-table">
+    <table>
+        <tr>
+              <td style="padding:1px">
+              <a href="http://orangefs.com"> <img src="/OrangeFS_logo.gif" alt="OrangeFS" style="width:200px"></a>
+            </td>
+        </tr>
+    </table>
+</div>
+
+  
+
+
+
+	</div>
+</footer>
+
+<script src="/js/clipboard.min.js"></script>
+
+<link href="/css/featherlight.min.css" rel="stylesheet">
+<script src="/js/featherlight.min.js"></script>
+
+
+<script src="/js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+
+<script src="/theme-flex/script.js"></script>
+
+    
+
+    
+    
+
+    
+  </body>
+</html>

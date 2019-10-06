@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  
+  <url>
+    <loc>/quickstart/</loc>
+  </url>
+  
+  <url>
+    <loc>/quickstart/quickstart-package/</loc>
+  </url>
+  
+  <url>
+    <loc>/quickstart/quickstart-build/</loc>
+  </url>
+  
+  <url>
+    <loc>/build-configure/</loc>
+  </url>
+  
+  <url>
+    <loc>/build-configure/setup_security_build/</loc>
+  </url>
+  
+  <url>
+    <loc>/build-configure/build_orangefs/</loc>
+  </url>
+  
+  <url>
+    <loc>/build-configure/configuring_ldap_for_identity_mapping/</loc>
+  </url>
+  
+  <url>
+    <loc>/build-configure/create_orangefs_configuration_file/</loc>
+  </url>
+  
+  <url>
+    <loc>/build-configure/results_of_build_and_configure/</loc>
+  </url>
+  
+  <url>
+    <loc>/add-servers/</loc>
+  </url>
+  
+  <url>
+    <loc>/add-servers/copy_ofs_install_directory_servers/</loc>
+  </url>
+  
+  <url>
+    <loc>/add-servers/set_up_security_servers/</loc>
+  </url>
+  
+  <url>
+    <loc>/add-servers/server-startup/</loc>
+  </url>
+  
+  <url>
+    <loc>/add-servers/results_of_add_servers/</loc>
+  </url>
+  
+  <url>
+    <loc>/nix-clients/</loc>
+  </url>
+  
+  <url>
+    <loc>/nix-clients/pvfs2tab-file/</loc>
+  </url>
+  
+  <url>
+    <loc>/nix-clients/linux-kernel-module/</loc>
+  </url>
+  
+  <url>
+    <loc>/nix-clients/direct-interface/</loc>
+  </url>
+  
+  <url>
+    <loc>/nix-clients/romio-interface/</loc>
+  </url>
+  
+  <url>
+    <loc>/nix-clients/advanced-linux-client-security/</loc>
+  </url>
+  
+  <url>
+    <loc>/nix-clients/fuse-client/</loc>
+  </url>
+  
+  <url>
+    <loc>/nix-clients/hadoop_installation/</loc>
+  </url>
+  
+  <url>
+    <loc>/windows-client/</loc>
+  </url>
+  
+  <url>
+    <loc>/windows-client/preparing_for_installation_windows/</loc>
+  </url>
+  
+  <url>
+    <loc>/windows-client/what_to_expect_windows/</loc>
+  </url>
+  
+  <url>
+    <loc>/windows-client/running_the_installation_program_windows/</loc>
+  </url>
+  
+  <url>
+    <loc>/windows-client/manual_installation_windows/</loc>
+  </url>
+  
+  <url>
+    <loc>/windows-client/uninstalling_the_client_windows/</loc>
+  </url>
+  
+  <url>
+    <loc>/windows-client/winclient_use/</loc>
+  </url>
+  
+  <url>
+    <loc>/windows-client/winclient_admin/</loc>
+  </url>
+  
+  <url>
+    <loc>/configuration/</loc>
+  </url>
+  
+  <url>
+    <loc>/configuration/admin_ofs_configuration_file/</loc>
+  </url>
+  
+  <url>
+    <loc>/configuration/orangefs_advanced_configuration/</loc>
+  </url>
+  
+  <url>
+    <loc>/configuration/multiple_server_processes/</loc>
+  </url>
+  
+  <url>
+    <loc>/_footer/</loc>
+  </url>
+  
+  <url>
+    <loc>/categories/</loc>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>/</loc>
+  </url>
+  
+  <url>
+    <loc>/tags/</loc>
+    <priority>0</priority>
+  </url>
+  
+</urlset>

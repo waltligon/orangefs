@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>OrangeFS Overview on OrangeFS Documentation</title>
+    <link>/</link>
+    <description>Recent content in OrangeFS Overview on OrangeFS Documentation</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    
+	<atom:link href="/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Quickstart Package Installation Guide</title>
+      <link>/quickstart/quickstart-package/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/quickstart/quickstart-package/</guid>
+      <description>Packages for OrangeFS are available in the Fedora repositories. Packages for CentOS are available in Fedora&amp;rsquo;s EPEL (Extra Packages for Enterprise Linux) repository. The packages are available on Fedora 27 and later and CentOS 7 and later.
+A number of packages are available. The OrangeFS package provides the client and the orangefs-server package provides the server. The orangefs-devel package is required to build additional programs against OrangeFS. There is also an orangefs-fuse package providing FUSE support, which is not described by this guide.</description>
+    </item>
+    
+    <item>
+      <title>Quickstart Source Build Guide</title>
+      <link>/quickstart/quickstart-build/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/quickstart/quickstart-build/</guid>
+      <description>This topic provides an example of a complete installation of OrangeFS from source in a single procedure. It can also be used as a Quick Start reference for experienced users who wish to bypass the more detailed and segmented instructions in the earlier topics of this manual.
+Notes Most of the following steps require that you have root permissions.
+If your distro includes the OrangeFS kernel module, you may skip tasks related to building and installing the kernel module.</description>
+    </item>
+    
+    <item>
+      <title>Build Security Setup</title>
+      <link>/build-configure/setup_security_build/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/build-configure/setup_security_build/</guid>
+      <description>After you build the OrangeFS installation directory, you must continue setup and configuration if you select either the key-based or certificate-based mode of security. Much of this work can be done once on the build system, then copied to your servers and clients. In future versions of OrangeFS, security will be simplified.    In the Procedure section of the previous topic, you specified a security mode when running .</description>
+    </item>
+    
+    <item>
+      <title>Build OrangeFS</title>
+      <link>/build-configure/build_orangefs/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/build-configure/build_orangefs/</guid>
+      <description>Building OrangeFS involves downloading the source software from orangefs.org onto a system preconfigured with several standard Linux packages. On this system you will extract and build OrangeFS into a portable directory named /opt/orangefs.
+This topic provides the procedure for building OrangeFS.
+System Requirements In addition to a supported distribution of Linux, the OrangeFS Build system requires eight more Linux software packages. The names for these packages vary from one Linux distribution to another.</description>
+    </item>
+    
+    <item>
+      <title>Configure LDAP</title>
+      <link>/build-configure/configuring_ldap_for_identity_mapping/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/build-configure/configuring_ldap_for_identity_mapping/</guid>
+      <description>When an OrangeFS server receives a certificate from a client, it performs identity mapping with the certificate. The certificate contains a subject distinguished name (DN) to identify it, while the server needs a numerical user ID (UID) and primary group ID (GID). In order to do the mapping, an LDAP directory is used. The subject DN is transformed in a configurable way to locate a user object in the LDAP directory; the object contains the UID and GID.</description>
+    </item>
+    
+    <item>
+      <title>OrangeFS Config File</title>
+      <link>/build-configure/create_orangefs_configuration_file/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/build-configure/create_orangefs_configuration_file/</guid>
+      <description>Procedure The OrangeFS installation directory on the Build system will need an OrangeFS configuration file. You will enter basic information for this file in a program called pvfs2-genconfig. Once the configuration file has been created, you might need to make additional modifications (regarding security, for example) for the initial deployment.
+ **Note **After standard installation, consult the [Administration Guide](Administration_Guide.htm) for details on the options and values available for fine tuning the configuration file.</description>
+    </item>
+    
+    <item>
+      <title>Results</title>
+      <link>/build-configure/results_of_build_and_configure/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/build-configure/results_of_build_and_configure/</guid>
+      <description>At the end of the Build and Configure step, the build system will include:
+ An installation directory (/opt/orangefs) A configuration file (/opt/orangefs/etc/orangefs-server.conf) to be used by all servers associated with this installation.  If you chose key-based security mode, the build system will also include:
+ A temporary directory where all keys and the keystore file were generated. A copy of the keystore file in the installation directory (opt/orangefs/etc/keystore).</description>
+    </item>
+    
+    <item>
+      <title>Copy OrangeFS Server Installation Directory</title>
+      <link>/add-servers/copy_ofs_install_directory_servers/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/add-servers/copy_ofs_install_directory_servers/</guid>
+      <description>Begin your deployment by copying the OrangeFS installation directory from the Build system to each Server system designated in your OrangeFS solution. These are the servers already identified in the OrangeFS configuration file.    System Requirements Any system that functions as an OrangeFS server requires a supported distribution of Linux.
+Note For more information on supported distributions, see Preview System Requirements.</description>
+    </item>
+    
+    <item>
+      <title>Set up Server Security</title>
+      <link>/add-servers/set_up_security_servers/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/add-servers/set_up_security_servers/</guid>
+      <description>To use key-based security mode, you must copy the private keys you generated on the Build system to each of your Server systems. In future versions of OrangeFS, security will be simplified.    *Note* Neither the default nor certificate-based modes of security require any additional setup on Server systems. For these modes, see the next topic, Server Startup</description>
+    </item>
+    
+    <item>
+      <title>Server Startup</title>
+      <link>/add-servers/server-startup/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/add-servers/server-startup/</guid>
+      <description>You will use the OrangeFS server daemon (pvfs2-server) on each server to initialize the storage directories and start the OrangeFS server process.    Procedure Running the server involves two tasks:
+ Initializing the working directories on each server for storage space Starting the server process  The first task must be performed once on each server.</description>
+    </item>
+    
+    <item>
+      <title>Add Server(s) Results</title>
+      <link>/add-servers/results_of_add_servers/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/add-servers/results_of_add_servers/</guid>
+      <description>At the end of the Add Servers step, each Server system will include an OrangeFS installation directory (/opt/orangefs).
+If you are using key-based security mode, each Server system will also include its own private key in /opt/orangefs/etc.
+     </description>
+    </item>
+    
+    <item>
+      <title>pvfs2tab</title>
+      <link>/nix-clients/pvfs2tab-file/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/nix-clients/pvfs2tab-file/</guid>
+      <description>Each client must know where to access OrangeFS resources. The pvfs2tab file, similar to the /etc/fstab file in Linux, provides clients with this access information. It involves creating a file at a designated path, which will function as the gateway to your OrangeFS installation.
+ Determine the URL of the OrangeFS server you will access.  You can retrieve this information from the orangefs-server.conf file. For example, the first URL listed in that file can be extracted with the following command:</description>
+    </item>
+    
+    <item>
+      <title>Linux Kernel Module</title>
+      <link>/nix-clients/linux-kernel-module/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/nix-clients/linux-kernel-module/</guid>
+      <description>The Kernel Module enables access to OrangeFS through the native Linux IO interfaces. Starting with the Linux Kernel verwsion 4.6, OrangeFS is available natively in the kernel source. The code that is upstream is recommended for kernel IO, the OrangeFS team has focused on improving the up stream module for several years thus it is recommended to use this version vs. the one that is in the orangefs repo.
+   Linux Kernel Version Features     4.</description>
+    </item>
+    
+    <item>
+      <title>Linux Direct Interface</title>
+      <link>/nix-clients/direct-interface/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/nix-clients/direct-interface/</guid>
+      <description>The Direct Interface allows you to access OrangeFS in a cluster similar to Linux (POSIX-based); however, the Direct Interface (also known by usrint, the system folder in which it is stored) bypasses the Linux Kernel for a more direct and better performing path to OrangeFS. It provides high performance access for programs that are not written for MPI.
+Important The OrangeFS Direct Interface using Global Configuration will work only on systems configured with shared C libraries.</description>
+    </item>
+    
+    <item>
+      <title>Linux ROMIO MPI Interface</title>
+      <link>/nix-clients/romio-interface/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/nix-clients/romio-interface/</guid>
+      <description>ROMIO is a particular implementation of the MPI-IO protocol, the open standard for data transfer to and from MPI.
+MPI, also an open standard, was created for researchers who needed a message-passing interface optimized for high performance parallel computing.
+Different working implementations for MPI, also called MPI libraries, exist. Two popular MPI libraries are MPICH from Argonne National Laboratory and Open MPI from a consortium of users including Oak Ridge National Laboratory.</description>
+    </item>
+    
+    <item>
+      <title>Linux Client Advanced Security Modes</title>
+      <link>/nix-clients/advanced-linux-client-security/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/nix-clients/advanced-linux-client-security/</guid>
+      <description>After you copy the OrangeFS installation directory, you must perform additional setup and configuration for the advanced key-based and certificate-based security modes.    For key-based security, most of this work can be done once on the build system, then copied later to your servers and clients.
+This topic includes sections for setting up two types of security:</description>
+    </item>
+    
+    <item>
+      <title>FUSE Client</title>
+      <link>/nix-clients/fuse-client/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/nix-clients/fuse-client/</guid>
+      <description>Filesystem in Userspace (FUSE) is a loadable kernel module for UNIX-like computer operating systems that lets non-privileged users create their own file systems without editing kernel code. File system code is run in user space while the FUSE module provides only a bridge to the actual kernel interfaces.
+The OrangeFS client interface for FUSE enables access to an OrangeFS file system from a Mac.
+*Note* While FUSE can run on both Linux and Mac.</description>
+    </item>
+    
+    <item>
+      <title>Hadoop Client</title>
+      <link>/nix-clients/hadoop_installation/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/nix-clients/hadoop_installation/</guid>
+      <description>Apache Hadoop is an open source framework that supports data-intensive distributed applications. Hadoop has many parts, but two are fundamental:
+ MapReduce is the framework that understands and assigns work to the nodes in a cluster. MapReduce divides the application into many fragments of work, each of which can be executed or re-executed on any node in the cluster.
+ HDFS (Hadoop File System) spans all the nodes in a Hadoop cluster for data storage.</description>
+    </item>
+    
+    <item>
+      <title>Preparing for Windows Installation</title>
+      <link>/windows-client/preparing_for_installation_windows/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/windows-client/preparing_for_installation_windows/</guid>
+      <description>*Important* Please read this section before beginning installation of the Windows Client.
+Client Requirements Operating systems:
+ Windows Vista Windows 7 Windows 8 Windows Server 2008 or Windows Server 2008 R2 (all editions; Server Core installation not currently supported) Windows Server 2012 (all editions; Server Core installation not currently supported)   Hardware:
+ 30MB disk space Other requirements dependent on usage; minimum requirements very low   Other:</description>
+    </item>
+    
+    <item>
+      <title>What to Expect</title>
+      <link>/windows-client/what_to_expect_windows/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/windows-client/what_to_expect_windows/</guid>
+      <description>When you complete the Enterprise installation process, if you have provided all the necessary inputs, the last panel in the installer offers the option to start the client. If you select this option, your system mounts the OrangeFS server you specified, and the Windows Client starts. If you are not ready to start the client, you can do it manually later.
+The installation program creates two new directories on your Windows system:</description>
+    </item>
+    
+    <item>
+      <title>Installing the Software</title>
+      <link>/windows-client/running_the_installation_program_windows/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/windows-client/running_the_installation_program_windows/</guid>
+      <description>To install the OrangeFS Windows Client, you need the self-extracting installation program. Two versions are available, depending on your system’s processor type (32-bit or 64-bit).
+Download and run orangefs-client-version-win32.exe or orangefs-client-version-win64.exe
+where&amp;hellip;
+version = version number of the executable
+Example: orangefs-client-2.8.5.3-win64.exe
+Notes OS. It is best to run the installer as an administrative user (Administrator, for example).
+After running the executable, follow these steps:
+ When the installation program&amp;rsquo;s Welcome dialog displays, click Next.</description>
+    </item>
+    
+    <item>
+      <title>Manual Installation</title>
+      <link>/windows-client/manual_installation_windows/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/windows-client/manual_installation_windows/</guid>
+      <description>Important The Client connects to a running OrangeFS server. If you have not yet installed the OrangeFS server components, consult the documentation and install the server before installing the Windows Client.
+Follow the instructions below to install the OrangeFS Windows Client:
+Download the ZIP file associated with your system type (64- or 32-bit):
+ For 64-bit systems, download orangefs-windows-client-version#-win64.zip. For 32-bit systems, download orangefs-windows-client-version#-win32.zip.
+where&amp;hellip;
+version# is the OrangeFS version, for example, 2.</description>
+    </item>
+    
+    <item>
+      <title>Uninstalling the Windows client</title>
+      <link>/windows-client/uninstalling_the_client_windows/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/windows-client/uninstalling_the_client_windows/</guid>
+      <description>Uninstalling the Enterprise Installation To uninstall the Windows client, follow these steps:
+ From the Windows Start Menu, select Control Panel, then Programs and Features. Locate and select the OrangeFS Client item, and click the Uninstall button above. Follow the uninstaller steps to remove the Client. Remove configuration files under C:\OrangeFS\Client (by default) and the C:\OrangeFS\Client directories.  Uninstalling a Manual Installation Follow the instructions below to uninstall the OrangeFS Windows Client:</description>
+    </item>
+    
+    <item>
+      <title>Using the Client</title>
+      <link>/windows-client/winclient_use/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/windows-client/winclient_use/</guid>
+      <description>Information in this topic includes:
+ Interfacing with OrangeFS Running the Client Understanding Security Getting/Generating New User-Mapping Certificates  Interfacing with OrangeFS When the Windows Client is running on your computer, the OrangeFS file system appears as a removable drive at the drive letter (E:-Z:). This drive letter, specified during installation, is a setting in the configuration file that can be changed. For more information, see Client Administration.
+You can interact with files and directories in the file system like local files.</description>
+    </item>
+    
+    <item>
+      <title>Client Administration</title>
+      <link>/windows-client/winclient_admin/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/windows-client/winclient_admin/</guid>
+      <description>Information in this topic includes:
+ Configuration Configuring the Client Security Mode User Mapping Installing and Using Globus Toolkit (certificates only) Troubleshooting Source Code  Configuration Two configuration files exist for the OrangeFS Client:
+ orangefstab orangefs.cfg   Both text files are located in the installation directory (C:\OrangeFS\Client) by default and can be edited.
+The orangefstab file contains only one line entry, which is the URI address of the OrangeFS server to be mounted for Windows Client access.</description>
+    </item>
+    
+    <item>
+      <title>OrangeFS Configuration File</title>
+      <link>/configuration/admin_ofs_configuration_file/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/configuration/admin_ofs_configuration_file/</guid>
+      <description>OrangeFS Configuration File {.body} The OrangeFS configuration file is copied to all servers as a single reference point for operation and performance. This is the file in which you specify settings and preferences for the file system. During installation, you use a program called pvfs2-genconfig to automatically generate the OrangeFS configuration file. The program presents a series of prompts, enabling you to enter basic required settings.
+While pvfs2-genconfig is designed to query you about the most important options, there are many additional options with default values that are bypassed during installation.</description>
+    </item>
+    
+    <item>
+      <title>Multiple File Systems</title>
+      <link>/configuration/orangefs_advanced_configuration/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/configuration/orangefs_advanced_configuration/</guid>
+      <description>OrangeFS Advanced Configuration In some circumstances, you may need to configure OrangeFS to support multiple concurrent file systems on the same set of storage servers. This topic provides examples of two different configuration options.
+To configure OrangeFS to support multiple concurrent file systems on the same set of storage servers, you have two options. One is to run multiple server processes, each with its own config file. The second option is to have a single server process surface multiple file systems.</description>
+    </item>
+    
+    <item>
+      <title>Multiple Server Processes</title>
+      <link>/configuration/multiple_server_processes/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/configuration/multiple_server_processes/</guid>
+      <description>Multiple Server Processes {.body} To increase backend throughput when you have separate local volumes, you may elect to run multiple server processes on each server.
+The topic is organized into the following three sections:
+ Multiple Server Processes, Single File System Multiple Servers, Single File System, Some Data-only Servers Multiple Server Processes, Single File System, Multiple Machines  Multiple Server Processes, Single File System You can increase parallel throughput with multiple server processes.</description>
+    </item>
+    
+    <item>
+      <title></title>
+      <link>/_footer/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/_footer/</guid>
+      <description>       </description>
+    </item>
+    
+  </channel>
+</rss>

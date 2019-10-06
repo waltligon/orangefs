@@ -9,15 +9,15 @@ operating environments and interfaces.
 Depending on the Client you wish to select, your Client system might
 run Linux, Windows, MacOS X or even Apache (web-based), as shown here:
 
-  -------------------- -------------------------------------------
-  Client Interface     Client System (Operating Environment)
-  Kernel Module        Linux
-  Direct Interface     Linux (Kernel bypass)
-  FUSE                 Linux and MacOS X
-  ROMIO (MPI-IO)       Linux
-  Windows Client       Windows
-  Apache WebDAV / S3   Multiplatform Web Access (OS-Independent)
-  -------------------- -------------------------------------------
+| Client Interface | Client System (Operating Environment) |
+|---|---|
+| Kernel Module | Linux |
+| Direct Interface | Linux (Kernel bypass) |
+| FUSE | MacOS X and Linux |
+| ROMIO (MPI-IO) | Linux |
+| Windows Client | Windows |
+| Apache WebDAV / S3 | Multiplatform Web Access |
+
 
 Generally, the requirements for these client solutions can be addressed
 separately, as their instructions assume the file system servers are

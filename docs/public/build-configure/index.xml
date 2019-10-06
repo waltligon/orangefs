@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Build and Configure on OrangeFS Documentation</title>
+    <link>/build-configure/</link>
+    <description>Recent content in Build and Configure on OrangeFS Documentation</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    
+	<atom:link href="/build-configure/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Build Security Setup</title>
+      <link>/build-configure/setup_security_build/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/build-configure/setup_security_build/</guid>
+      <description>After you build the OrangeFS installation directory, you must continue setup and configuration if you select either the key-based or certificate-based mode of security. Much of this work can be done once on the build system, then copied to your servers and clients. In future versions of OrangeFS, security will be simplified.    In the Procedure section of the previous topic, you specified a security mode when running .</description>
+    </item>
+    
+    <item>
+      <title>Build OrangeFS</title>
+      <link>/build-configure/build_orangefs/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/build-configure/build_orangefs/</guid>
+      <description>Building OrangeFS involves downloading the source software from orangefs.org onto a system preconfigured with several standard Linux packages. On this system you will extract and build OrangeFS into a portable directory named /opt/orangefs.
+This topic provides the procedure for building OrangeFS.
+System Requirements In addition to a supported distribution of Linux, the OrangeFS Build system requires eight more Linux software packages. The names for these packages vary from one Linux distribution to another.</description>
+    </item>
+    
+    <item>
+      <title>Configure LDAP</title>
+      <link>/build-configure/configuring_ldap_for_identity_mapping/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/build-configure/configuring_ldap_for_identity_mapping/</guid>
+      <description>When an OrangeFS server receives a certificate from a client, it performs identity mapping with the certificate. The certificate contains a subject distinguished name (DN) to identify it, while the server needs a numerical user ID (UID) and primary group ID (GID). In order to do the mapping, an LDAP directory is used. The subject DN is transformed in a configurable way to locate a user object in the LDAP directory; the object contains the UID and GID.</description>
+    </item>
+    
+    <item>
+      <title>OrangeFS Config File</title>
+      <link>/build-configure/create_orangefs_configuration_file/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/build-configure/create_orangefs_configuration_file/</guid>
+      <description>Procedure The OrangeFS installation directory on the Build system will need an OrangeFS configuration file. You will enter basic information for this file in a program called pvfs2-genconfig. Once the configuration file has been created, you might need to make additional modifications (regarding security, for example) for the initial deployment.
+ **Note **After standard installation, consult the [Administration Guide](Administration_Guide.htm) for details on the options and values available for fine tuning the configuration file.</description>
+    </item>
+    
+    <item>
+      <title>Results</title>
+      <link>/build-configure/results_of_build_and_configure/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/build-configure/results_of_build_and_configure/</guid>
+      <description>At the end of the Build and Configure step, the build system will include:
+ An installation directory (/opt/orangefs) A configuration file (/opt/orangefs/etc/orangefs-server.conf) to be used by all servers associated with this installation.  If you chose key-based security mode, the build system will also include:
+ A temporary directory where all keys and the keystore file were generated. A copy of the keystore file in the installation directory (opt/orangefs/etc/keystore).</description>
+    </item>
+    
+  </channel>
+</rss>

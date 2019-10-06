@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>OrangeFS Documentation</title>
+    
+      <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="generator" content="Hugo 0.42" />
+<title>FUSE Client :: OrangeFS Documentation</title>
+<link rel="shortcut icon" href="/images/favicon.png" type="image/x-icon" />
+<link href="/css/font-awesome.min.css" rel="stylesheet">
+<link href="/css/nucleus.css" rel="stylesheet">
+<link href="/theme-flex/style.css" rel="stylesheet">
+
+	<link href="/theme-flex/variant-blue.css" rel="stylesheet">
+
+<link rel="stylesheet" href="/css/bootstrap.min.css">
+<script src="/js/jquery-2.x.min.js"></script>
+<script type="text/javascript">
+      var baseurl = "\/";
+</script>
+<meta name="description" content="">
+
+
+
+    
+  </head>
+  <body data-url="/nix-clients/fuse-client/">
+    
+      <header>
+  <div class="logo">
+    
+	
+  
+    <a class="baselink" href="/">OrangeFS Documentation</a>
+  
+
+  </div>
+  <div class="burger"><a href="javascript:void(0);" style="font-size:15px;">&#9776;</a></div>
+</header>
+<article>
+  <aside>
+    <ul class="menu">
+    <li data-nav-id="/quickstart/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/quickstart/">Quickstart Guides</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/quickstart/quickstart-package/" class="dd-item">
+        <div>
+          <a href="/quickstart/quickstart-package/">
+            Quickstart Package Installation Guide
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/quickstart/quickstart-build/" class="dd-item">
+        <div>
+          <a href="/quickstart/quickstart-build/">
+            Quickstart Source Build Guide
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/build-configure/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/build-configure/">Build and Configure</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/build-configure/setup_security_build/" class="dd-item">
+        <div>
+          <a href="/build-configure/setup_security_build/">
+            Build Security Setup
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/build_orangefs/" class="dd-item">
+        <div>
+          <a href="/build-configure/build_orangefs/">
+            Build OrangeFS
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/configuring_ldap_for_identity_mapping/" class="dd-item">
+        <div>
+          <a href="/build-configure/configuring_ldap_for_identity_mapping/">
+            Configure LDAP
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/create_orangefs_configuration_file/" class="dd-item">
+        <div>
+          <a href="/build-configure/create_orangefs_configuration_file/">
+            OrangeFS Config File
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/results_of_build_and_configure/" class="dd-item">
+        <div>
+          <a href="/build-configure/results_of_build_and_configure/">
+            Results
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/add-servers/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/add-servers/">Add Server(s)</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/add-servers/copy_ofs_install_directory_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/copy_ofs_install_directory_servers/">
+            Copy OrangeFS Server Installation Directory
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/set_up_security_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/set_up_security_servers/">
+            Set up Server Security
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/server-startup/" class="dd-item">
+        <div>
+          <a href="/add-servers/server-startup/">
+            Server Startup
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/results_of_add_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/results_of_add_servers/">
+            Add Server(s) Results
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/nix-clients/" class="dd-item parent haschildren
+        ">
+      <div>
+      <a href="/nix-clients/">OrangeFS Clients</a>
+            <i class="fa fa-angle-down fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/nix-clients/pvfs2tab-file/" class="dd-item">
+        <div>
+          <a href="/nix-clients/pvfs2tab-file/">
+            pvfs2tab
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/linux-kernel-module/" class="dd-item">
+        <div>
+          <a href="/nix-clients/linux-kernel-module/">
+            Linux Kernel Module
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/direct-interface/" class="dd-item">
+        <div>
+          <a href="/nix-clients/direct-interface/">
+            Linux Direct Interface
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/romio-interface/" class="dd-item">
+        <div>
+          <a href="/nix-clients/romio-interface/">
+            Linux ROMIO MPI Interface
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/advanced-linux-client-security/" class="dd-item">
+        <div>
+          <a href="/nix-clients/advanced-linux-client-security/">
+            Linux Client Advanced Security Modes
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/fuse-client/" class="dd-item active">
+        <div>
+          <a href="/nix-clients/fuse-client/">
+            FUSE Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/hadoop_installation/" class="dd-item">
+        <div>
+          <a href="/nix-clients/hadoop_installation/">
+            Hadoop Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/windows-client/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/windows-client/">Windows Client</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/windows-client/preparing_for_installation_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/preparing_for_installation_windows/">
+            Preparing for Windows Installation
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/what_to_expect_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/what_to_expect_windows/">
+            What to Expect
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/running_the_installation_program_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/running_the_installation_program_windows/">
+            Installing the Software
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/manual_installation_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/manual_installation_windows/">
+            Manual Installation
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/uninstalling_the_client_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/uninstalling_the_client_windows/">
+            Uninstalling the Windows client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/winclient_use/" class="dd-item">
+        <div>
+          <a href="/windows-client/winclient_use/">
+            Using the Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/winclient_admin/" class="dd-item">
+        <div>
+          <a href="/windows-client/winclient_admin/">
+            Client Administration
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/configuration/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/configuration/">OrangeFS Configuration</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/configuration/admin_ofs_configuration_file/" class="dd-item">
+        <div>
+          <a href="/configuration/admin_ofs_configuration_file/">
+            OrangeFS Configuration File
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/configuration/orangefs_advanced_configuration/" class="dd-item">
+        <div>
+          <a href="/configuration/orangefs_advanced_configuration/">
+            Multiple File Systems
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/configuration/multiple_server_processes/" class="dd-item">
+        <div>
+          <a href="/configuration/multiple_server_processes/">
+            Multiple Server Processes
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+
+
+
+
+    </ul>
+    <section>
+    </section>
+  </aside>
+  <section class="page">
+    
+    <div class="nav-select">
+      <center>Navigation : 
+        <select onchange="javascript:location.href = this.value;">
+          
+    <option value="/quickstart/" >
+   Quickstart Guides</option>
+    <option value="/build-configure/" >
+   Build and Configure</option>
+    <option value="/add-servers/" >
+   Add Server(s)</option>
+    <option value="/nix-clients/" >
+   OrangeFS Clients</option> 
+      <option value="/nix-clients/pvfs2tab-file/" >- pvfs2tab</option>
+      <option value="/nix-clients/linux-kernel-module/" >- Linux Kernel Module</option>
+      <option value="/nix-clients/direct-interface/" >- Linux Direct Interface</option>
+      <option value="/nix-clients/romio-interface/" >- Linux ROMIO MPI Interface</option>
+      <option value="/nix-clients/advanced-linux-client-security/" >- Linux Client Advanced Security Modes</option>
+      <option value="/nix-clients/fuse-client/"  selected>- FUSE Client</option>
+      <option value="/nix-clients/hadoop_installation/" >- Hadoop Client</option>
+  
+    <option value="/windows-client/" >
+   Windows Client</option>
+    <option value="/configuration/" >
+   OrangeFS Configuration</option>
+
+
+
+        </select>
+      </center>
+    </div>
+      <div>
+        <div class="searchbox">
+          <input data-search-input id="search-by" type="text" placeholder="Search...">
+        </div>
+        <script type="text/javascript" src="/js/lunr.min.js"></script>
+        <script type="text/javascript" src="/js/auto-complete.js"></script>
+        <link href="/css/auto-complete.css" rel="stylesheet">
+        <script type="text/javascript">
+          
+              var baseurl = "\/";
+          
+        </script>
+        <script type="text/javascript" src="/js/search.js"></script>
+      </div>
+    
+
+    <h1>FUSE Client</h1>
+    
+    
+    
+    
+
+<p>Filesystem in Userspace (FUSE) is a loadable kernel module for UNIX-like
+computer operating systems that lets non-privileged users create their
+own file systems without editing kernel code. File system code is run in
+user space while the FUSE module provides only a bridge to the actual
+kernel interfaces.</p>
+
+<p>The OrangeFS client interface for FUSE enables access to an OrangeFS
+file system from a Mac.</p>
+
+<p>*Note* While FUSE can run on both Linux and Mac. Linux users will achieve better results with the up-stream Linux Kernel module and
+Direct Interface.</p>
+
+<p>Setting up a FUSE client involves four main steps on your Mac system:</p>
+
+<ul>
+<li><p><a href="#Install_FUSE">Install FUSE</a></p></li>
+
+<li><p><a href="#Install_OrangeFS">Install OrangeFS</a></p></li>
+
+<li><p><a href="#Mount_an_OrangeFS_Server">Mount an OrangeFS Server</a></p></li>
+
+<li><p><a href="FUSE_Client.md">Set up Security</a></p></li>
+</ul>
+
+<h2 id="install-fuse">Install FUSE</h2>
+
+<p>The recommended FUSE distribution for the Mac is Fuse4x.</p>
+
+<p>Fuse4x can be downloaded using Apple&rsquo;s port mechanism or from the Web at
+<a href="http://fuse4x.github.io/">http://fuse4x.github.io/</a>.</p>
+
+<p>To get fuse4x using the port command:</p>
+
+<p>port install fuse4x</p>
+
+<p><strong>Note     </strong> At the time of this Installation Guide’s initial release,
+Fuse4x had been recently tested on OrangeFS using the Darwin Kernel
+Version 11.4.2.</p>
+
+<p>Fuse4x documentation on its website will guide you through the
+installation process.</p>
+
+<h2 id="install-orangefs">Install OrangeFS</h2>
+
+<p>OrangeFS must be downloaded and built in the OS X environment on your
+Mac system.</p>
+
+<p><strong>Important  </strong>Copying the OrangeFS installation directory from your
+Linux Build system to a Mac system will not work. You must build it
+separately.</p>
+
+<h3 id="prerequisites">Prerequisites</h3>
+
+<p>Prior to installing OrangeFS, you must install gcc, flex, bison, make,
+and openssl-devel as described in <a href="Preview_System_Requirements.md">Additional Linux Software for the
+Build
+System</a>.</p>
+
+<h3 id="procedure">Procedure</h3>
+
+<p>To build OrangeFS on your Mac system, follow these steps:</p>
+
+<ol>
+<li>Go to <a href="http://www.orangefs.org/download/">www.orangefs.org</a>. If your
+OrangeFS filesystem is using the latest released version, select</li>
+</ol>
+
+<p>orangefs-<em>&lt;version&gt;</em></p>
+
+<p>where&hellip;</p>
+
+<p><em>&lt;version&gt;</em> = version number of the OrangeFS distribution release</p>
+
+<p>Example: orangefs-2.9. <br />
+ <br />
+ If your OrangeFS filesystem is using an older version, select the <a href="http://www.orangefs.org/downloads/old-releases/">New
+releases</a> in the
+Previous Releases section on the OrangeFS downloads page.  select your
+release then select the source link to find the tar ball.</p>
+
+<p><strong>Notes   </strong>The OrangeFS client and servers MUST be using the same
+version.<br />
+ <br />
+ For systems using releases older than 2.8.2-1, the tar balls can be
+found by selecting the <a href="ftp://ftp.parl.clemson.edu/pub/pvfs2/old">Previous
+releases</a> link; however, these
+releases have not been recently tested.  Use at your own discretion.<br />
+ <br />
+ If using Safari to download, the tar ball will be automatically
+unzipped, producing an orangefs-<em>&lt;version&gt;</em>.tar file.  In Firefox, you
+will download a zipped tar ball, orangefs-<em>&lt;version&gt;</em>.tar.gz.</p>
+
+<ol>
+<li>Change directory (cd) to</li>
+</ol>
+
+<p>/Users/<em>username</em>/Downloads,</p>
+
+<p>where&hellip;</p>
+
+<p><em>username</em> is the Mac username of the person creating this interface.</p>
+
+<p>Locate one of the following tar balls:</p>
+
+<p>orangefs-&lt;<em>version</em>&gt;.tar or orangefs-&lt;<em>version</em>&gt;.tar.gz</p>
+
+<p>and extract the OrangeFS source files using one of the following
+commands:</p>
+
+<p>Unzipped:</p>
+
+<p>tar -xf orangefs-&lt;<em>version</em>&gt;.tar</p>
+
+<p>Zipped:</p>
+
+<p>tar -xzf orangefs-&lt;<em>version</em>&gt;.tar.gz</p>
+
+<p>Then, change your working directory (cd)  to orangefs-&lt;<em>version</em>&gt;.</p>
+
+<p>-xzf orangefs-&lt;<em>version</em>&gt;.tar.gz<br />
+ cd orangefs-<em>&lt;version&gt;</em></p>
+
+<ol>
+<li>Build a Makefile for OrangeFS that includes the installation
+location and four other options as follows:</li>
+</ol>
+
+<p>./configure &ndash;prefix=/opt/orangefs &ndash;disable-server &ndash;disable-usrint
+&ndash;disable-opt &ndash;enable-fuse</p>
+
+<ol>
+<li>Continue with the standard Linux commands to build and run an
+executable program:</li>
+</ol>
+
+<p>make<br />
+ make install</p>
+
+<p>This will create the OrangeFS installation directory in /opt/orangefs.
+Within that directory, the binary you need to run FUSE, pvfs2fuse, will
+be located in the bin directory.</p>
+
+<h2 id="mount-an-orangefs-filesystem">Mount an OrangeFS Filesystem</h2>
+
+<p>Assuming you have network access to the OrangeFS filesystem, you must
+first create a mount point on your Mac.</p>
+
+<p><strong>Note     </strong>Confirm access to any of the servers using the ping
+command.</p>
+
+<p>To mount an OrangeFS Server:</p>
+
+<ol>
+<li>Create a directory as the mount point.  This directory can be
+anywhere on your Mac where you have create permissions:</li>
+</ol>
+
+<p>mkdir /mnt/orangefs</p>
+
+<ol>
+<li>The FUSE client requires an OrangeFS filesystem specification
+defined as</li>
+</ol>
+
+<p><em>URL</em>/&lt;<em>filesystem name&gt;</em></p>
+
+<p>where&hellip;</p>
+
+<p><em>URL</em>= any ONE of the OrangeFS servers that manages your filesystem,
+found with the filesystem name in the OrangeFS server conf file</p>
+
+<p>Example: orangefs-server.conf.</p>
+
+<p>The URL value for each server in the filesystem is listed in the
+&lt;Aliases&gt; section, while the filesystem name is listed in the
+&lt;Filesystem&gt; section.</p>
+
+<p>&lt;Aliases&gt;<br />
+     clemson1 tcp://server1:3334<br />
+     tiger1 tcp://server2:3334<br />
+ &lt;/Aliases&gt;<br />
+ <br />
+ &lt;Filesystem&gt;<br />
+   Name &lt;<em>filesystem name</em>&gt;<br />
+ &hellip;<br />
+ &lt;/Filesystem&gt;</p>
+
+<p>The filesystem spec in this case is one of two choices:</p>
+
+<p>tcp://server1:3334/&lt;<em>filesystem name</em>&gt;<br />
+ tcp://server2:3334/&lt;<em>filesystem name</em>&gt;</p>
+
+<ol>
+<li>Now you are ready to mount an OrangeFS filesystem, as follows:</li>
+</ol>
+
+<p>/opt/orangefs/bin/pvfs2fuse /mnt/orangefs -o
+fs_spec=tcp://server1:3334/&lt;<em>filesystem name</em>&gt;</p>
+
+<p><strong>Notes   </strong>In the above example, tcp://server1:3334 is the URL of only
+one of the OrangeFS servers managing the given filesystem, determined in
+Step 2; /mnt/orangefs is the mount point created in Step 1.<br />
+ <br />
+ If &lsquo;root&rsquo; issues the pvfs2fuse command, then all users of your Mac can
+access the filesystem.  However, if <em>&lt;username&gt;</em> issues the command,
+only <em>&lt;username&gt;</em> has access.</p>
+
+<p>Once the mount is successful, you can access your OrangeFS installation
+using common commands like ls and cp.  For example:</p>
+
+<p>ls /mnt/orangefs</p>
+
+<h2 id="set-up-security">Set up Security</h2>
+
+<h3 id="using-default-security">Using Default Security</h3>
+
+<p>By default, OrangeFS uses User and Group IDs to enforce file
+permissions.  Files created using your Mac will be stored with your Mac
+UID and primary GID, so only you have access to your files.  However, if
+you created files using one of the other OrangeFS clients, you might not
+have access to your files from the Mac, unless your Mac UID (or GID)
+happens to match the UID (or GID) in these other environments.</p>
+
+<p>To alleviate this problem, you or your Mac administrator can create User
+IDs having the same UIDs and GIDs that match across platforms.  We
+suggest that you do NOT change an existing user&rsquo;s UID or primary GID.
+Instead, we recommend you create a new ID having the appropriate UID/GID
+values.  </p>
+
+<p>Below is an example (Darwin Kernel Version 11.4.2) that creates a Mac
+user called &ldquo;orangefs&rdquo;, with a specific UID and GID from the command
+line:</p>
+
+<p>\$ sudo dscl . create /Users/orangefs uid 500<br />
+ \$ sudo dscl . create /Users/orangefs gid 5005<br />
+ \$ sudo dscl . create /Users/orangefs shell /bin/bash<br />
+ \$ sudo dscl . create /Users/orangefs home /Users/orangefs<br />
+ \$ sudo dscl . create /Users/orangefs realname &ldquo;orangefs&rdquo;<br />
+ \$ sudo dscl . create /Groups/orangefs gid 5005<br />
+ \$ sudo dscl . create /Groups/orangefs passwd \*</p>
+
+<p>To create an &ldquo;orangefs&rdquo; group and set its GID to 5005:</p>
+
+<p>\$ sudo dscl . create /Groups/orangefs gid 5005<br />
+ \$ sudo dscl . create /Groups/orangefs passwd &lsquo;*&lsquo;</p>
+
+<p>To add a user to this group:</p>
+
+<p>\$ sudo dscl . merge /Groups/orangefs users &lt;<em>username</em>&gt;</p>
+
+<h3 id="using-key-security">Using Key Security</h3>
+
+<p>If your OrangeFS file system is using key security, then the OrangeFS
+FUSE client must be built with key security enabled.  Add
+&ndash;enable-security-key to the &ldquo;configure&rdquo; command:</p>
+
+<p>./configure &ndash;prefix=/opt/orangefs &ndash;disable-server &ndash;disable-usrint
+&ndash;disable-opt &ndash;enable-fuse &ndash;enable-security-key</p>
+
+<p>Your OrangeFS system administrator will typically create a
+public/private key pair for your Mac and will give you the private key
+to store on your machine.  By storing the private key as</p>
+
+<p>&lt;prefix&gt;/etc/pvfs2-clientkey.pem</p>
+
+<p>or, as in the above configure command,</p>
+
+<p>/opt/orangefs/etc/pvfs2-clientkey.pem</p>
+
+<p>pvfs2fuse will automatically find and use this key.  If you store the
+key with a different name or in a different location, you must first
+define the PVFS2KEY_FILE environment variable before issuing the
+pvfs2fuse command:</p>
+
+<p>\$ export PVFS2KEY_FILE=&lt;path-to-key&gt;/&lt;<em>key filename</em>&gt;</p>
+
+<p>Your OrangeFS system administrator must create the public/private key
+pair using the hostname of your Mac.  To determine the hostname, first
+ensure that you can ping at least one of the OrangeFS server machines.
+  Then, issue the hostname command to get the value needed by the system
+administrator to create the correct public/private key pair.</p>
+
+<p><strong>Notes   </strong>The system administrator must add the public key to the
+OrangeFS keystore, copy the keystore to each server machine, then
+restart the servers before you will have access to the file system.  See
+<a href="Setting_Up_Key-Based_Security_Mode.md">Setting up Key-Based Security
+Mode</a> for more information.<br />
+ <br />
+ If your Mac has a non-static IP address in your environment, you will
+have to regenerate a new public/private key pair each time the address
+changes.<br />
+ <br />
+ The default security using UID and GID for file permissions is used in
+addition to the public/private key pair.  See <a href="FUSE_Client.md">Using Default
+Security</a> above.</p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+
+    
+    
+        <div class="chevrons">
+    <div id="navigation">
+<a class="nav nav-prev" href="/nix-clients/advanced-linux-client-security/" title="Linux Client Advanced Security Modes"> <i class="fa fa-chevron-left"></i><label>Linux Client Advanced Security Modes</label></a>
+    <a class="nav nav-next" href="/nix-clients/hadoop_installation/" title="Hadoop Client" style="margin-right: 0px;"><label>Hadoop Client</label><i class="fa fa-chevron-right"></i></a></div>
+  </div>
+
+  </section>
+</article>
+
+<footer>
+
+<div class="footline">
+    
+
+    
+
+  
+
+
+	<div>
+
+
+  
+    <div id="image-table">
+    <table>
+        <tr>
+              <td style="padding:1px">
+              <a href="http://orangefs.com"> <img src="/OrangeFS_logo.gif" alt="OrangeFS" style="width:200px"></a>
+            </td>
+        </tr>
+    </table>
+</div>
+
+  
+
+
+
+	</div>
+</footer>
+
+<script src="/js/clipboard.min.js"></script>
+
+<link href="/css/featherlight.min.css" rel="stylesheet">
+<script src="/js/featherlight.min.js"></script>
+
+
+<script src="/js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+
+<script src="/theme-flex/script.js"></script>
+
+    
+
+    
+    
+
+    
+  </body>
+</html>

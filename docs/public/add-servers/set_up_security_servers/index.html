@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>OrangeFS Documentation</title>
+    
+      <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="generator" content="Hugo 0.42" />
+<title>Set up Server Security :: OrangeFS Documentation</title>
+<link rel="shortcut icon" href="/images/favicon.png" type="image/x-icon" />
+<link href="/css/font-awesome.min.css" rel="stylesheet">
+<link href="/css/nucleus.css" rel="stylesheet">
+<link href="/theme-flex/style.css" rel="stylesheet">
+
+	<link href="/theme-flex/variant-blue.css" rel="stylesheet">
+
+<link rel="stylesheet" href="/css/bootstrap.min.css">
+<script src="/js/jquery-2.x.min.js"></script>
+<script type="text/javascript">
+      var baseurl = "\/";
+</script>
+<meta name="description" content="">
+
+
+
+    
+  </head>
+  <body data-url="/add-servers/set_up_security_servers/">
+    
+      <header>
+  <div class="logo">
+    
+	
+  
+    <a class="baselink" href="/">OrangeFS Documentation</a>
+  
+
+  </div>
+  <div class="burger"><a href="javascript:void(0);" style="font-size:15px;">&#9776;</a></div>
+</header>
+<article>
+  <aside>
+    <ul class="menu">
+    <li data-nav-id="/quickstart/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/quickstart/">Quickstart Guides</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/quickstart/quickstart-package/" class="dd-item">
+        <div>
+          <a href="/quickstart/quickstart-package/">
+            Quickstart Package Installation Guide
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/quickstart/quickstart-build/" class="dd-item">
+        <div>
+          <a href="/quickstart/quickstart-build/">
+            Quickstart Source Build Guide
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/build-configure/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/build-configure/">Build and Configure</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/build-configure/setup_security_build/" class="dd-item">
+        <div>
+          <a href="/build-configure/setup_security_build/">
+            Build Security Setup
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/build_orangefs/" class="dd-item">
+        <div>
+          <a href="/build-configure/build_orangefs/">
+            Build OrangeFS
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/configuring_ldap_for_identity_mapping/" class="dd-item">
+        <div>
+          <a href="/build-configure/configuring_ldap_for_identity_mapping/">
+            Configure LDAP
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/create_orangefs_configuration_file/" class="dd-item">
+        <div>
+          <a href="/build-configure/create_orangefs_configuration_file/">
+            OrangeFS Config File
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/results_of_build_and_configure/" class="dd-item">
+        <div>
+          <a href="/build-configure/results_of_build_and_configure/">
+            Results
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/add-servers/" class="dd-item parent haschildren
+        ">
+      <div>
+      <a href="/add-servers/">Add Server(s)</a>
+            <i class="fa fa-angle-down fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/add-servers/copy_ofs_install_directory_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/copy_ofs_install_directory_servers/">
+            Copy OrangeFS Server Installation Directory
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/set_up_security_servers/" class="dd-item active">
+        <div>
+          <a href="/add-servers/set_up_security_servers/">
+            Set up Server Security
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/server-startup/" class="dd-item">
+        <div>
+          <a href="/add-servers/server-startup/">
+            Server Startup
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/results_of_add_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/results_of_add_servers/">
+            Add Server(s) Results
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/nix-clients/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/nix-clients/">OrangeFS Clients</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/nix-clients/pvfs2tab-file/" class="dd-item">
+        <div>
+          <a href="/nix-clients/pvfs2tab-file/">
+            pvfs2tab
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/linux-kernel-module/" class="dd-item">
+        <div>
+          <a href="/nix-clients/linux-kernel-module/">
+            Linux Kernel Module
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/direct-interface/" class="dd-item">
+        <div>
+          <a href="/nix-clients/direct-interface/">
+            Linux Direct Interface
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/romio-interface/" class="dd-item">
+        <div>
+          <a href="/nix-clients/romio-interface/">
+            Linux ROMIO MPI Interface
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/advanced-linux-client-security/" class="dd-item">
+        <div>
+          <a href="/nix-clients/advanced-linux-client-security/">
+            Linux Client Advanced Security Modes
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/fuse-client/" class="dd-item">
+        <div>
+          <a href="/nix-clients/fuse-client/">
+            FUSE Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/hadoop_installation/" class="dd-item">
+        <div>
+          <a href="/nix-clients/hadoop_installation/">
+            Hadoop Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/windows-client/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/windows-client/">Windows Client</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/windows-client/preparing_for_installation_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/preparing_for_installation_windows/">
+            Preparing for Windows Installation
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/what_to_expect_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/what_to_expect_windows/">
+            What to Expect
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/running_the_installation_program_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/running_the_installation_program_windows/">
+            Installing the Software
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/manual_installation_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/manual_installation_windows/">
+            Manual Installation
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/uninstalling_the_client_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/uninstalling_the_client_windows/">
+            Uninstalling the Windows client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/winclient_use/" class="dd-item">
+        <div>
+          <a href="/windows-client/winclient_use/">
+            Using the Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/winclient_admin/" class="dd-item">
+        <div>
+          <a href="/windows-client/winclient_admin/">
+            Client Administration
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/configuration/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/configuration/">OrangeFS Configuration</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/configuration/admin_ofs_configuration_file/" class="dd-item">
+        <div>
+          <a href="/configuration/admin_ofs_configuration_file/">
+            OrangeFS Configuration File
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/configuration/orangefs_advanced_configuration/" class="dd-item">
+        <div>
+          <a href="/configuration/orangefs_advanced_configuration/">
+            Multiple File Systems
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/configuration/multiple_server_processes/" class="dd-item">
+        <div>
+          <a href="/configuration/multiple_server_processes/">
+            Multiple Server Processes
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+
+
+
+
+    </ul>
+    <section>
+    </section>
+  </aside>
+  <section class="page">
+    
+    <div class="nav-select">
+      <center>Navigation : 
+        <select onchange="javascript:location.href = this.value;">
+          
+    <option value="/quickstart/" >
+   Quickstart Guides</option>
+    <option value="/build-configure/" >
+   Build and Configure</option>
+    <option value="/add-servers/" >
+   Add Server(s)</option> 
+      <option value="/add-servers/copy_ofs_install_directory_servers/" >- Copy OrangeFS Server Installation Directory</option>
+      <option value="/add-servers/set_up_security_servers/"  selected>- Set up Server Security</option>
+      <option value="/add-servers/server-startup/" >- Server Startup</option>
+      <option value="/add-servers/results_of_add_servers/" >- Add Server(s) Results</option>
+  
+    <option value="/nix-clients/" >
+   OrangeFS Clients</option>
+    <option value="/windows-client/" >
+   Windows Client</option>
+    <option value="/configuration/" >
+   OrangeFS Configuration</option>
+
+
+
+        </select>
+      </center>
+    </div>
+      <div>
+        <div class="searchbox">
+          <input data-search-input id="search-by" type="text" placeholder="Search...">
+        </div>
+        <script type="text/javascript" src="/js/lunr.min.js"></script>
+        <script type="text/javascript" src="/js/auto-complete.js"></script>
+        <link href="/css/auto-complete.css" rel="stylesheet">
+        <script type="text/javascript">
+          
+              var baseurl = "\/";
+          
+        </script>
+        <script type="text/javascript" src="/js/search.js"></script>
+      </div>
+    
+
+    <h1>Set up Server Security</h1>
+    
+    
+    
+    
+
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>
+<figure>
+    
+        <img src="../images/icon_security.png" alt="Security Icon" width="50" />
+    
+    
+</figure>
+</td>
+<td>To use key-based security mode, you must copy the private keys you generated on the Build system to each of your Server systems. In future versions of OrangeFS, security will be simplified.</td>
+</tr>
+</tbody>
+</table>
+
+<p>*Note*     Neither the default nor certificate-based modes of security
+require any additional setup on Server systems. For these modes, see the
+next topic, <a href="/add-servers/server-startup/">Server Startup</a></p>
+
+<h2 id="procedure">Procedure</h2>
+
+<h3 id="copying-keys-manually">Copying Keys Manually</h3>
+
+<p>To add a private key to an individual Server, copy the private key file
+from /opt/ofs_keys on the Build system to the Server system:</p>
+
+<p>scp –r /opt/ofs_keys/orangefs-serverkey-hostname.pem
+hostname:/opt/orangefs/etc/orangefs-serverkey.pem</p>
+
+<p>where&hellip;</p>
+
+<p><em>hostname</em> = host name of the Server system</p>
+
+<p><strong>Note     </strong>The above command line format assumes you generated your
+keys according to instructions in <a href="Setup_Security_(Build).htm">Set Up
+Security</a> under the <a href="Build_and_Configure.htm">Build and
+Configure</a> step.</p>
+
+<h3 id="copying-keys-to-many-systems">Copying Keys to Many Systems</h3>
+
+<p>You can use a script file (provided with OrangeFS) to copy all of your
+private keys with one command <strong>if both the following statements are
+true</strong>:</p>
+
+<ol>
+<li><p>You have already copied the OrangeFS installation directory to all
+of your designated servers and any additional Linux systems on which
+you plan to use an OrangeFS client interface.</p></li>
+
+<li><p>You generated your security keys during the <a href="Build_and_Configure.htm">Build and
+Configure</a> step, using the script provided
+with OrangeFS (pvfs2-gen-keys.sh).</p></li>
+</ol>
+
+<p><strong>Note     </strong>For more information about client interfaces, see <a href="Installing_Other_Clients.htm">Add
+Clients</a>.</p>
+
+<p> </p>
+
+<p>If both the above statements are true, you can add private keys to all
+your Linux-based OrangeFS systems as follows:</p>
+
+<ol>
+<li>Change Directory (cd) to the /opt/ofs_keys directory on the Build
+system:</li>
+</ol>
+
+<p>cd /opt/ofs_keys</p>
+
+<p> </p>
+
+<ol>
+<li>If you followed the security setup instructions under the earlier
+Build and Configure step, the script file should be in the current
+directory and you can skip this step. Otherwise, copy the script
+from the OrangeFS source directory as follows:</li>
+</ol>
+
+<p>cp /tmp/src/orangefs-version/examples/keys/pvfs2-dist-keys.sh</p>
+
+<p> </p>
+
+<ol>
+<li>With the script named pvfs2-dist-keys.sh, use the following command
+format to copy private keys to all OrangeFS Linux systems:</li>
+</ol>
+
+<p>./pvfs2-dist-keys.sh <em>orangefs_install</em></p>
+
+<p>where&hellip;</p>
+
+<p><em>orangefs_install</em> = the location of the OrangeFS installation
+directory</p>
+
+<p><em>Example:</em>  /opt/orangefs</p>
+
+<p> </p>
+
+<p>Example of full command:</p>
+
+<p>./pvfs2-dist-keys.sh /opt/orangefs</p>
+
+<p>If the above example is used, the script examines the key filenames to
+determine the hostname for each target server or client, then
+secure-copies (scp) each key accordingly to the /opt/orangefs/etc
+directory of the relevant system.  </p>
+
+<p><strong>Note     </strong>The script assumes that the specified OrangeFS installation
+directory already exists on all of the targeted systems. The above
+example uses the default location for the instructions in this
+<em>Installation Guide</em>.</p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+
+    
+    
+        <div class="chevrons">
+    <div id="navigation">
+<a class="nav nav-prev" href="/add-servers/copy_ofs_install_directory_servers/" title="Copy OrangeFS Server Installation Directory"> <i class="fa fa-chevron-left"></i><label>Copy OrangeFS Server Installation Directory</label></a>
+    <a class="nav nav-next" href="/add-servers/server-startup/" title="Server Startup" style="margin-right: 0px;"><label>Server Startup</label><i class="fa fa-chevron-right"></i></a></div>
+  </div>
+
+  </section>
+</article>
+
+<footer>
+
+<div class="footline">
+    
+
+    
+
+  
+
+
+	<div>
+
+
+  
+    <div id="image-table">
+    <table>
+        <tr>
+              <td style="padding:1px">
+              <a href="http://orangefs.com"> <img src="/OrangeFS_logo.gif" alt="OrangeFS" style="width:200px"></a>
+            </td>
+        </tr>
+    </table>
+</div>
+
+  
+
+
+
+	</div>
+</footer>
+
+<script src="/js/clipboard.min.js"></script>
+
+<link href="/css/featherlight.min.css" rel="stylesheet">
+<script src="/js/featherlight.min.js"></script>
+
+
+<script src="/js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+
+<script src="/theme-flex/script.js"></script>
+
+    
+
+    
+    
+
+    
+  </body>
+</html>

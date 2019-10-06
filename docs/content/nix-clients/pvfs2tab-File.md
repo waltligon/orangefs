@@ -3,7 +3,9 @@ title= "pvfs2tab"
 weight=310
 +++
 
-  ![](icon_mount.png)   Each client must know where to access OrangeFS resources. The pvfs2tab file, similar to the /etc/fstab file in Linux, provides clients with this access information. It involves creating a file at a designated path, which will function as the gateway to your OrangeFS installation.
+  {{<figure src="../images/icon_mount.png" width="50" alt="mount">}}
+
+Each client must know where to access OrangeFS resources. The pvfs2tab file, similar to the /etc/fstab file in Linux, provides clients with this access information. It involves creating a file at a designated path, which will function as the gateway to your OrangeFS installation.
 
 
 1.  Determine the URL of the OrangeFS server you will access.

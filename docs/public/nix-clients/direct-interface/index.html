@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>OrangeFS Documentation</title>
+    
+      <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="generator" content="Hugo 0.42" />
+<title>Linux Direct Interface :: OrangeFS Documentation</title>
+<link rel="shortcut icon" href="/images/favicon.png" type="image/x-icon" />
+<link href="/css/font-awesome.min.css" rel="stylesheet">
+<link href="/css/nucleus.css" rel="stylesheet">
+<link href="/theme-flex/style.css" rel="stylesheet">
+
+	<link href="/theme-flex/variant-blue.css" rel="stylesheet">
+
+<link rel="stylesheet" href="/css/bootstrap.min.css">
+<script src="/js/jquery-2.x.min.js"></script>
+<script type="text/javascript">
+      var baseurl = "\/";
+</script>
+<meta name="description" content="">
+
+
+
+    
+  </head>
+  <body data-url="/nix-clients/direct-interface/">
+    
+      <header>
+  <div class="logo">
+    
+	
+  
+    <a class="baselink" href="/">OrangeFS Documentation</a>
+  
+
+  </div>
+  <div class="burger"><a href="javascript:void(0);" style="font-size:15px;">&#9776;</a></div>
+</header>
+<article>
+  <aside>
+    <ul class="menu">
+    <li data-nav-id="/quickstart/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/quickstart/">Quickstart Guides</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/quickstart/quickstart-package/" class="dd-item">
+        <div>
+          <a href="/quickstart/quickstart-package/">
+            Quickstart Package Installation Guide
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/quickstart/quickstart-build/" class="dd-item">
+        <div>
+          <a href="/quickstart/quickstart-build/">
+            Quickstart Source Build Guide
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/build-configure/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/build-configure/">Build and Configure</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/build-configure/setup_security_build/" class="dd-item">
+        <div>
+          <a href="/build-configure/setup_security_build/">
+            Build Security Setup
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/build_orangefs/" class="dd-item">
+        <div>
+          <a href="/build-configure/build_orangefs/">
+            Build OrangeFS
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/configuring_ldap_for_identity_mapping/" class="dd-item">
+        <div>
+          <a href="/build-configure/configuring_ldap_for_identity_mapping/">
+            Configure LDAP
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/create_orangefs_configuration_file/" class="dd-item">
+        <div>
+          <a href="/build-configure/create_orangefs_configuration_file/">
+            OrangeFS Config File
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/results_of_build_and_configure/" class="dd-item">
+        <div>
+          <a href="/build-configure/results_of_build_and_configure/">
+            Results
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/add-servers/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/add-servers/">Add Server(s)</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/add-servers/copy_ofs_install_directory_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/copy_ofs_install_directory_servers/">
+            Copy OrangeFS Server Installation Directory
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/set_up_security_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/set_up_security_servers/">
+            Set up Server Security
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/server-startup/" class="dd-item">
+        <div>
+          <a href="/add-servers/server-startup/">
+            Server Startup
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/results_of_add_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/results_of_add_servers/">
+            Add Server(s) Results
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/nix-clients/" class="dd-item parent haschildren
+        ">
+      <div>
+      <a href="/nix-clients/">OrangeFS Clients</a>
+            <i class="fa fa-angle-down fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/nix-clients/pvfs2tab-file/" class="dd-item">
+        <div>
+          <a href="/nix-clients/pvfs2tab-file/">
+            pvfs2tab
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/linux-kernel-module/" class="dd-item">
+        <div>
+          <a href="/nix-clients/linux-kernel-module/">
+            Linux Kernel Module
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/direct-interface/" class="dd-item active">
+        <div>
+          <a href="/nix-clients/direct-interface/">
+            Linux Direct Interface
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/romio-interface/" class="dd-item">
+        <div>
+          <a href="/nix-clients/romio-interface/">
+            Linux ROMIO MPI Interface
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/advanced-linux-client-security/" class="dd-item">
+        <div>
+          <a href="/nix-clients/advanced-linux-client-security/">
+            Linux Client Advanced Security Modes
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/fuse-client/" class="dd-item">
+        <div>
+          <a href="/nix-clients/fuse-client/">
+            FUSE Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/hadoop_installation/" class="dd-item">
+        <div>
+          <a href="/nix-clients/hadoop_installation/">
+            Hadoop Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/windows-client/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/windows-client/">Windows Client</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/windows-client/preparing_for_installation_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/preparing_for_installation_windows/">
+            Preparing for Windows Installation
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/what_to_expect_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/what_to_expect_windows/">
+            What to Expect
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/running_the_installation_program_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/running_the_installation_program_windows/">
+            Installing the Software
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/manual_installation_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/manual_installation_windows/">
+            Manual Installation
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/uninstalling_the_client_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/uninstalling_the_client_windows/">
+            Uninstalling the Windows client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/winclient_use/" class="dd-item">
+        <div>
+          <a href="/windows-client/winclient_use/">
+            Using the Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/winclient_admin/" class="dd-item">
+        <div>
+          <a href="/windows-client/winclient_admin/">
+            Client Administration
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/configuration/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/configuration/">OrangeFS Configuration</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/configuration/admin_ofs_configuration_file/" class="dd-item">
+        <div>
+          <a href="/configuration/admin_ofs_configuration_file/">
+            OrangeFS Configuration File
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/configuration/orangefs_advanced_configuration/" class="dd-item">
+        <div>
+          <a href="/configuration/orangefs_advanced_configuration/">
+            Multiple File Systems
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/configuration/multiple_server_processes/" class="dd-item">
+        <div>
+          <a href="/configuration/multiple_server_processes/">
+            Multiple Server Processes
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+
+
+
+
+    </ul>
+    <section>
+    </section>
+  </aside>
+  <section class="page">
+    
+    <div class="nav-select">
+      <center>Navigation : 
+        <select onchange="javascript:location.href = this.value;">
+          
+    <option value="/quickstart/" >
+   Quickstart Guides</option>
+    <option value="/build-configure/" >
+   Build and Configure</option>
+    <option value="/add-servers/" >
+   Add Server(s)</option>
+    <option value="/nix-clients/" >
+   OrangeFS Clients</option> 
+      <option value="/nix-clients/pvfs2tab-file/" >- pvfs2tab</option>
+      <option value="/nix-clients/linux-kernel-module/" >- Linux Kernel Module</option>
+      <option value="/nix-clients/direct-interface/"  selected>- Linux Direct Interface</option>
+      <option value="/nix-clients/romio-interface/" >- Linux ROMIO MPI Interface</option>
+      <option value="/nix-clients/advanced-linux-client-security/" >- Linux Client Advanced Security Modes</option>
+      <option value="/nix-clients/fuse-client/" >- FUSE Client</option>
+      <option value="/nix-clients/hadoop_installation/" >- Hadoop Client</option>
+  
+    <option value="/windows-client/" >
+   Windows Client</option>
+    <option value="/configuration/" >
+   OrangeFS Configuration</option>
+
+
+
+        </select>
+      </center>
+    </div>
+      <div>
+        <div class="searchbox">
+          <input data-search-input id="search-by" type="text" placeholder="Search...">
+        </div>
+        <script type="text/javascript" src="/js/lunr.min.js"></script>
+        <script type="text/javascript" src="/js/auto-complete.js"></script>
+        <link href="/css/auto-complete.css" rel="stylesheet">
+        <script type="text/javascript">
+          
+              var baseurl = "\/";
+          
+        </script>
+        <script type="text/javascript" src="/js/search.js"></script>
+      </div>
+    
+
+    <h1>Linux Direct Interface</h1>
+    
+    
+    
+    
+
+<p>The Direct Interface allows you to access OrangeFS in a cluster similar
+to Linux (POSIX-based); however, the Direct Interface (also known by
+usrint, the system folder in which it is stored) bypasses the Linux
+Kernel for a more direct and better performing path to OrangeFS. It
+provides high performance access for programs that are not written for
+MPI.</p>
+
+<p><strong>Important  </strong>The OrangeFS Direct Interface using Global Configuration
+will work only on systems configured with shared C libraries.</p>
+
+<p>The Direct Interface is included with the OrangeFS standard
+installation, accessed  by copying appropriate files to a client
+location and activating it with configuration statements.</p>
+
+<p>This topic is organized into two sections:</p>
+
+<ul>
+<li><a href="#Understanding_The_Interface_Levels">Understanding_the_Interface_Levels</a></li>
+<li><a href="#Configuring_The_Direct_Interface">Configuring_the_Direct_Interface</a></li>
+</ul>
+
+<p><strong>Note     </strong>To learn about System Calls for the Direct Interface, see
+<a href="System_Calls.htm">System Calls</a> in the Administration Guide.</p>
+
+<h2 id="understanding-the-interface-levels">Understanding the Interface Levels</h2>
+
+<p>The Direct Interface offers three levels of access, so you must
+configure your access based on the level that works best for your needs.
+The following illustration shows the three interface levels.</p>
+
+<p><img src="ofs_usrint_parts.png" alt="" /></p>
+
+<p>Descriptions of the three levels:</p>
+
+<hr />
+
+<p>Level   Library               Description</p>
+
+<p>1       System Call Library   The first and lowest level is an API with OrangeFS-specific functions that can be substituted for each of the basic POSIX defined I/O related system calls. Essentially, each POSIX system call is replicated in the API. What makes this API different is that each function ONLY works with files in the OrangeFS file systems.</p>
+
+<p>2       POSIX Library         The next layer is a POSIX system call interposition library. Each of the same POSIX system calls represented in the lower layer are provided in this API, this time with the same interface syntax as Linux POSIX. Rather than calling the Linux kernel directly, each call is checked to see if it refers to an OrangeFS file, and if so the call is made to the corresponding function in the lower level API. Thus a call to open() will call pvfs_open() if the path refers to an OrangeFS file; otherwise it will call the Linux open system call. This API is more convenient, though slightly less efficient, than the lower level one.</p>
+
+<p>3       C Library             Finally, many programmers prefer to use the C library interface rather than the system call interface to file I/O, in part because it provides I/O buffering and a richer set of interface options. Any C calls are implemented using the POSIX calls, and so their implementation can, in theory, be linked from the C library, and use the OrangeFS POSIX interposition API.</p>
+
+<pre><code>                            Virtually all modern Linux systems use shared libraries for the C library. Shared libraries tend to link all of the various functions at various levels into a single shared object that is loaded dynamically. Thus, if you call fopen() using the standard shared C library, there is no means to get that function to call the OrangeFS pvfs\_open() function. For this reason, OrangeFS provides its own implementation of these functions in an OrangeFS C Library interposition API. These functions are identical to those in the standard C library implementation, except that they call the OrangeFS functions, and, in some cases, can be optimized for specific OrangeFS features.
+</code></pre>
+
+<hr />
+
+<p> </p>
+
+<h2 id="configuring-the-direct-interface">Configuring the Direct Interface</h2>
+
+<p>This section explains two methods for configuring the Direct Interface.</p>
+
+<hr />
+
+<p><a href="#Program_Configuration">Program_Configuration</a>   Use this method to specify an individual program to run through the OrangeFS Direct Interface.
+  <a href="#Global_Configuration">Global_Configuration</a>     Use this method to specify that all programs will run through the OrangeFS Direct Interface.</p>
+
+<hr />
+
+<p> </p>
+
+<h3 id="program-configuration">Program Configuration</h3>
+
+<p>Programs, and higher level libraries, written to any of the three
+library levels included in the Direct Interface should link to the
+appropriate OrangeFS replacement library (liborangefsposix or
+liborangefs) to directly access the OrangeFS file system. The command
+for this configuration also determines whether to use a shared or static
+version of the library.</p>
+
+<p>To link a program with the replacement library, include the following
+command when compiling the program:</p>
+
+<p>gcc -o <em>program</em> <em>program_source</em> -L<em>orangefs_lib_path</em> -<em>rep_lib</em></p>
+
+<p>where&hellip;</p>
+
+<p><em>program</em> = the name of your program, including the path</p>
+
+<p><em>program_source</em> = the name of your program source code, including the
+path</p>
+
+<p><em>orangefs_lib_path</em> = path to lib directory in the OrangeFS
+installation directory</p>
+
+<p><em>rep_lib</em> = one of the following options:</p>
+
+<hr />
+
+<p>If your program is written to:   Enter this option:   To use this replacement library:
+  C Library or POSIX Library       -lorangefsposix      liborangefsposix
+  OrangeFS System Call Library     -lorangefs           liborangefs</p>
+
+<hr />
+
+<p>Example command line:</p>
+
+<p>gcc -o /programs/foo /programs/foo.c -L/opt/orangefs/lib -lorangefsposix</p>
+
+<p> </p>
+
+<h3 id="global-configuration">Global Configuration</h3>
+
+<p>Programs not specifically recompiled to use OrangeFS can still be
+redirected to do so by preloading the shared version of the appropriate
+OrangeFS replacement library (libofs and/or libpvfs2). You must
+configure the source to build the shared library before compiling
+OrangeFS.</p>
+
+<p>Assuming the shared libraries are installed, set the following
+environment variables:</p>
+
+<p>export OFS_LIB_PATH=<em>orangefs_lib_path</em><br />
+ export LD_LIBRARY_PATH=\$OFS_LIB_PATH:\$LD_LIBRARY_PATH<br />
+ export LD_PRELOAD=\$OFS_LIB_PATH/<em>rep_shared_library</em></p>
+
+<p>where&hellip;</p>
+
+<p><em>orangefs_lib_path</em> = path to lib directory (in the OrangeFS
+installation directory)</p>
+
+<p>Example: /opt/orangefs/lib</p>
+
+<p><em>rep_shared_lib</em> = one of the following replacement library files:</p>
+
+<hr />
+
+<p>To redirect programs written to:   Use these replacement library files:
+  C Library or POSIX Library         libofs.so and libpvfs2.so
+  OrangeFS System Call Library       libpvfs2.so</p>
+
+<hr />
+
+<p>Example: LD_PRELOAD=\$OFS_LIB_PATH/libpvfs2.so</p>
+
+<p> </p>
+
+<p><strong>Notes   </strong>The global configuration method does not work if you use the
+static version of libc.<br />
+ <br />
+ Ensure that your system&rsquo;s /etc/ld.so.preload includes libdl, libssl,
+libcrypto and libpthreads preloaded through /etc/ld.so.preload. Most
+Linux systems will already include this.<br />
+ <br />
+ If this configuration method is used in the shell, every program
+(including such commands as ls, vi and cp) will redirect through the
+OrangeFS libraries. You can set these variables in a script to affect
+only the desired commands.<br />
+ <br />
+ If all users on a system want the shared libraries preloaded, the
+system administrator can edit the file /etc/ld.so.preload and list the
+libraries there.</p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+
+    
+    
+        <div class="chevrons">
+    <div id="navigation">
+<a class="nav nav-prev" href="/nix-clients/linux-kernel-module/" title="Linux Kernel Module"> <i class="fa fa-chevron-left"></i><label>Linux Kernel Module</label></a>
+    <a class="nav nav-next" href="/nix-clients/romio-interface/" title="Linux ROMIO MPI Interface" style="margin-right: 0px;"><label>Linux ROMIO MPI Interface</label><i class="fa fa-chevron-right"></i></a></div>
+  </div>
+
+  </section>
+</article>
+
+<footer>
+
+<div class="footline">
+    
+
+    
+
+  
+
+
+	<div>
+
+
+  
+    <div id="image-table">
+    <table>
+        <tr>
+              <td style="padding:1px">
+              <a href="http://orangefs.com"> <img src="/OrangeFS_logo.gif" alt="OrangeFS" style="width:200px"></a>
+            </td>
+        </tr>
+    </table>
+</div>
+
+  
+
+
+
+	</div>
+</footer>
+
+<script src="/js/clipboard.min.js"></script>
+
+<link href="/css/featherlight.min.css" rel="stylesheet">
+<script src="/js/featherlight.min.js"></script>
+
+
+<script src="/js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+
+<script src="/theme-flex/script.js"></script>
+
+    
+
+    
+    
+
+    
+  </body>
+</html>

@@ -14,7 +14,7 @@ This Client enables you to view files though Windows Explorer and the Command Pr
 
 The following topics guide you through the installation, operation and configuration of the Windows Client:
 
--   [Preparing for Installation](({{<relref "Preparing_for_Installation_(Windows)..md">}})
+-   [Preparing for Installation](({{<relref "Preparing_for_Installation_(Windows).md">}})
 -   [What to Expect](({{<relref "What_to_Expect_(Windows).md">}})
 -   [Running the Installer](({{<relref "Running_The_Installation_Program_(Windows).md">}})
 -   [Manual Installation](({{<relref "Manual_Installation_(Windows).md">}})

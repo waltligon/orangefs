@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>OrangeFS Documentation</title>
+    
+      <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="generator" content="Hugo 0.42" />
+<title>Using the Client :: OrangeFS Documentation</title>
+<link rel="shortcut icon" href="/images/favicon.png" type="image/x-icon" />
+<link href="/css/font-awesome.min.css" rel="stylesheet">
+<link href="/css/nucleus.css" rel="stylesheet">
+<link href="/theme-flex/style.css" rel="stylesheet">
+
+	<link href="/theme-flex/variant-blue.css" rel="stylesheet">
+
+<link rel="stylesheet" href="/css/bootstrap.min.css">
+<script src="/js/jquery-2.x.min.js"></script>
+<script type="text/javascript">
+      var baseurl = "\/";
+</script>
+<meta name="description" content="">
+
+
+
+    
+  </head>
+  <body data-url="/windows-client/winclient_use/">
+    
+      <header>
+  <div class="logo">
+    
+	
+  
+    <a class="baselink" href="/">OrangeFS Documentation</a>
+  
+
+  </div>
+  <div class="burger"><a href="javascript:void(0);" style="font-size:15px;">&#9776;</a></div>
+</header>
+<article>
+  <aside>
+    <ul class="menu">
+    <li data-nav-id="/quickstart/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/quickstart/">Quickstart Guides</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/quickstart/quickstart-package/" class="dd-item">
+        <div>
+          <a href="/quickstart/quickstart-package/">
+            Quickstart Package Installation Guide
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/quickstart/quickstart-build/" class="dd-item">
+        <div>
+          <a href="/quickstart/quickstart-build/">
+            Quickstart Source Build Guide
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/build-configure/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/build-configure/">Build and Configure</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/build-configure/setup_security_build/" class="dd-item">
+        <div>
+          <a href="/build-configure/setup_security_build/">
+            Build Security Setup
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/build_orangefs/" class="dd-item">
+        <div>
+          <a href="/build-configure/build_orangefs/">
+            Build OrangeFS
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/configuring_ldap_for_identity_mapping/" class="dd-item">
+        <div>
+          <a href="/build-configure/configuring_ldap_for_identity_mapping/">
+            Configure LDAP
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/create_orangefs_configuration_file/" class="dd-item">
+        <div>
+          <a href="/build-configure/create_orangefs_configuration_file/">
+            OrangeFS Config File
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/build-configure/results_of_build_and_configure/" class="dd-item">
+        <div>
+          <a href="/build-configure/results_of_build_and_configure/">
+            Results
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/add-servers/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/add-servers/">Add Server(s)</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/add-servers/copy_ofs_install_directory_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/copy_ofs_install_directory_servers/">
+            Copy OrangeFS Server Installation Directory
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/set_up_security_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/set_up_security_servers/">
+            Set up Server Security
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/server-startup/" class="dd-item">
+        <div>
+          <a href="/add-servers/server-startup/">
+            Server Startup
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/add-servers/results_of_add_servers/" class="dd-item">
+        <div>
+          <a href="/add-servers/results_of_add_servers/">
+            Add Server(s) Results
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/nix-clients/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/nix-clients/">OrangeFS Clients</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/nix-clients/pvfs2tab-file/" class="dd-item">
+        <div>
+          <a href="/nix-clients/pvfs2tab-file/">
+            pvfs2tab
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/linux-kernel-module/" class="dd-item">
+        <div>
+          <a href="/nix-clients/linux-kernel-module/">
+            Linux Kernel Module
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/direct-interface/" class="dd-item">
+        <div>
+          <a href="/nix-clients/direct-interface/">
+            Linux Direct Interface
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/romio-interface/" class="dd-item">
+        <div>
+          <a href="/nix-clients/romio-interface/">
+            Linux ROMIO MPI Interface
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/advanced-linux-client-security/" class="dd-item">
+        <div>
+          <a href="/nix-clients/advanced-linux-client-security/">
+            Linux Client Advanced Security Modes
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/fuse-client/" class="dd-item">
+        <div>
+          <a href="/nix-clients/fuse-client/">
+            FUSE Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/nix-clients/hadoop_installation/" class="dd-item">
+        <div>
+          <a href="/nix-clients/hadoop_installation/">
+            Hadoop Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/windows-client/" class="dd-item parent haschildren
+        ">
+      <div>
+      <a href="/windows-client/">Windows Client</a>
+            <i class="fa fa-angle-down fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/windows-client/preparing_for_installation_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/preparing_for_installation_windows/">
+            Preparing for Windows Installation
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/what_to_expect_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/what_to_expect_windows/">
+            What to Expect
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/running_the_installation_program_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/running_the_installation_program_windows/">
+            Installing the Software
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/manual_installation_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/manual_installation_windows/">
+            Manual Installation
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/uninstalling_the_client_windows/" class="dd-item">
+        <div>
+          <a href="/windows-client/uninstalling_the_client_windows/">
+            Uninstalling the Windows client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/winclient_use/" class="dd-item active">
+        <div>
+          <a href="/windows-client/winclient_use/">
+            Using the Client
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/windows-client/winclient_admin/" class="dd-item">
+        <div>
+          <a href="/windows-client/winclient_admin/">
+            Client Administration
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/configuration/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="/configuration/">OrangeFS Configuration</a><i class="fa fa-angle-right fa-lg category-icon"></i><i class="fa fa-circle-thin read-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/configuration/admin_ofs_configuration_file/" class="dd-item">
+        <div>
+          <a href="/configuration/admin_ofs_configuration_file/">
+            OrangeFS Configuration File
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/configuration/orangefs_advanced_configuration/" class="dd-item">
+        <div>
+          <a href="/configuration/orangefs_advanced_configuration/">
+            Multiple File Systems
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+      <li data-nav-id="/configuration/multiple_server_processes/" class="dd-item">
+        <div>
+          <a href="/configuration/multiple_server_processes/">
+            Multiple Server Processes
+          </a><i class="fa fa-circle-thin read-icon"></i>
+        </div>
+    </li>
+        </ul>
+    </li>
+
+
+
+
+    </ul>
+    <section>
+    </section>
+  </aside>
+  <section class="page">
+    
+    <div class="nav-select">
+      <center>Navigation : 
+        <select onchange="javascript:location.href = this.value;">
+          
+    <option value="/quickstart/" >
+   Quickstart Guides</option>
+    <option value="/build-configure/" >
+   Build and Configure</option>
+    <option value="/add-servers/" >
+   Add Server(s)</option>
+    <option value="/nix-clients/" >
+   OrangeFS Clients</option>
+    <option value="/windows-client/" >
+   Windows Client</option> 
+      <option value="/windows-client/preparing_for_installation_windows/" >- Preparing for Windows Installation</option>
+      <option value="/windows-client/what_to_expect_windows/" >- What to Expect</option>
+      <option value="/windows-client/running_the_installation_program_windows/" >- Installing the Software</option>
+      <option value="/windows-client/manual_installation_windows/" >- Manual Installation</option>
+      <option value="/windows-client/uninstalling_the_client_windows/" >- Uninstalling the Windows client</option>
+      <option value="/windows-client/winclient_use/"  selected>- Using the Client</option>
+      <option value="/windows-client/winclient_admin/" >- Client Administration</option>
+  
+    <option value="/configuration/" >
+   OrangeFS Configuration</option>
+
+
+
+        </select>
+      </center>
+    </div>
+      <div>
+        <div class="searchbox">
+          <input data-search-input id="search-by" type="text" placeholder="Search...">
+        </div>
+        <script type="text/javascript" src="/js/lunr.min.js"></script>
+        <script type="text/javascript" src="/js/auto-complete.js"></script>
+        <link href="/css/auto-complete.css" rel="stylesheet">
+        <script type="text/javascript">
+          
+              var baseurl = "\/";
+          
+        </script>
+        <script type="text/javascript" src="/js/search.js"></script>
+      </div>
+    
+
+    <h1>Using the Client</h1>
+    
+    
+    
+    
+
+<p>Information in this topic includes:</p>
+
+<ul>
+<li><a href="#Interfacing_with_OrangeFS">Interfacing with OrangeFS</a></li>
+<li><a href="#Running_the_Client">Running the Client</a></li>
+<li><a href="#Understanding_Security">Understanding Security</a></li>
+<li><a href="#Getting__or_Generating__New_Certificates">Getting/Generating New User-Mapping
+Certificates</a></li>
+</ul>
+
+<h2 id="interfacing-with-orangefs">Interfacing with OrangeFS</h2>
+
+<p>When the Windows Client is running on your computer, the OrangeFS file
+system appears as a removable drive at the drive letter (E:-Z:). This
+drive letter, specified during installation, is a setting in the
+configuration file that can be changed. For more information, see
+<a href="/windows-client/winclient_admin/">Client Administration</a>.</p>
+
+<p>You can interact with files and directories in the file system like
+local files. For example, they can be viewed in Windows Explorer, listed
+in the Command Prompt or accessed using program API functions, such as
+fopen.</p>
+
+<p><strong>Note     </strong>Currently the Client can mount only one OrangeFS file
+system at a time.</p>
+
+<h2 id="running-the-client">Running the Client</h2>
+
+<p>You must start two Windows Services to run the OrangeFS Windows Client:</p>
+
+<ul>
+<li>DokanMounter</li>
+<li>OrangeFS Client</li>
+</ul>
+
+<p>You can access these services in the Windows Services utility. To open
+the Services utility, navigate to the <strong>Control Panel</strong> and click
+<strong>Administrative Tools</strong> | <strong>Services</strong>. You should see the DokanMounter
+and OrangeFS Client services included in the console listing.</p>
+
+<p>To start (or stop) a service, right-click the service and select the
+desired action.</p>
+
+<p>You should start the DokanMounter service first. This service is tied to
+the Dokan Library, which is the third-party software included with your
+installation. DokanMounter enables the Windows Client to mount the file
+system transparently.</p>
+
+<p>The two services are configured to start automatically any time the
+system is restarted. To change this setting, right-click the service and
+select <strong>Properties</strong>.</p>
+
+<p><strong>Note     </strong>If you need to stop the Windows Client service, you do not
+normally have to stop the DokanMounter service.</p>
+
+<h2 id="understanding-security">Understanding Security</h2>
+
+<p>First you must set the Client to operate using the File System security
+mode used by the servers. Do this by setting the “security-mode” option
+in the configuration file to “default”, “key” or “certificate”, with
+“default” being used if no option is specified. (For more information,
+see <a href="WinClient_Admin.htm">Client Administration</a>.)</p>
+
+<p>You can configure the file as read-only on Windows to remove owner write
+permissions.</p>
+
+<p><strong>Note     </strong>The default permissions mask can be changed with the
+new-file-perms and new-dir-perms configuration file keywords. Form more
+information, see <a href="/windows-client/winclient_admin/">Client Administration</a>.</p>
+
+<p>Level of security will also depend on the user mapping configuration of
+your Windows Client. The three types of user mapping are</p>
+
+<hr />
+
+<p>List          Directly matches one Windows ID with one OrangeFS UID and primary GID.
+  Certificate   Maps user digital certificate to OrangeFS UID/GID. Our recommended configuration is for grid computing which requires CA, proxy and user certificates.
+  LDAP          Maps user(s) on an LDAP tree, such as Active Directory or eDirectory, to OrangeFS UIDs/GIDs.
+  Server        Used only when the security mode is “certificate,” this mode features client-side certificates for each user and server-side identity mapping with LDAP.</p>
+
+<hr />
+
+<p>For more information, see <a href="WinClient_Admin.htm">Client Administration</a>.</p>
+
+<h2 id="getting-or-generating-new-user-mapping-certificates">Getting (or Generating) New User-Mapping Certificates</h2>
+
+<p><strong>Note     </strong>This task only applies if your Windows Client is using
+certificates mode for user mapping.</p>
+
+<p>If your Windows Client is configured for certificate mapping, this will
+likely involve three types of certificates (CA, proxy, user). Usually,
+your administrator creates and installs these certificates. However,
+since all certificates have expiration dates, you might need new ones
+regenerated from time to time while using the Windows Client.</p>
+
+<p>Depending on your setup, you might need to request new certificates from
+your administrator, or the administrator might provide you with
+instructions for doing it yourself.</p>
+
+<p>Of the three types of certificates mentioned earlier, the proxy
+certificate must generally be renewed more often than the other two.
+Depending on your administrative policies, the time before a proxy
+certificate expires can average anywhere from 6 hours to two weeks.</p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+
+    
+    
+        <div class="chevrons">
+    <div id="navigation">
+<a class="nav nav-prev" href="/windows-client/uninstalling_the_client_windows/" title="Uninstalling the Windows client"> <i class="fa fa-chevron-left"></i><label>Uninstalling the Windows client</label></a>
+    <a class="nav nav-next" href="/windows-client/winclient_admin/" title="Client Administration" style="margin-right: 0px;"><label>Client Administration</label><i class="fa fa-chevron-right"></i></a></div>
+  </div>
+
+  </section>
+</article>
+
+<footer>
+
+<div class="footline">
+    
+
+    
+
+  
+
+
+	<div>
+
+
+  
+    <div id="image-table">
+    <table>
+        <tr>
+              <td style="padding:1px">
+              <a href="http://orangefs.com"> <img src="/OrangeFS_logo.gif" alt="OrangeFS" style="width:200px"></a>
+            </td>
+        </tr>
+    </table>
+</div>
+
+  
+
+
+
+	</div>
+</footer>
+
+<script src="/js/clipboard.min.js"></script>
+
+<link href="/css/featherlight.min.css" rel="stylesheet">
+<script src="/js/featherlight.min.js"></script>
+
+
+<script src="/js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+
+<script src="/theme-flex/script.js"></script>
+
+    
+
+    
+    
+
+    
+  </body>
+</html>
