@@ -5,14 +5,14 @@
     
       <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="generator" content="Hugo 0.42" />
+<meta name="revised" content="2019-10-06T16:42:54 EDT">
 <title>Quickstart Package Installation Guide :: OrangeFS Documentation</title>
 <link rel="shortcut icon" href="/images/favicon.png" type="image/x-icon" />
 <link href="/css/font-awesome.min.css" rel="stylesheet">
 <link href="/css/nucleus.css" rel="stylesheet">
 <link href="/theme-flex/style.css" rel="stylesheet">
 
-	<link href="/theme-flex/variant-blue.css" rel="stylesheet">
+	<link href="/theme-flex/variant-gray.css" rel="stylesheet">
 
 <link rel="stylesheet" href="/css/bootstrap.min.css">
 <script src="/js/jquery-2.x.min.js"></script>
@@ -34,6 +34,7 @@
   
     <a class="baselink" href="/">OrangeFS Documentation</a>
   
+
 
   </div>
   <div class="burger"><a href="javascript:void(0);" style="font-size:15px;">&#9776;</a></div>
@@ -371,68 +372,53 @@ package.</p>
 
 <h3 id="install-on-fedora">Install on Fedora</h3>
 
-<p>To install on Fedora, issue the following command:</p>
-
-<p>dnf -y install orangefs orangefs-server</p>
+<p>To install on Fedora, issue the following command:<br />
+dnf -y install orangefs orangefs-server</p>
 
 <h3 id="install-on-centos">Install on CentOS</h3>
 
 <p>To install on CentOS, issue the following commands:</p>
 
 <p>yum -y install epel-release<br />
- yum -y install orangefs orangefs-server</p>
+yum -y install orangefs orangefs-server</p>
 
 <h4 id="install-the-elrepo-kernel">Install the ELRepo Kernel</h4>
 
 <p>If the kernel module will be used on CentOS, the ELRepo kernel must be
 installed. To install the ELRepo kernel, issue the following commands:</p>
 
-<p>rpm &ndash;import <a href="https://www.elrepo.org/RPM-GPG-KEY-elrepo.org">https://www.elrepo.org/RPM-GPG-KEY-elrepo.org</a<br />
- rpm -Uvh
-<a href="http://www.elrepo.org/elrepo-release-7.0-3.el7.elrepo.noarch.rpm">http://www.elrepo.org/elrepo-release-7.0-3.el7.elrepo.noarch.rpm</a<br />
- yum -y &ndash;enablerepo=elrepo-kernel install kernel-ml</p>
+<p>rpm &ndash;import <a href="https://www.elrepo.org/RPM-GPG-KEY-elrepo.org">https://www.elrepo.org/RPM-GPG-KEY-elrepo.org</a><br />
+rpm -Uvh
+ <a href="http://www.elrepo.org/elrepo-release-7.0-3.el7.elrepo.noarch.rpm">http://www.elrepo.org/elrepo-release-7.0-3.el7.elrepo.noarch.rpm</a><br />
+yum -y &ndash;enablerepo=elrepo-kernel install kernel-ml</p>
 
 <h3 id="add-servers">Add Servers</h3>
 
 <p>To add servers, complete the following steps:</p>
 
 <ol>
-<li>Install the necessary packages on each machine as described above.
+<li><p>Install the necessary packages on each machine as described above.
 An example server configuration is provided in
 /etc/orangefs/orangefs.conf.  It will suffice for a single-server
 installation.  If necessary, the default hostname localhost should
 be changed. Otherwise, if multiple servers will be used, generate a
-configuration.</li>
+configuration using:<br />
+pvfs2-genconfig</p></li>
+
+<li><p>Copy the configuration to each server machine.<br />
+scp -pr hostname:/etc/orangefs/orangefs.conf /etc/orangefs/orangefs.conf</p></li>
+
+<li><p>Initialize the filesystem and start on each machine.<br />
+pvfs2-server -f /etc/orangefs/orangefs.conf<br />
+systemctl start orangefs-server<br />
+<strong>Note</strong> The filesystem should only be initialized once.    </p></li>
+
+<li><p>In the future each server can be started manually.<br />
+systemctl start orangefs-server</p></li>
+
+<li><p>Start the server at boot.<br />
+systemctl enable orangefs-server</p></li>
 </ol>
-
-<p>pvfs2-genconfig</p>
-
-<ol>
-<li>Copy the configuration to each server machine.</li>
-</ol>
-
-<p>scp -pr hostname:/etc/orangefs/orangefs.conf /etc/orangefs/orangefs.conf</p>
-
-<ol>
-<li>Initialize the filesystem and start on each machine.</li>
-</ol>
-
-<p>pvfs2-server -f /etc/orangefs/orangefs.conf<br />
- systemctl start orangefs-server</p>
-
-<p><strong>Note     </strong>The filesystem should only be initialized once.  </p>
-
-<ol>
-<li>In the future each server can be started manually.</li>
-</ol>
-
-<p>systemctl start orangefs-server</p>
-
-<ol>
-<li>Start the server at boot.</li>
-</ol>
-
-<p>systemctl enable orangefs-server</p>
 
 <h3 id="add-clients">Add Clients</h3>
 
@@ -443,87 +429,62 @@ configuration.</li>
 <li>An example client configuration is provided in /etc/pvfs2tab.  It is
 commented by default.  Uncomment it by removing the leading &lsquo;#&rsquo;,
 then change the hostname if necessary.  </li>
-<li>Change the default mount point, /pvfsmnt, if necessary.</li>
-<li>Copy the client configuration to each client machine.</li>
-</ol>
+<li>Change the default mount point, /orangefs, if necessary.</li>
 
-<p>scp -pr hostname:/etc/pvfs2tab /etc/pvfs2tab</p>
+<li><p>Copy the client configuration to each client machine.<br />
+scp -pr hostname:/etc/pvfs2tab /etc/pvfs2tab</p></li>
 
-<ol>
-<li>Test connectivity to the server</li>
-</ol>
+<li><p>Test connectivity to the server<br />
+pvfs2-ping -m /orangef</p></li>
 
-<p>pvfs2-ping -m /pvfsmnt</p>
-
-<ol>
-<li>If everything is working correctly, the pvfs2-ping utility will
-output similar to the following.</li>
-</ol>
-
-<p>​(1) Parsing tab file&hellip;<br />
- <br />
- (2) Initializing system interface&hellip;<br />
- <br />
- (3) Initializing each file system found in tab file: /etc/pvfs2tab&hellip;<br />
- <br />
-   PVFS2 servers: tcp://localhost:3334<br />
-   Storage name: orangefs<br />
-   Local mount point: /pvfsmnt<br />
-   /pvfsmnt: Ok<br />
- <br />
- (4) Searching for /orangefs in pvfstab&hellip;<br />
- <br />
-   PVFS2 servers: tcp://localhost:3334<br />
-   Storage name: orangefs<br />
-   Local mount point: /pvfsmnt<br />
- <br />
-   meta servers:<br />
-   tcp://localhost:3334<br />
- <br />
-   data servers:<br />
-   tcp://localhost:3334<br />
- <br />
- (5) Verifying that all servers are responding&hellip;<br />
- <br />
-   meta servers:<br />
-   tcp://localhost:3334 Ok<br />
- <br />
-   data servers:<br />
-   tcp://localhost:3334 Ok<br />
- <br />
- (6) Verifying that fsid 1 is acceptable to all servers&hellip;<br />
- <br />
-   Ok; all servers understand fs_id 1<br />
- <br />
- (7) Verifying that root handle is owned by one server&hellip;<br />
- <br />
-   Root handle: 1048576<br />
-     Ok; root handle is owned by exactly one server.<br />
- <br />
+<li><p>If everything is working correctly, the pvfs2-ping utility will
+output similar to the following.<br />
+​<div class="panel panel-danger">
+	
+	<div class="panel-body"><p>(1) Parsing tab file&hellip;<br />
+(2) Initializing system interface&hellip;<br />
+(3) Initializing each file system found in tab file: /etc/pvfs2tab&hellip;<br />
+    PVFS2 servers: tcp://localhost:3334<br />
+    Storage name: orangefs
+    Local mount point: /orangefs<br />
+/orangefs: Ok<br />
+(4) Searching for /orangefs in pvfstab&hellip;<br />
+PVFS2 servers: tcp://localhost:3334<br />
+Storage name: orangefs<br />
+Local mount point: /pvfsmnt<br />
+meta servers:<br />
+tcp://localhost:3334<br />
+data servers:<br />
+tcp://localhost:3334<br />
+(5) Verifying that all servers are responding&hellip;<br />
+meta servers:<br />
+tcp://localhost:3334 Ok<br />
+data servers:<br />
+tcp://localhost:3334 Ok<br />
+(6) Verifying that fsid 1 is acceptable to all servers&hellip;<br />
+Ok; all servers understand fs_id 1<br />
+(7) Verifying that root handle is owned by one server&hellip;<br />
+Root handle: 1048576<br />
+Ok; root handle is owned by exactly one server.<br />
  =============================================================<br />
- <br />
- The PVFS2 filesystem at /pvfsmnt appears to be correctly configured.</p>
+The PVFS2 filesystem at /pvfsmnt appears to be correctly configured.</p>
+</div>
+	
+</div>
+</p></li>
 
-<ol>
-<li> If the kernel module will not be used, OrangeFS is now installed;
+<li><p> If the kernel module will not be used, OrangeFS is now installed;
 otherwise, the kernel module will be used. To load the kernel
-module, issue the following command:</li>
+module, issue the following command:<br />
+modprobe orangefs</p></li>
+
+<li><p>Start the client with the following command:<br />
+systemctl start orangefs-client</p></li>
+
+<li><p>Next, mount the filesystem.  Change the hostname and mountpoint if
+necessary.<br />
+mount -t pvfs2 tcp://localhost:3334/orangefs /pvfsmnt</p></li>
 </ol>
-
-<p>modprobe orangefs</p>
-
-<ol>
-<li>Start the client with the following command:</li>
-</ol>
-
-<p>systemctl start orangefs-client</p>
-
-<ol>
-<li>Next, mount the filesystem.  Change the hostname and mountpoint if
-necessary.</li>
-</ol>
-
-<p>mount -t pvfs2 tcp://localhost:3334/orangefs /pvfsmnt</p>
 
 <p>The filesystem is now mounted.</p>
 
@@ -550,8 +511,7 @@ necessary.</li>
     
         <div class="chevrons">
     <div id="navigation">
-<a class="nav nav-prev" href="/quickstart/" title="Quickstart Guides"> <i class="fa fa-chevron-left"></i><label>Quickstart Guides</label></a>
-    <a class="nav nav-next" href="/quickstart/quickstart-build/" title="Quickstart Source Build Guide" style="margin-right: 0px;"><label>Quickstart Source Build Guide</label><i class="fa fa-chevron-right"></i></a></div>
+</div>
   </div>
 
   </section>
@@ -564,7 +524,15 @@ necessary.</li>
 
     
 
-  
+    
+
+    
+    <div class="github-link">
+      <a href="https://github.com/waltligon/orangefs/tree/master/docsquickstart/quickstart-package.md" target="blank"><i class="fa fa-code-fork"></i>
+        Improve this page</a>
+    </div>
+    
+  </div>
 
 
 	<div>
@@ -599,6 +567,7 @@ necessary.</li>
 
 
 <script src="/theme-flex/script.js"></script>
+
 
     
 

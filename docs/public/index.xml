@@ -285,7 +285,7 @@ The orangefstab file contains only one line entry, which is the URI address of t
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
       <guid>/configuration/admin_ofs_configuration_file/</guid>
-      <description>OrangeFS Configuration File {.body} The OrangeFS configuration file is copied to all servers as a single reference point for operation and performance. This is the file in which you specify settings and preferences for the file system. During installation, you use a program called pvfs2-genconfig to automatically generate the OrangeFS configuration file. The program presents a series of prompts, enabling you to enter basic required settings.
+      <description>The OrangeFS configuration file is copied to all servers as a single reference point for operation and performance. This is the file in which you specify settings and preferences for the file system. During installation, you use a program called pvfs2-genconfig to automatically generate the OrangeFS configuration file. The program presents a series of prompts, enabling you to enter basic required settings.
 While pvfs2-genconfig is designed to query you about the most important options, there are many additional options with default values that are bypassed during installation.</description>
     </item>
     
@@ -295,7 +295,7 @@ While pvfs2-genconfig is designed to query you about the most important options,
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
       <guid>/configuration/orangefs_advanced_configuration/</guid>
-      <description>OrangeFS Advanced Configuration In some circumstances, you may need to configure OrangeFS to support multiple concurrent file systems on the same set of storage servers. This topic provides examples of two different configuration options.
+      <description>In some circumstances, you may need to configure OrangeFS to support multiple concurrent file systems on the same set of storage servers. This topic provides examples of two different configuration options.
 To configure OrangeFS to support multiple concurrent file systems on the same set of storage servers, you have two options. One is to run multiple server processes, each with its own config file. The second option is to have a single server process surface multiple file systems.</description>
     </item>
     
@@ -305,9 +305,9 @@ To configure OrangeFS to support multiple concurrent file systems on the same se
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
       <guid>/configuration/multiple_server_processes/</guid>
-      <description>Multiple Server Processes {.body} To increase backend throughput when you have separate local volumes, you may elect to run multiple server processes on each server.
+      <description>To increase backend throughput when you have separate local volumes, you may elect to run multiple server processes on each server.
 The topic is organized into the following three sections:
- Multiple Server Processes, Single File System Multiple Servers, Single File System, Some Data-only Servers Multiple Server Processes, Single File System, Multiple Machines  Multiple Server Processes, Single File System You can increase parallel throughput with multiple server processes.</description>
+ Multiple Server Processes, Single File System Multiple Servers, Single File System, Some Data-only Servers Multiple Server Processes, Single File System, Multiple Machines  Multiple Server Processes, Single File System You can increase parallel throughput with multiple server processes. This option is efficient only when you run one server process per disc, because running multiple server processes per disc will cause access delays which counteract any throughput advantage.</description>
     </item>
     
     <item>

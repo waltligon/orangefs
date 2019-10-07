@@ -5,14 +5,14 @@
     
       <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="generator" content="Hugo 0.42" />
+<meta name="revised" content="2019-10-06T16:42:54 EDT">
 <title>Multiple Server Processes :: OrangeFS Documentation</title>
 <link rel="shortcut icon" href="/images/favicon.png" type="image/x-icon" />
 <link href="/css/font-awesome.min.css" rel="stylesheet">
 <link href="/css/nucleus.css" rel="stylesheet">
 <link href="/theme-flex/style.css" rel="stylesheet">
 
-	<link href="/theme-flex/variant-blue.css" rel="stylesheet">
+	<link href="/theme-flex/variant-gray.css" rel="stylesheet">
 
 <link rel="stylesheet" href="/css/bootstrap.min.css">
 <script src="/js/jquery-2.x.min.js"></script>
@@ -34,6 +34,7 @@
   
     <a class="baselink" href="/">OrangeFS Documentation</a>
   
+
 
   </div>
   <div class="burger"><a href="javascript:void(0);" style="font-size:15px;">&#9776;</a></div>
@@ -344,8 +345,6 @@
     
     
 
-<h1 id="multiple-server-processes-body">Multiple Server Processes {.body}</h1>
-
 <p>To increase backend throughput when you have separate local volumes, you
 may elect to run multiple server processes on each server.</p>
 
@@ -455,7 +454,7 @@ single file system.</p>
      &lt;/DataHandleRanges&gt;<br />
  &lt;/Filesystem&gt;</p>
 
-<h2 id="multiple-servers-single-file-system-some-data-only-servers-dir-ltr">Multiple Servers, Single File System, Some Data-only Servers {dir=&ldquo;ltr&rdquo;}</h2>
+<h2 id="multiple-servers-single-file-system-some-data-only-servers">Multiple Servers, Single File System, Some Data-only Servers</h2>
 
 <p>Below is an example configuration file for a situation in which seven
 servers are combined meta and data servers, and the remaining nine
@@ -552,7 +551,7 @@ serve in which capacity.</p>
        &lt;/StorageHints&gt;<br />
  &lt;/Filesystem&gt;</p>
 
-<h2 id="multiple-server-processes-single-file-system-multiple-machines-dir-ltr">Multiple Server Processes, Single File System, Multiple Machines {dir=&ldquo;ltr&rdquo;}</h2>
+<h2 id="multiple-server-processes-single-file-system-multiple-machines">Multiple Server Processes, Single File System, Multiple Machines</h2>
 
 <p>Below is an example configuration file for a situation with four server
 processes per machine with four machines serving a single file system.</p>
@@ -774,8 +773,7 @@ processes per machine with four machines serving a single file system.</p>
     
         <div class="chevrons">
     <div id="navigation">
-<a class="nav nav-prev" href="/configuration/orangefs_advanced_configuration/" title="Multiple File Systems"> <i class="fa fa-chevron-left"></i><label>Multiple File Systems</label></a>
-    <a class="nav nav-next" href="/configuration/admin_ofs_configuration_file/" title="OrangeFS Configuration File" style="margin-right: 0px;"><label>OrangeFS Configuration File</label><i class="fa fa-chevron-right"></i></a></div>
+</div>
   </div>
 
   </section>
@@ -788,7 +786,15 @@ processes per machine with four machines serving a single file system.</p>
 
     
 
-  
+    
+
+    
+    <div class="github-link">
+      <a href="https://github.com/waltligon/orangefs/tree/master/docsconfiguration/Multiple_Server_Processes.md" target="blank"><i class="fa fa-code-fork"></i>
+        Improve this page</a>
+    </div>
+    
+  </div>
 
 
 	<div>
@@ -823,6 +829,7 @@ processes per machine with four machines serving a single file system.</p>
 
 
 <script src="/theme-flex/script.js"></script>
+
 
     
 

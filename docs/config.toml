@@ -28,14 +28,14 @@ googleAnalytics = "UA-"
 
 
 [params]
-editURL = "https://github.com/vjeantet/hugo-theme-docdock/edit/master/exampleSite/content/"
+editURL = "https://github.com/waltligon/orangefs/tree/master/docs"
 showVisitedLinks = true # default is false
 themeStyle = "flex" # "original" or "flex" # default "flex"
-themeVariant = "blue" # choose theme variant "green", "gold" , "gray", "blue" (default)
+themeVariant = "gray" # choose theme variant "green", "gold" , "gray", "blue" (default)
 ordersectionsby = "weight" # ordersectionsby = "title"
 disableHomeIcon = true # default is false
 disableSearch = false # default is false
-disableNavChevron = false # set true to hide next/prev chevron, default is false
+disableNavChevron = true # set true to hide next/prev chevron, default is false
 highlightClientSide = true # set true to use highlight.pack.js instead of the default hugo chroma highlighter
 menushortcutsnewtab = "false" # set true to open shortcuts links to a new tab/window
 enableGitInfo = "true"

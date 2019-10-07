@@ -5,14 +5,14 @@
     
       <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="generator" content="Hugo 0.42" />
+<meta name="revised" content="2019-10-06T16:42:54 EDT">
 <title>OrangeFS Configuration File :: OrangeFS Documentation</title>
 <link rel="shortcut icon" href="/images/favicon.png" type="image/x-icon" />
 <link href="/css/font-awesome.min.css" rel="stylesheet">
 <link href="/css/nucleus.css" rel="stylesheet">
 <link href="/theme-flex/style.css" rel="stylesheet">
 
-	<link href="/theme-flex/variant-blue.css" rel="stylesheet">
+	<link href="/theme-flex/variant-gray.css" rel="stylesheet">
 
 <link rel="stylesheet" href="/css/bootstrap.min.css">
 <script src="/js/jquery-2.x.min.js"></script>
@@ -34,6 +34,7 @@
   
     <a class="baselink" href="/">OrangeFS Documentation</a>
   
+
 
   </div>
   <div class="burger"><a href="javascript:void(0);" style="font-size:15px;">&#9776;</a></div>
@@ -344,8 +345,6 @@
     
     
 
-<h1 id="orangefs-configuration-file-body">OrangeFS Configuration File {.body}</h1>
-
 <p>The OrangeFS configuration file is copied to all servers as a single
 reference point for operation and performance. This is the file in which
 you specify settings and preferences for the file system. During
@@ -435,7 +434,7 @@ values must be defined.</p>
 configuration file, grouped by the contexts in which they are allowed to
 be used.</p>
 
-<h1 id="orangefs-configuration-file-body-1">OrangeFS Configuration File {.body}</h1>
+<h1 id="orangefs-configuration-file">OrangeFS Configuration File</h1>
 
 <p>The OrangeFS configuration file is copied to all servers as a single
 reference point for operation and performance. This is the file in which
@@ -1875,10 +1874,15 @@ files in this version of OrangeFS.</p>
 </tbody>
 </table>
 
-<p>The value of the EventLogging option can be a comma-separated list of the above values. Individual values can also be negated with a &lsquo;-&rsquo;. Examples of possible values are:
-- EventLogging flow,msgpair,io
-- EventLogging -storage
-- EventLogging -flow,-flowproto</p>
+<p>The value of the EventLogging option can be a comma-separated list of the above values. Individual values can also be negated with a &lsquo;-&rsquo;. Examples of possible values are:</p>
+
+<ul>
+<li>EventLogging flow,msgpair,io</li>
+<li>EventLogging -storage</li>
+<li>EventLogging -flow,-flowproto</li>
+</ul>
+
+<p><br></p>
 
 <table>
 <thead>
@@ -3286,8 +3290,7 @@ files in this version of OrangeFS.</p>
     
         <div class="chevrons">
     <div id="navigation">
-<a class="nav nav-prev" href="/configuration/" title="OrangeFS Configuration"> <i class="fa fa-chevron-left"></i><label>OrangeFS Configuration</label></a>
-    <a class="nav nav-next" href="/configuration/orangefs_advanced_configuration/" title="Multiple File Systems" style="margin-right: 0px;"><label>Multiple File Systems</label><i class="fa fa-chevron-right"></i></a></div>
+</div>
   </div>
 
   </section>
@@ -3300,7 +3303,15 @@ files in this version of OrangeFS.</p>
 
     
 
-  
+    
+
+    
+    <div class="github-link">
+      <a href="https://github.com/waltligon/orangefs/tree/master/docsconfiguration/admin_ofs_configuration_file.md" target="blank"><i class="fa fa-code-fork"></i>
+        Improve this page</a>
+    </div>
+    
+  </div>
 
 
 	<div>
@@ -3335,6 +3346,7 @@ files in this version of OrangeFS.</p>
 
 
 <script src="/theme-flex/script.js"></script>
+
 
     
 

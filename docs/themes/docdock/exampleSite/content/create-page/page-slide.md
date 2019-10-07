@@ -44,12 +44,12 @@ When creating the content for your slideshow presentation within content markdow
 
 As both horizontal and vertical slides are supported by reveal.js each has it's own unique delimiter.
 
-To denote the start of a horizontal slide simply add the following delimiter in your Markdown:
+To denote the start of a horizontal slide simply add the following delimiter (dashes) in your Markdown:
 
 	---
 
 
-To denote the start of a vertical slide simply add the following delimiter in your Markdown:
+To denote the start of a vertical slide simply add the following delimiter (underscores) in your Markdown:
 	
 	___
 
