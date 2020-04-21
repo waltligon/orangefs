@@ -453,6 +453,47 @@ static int hash_fsid_compare(const void *key, struct qlist_head *link)
     return ((config->fs_id == fs_id) ? 1 : 0);
 }
 
+void debug_dump_config(struct filesystem_configuration_s *fs,
+                       struct server_configuration_s *sr)
+{
+    gossip_log("Active Configuration Settings\n");
+    gossip_log("file_system_name => %s\n", fs->file_system_name);
+    gossip_log("collection ID => %d\n", fs->coll_id);
+    gossip_log("ROOT HANDLE\n");
+    gossip_log("ROOT DIRDATA HANDLE\n");
+    gossip_log("root_sid_count => %d\n", fs->root_sid_count);
+    gossip_log("default_num_files => %d\n", fs->default_num_dfiles);
+    gossip_log("default_dfile_replication_factor => %d \n", fs->default_dfile_replication_factor);
+    gossip_log("metadata_replication_factor => %d \n", fs->metadata_replication_factor);
+    gossip_log("handle_recycle_timeout_sec => %ld\n", fs->handle_recycle_timeout_sec.tv_sec);
+    gossip_log("attr_cache_size => %d\n", fs->attr_cache_size);
+    gossip_log("trove_sync_meta => %d\n", fs->trove_sync_meta);
+    gossip_log("trove_sync_data => %d\n", fs->trove_sync_data);
+    gossip_log("immediate_completion => %d\n", fs->immediate_completion);
+    gossip_log("coalescing_high_watermark => %d\n", fs->coalescing_high_watermark);
+    gossip_log("coalescing_low_watermark => %d\n", fs->coalescing_low_watermark);
+    gossip_log("file_stuffing => %d\n", fs->file_stuffing);
+    gossip_log("fp_buffer_size => %d\n", fs->fp_buffer_size);
+    gossip_log("fp_buffers_per_flow => %d\n", fs->fp_buffers_per_flow);
+    gossip_log("----------\n");
+    gossip_log("server_alias => %s\n", sr->server_alias);
+    gossip_log("data_path => %s\n", sr->data_path);
+    gossip_log("meta_path => %s\n", sr->meta_path);
+    gossip_log("fs_config_filename => %s\n", sr->fs_config_filename);
+    gossip_log("initial_unexpected_requests => %d\n", sr->initial_unexpected_requests);
+    gossip_log("server_job_bmi_timeout => %d\n", sr->server_job_bmi_timeout);
+    gossip_log("server_job_flow_timeout => %d\n", sr->server_job_flow_timeout);
+    gossip_log("client_job_bmi_timeout => %d\n", sr->client_job_bmi_timeout);
+    gossip_log("client_job_flow_timeout => %d\n", sr->client_job_flow_timeout);
+    gossip_log("client_retry_limit => %d\n", sr->client_retry_limit);
+    gossip_log("client_retry_delay_ms => %d\n", sr->client_retry_delay_ms);
+    gossip_log("perf_update_history => %d\n", sr->perf_update_history);
+    gossip_log("perf_update_interval => %d\n", sr->perf_update_interval);
+    gossip_log("tcp_buffer_size_receive => %d\n", sr->tcp_buffer_size_receive);
+    gossip_log("tcp_buffer_size_send => %d\n", sr->tcp_buffer_size_send);
+    gossip_log("\n");
+}
+
 /*
  * Local variables:
  *  c-indent-level: 4

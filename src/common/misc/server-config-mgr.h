@@ -30,6 +30,9 @@ struct server_configuration_s *__PINT_server_config_mgr_get_config(
 void __PINT_server_config_mgr_put_config(
     struct server_configuration_s *config_s);
 
+void debug_dump_config(struct filesystem_configuration_s *fs,
+                       struct server_configuration_s *sr);
+
 /*
 int PINT_server_config_mgr_get_abs_min_handle_recycle_time(void);
 */

@@ -11,7 +11,16 @@
 
 #include "pvfs2-internal.h"
 #include "pvfs2-debug.h"
+#include "gossip.h"
 
+/* This function takes a string of comma separated key words in
+ * event_logging and extracts them one at a time into t.  t is then
+ * searched for in the table mask_map, found in
+ * src/common/gossip/gossip-flags.c.  When found, the tablle indicates
+ * the numerical value for the flag, which is or'd together one ata time
+ * to form the final mask.  Negative inputs indicate the bitwise not of
+ * the binary value should be included.
+ */
 static PVFS_debug_mask debug_to_mask(const __keyword_mask_t *mask_map, 
                                      int num_mask_map,
                                      const char *event_logging)
@@ -28,6 +37,8 @@ static PVFS_debug_mask debug_to_mask(const __keyword_mask_t *mask_map,
 
         while(t)
         {
+            gossip_debug(GOSSIP_SERVER_DEBUG, "dbg2mask: %lx %lx\n",
+                         mask.mask1, mask.mask2);
             if (*t == '-')
             {
                 negate = 1;
@@ -52,6 +63,8 @@ static PVFS_debug_mask debug_to_mask(const __keyword_mask_t *mask_map,
             t = strtok(NULL, toks);
         }
         free(s);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "dbg2mask: %lx %lx\n",
+                    mask.mask1, mask.mask2);
     }
     return mask;
 }
@@ -67,6 +80,9 @@ static PVFS_debug_mask debug_to_mask(const __keyword_mask_t *mask_map,
  */
 PVFS_debug_mask PVFS_debug_eventlog_to_mask(const char *event_logging)
 {
+    //int num_keyword_mask_map = (int)           
+    //    (sizeof(s_keyword_mask_map) / sizeof(__keyword_mask_t));
+
     return debug_to_mask(s_keyword_mask_map, 
                          num_keyword_mask_map, 
                          event_logging);
@@ -74,6 +90,9 @@ PVFS_debug_mask PVFS_debug_eventlog_to_mask(const char *event_logging)
 
 PVFS_debug_mask PVFS_kmod_eventlog_to_mask(const char *event_logging)
 {
+    //int num_kmod_keyword_mask_map = (int)           
+    //    (sizeof(s_kmod_keyword_mask_map) / sizeof(__keyword_mask_t));
+
     return debug_to_mask(s_kmod_keyword_mask_map, 
                          num_kmod_keyword_mask_map, 
                          event_logging);
@@ -91,6 +110,31 @@ const char *PVFS_debug_get_next_debug_keyword(int position)
     return (((position > -1) && (position < num_keyword_mask_map)) ?
             s_keyword_mask_map[position].keyword : NULL);
 }
+
+/* static table for decodinng a ds type variable
+ */
+static const char *typestring_array[] = 
+{
+    "PVFS_TYPE_NONE",
+    "PVFS_TYPE_METAFILE",
+    "PVFS_TYPE_DATAFILE",
+    "PVFS_TYPE_DIRECTORY",
+    "PVFS_TYPE_SYMLINK",
+    "PVFS_TYPE_DIRDATA",
+    "PVFS_TYPE_INTERNAL",
+    NULL
+};
+
+/* convert a PVFS_ds_type variable into a string with a human
+ * readable representation of the object type
+ */
+const char *PVFS_ds_type_to_string(PVFS_ds_type dstype)
+{
+    int ix;
+    PVFS_ds_type_to_int(dstype, &ix);
+    return typestring_array[ix];
+}
+
 /*
  * Local variables:
  *  c-indent-level: 4

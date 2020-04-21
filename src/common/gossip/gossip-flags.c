@@ -97,6 +97,13 @@ PVFS_DEBUG_MASK_DECL(GOSSIP_UNUSED_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_BMI_DEBUG_ALL);
 PVFS_DEBUG_MASK_DECL(GOSSIP_GETATTR_SECURITY_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_SETATTR_SECURITY_DEBUG);
+PVFS_DEBUG_MASK_DECL(GOSSIP_CONFIG_DEBUG);
+PVFS_DEBUG_MASK_DECL(GOSSIP_CREATE_DEBUG);
+PVFS_DEBUG_MASK_DECL(GOSSIP_GOSSIP_DEBUG);
+
+/* NOTE you MUST add coresponding entries in
+ * include/pvfs2-debug.h
+ */
 
 /* map all config keywords to pvfs2 debug masks here */
 const __keyword_mask_t s_keyword_mask_map[] =
@@ -206,6 +213,16 @@ const __keyword_mask_t s_keyword_mask_map[] =
     { "usrint", {GOSSIP_USRINT_DEBUG_INIT} },
     /* Sidcache debugging */
     { "sidcache", {GOSSIP_SIDCACHE_DEBUG_INIT} },
+    /* Configuration file debugging */
+    { "getattrsecure", {GOSSIP_GETATTR_SECURITY_DEBUG_INIT} },
+    /* Everything except the periodic events.  Useful for debugging */
+    { "setattrsecure", {GOSSIP_SETATTR_SECURITY_DEBUG_INIT} },
+    /* Config file parsing */
+    { "config", {GOSSIP_CONFIG_DEBUG_INIT} },
+    /* Create op and state machine server and client */
+    { "create", {GOSSIP_CREATE_DEBUG_INIT} },
+    /* Debug the debugger, in particular some critial flags and such */
+    { "gossip", {GOSSIP_GOSSIP_DEBUG_INIT} },
     /* Everything except the periodic events.  Useful for debugging */
     { "verbose", { __DEBUG_ALL_INIT } },
     /* No debug output */
@@ -217,32 +234,7 @@ const __keyword_mask_t s_keyword_mask_map[] =
 const int num_keyword_mask_map = (int)           \
         (sizeof(s_keyword_mask_map) / sizeof(__keyword_mask_t));
 
-const __keyword_mask_t s_kmod_keyword_mask_map[] =
-{
-/* V3 these are commented out because I don't know if we will convert
- * the kmod stuff to use the new gossip or not - not sure what client
- * core uses either.  This is just a convenience for now
- */
-#if 0
-    {"super" , GOSSIP_SUPER_DEBUG},
-    {"inode" , GOSSIP_INODE_DEBUG},
-    {"file"  , GOSSIP_FILE_DEBUG},
-    {"dir"   , GOSSIP_DIR_DEBUG},
-    {"utils" , GOSSIP_UTILS_DEBUG},
-    {"wait"  , GOSSIP_WAIT_DEBUG},
-    {"acl"   , GOSSIP_ACL_DEBUG},
-    {"dcache", GOSSIP_DCACHE_DEBUG},
-    {"dev"   , GOSSIP_DEV_DEBUG},
-    {"name"  , GOSSIP_NAME_DEBUG},
-    {"bufmap", GOSSIP_BUFMAP_DEBUG},
-    {"cache" , GOSSIP_CACHE_DEBUG},
-    {"proc"  , GOSSIP_PROC_DEBUG},
-    {"xattr" , GOSSIP_XATTR_DEBUG},
-    {"init"  , GOSSIP_INIT_DEBUG},
-    {"none"  , GOSSIP_NO_DEBUG},
-    {"all"   , GOSSIP_MAX_DEBUG}
-#endif
-};
+const __keyword_mask_t s_kmod_keyword_mask_map[] = { };
 
 const int num_kmod_keyword_mask_map = (int)           \
         (sizeof(s_kmod_keyword_mask_map) / sizeof(__keyword_mask_t));

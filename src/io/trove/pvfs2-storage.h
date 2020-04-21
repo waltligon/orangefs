@@ -159,9 +159,11 @@ do {                                                                   \
         (__oa)->u.meta.size = (__dsa)->u.metafile.size;                \
         (__oa)->u.meta.mirror_mode = (__dsa)->u.metafile.mirror_mode;  \
         (__oa)->u.meta.flags = (__dsa)->u.metafile.flags;              \
+        (__oa)->mask = PVFS_ATTR_META_ALL; /*includes COMMON_ALL */    \
         break;                                                         \
     case PVFS_TYPE_DATAFILE :                                          \
         (__oa)->u.data.size = (__dsa)->u.datafile.b_size;              \
+        (__oa)->mask = PVFS_ATTR_DATA_ALL; /*includes COMMON_ALL */    \
         break;                                                         \
     case PVFS_TYPE_DIRECTORY :                                         \
         (__oa)->u.dir.dirent_count =                                   \
@@ -180,6 +182,7 @@ do {                                                                   \
                 (__dsa)->u.directory.server_no;                        \
         (__oa)->u.dir.dist_dir_attr.branch_level =                     \
                 (__dsa)->u.directory.branch_level;                     \
+        (__oa)->mask = PVFS_ATTR_DIR_ALL; /*includes COMMON_ALL */     \
         break;                                                         \
     case PVFS_TYPE_DIRDATA :                                           \
         (__oa)->u.dirdata.dirent_count =                               \
@@ -198,8 +201,10 @@ do {                                                                   \
                 (__dsa)->u.dirdata.server_no;                          \
         (__oa)->u.dirdata.dist_dir_attr.branch_level =                 \
                 (__dsa)->u.dirdata.branch_level;                       \
+        (__oa)->mask = PVFS_ATTR_DIRDATA_ALL; /*includes COMMON_ALL */ \
         break;                                                         \
     default :                                                          \
+        (__oa)->mask = PVFS_ATTR_COMMON_ALL;                           \
         break;                                                         \
     }                                                                  \
 } while(0)
@@ -302,7 +307,7 @@ do {                                                           \
         }                                                      \
         else                                                   \
         {                                                      \
-            (dest)->mtime = PINT_util_mktime_version(time(NULL)); \
+            (dest)->mtime = time(NULL);                        \
         }                                                      \
     }                                                          \
     if ((src)->mask & PVFS_ATTR_COMMON_NTIME)                  \

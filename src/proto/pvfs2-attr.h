@@ -93,6 +93,11 @@ typedef uint64_t PVFS_object_attrmask;
  * interfaces can choose to force a "latest" when desired
  */
 
+/* -------------------------
+ * COMMON OBJECT ATTRIBUTES
+ * -------------------------
+ */
+
 /* internal attribute masks, common to all obj types */
 #define PVFS_ATTR_COMMON_UID         (1ULL << 0)
 #define PVFS_ATTR_COMMON_GID         (1ULL << 1)
@@ -124,6 +129,11 @@ typedef uint64_t PVFS_object_attrmask;
          PVFS_ATTR_COMMON_PERM  | PVFS_ATTR_COMMON_TYPE  | \
          PVFS_ATTR_TIME_ALL)
 
+/* -------------------------
+ * METAFILE OBJECT ATTRIBUTES
+ * -------------------------
+ */
+
 /* internal attribute masks for metadata objects - "get or put" 
  * Items that must be get or put of variable side and are stored
  * in the keyval db, thus requiring extra reads to get the data
@@ -144,6 +154,10 @@ typedef uint64_t PVFS_object_attrmask;
          PVFS_ATTR_META_SIZE      | PVFS_ATTR_META_FLAGS       | \
          PVFS_ATTR_COMMON_ALL)
 
+/* -------------------------
+ * DATAFILE OBJECT ATTRIBUTES
+ * -------------------------
+ */
 /* internal attribute masks for datafile objects */
 #define PVFS_ATTR_DATA_SIZE          (1ULL << 20)   /* size of a DFILE
                                                   * replace with latest bit */
@@ -151,11 +165,21 @@ typedef uint64_t PVFS_object_attrmask;
 #define PVFS_ATTR_DATA_ALL \
              (PVFS_ATTR_DATA_SIZE | PVFS_ATTR_TIME_ALL)
 
+/* -------------------------
+ * SYMLINK OBJECT ATTRIBUTES
+ * -------------------------
+ */
+
 /* internal attribute masks for symlink objects */
 #define PVFS_ATTR_SYMLNK_TARGET      (1ULL << 21)   /* writable */
 
 #define PVFS_ATTR_SYMLNK_ALL \
              (PVFS_ATTR_SYMLNK_TARGET | PVFS_ATTR_COMMON_ALL)
+
+/* --------------------------
+ * DIRECTORY OBJECT ATTRIBUTES
+ * --------------------------
+ */
 
 /* internal attribute masks for directory objects */
 #define PVFS_ATTR_DIR_DIRENT_COUNT         (1ULL << 22)  
@@ -198,11 +222,13 @@ typedef uint64_t PVFS_object_attrmask;
     PVFS_ATTR_DIR_BRANCH_LEVEL | PVFS_ATTR_DIR_DIRDATA | \
     PVFS_ATTR_COMMON_ALL)
 
-#define PVFS_ATTR_DIRDATA_ALL \
-             (PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_TIME_ALL)
-
 #define PVFS_ATTR_DIR_ALL_COMMON \
              (PVFS_ATTR_DIR_ALL | PVFS_ATTR_COMMON_ALL)
+
+/* -------------------------
+ * DIRDATA OBJECT ATTRIBUTES
+ * -------------------------
+ */
 
 /* internal attribute mask for distributed directory information */
 #define PVFS_ATTR_DIRDATA_DIRENT_COUNT   (1ULL << 37)
@@ -218,7 +244,21 @@ typedef uint64_t PVFS_object_attrmask;
 #define PVFS_ATTR_DIRDATA_SERVER_NO      (1ULL << 43)
 #define PVFS_ATTR_DIRDATA_BRANCH_LEVEL   (1ULL << 44)
 
-/* I think we should have two of these, one for DIR and one for DIRDATA
+#define PVFS_ATTR_DIRDATA_ALL \
+    (PVFS_ATTR_DIRDATA_DIRENT_COUNT | \
+    PVFS_ATTR_DIRDATA_TREE_HEIGHT  | PVFS_ATTR_DIRDATA_DIRDATA_COUNT | \
+    PVFS_ATTR_DIRDATA_SID_COUNT    | PVFS_ATTR_DIRDATA_BITMAP_SIZE | \
+    PVFS_ATTR_DIRDATA_SPLIT_SIZE   | PVFS_ATTR_DIRDATA_SERVER_NO | \
+    PVFS_ATTR_DIRDATA_BRANCH_LEVEL | PVFS_ATTR_TIME_ALL)
+
+/* -------------------------
+ * DISTDIR ATTRIBUTES
+ * -------------------------
+ */
+
+/* This define exists for managing the dist_dir_attr struct independent
+ * of the type of object record it is in.
+ * I think we should have two of these, one for DIR and one for DIRDATA
  * and neither should have this name (so we can find places we referred
  * to it
  */
@@ -226,8 +266,8 @@ typedef uint64_t PVFS_object_attrmask;
 #define PVFS_ATTR_DISTDIR_ATTR  \
         (PVFS_ATTR_DIRDATA_DIRENT_COUNT | PVFS_ATTR_DIRDATA_TREE_HEIGHT | \
         PVFS_ATTR_DIRDATA_SID_COUNT | PVFS_ATTR_DIRDATA_BITMAP_SIZE | \
-        PVFS_ATTR_DIRDATA_SPLIT_SIZE | PVFS_ATTR_DIRDATA_SPLIT_SIZE | \
-        PVFS_ATTR_DIRDATA_SERVER_NO | PVFS_ATTR_DIRDATA_BRANCH_LEVEL)
+        PVFS_ATTR_DIRDATA_SPLIT_SIZE | PVFS_ATTR_DIRDATA_SERVER_NO | \
+        PVFS_ATTR_DIRDATA_BRANCH_LEVEL)
 
 /* internal attribute mask for capability objects */
 #define PVFS_ATTR_CAPABILITY             (1ULL << 45)

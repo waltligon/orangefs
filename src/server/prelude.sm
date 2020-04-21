@@ -150,12 +150,6 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     int ret;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    fprintf(stderr, "Prelude: gossip_debug_on = %d\n", gossip_debug_on);
-    fprintf(stderr, "SERVER_DEBUG 1 = %lud\n", GOSSIP_SERVER_DEBUG.mask1);
-    fprintf(stderr, "SERVER_DEBUG 2 = %lud\n", GOSSIP_SERVER_DEBUG.mask2);
-    fprintf(stderr, "debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
-    fprintf(stderr, "debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
-
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (prelude sm) state: req_sched\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
@@ -185,14 +179,20 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
                  s_op->access_type, s_op->sched_policy);
 
     /* add the user to the uid mgmt system */
-    /* TODO: not currently supported w/new security system
+    /* TODO: not currently supported w/new security system */
+    /* Why not supported?  Is there nolonger uid in all requests
+     * can we write logic for when there is or is not (like not if
+     * using cert security)?  This is an important mgmt function, if 
+     * it is possible to support.
+     */
+#if 0
     ret = PINT_add_user_to_uid_mgmt(s_op->req->credentials.uid);
     if (ret != 0)
     {
         gossip_debug(GOSSIP_MIRROR_DEBUG, "Unable to add user id to uid"
                       "management interface\n");
     }
-*/
+#endif
 
     return SM_ACTION_COMPLETE;
 }
@@ -306,6 +306,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_credential *cred = NULL;
     int create_object = 0;
+    time_t current_time;
     int ret = -PVFS_EINVAL, capcache_hit = 0, credcache_hit = 0;
     PVFS_error error_code = 0;
     DECLARE_PROFILER(profiler);
@@ -322,50 +323,63 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     /* Get the errno value to use for comparison */
     error_code = PVFS_get_errno_mapping(js_p->error_code);
 
-    /* RAL:  Need to re-visit this logic.  Should we always create the DATAFILE
-     *       dspace record, regardless of operation?
-     */ 
+    /* Reworked logic
+     * The only objects created by prelude are DATAFILE and DIRDATA objects
+     * that we not created during the original CREATE or MKDIR operations
+     * When we create these objects the implication is that the getattr from 
+     * the previous state failed, and thus we cannot depend on attr fields until
+     * they are filled in.
+     */
     if (error_code == ENOENT)
     {
-        /* probably a new object, try to create the object */
-        s_op->ds_attr.fs_id = s_op->target_fs_id;
-        s_op->ds_attr.handle = s_op->target_handle;
-        create_object = 1;
-        js_p->error_code = 0;
+        /* probably a new object, try to create the object attr */
+        /* we are building the object attr which we later convert to
+         * a ds_attr for writing to the database
+         */
+        /* copy in the attrs sent in setaaattr */
+        memcpy((void *)&s_op->attr,
+               (void *)&s_op->req->u.setattr.attr,
+               sizeof(PVFS_object_attr));
+
+        create_object = 1;    /* assume creating unless proven otherwise */
+        js_p->error_code = 0; /* clear ENOENT */
         switch (s_op->req->op)
         {
         /* datafile object specific */
         case PVFS_SERV_IO :
         case PVFS_SERV_SMALL_IO :
         case PVFS_SERV_TRUNCATE :
-            s_op->ds_attr.u.datafile.b_size = 0;
-            s_op->ds_attr.type = PVFS_TYPE_DATAFILE;
+            s_op->attr.objtype = PVFS_TYPE_DATAFILE;
+            s_op->attr.u.data.size = 0;
             break;
         /* dirdata object specific */
+        case PVFS_SERV_RMDIRENT : /* assumes existing dirdata */
+        case PVFS_SERV_CHDIRENT : /* assumes existing dirdata */
+
         case PVFS_SERV_CRDIRENT :
-        case PVFS_SERV_RMDIRENT :
-        case PVFS_SERV_CHDIRENT :
-            s_op->ds_attr.type = PVFS_TYPE_DIRDATA;
-            s_op->ds_attr.u.dirdata.dirent_count = 0;
+            s_op->attr.objtype = PVFS_TYPE_DIRDATA;
+            s_op->attr.u.dirdata.dirent_count = 0;
             break;
         /* either data or dirdata */
+        case PVFS_SERV_DELEATTR : /* assumes existing dirdata/datafile */
+
         case PVFS_SERV_GETATTR :
-        case PVFS_SERV_SETATTR :
         case PVFS_SERV_LISTATTR :
         case PVFS_SERV_GETEATTR :
-        case PVFS_SERV_SETEATTR :
-        case PVFS_SERV_DELEATTR :
         case PVFS_SERV_LISTEATTR :
+
+        case PVFS_SERV_SETATTR :
+        case PVFS_SERV_SETEATTR :
         case PVFS_SERV_ATOMICEATTR :
             if (s_op->req->ctrl.sub == PVFS_REQ_DATAFILE)
             {
-                s_op->ds_attr.type = PVFS_TYPE_DATAFILE;
-                s_op->ds_attr.u.datafile.b_size = 0;
+                s_op->attr.objtype = PVFS_TYPE_DATAFILE;
+                s_op->attr.u.data.size = 0;
             }
             else if (s_op->req->ctrl.sub == PVFS_REQ_DIRDATA)
             {
-                s_op->ds_attr.type = PVFS_TYPE_DIRDATA;
-                s_op->ds_attr.u.dirdata.dirent_count = 0;
+                s_op->attr.objtype = PVFS_TYPE_DIRDATA;
+                s_op->attr.u.dirdata.dirent_count = 0;
             }
             else
             {
@@ -383,12 +397,53 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             js_p->error_code = 0;
             break;
         default:
-                gossip_err("Prelude has request of unknown op %d\n",
-                           s_op->req->op);
-                create_object = 0;
-                js_p->error_code = ENOENT;
+            gossip_err("Prelude has request of unknown op %d\n", s_op->req->op);
+            create_object = 0;
+            js_p->error_code = ENOENT;
             break;
         }
+    }
+
+    /* initialize the time members */
+    /* these are used for fine-grain time values */
+    current_time = time(NULL);
+    s_op->attr.atime = current_time;
+    s_op->attr.mtime = current_time;
+    s_op->attr.ctime = current_time;
+    s_op->attr.ntime = current_time;
+
+
+    /* DIRDATA needs a set of dist_dir_data fields for distributed diretories
+     * and such.  This needs to be passed by the caller, which is normally a server
+     * in the midst of MKDIR operation so mkdir needs to have this info in its
+     * attributes, which it does - just be sure its filled in.  Theoretically this
+     * could also result from a CRDIRENT which wants to put an entry in a missing
+     * dirdata.  Unfortunately crdirent does not pass an attribute.  Normally a
+     * crdirent comes from a CREATE, which reads attributes from the parent dir
+     * including this stuff, and issues the crdirent, so it could pass the attr
+     * if the crdirent req had an attr field.
+     */
+    if (s_op->attr.objtype == PVFS_TYPE_DIRDATA)
+    {
+        s_op->attr.u.dirdata.dirent_count = 0; /* new object no items */
+
+        s_op->attr.u.dirdata.dist_dir_attr.tree_height =
+                        s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.tree_height;
+        
+        s_op->attr.u.dirdata.dist_dir_attr.dirdata_count =
+                        s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.dirdata_count;
+
+        s_op->attr.u.dirdata.dist_dir_attr.sid_count =
+                        s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.sid_count;
+
+        s_op->attr.u.dirdata.dist_dir_attr.bitmap_size =
+                        s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.bitmap_size;
+
+        s_op->attr.u.dirdata.dist_dir_attr.split_size =
+                        s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.split_size;
+
+        s_op->attr.u.dirdata.dist_dir_attr.server_no =
+                        s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.server_no;
     }
 
 #if 0
@@ -419,12 +474,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     }
 #endif
 
-    /*
-     * first we translate the dspace attributes into a more convenient
-     * server use-able format.  i.e. a PVFS_object_attr
-     */
-    PVFS_object_attr_from_ds_attr(&s_op->attr, &s_op->ds_attr);
 
+#if 0
     if ( s_op->attr.objtype == PVFS_TYPE_DATAFILE )
     {
        s_op->attr.mask = PVFS_ATTR_DATA_ALL;
@@ -438,6 +489,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     {
        s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
     }
+#endif
 
     s_op->target_object_attr = &s_op->attr;
 
@@ -645,7 +697,6 @@ complete:
     if (js_p->error_code == 0 && create_object == 1)
     {
         js_p->error_code = CREATE_OBJECT;
-    }
 #if 0
         if (s_op->attr.objtype == PVFS_TYPE_DATAFILE)
         {
@@ -655,8 +706,8 @@ complete:
         {
             js_p->error_code = CREATE_DIRDATA_OBJECT;
         }
-    }
 #endif
+    }
     return SM_ACTION_COMPLETE;
 }
 
@@ -665,8 +716,7 @@ complete:
  * attributes
  */
 //static PINT_sm_action prelude_create_data_object_if_allowed(
-static PINT_sm_action prelude_create_object_if_allowed(
-                                                       struct PINT_smcb *smcb,
+static PINT_sm_action prelude_create_object_if_allowed(struct PINT_smcb *smcb,
                                                        job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -678,44 +728,20 @@ static PINT_sm_action prelude_create_object_if_allowed(
                  "(%p) %s (prelude sm) state: req_sched\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
     gossip_debug(GOSSIP_SERVER_DEBUG, "creating missing object\n");
-#if 0
-    /* RAL:  revisit the operations allowed to create a DATAFILE dspace record
-     */ 
-    switch (s_op->req->op)
-    {
-    /* data object specific */
-    case PVFS_SERV_IO :
-    case PVFS_SERV_SMALL_IO :
-    case PVFS_SERV_TRUNCATE :
-    /* either data or dirdata */
-    case PVFS_SERV_GETATTR :
-    case PVFS_SERV_SETATTR :
-    case PVFS_SERV_GETEATTR :
-    case PVFS_SERV_SETEATTR :
-    case PVFS_SERV_DELEATTR :
-    case PVFS_SERV_LISTEATTR :
-    case PVFS_SERV_ATOMICEATTR :
-#endif
-        /* setup and post dspace create job */
-        ret = job_trove_dspace_create(s_op->target_fs_id,
-                                      s_op->target_handle,
-                                      s_op->attr.objtype,
-                                      NULL, /* hint */
-                                      0,    /* flags */
-                                      smcb, /* user_ptr */
-                                      0,    /* status_user_tag */
-                                      js_p,
-                                      &tmp_id,
-                                      server_job_context,
-                                      s_op->req->hints);
-        return ret;
-#if 0
-    default :
-        break;
-    }
 
-    return SM_ACTION_COMPLETE;
-#endif
+    /* setup and post dspace create job */
+    ret = job_trove_dspace_create(s_op->target_fs_id,
+                                  s_op->target_handle,
+                                  s_op->attr.objtype,
+                                  NULL, /* hint */
+                                  0,    /* flags */
+                                  smcb, /* user_ptr */
+                                  0,    /* status_user_tag */
+                                  js_p,
+                                  &tmp_id,
+                                  server_job_context,
+                                  s_op->req->hints);
+    return ret;
 }
 
 #if 0
@@ -775,7 +801,6 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
-    time_t current_time;
     int ret;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
@@ -792,9 +817,9 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
     case PVFS_SERV_IO :
     case PVFS_SERV_GETATTR :
     case PVFS_SERV_SETATTR :
-#endif
 
     /* initialize the time members */
+    /* these are used for fine-grain time values */
     current_time = time(NULL);
     s_op->ds_attr.atime = current_time;
     s_op->ds_attr.mtime = current_time;
@@ -814,6 +839,10 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
     s_op->ds_attr.gid = s_op->attr.group;
     s_op->ds_attr.mode = s_op->attr.perms;
     */
+    /* These are op specific (this func is not) and I don't
+     * think we need these values - access to this object should
+     * be controlled by capabilities
+     */
     s_op->ds_attr.uid = s_op->req->u.setattr.attr.owner;
     s_op->ds_attr.gid = s_op->req->u.setattr.attr.group;
     s_op->ds_attr.mode = s_op->req->u.setattr.attr.perms;
@@ -822,6 +851,7 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
     switch (s_op->ds_attr.type)
     {
     case PVFS_TYPE_DIRDATA :
+        /* is anythin IN s_op->attr at this point after failing the initial search? */
         s_op->ds_attr.u.dirdata.dirent_count = 0; /* new object no items */
         s_op->ds_attr.u.dirdata.tree_height = 
                            s_op->attr.u.dirdata.dist_dir_attr.tree_height;
@@ -844,6 +874,13 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
     default:
         break;
     }
+#endif
+
+    /* PVFS_object_attr_from_ds_attr(&s_op->attr, &s_op->ds_attr); */
+    PVFS_ds_attr_from_object_attr(&s_op->ds_attr, &s_op->attr);
+
+    s_op->ds_attr.fs_id =  s_op->target_fs_id;
+    s_op->ds_attr.handle = s_op->target_handle;
 
     /* post dspace setattr job */
     ret = job_trove_dspace_setattr(s_op->target_fs_id,
@@ -866,25 +903,29 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
 #endif
 }
 
+/*
+ * This runs on a mkdir when the dirdata object has not been created
+ * yet.
+ */
 static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
                                                       job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i = 0;
+    //int i = 0;
     PVFS_object_attr *pattr;
     int ret = -1;
     job_id_t j_id;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "(%p) %s (prelude sm) state: req_sched\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
+                 "(%p) %s (prelude sm) state: write_new_object_keyval\n",
+                 s_op, PINT_map_server_op_to_string(s_op->req->op));
     gossip_debug(GOSSIP_SERVER_DEBUG, "writing keyvals for new object\n");
 
     /* total 3 static keyvals every dirdata has:
      * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES, PARENT */
     int keyval_count = 3;
 
-    pattr = &s_op->req->u.mkdir.attr;
+    pattr = &s_op->req->u.mkdir.attr; /* mkdir specific? */
 
     s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
     if(!s_op->key_a)
@@ -896,8 +937,6 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
 
     s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
 
-    /*gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals %s\n", s_op->val_a); */
-
     if(!s_op->val_a)
     {
         free(s_op->key_a);
@@ -906,6 +945,9 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
     }
     ZEROMEM(s_op->val_a, (sizeof(PVFS_ds_keyval) * keyval_count));
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals k:%p v:%p\n",
+                                       (void *)s_op->key_a, (void *)s_op->val_a); 
+
 /*---------------------------------------------------------------------------*/
 
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
@@ -913,8 +955,10 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
 
     s_op->val_a[0].buffer_sz = pattr->u.dir.dist_dir_attr.bitmap_size *
                                sizeof(PVFS_dist_dir_bitmap_basetype);
-    s_op->val_a[0].buffer = pattr->u.dir.dist_dir_bitmap;
-    /*gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals %s\n", s_op->val_a); */
+    s_op->val_a[0].buffer = (void *)&pattr->u.dir.dist_dir_bitmap;
+    gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals0 %p sz %d\n",
+                                      (void *)s_op->val_a[0].buffer,
+                                      s_op->val_a[0].buffer_sz);
     keep_keyval_buffers(s_op, 0);
 
 /*---------------------------------------------------------------------------*/
@@ -924,8 +968,10 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
 
     s_op->val_a[1].buffer_sz = OSASZ(pattr->u.dir.dist_dir_attr.dirdata_count,
                                      pattr->u.dir.dist_dir_attr.sid_count);
-    s_op->val_a[1].buffer = pattr->u.dir.dirdata_handles;
-    /*gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals %s\n", s_op->val_a);*/
+    s_op->val_a[1].buffer = (void *)&pattr->u.dir.dirdata_handles;
+    gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals1 %p sz %d\n",
+                                      (void *)s_op->val_a[1].buffer,
+                                      s_op->val_a[1].buffer_sz);
     keep_keyval_buffers(s_op, 1);
 
 /*---------------------------------------------------------------------------*/
@@ -934,23 +980,25 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
     s_op->key_a[2].buffer = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
 
     s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.mkdir.sid_count);
-    s_op->val_a[2].buffer = s_op->req->u.mkdir.parent;
-
-/*---------------------------------------------------------------------------*/
+    s_op->val_a[2].buffer = (void *)&s_op->req->u.mkdir.parent;
+    gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals2 %p sz %d\n",
+                                      (void *)s_op->val_a[2].buffer,
+                                      s_op->val_a[2].buffer_sz);
 
     keep_keyval_buffers(s_op, 2);
+/*---------------------------------------------------------------------------*/
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "  writing dist-dir-struct keyvals for dirdata: %s "
+                 "  writing kvals for dirdata: %s "
                  "\t with server_no=%d and branch_level=%d \n",
-                 PVFS_OID_str(&s_op->u.mkdir.handle),
-                 pattr->u.dir.dist_dir_attr.server_no,
-                 pattr->u.dir.dist_dir_attr.branch_level);
+                 PVFS_OID_str(&s_op->target_handle),
+                 s_op->attr.u.dirdata.dist_dir_attr.server_no,
+                 s_op->attr.u.dirdata.dist_dir_attr.branch_level);
 
-    i = s_op->u.mkdir.handle_index;
+    //i = s_op->u.mkdir.handle_index;
 
-    ret = job_trove_keyval_write_list(s_op->req->u.mkdir.fs_id,
-                                      s_op->req->u.mkdir.dirdata_handles[i],
+    ret = job_trove_keyval_write_list(s_op->target_fs_id,
+                                      s_op->target_handle,
                                       s_op->key_a,
                                       s_op->val_a,
                                       keyval_count,

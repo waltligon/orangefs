@@ -450,6 +450,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         dest->u.dir.hint.dfile_sid_count =
                 src->u.dir.hint.dfile_sid_count;
         /* end hints */
+        /* begin dist_dir_attr */
         dest->u.dir.dist_dir_attr.tree_height =
                 src->u.dir.dist_dir_attr.tree_height;
         dest->u.dir.dist_dir_attr.dirdata_count =
@@ -464,6 +465,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
                 src->u.dir.dist_dir_attr.server_no;
         dest->u.dir.dist_dir_attr.branch_level =
                 src->u.dir.dist_dir_attr.branch_level;
+        /* begin dist_dir_attr */
         CLRFIELD(dest->u.dir.dist_dir_bitmap);
         CLRPACK(dir.dirdata_handles,
                 dir.dirdata_sids,
@@ -471,6 +473,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         /**/
         break;
     case PVFS_TYPE_DIRDATA:
+        /* begin dist_dir_attr */
         dest->u.dirdata.dirent_count =
                 src->u.dirdata.dirent_count;
         dest->u.dirdata.dist_dir_attr.tree_height =
@@ -487,6 +490,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
                 src->u.dirdata.dist_dir_attr.server_no;
         dest->u.dirdata.dist_dir_attr.branch_level =
                 src->u.dirdata.dist_dir_attr.branch_level;
+        /* begin dist_dir_attr */
         CLRFIELD(dest->u.dirdata.dist_dir_bitmap);
         CLRPACK(dirdata.dirdata_handles,
                 dirdata.dirdata_sids,

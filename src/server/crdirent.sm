@@ -668,14 +668,14 @@ static PINT_sm_action crdirent_update_directory_attr(
         }
 
         /* map owner from credential */
-        if (dspace_attr->mask & PVFS_ATTR_COMMON_UID &&
+        if ((dspace_attr->mask & PVFS_ATTR_COMMON_UID) &&
             dspace_attr->owner == PVFS_UID_MAX)
         {
             dspace_attr->owner = uid;
         }
 
         /* map primary group from credential */
-        if (dspace_attr->mask & PVFS_ATTR_COMMON_GID &&
+        if ((dspace_attr->mask & PVFS_ATTR_COMMON_GID) &&
             dspace_attr->group == PVFS_GID_MAX)
         {
             dspace_attr->group = group_array[0];
@@ -739,6 +739,11 @@ static PINT_sm_action crdirent_update_metahandle_timestamp(
     else
     {
         /* remote */
+        gossip_debug(GOSSIP_SERVER_DEBUG, "About to send setattr "
+                     "request for metadata handle %s\n",
+                     PVFS_OID_str(&s_op->req->u.crdirent.new_handle));
+        /* if we get an error somewhere we will not take this jump */
+        js_p->error_code = REMOTE_METAHANDLE;
 
         PINT_sm_msgpair_state *msg_p = NULL;
         PVFS_handle *capability_handles = NULL;
@@ -792,26 +797,34 @@ static PINT_sm_action crdirent_update_metahandle_timestamp(
                                   PVFS_ATTR_COMMON_CTIME,
                                   s_op->req->hints);
 
+        msg_p->msgclass = PVFS_IO_METADATA;
+        msg_p->msgdir = PVFS_IO_WRITE;
         msg_p->fs_id = s_op->req->u.crdirent.fs_id;
         msg_p->handle = s_op->req->u.crdirent.new_handle;
+        msg_p->sid_count = s_op->req->u.crdirent.sid_count;
+        msg_p->sid_index = 0;
+        msg_p->sid_array = s_op->req->u.crdirent.new_sid_array;
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = NULL;
 
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "setting timestamps for handle %s\n"
+                     "               SID %s\n",
+                     PVFS_OID_str(&msg_p->handle),
+                     PVFS_SID_str(&s_op->req->u.crdirent.new_sid_array[0])
+                     );
+
         ret = PVFS_SID_get_addr(&msg_p->svr_addr,
                                 &s_op->req->u.crdirent.new_sid_array[0]);
-
         if (ret)
         {
             gossip_err("Failed to map dirdata server address\n");
             js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
         }
 
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "setting timestamps for handle %s\n",
-                     PVFS_OID_str(&msg_p->handle));
-
+        /* ready to submit the requests */
         PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
-        js_p->error_code = REMOTE_METAHANDLE;
         return SM_ACTION_COMPLETE;
     }
 

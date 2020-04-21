@@ -206,10 +206,13 @@ int main(int argc, char **argv)
     int ret = -1, siglevel = 0;
     struct PINT_smcb *tmp_op = NULL;
     PVFS_debug_mask debug_mask = GOSSIP_NO_DEBUG;
+    int debug_on = 0;
 
 #ifdef WITH_MTRACE
     mtrace();
 #endif
+
+    fprintf(stderr, "Entering main ...\n");
 
     /* Passed to server shutdown function */
     server_status_flag = SERVER_DEFAULT_INIT;
@@ -258,7 +261,7 @@ int main(int argc, char **argv)
     }
     server_status_flag |= SERVER_SID_INIT;
 
-    gossip_log("PINT_parse_config called from main\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "PINT_parse_config called from main\n");
     /* read the local config file first to get initial settings */
     /* code to handle older two config file format */
     ret = PINT_parse_config(&server_config,
@@ -272,7 +275,7 @@ int main(int argc, char **argv)
         ret = -PVFS_EINVAL;
         goto server_shutdown;
     }
-    gossip_log("PINT_parse_config complete\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "PINT_parse_config complete\n");
 
     /* V3 retrieve aux and remote config files as needed 
      * not active just yet
@@ -310,12 +313,11 @@ int main(int argc, char **argv)
 
     /* reset gossip debug mask based on configuration settings */
     debug_mask = PVFS_debug_eventlog_to_mask(server_config.event_logging);
+    debug_on = DBG_TRUE(debug_mask);
+    gossip_set_debug_mask(debug_on, debug_mask);
 
-    gossip_err("Config gossip debug flag %d\n", gossip_debug_on);
-
-    gossip_set_debug_mask(1, debug_mask);
     gossip_set_logstamp(server_config.logstamp_type);
-    gossip_debug(GOSSIP_SERVER_DEBUG, "Logging %s (mask %llu %llu)\n",
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Logging %s (mask %llx %llx)\n",
                  server_config.event_logging, 
                  llu(debug_mask.mask1), llu(debug_mask.mask2));
 
@@ -614,17 +616,20 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
                              job_status_s *job_status_structs)
 {
     int ret = 0, i = 0; 
-    FILE *dummy;
-    PVFS_debug_mask debug_mask, old_debug_mask;
+    FILE *dummy = NULL;
+    /* int old_flag = 0; */
+    /* PVFS_debug_mask old_debug_mask = {0, 0}; */
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "Initializing server\n");
 
-    old_debug_mask = PVFS_debug_eventlog_to_mask(server_config.event_logging);
-    debug_mask = GOSSIP_NO_DEBUG;
-    gossip_set_debug_mask(1, debug_mask);
+    /* Grab a copy of the config mask set mask to server for
+     * initialization routines.  Then we will reset down below
+     */
     
     assert(server_config.logfile != NULL);
 
+    /* Set up log file if there is one */
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Open log file\n");
     if(!strcmp(server_config.logtype, "file"))
     {
         dummy = fopen(server_config.logfile, "a");
@@ -637,6 +642,9 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
         }
         fclose(dummy);
     }
+
+    /* Enable gossip on requested service */
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Redirecting gossip output\n");
 
     /* redirect gossip to specified target if backgrounded */
     if (s_server_options.server_background)
@@ -651,7 +659,8 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
         if(!strcmp(server_config.logtype, "syslog"))
         {
             ret = gossip_enable_syslog(LOG_INFO);
-        }
+        } 
+        /* copy the relative path into the string for the user */
         else if(!strcmp(server_config.logtype, "file"))
         {
             ret = gossip_enable_file(server_config.logfile, "a");
@@ -671,9 +680,9 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
          * console
          */
         gossip_log("PVFS2 Server version %s starting.\n", PVFS2_VERSION);
-        debug_mask = PVFS_debug_eventlog_to_mask(server_config.event_logging);
-        gossip_set_debug_mask(1, debug_mask);
     }
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Set up working environment\n");
 
     /* handle backgrounding, setting up working directory, and so on. */
     ret = server_setup_process_environment(
@@ -684,6 +693,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
         return ret;
     }
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Initialize Security\n");
     /* initialize the security module */
     ret = PINT_security_initialize();
     if (ret < 0)
@@ -696,6 +706,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
     *server_status_flag |= SERVER_SECURITY_INIT;
 
 #ifdef ENABLE_CAPCACHE
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Initialize Capcache\n");
     /* initialize the capability cache */
     ret = PINT_capcache_init();
     if(ret < 0)
@@ -709,6 +720,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
 #endif /* ENABLE_CAPCACHE */
 
 #ifdef ENABLE_CREDCACHE
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Initialize Credcache\n");
     /* initialize the credential cache */
     ret = PINT_credcache_init();
     if(ret < 0)
@@ -722,6 +734,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
 #endif
 
 #ifdef ENABLE_CERTCACHE
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Initialize Certcache\n");
     /* initialize the certificate cache */
     ret = PINT_certcache_init();
     if (ret < 0)
@@ -732,7 +745,6 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
     }
 
     *server_status_flag |= SERVER_CERTCACHE_INIT;
-
     /* cache CA cert */
     ret = PINT_security_cache_ca_cert();
     if (ret != 0)
@@ -741,6 +753,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
     }
 #endif
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Initialize Subsystems\n");
     /* Initialize the bmi, flow, trove and job interfaces */
     ret = server_initialize_subsystems(server_status_flag);
     if (ret < 0)
@@ -768,11 +781,18 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
 
     *server_status_flag |= SERVER_SIGNAL_HANDLER_INIT;
 
-    debug_mask = old_debug_mask;
-    gossip_set_debug_mask(1, debug_mask);
-
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "Initialization completed successfully.\n");
+
+    /* restore gossip debug mask */
+    /* fprintf(stderr, "old flag = %d mask = %lx %lx\n",
+     *      old_flag, old_debug_mask.mask1, old_debug_mask.mask2);
+     */
+    /* gossip_set_debug_mask(old_flag, old_debug_mask); */
+    /* not sure what the old_mask etc is about - I think we just run
+     * with what we have
+     */
+    /* gossip_pop_mask(NULL, NULL); */
 
     return ret;
 }
@@ -1769,8 +1789,14 @@ static void reload_config(void)
         
         gossip_log("Enabling gossip debug via config reload\n");
         /* Reset the debug mask */
+        /* I think we can just pop here */
         gossip_set_debug_mask(1,
                 PVFS_debug_eventlog_to_mask(orig_server_config->event_logging));
+        /* not sure why a pop here, there is no push or other temp
+         * change of the mask.  I think at this point we just set
+         * it to the new value (function above)
+         */
+        /* gossip_pop_mask(NULL, NULL); */
         if (gossip_debug_on)
         {
             gossip_log("gossip debug turned on\n");

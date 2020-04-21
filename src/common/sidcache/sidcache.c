@@ -369,10 +369,11 @@ void SID_cacheval_pack(const SID_cacheval_t *cacheval, DBT *val)
         return;
     }
     val->data = (SID_cacheval_t *)cacheval;
+    /*
     val->size = (sizeof(int) * SID_NUM_ATTR) +
                  sizeof(BMI_addr) +
-                 strlen(cacheval->url) +
-                 1;
+     */
+    val->size = sizeof(SID_cacheval_t) + strlen(cacheval->url) + 1;
     val->ulen = val->size;
     val->flags = DB_DBT_USERMEM;
 }
@@ -401,13 +402,13 @@ int SID_cacheval_alloc(SID_cacheval_t **cacheval,
 
     /* Mallocing space for the SID_cacheval_t struct */
     *cacheval = (SID_cacheval_t *)malloc(sizeof(SID_cacheval_t) +
-                                                (strlen(sid_url) + 1));
+                                         (strlen(sid_url) + 1));
     if (!*cacheval)
     {
         gossip_err("%s: failed to malloc cacheval\n", __func__);
         return -1;
     }
-    SID_cacheval_init(cacheval);
+    SID_cacheval_init(cacheval); /* sets up url pointer */
     
     /* Setting the values of the SID_cacheval_t struct */    
     if (sid_attributes)
@@ -453,7 +454,8 @@ void SID_cacheval_unpack(SID_cacheval_t **cacheval, DBT *data)
     {
         return;
     }
-    memcpy(*cacheval, data->data, data->size);
+    memcpy(*cacheval, data->data, data->size); /* includes url copy */
+    (*cacheval)->url = (char *)&(*cacheval)[1];
 }
 
 /* <====================== SID CACHE FUNCTIONS ============================> */
@@ -895,6 +897,15 @@ int SID_cache_put(DB *dbp,
     {
         *num_db_records += 1;
     }
+    /*
+     * gossip not running yet
+     */
+    /*
+    gossip_debug(GOSSIP_SIDCACHE_DEBUG, "sidcache adds record for SID %s\n",
+                 PVFS_SID_str(sid_server));
+    */
+    fprintf(stderr, "sidcache adds record for SID %s\n",
+                 PVFS_SID_str(sid_server));
 
     return(ret);
 }
@@ -917,6 +928,9 @@ int SID_cache_get(DB *dbp,
     DBT key, val;
 
     SID_zero_dbt(&key, &val, NULL);
+
+    gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Searching sidcache for %s\n",
+                                        PVFS_SID_str(sid_server));
 
     key.data = (PVFS_SID *)sid_server;
     key.size = sizeof(PVFS_SID);
@@ -949,8 +963,11 @@ int SID_cache_get(DB *dbp,
     }
     else
     {
-        /* report an error */
+        gossip_err("SID_cache_get returns a null data pointere\n");
+        return -1;
     }
+    gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Sidcache returns %s\n",
+                                        (*cacheval)->url);
     
     return(ret);
 }
@@ -1917,6 +1934,9 @@ int SID_bulk_insert_into_sid_cache(DB *dbp, DBT *input)
                            "Error cannot fit into write buffer\n");
             break;
         }
+        /*gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Record bulk added %s\n",
+                    );
+         */
     }
 
     /* Bulk insert of output bulk buffer */

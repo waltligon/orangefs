@@ -467,14 +467,62 @@ static const configoption_t options[] =
      */
     {"</ServerDefines>", ARG_NONE, exit_server_context, NULL, CTX_SERVER, NULL},
 
-    /* THis groups defines for a single server
+    /* This groups defines for a single server
      */
     {"<ServerDef>", ARG_NONE, enter_serverdef_context, NULL, CTX_SERVER, NULL},
 
     /* Specifies the end-tag for the ServerDef context.
      */
-    {"</ServerDef>", ARG_NONE, exit_serverdef_context, NULL, CTX_SERVERDEF, NULL},
+    {"</ServerDef>", ARG_NONE, exit_serverdef_context, NULL,
+                    CTX_SERVERDEF, NULL},
 
+    /* /ServerOptions
+     * This groups the Server specific options.
+     *
+     * The ServerOptions context should be defined after the Alias mappings 
+     * have been defined. The reason is that the ServerOptions context is
+     * defined in terms of the aliases defined in that context.
+     *
+     * Default options applicable to all servers can be overridden on
+     * a per-server basis in the ServerOptions context.
+     * To illustrate:
+     * Suppose the Option name is X, its default value is Y,
+     * and one wishes to override the option for a server to Y'.
+     *
+     * Defaults
+     * ..
+     * X Y
+     * ..
+     * /Defaults
+     *
+     * ServerDefines
+     *     ServerDef
+     *         Alias {server alias}
+     *         ServerOptions
+     *             ..
+     *             X Y'
+     *             ..
+     *         /ServerOptions
+     *     /ServerDef
+     * /ServerDefines
+     *
+     * The ServerOptions context REQUIRES the Server option specify
+     * the server Alias, which sets the remaining options specified
+     * in the context for that server.
+     */
+    {"<ServerOptions>", ARG_NONE, enter_server_options_context, NULL,
+            CTX_SERVERDEF, NULL},
+
+    /* Specifies the end-tag of the ServerOptions context.
+     */
+    {"</ServerOptions>", ARG_NONE, exit_server_options_context, NULL,
+            CTX_SERVER_OPTIONS, NULL},
+
+    /* These options belong in a ServerDef before but not inside the
+     * ServerOptions if one exists.  These define critical attributes
+     * for the server record and some are needed to make the parser work
+     * correctly (Alias for example)
+     */
 
     /* Specifies an alias in the form of a non-whitespace string that
      * can be used to reference a BMI server address (a HostID).  This
@@ -529,49 +577,14 @@ static const configoption_t options[] =
      */
     {"Attribute", ARG_LIST, get_attribute_list, NULL, CTX_SERVERDEF, NULL},
 
-    /* This groups the Server specific options.
-     *
-     * The ServerOptions context should be defined after the Alias mappings 
-     * have been defined. The reason is that the ServerOptions context is
-     * defined in terms of the aliases defined in that context.
-     *
-     * Default options applicable to all servers can be overridden on
-     * a per-server basis in the ServerOptions context.
-     * To illustrate:
-     * Suppose the Option name is X, its default value is Y,
-     * and one wishes to override the option for a server to Y'.
-     *
-     * Defaults
-     * ..
-     * X Y
-     * ..
-     * /Defaults
-     *
-     * ServerOptions
-     * Server {server alias}
-     * ..
-     * X Y'
-     * ..
-     * /ServerOptions
-     *
-     * The ServerOptions context REQUIRES the Server option specify
-     * the server alias, which sets the remaining options specified
-     * in the context for that server.
-    */
-    {"<ServerOptions>", ARG_NONE, enter_server_options_context, NULL,
-            CTX_SERVERDEF, NULL},
-
-    /* Specifies the end-tag of the ServerOptions context.
-     */
-    {"</ServerOptions>", ARG_NONE, exit_server_options_context, NULL,
-            CTX_SERVER_OPTIONS, NULL},
-
+    /* Server is obsolete, see Alias */
     /* Defines the server alias for the server specific options that
      * are to be set within the ServerOptions context.
      */
     {"Server", ARG_STR, check_this_server, NULL, CTX_SERVER_OPTIONS, NULL},
 
-    /* This groups options specific to a file system.  An OrangeFS server may manage
+    /* This groups options specific to a file system.  
+     * An OrangeFS server may manage
      * more than one file system, so a config file may have more than
      * one FileSystem context, each defining the parameters of a different
      * file system.
@@ -615,7 +628,8 @@ static const configoption_t options[] =
     /* Provides a context for defining the file system's default
      * distribution to use and the parameters to be set for that distribution.
      *
-     * Valid options within the Distribution context are <c>Name</c>, <c>Param</c>, and <c>Value</c>.
+     * Valid options within the Distribution context are <c>Name</c>,
+     *                                    <c>Param</c>, and <c>Value</c>.
      *
      * This context is an optional context within the FileSystem context.  If
      * not specified, the file system defaults to the simple-stripe distribution.
@@ -649,7 +663,8 @@ static const configoption_t options[] =
      *
      * <c>RootHandle {</c><i>OID</i><c>}</c>
      *
-     * Where <c>{</c><i>OID</i><c>}</c> is a UUID: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+     * Where <c>{</c><i>OID</i><c>}</c> is 
+     *                 a UUID: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
      *
      * In general its best to let the pvfs-genconfig script specify a
      * RootHandle value for the file system.
@@ -695,7 +710,7 @@ static const configoption_t options[] =
      * replication).
      */
     {"MetaReplicationFactor", ARG_INT, get_filesystem_replication, NULL,
-            CTX_FILESYSTEM, NULL},
+            CTX_FILESYSTEM, "1"},
 
     /* maximum number of AIO operations that Trove will allow to run
      * concurrently 
@@ -1068,12 +1083,14 @@ static const configoption_t options[] =
      * The format of this option is a comma-separated list of one or more
      * of the above values.  For example:
      *
+     * The last 4 items are all one string argument
+     *
      * <c>AttrCacheKeywords dh,md,de,st</c>
      */
     {"AttrCacheKeywords",ARG_LIST, get_attr_cache_keywords_list,NULL,
         CTX_STORAGEHINTS, 
-        DATAFILE_HANDLES_KEYSTR","METAFILE_DIST_KEYSTR","
-        DIRECTORY_ENTRY_KEYSTR","SYMLINK_TARGET_KEYSTR},
+                DATAFILE_HANDLES_KEYSTR","METAFILE_DIST_KEYSTR","
+                DIRECTORY_ENTRY_KEYSTR","SYMLINK_TARGET_KEYSTR},
     
     /* The attribute cache in the TROVE layer mentioned in the documentation
      * for the AttrCacheKeywords option is managed as a hashtable.  The
@@ -1151,14 +1168,14 @@ static const configoption_t options[] =
      * and it determines whether to use that value or not.
      */
     {"DefaultNumDFiles", ARG_INT, get_default_num_dfiles, NULL,
-        CTX_FILESYSTEM, "0"},
+        CTX_FILESYSTEM, "1"},
 
     /* This option specifies the default number of datafiles to use
      * when a new file is created.  The value is passed to the distribution
      * and it determines whether to use that value or not.
      */
     {"DefaultDFileReplication", ARG_INT, get_default_dfile_replication, NULL,
-        CTX_FILESYSTEM, NULL},
+        CTX_FILESYSTEM, "1"},
 
     {"ImmediateCompletion", ARG_STR, get_immediate_completion, NULL,
         CTX_STORAGEHINTS, "no"},
@@ -1323,6 +1340,11 @@ int PINT_parse_config(struct server_configuration_s *config_obj,
     config_s->client_retry_delay_ms = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
     config_s->trove_max_concurrent_io = 16;
     config_s->db_max_size = 536870912;
+
+    /* set up a couple critical parsing variables
+     */
+    config_s->my_server_options = 0;
+    config_s->server_defaults = 0;
 
     if (cache_config_files(config_s, global_config_filename))
     {
@@ -1518,11 +1540,54 @@ DOTCONF_CB(get_logstamp)
     struct server_configuration_s *config_s = 
             (struct server_configuration_s *)cmd->context;
 
+/*
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
         return NULL;
     }
+*/
+
+    gossip_debug(GOSSIP_CONFIG_DEBUG, "Entering get_logstamp:%d\n",
+                    config_s->logstamp_type);
+
+    gossip_debug(GOSSIP_CONFIG_DEBUG,
+                 "Context = %d Myserver = %d " "ServDefaults = %d\n",
+                 config_s->configuration_context, 
+                 config_s->my_server_options, config_s->server_defaults);
+
+    /* These options can be used in either CTX_SERVER_OPTIONS or
+     * other contexts in the config file (CTX_DEFAULTS in this
+     * case).  This logic bypasses getting this option in the
+     * case where we are in CTS_SERVER_OPTIONS for the current
+     * server.  This code only runs in CTX_DEFAULTS or my_server.
+     */
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        gossip_debug(GOSSIP_CONFIG_DEBUG, "get_logstamp: bailing out\n");
+        return NULL;
+    }
+    /* if we are processing defaults we do NOT want to blow
+     * away what is in the config, it IS the default, possibly
+     * higher level than the lowest level defaults we are about to
+     * set
+     */
+    if (config_s->logstamp_type != 0) 
+    {
+        if (config_s->server_defaults)
+        {
+            /* don't override a higher level default */
+            gossip_debug(GOSSIP_CONFIG_DEBUG,
+                         "get_logstamp: keeping default\n");
+            return NULL;
+        }
+        config_s->logstamp_type = 0;
+    }
+    gossip_debug(GOSSIP_CONFIG_DEBUG,
+                 "get_logstamp: setting new default %d\n", 
+                 config_s->logstamp_type);
+
     if(!strcmp(cmd->data.str, "none"))
     {
         config_s->logstamp_type = GOSSIP_LOGSTAMP_NONE;
@@ -1541,7 +1606,8 @@ DOTCONF_CB(get_logstamp)
     }
     else
     {
-        return("LogStamp tag (if specified) must have one of the following values: none, usec, or datetime.\n");
+        return("LogStamp tag (if specified) must have one of the "
+        "following values: none, usec, datetime or thread.\n");
     }
 
     return NULL;
@@ -1609,6 +1675,10 @@ DOTCONF_CB(get_meta_path)
     return NULL;
 }
 
+/* enter_defaults_context <Defaults>
+ * CTX_GLOBAL -> CTX_DEFAULTS
+ * set defaults for security and defaults
+ */
 DOTCONF_CB(enter_defaults_context)
 {
     struct server_configuration_s *config_s = 
@@ -1625,6 +1695,9 @@ DOTCONF_CB(enter_defaults_context)
     return PINT_dotconf_set_defaults(cmd->configfile, CTX_DEFAULTS);
 }
 
+/* exit_defaults_context </Defaults>
+ * CTX_GLOBAL <- CTX_DEFAULTS
+ */
 DOTCONF_CB(exit_defaults_context)
 {
     struct server_configuration_s *config_s = 
@@ -1653,6 +1726,9 @@ DOTCONF_CB(exit_security_context)
     return NULL;
 }
 
+/* enter_server_context <ServerDefines>
+ * CTX_GLOBAL -> CTX_SERVER
+ */
 DOTCONF_CB(enter_server_context)
 {
     struct server_configuration_s *config_s = 
@@ -1661,6 +1737,9 @@ DOTCONF_CB(enter_server_context)
     return NULL;
 }
 
+/* enter_server_context </ServerDefines>
+ * CTX_GLOBAL <- CTX_SERVER
+ */
 DOTCONF_CB(exit_server_context)
 {
     struct server_configuration_s *config_s = 
@@ -1669,6 +1748,9 @@ DOTCONF_CB(exit_server_context)
     return NULL;
 }
 
+/* enter_serverdef_context </ServerDef>
+ * CTX_SERVER -> CTX_SERVERDEF
+ */
 DOTCONF_CB(enter_serverdef_context)
 {
     struct server_configuration_s *config_s = 
@@ -1687,7 +1769,8 @@ DOTCONF_CB(enter_serverdef_context)
     return NULL;
 }
 
-/* This only exists to match argument types for an llist doall below
+/* This only exists to match argument types for an llist doall 
+ * in exit_serverdef_context below
  */
 static int SID_update_type_2(void *item, void *arg);
 static int SID_update_type_2(void *item, void *arg)
@@ -1695,6 +1778,9 @@ static int SID_update_type_2(void *item, void *arg)
     return SID_update_type((PVFS_SID *)arg, (struct SID_type_s *)item);
 }
 
+/* enter_serverdef_context </ServerDef>
+ * CTX_SERVER <- CTX_SERVERDEF
+ */
 DOTCONF_CB(exit_serverdef_context)
 {
     int ret;
@@ -1779,6 +1865,10 @@ DOTCONF_CB(exit_serverdef_context)
     return NULL;
 }
 
+/* enter_filesystem_context </FileSystem>
+ * CTX_GLOBAL -> CTX_FILESYSTEM
+ * set defaults for filesystems
+ */
 DOTCONF_CB(enter_filesystem_context)
 {
     struct server_configuration_s *config_s = 
@@ -1799,7 +1889,11 @@ DOTCONF_CB(enter_filesystem_context)
     }
     memset(fs_conf, 0, sizeof(struct filesystem_configuration_s));
 
-    /* fill any fs defaults here */
+    /* fill any fs defaults here 
+     * these are hard built-in defaults, but there are at least
+     * two levels of override possible, as well well manually
+     * setting these for a file
+     */
     fs_conf->flowproto = FLOWPROTO_DEFAULT;
     fs_conf->encoding = PVFS2_ENCODING_DEFAULT;
     fs_conf->trove_sync_meta = TROVE_SYNC;
@@ -1807,8 +1901,8 @@ DOTCONF_CB(enter_filesystem_context)
     fs_conf->fp_buffer_size = -1;
     fs_conf->fp_buffers_per_flow = -1;
     fs_conf->file_stuffing = 1;
-    fs_conf->metadata_replication_factor = 0;
-    fs_conf->default_dfile_replication_factor = 0;
+    fs_conf->metadata_replication_factor = 1;
+    fs_conf->default_dfile_replication_factor = 1;
 
     if (!config_s->file_systems)
     {
@@ -1821,6 +1915,9 @@ DOTCONF_CB(enter_filesystem_context)
     return PINT_dotconf_set_defaults(cmd->configfile, CTX_FILESYSTEM);
 }
 
+/* enter_filesystem_context </FileSystem>
+ * CTX_GLOBAL <- CTX_FILESYSTEM
+ */
 DOTCONF_CB(exit_filesystem_context)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
@@ -1855,6 +1952,10 @@ DOTCONF_CB(exit_filesystem_context)
     return NULL;
 }
 
+/* enter_rootsrvrs_context <RootServers>
+ * CTX_FILESYSTEM -> CTS_ROOTSERVERS
+ * No defaults?
+ */
 DOTCONF_CB(enter_rootsrvs_context)
 {
     struct server_configuration_s *config_s = 
@@ -1876,6 +1977,9 @@ DOTCONF_CB(enter_rootsrvs_context)
     return NULL;
 }
 
+/* exit_rootsrvrs_context </RootServers>
+ * CTX_FILESYSTEM <- CTS_ROOTSERVERS
+ */
 DOTCONF_CB(exit_rootsrvs_context)
 {
     struct server_configuration_s *config_s = 
@@ -1936,6 +2040,10 @@ DOTCONF_CB(exit_rootsrvs_context)
     return NULL;
 }
 
+/* enter_storage_hints_context <StorageHints>
+ * CTX_FILESYSTEM -> CTX_STORAGEHINTS
+ * set defaults for storagehints
+ */
 DOTCONF_CB(enter_storage_hints_context)
 {
     struct server_configuration_s *config_s = 
@@ -1945,6 +2053,9 @@ DOTCONF_CB(enter_storage_hints_context)
     return PINT_dotconf_set_defaults(cmd->configfile, CTX_STORAGEHINTS);
 }
 
+/* exit_storage_hints_context </StorageHints>
+ * CTX_FILESYSTEM <- CTX_STORAGEHINTS
+ */
 DOTCONF_CB(exit_storage_hints_context)
 {
     struct server_configuration_s *config_s = 
@@ -1953,6 +2064,9 @@ DOTCONF_CB(exit_storage_hints_context)
     return NULL;
 }
 
+/* enter_export_options_context <ExportOptions>
+ * CTX_FILESYSTEM -> CTX_EXPORT
+ */
 DOTCONF_CB(enter_export_options_context)
 {
     struct server_configuration_s *config_s = 
@@ -1961,6 +2075,9 @@ DOTCONF_CB(enter_export_options_context)
 
     return PINT_dotconf_set_defaults(cmd->configfile, CTX_EXPORT);
 }
+/* enter_export_options_context </ExportOptions>
+ * CTX_FILESYSTEM <- CTX_EXPORT
+ */
 
 DOTCONF_CB(exit_export_options_context)
 {
@@ -1970,6 +2087,10 @@ DOTCONF_CB(exit_export_options_context)
     return NULL;
 }
 
+/* enter_server_context <ServerOptions>
+ * CTX_SERVERDEF -> CTX_SERVER_OPTIONS
+ * set defaults for server_options
+ */
 DOTCONF_CB(enter_server_options_context)
 {
     struct server_configuration_s *config_s = 
@@ -1979,6 +2100,9 @@ DOTCONF_CB(enter_server_options_context)
     return PINT_dotconf_set_defaults(cmd->configfile, CTX_SERVER_OPTIONS);
 }
 
+/* enter_server_context </ServerOptions>
+ * CTX_SERVERDEF <- CTX_SERVER_OPTIONS
+ */
 DOTCONF_CB(exit_server_options_context)
 {
     struct server_configuration_s *config_s = 
@@ -2192,7 +2316,8 @@ DOTCONF_CB(get_logtype)
     return NULL;
 }
 
-
+/* get_event_logging_list <EventLogging>
+ */
 DOTCONF_CB(get_event_logging_list)
 {
     struct server_configuration_s *config_s = 
@@ -2201,16 +2326,41 @@ DOTCONF_CB(get_event_logging_list)
     char buf[512] = {0};
     char *ptr = buf;
 
-    fprintf(stderr,"entering event_logging_list:%s\n", config_s->event_logging);
+    gossip_debug(GOSSIP_CONFIG_DEBUG, "Entering event_logging_list:%s\n",
+                    config_s->event_logging);
 
+    gossip_debug(GOSSIP_CONFIG_DEBUG,
+                 "Context = %d Myserver = %d " "ServDefaults = %d\n",
+                 config_s->configuration_context, 
+                 config_s->my_server_options, config_s->server_defaults);
+
+    /* These options can be used in either CTX_SERVER_OPTIONS or
+     * other contexts in the config file (CTX_DEFAULTS in this
+     * case).  This logic bypasses getting this option in the
+     * case where we are in CTS_SERVER_OPTIONS for the current
+     * server.  This code only runs in CTX_DEFAULTS or my_server.
+     */
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
-        fprintf(stderr,"BAIL OUT event_logging_list\n");
+        gossip_debug(GOSSIP_CONFIG_DEBUG,
+                     "Event_logging_list: bailing out\n");
         return NULL;
     }
+    /* if we are processing defaults we do NOT want to blow
+     * away what is in the config, it IS the default, possibly
+     * higher level than the lowest level defaults we are about to
+     * set
+     */
     if (config_s->event_logging != NULL) 
     {
+        if (config_s->server_defaults)
+        {
+            /* don't override a higher level default */
+            gossip_debug(GOSSIP_CONFIG_DEBUG,
+                         "event_logging_list: keeping default\n");
+            return NULL;
+        }
         free(config_s->event_logging);
         config_s->event_logging = NULL;
     }
@@ -2221,11 +2371,15 @@ DOTCONF_CB(get_event_logging_list)
     }
     config_s->event_logging = strdup(buf);
 
-    fprintf(stderr,"complete event_logging_list:%s\n", config_s->event_logging);
+    gossip_debug(GOSSIP_CONFIG_DEBUG,
+                 "event_logging_list: setting new default %s\n", 
+                 config_s->event_logging);
 
     return NULL;
 }
 
+/* get_config_path <ConfigPath>
+ */
 DOTCONF_CB(get_config_path)
 {
     struct server_configuration_s *config_s = 
@@ -3290,10 +3444,11 @@ DOTCONF_CB(get_filesystem_replication)
 
     if (cmd->data.value < 1)
     {
+        /* does this fail?  Or continue with the value 1? */
         gossip_err("Metadata Replication Factor must be > 0");
         return NULL;
     }
-    if (fs_conf->metadata_replication_factor)
+    if (fs_conf->metadata_replication_factor > 1) /* 1 is minimum */
     {
         gossip_err("WARNING: Overwriting Metadata Replication Factor %d with %d\n",
                    (int)fs_conf->metadata_replication_factor,
@@ -3594,9 +3749,9 @@ DOTCONF_CB(get_default_num_dfiles)
             PINT_llist_head(config_s->file_systems);
 
     fs_conf->default_num_dfiles = (int)cmd->data.value;
-    if(fs_conf->default_num_dfiles < 0)
+    if(fs_conf->default_num_dfiles < 1)
     {
-        return("Error DefaultNumDFiles must be non-negative.\n");
+        return("Error DefaultNumDFiles must be greater than zero.\n");
     }
     return NULL;
 }
@@ -3611,9 +3766,9 @@ DOTCONF_CB(get_default_dfile_replication)
             PINT_llist_head(config_s->file_systems);
 
     fs_conf->default_dfile_replication_factor = (int)cmd->data.value;
-    if(fs_conf->default_dfile_replication_factor < 0)
+    if(fs_conf->default_dfile_replication_factor < 1)
     {
-        return("Error DefaultDFileReplication must be non-negative.\n");
+        return("Error DefaultDFileReplication must be greater then zero.\n");
     }
     return NULL;
 }

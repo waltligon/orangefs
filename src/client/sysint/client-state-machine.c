@@ -532,6 +532,8 @@ PVFS_error PINT_client_state_machine_post(PINT_smcb *smcb,
     int pvfs_sys_op = PINT_smcb_op(smcb);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_client_state_machine_post.\n");
+
     /* this checks sm_p and indirectly smcb */
     if (!sm_p)
     {

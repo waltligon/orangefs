@@ -33,11 +33,22 @@
 #include "gossip.h"
 #include "gen-locks.h"
 
+/* These gobal vars are used to control calls to gossip_debug()
+ */
+
 /** controls whether debugging is on or off */
 int gossip_debug_on = 0;
 
+int gossip_facility;
+
+PVFS_debug_mask gossip_debug_mask;
+
 /** controls the mask level for debugging messages */
-PVFS_debug_mask gossip_debug_mask = {0, 0};
+static gossip_mask_stack
+             gossip_debug_stack = {.debug_on = 0, .debug_facility = 0,
+                    .debug_mask = {.mask1 = 0, .mask2 = 0},
+                   .debug_stack = {.next = &gossip_debug_stack.debug_stack,
+                                   .prev = &gossip_debug_stack.debug_stack}};
 
 enum
 {
@@ -46,10 +57,22 @@ enum
     GOSSIP_SYSLOG = 4
 };
 
-/** determines which logging facility to use.  Default to stderr to begin
- *  with.
+/* determines which logging facility to use. Default to stderr to begin with.
  */
 int gossip_facility = GOSSIP_STDERR;
+
+/* Using gossip to debug gossip can be problematic so this is a simple
+ * macro that can be set on or off to enable direct printing to stderr
+ */
+#define GOSSIP_INTERNAL 1
+#ifndef GOSSIP_INTERNAL
+#define gossip_internal(format, f...) do {} while(0)
+#else
+#define gossip_internal(format, f...)                  \
+do {                                                   \
+    fprintf(stderr, format, ##f);                      \
+} while(0)
+#endif /* GOSSIP_INTERNAL */
 
 /* file handle used for file logging */
 static FILE *internal_log_file = NULL;
@@ -102,16 +125,14 @@ int gossip_enable_syslog(int priority)
 #else
 int gossip_enable_syslog(int priority)
 {
-    fprintf(stderr, "gossip_enable_syslog\n");
-    fprintf(stderr, "init debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
-    fprintf(stderr, "init debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
-
-    /* keep up with the existing logging settings */
-    int tmp_debug_on = gossip_debug_on;
-    PVFS_debug_mask tmp_debug_mask = gossip_debug_mask;
+    /* Debug setting/clearing debug_mask */
+    gossip_internal( "Gossip_enable_syslog\n");
+    gossip_internal( "gdm = %d, (%lx , %lx)\n", 
+                    gossip_debug_on, gossip_debug_mask.mask1, 
+                                     gossip_debug_mask.mask2);
 
     /* turn off any running facility */
-    gossip_disable();
+    gossip_disable(); /* includes  a push */
 
     internal_syslog_priority = priority;
     gossip_facility = GOSSIP_SYSLOG;
@@ -119,11 +140,11 @@ int gossip_enable_syslog(int priority)
     openlog("PVFS2", 0, LOG_DAEMON);
 
     /* restore the logging settings */
-    gossip_debug_on = tmp_debug_on;
-    gossip_debug_mask = tmp_debug_mask;
+    gossip_pop_mask(NULL, NULL);
 
-    fprintf(stderr, "fini debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
-    fprintf(stderr, "fini debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
+    gossip_internal( "final enable syslog gdm = %d, (%lx , %lx)\n\n", 
+                    gossip_debug_on, gossip_debug_mask.mask1, 
+                                     gossip_debug_mask.mask2);
     return 0;
 }
 #endif
@@ -134,25 +155,23 @@ int gossip_enable_syslog(int priority)
  */
 int gossip_enable_stderr(void)
 {
-    fprintf(stderr, "gossip_enable_stderr\n");
-    fprintf(stderr, "init debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
-    fprintf(stderr, "init debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
-
-    /* keep up with the existing logging settings */
-    int tmp_debug_on = gossip_debug_on;
-    PVFS_debug_mask tmp_debug_mask = gossip_debug_mask;
+    /* Debug setting/clearing debug_mask */
+    gossip_internal( "Gossip_enable_stderr\n");
+    gossip_internal( "gdm = %d, (%lx , %lx)\n", 
+                    gossip_debug_on, gossip_debug_mask.mask1, 
+                                     gossip_debug_mask.mask2);
 
     /* turn off any running facility */
-    gossip_disable();
+    gossip_disable();  /* includes a push */
 
     gossip_facility = GOSSIP_STDERR;
 
     /* restore the logging settings */
-    gossip_debug_on = tmp_debug_on;
-    gossip_debug_mask = tmp_debug_mask;
+    gossip_pop_mask(NULL, NULL);
 
-    fprintf(stderr, "fini debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
-    fprintf(stderr, "fini debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
+    gossip_internal( "final enable stderr gdm = %d, (%lx , %lx)\n\n", 
+                    gossip_debug_on, gossip_debug_mask.mask1, 
+                                     gossip_debug_mask.mask2);
     return 0;
 }
 
@@ -164,37 +183,33 @@ int gossip_enable_stderr(void)
  */
 int gossip_enable_file(const char *filename, const char *mode)
 {
-    fprintf(stderr, "gossip_enable_file\n");
-    fprintf(stderr, "init debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
-    fprintf(stderr, "init debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
-
-    /* keep up with the existing logging settings */
-    int tmp_debug_on = gossip_debug_on;
-    PVFS_debug_mask tmp_debug_mask = gossip_debug_mask;
-
+    gossip_internal( "Gossip_enable_file\n");
     /* turn off any running facility */
-    gossip_disable();
+    gossip_disable();  /* includes a push */
 
     internal_log_file = fopen(filename, mode);
     if (!internal_log_file)
     {
+        /* should recover? */
         return -errno;
     }
 
     gossip_facility = GOSSIP_FILE;
 
     /* restore the logging settings */
-    gossip_debug_on = tmp_debug_on;
-    gossip_debug_mask = tmp_debug_mask;
+    gossip_pop_mask(NULL, NULL);
 
-    fprintf(stderr, "fini debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
-    fprintf(stderr, "fini debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
+    /* Debug setting/clearing debug_mask */
+    gossip_debug(GOSSIP_GOSSIP_DEBUG,
+                 "final enable file  gdm = %d, (%lx , %lx)\n\n", 
+                 gossip_debug_on, gossip_debug_mask.mask1, 
+                                  gossip_debug_mask.mask2);
     return 0;
 }
 
 int gossip_reopen_file(const char *filename, const char *mode)
 {
-    if( gossip_facility != GOSSIP_FILE )
+    if(gossip_facility != GOSSIP_FILE)
     {
         return -EINVAL;
     }
@@ -203,7 +218,7 @@ int gossip_reopen_file(const char *filename, const char *mode)
     gossip_disable_file();
 
     /* open the file */
-    gossip_enable_file( filename, mode );
+    gossip_enable_file(filename, mode);
     return 0;
 }
 
@@ -214,6 +229,16 @@ int gossip_reopen_file(const char *filename, const char *mode)
 int gossip_disable(void)
 {
     int ret = -EINVAL;
+    gossip_internal( "Gossip_disable\n");
+
+    /* if stack is not initialized yet, do it now */
+    if (gossip_debug_stack.debug_stack.next == NULL ||
+        gossip_debug_stack.debug_stack.prev == NULL)
+    {
+        INIT_QLIST_HEAD(&gossip_debug_stack.debug_stack);
+    }
+
+    gossip_push_mask(gossip_debug_on, &gossip_debug_mask);
 
     switch (gossip_facility)
     {
@@ -230,8 +255,8 @@ int gossip_disable(void)
         break;
     }
 
-    gossip_debug_on = 0;
-    gossip_debug_mask = GOSSIP_NO_DEBUG;
+    gossip_set_debug_mask(0, GOSSIP_NO_DEBUG);
+    gossip_internal( "Gossip_disable complete\n");
 
     return ret;
 }
@@ -254,22 +279,43 @@ int gossip_get_debug_mask(int *debug_on, PVFS_debug_mask *mask)
  *
  *  \return 0 on success, -errno on failure.
  */
-int gossip_set_debug_mask(int debug_on, PVFS_debug_mask mask)
+int gossip_set_debug_mask(int debug_on, PVFS_debug_mask debug_mask)
 {
-    fprintf(stderr, "gossip_set_debug_mask\n");
-    fprintf(stderr, "init debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
-    fprintf(stderr, "init debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
-
+    /* Debug setting/clearing debug_mask */
+     gossip_internal( "Gossip_set_debug_mask(%d, (%lx , %lx))\n", 
+                  debug_on, debug_mask.mask1, debug_mask.mask2);
+     gossip_internal( "old gdm = %d, (%lx , %lx)\n", 
+                  gossip_debug_on, gossip_debug_mask.mask1, 
+                                  gossip_debug_mask.mask2);
+     
+    /* these old semantics don't make sense to me
+     * chaning them to std C and if we have no problems
+     * later remove this
+     */
+#if 0
     if ((debug_on != 0) && (debug_on != 1))
     {
         return -EINVAL;
     }
+#endif
+    if (debug_on)
+    {
+        debug_on = 1; /* we will always store a 1 or 0 */
+    }
 
+    /* current values are on top of the stack
+     * we will push the new ones so we can get back if we want
+     * THIS breaks expected push/pop semantics, taking it out.
+     */
+    /* gossip_push_mask(debug_on, &debug_mask); */
+
+    /* Set the mask and flag to the new value */
     gossip_debug_on = debug_on;
-    gossip_debug_mask = mask;
+    gossip_debug_mask = debug_mask;
 
-    fprintf(stderr, "fini debug_mask 1 = %lud\n", gossip_debug_mask.mask1);
-    fprintf(stderr, "fini debug_mask 2 = %lud\n", gossip_debug_mask.mask2);
+    gossip_internal( "final set gdm = %d, (%lx , %lx)\n\n", 
+                    gossip_debug_on, gossip_debug_mask.mask1, 
+                                     gossip_debug_mask.mask2);
     return 0;
 }
 
@@ -676,8 +722,7 @@ static int gossip_msg_syslog(const char prefix, const char *format, va_list ap)
  *
  * returns 0 on success, -errno on failure
  */
-static int gossip_disable_stderr(
-    void)
+static int gossip_disable_stderr(void)
 {
     /* this function doesn't need to do anything... */
     return 0;
@@ -720,6 +765,112 @@ static int gossip_disable_syslog(void)
     return 0;
 }
 #endif
+
+/* push debug mask onto stack */
+int gossip_push_mask(int debug_on,
+                     PVFS_debug_mask *debug_mask)
+{
+    gossip_mask_stack *new_mask;
+    new_mask = (gossip_mask_stack *)malloc(sizeof(struct gossip_mask_stack_s));
+
+    /* Debug setting/clearing debug_mask */
+    gossip_internal( "Gossip_push_mask(%d, (%lx , %lx))\n", 
+                  debug_on, debug_mask->mask1, debug_mask->mask2);
+    gossip_internal( "old gdm = %d, (%lx , %lx)\n", 
+                  gossip_debug_on, gossip_debug_mask.mask1, 
+                                   gossip_debug_mask.mask2);
+
+    if (!new_mask)
+    {
+        return -1;
+    }
+    if (!debug_mask)
+    {
+        return -1;
+    }
+
+    /* Add entry to the stack */
+    new_mask->debug_on = debug_on;
+    new_mask->debug_mask = *debug_mask;
+    new_mask->debug_facility = gossip_facility;
+    qlist_add(&new_mask->debug_stack, &gossip_debug_stack.debug_stack);
+
+    /* Set gossip controlling variables */
+    gossip_debug_on = debug_on;
+    gossip_debug_mask = *debug_mask;
+
+    gossip_internal( "new gdm = %d, (%lx , %lx)\n", 
+                  gossip_debug_on, gossip_debug_mask.mask1, 
+                                   gossip_debug_mask.mask2);
+
+    gossip_internal( "Gossip_push_mask complete\n"); 
+    return 0;
+}
+
+/* pops an entry off of the gossip mask stack and loads it into
+ * variables gossip_debug_mask and gossip_debug_on
+ * if pointers are provided as arguments, will also output the values.
+ */
+/* pop debug mask from stack */
+int gossip_pop_mask(int *debug_on,
+                    PVFS_debug_mask *debug_mask)
+{
+    gossip_mask_stack *new_stack;
+    struct qlist_head *qh;
+#ifdef GOSSIP_INTERNAL
+    int pflag = -1;
+    unsigned long pmask1 = -1, pmask2 = -1;
+
+    /* this is just for debugging gossip */
+    if (debug_on != NULL)
+    {
+        pflag = *debug_on;
+    }
+    if (debug_mask != NULL)
+    {
+        pmask1 = debug_mask->mask1;
+        pmask2 = debug_mask->mask2;
+    }
+#endif
+        
+    /* Debug setting/clearing debug_mask */
+    gossip_internal( "Gossip_pop_mask(%d, (%lx , %lx))\n", 
+                  pflag, pmask1, pmask2);
+    gossip_internal( "old gdm = %d, (%lx , %lx)\n", 
+                  gossip_debug_on, gossip_debug_mask.mask1, 
+                                   gossip_debug_mask.mask2);
+
+    if (qlist_empty(&gossip_debug_stack.debug_stack))
+    {
+        gossip_err("gossip_pop_mask has failed rendering gossip off.");
+        return -1;
+    }
+
+    qh = qlist_pop(&gossip_debug_stack.debug_stack);
+    new_stack = qlist_entry(qh, gossip_mask_stack, debug_stack);
+    /* set optional arguments as outputs */
+    if (debug_on != NULL)
+    {
+        *debug_on = new_stack->debug_on;
+    }
+    if (debug_mask != NULL)
+    {
+        *debug_mask = new_stack->debug_mask;
+    }
+
+    /* set current debug mask */
+    gossip_debug_on = new_stack->debug_on;
+    gossip_debug_mask = new_stack->debug_mask;
+    free(new_stack);
+
+    gossip_internal( "new gdm = %d, (%lx , %lx)\n", 
+                  gossip_debug_on, gossip_debug_mask.mask1, 
+                                   gossip_debug_mask.mask2);
+
+    gossip_internal( "Gossip_pop_mask complete\n"); 
+
+    return 0;
+}
 
 /*
  * Local variables:

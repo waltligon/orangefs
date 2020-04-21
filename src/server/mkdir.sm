@@ -394,7 +394,7 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
     }
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, 
-            "  writing dist-dir-struct keyvals for meta handle: %s "
+            "  writing kvals for meta handle: %s "
             "\t with server_no=%d and branch_level=%d \n", 
             PVFS_OID_str(&s_op->u.mkdir.handle),
             pattr->u.dir.dist_dir_attr.server_no,

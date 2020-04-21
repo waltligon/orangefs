@@ -69,6 +69,8 @@
 
 #include "pvfs2-internal.h"
 
+#include "server-config.h"
+
 #ifdef WIN32
 #define snprintf    _snprintf
 #define strcasecmp  stricmp
@@ -227,7 +229,7 @@ int PINT_dotconf_warning(configfile_t * configfile,
     int retval = 0;
 
     va_start(args, fmt);
-    if (configfile->errorhandler != 0)        /* an errorhandler is registered */
+    if (configfile->errorhandler != 0)   /* an errorhandler is registered */
     {
         char msg[CFG_BUFSIZE];
         vsnprintf(msg, CFG_BUFSIZE, fmt, args);
@@ -349,9 +351,9 @@ int PINT_dotconf_get_next_line(char *buffer,
         cp2 = fgets(buf2, CFG_BUFSIZE, configfile->stream);
         if (!cp2)
         {
-            fprintf(stderr, "[dotconf] Parse error. Unexpected end of file at "
-                    "line %ld in file %s\n", configfile->line,
-                    configfile->filename);
+            gossip_err("[dotconf] Parse error. Unexpected end of file at "
+                       "line %ld in file %s\n", configfile->line,
+                       configfile->filename);
             configfile->eof = 1;
             return 1;
         }
@@ -434,6 +436,7 @@ const char *PINT_dotconf_set_defaults(configfile_t *configfile,
     const char *error = 0;
     const configoption_t *option;
     command_t command;
+    server_configuration_t *config_s;
     int done = 0;
     int opt_idx = 0;
     int mod = 0;
@@ -443,14 +446,17 @@ const char *PINT_dotconf_set_defaults(configfile_t *configfile,
      * them?  Yes a few require some ordering, but that we can do
      * with contexts. WBL
      */
+    gossip_debug(GOSSIP_CONFIG_DEBUG,
+                 "\nStarting To Set Defaults Context = %d\n",
+                 (int)context);
     for (option = 0; configfile->config_options[mod] && !done; mod++)
     {
         for (opt_idx = 0;
              configfile->config_options[mod][opt_idx].name[0];
              opt_idx++)
         {
-            fprintf(stderr, "Set_defaults teration mod=%d opt_idx=%d\n",
-                    mod,opt_idx);
+            /* fprintf(stderr, "Set_defaults iteration mod=%d opt_idx=%d\n",
+                            mod, opt_idx); */
             option = &(configfile->config_options[mod][opt_idx]);
             if(option && (context & option->context) && option->default_value)
             {
@@ -466,9 +472,22 @@ const char *PINT_dotconf_set_defaults(configfile_t *configfile,
                     return error;
                 }
 
-                fprintf(stderr, "Invoke_command\n");
+                config_s = (server_configuration_t *)command.context;
+                config_s->server_defaults = 1;
+                gossip_debug(GOSSIP_CONFIG_DEBUG,
+                             "sd addr = %p, sd = %d\n",
+                             &config_s->server_defaults,
+                             config_s->server_defaults);
+
+                gossip_debug(GOSSIP_CONFIG_DEBUG, 
+                             "Invoke_command opt_idx = %d\n", opt_idx);
                 error = PINT_dotconf_invoke_command(configfile, &command);
                 PINT_dotconf_free_command(&command);
+                /* config_s actually points to the server_confuration_s
+                 * struct, so even if command gets freed, the pointer
+                 * should be fine.
+                 */
+                config_s->server_defaults = 0;
                 if(error)
                 {
                     return error;
@@ -477,6 +496,7 @@ const char *PINT_dotconf_set_defaults(configfile_t *configfile,
         }
     }
 
+    gossip_debug(GOSSIP_CONFIG_DEBUG, "Finished Setting Defaults \n");
     return error;
 }
 
@@ -633,15 +653,15 @@ static void PINT_dotconf_set_command(configfile_t *configfile,
 
         if (cmd->arg_count == (CFG_VALUES - 1))
         {
-            fprintf(stderr, "\n*********************************\n");
-            fprintf(stderr, "--  DotConf Parser Error  --\n");
-            fprintf(stderr, "There's a good chance that "
-                    "there are missing arguments\nthat were not "
-                    "picked up because this parser is weak.\n");
-            fprintf(stderr, "Please increase the defined CFG_VALUES "
-                    "value in dotconf.h\nbefore recompiling to "
-                    "avoid this error.  Program terminating.\n");
-            fprintf(stderr, "\n*********************************\n");
+            gossip_err("\n*********************************\n");
+            gossip_err("--  DotConf Parser Error  --\n");
+            gossip_err("There's a good chance that "
+                       "there are missing arguments\nthat were not "
+                       "picked up because this parser is weak.\n");
+            gossip_err("Please increase the defined CFG_VALUES "
+                       "value in dotconf.h\nbefore recompiling to "
+                       "avoid this error.  Program terminating.\n");
+            gossip_err("\n*********************************\n");
             exit(1);
         }
 
@@ -828,6 +848,7 @@ const char *PINT_dotconf_handle_command(configfile_t * configfile,
 		configfile->contextchecker(&command, command.option->context);
         }
 
+
 	if (!context_error)
         {
 	    error = PINT_dotconf_invoke_command(configfile, &command);
@@ -905,7 +926,7 @@ configfile_t *PINT_dotconf_create(char *fname,
     {
         if (!(new->stream = fopen(fname, "r")))
         {
-	    fprintf(stderr, "Error opening configuration file '%s'\n", fname);
+	    gossip_err("Error opening configuration file '%s'\n", fname);
 	    free(new);
 	    return NULL;
         }
@@ -914,7 +935,7 @@ configfile_t *PINT_dotconf_create(char *fname,
     {
         if (!(new->stream = fmemopen(buffer, bufsize, "r")))
         {
-	    fprintf(stderr, "Error opening configuration buffer\n");
+	    gossip_err("Error opening configuration buffer\n");
 	    free(new);
 	    return NULL;
         }
@@ -922,7 +943,7 @@ configfile_t *PINT_dotconf_create(char *fname,
     }
     else
     {
-        fprintf(stderr, "Error no configuration file or buffer given\n");
+        gossip_err("Error no configuration file or buffer given\n");
 	free(new);
 	return NULL;
     }

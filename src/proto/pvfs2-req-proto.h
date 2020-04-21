@@ -121,6 +121,8 @@ enum PVFS_server_op
 /******************************************************************/
 /* This struct ised used to control the way the server passes requests
  * to replicant servers in Version 3
+ * For now these are part of requests - mostly set automatically in the
+ * FILL macros except where differentiation is needed.
  */
 
 enum PVFS_server_ctrlval
@@ -142,9 +144,9 @@ enum PVFS_server_ctrlval
 
 typedef struct PVFS_server_control_s
 {
-    uint8_t mode; /* replicated write or not */
+    uint8_t mode; /* replicated write or not, tree or not */
     uint8_t type; /* primary or secondary */
-    uint8_t sub;  /* DataFile or DirData */
+    uint8_t sub;  /* create datafile or dirdata */
     uint8_t __pad1;
 } PVFS_server_control;
 
@@ -263,6 +265,36 @@ do {                                             \
 /* max size of encrypted private key for cert request (in bytes) */
 #define PVFS_REQ_LIMIT_ENC_KEY 16384
 
+/* used for building protocol debug macros
+ */
+
+#define PVFS_to_string_PVFS_fs_id(fsid, string) \
+do { \
+    sprintf(string, "%d", (fsid)); \
+} while (0)
+
+#define PVFS_to_string_PVFS_handle(handle, string) \
+do { \
+    PVFS_OID_bin2str(handle, string); \
+} while (0)
+
+#define PVFS_to_string_int32_t(integer, string) \
+do { \
+    sprintf(string, "%d", (integer)); \
+} while (0)
+
+#define PVFS_to_string_PVFS_SID(sid, string) \
+do { \
+    PVFS_SID_bin2str(sid, string); \
+} while (0)
+
+#define PVFS_debug_reqfield(mask, field, type) \
+do { \
+    char string[100]; \
+    PVFS_to_string_##type(field, string); \
+    gossip_debug((mask), "\t" #field ": %s\n", string); \
+} while (0) 
+
 /* create *********************************************************/
 /* - used to create an object.  This creates a metadata handle,
  * a datafile handle, and links the datafile handle to the metadata handle.
@@ -290,6 +322,23 @@ struct PVFS_servreq_create
     int32_t datafile_sid_count;    /* number of sids per datafile */
     PVFS_SID *datafile_sid_array;  /* sids for datafiles */
 };
+
+#define PVFS_debug_servreq_create(mask, req) \
+do { \
+    if (gossip_isset(gossip_debug_mask, (mask))) \
+    { \
+        PVFS_debug_reqfield((mask), (req)->fs_id, PVFS_fs_id); \
+        PVFS_debug_reqfield((mask), &(req)->handle, PVFS_handle); \
+        PVFS_debug_reqfield((mask), (req)->sid_count, int32_t); \
+        PVFS_debug_reqfield((mask), (req)->sid_array, PVFS_SID); \
+        PVFS_debug_reqfield((mask), (req)->parent, PVFS_handle); \
+        PVFS_debug_reqfield((mask), (req)->parent_sid_array, PVFS_SID); \
+        PVFS_debug_reqfield((mask), (req)->datafile_count, int32_t); \
+        PVFS_debug_reqfield((mask), (req)->datafile_handles, PVFS_handle); \
+        PVFS_debug_reqfield((mask), (req)->datafile_sid_count, int32_t); \
+        PVFS_debug_reqfield((mask), (req)->datafile_sid_array, PVFS_SID); \
+    } \
+} while (0)
 
 #if 0
 endecode_fields_7a1a_struct(
@@ -1217,6 +1266,17 @@ endecode_fields_4a_struct(
               (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID)) + \
               extra_size_PVFS_credential)
 
+#define PVFS_debug_servreq_setattr(mask, req) \
+do { \
+    if (gossip_isset(gossip_debug_mask, (mask))) \
+    { \
+        PVFS_debug_reqfield((mask), (req)->fs_id, PVFS_fs_id); \
+        PVFS_debug_reqfield((mask), &(req)->handle, PVFS_handle); \
+        PVFS_debug_reqfield((mask), (req)->sid_count, int32_t); \
+        PVFS_debug_reqfield((mask), (req)->sid_array, PVFS_SID); \
+    } \
+} while (0)
+
 #define PINT_SERVREQ_SETATTR_FILL(__req,         \
                                   __sub,         \
                                   __cap,         \
@@ -1356,6 +1416,25 @@ struct PVFS_servreq_mkdir
     int32_t dist_dir_servers_initial; /* initial # of active dirdata handles */
     int32_t dist_dir_split_size;  /* # of dirents to reach for split to occur */
 };
+
+#define PVFS_debug_servreq_mkdir(mask, req) \
+do { \
+    if (gossip_isset(gossip_debug_mask, (mask))) \
+    { \
+        PVFS_debug_reqfield((mask), (req)->fs_id, PVFS_fs_id); \
+        PVFS_debug_reqfield((mask), &(req)->handle, PVFS_handle); \
+        PVFS_debug_reqfield((mask), (req)->sid_count, int32_t); \
+        PVFS_debug_reqfield((mask), (req)->sid_array, PVFS_SID); \
+        PVFS_debug_reqfield((mask), (req)->parent, PVFS_handle); \
+        PVFS_debug_reqfield((mask), (req)->parent_sid_array, PVFS_SID); \
+        PVFS_debug_reqfield((mask), (req)->dirdata_count, int32_t); \
+        PVFS_debug_reqfield((mask), (req)->dirdata_handles, PVFS_handle); \
+        PVFS_debug_reqfield((mask), (req)->dirdata_sid_count, int32_t); \
+        PVFS_debug_reqfield((mask), (req)->dirdata_sid_array, PVFS_SID); \
+        PVFS_debug_reqfield((mask), (req)->dist_dir_servers_initial, int32_t); \
+        PVFS_debug_reqfield((mask), (req)->dist_dir_split_size, int32_t); \
+    } \
+} while (0)
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 static inline void encode_PVFS_servreq_mkdir(char **pptr,
@@ -1559,6 +1638,22 @@ endecode_fields_6a2a_struct(
 #define extra_size_PVFS_servreq_crdirent \
                     (roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES + 1) + \
                      (PVFS_REQ_LIMIT_SIDS_COUNT * 3 * sizeof(PVFS_SID)))
+
+#define PVFS_debug_servreq_crdirent(mask, req) \
+do { \
+    if (gossip_isset(gossip_debug_mask, (mask))) \
+    { \
+        PVFS_debug_reqfield((mask), (req)->fs_id, PVFS_fs_id); \
+        PVFS_debug_reqfield((mask), &(req)->new_handle, PVFS_handle); \
+        PVFS_debug_reqfield((mask), &(req)->parent_handle, PVFS_handle); \
+        PVFS_debug_reqfield((mask), &(req)->dirdata_handle, PVFS_handle); \
+        PVFS_debug_reqfield((mask), (req)->sid_count, int32_t); \
+        PVFS_debug_reqfield((mask), (req)->new_sid_count, int32_t); \
+        PVFS_debug_reqfield((mask), (req)->new_sid_array, PVFS_SID); \
+        PVFS_debug_reqfield((mask), (req)->parent_sid_array, PVFS_SID); \
+        PVFS_debug_reqfield((mask), (req)->dirdata_sid_array, PVFS_SID); \
+    } \
+} while (0)
 
 #define PINT_SERVREQ_CRDIRENT_FILL(__req,                         \
                                    __cap,                         \

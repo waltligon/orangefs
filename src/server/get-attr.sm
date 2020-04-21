@@ -347,7 +347,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
     switch(respattr->objtype)
     {
         case PVFS_TYPE_METAFILE:
-            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: metafile\n");
+            PINT_ACCESS_DEBUG(s_op, GOSSIP_GETATTR_DEBUG, "type: metafile\n");
             gossip_debug(GOSSIP_GETATTR_DEBUG,
                          "  Req handle %s refers to a metafile\n",
                          PVFS_OID_str(&s_op->u.getattr.handle));
@@ -404,17 +404,21 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
 
             gossip_debug(
                 GOSSIP_GETATTR_DEBUG,
-                "+  _DSPACE_ retrieved attrs: [mask = 0x%lx, owner = %d, "
-                "group = %d\n\t"
-                "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
-                "ctime = %llu, ntime = %llu, dfile_count = %d, sid_count = %d, "
-                "dist_size = %d]\n",
-                respattr->mask,
-                respattr->owner, respattr->group, respattr->perms,
-                respattr->objtype, llu(respattr->atime),
-                llu(respattr->mtime), llu(respattr->ctime),llu(respattr->ntime),
-                (int)respattr->u.meta.dfile_count,
-                (int)respattr->u.meta.sid_count,
+                "+  _DSPACE_ retrieved attrs:\n"
+                "\t\t[Type = %s,\n"
+                "\t\tmask = 0x%lx, owner = %d, group = %d,\n"
+                "\t\tperms = %o, dfile_count = %d, sid_count = %d,\n"
+                "\t\tatime = %llu, mtime = %llu,\n"
+                "\t\tctime = %llu, ntime = %llu,\n"
+                "\t\tdist_size = %d]\n",
+                PVFS_ds_type_to_string(respattr->objtype),
+                respattr->mask, respattr->owner, respattr->group,
+                respattr->perms, (int)respattr->u.meta.dfile_count,
+                                 (int)respattr->u.meta.sid_count,
+                llu(respattr->atime),
+                llu(respattr->mtime),
+                llu(respattr->ctime),
+                llu(respattr->ntime),
                 (int)respattr->u.meta.dist_size);
 
             respattr->mask |= PVFS_ATTR_META_ALL;
@@ -525,18 +529,25 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
 #endif
             gossip_debug(
                 GOSSIP_GETATTR_DEBUG,
-                "+  _DSPACE_ retrieved attrs: [mask = 0x%lx, owner = %d, "
-                "group = %d\n\t"
-                "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
-                "ctime = %llu, ntime = %llu, dfile_count = %d, sid_count = %d, "
-                "dirent_count = %d]\n",
-                respattr->mask,
-                respattr->owner, respattr->group, respattr->perms,
-                respattr->objtype, llu(respattr->atime),
-                llu(respattr->mtime),llu(respattr->ctime),llu(respattr->ntime),
+                "+  _DSPACE_ retrieved attrs:\n"
+                "\t\t[Type = %s,\n"
+                "\t\tmask = 0x%lx, owner = %d, group = %d,\n"
+                "\t\tperms = %o, dirdata_count = %d, sid_count = %d,\n"
+                "\t\ttree_height = %d, bitmap_size = %d, split_size = %d,\n"
+                        " dirent_count= %d,\n"
+                "\t\tatime = %llu, mtime = %llu,\n"
+                "\t\tctime = %llu, ntime = %llu,\n",
+                PVFS_ds_type_to_string(respattr->objtype),
+                respattr->mask, respattr->owner, respattr->group,
+                respattr->perms, 
                 (int)respattr->u.dir.dist_dir_attr.dirdata_count,
                 (int)respattr->u.dir.dist_dir_attr.sid_count,
-                (int)respattr->u.dir.dirent_count);
+                (int)respattr->u.dir.dist_dir_attr.tree_height,
+                (int)respattr->u.dir.dist_dir_attr.bitmap_size,
+                (int)respattr->u.dir.dist_dir_attr.split_size,
+                (int)respattr->u.dir.dirent_count,
+                llu(respattr->atime), llu(respattr->mtime),
+                llu(respattr->ctime), llu(respattr->ntime));
 
             respattr->mask |= PVFS_ATTR_DIR_ALL;
             js_p->error_code = STATE_DIR;
@@ -1062,6 +1073,12 @@ static PINT_sm_action getattr_read_acl(struct PINT_smcb *smcb,
 
     assert(s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY);
 
+    /* clear the state transition flag */
+    if (js_p->error_code > 0)
+    {
+        js_p->error_code = 0;
+    }
+
     free_keyval_buffers(s_op);
 
     s_op->key.buffer = "system.posix_acl_access";
@@ -1314,7 +1331,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "Handle %s \n\t"
-                 "retrieved attrs: [type = %d, owner = %d, group = %d, "
+                 "retrieved attrs: [type = %d, owner = %d, group = %d, \n\t"
                  "perms = %o, \n\t"
                  "atime = %llu, mtime = %llu, ctime = %llu,  \n\t"
                  "dist_size = %d, dirent_count = %d]\n",
@@ -1390,16 +1407,22 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
         unsigned char *c;
 
         /* !!! may change later */
-        gossip_debug(GOSSIP_GETATTR_DEBUG, " server returning "
-                     "dirent_count           = %llu "
-                     "dirdata_oid_count      = %d "
-                     "dirdata_sid_count      = %d "
-                     "dfile_count(hint)      = %d "
-                     "dist_name_len(hint)    = %d "
-                     "dist_params_len(hint)  = %d\n",
+        gossip_debug(GOSSIP_GETATTR_DEBUG, " SERVER RETURNING :\n"
+                     "\t\tdirent_count           = %llu \n"
+                     "\t\tdirdata_oid_count      = %d \n"
+                     "\t\tdirdata_sid_count      = %d \n"
+                     "\t\tdirdata_tree_height    = %d \n"
+                     "\t\tdirdata_bitmap_size    = %d \n"
+                     "\t\tdirdata_split_size     = %d \n"
+                     "\t\tdfile_count(hint)      = %d \n"
+                     "\t\tdist_name_len(hint)    = %d \n"
+                     "\t\tdist_params_len(hint)  = %d \n",
                      llu(respattr->u.dir.dirent_count),
                      respattr->u.dir.dist_dir_attr.dirdata_count,
                      respattr->u.dir.dist_dir_attr.sid_count,
+                     respattr->u.dir.dist_dir_attr.tree_height,
+                     respattr->u.dir.dist_dir_attr.bitmap_size,
+                     respattr->u.dir.dist_dir_attr.split_size,
                      respattr->u.dir.hint.dfile_count,
                      respattr->u.dir.hint.dist_name_len,
                      respattr->u.dir.hint.dist_params_len);
@@ -1995,13 +2018,13 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
     {
         /* if we failed to get any of the keys, and the error code is due to
          * something other than the keys simply not being present, then
-         * propigate the error.
+         * propagate the error.
          */
         return SM_ACTION_COMPLETE;
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-        "getattr: job status code = %d\n", js_p->error_code);
+        "getattr: job status code = %d (should be OK)\n", js_p->error_code);
 
     if (s_op->val_a && s_op->key_a)
     {

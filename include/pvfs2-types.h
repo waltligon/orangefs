@@ -378,9 +378,14 @@ void defree_PVFS_sys_layout(struct PVFS_sys_layout_s *x);
 #define PVFS_ALL_READ    (PVFS_U_READ|PVFS_G_READ|PVFS_O_READ)
 
 /** Object and attribute types. */
-/* If this enum is modified the server parameters related to the precreate pool
- * batch and low threshold sizes may need to be modified  to reflect this 
- * change. Also, the PVFS_DS_TYPE_COUNT #define below must be updated */
+/* Not sure why this is encoded as bits - I can't think of a use case
+ * for putting more than one type in a variable.  Maybe revisit
+ * later.
+ *
+ * If this enum is modified the server parameters related to the precreate
+ * pool batch and low threshold sizes may need to be modified to reflect
+ * this change. Also, the PVFS_DS_TYPE_COUNT #define below must be updated
+ */
 typedef enum
 {
     PVFS_TYPE_NONE =              0,
@@ -391,14 +396,14 @@ typedef enum
     PVFS_TYPE_DIRDATA =     (1 << 4),
     PVFS_TYPE_INTERNAL =    (1 << 5)   /* for the server's private use */
 } PVFS_ds_type;
+#define PVFS_DS_TYPE_COUNT      7      /* total number of DS types defined in
+                                        * the PVFS_ds_type enum */
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_ds_type encode_enum
 #define decode_PVFS_ds_type decode_enum
 #define defree_PVFS_ds_type defree_enum
 #endif
-#define PVFS_DS_TYPE_COUNT      7      /* total number of DS types defined in
-                                        * the PVFS_ds_type enum */
 
 /* helper to translate bit-shifted enum types to array index number in the 
  * range (0-(PVFS_DS_TYPE_COUNT-1)) */
@@ -412,11 +417,11 @@ do {                                                \
     }                                               \
     else                                            \
     {                                               \
-        while( t >>=1 )                             \
+        while( t >>= 1 )                            \
         {                                           \
             r++;                                    \
         }                                           \
-        *((uint32_t *)__intp) = r+1;                \
+        *((uint32_t *)__intp) = r + 1;              \
     }                                               \
 } while( 0 )
 

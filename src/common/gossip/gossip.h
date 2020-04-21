@@ -31,6 +31,8 @@
 #include "syslog.h"
 #endif
 #endif
+#include "gossip.h"
+#include "quicklist.h"
 #include "pvfs2-config.h"
 #include "pvfs2-types.h"
 #include "pvfs2-debug.h"
@@ -40,8 +42,19 @@
  */
 
 extern PVFS_debug_mask gossip_debug_mask;
+
 extern int gossip_debug_on;
+
 extern int gossip_facility;
+
+struct gossip_mask_stack_s
+{
+    int                 debug_on;
+    int                 debug_facility;
+    PVFS_debug_mask     debug_mask;
+    struct qlist_head   debug_stack;
+};
+typedef struct gossip_mask_stack_s gossip_mask_stack;
 
 
 #define GOSSIP_BUF_SIZE 5120
@@ -63,10 +76,13 @@ enum gossip_logstamp
 #define gossip_debug(mask, format, f...) do {} while(0)
 #else
 
+#define gossip_isset(__m1,__m2) ((__m1.mask1 & (__m2).mask1) || \
+                                 (__m1.mask2 & (__m2).mask2))
+
 /* try to avoid function call overhead by checking masks in macro */
 #define gossip_debug(mask, format, f...)                  \
 do {                                                      \
-    if (gossip_debug_mask & mask)                         \
+    if (gossip_isset(gossip_debug_mask, mask))            \
     {                                                     \
         printk(format, ##f);                              \
     }                                                     \
@@ -98,6 +114,9 @@ int gossip_reopen_file(const char *filename, const char *mode);
 int gossip_disable(void);
 int gossip_set_debug_mask(int debug_on, PVFS_debug_mask mask);
 int gossip_get_debug_mask(int *debug_on, PVFS_debug_mask *mask);
+int gossip_push_mask(int debug_on, PVFS_debug_mask *mask);
+int gossip_pop_mask(int *debug_on, PVFS_debug_mask *mask);
+
 int gossip_set_logstamp(enum gossip_logstamp ts);
 
 void gossip_backtrace(void);
@@ -143,18 +162,18 @@ int gossip_debug_fp(FILE *fp,
  */
 static inline PVFS_debug_mask GDM_OR(int count, ...)
 {
-    PVFS_debug_mask mask = {GOSSIP_NO_DEBUG_INIT};
+    PVFS_debug_mask maskA = {GOSSIP_NO_DEBUG_INIT};
     va_list args;
     va_start(args, count);
     if (count < 0)
     {
-        return mask;
+        return maskA;
     }
     while (count--)
     {
-        PVFS_debug_mask mask2 = va_arg(args, PVFS_debug_mask);;
-        mask.mask1 = mask.mask1 | mask2.mask1;
-        mask.mask2 = mask.mask2 | mask2.mask2;
+        PVFS_debug_mask maskB = va_arg(args, PVFS_debug_mask);;
+        maskA.mask1 = maskA.mask1 | maskB.mask1;
+        maskA.mask2 = maskA.mask2 | maskB.mask2;
     }
     va_end(args);
     return mask;
@@ -162,18 +181,18 @@ static inline PVFS_debug_mask GDM_OR(int count, ...)
 
 static inline PVFS_debug_mask GDM_AND(int count, ...)
 {
-    PVFS_debug_mask mask = {__DEBUG_ALL_INIT};
+    PVFS_debug_mask maskA = {__DEBUG_ALL_INIT};
     va_list args;
     va_start(args, count);
     if (count < 0)
     {
-        return mask;
+        return maskA;
     }
     while (count--)
     {
-        PVFS_debug_mask mask2 = va_arg(args, PVFS_debug_mask);;
-        mask.mask1 = mask.mask1 & mask2.mask1;
-        mask.mask2 = mask.mask2 & mask2.mask2;
+        PVFS_debug_mask maskB = va_arg(args, PVFS_debug_mask);;
+        maskA.mask1 = maskA.mask1 & maskB.mask1;
+        maskA.mask2 = maskA.mask2 & maskB.mask2;
     }
     va_end(args);
     return mask;

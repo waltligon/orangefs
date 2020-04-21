@@ -172,7 +172,13 @@ PVFS_error PVFS_isys_create(char *object_name,
     struct server_configuration_s *server_config = NULL;
     struct filesystem_configuration_s *fs_config = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_create entered\n");
+{ fprintf(stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+  PVFS_debug_mask dm; int m1, m2, fl; 
+  gossip_get_debug_mask(&fl, &dm); m1 = dm.mask1; m2 = dm.mask2;
+  fprintf(stderr, "Mask: %x %x\n", m1, m2);
+}
+
+    gossip_debug(GOSSIP_CREATE_DEBUG, "PVFS_isys_create entered\n");
 
     if (!PVFS_OID_cmp(&parent_ref.handle, &PVFS_HANDLE_NULL) ||
         (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
@@ -211,7 +217,7 @@ PVFS_error PVFS_isys_create(char *object_name,
     if (attr.owner != credential->userid &&
         credential->userid != 0)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing owner uid %d with %d "
+        gossip_debug(GOSSIP_CREATE_DEBUG, "Replacing owner uid %d with %d "
                      "on create\n", attr.owner, credential->userid);
         attr.owner = credential->userid;
     }
@@ -219,12 +225,13 @@ PVFS_error PVFS_isys_create(char *object_name,
     if (attr.group != credential->group_array[0] && 
         credential->group_array[0] != 0)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing group gid %d with %d "
+        gossip_debug(GOSSIP_CREATE_DEBUG, "Replacing group gid %d with %d "
                      "on create\n", attr.group, credential->group_array[0]);
         attr.group = credential->group_array[0];
     }
 #endif
 
+    gossip_debug(GOSSIP_CREATE_DEBUG, "Allocating SMCB\n\n");
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_CREATE,
                     sizeof(struct PINT_client_sm),
@@ -252,6 +259,7 @@ PVFS_error PVFS_isys_create(char *object_name,
     sm_p->u.create.stored_error_code = 0;
     sm_p->u.create.retry_count = 0;
 
+    gossip_debug(GOSSIP_CREATE_DEBUG, "Adding hints\n\n");
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints,
                   PVFS_HINT_HANDLE_NAME,
@@ -265,6 +273,7 @@ PVFS_error PVFS_isys_create(char *object_name,
         sm_p->u.create.user_requested_num_data_files = attr.dfile_count;
     }
 
+    gossip_debug(GOSSIP_CREATE_DEBUG, "Checking SID/UID counts\n");
     /* V3 need to add config default and dir override ability */
     server_config = PINT_get_server_config_struct(parent_ref.fs_id);
     fs_config = PINT_config_find_fs_id(server_config, parent_ref.fs_id);
@@ -285,6 +294,7 @@ PVFS_error PVFS_isys_create(char *object_name,
     /* copy layout to sm struct */
     if(layout)
     {
+        gossip_debug(GOSSIP_CREATE_DEBUG,"Using supplied layout\n");
         /* make sure it is a supported layout */
         if ((layout->algorithm <= PVFS_SYS_LAYOUT_NULL) ||
             (layout->algorithm > PVFS_SYS_LAYOUT_MAX))
@@ -320,6 +330,7 @@ PVFS_error PVFS_isys_create(char *object_name,
        else, use the default distribution */
     if (dist)
     {
+        gossip_debug(GOSSIP_CREATE_DEBUG,"Using supplied distribution\n");
         if (!dist->name)
         {
             PINT_smcb_free(smcb);
@@ -355,6 +366,7 @@ PVFS_error PVFS_isys_create(char *object_name,
                  object_name, PVFS_OID_str(&parent_ref.handle),
                  parent_ref.fs_id);
 
+    gossip_debug(GOSSIP_CREATE_DEBUG,"Posting state machine.\n");
     ret = PINT_client_state_machine_post(smcb, op_id, user_ptr);
     return ret;
 }
@@ -373,6 +385,9 @@ PVFS_error PVFS_sys_create(
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
+
+{ fprintf(stderr, "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&\n");
+}
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create entered\n");
 
@@ -393,6 +408,7 @@ PVFS_error PVFS_sys_create(
     }
     else if (!ret && op_id != -1)
     {
+        gossip_debug(GOSSIP_CREATE_DEBUG,"Waiting for state machine.\n");
         ret = PVFS_sys_wait(op_id, "create", &error);
         if (ret)
         {
@@ -519,6 +535,7 @@ static PINT_sm_action create_init(struct PINT_smcb *smcb, job_status_s *js_p)
     assert((js_p->error_code == 0) ||
            (js_p->error_code == CREATE_RETRY));
 
+    gossip_debug(GOSSIP_CREATE_DEBUG, "Create state: create_init.\n");
     /* set up to read the attributes of the parent,
      * which must be a directory 
      */
@@ -538,6 +555,7 @@ static PINT_sm_action create_init(struct PINT_smcb *smcb, job_status_s *js_p)
     if (js_p->error_code == CREATE_RETRY)
     {
         js_p->error_code = 0;
+        gossip_debug(GOSSIP_CREATE_DEBUG, "Calling post timer\n");
 
         return job_req_sched_post_timer(sm_p->msgarray_op.params.retry_delay,
                                         smcb,
@@ -546,7 +564,8 @@ static PINT_sm_action create_init(struct PINT_smcb *smcb, job_status_s *js_p)
                                         &tmp_id,
                                         pint_client_sm_context);
     }    
-   return SM_ACTION_COMPLETE;
+    gossip_debug(GOSSIP_CREATE_DEBUG, "Returning from create_init\n");
+    return SM_ACTION_COMPLETE;
 }
 
 /** create_parent_getattr_inspect
@@ -567,12 +586,19 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
     int num_dfiles_requested = 0;
     int tmp_i;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: parent_getattr_inspect\n");
+    { fprintf(stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+      PVFS_debug_mask dm; int m1, m2, fl; 
+      gossip_get_debug_mask(&fl, &dm); m1 = dm.mask1; m2 = dm.mask2;
+      fprintf(stderr, "Mask: %x %x\n", m1, m2);
+    }
+
+    gossip_debug(GOSSIP_CREATE_DEBUG,
+                 "Create state: parent_getattr_inspect.\n");
 
     attr = &sm_p->getattr.attr;
     assert(attr);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CREATE_DEBUG,
                  "parent owner: %d, group: %d, perms: %d\n",
                  (int)attr->owner, (int)attr->group, (int)attr->perms);
 
@@ -582,8 +608,8 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
     /* do we have a setgid bit? */
     if(attr->perms & PVFS_G_SGID)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "parent has setgid bit set.\n");
-        gossip_debug(GOSSIP_CLIENT_DEBUG, " - modifying requested attr "
+        gossip_debug(GOSSIP_CREATE_DEBUG, "parent has setgid bit set.\n");
+        gossip_debug(GOSSIP_CREATE_DEBUG, " - modifying requested attr "
                                           "for new file.\n");
         sm_p->u.create.attr.group = attr->group;
         /* note that permission checking is left to server even in this case */
@@ -600,9 +626,9 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
 #endif
 
     /* !!! change more later */
-    if (gossip_debug_enabled(GOSSIP_CLIENT_DEBUG))
+    if (gossip_debug_enabled(GOSSIP_CREATE_DEBUG))
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "create_parent_getattr: [%p]\n"
+        gossip_debug(GOSSIP_CREATE_DEBUG, "create_parent_getattr: [%p]\n"
                  "                     dirdata_oid_count     = %d\n"
                  "                     dirdata_sid_count     = %d\n"
                  "                     dfile_count(hint)     = %d\n"
@@ -619,14 +645,14 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         for (tmp_i = 0;
              tmp_i < attr->u.dir.dist_dir_attr.dirdata_count; tmp_i++)
         {
-            gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "            dirdata_handles[%d] = %s\n",
+            gossip_debug(GOSSIP_CREATE_DEBUG,
+                     " dirdata_handles[%d] = %s\n",
                      tmp_i, PVFS_OID_str(&attr->u.dir.dirdata_handles[tmp_i]));
         }
         for (tmp_i = 0; tmp_i < attr->u.dir.dist_dir_attr.sid_count; tmp_i++)
         {
-            gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "            dirdata_sids[%d] = %s\n",
+            gossip_debug(GOSSIP_CREATE_DEBUG,
+                     " dirdata_sids[%d] = %s\n",
                      tmp_i, PVFS_SID_str(&attr->u.dir.dirdata_sids[tmp_i]));
         }
     }
@@ -654,7 +680,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         new_dist = PINT_dist_create(attr->u.dir.hint.dist_name);
         if (new_dist)
         {
-            gossip_debug(GOSSIP_CLIENT_DEBUG,
+            gossip_debug(GOSSIP_CREATE_DEBUG,
                          "Setting distribution to %s\n",
                          attr->u.dir.hint.dist_name);
             PINT_dist_free(current_dist);
@@ -663,7 +689,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         }
         else
         {
-            gossip_debug(GOSSIP_CLIENT_DEBUG,
+            gossip_debug(GOSSIP_CREATE_DEBUG,
                          "ran out of memory creating distribution\n");
             js_p->error_code = -PVFS_EINVAL;
             return SM_ACTION_COMPLETE;
@@ -719,7 +745,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
             int i;
             for (i = 0; i < nparams; i++)
             {
-                gossip_debug(GOSSIP_CLIENT_DEBUG,
+                gossip_debug(GOSSIP_CREATE_DEBUG,
                              "distribution parameter %s, value %s\n",
                              key[i], val[i]);
                 /* NOTE: just as in server-config.c when parsing "Param" and
@@ -844,7 +870,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CREATE_DEBUG,
                  "Setting number of datafiles to %d [requested %d]\n", 
                  sm_p->u.create.datafile_count, num_dfiles_requested);
 
@@ -888,12 +914,11 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
+    gossip_debug(GOSSIP_CREATE_DEBUG, "create state: "
                  "dspace_create_setup_msgpair\n");
 
     js_p->error_code = 0;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting create req\n");
 
     /* reset the attributes to what got passed in to the sysint call. the retry
      * path comes through here so we'll want to reset it after each try. 
@@ -921,6 +946,7 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     ret = PVFS_OBJ_gen_meta(&sm_p->object_ref, 1, sm_p->parent_ref.fs_id);
 #endif
 
+    gossip_debug(GOSSIP_CREATE_DEBUG,"create: Calling gen file\n");
     /* Allocate OIDs and SIDs for a file.
      * There is one OID for the metadata, and n OIDs for the data
      * and each OID has multiple SIDs.
@@ -958,11 +984,14 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
      */
     if (gossip_debug_enabled(GOSSIP_CLIENT_DEBUG))
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, 
-                     "sys_create: selected meta SID: %s\n", 
+        gossip_debug(GOSSIP_CREATE_DEBUG, 
+                     "sys_create: selected meta \n"
+                     "                    OID: %s\n"
+                     "                    SID: %s\n", 
+                     PVFS_OID_str(&sm_p->object_ref.handle),
                      PVFS_SID_str(&sm_p->object_ref.sid_array[0]));
     }
-
+    gossip_debug(GOSSIP_CREATE_DEBUG, "sys-create: Setting up create request\n");
     PINT_SERVREQ_CREATE_FILL(msg_p->req,
                              sm_p->getattr.attr.capability,
                              *sm_p->cred_p,
@@ -979,6 +1008,7 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
                              sm_p->u.create.datafile_sid_array,
                              sm_p->hints);
 
+    gossip_debug(GOSSIP_CREATE_DEBUG, "sys-create: Setting up message request\n");
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->parent_ref.fs_id;
@@ -1006,6 +1036,9 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->req.u.create.attr.u.meta.stuffed_size = 0;
 #endif
 
+    PVFS_debug_servreq_create(GOSSIP_CREATE_DEBUG, &(msg_p->req.u.create));
+
+    gossip_debug(GOSSIP_CREATE_DEBUG, "sys-create: Resolving address\n");
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret < 0)
     {
@@ -1022,7 +1055,13 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
          * Should return a SM error code, call a lookup SM, then resume
          */
     }
+    else
+    {
+        gossip_debug(GOSSIP_CREATE_DEBUG, "sys-create target SID: %s\n",
+                     PVFS_SID_str(&msg_p->sid_array[0]));
+    }
 
+    gossip_debug(GOSSIP_CREATE_DEBUG, "sys-create: Push frame\n");
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
@@ -1042,19 +1081,19 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     int i;
     unsigned char *c;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CREATE_DEBUG,
                  "create state: crdirent_setup_msgpair\n");
 
     js_p->error_code = 0;
 
     /* find the hash value and the dist dir bucket */
     dirdata_hash = PINT_encrypt_dirdata(sm_p->u.create.object_name);
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CREATE_DEBUG,
                  "create: encrypt dirent %s into hash value %llu.\n", 
                  sm_p->u.create.object_name,
                  llu(dirdata_hash));
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create: dist_dir_bitmap:\n");
+    gossip_debug(GOSSIP_CREATE_DEBUG, "create: dist_dir_bitmap:\n");
  
     if (gossip_debug_enabled(GOSSIP_CLIENT_DEBUG))
     {
@@ -1063,10 +1102,10 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
             i--)
         {
             c = (unsigned char *)(sm_p->getattr.attr.u.dir.dist_dir_bitmap + i);
-            gossip_debug(GOSSIP_CLIENT_DEBUG," i=%d : %02x %02x %02x %02x\n"
+            gossip_debug(GOSSIP_CREATE_DEBUG," i=%d : %02x %02x %02x %02x\n"
                                             , i, c[3], c[2], c[1], c[0]);
         }
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "\n");
+        gossip_debug(GOSSIP_CREATE_DEBUG, "\n");
     }
 
     dirdata_server_index = 
@@ -1077,15 +1116,15 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     dirdata_sid_index = dirdata_server_index *
                         sm_p->getattr.attr.u.dir.dist_dir_attr.sid_count;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CREATE_DEBUG,
                  "create: selecting bucket No.%d from dist_dir_bitmap.\n", 
                  dirdata_server_index);
         
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CREATE_DEBUG,
                  "create: corresponding sid index is %d.\n", 
                  dirdata_sid_index);
         
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CREATE_DEBUG,
                  "create: %s: posting crdirent req: parent OID: %s, "
                  "name: %s, meta OID: %s\n",
                  __func__,
@@ -1118,41 +1157,41 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
 
     if (gossip_debug_enabled(GOSSIP_CLIENT_DEBUG))
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CREATE_DEBUG,
                      "create(crdirent): fsid(%d)\n",
                      sm_p->parent_ref.fs_id);
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CREATE_DEBUG,
                      "create(crdirent): dirdata handle[%d](%s)\n",
                      dirdata_server_index,
                      PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles
                                         [dirdata_server_index]));
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CREATE_DEBUG,
                      "create(crdirent): parent sid count(%d)\n",
                      sm_p->parent_ref.sid_count);
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CREATE_DEBUG,
                      "create(crdirent): dirdata sid[%d](%s)\n",
                      dirdata_sid_index,
                      PVFS_SID_str(&sm_p->getattr.attr.u.dir.dirdata_sids
                                         [dirdata_sid_index]));
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CREATE_DEBUG,
                      "create(crdirent): object name(%s)\n",
                      sm_p->u.create.object_name);
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CREATE_DEBUG,
                      "create(crdirent): object handle(%s)\n",
                      PVFS_OID_str(sm_p->u.create.metadata_handle));
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CREATE_DEBUG,
                      "create(crdirent): object sid(%s)\n",
                      PVFS_SID_str(&sm_p->u.create.metadata_sid_array[0]));
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CREATE_DEBUG,
                      "create(crdirent): sid count(%d)\n",
                      sm_p->u.create.metadata_sid_count);
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CREATE_DEBUG,
                      "create(crdirent): parent handle(%s)\n",
                      PVFS_OID_str(&sm_p->parent_ref.handle));
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CREATE_DEBUG,
                      "create(crdirent): parent sid(%s)\n",
                      PVFS_SID_str(&sm_p->parent_ref.sid_array[0]));
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CREATE_DEBUG,
                      "create(crdirent): msg_p->req.op(%d)\n",msg_p->req.op);
     }
 
@@ -1170,11 +1209,18 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->comp_fn = create_crdirent_comp_fn;
     /* not adding an object so no attr needed */
 
+    PVFS_debug_servreq_crdirent(GOSSIP_CREATE_DEBUG, &(msg_p->req.u.crdirent));
+
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
+    }
+    else
+    {
+        gossip_debug(GOSSIP_CREATE_DEBUG, "sys-crdirent target SID: %s\n",
+                     PVFS_SID_str(&msg_p->sid_array[0]));
     }
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
@@ -1186,7 +1232,7 @@ static PINT_sm_action create_crdirent_failure(struct PINT_smcb *smcb,
 {
     PVFS_uid local_uid;
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: crdirent_failure\n");
+    gossip_debug(GOSSIP_CREATE_DEBUG, "create state: crdirent_failure\n");
 
     /* if need to retry. clear the error_code and setup getattr. */
     if(js_p->error_code == -PVFS_EAGAIN &&
@@ -1197,12 +1243,12 @@ static PINT_sm_action create_crdirent_failure(struct PINT_smcb *smcb,
          */
         sm_p->u.create.retry_count++;
 
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CREATE_DEBUG,
                      "create: received -PVFS_EAGAIN, "
                      "will retry getattr and crdirent (attempt number %d).\n",
                      sm_p->u.create.retry_count);
 
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CREATE_DEBUG,
                      "%s:sm_p->getattr.attr.mask(0x%0lx)\n",
                      __func__,
                      sm_p->getattr.attr.mask);
@@ -1242,7 +1288,7 @@ static PINT_sm_action create_crdirent_failure(struct PINT_smcb *smcb,
 
     if (sm_p->u.create.stored_error_code == -PVFS_EEXIST)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "crdirent failed: "
+        gossip_debug(GOSSIP_CREATE_DEBUG, "crdirent failed: "
                      "dirent already exists!\n");
     }
     return SM_ACTION_COMPLETE;
@@ -1254,7 +1300,7 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     PVFS_size data_size = 0;
     int ret;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: cleanup\n");
+    gossip_debug(GOSSIP_CREATE_DEBUG, "create state: cleanup\n");
 
     sm_p->error_code = (sm_p->u.create.stored_error_code ?
                         sm_p->u.create.stored_error_code :
@@ -1345,7 +1391,7 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
         sm_p->u.create.stored_error_code = 0;
         sm_p->u.create.retry_count++;
 
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "Retrying create operation "
+        gossip_debug(GOSSIP_CREATE_DEBUG, "Retrying create operation "
                      "(attempt number %d)\n", sm_p->u.create.retry_count);
 
         js_p->error_code = CREATE_RETRY;
@@ -1488,7 +1534,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
     PINT_sm_msgpair_state *msg_p = NULL;
     int dfilesids = 0;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
+    gossip_debug(GOSSIP_CREATE_DEBUG, "create state: "
                  "delete_handles_setup_msgpair_array\n");
 
     js_p->error_code = 0;
@@ -1510,7 +1556,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
     dfilesids = sm_p->u.create.datafile_sid_count;
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CREATE_DEBUG,
                      "create: posting data file remove req %d\n", i);
 
         /* arbitrarily handle deletion of the metafile last */
@@ -1536,7 +1582,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
             msg_p->comp_fn = create_delete_handles_comp_fn;
             PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
 
-            gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
+            gossip_debug(GOSSIP_CREATE_DEBUG, " Preparing to remove "
                          "metafile handle %s\n", PVFS_OID_str(&msg_p->handle));
         }
         else
@@ -1564,7 +1610,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
             PVFS_SID_get_addr(&msg_p->svr_addr,
                               &msg_p->sid_array[i * dfilesids]); 
 
-            gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
+            gossip_debug(GOSSIP_CREATE_DEBUG, " Preparing to remove "
                          "datafile handle %s\n", PVFS_OID_str(&msg_p->handle));
         }
     }

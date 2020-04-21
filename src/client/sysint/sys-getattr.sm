@@ -306,6 +306,7 @@ PVFS_error PVFS_sys_getattr(PVFS_object_ref ref,
     }
     else if (!ret && op_id != -1)
     {
+        gossip_debug(GOSSIP_GETATTR_DEBUG,"Waiting for state machine.\n");
         ret = PVFS_sys_wait(op_id, "getattr", &error);
         if (ret)
         {
@@ -350,6 +351,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
      * then we can make a copy of the retrieved attribute for later
      * caching.
      */
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "Copy sm_p->getattr.attr into resp\n");
     PINT_copy_object_attr(&sm_p->getattr.attr,
                           &resp_p->u.getattr.attr);
 
@@ -509,7 +511,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 
                     /* gossip bitmap */
                     gossip_debug(GOSSIP_GETATTR_DEBUG,
-                            "sys-getattr: dist_dir_bitmap as:\n");
+                            "sys-getattr: dist_dir_bitmap:\n");
 
                     for(tmp_i = attr->u.dir.dist_dir_attr.bitmap_size - 1;
                         tmp_i >= 0;
@@ -525,7 +527,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 
                     /* gossip dirdata handles */
                     gossip_debug(GOSSIP_GETATTR_DEBUG,
-                            "sys-getattr: dirdata_handles as:\n");
+                            "sys-getattr: dirdata_handles:\n");
                     for (dirent_file_count_i = 0;
                          dirent_file_count_i < 
                                      attr->u.dir.dist_dir_attr.dirdata_count;
@@ -539,7 +541,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                     }
                     /* gossip dirdata sids */
                     gossip_debug(GOSSIP_GETATTR_DEBUG,
-                            "sys-getattr: dirdata_sids as:\n");
+                            "sys-getattr: dirdata_sids:\n");
                     for (dirent_sid_count_i = 0;
                          dirent_sid_count_i < 
                                      attr->u.dir.dist_dir_attr.sid_count;
@@ -759,8 +761,8 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     gossip_backtrace();
 #endif
 
-    /* This dumps the whole mask */
-    DEBUG_attr_mask(sm_p->getattr.req_attrmask);
+    /* This dumps the whole mask for debugging */
+    /* DEBUG_attr_mask(sm_p->getattr.req_attrmask); */
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "%s: handle %s fsid %d\n", __func__,
@@ -808,8 +810,8 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_GETATTR_DEBUG, "Mask has DISTDIR_ATTR added\n");
     }
 
-    /* This dumps the whole mask */
-    DEBUG_attr_mask(sm_p->getattr.req_attrmask);
+    /* This dumps the whole mask for debugging */
+    /* DEBUG_attr_mask(sm_p->getattr.req_attrmask); */
 
 #if 0
      /* TESTING ONLY: Force miss! */
@@ -1166,6 +1168,7 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
                                | PVFS_ATTR_CAPABILITY;
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, sm_p->getattr.req_attrmask);
 
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "Fill in getattr request\n");
     /* setup the msgpair to do a getattr operation */
     PINT_SERVREQ_GETATTR_FILL(msg_p->req,
                               PVFS_REQ_OTHER,
@@ -1204,6 +1207,7 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
         js_p->error_code = ret;
     }
 
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: exiting state action\n", __func__);
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
