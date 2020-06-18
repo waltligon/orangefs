@@ -401,7 +401,7 @@ int PINT_get_path_element(
     void *segstate = NULL;
     char local_pathname[PVFS_NAME_MAX] = {0};
 
-    strncpy(local_pathname,pathname,PVFS_NAME_MAX);
+    strncpy(local_pathname,pathname,PVFS_NAME_MAX - 1);
 
     while(!PINT_string_next_segment(local_pathname,&segp,&segstate))
     {
