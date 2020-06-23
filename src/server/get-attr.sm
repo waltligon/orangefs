@@ -638,7 +638,8 @@ static PINT_sm_action getattr_read_symlink_target(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
-    job_id_t i;
+    int keyval_count = 0;
+    job_id_t j_id;
     PVFS_object_attr *respattr = &(s_op->resp.u.getattr.attr);
 
     gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
@@ -668,27 +669,75 @@ static PINT_sm_action getattr_read_symlink_target(struct PINT_smcb *smcb,
 
     free_keyval_buffers(s_op);
 
-    s_op->key.buffer    = Trove_Common_Keys[SYMLINK_TARGET_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[SYMLINK_TARGET_KEY].size;
+    keyval_count = 2; /* symlink target and parent */
 
-    s_op->val.buffer = respattr->u.sym.target_path;
-    s_op->val.buffer_sz = respattr->u.sym.target_path_len;
+    s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    if(!s_op->key_a)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    ZEROMEM(s_op->key_a, (sizeof(PVFS_ds_keyval) * keyval_count));
 
-    /* this will get cleaned up with attr structure */
-    KEEP_BUFFER(KEYVAL);
+    s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    if(!s_op->val_a)
+    {
+        free(s_op->key_a);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    ZEROMEM(s_op->val_a, (sizeof(PVFS_ds_keyval) * keyval_count));
 
-    ret = job_trove_keyval_read(s_op->u.getattr.fs_id,
-                                s_op->u.getattr.handle,
-                                &s_op->key,
-                                &s_op->val,
-                                0,
-                                NULL,
-                                smcb,
-                                0,
-                                js_p,
-                                &i,
-                                server_job_context,
-                                s_op->req->hints);
+    s_op->error_a = malloc(sizeof(PVFS_error) * keyval_count);
+    if(!s_op->error_a)
+    {
+        free(s_op->error_a);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    ZEROMEM(s_op->error_a, (sizeof(PVFS_error) * keyval_count));
+
+    /* this is freed with the attr struct */
+    respattr->meta_sid_count = OSASZ(1, s_op->req->u.mkdir.sid_count);
+    respattr->parent         = malloc(respattr->meta_sid_count);
+    respattr->parent_sids    = (PVFS_SID *)(respattr->parent + 1);
+
+    /*------------------------------------------------------------------*/
+
+    s_op->key_a[0].buffer    = Trove_Common_Keys[SYMLINK_TARGET_KEY].key;
+    s_op->key_a[0].buffer_sz = Trove_Common_Keys[SYMLINK_TARGET_KEY].size;
+
+    s_op->val_a[0].buffer    = respattr->u.sym.target_path;
+    s_op->val_a[0].buffer_sz = respattr->u.sym.target_path_len;
+
+    keep_keyval_buffers(s_op, 0);
+
+    /*------------------------------------------------------------------*/
+
+    s_op->key_a[1].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
+    s_op->key_a[1].buffer    = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
+
+    s_op->val_a[1].buffer_sz = respattr->meta_sid_count;
+    s_op->val_a[1].buffer    = respattr->parent;
+
+    keep_keyval_buffers(s_op, 1);
+
+    /*------------------------------------------------------------------*/
+
+    ret = job_trove_keyval_read_list(s_op->u.getattr.fs_id,
+                                     s_op->u.getattr.handle,
+                                     s_op->key_a,
+                                     s_op->val_a,
+                                     s_op->error_a,
+                                     keyval_count,
+                                     0,
+                                     NULL,
+                                     smcb,
+                                     0,
+                                     js_p,
+                                     &j_id,
+                                     server_job_context,
+                                     s_op->req->hints);
 
     return ret;
 }
@@ -1536,35 +1585,6 @@ static void free_nested_getattr_data(struct PINT_server_op *s_op)
     return;
 }
 
-/*
- * Function: getattr_free
- *
- * Params:   server_op *s_op,
- *
- * Returns:  N/A
- *
- * Synopsis: free memory - can be called from outside this source file.
- *
- */
-void getattr_free(struct PINT_server_op *s_op)
-{
-    free_keyval_buffers(s_op);
-
-    PINT_free_object_attr(&s_op->resp.u.getattr.attr);
-}
-
-static PINT_sm_action getattr_cleanup(struct PINT_smcb *smcb,
-                                      job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
-
-    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TGETATTR, &s_op->start_time);
-    getattr_free(s_op);
-    return(server_state_machine_complete(smcb));
-}
-
 static PINT_sm_action getattr_with_prelude_init(struct PINT_smcb *smcb,
                                                 job_status_s *js_p)
 {
@@ -2151,6 +2171,35 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
         js_p->error_code = 0;
     }/* end if val_a and key_a */
     return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action getattr_cleanup(struct PINT_smcb *smcb,
+                                      job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+
+    PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TGETATTR, &s_op->start_time);
+    getattr_free(s_op);
+    return(server_state_machine_complete(smcb));
+}
+
+/*
+ * Function: getattr_free
+ *
+ * Params:   server_op *s_op,
+ *
+ * Returns:  N/A
+ *
+ * Synopsis: free memory - can be called from outside this source file.
+ *
+ */
+void getattr_free(struct PINT_server_op *s_op)
+{
+    free_keyval_buffers(s_op);
+
+    PINT_free_object_attr(&s_op->resp.u.getattr.attr);
 }
 
 static int perm_getattr(PINT_server_op *s_op)
