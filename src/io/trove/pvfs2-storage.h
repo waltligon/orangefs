@@ -113,6 +113,8 @@ struct PVFS_ds_attributes_s
     PVFS_time atime; /* access (read) time */
     PVFS_time ntime; /* new (create) time */
 
+    uint32_t meta_sid_count; /* FS wide count of metadata replication */
+
     union
     {
         struct PVFS_ds_metadata_attr_s metafile;
@@ -148,6 +150,7 @@ do {                                                                   \
     (__oa)->atime = (__dsa)->atime;                                    \
     (__oa)->ntime = (__dsa)->ntime;                                    \
     (__oa)->objtype = (__dsa)->type;                                   \
+    (__oa)->meta_sid_count = (__dsa)->meta_sid_count;                  \
     /* force a null capability */                                      \
     PINT_null_capability(&(__oa)->capability);                         \
     switch ((__dsa)->type)                                             \
@@ -219,6 +222,7 @@ do {                                                                   \
     (__dsa)->atime = (__oa)->atime;                                    \
     (__dsa)->ntime = (__oa)->ntime;                                    \
     (__dsa)->type = (__oa)->objtype;                                   \
+    (__dsa)->meta_sid_count = (__oa)->meta_sid_count;                  \
     switch ((__oa)->objtype)                                           \
     {                                                                  \
     case PVFS_TYPE_METAFILE :                                          \

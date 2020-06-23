@@ -159,7 +159,7 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
                  "\tbase frame:%d\tframe count:%d\n"
                  ,smcb->base_frame,smcb->frame_count);
 
-    /* gets the target fs_id and handle from the request and puts
+    /* gets the target fs_id and handle from the request and copies
      * them in the s_op
      */
     ret = PINT_server_req_get_object_ref(s_op->req,
@@ -712,10 +712,9 @@ complete:
 }
 
 /* if opcode is appropriate and we have a proper capability
- * then we create the object - a DFILE with the approporiate
- * attributes
+ * then we create the object - a DATAFILE  or DIRFILE with the
+ * approporiate attributes
  */
-//static PINT_sm_action prelude_create_data_object_if_allowed(
 static PINT_sm_action prelude_create_object_if_allowed(struct PINT_smcb *smcb,
                                                        job_status_s *js_p)
 {
@@ -725,7 +724,7 @@ static PINT_sm_action prelude_create_object_if_allowed(struct PINT_smcb *smcb,
 
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "(%p) %s (prelude sm) state: req_sched\n", s_op,
+                 "(%p) %s (prelude sm) state: create_object\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
     gossip_debug(GOSSIP_SERVER_DEBUG, "creating missing object\n");
 
@@ -810,72 +809,6 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
 
     js_p->error_code = 0;
 
-#if 0
-    /* RAL:  revisit if operation type is necessary */
-    switch (s_op->req->op)
-    {
-    case PVFS_SERV_IO :
-    case PVFS_SERV_GETATTR :
-    case PVFS_SERV_SETATTR :
-
-    /* initialize the time members */
-    /* these are used for fine-grain time values */
-    current_time = time(NULL);
-    s_op->ds_attr.atime = current_time;
-    s_op->ds_attr.mtime = current_time;
-    s_op->ds_attr.ctime = current_time;
-    s_op->ds_attr.ntime = current_time;
-
-    /* I'm pretty sure that s_op->attr has nothing in it - its failure
-     * is what started us down this path - so we need a better/more
-     * reliable place to get this data from.
-     */
-
-    /* s_op->ds_attr.type = ; already done */
-    s_op->ds_attr.fs_id =  s_op->target_fs_id;
-    s_op->ds_attr.handle = s_op->target_handle;
-    /*
-    s_op->ds_attr.uid = s_op->attr.owner;
-    s_op->ds_attr.gid = s_op->attr.group;
-    s_op->ds_attr.mode = s_op->attr.perms;
-    */
-    /* These are op specific (this func is not) and I don't
-     * think we need these values - access to this object should
-     * be controlled by capabilities
-     */
-    s_op->ds_attr.uid = s_op->req->u.setattr.attr.owner;
-    s_op->ds_attr.gid = s_op->req->u.setattr.attr.group;
-    s_op->ds_attr.mode = s_op->req->u.setattr.attr.perms;
-
-
-    switch (s_op->ds_attr.type)
-    {
-    case PVFS_TYPE_DIRDATA :
-        /* is anythin IN s_op->attr at this point after failing the initial search? */
-        s_op->ds_attr.u.dirdata.dirent_count = 0; /* new object no items */
-        s_op->ds_attr.u.dirdata.tree_height = 
-                           s_op->attr.u.dirdata.dist_dir_attr.tree_height;
-        s_op->ds_attr.u.dirdata.dirdata_count = 
-                           s_op->attr.u.dirdata.dist_dir_attr.dirdata_count;
-        s_op->ds_attr.u.dirdata.sid_count = 
-                           s_op->attr.u.dirdata.dist_dir_attr.sid_count;
-        s_op->ds_attr.u.dirdata.bitmap_size = 
-                           s_op->attr.u.dirdata.dist_dir_attr.bitmap_size;
-        s_op->ds_attr.u.dirdata.split_size = 
-                           s_op->attr.u.dirdata.dist_dir_attr.split_size;
-        s_op->ds_attr.u.dirdata.server_no = 
-                           s_op->attr.u.dirdata.dist_dir_attr.server_no;
-        /* s_op->ds_attr.u.dirdata.branch_level = ; already done */
-
-        break;
-    case PVFS_TYPE_DATAFILE :
-        /* s_op->ds_attr.u.wdatafile.b_size = ; already done */
-
-    default:
-        break;
-    }
-#endif
-
     /* PVFS_object_attr_from_ds_attr(&s_op->attr, &s_op->ds_attr); */
     PVFS_ds_attr_from_object_attr(&s_op->ds_attr, &s_op->attr);
 
@@ -894,13 +827,6 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
                                    server_job_context,
                                    s_op->req->hints);
     return ret;
-#if 0
-    default :
-        break;
-    }
-
-    return SM_ACTION_COMPLETE;
-#endif
 }
 
 /*
@@ -915,17 +841,24 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
     PVFS_object_attr *pattr;
     int ret = -1;
     job_id_t j_id;
+    int keyval_count = 1; /* for a DATAFILE - PARENT key */
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (prelude sm) state: write_new_object_keyval\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op));
     gossip_debug(GOSSIP_SERVER_DEBUG, "writing keyvals for new object\n");
 
-    /* total 3 static keyvals every dirdata has:
-     * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES, PARENT */
-    int keyval_count = 3;
+    if (s_op->req->ctrl.sub == PVFS_REQ_DIRDATA)
+    {
+        /* total 3 static keyvals every dirdata has:
+         * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES, PARENT */
+        keyval_count = 3;
+    }
 
-    pattr = &s_op->req->u.mkdir.attr; /* mkdir specific? */
+    /* no attr in the db, so we are assuming the request attr has our data */
+    pattr = &s_op->req->u.setattr.attr;
+
+    /* allocate key and val arrays */
 
     s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
     if(!s_op->key_a)
@@ -950,42 +883,55 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
 
 /*---------------------------------------------------------------------------*/
 
-    s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
-    s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
+    /* write parent data for DIRDATA or DATAFILE */
 
-    s_op->val_a[0].buffer_sz = pattr->u.dir.dist_dir_attr.bitmap_size *
-                               sizeof(PVFS_dist_dir_bitmap_basetype);
-    s_op->val_a[0].buffer = (void *)&pattr->u.dir.dist_dir_bitmap;
-    gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals0 %p sz %d\n",
+    s_op->key_a[0].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
+    s_op->key_a[0].buffer = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
+
+    s_op->val_a[0].buffer_sz = OSASZ(1, s_op->req->u.setattr.sid_count);
+    s_op->val_a[0].buffer = (void *)&s_op->req->u.setattr.attr.parent;
+    gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals2 %p sz %d\n",
                                       (void *)s_op->val_a[0].buffer,
                                       s_op->val_a[0].buffer_sz);
+
     keep_keyval_buffers(s_op, 0);
 
 /*---------------------------------------------------------------------------*/
 
-    s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
-    s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
 
-    s_op->val_a[1].buffer_sz = OSASZ(pattr->u.dir.dist_dir_attr.dirdata_count,
-                                     pattr->u.dir.dist_dir_attr.sid_count);
-    s_op->val_a[1].buffer = (void *)&pattr->u.dir.dirdata_handles;
-    gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals1 %p sz %d\n",
-                                      (void *)s_op->val_a[1].buffer,
-                                      s_op->val_a[1].buffer_sz);
-    keep_keyval_buffers(s_op, 1);
+    if (keyval_count == 3)  
+    {
+        /* write dirdata handles for DIRDATA */
+
+        s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
+        s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
+
+        s_op->val_a[1].buffer_sz = OSASZ(pattr->u.dir.dist_dir_attr.dirdata_count,
+                                        pattr->u.dir.dist_dir_attr.sid_count);
+        s_op->val_a[1].buffer = (void *)&pattr->u.dir.dirdata_handles;
+        gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals1 %p sz %d\n",
+                                        (void *)s_op->val_a[1].buffer,
+                                        s_op->val_a[1].buffer_sz);
+
+        keep_keyval_buffers(s_op, 1);
 
 /*---------------------------------------------------------------------------*/
 
-    s_op->key_a[2].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
-    s_op->key_a[2].buffer = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
+        /* write bitmap data for DIRDATA */
 
-    s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.mkdir.sid_count);
-    s_op->val_a[2].buffer = (void *)&s_op->req->u.mkdir.parent;
-    gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals2 %p sz %d\n",
-                                      (void *)s_op->val_a[2].buffer,
-                                      s_op->val_a[2].buffer_sz);
+        s_op->key_a[2].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
+        s_op->key_a[2].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
 
-    keep_keyval_buffers(s_op, 2);
+        s_op->val_a[2].buffer_sz = pattr->u.dir.dist_dir_attr.bitmap_size *
+                                sizeof(PVFS_dist_dir_bitmap_basetype);
+        s_op->val_a[2].buffer = (void *)&pattr->u.dir.dist_dir_bitmap;
+        gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals0 %p sz %d\n",
+                                        (void *)s_op->val_a[2].buffer,
+                                        s_op->val_a[2].buffer_sz);
+
+        keep_keyval_buffers(s_op, 2);
+
+    }
 /*---------------------------------------------------------------------------*/
 
     gossip_debug(GOSSIP_SERVER_DEBUG,

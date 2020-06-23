@@ -602,7 +602,10 @@ struct PINT_server_mkdir_op
     int handle_array_remote_count;
     */
     PVFS_error saved_error_code;
-    int handle_index;
+    int dirdata_index;      /* index for looping through all dirdata */
+    int rmt_dirdata_index;  /* index for looping through remote dirdata */
+    int *rmt_dirdata_array; /* array of indicies of the dirdata that are remote */
+    PVFS_OID *dirdata_parent_buffer; /* OID and SIDs of the dir (parent to dirdatas) */
 };
 
 struct PINT_server_getattr_op

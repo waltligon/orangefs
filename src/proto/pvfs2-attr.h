@@ -111,10 +111,13 @@ typedef uint64_t PVFS_object_attrmask;
 #define PVFS_ATTR_COMMON_CTIME_SET   (1ULL << 9)
 #define PVFS_ATTR_COMMON_MTIME_SET   (1ULL << 10)
 #define PVFS_ATTR_COMMON_NTIME_SET   (1ULL << 11)
+#define PVFS_ATTR_COMMON_PARENT      (1ULL << 47)
+#define PVFS_ATTR_COMMON_SID_COUNT   (1ULL << 48)
 
 #define PVFS_ATTR_COMMON_NOTIME                           \
         (PVFS_ATTR_COMMON_UID  | PVFS_ATTR_COMMON_GID   | \
-         PVFS_ATTR_COMMON_PERM | PVFS_ATTR_COMMON_TYPE)
+         PVFS_ATTR_COMMON_PERM | PVFS_ATTR_COMMON_TYPE  | \
+         PVFS_ATTR_COMMON_PARENT | PVFS_ATTR_COMMON_SID_COUNT)
 
 #define PVFS_ATTR_NOTIME_SET \
         ~(PVFS_ATTR_COMMON_ATIME_SET | PVFS_ATTR_COMMON_NTIME_SET | \
@@ -128,6 +131,7 @@ typedef uint64_t PVFS_object_attrmask;
         (PVFS_ATTR_COMMON_UID   | PVFS_ATTR_COMMON_GID   | \
          PVFS_ATTR_COMMON_PERM  | PVFS_ATTR_COMMON_TYPE  | \
          PVFS_ATTR_TIME_ALL)
+
 
 /* -------------------------
  * METAFILE OBJECT ATTRIBUTES
@@ -341,6 +345,7 @@ static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask,
     MASKDEBUG(PVFS_ATTR_COMMON_ATIME_SET,         "COMMON_ATIME_SET\n");
     MASKDEBUG(PVFS_ATTR_COMMON_CTIME_SET,         "COMMON_CTIME_SET\n");
     MASKDEBUG(PVFS_ATTR_COMMON_MTIME_SET,         "COMMON_MTIME_SET\n");
+    MASKDEBUG(PVFS_ATTR_COMMON_PARENT,            "COMMON_PARENT\n"); /* 47 */
     MASKDEBUG(PVFS_ATTR_META_DIST,                "META_DIST\n");
     MASKDEBUG(PVFS_ATTR_META_DIST_SIZE,           "META_DIST_SIZE\n");
 /**/MASKDEBUG(PVFS_ATTR_META_DFILES,              "META_DFILES\n");
@@ -420,7 +425,7 @@ struct PVFS_metafile_attr_s
 
     /* list of sids */
     PVFS_SID *sid_array;
-    int32_t sid_count;
+    int32_t sid_count;   /* which sids is this conting? */
 
     uint32_t mirror_mode;
 
@@ -871,7 +876,10 @@ struct PVFS_object_attr
     PVFS_time mtime;           /* modify (data) time */
     PVFS_time ctime;           /* change (metadata) time */
     PVFS_time ntime;           /* new (create) time */
+    uint32_t meta_sid_count;   /* number of metadata sids in this FS */
     PVFS_capability capability;
+    PVFS_handle *parent;       /* handle for parent object */
+    PVFS_SID *parent_sids;
 
     union
     {
@@ -890,6 +898,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 static inline void encode_PVFS_object_attr(char **pptr, 
                                            const PVFS_object_attr *x) 
 { 
+    int index_i = 0;
     encode_PVFS_ds_type(pptr, &(x)->objtype); 
     encode_uint32_t(pptr, &(x)->mask); 
     encode_PVFS_uid(pptr, &(x)->owner); 
@@ -900,7 +909,15 @@ static inline void encode_PVFS_object_attr(char **pptr,
     encode_PVFS_time(pptr, &(x)->mtime); 
     encode_PVFS_time(pptr, &(x)->ctime); 
     encode_PVFS_time(pptr, &(x)->ntime); 
+    encode_uint32_t(pptr, &(x)->meta_sid_count); 
+    encode_skip4(pptr,);
     encode_PVFS_capability(pptr, &(x)->capability); 
+    encode_PVFS_handle(pptr, (x)->parent);             
+    align8(pptr);                                                             
+    for (index_i = 0; index_i < (x)->meta_sid_count; index_i++)      
+    {                                                                         
+        encode_PVFS_SID(pptr, &(x)->parent_sids[index_i]);                   
+    }                                                                         
     switch ((x)->objtype) 
     { 
     case PVFS_TYPE_METAFILE : 
@@ -926,6 +943,7 @@ static inline void encode_PVFS_object_attr(char **pptr,
 
 static inline void decode_PVFS_object_attr(char **pptr, PVFS_object_attr *x) 
 {
+    int index_i = 0;
     decode_PVFS_ds_type(pptr, &(x)->objtype); 
     decode_uint32_t(pptr, &(x)->mask); 
     decode_PVFS_uid(pptr, &(x)->owner); 
@@ -936,7 +954,20 @@ static inline void decode_PVFS_object_attr(char **pptr, PVFS_object_attr *x)
     decode_PVFS_time(pptr, &(x)->mtime); 
     decode_PVFS_time(pptr, &(x)->ctime); 
     decode_PVFS_time(pptr, &(x)->ntime); 
+    decode_uint32_t(pptr, &(x)->meta_sid_count); 
+    decode_skip4(pptr,); 
     decode_PVFS_capability(pptr, &(x)->capability); 
+    align8(pptr);                                                             
+
+    (x)->parent = decode_malloc(OSASZ(1, (x)->meta_sid_count));       
+    (x)->parent_sids = (PVFS_SID *)&(x)->parent[1]; 
+
+    decode_PVFS_handle(pptr, (x)->parent);             
+    for (index_i = 0; index_i < (x)->meta_sid_count; index_i++)      
+    {                                                                         
+        decode_PVFS_SID(pptr, &(x)->parent_sids[index_i]);                   
+    }                                                                         
+
     switch ((x)->objtype) 
     { 
     case PVFS_TYPE_METAFILE : 
@@ -963,6 +994,7 @@ static inline void decode_PVFS_object_attr(char **pptr, PVFS_object_attr *x)
 static inline void defree_PVFS_object_attr(PVFS_object_attr *x) 
 { 
     defree_PVFS_capability(&(x)->capability); 
+    decode_free(&(x)->parent);
     switch ((x)->objtype) 
     { 
     case PVFS_TYPE_METAFILE : 

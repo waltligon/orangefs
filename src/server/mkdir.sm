@@ -70,7 +70,7 @@ nested machine pvfs2_mkdir_work_sm
     state dirdata_create
     {
         run mkdir_dirdata_create;
-        STATE_DIRDATA_DONE => setup_getattr_request;
+        STATE_DIRDATA_DONE => setup_dirdata_create;
         default => dirdata_attribs;
     }
 
@@ -84,6 +84,23 @@ nested machine pvfs2_mkdir_work_sm
     {
         run mkdir_dirdata_keyvals;
         default => dirdata_create;
+    }
+
+    /* create remote dirdatas */
+    /* eventually we want this PJMP so we can return before completion */
+
+    state setup_dirdata_create
+    {
+        run setup_dirdata_create;
+        STATE_DIRDATA_DONE => setup_getattr_request;
+        default => initiate_dirdata_create;
+    }
+
+    state initiate_dirdata_create
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => setup_getattr_request;
+        default => err_msg;
     }
 
     /* getattr for response */
@@ -147,6 +164,114 @@ machine pvfs2_mkdir_sm
 %%
 
 /*
+ * Function: mkdir_prep_sm
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s *js_p
+ *
+ * Returns:  int
+ *
+ * Synopsis: Creates initializes state machine variables for mkdir
+ *
+ */
+
+static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *a_p = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
+    PVFS_uid uid;
+    uint32_t num_groups;
+    PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
+    int ret;
+
+    /* This is the first true state action of the mkdir SM so
+     * increment the counter for mkdir requests
+     */
+    PINT_perf_count(PINT_server_pc, PINT_PERF_MKDIR, 1, PINT_PERF_ADD);
+
+    s_op->attr.u.dir.dirdata_handles = NULL;
+    s_op->attr.u.dir.dist_dir_bitmap = NULL;
+    s_op->key_a = NULL;
+    s_op->val_a = NULL;
+    s_op->error_a = NULL;
+
+    s_op->u.mkdir.fs_id = s_op->req->u.mkdir.fs_id;
+    s_op->u.mkdir.handle = s_op->req->u.mkdir.handle;
+
+    a_p = &(s_op->req->u.mkdir.attr);
+    ds_attr = (&s_op->ds_attr);
+
+    if (a_p->objtype != PVFS_TYPE_DIRECTORY)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* map owner/group from credential */
+    if (a_p->mask & (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID) &&
+        (a_p->owner == PVFS_UID_MAX || a_p->group == PVFS_GID_MAX))
+    {
+        ret  = PINT_map_credential(&s_op->req->u.mkdir.credential, 
+                                   &uid, &num_groups, group_array);
+        if (ret != 0)
+        {
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
+        }
+
+        if (a_p->mask & PVFS_ATTR_COMMON_UID &&
+            a_p->owner == PVFS_UID_MAX)
+        {
+            a_p->owner = uid;
+        }
+
+        if (a_p->mask & PVFS_ATTR_COMMON_GID &&
+            a_p->group == PVFS_GID_MAX)
+        {
+            a_p->group = group_array[0];
+        }
+    }
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " attrs to write: [owner = %d, "
+                 "group = %d, perms = %o]\n", a_p->owner, a_p->group,
+                 a_p->perms);
+
+    /* set up the dist-dir-state portion of the attributes
+     * pointed to by a_p attributes in the mkdir request
+     * which are the directory attributes.
+     */
+    ret = PINT_init_dist_dir_state(&a_p->u.dir.dist_dir_attr,
+                                   &a_p->u.dir.dist_dir_bitmap,
+                                   s_op->req->u.mkdir.dirdata_count,
+                                   s_op->req->u.mkdir.dirdata_sid_count,
+                                   0,
+                                   s_op->req->u.mkdir.dist_dir_servers_initial,
+                                   s_op->req->u.mkdir.dist_dir_split_size);
+
+    if(ret != 0)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* struct specific gossip macros */
+    PINT_debug_dist_dir_attr(GOSSIP_MKDIR_DEBUG, a_p->u.dir.dist_dir_attr);
+    PINT_debug_dist_dir_bitmap(GOSSIP_MKDIR_DEBUG, a_p->u.dir.dist_dir_attr,
+                               a_p->u.dir.dist_dir_bitmap);
+
+    /* last couple of things to set up before we convert to ds_attr */
+    a_p->u.dir.dirdata_handles = s_op->req->u.mkdir.dirdata_handles;
+    a_p->u.dir.dirdata_sids = s_op->req->u.mkdir.dirdata_sid_array;
+
+    /* translate attrs to storage attr format */
+    PVFS_ds_attr_from_object_attr(ds_attr, a_p);
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+/*
  * Function: mkdir_create
  *
  * Params:   server_op *s_op, 
@@ -204,7 +329,7 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
     PVFS_ds_attributes *ds_attr = NULL;
 
     ds_attr = (&s_op->ds_attr);
-    PVFS_ds_init_time(ds_attr);
+    PVFS_ds_init_time(ds_attr); /* this determines the time of dir creation */
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " setting directory version to "
                  "%llu\n\tmtime is %llu\n", llu(ds_attr->mtime),
@@ -308,6 +433,7 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
     s_op->val_a[1].buffer = pattr->u.dir.dirdata_handles;
     keep_keyval_buffers(s_op, 1);
 
+    /* parent of directory is passed from client */
     s_op->key_a[2].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
     s_op->key_a[2].buffer = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
 
@@ -415,13 +541,16 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
                                   server_job_context,
                                   s_op->req->hints);
 
-    /* handle_index is defined but not used in s_op so
+    /* dirdata_index is defined but not used in s_op so
      * for now I'm co-opting it - if it is needed later for
      * tree stuff we will have to solve the conflict, probably
      * by renaming this variable
      */
 
-    s_op->u.mkdir.handle_index = s_op->req->u.mkdir.dirdata_count;
+    s_op->u.mkdir.dirdata_index = s_op->req->u.mkdir.dirdata_count;
+    s_op->u.mkdir.rmt_dirdata_index = 0;
+    s_op->u.mkdir.rmt_dirdata_array = (int *)calloc(s_op->req->u.mkdir.dirdata_count + 1,
+                                                    sizeof(int));
 
     return ret;
 }
@@ -440,26 +569,65 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
     int ret;
     job_id_t j_id;
     int i = 0;
+    int j = 0;
 
-    i = s_op->u.mkdir.handle_index - 1;
+    /* dirdata_index is apparently NOT an index but is the NUMBER of dirdata's so we
+     * convert it into an index in i so we can loop from N-1 .. 0 over the dirdata's
+     * and decide if they are local or remote
+     */
+
+    i = s_op->u.mkdir.dirdata_index - 1;
+    j = s_op->u.mkdir.rmt_dirdata_index - 1;
 
     /* find dirdata on this server and create it */
     for (; i >= 0; i--)
     {
+        /* test for local */
         if (PINT_cached_config_server_local(
                         &s_op->req->u.mkdir.dirdata_sid_array[i]))
         {
-            /* equals so go create it */
+            /* equals so go create it - we will loop back to this state with
+             * dirdata_index suitably adjustd and continue our search
+             */
             break;
         }
+        else
+        {
+            /* this is a remote dirdata, so we need to set it up for later
+             */
+            s_op->u.mkdir.rmt_dirdata_array[j++] = i;
+        }
     }
-    s_op->u.mkdir.handle_index = i;
+    /* this resets dirdata_index for the next call to this state */
+    s_op->u.mkdir.dirdata_index = i;
+    s_op->u.mkdir.rmt_dirdata_index = j;
 
-    /* if i is zero there are no more dirdata to create */
+    /* if i is zero there are no more dirdata to test/create */
     if (i < 0)
     {
         js_p->error_code = STATE_DIRDATA_DONE;
         return SM_ACTION_COMPLETE;
+    }
+
+    /* when we create the local dirdata (if there is one) we need a buffer of the
+     * dirdata's parent with OID and SIDs.  The newly created directory object is
+     * the parent of the dirdatas, so we get that right out of the request.  We
+     * will reuse the buffer for multiple dirdatas if needed and then free in the
+     * cleanup state.
+     */
+
+    if (!s_op->u.mkdir.dirdata_parent_buffer)
+    {
+        char *p;
+        s_op->u.mkdir.dirdata_parent_buffer =
+                malloc(OSASZ(1, s_op->req->u.mkdir.sid_count));
+        p = (char *)s_op->u.mkdir.dirdata_parent_buffer;
+        ZEROMEM(p, OSASZ(1, s_op->req->u.mkdir.sid_count));
+        memcpy((void *)p, (void *)&s_op->req->u.mkdir.handle, sizeof(PVFS_OID));
+        p += sizeof(PVFS_OID);
+        memcpy((void *)p,
+               (void *)s_op->req->u.mkdir.sid_array, 
+               sizeof(PVFS_SID) * s_op->req->u.mkdir.sid_count);
     }
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " creating dirdata dspace on coll_id %d\n",
@@ -498,11 +666,23 @@ static PINT_sm_action mkdir_dirdata_attribs(struct PINT_smcb *smcb,
     int ret = -1;
     job_id_t j_id;
 
-    i = s_op->u.mkdir.handle_index;
+    i = s_op->u.mkdir.dirdata_index;
     PVFS_ds_attributes *ds_attr = NULL;
 
+    /* writing the same attributes from the directory */
+    /* in fact we can zap a few of them that are not valid
+     */
     ds_attr = (&s_op->ds_attr);
-    PVFS_ds_init_time(ds_attr);
+    ds_attr->type = PVFS_TYPE_DIRDATA;
+    ds_attr->handle = s_op->req->u.mkdir.dirdata_handles[i];
+    ds_attr->uid = 0;
+    ds_attr->gid = 0;
+    ds_attr->mode = 0;
+
+    /* do not update time here - keep the original time until
+     * something modifies this dirdata, the time on this object
+     * should be identical to the dir
+     */
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " setting dirdata version to "
                  "%llu\n\tmtime is %llu\n", llu(ds_attr->mtime),
@@ -534,7 +714,7 @@ static PINT_sm_action mkdir_dirdata_keyvals(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
-    PVFS_object_attr *pattr;
+    PVFS_object_attr *pattr = NULL;
     int ret = -1;
     job_id_t j_id;
     int k = 0;
@@ -578,11 +758,12 @@ static PINT_sm_action mkdir_dirdata_keyvals(struct PINT_smcb *smcb,
     s_op->val_a[1].buffer = pattr->u.dir.dirdata_handles;
     keep_keyval_buffers(s_op, 1);
 
+    /* parent of dirdata is the directory, handle passed up from client */
     s_op->key_a[2].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
     s_op->key_a[2].buffer = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
 
     s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.mkdir.sid_count);
-    s_op->val_a[2].buffer = s_op->req->u.mkdir.parent;
+    s_op->val_a[2].buffer = s_op->u.mkdir.dirdata_parent_buffer;
     keep_keyval_buffers(s_op, 2);
 
     if (k != keyval_count)
@@ -590,14 +771,15 @@ static PINT_sm_action mkdir_dirdata_keyvals(struct PINT_smcb *smcb,
         gossip_lerr("error building args for new dir attributes\n");
     }
 
+    i = s_op->u.mkdir.dirdata_index;
+    pattr->u.dir.dist_dir_attr.server_no = i;
+
     gossip_debug(GOSSIP_MKDIR_DEBUG,
             "  writing dist-dir-struct keyvals for dirdata: %s "
             "\t with server_no=%d and branch_level=%d \n",
-            PVFS_OID_str(&s_op->u.mkdir.handle),
+            PVFS_OID_str(&s_op->req->u.mkdir.dirdata_handles[i]),
             pattr->u.dir.dist_dir_attr.server_no,
             pattr->u.dir.dist_dir_attr.branch_level);
-
-    i = s_op->u.mkdir.handle_index;
 
     ret = job_trove_keyval_write_list(
                                   s_op->req->u.mkdir.fs_id,
@@ -614,6 +796,107 @@ static PINT_sm_action mkdir_dirdata_keyvals(struct PINT_smcb *smcb,
                                   server_job_context,
                                   s_op->req->hints);
     return ret;
+}
+
+/*
+ * Function: setup_dirdata_create
+ *
+ * Synopsis: Setup to send requests to servers that will hold a remote dirdata for
+ * this directory - locals have already been created.
+ *
+ */
+
+static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1, h = 0;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability capability;
+    PVFS_object_attr *pattr = NULL;;
+
+    /* set up for an array of requests */
+    ret = PINT_msgpairarray_init(&s_op->msgarray_op, s_op->u.mkdir.rmt_dirdata_index);
+    if (ret != 0)
+    {
+        gossip_err("mkdir: setattr failed to initialize %d msgpairs\n",
+                   s_op->u.mkdir.rmt_dirdata_index);
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+    
+    /* we need to set up the attributes, do as we did a few states above
+     * zero out a couple, change a couple.  the only objattr we have is in
+     * the request, we either copy it, or change it and hope we don't need
+     * it again.  Going to try the latter.  Note handle is edited inside the
+     * loop below.
+     */
+    pattr = (&s_op->req->u.mkdir.attr);
+    pattr->objtype = PVFS_TYPE_DIRDATA;
+    pattr->owner = 0;
+    pattr->group = 0;
+    pattr->perms = 0;
+    pattr->parent = s_op->u.mkdir.dirdata_parent_buffer;
+    pattr->parent_sids = (PVFS_SID *)(pattr->parent + 1);
+
+    /* need to setup capability for server-to-server */
+    PINT_null_capability(&capability);
+
+    foreach_msgpair(&s_op->msgarray_op, msg_p, h)
+    {
+        /* these are needed in both msg_p and req */
+        msg_p->fs_id = s_op->req->u.mkdir.fs_id;
+        /* this picks the remote handles - computed earlier */
+        msg_p->handle = s_op->req->u.mkdir.dirdata_handles[h];
+        msg_p->sid_array = &s_op->req->u.mkdir.sid_array[h * s_op->req->u.mkdir.sid_count];
+        msg_p->sid_count = s_op->req->u.mkdir.sid_count;
+
+        PINT_SERVREQ_SETATTR_FILL(msg_p->req,
+                                  PVFS_REQ_DIRDATA, /* sub_op req type */
+                                  capability,
+                                  s_op->req->u.mkdir.credential,
+                                  msg_p->fs_id,
+                                  msg_p->handle,
+                                  msg_p->sid_count,
+                                  msg_p->sid_array,
+                                  objtype,
+                                  s_op->req->u.mkdir.attr, 
+                                  0,     /* extra_amask */
+                                  NULL);
+
+        msg_p->msgclass = PVFS_IO_METADATA;
+        msg_p->msgdir = PVFS_IO_WRITE;
+        msg_p->sid_index = 0; /* indexes sid_array. h used above to compute sid_array. */
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = NULL;
+
+        PVFS_debug_servreq_setattr(GOSSIP_SETATTR_DEBUG, &(msg_p->req.u.setattr));
+
+        /* This sets svr_addr for BMI */
+        ret = PVFS_SID_get_addr(&msg_p->svr_addr, msg_p->sid_array);
+        if (ret)
+        {
+            gossip_err("Failed to map meta server address\n");
+            js_p->error_code = ret;
+            /* need to return this error - handle in SM? */
+        }
+        else
+        {
+            js_p->error_code = 0;
+        }
+    }
+
+    ret = PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    if ( ret < 0 )
+    {
+       gossip_err("%s:Error pushing setattr frame onto mkdir stack:ret(%d)\n",
+                   __func__, ret);
+       js_p->error_code = ret;
+       return SM_ACTION_COMPLETE;
+    }
+
+
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -757,6 +1040,11 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 
     PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TMKDIR, &s_op->start_time);
     mkdir_free(s_op);
+    /* do any of these need to be free'd ? */
+    s_op->u.mkdir.saved_attr = NULL;
+    s_op->u.mkdir.rmt_dirdata_array = NULL;
+    free(s_op->u.mkdir.dirdata_parent_buffer);
+    s_op->u.mkdir.dirdata_parent_buffer = NULL;
 #if 0
     if (s_op->msgarray_op.count > 0)
     {
@@ -764,97 +1052,6 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     }
 #endif
     return(server_state_machine_complete(smcb));
-}
-
-static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *a_p = NULL;
-    PVFS_ds_attributes *ds_attr = NULL;
-    PVFS_uid uid;
-    uint32_t num_groups;
-    PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
-    int ret;
-
-    /* This is the first true state action of the create SM so
-     * increment the counter for mkdir requests
-     */
-    PINT_perf_count(PINT_server_pc, PINT_PERF_MKDIR, 1, PINT_PERF_ADD);
-
-    s_op->attr.u.dir.dirdata_handles = NULL;
-    s_op->attr.u.dir.dist_dir_bitmap = NULL;
-    s_op->key_a = NULL;
-    s_op->val_a = NULL;
-    s_op->error_a = NULL;
-
-    s_op->u.mkdir.fs_id = s_op->req->u.mkdir.fs_id;
-    s_op->u.mkdir.handle = s_op->req->u.mkdir.handle;
-
-    a_p = &(s_op->req->u.mkdir.attr);
-
-    if (a_p->objtype != PVFS_TYPE_DIRECTORY)
-    {
-        js_p->error_code = -PVFS_EINVAL;
-        return SM_ACTION_COMPLETE;
-    }
-
-    /* map owner/group from credential */
-    if (a_p->mask & (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID) &&
-        (a_p->owner == PVFS_UID_MAX || a_p->group == PVFS_GID_MAX))
-    {
-        ret  = PINT_map_credential(&s_op->req->u.mkdir.credential, 
-                                   &uid, &num_groups, group_array);
-        if (ret != 0)
-        {
-            js_p->error_code = ret;
-            return SM_ACTION_COMPLETE;
-        }
-
-        if (a_p->mask & PVFS_ATTR_COMMON_UID &&
-            a_p->owner == PVFS_UID_MAX)
-        {
-            a_p->owner = uid;
-        }
-
-        if (a_p->mask & PVFS_ATTR_COMMON_GID &&
-            a_p->group == PVFS_GID_MAX)
-        {
-            a_p->group = group_array[0];
-        }
-    }
-
-
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " attrs to write: [owner = %d, "
-                 "group = %d, perms = %o]\n", a_p->owner, a_p->group,
-                 a_p->perms);
-
-    /* translate attrs to storage attr format */
-    ds_attr = (&s_op->ds_attr);
-    ret = PINT_init_dist_dir_state(&a_p->u.dir.dist_dir_attr,
-                                   &a_p->u.dir.dist_dir_bitmap,
-                                   s_op->req->u.mkdir.dirdata_count,
-                                   s_op->req->u.mkdir.dirdata_sid_count,
-                                   0,
-                                   s_op->req->u.mkdir.dist_dir_servers_initial,
-                                   s_op->req->u.mkdir.dist_dir_split_size);
-
-    if(ret != 0)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-
-    PINT_debug_dist_dir_attr(GOSSIP_MKDIR_DEBUG, a_p->u.dir.dist_dir_attr);
-    PINT_debug_dist_dir_bitmap(GOSSIP_MKDIR_DEBUG, a_p->u.dir.dist_dir_attr,
-                               a_p->u.dir.dist_dir_bitmap);
-
-    a_p->u.dir.dirdata_handles = s_op->req->u.mkdir.dirdata_handles;
-    a_p->u.dir.dirdata_sids = s_op->req->u.mkdir.dirdata_sid_array;
-
-    PVFS_ds_attr_from_object_attr(ds_attr, a_p);
-
-    js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
 }
 
 static inline int PINT_get_object_ref_mkdir(struct PVFS_server_req *req,
