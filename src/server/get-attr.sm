@@ -1145,6 +1145,507 @@ static PINT_sm_action interpret_metafile_distribution(struct PINT_smcb *smcb,
 }
 #endif
 
+static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
+                                                     job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+    job_id_t tmp_id;
+    PVFS_object_attr *attr;
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+
+    attr = &s_op->resp.u.getattr.attr;
+
+    /* This thinks we just read dist_dir_attr from keyval
+     * We don't do that any more, but we may have just
+     * read something we should check.  If not, we should
+     * remove this whole thing.
+     */
+    if (js_p->error_code == -TROVE_ENOENT)
+    {
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     "getattr: no DIST_DIR_ATTR key present!!\n");
+        attr->u.dir.dist_dir_bitmap = NULL;
+        attr->u.dir.dirdata_handles = NULL;
+        attr->parent = NULL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* this code is just for early V3 work, it should be removed */
+    attr->u.dir.dist_dir_attr.dirdata_count = 1;
+    attr->u.dir.dist_dir_attr.bitmap_size   = 1;
+
+    /* this should not assert, but error and drop the request
+     * so the server doesn't die.  We should be building with NDEBUG
+     * for real installations.  Probably just good error messages
+     * are best.
+     */
+    assert(attr->u.dir.dist_dir_attr.dirdata_count > 0);
+    assert(attr->u.dir.dist_dir_attr.bitmap_size > 0);
+    assert(attr->meta_sid_count > 0);
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                 "getattr: get dist-dir-attr for dir meta handle %s "
+                 "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
+                 "split_size=%d, server_no=%d and branch_level=%d\n",
+                 PVFS_OID_str(&s_op->u.getattr.handle),
+                 attr->u.dir.dist_dir_attr.tree_height,
+                 attr->u.dir.dist_dir_attr.dirdata_count,
+                 attr->u.dir.dist_dir_attr.bitmap_size,
+                 attr->u.dir.dist_dir_attr.split_size,
+                 attr->u.dir.dist_dir_attr.server_no,
+                 attr->u.dir.dist_dir_attr.branch_level);
+
+    /* allocate space for bitmap, dirdata handles, and dirdata sids */
+    attr->u.dir.dist_dir_bitmap =
+                malloc(attr->u.dir.dist_dir_attr.bitmap_size *
+                             sizeof(PVFS_dist_dir_bitmap_basetype));
+
+    attr->u.dir.dirdata_handles =
+                (PVFS_OID *)malloc(OSASZ(attr->u.dir.dist_dir_attr.dirdata_count, 
+                                          attr->u.dir.dist_dir_attr.sid_count));
+    
+    attr->u.dir.dirdata_sids = (PVFS_SID *)(attr->u.dir.dirdata_handles +
+                               attr->u.dir.dist_dir_attr.dirdata_count);
+
+    attr->parent = (PVFS_OID *)malloc(OSASZ(1, attr->meta_sid_count));
+
+    attr->parent_sids = (PVFS_SID *)(attr->parent + 1);
+
+    if(!attr->u.dir.dist_dir_bitmap || 
+       !attr->u.dir.dirdata_handles ||
+       !attr->parent)
+    {
+        free(attr->u.dir.dist_dir_bitmap);
+        free(attr->u.dir.dirdata_handles);
+        free(attr->parent);
+        attr->u.dir.dist_dir_bitmap = NULL;
+        attr->u.dir.dirdata_handles = NULL;
+        attr->u.dir.dirdata_sids = NULL;
+        attr->parent = NULL;
+        attr->parent_sids = NULL;
+        js_p->error_code = -PVFS_ENOMEM;
+        gossip_err("Failed to allocate memory in getattr(dir)\n");
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* total 3 keyvals, DIST_DIRDATA_BITMAP, DIST_DIRDATA_HANDLES, OBJECT_PARENT  */
+
+    free_keyval_buffers(s_op);
+
+    /* allocate space for keys and values */
+    s_op->keyval_count = 3;
+    s_op->key_a = s_op->val_a = NULL;
+    s_op->error_a = NULL;
+
+    s_op->key_a = calloc(s_op->keyval_count, sizeof(PVFS_ds_keyval));
+    s_op->val_a = calloc(s_op->keyval_count, sizeof(PVFS_ds_keyval));
+    s_op->error_a = calloc(s_op->keyval_count, sizeof(PVFS_error));
+
+    if(! s_op->key_a || ! s_op->val_a || ! s_op->error_a)
+    {
+        gossip_lerr("Cannot allocate memory for key/val/error.\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /*----------------------------------------------------------------------------*/
+
+    s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
+    s_op->key_a[0].buffer    = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
+
+    s_op->val_a[0].buffer_sz = attr->u.dir.dist_dir_attr.bitmap_size *
+                               sizeof(PVFS_dist_dir_bitmap_basetype);
+    s_op->val_a[0].buffer    = attr->u.dir.dist_dir_bitmap;
+
+    keep_keyval_buffers(s_op, 0);
+
+    /*----------------------------------------------------------------------------*/
+
+    s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
+    s_op->key_a[1].buffer    = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
+
+    s_op->val_a[1].buffer_sz = OSASZ(attr->u.dir.dist_dir_attr.dirdata_count, 
+                                     attr->u.dir.dist_dir_attr.sid_count);
+    s_op->val_a[1].buffer    = attr->u.dir.dirdata_handles;
+
+    keep_keyval_buffers(s_op, 1);
+
+    /*----------------------------------------------------------------------------*/
+
+    s_op->key_a[1].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
+    s_op->key_a[1].buffer    = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
+
+    s_op->val_a[1].buffer_sz = OSASZ(1, attr->meta_sid_count);
+    s_op->val_a[1].buffer    = attr->parent;
+
+    keep_keyval_buffers(s_op, 2);
+    /*----------------------------------------------------------------------------*/
+
+    js_p->error_code = 0;
+    ret = job_trove_keyval_read_list(s_op->u.getattr.fs_id,
+                                     s_op->u.getattr.handle,
+                                     s_op->key_a,
+                                     s_op->val_a,
+                                     s_op->error_a,
+                                     s_op->keyval_count,
+                                     0,
+                                     NULL,
+                                     smcb,
+                                     0,
+                                     js_p,
+                                     &tmp_id,
+                                     server_job_context,
+                                     s_op->req->hints);
+
+    return ret;
+}
+
+static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret, i;
+    job_id_t tmp_id;
+    PVFS_object_attr *attr_p;
+    unsigned char *c;
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+
+    /* wrapping up get_bitmap_and_dirdata_handles */
+    if (js_p->error_code == -TROVE_ENOENT)
+    {
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+        "getattr: no DIST_DIR_ATTR key present, not getting DIR_HINTS! \n");
+        return SM_ACTION_COMPLETE;
+    }
+
+    attr_p = &s_op->resp.u.getattr.attr;
+
+    /* gossip bitmap */
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                 "getattr: dist_dir_bitmap as:\n");
+
+    for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
+    {
+        c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     " i=%d : %02x %02x %02x %02x\n",
+                     i, c[3], c[2], c[1], c[0]);
+    }
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "\n");
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                 "\t getattr: dirdata handles array of directory %s.\n",
+                 PVFS_OID_str(&s_op->u.getattr.handle));
+
+    for(i = 0; i < attr_p->u.dir.dist_dir_attr.dirdata_count; i++)
+    {
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     "\t\tdirdata server %d: %s.\n",
+                     i, PVFS_OID_str(&attr_p->u.dir.dirdata_handles[i]));
+    }
+
+    /* NOTE: memory allocations are released in the getattr_cleanup()
+     * function 
+     */
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  trying to getxattr of %s,%s,%s "
+                 "of dir handle (coll_id = %d, handle = %s\n",
+                 Trove_Special_Keys[DIST_NAME_KEY].key,
+                 Trove_Special_Keys[DIST_PARAMS_KEY].key, 
+                 Trove_Special_Keys[DEFAULT_NUM_DFILES_KEY].key,
+                 s_op->u.getattr.fs_id,
+                 PVFS_OID_str(&s_op->u.getattr.handle));
+
+    /* distribution parameters */
+    s_op->resp.u.getattr.attr.u.dir.hint.dist_params = 
+                    (char *) calloc(1, PVFS_REQ_LIMIT_DIST_BYTES);
+
+    if (!s_op->resp.u.getattr.attr.u.dir.hint.dist_params)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len = 
+                    PVFS_REQ_LIMIT_DIST_BYTES;
+
+    /* distribution name */
+    s_op->resp.u.getattr.attr.u.dir.hint.dist_name = 
+            (char *) calloc(1, PVFS_REQ_LIMIT_DIST_NAME);
+
+    if (!s_op->resp.u.getattr.attr.u.dir.hint.dist_name)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len = 
+                    PVFS_REQ_LIMIT_DIST_NAME;
+
+    /* layout and server list */
+    s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers =
+            (char *) calloc(1, PVFS_REQ_LIMIT_LAYOUT);
+    if (!s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize =
+            PVFS_REQ_LIMIT_LAYOUT;
+    s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count = 0;
+
+    free_keyval_buffers(s_op);
+
+    /* Note NUM Special Keys is the number of user space attributes we
+     * automatically read with get-attr - we know what they are so we
+     * set up specifically for them.  Note sure why this is done with a
+     * for loop below
+     */
+        
+    /* allocate key and val buffers */
+    s_op->key_a = (PVFS_ds_keyval *) calloc(NUM_SPECIAL_KEYS,
+                                            sizeof(PVFS_ds_keyval));
+    if (s_op->key_a == NULL)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->val_a = (PVFS_ds_keyval *) calloc(NUM_SPECIAL_KEYS,
+                                            sizeof(PVFS_ds_keyval));
+    if (s_op->val_a == NULL)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->error_a = (PVFS_error*)calloc(NUM_SPECIAL_KEYS, sizeof(PVFS_error));
+    if (s_op->error_a == NULL)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* set up key and val buffers */
+    s_op->keyval_count = NUM_SPECIAL_KEYS;
+
+    for (i = 0; i < NUM_SPECIAL_KEYS; i++)
+    {
+        s_op->key_a[i].buffer = Trove_Special_Keys[i].key;
+        s_op->key_a[i].buffer_sz = Trove_Special_Keys[i].size;
+
+        if (i == DEFAULT_NUM_DFILES_KEY)
+        {
+            s_op->val_a[i].buffer = (char *) calloc(1, 16);
+            if (s_op->val_a[i].buffer == NULL)
+            {
+                js_p->error_code = -PVFS_ENOMEM;
+                return SM_ACTION_COMPLETE;
+            }
+            s_op->val_a[i].buffer_sz = 16;
+        }
+        else if (i == DIST_PARAMS_KEY)
+        {
+            s_op->val_a[i].buffer =
+                        s_op->resp.u.getattr.attr.u.dir.hint.dist_params;
+            s_op->val_a[i].buffer_sz =
+                        s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len;
+            KEEP_BUFFER(DIST_PARAMS_KEY);
+            KEEP_BUFFER(DIST_PARAMS_KEY);
+        }
+        else if (i == DIST_NAME_KEY)
+        {
+            s_op->val_a[i].buffer =
+                        s_op->resp.u.getattr.attr.u.dir.hint.dist_name;
+            s_op->val_a[i].buffer_sz =
+                        s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len;
+            KEEP_BUFFER(DIST_NAME_KEY);
+            KEEP_BUFFER(DIST_NAME_KEY);
+        }
+        else if (i == LAYOUT_KEY)
+        {
+            s_op->val_a[i].buffer = (char *) calloc(1, 16);
+            if (s_op->val_a[i].buffer == NULL)
+            {
+                js_p->error_code = -PVFS_ENOMEM;
+                return SM_ACTION_COMPLETE;
+            }
+            s_op->val_a[i].buffer_sz = 16;
+        }
+        else if (i == SERVER_LIST_KEY)
+        {
+            s_op->val_a[i].buffer =
+                s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers;
+            s_op->val_a[i].buffer_sz =
+                s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize;
+            KEEP_BUFFER(SERVER_LIST_KEY);
+        }
+    }
+
+    /* read key val pairs */
+    js_p->error_code = 0;
+    ret = job_trove_keyval_read_list(s_op->u.getattr.fs_id, 
+                                     s_op->u.getattr.handle,
+                                     s_op->key_a,
+                                     s_op->val_a,
+                                     s_op->error_a,
+                                     NUM_SPECIAL_KEYS,
+                                     0,
+                                     NULL,
+                                     smcb,
+                                     0,
+                                     js_p,
+                                     &tmp_id,
+                                     server_job_context,
+                                     s_op->req->hints);
+
+    return ret;
+}
+
+static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
+                                                 job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+
+    if (js_p->error_code != 0 && js_p->error_code != -TROVE_ENOENT)
+    {
+        /* if we failed to get any of the keys, and the error code is due to
+         * something other than the keys simply not being present, then
+         * propagate the error.
+         */
+        return SM_ACTION_COMPLETE;
+    }
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+        "getattr: job status code = %d (should be OK)\n", js_p->error_code);
+
+    if (s_op->val_a && s_op->key_a)
+    {
+
+        if (s_op->error_a[DIST_NAME_KEY] == 0)
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG, 
+                "val_a[DIST_NAME_KEY] %p read_sz = %d dist_name = %s\n", 
+                s_op->val_a[DIST_NAME_KEY].buffer, 
+                s_op->val_a[DIST_NAME_KEY].read_sz,
+                (char *)s_op->val_a[DIST_NAME_KEY].buffer);
+
+            s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len = 
+                            s_op->val_a[DIST_NAME_KEY].read_sz;
+        }
+        else
+        {
+            s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len = 0;
+        }            
+
+        if (s_op->error_a[DIST_PARAMS_KEY] == 0)
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG, 
+                "val_a[DIST_PARAMS_KEY] %p read_sz = %d dist_params = %s\n", 
+                s_op->val_a[DIST_PARAMS_KEY].buffer, 
+                s_op->val_a[DIST_PARAMS_KEY].read_sz,
+                (char *)s_op->val_a[DIST_PARAMS_KEY].buffer);
+
+            s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len = 
+                            s_op->val_a[DIST_PARAMS_KEY].read_sz;
+        }
+        else
+        {
+            s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len = 0;
+        }
+
+        if (s_op->error_a[DEFAULT_NUM_DFILES_KEY] == 0)
+        {
+            long int dfile_count = 0;
+            char *endptr = NULL;
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "val_a[DEFAULT_NUM_DFILES_KEY] %p read_sz = %d\n", 
+                         s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer, 
+                         s_op->val_a[DEFAULT_NUM_DFILES_KEY].read_sz);
+
+            dfile_count = strtol(s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer,
+                                 &endptr,
+                                 10);
+
+            if (*endptr != '\0' || dfile_count < 0)
+            {
+                dfile_count = 0;
+            }
+            s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = dfile_count;
+        }
+/* commented out in trunk, not sure why WBL */
+#if 0
+        if(s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer)
+        {
+            free(s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer);
+            s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer = NULL;
+            s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer_sz = 0;
+        }
+#endif
+        if (s_op->error_a[LAYOUT_KEY] == 0)
+        {
+            long int layout;
+            char *endptr = NULL;
+
+            layout = strtol(s_op->val_a[LAYOUT_KEY].buffer,
+                            &endptr, 
+                            10);
+
+            if (*endptr != '\0' ||
+                layout < PVFS_SYS_LAYOUT_NULL ||
+                layout > PVFS_SYS_LAYOUT_MAX)
+            {
+                layout = PVFS_SYS_LAYOUT_NULL;
+            }
+            s_op->resp.u.getattr.attr.u.dir.hint.layout.algorithm = layout;
+        }
+        else
+        {
+            s_op->resp.u.getattr.attr.u.dir.hint.layout.algorithm =
+                    PVFS_SYS_LAYOUT_NULL;
+        }
+
+        if ((s_op->error_a[SERVER_LIST_KEY] == 0) &&
+            (s_op->val_a[SERVER_LIST_KEY].read_sz >= 6))
+        {
+            /* no error, so set the count from the list */
+            /* list should be in the buffer of the k/v read */
+            s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count = 
+                    strtol(s_op->val_a[SERVER_LIST_KEY].buffer,
+                    NULL,
+                    10);
+            /* WBL
+             * should this be s_op->val_a[SERVER_LIST_KEY].read_sz ? 
+             * instead of strlen(buffer) and if not, should it be
+             * strlen + 1 ? */
+            s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize = 
+                    strlen(s_op->val_a[SERVER_LIST_KEY].buffer) + 1;
+            /* force the dfile_count */
+            s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = 
+                  s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count;
+        }
+        else
+        {
+            s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count = 0;
+            s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize = 0;
+        }            
+
+        /* s_op->free_val = 1; free everything that is not KEEP_BUF */
+        free_keyval_buffers(s_op);
+
+        gossip_debug(GOSSIP_SERVER_DEBUG, "getattr: dir hint dfile_count: %d\n",
+            s_op->resp.u.getattr.attr.u.dir.hint.dfile_count);
+
+        js_p->error_code = 0;
+    }/* end if val_a and key_a */
+    return SM_ACTION_COMPLETE;
+}
+
 /* check_if_capability_required
  *
  * Branch point for capability creation.
@@ -1645,507 +2146,6 @@ static PINT_sm_action getattr_setup_op(struct PINT_smcb *smcb,
     DEBUG_attr_mask(s_op->req->u.getattr.attrmask);
 
     js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
-                                                             job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret;
-    job_id_t tmp_id;
-    PVFS_object_attr *attr;
-
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
-
-    attr = &s_op->resp.u.getattr.attr;
-
-    /* This thinks we just read dist_dir_attr from keyval
-     * We don't do that any more, but we may have just
-     * read something we should check.  If not, we should
-     * remove this whole thing.
-     */
-    if (js_p->error_code == -TROVE_ENOENT)
-    {
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     "getattr: no DIST_DIR_ATTR key present!!\n");
-        attr->u.dir.dist_dir_bitmap = NULL;
-        attr->u.dir.dirdata_handles = NULL;
-        attr->parent = NULL;
-        return SM_ACTION_COMPLETE;
-    }
-
-    /* this code is just for early V3 work, it should be removed */
-    attr->u.dir.dist_dir_attr.dirdata_count = 1;
-    attr->u.dir.dist_dir_attr.bitmap_size   = 1;
-
-    /* this should not assert, but error and drop the request
-     * so the server doesn't die.  We should be building with NDEBUG
-     * for real installations.  Probably just good error messages
-     * are best.
-     */
-    assert(attr->u.dir.dist_dir_attr.dirdata_count > 0);
-    assert(attr->u.dir.dist_dir_attr.bitmap_size > 0);
-    assert(attr->meta_sid_count > 0);
-
-    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "getattr: get dist-dir-attr for dir meta handle %s "
-                 "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
-                 "split_size=%d, server_no=%d and branch_level=%d\n",
-                 PVFS_OID_str(&s_op->u.getattr.handle),
-                 attr->u.dir.dist_dir_attr.tree_height,
-                 attr->u.dir.dist_dir_attr.dirdata_count,
-                 attr->u.dir.dist_dir_attr.bitmap_size,
-                 attr->u.dir.dist_dir_attr.split_size,
-                 attr->u.dir.dist_dir_attr.server_no,
-                 attr->u.dir.dist_dir_attr.branch_level);
-
-    /* allocate space for bitmap, dirdata handles, and dirdata sids */
-    attr->u.dir.dist_dir_bitmap =
-                malloc(attr->u.dir.dist_dir_attr.bitmap_size *
-                             sizeof(PVFS_dist_dir_bitmap_basetype));
-
-    attr->u.dir.dirdata_handles =
-                (PVFS_OID *)malloc(OSASZ(attr->u.dir.dist_dir_attr.dirdata_count, 
-                                          attr->u.dir.dist_dir_attr.sid_count));
-    
-    attr->u.dir.dirdata_sids = (PVFS_SID *)(attr->u.dir.dirdata_handles +
-                               attr->u.dir.dist_dir_attr.dirdata_count);
-
-    attr->parent = (PVFS_OID *)malloc(OSASZ(1, attr->meta_sid_count));
-
-    attr->parent_sids = (PVFS_SID *)(attr->parent + 1);
-
-    if(!attr->u.dir.dist_dir_bitmap || 
-       !attr->u.dir.dirdata_handles ||
-       !attr->parent)
-    {
-        free(attr->u.dir.dist_dir_bitmap);
-        free(attr->u.dir.dirdata_handles);
-        free(attr->parent);
-        attr->u.dir.dist_dir_bitmap = NULL;
-        attr->u.dir.dirdata_handles = NULL;
-        attr->u.dir.dirdata_sids = NULL;
-        attr->parent = NULL;
-        attr->parent_sids = NULL;
-        js_p->error_code = -PVFS_ENOMEM;
-        gossip_err("Failed to allocate memory in getattr(dir)\n");
-        return SM_ACTION_COMPLETE;
-    }
-
-    /* total 3 keyvals, DIST_DIRDATA_BITMAP, DIST_DIRDATA_HANDLES, OBJECT_PARENT  */
-
-    free_keyval_buffers(s_op);
-
-    /* allocate space for keys and values */
-    s_op->keyval_count = 3;
-    s_op->key_a = s_op->val_a = NULL;
-    s_op->error_a = NULL;
-
-    s_op->key_a = calloc(s_op->keyval_count, sizeof(PVFS_ds_keyval));
-    s_op->val_a = calloc(s_op->keyval_count, sizeof(PVFS_ds_keyval));
-    s_op->error_a = calloc(s_op->keyval_count, sizeof(PVFS_error));
-
-    if(! s_op->key_a || ! s_op->val_a || ! s_op->error_a)
-    {
-        gossip_lerr("Cannot allocate memory for key/val/error.\n");
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-
-    /*----------------------------------------------------------------------------*/
-
-    s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
-    s_op->key_a[0].buffer    = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
-
-    s_op->val_a[0].buffer_sz = attr->u.dir.dist_dir_attr.bitmap_size *
-                               sizeof(PVFS_dist_dir_bitmap_basetype);
-    s_op->val_a[0].buffer    = attr->u.dir.dist_dir_bitmap;
-
-    keep_keyval_buffers(s_op, 0);
-
-    /*----------------------------------------------------------------------------*/
-
-    s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
-    s_op->key_a[1].buffer    = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
-
-    s_op->val_a[1].buffer_sz = OSASZ(attr->u.dir.dist_dir_attr.dirdata_count, 
-                                     attr->u.dir.dist_dir_attr.sid_count);
-    s_op->val_a[1].buffer    = attr->u.dir.dirdata_handles;
-
-    keep_keyval_buffers(s_op, 1);
-
-    /*----------------------------------------------------------------------------*/
-
-    s_op->key_a[1].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
-    s_op->key_a[1].buffer    = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
-
-    s_op->val_a[1].buffer_sz = OSASZ(1, attr->meta_sid_count);
-    s_op->val_a[1].buffer    = attr->parent;
-
-    keep_keyval_buffers(s_op, 2);
-    /*----------------------------------------------------------------------------*/
-
-    js_p->error_code = 0;
-    ret = job_trove_keyval_read_list(s_op->u.getattr.fs_id,
-                                     s_op->u.getattr.handle,
-                                     s_op->key_a,
-                                     s_op->val_a,
-                                     s_op->error_a,
-                                     s_op->keyval_count,
-                                     0,
-                                     NULL,
-                                     smcb,
-                                     0,
-                                     js_p,
-                                     &tmp_id,
-                                     server_job_context,
-                                     s_op->req->hints);
-
-    return ret;
-}
-
-static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
-                                           job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret, i;
-    job_id_t tmp_id;
-    PVFS_object_attr *attr_p;
-    unsigned char *c;
-
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
-
-    /* wrapping up get_bitmap_and_dirdata_handles */
-    if (js_p->error_code == -TROVE_ENOENT)
-    {
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
-        "getattr: no DIST_DIR_ATTR key present, not getting DIR_HINTS! \n");
-        return SM_ACTION_COMPLETE;
-    }
-
-    attr_p = &s_op->resp.u.getattr.attr;
-
-    /* gossip bitmap */
-    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "getattr: dist_dir_bitmap as:\n");
-
-    for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
-    {
-        c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     " i=%d : %02x %02x %02x %02x\n",
-                     i, c[3], c[2], c[1], c[0]);
-    }
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "\n");
-
-    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "\t getattr: dirdata handles array of directory %s.\n",
-                 PVFS_OID_str(&s_op->u.getattr.handle));
-
-    for(i = 0; i < attr_p->u.dir.dist_dir_attr.dirdata_count; i++)
-    {
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     "\t\tdirdata server %d: %s.\n",
-                     i, PVFS_OID_str(&attr_p->u.dir.dirdata_handles[i]));
-    }
-
-    /* NOTE: memory allocations are released in the getattr_cleanup()
-     * function 
-     */
-
-    gossip_debug(GOSSIP_SERVER_DEBUG, "  trying to getxattr of %s,%s,%s "
-                 "of dir handle (coll_id = %d, handle = %s\n",
-                 Trove_Special_Keys[DIST_NAME_KEY].key,
-                 Trove_Special_Keys[DIST_PARAMS_KEY].key, 
-                 Trove_Special_Keys[DEFAULT_NUM_DFILES_KEY].key,
-                 s_op->u.getattr.fs_id,
-                 PVFS_OID_str(&s_op->u.getattr.handle));
-
-    /* distribution parameters */
-    s_op->resp.u.getattr.attr.u.dir.hint.dist_params = 
-                    (char *) calloc(1, PVFS_REQ_LIMIT_DIST_BYTES);
-
-    if (!s_op->resp.u.getattr.attr.u.dir.hint.dist_params)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-
-    s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len = 
-                    PVFS_REQ_LIMIT_DIST_BYTES;
-
-    /* distribution name */
-    s_op->resp.u.getattr.attr.u.dir.hint.dist_name = 
-            (char *) calloc(1, PVFS_REQ_LIMIT_DIST_NAME);
-
-    if (!s_op->resp.u.getattr.attr.u.dir.hint.dist_name)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-
-    s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len = 
-                    PVFS_REQ_LIMIT_DIST_NAME;
-
-    /* layout and server list */
-    s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers =
-            (char *) calloc(1, PVFS_REQ_LIMIT_LAYOUT);
-    if (!s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-    s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize =
-            PVFS_REQ_LIMIT_LAYOUT;
-    s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count = 0;
-
-    free_keyval_buffers(s_op);
-
-    /* Note NUM Special Keys is the number of user space attributes we
-     * automatically read with get-attr - we know what they are so we
-     * set up specifically for them.  Note sure why this is done with a
-     * for loop below
-     */
-        
-    /* allocate key and val buffers */
-    s_op->key_a = (PVFS_ds_keyval *) calloc(NUM_SPECIAL_KEYS,
-                                            sizeof(PVFS_ds_keyval));
-    if (s_op->key_a == NULL)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-
-    s_op->val_a = (PVFS_ds_keyval *) calloc(NUM_SPECIAL_KEYS,
-                                            sizeof(PVFS_ds_keyval));
-    if (s_op->val_a == NULL)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-
-    s_op->error_a = (PVFS_error*)calloc(NUM_SPECIAL_KEYS, sizeof(PVFS_error));
-    if (s_op->error_a == NULL)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-
-    /* set up key and val buffers */
-    s_op->keyval_count = NUM_SPECIAL_KEYS;
-
-    for (i = 0; i < NUM_SPECIAL_KEYS; i++)
-    {
-        s_op->key_a[i].buffer = Trove_Special_Keys[i].key;
-        s_op->key_a[i].buffer_sz = Trove_Special_Keys[i].size;
-
-        if (i == DEFAULT_NUM_DFILES_KEY)
-        {
-            s_op->val_a[i].buffer = (char *) calloc(1, 16);
-            if (s_op->val_a[i].buffer == NULL)
-            {
-                js_p->error_code = -PVFS_ENOMEM;
-                return SM_ACTION_COMPLETE;
-            }
-            s_op->val_a[i].buffer_sz = 16;
-        }
-        else if (i == DIST_PARAMS_KEY)
-        {
-            s_op->val_a[i].buffer =
-                        s_op->resp.u.getattr.attr.u.dir.hint.dist_params;
-            s_op->val_a[i].buffer_sz =
-                        s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len;
-            KEEP_BUFFER(DIST_PARAMS_KEY);
-            KEEP_BUFFER(DIST_PARAMS_KEY);
-        }
-        else if (i == DIST_NAME_KEY)
-        {
-            s_op->val_a[i].buffer =
-                        s_op->resp.u.getattr.attr.u.dir.hint.dist_name;
-            s_op->val_a[i].buffer_sz =
-                        s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len;
-            KEEP_BUFFER(DIST_NAME_KEY);
-            KEEP_BUFFER(DIST_NAME_KEY);
-        }
-        else if (i == LAYOUT_KEY)
-        {
-            s_op->val_a[i].buffer = (char *) calloc(1, 16);
-            if (s_op->val_a[i].buffer == NULL)
-            {
-                js_p->error_code = -PVFS_ENOMEM;
-                return SM_ACTION_COMPLETE;
-            }
-            s_op->val_a[i].buffer_sz = 16;
-        }
-        else if (i == SERVER_LIST_KEY)
-        {
-            s_op->val_a[i].buffer =
-                s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers;
-            s_op->val_a[i].buffer_sz =
-                s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize;
-            KEEP_BUFFER(SERVER_LIST_KEY);
-        }
-    }
-
-    /* read key val pairs */
-    js_p->error_code = 0;
-    ret = job_trove_keyval_read_list(s_op->u.getattr.fs_id, 
-                                     s_op->u.getattr.handle,
-                                     s_op->key_a,
-                                     s_op->val_a,
-                                     s_op->error_a,
-                                     NUM_SPECIAL_KEYS,
-                                     0,
-                                     NULL,
-                                     smcb,
-                                     0,
-                                     js_p,
-                                     &tmp_id,
-                                     server_job_context,
-                                     s_op->req->hints);
-
-    return ret;
-}
-
-static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
-                                                 job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
-
-    if (js_p->error_code != 0 && js_p->error_code != -TROVE_ENOENT)
-    {
-        /* if we failed to get any of the keys, and the error code is due to
-         * something other than the keys simply not being present, then
-         * propagate the error.
-         */
-        return SM_ACTION_COMPLETE;
-    }
-
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
-        "getattr: job status code = %d (should be OK)\n", js_p->error_code);
-
-    if (s_op->val_a && s_op->key_a)
-    {
-
-        if (s_op->error_a[DIST_NAME_KEY] == 0)
-        {
-            gossip_debug(GOSSIP_SERVER_DEBUG, 
-                "val_a[DIST_NAME_KEY] %p read_sz = %d dist_name = %s\n", 
-                s_op->val_a[DIST_NAME_KEY].buffer, 
-                s_op->val_a[DIST_NAME_KEY].read_sz,
-                (char *)s_op->val_a[DIST_NAME_KEY].buffer);
-
-            s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len = 
-                            s_op->val_a[DIST_NAME_KEY].read_sz;
-        }
-        else
-        {
-            s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len = 0;
-        }            
-
-        if (s_op->error_a[DIST_PARAMS_KEY] == 0)
-        {
-            gossip_debug(GOSSIP_SERVER_DEBUG, 
-                "val_a[DIST_PARAMS_KEY] %p read_sz = %d dist_params = %s\n", 
-                s_op->val_a[DIST_PARAMS_KEY].buffer, 
-                s_op->val_a[DIST_PARAMS_KEY].read_sz,
-                (char *)s_op->val_a[DIST_PARAMS_KEY].buffer);
-
-            s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len = 
-                            s_op->val_a[DIST_PARAMS_KEY].read_sz;
-        }
-        else
-        {
-            s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len = 0;
-        }
-
-        if (s_op->error_a[DEFAULT_NUM_DFILES_KEY] == 0)
-        {
-            long int dfile_count = 0;
-            char *endptr = NULL;
-            gossip_debug(GOSSIP_SERVER_DEBUG,
-                         "val_a[DEFAULT_NUM_DFILES_KEY] %p read_sz = %d\n", 
-                         s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer, 
-                         s_op->val_a[DEFAULT_NUM_DFILES_KEY].read_sz);
-
-            dfile_count = strtol(s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer,
-                                 &endptr,
-                                 10);
-
-            if (*endptr != '\0' || dfile_count < 0)
-            {
-                dfile_count = 0;
-            }
-            s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = dfile_count;
-        }
-/* commented out in trunk, not sure why WBL */
-#if 0
-        if(s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer)
-        {
-            free(s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer);
-            s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer = NULL;
-            s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer_sz = 0;
-        }
-#endif
-        if (s_op->error_a[LAYOUT_KEY] == 0)
-        {
-            long int layout;
-            char *endptr = NULL;
-
-            layout = strtol(s_op->val_a[LAYOUT_KEY].buffer,
-                            &endptr, 
-                            10);
-
-            if (*endptr != '\0' ||
-                layout < PVFS_SYS_LAYOUT_NULL ||
-                layout > PVFS_SYS_LAYOUT_MAX)
-            {
-                layout = PVFS_SYS_LAYOUT_NULL;
-            }
-            s_op->resp.u.getattr.attr.u.dir.hint.layout.algorithm = layout;
-        }
-        else
-        {
-            s_op->resp.u.getattr.attr.u.dir.hint.layout.algorithm =
-                    PVFS_SYS_LAYOUT_NULL;
-        }
-
-        if ((s_op->error_a[SERVER_LIST_KEY] == 0) &&
-            (s_op->val_a[SERVER_LIST_KEY].read_sz >= 6))
-        {
-            /* no error, so set the count from the list */
-            /* list should be in the buffer of the k/v read */
-            s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count = 
-                    strtol(s_op->val_a[SERVER_LIST_KEY].buffer,
-                    NULL,
-                    10);
-            /* WBL
-             * should this be s_op->val_a[SERVER_LIST_KEY].read_sz ? 
-             * instead of strlen(buffer) and if not, should it be
-             * strlen + 1 ? */
-            s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize = 
-                    strlen(s_op->val_a[SERVER_LIST_KEY].buffer) + 1;
-            /* force the dfile_count */
-            s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = 
-                  s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count;
-        }
-        else
-        {
-            s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count = 0;
-            s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize = 0;
-        }            
-
-        /* s_op->free_val = 1; free everything that is not KEEP_BUF */
-        free_keyval_buffers(s_op);
-
-        gossip_debug(GOSSIP_SERVER_DEBUG, "getattr: dir hint dfile_count: %d\n",
-            s_op->resp.u.getattr.attr.u.dir.hint.dfile_count);
-
-        js_p->error_code = 0;
-    }/* end if val_a and key_a */
     return SM_ACTION_COMPLETE;
 }
 
