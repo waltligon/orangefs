@@ -128,9 +128,7 @@ typedef uint64_t PVFS_object_attrmask;
          PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_MTIME)
 
 #define PVFS_ATTR_COMMON_ALL                               \
-        (PVFS_ATTR_COMMON_UID   | PVFS_ATTR_COMMON_GID   | \
-         PVFS_ATTR_COMMON_PERM  | PVFS_ATTR_COMMON_TYPE  | \
-         PVFS_ATTR_TIME_ALL)
+        (PVFS_ATTR_COMMON_NOTIME | PVFS_ATTR_TIME_ALL)
 
 
 /* -------------------------
@@ -197,7 +195,7 @@ typedef uint64_t PVFS_object_attrmask;
 #define PVFS_ATTR_DIR_HINT_SID_COUNT       (1ULL << 26)
 #define PVFS_ATTR_DIR_HINT_LAYOUT          (1ULL << 27)
 
-/* These used to be the dist_dir_attr struct but now are part of
+/* These are the dist_dir_attr struct which now are in the 
  * the dspace so we are getting away from refering to them as such
  */
 #define PVFS_ATTR_DIR_TREE_HEIGHT          (1ULL << 28)
@@ -208,24 +206,28 @@ typedef uint64_t PVFS_object_attrmask;
 #define PVFS_ATTR_DIR_SERVER_NO            (1ULL << 33)
 #define PVFS_ATTR_DIR_BRANCH_LEVEL         (1ULL << 34)
 
+#define PVFS_ATTR_DIST_DIR_ALL \
+    (PVFS_ATTR_DIR_TREE_HEIGHT | PVFS_ATTR_DIR_DIRDATA_COUNT | \
+    PVFS_ATTR_DIR_SID_COUNT    | PVFS_ATTR_DIR_BITMAP_SIZE | \
+    PVFS_ATTR_DIR_SPLIT_SIZE   | PVFS_ATTR_DIR_SERVER_NO | \
+    PVFS_ATTR_DIR_BRANCH_LEVEL)
+
+/* not sure why we have these - should use ALL groups? */
 #define PVFS_ATTR_DIR_DIRDATA              (1ULL << 35)   /* includes sids */
 #define PVFS_ATTR_DIR_HINT                 (1ULL << 36)   /* writable */
 
 #define PVFS_ATTR_DIR_HINT_ALL \
     (PVFS_ATTR_DIR_HINT_DIST_NAME_LEN | PVFS_ATTR_DIR_HINT_DIST_PARAMS_LEN | \
-    PVFS_ATTR_DIR_HINT_DFILE_COUNT | PVFS_ATTR_DIR_HINT_SID_COUNT | \
+    PVFS_ATTR_DIR_HINT_DFILE_COUNT    | PVFS_ATTR_DIR_HINT_SID_COUNT | \
     PVFS_ATTR_DIR_HINT_LAYOUT)
 
 //dir.dist_dir_attr.dirdata_count
 
 #define PVFS_ATTR_DIR_ALL \
-    (PVFS_ATTR_DIR_HINT_ALL    | PVFS_ATTR_DIR_DIRENT_COUNT | \
-    PVFS_ATTR_DIR_TREE_HEIGHT  | PVFS_ATTR_DIR_DIRDATA_COUNT | \
-    PVFS_ATTR_DIR_SID_COUNT    | PVFS_ATTR_DIR_BITMAP_SIZE | \
-    PVFS_ATTR_DIR_SPLIT_SIZE   | PVFS_ATTR_DIR_SERVER_NO | \
-    PVFS_ATTR_DIR_BRANCH_LEVEL | PVFS_ATTR_DIR_DIRDATA | \
-    PVFS_ATTR_COMMON_ALL)
+    (PVFS_ATTR_DIR_HINT_ALL | PVFS_ATTR_DIST_DIR_ALL | \
+     PVFS_ATTR_DIR_DIRDATA  | PVFS_ATTR_COMMON_ALL)
 
+/* not sure what this is for */
 #define PVFS_ATTR_DIR_ALL_COMMON \
              (PVFS_ATTR_DIR_ALL | PVFS_ATTR_COMMON_ALL)
 
@@ -620,22 +622,22 @@ endecode_fields_2(PVFS_dirhint_layout,
 /* these are local defaults that control creates */
 struct PVFS_directory_hint_s
 {
-    uint32_t            dist_name_len;
-    /* what is the distribution name? */
-    char               *dist_name;
-    /* what are the distribution parameters? */
-    uint32_t            dist_params_len;
-    char               *dist_params;
-    /* how many dfiles ought to be used */
-    uint32_t            dfile_count;
-    int32_t             dfile_sid_count;
-    /* how servers are selected */
-    PVFS_dirhint_layout layout;
+    uint32_t            dist_name_len;     /* size of dist name buffer */
+    char               *dist_name;         /* distribution name */
+    uint32_t            dist_params_len;   /* size of dist params buffer */
+    char               *dist_params;       /* distribution parameters? */
+    uint32_t            dfile_count;       /* number of dfiles to be used */
+    int32_t             dfile_sid_count;   /* number of dfile replicas */
+    PVFS_dirhint_layout layout;            /* how servers are selected */
+    uint32_t            dir_dirdata_count; /* max number of dirdata to be used */    
+    uint32_t            dir_split_size;    /* max number of entries before a split */
+    PVFS_dirhint_layout dir_layout;        /* how servers are selected */
+
 };
 typedef struct PVFS_directory_hint_s PVFS_directory_hint;
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
-endecode_fields_9(
+endecode_fields_12(
         PVFS_directory_hint,
         uint32_t, dist_name_len,
         skip4,,
@@ -645,7 +647,10 @@ endecode_fields_9(
         string,   dist_params,
         uint32_t, dfile_count,
         int32_t,  dfile_sid_count,
-        PVFS_dirhint_layout, layout);
+        PVFS_dirhint_layout, layout,
+        uint32_t, dir_dirdata_count,
+        uint32_t, dir_split_size,
+        PVFS_dirhint_layout, dir_layout);
 #endif
 
 /* attributes specific to directory objects */
@@ -912,7 +917,7 @@ static inline void encode_PVFS_object_attr(char **pptr,
     encode_uint32_t(pptr, &(x)->meta_sid_count); 
     encode_skip4(pptr,);
     encode_PVFS_capability(pptr, &(x)->capability); 
-    encode_PVFS_handle(pptr, (x)->parent);             
+    encode_PVFS_handle(pptr, &(x)->parent);             
     align8(pptr);                                                             
     for (index_i = 0; index_i < (x)->meta_sid_count; index_i++)      
     {                                                                         
@@ -965,7 +970,7 @@ static inline void decode_PVFS_object_attr(char **pptr, PVFS_object_attr *x)
     decode_PVFS_handle(pptr, (x)->parent);             
     for (index_i = 0; index_i < (x)->meta_sid_count; index_i++)      
     {                                                                         
-        decode_PVFS_SID(pptr, &(x)->parent_sids[index_i]);                   
+        decode_PVFS_SID(pptr, (x)->parent_sids + index_i);                   
     }                                                                         
 
     switch ((x)->objtype) 

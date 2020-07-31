@@ -108,7 +108,8 @@ enum
     DIST_DIR_ATTR_KEY        = 7, /* obsolete in V3 */
     DIST_DIRDATA_BITMAP_KEY  = 8,
     DIST_DIRDATA_HANDLES_KEY = 9,
-    OBJECT_PARENT_KEY        = 10
+    OBJECT_PARENT_KEY        = 10,
+    POSIX_ACL_KEY            = 11
 };
 
 /* This is defined in src/server/get-attr.sm

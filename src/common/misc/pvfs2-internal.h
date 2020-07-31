@@ -182,6 +182,13 @@
 #define SPECIAL_MIRROR_STATUS_STRING   SPECIAL_PREFIX SPECIAL_MIRROR_STATUS_KEYSTR
 #define SPECIAL_MIRROR_STATUS_KEYLEN   25
 
+/* Optional xattrs have "user.pvfs2." as a prefix */
+#define SYSTEM_PREFIX                  "system."
+
+#define SYSTEM_POSIX_ACL_KEYSTR        "posix_acl_access\0"
+#define SYSTEM_POSIX_ACL_STRING        SYSTEM_PREFIX SYSTEM_POSIX_ACL_ACCESS_KEYSTR
+#define SYSTEM_POSIX_ACL_KEYLEN        24
+
 
 #define IO_MAX_REGIONS 64
 

@@ -265,9 +265,10 @@ void print_dspace( struct dbpf_data key, struct dbpf_data val )
     print_ds_type( v->type );
 
     printf("(fsid: %d)(handle: %s)(uid: %u)(gid: %u)"
-       "(perm: %o)(ctime: %s)(mtime: %s)(atime: %s)(ntime: %s)\n",
+       "(perm: %o)(ctime: %s)(mtime: %s)(atime: %s)(ntime: %s)"
+       "(meta_sid_count %d)",
        v->fs_id, PVFS_OID_str(&v->handle), v->uid, v->gid, v->mode,
-       ctimeStr, mtimeStr, atimeStr, ntimeStr);
+       ctimeStr, mtimeStr, atimeStr, ntimeStr,v->meta_sid_count);
 
     /* union elements */
     switch (v->type)

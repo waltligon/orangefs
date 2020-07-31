@@ -185,10 +185,22 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
     int ret;
 
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+
     /* This is the first true state action of the mkdir SM so
      * increment the counter for mkdir requests
      */
     PINT_perf_count(PINT_server_pc, PINT_PERF_MKDIR, 1, PINT_PERF_ADD);
+
+    /* The request provides a set of object attributes (s_op->req->u.mkdir.attr)
+     * The parent getattr provides another obj set (s_op->attr).  
+     * We need to create a set of ds attributes for writing to storage (s_op->ds_attr).A
+     * We will modify the req attr and convert them to ds_attrs at the end.
+     * There are shortcut pointers (a_p, ds_attr) to these structs.
+     * We must also consider hints from the parent directory
+     * (s_op->attr.u.dir.hint.xxx).
+     * We can fall back to defaults provided by the system.
+     */
 
     s_op->attr.u.dir.dirdata_handles = NULL;
     s_op->attr.u.dir.dist_dir_bitmap = NULL;
@@ -245,17 +257,74 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
                                    &a_p->u.dir.dist_dir_bitmap,
                                    s_op->req->u.mkdir.dirdata_count,
                                    s_op->req->u.mkdir.dirdata_sid_count,
-                                   0,
+                                   -1, /* server_no -1 for meta objects */
                                    s_op->req->u.mkdir.dist_dir_servers_initial,
                                    s_op->req->u.mkdir.dist_dir_split_size);
 
-    if(ret != 0)
+    if (a_p->u.dir.dist_dir_attr.dirdata_count < 1)
+    {
+        /* check for parent hint */
+        if (s_op->attr.u.dir.hint.dir_dirdata_count > 0)
+        {
+            a_p->u.dir.dist_dir_attr.dirdata_count = 
+                            s_op->attr.u.dir.hint.dir_dirdata_count;
+        }
+        else
+        {
+            /* look up default */
+        }
+    }
+
+/* this might be totally useless */
+#if 0
+    if (a_p->u.dir.dist_dir_attr.sid_count < 1)
+    {
+        /* check for parent hint */
+        if (s_op->attr.u.dir.hint.sid_count > 0)
+        {
+            a_p->u.dir.dist_dir_attr.sid_count = s_op->attr.u.dir.hint.sid_count;
+        }
+        else
+        {
+            /* look up default */
+        }
+    }
+#endif
+
+    if (ret != 0)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
-    /* struct specific gossip macros */
+    /* inherit hints from parent */
+    memcpy(&a_p->u.dir.hint, &s_op->attr.u.dir.hint, sizeof(PVFS_directory_hint));
+    /* copy distribution parameters string */
+    if (s_op->attr.u.dir.hint.dist_params_len > 0 && s_op->attr.u.dir.hint.dist_params)
+    {
+        a_p->u.dir.hint.dist_params = strdup(s_op->attr.u.dir.hint.dist_params);
+    }
+    else
+    {
+        a_p->u.dir.hint.dist_params = NULL;
+        a_p->u.dir.hint.dist_params_len = 0;
+    }
+    /* copy distribution name string */
+    if (s_op->attr.u.dir.hint.dist_name_len > 0 && s_op->attr.u.dir.hint.dist_name)
+    {
+        a_p->u.dir.hint.dist_name = strdup(s_op->attr.u.dir.hint.dist_name);
+    }
+    else
+    {
+        /* if name is missing, there is no dist so zero it all */
+        a_p->u.dir.hint.dist_name = NULL;
+        a_p->u.dir.hint.dist_name_len = 0;
+        free(a_p->u.dir.hint.dist_params);
+        a_p->u.dir.hint.dist_params = NULL;
+        a_p->u.dir.hint.dist_params_len = 0;
+    }
+
+    /* struct specific gossip macros defined in src/common/misc/dist-dir-utils.h */
     PINT_debug_dist_dir_attr(GOSSIP_MKDIR_DEBUG, a_p->u.dir.dist_dir_attr);
     PINT_debug_dist_dir_bitmap(GOSSIP_MKDIR_DEBUG, a_p->u.dir.dist_dir_attr,
                                a_p->u.dir.dist_dir_bitmap);
@@ -263,6 +332,8 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
     /* last couple of things to set up before we convert to ds_attr */
     a_p->u.dir.dirdata_handles = s_op->req->u.mkdir.dirdata_handles;
     a_p->u.dir.dirdata_sids = s_op->req->u.mkdir.dirdata_sid_array;
+    a_p->u.dir.dirent_count = 0; /* new dir so no entries */
+    a_p->meta_sid_count = s_op->attr.meta_sid_count; /* get from parent */
 
     /* translate attrs to storage attr format */
     PVFS_ds_attr_from_object_attr(ds_attr, a_p);
@@ -287,6 +358,8 @@ static PINT_sm_action mkdir_create(struct PINT_smcb *smcb, job_status_s *js_p)
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t i;
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " creating dspace on coll_id %d\n",
                  s_op->u.mkdir.fs_id);
@@ -328,12 +401,32 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
     job_id_t j_id;
     PVFS_ds_attributes *ds_attr = NULL;
 
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+
     ds_attr = (&s_op->ds_attr);
     PVFS_ds_init_time(ds_attr); /* this determines the time of dir creation */
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " setting directory version to "
-                 "%llu\n\tmtime is %llu\n", llu(ds_attr->mtime),
-                 llu(PINT_util_mkversion_time(ds_attr->mtime)));
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " writing directory attributes (ds):\n\t\t"
+                 "object type     %d\n\t\t"
+                 "uid             %d\n\t\t"
+                 "gid             %d\n\t\t"
+                 "mode            %d\n\t\t"
+                 "meta_sids       %d\n\t\t"
+                 "dirent_count    %d\n\t\t"
+                 "tree_height     %d\n\t\t"
+                 "dirdata_count   %d\n\t\t"
+                 "bitmap_size     %d\n\t\t"
+                 "split_size      %d\n\t\t"
+                 "branch_level    %d\n\t\t",
+                 ds_attr->type, ds_attr->uid, ds_attr->gid, ds_attr->mode,
+                 ds_attr->meta_sid_count,
+                 (int)ds_attr->u.directory.dirent_count,
+                 ds_attr->u.directory.tree_height,
+                 ds_attr->u.directory.dirdata_count,
+                 ds_attr->u.directory.bitmap_size,
+                 ds_attr->u.directory.split_size,
+                 ds_attr->u.directory.branch_level);
+
 
     ret = job_trove_dspace_setattr(s_op->u.mkdir.fs_id,
                                    s_op->u.mkdir.handle,
@@ -365,6 +458,8 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
     /* total 3 static keyvals every dir has:
      * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES, PARENT */
     int keyval_count = 3;
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
 
     /* free saved capability */
 /*
@@ -571,6 +666,8 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
     int i = 0;
     int j = 0;
 
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+
     /* dirdata_index is apparently NOT an index but is the NUMBER of dirdata's so we
      * convert it into an index in i so we can loop from N-1 .. 0 over the dirdata's
      * and decide if they are local or remote
@@ -589,12 +686,14 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
             /* equals so go create it - we will loop back to this state with
              * dirdata_index suitably adjustd and continue our search
              */
+            gossip_debug(GOSSIP_MKDIR_DEBUG, "Local DIRDATA to create i = %d\n", i);
             break;
         }
         else
         {
             /* this is a remote dirdata, so we need to set it up for later
              */
+            gossip_debug(GOSSIP_MKDIR_DEBUG, "Remote DIRDATA to create i = %d\n", i);
             s_op->u.mkdir.rmt_dirdata_array[j++] = i;
         }
     }
@@ -630,11 +729,11 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
                sizeof(PVFS_SID) * s_op->req->u.mkdir.sid_count);
     }
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " creating dirdata dspace on coll_id %d\n",
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " creating local dirdata dspace on coll_id %d\n",
                  s_op->u.mkdir.fs_id);
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " dirdata handle will be %s\n",
-                 PVFS_OID_str(&s_op->u.mkdir.handle));
+                 PVFS_OID_str(&s_op->req->u.mkdir.dirdata_handles[i]));
 
     ret = job_trove_dspace_create(s_op->u.mkdir.fs_id,
                                   s_op->req->u.mkdir.dirdata_handles[i],
@@ -654,7 +753,7 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
 /*
  * Function: mkdir_dirdata_attribs
  *
- * Synopsis: Update attribs dspace record for the DIRDATA object
+ * Synopsis: Update attribs local dspace record for the DIRDATA object
  *
  */
 
@@ -665,6 +764,8 @@ static PINT_sm_action mkdir_dirdata_attribs(struct PINT_smcb *smcb,
     int i = 0;
     int ret = -1;
     job_id_t j_id;
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
 
     i = s_op->u.mkdir.dirdata_index;
     PVFS_ds_attributes *ds_attr = NULL;
@@ -678,6 +779,7 @@ static PINT_sm_action mkdir_dirdata_attribs(struct PINT_smcb *smcb,
     ds_attr->uid = 0;
     ds_attr->gid = 0;
     ds_attr->mode = 0;
+    ds_attr->u.dirdata.server_no = i;
 
     /* do not update time here - keep the original time until
      * something modifies this dirdata, the time on this object
@@ -705,7 +807,7 @@ static PINT_sm_action mkdir_dirdata_attribs(struct PINT_smcb *smcb,
 /*
  * Function: mkdir_dirdata_keyvals
  *
- * Synopsis: Create keyval records for the DIRDATA object
+ * Synopsis: Create local keyval records for the DIRDATA object
  *
  */
 
@@ -718,6 +820,8 @@ static PINT_sm_action mkdir_dirdata_keyvals(struct PINT_smcb *smcb,
     int ret = -1;
     job_id_t j_id;
     int k = 0;
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
 
     /* total 3 static keyvals every dirdata has:
      * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES, PARENT */
@@ -814,6 +918,8 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_capability capability;
     PVFS_object_attr *pattr = NULL;;
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
 
     /* set up for an array of requests */
     ret = PINT_msgpairarray_init(&s_op->msgarray_op, s_op->u.mkdir.rmt_dirdata_index);
@@ -916,6 +1022,8 @@ static PINT_sm_action mkdir_setup_getattr_request(
     int ret;
     PVFS_capability capability;
 
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+
     getattr_op = calloc(1, sizeof(*getattr_op));
     if ( !getattr_op )
     {
@@ -966,12 +1074,14 @@ static PINT_sm_action mkdir_setup_getattr_request(
 static PINT_sm_action mkdir_setup_response(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *getattr_op;
-    struct PINT_server_op *s_op;
     int task_id;
     int remaining;
     int ret;
     PVFS_object_attr *resp_attr;
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
 
     getattr_op = PINT_sm_pop_frame(smcb,
                              &task_id,
@@ -979,8 +1089,6 @@ static PINT_sm_action mkdir_setup_response(struct PINT_smcb *smcb,
                              &remaining);
 
     resp_attr = &(getattr_op->resp.u.getattr.attr);
-
-    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     ret  = PINT_copy_capability(&resp_attr->capability, 
                                &s_op->resp.u.mkdir.capability);
@@ -1038,6 +1146,8 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+
     PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TMKDIR, &s_op->start_time);
     mkdir_free(s_op);
     /* do any of these need to be free'd ? */
@@ -1045,6 +1155,8 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     s_op->u.mkdir.rmt_dirdata_array = NULL;
     free(s_op->u.mkdir.dirdata_parent_buffer);
     s_op->u.mkdir.dirdata_parent_buffer = NULL;
+    free(s_op->req->u.mkdir.attr.u.dir.hint.dist_name);
+    free(s_op->req->u.mkdir.attr.u.dir.hint.dist_params);
 #if 0
     if (s_op->msgarray_op.count > 0)
     {

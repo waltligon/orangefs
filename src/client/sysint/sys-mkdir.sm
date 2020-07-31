@@ -393,14 +393,18 @@ static int mkdir_msg_comp_fn(void *v_p,
                      __func__, ret);
     }
 
-/* WBL - REVIEW this - can we update attr without size array?
- * can we avoid the following invalidation - what are the
- * consequences of being a little out of date?  how much
- * performance do we lose?  Can we pass new timestamps back
- * so we can update cache rather then invalidate?  Is this the right
- * place to invalidate anyway, this is the return of the mkdir not the
- * crdirent, which would have updated the parent's stimestamp.
- */
+    /* WBL - REVIEW this - can we update attr without size array?
+     * can we avoid the following invalidation - what are the
+     * consequences of being a little out of date?  how much
+     * performance do we lose?  Can we pass new timestamps back
+     * so we can update cache rather then invalidate?  Is this the right
+     * place to invalidate anyway, this is the return of the mkdir not the
+     * crdirent, which would have updated the parent's stimestamp.
+     * WBL - at this point in time the dir has 0 dirents because it was
+     * just created.  We should be able to update attrs.
+     * The crdirent should update a timestamp on the parent, but that
+     * is not reflected on this object.
+     */
 
 #if 0 /* Don't cache size_array. */
     PINT_acache_update(sm_p->object_ref, &attr, NULL, NULL);
@@ -517,6 +521,16 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
         sm_p->u.mkdir.sys_attr.perms |= PVFS_G_SGID;
         /* note that permission checking is left to server even in this case */
     }
+
+    /* set up redundancy defaults */
+#if 0
+    if (sm_p->u.mkdir.sys_attr.meta_sid_count == 0)
+    {
+        sm_p->u.mkdir.sys_attr.meta_sid_count
+        sm_p->u.mkdir.metadata_sid_count
+        attr->meta_sid_count;
+    }
+#endif
 
     /* set values of distributed directory parameters,
      * priority for determining user's preference for number of data files:

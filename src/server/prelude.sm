@@ -319,30 +319,35 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     /* Profile validate operation */
     INIT_PROFILER(profiler);
     START_PROFILER(profiler);
+ 
+    /* First translate the dspace attributes into object attributes */
+    PVFS_ds_attr_to_object_attr(&s_op->ds_attr, &s_op->attr);
+    /* s_op->attr.mask = PVFS_ATTR_COMMON_ALL; */
+    s_op->target_object_attr = &s_op->attr;
 
     /* Get the errno value to use for comparison */
     error_code = PVFS_get_errno_mapping(js_p->error_code);
 
-    /* Reworked logic
+    /* Reworked logic.  Next we see if we need to create a new object.
      * The only objects created by prelude are DATAFILE and DIRDATA objects
-     * that we not created during the original CREATE or MKDIR operations
+     * that were not created during the original CREATE or MKDIR operations.
      * When we create these objects the implication is that the getattr from 
      * the previous state failed, and thus we cannot depend on attr fields until
      * they are filled in.
      */
     if (error_code == ENOENT)
     {
-        /* probably a new object, try to create the object attr */
-        /* we are building the object attr which we later convert to
-         * a ds_attr for writing to the database
+        /* A new object, Try to decide what kind of object from the req op type.
+         * We are building the object attr for the new object which we later 
+         * convert to a ds_attr for writing to the database.
+         * First copy in the attrs sent in by the original req as a starting point.
          */
-        /* copy in the attrs sent in setaaattr */
         memcpy((void *)&s_op->attr,
                (void *)&s_op->req->u.setattr.attr,
                sizeof(PVFS_object_attr));
 
-        create_object = 1;    /* assume creating unless proven otherwise */
-        js_p->error_code = 0; /* clear ENOENT */
+        create_object = 1;    /* Assume creating unless proven otherwise */
+        js_p->error_code = 0; /* Clear ENOENT */
         switch (s_op->req->op)
         {
         /* datafile object specific */
@@ -355,8 +360,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         /* dirdata object specific */
         case PVFS_SERV_RMDIRENT : /* assumes existing dirdata */
         case PVFS_SERV_CHDIRENT : /* assumes existing dirdata */
-
-        case PVFS_SERV_CRDIRENT :
+        case PVFS_SERV_CRDIRENT : /* assumes existing dirdata */
             s_op->attr.objtype = PVFS_TYPE_DIRDATA;
             s_op->attr.u.dirdata.dirent_count = 0;
             break;
@@ -402,96 +406,51 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             js_p->error_code = ENOENT;
             break;
         }
-    }
 
-    /* initialize the time members */
-    /* these are used for fine-grain time values */
-    current_time = time(NULL);
-    s_op->attr.atime = current_time;
-    s_op->attr.mtime = current_time;
-    s_op->attr.ctime = current_time;
-    s_op->attr.ntime = current_time;
+        /* initialize the time members */
+        /* these are used for fine-grain time values */
+            current_time = time(NULL);
+        s_op->attr.atime = current_time;
+        s_op->attr.mtime = current_time;
+        s_op->attr.ctime = current_time;
+        s_op->attr.ntime = current_time;
+    
 
+        /* DIRDATA needs a set of dist_dir_data fields for distributed diretories
+         * and such.  This needs to be passed by the caller, which is normally a server
+         * in the midst of MKDIR operation so mkdir needs to have this info in its
+         * attributes, which it does - just be sure its filled in.  Theoretically this
+         * could also result from a CRDIRENT which wants to put an entry in a missing
+         * dirdata.  Unfortunately crdirent does not pass an attribute.  Normally a
+         * crdirent comes from a CREATE, which reads attributes from the parent dir
+         * including this stuff, and issues the crdirent, so it could pass the attr
+         * if the crdirent req had an attr field.
+         */
+        if (s_op->attr.objtype == PVFS_TYPE_DIRDATA)
+        {
+            s_op->attr.u.dirdata.dirent_count = 0; /* new object no items */
 
-    /* DIRDATA needs a set of dist_dir_data fields for distributed diretories
-     * and such.  This needs to be passed by the caller, which is normally a server
-     * in the midst of MKDIR operation so mkdir needs to have this info in its
-     * attributes, which it does - just be sure its filled in.  Theoretically this
-     * could also result from a CRDIRENT which wants to put an entry in a missing
-     * dirdata.  Unfortunately crdirent does not pass an attribute.  Normally a
-     * crdirent comes from a CREATE, which reads attributes from the parent dir
-     * including this stuff, and issues the crdirent, so it could pass the attr
-     * if the crdirent req had an attr field.
-     */
-    if (s_op->attr.objtype == PVFS_TYPE_DIRDATA)
-    {
-        s_op->attr.u.dirdata.dirent_count = 0; /* new object no items */
-
-        s_op->attr.u.dirdata.dist_dir_attr.tree_height =
-                        s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.tree_height;
+            s_op->attr.u.dirdata.dist_dir_attr.tree_height =
+                            s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.tree_height;
         
-        s_op->attr.u.dirdata.dist_dir_attr.dirdata_count =
-                        s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.dirdata_count;
+            s_op->attr.u.dirdata.dist_dir_attr.dirdata_count =
+                            s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.dirdata_count;
 
-        s_op->attr.u.dirdata.dist_dir_attr.sid_count =
-                        s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.sid_count;
+            s_op->attr.u.dirdata.dist_dir_attr.sid_count =
+                            s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.sid_count;
 
-        s_op->attr.u.dirdata.dist_dir_attr.bitmap_size =
-                        s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.bitmap_size;
+            s_op->attr.u.dirdata.dist_dir_attr.bitmap_size =
+                            s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.bitmap_size;
 
-        s_op->attr.u.dirdata.dist_dir_attr.split_size =
-                        s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.split_size;
+            s_op->attr.u.dirdata.dist_dir_attr.split_size =
+                            s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.split_size;
 
-        s_op->attr.u.dirdata.dist_dir_attr.server_no =
-                        s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.server_no;
-    }
+            s_op->attr.u.dirdata.dist_dir_attr.server_no =
+                            s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.server_no;
+        }
+    } /* endif */
 
-#if 0
-    if (error_code == ENOENT && (s_op->req->op == PVFS_SERV_IO || 
-                                 s_op->req->op == PVFS_SERV_GETATTR))
-    {
-        /* we failed to find the dpsace record.  fake one and we will 
-         * add it later if validation works out.
-         */
-        s_op->ds_attr.type = PVFS_TYPE_DATAFILE;
-        s_op->ds_attr.fs_id = s_op->target_fs_id;
-        s_op->ds_attr.handle = s_op->target_handle;
-        s_op->ds_attr.u.datafile.b_size = 0;
-        create_object = 1;
-        js_p->error_code = 0;
-    }
-    if (error_code == ENOENT && s_op->req->op == PVFS_SERV_SETATTR)
-    {
-        /* we failed to find the dpsace record.  fake one and we will 
-         * add it later if validation works out.
-         */
-        s_op->ds_attr.type = PVFS_TYPE_DIRDATA;
-        s_op->ds_attr.fs_id = s_op->target_fs_id;
-        s_op->ds_attr.handle = s_op->target_handle;
-        s_op->ds_attr.u.dirdata.dirent_count = 0;
-        create_object = 1;
-        js_p->error_code = 0;
-    }
-#endif
-
-
-#if 0
-    if ( s_op->attr.objtype == PVFS_TYPE_DATAFILE )
-    {
-       s_op->attr.mask = PVFS_ATTR_DATA_ALL;
-    }
-    else
-    if ( s_op->attr.objtype == PVFS_TYPE_DIRDATA )
-    {
-       s_op->attr.mask = PVFS_ATTR_DIRDATA_ALL;
-    }
-    else
-    {
-       s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
-    }
-#endif
-
-    s_op->target_object_attr = &s_op->attr;
+    /* Remaining logic deals with new or existing object. */
 
     if (s_op->prelude_mask & PRELUDE_PERM_CHECK_DONE)
     {

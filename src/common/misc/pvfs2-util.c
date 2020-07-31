@@ -1712,7 +1712,7 @@ fprintf(stderr, "Calling PVFS_util_resolve_absolute\n");
         }
         return(0);
     }
-fprintf(stderr, "Not found, attempting canobicalization\n");
+fprintf(stderr, "Not found, attempting canonicalization\n");
     if(ret == -PVFS_ENOENT)
     {
         /* if the path wasn't found, try canonicalizing the path in case it

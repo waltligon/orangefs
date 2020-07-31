@@ -176,7 +176,8 @@ PVFS_error PVFS_isys_fs_add(struct PVFS_sys_mntent *mntent,
 
        do
        {
-          gossip_err("%s:Retrying BMI_addr_lookup for %s.\n",__func__,mntent->pvfs_config_servers[i]);
+          gossip_err("%s:Retrying BMI_addr_lookup for %s\n",__func__,
+                     mntent->pvfs_config_servers[i]);
           ret = BMI_addr_lookup(&test_addr,
                                 mntent->pvfs_config_servers[i],
                                 mntent->bmi_opts);

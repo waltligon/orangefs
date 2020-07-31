@@ -30,12 +30,25 @@
 #include "dist-dir-utils.h"
 #include "server-config-mgr.h"
 
-#define DEFAULT_ROOTDIR_TREE_HEIGHT 1
-#define DEFAULT_ROOTDIR_DIRDATA_COUNT 1
-#define DEFAULT_ROOTDIR_BITMAP_SIZE 1
-#define DEFAULT_ROOTDIR_SPLIT_SIZE 4096
-#define DEFAULT_ROOTDIR_SERVER_NO 0
-#define DEFAULT_ROOTDIR_BRANCH_LEVEL 1
+#define DEFAULT_ROOTDIR_META_SID_COUNT 1
+#define DEFAULT_ROOTDIR_TREE_HEIGHT    0
+#define DEFAULT_ROOTDIR_DIRDATA_COUNT  1
+#define DEFAULT_ROOTDIR_BITMAP_SIZE    1
+#define DEFAULT_ROOTDIR_SPLIT_SIZE  4096
+#define DEFAULT_ROOTDIR_BRANCH_LEVEL   1
+/* Note: server_no is set below where attribs are initialized */
+/* -1 indicates no hint present */
+#define DEFAULT_ROOTDIR_HINT_DIST_NAME_LEN -1
+#define DEFAULT_ROOTDIR_HINT_DIST_PARAMS_LEN -1
+#define DEFAULT_ROOTDIR_HINT_DFILE_COUNT -1
+#define DEFAULT_ROOTDIR_HINT_DFILE_SID_COUNT -1
+#define DEFAULT_ROOTDIR_HINT_LAYOUT_ALGORITHM PVFS_SYS_LAYOUT_NULL
+#define DEFAULT_ROOTDIR_HINT_LAYOUT_LIST_CNT -1
+#define DEFAULT_ROOTDIR_HINT_DIRDATA_COUNT -1
+#define DEFAULT_ROOTDIR_HINT_SPLIT_SIZE -1
+#define DEFAULT_ROOTDIR_HINT_DIR_LAYOUT_ALGORITHM PVFS_SYS_LAYOUT_NULL
+#define DEFAULT_ROOTDIR_HINT_DIR_LAYOUT_LIST_CNT -1
+
 
 /*
 static char *lost_and_found_string = "lost+found";
@@ -170,7 +183,7 @@ int pvfs2_mkspace(char *data_path,
     TROVE_ds_state state;
     TROVE_keyval_s key, val;
     TROVE_keyval_s *key_a = NULL, *val_a = NULL;
-    TROVE_ds_attributes_s attr;
+    TROVE_ds_attributes_s ds_attr;
     TROVE_handle new_root_handle = root_handle;
     TROVE_handle new_root_dirdata_handle = root_dirdata_handle;
     PVFS_dist_dir_bitmap_basetype bitmap[1];
@@ -495,27 +508,40 @@ int pvfs2_mkspace(char *data_path,
         /**********************************/
         /* set Root Dir dspace attributes */
 
-        memset(&attr, 0, sizeof(TROVE_ds_attributes_s));
-        attr.type = PVFS_TYPE_DIRECTORY;
+        memset(&ds_attr, 0, sizeof(TROVE_ds_attributes_s));
+        ds_attr.type = PVFS_TYPE_DIRECTORY;
         /* fs_id and handle filled in by call */
-        attr.uid = getuid();
-        attr.gid = getgid();
-        attr.mode = 0777;
-	attr.ntime = attr.atime = attr.ctime = PINT_util_get_current_time();
-        attr.mtime = PINT_util_mktime_version(attr.ntime);
-        attr.u.directory.dirent_count = 0;
-        attr.u.directory.tree_height = DEFAULT_ROOTDIR_TREE_HEIGHT;
-        attr.u.directory.dirdata_count = DEFAULT_ROOTDIR_DIRDATA_COUNT;
-        attr.u.directory.sid_count = root_sid_count;
-        attr.u.directory.bitmap_size = DEFAULT_ROOTDIR_BITMAP_SIZE;
-        attr.u.directory.split_size = DEFAULT_ROOTDIR_SPLIT_SIZE;
-        /* V3 DOES THIS MAKE SENSE? */
-        attr.u.directory.server_no = DEFAULT_ROOTDIR_SERVER_NO;
-        attr.u.directory.branch_level = DEFAULT_ROOTDIR_BRANCH_LEVEL;
+        ds_attr.uid = getuid();
+        ds_attr.gid = getgid();
+        ds_attr.mode = 0777;
+	ds_attr.mtime = ds_attr.ntime = ds_attr.atime = ds_attr.ctime = 
+                        PINT_util_get_current_time();
+        /* attr.mtime = PINT_util_mktime_version(attr.ntime); */
+        ds_attr.meta_sid_count =                   DEFAULT_ROOTDIR_META_SID_COUNT;
+        ds_attr.u.directory.dirent_count =         0;
+        ds_attr.u.directory.tree_height =          DEFAULT_ROOTDIR_TREE_HEIGHT;
+        ds_attr.u.directory.dirdata_count =        DEFAULT_ROOTDIR_DIRDATA_COUNT;
+        /*attr.u.directory.sid_count =            root_sid_count;*/
+        ds_attr.u.directory.bitmap_size =          DEFAULT_ROOTDIR_BITMAP_SIZE;
+        ds_attr.u.directory.split_size =           DEFAULT_ROOTDIR_SPLIT_SIZE;
+        /*attr.u.directory.server_no =            -1;*/
+        ds_attr.u.directory.branch_level =         DEFAULT_ROOTDIR_BRANCH_LEVEL;
+        /* FILE HINTS */
+        ds_attr.u.directory.hint_dist_name_len =   DEFAULT_ROOTDIR_HINT_DIST_NAME_LEN;
+        ds_attr.u.directory.hint_dist_params_len = DEFAULT_ROOTDIR_HINT_DIST_PARAMS_LEN;
+        ds_attr.u.directory.hint_dfile_count =     DEFAULT_ROOTDIR_HINT_DFILE_COUNT;
+        ds_attr.u.directory.hint_dfile_sid_count = DEFAULT_ROOTDIR_HINT_DFILE_SID_COUNT;
+        ds_attr.u.directory.hint_layout_algorithm = DEFAULT_ROOTDIR_HINT_LAYOUT_ALGORITHM;
+        ds_attr.u.directory.hint_layout_list_cnt = DEFAULT_ROOTDIR_HINT_LAYOUT_LIST_CNT;
+        /* DIR HINTS */
+        ds_attr.u.directory.hint_dirdata_count =   DEFAULT_ROOTDIR_HINT_DIRDATA_COUNT;
+        ds_attr.u.directory.hint_split_size =      DEFAULT_ROOTDIR_HINT_SPLIT_SIZE;
+        ds_attr.u.directory.hint_dir_layout_algorithm = DEFAULT_ROOTDIR_HINT_DIR_LAYOUT_ALGORITHM;
+        ds_attr.u.directory.hint_dir_layout_list_cnt = DEFAULT_ROOTDIR_HINT_DIR_LAYOUT_LIST_CNT;
 
         ret = trove_dspace_setattr(coll_id,
                                    root_handle,
-                                   &attr,
+                                   &ds_attr,
                                    TROVE_SYNC,
                                    NULL,
                                    trove_context,
@@ -545,23 +571,25 @@ int pvfs2_mkspace(char *data_path,
         /***********************************/
         /* write Dirdata dspace attributes */
 
-        memset(&attr, 0, sizeof(TROVE_ds_attributes_s));
+        memset(&ds_attr, 0, sizeof(TROVE_ds_attributes_s));
         /* fs_id and handle filled in by call */
-        attr.type = PVFS_TYPE_DIRDATA;
-	attr.ntime = attr.atime = attr.ctime = PINT_util_get_current_time();
-        attr.mtime = PINT_util_mktime_version(attr.ntime);
-        attr.u.dirdata.dirent_count = 0;
-        attr.u.dirdata.tree_height = DEFAULT_ROOTDIR_TREE_HEIGHT;
-        attr.u.dirdata.dirdata_count = DEFAULT_ROOTDIR_DIRDATA_COUNT;
-        attr.u.dirdata.sid_count = root_sid_count;
-        attr.u.dirdata.bitmap_size = DEFAULT_ROOTDIR_BITMAP_SIZE;
-        attr.u.dirdata.split_size = DEFAULT_ROOTDIR_SPLIT_SIZE;
-        attr.u.dirdata.server_no = DEFAULT_ROOTDIR_SERVER_NO;
-        attr.u.dirdata.branch_level = DEFAULT_ROOTDIR_BRANCH_LEVEL;
+        ds_attr.type = PVFS_TYPE_DIRDATA;
+	ds_attr.mtime = ds_attr.ntime = ds_attr.atime = ds_attr.ctime =
+                        PINT_util_get_current_time();
+        /* attr.mtime = PINT_util_mktime_version(attr.ntime); */
+        ds_attr.meta_sid_count =          DEFAULT_ROOTDIR_META_SID_COUNT;
+        ds_attr.u.dirdata.dirent_count =  0;
+        ds_attr.u.dirdata.tree_height =   DEFAULT_ROOTDIR_TREE_HEIGHT;
+        ds_attr.u.dirdata.dirdata_count = DEFAULT_ROOTDIR_DIRDATA_COUNT;
+        /*attr.u.dirdata.sid_count =     root_sid_count;*/
+        ds_attr.u.dirdata.bitmap_size =   DEFAULT_ROOTDIR_BITMAP_SIZE;
+        ds_attr.u.dirdata.split_size =    DEFAULT_ROOTDIR_SPLIT_SIZE;
+        ds_attr.u.dirdata.server_no =     0;
+        ds_attr.u.dirdata.branch_level =  DEFAULT_ROOTDIR_BRANCH_LEVEL;
 
         ret = trove_dspace_setattr(coll_id,
                                    root_dirdata_handle,
-                                   &attr,
+                                   &ds_attr,
                                    TROVE_SYNC,
                                    NULL,
                                    trove_context,

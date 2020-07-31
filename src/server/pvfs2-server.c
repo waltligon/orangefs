@@ -130,7 +130,7 @@ static char startup_cwd[PATH_MAX+1];
  * we're able to use sizeof here because sizeof an inlined string ("") gives
  * the length of the string with the null terminator
  */
-/* These are defined in src/common/pvfs2-internal.h
+/* These are defined in src/common/misc/pvfs2-internal.h
  */
 PINT_server_trove_keys_s Trove_Common_Keys[] =
 {
@@ -145,6 +145,7 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {DIST_DIRDATA_BITMAP_KEYSTR,  DIST_DIRDATA_BITMAP_KEYLEN},
     {DIST_DIRDATA_HANDLES_KEYSTR, DIST_DIRDATA_HANDLES_KEYLEN},
     {OBJECT_PARENT_KEYSTR,        OBJECT_PARENT_KEYLEN},
+    {SYSTEM_POSIX_ACL_KEYSTR,     SYSTEM_POSIX_ACL_KEYLEN},
 };
 
 PINT_server_trove_keys_s Trove_Special_Keys[] =
@@ -904,6 +905,7 @@ static int server_initialize_subsystems(
     if(!(*server_status_flag & SERVER_EVENT_INIT) && 
        server_config.enable_events)
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... starting event logging init\n");
         ret = PINT_event_init(PINT_EVENT_TRACE_TAU);
         if (ret < 0)
         {
@@ -924,6 +926,7 @@ static int server_initialize_subsystems(
     /* Initialize distributions */
     if(!(*server_status_flag & SERVER_DIST_INIT))
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... starting distribution init\n");
         ret = PINT_dist_initialize(0);
         if (ret < 0)
         {
@@ -935,6 +938,7 @@ static int server_initialize_subsystems(
 
     if(!(*server_status_flag & SERVER_ENCODER_INIT))
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... starting encode init\n");
         ret = PINT_encode_initialize();
         if (ret < 0)
         {
@@ -949,6 +953,9 @@ static int server_initialize_subsystems(
     {
         char *modules = NULL;
         char *listen_addrs = NULL;
+
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... starting BMI init\n");
+
         if (*server_status_flag & SERVER_BMI_CLIENT_INIT)
         {
             bmi_flags = 0;
@@ -1016,6 +1023,7 @@ static int server_initialize_subsystems(
     /* create the configuration cache */
     if(!(*server_status_flag & SERVER_CACHED_CONFIG_INIT))
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... starting configuration cache init\n");
         ret = PINT_cached_config_initialize();
         if(ret < 0)
         {
@@ -1028,6 +1036,7 @@ static int server_initialize_subsystems(
     /********** START OF TROVE INIT ***********/
     if(!(*server_status_flag & SERVER_TROVE_INIT))
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... starting trove init\n");
         /* this should never fail */
         ret = trove_collection_setinfo(0,
                                        0,
@@ -1058,6 +1067,7 @@ static int server_initialize_subsystems(
     /* initialize the flow interface */
     if(!(*server_status_flag & SERVER_FLOW_INIT))
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... starting flow init\n");
         ret = PINT_flow_initialize(server_config.flow_modules, 0);
 
         if (ret < 0)
@@ -1070,6 +1080,7 @@ static int server_initialize_subsystems(
 
     if(!(*server_status_flag & SERVER_FILESYS_INIT))
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... starting filesystem init\n");
         for(cur = server_config.file_systems; cur; cur = PINT_llist_next(cur))
         {
             cur_fs = PINT_llist_head(cur);
@@ -1329,6 +1340,7 @@ static int server_initialize_subsystems(
     /* Initialize Job Timer */
     if(!(*server_status_flag & SERVER_JOB_TIME_MGR_INIT))
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... starting job timer init\n");
         ret = job_time_mgr_init();
         if(ret < 0)
         {
@@ -1341,6 +1353,7 @@ static int server_initialize_subsystems(
     /* initialize Job Interface */
     if(!(*server_status_flag & SERVER_JOB_INIT))
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... starting job intereface init\n");
         ret = job_initialize(0);
         if (ret < 0)
         {
@@ -1352,6 +1365,7 @@ static int server_initialize_subsystems(
     
     if(!(*server_status_flag & SERVER_JOB_CTX_INIT))
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... starting job context init\n");
         ret = job_open_context(&server_job_context);
         if (ret < 0)
         {
@@ -1364,6 +1378,7 @@ static int server_initialize_subsystems(
     /* initialize Request Scheduler */
     if(!(*server_status_flag & SERVER_REQ_SCHED_INIT))
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... starting job scheduler init\n");
         ret = PINT_req_sched_initialize();
         if (ret < 0)
         {
@@ -1374,6 +1389,7 @@ static int server_initialize_subsystems(
     }
 
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
+    gossip_debug(GOSSIP_SERVER_DEBUG, "... starting performance counter init\n");
     /* history size should be in server config too */
     PINT_server_pc = PINT_perf_initialize(PINT_PERF_COUNTER,
                                           server_keys, 
@@ -1469,6 +1485,7 @@ static int server_initialize_subsystems(
     /* Initialize uid tracker */
     if(!(*server_status_flag & SERVER_UID_MGMT_INIT))
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... starting uid tracking init\n");
         ret = PINT_uid_mgmt_initialize();
         if (ret < 0)
         {
@@ -1481,6 +1498,7 @@ static int server_initialize_subsystems(
 /* WBL V3 ADD */
     /* Perform Server Check-In */
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "... finished initializing subsystems\n");
     return ret;
 }
 

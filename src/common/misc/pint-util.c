@@ -180,6 +180,7 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
         dest->parent_sids = (PVFS_SID *)(dest->parent + 1);
         memcpy(dest->parent, src->parent, OASZ(1));
         memcpy(dest->parent_sids, src->parent_sids, SASZ(src->meta_sid_count));
+        dest->mask |= PVFS_ATTR_COMMON_PARENT;
     }
     else
     {
@@ -194,17 +195,19 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
             PINT_dist_free(dest->u.meta.dist);
         }
         dest->u.meta.dist = PINT_dist_copy(src->u.meta.dist);
+        dest->mask |= PVFS_ATTR_META_DIST;
         if (dest->u.meta.dist == NULL)
         {
             return -PVFS_ENOMEM;
         }
-        dest->u.meta.dist_size = src->u.meta.dist_size;
+        /* dest->u.meta.dist_size = src->u.meta.dist_size; */
         PACKSID(meta.dfile_array,
                 meta.sid_array,
                 meta.dfile_count,
                 meta.sid_count,
                 (PVFS_ATTR_META_DFILE_COUNT |
                      PVFS_ATTR_META_SID_COUNT)); 
+        dest->mask |= PVFS_ATTR_META_DFILES;
         break;
     case PVFS_TYPE_DATAFILE:
         break;
@@ -215,6 +218,7 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
         CPYFIELD(dir.hint.dist_params,
                  dest->u.dir.hint.dist_params_len,
                  PVFS_ATTR_DIR_HINT_DIST_PARAMS_LEN);
+        dest->mask |= PVFS_ATTR_DIR_HINT;     /* CHECK ON THIS */
         CPYFIELD(dir.dist_dir_bitmap,
                  (dest->u.dir.dist_dir_attr.bitmap_size *
                         sizeof(PVFS_dist_dir_bitmap_basetype)),
@@ -225,6 +229,7 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
                 dir.dist_dir_attr.sid_count,
                 (PVFS_ATTR_DIR_DIRDATA_COUNT |
                      PVFS_ATTR_DIR_SID_COUNT)); 
+        dest->mask |= PVFS_ATTR_DIR_DIRDATA;     /* CHECK ON THIS */
         break;
     case PVFS_TYPE_DIRDATA:
         CPYFIELD(dirdata.dist_dir_bitmap,
@@ -238,15 +243,17 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
                 (PVFS_ATTR_DIRDATA_DIRDATA_COUNT |
                      PVFS_ATTR_DIRDATA_SID_COUNT)); 
         break;
+        dest->mask |= PVFS_ATTR_DIR_DIRDATA;     /* CHECK ON THIS */
     case PVFS_TYPE_SYMLINK:
         CPYFIELD(sym.target_path, 
                  dest->u.sym.target_path_len,
                  PVFS_ATTR_SYMLNK_TARGET);
+        dest->mask |= PVFS_ATTR_SYMLNK_TARGET;
         break;
     default :
         break;
     }
-    dest->mask = src->mask;
+    /* dest->mask = src->mask; */
     return 0;
 }
 #undef CPYFIELD
@@ -320,8 +327,12 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
     /* first clear the dest attr */
     PINT_free_object_attr(dest);
 
+    /* should not need to copy the mask - each mask bit is being
+     * set by copy_attr() and all of the relevant fields should be 
+     * referenced here
+     */
+    /* copy_attr(mask, 0); */
     copy_attr(objtype, PVFS_ATTR_COMMON_TYPE);
-    copy_attr(mask, 0);
     copy_attr(owner, PVFS_ATTR_COMMON_UID);
     copy_attr(group, PVFS_ATTR_COMMON_GID);
     copy_attr(perms, PVFS_ATTR_COMMON_PERM);
@@ -330,11 +341,19 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
     copy_attr(ctime, PVFS_ATTR_COMMON_CTIME);
     copy_attr(ntime, PVFS_ATTR_COMMON_NTIME);
     copy_attr(meta_sid_count, PVFS_ATTR_COMMON_SID_COUNT);
-    /* we do not do anything with time_set flags here */
+
+    if ((src->mask & PVFS_ATTR_COMMON_ATIME_SET) == PVFS_ATTR_COMMON_ATIME_SET)
+        dest->mask |= PVFS_ATTR_COMMON_ATIME_SET;
+    if ((src->mask & PVFS_ATTR_COMMON_CTIME_SET) == PVFS_ATTR_COMMON_CTIME_SET)
+        dest->mask |= PVFS_ATTR_COMMON_CTIME_SET;
+    if ((src->mask & PVFS_ATTR_COMMON_MTIME_SET) == PVFS_ATTR_COMMON_MTIME_SET)
+        dest->mask |= PVFS_ATTR_COMMON_MTIME_SET;
+    if ((src->mask & PVFS_ATTR_COMMON_NTIME_SET) == PVFS_ATTR_COMMON_NTIME_SET)
+        dest->mask |= PVFS_ATTR_COMMON_NTIME_SET;
 
     switch(dest->objtype)
     {
-    case PVFS_TYPE_METAFILE:
+    case PVFS_TYPE_METAFILE :
         CLRFIELD(dest->u.meta.dist);
 
         copy_attr(u.meta.dist_size, PVFS_ATTR_META_DIST_SIZE);
@@ -349,10 +368,11 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         copy_attr(u.meta.flags, PVFS_ATTR_META_FLAGS);
         /**/
         break;
-    case PVFS_TYPE_DATAFILE:
+    case PVFS_TYPE_DATAFILE :
         copy_attr(u.data.size, PVFS_ATTR_DATA_SIZE);
+        /**/
         break;
-    case PVFS_TYPE_DIRECTORY:
+    case PVFS_TYPE_DIRECTORY :
         copy_attr(u.dir.dirent_count, PVFS_ATTR_DIR_DIRENT_COUNT);
         /* begin hints */
         copy_attr(u.dir.hint.dist_name_len, PVFS_ATTR_DIR_HINT_DIST_NAME_LEN);
@@ -383,7 +403,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
                 dir.dist_dir_attr.dirdata_count);
         /**/
         break;
-    case PVFS_TYPE_DIRDATA:
+    case PVFS_TYPE_DIRDATA :
         copy_attr(u.dirdata.dirent_count, PVFS_ATTR_DIRDATA_DIRENT_COUNT);
         /* begin dirdata */
         copy_attr(u.dirdata.dist_dir_attr.tree_height, PVFS_ATTR_DIRDATA_TREE_HEIGHT);
@@ -400,15 +420,21 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
                 dirdata.dist_dir_attr.dirdata_count);
         /**/
         break;
-    case PVFS_TYPE_SYMLINK:
+    case PVFS_TYPE_SYMLINK :
         copy_attr(u.sym.target_path_len, PVFS_ATTR_SYMLNK_TARGET);
         CLRFIELD(dest->u.sym.target_path);
         /**/
         break;
     default :
+        /**/
         break;
     }
-    dest->mask = src->mask;
+    /* should not need to copy the mask - each mask bit is being
+     * set by copy_attr() and all of the relevant fields should be 
+     * referenced here - not to mention there was a copy statement
+     * the top of this function also
+     */
+    /* dest->mask = src->mask; */
     return 0;
 }
 

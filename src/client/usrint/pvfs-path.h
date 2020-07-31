@@ -56,24 +56,24 @@
 #define CLEAR_ERROR(p) do{(p)->magic &= ~PVFS_PATH_ERROR;}while(0)
 
 /**
- * A PVFS_path keeps up with an path we are trying to access and the
+ * A PVFS_path keeps up with one path we are trying to access and the
  * the results of processing that path.  If the path is qualified and/or
  * expanded then the path starts at the root and has had all . and /
  * elements removed (except a single / between segments).  Qualified
  * paths have not had any segment verified or resolved.  Later a resolved
  * path has the pvfs_path pointer pointing to the portion of the path
  * just past the mount point and has the fs_id filled in.  In most cases
- * we co do a lookup from there.  If the path fails to resolve or lookup
+ * we can do a lookup from there.  If the path fails to resolve or lookup
  * correctly we will fully expand the path resolving symbolic links.
  * During this process each segment is resolved and then looked up to see
- * if it is a symlink, and if so the link is read and the path futher
+ * if it is a symlink, and if so the link is read and the path further
  * expanded.  If a segment fails to look up the process stops.  In this
  * case the last successful lookup in pvfs space will have its object
- * handle recorded and the filename poitner will point to the remaining
+ * handle recorded and the filename pointer will point to the remaining
  * segments.  In the case where we are creating an object this might be a
  * signle segment.  If it is multiple segments it may be an error.
  *
- * the structure uspassed around using the address if the expanded path
+ * The structure is passed around using the address if the expanded path
  * buffer so that it appears to be a simple char path.  Functions compute
  * the address of the structure and check for the magic number to verify
  * they have a PVFS_path and not single char array.  This is used because
@@ -88,11 +88,11 @@ typedef struct PVFS_path_s
     char *orig_path;    /* this is the original unmodified path */
     char *pvfs_path;    /* if we resove, this points to the pvfs portion */
     PVFS_fs_id fs_id;   /* if we resolve this is the fs_id */
-    PVFS_handle handle ;/* if we look up a pvfs object, this is the last one */
+    PVFS_handle handle; /* if we look up a pvfs object, this is the last one */
     int32_t sid_count;  /* if we look up a pvfs object, this is the last one */
     PVFS_SID *sid_array;/* if we look up a pvfs object, this is the last one */
     char *filename;     /* this is the path left after the object */
-    uint64_t magic;     /* contains a magic to id the struct a flags */
+    uint64_t magic;     /* contains a magic number to id the struct and flags */
     char expanded_path[PVFS_PATH_MAX + 1]; /* modified path is here */
 } PVFS_path_t;
 

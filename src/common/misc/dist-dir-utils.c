@@ -69,7 +69,10 @@ static int dist_dir_calc_branch_level(
  * server_no <- -1..(dirdata_count-1)
  * pre_dsg_num_server: pre-set a number of servers,
  *                     used for known large directory.
-  * default value can be 1.
+ *                     default value can be 1.
+ *  Defaults used here should be compared against those
+ *  at the top of src/common/misc/mkspace.c used for
+ *  root dir and dirdata.
  */
 
 int PINT_init_dist_dir_state(
