@@ -44,7 +44,8 @@
 #define DEFAULT_ROOTDIR_HINT_DFILE_SID_COUNT -1
 #define DEFAULT_ROOTDIR_HINT_LAYOUT_ALGORITHM PVFS_SYS_LAYOUT_NULL
 #define DEFAULT_ROOTDIR_HINT_LAYOUT_LIST_CNT -1
-#define DEFAULT_ROOTDIR_HINT_DIRDATA_COUNT -1
+#define DEFAULT_ROOTDIR_HINT_DIRDATA_MIN -1
+#define DEFAULT_ROOTDIR_HINT_DIRDATA_MAX -1
 #define DEFAULT_ROOTDIR_HINT_SPLIT_SIZE -1
 #define DEFAULT_ROOTDIR_HINT_DIR_LAYOUT_ALGORITHM PVFS_SYS_LAYOUT_NULL
 #define DEFAULT_ROOTDIR_HINT_DIR_LAYOUT_LIST_CNT -1
@@ -534,7 +535,8 @@ int pvfs2_mkspace(char *data_path,
         ds_attr.u.directory.hint_layout_algorithm = DEFAULT_ROOTDIR_HINT_LAYOUT_ALGORITHM;
         ds_attr.u.directory.hint_layout_list_cnt = DEFAULT_ROOTDIR_HINT_LAYOUT_LIST_CNT;
         /* DIR HINTS */
-        ds_attr.u.directory.hint_dirdata_count =   DEFAULT_ROOTDIR_HINT_DIRDATA_COUNT;
+        ds_attr.u.directory.hint_dirdata_min =     DEFAULT_ROOTDIR_HINT_DIRDATA_MIN;
+        ds_attr.u.directory.hint_dirdata_max =     DEFAULT_ROOTDIR_HINT_DIRDATA_MAX;
         ds_attr.u.directory.hint_split_size =      DEFAULT_ROOTDIR_HINT_SPLIT_SIZE;
         ds_attr.u.directory.hint_dir_layout_algorithm = DEFAULT_ROOTDIR_HINT_DIR_LAYOUT_ALGORITHM;
         ds_attr.u.directory.hint_dir_layout_list_cnt = DEFAULT_ROOTDIR_HINT_DIR_LAYOUT_LIST_CNT;

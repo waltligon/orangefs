@@ -57,10 +57,12 @@
 #define endecode_fields_7(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7) struct endecode_fake_struct
 #define endecode_fields_7_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7) struct endecode_fake_struct
 #define endecode_fields_8_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8) struct endecode_fake_struct
+#define endecode_fields_9(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9) struct endecode_fake_struct
 #define endecode_fields_9_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9) struct endecode_fake_struct
 #define endecode_fields_10_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10) struct endecode_fake_struct
 #define endecode_fields_11_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11) struct endecode_fake_struct
 #define endecode_fields_12(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11,t12,x12) struct endecode_fake_struct
+#define endecode_fields_13(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11,t12,x12,t13,x13) struct endecode_fake_struct
 
 #define endecode_fields_1a(n,t1,x1,tn1,n1,ta1,a1) struct endecode_fake_struct
 #define endecode_fields_1a_struct(n,t1,x1,tn1,n1,ta1,a1) struct endecode_fake_struct

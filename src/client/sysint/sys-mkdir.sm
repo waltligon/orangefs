@@ -196,6 +196,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     PINT_client_sm *sm_p = NULL;
     struct server_configuration_s *server_config = NULL;
     struct filesystem_configuration_s *fs_config = NULL;
+    PVFS_object_attr *dir_attr = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_mkdir entered\n");
 
@@ -247,6 +248,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     PINT_init_sysint_credential(sm_p->cred_p, credential);
 
     sm_p->u.mkdir.object_name = object_name;
+    dir_attr = &sm_p->u.mkdir.obj_attr;
 
     /*
      * I really hate sys_attr's - I would really rather convert them to
@@ -255,6 +257,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
      * possible - tricky because of return struct we use.
      */
     
+    /* COPY the user provided attributes into the sys_aattr sm block */
     PVFS_util_copy_sys_attr(&sm_p->u.mkdir.sys_attr, &attr);
 
     sm_p->u.mkdir.mkdir_resp = resp;
@@ -270,44 +273,100 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
 
     sm_p->parent_ref = parent_ref;
 
-    /* V3 need to add config default and dir override ability */
+    /* We will start building attributes for the new directory object
+     * In this function we will add attributes to sm_p->u.mkdir.obj_attr
+     * first from the built-in defaults, second from config file defaults,
+     * In the validate function - after we have read the parent attributes
+     * we continue with third from the parent directory attributes and hints,
+     * and finall from the sys_attrs passed in to the sys_mkdir call.
+     */
+
+    /*********************/
+    /* Built-in defaults */
+    /*********************/
+
+    /* General attributes */
+    dir_attr->objtype = PVFS_TYPE_DIRECTORY;
+    dir_attr->meta_sid_count = 1;
+    dir_attr->u.dir.dirent_count = 0;
+    /* Hints pertaining to files */
+    dir_attr->u.dir.hint.dist_name_len = 0;
+    dir_attr->u.dir.hint.dist_name = NULL;
+    dir_attr->u.dir.hint.dist_params_len = 0;
+    dir_attr->u.dir.hint.dist_params = NULL;
+    dir_attr->u.dir.hint.dfile_count = 0;
+    dir_attr->u.dir.hint.dfile_sid_count = 0;
+    dir_attr->u.dir.hint.layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
+    dir_attr->u.dir.hint.layout.server_list.count = 0;
+    dir_attr->u.dir.hint.layout.server_list.bufsize = 0;
+    dir_attr->u.dir.hint.layout.server_list.servers = NULL;
+    /* Hints pertaining to directories */
+    dir_attr->u.dir.hint.dir_dirdata_min = 0;
+    dir_attr->u.dir.hint.dir_dirdata_max = 0;
+    dir_attr->u.dir.hint.dir_split_size = 0;
+    dir_attr->u.dir.hint.dir_layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
+    dir_attr->u.dir.hint.dir_layout.server_list.count = 0;
+    dir_attr->u.dir.hint.dir_layout.server_list.bufsize = 0;
+    dir_attr->u.dir.hint.dir_layout.server_list.servers = NULL;
+    /* Distributed Directory Attributes */
+    dir_attr->u.dir.dist_dir_attr.tree_height = 0;
+    dir_attr->u.dir.dist_dir_attr.dirdata_min = 1;
+    dir_attr->u.dir.dist_dir_attr.dirdata_max = 1;
+    dir_attr->u.dir.dist_dir_attr.dirdata_count = 1;
+    dir_attr->u.dir.dist_dir_attr.sid_count = 1;      /* I think this is obsolete */
+    dir_attr->u.dir.dist_dir_attr.bitmap_size = 1;
+    dir_attr->u.dir.dist_dir_attr.split_size = 8192;
+    dir_attr->u.dir.dist_dir_attr.server_no = -1;
+    dir_attr->u.dir.dist_dir_attr.branch_level = 0;
+
+    /* get config for this filesystem */
     server_config = PINT_get_server_config_struct(parent_ref.fs_id);
-    /* sticks server config on a linked list */
     fs_config = PINT_config_find_fs_id(server_config, parent_ref.fs_id);
+
+    /*********************************/
+    /* Defaults from the config file */
+    /*********************************/
+
+    if (fs_config->default_distr_dir_servers_initial > 0)
+    {
+        dir_attr->u.dir.dist_dir_attr.dirdata_min = 
+        dir_attr->u.dir.dist_dir_attr.dirdata_count = 
+                         fs_config->default_distr_dir_servers_initial;
+    }
+    if (fs_config->default_distr_dir_servers_max > 0)
+    {
+        dir_attr->u.dir.dist_dir_attr.dirdata_max = 
+                         fs_config->default_distr_dir_servers_max;
+    }
+    if (fs_config->default_distr_dir_split_size > 100)
+    {
+        dir_attr->u.dir.dist_dir_attr.split_size = fs_config->default_distr_dir_split_size;
+    }
+    if (fs_config->metadata_replication_factor > 0)
+    {
+        dir_attr->meta_sid_count = fs_config->metadata_replication_factor;
+    }
+
     /* return checked out verion of config struct */
     PINT_put_server_config_struct(server_config);
-    /* zereo is a bad repl number. Prevent bad values from screwing up */
-    if (fs_config->metadata_replication_factor <= 0)
-    {
-        fs_config->metadata_replication_factor = 1;
-    }
 
-    /* This is fine - all metadata will be replicated the same amount */
-    sm_p->u.mkdir.metadata_sid_count =
-                            fs_config->metadata_replication_factor;
-
-    /* This is a problem becase different files may have different
-     * replication - though alli datafiles in a file must be the same.
-     * Also, there is a default data replication in the fs_conf so again
-     * there should be consistency.
+    /* These are convenience variables in the sm_p 
+     * In the case of a directory both should be the same
+     * since directories are metadata
      */
-    sm_p->u.mkdir.dirdata_sid_count =
-                            fs_config->metadata_replication_factor;
-#if 0
-    if (fs_config->metadata_replication_factor <= 0)
-    {
-        sm_p->u.mkdir.metadata_sid_count = 1;
-        sm_p->u.mkdir.dirdata_sid_count = 1;
-    }
-#endif
+    sm_p->u.mkdir.metadata_sid_count = dir_attr->meta_sid_count;
+    sm_p->u.mkdir.dirdata_sid_count = dir_attr->meta_sid_count;
 
+    /* does this apply to a dir?  if so, shouldn't we have attrs for it? */
     /* TODO: For now, just use round robin layout. */
-    sm_p->u.mkdir.layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
+    /* handled above */
+    //sm_p->u.mkdir.layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Creating directory named %s "
                  "under parent handle %s on fs %d\n", object_name,
                  PVFS_OID_str(&parent_ref.handle), parent_ref.fs_id);
 
+    /* Start the mkdir state machine */
     return PINT_client_state_machine_post(smcb, op_id, user_ptr);
 }
 
@@ -489,7 +548,9 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
                                                    job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *attr = NULL;
+    PVFS_object_attr *p_attr = NULL;
+    PVFS_object_attr *dir_attr = NULL;
+    PVFS_sys_attr *sys_attr = NULL;
     int32_t distr_dir_servers_initial_requested = 0;
     int32_t distr_dir_servers_max_requested = 0;
     int32_t distr_dir_split_size_requested = 0;
@@ -497,53 +558,191 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, "mkdir state: parent_getattr_inspect\n");
 
-    attr = &sm_p->getattr.attr;
-    assert(attr);
+    /*
+     * The getattr leaves the attributes (obj) of the parent in sm_p->getattr.attr
+     * Attributes (sys) for the mkdir request constructed in sm_p->u.mkdir.sys_attr
+     * Attributes (obj) in sm_p->u.mkdir.obj_attr will be passed to the server
+     * We need to complete the attributes using parent attributes and user
+     * attributes including hints, and meta_sid_count
+     */
+
+    p_attr = &sm_p->getattr.attr;       /* parent attributes */
+    assert(p_attr);
+    dir_attr = &sm_p->u.mkdir.obj_attr; /* new dir attributes */
+    assert(dir_attr);
+    sys_attr = &sm_p->u.mkdir.sys_attr;   /* system attributes from user */
+    assert(sys_attr);
 
     gossip_debug(GOSSIP_MKDIR_DEBUG,
         "parent owner: %d, group: %d, perms: %d, dirdata_count: %d\n",
-        (int)attr->owner, (int)attr->group, (int)attr->perms,
-        attr->u.dir.dist_dir_attr.dirdata_count);
+        (int)p_attr->owner, (int)p_attr->group, (int)p_attr->perms,
+        p_attr->u.dir.dist_dir_attr.dirdata_count);
 
     PINT_debug_capability(&sm_p->getattr.attr.capability,
                           "mkdir_parent_getattr_inspect");
 
-    PINT_debug_dist_dir_handles(GOSSIP_CLIENT_DEBUG, attr->u.dir.dist_dir_attr,
-                                attr->u.dir.dirdata_handles);
+    PINT_debug_dist_dir_handles(GOSSIP_CLIENT_DEBUG, p_attr->u.dir.dist_dir_attr,
+                                p_attr->u.dir.dirdata_handles);
 
     /* do we have a setgid bit? */
-    if(attr->perms & PVFS_G_SGID)
+    if(p_attr->perms & PVFS_G_SGID)
     {
         gossip_debug(GOSSIP_MKDIR_DEBUG, "parent has setgid bit set.\n");
         gossip_debug(GOSSIP_MKDIR_DEBUG,
                      " - modifying requested attr for new file.\n");
-        sm_p->u.mkdir.sys_attr.group = attr->group;
-        sm_p->u.mkdir.sys_attr.perms |= PVFS_G_SGID;
+        sys_attr->group = p_attr->group;
+        sys_attr->perms |= PVFS_G_SGID;
         /* note that permission checking is left to server even in this case */
     }
 
     /* set up redundancy defaults */
 #if 0
-    if (sm_p->u.mkdir.sys_attr.meta_sid_count == 0)
+    if (sys_attr->meta_sid_count == 0)
     {
-        sm_p->u.mkdir.sys_attr.meta_sid_count
+        sys_attr->meta_sid_count
         sm_p->u.mkdir.metadata_sid_count
-        attr->meta_sid_count;
+        p_attr->meta_sid_count;
     }
 #endif
 
-    /* set values of distributed directory parameters,
-     * priority for determining user's preference for number of data files:
+    /* Priority for new directory object attributes such as:
+     * number of data files / distributed directory parameters,
      * 1) values passed into sys_mkdir
-     * 2) directory hints (not yet implemented)
-     * 3) mount options (not yet implemented)
-     * 4) system default
+     * 2) directory hints / parent attributes
+     * 3) mount options (not yet implemented)  -- N/A
+     * 4) config file defaults                 -- DONE
+     * 4) system default (compiled in limits)  -- DONE
      */
+
+    /*******************************/
+    /* Parent defaults/hints */
+    /*******************************/
+#define SET_DIR_ATTR_FROM_PARENT(attr, mbit)                                    \
+    if (((p_attr->attr) > 0) && PVFS2_attr_all(p_attr->mask, (mbit)))           \
+    {                                                                           \
+        dir_attr->attr = p_attr->attr;                                          \
+        dir_attr->mask |= mbit;                                                 \
+    }
+
+    /* General attributes - inherit */
+    SET_DIR_ATTR_FROM_PARENT(meta_sid_count, PVFS_ATTR_COMMON_SID_COUNT);
+    /* Hints pertaining to files - inherit */
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dist_name_len, PVFS_ATTR_DIR_HINT_DIST_NAME_LEN);
+    dir_attr->u.dir.hint.dist_name = strdup(p_attr->u.dir.hint.dist_name);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dist_params_len,
+                             PVFS_ATTR_DIR_HINT_DIST_PARAMS_LEN);
+    dir_attr->u.dir.hint.dist_params = strdup(p_attr->u.dir.hint.dist_params);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dfile_count, PVFS_ATTR_DIR_HINT_DFILE_COUNT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dfile_sid_count, PVFS_ATTR_DIR_HINT_SID_COUNT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.layout.algorithm, PVFS_ATTR_DIR_HINT_LAYOUT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.layout.server_list.count,
+                             PVFS_ATTR_DIR_HINT_LAYOUT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.layout.server_list.bufsize,
+                             PVFS_ATTR_DIR_HINT_LAYOUT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.layout.server_list.servers,
+                             PVFS_ATTR_DIR_HINT_LAYOUT);
+    /* Hints pertaining to directories - inherit and apply */
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_dirdata_min, PVFS_ATTR_DIR_DIRDATA_COUNT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_dirdata_max, PVFS_ATTR_DIR_DIRDATA_COUNT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_split_size, PVFS_ATTR_DIR_SPLIT_SIZE);
+    //SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.algorithm = 0;
+    //SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.server_list.count = 0;
+    //SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.server_list.bufsize = 0;
+    //SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.server_list.servers = NULL;
+    /* Distributed Directory Attributes - inherit */
+    SET_DIR_ATTR_FROM_PARENT(u.dir.dist_dir_attr.dirdata_min, 
+                             PVFS_ATTR_DIR_DIRDATA_COUNT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.dist_dir_attr.dirdata_max, 
+                             PVFS_ATTR_DIR_DIRDATA_COUNT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.dist_dir_attr.dirdata_count, 
+                             PVFS_ATTR_DIR_DIRDATA_COUNT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.dist_dir_attr.split_size, PVFS_ATTR_DIR_SPLIT_SIZE);
+    dir_attr->u.dir.dist_dir_attr.server_no = -1;
+    /* tree height, bitmap size and branch level are computed so not shown here */
+
+    /* Apply directory hints after inheriting attributes */
+    if ((p_attr->u.dir.hint.dir_dirdata_min > 0) && 
+        PVFS2_attr_all(p_attr->mask, PVFS_ATTR_DIR_DIRDATA_COUNT))
+    {
+        dir_attr->u.dir.dist_dir_attr.dirdata_min = p_attr->u.dir.hint.dir_dirdata_min;
+        dir_attr->u.dir.dist_dir_attr.dirdata_count = p_attr->u.dir.hint.dir_dirdata_min;
+        dir_attr->mask |= PVFS_ATTR_DIR_DIRDATA_COUNT;
+    }
+    if ((p_attr->u.dir.hint.dir_split_size > 0) && 
+        PVFS2_attr_all(p_attr->mask, PVFS_ATTR_DIR_SPLIT_SIZE))
+    {
+        dir_attr->u.dir.dist_dir_attr.split_size = p_attr->u.dir.hint.dir_split_size;
+        dir_attr->mask |= PVFS_ATTR_DIR_SPLIT_SIZE;
+    }
+#undef SET_DIR_ATTR_FROM_PARENT
+
+    /***********************************/
+    /* User provided attributes */
+    /***********************************/
+#define SET_DIR_ATTR_FROM_USER(dattr, mbit, sattr)                              \
+    if ((sys_attr->sattr) > 0 && PVFS2_attr_all(sys_attr->mask, (mbit)))        \
+    {                                                                           \
+        dir_attr->dattr = sys_attr->sattr;                                      \
+        dir_attr->mask |= mbit;                                                 \
+    }
+
+    /* General attributes */
+    SET_DIR_ATTR_FROM_USER(owner,
+                           PVFS_ATTR_COMMON_UID,
+                           owner);
+    SET_DIR_ATTR_FROM_USER(group,
+                           PVFS_ATTR_COMMON_GID,
+                           dfile_count);
+    SET_DIR_ATTR_FROM_USER(perms,
+                           PVFS_ATTR_COMMON_PERM,
+                           perms);
+    /* Hints pertaining to files - inherit */
+    SET_DIR_ATTR_FROM_USER(u.dir.hint.dfile_sid_count, 
+                           PVFS_ATTR_DIR_HINT_SID_COUNT,
+                           mirror_copies_count);
+    if (sys_attr->dist_name && PVFS2_attr_all(sys_attr->mask,
+                                              PVFS_ATTR_DIR_HINT_DIST_NAME_LEN))
+    {
+        int namelen = strlen(sys_attr->dist_name);
+        dir_attr->u.dir.hint.dist_name_len = namelen;
+        dir_attr->u.dir.hint.dist_name = strndup(sys_attr->dist_name, namelen);
+        dir_attr->mask |= PVFS_ATTR_DIR_HINT_DIST_NAME_LEN;
+    }
+    if (sys_attr->dist_params && PVFS2_attr_all(sys_attr->mask,
+                                                PVFS_ATTR_DIR_HINT_DIST_PARAMS_LEN))
+    {
+        int paramslen = strlen(sys_attr->dist_params);
+        dir_attr->u.dir.hint.dist_params_len = paramslen;
+        dir_attr->u.dir.hint.dist_params = strndup(sys_attr->dist_params, paramslen);
+        dir_attr->mask |= PVFS_ATTR_DIR_HINT_DIST_PARAMS_LEN;
+    }
+    /* Hints pertaining to directories */
+    /* Distributed Directory Attributes  - set directly */
+    SET_DIR_ATTR_FROM_USER(u.dir.dist_dir_attr.dirdata_min, 
+                           PVFS_ATTR_DIR_DIRDATA_COUNT,
+                           distr_dir_servers_initial);
+    SET_DIR_ATTR_FROM_USER(u.dir.dist_dir_attr.dirdata_max, 
+                           PVFS_ATTR_DIR_DIRDATA_COUNT,
+                           distr_dir_servers_max);
+    SET_DIR_ATTR_FROM_USER(u.dir.dist_dir_attr.split_size,
+                           PVFS_ATTR_DIR_SPLIT_SIZE,
+                           distr_dir_split_size);
+    dir_attr->u.dir.dist_dir_attr.dirdata_count =
+                           dir_attr->u.dir.dist_dir_attr.dirdata_min;
+    /* tree height, bitmap size and branch level are computed */
+#undef SET_DIR_ATTR_FROM_USER
+
+
+
+
+
+
+#if 0
     /* Initial Requested */
-    if (sm_p->u.mkdir.sys_attr.distr_dir_servers_initial > 0)
+    if (sys_attr->distr_dir_servers_initial > 0)
     {
         distr_dir_servers_initial_requested =
-            sm_p->u.mkdir.sys_attr.distr_dir_servers_initial;
+            sys_attr->distr_dir_servers_initial;
     }
     else
     {
@@ -552,10 +751,10 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     }
 
     /* Servers_MAX */
-    if (sm_p->u.mkdir.sys_attr.distr_dir_servers_max > 0)
+    if (sys_attr->distr_dir_servers_max > 0)
     {
         distr_dir_servers_max_requested =
-            sm_p->u.mkdir.sys_attr.distr_dir_servers_max;
+            sys_attr->distr_dir_servers_max;
     }
     else
     {
@@ -564,10 +763,10 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     }
 
     /* Split_Size */
-    if (sm_p->u.mkdir.sys_attr.distr_dir_split_size > 0)
+    if (sys_attr->distr_dir_split_size > 0)
     {
         distr_dir_split_size_requested =
-            sm_p->u.mkdir.sys_attr.distr_dir_split_size;
+            sys_attr->distr_dir_split_size;
     }
     else
     {
@@ -580,12 +779,11 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
  * have enough data to fill the attr - also give programmers an
  * option to set some of these fields.
  */
-#if 0
     /* Dirdata Count */
-    if (sm_p->u.mkdir.sys_attr.distr_dir_dirdata_count > 0)
+    if (sys_attr->distr_dir_dirdata_count > 0)
     {
         distr_dir_dirdata_count_requested =
-            sm_p->u.mkdir.sys_attr.distr_dir_dirdata_count;
+            sys_attr->distr_dir_dirdata_count;
     }
     else
     {
@@ -594,10 +792,10 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     }
 
     /* Bitmap Size */
-    if (sm_p->u.mkdir.sys_attr.distr_dir_bitmap_size > 0)
+    if (sys_attr->distr_dir_bitmap_size > 0)
     {
         distr_dir_bitmap_size_requested =
-            sm_p->u.mkdir.sys_attr.distr_dir_bitmap_size;
+            sys_attr->distr_dir_bitmap_size;
     }
     else
     {
@@ -606,10 +804,10 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     }
 
     /* Sid Count  - set to asystem preset */
-    if (sm_p->u.mkdir.sys_attr.distr_dir_sid_count > 0)
+    if (sys_attr->distr_dir_sid_count > 0)
     {
         distr_dir_sid_count_requested =
-            sm_p->u.mkdir.sys_attr.distr_dir_sid_count;
+            sys_attr->distr_dir_sid_count;
     }
     else
     {
@@ -619,17 +817,19 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
 #endif
 
 
+#if 0
     /* Final determination based on config and number of meta
      * servers present.
      */
     ret = PINT_cached_config_get_default_distr_dir_params(
                              sm_p->parent_ref.fs_id,
                              distr_dir_servers_initial_requested,
-                             &sm_p->u.mkdir.sys_attr.distr_dir_servers_initial,
+                             &sys_attr->distr_dir_servers_initial,
                              distr_dir_servers_max_requested,
-                             &sm_p->u.mkdir.sys_attr.distr_dir_servers_max,
+                             &sys_attr->distr_dir_servers_max,
                              distr_dir_split_size_requested,
-                             &sm_p->u.mkdir.sys_attr.distr_dir_split_size);
+                             &sys_attr->distr_dir_split_size);
+#endif
     if (ret < 0)
     {
         gossip_err("Error: failed to get distributed directory parameters\n");
@@ -640,17 +840,17 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_MKDIR_DEBUG,
                  "Setting distributed directory initial "
                  "servers to %d [requested %d]\n",
-                 sm_p->u.mkdir.sys_attr.distr_dir_servers_initial,
+                 sys_attr->distr_dir_servers_initial,
                  distr_dir_servers_initial_requested);
     gossip_debug(GOSSIP_MKDIR_DEBUG,
                  "Setting distributed directory max "
                  "servers to %d [requested %d]\n",
-                 sm_p->u.mkdir.sys_attr.distr_dir_servers_max,
+                 sys_attr->distr_dir_servers_max,
                  distr_dir_servers_max_requested);
     gossip_debug(GOSSIP_MKDIR_DEBUG,
                  "Setting distributed directory split size "
                  "to %d [requested %d]\n",
-                 sm_p->u.mkdir.sys_attr.distr_dir_split_size,
+                 sys_attr->distr_dir_split_size,
                  distr_dir_split_size_requested);
 
 
@@ -716,15 +916,18 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     }
 
     /* object ref will now refer to newly created metadata object */
-    sm_p->object_ref.handle = *sm_p->u.mkdir.metadata_handle;
-    sm_p->object_ref.fs_id = sm_p->parent_ref.fs_id;
+    sm_p->object_ref.handle    = *sm_p->u.mkdir.metadata_handle;
+    sm_p->object_ref.fs_id     = sm_p->parent_ref.fs_id;
     sm_p->object_ref.sid_count = sm_p->u.mkdir.metadata_sid_count;
     sm_p->object_ref.sid_array = sm_p->u.mkdir.metadata_sid_array;
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    PINT_CONVERT_ATTR(&sm_p->u.mkdir.obj_attr, &sm_p->u.mkdir.sys_attr, 0);
+    /* we have built the object attrs directly, do no need to conver any more
+     * and sys_attr is only the atts passed by user, not final attrs
+     */
+    //PINT_CONVERT_ATTR(&sm_p->u.mkdir.obj_attr, &sm_p->u.mkdir.sys_attr, 0);
 
     PINT_SERVREQ_MKDIR_FILL(msg_p->req,
                             sm_p->getattr.attr.capability,
@@ -800,6 +1003,10 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
 
     memset(&dirdata_attr, 0, sizeof(PVFS_object_attr));
 
+    /* this copies the attr created for the mkdir request to be modified
+     * and used in the upcomming setattr call
+     * Do we NEED to make this copy?   Is the src used anywhere after this?
+     */
     PINT_copy_object_attr(&dirdata_attr, &sm_p->u.mkdir.obj_attr);
 
     /* we need the masks to reflect what is really in the attr */
@@ -809,7 +1016,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
                                    &dirdata_attr.u.dirdata.dist_dir_bitmap,
                                    sm_p->u.mkdir.sys_attr.distr_dir_servers_max,
                                    sm_p->u.mkdir.dirdata_sid_count,
-                                   0,
+                                   0,  /* server_no - reset below */
                                    sm_p->u.mkdir.sys_attr.distr_dir_servers_initial,
                                    sm_p->u.mkdir.sys_attr.distr_dir_split_size);
 
@@ -831,6 +1038,9 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
     /* should we send as a batch, or multiple singles? */
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
+        /* need to set dirdata_attr->u.dir.dist_dir_attr.server_no to i 
+         * this is ok because this FILL macro copies the attributes
+         */
         PINT_SERVREQ_SETATTR_FILL(msg_p->req,
                                   PVFS_REQ_DIRDATA,  /* sub ctrl */
                                   sm_p->u.mkdir.capability,
@@ -841,7 +1051,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
                                   &sm_p->u.mkdir.dirdata_sid_array[i *
                                               sm_p->u.mkdir.dirdata_sid_count],
                                   PVFS_TYPE_DIRDATA, /* type of obj being set */
-                                  dirdata_attr,      /* attrs to set */
+                                  dirdata_attr,      /* attrs COPIED by macro */
                                   0,                 /* extra_amask - remove this? */
                                   NULL);
         /* this is done in the FILL macro */

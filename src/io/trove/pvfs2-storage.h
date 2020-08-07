@@ -34,8 +34,8 @@ typedef struct PVFS_vtag_s PVFS_vtag;
 struct PVFS_ds_metadata_attr_s
 {
     PVFS_size size;        /* global file size, volatile */
-    uint32_t dfile_count;
-    uint32_t dist_size;
+    uint32_t dfile_count;  /* dfiles for this file */
+    uint32_t dist_size;    /* size of the string coding distribution */
     int32_t  sid_count;    /* sids per dfile */
     uint32_t mirror_mode;  /* sync model for replication */
     uint64_t flags;        /* various hint modes */
@@ -49,17 +49,19 @@ struct PVFS_ds_datafile_attr_s
 /* this is the same as the client/memory side attr structure */
 struct PVFS_ds_directory_attr_s
 {
-    uint64_t    dirent_count; /* number of dirents in this dir - volatile */
+    uint64_t    dirent_count;  /* number of dirents in this dir - volatile */
     /* global info */
     int32_t     tree_height;   /* ceil(log2(dirdata_count)) */
-    int32_t     dirdata_count; /* number of servers that are part of this dir */
-    //int32_t sid_count;     /* number of SIDs per dirdata */
+    int32_t     dirdata_min;   /* min number of servers that are part of this dir */
+    int32_t     dirdata_max;   /* max of servers that are part of this dir */
+    int32_t     dirdata_count; /* current number of servers that are part of this dir */
+    //int32_t sid_count;       /* number of SIDs per dirdata */
     int32_t     bitmap_size;   /* number of PVFS_dist_dir_bitmap_basetype */
-                           /* stored under the key DIST_DIR_BITMAP */
+                               /*     stored under the key DIST_DIR_BITMAP */
     int32_t     split_size;    /* maximum number of entries before a split */
     /* local info */
-    //int32_t server_no;     /* 0 to dirdata_count-1, indicates */
-                           /* which server is running this code */
+    //int32_t server_no;       /* 0 to dirdata_count-1, indicates */
+                               /*     which server is running this code */
     int32_t     branch_level;  /* level of branching on this server */
     /* FILE HINTS */
     int32_t     hint_dist_name_len;        /* size of dist name buffer */
@@ -69,7 +71,8 @@ struct PVFS_ds_directory_attr_s
     int32_t     hint_layout_algorithm;     /* how servers are selected */
     int32_t     hint_layout_list_cnt;      /* servers in list */
     /* DIR HINTS */
-    int32_t     hint_dirdata_count;        /* number of dfiles to be used */
+    int32_t     hint_dirdata_min;          /* number of dfiles to be used */
+    int32_t     hint_dirdata_max;          /* number of dfiles to be used */
     int32_t     hint_split_size;           /* max number of entries before a split */
     int32_t     hint_dir_layout_algorithm; /* how servers are selected */
     int32_t     hint_dir_layout_list_cnt;  /* servers in list */
@@ -189,40 +192,46 @@ do {                                                                   \
                 (__dsa)->u.directory.dirent_count;                     \
         (__oa)->u.dir.dist_dir_attr.tree_height =                      \
                 (__dsa)->u.directory.tree_height;                      \
+        (__oa)->u.dir.dist_dir_attr.dirdata_min =                      \
+                (__dsa)->u.directory.dirdata_min;                      \
+        (__oa)->u.dir.dist_dir_attr.dirdata_max =                      \
+                (__dsa)->u.directory.dirdata_max;                      \
         (__oa)->u.dir.dist_dir_attr.dirdata_count =                    \
                 (__dsa)->u.directory.dirdata_count;                    \
-        (__oa)->u.dir.dist_dir_attr.sid_count =                        \
-                (__dsa)->meta_sid_count;                        \
+        /*(__oa)->u.dir.dist_dir_attr.sid_count =                        \
+                (__dsa)->meta_sid_count;  */                             \
         (__oa)->u.dir.dist_dir_attr.bitmap_size =                      \
                 (__dsa)->u.directory.bitmap_size;                      \
         (__oa)->u.dir.dist_dir_attr.split_size =                       \
                 (__dsa)->u.directory.split_size;                       \
         (__oa)->u.dir.dist_dir_attr.server_no =                        \
-                -1;  /* dir is not a numbered server */                        \
+                -1;  /* dir is not a numbered server */                \
         (__oa)->u.dir.dist_dir_attr.branch_level =                     \
                 (__dsa)->u.directory.branch_level;                     \
         /* FILE HINTS */                                               \
-        (__oa)->u.dir.hint.dist_name_len =                     \
-                (__dsa)->u.directory.hint_dist_name_len;                     \
-        (__oa)->u.dir.hint.dist_params_len =                     \
-                (__dsa)->u.directory.hint_dist_params_len;                     \
-        (__oa)->u.dir.hint.dfile_count =                     \
-                (__dsa)->u.directory.hint_dfile_count;                     \
-        (__oa)->u.dir.hint.dfile_sid_count =                     \
-                (__dsa)->u.directory.hint_dfile_sid_count;                     \
-        (__oa)->u.dir.hint.layout.algorithm =                     \
-                (__dsa)->u.directory.hint_layout_algorithm;                     \
-        (__oa)->u.dir.hint.layout.server_list.count =                     \
-                (__dsa)->u.directory.hint_layout_list_cnt;                     \
+        (__oa)->u.dir.hint.dist_name_len =                             \
+                (__dsa)->u.directory.hint_dist_name_len;               \
+        (__oa)->u.dir.hint.dist_params_len =                           \
+                (__dsa)->u.directory.hint_dist_params_len;             \
+        (__oa)->u.dir.hint.dfile_count =                               \
+                (__dsa)->u.directory.hint_dfile_count;                 \
+        (__oa)->u.dir.hint.dfile_sid_count =                           \
+                (__dsa)->u.directory.hint_dfile_sid_count;             \
+        (__oa)->u.dir.hint.layout.algorithm =                          \
+                (__dsa)->u.directory.hint_layout_algorithm;            \
+        (__oa)->u.dir.hint.layout.server_list.count =                  \
+                (__dsa)->u.directory.hint_layout_list_cnt;             \
         /* DIR HINTS */                                                \
-        (__oa)->u.dir.hint.dir_dirdata_count =                     \
-                (__dsa)->u.directory.hint_dirdata_count;                     \
-        (__oa)->u.dir.hint.dir_split_size =                     \
-                (__dsa)->u.directory.hint_split_size;                     \
-        (__oa)->u.dir.hint.dir_layout.algorithm =                     \
-                (__dsa)->u.directory.hint_dir_layout_algorithm;                     \
-        (__oa)->u.dir.hint.dir_layout.server_list.count =                     \
-                (__dsa)->u.directory.hint_dir_layout_list_cnt;                     \
+        (__oa)->u.dir.hint.dir_dirdata_min =                           \
+                (__dsa)->u.directory.hint_dirdata_min;                 \
+        (__oa)->u.dir.hint.dir_dirdata_max =                           \
+                (__dsa)->u.directory.hint_dirdata_max;                 \
+        (__oa)->u.dir.hint.dir_split_size =                            \
+                (__dsa)->u.directory.hint_split_size;                  \
+        (__oa)->u.dir.hint.dir_layout.algorithm =                      \
+                (__dsa)->u.directory.hint_dir_layout_algorithm;        \
+        (__oa)->u.dir.hint.dir_layout.server_list.count =              \
+                (__dsa)->u.directory.hint_dir_layout_list_cnt;         \
         (__oa)->mask |= PVFS_ATTR_DIR_ALL; /*includes COMMON_ALL */    \
         break;                                                         \
     case PVFS_TYPE_DIRDATA :                                           \
@@ -232,8 +241,8 @@ do {                                                                   \
                 (__dsa)->u.dirdata.tree_height;                        \
         (__oa)->u.dirdata.dist_dir_attr.dirdata_count =                \
                 (__dsa)->u.dirdata.dirdata_count;                      \
-        (__oa)->u.dirdata.dist_dir_attr.sid_count =                    \
-                (__dsa)->meta_sid_count;                          \
+        /* (__oa)->u.dirdata.dist_dir_attr.sid_count =                    \
+                (__dsa)->meta_sid_count;   */                            \
         (__oa)->u.dirdata.dist_dir_attr.bitmap_size =                  \
                 (__dsa)->u.dirdata.bitmap_size;                        \
         (__oa)->u.dirdata.dist_dir_attr.split_size =                   \
@@ -278,18 +287,47 @@ do {                                                                   \
                 (__oa)->u.dir.dirent_count;                            \
         (__dsa)->u.directory.tree_height =                             \
                 (__oa)->u.dir.dist_dir_attr.tree_height;               \
+        (__dsa)->u.directory.dirdata_max =                             \
+                (__oa)->u.dir.dist_dir_attr.dirdata_max;               \
+        (__dsa)->u.directory.dirdata_min =                             \
+                (__oa)->u.dir.dist_dir_attr.dirdata_min;               \
         (__dsa)->u.directory.dirdata_count =                           \
                 (__oa)->u.dir.dist_dir_attr.dirdata_count;             \
-        /*(__dsa)->u.directory.sid_count =                               \
-                (__oa)->u.dir.dist_dir_attr.sid_count;*/                 \
+        /*(__dsa)->u.directory.sid_count =                             \
+                (__oa)->u.dir.dist_dir_attr.sid_count;*/               \
         (__dsa)->u.directory.bitmap_size =                             \
                 (__oa)->u.dir.dist_dir_attr.bitmap_size;               \
         (__dsa)->u.directory.split_size =                              \
                 (__oa)->u.dir.dist_dir_attr.split_size;                \
-        /*(__dsa)->u.directory.server_no =                               \
-                (__oa)->u.dir.dist_dir_attr.server_no;*/                 \
+        /*(__dsa)->u.directory.server_no =                             \
+                (__oa)->u.dir.dist_dir_attr.server_no;*/               \
         (__dsa)->u.directory.branch_level =                            \
                 (__oa)->u.dir.dist_dir_attr.branch_level;              \
+        /* FILE HINTS */                                               \
+        (__dsa)->u.directory.hint_dist_name_len =                      \
+                (__oa)->u.dir.hint.dist_name_len;                      \
+        (__dsa)->u.directory.hint_dist_params_len =                    \
+                (__oa)->u.dir.hint.dist_params_len;                    \
+        (__dsa)->u.directory.hint_dfile_count =                        \
+                (__oa)->u.dir.hint.dfile_count;                        \
+        (__dsa)->u.directory.hint_dfile_sid_count =                    \
+                (__oa)->u.dir.hint.dfile_sid_count;                    \
+        (__dsa)->u.directory.hint_layout_algorithm =                   \
+                (__oa)->u.dir.hint.layout.algorithm;                   \
+        (__dsa)->u.directory.hint_layout_list_cnt =                    \
+                (__oa)->u.dir.hint.layout.server_list.count;           \
+        /* DIR HINTS */                                                \
+        (__dsa)->u.directory.hint_dirdata_min =                        \
+                (__oa)->u.dir.hint.dir_dirdata_min;                    \
+        (__dsa)->u.directory.hint_dirdata_max =                        \
+                (__oa)->u.dir.hint.dir_dirdata_max;                    \
+        (__dsa)->u.directory.hint_split_size =                         \
+                (__oa)->u.dir.hint.dir_split_size;                     \
+        (__dsa)->u.directory.hint_dir_layout_algorithm =               \
+                (__oa)->u.dir.hint.dir_layout.algorithm;               \
+        (__dsa)->u.directory.hint_dir_layout_list_cnt =                \
+                (__oa)->u.dir.hint.dir_layout.server_list.count;       \
+        /*(__dsa)->mask |= PVFS_ATTR_DIR_ALL;*/ /*includes COMMON_ALL */    \
         break;                                                         \
     case PVFS_TYPE_DIRDATA :                                           \
         (__dsa)->u.dirdata.dirent_count =                              \
@@ -298,8 +336,8 @@ do {                                                                   \
                 (__oa)->u.dirdata.dist_dir_attr.tree_height;           \
         (__dsa)->u.dirdata.dirdata_count =                             \
                 (__oa)->u.dirdata.dist_dir_attr.dirdata_count;         \
-        /*(__dsa)->u.dirdata.sid_count =                                 \
-                (__oa)->u.dirdata.dist_dir_attr.sid_count;*/             \
+        /*(__dsa)->u.dirdata.sid_count =                               \
+                (__oa)->u.dirdata.dist_dir_attr.sid_count;*/           \
         (__dsa)->u.dirdata.bitmap_size =                               \
                 (__oa)->u.dirdata.dist_dir_attr.bitmap_size;           \
         (__dsa)->u.dirdata.split_size =                                \

@@ -711,6 +711,61 @@ static inline void defree_##name(sname *x) { \
 
 /*****************************/
 
+#define endecode_fields_13_generic(name,sname,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11,t12,x12,t13,x13) \
+static inline void encode_##name(char **pptr, const sname *x) { \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##t5(pptr, &x->x5); \
+    encode_##t6(pptr, &x->x6); \
+    encode_##t7(pptr, &x->x7); \
+    encode_##t8(pptr, &x->x8); \
+    encode_##t9(pptr, &x->x9); \
+    encode_##t10(pptr, &x->x10); \
+    encode_##t11(pptr, &x->x11); \
+    encode_##t12(pptr, &x->x12); \
+    encode_##t13(pptr, &x->x13); \
+} \
+static inline void decode_##name(char **pptr, sname *x) { \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##t5(pptr, &x->x5); \
+    decode_##t6(pptr, &x->x6); \
+    decode_##t7(pptr, &x->x7); \
+    decode_##t8(pptr, &x->x8); \
+    decode_##t9(pptr, &x->x9); \
+    decode_##t10(pptr, &x->x10); \
+    decode_##t11(pptr, &x->x11); \
+    decode_##t12(pptr, &x->x12); \
+    decode_##t13(pptr, &x->x13); \
+} \
+static inline void defree_##name(sname *x) { \
+    defree_##t1(&x->x1); \
+    defree_##t2(&x->x2); \
+    defree_##t3(&x->x3); \
+    defree_##t4(&x->x4); \
+    defree_##t5(&x->x5); \
+    defree_##t6(&x->x6); \
+    defree_##t7(&x->x7); \
+    defree_##t8(&x->x8); \
+    defree_##t9(&x->x9); \
+    defree_##t10(&x->x10); \
+    defree_##t11(&x->x11); \
+    defree_##t12(&x->x12); \
+    defree_##t13(&x->x13); \
+}
+
+#define endecode_fields_13(name,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11,t12,x12,t13,x13) \
+    endecode_fields_13_generic(name, name, t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11,t12,x12,t13,x13) 
+
+#define endecode_fields_13_struct(name, t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11,t12,x12,t13,x13) \
+    endecode_fields_13_generic(name, struct name, t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11,t12,x12,t13,x13) 
+
+/*****************************/
+
 #define endecode_fields_15_generic(name,sname,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7, \
     t8,x8,t9,x9,t10,x10,t11,x11,t12,x12,t13,x13,t14,x14,t15,x15) \
 static inline void encode_##name(char **pptr, const sname *x) { \

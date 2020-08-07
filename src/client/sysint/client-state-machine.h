@@ -232,8 +232,8 @@ struct PINT_client_mkdir_sm
 {
     char *object_name;              /* input parameter  */
     PVFS_sysresp_mkdir *mkdir_resp; /* in/out parameter */
-    PVFS_sys_attr sys_attr;         /* input parameter  */
-    PVFS_object_attr obj_attr;      /* convert from sys_attr */
+    PVFS_sys_attr sys_attr;         /* input: user passed attributes  */
+    PVFS_object_attr obj_attr;      /* attributes passed to server mkdir */
     PVFS_ds_keyval *key_array;
     PVFS_ds_keyval *val_array;
 

@@ -629,7 +629,8 @@ struct PVFS_directory_hint_s
     uint32_t            dfile_count;       /* number of dfiles to be used */
     int32_t             dfile_sid_count;   /* number of dfile replicas */
     PVFS_dirhint_layout layout;            /* how servers are selected */
-    uint32_t            dir_dirdata_count; /* max number of dirdata to be used */    
+    uint32_t            dir_dirdata_min;   /* min number of dirdata to be used */    
+    uint32_t            dir_dirdata_max;   /* max number of dirdata to be used */    
     uint32_t            dir_split_size;    /* max number of entries before a split */
     PVFS_dirhint_layout dir_layout;        /* how servers are selected */
 
@@ -637,7 +638,7 @@ struct PVFS_directory_hint_s
 typedef struct PVFS_directory_hint_s PVFS_directory_hint;
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
-endecode_fields_12(
+endecode_fields_13(
         PVFS_directory_hint,
         uint32_t, dist_name_len,
         skip4,,
@@ -648,7 +649,8 @@ endecode_fields_12(
         uint32_t, dfile_count,
         int32_t,  dfile_sid_count,
         PVFS_dirhint_layout, layout,
-        uint32_t, dir_dirdata_count,
+        uint32_t, dir_dirdata_min,
+        uint32_t, dir_dirdata_max,
         uint32_t, dir_split_size,
         PVFS_dirhint_layout, dir_layout);
 #endif

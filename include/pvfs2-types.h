@@ -782,8 +782,10 @@ typedef struct PVFS_dist_dir_attr_s
 {
     /* global info */
     int32_t tree_height;    /* ceil(log2(dirdata_count)) */
-    int32_t dirdata_count;  /* total number of servers */
-    int32_t sid_count;      /* number of copies of each bucket */
+    int32_t dirdata_min;    /* minimum and initial number if dirdata servers */
+    int32_t dirdata_max;    /* maximum number if dirdata servers */
+    int32_t dirdata_count;  /* current number of dirdata servers */
+    /* int32_t sid_count; */     /* number of copies of each dirdata (bucket) */
     int32_t bitmap_size;    /* number of PVFS_dist_dir_bitmap_basetype */
                             /* stored under the key DIST_DIR_BITMAP */
     int32_t split_size;     /* maximum number of entries before a split */
@@ -793,9 +795,11 @@ typedef struct PVFS_dist_dir_attr_s
                                 /* which server is running this code */
     int32_t branch_level;   /* level of branching on this server */
 } PVFS_dist_dir_attr;
-endecode_fields_7(
+endecode_fields_9(
     PVFS_dist_dir_attr,
     int32_t, tree_height,
+    int32_t, dirdata_min,
+    int32_t, dirdata_max,
     int32_t, dirdata_count,
     int32_t, sid_count,
     int32_t, bitmap_size,
