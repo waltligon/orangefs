@@ -30,7 +30,7 @@
 #include "dist-dir-utils.h"
 #include "server-config-mgr.h"
 
-#define DEFAULT_ROOTDIR_META_SID_COUNT 1
+#define DEFAULT_ROOTDIR_META_SID_COUNT root_sid_count
 #define DEFAULT_ROOTDIR_TREE_HEIGHT    0
 #define DEFAULT_ROOTDIR_DIRDATA_COUNT  1
 #define DEFAULT_ROOTDIR_BITMAP_SIZE    1
@@ -518,26 +518,25 @@ int pvfs2_mkspace(char *data_path,
 	ds_attr.mtime = ds_attr.ntime = ds_attr.atime = ds_attr.ctime = 
                         PINT_util_get_current_time();
         /* attr.mtime = PINT_util_mktime_version(attr.ntime); */
-        ds_attr.meta_sid_count =                   DEFAULT_ROOTDIR_META_SID_COUNT;
-        ds_attr.u.directory.dirent_count =         0;
-        ds_attr.u.directory.tree_height =          DEFAULT_ROOTDIR_TREE_HEIGHT;
-        ds_attr.u.directory.dirdata_count =        DEFAULT_ROOTDIR_DIRDATA_COUNT;
-        /*attr.u.directory.sid_count =            root_sid_count;*/
-        ds_attr.u.directory.bitmap_size =          DEFAULT_ROOTDIR_BITMAP_SIZE;
-        ds_attr.u.directory.split_size =           DEFAULT_ROOTDIR_SPLIT_SIZE;
-        /*attr.u.directory.server_no =            -1;*/
-        ds_attr.u.directory.branch_level =         DEFAULT_ROOTDIR_BRANCH_LEVEL;
+        ds_attr.meta_sid_count =                    DEFAULT_ROOTDIR_META_SID_COUNT;
+        ds_attr.u.directory.dirent_count =          0;
+        ds_attr.u.directory.tree_height =           DEFAULT_ROOTDIR_TREE_HEIGHT;
+        ds_attr.u.directory.dirdata_count =         DEFAULT_ROOTDIR_DIRDATA_COUNT;
+        ds_attr.u.directory.bitmap_size =           DEFAULT_ROOTDIR_BITMAP_SIZE;
+        ds_attr.u.directory.split_size =            DEFAULT_ROOTDIR_SPLIT_SIZE;
+        /*attr.u.directory.server_no =                -1;*/
+        ds_attr.u.directory.branch_level =          DEFAULT_ROOTDIR_BRANCH_LEVEL;
         /* FILE HINTS */
-        ds_attr.u.directory.hint_dist_name_len =   DEFAULT_ROOTDIR_HINT_DIST_NAME_LEN;
-        ds_attr.u.directory.hint_dist_params_len = DEFAULT_ROOTDIR_HINT_DIST_PARAMS_LEN;
-        ds_attr.u.directory.hint_dfile_count =     DEFAULT_ROOTDIR_HINT_DFILE_COUNT;
-        ds_attr.u.directory.hint_dfile_sid_count = DEFAULT_ROOTDIR_HINT_DFILE_SID_COUNT;
+        ds_attr.u.directory.hint_dist_name_len =    DEFAULT_ROOTDIR_HINT_DIST_NAME_LEN;
+        ds_attr.u.directory.hint_dist_params_len =  DEFAULT_ROOTDIR_HINT_DIST_PARAMS_LEN;
+        ds_attr.u.directory.hint_dfile_count =      DEFAULT_ROOTDIR_HINT_DFILE_COUNT;
+        ds_attr.u.directory.hint_dfile_sid_count =  DEFAULT_ROOTDIR_HINT_DFILE_SID_COUNT;
         ds_attr.u.directory.hint_layout_algorithm = DEFAULT_ROOTDIR_HINT_LAYOUT_ALGORITHM;
-        ds_attr.u.directory.hint_layout_list_cnt = DEFAULT_ROOTDIR_HINT_LAYOUT_LIST_CNT;
+        ds_attr.u.directory.hint_layout_list_cnt =  DEFAULT_ROOTDIR_HINT_LAYOUT_LIST_CNT;
         /* DIR HINTS */
-        ds_attr.u.directory.hint_dirdata_min =     DEFAULT_ROOTDIR_HINT_DIRDATA_MIN;
-        ds_attr.u.directory.hint_dirdata_max =     DEFAULT_ROOTDIR_HINT_DIRDATA_MAX;
-        ds_attr.u.directory.hint_split_size =      DEFAULT_ROOTDIR_HINT_SPLIT_SIZE;
+        ds_attr.u.directory.hint_dirdata_min =      DEFAULT_ROOTDIR_HINT_DIRDATA_MIN;
+        ds_attr.u.directory.hint_dirdata_max =      DEFAULT_ROOTDIR_HINT_DIRDATA_MAX;
+        ds_attr.u.directory.hint_split_size =       DEFAULT_ROOTDIR_HINT_SPLIT_SIZE;
         ds_attr.u.directory.hint_dir_layout_algorithm = DEFAULT_ROOTDIR_HINT_DIR_LAYOUT_ALGORITHM;
         ds_attr.u.directory.hint_dir_layout_list_cnt = DEFAULT_ROOTDIR_HINT_DIR_LAYOUT_LIST_CNT;
 
@@ -583,7 +582,6 @@ int pvfs2_mkspace(char *data_path,
         ds_attr.u.dirdata.dirent_count =  0;
         ds_attr.u.dirdata.tree_height =   DEFAULT_ROOTDIR_TREE_HEIGHT;
         ds_attr.u.dirdata.dirdata_count = DEFAULT_ROOTDIR_DIRDATA_COUNT;
-        /*attr.u.dirdata.sid_count =     root_sid_count;*/
         ds_attr.u.dirdata.bitmap_size =   DEFAULT_ROOTDIR_BITMAP_SIZE;
         ds_attr.u.dirdata.split_size =    DEFAULT_ROOTDIR_SPLIT_SIZE;
         ds_attr.u.dirdata.server_no =     0;

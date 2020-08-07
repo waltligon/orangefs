@@ -36,11 +36,17 @@ enum PVFS_sys_setinfo_opt
 /** Holds a non-blocking system interface operation handle. */
 typedef PVFS_id_gen_t PVFS_sys_op_id;
 
-/** This is a sys_attr because it is sent between the client 
-  * and ther server.  Mask is 32bit for now. **/
+/** This is a sys_attr because.  It is NOT sent between the client 
+  * and ther server but only from the user into the PVFS_sys calls.
+  * It is converted to an object attr before being sent to the server.
+  * Mask is 32bit for now. **/
 /** Describes attributes for a file, directory, or symlink. */
 struct PVFS_sys_attr_s
 {
+    /* commoon */
+    PVFS_ds_type objtype;
+    PVFS_flags flags;
+    uint32_t mask;
     PVFS_uid owner;
     PVFS_gid group;
     PVFS2_ALIGN_VAR(PVFS_permissions, perms);
@@ -48,21 +54,21 @@ struct PVFS_sys_attr_s
     PVFS_time mtime;
     PVFS_time ctime;
     PVFS_time ntime;
-    PVFS_size size;
+    /* link */
     PVFS2_ALIGN_VAR(char *, link_target);/**< NOTE: caller must free if valid */
+    /* file */
+    PVFS_size size;
     PVFS2_ALIGN_VAR(int32_t, dfile_count);
+    PVFS2_ALIGN_VAR(char *, dist_name);  /**< NOTE: caller must free if valid */
+    PVFS2_ALIGN_VAR(char *, dist_params);/**< NOTE: caller must free if valid */
+    PVFS_size blksize;
+    PVFS2_ALIGN_VAR(uint32_t, mirror_copies_count);
+    uint32_t stuffed;
+    /* directory */
+    PVFS_size dirent_count;
     PVFS2_ALIGN_VAR(int32_t, distr_dir_servers_initial);
     PVFS2_ALIGN_VAR(int32_t, distr_dir_servers_max);
     PVFS2_ALIGN_VAR(int32_t, distr_dir_split_size);
-    PVFS2_ALIGN_VAR(uint32_t, mirror_copies_count);
-    PVFS2_ALIGN_VAR(char *, dist_name);  /**< NOTE: caller must free if valid */
-    PVFS2_ALIGN_VAR(char *, dist_params);/**< NOTE: caller must free if valid */
-    PVFS_size dirent_count;
-    PVFS_ds_type objtype;
-    PVFS_flags flags;
-    uint32_t mask;
-    PVFS_size blksize;
-    uint32_t stuffed;
 };
 typedef struct PVFS_sys_attr_s PVFS_sys_attr;
 
