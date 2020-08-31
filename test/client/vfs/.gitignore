@@ -1,0 +1,3 @@
+test-mkdir
+test-symlink-perms
+test-setgid

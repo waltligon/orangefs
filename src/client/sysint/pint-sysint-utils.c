@@ -42,24 +42,36 @@ struct CRYPTO_dynlock_value
 
 static int setup_threading(void);
 static void cleanup_threading(void);
-/* OpenSSL 1.0 allows thread id to be either long or a pointer */
-#if OPENSSL_VERSION_NUMBER & 0x10000000
-#define PVFS_OPENSSL_USE_THREADID
-#define CRYPTO_SET_ID_CALLBACK    CRYPTO_THREADID_set_callback
-#define ID_FUNCTION               threadid_function
-static void threadid_function(CRYPTO_THREADID *);
+/* OpenSSL 1.0 allows thread id to be either long or a pointer  */
+/* OpenSSl 1.1 does not use threadid callback functions anymore */
+#if OPENSSL_VERSION_NUMBER & 0x10000000L
+#   ifndef CRYPTO_THREADID_set_callback
+#          define PVFS_OPENSSL_USE_THREADID
+#          define CRYPTO_SET_ID_CALLBACK    CRYPTO_THREADID_set_callback
+#          define ID_FUNCTION               threadid_function
+           static void threadid_function(CRYPTO_THREADID *);
+#   endif
 #else
-#define CRYPTO_SET_ID_CALLBACK    CRYPTO_set_id_callback
-#define ID_FUNCTION               id_function
-static unsigned long id_function(void);
+#   define CRYPTO_SET_ID_CALLBACK    CRYPTO_set_id_callback
+#   define ID_FUNCTION               id_function
+    static unsigned long id_function(void);
 #endif
 
+#ifndef CRYPTO_set_locking_callback
 static void locking_function(int, int, const char*, int);
+#endif
+
+#ifndef CRYPTO_set_dynlock_create_callback
 static struct CRYPTO_dynlock_value *dyn_create_function(const char*, int);
-static void dyn_lock_function(int, struct CRYPTO_dynlock_value*, const char*,
-                              int);
-static void dyn_destroy_function(struct CRYPTO_dynlock_value*, const char*,
-                                 int);
+#endif
+
+#ifndef CRYPTO_set_dynlock_lock_callback
+static void dyn_lock_function(int,struct CRYPTO_dynlock_value*,const char*,int);
+#endif
+
+#ifndef CRYPTO_set_dynlock_destroy_callback
+static void dyn_destroy_function(struct CRYPTO_dynlock_value*,const char*,int);
+#endif
 
 #endif /* HAVE_OPENSSL */
 
@@ -221,7 +233,9 @@ static int setup_threading(void)
         }
     }
 
+#ifndef CRYPTO_THREADID_set_callback
     CRYPTO_SET_ID_CALLBACK(ID_FUNCTION);
+#endif
     CRYPTO_set_locking_callback(locking_function);
     CRYPTO_set_dynlock_create_callback(dyn_create_function);
     CRYPTO_set_dynlock_lock_callback(dyn_lock_function);
@@ -238,7 +252,9 @@ static void cleanup_threading(void)
 {
     int i;
 
+#ifndef CRYPTO_THREADID_set_callback
     CRYPTO_SET_ID_CALLBACK(NULL);
+#endif
     CRYPTO_set_locking_callback(NULL);
     CRYPTO_set_dynlock_create_callback(NULL);
     CRYPTO_set_dynlock_lock_callback(NULL);
@@ -256,35 +272,42 @@ static void cleanup_threading(void)
     openssl_mutexes = NULL;
 }
 
+
+/* If PVFS_OPENSSL_USE_THREADID is defined, then OpenSSL is at major version #1
+ * and CRYPTO_THREADID_set_callback is NOT defined.
+ */
 #ifdef PVFS_OPENSSL_USE_THREADID
-/* threadid_function
- * 
- * The OpenSSL thread id callback for OpenSSL v1.0.0. 
- */
-static void threadid_function(CRYPTO_THREADID *id)
-{
-/* NOTE: PVFS_OPENSSL_USE_THREAD_PTR is not currently defined in 
-   the source. If you wish to use a thread pointer, you must implement 
-   a gen_thread_self (etc.) that uses thread pointers. Then define 
-   this macro in this file or through the configure script. 
- */
-#ifdef PVFS_OPENSSL_USE_THREAD_PTR
-    CRYPTO_THREADID_set_pointer(id, gen_thread_self());
-#else
-    CRYPTO_THREADID_set_numeric(id, (unsigned long) gen_thread_self());
-#endif
-}
-#else
-/* id_function
- *
- * The OpenSSL thread id callback for OpenSSL v0.9.8.
- */
-static unsigned long id_function(void)
-{
-    return (unsigned long) gen_thread_self();
-}
+    /* threadid_function
+     * 
+     * The OpenSSL thread id callback for OpenSSL v1.0.0. 
+    */
+   static void threadid_function(CRYPTO_THREADID *id)
+   {
+   /* NOTE: PVFS_OPENSSL_USE_THREAD_PTR is not currently defined in 
+      the source. If you wish to use a thread pointer, you must implement 
+      a gen_thread_self (etc.) that uses thread pointers. Then define 
+      this macro in this file or through the configure script. 
+    */
+#   ifdef PVFS_OPENSSL_USE_THREAD_PTR
+          CRYPTO_THREADID_set_pointer(id, gen_thread_self());
+#   else
+          CRYPTO_THREADID_set_numeric(id, (unsigned long) gen_thread_self());
+#   endif
+   }
+#else 
+#   if !(OPENSSL_VERSION_NUMBER & 0x10000000L)
+    /* id_function
+     *
+     * The OpenSSL thread id callback for OpenSSL v0.9.8.
+     */
+    static unsigned long id_function(void)
+    {
+        return (unsigned long) gen_thread_self();
+    }
+#   endif
 #endif
 
+#ifndef CRYPTO_set_locking_callback
 /* locking_function
  *
  * The OpenSSL locking_function callback.
@@ -300,7 +323,9 @@ static void locking_function(int mode, int n, const char *file, int line)
         gen_mutex_unlock(&openssl_mutexes[n]);
     }
 }
+#endif
 
+#ifndef CRYPTO_set_dynlock_create_callback
 /* dyn_create_function
  *
  * The OpenSSL dyn_create_function callback.
@@ -318,7 +343,9 @@ static struct CRYPTO_dynlock_value *dyn_create_function(const char *file,
 
     return ret;
 }
+#endif
 
+#ifndef CRYPTO_set_dynlock_lock_callback
 /* dyn_lock_function
  *
  * The OpenSSL dyn_lock_function callback.
@@ -335,7 +362,10 @@ static void dyn_lock_function(int mode, struct CRYPTO_dynlock_value *l,
         gen_mutex_unlock(&l->mutex);
     }
 }
+#endif
 
+
+#ifndef CRYPTO_set_dynlock_destroy_callback
 /* dyn_destroy_function
  *
  * The OpenSSL dyn_destroy_function callback.
@@ -346,6 +376,7 @@ static void dyn_destroy_function(struct CRYPTO_dynlock_value *l,
     gen_mutex_destroy(&l->mutex);
     free(l);
 }
+#endif
 
 #else /* !HAVE_OPENSSL */
 

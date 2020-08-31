@@ -6,7 +6,7 @@ individually.
 
 OrangeFS Client and Server
 
-(C) 2010-2013 Clemson University and Omnibond Systems, LLC
+(C) 2010-2018 Clemson University and Omnibond Systems, LLC
 (C) 2001 Clemson University and The University of Chicago
 (C) 2003-6 Pete Wyckoff, Ohio Supercomputer Center <pw@osc.edu>
 (C) 2002 Clemson University
@@ -681,7 +681,8 @@ Copyright (C) 2001 University of Chicago
 (C) 2003 by Argonne National Laboratory
 (C) 2004 by Argonne National Laboratory
 (C) 2001 Clemson University
-(C) 2001 Clemson University and The University of Chicago
+(C) 2001-2010 Clemson University and The University of Chicago
+(C) 2010-2018 Clemson University and Omnibond
 
 This library is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public

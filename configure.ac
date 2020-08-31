@@ -1088,8 +1088,11 @@ AC_ARG_ENABLE(usrint,
    ],
    [AC_DEFINE(PVFS_USRINT_BUILD, 1,
               [Should we build user interface libraries.])
-    build_usrint=yes
-    BUILD_USRINT=1
+dnl hubcap changed default to no for now.
+dnl    build_usrint=yes
+dnl    BUILD_USRINT=1
+   build_usrint=no
+   BUILD_USRINT=0
    ])
 AC_SUBST(build_usrint)
 

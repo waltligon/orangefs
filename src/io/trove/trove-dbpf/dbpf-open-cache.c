@@ -752,8 +752,15 @@ void clear_stranded_bstreams(TROVE_coll_id coll_id)
                 free(tmp_item);
                 return;
             }
-            snprintf(tmp_item->pathname, PATH_MAX, "%s/%s", path_name,
-                     current_dirent->d_name);
+            if (snprintf(tmp_item->pathname,
+                         PATH_MAX, "%s/%s",
+                         path_name,
+                         current_dirent->d_name) < 0 )
+            {
+                gossip_err("pathname overflow.\n");
+                free(tmp_item);
+                return;
+            }
             if(stat(tmp_item->pathname, &file_info) < 0)
             {
                 gossip_err("error doing stat on bstream entry\n");

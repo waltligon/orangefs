@@ -24,11 +24,7 @@
 
 static int needcomma = 1;
 
-#ifdef WIN32
 static void gen_state_decl(struct state *s, char *state_name);
-#else
-static void gen_state_decl(char *state_name);
-#endif
 static void gen_runfunc_decl(char *func_name);
 static void gen_state_start(char *state_name, char *machine_name);
 static void gen_state_action(
@@ -54,11 +50,7 @@ void gen_machine(char *machine_name)
     {
         if(s->action == ACTION_RUN || s->action == ACTION_PJMP)
             gen_runfunc_decl(s->function_or_machine);
-#ifdef WIN32
         gen_state_decl(s, s->name);
-#else
-        gen_state_decl(s->name);
-#endif
     }
 
     /* delcare the machine start point */
@@ -183,11 +175,7 @@ static void gen_runfunc_decl(char *func_name)
     }
 }
 
-#ifdef WIN32
 static void gen_state_decl(struct state *s, char *state_name)
-#else
-static void gen_state_decl(char *state_name)
-#endif
 {
 #ifdef WIN32
     struct task *task;
@@ -200,7 +188,7 @@ static void gen_state_decl(char *state_name)
     if (s->action == ACTION_PJMP)
     {
         for (task = s->task, count = 0; task; task = task->next, ++count) ;
-        fprintf(out_file, "static struct PINT_pjmp_tbl_s ST_%s_pjtbl[%d];\n", 
+        fprintf(out_file, "static struct PINT_pjmp_tbl_s ST_%s_pjtbl[%d];\n",
                 state_name, count);
     }
     /* determine transition count for array declaration */
@@ -208,8 +196,9 @@ static void gen_state_decl(char *state_name)
     fprintf(out_file, "static struct PINT_tran_tbl_s ST_%s_trtbl[%d];\n",
             state_name, count);
 #else
-    fprintf(out_file, "static struct PINT_pjmp_tbl_s ST_%s_pjtbl[];\n", 
-            state_name);
+    if (s->action == ACTION_PJMP)
+       fprintf(out_file, "static struct PINT_pjmp_tbl_s ST_%s_pjtbl[];\n",
+               state_name);
     fprintf(out_file, "static struct PINT_tran_tbl_s ST_%s_trtbl[];\n",
             state_name);
 #endif

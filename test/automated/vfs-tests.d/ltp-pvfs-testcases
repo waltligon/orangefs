@@ -120,7 +120,7 @@ fsync03 fsync03
 ftruncate01 ftruncate01
 ftruncate02 ftruncate02
 ftruncate03 ftruncate03
-ftruncate04 ftruncate04
+#ftruncate04 ftruncate04
 getcwd01 getcwd01
 getcwd02 getcwd02
 getcwd03 getcwd03
@@ -157,7 +157,7 @@ mprotect01 mprotect01
 mremap02 mremap02
 mremap03 mremap03
 mremap04 mremap04
-msync03 msync03
+#msync03 msync03
 nftw01 nftw01
 nftw6401 nftw6401
 open01A symlink01 -T open01
@@ -194,7 +194,7 @@ pwrite02 pwrite02
 pwrite04 pwrite04
 read02 read02
 read04 read04
-readdir02 readdir02
+#readdir02 readdir02
 readlink01A symlink01 -T readlink01
 readlink01 readlink01
 readlink03 readlink03
@@ -214,7 +214,7 @@ rename09 rename09
 rename10 rename10
 rename14 rename14
 rmdir01 rmdir01
-rmdir02 rmdir02
+#rmdir02 rmdir02
 rmdir03A symlink01 -T rmdir03
 stat01 stat01
 stat02 stat02
@@ -252,7 +252,7 @@ utime02 utime02
 utime03 utime03
 utime04 utime04
 utime05 utime05
-utime06 utime06
+#utime06 utime06
 # Removed from LTP
 #write02 write02
 write03 write03
