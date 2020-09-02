@@ -2,10 +2,31 @@
 
 OrangeFS Release ChangeLog
 -----------------------
-Development 2.9.8
-orangefs-2.9.7 (Subversion Branch v.2.9.x)
+Development 2.9.10
+orangefs-2.9.8 (Git Branch v.2.9.x)
 http://dev.orangefs.org/svn/orangefs/branches/v.2.9.x
-up to rev 13181
+up to rev 65ab0d2
+
+This version of OrangeFS includes many bug fixes.
+
+	1. Disable usrint by default.
+	2. Fix potential memory overwrites in various utilities.
+		- Client-core
+		- Showcoll
+		- Mkspace
+		- Xattr
+		- Viewdist
+		- Str-utils
+	3. Eliminate compiler warnings.
+		- State machines
+		- Trove
+	4. Improve parsing of config file.
+	5. Update documentation flow.
+	6. Updated readmes.
+	7. Migrate documentation to hugo format.
+	8. Update perf mon example.
+
+
 
 New functionality:
 	1.  Added RoCE v1 support to our IB suite.
