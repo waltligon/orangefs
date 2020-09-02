@@ -2,9 +2,9 @@
 
 OrangeFS Release ChangeLog
 -----------------------
-Development 2.9.10
+Development 2.9.9
 orangefs-2.9.8 (Git Branch v.2.9.x)
-http://dev.orangefs.org/svn/orangefs/branches/v.2.9.x
+https://github.com/waltligon/orangefs.git
 up to rev 65ab0d2
 
 This version of OrangeFS includes many bug fixes.
