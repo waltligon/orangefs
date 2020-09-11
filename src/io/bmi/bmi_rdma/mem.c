@@ -462,7 +462,7 @@ void memcache_cache_flush(void *md)
     memcache_entry_t *c, *cn;
 
     debug(4, "%s", __func__);
-    qlist_for_each_entry_safe(c, cn, &memcache_device->list, list);
+    qlist_for_each_entry_safe(c, cn, &memcache_device->list, list)
     {
         debug(4, "%s: list c->count %x c->buf %p",
               __func__, c->count, c->buf);
