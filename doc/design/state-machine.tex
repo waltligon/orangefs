@@ -150,16 +150,16 @@ The second stack used by a running state machine is the frame stack.  A frame
 is a collection of data used by the state actions to store local variables and
 is analogous to the frames created by compilers of high level languages for
 holding local variables and function parameters.  The first step of every
-state action function is to call PINT_sm_frame() which retrives a frame from the
+state action function is to call PINT\_sm\_frame() which retrives a frame from the
 stack that will be used by the state action. Normally, this will be the 
-the "current" frame which is indexed by the macro PINT_FRAME_CURRENT or zero.
+the "current" frame which is indexed by the macro PINT\_FRAME\_CURRENT or zero.
 When a state machine begins execution one frame is allocated to it and pushed
 on the stack, becomming the current frame.  If no additional frames are pushed
 this frame will be the current frame for all states and nested state machines.
 
 Additional frames can be pushed on the stack.  Pushing a frame on the stack
 does not change the current frame.  Frames pushed can be accessed by specifying
-a positive index to PINT_sm_frame() and are indexed in the order pushed.  Thus,
+a positive index to PINT\_sm\_frame() and are indexed in the order pushed.  Thus,
 if a state action pushes 4 frames, they can be retrieved  as index 1 (the first
 frame pushed), 2, 3, and 4 (the last frame pushed, or top of stack).  Of course
 frames can also be poped from the stack in the usual LIFO manner.
@@ -181,40 +181,40 @@ follows.  There is a linked list of frames accessible from the SMCB through the
 field "frames" which is a struct with two fields "next" and "prev".  The field
 smcb->frames->next points to the top of stack, and the field smcb->frames->prev
 points to the bottom of stack.  The list is doubly linked and implemented with
-the qlist facility in PVFS.  All frames should be access via the PINT_sm_frame()
+the qlist facility in PVFS.  All frames should be access via the PINT\_sm\_frame()
 function which takes and SMCB and an integer index as arguments.
 
 The frames can be though of as numbered starting at zero from the bottom of the
 stack to N-1 at the top of the stack, where there are N frames in the stack. 
-The field smcb->frame_count is equal to N.  The index passed in through 
-PINT_sm_frame() is NOT this number.  Instead, there is a second field which
-records the number of the current frame smcb->base_frame.  The index passed to
-the function is added to the base_frame to arrive at the number of the desired
+The field smcb->frame\_count is equal to N.  The index passed in through
+PINT\_sm\_frame() is NOT this number.  Instead, there is a second field which
+records the number of the current frame smcb->base\_frame.  The index passed to
+the function is added to the base\_frame to arrive at the number of the desired
 frame, counting from the bottom of the stack.  For example:
 
-frame_count 6
-base_frame 2
+frame\_count 6
+base\_frame 2
 
-frame_number     0  1  2  3  4  5  <- top of stack
+frame\_number     0  1  2  3  4  5  <- top of stack
 index           -2 -1  0  1  2  3
 
 In general, the index of the top of stack can be computed as:
 
-(smcb->frame_count - 1) - smcb->base_frame
+(smcb->frame\_count - 1) - smcb->base\_frame
 
-This should be included in src/common/misc/state_machine.h as a macro:
+This should be included in src/common/misc/state\_machine.h as a macro:
 
-#define PINT_FRAME_TOP(smcb) (((smcb)->frame_count - 1) - (smcb)->base_frame)
+#define PINT\_FRAME\_TOP(smcb) (((smcb)->frame\_count - 1) - (smcb)->base\_frame)
 
 So call to retrieve the frame on top of the stack would be:
 
-top_frame = PINT_sm_frame(smcb,PINT_FRAME_TOP(smcb));
+top\_frame = PINT\_sm\_frame(smcb,PINT\_FRAME\_TOP(smcb));
 
 The current frame can be retrieved with the following macro:
 
-current_frame = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+current\_frame = PINT\_sm\_frame(smcb,PINT\_FRAME\_CURRENT);
 
 Offsets from the top or current frame can be made by either adding or subracting
 from one of these macros.  The bottom frame on the stack would be accessed as
-the negative of the base_frame, but this is rarely needed and there isn't a 
+the negative of the base\_frame, but this is rarely needed and there isn't a
 macro for it at this time.
