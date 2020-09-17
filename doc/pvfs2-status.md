@@ -10,15 +10,15 @@ title: Current PVFS2 status
 \newpage
 \thispagestyle{empty}
 \setlength{\parindent}{0.0cm}
-Introduction
-============
+# Current PVFS2 Status
+
+## Introduction
 
 This document describes the current status of PVFS2 development. This
 document only includes issues related to functionality or correctness.
 No performance optimizations are listed for now.
 
-Known limitiations and missing features
-=======================================
+## Known limitiations and missing features
 
 This section lists file system limitations for which we have a known
 solution or plan.
@@ -39,8 +39,7 @@ solution or plan.
 
 -   simple failover plan
 
-Experimental features
-=====================
+## Experimental features
 
 These are features that are implemented but have not been thoroughly
 tested.
@@ -49,8 +48,7 @@ tested.
 
 -   IB network support
 
-Placeholder / depricated code
-=============================
+## Placeholder / depricated code
 
 These parts of the code have a working implementation, but we intend to
 replace them as time permits.
@@ -59,8 +57,7 @@ replace them as time permits.
 
 -   pvfs2-client implementation
 
-Open issues
-===========
+## Open issues
 
 The items on this list are known problems that have not been resolved.
 
@@ -85,8 +82,7 @@ The items on this list are known problems that have not been resolved.
 
 -   redundancy
 
-Good examples
-=============
+## Good examples
 
 This section points out specific areas of the code that demonstrate best
 practice for PVFS2 development.

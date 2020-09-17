@@ -1,11 +1,9 @@
-PVFS Logging
-============
+# PVFS Logging
 
 This document describes log files produced by PVFS and how to control
 what messages are included in them.
 
-PVFS Log Format
----------------
+## PVFS Log Format
 
 The log messages from all PVFS components except for the kernel module
 are in the following format: 
@@ -30,8 +28,7 @@ or the LogStamp field in the pvfs2-server config file:
     none: no time stamp
     thread: includes thread ID with each message
 
-PVFS Log Locations
-------------------
+## PVFS Log Locations
 
 The pvfs2-server daemon writes log messages to /tmp/pvfs2-server.log by
 default.  A different output file can be specified using the LogFile
@@ -48,8 +45,7 @@ The PVFS kernel module (pvfs2.ko) generates log messages to dmesg and/or
 The PVFS client library (libpvfs2) and command line utilities generate log
 messages to stderr if enabled.
 
-Logging Levels
---------------
+## Logging Levels
 
 All PVFS components log critical error messages automatically.  However, 
 you can also turn on additional logging for debugging purposes.  This is
@@ -65,23 +61,20 @@ logging masks by running "cat /proc/sys/pvfs2/debug-help".
 The "verbose" mask is commonly used to turn on most of the logging
 levels that are useful for debugging problems.
 
-Changing the log mask for pvfs2-server
---------------------------------------
+## Changing the log mask for pvfs2-server
 
 Use the EventLogging field in the configuration file to specify
 a comma separated list of masks to enable.  You can also use the
 pvfs2-set-debugmask command line utility to change the mask dynamically
 without restarting the server.
 
-Changing the log mask for libpvfs and command line utilities
-------------------------------------------------------------
+## Changing the log mask for libpvfs and command line utilities
 
 Set the PVFS2_DEBUGMASK environment variable to a comma separated list of
 client-appropriate masks prior to launching the application.
 
 
-Changing the log mask for the kernel module
--------------------------------------------
+## Changing the log mask for the kernel module
 
 There are three ways to set the debugging level for the kernel module:
 
@@ -143,8 +136,7 @@ want turned on.
 
 
 
-Changing the log mask for the client module
--------------------------------------------
+## Changing the log mask for the client module
 
 There are three ways to set the debugging level for the pvfs2-client:
 

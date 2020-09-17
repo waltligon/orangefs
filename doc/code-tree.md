@@ -1,11 +1,9 @@
-The code tree
-=============
+# The code tree
 
 In this section we describe how the code tree is set up for PVFS2 and
 discuss a little about how the build system works.
 
-The top level
--------------
+## The top level
 
 At the top level we see:
 
@@ -57,8 +55,7 @@ We'll talk more about this one in a subsequent subsection.
 over time to validate the PVFS2 implementation. We will discuss this
 more in a subsequent subsection as well.
 
-`src`
------
+## `src`
 
 The `src` directory contains the majority of the PVFS2 distribution.
 
@@ -133,8 +130,7 @@ only one, `src/kernel/linux-2.6`.
 `src/io` holds enough code that we'll just talk about it in its own
 subsection.
 
-`src/io`
---------
+## `src/io`
 
 This directory holds all the code used to move data across the wire, to
 store and retrieve data from local resources, to buffer data on servers,
@@ -173,8 +169,7 @@ storing local data.
 responsible for ferrying data between different types of *endpoints*.
 Valid endpoints include BMI, Trove, memory, and the buffer cache.
 
-`test`
-------
+## `test`
 
 This directory holds a great deal of test code, most of which is useless
 to the average user.
@@ -189,8 +184,7 @@ will run these in an automated fashion relatively often (but we aren't
 there quite yet). This is probably the second most useful code (after
 pvfs2-client) in the `test` directory.
 
-State machines and `statecomp`
-------------------------------
+## State machines and `statecomp`
 
 The PVFS2 source is heavily dependent on a state machine implementation
 that is included in the tree. We've already noted that the parser,
@@ -204,8 +198,7 @@ confusing situation of having both versions in the same subdirectory. If
 modifying these, be careful to only modify the `.sm` files -- the
 corresponding `.c` file can be overwritten on rebuilds.
 
-Build system
-------------
+## Build system
 
 The build system relies on the "single makefile" concept that was
 promoted by someone or another other than us (we should have a
@@ -218,8 +211,7 @@ build verbose again. This is controlled via a variable called
 `QUIET_COMPILE` in the makefile, if you are looking for how this is
 done.
 
-Out-of-tree builds
-------------------
+## Out-of-tree builds
 
 Some of the developers are really fond of out-of-tree builds, while
 others aren't. Basically the idea is to perform the build in a separate

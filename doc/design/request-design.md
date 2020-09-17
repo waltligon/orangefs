@@ -8,8 +8,9 @@ title: |
 ---
 
 \maketitle
-PVFS Requests
-=============
+# PVFS2 MPI Based Requests Design Notes
+
+## PVFS Requests
 
 PVFS user programs can construct a data structure that represents a
 specifc set of non-contiguous data that is to be read from or written to
@@ -51,8 +52,7 @@ structure, the PINT\_Request.
 These routines are based directly on the MPI datatype constructor
 routines of similar name and have the same semantics.
 
-Request Data Structures
-=======================
+## Request Data Structures
 
 The PINT\_Request is designed to represent any data layout that can be
 specified using MPI's MPI\_Datatype constructors. The
@@ -62,8 +62,7 @@ process part of a PVFS request, stop, and then resume processing at a
 later time when resources become available. This document outlines these
 structures and the algorithms for using them.
 
-The PINT\_Request {#the-pint_request .unnumbered .unnumbered}
------------------
+### The PINT\_Request {#the-pint_request .unnumbered .unnumbered}
 
        typedef struct PINT_Request {
           PVFS_offset  offset;     /* offset from start of last set of elements */
@@ -93,16 +92,14 @@ struct and the PINT\_Request struct passed in as the element type. Calls
 to MPI\_Type\_indexed, MPI\_Type\_hindexed, and MPI\_Type\_struct
 generally utilize the sequence type chain.
 
-Example Requests {#example-requests .unnumbered .unnumbered}
-----------------
+### Example Requests {#example-requests .unnumbered .unnumbered}
 
 The following are a few examples of how request patterns would be
 represented using the PVFS\_Request structure.
 
 ![image](figs_atoc.eps)
 
-Single Contiguous Region Requests {#single-contiguous-region-requests .unnumbered .unnumbered}
----------------------------------
+### Single Contiguous Region Requests {#single-contiguous-region-requests .unnumbered .unnumbered}
 
 A single contiguous region is represented by a single structure. The
 region can be specified as SIZE bytes at location OFFSET as in figure A:
@@ -155,8 +152,7 @@ PVFS\_Request\_double. Each of these standard types is defined with an
 etype of NULL which indicates that the region is contiguous regardless
 of the other parameters.
 
-Strided Region Requests {#strided-region-requests .unnumbered .unnumbered}
------------------------
+### Strided Region Requests {#strided-region-requests .unnumbered .unnumbered}
 
 A data area made up of regular strided groups of contiguous elements can
 also be represented with a single PINT\_Request structure. A region
@@ -181,8 +177,7 @@ Once again this assumes that ETYPE is a contiguous type.
 
 ![image](figs_dtoe.eps)
 
-Sequential Requests {#sequential-requests .unnumbered .unnumbered}
--------------------
+### Sequential Requests {#sequential-requests .unnumbered .unnumbered}
 
 A data area may consist of a region that conforms to one type, followed
 by a region that conforms to another. Example might include a strided
@@ -242,8 +237,7 @@ refers to the region represented down stream of the current
 PINT\_Request record, and not the whole region, however ub and lb are
 still expressed in terms of the entire data area.
 
-Nested Types {#nested-types .unnumbered .unnumbered}
-------------
+### Nested Types {#nested-types .unnumbered .unnumbered}
 
 Any request can be built on top of another request. When the base
 request is contiguous the result is as above, but when the base request
@@ -285,8 +279,7 @@ Note that the offset, ub, and lb are in terms of the inner elements and
 not of the entire buffer, thus the offset is the offset from the
 beginning of that element to the first bit of data in that element.
 
-The PINT\_Request\_state
-========================
+## The PINT\_Request\_state
 
 When processing a request described with a PVFS\_Request the following
 structures are used to keep track of how much of the request has been
@@ -318,8 +311,7 @@ a function used to process each contiguous block of data. The bytes
 field is used to record the results of a partial processing of bytes so
 the processing can be paused and resumed later.
 
-PINT\_Process\_request interface
-================================
+## PINT\_Process\_request interface
 
 Requests and distributions are processed using the interface described
 here. The caller allocates an array of SEGMAX offsets and an array of

@@ -7,8 +7,9 @@ title: PVFS Tuning
 \maketitle
 \tableofcontents
 \thispagestyle{empty}
-Introduction
-============
+# PVFS Tuning
+
+## Introduction
 
 The default settings for PVFS (those provided and in the source code and
 added to the config files by `pvfs2-genconfig`) provide good performance
@@ -35,30 +36,25 @@ tradeoffs that must be made during the tuning process, but the final
 decisions are best made by the administrators to determine the optimal
 setup that meets the needs of their users.
 
-Cluster Partitioning
-====================
+## Cluster Partitioning
 
 For users that have one use case, and a generic cluster, what's the best
 partition of compute/IO nodes? Is this section needed?
 
-Storage
-=======
+## Storage
 
-Server Configuration
---------------------
+### Server Configuration
 
 How many IO servers? [^1] How many MD servers? Should IO and MD servers
 be shared?
 
-Local File System
------------------
+### Local File System
 
 -   ext3
 
 -   xfs
 
-Disk Synchronization
---------------------
+### Disk Synchronization
 
 The easiest way to see an improvement in performance is to set the
 `TroveSyncMeta` and `TroveSyncData` attributes to "no" in the
@@ -74,19 +70,15 @@ Sync or not, metadata, data coalescing
 
 distributed metadata
 
-Metadata
---------
+### Metadata
 
-### Coalescing
+#### Coalescing
 
-Data
-----
+### Data
 
-Networks
-========
+## Networks
 
-Network Independent
--------------------
+### Network Independent
 
 1.  Unexpected message size
 
@@ -96,32 +88,25 @@ Network Independent
 
 -   count
 
-TCP
----
+### TCP
 
-### Kernel Parameters
+#### Kernel Parameters
 
-### Socket Buffer Sizes
+#### Socket Buffer Sizes
 
-### Listening Backlog (?)
+#### Listening Backlog (?)
 
-Infiniband
-----------
+### Infiniband
 
-Myrinet Express
----------------
+### Myrinet Express
 
-VFS Layer
-=========
+## VFS Layer
 
-Maximum I/O Size
-----------------
+### Maximum I/O Size
 
-Workload Specifics
-------------------
+### Workload Specifics
 
-Number of Datafiles
-===================
+## Number of Datafiles
 
 Each file stored on PVFS is broken into smaller parts to be distributed
 across servers. The metadata (which includes information such as the
@@ -173,8 +158,7 @@ datafiles that it is using:
     Server 0 - tcp://localhost:3334, handle: 5223372036854744173
     (487d2531626f846d.bstream)
 
-Distributions
-=============
+## Distributions
 
 A *distribution* is an algorithm that defines how a file's data will be
 distributed among available servers. PVFS provides an API for
@@ -198,8 +182,7 @@ the old file.
 This section describes the four available distributions and gives
 command line examples of how to use each one.
 
-Simple Stripe
--------------
+### Simple Stripe
 
 The simple stripe distribution is the default distribution used by PVFS.
 It dictates that file data will be striped evenly across all available
@@ -232,8 +215,7 @@ amount of data streamed to each server.
     Server 2 - tcp://localhost:3335, handle: 6223372036854744178 (565ddbe509d38472.bstream)
     Server 3 - tcp://localhost:3336, handle: 7223372036854744180 (643e9298b1378474.bstream)
 
-Basic
------
+### Basic
 
 The basic distribution is mainly included as an example for distribution
 developers. It performs no striping at all, and instead places all data
@@ -253,8 +235,7 @@ cases. There are no tunable parameters.
     Number of datafiles/servers = 1
     Server 0 - tcp://localhost:3334, handle: 5223372036854744172 (487d2531626f846c.bstream)
 
-Two Dimensional Stripe
-----------------------
+### Two Dimensional Stripe
 
 The two dimensional stripe distribution is a variation of the simple
 stripe distribution that is intended to combat the affects of *incast*.
@@ -312,8 +293,7 @@ factor of 256.
     Server 3 - tcp://localhost:3335, handle: 6223372036854744173
     (565ddbe509d3846d.bstream)
 
-Variable Strip
---------------
+### Variable Strip
 
 Variable strip is similar to simple stripe, except that it allows you to
 specify a different strip size for each server. For example, you could
@@ -356,26 +336,20 @@ short hand notation, such as "K" for kilobytes or "M" for megabytes.
     Server 2 - tcp://localhost:3335, handle: 6223372036854744171
     (565ddbe509d3846b.bstream)
 
-Workloads
-=========
+## Workloads
 
-Small files
------------
+### Small files
 
-Large Files
------------
+### Large Files
 
-Concurrent IO
--------------
+### Concurrent IO
 
-Benchmarking
-============
+## Benchmarking
 
 -   mpi-io-test
 
 -   mpi-md-test
 
-References
-==========
+## References
 
 [^1]: The FAQ already answers this to some degree

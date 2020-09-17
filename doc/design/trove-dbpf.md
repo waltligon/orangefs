@@ -5,8 +5,9 @@ title: 'Trove Database + Files (DBPF) Implementation'
 ---
 
 \maketitle
-Introduction
-============
+# Trove Database + Files (DBPF) Implementation
+
+## Introduction
 
 The purpose of this document is to sketch out the Database + Files
 (DBPF) implementation of the Trove storage interface. Included will be
@@ -15,8 +16,7 @@ discussion of how one might use the implementation in practice.
 DBPF uses UNIX files and Berkeley DB (3 or 4 I think) databases to store
 file and directory data and metadata.
 
-Entities on Physical Storage
-============================
+## Entities on Physical Storage
 
 The locations of these entities are defined in dbpf.h, although in
 future versions they should be relative to the storage name passed in at
@@ -52,8 +52,7 @@ directory structure. This may change to be a hashed directory system as
 in the PVFS1 iod if/when we see that we are incurring substantial
 overhead from lookups in a directory with many entries.
 
-Hooking to Upper Trove Layer
-============================
+## Hooking to Upper Trove Layer
 
 The DBPF implementation hooks to the upper trove "wrapper" layer through
 a set of structures that contain pointers to the functions that make up
@@ -72,8 +71,7 @@ that are used for storing the DBPF collections.
 The method name field is filled in by the DBPF implementation to
 describe what type of underlying storage is available.
 
-Operation Queue
-===============
+## Operation Queue
 
 The DBPF implementation has its own queue that it uses to hold
 operations in progress. Operations may have one of a number of states
@@ -91,8 +89,7 @@ operations in progress. Operations may have one of a number of states
 
 -   OP\_DEQUEUED
 
-Dataspaces Implementation
-=========================
+## Dataspaces Implementation
 
 Dataspaces are stored as:
 
@@ -106,8 +103,7 @@ Dataspaces are stored as:
 Keyval and bstream files are named by the handle (because they don't
 really have names\...).
 
-Keyval Spaces Implementation
-============================
+## Keyval Spaces Implementation
 
 Currently all keyval space operations use blocking DB calls. They queue
 the operation when the I/O call is made, and they service the operation
@@ -125,8 +121,7 @@ call: if fewer than *count* items are left in the database, we set
 *count* to how many items were processed. The caller should check that
 *count* has the same value as before the function was called.
 
-Bytestreams Implementation
-==========================
+## Bytestreams Implementation
 
 The read\_at and write\_at functions are implemented using blocking UNIX
 file I/O calls. They queue the operation when the I/O call is made, and
@@ -150,8 +145,7 @@ completing the entire operation, the operation is queued.
 
 Both the \_at and \_list functions use a FD cache for getting open FDs.
 
-Creating a "File System"
-========================
+## Creating a "File System"
 
 Theoretically Trove in general doesn't know anything about "file
 systems" per se. However, it's helpful for us to provide functions
@@ -167,16 +161,14 @@ At this time, a single file system is associated with one and only one
 collection, and a single collection is associated with one and only one
 file system.
 
-Creating a Storage Space
-------------------------
+### Creating a Storage Space
 
 First a storage space must be created. Storage spaces are created with
 the storage\_create mgmt operation. *This function can be used without
 calling the initialize function?* This function creates the storage
 attributes database and the collections database.
 
-Creating a Collection
----------------------
+### Creating a Collection
 
 Given that a storage space has been created, the next thing to do is
 create a collection. This is done with the collection\_create mgmt
@@ -208,13 +200,11 @@ In addition to creating one collection for the file system, a second
 "administrative" collection will be created. Currently, the handle
 allocator uses the admin collection to store handle state in a bstream.
 
-Creating a Root Directory
--------------------------
+### Creating a Root Directory
 
 There is a collection of file system helper functions too\...
 
-Creating Dataspaces
--------------------
+### Creating Dataspaces
 
 At this point dataspaces can be created with dspace\_create.
 
@@ -230,24 +220,24 @@ I think that the basic metadata for a file will be stored in the
 dataspace attribute DB by adding members to the dbpf\_dspace\_attr
 structure (defined in dbpf.h).
 
-### Creating a Directory
+#### Creating a Directory
 
 First we create a dataspace. Then we add a key/value to map the name of
 the directory to the handle into the parent directory keyval space.
 
-### Creating a File
+#### Creating a File
 
 First we create a dataspace. Then we add a key/value to map the name to
 the handle into the parent directory keyval space.
 
-### Deleting a Directory
+#### Deleting a Directory
 
 We check to make sure the "directory" has no elements in it. Then we
 remove the key/value mapping the name of the directory to the handle
 from the parent directory keyval space. After removing the key/value, we
 mark the dataspace as ready for deletion.
 
-### Deleting a File
+#### Deleting a File
 
 Given a file name, we retrieve the corresponding handle from the parent
 directory keyval space. Entries in the parent directory keyval space map
@@ -256,8 +246,7 @@ keyval space. We remove the key/value for the given name. We then use
 the handle we retrieved to find the dataspace and mark it as ready for
 deletion.
 
-Current Deficiencies
-====================
+## Current Deficiencies
 
 Only one collection can be used with the current implementation.
 

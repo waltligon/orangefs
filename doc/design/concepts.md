@@ -7,16 +7,16 @@ title: 'PVFS 2 Concepts: The new guy''s guide to PVFS'
 \maketitle
     $Id: concepts.tex,v 1.3 2006-09-13 20:22:43 vilayann Exp $
 
-Introduction
-============
+# PVFS2 Concepts: The new guy's guide to PVFS
+
+## Introduction
 
 PVFS2 represents a complete redesign and reimplementation of the
 parallel file system concepts in PVFS1. PVFS2 has new entities acting in
 new ways on new objects. This document will serve as an introduction to
 the terminology and concepts used in the other pvfs2 documents.
 
-Words
-=====
+## Words
 
 low-level interface to PVFS. sits on top of the servers. provides
 underlying foundation to higher-level interfaces like the PVFS library (
@@ -93,8 +93,7 @@ A logging library. Internal to clemson? freshmeat doesn't have an entry
 for it, and searching for "gossip logging library" in google turns up a
 ton of irrelevant searches.
 
-The view from 10,000 feet
-=========================
+## The view from 10,000 feet
 
 Refer to figure
 [\[fig:interface-model\]](#fig:interface-model){reference-type="ref"

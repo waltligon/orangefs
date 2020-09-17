@@ -1,5 +1,4 @@
-PVFS2 User APIs and Semantics {#sec:apis}
-=============================
+# PVFS2 User APIs and Semantics {#sec:apis}
 
 Because PVFS2 is designed specifically for performance in systems where
 concurrent access from many processes is commonplace, there are some
@@ -9,8 +8,7 @@ for applications to use when accessing PVFS2 file systems. We will start
 with the traditional UNIX I/O interface, which nearly all file systems
 implement. We will then cover the MPI-IO interface.
 
-UNIX I/O Interface
-------------------
+## UNIX I/O Interface
 
 We provide an implementation of the UNIX I/O interface for clients
 running Linux versions 2.4 (2.4.19 and later) and 2.6. This interface
@@ -107,8 +105,7 @@ system. At this time there is no add-on advisory locking component
 either. Thus neither the `flock` function nor the `fcntl` advisory locks
 are supported by PVFS2.
 
-MPI-IO Interface
-----------------
+## MPI-IO Interface
 
 We provide an implementation of the MPI-IO interface via an
 implementation of the ROMIO ADIO interface. This implementation is

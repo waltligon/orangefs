@@ -5,8 +5,9 @@ title: Trove and PVFS2
 ---
 
 \maketitle
-Motivation and Goals
-====================
+# Trove and PVFS2
+
+## Motivation and Goals
 
 The purpose of this document is to describe the use of Trove in PVFS2.
 
@@ -24,15 +25,13 @@ We will discuss how Trove is used to store these objects in the upcoming
 sections. Additionally we will cover how PVFS2 bootstraps from the Trove
 perspective; that is, how it obtains a "root handle" and so on.
 
-Current Implementation (03/21/2003)
-===================================
+## Current Implementation (03/21/2003)
 
 This section describes the implementation as of the date above.
 Eventually, when the implementation catches up with the long term plan,
 this entire section will probably disappear.
 
-PVFS2 Objects
--------------
+### PVFS2 Objects
 
 At this time the type of an object is stored in at least one place, the
 dataspace attributes. These can be retrieved using
@@ -66,23 +65,20 @@ datafiles, and all data is stored in the bstream.
 Symlinks are not currently implemented, but the intention is to use a
 keyval to hold the target of the link.
 
-Bootstrapping
--------------
+### Bootstrapping
 
 WHERE DO WE GET THE ROOT HANDLE?
 
 WHAT ELSE?
 
-Long Term Plan
-==============
+## Long Term Plan
 
 This section describes the (probably moving) target for how we will use
 Trove to store PVFS2 objects. Eventually, as we progress, this will
 start to describe interesting things such as storing small files in the
 metafile\...
 
-PVFS2 Objects
--------------
+### PVFS2 Objects
 
 The biggest overall change is the move to using dataspace attributes for
 storing basic metadata for PVFS2 objects.
@@ -104,8 +100,7 @@ Symlinks are made up of a single Trove dataspace with basic metadata (if
 any?) stored in the dataspace attributes and target stored as a keyval
 (TODO: WHAT KEY?).
 
-Bootstrapping
--------------
+### Bootstrapping
 
 WHERE DO WE GET THE ROOT HANDLE?
 

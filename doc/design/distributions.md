@@ -6,8 +6,9 @@ title: PVFS2 Distribution Design Notes
 ---
 
 \maketitle
-Introduction
-============
+# PVFS2 Distribution Design Notes
+
+## Introduction
 
 This document is intended to serve as a reference for the design of the
 PVFS2 file distributions. This should (eventually) include a description
@@ -36,8 +37,7 @@ by their offset from the start of the byte stream referred to here as a
 to determine which portion of the requested data is stored on the
 server, and where in the associated byte stream the data is stored.
 
-System Interface Distributions
-==============================
+## System Interface Distributions
 
 PVFS2 users should be able to utilize distributions effectively through
 the system interface. API's are exposed that allow users to create files
@@ -92,8 +92,7 @@ parameter struct. All parameters must be set before the distribution is
 used in file creation. Once a file is created, there is no safe way to
 modify the distribution parameters for that file.
 
-Distribution Initialization
-===========================
+## Distribution Initialization
 
 All distributions are registered during PVFS2 initialization. Although
 there has been some discussion about having distributions function as
@@ -117,8 +116,7 @@ PINT\_dist\_initialize() in pint-dist-utils.h. In order to add a new
 distribution to the table of registered distributions, it will be
 neccesary to modify this function.
 
-Internal Distribution Representation
-====================================
+## Internal Distribution Representation
 
 PVFS2 distributions are internally represented with the struct
 PINT\_dist. This structure contains a pointer to the distribution name,
@@ -156,8 +154,7 @@ data servers. This is planned in the near future, however their is no
 current consensus on how to improve upon the current round robin mapping
 approach (see PINT\_bucket\_get\_next\_io).
 
-Distribution Parameters
-=======================
+## Distribution Parameters
 
 The parameters for each distribution are defined in a struct defined
 specifically for the distribution, and an individual instance of the
@@ -170,8 +167,7 @@ behavior as neccesary. The distribution provider can also provide a
 method for setting the distribution parameters explicitly as described
 in the distribution methods below.
 
-Distribution Methods
-====================
+## Distribution Methods
 
 The distribution methods are the individual code used by each
 distribution to perform mappings between the logical file data and the

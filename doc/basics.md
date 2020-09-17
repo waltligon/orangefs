@@ -1,5 +1,4 @@
-The basics of PVFS2 {#sec:basics}
-===================
+# The basics of PVFS2 {#sec:basics}
 
 PVFS2 is a parallel file system. This means that it is designed for
 parallel applications sharing data across many clients in a coordinated
@@ -34,8 +33,7 @@ file system state is kept consistent without the use of locks. In many
 cases we will compare the new system with the original PVFS, for those
 who are may already be familiar with that architecture.
 
-Servers
--------
+## Servers
 
 In PVFS1 there were two types of server processes, *mgrs* that served
 metadata and *iods* that served data. For any given PVFS1 file system
@@ -57,16 +55,14 @@ current implementation of this storage relies on UNIX files to hold file
 data and a Berkeley DB database to hold things like metadata. The
 specifics of this storage are hidden under an API that we call Trove.
 
-Networks
---------
+## Networks
 
 PVFS2 has the capability to support an arbitrary number of different
 network types through an abstraction known as the Buffered Messaging
 Interface (BMI). At this time BMI implementations exist for TCP/IP,
 Myricom's GM, and InfiniBand (both Mellanox VAPI and OpenIB APIs).
 
-Interfaces
-----------
+## Interfaces
 
 At this time there are exactly two low-level I/O interfaces that clients
 commonly use to access parallel file systems. The first of these is the
@@ -91,8 +87,7 @@ implementation for PVFS2 MPI-IO support, just as we did for PVFS1. ROMIO
 links directly to a low-level PVFS2 API for access, so it avoids moving
 data through the OS and does not communicate with pvfs2-client.
 
-Client-server interactions
---------------------------
+## Client-server interactions
 
 At start-up clients contact any one of the pvfs2-servers and obtain
 configuration information about the file system. Once this data has been
@@ -134,8 +129,7 @@ so if a file is unlinked, it is gone gone gone. Perhaps we will come up
 with a clever way to support this or adapt the NFS approach (renaming
 the file to an odd name), but this is a very low priority.
 
-Consistency from the client point of view
------------------------------------------
+## Consistency from the client point of view
 
 We've discussed in a number of venues the opportunities that are made
 available when true POSIX semantics are given up. Truthfully very few
@@ -166,8 +160,7 @@ from one node than from another. The cache time value may be set to zero
 to avoid this behavior; however, we believe that users will not find
 this necessary.
 
-File system consistency
------------------------
+## File system consistency
 
 One of the more complicated issues in building a distributed file system
 of any kind is maintaining consistent file system state in the presence

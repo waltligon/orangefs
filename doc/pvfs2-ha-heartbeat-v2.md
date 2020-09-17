@@ -6,8 +6,9 @@ title: 'PVFS High Availability Clustering using Heartbeat 2.0'
 \maketitle
 \tableofcontents
 \newpage
-Introduction
-============
+# PVFS High Availability Clustering Using Heartbeat 2.0
+
+## Introduction
 
 This document describes how to configure PVFS for high availability
 using Heartbeat version 2.x from www.linux-ha.org.
@@ -30,13 +31,11 @@ No modifications of PVFS are required. Example scripts referenced in
 this document are available in the `examples/heartbeat` directory of the
 PVFS source tree.
 
-Requirements
-============
+## Requirements
 
-Hardware
---------
+### Hardware
 
-### Nodes
+#### Nodes
 
 Any number of nodes may be configured, although you need at least three
 total in order to tolerate a failure. You may also use any number of
@@ -50,7 +49,7 @@ The examples in this document will use 4 active nodes and 1 spare node,
 for a total of 5 nodes. Heartbeat has been tested with up to 16 nodes in
 configurations similar to the one outlined in this document.
 
-### Storage
+#### Storage
 
 A shared storage device is required. The storage must be configured to
 allocate a separate block device to each PVFS daemon, and all nodes
@@ -68,7 +67,7 @@ file system (for example, using the `-L` argument to `mke2fs` or
 consistent labels regardless of how Linux assigned device file names to
 the devices.
 
-### Stonith
+#### Stonith
 
 Heartbeat needs some mechanism to fence or stonith a failed node. Two
 popular ways to do this are either to use IPMI or a network controllable
@@ -83,15 +82,13 @@ Without stonith, there is no way to guarantee that a failed node has
 completely shutdown and stopped accessing its storage device before
 failing over.
 
-Software
---------
+### Software
 
 This document assumes that you are using Heartbeat version 2.1.3, and
 PVFS version 2.7.x or greater. You may also wish to use example scripts
 included in the `examples/heartbeat` directory of the PVFS source tree.
 
-Network
--------
+### Network
 
 There are two special issues regarding the network configuration to be
 used with Heartbeat. First of all, you must allocate a multicast address
@@ -115,8 +112,7 @@ virtual hostnames, and 192.168.0.{1-4} as the virtual addresses.
 Note that the virtual addresses must be on the same subnet as the true
 IP addresses for the nodes.
 
-Configuring PVFS
-================
+## Configuring PVFS
 
 Download, build, and install PVFS on all server nodes. Configure PVFS
 for use on each of the active nodes.
@@ -184,8 +180,7 @@ Download, build, and install Heartbeat following the instructions on
 their web site. No special parameters or options are required. Do not
 start the Heartbeat service.
 
-Configuring storage
-===================
+## Configuring storage
 
 Make sure that there is a block device allocated for each active server
 in the file system. Format each one with ext3. Do not create a PVFS
@@ -196,8 +191,7 @@ Confirm that each block device can be mounted from every node using the
 file system label. Do this one node at a time. Never mount the same
 block device concurrently on two nodes.
 
-Configuring stonith
-===================
+## Configuring stonith
 
 Make sure that your stonith device is accessible and responding from
 each node in the cluster. For the IPMI stonith example used in this
@@ -208,8 +202,7 @@ password.
     $ ipmitool -I lan -U Administrator -P password -H 192.168.0.10 power status
     Chassis Power is on
 
-Distributing Heartbeat scripts
-==============================
+## Distributing Heartbeat scripts
 
 The PVFS2 resource script must be installed and set as runnable on every
 cluster node as follows:
@@ -218,8 +211,7 @@ cluster node as follows:
     $ cp examples/heartbeat/PVFS2 /usr/lib/ocf/resource.d/external/
     $ chmod a+x /usr/lib/ocf/resource.d/external/PVFS2
 
-Base Heartbeat configuration
-============================
+## Base Heartbeat configuration
 
 This section describes how to configure the basic Heartbeat daemon
 parameters, which include an authentication key and a list of nodes that
@@ -243,8 +235,7 @@ You can view the configuration file that this generates in
 the Heartbeat package if you wish to investigate how to add or change
 any settings.
 
-CIB configuration
-=================
+## CIB configuration
 
 `Cluster Information Base` (CIB) is the the mechanism that Heartbeat 2.x
 uses to store information about the resources that are configured for
@@ -278,8 +269,7 @@ to modify cib.xml by hand. See the `cibadmin` command line tool and
 Heartbeat information on making modifications to existing or online CIB
 configurations.
 
-crm\_config
------------
+### crm\_config
 
 The `crm_config` portion of the CIB is used to set global parameters for
 Heartbeat. This includes behavioral settings (such as how to respond if
@@ -289,14 +279,12 @@ The options selected in this section should work well as a starting
 point, but you may refer to the Heartbeat documentation for more
 details.
 
-nodes
------
+### nodes
 
 The `nodes` section is empty on purpose. This will be filled in
 dynamically by the Heartbeat daemons.
 
-resources and groups
---------------------
+### resources and groups
 
 The `resources` section describes all resources that the Heartbeat
 software needs to manage for failover purposes. This includes IP
@@ -311,8 +299,7 @@ associated resources for a node with one unified command.
 In the example `cib.xml`, there are 4 groups (server0 through server3).
 These represent the 4 active PVFS servers that will run on the cluster.
 
-IPaddr
-------
+### IPaddr
 
 The `IPaddr` resources, such as `server0_address`, are used to indicate
 what virtual IP address should be used with each group. In this example,
@@ -320,8 +307,7 @@ all IP addresses are allocated from a private range, but these should be
 replaced with IP addresses that are appropriate for use on your network.
 See the network requirements section for more details.
 
-Filesystem
-----------
+### Filesystem
 
 The `Filesystem` resources, such as `server0_fs`, are used to describe
 the shared storage block devices that serve as back end storage for
@@ -334,8 +320,7 @@ processes to operate on the same node without collision. The file system
 type can be changed to reflect the use of alternative underlying file
 systems.
 
-PVFS
-----
+### PVFS
 
 The `PVFS2` resources, such as `server0_daemon`, are used to describe
 each `pvfs2-server` process. This resource is provided by the PVFS2
@@ -365,8 +350,7 @@ Please note that the PVFS2 script provided in the examples will attempt
 to create a storage space on startup for each server if it is not
 already present.
 
-rsc\_location
--------------
+### rsc\_location
 
 The `rsc_location` constraints, such as `run_server0`, are used to
 express a preference for where each resource group should run (if
@@ -374,8 +358,7 @@ possible). It may be useful for administrative purposes to have the
 first server group default to run on the first node of your cluster, for
 example. Otherwise the placement will be left up to Heartbeat.
 
-rsc\_order
-----------
+### rsc\_order
 
 The `rsc_order` constraints, such as `server0_order_start_fs` can be
 used to dictate the order in which resources must be started or stopped.
@@ -385,8 +368,7 @@ relative to each other. These constraints are necessary because a
 `pvfs2-server` process will not start properly until its IP address and
 storage are available.
 
-stonith
--------
+### stonith
 
 The `external/ipmi` stonith device is used in this example. Please see
 the Heartbeat documentation for instructions on configuring other types
@@ -396,8 +378,7 @@ There is one IPMI stonith device for each node. The attributes for that
 resources specify which node is being controlled, and the username,
 password, and IP address of corresponding IPMI device.
 
-Starting Heartbeat
-==================
+## Starting Heartbeat
 
 Once the CIB file is completed and installed in the correct location,
 then the Heartbeat services can be started on every node. The `crm_mon`
@@ -409,8 +390,7 @@ Check `/var/log/messages` if any of the groups fail to start.
     $ # wait a few minutes for heartbeat services to start
     $ crm_mon -r
 
-Mounting the file system
-========================
+## Mounting the file system
 
 Mounting PVFS with high availability is no different than mounting a
 normal PVFS file system, except that you must use the virtual hostname
@@ -418,8 +398,7 @@ for the PVFS server rather than the primary hostname of the node:
 
     $ mount -t pvfs2 tcp://virtual1:3334/pvfs2-fs /mnt/pvfs2
 
-What happens during failover
-============================
+## What happens during failover
 
 The following example illustrates the steps that occur when a node
 fails:
@@ -448,8 +427,7 @@ fails:
 9.  Client node retry eventually succeeds, but now the network traffic
     is routed to node5
 
-Controlling Heartbeat
-=====================
+## Controlling Heartbeat
 
 The Heartbeat software comes with a wide variety of tools for managing
 resources. The following are a few useful examples:
@@ -469,8 +447,7 @@ resources. The following are a few useful examples:
 -   `crm_verify`: can be used to confirm if the CIB information is valid
     and consistent
 
-Additional examples
-===================
+## Additional examples
 
 The `examples/heartbeat/hardware-specific` directory contains additional
 example scripts that may be helpful in some scenarios:

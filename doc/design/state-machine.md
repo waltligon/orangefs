@@ -1,5 +1,4 @@
-State Machine Code
-==================
+# State Machine Code
 
 Both the PVFS client and server use a state machine model to control
 execution. State machines are written in files with a .sm extention and
@@ -134,8 +133,7 @@ various options by way of example:
         return SM_ACTION_COMPLETE;
     }
 
-State Machine Stacks
-====================
+# State Machine Stacks
 
 A running state machine has two stacks. One is used implicitly to
 control flow in and out of nested state machines. When a state machine

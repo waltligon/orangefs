@@ -6,8 +6,9 @@ title: 'PVFS2 High-Availability Clustering'
 ---
 
 \maketitle
-Introduction
-============
+# PVFS2 High-Availability Clustering
+
+## Introduction
 
 We designed PVFS2 with performance in mind. Software redundancy, while
 appealing for its cost and reliability, has a substantial impact on
@@ -23,8 +24,7 @@ Please send updates, suggestions, corrections, and especially any notes
 for other Linux distributions to
 `pvfs2-developers@beowulf-underground.org`
 
-Hardware
-========
+## Hardware
 
 The whole point of failover is for one computer to take over the job of
 another if and when it dies (component failure, power cord unplugged,
@@ -41,11 +41,9 @@ It's conceivable that a Fibre Channel or Firewire drive would suffice
 for the shared storage device. Reports of success or failure using such
 devices would be most welcome.
 
-Software
-========
+## Software
 
-Installing the Operating System
--------------------------------
+### Installing the Operating System
 
 Some preliminary notes about installing Linux (Debian) on this hardware:
 
@@ -138,8 +136,7 @@ Some preliminary notes about installing Linux (Debian) on this hardware:
     and your network configuration scripts do not bring up the shared
     cluster IP addresses.
 
-PVFS2
------
+### PVFS2
 
 Partition and make a file system on the PowerVault. If you're going to
 set up Active-Active, make two partitions, else make one. Mount the
@@ -159,8 +156,7 @@ strictly necessary to configure the servers for both roles. Create a
 storage space on the PowerVault filesystem. Now shutdown PVFS2 and
 unmount the file system.
 
-Failover Software
------------------
+### Failover Software
 
 There are two main failover packages. I went with heartbeat from
 linux-ha.org. There is another package called "kimberlite", but it seems
@@ -179,7 +175,7 @@ config files, however, heartbeat can provide a lot of additional
 features. The older config files are left here for historical purposes
 until we add XML config files at some point in the future.
 
-### ACTIVE-PASSIVE (A-P)
+#### ACTIVE-PASSIVE (A-P)
 
 The two nodes are configured as in
 Figure [\[fig:nodes\]](#fig:nodes){reference-type="ref"
@@ -341,7 +337,7 @@ High Availability. To finish, bring A back up. The resources which were
 on node B will migrate back to node A (if you set `auto_failback` to
 'on' in ha.cf), and the client remains oblivious.
 
-### Active-Active (A-A)
+#### Active-Active (A-A)
 
 ![Simplified wiring diagram of a PVFS2 HA cluster, Active-Active
 configuration[]{label="fig:nodes-aa"}](pvfs2-failover-AA.eps)
@@ -464,8 +460,7 @@ interfaces B while continuing to manage it's default resource.
               RX bytes:198722216 (189.5 MiB)  TX bytes:158334802 (150.9 MiB)
               Interrupt:29 
 
-Acknowledgments
-===============
+## Acknowledgments
 
 We would like to thank Jasmina Janic for notes and technical support.
 The Dell Scalable Systems Group loaned the PVFS2 development team Dell

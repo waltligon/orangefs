@@ -6,8 +6,9 @@ title: BMI Document
 ---
 
 \maketitle
-TODO
-====
+# BMI Document
+
+## TODO
 
 -   maybe change method nomenclature to module
 
@@ -25,8 +26,7 @@ Stuff from discussions with Pete:
 
 -   discuss a little bit how flows fit in, what real purpose of bmi is
 
-Introduction
-============
+## Introduction
 
 This document describes the design and use of the Buffered Message
 Interface (BMI). BMI is a network abstraction layer that will form the
@@ -43,8 +43,7 @@ interface (see related documents). The default flow implementation will
 also use BMI as an underlying transport, but advanced implementations
 may elect to bypass it.
 
-Related Documents
-=================
+## Related Documents
 
 -   pvfs2-design-storageint: outlines the Trove interface, which is a
     low storage device interface used by PVFS2.
@@ -61,11 +60,9 @@ Related Documents
 
 -   pvfs2-design-concepts: general definitions and overview of PVFS2.
 
-High level design {#sec:high}
-=================
+## High level design {#sec:high}
 
-Features and Goals
-------------------
+### Features and Goals
 
 -   simple API
 
@@ -85,8 +82,7 @@ Features and Goals
 
 -   misc. features tailored to parallel I/O
 
-Implementation
---------------
+### Implementation
 
 BMI has been implemented as a user level library with modules to support
 various network protocols. Although designed for use with PVFS2, BMI is
@@ -100,8 +96,7 @@ then BMI is responsible for implementing it.
 Currently all modules are added to BMI statically at compile time. These
 could be implemented as runtime loadable modules if needed, however.
 
-Communications model
---------------------
+### Communications model
 
 All communications operations in BMI are nonblocking. In order to send a
 message, the user must first *post* the message to the interface, then
@@ -133,8 +128,7 @@ or maintain any link between hosts before sending messages. The BMI
 implementation may maintain connections internally if needed for a
 particular network device, but such details are not exposed to the user.
 
-Architecture {#sec:arch}
-------------
+### Architecture {#sec:arch}
 
 The overall architecture of BMI is shown in Figure
 [\[fig:bmi-arch\]](#fig:bmi-arch){reference-type="ref"
@@ -147,7 +141,7 @@ presenting the top level BMI interface to the application.
 ![BMI Architecture [\[fig:bmi-arch\]]{#fig:bmi-arch
 label="fig:bmi-arch"}](bmi-arch-color.eps)
 
-### Method control {#method-control-intro}
+#### Method control {#method-control-intro}
 
 From a high level, the method control layer is responsible for
 orchestrating network operations and managing the network methods. This
@@ -185,7 +179,7 @@ particular protocol. Note that method addresses are never, under any
 circumstances, exposed to the application. They are reserved for
 internal BMI use only.
 
-### Methods
+#### Methods
 
 Each method is implemented as a statically compiled module. This module
 must provide (and strictly adhere to) a predefined *method interface*.
@@ -199,7 +193,7 @@ Each method is responsible for maintaining the collection of operations
 that it is working on, usually through operation queues. These
 collections of operations are private to each method.
 
-### Thread safety
+#### Thread safety
 
 The top level BMI user interface is thread safe. This means that it is
 legal for more than one thread to make concurrent BMI calls, as long as
@@ -212,11 +206,9 @@ The BMI methods do not need to be thread safe. The method control layer
 will serialize any calls to a single method so that it is protected.
 This should ease the process of implementing new methods.
 
-Concepts
-========
+## Concepts
 
-Memory buffers
---------------
+### Memory buffers
 
 The user must specify a memory buffer to use when posting send or
 receive operations. This buffer may be a normal memory region, or it may
@@ -235,8 +227,7 @@ If a memory buffer is allocated using BMI function calls, then it must
 also be deallocated using BMI. These buffers are not guaranteed to be
 manageable by standard operating system libraries.
 
-Unexpected messages {#sec:unexp}
--------------------
+### Unexpected messages {#sec:unexp}
 
 BMI's default mode of operation requires that each send operation be
 matched with a certain receive operation at the remote host in order to
@@ -265,8 +256,7 @@ see if unexpected messages have arrived. It is the responsibility of the
 caller to eventually free this buffer using the normal system free()
 function.
 
-Short messages {#sec:short}
---------------
+### Short messages {#sec:short}
 
 The BMI interface does not allow partial completion of messages.
 However, it does allow for a sender to send less data than the receiver
@@ -285,8 +275,7 @@ receiver was expecting. This is necessary for the message to be matched
 properly between sender and receiver. When the receive completes, the
 caller is notified of how much data was actually present in the message.
 
-Immediate completion
---------------------
+### Immediate completion
 
 The default model for each network operation is to first post it and
 then test for completion. However, there are often instances in which
@@ -304,8 +293,7 @@ from post functions by a return value of one. BMI library users should
 always check this return value so that they are aware of opportunities
 to skip the test phase of communication.
 
-User pointers
--------------
+### User pointers
 
 BMI is intended to be used in an enviroment in which many operations are
 in flight at once. Several operations may be posted at different times
@@ -324,8 +312,7 @@ properly, user pointers eliminate the need for the caller to keep track
 of operation id's for any reason other than for calling test()
 functions.
 
-List I/O
---------
+### List I/O
 
 BMI provides seperate API functions for posting contiguous and
 noncontiguous buffers for communication. Noncontiguous buffers are
@@ -350,11 +337,9 @@ regions using contiguous intermediate buffers. This is obviously a
 performance penalty, but will ensure correct behavior when a native
 method cannot easily handle discontiguous memory regions.
 
-User interface {#sec:user}
-==============
+## User interface {#sec:user}
 
-Types and structures
---------------------
+### Types and structures
 
 -   **Message tags**: Message tags are numerical values that may be
     associated with messages to be sent or received using BMI. The
@@ -374,8 +359,7 @@ Types and structures
     unexpected messages. It is filled in by the testunexpected() and
     waitunexpected() calls (see below).
 
-Interface functions
--------------------
+### Interface functions
 
 The BMI interface can be separated into categories as follows: message
 initiation, message testing, memory management, list I/O, and utilities.
@@ -458,7 +442,7 @@ not directly involved in network I/O:
 
 -   **BMI\_get\_info()**: Reads optional BMI parameters.
 
-### Supported getinfo and setinfo options
+#### Supported getinfo and setinfo options
 
 -   BMI\_DROP\_ADDR: This is a hint which may be passed to set\_info. It
     tells the interface that no further communication will be requested
@@ -468,8 +452,7 @@ not directly involved in network I/O:
 -   BMI\_CHECK\_INIT: This is a query to get\_info which simply checks
     to see if the BMI interface has been properly initialized or not.
 
-Error handling
---------------
+### Error handling
 
 Errors may be reported from BMI in one of two ways:
 
@@ -487,16 +470,14 @@ Both types of error codes for the time being consist of -errno values.
 This is not really expressive enough for long term use, but at least
 gives a general idea of the type of failure for now.
 
-Method implementation {#sec:methguide}
-=====================
+## Method implementation {#sec:methguide}
 
 The method interface is very similar to the BMI user interface. It
 implements roughly the same functions. However, it includes minor
 variations that take into account the fact that operations at this level
 are targeted for a single specific method.
 
-Method interface
-----------------
+### Method interface
 
 -   **BMI\_method\_initialize()**:
 
@@ -538,8 +519,7 @@ Method interface
 
 -   **BMI\_method\_post\_recv\_list()**:
 
-Important structures
---------------------
+### Important structures
 
 There are three major structures that are manipulated at the BMI method
 level API:
@@ -558,8 +538,7 @@ level API:
     converted into information to be passed to the BMI user by the
     method control layer.
 
-Support libraries {#sec:support}
------------------
+### Support libraries {#sec:support}
 
 The BMI library provides several support functions which may aid method
 programmers when implementing support for new protocols. Each method can
@@ -567,7 +546,7 @@ expect these functions to be visible to it once it has been linked into
 the library. These functions are intended to be as generic as possible
 so that they may be used by a variety of different methods.
 
-### Operation queues
+#### Operation queues
 
 Every prototype method implemented so far makes use of FIFO queues to
 keep track of pending operations. Operations are described by generic
@@ -609,7 +588,7 @@ operation structures:
 
 -   **dealloc\_method\_op()**: Deallocates an existing method operation.
 
-### Method address support
+#### Method address support
 
 Method address structures are used by methods to identify network hosts.
 Like operation structures, they contain private storage for internal
@@ -628,14 +607,14 @@ structures:
     structure to represent the source host and register it with the
     upper API layers.
 
-### Logging and debugging
+#### Logging and debugging
 
 BMI uses the *gossip* library for reporting errors and logging messages.
 This mechanism is used in several other components besides BMI as well.
 A discussion of gossip may be found in the *parl-developer-guidelines*
 document.
 
-### Operation id's
+#### Operation id's
 
 Each method is responsible for creating opaque id's that can be used to
 refer to operations that are currently in progress. Typically these id's
@@ -650,8 +629,7 @@ across all methods.
 -   **id\_gen\_fast\_lookup()**: Returns a pointer to the original data
     structure that was associated with the given id.
 
-References {#sec:ref}
-==========
+## References {#sec:ref}
 
 -   **source code**: The source code to BMI may be found in the "pvfs2"
     cvs tree, within the pvfs2/src/io/bmi directory.

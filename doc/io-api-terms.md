@@ -1,13 +1,11 @@
-PVFS2 internal I/O API terminology
-==================================
+# PVFS2 internal I/O API terminology
 
 PVFS2 contains several low level interfaces for performing various types
 of I/O. None of these are meant to be accessed by end users. However,
 they are pervasive enough in the design that it is helpful to describe
 some of their common characteristics in a single piece of documentation.
 
-Internal I/O interfaces
------------------------
+## Internal I/O interfaces
 
 The following is a list of the lowest level APIs that share
 characteristics that we will discuss here.
@@ -29,16 +27,14 @@ characteristics that we will discuss here.
 -   Request scheduler: handles concurrency and scheduling at the file
     system request level
 
-Job interface
--------------
+## Job interface
 
 The Job interface is a single API that binds together all of the above
 components. This provides a single point for testing for completion of
 any nonblocking operations that have been submitted to a lower level
 API. It also handles most of the thread management where applicable.
 
-Posting and testing
--------------------
+## Posting and testing
 
 All of the APIs listed in this document are nonblocking. The model used
 in all cases is to first `post` a desired operation, then `test` until
@@ -57,8 +53,7 @@ that the call was immediately successful, and that no test is needed.
 Errors are indicated by either a negative return code, or else indicated
 by an output argument that is specific to that API.
 
-Test variations
----------------
+## Test variations
 
 In a parallel file system, it is not uncommon for a client or server to
 be carrying out many operations at once. We can improve efficiency in
@@ -86,8 +81,7 @@ API):
     following subsection) can be used to limit the scope of IDs that may
     be accessed through this function.
 
-Contexts
---------
+## Contexts
 
 Before posting any operations to a particular interface, the caller must
 first open a `context` for that interface. This is a mechanism by which
@@ -98,8 +92,7 @@ to every subsequent post and test call. In particular, it is very useful
 for the testcontext() functions, to insure that it does not return
 information about operations that were posted by a different caller.
 
-User pointers
--------------
+## User pointers
 
 `User pointers` are void\* values that are passed into an interface at
 post time and returned to the caller at completion time through one of
@@ -111,8 +104,7 @@ is returned at completion time, the caller can then map back to this
 data structure immediately without searching because it has a direct
 pointer.
 
-Time outs and max idle time
----------------------------
+## Time outs and max idle time
 
 The job interface allows the caller to specify a time out with all test
 functions. This determines how long the test function is allowed to

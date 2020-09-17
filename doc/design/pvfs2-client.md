@@ -6,8 +6,9 @@ title: '`pvfs2-client` Design Document (DRAFT)'
 ---
 
 \maketitle
-Introduction
-============
+# `pvfs2-client` Design Document (DRAFT)
+
+## Introduction
 
 The primary role of the pvfs2-client daemon is to efficiently *marshal*
 operation requests and data from the kernel's VFS ( *Virtual File
@@ -26,8 +27,7 @@ existing BMI interface is preferred.
 Figure 1 illustrates the architecture of several components of PVFS2.
 This document will focus specifically on the pvfs2-client application.
 
-Motivation for the `pvfs2-client` Application
-=============================================
+## Motivation for the `pvfs2-client` Application
 
 Currently, our entire code base exists as user space code. This includes
 all of our networking support (through the *BMI* and *Flow Interfaces*),
@@ -42,8 +42,7 @@ user-space application is required to make use of this code, and thus
 the need for the pvfs2-client application to bridge the gap between the
 Linux kernel's VFS layer and the *System Interface*.
 
-`pvfs2-client` Application Architecture
-=======================================
+## `pvfs2-client` Application Architecture
 
 The pvfs2-client application consists of a set of state machines roughly
 corresponding to all file system and I/O operations that can be
@@ -95,8 +94,7 @@ The pvfs2-client has a similar processing loop as the pvfs2-server:
           end foreach
         }
 
-Limitations of the Existing System Interface
-============================================
+## Limitations of the Existing System Interface
 
 Currently, all client interaction to a pvfs2-server is done through the
 *System Interface* API. This interface provides a set of file system and
@@ -117,8 +115,7 @@ can be described briefly as:
 A proposed redesign of the System Interface implemented in terms of
 reusable state machines can solve these limitations, as discussed below.
 
-`pvfs2-client` Request Servicing
-================================
+## `pvfs2-client` Request Servicing
 
 ![image](core-sm.eps)
 
@@ -172,8 +169,7 @@ be established before using the core functionality state machine. In
 Figure 2, for example, the pvfs2-client application may specify that the
 Flow's target endpoint should be the /dev/pvfs2 device node.
 
-Non-blocking and Blocking System Interface Implementations
-==========================================================
+## Non-blocking and Blocking System Interface Implementations
 
 Non-blocking and blocking System Interface methods (as shown in Figure
 3) can use the same core functionality once implemented as a state

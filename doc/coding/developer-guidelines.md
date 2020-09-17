@@ -11,15 +11,15 @@ title: |
 \tableofcontents
 \newpage
 \thispagestyle{plain}
-TODO
-====
+# Parallel Architecture Research Laboratory Developer Guidelines
+
+## TODO
 
 -   reorganize this to be PVFS-centric
 
 -   document the build system
 
-Introduction
-============
+## Introduction
 
 This document is intended to serve as an introduction and set of
 guidelines for programming style and development tools that are commonly
@@ -50,8 +50,7 @@ guidelines.
 The final section contains information that is very specific to PVFS and
 may not be applicable to other projects.
 
-Editors {#sec:editors}
-=======
+## Editors {#sec:editors}
 
 In the PARL lab we advocate the use of either vi or emacs. These are the
 most common editors used for writing software and are therefore the most
@@ -59,15 +58,14 @@ likely to be available on any given development platform. It is also
 useful to have everyone on a particular project use the same set of
 editors so that it is easier to maintain consistent formatting.
 
-Vi
---
+### Vi
 
 The general use of vi is beyond the scope of this document, but you can
 find out enough to get started by either asking a colleague or starting
 vi and typing ":help". There is also a tutorial available on many
 systems that can be started by typing "vimtutor" at the command line.
 
-### Vi variants
+#### Vi variants
 
 There are a few variations of the basic vi editor that support different
 features. The most popular is vim, or "Vi IMproved". vim adds several
@@ -95,7 +93,7 @@ The next time you login to the system, it will alias the vi command to
 either vimx of vim if they are available. Otherwise the vi command will
 simply start the original vi editor.
 
-### Syntax highlighting
+#### Syntax highlighting
 
 Syntax highlighting is an editor feature that uses various colors to
 notate different parts of the syntax (dependent upon which language you
@@ -128,13 +126,11 @@ settings for vi taken from a .vimrc file:
        hi! cSpecial ctermfg=darkmagenta
     endif
 
-Emacs
------
+### Emacs
 
 *I have no idea.*
 
-CVS tutorial
-============
+## CVS tutorial
 
 CVS is a network aware version control system. Several of the larger
 projects in the PARL lab use CVS to manage source code. These are some
@@ -154,8 +150,7 @@ of the basic capabilities that it provides:
 
 You can find out more information about CVS at http://www.cvshome.org.
 
-Overview
---------
+### Overview
 
 CVS stores revision history for each file in your project. Each time you
 "commit" a file to CVS, a snapshot of its state at that time is stored
@@ -173,8 +168,7 @@ If you wish to assign a version number or logical name to the state of
 the entire project at one time (for example, release version 1.0), then
 you must do this manually.
 
-Basic user commands
--------------------
+### Basic user commands
 
 Before using CVS, you must set an environment variable that tells it
 where to look for the CVS repositories. If you are using tcsh, you can
@@ -281,8 +275,7 @@ above should be enough to get you started. You can find out more
 information in the CVS man pages or by reading documentation at
 http://www.cvshome.org.
 
-Starting a new project
-----------------------
+### Starting a new project
 
 Lab users can also create new CVS directories to keep up with software
 projects. These can later be merged in as part of another project if
@@ -295,8 +288,7 @@ track the source code). Then run this command:
 (for the sake of clarity, $<$projectname$>$ should probably match the
 name of the directory that contains the source)
 
-Remote access
--------------
+### Remote access
 
 You can also access the PARL CVS repository remotely (outside of the
 lab) if you have an internet connection and the CVS and ssh programs
@@ -310,8 +302,7 @@ the following for the the word "cvs" in the command lines:
 or script to do this for convenience. CVS will prompt you for a password
 in this situation.
 
-Compiler flags {#sec:gcc}
-==============
+## Compiler flags {#sec:gcc}
 
 Gcc is the standard c compiler used for PARL software. The general use
 of gcc is beyond the scope of this document, but there are a few
@@ -338,8 +329,7 @@ guidelines that should be followed when building software with gcc:
     be removed in order to reduce binary size or increase optimization,
     but it is invaluable during the development cycle.
 
-Debugging tutorial {#sec:gdb}
-==================
+## Debugging tutorial {#sec:gdb}
 
 Gdb is a debugger for c and c++ programs. I lets you control the
 execution of a program, see what line of source code is being executed
@@ -347,8 +337,7 @@ at any given time, and inspect data structures while the program is
 running. There are several other debuggers or interfaces built on top of
 gdb, but gdb is still one of the most popular and most flexible.
 
-Starting gdb
-------------
+### Starting gdb
 
 In order to use gdb, the code in question must have been compiled with
 the debugging option turned on. For the gcc compiler (see section
@@ -382,8 +371,7 @@ middle of execution but will have stopped running. In order to make it
 continue where it left off you must use the continue command outlined
 below.
 
-Common gdb commands
--------------------
+### Common gdb commands
 
 This is a short list of the most common commands that you may wish to
 use with gdb. You can find out more specific information by using the
@@ -451,14 +439,12 @@ http://sources.redhat.com/gdb/\#documentation.
     source code surrounding a particular line number or function
     definition.
 
-Makefile tutorial
-=================
+## Makefile tutorial
 
 *We may be able to get this from the MPICH coding docs or from Walt's
 web page?*
 
-Electric Fence tutorial
-=======================
+## Electric Fence tutorial
 
 Electric Fence is a tool used for debugging buffer overruns and
 underruns that can occur when manipulating dynamically allocated memory.
@@ -474,8 +460,7 @@ Take note that Electric Fence does not help at all with problems that
 occur with staticly allocated memory. It also does not indicate memory
 leaks. Other tools should be used for debugging those types of problems.
 
-Using Electric Fence
---------------------
+### Using Electric Fence
 
 To use Electric Fence, you just need to link in the efence library
 during the last stage of linking (or compilation, if you do not have a
@@ -489,8 +474,7 @@ will not show you where it occurred, but you can then debug the program
 with gdb to determine this information (section
 [6](#sec:gdb){reference-type="ref" reference="sec:gdb"}).
 
-Electric Fence options
-----------------------
+### Electric Fence options
 
 There are several helpful Electric Fence options that can be controlled
 by way of environment variables. The following list summarizes the most
@@ -518,17 +502,15 @@ problems. Note that using Electric Fence (especially with the stricter
 options) will cause the memory utilization of your application to
 increase dramatically.
 
-C Programming
-=============
+## C Programming
 
-Formatting
-----------
+### Formatting
 
 This section will provide guidelines so that multiple users on a given
 project can write code with consistent appearance. This makes the code
 easier to maintain and audit in a group environment.
 
-### GPL {#sec:gpl}
+#### GPL {#sec:gpl}
 
 The GPL, or General Public License, is a software license created by the
 GNU organization (http://www.gnu.org). You can find out more information
@@ -560,13 +542,13 @@ code). If you wish to credit particular developers or provide contact
 information, please do so in the README file located in the top level
 directory.
 
-### Other source code header information
+#### Other source code header information
 
 In addition to the copyright comments, it is usually helpful to provide
 a brief description of what is contained in the each source file. This
 should just be a few summary lines below the copyright information.
 
-### Commenting {#sec:comments}
+#### Commenting {#sec:comments}
 
 Commenting your code effectively is very important! Please comment
 important sections of your code clearly and concisely as you write it.
@@ -613,7 +595,7 @@ function comments described in section
 [10.2](#sec:pvfs-comments){reference-type="ref"
 reference="sec:pvfs-comments"}.
 
-### Brackets
+#### Brackets
 
 Brackets are of course used to delineate blocks of code contained within
 loops, conditional statements, or functions. For clarity, *any*
@@ -632,7 +614,7 @@ and *not*
 
 Also note that each bracket gets it's own line in the source code.
 
-### Indentation {#sec:indent}
+#### Indentation {#sec:indent}
 
 Indentation is also very important to writing clear code. The easiest
 rule to remember is that any new set of brackets should add a level of
@@ -659,10 +641,9 @@ loops, and conditionals. The following is an example:
        return(0);
     }
 
-Hints for writing maintainable code
------------------------------------
+### Hints for writing maintainable code
 
-### General code layout {#sec:proto}
+#### General code layout {#sec:proto}
 
 These are a few general guidelines for how to organize your code:
 
@@ -689,14 +670,14 @@ These are a few general guidelines for how to organize your code:
     are needed by external pieces of code. It helps to encapsulate
     things by not providing extraneous information in the header files.
 
-### Length of functions
+#### Length of functions
 
 Try not to make extremely long functions. A good rule of thumb is to
 limit your functions to 100 lines or less. If a function is longer than
 this, then it should probably be broken apart into smaller subfunctions.
 Exceptions to this rule are rare.
 
-### Preventing double inclusion
+#### Preventing double inclusion
 
 If you are using a header file in several locations, it is easy to
 create a situation in which the same header file is indirectly included
@@ -739,7 +720,7 @@ with underscores. Here is an example for a header file called bmi.h:
     /* don't forget to end your header with this statement */
     #endif /* __BMI_H */   
 
-### Static declarations {#sec:static}
+#### Static declarations {#sec:static}
 
 Any function or variable that is declared global in a particular .c file
 but not referened in any other .c file should be declared static. This
@@ -747,7 +728,7 @@ helps to keep the symbol name space from becoming cluttered. It also
 insures that local functions are not accidentally called somewhere that
 they were not intended to be called.
 
-### Initializing variables
+#### Initializing variables
 
 Initialize all variables when they are declared in your software. Even
 if it is a trivial scalar variable, go ahead and initialize it. Integers
@@ -774,7 +755,7 @@ the memset() function:
 If there are sentinal values other than 0 for elements contained in your
 struct, they should be set as well.
 
-### Allocating and deallocating complex structures
+#### Allocating and deallocating complex structures
 
 If there is a particular structure that you are frequently dynamically
 allocating or deallocating, it usually pays off to go ahead and create
@@ -792,7 +773,7 @@ good naming convention is:
     /* no return value */
     void dealloc_foo(struct foo*);
 
-### Keeping up with work in progress
+#### Keeping up with work in progress
 
 There are often questionable issues, or even issues that you don't have
 time to deal with at the moment, that come up when writing large pieces
@@ -809,7 +790,7 @@ and marked with the text string "TODO" within the comment. This is
 highlighted with a special color with vi syntax highlighting, and can
 easily be found with the grep tool later.
 
-### Choosing good variable and function names
+#### Choosing good variable and function names
 
 Try to pick descriptive names for variables and functions, rather than
 saving keystrokes by picking obtuse abbreviations. This makes it easier
@@ -828,10 +809,9 @@ Function and variable nameing issues specific to PVFS can be found in
 section [10.3](#sec:pvfs-naming){reference-type="ref"
 reference="sec:pvfs-naming"}.
 
-Advanced topics
----------------
+### Advanced topics
 
-### Checking for interrupted system calls
+#### Checking for interrupted system calls
 
 If a system call fails, always check the return value to see if it was
 set to EINTR. If this happens, it means that the system call was
@@ -842,7 +822,7 @@ them in a while loop that causes it to try again if EINTR occurs, or you
 can use a goto and a label to jump back to the the system call you wish
 to repeat.
 
-### Constant arguments
+#### Constant arguments
 
 If you are passing in pointers as arguments to a function, but *do not*
 wish for the value contained in the pointer to be modified, then it is
@@ -863,7 +843,7 @@ argument can prevent this. Example:
        return(0);
     }
 
-### Obscure coding practices
+#### Obscure coding practices
 
 By all means, try to avoid the use of obscure coding tricks when writing
 software as part of a group. This especially true when there is there is
@@ -880,7 +860,7 @@ Obscure coding practices include but are not limited to:
 
 -   placing too much emphasis on makeing code small
 
-### Locking data structures
+#### Locking data structures
 
 If you are programming in a multithreaded or reentrant environment, it
 is very important to use locking mechanisms effectively. Any global
@@ -892,14 +872,14 @@ or off at compile time. The ability to disable locking can be useful
 during development or when running code on a system that does not
 require locking. Look in the pvfs-locks CVS module for an example.
 
-### Select vs. poll
+#### Select vs. poll
 
 Try to avoid using the select system call and use poll in its place.
 Poll scales more efficiently. It is also the most direct function call
 for accomplishing the desired task on modern Linux kernels because
 select is implemented on top of the kernel's poll function.
 
-### String parsing
+#### String parsing
 
 Be careful with regards to which functions you use when doing simple
 string parsing. Some of the functions provided in string.h are dangerous
@@ -922,7 +902,7 @@ of a string. In this case, it is better to use sscanf than atoi:
        /* as opposed to atoi, which will not tell you if it fails */
        my_number = atoi(number_string);
 
-### Abstraction
+#### Abstraction
 
 When you are designing new interfaces, think carefully about how to
 create an abstraction for what you want the interface to do. The
@@ -943,7 +923,7 @@ would be better to use functions such as "store\_item" or
 "create\_new\_container" and use opaque types to keep up with your data
 structure.
 
-### Function pointers
+#### Function pointers
 
 Function pointers can be useful when creating modular code. They allow
 you to pick which function will be used to perform a given task at run
@@ -977,7 +957,7 @@ manipulating pointers to variables:
      */
     send_message_generic(my_data, sizeof(my_data));
 
-### Typedefs and opaque types
+#### Typedefs and opaque types
 
 Choosing appropriate types for objects passed around in your code can be
 very important in some situations. There are a couple of different
@@ -1008,11 +988,9 @@ issues here:
 
     *Guess I need an example here\...*
 
-Specific PVFS issues
-====================
+## Specific PVFS issues
 
-Copyright information {#sec:pvfs-copyright}
----------------------
+### Copyright information {#sec:pvfs-copyright}
 
 Copyright information at the top of source code in PVFS should include
 the University of Chicago. (The University of Chicago is affiliated with
@@ -1024,16 +1002,14 @@ Argonne National Lab, where several key PVFS developers are located).
      * See COPYING in top-level directory.
      */       
 
-Function commenting {#sec:pvfs-comments}
--------------------
+### Function commenting {#sec:pvfs-comments}
 
 *Figure out what standard should be to match up with autodocument tools.
 This is on hold until we settle on such a tool, so use standard put
 forth in section [9.1.3](#sec:comments){reference-type="ref"
 reference="sec:comments"} for now.*
 
-Function naming {#sec:pvfs-naming}
----------------
+### Function naming {#sec:pvfs-naming}
 
 Interface functions and global variables in PVFS should use a standard
 naming convention for clarity. Here are a few guidelines:
@@ -1059,8 +1035,7 @@ naming convention for clarity. Here are a few guidelines:
     listed above as well. This naming convention is for both functions
     and global variables.
 
-Error logging with Gossip
--------------------------
+### Error logging with Gossip
 
 Gossip is a simple library for logging both errors and debugging
 messages. It allows you to send logging messages to either stderr,
@@ -1118,10 +1093,9 @@ Examples of how to use Gossip can be found in the gossip/examples
 directory of the Gossip source code. This code can be found in the
 pvfs2/src/common/gossip directory within the PVFS 2 source tree.
 
-Suggested error handling
-------------------------
+### Suggested error handling
 
-### Traditional application error handling with errno
+#### Traditional application error handling with errno
 
 Most unix system calls set a global variable called errno when an error
 condition occurs. Since this is a global variable, it is overwritten

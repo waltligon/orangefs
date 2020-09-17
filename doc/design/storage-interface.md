@@ -5,8 +5,9 @@ title: 'Trove: The PVFS2 Storage Interface'
 ---
 
 \maketitle
-Motivation and Goals
-====================
+# Trove: The PVFS2 Storage Interface
+
+## Motivation and Goals
 
 The Trove storage interface will be the lowest level interface used by
 the PVFS server for storing both file data and metadata. It will be used
@@ -69,8 +70,7 @@ restrictions:
 
 *PARTIAL COMPLETION SEMANTICS NEED MUCH WORK!!!*
 
-Storage space concepts
-======================
+## Storage space concepts
 
 A server controls one storage space.
 
@@ -94,8 +94,7 @@ A collection id will be used in conjunction with other parameters in
 order to specify a unique entity on a server to access or modify, just
 as a file system ID might be used.
 
-Dataspace concepts
-==================
+## Dataspace concepts
 
 This storage interface stores and accesses what we will call
 *dataspaces*. These are logical collections of data organized in one of
@@ -135,8 +134,7 @@ implemented using a combination of bytestream and/or keyval dataspaces.
 At the storage interface level there is no real distinction between
 different types of system level objects.
 
-Vtag concepts
-=============
+## Vtag concepts
 
 Vtags are a capability that can be used to implement atomic updates in
 shared storage systems. In this case they can be used to implement
@@ -150,8 +148,7 @@ This section can be skipped if you are not interested in consistency
 semantics. Vtags will probably not be implemented in the first cut
 anyway.
 
-Phil's poor explanation
------------------------
+### Phil's poor explanation
 
 Vtags are an approach to ensuring consistency for multiple readers and
 writers that avoids the use of locks and their associated problems
@@ -175,8 +172,7 @@ the region has not been modified.
 
 Many different locking primitives can be built upon the vtag concept\...
 
-Use of vtags
-------------
+### Use of vtags
 
 Layers above trove can take advantage of vtags as a way to simplify the
 enforcement of consistency semantics (rather than keeping complicated
@@ -186,8 +182,7 @@ handle the case of trove resources shared by multiple upper layers.
 Finally they might be used in conjunction with higher level consistency
 control in some complimentary fashion (dunno yet\...).
 
-The storage interface
-=====================
+## The storage interface
 
 In this section we describe all the functions that make up the storage
 interface. The storage interface functions can be divided into four
@@ -202,8 +197,7 @@ Next we describe the dataspace management functions. Next we describe
 the contiguous and noncontiguous dataspace access functions. Finally we
 cover the completion test functions.
 
-Return values
--------------
+### Return values
 
 Unless otherwise noted, all functions return an integer with three
 possible values:
@@ -217,8 +211,7 @@ possible values:
 -   -errno: Failure. The error code is encoded in the negative return
     value.
 
-Error values
-------------
+### Error values
 
 Table [\[table:storage\_errors\]](#table:storage_errors){reference-type="ref"
 reference="table:storage_errors"} shows values. All values will be
@@ -248,8 +241,7 @@ was (and still is in some cases) a real problem for PVFS1.*
 [\[table:storage\_errors\]]{#table:storage_errors
 label="table:storage_errors"}
 
-Flags related to vtags
-----------------------
+### Flags related to vtags
 
 As mentioned earlier, the usage of vtags is not manditory. Therefore we
 define two flags values that can be used to control the behavior of the
@@ -268,8 +260,7 @@ calls with respect to vtags:
 By default calls ignore vtag values on input and do not create vtag
 values for output.
 
-Implementation of keys, values, and hints
------------------------------------------
+### Implementation of keys, values, and hints
 
 *TODO: sync. with code on data\_sz element.*
 
@@ -292,14 +283,13 @@ MPI\_Info key/value pairs.
 *TODO: we should build hints out of a pair of the TROVE\_keyvals. We'll
 call them a TROVE\_hint\_s in here for now.*
 
-Functions
----------
+### Functions
 
 *Note: need to add valid error values for each function.*
 
 *TODO: find a better format for function descriptions.*
 
-### IDs
+#### IDs
 
 In this context, IDs are unique identifiers assigned to each storage
 interface operation. They are used as handles to test for completion of
@@ -313,7 +303,7 @@ instance).
 
 The type for these IDs is TROVE\_op\_id.
 
-### User pointers
+#### User pointers
 
 Each function allows the user to pass in a pointer value (void \*). This
 value is returned by the test functions, and it allows for quick
@@ -327,7 +317,7 @@ structures manually. By providing a parameter that the caller can pass
 in, they can directly reference these structures on trove operation
 completion.
 
-### Dataspace management
+#### Dataspace management
 
 -   **ds\_create( \[in\]coll\_id, \[in/out\]handle, \[in\]bitmask,
     \[in\]type, \[in/out\]hint, \[in\]user\_ptr, \[out\]id )**: Creates
@@ -375,7 +365,7 @@ completion.
     the hint call? having an id in this case is particularly useful \...
     so we know the operation is completed\...*
 
-### Byte stream access
+#### Byte stream access
 
 Parameters in read and write at calls are ordered similarly to pread and
 pwrite.
@@ -412,7 +402,7 @@ pwrite.
 
     *Flags?*
 
-### Key/value access
+#### Key/value access
 
 An important call for keyval spaces is the iterator function. The
 iterator function is used to obtain all keyword/value pairs from the
@@ -466,7 +456,7 @@ to continue reading pairs from the keyval space where it last left off.
     but only returns keys, not corresponding values. *need to fix
     parameters*
 
-### Noncontiguous (list) access
+#### Noncontiguous (list) access
 
 These functions are used to read noncontiguous byte stream regions or
 multiple key/value pairs.
@@ -503,7 +493,7 @@ available in the ROMIO code.
     \[in\]key\_array, \[in\]value\_array, \[in\]count, \[in\]flags,
     \[in/out\]vtag, \[in\]user\_ptr, \[out\]id )**:
 
-### Testing for completion
+#### Testing for completion
 
 *Do we need coll\_ids here?*
 
@@ -534,19 +524,17 @@ available in the ROMIO code.
 http://beowulf-underground.org/pipermail/pvfs2-internal/2001-October/000010.html
 for my thoughts on this topic.*
 
-### Batch operations
+#### Batch operations
 
 Batch operations are used to perform a sequence of operations possibly
 as an atomic whole. These will be handled at a higher level.
 
-Optimizations
-=============
+## Optimizations
 
 This section lists some potential optimizations that might be applied at
 this layer or that are related to this layer.
 
-Metadata Stuffing
------------------
+### Metadata Stuffing
 
 In many file systems "inode stuffing" is used to store the data for
 small files in the space used to store pointers to indirect blocks. The

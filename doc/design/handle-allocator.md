@@ -6,9 +6,9 @@ title: Trove DBPF Handle Allocator
 
 \maketitle
     $Id: handle-allocator.tex,v 1.1 2003-01-24 23:29:18 pcarns Exp $
+# Trove DBPF Handle Allocator
 
-Introduction
-============
+## Introduction
 
 The Trove interface gives out handles -- unique identifiers to trove
 objects. In addition to being unique, handles will not be reused within
@@ -18,10 +18,9 @@ expect. Add to that the fact that we want to serialize on disk all or
 part of the handle allocator's state, and here we are with a document to
 explain it all.
 
-Data Structures
----------------
+### Data Structures
 
-### Extents
+#### Extents
 
 We have a large handle space we need to represent efficiently. This
 approach uses extents:
@@ -32,7 +31,7 @@ approach uses extents:
         int64_t last;
     };
 
-### Extent List
+#### Extent List
 
 We keep the extents (not nescessarily sorted) in the `extents` array.
 For faster searches, `index` keeps an index into `extents` in an AVL
@@ -49,7 +48,7 @@ only used internally, keeping track of how big `extents` is.
         struct extent * extents;
     };
 
-### Handle Ledger
+#### Handle Ledger
 
 We manage several lists. The `free_list` contains all the valid handles.
 The `recently_freed_list` contains handles which have been freed, but
@@ -70,11 +69,9 @@ We save our state by writing out and reading from the three
         TROVE_handle overflow_list_handle;
     }
 
-Algorithm
-=========
+## Algorithm
 
-Assigning handles
------------------
+### Assigning handles
 
 Start off with a `free_list` of one big extent encompassing the entire
 handle space.
@@ -88,8 +85,7 @@ handle space.
 
 -   if $first > last$, mark the extent as empty.
 
-returning handles
------------------
+### returning handles
 
 -   when the first handle is returned, it gets added to the
     `recently_freed` list. Because this is the first item on that list,
@@ -111,8 +107,7 @@ returning handles
     into the `free_list`, the `overflow_list` becomes the
     `recently_freed` list and the `overflow_list` is empty.
 
-I don't know what to call this section
---------------------------------------
+### I don't know what to call this section
 
 Let $T_{r}$ be the minimum response time for an operation of any sort,
 $T_{f}$ be the time a handle must sit before being moved back to the

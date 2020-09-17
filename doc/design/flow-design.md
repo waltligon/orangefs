@@ -6,15 +6,15 @@ title: Flow Design Document
 ---
 
 \maketitle
-TODO
-====
+# Flow Design Document
+
+## TODO
 
 -   point to some other document for explanation of concepts common to
     all pvfs2 I/O interfaces (contexts, max idle time, test semantics,
     etc.)
 
-Concepts and Motivation
-=======================
+## Concepts and Motivation
 
 Flows are a high level model for how PVFS2 system components will
 perform I/O. It is designed to abstractly but efficiently move data from
@@ -42,11 +42,9 @@ Features include:
     down these datatypes into a format that can be used by lower level
     I/O interfaces.
 
-Flows
-=====
+## Flows
 
-Overview
---------
+### Overview
 
 A flow describes a movement of data. The data always moves from a single
 source to a single destination. There may be (and almost always will be)
@@ -78,8 +76,7 @@ the client and server (requests or acknowledgements). They will only be
 used for data transfer. It is assumed that request messages will be used
 for handshaking before or after the flow as needed.
 
-Architecture {#sec:arch}
-------------
+### Architecture {#sec:arch}
 
 There are two major parts of the flow architecture, as seen in figure
 [\[fig:flow-arch\]](#fig:flow-arch){reference-type="ref"
@@ -106,8 +103,7 @@ necessary.
 ![Basic flow architecture [\[fig:flow-arch\]]{#fig:flow-arch
 label="fig:flow-arch"}](flow-arch.eps)
 
-Describing flows
-----------------
+### Describing flows
 
 Individual flows are represented using structures called *flow
 descriptors*. The source and destination of a given flow are represented
@@ -123,8 +119,7 @@ Flow endpoints describe the memory, storage, or network locations for
 the movement of data. All flow descriptors must have both a source and a
 destination endpoint.
 
-Usage assumptions
------------------
+### Usage assumptions
 
 It is assumed that all flows in PVFS2 will be *preceded* by a PVFS2
 request protocol exchange between the client and server. In a file
@@ -140,11 +135,9 @@ operation.
 The request protocol will transmit information such as file size and
 distribution parameters that may be needed to coordinate remote flows.
 
-Data structures
-===============
+## Data structures
 
-Flow descriptor {#sec:flow-desc}
----------------
+### Flow descriptor {#sec:flow-desc}
 
 Flow descriptors are created by the flow interface user. At this time,
 the caller may edit these fields directly. Once the flow has been posted
@@ -217,8 +210,7 @@ The following fields are reserved for use within the flow code:
 
 -   result: result of each datatype processing iteration
 
-Flow interface
-==============
+## Flow interface
 
 The flow interface is the set of functions that the flow user is allowed
 to interact with. These functions allow you to do such things as create
@@ -260,8 +252,7 @@ Three functions are provided to test for completion of posted flows:
 -   *PINT\_flow\_testcontext()*: tests for completion of any flows that
     are in service in the interface
 
-Flow protocol interface
-=======================
+## Flow protocol interface
 
 The flow protocols are modular components capable of moving data between
 particular types of endpoints. (See section
@@ -293,8 +284,7 @@ The following section describing the interaction between the flow
 component and the flow protocols may be helpful in clarifying how the
 above functions will be used.
 
-Interaction between flow component and flow protocols
-=====================================================
+## Interaction between flow component and flow protocols
 
 The flow code that resides above the flow protocols serves two primary
 functions: multiplexing between the various flow protocols, and
@@ -346,8 +336,7 @@ The scheduling filter (at the time of this writing) does nothing but
 service all flows in order. More advanced schedulers will be added
 later.
 
-Example flow protocol (implementation)
---------------------------------------
+### Example flow protocol (implementation)
 
 The default flow protocol is called \"flowproto\_bmi\_trove" and is
 capable of handling the following endpoint combinations:
@@ -389,8 +378,7 @@ Trove support is compiled out if the \_\_PVFS2\_TROVE\_SUPPORT\_\_
 define is not detected. This is mainly done in client libraries which do
 not need to use Trove in order to reduce library dependencies.
 
-Implementation note: avoiding flows
-===================================
+## Implementation note: avoiding flows
 
 The flow interface will introduce overhead for small operations that
 would not otherwise be present. It may therefore be helpful to

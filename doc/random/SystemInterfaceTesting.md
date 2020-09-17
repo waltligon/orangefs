@@ -10,8 +10,9 @@ title: |
 ---
 
 \maketitle
-Introduction
-============
+# PVFS2: System Interface Test Suite
+
+## Introduction
 
 The Parallel Virtual File System version 2 (PVFS2) is in development.
 This document attempts to outline the process of validating the System
@@ -20,15 +21,13 @@ positive tests and negative tests. Positive tests examine functions
 operating on normal procedures. Negative tests examine the functions
 behavior on abnormal procedures designed to make the functions fail.
 
-Setup {#setupL}
-=====
+## Setup {#setupL}
 
 Describe the system (hardware and OS) that the tests are being run on
 and the version of pvfs2.
 
 \newcounter{marker}
-Positive Tests
-==============
+## Positive Tests
 
 The positive tests will verify basic functionality, and ensure that the
 system interface behaves as expected for a given set of reasonable
@@ -36,14 +35,12 @@ inputs. We expect that all of these calls should succeed. It is the goal
 of this section to provide coverage for all areas of the system
 interface that will recieve the most usage.
 
-Startup and Shutdown
---------------------
+### Startup and Shutdown
 
 The most trivial test of the system interface, we initialize and
 finalize the system interface.
 
-Metadata tests
---------------
+### Metadata tests
 
 .
 
@@ -102,10 +99,9 @@ attributes will be tested by setting all the attributes on a directory
 to some known values, then calling getattr to ensure that they have been
 set.
 
-I/O tests
----------
+### I/O tests
 
-### Reading
+#### Reading
 
 The read tests will be performed on files where we have read permission,
 and data exists within the file. The request will be committed prior to
@@ -130,7 +126,7 @@ as well as large block lengths will also be used.
 **Manual ub/lb/extents**: Calling read with varying the displacements on
 ub, lb, and extents will be performed.
 
-### Writing
+#### Writing
 
 The write tests will be performed on files where we have write
 permission. Data may or may not exist within file prior to calling
@@ -155,14 +151,13 @@ as well as large block lengths will also be used.
 **Manual ub/lbextent**: Calling write with varying the displacements on
 ub, lb, and extents will be performed.
 
-### Truncate
+#### Truncate
 
 The truncate tests will be performed on files where we have write
 permission. This test will need to be performed on files of size 0, as
 well as files with data on every combination of servers.
 
-Negative Tests
-==============
+## Negative Tests
 
 The negative tests are broken up into two sections: invalid parameters
 and functional ordering. The invalid parameters tests examines the
@@ -170,12 +165,11 @@ functions' behaviors when invalid parameters are supplied. The tests for
 functional ordering examines functions' behaviors when the ordering of
 functions are incorrect.
 
-Invalid Parameters
-------------------
+### Invalid Parameters
 
 Tests functions' behavior when invalid parameters are supplied
 
-### Null parameters {#null1L}
+#### Null parameters {#null1L}
 
 All parameters of each function are null. Note, before any of the
 functions can be called, initialize must be called with valid parameters
@@ -225,7 +219,7 @@ error code returned.
 Call write and set its parameters to null. Record the return value and
 error code returned.
 
-### Varied Null Parameters
+#### Varied Null Parameters
 
 Some of the parameters of each function are null. Note, before any of
 the functions can be called, initialize must be called with valid
@@ -256,7 +250,7 @@ and second parameter (if there is one) set to null. The remaining
 parameters (if there are any) are set to a valid value. Record the
 return value and error code returned.
 
-### Invalid File
+#### Invalid File
 
 All test cases use an invalid file
 
@@ -298,13 +292,12 @@ error code returned.
 Call write and set its parameters to null. Record the return value and
 error code returned.
 
-Functional Ordering
--------------------
+### Functional Ordering
 
 All test cases use the pre-built file found in section
 [2](#setupL){reference-type="ref" reference="setupL"}.
 
-### Client uninitialized
+#### Client uninitialized
 
 Test the behavior of all functions when the initialize function has not
 been called.
@@ -335,7 +328,7 @@ Call read and record the return value and error codes.
 
 Call write and record the return value and error codes.
 
-### Client unfinalized
+#### Client unfinalized
 
 Test the behavior of the system when the system is initialized but the
 program exits without calling finalize. Another program is run after the
@@ -383,7 +376,7 @@ record the return value and error codes.
 Call initialize and exit the program. Call initialize then write and
 record the return value and error codes.
 
-### Client finalized
+#### Client finalized
 
 The initialize function is called and immediately after the finalize
 function is called. Test behavior of system functions under this
@@ -427,7 +420,7 @@ record the return and error codes.
 Call initialize then finalize. Immediately after finalize, call write
 and record the return and error codes.
 
-### Operations on non-existent Files
+#### Operations on non-existent Files
 
 Tests for functions that operate on existing files on a file that has
 not been created.
@@ -464,7 +457,7 @@ the return value and error codes.
 Call initialize then write on a file that has not been created. Record
 the return value and error codes.
 
-### Repeated Operations: meta data
+#### Repeated Operations: meta data
 
 Continually call functions that change the meta data of a file.
 
@@ -479,7 +472,7 @@ error codes.
 Call initialize and then call symlink 100 times. Record return values
 and error codes.
 
-### Repeated Operations: create
+#### Repeated Operations: create
 
 Continually call functions on one file that create new files such as
 mkdir and create.
@@ -498,5 +491,4 @@ Record return values and error codes.
 Call initialize and then call create on differnt test file 100 times.
 Record return values and error codes.
 
-Results
-=======
+## Results

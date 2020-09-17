@@ -12,8 +12,9 @@ title: 'Parallel Virtual File System, Version 2'
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{11pt}
 \newpage
-An introduction to PVFS2
-========================
+# Parallel Virtual File System, Version 2
+
+## An introduction to PVFS2
 
 Since the mid-1990s we have been in the business of parallel I/O. Our
 first parallel file system, the Parallel Virtual File System (PVFS), has
@@ -45,8 +46,7 @@ interested and motivated parties.
 In this section we discuss the motivation behind and the key
 characteristics of our parallel file system, PVFS2.
 
-Why rewrite?
-------------
+### Why rewrite?
 
 There are lots of reasons why we've chosen to rewrite the code. We were
 bored with the old code. We were tired of trying to work around inherent
@@ -60,8 +60,7 @@ the opportunity for us to suffer from second system syndrome here! But
 we're willing to risk this in order to position ourselves to use the new
 code base for many years to come.
 
-What's different?
------------------
+### What's different?
 
 The new design has a number of important features, including:
 
@@ -85,7 +84,7 @@ The new design has a number of important features, including:
 
 -   support for data and metadata redundancy.
 
-### Modular networking and storage
+#### Modular networking and storage
 
 One shortcoming of the PVFS1 system is its reliance on the socket
 networking interface and local file systems for data and metadata
@@ -110,7 +109,7 @@ certainly going to leverage database technologies for metadata storage
 In PVFS2 the Buffered Messaging Interface (BMI) and the Trove storage
 interface provide APIs to network and storage technologies respectively.
 
-### Structured non-contiguous data access
+#### Structured non-contiguous data access
 
 Scientific applications are complicated entities constructed from
 numerous libraries and operating on highly structured data. This data is
@@ -129,7 +128,7 @@ description of structured data regions with strides, common block sizes,
 and so on. This capability can then be leveraged by higher-level
 libraries such as the MPI-IO implementation.
 
-### Flexible data distribution
+#### Flexible data distribution
 
 The tradition of striping data across I/O servers in round-robin fashion
 has been in place for quite some time, and it seems as good a default as
@@ -148,7 +147,7 @@ round-robin scheme that everyone is accustomed to, but we expect to see
 this mechanism used to better access multidimensional datasets. It might
 play a role in data redundancy as well.
 
-### Distributed metadata
+#### Distributed metadata
 
 One of the biggest complaints about PVFS1 is the single metadata server.
 There are actually two bases on which this complaint is typically
@@ -172,7 +171,7 @@ each other less.
 Distributed metadata is a relatively tricky problem, but we're going to
 provide it in early releases anyway.
 
-### Stateless servers and clients
+#### Stateless servers and clients
 
 Parallel file systems (and more generally distributed file systems) are
 potentially complicated systems. As the number of entities participating
@@ -199,7 +198,7 @@ off-the-shelf high-availability solutions for providing server failover.
 This does impact the semantics of the file system, but we believe that
 the resulting semantics are very appropriate for parallel I/O.
 
-### Explicit support for concurrency
+#### Explicit support for concurrency
 
 Clearly concurrent processing is key in this type of system. The PVFS2
 server and client designs are based around an explicit state machine
@@ -216,7 +215,7 @@ asynchronous operations on the client side. Native support for
 asynchronous operations makes nonblocking operations under MPI-IO both
 easy to implement and advantageous to use.
 
-### Tunable semantics
+#### Tunable semantics
 
 Most distributed file systems in use for cluster systems provide POSIX
 (or very close to POSIX) semantics. These semantics are very strict,
@@ -243,7 +242,7 @@ implemented. Other groups might go for looser semantics allowing for
 access across the wide area. The key here is allowing for the
 possibility of different semantics to match different needs.
 
-### Flexible mapping from file references to servers
+#### Flexible mapping from file references to servers
 
 Administrators appreciate the ability to reconfigure systems to adapt to
 changes in policy or available resources. In parallel file systems, the
@@ -260,7 +259,7 @@ then restarting with a new table. It is not difficult to imagine
 providing this functionality while the system is running, and we will be
 investigating this possibility once basic functionality is stable.
 
-### Tight MPI-IO coupling
+#### Tight MPI-IO coupling
 
 The UNIX interface is a poor building block for an MPI-IO
 implementation. It does not provide the rich API necessary to
@@ -287,7 +286,7 @@ processes. Operations that determine file size, truncate files, and
 remove files may all be performed in this same $O(1)$ manner, scaling as
 well as the MPI broadcast call.
 
-### Data and metadata redundancy
+#### Data and metadata redundancy
 
 Another common (and valid) complaint regarding PVFS1 is its lack of
 support for redundancy at the server level. RAID approaches are usable
@@ -324,7 +323,7 @@ determine how to best fit this into the system as a whole. However,
 traditional failover solutions may be put in place for the existing
 system.
 
-### And more\...
+#### And more\...
 
 There are so many things that we feel we could have done better in PVFS1
 that it is really a little embarrassing. Better heterogeneous system
@@ -336,8 +335,7 @@ concerns that our PVFS1 users have had over the years.
 
 It's a big undertaking for us. Which leads to the obvious next question.
 
-When will this be available?
-----------------------------
+### When will this be available?
 
 Believe it or not, right now. At SC2004 we released PVFS2 1.0. We would
 be foolish to claim PVFS2 has no bugs and will work for everyone 100% of
@@ -355,8 +353,7 @@ developments. All code is being distributed under the LGPL license to
 facilitate use under arbitrarily licensed high-level libraries.
 
 \newpage
-The basics of PVFS2 {#sec:basics}
-===================
+## The basics of PVFS2 {#sec:basics}
 
 PVFS2 is a parallel file system. This means that it is designed for
 parallel applications sharing data across many clients in a coordinated
@@ -391,8 +388,7 @@ file system state is kept consistent without the use of locks. In many
 cases we will compare the new system with the original PVFS, for those
 who are may already be familiar with that architecture.
 
-Servers
--------
+### Servers
 
 In PVFS1 there were two types of server processes, *mgrs* that served
 metadata and *iods* that served data. For any given PVFS1 file system
@@ -414,16 +410,14 @@ current implementation of this storage relies on UNIX files to hold file
 data and a Berkeley DB database to hold things like metadata. The
 specifics of this storage are hidden under an API that we call Trove.
 
-Networks
---------
+### Networks
 
 PVFS2 has the capability to support an arbitrary number of different
 network types through an abstraction known as the Buffered Messaging
 Interface (BMI). At this time BMI implementations exist for TCP/IP,
 Myricom's GM, and InfiniBand (both Mellanox VAPI and OpenIB APIs).
 
-Interfaces
-----------
+### Interfaces
 
 At this time there are exactly two low-level I/O interfaces that clients
 commonly use to access parallel file systems. The first of these is the
@@ -448,8 +442,7 @@ implementation for PVFS2 MPI-IO support, just as we did for PVFS1. ROMIO
 links directly to a low-level PVFS2 API for access, so it avoids moving
 data through the OS and does not communicate with pvfs2-client.
 
-Client-server interactions
---------------------------
+### Client-server interactions
 
 At start-up clients contact any one of the pvfs2-servers and obtain
 configuration information about the file system. Once this data has been
@@ -491,8 +484,7 @@ so if a file is unlinked, it is gone gone gone. Perhaps we will come up
 with a clever way to support this or adapt the NFS approach (renaming
 the file to an odd name), but this is a very low priority.
 
-Consistency from the client point of view
------------------------------------------
+### Consistency from the client point of view
 
 We've discussed in a number of venues the opportunities that are made
 available when true POSIX semantics are given up. Truthfully very few
@@ -523,8 +515,7 @@ from one node than from another. The cache time value may be set to zero
 to avoid this behavior; however, we believe that users will not find
 this necessary.
 
-File system consistency
------------------------
+### File system consistency
 
 One of the more complicated issues in building a distributed file system
 of any kind is maintaining consistent file system state in the presence
@@ -589,8 +580,7 @@ concern for what other processes might be up to -- they never made it
 into the directory hierarchy.
 
 \newpage
-PVFS2 terminology
-=================
+## PVFS2 terminology
 
 PVFS2 is based on a somewhat unconventional design in order to achieve
 high performance, scalability, and modularity. As a result, we have
@@ -598,8 +588,7 @@ introduced some new concepts and terminology to aid in describing and
 administering the system. This section describes the most important of
 these concepts from a high level.
 
-File system components
-----------------------
+### File system components
 
 We will start by defining the major system components from an
 administrator or user's perspective. A PVFS2 file system may consist of
@@ -658,8 +647,7 @@ PVFS2. ROMIO is included by default with the MPICH MPI implementation
 and includes drivers for several file systems. See
 http://www.mcs.anl.gov/romio/ for details.
 
-PVFS2 Objects
--------------
+### PVFS2 Objects
 
 PVFS2 has four different object types that are visible to users
 
@@ -673,8 +661,7 @@ PVFS2 has four different object types that are visible to users
 
 \...
 
-Handles
--------
+### Handles
 
 `Handles` are unique, opaque, integer-like identifiers for every object
 stored on a PVFS2 file system. Every file, directory, and symbolic link
@@ -688,8 +675,7 @@ the user does not typically manipulate them directly.
 The allowable range of values that handles may assume is known as the
 `handle space`.
 
-Handle ranges
--------------
+### Handle ranges
 
 Handles are essentially very large integers. This means that we can
 conveniently partition the handle space into subsets by simply
@@ -705,8 +691,7 @@ only interact with handle ranges; the mapping of ranges to servers is
 hidden beneath an abstraction layer. This allows for greater flexibility
 and future features like transparent migration.
 
-File system IDs
----------------
+### File system IDs
 
 Every PVFS2 file system hosted by a particular server has a unique
 identifier known as a `file system ID` or `fs id`. The file system ID
@@ -718,16 +703,14 @@ servers in order to produce more readable configuration files.
 File system IDs are also occasionally referred to as collection IDs.
 
 \newpage
-PVFS2 internal I/O API terminology
-==================================
+## PVFS2 internal I/O API terminology
 
 PVFS2 contains several low level interfaces for performing various types
 of I/O. None of these are meant to be accessed by end users. However,
 they are pervasive enough in the design that it is helpful to describe
 some of their common characteristics in a single piece of documentation.
 
-Internal I/O interfaces
------------------------
+### Internal I/O interfaces
 
 The following is a list of the lowest level APIs that share
 characteristics that we will discuss here.
@@ -749,16 +732,14 @@ characteristics that we will discuss here.
 -   Request scheduler: handles concurrency and scheduling at the file
     system request level
 
-Job interface
--------------
+### Job interface
 
 The Job interface is a single API that binds together all of the above
 components. This provides a single point for testing for completion of
 any nonblocking operations that have been submitted to a lower level
 API. It also handles most of the thread management where applicable.
 
-Posting and testing
--------------------
+### Posting and testing
 
 All of the APIs listed in this document are nonblocking. The model used
 in all cases is to first `post` a desired operation, then `test` until
@@ -777,8 +758,7 @@ that the call was immediately successful, and that no test is needed.
 Errors are indicated by either a negative return code, or else indicated
 by an output argument that is specific to that API.
 
-Test variations
----------------
+### Test variations
 
 In a parallel file system, it is not uncommon for a client or server to
 be carrying out many operations at once. We can improve efficiency in
@@ -806,8 +786,7 @@ API):
     following subsection) can be used to limit the scope of IDs that may
     be accessed through this function.
 
-Contexts
---------
+### Contexts
 
 Before posting any operations to a particular interface, the caller must
 first open a `context` for that interface. This is a mechanism by which
@@ -818,8 +797,7 @@ to every subsequent post and test call. In particular, it is very useful
 for the testcontext() functions, to insure that it does not return
 information about operations that were posted by a different caller.
 
-User pointers
--------------
+### User pointers
 
 `User pointers` are void\* values that are passed into an interface at
 post time and returned to the caller at completion time through one of
@@ -831,8 +809,7 @@ is returned at completion time, the caller can then map back to this
 data structure immediately without searching because it has a direct
 pointer.
 
-Time outs and max idle time
----------------------------
+### Time outs and max idle time
 
 The job interface allows the caller to specify a time out with all test
 functions. This determines how long the test function is allowed to
@@ -846,8 +823,7 @@ idle time. It is more like a hint to control whether the function is a
 busy poll, or if it should sleep when there is no work to do.
 
 \newpage
-PVFS2 User APIs and Semantics {#sec:apis}
-=============================
+## PVFS2 User APIs and Semantics {#sec:apis}
 
 Because PVFS2 is designed specifically for performance in systems where
 concurrent access from many processes is commonplace, there are some
@@ -857,8 +833,7 @@ for applications to use when accessing PVFS2 file systems. We will start
 with the traditional UNIX I/O interface, which nearly all file systems
 implement. We will then cover the MPI-IO interface.
 
-UNIX I/O Interface
-------------------
+### UNIX I/O Interface
 
 We provide an implementation of the UNIX I/O interface for clients
 running Linux versions 2.4 (2.4.19 and later) and 2.6. This interface
@@ -874,7 +849,7 @@ of writes that cross disk block boundaries. We also do not implement the
 full POSIX semantics. Here we will document aspects of the POSIX
 semantics that we do not implement.
 
-### Permission Checking
+#### Permission Checking
 
 To understand why PVFS2 permission checking behaves differently from the
 POSIX standard, it is useful to discuss how PVFS2 performs permission
@@ -893,7 +868,7 @@ accurate user and group information to be used for this purpose. No
 recursive directory permission checking is performed by the servers, for
 example.
 
-### Permissions and File Access
+#### Permissions and File Access
 
 POSIX semantics dictate that once a file has been opened it may continue
 to be accessed by the process until closed, regardless of changes to
@@ -906,7 +881,7 @@ file lookup, it is possible that a client may lose the ability to access
 a file that it has previously opened due to permission change, if for
 example the cached handle is lost and a lookup is performed again.
 
-### Access to Removed Files
+#### Access to Removed Files
 
 POSIX semantics dictate that a file opened by a process may continue to
 be accessed until the subsequent close, even if the file permissions are
@@ -924,7 +899,7 @@ that the file no longer exists.
 *Neill: Is this completely true, or do clients delay removal in
 pvfs2-client if someone is still accessing?*
 
-### Overlapping I/O Operations
+#### Overlapping I/O Operations
 
 POSIX semantics dictate sequential consistency for overlapping I/O
 operations. This means that I/O operations must be atomic with respect
@@ -943,7 +918,7 @@ some undefined combination of the bytes being written to storage, while
 read operations that conflict with write operations will see some
 undefined combination of original data and write data.
 
-### Locks
+#### Locks
 
 BSD provides the `flock` mechanism for locking file regions as a way to
 perform atomic modifications to files. POSIX provides this functionality
@@ -955,8 +930,7 @@ system. At this time there is no add-on advisory locking component
 either. Thus neither the `flock` function nor the `fcntl` advisory locks
 are supported by PVFS2.
 
-MPI-IO Interface
-----------------
+### MPI-IO Interface
 
 We provide an implementation of the MPI-IO interface via an
 implementation of the ROMIO ADIO interface. This implementation is
@@ -968,7 +942,7 @@ Our PVFS2 implementation does not include all the functionality of the
 MPI-IO specification. In this section we discuss the missing components
 of MPI-IO for PVFS2.
 
-### MPI-IO Atomic Mode
+#### MPI-IO Atomic Mode
 
 Atomic mode is enabled by calling `MPI_File_set_atomicity` and setting
 the atomicity to true. Atomic mode guarantees that data written on one
@@ -979,7 +953,7 @@ ROMIO currently uses file locking to implement the MPI-IO atomic mode
 functionality. Because we do not support locks in PVFS2, atomic mode is
 not currently supported.
 
-### MPI-IO Shared Pointer Mode
+#### MPI-IO Shared Pointer Mode
 
 Shared pointers are used in the `_shared` and `_ordered` families of
 functions.
@@ -990,14 +964,12 @@ are not currently supported. We are researching alternative
 implementations.
 
 \newpage
-The code tree
-=============
+## The code tree
 
 In this section we describe how the code tree is set up for PVFS2 and
 discuss a little about how the build system works.
 
-The top level
--------------
+### The top level
 
 At the top level we see:
 
@@ -1049,8 +1021,7 @@ We'll talk more about this one in a subsequent subsection.
 over time to validate the PVFS2 implementation. We will discuss this
 more in a subsequent subsection as well.
 
-`src`
------
+### `src`
 
 The `src` directory contains the majority of the PVFS2 distribution.
 
@@ -1125,8 +1096,7 @@ only one, `src/kernel/linux-2.6`.
 `src/io` holds enough code that we'll just talk about it in its own
 subsection.
 
-`src/io`
---------
+### `src/io`
 
 This directory holds all the code used to move data across the wire, to
 store and retrieve data from local resources, to buffer data on servers,
@@ -1165,8 +1135,7 @@ storing local data.
 responsible for ferrying data between different types of *endpoints*.
 Valid endpoints include BMI, Trove, memory, and the buffer cache.
 
-`test`
-------
+### `test`
 
 This directory holds a great deal of test code, most of which is useless
 to the average user.
@@ -1181,8 +1150,7 @@ will run these in an automated fashion relatively often (but we aren't
 there quite yet). This is probably the second most useful code (after
 pvfs2-client) in the `test` directory.
 
-State machines and `statecomp`
-------------------------------
+### State machines and `statecomp`
 
 The PVFS2 source is heavily dependent on a state machine implementation
 that is included in the tree. We've already noted that the parser,
@@ -1196,8 +1164,7 @@ confusing situation of having both versions in the same subdirectory. If
 modifying these, be careful to only modify the `.sm` files -- the
 corresponding `.c` file can be overwritten on rebuilds.
 
-Build system
-------------
+### Build system
 
 The build system relies on the "single makefile" concept that was
 promoted by someone or another other than us (we should have a
@@ -1210,8 +1177,7 @@ build verbose again. This is controlled via a variable called
 `QUIET_COMPILE` in the makefile, if you are looking for how this is
 done.
 
-Out-of-tree builds
-------------------
+### Out-of-tree builds
 
 Some of the developers are really fond of out-of-tree builds, while
 others aren't. Basically the idea is to perform the build in a separate

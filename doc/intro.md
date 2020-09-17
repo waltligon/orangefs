@@ -1,5 +1,4 @@
-An introduction to PVFS2
-========================
+# An introduction to PVFS2
 
 Since the mid-1990s we have been in the business of parallel I/O. Our
 first parallel file system, the Parallel Virtual File System (PVFS), has
@@ -31,8 +30,7 @@ interested and motivated parties.
 In this section we discuss the motivation behind and the key
 characteristics of our parallel file system, PVFS2.
 
-Why rewrite?
-------------
+## Why rewrite?
 
 There are lots of reasons why we've chosen to rewrite the code. We were
 bored with the old code. We were tired of trying to work around inherent
@@ -46,8 +44,7 @@ the opportunity for us to suffer from second system syndrome here! But
 we're willing to risk this in order to position ourselves to use the new
 code base for many years to come.
 
-What's different?
------------------
+## What's different?
 
 The new design has a number of important features, including:
 
@@ -322,8 +319,7 @@ concerns that our PVFS1 users have had over the years.
 
 It's a big undertaking for us. Which leads to the obvious next question.
 
-When will this be available?
-----------------------------
+## When will this be available?
 
 Believe it or not, right now. At SC2004 we released PVFS2 1.0. We would
 be foolish to claim PVFS2 has no bugs and will work for everyone 100% of

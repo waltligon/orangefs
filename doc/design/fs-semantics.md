@@ -6,8 +6,9 @@ title: PVFS 2 File System Semantics Document
 ---
 
 \maketitle
-Introduction
-============
+# PVFS2 File System Semantics Document
+
+## Introduction
 
 This document describes the file system semantics of PVFS2, both in
 terms of how it behaves and in terms of how this behavior is
@@ -26,16 +27,14 @@ system design and implementation.
 In some cases we will provide alternatives for semantics and/or the
 implementation.
 
-Definitions
-===========
+## Definitions
 
 We will define *overlapping writes* to be concurrent writes that modify
 the same bytes in an object. We will define *interleaved writes* to be
 concurrent writes that modify different bytes within a common extent
 (but do not modify the same bytes).
 
-Server Semantics
-================
+## Server Semantics
 
 In this section we discuss the semantics that are enforced by a server
 with respect to operations queued for service on the server. At times
@@ -46,8 +45,7 @@ semantics/policies.
 
 *Note: we're not counting on inter-server communication at this time.*
 
-Permissions and permission checking
------------------------------------
+### Permissions and permission checking
 
 The server will perform any permission checking on incoming operations
 before queuing them for service.
@@ -63,8 +61,7 @@ time of the operation.
 
 Probably datafiles don't have permissions for now.
 
-Removing an object that is being accessed
------------------------------------------
+### Removing an object that is being accessed
 
 The server will not remove an object while it is being accessed. For
 example, if a trove operation is in progress reading data from a
@@ -78,8 +75,7 @@ remove will occur) or to queue these operations until the remove has
 occurred, then allow them to fail. Obviously the first of these options
 is preferable.
 
-Overlapping writes
-------------------
+### Overlapping writes
 
 The server will allow overlapping and interleaved writes to be
 concurrently processed by the underlying storage subsystem (trove).
@@ -88,35 +84,31 @@ pattern is the union of the modified bytes of both operations. In the
 overlapping case trove is free to ignore all but one of the data values
 to be written to each byte or to write them all in some undefined order.
 
-Handle reuse
-------------
+### Handle reuse
 
 Servers will guarantee that handles spend a minimum amount of time out
 of use before they are reused. This time value will be known to clients.
 
-### Implementation
+#### Implementation
 
 Need to handle the case where a handle has been used, we're in the
 middle of this wait time, and the server gets restarted. To handle this
 we will need some kind of disk-resident list of handles along with some
 lower bound on how recently they were put in the unused list.
 
-Symbolic links
---------------
+### Symbolic links
 
 Symbolic links will be stored on servers. The "target" of the link need
 not exist, as with traditional symlinks.
 
-Top level scheduler semantics
------------------------------
+### Top level scheduler semantics
 
 Where does this go?
 
 We need a list of types of operations that shouldn't overlap. This is
 the rule set for the scheduler, or at least part of it.
 
-Client-side library without locks or inter-client communication
-===============================================================
+## Client-side library without locks or inter-client communication
 
 This section describes what will be our first, non-locking approach to
 metadata caching that does not involve client file system code
@@ -152,8 +144,7 @@ inconsistencies between client views.
 *Do we want some kind of optional data caching? If so, this changes our
 concurrent write model.*
 
-Caching of file and directory attributes
-----------------------------------------
+### Caching of file and directory attributes
 
 The most obvious and important data to cache from a performance
 standpoint is attributes associated with file system objects. Here we
@@ -168,17 +159,15 @@ A timeout will be associated with this information.
 
 Implications on file size.
 
-### Implementation
+#### Implementation
 
 Possible to use vtags for verification that data hasn't changed.
 
-Caching of directory hierarchy
-------------------------------
+### Caching of directory hierarchy
 
 Implications on renaming of files, directories, parent directories.
 
-Handle reuse
-------------
+### Handle reuse
 
 It is important that clients be able to identify when a handle has been
 reused by the system and is no longer a reference to the original
@@ -206,7 +195,7 @@ that clocks must be in sync between the various servers.
 
 Name the timeout.
 
-### Implementation
+#### Implementation
 
 Server must keep a time associated with freed handles. Groups of handles
 can be put together with a single time, because our space is big enough
@@ -222,8 +211,7 @@ function call, or there could be a thread in the client code, or maybe
 the client code is its own entity (e.g. pvfsd). All options to list
 here.
 
-Metadata not in cache
----------------------
+### Metadata not in cache
 
 A common occurrence in PVFS1 is that one client will create a file that
 is subsequently accessed by a number of other clients. It is important
@@ -243,8 +231,7 @@ hints occur.
 object that is not known to the client-side cache, the client will
 attempt to retrieve metadata for the object.*
 
-Concurrent, byte-overlapping writes to a single file
-----------------------------------------------------
+### Concurrent, byte-overlapping writes to a single file
 
 One of the most inconvenient of the POSIX I/O semantics is its
 specification of how concurrent, overlapping writes should be handled.
@@ -276,14 +263,13 @@ will result in data from one of the requests being written to each byte
 in the file, but for every given byte the data written could be from any
 one of the concurrent operations.*
 
-### Implementation
+#### Implementation
 
 We will assume that trove is able to handle the interleaved writes and
 support these semantics, so the higher level components of the server
 may pass down any combination of writes that it likes.
 
-Concurrent file create
-----------------------
+### Concurrent file create
 
 This happens all the time in parallel applications, even with ROMIO at
 the moment.
@@ -291,7 +277,7 @@ the moment.
 Only one instance must be created. Everyone must then get the right
 handle. When a handle is returned, it must be ready to be used for I/O.
 
-### Implementation
+#### Implementation
 
 To create a PVFS2 "file", there are actually three things that have to
 happen. A metafile must be created to hold attributes. A collection of
@@ -363,8 +349,7 @@ create completes.
 
 *We will implement the dirent second scheme.*
 
-Moving files
-------------
+### Moving files
 
 Concurrent moves can be tricky. The biggest concern is eliminating any
 point during which a file might have two references in the namespace.
@@ -372,7 +357,7 @@ point during which a file might have two references in the namespace.
 A secondary concern is that of a concurrent create of the destination
 file while the move is in progress.
 
-### Implementation
+#### Implementation
 
 Clients will perform moves in the following way:
 
@@ -401,8 +386,7 @@ the dentry as sv1 and the new holder of the dirent as sv2.
 
 -   on failure, returns failure to client
 
-Deleting a file that is being accessed
---------------------------------------
+### Deleting a file that is being accessed
 
 POSIX semantics dictate that a file deleted while held open by another
 process remains available through the reference that the process holds
@@ -418,12 +402,11 @@ side). We're not going to do this sort of thing on the server side, so
 unless we have communicating clients, we aren't going to get this
 behavior.
 
-### Implementation
+#### Implementation
 
 Delete the dirent first, then the metafile, then the datafiles. I think.
 
-Permissions and permission checking
------------------------------------
+### Permissions and permission checking
 
 Whole path permission checking is performed at lookup time (i.e. when
 someone attempts to get a handle). This will verify that they can read
@@ -442,8 +425,7 @@ Metafile operations get metafile permission checks using cached data.
 We should look at NAS authentication mechanisms and try to find one that
 we can leverage as a future project.
 
-Readdir with concurrent directory changes
------------------------------------------
+### Readdir with concurrent directory changes
 
 Vtags will be used to ensure that directory changes are noticed on
 client side.
@@ -452,8 +434,7 @@ This means that we need a vtag parameter in the request.
 
 We will restart the directory read process in the event of a change.
 
-Time synchronization
---------------------
+### Time synchronization
 
 NOTE: For now we are setting ctime, atime, and mtime at creation using
 time values computed on the client side. We may need to change this
@@ -464,8 +445,7 @@ derived value (as in PVFS1)? If so, we need to have tight clock
 synchronization, or we need some way for adjusting for clock skew (e.g.
 passing current time plus atime or mtime, letting server do the math).
 
-Computing file size
--------------------
+### Computing file size
 
 How? It's a derived value. If no server communication, then we'll need
 to talk to all the owners of datafiles and get their sizes, then do some
@@ -476,69 +456,58 @@ truncate do WRT the datafiles? Does it just make sure that the right one
 is big enough to show that the file should be so big, or do we do
 something to all the datafiles?
 
-Non-blocking calls
-------------------
+### Non-blocking calls
 
 We should have some for read/write in addition to the blocking calls.
 
 We may want a thread under the API to handle progress.
 
-UNIX-like interface
-===================
+## UNIX-like interface
 
 In this section we describe the implications of the server semantics and
 caching client semantics on a hypothetical UNIX-like interface.
 
 *Note the operations at this level.*
 
-Implementing`O_APPEND` with and without concurrent access
----------------------------------------------------------
+### Implementing`O_APPEND` with and without concurrent access
 
 Implications of attribute caching on O\_APPEND. Notes on concurrent
 O\_APPEND vs. not.
 
 Concurrent O\_APPEND is nondeterministic.
 
-Permissions and permission checking
------------------------------------
+### Permissions and permission checking
 
 Permissions can change while file is open, can all of a sudden fail.
 
-Truncate
---------
+### Truncate
 
 Our truncate always resizes when possible (man pages indicate that it
 might or might not grow files).
 
-Hard links
-----------
+### Hard links
 
 No such thing.
 
-Symlinks
---------
+### Symlinks
 
 What to say? Can have targets that don't exist.
 
-Misc.
-=====
+## Misc.
 
 Don't quite know where this stuff goes yet.
 
-Adding I/O servers
-------------------
+### Adding I/O servers
 
 Is there anything tricky here? There is if the servers communicate.
 
-Migrating files and changing distributions
-------------------------------------------
+### Migrating files and changing distributions
 
 Distributions don't change for a given metafile. So we need to get a new
 metafile and go from there. This is also the appropriate way to move
 metafiles around in order to balance the metadata load (if necessary).
 
-Metafile stuffing
------------------
+### Metafile stuffing
 
 This is our version of "inode stuffing", the technique used to store
 small files in the inode data space rather than allocating blocks for
@@ -552,8 +521,7 @@ How do we know when to use this? Do we ever switch from doing this to
 the tradational datafile approach? How do we do that? It might not be so
 hard with server communication, but how do we do it without?
 
-Adding metaservers
-------------------
+### Adding metaservers
 
 At the moment we have said that we will have a static metaserver list.
 How might we approach using a dynamic list?

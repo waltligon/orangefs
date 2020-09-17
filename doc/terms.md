@@ -1,5 +1,4 @@
-PVFS2 terminology
-=================
+# PVFS2 terminology
 
 PVFS2 is based on a somewhat unconventional design in order to achieve
 high performance, scalability, and modularity. As a result, we have
@@ -7,8 +6,7 @@ introduced some new concepts and terminology to aid in describing and
 administering the system. This section describes the most important of
 these concepts from a high level.
 
-File system components
-----------------------
+## File system components
 
 We will start by defining the major system components from an
 administrator or user's perspective. A PVFS2 file system may consist of
@@ -67,8 +65,7 @@ PVFS2. ROMIO is included by default with the MPICH MPI implementation
 and includes drivers for several file systems. See
 http://www.mcs.anl.gov/romio/ for details.
 
-PVFS2 Objects
--------------
+## PVFS2 Objects
 
 PVFS2 has four different object types that are visible to users
 
@@ -82,8 +79,7 @@ PVFS2 has four different object types that are visible to users
 
 \...
 
-Handles
--------
+## Handles
 
 `Handles` are unique, opaque, integer-like identifiers for every object
 stored on a PVFS2 file system. Every file, directory, and symbolic link
@@ -97,8 +93,7 @@ the user does not typically manipulate them directly.
 The allowable range of values that handles may assume is known as the
 `handle space`.
 
-Handle ranges
--------------
+## Handle ranges
 
 Handles are essentially very large integers. This means that we can
 conveniently partition the handle space into subsets by simply
@@ -114,8 +109,7 @@ only interact with handle ranges; the mapping of ranges to servers is
 hidden beneath an abstraction layer. This allows for greater flexibility
 and future features like transparent migration.
 
-File system IDs
----------------
+## File system IDs
 
 Every PVFS2 file system hosted by a particular server has a unique
 identifier known as a `file system ID` or `fs id`. The file system ID
