@@ -3,6 +3,21 @@
 \thispagestyle{empty}
 # Frequently Asked Questions About PVFS
 
+## Table of Contents
+
+1.  [Basics](#basics)
+2.  [Supported Architectures and Hardware](#supported-architectures-and-hardware)
+3.  [Installation](#installation)
+4.  [Reporting Problems](#reporting-problems)
+5.  [Problems and Solutions](#problems-and-solutions)
+6.  [Performance](#performance)
+7.  [Fault Tolerance](#fault-tolerance)
+8.  [File System Interfaces](#file-system-interfaces)
+9.  [Management](#management)
+10. [Missing Features](#missing-features)
+11. [Helping Out](#helping-out)
+12. [Implementation Details](#implementation-details)
+
 ## Basics
 
 This section covers some basic questions for people who are unfamiliar
