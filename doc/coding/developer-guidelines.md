@@ -50,7 +50,7 @@ guidelines.
 The final section contains information that is very specific to PVFS and
 may not be applicable to other projects.
 
-## Editors {#sec:editors}
+## Editors
 
 In the PARL lab we advocate the use of either vi or emacs. These are the
 most common editors used for writing software and are therefore the most
@@ -302,7 +302,7 @@ the following for the the word "cvs" in the command lines:
 or script to do this for convenience. CVS will prompt you for a password
 in this situation.
 
-## Compiler flags {#sec:gcc}
+## Compiler flags
 
 Gcc is the standard c compiler used for PARL software. The general use
 of gcc is beyond the scope of this document, but there are a few
@@ -329,7 +329,7 @@ guidelines that should be followed when building software with gcc:
     be removed in order to reduce binary size or increase optimization,
     but it is invaluable during the development cycle.
 
-## Debugging tutorial {#sec:gdb}
+## Debugging tutorial
 
 Gdb is a debugger for c and c++ programs. I lets you control the
 execution of a program, see what line of source code is being executed
@@ -510,7 +510,7 @@ This section will provide guidelines so that multiple users on a given
 project can write code with consistent appearance. This makes the code
 easier to maintain and audit in a group environment.
 
-#### GPL {#sec:gpl}
+#### GPL
 
 The GPL, or General Public License, is a software license created by the
 GNU organization (http://www.gnu.org). You can find out more information
@@ -548,7 +548,7 @@ In addition to the copyright comments, it is usually helpful to provide
 a brief description of what is contained in the each source file. This
 should just be a few summary lines below the copyright information.
 
-#### Commenting {#sec:comments}
+#### Commenting
 
 Commenting your code effectively is very important! Please comment
 important sections of your code clearly and concisely as you write it.
@@ -614,7 +614,7 @@ and *not*
 
 Also note that each bracket gets it's own line in the source code.
 
-#### Indentation {#sec:indent}
+#### Indentation
 
 Indentation is also very important to writing clear code. The easiest
 rule to remember is that any new set of brackets should add a level of
@@ -643,7 +643,7 @@ loops, and conditionals. The following is an example:
 
 ### Hints for writing maintainable code
 
-#### General code layout {#sec:proto}
+#### General code layout
 
 These are a few general guidelines for how to organize your code:
 
@@ -720,7 +720,7 @@ with underscores. Here is an example for a header file called bmi.h:
     /* don't forget to end your header with this statement */
     #endif /* __BMI_H */   
 
-#### Static declarations {#sec:static}
+#### Static declarations
 
 Any function or variable that is declared global in a particular .c file
 but not referened in any other .c file should be declared static. This
@@ -990,7 +990,7 @@ issues here:
 
 ## Specific PVFS issues
 
-### Copyright information {#sec:pvfs-copyright}
+### Copyright information
 
 Copyright information at the top of source code in PVFS should include
 the University of Chicago. (The University of Chicago is affiliated with
@@ -1002,14 +1002,14 @@ Argonne National Lab, where several key PVFS developers are located).
      * See COPYING in top-level directory.
      */       
 
-### Function commenting {#sec:pvfs-comments}
+### Function commenting
 
 *Figure out what standard should be to match up with autodocument tools.
 This is on hold until we settle on such a tool, so use standard put
 forth in section [9.1.3](#sec:comments){reference-type="ref"
 reference="sec:comments"} for now.*
 
-### Function naming {#sec:pvfs-naming}
+### Function naming
 
 Interface functions and global variables in PVFS should use a standard
 naming convention for clarity. Here are a few guidelines:

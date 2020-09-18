@@ -62,7 +62,7 @@ process part of a PVFS request, stop, and then resume processing at a
 later time when resources become available. This document outlines these
 structures and the algorithms for using them.
 
-### The PINT\_Request {#the-pint_request .unnumbered .unnumbered}
+### The PINT\_Request
 
        typedef struct PINT_Request {
           PVFS_offset  offset;     /* offset from start of last set of elements */
@@ -92,14 +92,14 @@ struct and the PINT\_Request struct passed in as the element type. Calls
 to MPI\_Type\_indexed, MPI\_Type\_hindexed, and MPI\_Type\_struct
 generally utilize the sequence type chain.
 
-### Example Requests {#example-requests .unnumbered .unnumbered}
+### Example Requests
 
 The following are a few examples of how request patterns would be
 represented using the PVFS\_Request structure.
 
 ![image](figs_atoc.eps)
 
-### Single Contiguous Region Requests {#single-contiguous-region-requests .unnumbered .unnumbered}
+### Single Contiguous Region Requests
 
 A single contiguous region is represented by a single structure. The
 region can be specified as SIZE bytes at location OFFSET as in figure A:
@@ -152,7 +152,7 @@ PVFS\_Request\_double. Each of these standard types is defined with an
 etype of NULL which indicates that the region is contiguous regardless
 of the other parameters.
 
-### Strided Region Requests {#strided-region-requests .unnumbered .unnumbered}
+### Strided Region Requests
 
 A data area made up of regular strided groups of contiguous elements can
 also be represented with a single PINT\_Request structure. A region
@@ -177,7 +177,7 @@ Once again this assumes that ETYPE is a contiguous type.
 
 ![image](figs_dtoe.eps)
 
-### Sequential Requests {#sequential-requests .unnumbered .unnumbered}
+### Sequential Requests
 
 A data area may consist of a region that conforms to one type, followed
 by a region that conforms to another. Example might include a strided
@@ -237,7 +237,7 @@ refers to the region represented down stream of the current
 PINT\_Request record, and not the whole region, however ub and lb are
 still expressed in terms of the entire data area.
 
-### Nested Types {#nested-types .unnumbered .unnumbered}
+### Nested Types
 
 Any request can be built on top of another request. When the base
 request is contiguous the result is as above, but when the base request

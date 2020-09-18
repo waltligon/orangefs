@@ -353,7 +353,7 @@ developments. All code is being distributed under the LGPL license to
 facilitate use under arbitrarily licensed high-level libraries.
 
 \newpage
-## The basics of PVFS2 {#sec:basics}
+## The basics of PVFS2
 
 PVFS2 is a parallel file system. This means that it is designed for
 parallel applications sharing data across many clients in a coordinated
@@ -823,7 +823,7 @@ idle time. It is more like a hint to control whether the function is a
 busy poll, or if it should sleep when there is no work to do.
 
 \newpage
-## PVFS2 User APIs and Semantics {#sec:apis}
+## PVFS2 User APIs and Semantics
 
 Because PVFS2 is designed specifically for performance in systems where
 concurrent access from many processes is commonplace, there are some

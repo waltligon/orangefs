@@ -10,7 +10,7 @@ title: A Quick Start Guide to PVFS2
 \thispagestyle{empty}
 # A Quick Start Guide to PVFS2
 
-## How to use this document {#sec:howto}
+## How to use this document
 
 The quick start guide is intended to be a reference on how to quickly
 install and configure a PVFS2 file system. It is broken down into three
@@ -122,7 +122,7 @@ Here are some optional configure arguments which may be of interest:
 Also note that the pvfs2 2.6.x kernel source supports out of tree builds
 if you prefer to use that technique.
 
-## Configuring PVFS2 for a single host {#sec:single}
+## Configuring PVFS2 for a single host
 
 This section documents the steps required to configure PVFS2 on a system
 in which a single machine acts as both the client and server for all
@@ -247,7 +247,7 @@ the config file, then then you must use the -a option. For example, each
 of above command lines could include "-a testhost" to specify that the
 server is using the `testhost` alias in the configuration file.
 
-#### Automatic server startup and shutdown {#sec:rc}
+#### Automatic server startup and shutdown
 
 Like most other system services, PVFS2 may be started up automatically
 at boot up time through the use of rc scripts. We have provided one such
@@ -274,7 +274,7 @@ To manually stop the server:
     bash-2.05b# /etc/init.d/pvfs2-server stop
     Stopping PVFS2 server:                                     [  OK  ]
 
-### Client configuration {#subsec:client}
+### Client configuration
 
 There are two primary methods for accessing a PVFS2 file system. The
 first is using the kernel module to provide standard Linux file system
@@ -319,7 +319,7 @@ useful in production environments:
     kernel or install the mount.pvfs2 utility on 2.4 Linux kernel
     systems.
 
-### Testing your installation {#subsec:testing}
+### Testing your installation
 
 PVFS2 currently includes (among others) the following tools for
 manipulating the file system using the native PVFS2 library: pvfs2-ping,
@@ -383,7 +383,7 @@ following examples:
 
     bash-2.05b# diff /tmp/testfile-out /usr/lib/libc.a
 
-## Installing PVFS2 on a cluster {#sec:cluster}
+## Installing PVFS2 on a cluster
 
 It is important to have in mind the roles that machines (a.k.a. nodes)
 will play in the PVFS2 system. There are three potential roles that a
@@ -410,7 +410,7 @@ We will configure our example system so that the node "cluster1"
 provides metadata information, eight nodes (named "cluster1" through
 "cluster8") provide I/O services, and all nodes act as clients.
 
-### Server configuration {#sec:server-config}
+### Server configuration
 
 We will assume that at this point you have either performed a make
 install on every node, or else have provided the pvfs2 executables,
@@ -539,7 +539,7 @@ If you wish to automate server startup and shutdown with rc scripts,
 refer to the corresponding section [3.2.1](#sec:rc){reference-type="ref"
 reference="sec:rc"} from the single server example.
 
-### Client configuration {#client-configuration}
+### Client configuration
 
 Setting up a client for multiple servers is the same as setting up a
 client for a single server. Refer to section
@@ -552,15 +552,15 @@ system will do. For large clusters, using different server names will
 eliminate one potential bottleneck in the system by balancing the load
 of clients reading initial configuration information.
 
-### Testing your Installation {#testing-your-installation}
+### Testing your Installation
 
 Testing a multiple-server pvfs2 installation is the same as testing a
 single-server pvfs2 installation. Refer to section
 [3.4](#subsec:testing){reference-type="ref" reference="subsec:testing"}
 
-## The PVFS2 Linux Kernel Interface {#sec:kernel-interface}
+## The PVFS2 Linux Kernel Interface
 
-### Finding an Appropriate Kernel Version {#sec:kernel-check}
+### Finding an Appropriate Kernel Version
 
 Now that you've mastered the download and installation steps of managing
 the userspace PVFS2 source code, configuring the PVFS2 Linux Kernel
@@ -601,7 +601,7 @@ For reference, you can download Linux kernels at:
 Once you're convinced the Linux kernel version is appropriate, it's time
 to compile the PVFS2 kernel module.
 
-### Preparing Linux Kernel 2.6.x configurations {#sec:vfs-configure}
+### Preparing Linux Kernel 2.6.x configurations
 
 To generate the Makefile, you need to make sure that you run
 './configure' with the '--with-kernel=path' argument. An example is
@@ -629,7 +629,7 @@ build tree. You may install it to the standard system location with
 Or you may override the install location by setting the variable
 KMOD\_DIR variable when you install.
 
-### Preparing Linux Kernel 2.4.x configurations {#sec:vfs24-configure}
+### Preparing Linux Kernel 2.4.x configurations
 
 To generate the Makefile, you need to make sure that you run
 './configure' with the '--with-kernel24=path' argument. An example is
@@ -652,7 +652,7 @@ build tree. You may install it to the standard system location with
 this. Or you may override the install location by setting the variable
 KMOD\_DIR variable when you install.
 
-### Testing the Kernel Interface {#sec:vfs-test}
+### Testing the Kernel Interface
 
 Now that you've built a valid PVFS2 kernel module, there are several
 steps to perform to properly use the file system.
@@ -868,7 +868,7 @@ will be a bitwise OR of values specified in pvfs2-debug.h. For more
 information on setting the kernel or client debug mask, see
 `doc/pvfs2-logging.txt` in the PVFS source tree.
 
-## ROMIO Support {#sec:romio}
+## ROMIO Support
 
 Building ROMIO with PVFS2 support can be a bit tricky, and is certainly
 not well documented. Reports of the correct way to build for OpenMPI

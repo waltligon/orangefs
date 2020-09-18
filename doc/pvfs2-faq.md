@@ -133,7 +133,7 @@ The PVFS Guide (<http://www.pvfs.org/pvfs2-guide.html>) has more
 information on all of these components, plus a discussion of the system
 as a whole, the code tree, and more.
 
-### What is the format of the PVFS version string? {#sec:version-string}
+### What is the format of the PVFS version string?
 
 PVFS uses a three-number version string: X.Y.Z. The first number (X)
 represents the high level design version of PVFS. The current design
@@ -167,7 +167,7 @@ it can be helpful when setting up fault tolerant solutions; see
 Section [7](#sec:fault-tolerance){reference-type="ref"
 reference="sec:fault-tolerance"}.
 
-### What architectures does PVFS support? {#sec:supported-architectures}
+### What architectures does PVFS support?
 
 The majority of PVFS is POSIX-compliant C code that runs in user space.
 As such, much of PVFS can run on most available systems. See
@@ -187,7 +187,7 @@ is encoded in a architecture-independent format (little-endian with
 fixed byte length parameters). This allows different PVFS components to
 interact seamlessly regardless of architecture.
 
-### Does running PVFS require a particular kernel or kernel version? {#sec:kernel-version}
+### Does running PVFS require a particular kernel or kernel version?
 
 You can run the userspace PVFS servers and administration tools on every
 major GNU/Linux distribution out of the box, and we intend to keep it
@@ -198,7 +198,7 @@ module). The kernel dependent PVFS client support has been written for
 Linux kernel versions 2.4.19 (and greater) and 2.6.0 (and greater). At
 this time only Linux clients have this level of support.
 
-### What specific hardware architectures are supported by the PVFS kernel module? {#sec:supported-hw}
+### What specific hardware architectures are supported by the PVFS kernel module?
 
 To our knowledge, PVFS has been verified to be working on x86/IA-32,
 IA-64, AMD64, PowerPC (ppc), and Alpha based GNU/Linux distributions.
@@ -234,7 +234,7 @@ The PVFS Quick Start Guide
 of both a simple, single-server installation, and a more complicated,
 multi-server configuration.
 
-### How can I store PVFS data on multiple disks on a single node? {#sec:multiple-disks}
+### How can I store PVFS data on multiple disks on a single node?
 
 There are at least two ways to do this.
 
@@ -283,7 +283,7 @@ these servers. For information on better handling failures, see
 Section [7](#sec:fault-tolerance){reference-type="ref"
 reference="sec:fault-tolerance"}.
 
-### How many servers should I run? {#sec:howmany-servers}
+### How many servers should I run?
 
 Really, the answer is "it depends", but here are some factors you should
 take into account.
@@ -329,7 +329,7 @@ Note the backslash-escape of the colon before the port number. Without
 that escape, the automounter will get confused and replace `’tcp://’`
 with `’tcp:///’`
 
-### Can I mount more than one PVFS file system on the same client? {#sec:multiple-mounts}
+### Can I mount more than one PVFS file system on the same client?
 
 Yes. However, when setting up the two file systems it is important that
 both file systems have unique `Name` and `ID` values (in the file system
@@ -448,7 +448,7 @@ reference="sec:multiple-mounts"}.
 Finally, be sure there are no typos in your command line, as this is
 commonly the case!
 
-### PVFS server consumes 100% of the CPU {#sec:server_100pct_cpu}
+### PVFS server consumes 100% of the CPU
 
 On some systems, the pvfs2-server will start consuming 100% of the CPU
 after you try to read or write a file to PVFS. gdb indicates that the
@@ -470,7 +470,7 @@ might make more sense: when/if the system's glibc is upgraded, you will
 only have to restart pvfs2-server with the environment variable unset.
 You would not have to rebuild pvfs2 to take advantage of the fix.
 
-### PVFS write performance slows down dramatically {#sec:write_slowdown}
+### PVFS write performance slows down dramatically
 
 Phil Carns noticed that on some kernels, write-heavy workloads can
 trigger a kernel bug. The symptoms are that the PVFS server will only be
@@ -505,7 +505,7 @@ libraries:
 I would suggest the ld.so.conf approach, since that will work for all
 users on your system.
 
-### PVFS performance gets really bad once a day, then gets better again {#sec:cron-indexing}
+### PVFS performance gets really bad once a day, then gets better again
 
 Several sites have reported poor PVFS performance early in the day that
 eventually goes away until the next day, when the cycle begins again.
@@ -558,7 +558,7 @@ associated interface changes).
 -   Take a look at dmesg. `pvfs2_get_sb – wait timed out` could indicate
     a problem with `pvfs2-client-core`. See the next question.
 
-### I did all three of the above steps and I still can't mount pvfs2 {#sec:nptl_and_mounting}
+### I did all three of the above steps and I still can't mount pvfs2
 
 There's one last thing to check. Are you you are using a Redhat or
 Fedora distribution, but running with a stock kernel.org 2.4 kernel? If
@@ -688,7 +688,7 @@ some inlined kernel routines. PVFS2-1.3.2 or newer has the configure
 option `–disable-kernel-aio`. Passing this option to configure results
 in a pvfs2 kernel module that uses only exported symbols.
 
-### Everything built fine, but when I try to compile programs that use PVFS, I get undefined references {#sec:undefined_references}
+### Everything built fine, but when I try to compile programs that use PVFS, I get undefined references
 
 The `libpvfs2` library requires a few additional libraries. Usually
 \"-lpthread -lcrypto -lssl\" are required. Further, Myrinet and
@@ -722,7 +722,7 @@ and thus there is a real possibility of the data being served stale.
 Therefore users of the sendfile system call are warned to be wary of
 this detail.
 
-### Trove-dbpf metadata format version mismatch! {#sec:trove-migration}
+### Trove-dbpf metadata format version mismatch!
 
 In PVFS2-1.5.0 or newer the format of the metadata storage has change
 from previous versions (1.4.0 or earlier). This affects users that have
@@ -740,7 +740,7 @@ using --all, the option --fs can be used to specify the name of the
 storage collection that needs to be migrated (usually there's only one
 storage collection, with the default name of 'pvfs2-fs').
 
-### Problems with pre-release kernels {#sec:rc-kernels}
+### Problems with pre-release kernels
 
 For better or worse, the Linux kernel development process for the 2.6
 series does not make much effort to maintain a stable kernel API. As a
@@ -752,7 +752,7 @@ you stand a good chance of running into problems. We are unable to track
 every pre-release kernel, but do make an effort to publish necessary
 patches once a kernel is officially released.
 
-### Does PVFS work with Open-MX? {#sec:open-mx}
+### Does PVFS work with Open-MX?
 
 Yes, PVFS does work with Open-MX. To use Open-MX, configure PVFS with
 the the same arguments that you would use for a normal MX installation:
@@ -766,7 +766,7 @@ by default.
 
 This section covers issues related to the performance of PVFS.
 
-### I configured PVFS with support for multiple intercdonnects (e.g. Infiniband and TCP), but see low performance {#sec:multi-method-badperf}
+### I configured PVFS with support for multiple intercdonnects (e.g. Infiniband and TCP), but see low performance
 
 When multiple interconnects are enabled, PVFS will poll both interfaces.
 This gives PVFS maximum flexiblity, but does incur a performance penalty
@@ -777,7 +777,7 @@ omit the `with-<METHOD>` option when configuring PVFS.
 Note that it can sometimes be useful to have multiple interconnects
 enabled. The right choice depends a lot on your situation.
 
-### I ran Bonnie and/or IOzone and the performance is terrible. Why? Is there anything I can do? {#sec:badperf}
+### I ran Bonnie and/or IOzone and the performance is terrible. Why? Is there anything I can do?
 
 We designed PVFS to work well for scientific applications in a cluster
 environment. In such an environment, a file system must either spend
@@ -806,7 +806,7 @@ serial nature, PVFS will be unable to deliver its full performance.
 Instead try running a parallel file system benchmark like IOR
 (<ftp://ftp.llnl.gov/pub/siop/ior/>).
 
-### Why is program XXX so slow? {#sec:why_so_slow}
+### Why is program XXX so slow?
 
 See Question [6.2](#sec:badperf){reference-type="ref"
 reference="sec:badperf"}. If the program uses small block sizes to
@@ -824,7 +824,7 @@ application on a single node, you can also use the client side attribute
 cache (disabled by default). This timeout is adjustable as a command
 line argument to pvfs2-client.
 
-### NFS outperforms PVFS for application XXX. Why? {#sec:nfs_vs_pvfs2}
+### NFS outperforms PVFS for application XXX. Why?
 
 In an environment where there is one client accessing a file on one
 server, NFS will outperform PVFS in many benchmarks. NFS has completely
@@ -854,7 +854,7 @@ what you're doing, then perhaps PVFS is not a wise choice of file system
 for you. PVFS is not designed for serial workloads, particularly one
 with small accesses.
 
-### Can the underlying local file system affect PVFS performance? {#sec:local_fs}
+### Can the underlying local file system affect PVFS performance?
 
 Yes! However, the interaction between the PVFS servers and the local
 file system hosting the storage space has not been fully explored. No
@@ -877,7 +877,7 @@ If you're looking for a quick suggestion for a local file system type to
 use, we suggest ext3 with "journal data writeback" option as a
 reasonable choice.
 
-### Is there any way to tune particular directories for different workloads? {#sec:dir_tuning}
+### Is there any way to tune particular directories for different workloads?
 
 Yes. This can be done by using extended attributes to set directory
 hints. Three hints are currently supported, and they allow you to
@@ -916,7 +916,7 @@ PVFS defaults to striping files across each server in the file system.
 However, you may find that for small files it is advantages to limit
 each file to only a subset of servers (or even just one).
 
-### My app still runs more slowly than I would like. What can I do? {#sec:tuning}
+### My app still runs more slowly than I would like. What can I do?
 
 If you ask the mailing list for help with performance, someone will
 probably ask you one or more of the following questions:
@@ -946,7 +946,7 @@ operating systems, PVFS, the application, and sometimes MPI. We are
 working on a document to better guide the tuning of systems for
 IO-intensive workloads.
 
-## Fault Tolerance {#sec:fault-tolerance}
+## Fault Tolerance
 
 This section covers issues related to fault tolerance in the context of
 PVFS.
@@ -1070,11 +1070,11 @@ Question [9.3](#sec:migration){reference-type="ref"
 reference="sec:migration"}) both in the case of a new server, or if you
 wanted to migrate data off a server before removing it.
 
-### Are there tools for migrating data between servers? {#sec:migration}
+### Are there tools for migrating data between servers?
 
 Not at this time, no.
 
-### Why does df show less free space than I think it should? What can I do about that? {#sec:df-free-space}
+### Why does df show less free space than I think it should? What can I do about that?
 
 PVFS uses a particular algorithm for calculating the free space on a
 file system that takes the minimum amount of space free on a single
@@ -1100,7 +1100,7 @@ determine the maximum file and file system sizes for the local file
 system type that you are using for PVFS server storage and multiply
 these values by the number of servers you are using.
 
-### Mouning PVFS with the interrupt option {#sec:mountintr}
+### Mouning PVFS with the interrupt option
 
 The PVFS kernel module supports the intr option provided by network file
 systems. This allows applications to be sent kill signals when a
@@ -1150,7 +1150,7 @@ point; however, there is no plan to build such a system at this time.
 
 This section covers ways one could contribute to the PVFS project.
 
-### How can I contribute to the PVFS project? {#sec:contributing}
+### How can I contribute to the PVFS project?
 
 There are lots of ways to directly or indirectly contribute to the PVFS
 project. Reporting bugs helps us make the system better, and describing

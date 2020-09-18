@@ -76,7 +76,7 @@ the client and server (requests or acknowledgements). They will only be
 used for data transfer. It is assumed that request messages will be used
 for handshaking before or after the flow as needed.
 
-### Architecture {#sec:arch}
+### Architecture
 
 There are two major parts of the flow architecture, as seen in figure
 [\[fig:flow-arch\]](#fig:flow-arch){reference-type="ref"
@@ -137,7 +137,7 @@ distribution parameters that may be needed to coordinate remote flows.
 
 ## Data structures
 
-### Flow descriptor {#sec:flow-desc}
+### Flow descriptor
 
 Flow descriptors are created by the flow interface user. At this time,
 the caller may edit these fields directly. Once the flow has been posted

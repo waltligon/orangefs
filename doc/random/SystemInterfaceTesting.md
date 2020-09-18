@@ -21,7 +21,7 @@ positive tests and negative tests. Positive tests examine functions
 operating on normal procedures. Negative tests examine the functions
 behavior on abnormal procedures designed to make the functions fail.
 
-## Setup {#setupL}
+## Setup
 
 Describe the system (hardware and OS) that the tests are being run on
 and the version of pvfs2.
@@ -169,7 +169,7 @@ functions are incorrect.
 
 Tests functions' behavior when invalid parameters are supplied
 
-#### Null parameters {#null1L}
+#### Null parameters
 
 All parameters of each function are null. Note, before any of the
 functions can be called, initialize must be called with valid parameters

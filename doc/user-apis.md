@@ -1,4 +1,4 @@
-# PVFS2 User APIs and Semantics {#sec:apis}
+# PVFS2 User APIs and Semantics
 
 Because PVFS2 is designed specifically for performance in systems where
 concurrent access from many processes is commonplace, there are some

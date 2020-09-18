@@ -1,4 +1,4 @@
-# The basics of PVFS2 {#sec:basics}
+# The basics of PVFS2
 
 PVFS2 is a parallel file system. This means that it is designed for
 parallel applications sharing data across many clients in a coordinated

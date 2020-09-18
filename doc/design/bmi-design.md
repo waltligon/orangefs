@@ -60,7 +60,7 @@ may elect to bypass it.
 
 -   pvfs2-design-concepts: general definitions and overview of PVFS2.
 
-## High level design {#sec:high}
+## High level design
 
 ### Features and Goals
 
@@ -128,7 +128,7 @@ or maintain any link between hosts before sending messages. The BMI
 implementation may maintain connections internally if needed for a
 particular network device, but such details are not exposed to the user.
 
-### Architecture {#sec:arch}
+### Architecture
 
 The overall architecture of BMI is shown in Figure
 [\[fig:bmi-arch\]](#fig:bmi-arch){reference-type="ref"
@@ -141,7 +141,7 @@ presenting the top level BMI interface to the application.
 ![BMI Architecture [\[fig:bmi-arch\]]{#fig:bmi-arch
 label="fig:bmi-arch"}](bmi-arch-color.eps)
 
-#### Method control {#method-control-intro}
+#### Method control
 
 From a high level, the method control layer is responsible for
 orchestrating network operations and managing the network methods. This
@@ -227,7 +227,7 @@ If a memory buffer is allocated using BMI function calls, then it must
 also be deallocated using BMI. These buffers are not guaranteed to be
 manageable by standard operating system libraries.
 
-### Unexpected messages {#sec:unexp}
+### Unexpected messages
 
 BMI's default mode of operation requires that each send operation be
 matched with a certain receive operation at the remote host in order to
@@ -256,7 +256,7 @@ see if unexpected messages have arrived. It is the responsibility of the
 caller to eventually free this buffer using the normal system free()
 function.
 
-### Short messages {#sec:short}
+### Short messages
 
 The BMI interface does not allow partial completion of messages.
 However, it does allow for a sender to send less data than the receiver
@@ -337,7 +337,7 @@ regions using contiguous intermediate buffers. This is obviously a
 performance penalty, but will ensure correct behavior when a native
 method cannot easily handle discontiguous memory regions.
 
-## User interface {#sec:user}
+## User interface
 
 ### Types and structures
 
@@ -470,7 +470,7 @@ Both types of error codes for the time being consist of -errno values.
 This is not really expressive enough for long term use, but at least
 gives a general idea of the type of failure for now.
 
-## Method implementation {#sec:methguide}
+## Method implementation
 
 The method interface is very similar to the BMI user interface. It
 implements roughly the same functions. However, it includes minor
@@ -538,7 +538,7 @@ level API:
     converted into information to be passed to the BMI user by the
     method control layer.
 
-### Support libraries {#sec:support}
+### Support libraries
 
 The BMI library provides several support functions which may aid method
 programmers when implementing support for new protocols. Each method can
@@ -629,7 +629,7 @@ across all methods.
 -   **id\_gen\_fast\_lookup()**: Returns a pointer to the original data
     structure that was associated with the given id.
 
-## References {#sec:ref}
+## References
 
 -   **source code**: The source code to BMI may be found in the "pvfs2"
     cvs tree, within the pvfs2/src/io/bmi directory.
