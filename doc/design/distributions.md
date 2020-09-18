@@ -1,10 +1,3 @@
----
-author:
-- PVFS Development Team
-date: May 2004
-title: PVFS2 Distribution Design Notes
----
-
 \maketitle
 # PVFS2 Distribution Design Notes
 

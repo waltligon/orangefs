@@ -1,9 +1,3 @@
----
-author:
-- PVFS Development Team
-title: Trove and PVFS2
----
-
 \maketitle
 # Trove and PVFS2
 

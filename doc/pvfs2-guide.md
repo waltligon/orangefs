@@ -1,10 +1,3 @@
----
-author:
-- PVFS2 Development Team
-date: 'September, 2003'
-title: 'Parallel Virtual File System, Version 2'
----
-
 \maketitle
 \newpage
 \setcounter{tocdepth}{2}

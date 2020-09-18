@@ -1,9 +1,3 @@
----
-author:
-- PVFS2 Development Team
-title: A Quick Start Guide to PVFS2
----
-
 \maketitle
 \tableofcontents
 \newpage

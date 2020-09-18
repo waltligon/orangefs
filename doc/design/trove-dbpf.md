@@ -1,9 +1,3 @@
----
-author:
-- PVFS Development Team
-title: 'Trove Database + Files (DBPF) Implementation'
----
-
 \maketitle
 # Trove Database + Files (DBPF) Implementation
 

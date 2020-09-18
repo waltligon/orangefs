@@ -1,9 +1,3 @@
----
-author:
-- PVFS Development Team
-title: 'Trove: The PVFS2 Storage Interface'
----
-
 \maketitle
 # Trove: The PVFS2 Storage Interface
 

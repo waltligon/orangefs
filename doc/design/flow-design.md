@@ -1,10 +1,3 @@
----
-author:
-- PVFS Development Team
-date: July 2002
-title: Flow Design Document
----
-
 \maketitle
 # Flow Design Document
 

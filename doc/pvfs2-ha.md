@@ -1,10 +1,3 @@
----
-author:
-- PVFS2 Development Team
-date: 'June, 2004'
-title: 'PVFS2 High-Availability Clustering'
----
-
 \maketitle
 # PVFS2 High-Availability Clustering
 

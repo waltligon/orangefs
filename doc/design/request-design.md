@@ -1,12 +1,3 @@
----
-author:
-- PVFS Development Team
-date: march 2002
-title: |
-    PVFS2 MPI Based Requests\
-    Design Notes
----
-
 \maketitle
 # PVFS2 MPI Based Requests Design Notes
 

@@ -1,9 +1,3 @@
----
-author:
-- PVFS Development Team
-title: PVFS Tuning
----
-
 \maketitle
 \tableofcontents
 \thispagestyle{empty}

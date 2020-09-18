@@ -1,9 +1,3 @@
----
-author:
-- PVFS Development Team
-title: Trove DBPF Handle Allocator
----
-
 \maketitle
     $Id: handle-allocator.tex,v 1.1 2003-01-24 23:29:18 pcarns Exp $
 # Trove DBPF Handle Allocator

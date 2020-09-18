@@ -1,8 +1,3 @@
----
-date: 2008
-title: 'PVFS High Availability Clustering using Heartbeat 2.0'
----
-
 \maketitle
 \tableofcontents
 \newpage

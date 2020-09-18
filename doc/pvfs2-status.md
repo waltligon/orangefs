@@ -1,10 +1,3 @@
----
-author:
-- PVFS2 Development Team
-date: ' Last Updated: September 2003'
-title: Current PVFS2 status
----
-
 \maketitle
 \tableofcontents
 \newpage

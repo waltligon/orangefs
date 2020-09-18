@@ -1,12 +1,3 @@
----
-author:
-- PVFS Development Team
-date: ' Feb 12, 2001'
-title: |
-    Parallel Architecture Research Laboratory\
-    Developer Guidelines
----
-
 \maketitle
 \tableofcontents
 \newpage

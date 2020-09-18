@@ -1,9 +1,3 @@
----
-author:
-- PVFS Development Team
-title: 'PVFS 2 Concepts: The new guy''s guide to PVFS'
----
-
 \maketitle
     $Id: concepts.tex,v 1.3 2006-09-13 20:22:43 vilayann Exp $
 

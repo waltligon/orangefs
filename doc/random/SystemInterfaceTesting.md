@@ -1,14 +1,3 @@
----
-author:
-- |
-    Frank Shorter\
-    Michael Speth
-date: 'May 16, 2003'
-title: |
-    PVFS2: System Interface\
-    Test Suite
----
-
 \maketitle
 # PVFS2: System Interface Test Suite
 

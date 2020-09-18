@@ -1,9 +1,3 @@
----
-author:
-- PVFS Development Team
-title: Frequently Asked Questions about PVFS
----
-
 \maketitle
 \tableofcontents
 \thispagestyle{empty}

@@ -1,10 +1,3 @@
----
-author:
-- PVFS Development Team
-date: May 2002
-title: PVFS 2 File System Semantics Document
----
-
 \maketitle
 # PVFS2 File System Semantics Document
 

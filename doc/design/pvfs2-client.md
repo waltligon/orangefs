@@ -1,10 +1,3 @@
----
-author:
-- PVFS Development Team
-date: April 2003
-title: '`pvfs2-client` Design Document (DRAFT)'
----
-
 \maketitle
 # `pvfs2-client` Design Document (DRAFT)
 

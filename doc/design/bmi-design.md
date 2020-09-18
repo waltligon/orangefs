@@ -1,10 +1,3 @@
----
-author:
-- PVFS Development Team
-date: July 2002
-title: BMI Document
----
-
 \maketitle
 # BMI Document
 
