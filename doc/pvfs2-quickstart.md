@@ -877,8 +877,7 @@ the last MPICH2 release. If there are bug fixes, they can be found at
 http://www.mcs.anl.gov/romio/pvfs2-patches.html.
 
 Unpack mpich2. Apply the ROMIO patch in the src/mpi/romio directory if
-one is
-    needed.
+one is needed.
 
     prompt% tar xzf ~/src/mpich2-1.4.0p1.tar.gz    # unpack mpich2 source
     prompt% cd mpich2-1.4.0p1/src/mpi/romio        # change to ROMIO dir
@@ -902,8 +901,7 @@ name.
 Please note: older versions of MPICH2 need a few changes to the normal
 configure process. MPICH2-1.0.4p1 and older will need to know the path
 to the PVFS2 installation. Modify the CFLAGS, LDFLAGS and LIBS
-environment
-    variables.
+environment variables.
 
     prompt% export CFLAGS="<other desired flags> -I/usr/local/pvfs2/include"
     prompt% export LDFLAGS="-L/usr/local/pvfs2/lib"
