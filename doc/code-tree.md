@@ -21,12 +21,13 @@ At the top level we see:
 
   - `test`
 
-The `doc` directory rather obviously holds documentation, mostly written
-in LaTeX. There are a few subdirectories under `doc`. The `coding`
-subdirectory has a document describing guidelines for writing code for
-the project. The `design` subdirectory has a number of documents
-describing various components of the system and APIs and more
-importantly currently houses the Quick Start.
+The `doc` directory rather obviously holds documentation, mostly
+originally written in LaTeX and recently converted to markdown. There
+are a few subdirectories under `doc`. The `coding` subdirectory has a
+document describing guidelines for writing code for the project. The
+`design` subdirectory has a number of documents describing various
+components of the system and APIs and more importantly currently
+houses the Quick Start.
 
 Much of the documentation is out of date.
 
