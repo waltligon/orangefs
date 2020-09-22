@@ -1,23 +1,24 @@
 \maketitle
+
 # BMI Document
 
 ## TODO
 
--   maybe change method nomenclature to module
+  - maybe change method nomenclature to module
 
--   no longer do size mathing
+  - no longer do size mathing
 
--   test/wait nomenclature and semantics
+  - test/wait nomenclature and semantics
 
 Stuff from discussions with Pete:
 
--   give a strict definition for "completion". we do local completion in
+  - give a strict definition for “completion”. we do local completion in
     MPI sense (completion means safe to reuse buffer). User can build
     barrier to get non local completion.
 
--   encourage preposting and discuss why
+  - encourage preposting and discuss why
 
--   discuss a little bit how flows fit in, what real purpose of bmi is
+  - discuss a little bit how flows fit in, what real purpose of bmi is
 
 ## Introduction
 
@@ -38,42 +39,42 @@ may elect to bypass it.
 
 ## Related Documents
 
--   pvfs2-design-storageint: outlines the Trove interface, which is a
+  - pvfs2-design-storageint: outlines the Trove interface, which is a
     low storage device interface used by PVFS2.
 
--   pvfs2-design-flow: outlines the flow interface. Flows are used to
+  - pvfs2-design-flow: outlines the flow interface. Flows are used to
     represent transfers that involve both network and storage. It also
     brings together scheduling, physical distribution, and I/O request
     processing for this environment. The default flow implementation
     uses BMI and Trove as underlying access mechanisms.
 
--   pvfs2-design-job: covers the high level glue layer that pulls the
+  - pvfs2-design-job: covers the high level glue layer that pulls the
     flow, BMI, trove, and scheduling interfaces together into a coherent
     framework.
 
--   pvfs2-design-concepts: general definitions and overview of PVFS2.
+  - pvfs2-design-concepts: general definitions and overview of PVFS2.
 
 ## High level design
 
 ### Features and Goals
 
--   simple API
+  - simple API
 
--   modularity
+  - modularity
 
--   efficiency
+  - efficiency
 
--   support for multiple simultaneous networks
+  - support for multiple simultaneous networks
 
--   client/server model
+  - client/server model
 
--   supports discontiguous memory regions
+  - supports discontiguous memory regions
 
--   hooks for obtaining information for scheduling
+  - hooks for obtaining information for scheduling
 
--   message based, reliable, ordered delivery
+  - message based, reliable, ordered delivery
 
--   misc. features tailored to parallel I/O
+  - misc. features tailored to parallel I/O
 
 ### Implementation
 
@@ -103,7 +104,7 @@ Each function may perform work before completing, but this work is
 guaranteed to complete within a bounded amount of time. This restriction
 implies that it may be necessary to test for completion of a message
 several times before it actually completes. There is no mechanism that
-allows the interface to "wait" indefinitely for completion of a
+allows the interface to “wait” indefinitely for completion of a
 particular operation. This design decision was made because blocking
 network calls (especially in large parallel systems) are prone to
 problems with robustness and scalability. They may cause an application
@@ -113,8 +114,7 @@ acceptable within low level system services.
 When posting receive operations, the user must specify the address of
 the sending host and the size of the message to accept. The user cannot
 post receives that match wildcard addresses. The only exceptions to this
-rule are unexpected messages, as defined in section
-[5.2](#sec:unexp){reference-type="ref" reference="sec:unexp"}.
+rule are unexpected messages, as defined in section [5.2](#sec:unexp).
 
 BMI is a connectionless interface; the user does not have to establish
 or maintain any link between hosts before sending messages. The BMI
@@ -124,15 +124,14 @@ particular network device, but such details are not exposed to the user.
 ### Architecture
 
 The overall architecture of BMI is shown in Figure
-[\[fig:bmi-arch\]](#fig:bmi-arch){reference-type="ref"
-reference="fig:bmi-arch"}. Support for individual network protocols is
-provided by BMI *methods*. There may be any number of methods active at
-a given time. This collection of methods is managed by the *method
-control layer*. The method control layer is also responsible for
-presenting the top level BMI interface to the application.
+[\[fig:bmi-arch\]](#fig:bmi-arch). Support for individual network
+protocols is provided by BMI *methods*. There may be any number of
+methods active at a given time. This collection of methods is managed by
+the *method control layer*. The method control layer is also responsible
+for presenting the top level BMI interface to the application.
 
-![BMI Architecture [\[fig:bmi-arch\]]{#fig:bmi-arch
-label="fig:bmi-arch"}](bmi-arch-color.eps)
+![BMI Architecture
+<span id="fig:bmi-arch" label="fig:bmi-arch">\[fig:bmi-arch\]</span>](bmi-arch-color.eps)
 
 #### Method control
 
@@ -165,7 +164,7 @@ representation of addresses, and the method specific representation of
 addresses. The BMI user level addresses are handles for network hosts
 that the application uses when calling BMI functions. The string
 representation is the ASCII host name of the hosts before they are
-resolved by BMI (as read from a "hosts" file, for example). Finally, the
+resolved by BMI (as read from a “hosts” file, for example). Finally, the
 method address is the representation that that methods use for
 identifying hosts, which may contain information specific to that
 particular protocol. Note that method addresses are never, under any
@@ -222,13 +221,12 @@ manageable by standard operating system libraries.
 
 ### Unexpected messages
 
-BMI's default mode of operation requires that each send operation be
+BMI’s default mode of operation requires that each send operation be
 matched with a certain receive operation at the remote host in order to
 complete. This send and receive operation must match in terms of
-expected message size (more on this in section
-[5.3](#sec:short){reference-type="ref" reference="sec:short"}), host
+expected message size (more on this in section [5.3](#sec:short)), host
 address, and identication tag. Otherwise the communication will not
-complete. There is no mechanism for receiving from a "wildcard" address.
+complete. There is no mechanism for receiving from a “wildcard” address.
 
 However, in order to loosen this restriction, BMI provides a special
 class of messages called *unexpected messages*. This type of message is
@@ -236,7 +234,7 @@ sent without the receiving host explicitly requesting the communication.
 In other words, the receiving host does not post a matching receive for
 this type of message. Instead, it must periodically check to see if any
 unexpected messages have arrived in order to receive them successfully.
-This is the equivalent of "listening" for new requests in a more
+This is the equivalent of “listening” for new requests in a more
 traditional networking system. Unexpected messages may come from any
 host on the network. Communication between two hosts is typically
 initiated by one of the hosts sending an unexpected message to the
@@ -253,8 +251,8 @@ function.
 
 The BMI interface does not allow partial completion of messages.
 However, it does allow for a sender to send less data than the receiver
-anticipated, resulting in what may be thought of as "short" messages
-from the receiver's point of view. Short messages *do not* indicate that
+anticipated, resulting in what may be thought of as “short” messages
+from the receiver’s point of view. Short messages *do not* indicate that
 another receive is needed to obtain the rest of the message. Instead it
 means that the sender does not have as much data to transmit as the
 receiver was expecting it to. In practice, this tends to occur in file
@@ -295,14 +293,14 @@ wait() call. This sometimes makes it challenging to map the completion
 of an operation back to the higher level operation or state that the
 user was trying to carry out.
 
-BMI includes the concept of "user pointers" to help with this problem. A
+BMI includes the concept of “user pointers” to help with this problem. A
 user pointer is a void\* passed in to message post functions, which is
 returned to the user when the message completes. The caller may use
 these pointer fields for any purpose. Typically it will be useful as a
 mechanism to map back to a higher level state without having to search
 through a queue of operations that are currently in flight. If used
 properly, user pointers eliminate the need for the caller to keep track
-of operation id's for any reason other than for calling test()
+of operation id’s for any reason other than for calling test()
 functions.
 
 ### List I/O
@@ -320,7 +318,7 @@ Messages posted using the list interface are completely compatible with
 contiguous messages on the peer side. Regions do not have to match
 between sender and receiver, nor do they both have to be discontiguous.
 The aggregate size of the message does need to match, however. The list
-functions support all of the features of the "normal" API, including
+functions support all of the features of the “normal” API, including
 short messages.
 
 The intention is for method level support of list messages to be
@@ -334,21 +332,21 @@ method cannot easily handle discontiguous memory regions.
 
 ### Types and structures
 
--   **Message tags**: Message tags are numerical values that may be
+  - **Message tags**: Message tags are numerical values that may be
     associated with messages to be sent or received using BMI. The
     sending and receiving process must use matching tags in order for a
     given communication to complete. Unexpected messages are the only
     exception; in that case only the sender must specify a tag.
-
+    
     Tags provide a mechanism for PVFS to differentiate between various
     messages and associate them with specific tasks.
 
--   **ID's**: ID's are opaque handles that a caller may use to keep
-    track of operations that are currently in progress. ID's are
+  - **ID’s**: ID’s are opaque handles that a caller may use to keep
+    track of operations that are currently in progress. ID’s are
     assigned by BMI when an operation is posted and then used in
     subsequent tests to determine if the operation has completed.
 
--   **unexpected\_info**: This is a struct used to describe incoming
+  - **unexpected\_info**: This is a struct used to describe incoming
     unexpected messages. It is filled in by the testunexpected() and
     waitunexpected() calls (see below).
 
@@ -360,46 +358,46 @@ initiation, message testing, memory management, list I/O, and utilities.
 The message initiation functions are used by an application to request
 the sending or receiving of network buffers:
 
--   **BMI\_post\_send()**: Posts a send operation.
+  - **BMI\_post\_send()**: Posts a send operation.
 
--   **BMI\_post\_recv()**: Posts a receive operation.
+  - **BMI\_post\_recv()**: Posts a receive operation.
 
--   **BMI\_post\_sendunexpected()**: Posts a send operation that was not
+  - **BMI\_post\_sendunexpected()**: Posts a send operation that was not
     expected by the receiving process.
 
--   **BMI\_unpost()**: Unposts a previously submitted operation. *This
+  - **BMI\_unpost()**: Unposts a previously submitted operation. *This
     is a blocking call.*
 
--   **BMI\_addr\_lookup()**: Converts the string representation of a BMI
+  - **BMI\_addr\_lookup()**: Converts the string representation of a BMI
     address (in url-like form) into an opaque BMI addr type.
 
 The message testing functions are used to check for completion of
 network operations:
 
--   **BMI\_test()**: Tests for completion of a single operation.
+  - **BMI\_test()**: Tests for completion of a single operation.
 
--   **BMI\_testsome()**: Tests for completion of any of a specified set
+  - **BMI\_testsome()**: Tests for completion of any of a specified set
     of operations.
 
--   **BMI\_testunexpected()**: Tests for arrival of any unexpected
+  - **BMI\_testunexpected()**: Tests for arrival of any unexpected
     messages.
 
--   **BMI\_wait()**: Tests for completion of a single operation; is
+  - **BMI\_wait()**: Tests for completion of a single operation; is
     allowed to block briefly if no work is available.
 
--   **BMI\_waitsome()**: Tests for completion of any of a specified set
+  - **BMI\_waitsome()**: Tests for completion of any of a specified set
     of operations; is allowed to block briefly if no work is available.
 
--   **BMI\_waitunexpected()**: Tests for completion of any of a
+  - **BMI\_waitunexpected()**: Tests for completion of any of a
     specified set of operations; is allowed to block briefly if no work
     is available.
 
 The BMI memory management functions are used to control memory buffers
 that are optimized for use with BMI:
 
--   **BMI\_memalloc()**: Creates a new buffer.
+  - **BMI\_memalloc()**: Creates a new buffer.
 
--   **BMI\_memfree()**: Destroys a buffer previously created with
+  - **BMI\_memfree()**: Destroys a buffer previously created with
     BMI\_memalloc().
 
 The list I/O functions are very similar to the message initiation
@@ -411,50 +409,50 @@ array of pointers and sizes to use as I/O targets. These arrays must not
 be freed or modified until completion of the requested operation (they
 are not copied by the BMI interface).
 
--   **BMI\_post\_send\_list()**: Same as BMI\_post\_send, except that it
+  - **BMI\_post\_send\_list()**: Same as BMI\_post\_send, except that it
     allows the caller to specify an array of buffers and sizes to send
     from.
 
--   **BMI\_post\_recv\_list()**: Same as BMI\_post\_recv, except that it
+  - **BMI\_post\_recv\_list()**: Same as BMI\_post\_recv, except that it
     allows the caller to specify an array of buffers and sizes to
     receive into.
 
--   **BMI\_post\_sendunexpected\_list()**: Same as
+  - **BMI\_post\_sendunexpected\_list()**: Same as
     BMI\_post\_sendunexpected(), execept that it allows the caller to
     specify an array of buffers and sizes to send from.
 
 The final collection of functions perform various utility tasks that are
 not directly involved in network I/O:
 
--   **BMI\_initialize()**: Starts the BMI interface; must be called
+  - **BMI\_initialize()**: Starts the BMI interface; must be called
     prior to any other BMI functions.
 
--   **BMI\_finalize()**: Shuts down the BMI interface.
+  - **BMI\_finalize()**: Shuts down the BMI interface.
 
--   **BMI\_set\_info()**: Sets optional BMI parameters.
+  - **BMI\_set\_info()**: Sets optional BMI parameters.
 
--   **BMI\_get\_info()**: Reads optional BMI parameters.
+  - **BMI\_get\_info()**: Reads optional BMI parameters.
 
 #### Supported getinfo and setinfo options
 
--   BMI\_DROP\_ADDR: This is a hint which may be passed to set\_info. It
+  - BMI\_DROP\_ADDR: This is a hint which may be passed to set\_info. It
     tells the interface that no further communication will be requested
     of the specified address, and that it should be discarded. *NOTE:
     this option will almost certainly be deprecated or replaced soon*
 
--   BMI\_CHECK\_INIT: This is a query to get\_info which simply checks
+  - BMI\_CHECK\_INIT: This is a query to get\_info which simply checks
     to see if the BMI interface has been properly initialized or not.
 
 ### Error handling
 
 Errors may be reported from BMI in one of two ways:
 
--   *Return value of API function*: If an API function returns a value
+  - *Return value of API function*: If an API function returns a value
     less than zero, it indicates that the function failed. This is an
     indication of a critical internal error that is not particular to
     any specific operation.
 
--   *Operation error code*: This is a value filled in upon completion of
+  - *Operation error code*: This is a value filled in upon completion of
     an operation. If less than zero, it indicates that the operation in
     question failed, but that the BMI interface as a whole is working
     properly.
@@ -472,61 +470,61 @@ are targeted for a single specific method.
 
 ### Method interface
 
--   **BMI\_method\_initialize()**:
+  - **BMI\_method\_initialize()**:
 
--   **BMI\_method\_finalize()**:
+  - **BMI\_method\_finalize()**:
 
--   **BMI\_method\_post\_send()**:
+  - **BMI\_method\_post\_send()**:
 
--   **BMI\_method\_post\_sendunexpected()**:
+  - **BMI\_method\_post\_sendunexpected()**:
 
--   **BMI\_method\_post\_recv()**:
+  - **BMI\_method\_post\_recv()**:
 
--   **BMI\_method\_unpost()**:
+  - **BMI\_method\_unpost()**:
 
--   **BMI\_method\_addr\_lookup()**:
+  - **BMI\_method\_addr\_lookup()**:
 
--   **BMI\_method\_test()**:
+  - **BMI\_method\_test()**:
 
--   **BMI\_method\_testsome()**:
+  - **BMI\_method\_testsome()**:
 
--   **BMI\_method\_testunexpected()**:
+  - **BMI\_method\_testunexpected()**:
 
--   **BMI\_method\_wait()**:
+  - **BMI\_method\_wait()**:
 
--   **BMI\_method\_waitsome()**:
+  - **BMI\_method\_waitsome()**:
 
--   **BMI\_method\_waitunexpected()**:
+  - **BMI\_method\_waitunexpected()**:
 
--   **BMI\_method\_memalloc()**:
+  - **BMI\_method\_memalloc()**:
 
--   **BMI\_method\_memfree()**:
+  - **BMI\_method\_memfree()**:
 
--   **BMI\_method\_set\_info()**:
+  - **BMI\_method\_set\_info()**:
 
--   **BMI\_method\_get\_info()**:
+  - **BMI\_method\_get\_info()**:
 
--   **BMI\_method\_post\_send\_list()**:
+  - **BMI\_method\_post\_send\_list()**:
 
--   **BMI\_method\_post\_sendunexpected\_list()**:
+  - **BMI\_method\_post\_sendunexpected\_list()**:
 
--   **BMI\_method\_post\_recv\_list()**:
+  - **BMI\_method\_post\_recv\_list()**:
 
 ### Important structures
 
 There are three major structures that are manipulated at the BMI method
 level API:
 
--   **method\_op**: This structure is used to keep track of pending
+  - **method\_op**: This structure is used to keep track of pending
     operations. It includes several generic fields which should apply to
     almost any method, as well as a private area which may be used
     internally by methods for storage of parameters.
 
--   **method\_addr**: This structure is used to describe network
+  - **method\_addr**: This structure is used to describe network
     addresses at the method level. Like the method\_op structure, it has
     both generic and private sections.
 
--   **method\_unexpected\_info**: This structure describes incoming
+  - **method\_unexpected\_info**: This structure describes incoming
     unexpected messages. It is filled in during testunexpected(), and
     converted into information to be passed to the BMI user by the
     method control layer.
@@ -549,37 +547,37 @@ private method specific parameters (such as flow control or device
 management information). The operation queue mechanism in BMI is based
 on the doubly linked list implementation found in the Linux kernel.
 
--   **op\_queue\_new()**: Creates a new operation queue.
+  - **op\_queue\_new()**: Creates a new operation queue.
 
--   **op\_queue\_cleanup()**: Destroys an existing operation queue as
+  - **op\_queue\_cleanup()**: Destroys an existing operation queue as
     well as any operations contained within it.
 
--   **op\_queue\_add()**: Adds a method operation onto the tail of a
+  - **op\_queue\_add()**: Adds a method operation onto the tail of a
     queue.
 
--   **op\_queue\_remove()**: Removes a specific operation from the queue
+  - **op\_queue\_remove()**: Removes a specific operation from the queue
     in which it resides.
 
--   **op\_queue\_search()**: Searches for an operation that matches the
+  - **op\_queue\_search()**: Searches for an operation that matches the
     characteristics specified a given key. All searches begin at the
     head of the target operation queue.
 
--   **op\_queue\_empty()**: Determines whether a queue is empty or not.
+  - **op\_queue\_empty()**: Determines whether a queue is empty or not.
 
--   **op\_queue\_count()**: Counts the number of entries within an
+  - **op\_queue\_count()**: Counts the number of entries within an
     operation queue. This function requires iteration through every
     element of the queue. It is therefore only suitable for debugging
     purposes in which performance is not critical.
 
--   **op\_queue\_dump()**: Prints out information about every operation
+  - **op\_queue\_dump()**: Prints out information about every operation
     in the queue. Only used for debugging and prototyping purposes.
 
 Two related functions are also provided for managing the creation of
 operation structures:
 
--   **alloc\_method\_op()**: Allocates a new operation structure.
+  - **alloc\_method\_op()**: Allocates a new operation structure.
 
--   **dealloc\_method\_op()**: Deallocates an existing method operation.
+  - **dealloc\_method\_op()**: Deallocates an existing method operation.
 
 #### Method address support
 
@@ -588,12 +586,12 @@ Like operation structures, they contain private storage for internal
 method use. Three functions are provided to aid in managing these
 structures:
 
--   **alloc\_method\_addr()**: Creates a new address structure.
+  - **alloc\_method\_addr()**: Creates a new address structure.
 
--   **dealloc\_method\_addr()**: Destroys an existing method address
+  - **dealloc\_method\_addr()**: Destroys an existing method address
     structure.
 
--   **bmi\_method\_addr\_reg\_callback()**: This is called by a method
+  - **bmi\_method\_addr\_reg\_callback()**: This is called by a method
     to inform the method control layer that it should register a new
     method address structure. The function is typically invoked when an
     unexpected message arrives and the method must create a new address
@@ -607,36 +605,36 @@ This mechanism is used in several other components besides BMI as well.
 A discussion of gossip may be found in the *parl-developer-guidelines*
 document.
 
-#### Operation id's
+#### Operation id’s
 
-Each method is responsible for creating opaque id's that can be used to
-refer to operations that are currently in progress. Typically these id's
+Each method is responsible for creating opaque id’s that can be used to
+refer to operations that are currently in progress. Typically these id’s
 will be used to map user requests to specific operation structures. The
 *id\_generator* library is available to aid methods in performing this
 mapping operation. It also insures that the id space is consistent
 across all methods.
 
--   **id\_gen\_fast\_register()**: Registers a new structure with the
+  - **id\_gen\_fast\_register()**: Registers a new structure with the
     interface and creates a new id that may be used to reference it.
 
--   **id\_gen\_fast\_lookup()**: Returns a pointer to the original data
+  - **id\_gen\_fast\_lookup()**: Returns a pointer to the original data
     structure that was associated with the given id.
 
 ## References
 
--   **source code**: The source code to BMI may be found in the "pvfs2"
+  - **source code**: The source code to BMI may be found in the “pvfs2”
     cvs tree, within the pvfs2/src/io/bmi directory.
 
--   **example methods**: Two example methods have been created thus far.
+  - **example methods**: Two example methods have been created thus far.
     A method for the GM protocol may be found in
     pvfs2/src/io/bmi/bmi\_gm. A method for the TCP/IP protocol may be
     found in pvfs2/src/io/bmi/bmi\_tcp.
 
--   **benchmarks**: Benchmarks that compare MPI and BMI can be found in
+  - **benchmarks**: Benchmarks that compare MPI and BMI can be found in
     pvfs2/src/io/bmi/benchmark.
 
--   **example applications**: Example applications that use BMI directly
+  - **example applications**: Example applications that use BMI directly
     may be found in pvfs2/src/io/bmi/examples.
 
--   **BMI technical paper**: work in progress, available in cvs as the
-    "bmi\_paper" project.
+  - **BMI technical paper**: work in progress, available in cvs as the
+    “bmi\_paper” project.

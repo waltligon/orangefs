@@ -2,13 +2,14 @@
 \tableofcontents
 \newpage
 \thispagestyle{plain}
+
 # Parallel Architecture Research Laboratory Developer Guidelines
 
 ## TODO
 
--   reorganize this to be PVFS-centric
+  - reorganize this to be PVFS-centric
 
--   document the build system
+  - document the build system
 
 ## Introduction
 
@@ -34,7 +35,7 @@ other UNIX-like platforms.
 The second portion of this document covers formatting and writing
 standard C code. Some of these guidelines are provided to maintain
 consistency in the appearance of the code, while others actually assist
-in writing "correct" code or making reasonable design decisions while
+in writing “correct” code or making reasonable design decisions while
 coding. The third section provides the Java counterpart to these
 guidelines.
 
@@ -53,26 +54,26 @@ editors so that it is easier to maintain consistent formatting.
 
 The general use of vi is beyond the scope of this document, but you can
 find out enough to get started by either asking a colleague or starting
-vi and typing ":help". There is also a tutorial available on many
-systems that can be started by typing "vimtutor" at the command line.
+vi and typing “:help”. There is also a tutorial available on many
+systems that can be started by typing “vimtutor” at the command line.
 
 #### Vi variants
 
 There are a few variations of the basic vi editor that support different
-features. The most popular is vim, or "Vi IMproved". vim adds several
+features. The most popular is vim, or “Vi IMproved”. vim adds several
 important features to vi, including multilevel undo, visual selection,
 and multiple buffers. It also is fully compatible with the original vi
 editor. Some machines utilize a version of vim that also contains
 optional context highlighting, while others provide a separate binary
 with this feature that is called vimx.
 
-This may seem a little confusing, but it is actually something you don't
+This may seem a little confusing, but it is actually something you don’t
 have to worry about if you just setup your environment to use the
 version that you prefer on any given system. The easiest way to do this
 is to add a conditional statement to your login configuration that
-aliases the "vi" command to start whichever version is available. This
+aliases the “vi” command to start whichever version is available. This
 example illustrates how to do this if you use the tcsh shell. Add the
-following lines to your \~/.cshrc file:
+following lines to your ~/.cshrc file:
 
     if ( -X vimx ) then
        alias vi vimx
@@ -92,11 +93,10 @@ are writing in). Vim has rule sets for several languages ranging from c
 to latex. This can be extremely useful when trying to quickly read code.
 It is also helpful in catching a few minor coding errors. You can
 control these options for vi by way of a file in your home directory
-name ".vimrc". This file can also be used to control other settings in
+name “.vimrc”. This file can also be used to control other settings in
 vi, as an alternative to the environment variable used in section
-[\[sec:vi\_env\]](#sec:vi_env){reference-type="ref"
-reference="sec:vi_env"}. The following is an example of some color
-settings for vi taken from a .vimrc file:
+[\[sec:vi\_env\]](#sec:vi_env). The following is an example of some
+color settings for vi taken from a .vimrc file:
 
     set background=dark
     if has("syntax")
@@ -127,31 +127,31 @@ CVS is a network aware version control system. Several of the larger
 projects in the PARL lab use CVS to manage source code. These are some
 of the basic capabilities that it provides:
 
--   automatically tracks changes to code so that old versions are backed
+  - automatically tracks changes to code so that old versions are backed
     up
 
--   allows you to document incremental changes and browse this
+  - allows you to document incremental changes and browse this
     documentation
 
--   multiple users can make changes simultaneously
+  - multiple users can make changes simultaneously
 
--   keeps multiple copies synchronized between different users
+  - keeps multiple copies synchronized between different users
 
--   allows you to work remotely
+  - allows you to work remotely
 
 You can find out more information about CVS at http://www.cvshome.org.
 
 ### Overview
 
 CVS stores revision history for each file in your project. Each time you
-"commit" a file to CVS, a snapshot of its state at that time is stored
+“commit” a file to CVS, a snapshot of its state at that time is stored
 in CVS. This allows you to back up to old versions at any time, or
 browse old versions to see how the code evolved.
 
 It is important to note that CVS stores version information
 independently for each file. There is no global verion number associated
 with your project at any time unless you manually assign it (see the
-"tag" feature, which is beyond the scope of this document). Version
+“tag” feature, which is beyond the scope of this document). Version
 numbers for each file revision are assigned automatically by CVS; there
 is no way to control this numbering.
 
@@ -175,90 +175,90 @@ and for bash:
 out? Might be nice to be able to play with this stuff without hurting a
 real project*
 
--   **export:** If you wish to get a copy of a source tree with no
+  - **export:** If you wish to get a copy of a source tree with no
     intention of modifying it or manipulating it with CVS, you can just
     export it. This command creates a directory for the project and
     populates it with the source code. To export the most recent copy of
     a project:
-
+    
         cvs export -D today <projectname>
+    
+    (where \(<\)projectname\(>\) is the name of the project). When you
+    are done with the code you can simply delete the directory.
 
-    (where $<$projectname$>$ is the name of the project). When you are
-    done with the code you can simply delete the directory.
-
--   **check out:** The check out command is used to obtain a copy of the
+  - **check out:** The check out command is used to obtain a copy of the
     source code that will be tracked by CVS. This will let you make
     changes and additions to the project. You must have appropriate
     permissions in order to perform this operation:
-
+    
         cvs co <projectname>
-
+    
     This will create a directory for the project that contains source
-    code and CVS information. See the "commit" command for information
-    on submitting modifications, and the "release" command to get rid of
+    code and CVS information. See the “commit” command for information
+    on submitting modifications, and the “release” command to get rid of
     the directory when you are done.
-
+    
     The checkout command can be run repeatedly without any harmful side
     effects. This is useful for updating your copy of a project to make
     sure that it matches the most recent modifications before adding any
     modifications of your own.
 
--   **release:** When you are done with a project, you may release the
+  - **release:** When you are done with a project, you may release the
     directory. This will warn you if you have made any modifications to
     the source code that have not been committed to CVS. The options
     listed below will also cause your copy of the project directory to
     be deleted. Note that it is perfectly fine to leave code checked out
     for long periods of time if you are going to be working on it
     regularly.
-
+    
         cvs release -d <projectname>
 
--   **commit:** Once you have made any changes to the project, you must
+  - **commit:** Once you have made any changes to the project, you must
     perform a commit operation to record the changes in CVS and make
     them available to other users. It is usually advisable to only
     commit code that compiles and works correctly, unless you are the
     only person working on the project. Otherwise, you may interfere
-    with someone else's work. This command should be carried out within
+    with someone else’s work. This command should be carried out within
     the project directory:
-
+    
         cvs commit
-
+    
     When you do this, CVS will open up a vi session that allows you to
     write a brief summary of the changes that you have made. Note that
     this summary will be associated with all of the files that you have
     changed since the last checkin, not just one. The commit will
     complete when you close the vi session.
 
--   **add:** The add command is used to add new files to the project.
+  - **add:** The add command is used to add new files to the project.
     You must create the new file first. Then run the following command
     from within the project directory that contains the new file:
-
+    
         cvs add <newfilename>
-
-    You must follow this up with a "commit" in order for other users to
+    
+    You must follow this up with a “commit” in order for other users to
     see the new file. This command may also be used to add new
     directories to a project. Add directories with caution, however.
     Unlike files, subdirectories are very difficult to remove from a CVS
     project.
 
--   **update:** You will often find it necessary to update your copy of
+  - **update:** You will often find it necessary to update your copy of
     the project to reflect the most recent changes. Rather than use the
     update command, however, it is often better to simply run the
     checkout command again. It will detect if your project is already
     checked out and will update if needed.
 
--   **status:** The status command will tell you the status of all of
+  - **status:** The status command will tell you the status of all of
     the files within a particular project directory. This is useful for
     determining if your copy is up to date or if it has been modified
     but not checked in:
-
+    
         cvs status
-
+    
     If you wish to filter the output from this command so that it only
     shows you files that are not up to date you may do the following
     (you can make this an alias or script if you wish to use this
     regularly):
-
+    
         cvs status |& grep Status: | grep -v Up-to-date 
 
 There are many other CVS commands and features, but the ones listed
@@ -276,8 +276,8 @@ track the source code). Then run this command:
 
     cvs import -m "Imported sources" <projectname> PARL start
 
-(for the sake of clarity, $<$projectname$>$ should probably match the
-name of the directory that contains the source)
+(for the sake of clarity, \(<\)projectname\(>\) should probably match
+the name of the directory that contains the source)
 
 ### Remote access
 
@@ -285,7 +285,7 @@ You can also access the PARL CVS repository remotely (outside of the
 lab) if you have an internet connection and the CVS and ssh programs
 installed on your remote machine. It works exactly like using CVS
 locally. You can use the same commands listed above, except substitute
-the following for the the word "cvs" in the command lines:
+the following for the the word “cvs” in the command lines:
 
     cvs -d :ext:<userid>@cvs.parl.clemson.edu:/projects/cvsroot
 
@@ -299,7 +299,7 @@ Gcc is the standard c compiler used for PARL software. The general use
 of gcc is beyond the scope of this document, but there are a few
 guidelines that should be followed when building software with gcc:
 
--   Always use the -Wall command line flag to gcc. This turns on most of
+  - Always use the -Wall command line flag to gcc. This turns on most of
     the warnings that gcc is capable of generating at compile time. The
     warnings tend to point out bad coding habits and ambiguous
     statements. Use the -Wall option from the very beginning of your
@@ -307,18 +307,16 @@ guidelines that should be followed when building software with gcc:
     base has gotten large because of the sheer number of warnings that
     it will probably find at that point.
 
--   Always use the -Wstrict-prototypes command line flag to gcc. This
+  - Always use the -Wstrict-prototypes command line flag to gcc. This
     turns on additional warnings that enforce the use of proper
-    prototypes for all functions. See section
-    [9.2.1](#sec:proto){reference-type="ref" reference="sec:proto"} for
+    prototypes for all functions. See section [9.2.1](#sec:proto) for
     more information.
 
--   Make use of the -g option to gcc in development code. This enables
-    debugging symbols for use with gdb (section
-    [6](#sec:gdb){reference-type="ref" reference="sec:gdb"}). When code
-    is released to the public, it may be the case that this option will
-    be removed in order to reduce binary size or increase optimization,
-    but it is invaluable during the development cycle.
+  - Make use of the -g option to gcc in development code. This enables
+    debugging symbols for use with gdb (section [6](#sec:gdb)). When
+    code is released to the public, it may be the case that this option
+    will be removed in order to reduce binary size or increase
+    optimization, but it is invaluable during the development cycle.
 
 ## Debugging tutorial
 
@@ -332,8 +330,7 @@ gdb, but gdb is still one of the most popular and most flexible.
 
 In order to use gdb, the code in question must have been compiled with
 the debugging option turned on. For the gcc compiler (see section
-[5](#sec:gcc){reference-type="ref" reference="sec:gcc"}), this just
-means using the -g option:
+[5](#sec:gcc)), this just means using the -g option:
 
     gcc -g test.c -o test
 
@@ -348,7 +345,7 @@ program you wish to debug has not been started and must be launched with
 the run command outlined below.
 
 Alternatively, you can attach to a process that is already running if
-you know it's pid. In this case, the command line arguments to gdb are
+you know it’s pid. In this case, the command line arguments to gdb are
 the program name followed by the pid of the running program.
 
     > ./test &
@@ -369,12 +366,12 @@ use with gdb. You can find out more specific information by using the
 help command or by looking at
 http://sources.redhat.com/gdb/\#documentation.
 
--   **help**: Typing just help at the prompt will give you a list of
+  - **help**: Typing just help at the prompt will give you a list of
     command classes that you can find out more information about. You
     can also get documentation for a particular command if you know its
     name.
 
--   **break**: Break is used for specifying where you would like to
+  - **break**: Break is used for specifying where you would like to
     pause execution of a program. You can either specify a function name
     or a line number with break. The next time you run or continue your
     program, it will stop at this breakpoint and wait for another gdb
@@ -385,22 +382,22 @@ http://sources.redhat.com/gdb/\#documentation.
     multiple break points if you would like the execution to stop at
     more than one location.
 
--   **run**: This command begins execution of your program. If you have
+  - **run**: This command begins execution of your program. If you have
     not specified any breakpoints, the program will run until it exits
     normally or an error occurs. If you do specify a breakpoint, it will
     also stop when it hits that breakpoint.
 
--   **continue**: Continue causes execution to resume if you are
+  - **continue**: Continue causes execution to resume if you are
     currently at a breakpoint or have been stepping through execution
     one line at a time. Continue will let program execution progress
     until it hits either an error, normal exit, or critical error.
 
--   **step**: Step lets you execute one line of source code at a time.
+  - **step**: Step lets you execute one line of source code at a time.
     It will tell you what line it is on, as well as what line of code is
     about to be executed. This allows you to examine the effects of
     particular statements in your code.
 
--   **next**: Next is very similar to step, except that it treats
+  - **next**: Next is very similar to step, except that it treats
     subroutine calls as a single instruction rather than stepping into
     all subroutines. This is very helpful for skipping over functions
     that you do not wish to inspect the internals of (such as printf for
@@ -408,23 +405,23 @@ http://sources.redhat.com/gdb/\#documentation.
     that are either known to work or were not compiled with debugging
     symbols.
 
--   **print**: The print command is the primary mechanism for inspecting
+  - **print**: The print command is the primary mechanism for inspecting
     data structures and variables. Print can be used to show the
     contents of a single variable by using the variable name as the
     argument. It will also attempt to print out a comma separated list
     of the elements of a structure if you try to print a structure.
     Print is aware of a c like syntax for specifying struct elements and
     pointers so that you can specify elements and variables using
-    struct.element, struct-$>$element and \*pointer notation.
+    struct.element, struct-\(>\)element and \*pointer notation.
     Parenthesis are often required in situations where they are not in c
     notation, however.
 
--   **where**: This command shows your current location in the execution
+  - **where**: This command shows your current location in the execution
     stack. It prints the line number of the current instruction, as well
     as the heirarchy of subroutine line numbers that were passed through
     to get to this point.
 
--   **list**: List is used to list the source code surrounding a
+  - **list**: List is used to list the source code surrounding a
     particular instruction. By default, you it lists the 10 lines
     surrounding the current instruction. You can also use it to list
     source code surrounding a particular line number or function
@@ -432,7 +429,7 @@ http://sources.redhat.com/gdb/\#documentation.
 
 ## Makefile tutorial
 
-*We may be able to get this from the MPICH coding docs or from Walt's
+*We may be able to get this from the MPICH coding docs or from Walt’s
 web page?*
 
 ## Electric Fence tutorial
@@ -462,29 +459,28 @@ separate link step):
 When you run your program, it should print a message to the screen
 indicating that Electric Fence is in use. If your program segfaults, it
 will not show you where it occurred, but you can then debug the program
-with gdb to determine this information (section
-[6](#sec:gdb){reference-type="ref" reference="sec:gdb"}).
+with gdb to determine this information (section [6](#sec:gdb)).
 
 ### Electric Fence options
 
 There are several helpful Electric Fence options that can be controlled
 by way of environment variables. The following list summarizes the most
-useful ones. They can be turned on in tcsh by typing "setenv VARIABLE
-value" or in bash by typing "export VARIABLE=value", where VARIABLE is
+useful ones. They can be turned on in tcsh by typing “setenv VARIABLE
+value” or in bash by typing “export VARIABLE=value”, where VARIABLE is
 the option you wish to control and value is the value that you wish to
 set it to.
 
--   EF\_ALIGNMENT: This controls the allignment of dynamically allocated
-    memory. By default, this alignment is equal to your machines's word
+  - EF\_ALIGNMENT: This controls the allignment of dynamically allocated
+    memory. By default, this alignment is equal to your machines’s word
     size. This means that small overruns might go unnoticed because
     extra memory has been allocated for certain buffers. To make sure
     that this does not happen, set alignment to 1. This ensures that
     even the small overruns will be caught.
 
--   EF\_PROTECT\_BELOW: When this option is set to 1, it tells Electric
+  - EF\_PROTECT\_BELOW: When this option is set to 1, it tells Electric
     Fence to check for buffer underruns in addtion to buffer overruns.
 
--   EF\_PROTECT\_FREE: When this option is set to 1, Electric Fence will
+  - EF\_PROTECT\_FREE: When this option is set to 1, Electric Fence will
     check to be sure that memory is not being accessed after it has been
     released with the free() system call.
 
@@ -514,24 +510,24 @@ legally protects your developments.
 
 Any PARL project code that you release to the community should include
 an electronic copy of the GPL. The easiest way to do this is to create a
-file in the project's top level directory called "COPYING" which
+file in the project’s top level directory called “COPYING” which
 contains the full text of the GPL version 2 as obtained from
 http://www.gnu.org. Then in *every* source code file in the project,
 include the following text at the very top of the file:
 
-    /*
-     * (C) 2001 Clemson University.
-     *
-     * See COPYING in top-level directory.
-     */       
+``` 
+/*
+ * (C) 2001 Clemson University.
+ *
+ * See COPYING in top-level directory.
+ */       
+```
 
 Other organizations that have contributed to the project may be listed
-in the copyright line as well (See section
-[10.1](#sec:pvfs-copyright){reference-type="ref"
-reference="sec:pvfs-copyright"} for information on how do this in PVFS
-code). If you wish to credit particular developers or provide contact
-information, please do so in the README file located in the top level
-directory.
+in the copyright line as well (See section [10.1](#sec:pvfs-copyright)
+for information on how do this in PVFS code). If you wish to credit
+particular developers or provide contact information, please do so in
+the README file located in the top level directory.
 
 #### Other source code header information
 
@@ -541,7 +537,7 @@ should just be a few summary lines below the copyright information.
 
 #### Commenting
 
-Commenting your code effectively is very important! Please comment
+Commenting your code effectively is very important\! Please comment
 important sections of your code clearly and concisely as you write it.
 The habit of commenting after completing the code often leads to poor
 comments.
@@ -552,7 +548,8 @@ part of the c language specification.
 
 For single line comments (or brief comments trailing a line of code),
 just use the /\* and \*/ delimiters. If the comment is longer than one
-line, use this format:
+line, use this
+    format:
 
     /* This code does lots of cool things.  It is also written perfectly and
      * will never break.  It is fast, robust, extensible, and resistant to
@@ -565,7 +562,6 @@ Comments that describe the operation of a particular function should be
 listed just above the function definition, not the prototype. The
 comment should give the function name, what it does, what any potential
 side effects are, and the range of return values. This is one example:
-
 
     /* MC_finalize()
      *
@@ -582,9 +578,7 @@ side effects are, and the range of return values. This is one example:
     }
 
 If you are working on the PVFS project, then you should adhere to the
-function comments described in section
-[10.2](#sec:pvfs-comments){reference-type="ref"
-reference="sec:pvfs-comments"}.
+function comments described in section [10.2](#sec:pvfs-comments).
 
 #### Brackets
 
@@ -603,7 +597,7 @@ and *not*
     if(something true) 
        do something;
 
-Also note that each bracket gets it's own line in the source code.
+Also note that each bracket gets it’s own line in the source code.
 
 #### Indentation
 
@@ -614,9 +608,9 @@ loops, and conditionals. The following is an example:
 
     int foofunction(int x)
     {
-
+    
        int y = 0;
-
+    
        if(x <= 0)
        {
           do some stuff;
@@ -628,7 +622,7 @@ loops, and conditionals. The following is an example:
              do lots of stuff;
           }
        }
-
+    
        return(0);
     }
 
@@ -638,26 +632,24 @@ loops, and conditionals. The following is an example:
 
 These are a few general guidelines for how to organize your code:
 
--   Group similar functions together into the same .c file.
+  - Group similar functions together into the same .c file.
 
--   If a function will only be called from within the .c file where it
+  - If a function will only be called from within the .c file where it
     is defined, then include the prototype for the function in the same
-    .c file near the top. (see section
-    [9.2.4](#sec:static){reference-type="ref" reference="sec:static"}
-    for information on static declarations)
+    .c file near the top. (see section [9.2.4](#sec:static) for
+    information on static declarations)
 
--   If a function will be called from outside of the .c file in which it
+  - If a function will be called from outside of the .c file in which it
     is declared, then put the prototype in a header file separate from
     the .c file. This header should be included in any other .c file
     where the function will be called.
 
--   Put comments describing the behavior of the function just before its
+  - Put comments describing the behavior of the function just before its
     definition, not with the prototype (see section
-    [9.1.3](#sec:comments){reference-type="ref"
-    reference="sec:comments"} for more detailed information about
+    [9.1.3](#sec:comments) for more detailed information about
     commenting functions).
 
--   Header files should *only* contain prototypes and structures that
+  - Header files should *only* contain prototypes and structures that
     are needed by external pieces of code. It helps to encapsulate
     things by not providing extraneous information in the header files.
 
@@ -683,33 +675,34 @@ variables or definitions in your code. It is usually safe to pick the
 filename of header, convert it to all uppercase, and replace punctuation
 with underscores. Here is an example for a header file called bmi.h:
 
+``` 
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
 
-    /*
-     * (C) 2001 Clemson University and The University of Chicago
-     *
-     * See COPYING in top-level directory.
-     */
+/* This file contains the primary application interface to the BMI
+ * library.
+ */
 
-    /* This file contains the primary application interface to the BMI
-     * library.
-     */
+#ifndef __BMI_H    /* these macros tell the compiler to skip the */
+#define __BMI_H    /* following code if it hits it a second time */
 
-    #ifndef __BMI_H    /* these macros tell the compiler to skip the */
-    #define __BMI_H    /* following code if it hits it a second time */
+/* now do whatever you would normally do in your header: */
 
-    /* now do whatever you would normally do in your header: */
+#include<bmi_types.h>
 
-    #include<bmi_types.h>
+struct foo{
+   int x;
+   int y;
+};
 
-    struct foo{
-       int x;
-       int y;
-    };
+int foo_function(double a, double b);
 
-    int foo_function(double a, double b);
-
-    /* don't forget to end your header with this statement */
-    #endif /* __BMI_H */   
+/* don't forget to end your header with this statement */
+#endif /* __BMI_H */   
+```
 
 #### Static declarations
 
@@ -758,26 +751,26 @@ good naming convention is:
 
     /* returns a pointer to new structure on success, null on failure */
     struct foo* alloc_foo(void);  
-
+    
     and
-
+    
     /* no return value */
     void dealloc_foo(struct foo*);
 
 #### Keeping up with work in progress
 
-There are often questionable issues, or even issues that you don't have
+There are often questionable issues, or even issues that you don’t have
 time to deal with at the moment, that come up when writing large pieces
-of code. It is generally helpful to document these questions or "todo"
+of code. It is generally helpful to document these questions or “todo”
 items in a known location so that they are not forgotten. There are two
 recommended ways of handling this. Keep larger or more imporant items
-listed in a file called "TODO" in the top level directory of your
+listed in a file called “TODO” in the top level directory of your
 project. This file can be added to CVS so that other developers can see
 a quick list of known bugs or issues that need resolution. As items on
 this list are corrected, you may wish to log them in another file at the
-top level called "Changelog". Smaller issues, that are perhaps only
+top level called “Changelog”. Smaller issues, that are perhaps only
 important from a stylistic point of view, can be commented in the code
-and marked with the text string "TODO" within the comment. This is
+and marked with the text string “TODO” within the comment. This is
 highlighted with a special color with vi syntax highlighting, and can
 easily be found with the grep tool later.
 
@@ -797,8 +790,7 @@ belong together:
     int test_control_read();
 
 Function and variable nameing issues specific to PVFS can be found in
-section [10.3](#sec:pvfs-naming){reference-type="ref"
-reference="sec:pvfs-naming"}.
+section [10.3](#sec:pvfs-naming).
 
 ### Advanced topics
 
@@ -841,15 +833,15 @@ software as part of a group. This especially true when there is there is
 an equally valid but much clearer method of accomplishing your goal.
 Obscure coding practices include but are not limited to:
 
--   the : ? conditional operator
+  - the : ? conditional operator
 
--   unecessary goto statements
+  - unecessary goto statements
 
--   nested switches
+  - nested switches
 
--   implicit type conversion
+  - implicit type conversion
 
--   placing too much emphasis on makeing code small
+  - placing too much emphasis on makeing code small
 
 #### Locking data structures
 
@@ -863,12 +855,12 @@ or off at compile time. The ability to disable locking can be useful
 during development or when running code on a system that does not
 require locking. Look in the pvfs-locks CVS module for an example.
 
-#### Select vs. poll
+#### Select vs. poll
 
 Try to avoid using the select system call and use poll in its place.
 Poll scales more efficiently. It is also the most direct function call
 for accomplishing the desired task on modern Linux kernels because
-select is implemented on top of the kernel's poll function.
+select is implemented on top of the kernel’s poll function.
 
 #### String parsing
 
@@ -879,19 +871,21 @@ alter their arguments. Most of these issues are documented in the man
 pages. One common example occurs when an integer value must be read out
 of a string. In this case, it is better to use sscanf than atoi:
 
-       char number_string[] = "300";
-       int my_number = -1;
-       ret = -1;
+``` 
+   char number_string[] = "300";
+   int my_number = -1;
+   ret = -1;
 
-       /* if you use sscanf, you can check the return value */
-       ret = sscanf(number_string, "%d", &my_number);
-       if(ret < 1)
-       {
-          return an error;
-       }
+   /* if you use sscanf, you can check the return value */
+   ret = sscanf(number_string, "%d", &my_number);
+   if(ret < 1)
+   {
+      return an error;
+   }
 
-       /* as opposed to atoi, which will not tell you if it fails */
-       my_number = atoi(number_string);
+   /* as opposed to atoi, which will not tell you if it fails */
+   my_number = atoi(number_string);
+```
 
 #### Abstraction
 
@@ -907,12 +901,12 @@ working. If you abstract the interface correctly, you can implement the
 functionality with a linked list for now just to get your program
 working and then come back later and plug in a hash table
 implementation. This is only possible with a good abstraction, however.
-If your first interface has functions such as "add\_to\_head" or
-"create\_new\_list" that pass around pointers to lists, then it will of
-course be difficult to change this interface to use a hash table. It
-would be better to use functions such as "store\_item" or
-"create\_new\_container" and use opaque types to keep up with your data
-structure.
+If your first interface has functions such as “add\_to\_head” or
+“create\_new\_list” that pass around pointers to lists, then it will
+of course be difficult to change this interface to use a hash table. It
+would be better to use functions such as “store\_item” or
+“create\_new\_container” and use opaque types to keep up with your
+data structure.
 
 #### Function pointers
 
@@ -923,15 +917,15 @@ manipulating pointers to variables:
 
     /* this is the first way to send a message */
     int send_message_one(void* data, int size);
-
+    
     /* this is the second way to send a message */
     int send_message_two(void* data, int size);
-
+    
     /* this is a pointer to the prefered method */
     int (*send_message_generic)(void*, int) = NULL;
-
+    
     ...
-
+    
     if(something is true)
     {
        send_message_generic = send_message_one;
@@ -940,9 +934,9 @@ manipulating pointers to variables:
     {
        send_message_generic = send_message_two;
     }
-
+    
     ...
-
+    
     /* We don't care which method the user chose.  We know that it can be
      * accessed through this function pointer without us modifying our code.
      */
@@ -954,30 +948,31 @@ Choosing appropriate types for objects passed around in your code can be
 very important in some situations. There are a couple of different
 issues here:
 
--   **Platform dependence:** Different architectures use a different
+  - **Platform dependence:** Different architectures use a different
     number of bytes for some variable types. This means that it can
     sometimes be very helpful to explicitly choose the size of some
     variables to aid portability. This is especially true if the data is
     going to passed over a network, although there are more issues (such
-    as big-endian vs. little-endian) to worry about in those situations.
+    as big-endian vs. little-endian) to worry about in those situations.
     It is often a good idea to use typedefs to create new type names
     that have a known, fixed size:
-
-            typedef int32_t pvfs_flag_t;
-            
-
+    
+    ``` 
+        typedef int32_t pvfs_flag_t;
+    ```
+    
     This guarantees that when a pvfs\_flag\_t variable is declared, it
     will be a 32 bit integer, regardless of the host architecture.
 
--   **Opaque types:** Sometimes you wish to have an interface operate in
+  - **Opaque types:** Sometimes you wish to have an interface operate in
     terms of a specific type. If you are not certain of what type should
     be used for this purpose in the long term, you can hide it behind a
-    typedef'd opaque type. That way, if you change the type later, you
+    typedef’d opaque type. That way, if you change the type later, you
     may not have to change every reference to it in the code. You just
     have to change the initial typedef statement. This can be done for
     structs or scalar types.
-
-    *Guess I need an example here\...*
+    
+    *Guess I need an example here...*
 
 ## Specific PVFS issues
 
@@ -987,42 +982,43 @@ Copyright information at the top of source code in PVFS should include
 the University of Chicago. (The University of Chicago is affiliated with
 Argonne National Lab, where several key PVFS developers are located).
 
-    /*
-     * (C) 2001 Clemson University and The University of Chicago.
-     *
-     * See COPYING in top-level directory.
-     */       
+``` 
+/*
+ * (C) 2001 Clemson University and The University of Chicago.
+ *
+ * See COPYING in top-level directory.
+ */       
+```
 
 ### Function commenting
 
 *Figure out what standard should be to match up with autodocument tools.
 This is on hold until we settle on such a tool, so use standard put
-forth in section [9.1.3](#sec:comments){reference-type="ref"
-reference="sec:comments"} for now.*
+forth in section [9.1.3](#sec:comments) for now.*
 
 ### Function naming
 
 Interface functions and global variables in PVFS should use a standard
 naming convention for clarity. Here are a few guidelines:
 
--   The letters "PVFS" should only be prepended to functions and global
+  - The letters “PVFS” should only be prepended to functions and global
     variables that exist as part of an application level interface. Some
     examples would be PVFS\_open and PVFS\_read. For clarity, do not use
     this naming scheme for interfaces internal to PVFS.
 
--   Well defined internal PVFS interfaces should use the prefix "PINT"
-    (this is short for "PVFS interface"). This should then be followed
+  - Well defined internal PVFS interfaces should use the prefix “PINT”
+    (this is short for “PVFS interface”). This should then be followed
     by an identifier for the interface, and then a description of what
     the particular function does. Some examples are PINT\_flow\_alloc,
     PINT\_flow\_free, and PINT\_flow\_post.
 
--   There are exceptions to the above rule. For example, well defined
+  - There are exceptions to the above rule. For example, well defined
     interfaces that exist within a very distinct module of PVFS may use
     a different prefix. Examples include the method functions within the
     BMI layer of PVFS communications have names such as METH\_tcp\_send
     and METH\_tcp\_recv.
 
--   Any variables that are globally visible should follow the rules
+  - Any variables that are globally visible should follow the rules
     listed above as well. This naming convention is for both functions
     and global variables.
 
@@ -1037,7 +1033,7 @@ specify a mask level with each debugging call. These messages can then
 be toggled on or off depending on what the global mask value is. This
 allows you to turn debugging on or off just for specific parts of your
 software at run time. The global mask may be made up of several
-individual mask values logially or'd together in order to enable logging
+individual mask values logially or’d together in order to enable logging
 for multiple parts of your software simultaneously.
 
 Gossip also allows you to send error messages. These are similar to
@@ -1048,35 +1044,35 @@ recorded.
 
 The following is a list of functions provided in the Gossip library:
 
--   **gossip\_enable\_stderr()**: Directs logging messages to stderr.
+  - **gossip\_enable\_stderr()**: Directs logging messages to stderr.
 
--   **gossip\_enable\_file(filename, mode)**: Directs logging messages
+  - **gossip\_enable\_file(filename, mode)**: Directs logging messages
     to a specified file. The arguments are the same as those taken by
     the fopen() function.
 
--   **gossip\_enable\_syslog(priority)**: Directs logging to syslog. The
+  - **gossip\_enable\_syslog(priority)**: Directs logging to syslog. The
     priority argument is the same as that given to the syslog()
     function.
 
--   **gossip\_set\_debug\_mask(debug\_on, mask)**: Turns debugging
+  - **gossip\_set\_debug\_mask(debug\_on, mask)**: Turns debugging
     messages on or off and specifies the mask value to use if turned on.
 
--   **gossip\_disable()**: Gracefully shuts down the Gossip logging
+  - **gossip\_disable()**: Gracefully shuts down the Gossip logging
     facilities.
 
--   **gossip\_debug(mask, format, \...)**: Logs a debugging message.
-    Uses the same format syntax as the printf() function call. It will
-    only print if debugging is turned on and the mask value matches the
+  - **gossip\_debug(mask, format, ...)**: Logs a debugging message. Uses
+    the same format syntax as the printf() function call. It will only
+    print if debugging is turned on and the mask value matches the
     global mask specified with gossip\_set\_debug\_mask().
 
--   **gossip\_ldebug(mask, format, \...)**: Same as above, except that
-    it prepends each message with the file name and line number of the
+  - **gossip\_ldebug(mask, format, ...)**: Same as above, except that it
+    prepends each message with the file name and line number of the
     source code that invoked it.
 
--   **gossip\_err(format, \...)**: Logs error messages. These will print
+  - **gossip\_err(format, ...)**: Logs error messages. These will print
     regardless of the mask and whether debugging is turned on or off.
 
--   **gossip\_lerr(format, \...)**: Same as above, except that it
+  - **gossip\_lerr(format, ...)**: Same as above, except that it
     prepends each message with the file name and line number of the
     source code that invoked it.
 
@@ -1092,8 +1088,8 @@ Most unix system calls set a global variable called errno when an error
 condition occurs. Since this is a global variable, it is overwritten
 everytime a system call is made. This means that it must be checked
 immediately following the failure of the system call in question. The
-errno values correspond to to various error conditions, wuch as "bad
-file descriptor" or "permission denied." One can print out a textual
+errno values correspond to to various error conditions, wuch as “bad
+file descriptor” or “permission denied.” One can print out a textual
 description of these error values using the perror() or strerror()
 functions. More information about the use of errno can be found in the
 man pages for errno, perror, and and strerror.

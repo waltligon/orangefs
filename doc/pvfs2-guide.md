@@ -5,6 +5,7 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{11pt}
 \newpage
+
 # Parallel Virtual File System, Version 2
 
 ## An introduction to PVFS2
@@ -15,7 +16,7 @@ been the most successful parallel file system on Linux clusters to date.
 This code base has been used both in production mode at large scientific
 computing centers and as a launching point for many research endeavors.
 
-However, the PVFS (or PVFS1) code base is a terrible mess! For the last
+However, the PVFS (or PVFS1) code base is a terrible mess\! For the last
 few years we have been pushing it well beyond the environment for which
 it was originally designed. The core of PVFS1 is no longer appropriate
 for the environment in which we now see parallel file systems being
@@ -41,41 +42,41 @@ characteristics of our parallel file system, PVFS2.
 
 ### Why rewrite?
 
-There are lots of reasons why we've chosen to rewrite the code. We were
+There are lots of reasons why we’ve chosen to rewrite the code. We were
 bored with the old code. We were tired of trying to work around inherent
 problems in the design. But mostly we felt hamstrung by the design. It
-was too socket-centric, too obviously single-threaded, wouldn't support
+was too socket-centric, too obviously single-threaded, wouldn’t support
 heterogeneous systems with different endian-ness, and relied too
 thoroughly on OS buffering and file system characteristics.
 
-The new code base is much bigger and more flexible. Definitely there's
-the opportunity for us to suffer from second system syndrome here! But
-we're willing to risk this in order to position ourselves to use the new
+The new code base is much bigger and more flexible. Definitely there’s
+the opportunity for us to suffer from second system syndrome here\! But
+we’re willing to risk this in order to position ourselves to use the new
 code base for many years to come.
 
-### What's different?
+### What’s different?
 
 The new design has a number of important features, including:
 
--   modular networking and storage subsystems,
+  - modular networking and storage subsystems,
 
--   powerful request format for structured non-contiguous accesses,
+  - powerful request format for structured non-contiguous accesses,
 
--   flexible and extensible data distribution modules,
+  - flexible and extensible data distribution modules,
 
--   distributed metadata,
+  - distributed metadata,
 
--   stateless servers and clients (no locking subsystem),
+  - stateless servers and clients (no locking subsystem),
 
--   explicit concurrency support,
+  - explicit concurrency support,
 
--   tunable semantics,
+  - tunable semantics,
 
--   flexible mapping from file references to servers,
+  - flexible mapping from file references to servers,
 
--   tight MPI-IO integration, and
+  - tight MPI-IO integration, and
 
--   support for data and metadata redundancy.
+  - support for data and metadata redundancy.
 
 #### Modular networking and storage
 
@@ -92,12 +93,12 @@ reliable UDP protocols might become an important component of a parallel
 file system as well. Supporting multiple networking technologies, and
 supporting them *efficiently* is key.
 
-Likewise many different storage technologies are now available. We're
+Likewise many different storage technologies are now available. We’re
 still getting our feet wet in this area, but it is clear that some
 flexibility on this front will pay off in terms of our ability to
 leverage new technologies as they appear. In the mean time we are
-certainly going to leverage database technologies for metadata storage
--- that just makes good sense.
+certainly going to leverage database technologies for metadata storage –
+that just makes good sense.
 
 In PVFS2 the Buffered Messaging Interface (BMI) and the Trove storage
 interface provide APIs to network and storage technologies respectively.
@@ -112,7 +113,7 @@ traditional byte-stream files.
 These libraries allow applications to describe complicated access
 patterns that extract subsets of large datasets. These subsets often do
 not sit in contiguous regions in the underlying file; however, they are
-often very structured (e.g. a block out of a multidimensional array).
+often very structured (e.g. a block out of a multidimensional array).
 
 It is imperative that a parallel file system natively support structured
 data access in an efficient manner. In PVFS2 we perform this with the
@@ -135,7 +136,7 @@ complicated systems could redistribute data to better match patterns
 that are seen in practice.
 
 PVFS2 includes a modular system for adding new data distributions to the
-system and using these for new files. We're starting with the same old
+system and using these for new files. We’re starting with the same old
 round-robin scheme that everyone is accustomed to, but we expect to see
 this mechanism used to better access multidimensional datasets. It might
 play a role in data redundancy as well.
@@ -144,7 +145,7 @@ play a role in data redundancy as well.
 
 One of the biggest complaints about PVFS1 is the single metadata server.
 There are actually two bases on which this complaint is typically
-launched. The first is that this is a single point of failure -- we'll
+launched. The first is that this is a single point of failure – we’ll
 address that in a bit when we talk about data and metadata redundancy.
 The second is that it is a potential performance bottleneck.
 
@@ -161,7 +162,7 @@ allows for metadata for different files to be placed on different
 servers, so that applications accessing different files tend to impact
 each other less.
 
-Distributed metadata is a relatively tricky problem, but we're going to
+Distributed metadata is a relatively tricky problem, but we’re going to
 provide it in early releases anyway.
 
 #### Stateless servers and clients
@@ -259,7 +260,7 @@ implementation. It does not provide the rich API necessary to
 communicate structured I/O accesses to the underlying file system. It
 has a lot of internal state stored as part of the file descriptor. It
 implies POSIX semantics, but does not provide them for some file systems
-(e.g. NFS, many local file systems when writing large data regions).
+(e.g. NFS, many local file systems when writing large data regions).
 
 Rather than building MPI-IO support for PVFS2 through a UNIX-like
 interface, we have started with something that exposes more of the
@@ -268,7 +269,7 @@ descriptors or internal state regarding such things as file positions,
 and in doing so allows us to better leverage the capabilities of MPI-IO
 to perform efficient access.
 
-We've already discussed rich I/O requests. "Opening" a file is another
+We’ve already discussed rich I/O requests. “Opening” a file is another
 good example. `MPI_File_open()` is a collective operation that gathers
 information on a file so that MPI processes may later access it. If we
 were to build this on top of a UNIX-like API, we would have each process
@@ -276,8 +277,8 @@ that would potentially access the file call `open()`. In PVFS2 we
 instead resolve the filename into a handle using a single file system
 operation, then broadcast the resulting handle to the remainder of the
 processes. Operations that determine file size, truncate files, and
-remove files may all be performed in this same $O(1)$ manner, scaling as
-well as the MPI broadcast call.
+remove files may all be performed in this same \(O(1)\) manner, scaling
+as well as the MPI broadcast call.
 
 #### Data and metadata redundancy
 
@@ -288,7 +289,7 @@ files with data on that server are inaccessible until the server is
 recovered.
 
 Traditional high-availability solutions may be applied to both metadata
-and data servers in PVFS2 (they're actually the same server). This
+and data servers in PVFS2 (they’re actually the same server). This
 option requires shared storage between the two machines on which file
 system data is stored, so this may be prohibitively expensive for some
 users.
@@ -311,22 +312,22 @@ Further, because this can be applied at a more coarse grain, more
 compute-intensive algorithms may be used in place of simple parity,
 providing higher reliability than simple parity schemes.
 
-Lazy redundancy is still at the conceptual stage. We're still trying to
+Lazy redundancy is still at the conceptual stage. We’re still trying to
 determine how to best fit this into the system as a whole. However,
 traditional failover solutions may be put in place for the existing
 system.
 
-#### And more\...
+#### And more...
 
 There are so many things that we feel we could have done better in PVFS1
 that it is really a little embarrassing. Better heterogeneous system
 support, a better build system, a solid infrastructure for testing
 concurrent access to the file system, an inherently concurrent approach
 to servicing operations on both the client and server, better management
-tools, even symlinks; we've tried to address most if not all the major
+tools, even symlinks; we’ve tried to address most if not all the major
 concerns that our PVFS1 users have had over the years.
 
-It's a big undertaking for us. Which leads to the obvious next question.
+It’s a big undertaking for us. Which leads to the obvious next question.
 
 ### When will this be available?
 
@@ -335,17 +336,18 @@ be foolish to claim PVFS2 has no bugs and will work for everyone 100% of
 the time, but we feel PVFS2 is in pretty good shape. Early testing has
 found a lot of bugs, and we feel PVFS is ready for wider use.
 
-Note that we're committed to supporting PVFS1 for some time after PVFS2
+Note that we’re committed to supporting PVFS1 for some time after PVFS2
 is available and stable. We feel like PVFS1 is a good solution for many
 groups already, and we would prefer for people to use PVFS1 for a little
 while longer rather than them have a sour first experience with PVFS2.
 
 We announce updates frequently on the PVFS2 mailing lists. We encourage
-users to subscribe -- it's the best way to keep abreast of PVFS2
+users to subscribe – it’s the best way to keep abreast of PVFS2
 developments. All code is being distributed under the LGPL license to
 facilitate use under arbitrarily licensed high-level libraries.
 
 \newpage
+
 ## The basics of PVFS2
 
 PVFS2 is a parallel file system. This means that it is designed for
@@ -353,16 +355,16 @@ parallel applications sharing data across many clients in a coordinated
 manner. To do this with high performance, many servers are used to
 provide multiple paths to data. Parallel file systems are a subset of
 distributed file systems, which are more generally file systems that
-provide shared access to distributed data, but don't necessarily have
+provide shared access to distributed data, but don’t necessarily have
 this focus on performance or parallel access.
 
 There are lots of things that PVFS2 is *not* designed for. In some cases
 it will coincidentally perform well for some arbitrary task that we
-weren't targeting. In other cases it will perform very poorly. If faced
-with the option of making the system better for some other task (e.g.
-executing off the file system, shared mmapping of files, storing mail in
-mbox format) at the expense of parallel I/O performance, we will always
-ruthlessly ignore performance for these other tasks.
+weren’t targeting. In other cases it will perform very poorly. If faced
+with the option of making the system better for some other task (
+e.g. executing off the file system, shared mmapping of files, storing
+mail in mbox format) at the expense of parallel I/O performance, we will
+always ruthlessly ignore performance for these other tasks.
 
 PVFS2 uses an *intelligent server* architecture. By this we mean that
 servers do more than simply provide clients with blocks of data from
@@ -408,7 +410,7 @@ specifics of this storage are hidden under an API that we call Trove.
 PVFS2 has the capability to support an arbitrary number of different
 network types through an abstraction known as the Buffered Messaging
 Interface (BMI). At this time BMI implementations exist for TCP/IP,
-Myricom's GM, and InfiniBand (both Mellanox VAPI and OpenIB APIs).
+Myricom’s GM, and InfiniBand (both Mellanox VAPI and OpenIB APIs).
 
 ### Interfaces
 
@@ -455,35 +457,35 @@ process to reference the same file. This gives us the ability to make
 the `MPI_File_open` call happen with a single lookup the the file system
 and a broadcast.
 
-There's no state held on the servers about "open" files. There's not
+There’s no state held on the servers about “open” files. There’s not
 even a concept of an open file in PVFS2. So this lookup is all that
 happens at open time. This has a number of other benefits. For one
-thing, there's no shared state to be lost if a client or server
-disappears. Also, there's nothing to do when a file is "closed" either,
+thing, there’s no shared state to be lost if a client or server
+disappears. Also, there’s nothing to do when a file is “closed” either,
 except perhaps ask the servers to push data to disk. In an MPI program
 this can be done by a single process as well.
 
 Of course if you are accessing PVFS2 through the OS, `open` and `close`
 still exist and work the way you would expect, as does `lseek`, although
-obviously PVFS2 servers don't keep up with file positions either. All
+obviously PVFS2 servers don’t keep up with file positions either. All
 this information is kept locally by the client.
 
 There are a few disadvantages to this. One that we will undoubtedly hear
 about more than once is that the UNIX behavior of unlinked open files.
 Usually with local file systems if the file was previously opened, then
 it can still be accessed. Certain programs rely on this behavior for
-correct operation. In PVFS2 we don't know if someone has the file open,
+correct operation. In PVFS2 we don’t know if someone has the file open,
 so if a file is unlinked, it is gone gone gone. Perhaps we will come up
 with a clever way to support this or adapt the NFS approach (renaming
 the file to an odd name), but this is a very low priority.
 
 ### Consistency from the client point of view
 
-We've discussed in a number of venues the opportunities that are made
+We’ve discussed in a number of venues the opportunities that are made
 available when true POSIX semantics are given up. Truthfully very few
-file systems actually support POSIX; ext3 file systems don't enforce
+file systems actually support POSIX; ext3 file systems don’t enforce
 atomic writes across block boundaries without special flags, and NFS
-file systems don't even come close. Never the less, many people claim
+file systems don’t even come close. Never the less, many people claim
 POSIX semantics, and many groups ask for them without knowing the costs
 associated.
 
@@ -491,7 +493,7 @@ PVFS2 does not provide POSIX semantics.
 
 PVFS2 does provide guarantees of atomicity of writes to nonoverlapping
 regions, even noncontiguous nonoverlapping regions. This is to say that
-if your parallel application doesn't write to the same bytes, then you
+if your parallel application doesn’t write to the same bytes, then you
 will get what you expect on subsequent reads.
 
 This is enough to provide all the non-atomic mode semantics for MPI-IO.
@@ -526,7 +528,7 @@ We have seen no evidence either from the parallel I/O community or the
 distributed shared memory community that these locking systems will work
 well at the scales of clusters that we are seeing deployed now, and we
 are not in the business of pushing the envelope on locking algorithms
-and implementations, so we're not using a locking subsystem.
+and implementations, so we’re not using a locking subsystem.
 
 Instead we force all operations that modify the file system hierarchy to
 be performed in a manner that results in an atomic change to the file
@@ -535,15 +537,15 @@ requests*) that result in what we tend to think of as atomic operations
 at the file system level. An example might help clarify this. Here are
 the steps necessary to create a new file in PVFS2:
 
--   create a directory entry for the new file
+  - create a directory entry for the new file
 
--   create a metadata object for the new file
+  - create a metadata object for the new file
 
--   point the directory entry to the metadata object
+  - point the directory entry to the metadata object
 
--   create a set of data objects to hold data for the new file
+  - create a set of data objects to hold data for the new file
 
--   point the metadata at the data objects
+  - point the metadata at the data objects
 
 Performing those steps in that particular order results in file system
 states where a directory entry exists for a file that is not really
@@ -560,7 +562,7 @@ ready to be accessed. If we carefully order the operations:
 
 we create a sequence of states that always leave the file system
 directory hierarchy in a consistent state. The file is either there (and
-ready to be accessed) or it isn't. All PVFS2 operations are performed in
+ready to be accessed) or it isn’t. All PVFS2 operations are performed in
 this manner.
 
 This approach brings with it a certain degree of complexity of its own;
@@ -569,10 +571,11 @@ directory entry turned out to already exist when we got to the final
 step, there would be a great deal of cleanup that must occur. This is a
 problem that can be surmounted, however, and because none of those
 objects are referenced by anyone else we can clean them up without
-concern for what other processes might be up to -- they never made it
+concern for what other processes might be up to – they never made it
 into the directory hierarchy.
 
 \newpage
+
 ## PVFS2 terminology
 
 PVFS2 is based on a somewhat unconventional design in order to achieve
@@ -584,7 +587,7 @@ these concepts from a high level.
 ### File system components
 
 We will start by defining the major system components from an
-administrator or user's perspective. A PVFS2 file system may consist of
+administrator or user’s perspective. A PVFS2 file system may consist of
 the following pieces (some are optional): the pvfs2-server, system
 interface, management interface, Linux kernel driver, pvfs2-client, and
 ROMIO PVFS2 device.
@@ -644,15 +647,15 @@ http://www.mcs.anl.gov/romio/ for details.
 
 PVFS2 has four different object types that are visible to users
 
--   directory
+  - directory
 
--   metafile
+  - metafile
 
--   datafile
+  - datafile
 
--   symbolic link
+  - symbolic link
 
-\...
+...
 
 ### Handles
 
@@ -696,6 +699,7 @@ servers in order to produce more readable configuration files.
 File system IDs are also occasionally referred to as collection IDs.
 
 \newpage
+
 ## PVFS2 internal I/O API terminology
 
 PVFS2 contains several low level interfaces for performing various types
@@ -708,21 +712,21 @@ some of their common characteristics in a single piece of documentation.
 The following is a list of the lowest level APIs that share
 characteristics that we will discuss here.
 
--   BMI (Buffered Message Interface): message based network
+  - BMI (Buffered Message Interface): message based network
     communications
 
--   Trove: local file and database access
+  - Trove: local file and database access
 
--   Flow: high level I/O API that ties together lower level components
+  - Flow: high level I/O API that ties together lower level components
     (such as BMI and Trove) in a single transfer; handles buffering and
     datatype processing
 
--   Dev: user level interaction with kernel device driver
+  - Dev: user level interaction with kernel device driver
 
--   NCAC (Network Centric Adaptive Cache): user level buffer cache that
+  - NCAC (Network Centric Adaptive Cache): user level buffer cache that
     works on top of Trove (*currently unused*)
 
--   Request scheduler: handles concurrency and scheduling at the file
+  - Request scheduler: handles concurrency and scheduling at the file
     system request level
 
 ### Job interface
@@ -760,18 +764,18 @@ than one operation in a single function call. Each API will support the
 following variants of the test function (where PREFIX depends on the
 API):
 
--   PREFIX\_test(): This is the most simple version of the test
+  - PREFIX\_test(): This is the most simple version of the test
     function. It checks for completion of an individual operation based
     on the ID given by the caller.
 
--   PREFIX\_testsome(): This is an expansion of the above call. The
+  - PREFIX\_testsome(): This is an expansion of the above call. The
     difference is that it takes an array of IDs and a count as input,
     and provides an array of status values and a count as output. It
     checks for completion of any non-zero ID in the array. The output
     count indicates how many of the operations in question completed,
     which may range from 0 to the input count.
 
--   PREFIX\_testcontext(): This function is similar to testsome().
+  - PREFIX\_testcontext(): This function is similar to testsome().
     However, it does not take an array of IDs as input. Instead, it
     tests for completion of *any* operations that have previously been
     posted, regardless of the ID. A count argument limits how many
@@ -816,6 +820,7 @@ idle time. It is more like a hint to control whether the function is a
 busy poll, or if it should sleep when there is no work to do.
 
 \newpage
+
 ## PVFS2 User APIs and Semantics
 
 Because PVFS2 is designed specifically for performance in systems where
@@ -881,7 +886,7 @@ be accessed until the subsequent close, even if the file permissions are
 changed or the file is deleted. This requires that the file system or
 clients somehow keep up with a list of files that are open, which adds
 unacceptable state to a distributed file system. In NFS, for example,
-this is implemented via the "sillyrename" approach, in which clients
+this is implemented via the “sillyrename” approach, in which clients
 rename a deleted but open file to hide it in the directory tree, then
 delete the renamed file when the file is finally closed.
 
@@ -896,7 +901,7 @@ pvfs2-client if someone is still accessing?*
 
 POSIX semantics dictate sequential consistency for overlapping I/O
 operations. This means that I/O operations must be atomic with respect
-to each other -- if one process performs a read spanning a collection of
+to each other – if one process performs a read spanning a collection of
 servers while another performs a write in the same region, the read must
 see either all or none of the changes. In a parallel file system this
 involves communication to coordinate access in this manner, and because
@@ -957,6 +962,7 @@ are not currently supported. We are researching alternative
 implementations.
 
 \newpage
+
 ## The code tree
 
 In this section we describe how the code tree is set up for PVFS2 and
@@ -966,19 +972,19 @@ discuss a little about how the build system works.
 
 At the top level we see:
 
--   `doc`
+  - `doc`
 
--   `examples`
+  - `examples`
 
--   `include`
+  - `include`
 
--   `lib`
+  - `lib`
 
--   `maint`
+  - `maint`
 
--   `src`
+  - `src`
 
--   `test`
+  - `test`
 
 The `doc` directory rather obviously holds documentation, mostly written
 in LaTeX. There are a few subdirectories under `doc`. The `coding`
@@ -1004,11 +1010,11 @@ later.
 `maint` holds a collection of scripts. Some of these are used in the
 build process, while others are used to check for the presence of
 inappropriately named symbols in the resulting library or reformat code
-that doesn't conform to the coding standard.
+that doesn’t conform to the coding standard.
 
 `src` holds the source code to the majority of PVFS2, including the
 server, client library, Linux 2.6.x kernel module, and management tools.
-We'll talk more about this one in a subsequent subsection.
+We’ll talk more about this one in a subsequent subsection.
 
 `test` holds the source code to many many tests that have been built
 over time to validate the PVFS2 implementation. We will discuss this
@@ -1019,32 +1025,32 @@ more in a subsequent subsection as well.
 The `src` directory contains the majority of the PVFS2 distribution.
 
 Unlike PVFS1, where the PVFS kernel code was in a separate package from
-the "core," in PVFS2 both the servers, client API, and kernel-specific
+the “core,” in PVFS2 both the servers, client API, and kernel-specific
 code are packaged together.
 
 `src/common` holds a number of components shared between clients and
 servers. This includes:
 
--   dotconf -- a configuration file parser
+  - dotconf – a configuration file parser
 
--   gen-locks -- an implementation of local locks used to provide atomic
+  - gen-locks – an implementation of local locks used to provide atomic
     access to shared structures in the presence of threads
 
--   id-generator -- a simple system for generating unique references
+  - id-generator – a simple system for generating unique references
     (ids) to data structures
 
--   llist -- a linked-list implementation
+  - llist – a linked-list implementation
 
--   gossip -- our logging component
+  - gossip – our logging component
 
--   quicklist -- another linked-list implementation
+  - quicklist – another linked-list implementation
 
--   quickhash -- a hash table implementation
+  - quickhash – a hash table implementation
 
--   statecomp -- the parser for our state machine description language
+  - statecomp – the parser for our state machine description language
     (discussed subsequently)
 
--   misc -- leftovers, including some state machine code, config file
+  - misc – leftovers, including some state machine code, config file
     manipulation code, some string manipulation utilities, etc.
 
 `src/apps` holds applications associated with PVFS2. The
@@ -1063,7 +1069,7 @@ component of the PVFS2 kernel driver implementation, which matches the
 kernel driver code found in `src/kernel/linux-2.6`. The `src/apps/vis`
 contains experimental code for performance visualization.
 
-`src/client` holds code for the "system interface" library, the lowest
+`src/client` holds code for the “system interface” library, the lowest
 level library used on the client side for access. This is in the
 `src/client/sysint` subdirectory. The `unix-io` subdirectory is no
 longer used. Note that there is other code used on the client side: the
@@ -1077,16 +1083,16 @@ ROMIO distributions and is not present anywhere in this tree.
 is split into its own subdirectory for no particular reason.
 
 `src/proto` holds code for encoding and decoding our over-the-wire
-protocol. Currently the "encoding scheme" used is the *contig* scheme,
+protocol. Currently the “encoding scheme” used is the *contig* scheme,
 stored in its own subdirectory. This encoding scheme really just puts
 the bytes into a contiguous region, so it is only good for homogeneous
 systems or systems with the same byte orders where we have correctly
-padded all the structures (which we probably haven't).
+padded all the structures (which we probably haven’t).
 
 `src/kernel` holds implementations of kernel support. Currently there is
 only one, `src/kernel/linux-2.6`.
 
-`src/io` holds enough code that we'll just talk about it in its own
+`src/io` holds enough code that we’ll just talk about it in its own
 subsection.
 
 ### `src/io`
@@ -1139,33 +1145,33 @@ implementing (or reimplementing) various system interface functions.
 `test/correctness/pts` holds the PVFS Test Suite (PTS), a suite designed
 for testing the correctness of PVFS under various different conditions.
 There are actually quite a few tests in here, and the vision is that we
-will run these in an automated fashion relatively often (but we aren't
+will run these in an automated fashion relatively often (but we aren’t
 there quite yet). This is probably the second most useful code (after
 pvfs2-client) in the `test` directory.
 
 ### State machines and `statecomp`
 
 The PVFS2 source is heavily dependent on a state machine implementation
-that is included in the tree. We've already noted that the parser,
+that is included in the tree. We’ve already noted that the parser,
 statecomp, is located in the `src/common/statecomp` subdirectory.
 Additional code for processing state machines is in `src/common/misc`.
 
 State machine source is denoted with a `.sm` suffix. These are converted
 to `.c` files by statecomp. If you are building out of tree, the `.c`
-files will end up in the build tree; otherwise you'll be in the
+files will end up in the build tree; otherwise you’ll be in the
 confusing situation of having both versions in the same subdirectory. If
-modifying these, be careful to only modify the `.sm` files -- the
+modifying these, be careful to only modify the `.sm` files – the
 corresponding `.c` file can be overwritten on rebuilds.
 
 ### Build system
 
-The build system relies on the "single makefile" concept that was
+The build system relies on the “single makefile” concept that was
 promoted by someone or another other than us (we should have a
-reference). Overall we're relatively happy with it.
+reference). Overall we’re relatively happy with it.
 
 We also adopted the Linux 2.6 kernel style of obfuscating the actual
-compile lines. This can be irritating if you're trying to debug the
-build system. It can be turned off with a "make V=1", which makes the
+compile lines. This can be irritating if you’re trying to debug the
+build system. It can be turned off with a “make V=1”, which makes the
 build verbose again. This is controlled via a variable called
 `QUIET_COMPILE` in the makefile, if you are looking for how this is
 done.
@@ -1173,8 +1179,8 @@ done.
 ### Out-of-tree builds
 
 Some of the developers are really fond of out-of-tree builds, while
-others aren't. Basically the idea is to perform the build in a separate
-directory so that the output from the build process doesn't clutter up
+others aren’t. Basically the idea is to perform the build in a separate
+directory so that the output from the build process doesn’t clutter up
 the source tree.
 
 This can be done by executing `configure` from a separate directory. For

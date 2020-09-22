@@ -1,4 +1,5 @@
 \maketitle
+
 # PVFS2 MPI Based Requests Design Notes
 
 ## PVFS Requests
@@ -8,36 +9,37 @@ specifc set of non-contiguous data that is to be read from or written to
 a PVFS file. The PVFS library includes a set of routines for creating
 these structures in a controlled manner. These routines produce an
 opaque type the PVFS\_Request which is actually a pointer to an internal
-structure, the PINT\_Request.
+structure, the
+    PINT\_Request.
 
     typedef struct PINT_Request *PVFS_Request; /* user type for requests */
-
+    
     int PVFS_Request_contiguous(int count, PVFS_Request oldreq,
                 PVFS_Request *newreq);
-
+    
     int PVFS_Request_vector(int count, int blocklength, int stride,
                 PVFS_Request oldreq, PVFS_Request *newreq);
-
+    
     int PVFS_Request_hvector(int count, int blocklength, int64_t stride,
                 PVFS_Request oldreq, PVFS_Request *newreq);
-
+    
     int PVFS_Request_indexed(int count, int *blocklengths,
                 int *displacements, PVFS_Request oldreq, PVFS_Request *newreq);
-
+    
     int PVFS_Request_hindexed(int count, int *blocklengths, int64_t *displacements,
                 PVFS_Request oldreq, PVFS_Request *newreq);
-
+    
     int PVFS_Request_struct(int count, int *blocklengths, int64_t *displacements,
                 PVFS_Request *oldreqs, PVFS_Request *newreq);
-
+    
     int PVFS_Address(void* location, int64_t *address);
-
+    
     int PVFS_Request_extent(PVFS_Request request, int64_t *extent);
-
+    
     int PVFS_Request_size(PVFS_Request request, int *size);
-
+    
     int PVFS_Request_lb(PVFS_Request request, int64_t* displacement);
-
+    
     int PVFS_Request_ub(PVFS_Request request, int64_t* displacement);
 
 These routines are based directly on the MPI datatype constructor
@@ -46,7 +48,7 @@ routines of similar name and have the same semantics.
 ## Request Data Structures
 
 The PINT\_Request is designed to represent any data layout that can be
-specified using MPI's MPI\_Datatype constructors. The
+specified using MPI’s MPI\_Datatype constructors. The
 PINT\_Request\_state is a structure that indicates how much of a request
 has actually been processed. Using these structures it is possible to
 process part of a PVFS request, stop, and then resume processing at a
@@ -55,19 +57,21 @@ structures and the algorithms for using them.
 
 ### The PINT\_Request
 
-       typedef struct PINT_Request {
-          PVFS_offset  offset;     /* offset from start of last set of elements */
-          int32_t num_ereqs;  /* number of ereqs in a block */
-          PVFS_size    stride;     /* stride between blocks in bytes */
-          int32_t num_blocks; /* number of blocks */
-          PVFS_offset  ub;         /* upper bound of the type in bytes */
-          PVFS_offset  lb;         /* lower bound of the type in bytes */
-          PVFS_size    aggregate_size; /* amount of aggregate data in bytes */
-          int32_t depth;      /* number of levels of nesting */
-          int32_t num_contig_chunks; /* number of contiguous data chunks */
-          struct PINT_Request *ereq; /* element type */
-          struct PINT_Request *sreq; /* sequence type */
-       } PINT_Request;
+``` 
+   typedef struct PINT_Request {
+      PVFS_offset  offset;     /* offset from start of last set of elements */
+      int32_t num_ereqs;  /* number of ereqs in a block */
+      PVFS_size    stride;     /* stride between blocks in bytes */
+      int32_t num_blocks; /* number of blocks */
+      PVFS_offset  ub;         /* upper bound of the type in bytes */
+      PVFS_offset  lb;         /* lower bound of the type in bytes */
+      PVFS_size    aggregate_size; /* amount of aggregate data in bytes */
+      int32_t depth;      /* number of levels of nesting */
+      int32_t num_contig_chunks; /* number of contiguous data chunks */
+      struct PINT_Request *ereq; /* element type */
+      struct PINT_Request *sreq; /* sequence type */
+   } PINT_Request;
+```
 
 A single PINT\_Request structure represents num\_blocks blocks of
 num\_ereqs elements separated by stride bytes, beginning offest bytes
@@ -95,46 +99,50 @@ represented using the PVFS\_Request structure.
 A single contiguous region is represented by a single structure. The
 region can be specified as SIZE bytes at location OFFSET as in figure A:
 
-       PTYPE:
-          offset = OFFSET
-          num_ereqs = SIZE
-          stride = 1
-          num_blocks = 1
-          ub = SIZE
-          lb = 0
-          aggregate_size = SIZE
-          depth = 1
-          num_contig_chunks = 1
-          etype = PVFS_Request_byte
-          stype = NULL
+``` 
+   PTYPE:
+      offset = OFFSET
+      num_ereqs = SIZE
+      stride = 1
+      num_blocks = 1
+      ub = SIZE
+      lb = 0
+      aggregate_size = SIZE
+      depth = 1
+      num_contig_chunks = 1
+      etype = PVFS_Request_byte
+      stype = NULL
+```
 
 Or can be specified as an array of COUNT integers as in figure B:
 
-       PTYPE:
-          offset = OFFSET
-          num_ereqs = COUNT
-          stride = 1
-          num_blocks = 1
-          ub = COUNT * 4
-          lb = 0
-          aggregate_size = COUNT * 4
-          depth = 1
-          num_contig_chunks = 1
-          etype = PVFS_Request_int
-          stype = NULL
+``` 
+   PTYPE:
+      offset = OFFSET
+      num_ereqs = COUNT
+      stride = 1
+      num_blocks = 1
+      ub = COUNT * 4
+      lb = 0
+      aggregate_size = COUNT * 4
+      depth = 1
+      num_contig_chunks = 1
+      etype = PVFS_Request_int
+      stype = NULL
 
-       PVFS_Request_int:
-          offset = 0
-          num_ereqs = 4
-          stride = 1
-          num_blocks = 1
-          ub = 4
-          lb = 0
-          aggregate_size = 4
-          depth = 0
-          num_contig_chunks = 1
-          etype = NULL
-          stype = NULL
+   PVFS_Request_int:
+      offset = 0
+      num_ereqs = 4
+      stride = 1
+      num_blocks = 1
+      ub = 4
+      lb = 0
+      aggregate_size = 4
+      depth = 0
+      num_contig_chunks = 1
+      etype = NULL
+      stype = NULL
+```
 
 Note that default PVFS\_Request exist for standard data types including:
 PVFS\_Request\_byte, PVFS\_Request\_char, PVFS\_Request\_short,
@@ -151,18 +159,20 @@ consisting of GROUPS groups of ELEMENTS items of type ETYPE with a size
 of ESIZE each with a stride between the first element of each group of
 STRIDE bytes would be as in figure C:
 
-       PTYPE:
-          offset = OFFSET
-          num_ereqs = ELEMENTS
-          stride = STRIDE
-          num_blocks = GROUPS
-          ub = ((GROUPS - 1) * STRIDE) + (ELEMENTS * ESIZE)
-          lb = 0
-          aggregate_size = GROUPS * ELEMENTS * ESIZE 
-          depth = 1
-          num_contig_chunks = GROUPS
-          etype = ETYPE
-          stype = NULL
+``` 
+   PTYPE:
+      offset = OFFSET
+      num_ereqs = ELEMENTS
+      stride = STRIDE
+      num_blocks = GROUPS
+      ub = ((GROUPS - 1) * STRIDE) + (ELEMENTS * ESIZE)
+      lb = 0
+      aggregate_size = GROUPS * ELEMENTS * ESIZE 
+      depth = 1
+      num_contig_chunks = GROUPS
+      etype = ETYPE
+      stype = NULL
+```
 
 Once again this assumes that ETYPE is a contiguous type.
 
@@ -184,44 +194,46 @@ and finally end 4 bytes into the last group (green). Each group is 6
 elements, and each element is a float (4 bytes). The stride between
 groups is 48 bytes (12 floats).
 
-       FIRST-PTYPE:
-          offset = OFFSET
-          num_ereqs = 4
-          stride = 1
-          num_blocks = 1
-          ub = 764
-          lb = 0
-          aggregate_size = 380
-          depth = 1
-          num_contig_chunks = 17
-          etype = PVFS_Request_float
-          stype = NEXT-PTYPE
-       
-       NEXT-PTYPE:
-          offset = OFFSET + 40
-          num_ereqs = 6
-          stride = 48
-          num_blocks = 15
-          ub = 764
-          lb = 40
-          aggregate_size = 364
-          depth = 1
-          num_contig_chunks = 16
-          etype = PVFS_Request_float
-          stype = LAST-PTYPE
-       
-       LAST-PTYPE:
-          offset = OFFSET + 760
-          num_ereqs = 1
-          stride = 1
-          num_blocks = 1
-          ub = 764
-          lb = 760
-          aggregate_size = 4
-          depth = 1
-          num_contig_chunks = 1
-          etype = PVFS_Request_float
-          stype = NULL
+``` 
+   FIRST-PTYPE:
+      offset = OFFSET
+      num_ereqs = 4
+      stride = 1
+      num_blocks = 1
+      ub = 764
+      lb = 0
+      aggregate_size = 380
+      depth = 1
+      num_contig_chunks = 17
+      etype = PVFS_Request_float
+      stype = NEXT-PTYPE
+   
+   NEXT-PTYPE:
+      offset = OFFSET + 40
+      num_ereqs = 6
+      stride = 48
+      num_blocks = 15
+      ub = 764
+      lb = 40
+      aggregate_size = 364
+      depth = 1
+      num_contig_chunks = 16
+      etype = PVFS_Request_float
+      stype = LAST-PTYPE
+   
+   LAST-PTYPE:
+      offset = OFFSET + 760
+      num_ereqs = 1
+      stride = 1
+      num_blocks = 1
+      ub = 764
+      lb = 760
+      aggregate_size = 4
+      depth = 1
+      num_contig_chunks = 1
+      etype = PVFS_Request_float
+      stype = NULL
+```
 
 Note that ub, lb, aggregate\_size, depth, and num\_contig\_chunks always
 refers to the region represented down stream of the current
@@ -236,35 +248,36 @@ is not contiguous things are more complicated. Examples include nested
 strided regions and vectors of records that are only partially accessed.
 
 The following is a nested strided region. There are 4 groups of two
-\"elements,\" with a stride of 8 elements. Each element consts of 2
-groups of 6 integers (one element shown in green), with a stride of 48
-bytes.
+"elements," with a stride of 8 elements. Each element consts of 2 groups
+of 6 integers (one element shown in green), with a stride of 48 bytes.
 
-       OUTER-PTYPE:
-          offset = OFFSET
-          num_ereqs = 2
-          stride = 768
-          num_blocks = 4
-          ub = 3264
-          lb = 0
-          aggregate_size = 384
-          depth = 2
-          num_contig_chunks = 16
-          etype = INNER-PTYPE
-          stype = NULL
+``` 
+   OUTER-PTYPE:
+      offset = OFFSET
+      num_ereqs = 2
+      stride = 768
+      num_blocks = 4
+      ub = 3264
+      lb = 0
+      aggregate_size = 384
+      depth = 2
+      num_contig_chunks = 16
+      etype = INNER-PTYPE
+      stype = NULL
 
-       INNER-PTYPE:
-          offset = 0
-          num_ereqs = 6
-          stride = 48
-          num_blocks = 2
-          ub = 96
-          lb = 0
-          aggregate_size = 48
-          depth = 1
-          num_contig_chunks = 2
-          etype = PVFS_Request_int
-          stype = NULL
+   INNER-PTYPE:
+      offset = 0
+      num_ereqs = 6
+      stride = 48
+      num_blocks = 2
+      ub = 96
+      lb = 0
+      aggregate_size = 48
+      depth = 1
+      num_contig_chunks = 2
+      etype = PVFS_Request_int
+      stype = NULL
+```
 
 Note that the offset, ub, and lb are in terms of the inner elements and
 not of the entire buffer, thus the offset is the offset from the
@@ -276,21 +289,23 @@ When processing a request described with a PVFS\_Request the following
 structures are used to keep track of how much of the request has been
 processed.
 
-       typedef struct PINT_reqstack {
-          int32_t el;      /* number of element being processed */
-          int32_t maxel;   /* total number of these elements to process */
-          PINT_Request *rq;     /* pointer to request structure */
-          PINT_Request *rqbase; /* pointer to first request is sequence chain */
-          int32_t blk;     /* number of block being processed */
-          PVFS_offset  chunk_offset; /* offset of beginning of current contiguous chunk */
-       } PINT_reqstack;
+``` 
+   typedef struct PINT_reqstack {
+      int32_t el;      /* number of element being processed */
+      int32_t maxel;   /* total number of these elements to process */
+      PINT_Request *rq;     /* pointer to request structure */
+      PINT_Request *rqbase; /* pointer to first request is sequence chain */
+      int32_t blk;     /* number of block being processed */
+      PVFS_offset  chunk_offset; /* offset of beginning of current contiguous chunk */
+   } PINT_reqstack;
 
-       typedef struct PINT_Request_state {
-          struct PINT_reqstack *cur; /* request element chain stack */
-          int32_t lvl;        /* level in element chain */
-          PVFS_size    bytes;      /* bytes in current contiguous chunk processed */
-          PVFS_offset  buf_offset; /* byte offset in user buffer */
-       } PINT_Request_state;
+   typedef struct PINT_Request_state {
+      struct PINT_reqstack *cur; /* request element chain stack */
+      int32_t lvl;        /* level in element chain */
+      PVFS_size    bytes;      /* bytes in current contiguous chunk processed */
+      PVFS_offset  buf_offset; /* byte offset in user buffer */
+   } PINT_Request_state;
+```
 
 The PINT\_Request\_state utilizes a stack to keep up with each level in
 the element type chain. For each level, a stack element records which
@@ -320,14 +335,16 @@ process SEGMAX, a maximum number of bytes to transfer BYTEMAX, and a
 starting offset START\_OFFSET, and EOF\_FLAG argument returns whether
 the end of the request is at or beyond the end of file.
 
-       typedef struct PINT_Request_file_data {
-          PVFS_size    fsize;     /* actual size of local storage object */
-          int32_t server_nr;   /* ordinal number of THIS server for this file */
-          int32_t server_ct; /* number of servers for this file */
-          PVFS_Distribution *dist;
-          PVFS_Dist_parm    *dparm;
-          PVFS_boolean      extend_flag;
-       } PINT_Request_file_data;
+``` 
+   typedef struct PINT_Request_file_data {
+      PVFS_size    fsize;     /* actual size of local storage object */
+      int32_t server_nr;   /* ordinal number of THIS server for this file */
+      int32_t server_ct; /* number of servers for this file */
+      PVFS_Distribution *dist;
+      PVFS_Dist_parm    *dparm;
+      PVFS_boolean      extend_flag;
+   } PINT_Request_file_data;
+```
 
 PINT\_Process\_request fills in up to SEGMAX array entries, updates
 SEGMAX to indicate the number of segments processed, updates BYTEMAX to
@@ -339,11 +356,13 @@ optimized for the case where START\_OFFSET is equal to the value
 returned the last time the function was called with the same
 PINT\_Request\_state.
 
-       int PINT_Process_request(PINT_Request_state *req,
-          PINT_Request_file_data *rfdata, int32_t *segmax,
-          PVFS_offset *offset_array, PVFS_size *size_array,
-          PVFS_offset *start_offset, PVFS_size *bytemax,
-          PVFS_boolean *eof_flag, int mode);
+``` 
+   int PINT_Process_request(PINT_Request_state *req,
+      PINT_Request_file_data *rfdata, int32_t *segmax,
+      PVFS_offset *offset_array, PVFS_size *size_array,
+      PVFS_offset *start_offset, PVFS_size *bytemax,
+      PVFS_boolean *eof_flag, int mode);
+```
 
 The MODE tells the request processor whether to process the request in
 terms of the local file offsets on a server or local buffer offsets on a
@@ -359,7 +378,8 @@ Before calling PINT\_Process\_request for a given request for the first
 time, the caller needs to allocate a PINT\_Request\_state structure.
 This is done by calling PINT\_New\_request passing in a pointer to the
 request. Theoretically multiple request states can exist for the same
-request, thought there is really no need to do such a thing.
+request, thought there is really no need to do such a
+    thing.
 
     struct PINT_Request_state *PINT_New_request_state (PINT_Request *request);
 
@@ -384,17 +404,17 @@ contiguous sements at a time and no more than BYTEMAX bytes at a time.
 
     #include <pvfs-types.h>
     #include <pint_distribution.h>
-
+    
     #define SEGMAX 32
     #define BYTEMAX 250
-
+    
     do_a_request(PINT_Request *req,
           PVFS_Distribution *dist,
           PVFS_Dist_parm *dparm,
           PVFS_Meta meta)
     {
        int i;
-
+    
        // PVFS_Process_request arguments
        PINT_Request_state *reqs;
         PINT_Request_file_data rfdata;
@@ -405,7 +425,7 @@ contiguous sements at a time and no more than BYTEMAX bytes at a time.
        int32_t segmax;
        PVFS_boolean extend_flag;
        PVFS_boolean eof_flag;
-
+    
        reqs = PINT_New_request_state(req);
        rfdata.server_nr = 0;
        rfdata.server_ct = 1;

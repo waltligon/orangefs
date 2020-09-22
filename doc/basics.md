@@ -5,16 +5,16 @@ parallel applications sharing data across many clients in a coordinated
 manner. To do this with high performance, many servers are used to
 provide multiple paths to data. Parallel file systems are a subset of
 distributed file systems, which are more generally file systems that
-provide shared access to distributed data, but don't necessarily have
+provide shared access to distributed data, but don’t necessarily have
 this focus on performance or parallel access.
 
 There are lots of things that PVFS2 is *not* designed for. In some cases
 it will coincidentally perform well for some arbitrary task that we
-weren't targeting. In other cases it will perform very poorly. If faced
-with the option of making the system better for some other task (e.g.
-executing off the file system, shared mmapping of files, storing mail in
-mbox format) at the expense of parallel I/O performance, we will always
-ruthlessly ignore performance for these other tasks.
+weren’t targeting. In other cases it will perform very poorly. If faced
+with the option of making the system better for some other task (
+e.g. executing off the file system, shared mmapping of files, storing
+mail in mbox format) at the expense of parallel I/O performance, we will
+always ruthlessly ignore performance for these other tasks.
 
 PVFS2 uses an *intelligent server* architecture. By this we mean that
 servers do more than simply provide clients with blocks of data from
@@ -60,7 +60,7 @@ specifics of this storage are hidden under an API that we call Trove.
 PVFS2 has the capability to support an arbitrary number of different
 network types through an abstraction known as the Buffered Messaging
 Interface (BMI). At this time BMI implementations exist for TCP/IP,
-Myricom's GM, and InfiniBand (both Mellanox VAPI and OpenIB APIs).
+Myricom’s GM, and InfiniBand (both Mellanox VAPI and OpenIB APIs).
 
 ## Interfaces
 
@@ -107,35 +107,35 @@ process to reference the same file. This gives us the ability to make
 the `MPI_File_open` call happen with a single lookup the the file system
 and a broadcast.
 
-There's no state held on the servers about "open" files. There's not
+There’s no state held on the servers about “open” files. There’s not
 even a concept of an open file in PVFS2. So this lookup is all that
 happens at open time. This has a number of other benefits. For one
-thing, there's no shared state to be lost if a client or server
-disappears. Also, there's nothing to do when a file is "closed" either,
+thing, there’s no shared state to be lost if a client or server
+disappears. Also, there’s nothing to do when a file is “closed” either,
 except perhaps ask the servers to push data to disk. In an MPI program
 this can be done by a single process as well.
 
 Of course if you are accessing PVFS2 through the OS, `open` and `close`
 still exist and work the way you would expect, as does `lseek`, although
-obviously PVFS2 servers don't keep up with file positions either. All
+obviously PVFS2 servers don’t keep up with file positions either. All
 this information is kept locally by the client.
 
 There are a few disadvantages to this. One that we will undoubtedly hear
 about more than once is that the UNIX behavior of unlinked open files.
 Usually with local file systems if the file was previously opened, then
 it can still be accessed. Certain programs rely on this behavior for
-correct operation. In PVFS2 we don't know if someone has the file open,
+correct operation. In PVFS2 we don’t know if someone has the file open,
 so if a file is unlinked, it is gone gone gone. Perhaps we will come up
 with a clever way to support this or adapt the NFS approach (renaming
 the file to an odd name), but this is a very low priority.
 
 ## Consistency from the client point of view
 
-We've discussed in a number of venues the opportunities that are made
+We’ve discussed in a number of venues the opportunities that are made
 available when true POSIX semantics are given up. Truthfully very few
-file systems actually support POSIX; ext3 file systems don't enforce
+file systems actually support POSIX; ext3 file systems don’t enforce
 atomic writes across block boundaries without special flags, and NFS
-file systems don't even come close. Never the less, many people claim
+file systems don’t even come close. Never the less, many people claim
 POSIX semantics, and many groups ask for them without knowing the costs
 associated.
 
@@ -143,7 +143,7 @@ PVFS2 does not provide POSIX semantics.
 
 PVFS2 does provide guarantees of atomicity of writes to nonoverlapping
 regions, even noncontiguous nonoverlapping regions. This is to say that
-if your parallel application doesn't write to the same bytes, then you
+if your parallel application doesn’t write to the same bytes, then you
 will get what you expect on subsequent reads.
 
 This is enough to provide all the non-atomic mode semantics for MPI-IO.
@@ -178,7 +178,7 @@ We have seen no evidence either from the parallel I/O community or the
 distributed shared memory community that these locking systems will work
 well at the scales of clusters that we are seeing deployed now, and we
 are not in the business of pushing the envelope on locking algorithms
-and implementations, so we're not using a locking subsystem.
+and implementations, so we’re not using a locking subsystem.
 
 Instead we force all operations that modify the file system hierarchy to
 be performed in a manner that results in an atomic change to the file
@@ -187,15 +187,15 @@ requests*) that result in what we tend to think of as atomic operations
 at the file system level. An example might help clarify this. Here are
 the steps necessary to create a new file in PVFS2:
 
--   create a directory entry for the new file
+  - create a directory entry for the new file
 
--   create a metadata object for the new file
+  - create a metadata object for the new file
 
--   point the directory entry to the metadata object
+  - point the directory entry to the metadata object
 
--   create a set of data objects to hold data for the new file
+  - create a set of data objects to hold data for the new file
 
--   point the metadata at the data objects
+  - point the metadata at the data objects
 
 Performing those steps in that particular order results in file system
 states where a directory entry exists for a file that is not really
@@ -212,7 +212,7 @@ ready to be accessed. If we carefully order the operations:
 
 we create a sequence of states that always leave the file system
 directory hierarchy in a consistent state. The file is either there (and
-ready to be accessed) or it isn't. All PVFS2 operations are performed in
+ready to be accessed) or it isn’t. All PVFS2 operations are performed in
 this manner.
 
 This approach brings with it a certain degree of complexity of its own;
@@ -221,5 +221,5 @@ directory entry turned out to already exist when we got to the final
 step, there would be a great deal of cleanup that must occur. This is a
 problem that can be surmounted, however, and because none of those
 objects are referenced by anyone else we can clean them up without
-concern for what other processes might be up to -- they never made it
+concern for what other processes might be up to – they never made it
 into the directory hierarchy.

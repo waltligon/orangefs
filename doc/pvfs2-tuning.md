@@ -1,6 +1,7 @@
 \maketitle
 \tableofcontents
 \thispagestyle{empty}
+
 # PVFS Tuning
 
 ## Introduction
@@ -32,33 +33,33 @@ setup that meets the needs of their users.
 
 ## Cluster Partitioning
 
-For users that have one use case, and a generic cluster, what's the best
+For users that have one use case, and a generic cluster, what’s the best
 partition of compute/IO nodes? Is this section needed?
 
 ## Storage
 
 ### Server Configuration
 
-How many IO servers? [^1] How many MD servers? Should IO and MD servers
+How many IO servers? \[1\] How many MD servers? Should IO and MD servers
 be shared?
 
 ### Local File System
 
--   ext3
+  - ext3
 
--   xfs
+  - xfs
 
 ### Disk Synchronization
 
 The easiest way to see an improvement in performance is to set the
-`TroveSyncMeta` and `TroveSyncData` attributes to "no" in the
-`<StorageHints>` section. If those attributes are set to "no" then Trove
+`TroveSyncMeta` and `TroveSyncData` attributes to “no” in the
+`<StorageHints>` section. If those attributes are set to “no” then Trove
 will read and write data from a cache and not the underlying file.
 Performance will increase greatly, but if the server dies at some point,
 you could lose data. At this point in PVFS2 development, server crashes
 are rare outside of hardware failures. PVFS2 developers should probably
-leave these settings to "yes". If PVFS2 hosts the only copy of your
-data, leave these settings to "yes". Otherwise, give "no" a shot.
+leave these settings to “yes”. If PVFS2 hosts the only copy of your
+data, leave these settings to “yes”. Otherwise, give “no” a shot.
 
 Sync or not, metadata, data coalescing
 
@@ -78,9 +79,11 @@ distributed metadata
 
 2.  Flow Parameters
 
--   buffer size
+<!-- end list -->
 
--   count
+  - buffer size
+
+  - count
 
 ### TCP
 
@@ -147,14 +150,14 @@ datafiles that it is using:
     dist_name = simple_stripe
     dist_params:
     strip_size:65536
-
+    
     Number of datafiles/servers = 1
     Server 0 - tcp://localhost:3334, handle: 5223372036854744173
     (487d2531626f846d.bstream)
 
 ## Distributions
 
-A *distribution* is an algorithm that defines how a file's data will be
+A *distribution* is an algorithm that defines how a file’s data will be
 distributed among available servers. PVFS provides an API for
 implementing arbitrary distributions, but four specific ones are
 available by default. Each distribution has different performance
@@ -187,22 +190,22 @@ The only tuning parameter within simple stripe is the *strip size*. The
 strip size determines how much data is stored on one server before
 switching to the next server. The default value in PVFS is 64 KB. You
 may want to experiment with this value in order to find a tradeoff
-between the amount of concurrency achieved with small accesses vs. the
+between the amount of concurrency achieved with small accesses vs. the
 amount of data streamed to each server.
 
     # to enable simple stripe distribution for a directory:
     $ setfattr -n user.pvfs2.dist_name -v simple_stripe /mnt/pvfs2/dir
-
+    
     # to change the strip size to 128 KB:
     $ setfattr -n user.pvfs2.dist_params -v strip_size:131072 /mnt/pvfs2/dir
-
+    
     # to create a new file and confirm the distribution:
     $ touch /mnt/pvfs2/dir/file
     $ pvfs2-viewdist -f /mnt/pvfs2/dir/file
     dist_name = simple_stripe
     dist_params:
     strip_size:131072
-
+    
     Number of datafiles/servers = 4
     Server 0 - tcp://localhost:3337, handle: 8223372036854744180 (721f494c589b8474.bstream)
     Server 1 - tcp://localhost:3334, handle: 5223372036854744174 (487d2531626f846e.bstream)
@@ -219,7 +222,7 @@ cases. There are no tunable parameters.
 
     # to enable basic distribution for a directory:
     $ setfattr -n user.pvfs2.dist_name -v basic_dist /mnt/pvfs2/dir
-
+    
     # to create a new file and confirm the distribution:
     $ touch /mnt/pvfs2/dir/file
     $ pvfs2-viewdist -f /mnt/pvfs2/dir/file
@@ -244,11 +247,11 @@ The two dimensional stripe distribution operates by grouping servers
 into smaller subsets and striping data within each group multiple times
 before switching. Three parameters control the grouping and striping:
 
--   strip size: same as in the simple stripe distribution
+  - strip size: same as in the simple stripe distribution
 
--   number of groups: how many groups to divide the servers into
+  - number of groups: how many groups to divide the servers into
 
--   factor: how many times to stripe within each group
+  - factor: how many times to stripe within each group
 
 The common access pattern that benefits from this distribution is the
 case of N clients operating on one file of size B, where each client is
@@ -265,18 +268,18 @@ factor of 256.
 
     # to enable basic distribution for a directory:
     $ setfattr -n user.pvfs2.dist_name -v twod_stripe /mnt/pvfs2/dir
-
+    
     # to change the strip size to 128 KB, the number of groups to 4, and a
     # factor of 228:
     $ setfattr -n user.pvfs2.dist_params -v strip_size:131072,num_groups:4,group_strip_factor:128 /mnt/pvfs2/dir
-
+    
     # to create a new file and confirm the distribution:
     $ touch /mnt/pvfs2/dir/file
     $ pvfs2-viewdist -f /mnt/pvfs2/dir/file
     dist_name = twod_stripe
     dist_params:
     num_groups:4,strip_size:131072,factor:128
-
+    
     Number of datafiles/servers = 4
     Server 0 - tcp://localhost:3336, handle: 7223372036854744175
     (643e9298b137846f.bstream)
@@ -306,16 +309,15 @@ servers, then files using this distribution will have at most three
 datafiles.
 
 The format of the strips parameter is a list of semicolon separated
-$<server>:<strip size>$ pairs. The strip size can be specified with
-short hand notation, such as "K" for kilobytes or "M" for megabytes.
-
+\(<server>:<strip size>\) pairs. The strip size can be specified with
+short hand notation, such as “K” for kilobytes or “M” for megabytes.
 
     # to enable basic distribution for a directory:
     $ setfattr -n user.pvfs2.dist_name -v varstrip_dist /mnt/pvfs2/dir
-
+    
     # to change the strip sizes to match the example above:
     $ setfattr -n user.pvfs2.dist_params -v "strips:0:32K;1:64K;2:128K" /mnt/pvfs2/dir
-
+    
     # to create a new file and confirm the distribution:
     $ touch /mnt/pvfs2/dir/file
     $ pvfs2-viewdist -f /mnt/pvfs2/dir/file
@@ -340,10 +342,10 @@ short hand notation, such as "K" for kilobytes or "M" for megabytes.
 
 ## Benchmarking
 
--   mpi-io-test
+  - mpi-io-test
 
--   mpi-md-test
+  - mpi-md-test
 
 ## References
 
-[^1]: The FAQ already answers this to some degree
+1.  The FAQ already answers this to some degree

@@ -9,7 +9,7 @@ these concepts from a high level.
 ## File system components
 
 We will start by defining the major system components from an
-administrator or user's perspective. A PVFS2 file system may consist of
+administrator or user’s perspective. A PVFS2 file system may consist of
 the following pieces (some are optional): the pvfs2-server, system
 interface, management interface, Linux kernel driver, pvfs2-client, and
 ROMIO PVFS2 device.
@@ -69,15 +69,15 @@ http://www.mcs.anl.gov/romio/ for details.
 
 PVFS2 has four different object types that are visible to users
 
--   directory
+  - directory
 
--   metafile
+  - metafile
 
--   datafile
+  - datafile
 
--   symbolic link
+  - symbolic link
 
-\...
+...
 
 ## Handles
 

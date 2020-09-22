@@ -10,12 +10,12 @@ the possible transitions to other states. Each transtition includes the
 name of the next state and the return code that is used to select that
 transition.
 
-Alternatively a state can specify another \"nested\" state machine
-rather than a state action, in which case this new state machine is
-executed as a subroutine. Upon return, the nested state machine returns
-to the calling state machine. A state can also specify that multiple
-instances of a state machine will be executed concurrently. When all of
-the concurrent state machines have returned the caller continues.
+Alternatively a state can specify another "nested" state machine rather
+than a state action, in which case this new state machine is executed as
+a subroutine. Upon return, the nested state machine returns to the
+calling state machine. A state can also specify that multiple instances
+of a state machine will be executed concurrently. When all of the
+concurrent state machines have returned the caller continues.
 
 Transitions can specify another state in the same machine, or to return
 from a nested state machine, or to terminate the current state machine.
@@ -24,25 +24,25 @@ The following is a synopsis of the state machine language, showing the
 various options by way of example:
 
     /* beginning of .sm file */
-
+    
     /* code at the top of the file is plain C code. */
     /* state actions must be declared here before the state machine */
-
+    
     static PINT_sm_action state_action_1 (
         struct PINT_smcb *smcb, job_status_s *js_p);
     static PINT_sm_action state_action_3 (
         struct PINT_smcb *smcb, job_status_s *js_p);
     static PINT_sm_action state_action_4 (
         struct PINT_smcb *smcb, job_status_s *js_p);
-
+    
     /* helper functions and other declarations go here too */
-
+    
     #define RETVAL 1
-
+    
     %%
-
+    
     /* after the double percent goes the machine declaration */
-
+    
     machine my_machine_sm (
         state_1,
          state_2,
@@ -54,13 +54,13 @@ various options by way of example:
               success => state_2;  /* success is return value 0 */
               default => state_4;
          }
-
+    
          state state_2
          {
              jump a_nested_state_machine_sm;
               RETVAL => state_3;
          }
-
+    
          state state_3
          {
              pjmp state_action_3
@@ -72,7 +72,7 @@ various options by way of example:
               }
               default => state_4;
          }
-
+    
          state state_4
          {
              /* this state action cleans up after the pjmp */
@@ -80,19 +80,19 @@ various options by way of example:
               default => terminate;
          }
     }
-
+    
     %%
-
+    
     /* after the second double percent all code is in plain C */
     /* here we implement all of the state actions */
-
+    
     static PINT_sm_action state_action_1 (
         struct PINT_smcb *smcb, job_status_s *js_p)
     {
         PINT_server_op *sop = (PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
         retrn SM_ACTION_COMPLETE;
     }
-
+    
     static PINT_sm_action state_action_3 (
         struct PINT_smcb *smcb, job_status_s *js_p)
     {
@@ -120,7 +120,7 @@ various options by way of example:
         } 
         return SM_ACTION_DEFERED;
     }
-
+    
     static PINT_sm_action state_action_4 (
         struct PINT_smcb *smcb, job_status_s *js_p)
     {
@@ -149,9 +149,9 @@ variables and is analogous to the frames created by compilers of high
 level languages for holding local variables and function parameters. The
 first step of every state action function is to call PINT\_sm\_frame()
 which retrives a frame from the stack that will be used by the state
-action. Normally, this will be the the \"current\" frame which is
-indexed by the macro PINT\_FRAME\_CURRENT or zero. When a state machine
-begins execution one frame is allocated to it and pushed on the stack,
+action. Normally, this will be the the "current" frame which is indexed
+by the macro PINT\_FRAME\_CURRENT or zero. When a state machine begins
+execution one frame is allocated to it and pushed on the stack,
 becomming the current frame. If no additional frames are pushed this
 frame will be the current frame for all states and nested state
 machines.
@@ -179,13 +179,13 @@ using a negative index. Thus the frame immediately below the current
 frame is -1, and the one below it is -2, and so on. In general, all
 frames on the stack since the initiation of the state machine can be
 accessed. The frame is organized as follows. There is a linked list of
-frames accessible from the SMCB through the field \"frames\" which is a
-struct with two fields \"next\" and \"prev\". The field
-smcb-\>frames-\>next points to the top of stack, and the field
-smcb-\>frames-\>prev points to the bottom of stack. The list is doubly
-linked and implemented with the qlist facility in PVFS. All frames
-should be access via the PINT\_sm\_frame() function which takes and SMCB
-and an integer index as arguments.
+frames accessible from the SMCB through the field "frames" which is a
+struct with two fields "next" and "prev". The field smcb-\>frames-\>next
+points to the top of stack, and the field smcb-\>frames-\>prev points to
+the bottom of stack. The list is doubly linked and implemented with the
+qlist facility in PVFS. All frames should be access via the
+PINT\_sm\_frame() function which takes and SMCB and an integer index as
+arguments.
 
 The frames can be though of as numbered starting at zero from the bottom
 of the stack to N-1 at the top of the stack, where there are N frames in
@@ -220,4 +220,4 @@ current\_frame = PINT\_sm\_frame(smcb,PINT\_FRAME\_CURRENT);
 Offsets from the top or current frame can be made by either adding or
 subracting from one of these macros. The bottom frame on the stack would
 be accessed as the negative of the base\_frame, but this is rarely
-needed and there isn't a macro for it at this time.
+needed and there isn’t a macro for it at this time.

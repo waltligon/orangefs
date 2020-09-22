@@ -1,15 +1,16 @@
 \maketitle
+
 # `pvfs2-client` Design Document (DRAFT)
 
 ## Introduction
 
 The primary role of the pvfs2-client daemon is to efficiently *marshal*
-operation requests and data from the kernel's VFS ( *Virtual File
+operation requests and data from the kernel’s VFS ( *Virtual File
 System*, or *Virtual Filesystem Switch*) layer to the pvfs2-server, and
 return responses from the pvfs2-server(s) back to the VFS layer. This
 involves waiting for file system and I/O requests, performing operations
 against the pvfs2-server application(s), and passing responses back to
-the Linux kernel's VFS layer. The data medium for the communication
+the Linux kernel’s VFS layer. The data medium for the communication
 between the VFS request and the pvfs2-client application is the
 /dev/pvfs2 device node. An interface that will allow incoming unexpected
 requests from the /dev/pvfs2 device node is required, and using the
@@ -33,7 +34,7 @@ the pvfs2-servers. Therefore, at least in the short term, it would be
 most appropriate to leverage as much of our existing code as possible. A
 user-space application is required to make use of this code, and thus
 the need for the pvfs2-client application to bridge the gap between the
-Linux kernel's VFS layer and the *System Interface*.
+Linux kernel’s VFS layer and the *System Interface*.
 
 ## `pvfs2-client` Application Architecture
 
@@ -66,26 +67,28 @@ encountered.
 Unexpected requests are delivered to the pvfs2-client application only
 from the /dev/pvfs2 device node that the pvfs2-client application
 monitors through the job interface. These requests are generated and
-passed up from the Linux kernel's VFS layer by the PVFS2 kernel module
+passed up from the Linux kernel’s VFS layer by the PVFS2 kernel module
 that implements the VFS operations.
 
 The pvfs2-client has a similar processing loop as the pvfs2-server:
 
-        while (pvfs2-client application is running)
-        {
-          ...
-          wait on pending jobs in progress and expected requests
-          ...
-          foreach job returned
-             if job is an unexpected request
-                initialize appropriate operation state machine
-             end if
-             ...
-             while completions occur immediately
-                 advance to next state in state machine
-             end while
-          end foreach
-        }
+``` 
+    while (pvfs2-client application is running)
+    {
+      ...
+      wait on pending jobs in progress and expected requests
+      ...
+      foreach job returned
+         if job is an unexpected request
+            initialize appropriate operation state machine
+         end if
+         ...
+         while completions occur immediately
+             advance to next state in state machine
+         end while
+      end foreach
+    }
+```
 
 ## Limitations of the Existing System Interface
 
@@ -95,12 +98,12 @@ I/O operations to be performed against the pvfs2-server(s), but suffers
 from several major limitations in its current state. These limitations
 can be described briefly as:
 
--   *Semantic Limitations*: the current implementation provides a
+  - *Semantic Limitations*: the current implementation provides a
     blocking interface to all operations. We already know that a
     non-blocking interface is required for efficient access through
     other existing non-blocking iterfaces such as ROMIO.
 
--   *Reusability Limitations*: the current implementation performs many
+  - *Reusability Limitations*: the current implementation performs many
     blocking operations. This cannot be used *as is* in the proposed
     non-blocking state-machine oriented architecture of the
     pvfs2-client.
@@ -129,8 +132,8 @@ re-use, and design simplicity.
 We can think of all pvfs2-client operations as having a similar
 structure, as depicted in Figure 2. What we see here is a generic state
 machine implementing an operation. For all operations there will be a
-*use specific* initialization, execution of some core routines (i.e.
-functionality provided by the current System Interface), and a
+*use specific* initialization, execution of some core routines (
+i.e. functionality provided by the current System Interface), and a
 use-specific notification of status and completion. If the core
 functionality of each System Interface routine were implemented in terms
 of a state machine, the execution of a core routine could be embedded as
@@ -160,7 +163,7 @@ blocking and non-blocking System Interface implementations. The
 requirement for this is that the source and target endpoints of the Flow
 be established before using the core functionality state machine. In
 Figure 2, for example, the pvfs2-client application may specify that the
-Flow's target endpoint should be the /dev/pvfs2 device node.
+Flow’s target endpoint should be the /dev/pvfs2 device node.
 
 ## Non-blocking and Blocking System Interface Implementations
 

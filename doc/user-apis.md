@@ -63,7 +63,7 @@ be accessed until the subsequent close, even if the file permissions are
 changed or the file is deleted. This requires that the file system or
 clients somehow keep up with a list of files that are open, which adds
 unacceptable state to a distributed file system. In NFS, for example,
-this is implemented via the "sillyrename" approach, in which clients
+this is implemented via the “sillyrename” approach, in which clients
 rename a deleted but open file to hide it in the directory tree, then
 delete the renamed file when the file is finally closed.
 
@@ -78,7 +78,7 @@ pvfs2-client if someone is still accessing?*
 
 POSIX semantics dictate sequential consistency for overlapping I/O
 operations. This means that I/O operations must be atomic with respect
-to each other -- if one process performs a read spanning a collection of
+to each other – if one process performs a read spanning a collection of
 servers while another performs a write in the same region, the read must
 see either all or none of the changes. In a parallel file system this
 involves communication to coordinate access in this manner, and because

@@ -1,4 +1,5 @@
 \maketitle
+
 # Trove: The PVFS2 Storage Interface
 
 ## Motivation and Goals
@@ -9,22 +10,22 @@ by individual servers (and servers only) to keep track of locally stored
 information. There are several goals and ideas that we should keep in
 mind when discussing this interface:
 
--   **Multiple storage instances**: This interface is intended to hide
+  - **Multiple storage instances**: This interface is intended to hide
     the use of multiple storage instances for storage of data. This data
     can be roughly categorized into two types, bytestream and keyval
     spaces, which are described in further detail below.
 
--   **Contiguous and noncontiguous data access**: The first cut of this
+  - **Contiguous and noncontiguous data access**: The first cut of this
     interface will probably only handle contiguous data access. However,
     we would like to also support some form of noncontiguous access. We
     think that this will be done through list I/O type operations, as we
-    don't necessarily want anything more complicated at this level.
+    don’t necessarily want anything more complicated at this level.
 
--   **Metadata storage**: This interface will be used as a building
+  - **Metadata storage**: This interface will be used as a building
     block for storing metadata in addition to file data. This includes
     extended metadata.
 
--   **Nonblocking semantics**: This interface will be completely
+  - **Nonblocking semantics**: This interface will be completely
     nonblocking for both file data and metadata operations. The usual
     argument for scalability and flexible interaction with other I/O
     devices applies here. We should try to provide this functionality
@@ -32,17 +33,17 @@ mind when discussing this interface:
     require interface calls to be made in order for progress to occur.*
     This implies that threads will be used underneath where necessary.
 
--   **Compatibility with flows**: Flows will almost certainly be built
+  - **Compatibility with flows**: Flows will almost certainly be built
     on top of this interface. Both the default BMI flow implementation
     and custom implementations should be able to use this interface.
 
--   **Consistency semantics**: If we are going to support consistency,
+  - **Consistency semantics**: If we are going to support consistency,
     locking, etc, then we need to be able to enforce consistency
     semantics at the storage interface level. The interface will provide
     the option for serializing access to a dataspace and a vtag
     interface.
 
--   **Error recovery**: The system must detect and report errors
+  - **Error recovery**: The system must detect and report errors
     occurring while accessing data storage. The system may or may not
     implement redundancy, journaling, etc. for recovering from errors
     resulting in data loss.
@@ -50,19 +51,19 @@ mind when discussing this interface:
 Our first cut implementation of this interface will have the following
 restrictions:
 
--   only one type of storage for bytestreams and one type for keyvals
+  - only one type of storage for bytestreams and one type for keyvals
     will be supported
 
--   consistency semantics will not be implemented
+  - consistency semantics will not be implemented
 
--   errors will be reported, but no measures will be taken to recover
+  - errors will be reported, but no measures will be taken to recover
 
--   noncontiguous access will not be enabled
+  - noncontiguous access will not be enabled
 
--   only one process/thread will be accessing a given storage instance
+  - only one process/thread will be accessing a given storage instance
     through this interface at a time
 
-*PARTIAL COMPLETION SEMANTICS NEED MUCH WORK!!!*
+*PARTIAL COMPLETION SEMANTICS NEED MUCH WORK\!\!\!*
 
 ## Storage space concepts
 
@@ -78,7 +79,7 @@ in systems that can migrate data from slow storage to faster storage as
 well).
 
 Two collections will be created for each file system: one collection
-will support the dataspaces needed for the file system's data and
+will support the dataspaces needed for the file system’s data and
 metadata objects. A second collection will be created for administrative
 purposes. If the underlying implementation needs to perform disk i/o,
 for example, it can use bstream and keyval objects from the
@@ -93,9 +94,9 @@ as a file system ID might be used.
 This storage interface stores and accesses what we will call
 *dataspaces*. These are logical collections of data organized in one of
 two possible ways. The first organization for a dataspace is the
-traditional "byte stream". This term refers to arbitrary binary data
+traditional “byte stream”. This term refers to arbitrary binary data
 that can be referenced using offsets and sizes. The second organization
-is "keyword/value" data. This term refers to information that is
+is “keyword/value” data. This term refers to information that is
 accessed in a simplified database-like manner. The data is indexed by
 way of a variable length key rather than an offset and size. Both
 keyword and value are arbitrary byte arrays with a length parameter
@@ -109,17 +110,17 @@ ways on underlying storage.
 
 Here are some potential uses of each type:
 
--   Byte stream
+  - Byte stream
+    
+      - traditional file data
+    
+      - binary metadata storage (as is currently done in PVFS 1)
 
-    -   traditional file data
-
-    -   binary metadata storage (as is currently done in PVFS 1)
-
--   Key/value
-
-    -   extended metadata attributes
-
-    -   directory entries
+  - Key/value
+    
+      - extended metadata attributes
+    
+      - directory entries
 
 In our design thus far (reference the system interface documents) we
 have defined four types of *system level objects*. These are data files,
@@ -142,7 +143,7 @@ This section can be skipped if you are not interested in consistency
 semantics. Vtags will probably not be implemented in the first cut
 anyway.
 
-### Phil's poor explanation
+### Phil’s poor explanation
 
 Vtags are an approach to ensuring consistency for multiple readers and
 writers that avoids the use of locks and their associated problems
@@ -153,7 +154,7 @@ A vtag fundamentally provides a version number for any region of a byte
 stream or any individual key/value pair. This allows the implementation
 of an optimistic approach to consistency. Take the example of a
 read-modify-write operation. The caller first reads a data region,
-obtaining a version tag in the process. It then modifies it's own copy
+obtaining a version tag in the process. It then modifies it’s own copy
 of the data. When it writes the data back, it gives the vtag back to the
 storage interface. The storage interface compares the given vtag against
 the current vtag for the region. If the vtags match, it indicates that
@@ -164,7 +165,7 @@ and the caller must retry the operation.
 This is an optimistic approach in that the caller always assumes that
 the region has not been modified.
 
-Many different locking primitives can be built upon the vtag concept\...
+Many different locking primitives can be built upon the vtag concept...
 
 ### Use of vtags
 
@@ -174,7 +175,7 @@ lists of concurrent operations, simply use the vtag facility to ensure
 that operations occur atomically). Alternatively they could be used to
 handle the case of trove resources shared by multiple upper layers.
 Finally they might be used in conjunction with higher level consistency
-control in some complimentary fashion (dunno yet\...).
+control in some complimentary fashion (dunno yet...).
 
 ## The storage interface
 
@@ -196,44 +197,44 @@ cover the completion test functions.
 Unless otherwise noted, all functions return an integer with three
 possible values:
 
--   0: Success. If the operation was nonblocking, then this return value
+  - 0: Success. If the operation was nonblocking, then this return value
     indicates the caller must test for completion later.
 
--   1: Success with immediate completion. No later testing is required,
+  - 1: Success with immediate completion. No later testing is required,
     and no handle is returned for use in testing.
 
--   -errno: Failure. The error code is encoded in the negative return
+  - \-errno: Failure. The error code is encoded in the negative return
     value.
 
 ### Error values
 
-Table [\[table:storage\_errors\]](#table:storage_errors){reference-type="ref"
-reference="table:storage_errors"} shows values. All values will be
-returned as integers in the native format (size and byte order).
+Table [\[table:storage\_errors\]](#table:storage_errors) shows values.
+All values will be returned as integers in the native format (size and
+byte order).
 
 *Needs to be fleshed out. Need to pick a reasonable prefix.*
 
 *Phil: Once this is fleshed out, can we apply the same sort of scheme to
-BMI? BMI doesn't have a particularly informative error reporting
+BMI? BMI doesn’t have a particularly informative error reporting
 mechanism.*
 
 *Rob: Definitely. I would really like to make sure that in addition to
 getting error values back, the error values actually make sense :). This
 was (and still is in some cases) a real problem for PVFS1.*
 
-  Value           Meaning
-  --------------- -----------------------------------------
-  TROVE\_ENOENT   no such dataspace
-  TROVE\_EIO      I/O error
-  TROVE\_ENOSPC   no space on storage device
-  TROVE\_EVTAG    vtag didn't match
-  TROVE\_ENOMEM   unable to allocate memory for operation
-  TROVE\_EINVAL   invalid input parameter
+| Value         | Meaning                                 |
+| :------------ | :-------------------------------------- |
+| TROVE\_ENOENT | no such dataspace                       |
+| TROVE\_EIO    | I/O error                               |
+| TROVE\_ENOSPC | no space on storage device              |
+| TROVE\_EVTAG  | vtag didn’t match                       |
+| TROVE\_ENOMEM | unable to allocate memory for operation |
+| TROVE\_EINVAL | invalid input parameter                 |
 
-  : Error values for storage interface
+Error values for storage
+interface
 
-[\[table:storage\_errors\]]{#table:storage_errors
-label="table:storage_errors"}
+<span id="table:storage_errors" label="table:storage_errors">\[table:storage\_errors\]</span>
 
 ### Flags related to vtags
 
@@ -243,11 +244,11 @@ calls with respect to vtags:
 
 *TODO: pick a reasonable prefix for our flags.*
 
--   **FLAG\_VTAG**: Indicates that the vtag is valid. The caller does
+  - **FLAG\_VTAG**: Indicates that the vtag is valid. The caller does
     not have a valid vtag for input, nor does he desire a valid vtag in
     response.
 
--   **FLAG\_VTAG\_RETURN**: Indicates that the caller wishes to obtain a
+  - **FLAG\_VTAG\_RETURN**: Indicates that the caller wishes to obtain a
     vtag from the operation. However, the caller does not wish to use a
     vtag for input.
 
@@ -274,7 +275,7 @@ Hint keys and values have the additional constraint of being
 null-terminated, readable strings. This makes them very similar to
 MPI\_Info key/value pairs.
 
-*TODO: we should build hints out of a pair of the TROVE\_keyvals. We'll
+*TODO: we should build hints out of a pair of the TROVE\_keyvals. We’ll
 call them a TROVE\_hint\_s in here for now.*
 
 ### Functions
@@ -304,7 +305,7 @@ value is returned by the test functions, and it allows for quick
 reference to user data structures associated with the completed
 operation.
 
-To motivate, normally there is some data at the caller's level that
+To motivate, normally there is some data at the caller’s level that
 corresponds with the trove operation. Without some help, the caller
 would have to map IDs for completed operations back to the caller data
 structures manually. By providing a parameter that the caller can pass
@@ -313,7 +314,7 @@ completion.
 
 #### Dataspace management
 
--   **ds\_create( \[in\]coll\_id, \[in/out\]handle, \[in\]bitmask,
+  - **ds\_create( \[in\]coll\_id, \[in/out\]handle, \[in\]bitmask,
     \[in\]type, \[in/out\]hint, \[in\]user\_ptr, \[out\]id )**: Creates
     a new storage interface object. The interface will fill any any
     portion of the handle that is not already filled in and ensure that
@@ -321,50 +322,50 @@ completion.
     16 bits of the handle, it may do so by setting the appropriate bits
     and then specifying with the bitmask that the storage interface
     should not modify those bits.
-
+    
     The type field can be used by the caller to assign an arbitrary
     integer type to the object. This may, for example, be used to
     distinguish between directories, symlinks, datafiles, and metadata
     files. The storage interface does not assign any meaning to the type
     value. *Do we even need this type field?*
-
+    
     The hint field may be used to specify what type of underlying
     storage should be used for this dataspace in the case where multiple
     potential underlying storage methods are available.
 
--   **ds\_remove( \[in\]handle, \[in\]user\_ptr, \[out\]id )**: Removes
+  - **ds\_remove( \[in\]handle, \[in\]user\_ptr, \[out\]id )**: Removes
     an existing object from the system.
 
--   **ds\_verify( \[in\]coll\_id, \[in\]handle, \[out\]type,
+  - **ds\_verify( \[in\]coll\_id, \[in\]handle, \[out\]type,
     \[in\]user\_ptr, \[out\]id )**: Verifies that an object exists with
     the specified handle. If the object does exist, then the type of the
     object is also returned. Useful for verifying sanity of handles
     provided by client.
 
--   **ds\_getattr( \[in\]coll\_id, \[in\]handle, \[out\]ds\_attr,
+  - **ds\_getattr( \[in\]coll\_id, \[in\]handle, \[out\]ds\_attr,
     \[in\]user\_ptr, \[out\]id )**: Obtains statistics about the given
-    dataspace that aren't actually stored within the dataspace. This may
+    dataspace that aren’t actually stored within the dataspace. This may
     include information such as number of key/value pairs, size of byte
     stream, access statistics, on what medium it is stored, etc.
 
--   **ds\_setattr() ???**
+  - **ds\_setattr() ???**
 
--   **ds\_hint( \[in\]coll\_id, \[in\]handle, \[in/out\]hint );**:
+  - **ds\_hint( \[in\]coll\_id, \[in\]handle, \[in/out\]hint );**:
     Passes a hint to the underlying trove implementation. Used to
     indicate caching needs, access patterns, begin/end of use, etc.
 
--   **ds\_migrate( \[in\]coll\_id, \[in\]handle, \[in/out\]hint,
+  - **ds\_migrate( \[in\]coll\_id, \[in\]handle, \[in/out\]hint,
     \[in\]user\_ptr, \[out\]id );**: Used to indicate that a dataspace
     should be migrated to another medium. *could this be done with just
-    the hint call? having an id in this case is particularly useful \...
-    so we know the operation is completed\...*
+    the hint call? having an id in this case is particularly useful ...
+    so we know the operation is completed...*
 
 #### Byte stream access
 
 Parameters in read and write at calls are ordered similarly to pread and
 pwrite.
 
--   **bstream\_read\_at( \[in\]coll\_id, \[in\]handle, \[in\]buffer,
+  - **bstream\_read\_at( \[in\]coll\_id, \[in\]handle, \[in\]buffer,
     \[in\]size, \[in\]offset, \[in\]flags, \[out\]vtag, \[in\]user\_ptr,
     \[out\]id )**: Reads a contiguous region from bytestream. Most of
     the arguments are self explanatory. The flags are not yet defined,
@@ -373,27 +374,27 @@ pwrite.
     byte stream defined by the requested offset and size. This allows
     the underlying implementation to avoid the overhead of calculating
     the value.
+    
+    *The size is \[in/out\] in code? Figure out semantics\!\!\!*
 
-    *The size is \[in/out\] in code? Figure out semantics!!!*
-
--   **bstream\_write\_at( \[in\]coll\_id, \[in\]handle, \[in\]buffer,
+  - **bstream\_write\_at( \[in\]coll\_id, \[in\]handle, \[in\]buffer,
     \[in\]size, \[in\]offset, \[in\]flags, \[in/out\]vtag,
     \[in\]user\_ptr, \[out\]id )**:
-
+    
     Writes a contiguous region to the bytestream. Same arguments as
     read\_bytestream, except that the vtag is an in/out parameter.
+    
+    *The size is \[in/out\] in code? Figure out semantics\!\!\!*
 
-    *The size is \[in/out\] in code? Figure out semantics!!!*
-
--   **bstream\_resize( \[in\]coll\_id, \[in\]handle, \[in\]size,
+  - **bstream\_resize( \[in\]coll\_id, \[in\]handle, \[in\]size,
     \[in\]flags, \[in/out\]vtag, \[in\]user\_ptr, \[out\]id )**: Used to
     truncate or allocate storage for a bytestream. Flags are used to
     specify if preallocation is desired.
 
--   **bstream\_validate( \[in\]handle, \[in/out\]vtag, \[in\]user\_ptr,
+  - **bstream\_validate( \[in\]handle, \[in/out\]vtag, \[in\]user\_ptr,
     \[out\]id )**: This function may be used to check for modification
     of a particular bytestream.
-
+    
     *Flags?*
 
 #### Key/value access
@@ -401,39 +402,39 @@ pwrite.
 An important call for keyval spaces is the iterator function. The
 iterator function is used to obtain all keyword/value pairs from the
 keyval space with a sequence of calls from the client. The iterator
-function returns a logical, opaque "position" value that allows a client
+function returns a logical, opaque “position” value that allows a client
 to continue reading pairs from the keyval space where it last left off.
 
--   **keyval\_read( \[in\]coll\_id, \[in\]handle, \[in\]key, \[out\]val,
+  - **keyval\_read( \[in\]coll\_id, \[in\]handle, \[in\]key, \[out\]val,
     \[in\]flags, \[out\]vtag, \[in\]user\_ptr, \[out\]id )**: Reads the
     value corresponding to a given key. Fails if the key does not exist.
     A buffer is provided for the value to be placed in (the value may be
     an arbitrary type).
-
+    
     The amount of data actually placed in the value buffer should be
     indicated by the data\_sz element of the structure.
 
--   **keyval\_write( \[in\]coll\_id, \[in\]handle, \[in\]key, \[in\]val,
+  - **keyval\_write( \[in\]coll\_id, \[in\]handle, \[in\]key, \[in\]val,
     \[in\]flags, \[in/out\]vtag, \[in\]user\_ptr, \[out\]id )**: Writes
     out a value for a given key. If the key does not exist, it is added.
 
--   **keyval\_remove( \[in\]coll\_id, \[in\]handle, \[in\]key,
+  - **keyval\_remove( \[in\]coll\_id, \[in\]handle, \[in\]key,
     \[in\]flags, \[in/out\]vtag, \[in\]user\_ptr, \[out\]id )**: Removes
     a key/value pair from the keyval data space.
 
--   **keyval\_validate( \[in\]coll\_id, \[in\]handle, \[in/out\]vtag,
+  - **keyval\_validate( \[in\]coll\_id, \[in\]handle, \[in/out\]vtag,
     \[in\]user\_ptr, \[out\]id )**: Used to check for modification of a
     particular key/value pair.
 
--   **keyval\_iterate( \[in\]coll\_id, \[in\]handle, \[in/out\]position,
+  - **keyval\_iterate( \[in\]coll\_id, \[in\]handle, \[in/out\]position,
     \[out\]key\_array, \[out\]val\_array, \[in/out\]count, \[in\]flags,
     \[in/out\]vtag, \[in\]user\_ptr, \[out\]id )**: Reads count
     keyword/value pairs from the provided logical position in the keyval
-    space. Fails if the vtag doesn't match. The position
+    space. Fails if the vtag doesn’t match. The position
     SI\_START\_POSITION is used to start at the beginning, and a new
     position is returned allowing the caller to continue where they left
     off.
-
+    
     keyval\_iterate will always read *count* items, unless it hits the
     end of the keyval space (EOK). After hitting EOK, *count* will be
     set to the number of pairs processed. Thus, callers must compare
@@ -444,7 +445,7 @@ to continue reading pairs from the keyval space where it last left off.
     only after making another call will the caller know he is at EOK.
     The value of *position* is not meaningful after reaching EOK.
 
--   **keyval\_iterate\_keys( \[in\]coll\_id, \[in\]handle,
+  - **keyval\_iterate\_keys( \[in\]coll\_id, \[in\]handle,
     \[in/out\]position, \[out\]key\_array, \[in\]count, \[in\]flags,
     \[in/out\]vtag, \[in\]user\_ptr, \[out\]id )**: Similar to above,
     but only returns keys, not corresponding values. *need to fix
@@ -463,27 +464,27 @@ into flat regions before reaching this interface. The process for
 unrolling is outside the scope of this document, but examples are
 available in the ROMIO code.
 
-*TODO: SEMANTICS!!!!!*
+*TODO: SEMANTICS\!\!\!\!\!*
 
 *TODO: how to we report partial success for listio calls?*
 
--   **bstream\_read\_list( \[in\]coll\_id, \[in\]handle,
+  - **bstream\_read\_list( \[in\]coll\_id, \[in\]handle,
     \[in\]mem\_offset\_array, \[in\]mem\_size\_array, \[in\]mem\_count,
     \[in\]stream\_offset\_array, \[in\]stream\_size\_array,
     \[in\]stream\_count, \[in\]flags, \[out\]vtag(?), \[in\]user\_ptr,
     \[out\]id )**:
 
--   **bstream\_write\_list( \[in\]coll\_id, \[in\]handle,
+  - **bstream\_write\_list( \[in\]coll\_id, \[in\]handle,
     \[in\]mem\_offset\_array, \[in\]mem\_size\_array, \[in\]mem\_count,
     \[in\]stream\_offset\_array, \[in\]stream\_size\_array,
     \[in\]stream\_count, \[in\]flags, \[in/out\]vtag(?),
     \[in\]user\_ptr, \[out\]id )**:
 
--   **keyval\_read\_list( \[in\]coll\_id, \[in\]handle,
+  - **keyval\_read\_list( \[in\]coll\_id, \[in\]handle,
     \[in\]key\_array, \[in\]value\_array, \[in\]count, \[in\]flags,
     \[out\]vtag, \[in\]user\_ptr, \[out\]id )**:
 
--   **keyval\_write\_list( \[in\]coll\_id, \[in\]handle,
+  - **keyval\_write\_list( \[in\]coll\_id, \[in\]handle,
     \[in\]key\_array, \[in\]value\_array, \[in\]count, \[in\]flags,
     \[in/out\]vtag, \[in\]user\_ptr, \[out\]id )**:
 
@@ -491,7 +492,7 @@ available in the ROMIO code.
 
 *Do we need coll\_ids here?*
 
--   **test( \[in\]coll\_id, \[in\]id, \[out\]count, \[out\]vtag,
+  - **test( \[in\]coll\_id, \[in\]id, \[out\]count, \[out\]vtag,
     \[out\]user\_ptr, \[out\]state )**: Tests for completion of a
     storage interface operation. The count field indicates how many
     operations completed (in this case either 1 or 0). If an operation
@@ -500,21 +501,22 @@ available in the ROMIO code.
     used to provide vtags for operations that did not complete
     immediately.
 
--   **testsome( \[in\]coll\_id, \[in/out\]id\_array, \[in/out\]count,
+  - **testsome( \[in\]coll\_id, \[in/out\]id\_array, \[in/out\]count,
     \[out\]vtag\_array, \[out\]user\_ptr\_array, \[out\]state\_array
     )**: Tests for completion of one or more trove operations. The
     id\_array lists operations to test on. A value of
     TROVE\_OP\_ID\_NULL will be ignored. Count is set to the number of
     completed items on return.
-
+    
     *TODO: fix up semantics for testsome; look at MPI functions for
     ideas.*
-
+    
     *wait function for testing purposes if nothing else?*
 
 *Note: need to discuss completion queue, internal or external?*
 
-*Phil: See pvfs2-internal email at\
+*Phil: See pvfs2-internal email
+at  
 http://beowulf-underground.org/pipermail/pvfs2-internal/2001-October/000010.html
 for my thoughts on this topic.*
 
@@ -530,7 +532,7 @@ this layer or that are related to this layer.
 
 ### Metadata Stuffing
 
-In many file systems "inode stuffing" is used to store the data for
+In many file systems “inode stuffing” is used to store the data for
 small files in the space used to store pointers to indirect blocks. The
 analogous approach for PVFS2 would be to store the data for small files
 in the bytestream space associated with the metafile.

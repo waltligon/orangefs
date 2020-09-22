@@ -1,6 +1,7 @@
 \maketitle
 \tableofcontents
 \newpage
+
 # PVFS High Availability Clustering Using Heartbeat 2.0
 
 ## Introduction
@@ -12,9 +13,9 @@ The combination of PVFS and Heartbeat can support an arbitrary number of
 active server nodes and an arbitrary number of passive spare nodes.
 Spare nodes are not required unless you wish to avoid performance
 degradation upon failure. As configured in this document, PVFS will be
-able to tolerate $\lceil ((N/2)-1) \rceil$ node failures, where N is the
-number of nodes present in the Heartbeat cluster including spares. Over
-half of the nodes must be available in order to reach a quorum and
+able to tolerate \(\lceil ((N/2)-1) \rceil\) node failures, where N is
+the number of nodes present in the Heartbeat cluster including spares.
+Over half of the nodes must be available in order to reach a quorum and
 decide if another node has failed.
 
 Heartbeat can be configured to monitor IP connectivity, storage hardware
@@ -92,8 +93,8 @@ to use for communication within the cluster nodes.
 Secondly, you need to allocate an extra IP address and hostname for each
 PVFS daemon. In the example that this document uses, we must allocate 4
 extra IP addresses, along with 4 hostnames in DNS for those IP
-addresses. In this document, we will refer to these as "virtual
-addresses" or "virtual hostnames". Each active PVFS server will be
+addresses. In this document, we will refer to these as “virtual
+addresses” or “virtual hostnames”. Each active PVFS server will be
 configured to automatically bring up one of these virtual addresses to
 use for communication. If the node fails, then that IP address is
 migrated to another node so that clients will appear to communicate with
@@ -114,19 +115,19 @@ for use on each of the active nodes.
 
 There are a few points to consider when configuring PVFS:
 
--   Use the virtual hostnames when specifying meta servers and I/O
+  - Use the virtual hostnames when specifying meta servers and I/O
     servers
 
--   Synchronize file data on every operation (necessary for consistency
+  - Synchronize file data on every operation (necessary for consistency
     on failover)
 
--   Synchronize meta data on every operation (necessary for consistency
+  - Synchronize meta data on every operation (necessary for consistency
     on failover). Coalescing is allowed.
 
--   Use the `TCPBindSpecific` option (this allows multiple daemons to
+  - Use the `TCPBindSpecific` option (this allows multiple daemons to
     run on the same node using different virtual addresses)
 
--   Tune retry and timeout values appropriately for your system. This
+  - Tune retry and timeout values appropriately for your system. This
     may depend on how long it takes for your power control device to
     safely shutdown a node.
 
@@ -144,14 +145,14 @@ relevant to Heartbeat:
             TCPBindSpecific yes
             ...
     </Defaults>
-
+    
     <Aliases>
             Alias virtual1_tcp3334 tcp://virtual1:3334
             Alias virtual2_tcp3334 tcp://virtual2:3334
             Alias virtual3_tcp3334 tcp://virtual3:3334
             Alias virtual4_tcp3334 tcp://virtual4:3334
     </Aliases>
-
+    
     <Filesystem>
             ...
             <MetaHandleRanges>
@@ -220,7 +221,7 @@ and list of nodes (including spares) appropriate for your environment.
 
     $ dd if=/dev/urandom count=4 2>/dev/null | openssl dgst -sha1
     dcdebc13c41977eac8cca0023266a8b16d234262
-
+    
     $ examples/heartbeat/pvfs2-ha-heartbeat-configure.sh /etc/ha.d 225.0.0.1 \
       dcdebc13c41977eac8cca0023266a8b16d234262 \
       node1 node2 node3 node4 node5
@@ -322,17 +323,17 @@ each `pvfs2-server` process. This resource is provided by the PVFS2
 script in the examples directory. The parameters to this resource are
 listed below:
 
--   `fsconfig`: location of PVFS fs configuration file
+  - `fsconfig`: location of PVFS fs configuration file
 
--   `port`: TCP/IP port that the server will listen on (must match
+  - `port`: TCP/IP port that the server will listen on (must match
     server configuration file)
 
--   `ip`: IP address that the server will listen on (must match both the
+  - `ip`: IP address that the server will listen on (must match both the
     file system configuration file and the IPAddr resource)
 
--   `pidfile`: Location where a pid file can be written
+  - `pidfile`: Location where a pid file can be written
 
--   `alias`: alias to identify this PVFS daemon instance
+  - `alias`: alias to identify this PVFS daemon instance
 
 Also notice that there is a monitor operation associated with the PVFS
 resource. This will cause the `pvfs2-check-server` utility to be
@@ -427,19 +428,19 @@ fails:
 The Heartbeat software comes with a wide variety of tools for managing
 resources. The following are a few useful examples:
 
--   `cibadmin -Q`: Display the current CIB information
+  - `cibadmin -Q`: Display the current CIB information
 
--   `crm_mon -r -1`: Display the current resource status
+  - `crm_mon -r -1`: Display the current resource status
 
--   `crm_standby`: Used to manually take a node in an out of standby
+  - `crm_standby`: Used to manually take a node in an out of standby
     mode. This can be used to take a node offline for maintenance
     without a true failure event.
 
--   `crm_resource`: Modify resource information. For example,
+  - `crm_resource`: Modify resource information. For example,
     `crm_resource -r server0 -p target_role -v stopped` will stop a
     particular resource group.
 
--   `crm_verify`: can be used to confirm if the CIB information is valid
+  - `crm_verify`: can be used to confirm if the CIB information is valid
     and consistent
 
 ## Additional examples
@@ -447,15 +448,15 @@ resources. The following are a few useful examples:
 The `examples/heartbeat/hardware-specific` directory contains additional
 example scripts that may be helpful in some scenarios:
 
--   `pvfs2-stonith-plugin`: An example stonith plugin that can use an
+  - `pvfs2-stonith-plugin`: An example stonith plugin that can use an
     arbitrary script to power off nodes. May be used (for example) with
     the `apc*` and `baytech*` scripts to control remote controlled power
     strips if the scripts provided by Heartbeat are not sufficient.
 
--   `Filesystem-qla-monitor`: A modified version of the standard
+  - `Filesystem-qla-monitor`: A modified version of the standard
     FileSystem resource that uses the `qla-monitor.pl` script to provide
     additional monitoring capability for QLogic fibre channel cards.
 
--   `PVFS2-notify`: An example of a dummy resource that could be added
+  - `PVFS2-notify`: An example of a dummy resource that could be added
     to the configuration to perform additional logging or notification
     steps on startup.

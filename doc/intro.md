@@ -6,7 +6,7 @@ been the most successful parallel file system on Linux clusters to date.
 This code base has been used both in production mode at large scientific
 computing centers and as a launching point for many research endeavors.
 
-However, the PVFS (or PVFS1) code base is a terrible mess! For the last
+However, the PVFS (or PVFS1) code base is a terrible mess\! For the last
 few years we have been pushing it well beyond the environment for which
 it was originally designed. The core of PVFS1 is no longer appropriate
 for the environment in which we now see parallel file systems being
@@ -32,41 +32,41 @@ characteristics of our parallel file system, PVFS2.
 
 ## Why rewrite?
 
-There are lots of reasons why we've chosen to rewrite the code. We were
+There are lots of reasons why we’ve chosen to rewrite the code. We were
 bored with the old code. We were tired of trying to work around inherent
 problems in the design. But mostly we felt hamstrung by the design. It
-was too socket-centric, too obviously single-threaded, wouldn't support
+was too socket-centric, too obviously single-threaded, wouldn’t support
 heterogeneous systems with different endian-ness, and relied too
 thoroughly on OS buffering and file system characteristics.
 
-The new code base is much bigger and more flexible. Definitely there's
-the opportunity for us to suffer from second system syndrome here! But
-we're willing to risk this in order to position ourselves to use the new
+The new code base is much bigger and more flexible. Definitely there’s
+the opportunity for us to suffer from second system syndrome here\! But
+we’re willing to risk this in order to position ourselves to use the new
 code base for many years to come.
 
-## What's different?
+## What’s different?
 
 The new design has a number of important features, including:
 
--   modular networking and storage subsystems,
+  - modular networking and storage subsystems,
 
--   powerful request format for structured non-contiguous accesses,
+  - powerful request format for structured non-contiguous accesses,
 
--   flexible and extensible data distribution modules,
+  - flexible and extensible data distribution modules,
 
--   distributed metadata,
+  - distributed metadata,
 
--   stateless servers and clients (no locking subsystem),
+  - stateless servers and clients (no locking subsystem),
 
--   explicit concurrency support,
+  - explicit concurrency support,
 
--   tunable semantics,
+  - tunable semantics,
 
--   flexible mapping from file references to servers,
+  - flexible mapping from file references to servers,
 
--   tight MPI-IO integration, and
+  - tight MPI-IO integration, and
 
--   support for data and metadata redundancy.
+  - support for data and metadata redundancy.
 
 ### Modular networking and storage
 
@@ -83,12 +83,12 @@ reliable UDP protocols might become an important component of a parallel
 file system as well. Supporting multiple networking technologies, and
 supporting them *efficiently* is key.
 
-Likewise many different storage technologies are now available. We're
+Likewise many different storage technologies are now available. We’re
 still getting our feet wet in this area, but it is clear that some
 flexibility on this front will pay off in terms of our ability to
 leverage new technologies as they appear. In the mean time we are
-certainly going to leverage database technologies for metadata storage
--- that just makes good sense.
+certainly going to leverage database technologies for metadata storage –
+that just makes good sense.
 
 In PVFS2 the Buffered Messaging Interface (BMI) and the Trove storage
 interface provide APIs to network and storage technologies respectively.
@@ -103,7 +103,7 @@ traditional byte-stream files.
 These libraries allow applications to describe complicated access
 patterns that extract subsets of large datasets. These subsets often do
 not sit in contiguous regions in the underlying file; however, they are
-often very structured (e.g. a block out of a multidimensional array).
+often very structured (e.g. a block out of a multidimensional array).
 
 It is imperative that a parallel file system natively support structured
 data access in an efficient manner. In PVFS2 we perform this with the
@@ -126,7 +126,7 @@ complicated systems could redistribute data to better match patterns
 that are seen in practice.
 
 PVFS2 includes a modular system for adding new data distributions to the
-system and using these for new files. We're starting with the same old
+system and using these for new files. We’re starting with the same old
 round-robin scheme that everyone is accustomed to, but we expect to see
 this mechanism used to better access multidimensional datasets. It might
 play a role in data redundancy as well.
@@ -135,7 +135,7 @@ play a role in data redundancy as well.
 
 One of the biggest complaints about PVFS1 is the single metadata server.
 There are actually two bases on which this complaint is typically
-launched. The first is that this is a single point of failure -- we'll
+launched. The first is that this is a single point of failure – we’ll
 address that in a bit when we talk about data and metadata redundancy.
 The second is that it is a potential performance bottleneck.
 
@@ -152,7 +152,7 @@ allows for metadata for different files to be placed on different
 servers, so that applications accessing different files tend to impact
 each other less.
 
-Distributed metadata is a relatively tricky problem, but we're going to
+Distributed metadata is a relatively tricky problem, but we’re going to
 provide it in early releases anyway.
 
 ### Stateless servers and clients
@@ -250,7 +250,7 @@ implementation. It does not provide the rich API necessary to
 communicate structured I/O accesses to the underlying file system. It
 has a lot of internal state stored as part of the file descriptor. It
 implies POSIX semantics, but does not provide them for some file systems
-(e.g. NFS, many local file systems when writing large data regions).
+(e.g. NFS, many local file systems when writing large data regions).
 
 Rather than building MPI-IO support for PVFS2 through a UNIX-like
 interface, we have started with something that exposes more of the
@@ -259,7 +259,7 @@ descriptors or internal state regarding such things as file positions,
 and in doing so allows us to better leverage the capabilities of MPI-IO
 to perform efficient access.
 
-We've already discussed rich I/O requests. "Opening" a file is another
+We’ve already discussed rich I/O requests. “Opening” a file is another
 good example. `MPI_File_open()` is a collective operation that gathers
 information on a file so that MPI processes may later access it. If we
 were to build this on top of a UNIX-like API, we would have each process
@@ -267,8 +267,8 @@ that would potentially access the file call `open()`. In PVFS2 we
 instead resolve the filename into a handle using a single file system
 operation, then broadcast the resulting handle to the remainder of the
 processes. Operations that determine file size, truncate files, and
-remove files may all be performed in this same $O(1)$ manner, scaling as
-well as the MPI broadcast call.
+remove files may all be performed in this same \(O(1)\) manner, scaling
+as well as the MPI broadcast call.
 
 ### Data and metadata redundancy
 
@@ -279,7 +279,7 @@ files with data on that server are inaccessible until the server is
 recovered.
 
 Traditional high-availability solutions may be applied to both metadata
-and data servers in PVFS2 (they're actually the same server). This
+and data servers in PVFS2 (they’re actually the same server). This
 option requires shared storage between the two machines on which file
 system data is stored, so this may be prohibitively expensive for some
 users.
@@ -302,22 +302,22 @@ Further, because this can be applied at a more coarse grain, more
 compute-intensive algorithms may be used in place of simple parity,
 providing higher reliability than simple parity schemes.
 
-Lazy redundancy is still at the conceptual stage. We're still trying to
+Lazy redundancy is still at the conceptual stage. We’re still trying to
 determine how to best fit this into the system as a whole. However,
 traditional failover solutions may be put in place for the existing
 system.
 
-### And more\...
+### And more...
 
 There are so many things that we feel we could have done better in PVFS1
 that it is really a little embarrassing. Better heterogeneous system
 support, a better build system, a solid infrastructure for testing
 concurrent access to the file system, an inherently concurrent approach
 to servicing operations on both the client and server, better management
-tools, even symlinks; we've tried to address most if not all the major
+tools, even symlinks; we’ve tried to address most if not all the major
 concerns that our PVFS1 users have had over the years.
 
-It's a big undertaking for us. Which leads to the obvious next question.
+It’s a big undertaking for us. Which leads to the obvious next question.
 
 ## When will this be available?
 
@@ -326,12 +326,12 @@ be foolish to claim PVFS2 has no bugs and will work for everyone 100% of
 the time, but we feel PVFS2 is in pretty good shape. Early testing has
 found a lot of bugs, and we feel PVFS is ready for wider use.
 
-Note that we're committed to supporting PVFS1 for some time after PVFS2
+Note that we’re committed to supporting PVFS1 for some time after PVFS2
 is available and stable. We feel like PVFS1 is a good solution for many
 groups already, and we would prefer for people to use PVFS1 for a little
 while longer rather than them have a sour first experience with PVFS2.
 
 We announce updates frequently on the PVFS2 mailing lists. We encourage
-users to subscribe -- it's the best way to keep abreast of PVFS2
+users to subscribe – it’s the best way to keep abreast of PVFS2
 developments. All code is being distributed under the LGPL license to
 facilitate use under arbitrarily licensed high-level libraries.

@@ -1,4 +1,5 @@
 \maketitle
+
 # PVFS2 File System Semantics Document
 
 ## Introduction
@@ -36,7 +37,7 @@ this will delve down into the trove and/or BMI semantics.
 The server scheduler component is responsible for enforcing these
 semantics/policies.
 
-*Note: we're not counting on inter-server communication at this time.*
+*Note: we’re not counting on inter-server communication at this time.*
 
 ### Permissions and permission checking
 
@@ -47,12 +48,12 @@ Permission checking on the server is limited to checking that can occur
 on the object itself (as opposed to checking that would occur, for
 example, to verify access to a file through a given path).
 
-It's not clear if datafiles have permissions yet.
+It’s not clear if datafiles have permissions yet.
 
 Operations on the metafile use the permissions on the metafile at the
 time of the operation.
 
-Probably datafiles don't have permissions for now.
+Probably datafiles don’t have permissions for now.
 
 ### Removing an object that is being accessed
 
@@ -61,7 +62,7 @@ example, if a trove operation is in progress reading data from a
 datafile, the server will queue a subsequent remove operation on that
 object until the read operation completes.
 
-The server is free to return "no such file" results to future operations
+The server is free to return “no such file” results to future operations
 on that object even if it has not completed the remove operation
 (assuming that permission checking has been performed to verify that the
 remove will occur) or to queue these operations until the remove has
@@ -84,21 +85,21 @@ of use before they are reused. This time value will be known to clients.
 
 #### Implementation
 
-Need to handle the case where a handle has been used, we're in the
+Need to handle the case where a handle has been used, we’re in the
 middle of this wait time, and the server gets restarted. To handle this
 we will need some kind of disk-resident list of handles along with some
 lower bound on how recently they were put in the unused list.
 
 ### Symbolic links
 
-Symbolic links will be stored on servers. The "target" of the link need
+Symbolic links will be stored on servers. The “target” of the link need
 not exist, as with traditional symlinks.
 
 ### Top level scheduler semantics
 
 Where does this go?
 
-We need a list of types of operations that shouldn't overlap. This is
+We need a list of types of operations that shouldn’t overlap. This is
 the rule set for the scheduler, or at least part of it.
 
 ## Client-side library without locks or inter-client communication
@@ -107,10 +108,10 @@ This section describes what will be our first, non-locking approach to
 metadata caching that does not involve client file system code
 communicating with other client instances. This scheme relies on
 timeouts. There are potentials for inconsistencies, just as there are in
-NFS, if the timeouts don't match well with access patterns.
+NFS, if the timeouts don’t match well with access patterns.
 
 Obviously this is just one of many possible client-side library
-implementations. It just happens to be the first one we're going to
+implementations. It just happens to be the first one we’re going to
 implement.
 
 *Note the operations at this level*
@@ -123,13 +124,13 @@ One should think of these timeouts as providing a window of time during
 which the view of one client can differ from the view of another client.
 There are a number of aspects to the view of interest:
 
--   attributes of objects
+  - attributes of objects
 
--   locations of objects in the name space
+  - locations of objects in the name space
 
--   existence of objects
+  - existence of objects
 
--   data in objects
+  - data in objects
 
 In this section we cover one mechanism for limiting the potential
 inconsistencies between client views.
@@ -154,7 +155,7 @@ Implications on file size.
 
 #### Implementation
 
-Possible to use vtags for verification that data hasn't changed.
+Possible to use vtags for verification that data hasn’t changed.
 
 ### Caching of directory hierarchy
 
@@ -192,16 +193,16 @@ Name the timeout.
 
 Server must keep a time associated with freed handles. Groups of handles
 can be put together with a single time, because our space is big enough
-that this shouldn't be a problem. This will need to be written to disk
+that this shouldn’t be a problem. This will need to be written to disk
 so that this policy can be upheld in the face of a restart.
 
 We should do the math on how long we should wait, work out the specifics
-of what goes to disk (how it goes to disk doesn't have to be here).
+of what goes to disk (how it goes to disk doesn’t have to be here).
 
 On the client side, we will want the ability to get control to the
-client code even if there aren't ops to perform. This could be a
+client code even if there aren’t ops to perform. This could be a
 function call, or there could be a thread in the client code, or maybe
-the client code is its own entity (e.g. pvfsd). All options to list
+the client code is its own entity (e.g. pvfsd). All options to list
 here.
 
 ### Metadata not in cache
@@ -231,7 +232,7 @@ specification of how concurrent, overlapping writes should be handled.
 To be POSIX compliant, sequential consistency must be maintained in the
 face of concurrent, overlapping writes.
 
-In PVFS1 we didn't support this semantic. The premise was that
+In PVFS1 we didn’t support this semantic. The premise was that
 application programmers are not really doing this, that a well-written
 application does not have multiple processes writing to the same bytes
 in the file. Instead the PVFS1 semantics said that writes that do not
@@ -272,22 +273,22 @@ handle. When a handle is returned, it must be ready to be used for I/O.
 
 #### Implementation
 
-To create a PVFS2 "file", there are actually three things that have to
+To create a PVFS2 “file”, there are actually three things that have to
 happen. A metafile must be created to hold attributes. A collection of
 datafiles must be created to hold the data. A dirent in the parent
 directory must be created to add the file into the name space.
 
 There are a bunch of options for implementing this correctly:
 
--   dirent first
+  - dirent first
 
--   dirent second
+  - dirent second
 
--   dirent last
+  - dirent last
 
--   hash to metafile
+  - hash to metafile
 
--   server-supported w/server communication
+  - server-supported w/server communication
 
 In the first four schemes, the clients are totally responsible for
 creating all the components of a PVFS2 file.
@@ -297,14 +298,14 @@ Following this the other objects are allocated and filled in. The
 advantage of this approach is that clients that lose the race to create
 the file will do so on the first step (as opposed to the dirent last
 case, described below). This means that the minimum amount of redundant
-work occurs. However, the dirent can't even have a valid handle in it if
+work occurs. However, the dirent can’t even have a valid handle in it if
 it is created first, meaning that the dirent will have to be modified a
 second time by the creator to fill in the right value (once the metafile
 is allocated). This leaves a window of time during which the dirent
 exists but refers to a file that has no attributes and cannot be read.
 
 In the dirent second scheme, clients first allocate a metafile with
-parameters indicating that it isn't complete, then allocate the dirent.
+parameters indicating that it isn’t complete, then allocate the dirent.
 This means that losing clients will all allocate a metafile (and then
 have to free it). However, it also provides a valid set of attributes
 that could be seen during the window of time that the file is being
@@ -314,24 +315,24 @@ it has been added into the namespace; however, a valid handle would
 already exist in the name space, resulting in a cleaner client-side
 mechanism for updating the distribution information once it is filled
 in. Clients attempting to read/write a file with cached distribution
-information that isn't filled in will necessarily need to update their
+information that isn’t filled in will necessarily need to update their
 cache and potentially wait for this to finish.
 
 In the dirent last scheme clients first allocate datafiles, then the
 metafile (filling in the distribution information), then finally fill in
 the dirent. This scheme has the benefit of at all times providing a
 consistent, complete name space. It has the drawback of a lot of work on
-the client side for the losers to "undo" all the allocation that they
+the client side for the losers to “undo” all the allocation that they
 performed before failing to obtain the dirent.
 
 The hash to metafile scheme relies on the use of the vesta-like hashing
 scheme for directly finding metafiles. This scheme is listed here just
-to keep it in mind; we don't expect to use the hashing scheme at this
+to keep it in mind; we don’t expect to use the hashing scheme at this
 time. In this scheme the metafile is created first. Since all clients
 will hash to the same server, and a path name is associated with the
 metafile (in this scheme), the server would allow only one metafile to
 be created. After this the winner could allocate datafiles and finally
-create the dirent. It's not a bad scheme, but we're not doing the
+create the dirent. It’s not a bad scheme, but we’re not doing the
 hashing right now because of costs in other operations.
 
 In the last scheme server communication is used to coordinate creation
@@ -354,12 +355,12 @@ file while the move is in progress.
 
 Clients will perform moves in the following way:
 
--   delete original dentry
+  - delete original dentry
 
--   create new dentry
+  - create new dentry
 
-By performing the operations in this order, we preserve the "no more
-than one reference" semantic listed above.
+By performing the operations in this order, we preserve the “no more
+than one reference” semantic listed above.
 
 *Need to handle the create/move in some way. How?*
 
@@ -368,16 +369,16 @@ approach, a scheme can be applied that eliminates the create/move
 problem. In this description we denote the server that originally holds
 the dentry as sv1 and the new holder of the dirent as sv2.
 
--   sv1 receives move request
+  - sv1 receives move request
 
--   sv1 ensures no other operations will proceed on old dirent until
+  - sv1 ensures no other operations will proceed on old dirent until
     complete (through scheduler)
 
--   sv1 creates new dirent on sv2
+  - sv1 creates new dirent on sv2
 
--   on success, deletes original dirent
+  - on success, deletes original dirent
 
--   on failure, returns failure to client
+  - on failure, returns failure to client
 
 ### Deleting a file that is being accessed
 
@@ -391,8 +392,8 @@ PVFS1 actually attempts to support this semantic.
 We will not try to support this in PVFS2. Clients with it open will all
 of a sudden get ENOFILE or something similar. Too much state must be
 maintained to provide this functionality (either on client or server
-side). We're not going to do this sort of thing on the server side, so
-unless we have communicating clients, we aren't going to get this
+side). We’re not going to do this sort of thing on the server side, so
+unless we have communicating clients, we aren’t going to get this
 behavior.
 
 #### Implementation
@@ -401,7 +402,7 @@ Delete the dirent first, then the metafile, then the datafiles. I think.
 
 ### Permissions and permission checking
 
-Whole path permission checking is performed at lookup time (i.e. when
+Whole path permission checking is performed at lookup time (i.e. when
 someone attempts to get a handle). This will verify that they can read
 the metadata.
 
@@ -431,16 +432,17 @@ We will restart the directory read process in the event of a change.
 
 NOTE: For now we are setting ctime, atime, and mtime at creation using
 time values computed on the client side. We may need to change this
-later\...
+later...
 
 How do we get the atimes and mtimes right for files? Do we make this a
 derived value (as in PVFS1)? If so, we need to have tight clock
-synchronization, or we need some way for adjusting for clock skew (e.g.
-passing current time plus atime or mtime, letting server do the math).
+synchronization, or we need some way for adjusting for clock skew (
+e.g. passing current time plus atime or mtime, letting server do the
+math).
 
 ### Computing file size
 
-How? It's a derived value. If no server communication, then we'll need
+How? It’s a derived value. If no server communication, then we’ll need
 to talk to all the owners of datafiles and get their sizes, then do some
 dist-specific math to get the actual size.
 
@@ -465,7 +467,7 @@ caching client semantics on a hypothetical UNIX-like interface.
 ### Implementing`O_APPEND` with and without concurrent access
 
 Implications of attribute caching on O\_APPEND. Notes on concurrent
-O\_APPEND vs. not.
+O\_APPEND vs. not.
 
 Concurrent O\_APPEND is nondeterministic.
 
@@ -484,11 +486,11 @@ No such thing.
 
 ### Symlinks
 
-What to say? Can have targets that don't exist.
+What to say? Can have targets that don’t exist.
 
 ## Misc.
 
-Don't quite know where this stuff goes yet.
+Don’t quite know where this stuff goes yet.
 
 ### Adding I/O servers
 
@@ -496,13 +498,13 @@ Is there anything tricky here? There is if the servers communicate.
 
 ### Migrating files and changing distributions
 
-Distributions don't change for a given metafile. So we need to get a new
+Distributions don’t change for a given metafile. So we need to get a new
 metafile and go from there. This is also the appropriate way to move
 metafiles around in order to balance the metadata load (if necessary).
 
 ### Metafile stuffing
 
-This is our version of "inode stuffing", the technique used to store
+This is our version of “inode stuffing”, the technique used to store
 small files in the inode data space rather than allocating blocks for
 data (in local file systems and such).
 

@@ -10,21 +10,21 @@ some of their common characteristics in a single piece of documentation.
 The following is a list of the lowest level APIs that share
 characteristics that we will discuss here.
 
--   BMI (Buffered Message Interface): message based network
+  - BMI (Buffered Message Interface): message based network
     communications
 
--   Trove: local file and database access
+  - Trove: local file and database access
 
--   Flow: high level I/O API that ties together lower level components
+  - Flow: high level I/O API that ties together lower level components
     (such as BMI and Trove) in a single transfer; handles buffering and
     datatype processing
 
--   Dev: user level interaction with kernel device driver
+  - Dev: user level interaction with kernel device driver
 
--   NCAC (Network Centric Adaptive Cache): user level buffer cache that
+  - NCAC (Network Centric Adaptive Cache): user level buffer cache that
     works on top of Trove (*currently unused*)
 
--   Request scheduler: handles concurrency and scheduling at the file
+  - Request scheduler: handles concurrency and scheduling at the file
     system request level
 
 ## Job interface
@@ -62,18 +62,18 @@ than one operation in a single function call. Each API will support the
 following variants of the test function (where PREFIX depends on the
 API):
 
--   PREFIX\_test(): This is the most simple version of the test
+  - PREFIX\_test(): This is the most simple version of the test
     function. It checks for completion of an individual operation based
     on the ID given by the caller.
 
--   PREFIX\_testsome(): This is an expansion of the above call. The
+  - PREFIX\_testsome(): This is an expansion of the above call. The
     difference is that it takes an array of IDs and a count as input,
     and provides an array of status values and a count as output. It
     checks for completion of any non-zero ID in the array. The output
     count indicates how many of the operations in question completed,
     which may range from 0 to the input count.
 
--   PREFIX\_testcontext(): This function is similar to testsome().
+  - PREFIX\_testcontext(): This function is similar to testsome().
     However, it does not take an array of IDs as input. Instead, it
     tests for completion of *any* operations that have previously been
     posted, regardless of the ID. A count argument limits how many

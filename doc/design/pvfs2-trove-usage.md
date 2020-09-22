@@ -1,4 +1,5 @@
 \maketitle
+
 # Trove and PVFS2
 
 ## Motivation and Goals
@@ -7,17 +8,17 @@ The purpose of this document is to describe the use of Trove in PVFS2.
 
 PVFS2 deals with four basic types of objects:
 
--   directories
+  - directories
 
--   metafiles
+  - metafiles
 
--   datafiles
+  - datafiles
 
--   symlinks
+  - symlinks
 
 We will discuss how Trove is used to store these objects in the upcoming
 sections. Additionally we will cover how PVFS2 bootstraps from the Trove
-perspective; that is, how it obtains a "root handle" and so on.
+perspective; that is, how it obtains a “root handle” and so on.
 
 ## Current Implementation (03/21/2003)
 
@@ -70,7 +71,7 @@ WHAT ELSE?
 This section describes the (probably moving) target for how we will use
 Trove to store PVFS2 objects. Eventually, as we progress, this will
 start to describe interesting things such as storing small files in the
-metafile\...
+metafile...
 
 ### PVFS2 Objects
 

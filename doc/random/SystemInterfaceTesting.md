@@ -1,4 +1,5 @@
 \maketitle
+
 # PVFS2: System Interface Test Suite
 
 ## Introduction
@@ -16,6 +17,7 @@ Describe the system (hardware and OS) that the tests are being run on
 and the version of pvfs2.
 
 \newcounter{marker}
+
 ## Positive Tests
 
 The positive tests will verify basic functionality, and ensure that the
@@ -64,7 +66,7 @@ renaming(essentially moving) files into different directories.
 
 **Directory creation**: We will test the creation of directories with
 valid attributes inside of directories where we have permission to do
-so. We're only looking to create a moderate number of directories with
+so. We’re only looking to create a moderate number of directories with
 this test case. Please refer to the stress testing section for info on
 the directory tests where a very large number of directories are added.
 directory creation will be verified both by having it appear when
@@ -99,10 +101,10 @@ pvfs-request.h):
 
 .
 
-**Contiguous**: count should be varied to ensure that we're hitting
+**Contiguous**: count should be varied to ensure that we’re hitting
 multiple servers as well as only getting data from each server at time.
 
-**Vector**: with \"stride\" lengths that span multiple servers.
+**Vector**: with "stride" lengths that span multiple servers.
 
 **Hvector**: see vector.
 
@@ -124,10 +126,10 @@ to test every combination of requests (from pvfs-request.h):
 
 .
 
-**Contiguous**: count should be varied to ensure that we're hitting
+**Contiguous**: count should be varied to ensure that we’re hitting
 multiple servers as well as only getting data from each server at time.
 
-**Vector**: with \"stride\" lengths that span multiple servers.
+**Vector**: with "stride" lengths that span multiple servers.
 
 **Hvector**: see vector.
 
@@ -150,13 +152,13 @@ well as files with data on every combination of servers.
 
 The negative tests are broken up into two sections: invalid parameters
 and functional ordering. The invalid parameters tests examines the
-functions' behaviors when invalid parameters are supplied. The tests for
-functional ordering examines functions' behaviors when the ordering of
+functions’ behaviors when invalid parameters are supplied. The tests for
+functional ordering examines functions’ behaviors when the ordering of
 functions are incorrect.
 
 ### Invalid Parameters
 
-Tests functions' behavior when invalid parameters are supplied
+Tests functions’ behavior when invalid parameters are supplied
 
 #### Null parameters
 
@@ -216,26 +218,23 @@ parameters expect for tests regarding initialize.
 
 .
 
-Iterate through the list found in section
-[4.1.1](#null1L){reference-type="ref" reference="null1L"} with the first
-parameter set to null. The remaining parameters (if there are any) are
-set to a valid value. Record the return value and error code returned.
+Iterate through the list found in section [4.1.1](#null1L) with the
+first parameter set to null. The remaining parameters (if there are any)
+are set to a valid value. Record the return value and error code
+returned.
 
-Iterate through the list found in section
-[4.1.1](#null1L){reference-type="ref" reference="null1L"} with the
+Iterate through the list found in section [4.1.1](#null1L) with the
 second parameter (if there is one) set to null. The remaining parameters
 (if there are any) are set to a valid value. Record the return value and
 error code returned.
 
-Iterate through the list found in section
-[4.1.1](#null1L){reference-type="ref" reference="null1L"} with the third
-parameter (if there is one) set to null. The remaining parameters (if
-there are any) are set to a valid value. Record the return value and
+Iterate through the list found in section [4.1.1](#null1L) with the
+third parameter (if there is one) set to null. The remaining parameters
+(if there are any) are set to a valid value. Record the return value and
 error code returned.
 
-Iterate through the list found in section
-[4.1.1](#null1L){reference-type="ref" reference="null1L"} with the first
-and second parameter (if there is one) set to null. The remaining
+Iterate through the list found in section [4.1.1](#null1L) with the
+first and second parameter (if there is one) set to null. The remaining
 parameters (if there are any) are set to a valid value. Record the
 return value and error code returned.
 
@@ -283,8 +282,7 @@ error code returned.
 
 ### Functional Ordering
 
-All test cases use the pre-built file found in section
-[2](#setupL){reference-type="ref" reference="setupL"}.
+All test cases use the pre-built file found in section [2](#setupL).
 
 #### Client uninitialized
 

@@ -1,15 +1,17 @@
 \maketitle
+
     $Id: handle-allocator.tex,v 1.1 2003-01-24 23:29:18 pcarns Exp $
+
 # Trove DBPF Handle Allocator
 
 ## Introduction
 
-The Trove interface gives out handles -- unique identifiers to trove
+The Trove interface gives out handles – unique identifiers to trove
 objects. In addition to being unique, handles will not be reused within
 a configurable amount of time. These two constraints make for a handle
 allocator that ends up being a bit more complicated than one might
 expect. Add to that the fact that we want to serialize on disk all or
-part of the handle allocator's state, and here we are with a document to
+part of the handle allocator’s state, and here we are with a document to
 explain it all.
 
 ### Data Structures
@@ -18,7 +20,6 @@ explain it all.
 
 We have a large handle space we need to represent efficiently. This
 approach uses extents:
-
 
     struct extent {
         int64_t first;
@@ -70,59 +71,59 @@ We save our state by writing out and reading from the three
 Start off with a `free_list` of one big extent encompassing the entire
 handle space.
 
--   Get the last extent from the `free_list` (We hope getting the last
+  - Get the last extent from the `free_list` (We hope getting the last
     extent improves the effiency of the extent representation)
 
--   Save `last` for later return to the caller
+  - Save `last` for later return to the caller
 
--   Decrement `last`
+  - Decrement `last`
 
--   if $first > last$, mark the extent as empty.
+  - if \(first > last\), mark the extent as empty.
 
 ### returning handles
 
--   when the first handle is returned, it gets added to the
+  - when the first handle is returned, it gets added to the
     `recently_freed` list. Because this is the first item on that list,
     we check the time.
 
--   now we add more handles to the list. we check the time after $N$
+  - now we add more handles to the list. we check the time after \(N\)
     handles are returned and update the timestamp.
 
--   Once we have added $H$ handles, we decide the `recently_freed` list
-    has enough handles. We then start using the `overflow_list` to hold
-    returned handles.
+  - Once we have added \(H\) handles, we decide the `recently_freed`
+    list has enough handles. We then start using the `overflow_list` to
+    hold returned handles.
 
--   as with the `recently_freed` list, we record the time that this
-    handle was added, updating the timestamp after every $N$ additions.
-    We also check how old the `recently_freed` list is.
+  - as with the `recently_freed` list, we record the time that this
+    handle was added, updating the timestamp after every \(N\)
+    additions. We also check how old the `recently_freed` list is.
 
--   at some point in time, the whole `recently_freed` list is ready to
+  - at some point in time, the whole `recently_freed` list is ready to
     be returned to the `free_list`. The `recently_freed` list is merged
     into the `free_list`, the `overflow_list` becomes the
     `recently_freed` list and the `overflow_list` is empty.
 
-### I don't know what to call this section
+### I don’t know what to call this section
 
-Let $T_{r}$ be the minimum response time for an operation of any sort,
-$T_{f}$ be the time a handle must sit before being moved back to the
-free list, and $N_{tot}$ be the total number of handles available on a
+Let \(T_{r}\) be the minimum response time for an operation of any sort,
+\(T_{f}\) be the time a handle must sit before being moved back to the
+free list, and \(N_{tot}\) be the total number of handles available on a
 server.
 
 The pathological case would be one where a caller
 
--   fills up the `recently_freed` list
+  - fills up the `recently_freed` list
 
--   immediately starts consuming handles as quickly as possible to make
+  - immediately starts consuming handles as quickly as possible to make
     for the largest possible `recently_freed` list in the next pass
 
 This results in the largest number of handles being unavailable due to
-sitting on the `overflow_list`. Call $N_{purg}$ the number of handles
-waiting in "purgatory" ( waiting for $T_{f}$ to pass)
-$$N_{purg} = T_{f} / T_{r}$$
+sitting on the `overflow_list`. Call \(N_{purg}\) the number of handles
+waiting in “purgatory” ( waiting for \(T_{f}\) to pass)
+\[N_{purg} = T_{f} / T_{r}\]
 
-$$F_{purg} = N_{purg} / N_{tot}$$
+\[F_{purg} = N_{purg} / N_{tot}\]
 
-$$F_{purg} = T_{f} / (T_{r} * N_{tot})$$
+\[F_{purg} = T_{f} / (T_{r} * N_{tot})\]
 
-We should try to collect statistics and see what $T_{r}$ and $N_{purg}$
-end up being for real and pathological workloads.
+We should try to collect statistics and see what \(T_{r}\) and
+\(N_{purg}\) end up being for real and pathological workloads.
