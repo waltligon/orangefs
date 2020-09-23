@@ -4,6 +4,37 @@
 
 # PVFS High Availability Clustering Using Heartbeat 2.0
 
+## Contents
+
+1.  [Introduction](#introduction)
+2.  [Requirements](#requirements)
+    1. [Hardware](#hardware)
+        1. [Nodes](#nodes)
+        2. [Storage](#storage)
+        3. [Stonith](#stonith)
+    2. [Software](#software)
+    3. [Network](#network)
+3.  [Configuring PVFS](#configuring-pvfs)
+4.  [Configuring storage](#configuring-storage)
+5.  [Configuring stonith](#configuring-stonith)
+6.  [Distributing Heartbeat scripts](#distributing-heartbeat-scripts)
+7.  [Base Heartbeat configuration](#base-heartbeat-configuration)
+8.  [CIB configuration](#cib-configuration)
+    1. [crm_config](#crmconfig)
+    2. [nodes](#nodes)
+    3. [resources and groups](#resources-and-groups)
+    4. [IPaddr](#ipaddr)
+    5. [Filesystem](#filesystem)
+    6. [PVFS](#pvfs)
+    7. [rsc_location](#rsclocation)
+    8. [rsc_order](#rscorder)
+    9. [stonith device](#stonith-device)
+9.  [Starting Heartbeat](#starting-heartbeat)
+10. [Mounting the file system](#mounting-the-file-system)
+11. [What happens during failover](#what-happens-during-failover)
+12. [Controlling Heartbeat](#controlling-heartbeat)
+13. [Additional examples](#additional-examples)
+
 ## Introduction
 
 This document describes how to configure PVFS for high availability
@@ -364,7 +395,7 @@ relative to each other. These constraints are necessary because a
 `pvfs2-server` process will not start properly until its IP address and
 storage are available.
 
-### stonith
+### stonith device
 
 The `external/ipmi` stonith device is used in this example. Please see
 the Heartbeat documentation for instructions on configuring other types
