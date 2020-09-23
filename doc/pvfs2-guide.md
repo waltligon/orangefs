@@ -8,6 +8,45 @@
 
 # Parallel Virtual File System, Version 2
 
+## Contents
+
+1. [An introduction to PVFS2](#an-introduction-to-PVFS2)
+    1. [Why rewrite?](#why-rewrite)
+    2. [What's different?](#whats-different)
+    3. [When will this be available?](#when-will-this-be-available)
+2. [The basics of PVFS2](#the-basics-of-PVFS2)
+    1. [Servers](#servers)
+    2. [Networks](#networks)
+    3. [Interfaces](#interfaces)
+    4. [Client-server interactions](#client-server-interactions)
+    5. [Consistency from the client point of view](#consistency-from-the-client-point-of-view)
+    6. [File system consistency](#file-system-consistency)
+3. [PVFS2 terminology](#pvfs2-terminology)
+    1. [File system components](#file-system-components)
+    2. [PVFS2 Objects](#pvfs2-objects)
+    3. [Handles](#handles)
+    4. [Handle ranges](#handle-ranges)
+    5. [File system IDs](#file-system-ids)
+4. [PVFS2 internal I/O API terminology](#pvfs2-internal-io-api-terminology)
+    1. [Internal I/O interfaces](#internal-io-interfaces)
+    2. [Job interface](#job-interface)
+    3. [Posting and testing](#posting-and-testing)
+    4. [Test variations](#test-variations)
+    5. [Contexts](#contexts)
+    6. [User pointers](#user-pointers)
+    7. [Time outs and max idle time](#time-outs-and-max-idle-time)
+5. [PVFS2 User APIs and Semantics](#pvfs2-user-apis-and-semantics)
+    1. [UNIX I/O Interface](#unix-io-interface)
+    2. [MPI-IO Interface](#mpi-io-interface)
+6. [The code tree](#the-code-tree)
+    1. [The top level](#the-top-level)
+    2. [`src`](#src)
+    3. [`src/io`](#srcio)
+    4. [`test`](#test)
+    5. [State machines and `statecomp`](#state-machines-and-statecomp)
+    6. [Build system](#build-system)
+    7. [Out-of-tree builds](#out-of-tree-builds)
+
 ## An introduction to PVFS2
 
 Since the mid-1990s we have been in the business of parallel I/O. Our
