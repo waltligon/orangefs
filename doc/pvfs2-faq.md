@@ -4,21 +4,100 @@
 
 # Frequently Asked Questions About PVFS
 
-## Table of Contents
+## Contents
 
 1.  [Basics](#basics)
+    1.  [What is PVFS?](#what-is-pvfs)
+    2.  [What is the history of PVFS?](#what-is-the-history-of-pvfs)
+    3.  [What is OrangeFS?](#what-is-orangefs)
+    4.  [What is Omnibond?](#what-is-omnibond)
+    5.  [What does the "V" in PVFS stand for?](#what-does-the-v-in-pvfs-stand-for)
+    6.  [Is PVFS an attempt to parallelize the *NIX VFS?](#is-pvfs-an-attempt-to-parallelize-the-nix-vfs)
+    7.  [What are the components of PVFS that I should know about?](#what-are-the-components-of-pvfs-that-i-should-know-about)
+    8.  [What is the format of the PVFS version string?](#what-is-the-format-of-the-pvfs-version-string)
 2.  [Supported Architectures and
     Hardware](#supported-architectures-and-hardware)
+    1.  [Does PVFS require any particular hardware?](#does-pvfs-require-any-particular-hardware)
+    2.  [What architectures does PVFS support?](#what-architectures-does-pvfs-support)
+    3.  [Does PVFS work across heterogeneous architectures?](#does-pvfs-work-across-heterogeneous-architectures)
+    4.  [Does running PVFS require a particular kernel or kernel version?](#does-running-pvfs-require-a-particular-kernel-or-kernel-version)
+    5.  [What specific hardware architectures are supported by the PVFS kernel module?](#what-specific-hardware-architectures-are-supported-by-the-pvfs-kernel-module)
+    6.  [Does the PVFS client require a patched Linux kernel?](#does-the-pvfs-client-require-a-patched-linux-kernel)
+    7.  [Can I build the PVFS kernel code directly into the kernel, rather than as a module?](#can-i-build-the-pvfs-kernel-code-directly-into-the-kernel-rather-than-as-a-module)
+    8.  [Is there a MacOS X/Cygwin/Windows client for PVFS?](#is-there-a-macos-xcygwinwindows-client-for-pvfs)
 3.  [Installation](#installation)
+    1.  [How do I install PVFS?](#how-do-i-install-pvfs)
+    2.  [How can I store PVFS data on multiple disks on a single node?](#how-can-i-store-pvfs-data-on-multiple-disks-on-a-single-node)
+    3.  [How can I run multiple PVFS servers on the same node?](#how-can-i-run-multiple-pvfs-servers-on-the-same-node)
+    4.  [Can I use multiple metadata servers in PVFS?](#can-i-use-multiple-metadata-servers-in-pvfs)
+    5.  [Does using multiple metadata servers reduce the chance of file system corruption during hardware failures?](#does-using-multiple-metadata-servers-reduce-the-chance-of-file-system-corruption-during-hardware-failures)
+    6.  [How many servers should I run?](#how-many-servers-should-i-run)
+    7.  [Can PVFS servers listen on two network interfaces simultaneously (i.e. multihome)?](#can-pvfs-servers-listen-on-two-network-interfaces-simultaneously-ie-multihome)
+    8.  [How can I automount PVFS volumes?](#how-can-i-automount-pvfs-volumes)
+    9.  [Can I mount more than one PVFS file system on the same client?](#can-i-mount-more-than-one-pvfs-file-system-on-the-same-client)
+    10. [How can I upgrade from PVFS v1 to PVFS v2?](#how-can-i-upgrade-from-pvfs-v1-to-pvfs-v2)
 4.  [Reporting Problems](#reporting-problems)
+    1.  [Where can I find documentation?](#where-can-i-find-documentation)
+    2.  [What should I do if I have a problem?](#what-should-i-do-if-i-have-a-problem)
+    3.  [How do I report a problem with PVFS?](#how-do-i-report-a-problem-with-pvfs)
 5.  [Problems and Solutions](#problems-and-solutions)
+    1.  [When I try to mount, I get 'wrong fs type, bad option, bad superblock...'](#when-i-try-to-mount-i-get-wrong-fs-type-bad-option-bad-superblock)
+    2.  [PVFS server consumes 100% of the CPU](#pvfs-server-consumes-100-of-the-cpu)
+    3.  [PVFS write performance slows down dramatically](#pvfs-write-performance-slows-down-dramatically)
+    4.  [I get "error while loading shared libraries" when starting PVFS programs](#i-get-error-while-loading-shared-libraries-when-starting-pvfs-programs)
+    5.  [PVFS performance gets really bad once a day, then gets better again](#pvfs-performance-gets-really-bad-once-a-day-then-gets-better-again)
+    6.  [Make kmod24 fails with "structure has no member..." errors](#make-kmod24-fails-with-structure-has-no-member-errors)
+    7.  [When I try to mount a pvfs2 file system, something goes wrong](#when-i-try-to-mount-a-pvfs2-file-system-something-goes-wrong)
+    8.  [I did all three of the above steps and I still can't mount pvfs2](#i-did-all-three-of-the-above-steps-and-i-still-cant-mount-pvfs2)
+    9.  [I'm running Redhat and the pvfs2-server can't be killed! What's wrong?](#im-running-redhat-and-the-pvfs2-server-cant-be-killed-whats-wrong)
+    10. [Why do you single out Redhat users? What's so different about Redhat than other distributions?](#why-do-you-single-out-redhat-users-whats-so-different-about-redhat-than-other-distributions)
+    11. [Where is the kernel source on a Fedora system?](#where-is-the-kernel-source-on-a-fedora-system)
+    12. [What are extended attributes? How do I use them with PVFS?](#what-are-extended-attributes-how-do-i-use-them-with-pvfs)
+    13. [What are Access Control Lists? How do I enable Access Control Lists on PVFS?](#what-are-access-control-lists-how-do-i-enable-access-control-lists-on-pvfs)
+    14. [On SLES 9, 'make kmod' complains about `mmgrab` and `flush_icache_range` being undefined](#on-sles-9-make-kmod-complains-about-mmgrab-and-flushicacherange-being-undefined)
+    15. [Everything built fine, but when I try to compile programs that use PVFS, I get undefined references](#everything-built-fine-but-when-i-try-to-compile-programs-that-use-pvfs-i-get-undefined-references)
+    16. [Can we run the Apache webserver to serve files off a PVFS volume?](#can-we-run-the-apache-webserver-to-serve-files-off-a-pvfs-volume)
+    17. [Trove-dbpf metadata format version mismatch!](#trove-dbpf-metadata-format-version-mismatch)
+    18. [Problems with pre-release kernels](#problems-with-pre-release-kernels)
+    19. [Does PVFS work with Open-MX?](#does-pvfs-work-with-open-mx)
 6.  [Performance](#performance)
+    1.  [I configured PVFS with support for multiple interconnects (e.g. Infiniband and TCP), but see low performance](#i-configured-pvfs-with-support-for-multiple-interconnects-eg-infiniband-and-tcp-but-see-low-performance)
+    2.  [I ran Bonnie and/or IOzone and the performance is terrible. Why? Is there anything I can do?](#i-ran-bonnie-andor-iozone-and-the-performance-is-terrible-why-is-there-anything-i-can-do)
+    3.  [Why is program XXX so slow?](#why-is-program-xxx-so-slow)
+    4.  [NFS outperforms PVFS for application XXX. Why?](#nfs-outperforms-pvfs-for-application-xxx-why)
+    5.  [Can the underlying local file system affect PVFS performance?](#can-the-underlying-local-file-system-affect-pvfs-performance)
+    6.  [Is there any way to tune particular directories for different workloads?](#is-there-any-way-to-tune-particular-directories-for-different-workloads)
+        1. [Distribution](#distribution)
+        2. [Distribution parameters](#distribution-parameters)
+        3. [Number of datafiles](#number-of-datafiles)
+    7.  [My app still runs more slowly than I would like. What can I do?](#my-app-still-runs-more-slowly-than-i-would-like-what-can-i-do)
 7.  [Fault Tolerance](#fault-tolerance)
+    1.  [Does PVFS support some form of fault tolerance?](#does-pvfs-support-some-form-of-fault-tolerance)
+    2.  [Can PVFS tolerate client failures?](#can-pvfs-tolerate-client-failures)
+    3.  [Can PVFS tolerate disk failures?](#can-pvfs-tolerate-disk-failures)
+    4.  [Can PVFS tolerate network failures?](#can-pvfs-tolerate-network-failures)
+    5.  [Can PVFS tolerate server failures?](#can-pvfs-tolerate-server-failures)
 8.  [File System Interfaces](#file-system-interfaces)
+    1.  [How do I get MPI-IO for PVFS?](#how-do-i-get-mpi-io-for-pvfs)
+    2.  [Can I directly manipulate PVFS files on the PVFS servers without going through some client interface?](#can-i-directly-manipulate-pvfs-files-on-the-pvfs-servers-without-going-through-some-client-interface)
 9.  [Management](#management)
+    1.  [How can I back up my PVFS file system?](#how-can-i-back-up-my-pvfs-file-system)
+    2.  [Can I add, remove, or change the order of the PVFS servers on an existing PVFS file system?](#can-i-add-remove-or-change-the-order-of-the-pvfs-servers-on-an-existing-pvfs-file-system)
+    3.  [Are there tools for migrating data between servers?](#are-there-tools-for-migrating-data-between-servers)
+    4.  [Why does df show less free space than I think it should? What can I do about that?](#why-does-df-show-less-free-space-than-i-think-it-should-what-can-i-do-about-that)
+    5.  [Does PVFS have a maximum file system size? If so, what is it?](#does-pvfs-have-a-maximum-file-system-size-if-so-what-is-it)
+    6.  [Mounting PVFS with the interrupt option](#mounting-pvfs-with-the-interrupt-option)
 10. [Missing Features](#missing-features)
+    1.  [Why don't hardlinks work under PVFS?](#why-dont-hardlinks-work-under-pvfs)
+    2.  [Can I `mmap` a PVFS file?](#can-i-mmap-a-pvfs-file)
+    3.  [Will PVFS store new files on servers with more space, allowing files to be stored when one server runs out of space?](#will-pvfs-store-new-files-on-servers-with-more-space-allowing-files-to-be-stored-when-one-server-runs-out-of-space)
+    4.  [Does PVFS have locks?](#does-pvfs-have-locks)
 11. [Helping Out](#helping-out)
+    1.  [How can I contribute to the PVFS project?](#how-can-i-contribute-to-the-pvfs-project)
 12. [Implementation Details](#implementation-details)
+    1.  [BMI](#bmi)
+        1. [What is the maximum packet size for BMI?](#what-is-the-maximum-packet-size-for-bmi)
+        2. [What happens if I try to match a BMI send with a BMI receive that has too small a buffer?](#what-happens-if-i-try-to-match-a-bmi-send-with-a-bmi-receive-that-has-too-small-a-buffer)
 
 ## Basics
 
@@ -776,7 +855,7 @@ by default.
 
 This section covers issues related to the performance of PVFS.
 
-### I configured PVFS with support for multiple intercdonnects (e.g. Infiniband and TCP), but see low performance
+### I configured PVFS with support for multiple interconnects (e.g. Infiniband and TCP), but see low performance
 
 When multiple interconnects are enabled, PVFS will poll both interfaces.
 This gives PVFS maximum flexiblity, but does incur a performance penalty
@@ -1102,7 +1181,7 @@ determine the maximum file and file system sizes for the local file
 system type that you are using for PVFS server storage and multiply
 these values by the number of servers you are using.
 
-### Mouning PVFS with the interrupt option
+### Mounting PVFS with the interrupt option
 
 The PVFS kernel module supports the intr option provided by network file
 systems. This allows applications to be sent kill signals when a
