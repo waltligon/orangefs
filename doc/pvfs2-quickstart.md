@@ -5,6 +5,37 @@
 
 # A Quick Start Guide to PVFS2
 
+## Contents
+
+1. [How to use this document](#how-to-use-this-document)
+    1. [Versions](#versions)
+2. [Downloading and compiling PVFS2](#downloading-and-compiling-pvfs2)
+    1. [Dependencies](#dependencies)
+    2. [Untarring the packages](#untarring-the-packages)
+    3. [Building and installing the packages](#building-and-installing-the-packages)
+3. [Configuring PVFS2 for a single host](#configuring-pvfs2-for-a-single-host)
+    1. [Server configuration](#server-configuration-single-host)
+    2. [Starting the server](#starting-the-server-single-host)
+        1. [Automatic server startup and shutdown](#automatic-server-startup-and-shutdown)
+    3. [Client configuration](#client-configuration-single-host)
+    4. [Testing your installation](#testing-your-installation)
+4. [Installing PVFS2 on a cluster](#installing-pvfs2-on-a-cluster)
+    1. [Server configuration](#server-configuration-cluster)
+    2. [Starting the servers](#starting-the-servers-cluster)
+    3. [Client configuration](#client-configuration-cluster)
+    4. [Testing your installation](#testing-your-installation-cluster)
+5. [The PVFS2 Linux Kernel Interface](#the-pvfs2-linux-kernel-interface)
+    1. [Finding an Appropriate Kernel Version](#finding-an-appropriate-kernel-version)
+    2. [Preparing Linux Kernel 2.6.x configurations](#preparing-linux-kernel-26x-configurations)
+    3. [Preparing Linux Kernel 2.4.x configurations](#preparing-linux-kernel-24x-configurations)
+    4. [Testing the Kernel Interface](#testing-the-kernel-interface)
+        1. [Loading the kernel module](#loading-the-kernel-module)
+        2. [Special Note for 2.4 kernels](#special-note-for-24-kernels)
+    5. [Unmounting and stopping PVFS2 on a client](#unmounting-and-stopping-pvfs2-on-a-client)
+6. [Notes on running PVFS2 without root access](#notes-on-running-pvfs2-without-root-access)
+7. [Debugging your PVFS2 configuration](#debugging-your-pvfs2-configuration)
+8. [ROMIO Support](#romio-support)
+
 ## How to use this document
 
 The quick start guide is intended to be a reference on how to quickly
@@ -136,7 +167,7 @@ test one machine. We will store all PVFS2 data in /pvfs2-storage-space.
 details about the purpose of these directories please see the PVFS2
 users guide.
 
-### Server configuration
+### Server configuration (single host)
 
 Since this is a single host configuration, we only have to configure one
 server daemon. In the original PVFS, the metadata and I/O servers were
@@ -213,7 +244,7 @@ The generated config file will have conservative default values. The
 PVFS2 Users Guide has more information about the settings and the
 consequences of setting more aggressive, high performance values.
 
-### Starting the server
+### Starting the server (single host)
 
 Before you run pvfs2-server for the first time, you must run it with a
 special argument that tells it to create a new storage space if it does
@@ -269,7 +300,7 @@ To manually stop the server:
     bash-2.05b# /etc/init.d/pvfs2-server stop
     Stopping PVFS2 server:                                     [  OK  ]
 
-### Client configuration
+### Client configuration (single host)
 
 There are two primary methods for accessing a PVFS2 file system. The
 first is using the kernel module to provide standard Linux file system
@@ -314,7 +345,7 @@ useful in production environments:
     kernel or install the mount.pvfs2 utility on 2.4 Linux kernel
     systems.
 
-### Testing your installation
+### Testing your installation (single host)
 
 PVFS2 currently includes (among others) the following tools for
 manipulating the file system using the native PVFS2 library: pvfs2-ping,
@@ -405,7 +436,7 @@ We will configure our example system so that the node “cluster1”
 provides metadata information, eight nodes (named “cluster1” through
 “cluster8”) provide I/O services, and all nodes act as clients.
 
-### Server configuration
+### Server configuration (cluster)
 
 We will assume that at this point you have either performed a make
 install on every node, or else have provided the pvfs2 executables,
@@ -512,7 +543,7 @@ on each machine.
     > ssh cluster\${i} /sbin/chkconfig pvfs2-server on
     > done
 
-### Starting the servers
+### Starting the servers (cluster)
 
 As with the single-machine case, you must run pvfs2-server with a
 special argument to create the storage space on all the nodes if it does
@@ -533,7 +564,7 @@ If you wish to automate server startup and shutdown with rc scripts,
 refer to the corresponding section [3.2.1](#sec:rc) from the single
 server example.
 
-### Client configuration
+### Client configuration (cluster)
 
 Setting up a client for multiple servers is the same as setting up a
 client for a single server. Refer to section [3.3](#subsec:client).
@@ -545,7 +576,7 @@ system will do. For large clusters, using different server names will
 eliminate one potential bottleneck in the system by balancing the load
 of clients reading initial configuration information.
 
-### Testing your Installation
+### Testing your Installation (cluster)
 
 Testing a multiple-server pvfs2 installation is the same as testing a
 single-server pvfs2 installation. Refer to section
