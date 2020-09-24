@@ -100,7 +100,7 @@ may not be applicable to other projects.
 
 ## Editors
 
-In the PARL lab we advocate the use of either vi or emacs. These are the
+In the PARL lab we advocate the use of either `vi` or `emacs`. These are the
 most common editors used for writing software and are therefore the most
 likely to be available on any given development platform. It is also
 useful to have everyone on a particular project use the same set of
@@ -121,7 +121,7 @@ important features to vi, including multilevel undo, visual selection,
 and multiple buffers. It also is fully compatible with the original vi
 editor. Some machines utilize a version of vim that also contains
 optional context highlighting, while others provide a separate binary
-with this feature that is called vimx.
+with this feature that is called `vimx`.
 
 This may seem a little confusing, but it is actually something you don’t
 have to worry about if you just setup your environment to use the
@@ -239,7 +239,7 @@ real project*
     
         cvs export -D today <projectname>
     
-    (where \(<\)projectname\(>\) is the name of the project). When you
+    (where \<projectname\> is the name of the project). When you
     are done with the code you can simply delete the directory.
 
   - **check out:** The check out command is used to obtain a copy of the
@@ -332,7 +332,7 @@ track the source code). Then run this command:
 
     cvs import -m "Imported sources" <projectname> PARL start
 
-(for the sake of clarity, \(<\)projectname\(>\) should probably match
+(for the sake of clarity, \<projectname\> should probably match
 the name of the directory that contains the source)
 
 ### Remote access
@@ -365,11 +365,10 @@ guidelines that should be followed when building software with gcc:
 
   - Always use the -Wstrict-prototypes command line flag to gcc. This
     turns on additional warnings that enforce the use of proper
-    prototypes for all functions. See section [9.2.1](#sec:proto) for
-    more information.
+    prototypes for all functions. See section [9.2.1](#general-code-layout) for more information.
 
   - Make use of the -g option to gcc in development code. This enables
-    debugging symbols for use with gdb (section [6](#sec:gdb)). When
+    debugging symbols for use with gdb (section [6](#debugging-tutorial)). When
     code is released to the public, it may be the case that this option
     will be removed in order to reduce binary size or increase
     optimization, but it is invaluable during the development cycle.
@@ -386,7 +385,7 @@ gdb, but gdb is still one of the most popular and most flexible.
 
 In order to use gdb, the code in question must have been compiled with
 the debugging option turned on. For the gcc compiler (see section
-[5](#sec:gcc)), this just means using the -g option:
+[5](#compiler-flags)), this just means using the -g option:
 
     gcc -g test.c -o test
 
@@ -398,7 +397,7 @@ program you wish to debug as the only argument:
 If you start gdb by this mechanism, then gdb will present you with a
 prompt at which you can enter commands to gdb. At this point, the
 program you wish to debug has not been started and must be launched with
-the run command outlined below.
+the `run` command outlined below.
 
 Alternatively, you can attach to a process that is already running if
 you know it’s pid. In this case, the command line arguments to gdb are
@@ -419,8 +418,7 @@ below.
 
 This is a short list of the most common commands that you may wish to
 use with gdb. You can find out more specific information by using the
-help command or by looking at
-http://sources.redhat.com/gdb/\#documentation.
+`help` command or by looking at http://sources.redhat.com/gdb/\#documentation.
 
   - **help**: Typing just help at the prompt will give you a list of
     command classes that you can find out more information about. You
@@ -456,7 +454,7 @@ http://sources.redhat.com/gdb/\#documentation.
   - **next**: Next is very similar to step, except that it treats
     subroutine calls as a single instruction rather than stepping into
     all subroutines. This is very helpful for skipping over functions
-    that you do not wish to inspect the internals of (such as printf for
+    that you do not wish to inspect the internals of (such as `printf` for
     example). It is helpful to be able to skip over complex functions
     that are either known to work or were not compiled with debugging
     symbols.
@@ -515,7 +513,7 @@ separate link step):
 When you run your program, it should print a message to the screen
 indicating that Electric Fence is in use. If your program segfaults, it
 will not show you where it occurred, but you can then debug the program
-with gdb to determine this information (section [6](#sec:gdb)).
+with gdb to determine this information (section [6](#debugging-tutorial)).
 
 ### Electric Fence options
 
@@ -538,7 +536,7 @@ set it to.
 
   - EF\_PROTECT\_FREE: When this option is set to 1, Electric Fence will
     check to be sure that memory is not being accessed after it has been
-    released with the free() system call.
+    released with the `free()` system call.
 
 Turning on all of these options is helpful in debugging dynamic memory
 problems. Note that using Electric Fence (especially with the stricter
@@ -580,7 +578,7 @@ include the following text at the very top of the file:
 ```
 
 Other organizations that have contributed to the project may be listed
-in the copyright line as well (See section [10.1](#sec:pvfs-copyright)
+in the copyright line as well (See section [10.1](#copyright-information)
 for information on how do this in PVFS code). If you wish to credit
 particular developers or provide contact information, please do so in
 the README file located in the top level directory.
@@ -634,7 +632,7 @@ side effects are, and the range of return values. This is one example:
     }
 
 If you are working on the PVFS project, then you should adhere to the
-function comments described in section [10.2](#sec:pvfs-comments).
+function comments described in section [10.2](#function-commenting).
 
 #### Brackets
 
@@ -692,7 +690,7 @@ These are a few general guidelines for how to organize your code:
 
   - If a function will only be called from within the .c file where it
     is defined, then include the prototype for the function in the same
-    .c file near the top. (see section [9.2.4](#sec:static) for
+    .c file near the top. (see section [9.2.4](#static-declarations) for
     information on static declarations)
 
   - If a function will be called from outside of the .c file in which it
@@ -702,7 +700,7 @@ These are a few general guidelines for how to organize your code:
 
   - Put comments describing the behavior of the function just before its
     definition, not with the prototype (see section
-    [9.1.3](#sec:comments) for more detailed information about
+    [9.1.3](#commenting) for more detailed information about
     commenting functions).
 
   - Header files should *only* contain prototypes and structures that
@@ -782,7 +780,7 @@ garbage data from being interpreted as valid information.
 A similar argument applies to memory regions that are dynamically
 allocated. Any dynamically allocated structure or variable should at
 least be zeroed out before being used in the code. This can be done with
-the memset() function:
+the `memset()` function:
 
     foopointer = (struct foostruct)malloc(sizeof(struct foostruct));
     if(foopointer == NULL)
@@ -828,7 +826,7 @@ top level called “Changelog”. Smaller issues, that are perhaps only
 important from a stylistic point of view, can be commented in the code
 and marked with the text string “TODO” within the comment. This is
 highlighted with a special color with vi syntax highlighting, and can
-easily be found with the grep tool later.
+easily be found with the `grep` tool later.
 
 #### Choosing good variable and function names
 
@@ -846,7 +844,7 @@ belong together:
     int test_control_read();
 
 Function and variable nameing issues specific to PVFS can be found in
-section [10.3](#sec:pvfs-naming).
+section [10.3](#function-naming).
 
 ### Advanced topics
 
@@ -856,10 +854,7 @@ If a system call fails, always check the return value to see if it was
 set to EINTR. If this happens, it means that the system call was
 interrupted by a signal and probably did not actually fail; it just
 needs to be restarted. This is a fairly common situation when doing
-reads, writes, or polls. You can restart operations either by wrapping
-them in a while loop that causes it to try again if EINTR occurs, or you
-can use a goto and a label to jump back to the the system call you wish
-to repeat.
+`reads`, `writes`, or `polls`. You can restart operations either by wrapping them in a while loop that causes it to try again if EINTR occurs, or you can use a goto and a label to jump back to the the system call you wish to repeat.
 
 #### Constant arguments
 
@@ -921,7 +916,7 @@ select is implemented on top of the kernel’s poll function.
 #### String parsing
 
 Be careful with regards to which functions you use when doing simple
-string parsing. Some of the functions provided in string.h are dangerous
+string parsing. Some of the functions provided in `string.h` are dangerous
 to use, either because they do not return error values, or because they
 alter their arguments. Most of these issues are documented in the man
 pages. One common example occurs when an integer value must be read out
@@ -1059,20 +1054,19 @@ naming convention for clarity. Here are a few guidelines:
 
   - The letters “PVFS” should only be prepended to functions and global
     variables that exist as part of an application level interface. Some
-    examples would be PVFS\_open and PVFS\_read. For clarity, do not use
-    this naming scheme for interfaces internal to PVFS.
+    examples would be `PVFS_open` and `PVFS_read`. For clarity, do not use this naming scheme for interfaces internal to PVFS.
 
   - Well defined internal PVFS interfaces should use the prefix “PINT”
     (this is short for “PVFS interface”). This should then be followed
     by an identifier for the interface, and then a description of what
-    the particular function does. Some examples are PINT\_flow\_alloc,
-    PINT\_flow\_free, and PINT\_flow\_post.
+    the particular function does. Some examples are `PINT_flow_alloc`,
+    `PINT_flow_free`, and `PINT_flow_post`.
 
   - There are exceptions to the above rule. For example, well defined
     interfaces that exist within a very distinct module of PVFS may use
     a different prefix. Examples include the method functions within the
-    BMI layer of PVFS communications have names such as METH\_tcp\_send
-    and METH\_tcp\_recv.
+    BMI layer of PVFS communications have names such as `METH_tcp_send`
+    and `METH_tcp_recv`.
 
   - Any variables that are globally visible should follow the rules
     listed above as well. This naming convention is for both functions
@@ -1084,7 +1078,7 @@ Gossip is a simple library for logging both errors and debugging
 messages. It allows you to send logging messages to either stderr,
 syslog, or a text file.
 
-Gossip uses a debug mask to determine which messages get logged. You may
+Gossip uses a `debug mask` to determine which messages get logged. You may
 specify a mask level with each debugging call. These messages can then
 be toggled on or off depending on what the global mask value is. This
 allows you to turn debugging on or off just for specific parts of your
@@ -1104,7 +1098,7 @@ The following is a list of functions provided in the Gossip library:
 
   - **gossip\_enable\_file(filename, mode)**: Directs logging messages
     to a specified file. The arguments are the same as those taken by
-    the fopen() function.
+    the `fopen()` function.
 
   - **gossip\_enable\_syslog(priority)**: Directs logging to syslog. The
     priority argument is the same as that given to the syslog()
@@ -1117,7 +1111,7 @@ The following is a list of functions provided in the Gossip library:
     facilities.
 
   - **gossip\_debug(mask, format, ...)**: Logs a debugging message. Uses
-    the same format syntax as the printf() function call. It will only
+    the same format syntax as the `printf()` function call. It will only
     print if debugging is turned on and the mask value matches the
     global mask specified with gossip\_set\_debug\_mask().
 
@@ -1134,21 +1128,21 @@ The following is a list of functions provided in the Gossip library:
 
 Examples of how to use Gossip can be found in the gossip/examples
 directory of the Gossip source code. This code can be found in the
-pvfs2/src/common/gossip directory within the PVFS 2 source tree.
+`pvfs2/src/common/gossip` directory within the PVFS 2 source tree.
 
 ### Suggested error handling
 
 #### Traditional application error handling with errno
 
-Most unix system calls set a global variable called errno when an error
+Most unix system calls set a global variable called `errno` when an error
 condition occurs. Since this is a global variable, it is overwritten
 everytime a system call is made. This means that it must be checked
 immediately following the failure of the system call in question. The
 errno values correspond to to various error conditions, wuch as “bad
 file descriptor” or “permission denied.” One can print out a textual
-description of these error values using the perror() or strerror()
-functions. More information about the use of errno can be found in the
-man pages for errno, perror, and and strerror.
+description of these error values using the `perror()` or `strerror()`
+functions. More information about the use of `errno` can be found in the
+man pages for `errno`, `perror`, and `strerror`.
 
 The use of errno in this manner is fine for small applications, but
 becomes more tedious when building larger software projects. The problem
