@@ -2,6 +2,41 @@
 
 # BMI Document
 
+## Contents
+
+1.  [TODO](#todo)
+2.  [Introduction](#introduction)
+3.  [Related Documents](#related-documents)
+4.  [High level design](#high-level-design)
+    1.  [Features and Goals](#features-and-goals)
+    2.  [Implementation](#implementation)
+    3.  [Communications model](#communications-model)
+    4.  [Architecture](#architecture)
+        1. [Method control](#method-control)
+        2. [Methods](#methods)
+        3. [Thread safety](#thread-safety)
+5.  [Concepts](#concepts)
+    1.  [Memory buffers](#memory-buffers)
+    2.  [Unexpected messages](#unexpected-messages)
+    3.  [Short messages](#short-messages)
+    4.  [Immediate completion](#immediate-completion)
+    5.  [User pointers](#user-pointers)
+    6.  [List I/O](#list-io)
+6.  [User interface](#user-interface)
+    1.  [Types and structures](#types-and-structures)
+    2.  [Interface functions](#interface-functions)
+        1. [Supported getinfo and setinfo options](#supported-getinfo-and-setinfo-options)
+    3.  [Error handling](#error-handling)
+7.  [Method implementation](#method-implementation)
+    1.  [Method interface](#method-interface)
+    2.  [Important structures](#important-structures)
+    3.  [Support libraries](#support-libraries)
+        1. [Operation queues](#operation-queues)
+        2. [Method address support](#method-address-support)
+        3. [Logging and debugging](#logging-and-debugging)
+        4. [Operation id's](#operation-ids)
+8.  [References](#references)
+
 ## TODO
 
   - maybe change method nomenclature to module
