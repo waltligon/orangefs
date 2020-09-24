@@ -6,13 +6,22 @@
 
 # Current PVFS2 Status
 
+## Contents
+
+1. [Introduction](#introduction)
+2. [Known limitations and missing features](#known-limitations-and-missing-features)
+3. [Experimental features](#experimental-features)
+4. [Placeholder / depricated code](#placeholder--depricated-code)
+5. [Open issues](#open-issues)
+6. [Good examples](#good-examples)
+
 ## Introduction
 
 This document describes the current status of PVFS2 development. This
 document only includes issues related to functionality or correctness.
 No performance optimizations are listed for now.
 
-## Known limitiations and missing features
+## Known limitations and missing features
 
 This section lists file system limitations for which we have a known
 solution or plan.
