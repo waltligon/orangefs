@@ -208,8 +208,7 @@ The flow interface is the set of functions that the flow user is allowed
 to interact with. These functions allow you to do such things as create
 flows, post them for service, and check for completion.
 
-  - *PINT\_flow\_initialize()*: performs initial setup of flow interface
-    - must be called once before any other flow interface functions
+  - *PINT\_flow\_initialize()*: performs initial setup of flow interface - must be called once before any other flow interface functions
 
   - *PINT\_flow\_finalize()*: shuts down the flow interface
 
@@ -246,7 +245,7 @@ Three functions are provided to test for completion of posted flows:
 ## Flow protocol interface
 
 The flow protocols are modular components capable of moving data between
-particular types of endpoints. (See section [3.2](#sec:arch) for an
+particular types of endpoints. (See [Architecture](#architecture) for an
 overview). Any flow protocol implementation must conform to a predefined
 flow protocol interface in order to interoperate with the flow system.
 
