@@ -13,80 +13,61 @@ the terminology and concepts used in the other pvfs2 documents.
 
 ## Words
 
-low-level interface to PVFS. sits on top of the servers. provides
-underlying foundation to higher-level interfaces like the PVFS library (
-libpvfs2 ) and the PVFS VFS interface.
+- ***system interface:*** low-level interface to PVFS. sits on top of the servers. provides underlying foundation to higher-level interfaces like the PVFS library ( libpvfs2 ) and the PVFS VFS interface.
 
-(also “file distributions”, “physical distribution” ) set of methods
-describing a mapping from a logical sequence of bytes to a physical
-layout of bytes on PVFS servers. PVFS1 had one type of distribution –
-regularly striding data. PVFS2 will understand many distributions,
-including but not limited to strided, block and cyclic.
+- ***distributions:*** (also “file distributions”, “physical distribution” ) set of methods describing a mapping from a logical sequence of bytes to a physical layout of bytes on PVFS servers. PVFS1 had one type of distribution – regularly striding data. PVFS2 will understand many distributions, including but not limited to strided, block and cyclic.
 
-a PVFS operation requires several steps, called “jobs”
+- ***job:*** a PVFS operation requires several steps, called “jobs”
 
-keeps track of progress as an operation makes its way through the pvfs2
-layers
+    - ***job interface:*** keeps track of progress as an operation makes its way through the pvfs2 layers
 
-abstracts network communication. Currently BMI supports TCP, Myricom/GM,
-and InfiniBand using either VAPI or OpenIB APIs. It has been extended to
-at least two other protocols not included in the distribution.
+    - ***job structure:***
 
-a flow describes the movement of file data from client initialization to
-putting bits on disk. It encompasses both transporting data over the
-network as well as interacting with storage devices. ( XXX: scheduler?).
-Users tell flow *what* they want done, and flow figures out *how* to
-accomplish the request. Flows are not involved in metadata operations.
+- ***BMI (Buffered Message Interface):*** abstracts network communication. Currently BMI supports TCP, Myricom/GM, and InfiniBand using either VAPI or OpenIB APIs. It has been extended to at least two other protocols not included in the distribution.
 
-the API for setting up flows
+- ***flows:*** a flow describes the movement of file data from client initialization to putting bits on disk. It encompasses both transporting data over the network as well as interacting with storage devices. ( XXX: scheduler?). Users tell flow *what* they want done, and flow figures out *how* to accomplish the request. Flows are not involved in metadata operations.
 
-Implements whatever underlying protocol is needed for two endpoints to
-communicate
+    - ***flow interface:*** the API for setting up flows
 
-the source or destination of a flow
+    - ***flow protocol:*** Implements whatever underlying protocol is needed for two endpoints to communicate
 
-data structure representing a flow
+    - ***flow endpoint:*** the source or destination of a flow
 
-stores both keyword-value pairs and data (?)
+    - ***flow descriptor:*** data structure representing a flow
 
-*storage interface (obsolete)* now called *trove*
+- ***trove:*** stores both keyword-value pairs and data (?)
 
-data files, metadata files, directories, symlinks
+    - *storage interface (obsolete):* now called *trove*
 
-data about data. in the UNIX sense, such things as owner, group,
-permissions, timestamps, sizes. in the PVFS sense, also distribution
-information.
+- ***system level objects:*** data files, metadata files, directories, symlinks
 
-actual contents of file
+    - ***metadata:*** data about data. in the UNIX sense, such things as owner, group, permissions, timestamps, sizes. in the PVFS sense, also distribution information.
 
-contains the metadata for a single PVFS file
+    - ***data:*** actual contents of file
 
-contains some portion of the data for a single PVFS file
+    - ***metafile:*** contains the metadata for a single PVFS file
 
-logical collections of data
+    - ***datafile:*** contains some portion of the data for a single PVFS file
 
-arbitrary binary data. Data is accessed with sizes from offsets.
+- ***dataspace:*** logical collections of data
 
-a keyword/value pair. Data is accessed by resolving a key.
+    - ***bytestream:*** arbitrary binary data. Data is accessed with sizes from offsets.
 
-provides a version number for any region of a byte stream or any
-individual key/value pair. By comparing the vtag before and after an
-operation, one can ensure consistency.
+    - ***keyval:*** a keyword/value pair. Data is accessed by resolving a key.
 
-a 64-bit tag to uniquely identify PVFS objects. Re-using handles brings
-up some “interesting” cases. (aside: what if we made the handles 128
-bits )
+- ***collections:***
 
-in some cases, a handle might refer to two distinct files with the same
-name. The instance tag serves as an extra identifier to help ensure
-consistency
+- ***server request protocol:***
 
-A mechanism for associating information with a handle. Like a linux
-inode, a pinode contains information used by PVFS2 internally.
+- ***vtags:*** provides a version number for any region of a byte stream or any individual key/value pair. By comparing the vtag before and after an operation, one can ensure consistency.
 
-A logging library. Internal to clemson? freshmeat doesn’t have an entry
-for it, and searching for “gossip logging library” in google turns up a
-ton of irrelevant searches.
+- ***handle:*** a 64-bit tag to uniquely identify PVFS objects. Re-using handles brings up some “interesting” cases. (aside: what if we made the handles 128 bits )
+
+- ***instance tag:*** in some cases, a handle might refer to two distinct files with the same name. The instance tag serves as an extra identifier to help ensure consistency
+
+- ***pinode:*** A mechanism for associating information with a handle. Like a linux inode, a pinode contains information used by PVFS2 internally.
+
+- ***gossip:*** A logging library. Internal to clemson? freshmeat doesn’t have an entry for it, and searching for “gossip logging library” in google turns up a ton of irrelevant searches.
 
 ## The view from 10,000 feet
 
