@@ -4,6 +4,41 @@
 
 # PVFS Tuning
 
+## Contents
+
+1.  [Introduction](#introduction)
+2.  [Cluster Partitioning](#cluster-partitioning)
+3.  [Storage](#storage)
+    1. [Server Configuration](#server-configuration)
+    2. [Local File System](#local-file-system)
+    3. [Disk Synchronization](#disk-synchronization)
+    4. [Metadata](#metadata)
+        1. [Coalescing](#coalescing)
+    5. [Data](#data)
+4.  [Networks](#networks)
+    1. [Network Independent](#network-independent)
+    2. [TCP](#tcp)
+        1. [Kernel Parameters](#kernel-parameters)
+        2. [Socket Buffer Sizes](#socket-buffer-sizes)
+        3. [Listening Backlog (?)](#listening-backlog-)
+    3. [Infiniband](#infiniband)
+    4. [Myrinet Express](#myrinet-express)
+5.  [VFS Layer](#vfs-layer)
+    1. [Maximum I/O Size](#maximum-io-size)
+    2. [Workload Specifics](#workload-specifics)
+6.  [Number of Datafiles](#number-of-datafiles)
+7.  [Distributions](#distributions)
+    1. [Simple Stripe](#simple-stripe)
+    2. [Basic](#basic)
+    3. [Two Dimensional Stripe](#two-dimensional-stripe)
+    4. [Variable Strip](#variable-strip)
+8.  [Workloads](#workloads)
+    1. [Small files](#small-files)
+    2. [Large files](#large-files)
+    3. [Concurrent IO](#concurrent-io)
+9.  [Benchmarking](#benchmarking)
+10. [References](#references)
+
 ## Introduction
 
 The default settings for PVFS (those provided and in the source code and
