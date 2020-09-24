@@ -75,7 +75,7 @@ partition of compute/IO nodes? Is this section needed?
 
 ### Server Configuration
 
-How many IO servers? \[1\] How many MD servers? Should IO and MD servers
+How many IO servers? \[[1](#references)\] How many MD servers? Should IO and MD servers
 be shared?
 
 ### Local File System
@@ -383,4 +383,4 @@ short hand notation, such as “K” for kilobytes or “M” for megabytes.
 
 ## References
 
-1.  The FAQ already answers this to some degree
+1.  The [FAQ](./pvfs2-faq.md#how-many-servers-should-i-run) already answers this to some degree
