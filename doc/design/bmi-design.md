@@ -149,7 +149,7 @@ acceptable within low level system services.
 When posting receive operations, the user must specify the address of
 the sending host and the size of the message to accept. The user cannot
 post receives that match wildcard addresses. The only exceptions to this
-rule are unexpected messages, as defined in section [5.2](#sec:unexp).
+rule are unexpected messages, as defined in section [5.2](#unexpected-messages).
 
 BMI is a connectionless interface; the user does not have to establish
 or maintain any link between hosts before sending messages. The BMI
@@ -259,7 +259,7 @@ manageable by standard operating system libraries.
 BMI’s default mode of operation requires that each send operation be
 matched with a certain receive operation at the remote host in order to
 complete. This send and receive operation must match in terms of
-expected message size (more on this in section [5.3](#sec:short)), host
+expected message size (more on this in section [5.3](#short-messages)), host
 address, and identication tag. Otherwise the communication will not
 complete. There is no mechanism for receiving from a “wildcard” address.
 
