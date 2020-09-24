@@ -33,38 +33,36 @@ finalize the system interface.
 
 ### Metadata tests
 
-.
-
-**File creation**: We will test the creation of files with valid
+1. **File creation**: We will test the creation of files with valid
 attributes inside of directories where we have permission to do so. The
 number of data files will be varied from 1 to 2N (where N is the number
 of I/O servers). Creation will be verified with a lookup operation.
 
-**File removal**: We will test the removal of files that have the
+2. **File removal**: We will test the removal of files that have the
 appropriate permissions for our user. Removal will be verified by a
 failed lookup operation. After the file is removed, we will re-create a
 new file with the same name. Lookup of the new file must return the new
 handle. as well as the attributes of the new file(including datafile
 handles).
 
-**Setting/retrieving attributes on a file**: Setting/retrieving
+3. **Setting/retrieving attributes on a file**: Setting/retrieving
 attributes will be tested by setting all the attributes on a file to
 some known values, then calling getattr to ensure that they have been
 set. Important things to pay attention to here are the filesize, as well
 as permissions.
 
-**Lookup of a file**: Lookup will be tested by creating a file, and then
+4. **Lookup of a file**: Lookup will be tested by creating a file, and then
 looking up that file and comparing the handles. Create and Lookup should
 return the same handles and file system id numbers.
 
-**Renaming files**: We will create a file, lookup the file, then call
+5. **Renaming files**: We will create a file, lookup the file, then call
 rename. We will verify rename by calling lookup on the old filename,
 ensuring that it fails, and then calling lookup on the new filename and
 ensuring that it returns the handle we were given at create time.
 Renaming will need to be tested within the same directory, as well as
 renaming(essentially moving) files into different directories.
 
-**Directory creation**: We will test the creation of directories with
+6. **Directory creation**: We will test the creation of directories with
 valid attributes inside of directories where we have permission to do
 so. We’re only looking to create a moderate number of directories with
 this test case. Please refer to the stress testing section for info on
@@ -73,19 +71,19 @@ directory creation will be verified both by having it appear when
 readdir is called, as well as being able to look it up with the lookup
 function.
 
-**Directory removal**: We will create a directory, verify that it exists
+7. **Directory removal**: We will create a directory, verify that it exists
 with readdir and lookup, then call rmdir. To ensure that it has been
 deleted, we will attempt to lookup and call readdir on the directory
 name that was just removed. Both of these calls must not return any
 trace of the directory. Additionally, we will create a directory of the
 same name, and compare its attributes to the previous directory.
 
-**Lookup of a directory**: Lookup will be tested by creating a
+8. **Lookup of a directory**: Lookup will be tested by creating a
 directory, and then looking up that directory and comparing the handles.
 Create and Lookup should return the same handles and file system id
 numbers.
 
-**Setting/retrieving attributes on a directory**: Setting/retrieving
+9. **Setting/retrieving attributes on a directory**: Setting/retrieving
 attributes will be tested by setting all the attributes on a directory
 to some known values, then calling getattr to ensure that they have been
 set.
@@ -99,22 +97,20 @@ and data exists within the file. The request will be committed prior to
 the IO call. We will need to test every combination of requests (from
 pvfs-request.h):
 
-.
-
-**Contiguous**: count should be varied to ensure that we’re hitting
+1. **Contiguous**: count should be varied to ensure that we’re hitting
 multiple servers as well as only getting data from each server at time.
 
-**Vector**: with "stride" lengths that span multiple servers.
+2. **Vector**: with "stride" lengths that span multiple servers.
 
-**Hvector**: see vector.
+3. **Hvector**: see vector.
 
-**Indexed**: indexed will be tested with varying block lengths and
+4. **Indexed**: indexed will be tested with varying block lengths and
 displacements. displacements that cause multiple servers to be spanned
 as well as large block lengths will also be used.
 
-**Hindexed**: see indexed.
+5. **Hindexed**: see indexed.
 
-**Manual ub/lb/extents**: Calling read with varying the displacements on
+6. **Manual ub/lb/extents**: Calling read with varying the displacements on
 ub, lb, and extents will be performed.
 
 #### Writing
@@ -124,22 +120,20 @@ permission. Data may or may not exist within file prior to calling
 write. The request will be committed prior to the IO call. We will need
 to test every combination of requests (from pvfs-request.h):
 
-.
-
-**Contiguous**: count should be varied to ensure that we’re hitting
+1. **Contiguous**: count should be varied to ensure that we’re hitting
 multiple servers as well as only getting data from each server at time.
 
-**Vector**: with "stride" lengths that span multiple servers.
+2. **Vector**: with "stride" lengths that span multiple servers.
 
-**Hvector**: see vector.
+3. **Hvector**: see vector.
 
-**Indexed**: indexed will be tested with varying block lengths and
+4. **Indexed**: indexed will be tested with varying block lengths and
 displacements. displacements that cause multiple servers to be spanned
 as well as large block lengths will also be used.
 
-**Hindexed**: see indexed.
+5. **Hindexed**: see indexed.
 
-**Manual ub/lbextent**: Calling write with varying the displacements on
+6. **Manual ub/lbextent**: Calling write with varying the displacements on
 ub, lb, and extents will be performed.
 
 #### Truncate
@@ -166,48 +160,46 @@ All parameters of each function are null. Note, before any of the
 functions can be called, initialize must be called with valid parameters
 expect for tests regarding initialize.
 
-.
-
-Call initialize and set its parameters to null. Record the return value
+1. Call initialize and set its parameters to null. Record the return value
 and error code returned.
 
-Call finalize and set its parameters to null. Record the return value
+2. Call finalize and set its parameters to null. Record the return value
 and error code returned.
 
-Call lookup and set its parameters to null. Record the return value and
+3. Call lookup and set its parameters to null. Record the return value and
 error code returned.
 
-Call getattr and set its parameters to null. Record the return value and
+4. Call getattr and set its parameters to null. Record the return value and
 error code returned.
 
-Call setattr and set its parameters to null. Record the return value and
+5. Call setattr and set its parameters to null. Record the return value and
 error code returned.
 
-Call mkdir and set its parameters to null. Record the return value and
+6. Call mkdir and set its parameters to null. Record the return value and
 error code returned.
 
-Call readdir and set its parameters to null. Record the return value and
+7. Call readdir and set its parameters to null. Record the return value and
 error code returned.
 
-Call create and set its parameters to null. Record the return value and
+8. Call create and set its parameters to null. Record the return value and
 error code returned.
 
-Call remove and set its parameters to null. Record the return value and
+9. Call remove and set its parameters to null. Record the return value and
 error code returned.
 
-Call rename and set its parameters to null. Record the return value and
+10. Call rename and set its parameters to null. Record the return value and
 error code returned.
 
-Call symlink and set its parameters to null. Record the return value and
+11. Call symlink and set its parameters to null. Record the return value and
 error code returned.
 
-Call readlink and set its parameters to null. Record the return value
+12. Call readlink and set its parameters to null. Record the return value
 and error code returned.
 
-Call read and set its parameters to null. Record the return value and
+13. Call read and set its parameters to null. Record the return value and
 error code returned.
 
-Call write and set its parameters to null. Record the return value and
+14. Call write and set its parameters to null. Record the return value and
 error code returned.
 
 #### Varied Null Parameters
@@ -216,24 +208,22 @@ Some of the parameters of each function are null. Note, before any of
 the functions can be called, initialize must be called with valid
 parameters expect for tests regarding initialize.
 
-.
-
-Iterate through the list found in section [4.1.1](#null1L) with the
+1. Iterate through the list found in section [Null parameters](#null-parameters) with the
 first parameter set to null. The remaining parameters (if there are any)
 are set to a valid value. Record the return value and error code
 returned.
 
-Iterate through the list found in section [4.1.1](#null1L) with the
+2. Iterate through the list found in section [Null parameters](#null-parameters) with the
 second parameter (if there is one) set to null. The remaining parameters
 (if there are any) are set to a valid value. Record the return value and
 error code returned.
 
-Iterate through the list found in section [4.1.1](#null1L) with the
+3. Iterate through the list found in section [Null parameters](#null-parameters) with the
 third parameter (if there is one) set to null. The remaining parameters
 (if there are any) are set to a valid value. Record the return value and
 error code returned.
 
-Iterate through the list found in section [4.1.1](#null1L) with the
+4. Iterate through the list found in section [Null parameters](#null-parameters) with the
 first and second parameter (if there is one) set to null. The remaining
 parameters (if there are any) are set to a valid value. Record the
 return value and error code returned.
@@ -242,78 +232,74 @@ return value and error code returned.
 
 All test cases use an invalid file
 
-.
-
-Call lookup and set the pinode\_refernce.handle to -1. Record the return
+1. Call lookup and set the pinode\_refernce.handle to -1. Record the return
 value and error code returned.
 
-Call getattr and set its parameters to null. Record the return value and
+2. Call getattr and set its parameters to null. Record the return value and
 error code returned.
 
-Call setattr and set its parameters to null. Record the return value and
+3. Call setattr and set its parameters to null. Record the return value and
 error code returned.
 
-Call mkdir and set its parameters to null. Record the return value and
+4. Call mkdir and set its parameters to null. Record the return value and
 error code returned.
 
-Call readdir and set its parameters to null. Record the return value and
+5. Call readdir and set its parameters to null. Record the return value and
 error code returned.
 
-Call create and set its parameters to null. Record the return value and
+6. Call create and set its parameters to null. Record the return value and
 error code returned.
 
-Call remove and set its parameters to null. Record the return value and
+7. Call remove and set its parameters to null. Record the return value and
 error code returned.
 
-Call rename and set its parameters to null. Record the return value and
+8. Call rename and set its parameters to null. Record the return value and
 error code returned.
 
-Call symlink and set its parameters to null. Record the return value and
+9. Call symlink and set its parameters to null. Record the return value and
 error code returned.
 
-Call readlink and set its parameters to null. Record the return value
+10. Call readlink and set its parameters to null. Record the return value
 and error code returned.
 
-Call read and set its parameters to null. Record the return value and
+11. Call read and set its parameters to null. Record the return value and
 error code returned.
 
-Call write and set its parameters to null. Record the return value and
+12. Call write and set its parameters to null. Record the return value and
 error code returned.
 
 ### Functional Ordering
 
-All test cases use the pre-built file found in section [2](#setupL).
+All test cases use the pre-built file found in section [Setup](#setup).
 
 #### Client uninitialized
 
 Test the behavior of all functions when the initialize function has not
 been called.
 
-.
+1. Call lookup and record the return value and error codes.
 
-Call lookup and record the return value and error codes.
+2. Call getattr and record the return value and error codes.
 
-Call getattr and record the return value and error codes.
+3. Call setattr and record the return value and error codes.
 
-Call setattr and record the return value and error codes.
+4. Call mkdir and record the return value and error codes.
 
-Call mkdir and record the return value and error codes.
+5. Call readdir and record the return value and error codes.
 
-Call readdir and record the return value and error codes.
+6. Call create and record the return value and error codes.
 
-Call create and record the return value and error codes.
+7. Call remove and record the return value and error codes.
 
-Call remove and record the return value and error codes.
+8. Call rename and record the return value and error codes.
 
-Call rename and record the return value and error codes.
+9. Call symlink and record the return value and error codes.
 
-Call symlink and record the return value and error codes.
+10. Call readlink and record the return value and error codes.
 
-Call readlink and record the return value and error codes.
+11. Call read and record the return value and error codes.
 
-Call read and record the return value and error codes.
-
-Call write and record the return value and error codes.
+12. Call write and record the return value and error codes.
 
 #### Client unfinalized
 
@@ -322,45 +308,43 @@ program exits without calling finalize. Another program is run after the
 previous program exited and all functions are tested including
 initialize and finalize.
 
-.
-
-Call initialize and exit the program. Call initialize and record the
+1. Call initialize and exit the program. Call initialize and record the
 return value and error codes.
 
-Call initialize and exit the program. Call initialize then lookup and
+2. Call initialize and exit the program. Call initialize then lookup and
 record the return value and error codes.
 
-Call initialize and exit the program. Call initialize then getattr and
+3. Call initialize and exit the program. Call initialize then getattr and
 record the return value and error codes.
 
-Call initialize and exit the program. Call initialize then setattr and
+4. Call initialize and exit the program. Call initialize then setattr and
 record the return value and error codes.
 
-Call initialize and exit the program. Call initialize then mkdir and
+5. Call initialize and exit the program. Call initialize then mkdir and
 record the return value and error codes.
 
-Call initialize and exit the program. Call initialize then readdir and
+6. Call initialize and exit the program. Call initialize then readdir and
 record the return value and error codes.
 
-Call initialize and exit the program. Call initialize then create and
+7. Call initialize and exit the program. Call initialize then create and
 record the return value and error codes.
 
-Call initialize and exit the program. Call initialize then remove and
+8. Call initialize and exit the program. Call initialize then remove and
 record the return value and error codes.
 
-Call initialize and exit the program. Call initialize then rename and
+9. Call initialize and exit the program. Call initialize then rename and
 record the return value and error codes.
 
-Call initialize and exit the program. Call initialize then symlink and
+10. Call initialize and exit the program. Call initialize then symlink and
 record the return value and error codes.
 
-Call initialize and exit the program. Call initialize then readlink and
+11. Call initialize and exit the program. Call initialize then readlink and
 record the return value and error codes.
 
-Call initialize and exit the program. Call initialize then read and
+12. Call initialize and exit the program. Call initialize then read and
 record the return value and error codes.
 
-Call initialize and exit the program. Call initialize then write and
+13. Call initialize and exit the program. Call initialize then write and
 record the return value and error codes.
 
 #### Client finalized
@@ -369,42 +353,40 @@ The initialize function is called and immediately after the finalize
 function is called. Test behavior of system functions under this
 scenario.
 
-.
-
-Call initialize then finalize. Immediately after finalize, call lookup
+1. Call initialize then finalize. Immediately after finalize, call lookup
 and record the return and error codes.
 
-Call initialize then finalize. Immediately after finalize, call getattr
+2. Call initialize then finalize. Immediately after finalize, call getattr
 and record the return and error codes.
 
-Call initialize then finalize. Immediately after finalize, call setattr
+3. Call initialize then finalize. Immediately after finalize, call setattr
 and record the return and error codes.
 
-Call initialize then finalize. Immediately after finalize, call mkdir
+4. Call initialize then finalize. Immediately after finalize, call mkdir
 and record the return and error codes.
 
-Call initialize then finalize. Immediately after finalize, call readdir
+5. Call initialize then finalize. Immediately after finalize, call readdir
 and record the return and error codes.
 
-Call initialize then finalize. Immediately after finalize, call create
+6. Call initialize then finalize. Immediately after finalize, call create
 and record the return and error codes.
 
-Call initialize then finalize. Immediately after finalize, call remove
+7. Call initialize then finalize. Immediately after finalize, call remove
 and record the return and error codes.
 
-Call initialize then finalize. Immediately after finalize, call rename
+8. Call initialize then finalize. Immediately after finalize, call rename
 and record the return and error codes.
 
-Call initialize then finalize. Immediately after finalize, call symlink
+9. Call initialize then finalize. Immediately after finalize, call symlink
 and record the return and error codes.
 
-Call initialize then finalize. Immediately after finalize, call readlink
+10. Call initialize then finalize. Immediately after finalize, call readlink
 and record the return and error codes.
 
-Call initialize then finalize. Immediately after finalize, call read and
+11. Call initialize then finalize. Immediately after finalize, call read and
 record the return and error codes.
 
-Call initialize then finalize. Immediately after finalize, call write
+12. Call initialize then finalize. Immediately after finalize, call write
 and record the return and error codes.
 
 #### Operations on non-existent Files
@@ -412,51 +394,47 @@ and record the return and error codes.
 Tests for functions that operate on existing files on a file that has
 not been created.
 
-.
-
-Call initialize then lookup on a file that has not been created. Record
+1. Call initialize then lookup on a file that has not been created. Record
 the return value and error codes.
 
-Call initialize then getattr on a file that has not been created. Record
+2. Call initialize then getattr on a file that has not been created. Record
 the return value and error codes.
 
-Call initialize then setattr on a file that has not been created. Record
+3. Call initialize then setattr on a file that has not been created. Record
 the return value and error codes.
 
-Call initialize then readdir on a file that has not been created. Record
+4. Call initialize then readdir on a file that has not been created. Record
 the return value and error codes.
 
-Call initialize then remove on a file that has not been created. Record
+5. Call initialize then remove on a file that has not been created. Record
 the return value and error codes.
 
-Call initialize then rename on a file that has not been created. Record
+6. Call initialize then rename on a file that has not been created. Record
 the return value and error codes.
 
-Call initialize then symlink on a file that has not been created. Record
+7. Call initialize then symlink on a file that has not been created. Record
 the return value and error codes.
 
-Call initialize then readlink on a file that has not been created.
+8. Call initialize then readlink on a file that has not been created.
 Record the return value and error codes.
 
-Call initialize then read on a file that has not been created. Record
+9. Call initialize then read on a file that has not been created. Record
 the return value and error codes.
 
-Call initialize then write on a file that has not been created. Record
+10. Call initialize then write on a file that has not been created. Record
 the return value and error codes.
 
 #### Repeated Operations: meta data
 
 Continually call functions that change the meta data of a file.
 
-.
-
-Call initialize and then call setattr on the same test file 100 times.
+1. Call initialize and then call setattr on the same test file 100 times.
 Record return values and error codes.
 
-Call initialize and then call rename 100 times. Record return values and
+2. Call initialize and then call rename 100 times. Record return values and
 error codes.
 
-Call initialize and then call symlink 100 times. Record return values
+3. Call initialize and then call symlink 100 times. Record return values
 and error codes.
 
 #### Repeated Operations: create
@@ -464,18 +442,16 @@ and error codes.
 Continually call functions on one file that create new files such as
 mkdir and create.
 
-.
-
-Call initialize and then call mkdir on the same test file 100 times.
+1. Call initialize and then call mkdir on the same test file 100 times.
 Record return values and error codes.
 
-Call initialize and then call create on the same test file 100 times.
+2. Call initialize and then call create on the same test file 100 times.
 Record return values and error codes.
 
-Call initialize and then call mkdir on differnt test files 100 times.
+3. Call initialize and then call mkdir on differnt test files 100 times.
 Record return values and error codes.
 
-Call initialize and then call create on differnt test file 100 times.
+4. Call initialize and then call create on differnt test file 100 times.
 Record return values and error codes.
 
 ## Results
