@@ -78,7 +78,7 @@ handle space.
 
   - Decrement `last`
 
-  - if \(first > last\), mark the extent as empty.
+  - if *first* > *last*, mark the extent as empty.
 
 ### returning handles
 
@@ -86,10 +86,10 @@ handle space.
     `recently_freed` list. Because this is the first item on that list,
     we check the time.
 
-  - now we add more handles to the list. we check the time after \(N\)
+  - now we add more handles to the list. we check the time after *N*
     handles are returned and update the timestamp.
 
-  - Once we have added \(H\) handles, we decide the `recently_freed`
+  - Once we have added *H* handles, we decide the `recently_freed`
     list has enough handles. We then start using the `overflow_list` to
     hold returned handles.
 
@@ -104,9 +104,9 @@ handle space.
 
 ### I don’t know what to call this section
 
-Let \(T_{r}\) be the minimum response time for an operation of any sort,
-\(T_{f}\) be the time a handle must sit before being moved back to the
-free list, and \(N_{tot}\) be the total number of handles available on a
+Let *T<sub>r</sub>* be the minimum response time for an operation of any sort,
+*T<sub>f</sub>* be the time a handle must sit before being moved back to the
+free list, and *N<sub>tot</sub>* be the total number of handles available on a
 server.
 
 The pathological case would be one where a caller
@@ -117,13 +117,14 @@ The pathological case would be one where a caller
     for the largest possible `recently_freed` list in the next pass
 
 This results in the largest number of handles being unavailable due to
-sitting on the `overflow_list`. Call \(N_{purg}\) the number of handles
-waiting in “purgatory” ( waiting for \(T_{f}\) to pass)
-\[N_{purg} = T_{f} / T_{r}\]
+sitting on the `overflow_list`. Call *N<sub>purg</sub>* the number of handles
+waiting in “purgatory” ( waiting for *T<sub>f</sub>* to pass)
 
-\[F_{purg} = N_{purg} / N_{tot}\]
+*N<sub>purg</sub>* = *T<sub>f</sub>* / *T<sub>r</sub>*
 
-\[F_{purg} = T_{f} / (T_{r} * N_{tot})\]
+*F<sub>purg</sub>* = *N<sub>purg</sub>* / *N<sub>tot</sub>*
 
-We should try to collect statistics and see what \(T_{r}\) and
-\(N_{purg}\) end up being for real and pathological workloads.
+*F<sub>purg</sub>* = *T<sub>f</sub>* / (*T<sub>r</sub>* * *N<sub>tot</sub>*)
+
+We should try to collect statistics and see what *T<sub>r</sub>* and
+*N<sub>purg</sub>* end up being for real and pathological workloads.
