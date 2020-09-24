@@ -1,7 +1,3 @@
-\maketitle
-\tableofcontents
-\thispagestyle{empty}
-
 # Frequently Asked Questions About PVFS
 
 ## Contents

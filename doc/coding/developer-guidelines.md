@@ -1,8 +1,3 @@
-\maketitle
-\tableofcontents
-\newpage
-\thispagestyle{plain}
-
 # Parallel Architecture Research Laboratory Developer Guidelines
 
 ## Contents

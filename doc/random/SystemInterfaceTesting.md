@@ -1,5 +1,3 @@
-\maketitle
-
 # PVFS2: System Interface Test Suite
 
 ## Introduction
@@ -15,8 +13,6 @@ behavior on abnormal procedures designed to make the functions fail.
 
 Describe the system (hardware and OS) that the tests are being run on
 and the version of pvfs2.
-
-\newcounter{marker}
 
 ## Positive Tests
 

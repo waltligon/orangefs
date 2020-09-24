@@ -1,9 +1,3 @@
-\maketitle
-\tableofcontents
-\newpage
-\thispagestyle{empty}
-\setlength{\parindent}{0.0cm}
-
 # Current PVFS2 Status
 
 ## Contents

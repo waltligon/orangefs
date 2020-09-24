@@ -1,5 +1,3 @@
-\maketitle
-
 # Trove: The PVFS2 Storage Interface
 
 ## Motivation and Goals

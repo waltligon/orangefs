@@ -1,8 +1,3 @@
-\maketitle
-\tableofcontents
-\newpage
-\thispagestyle{empty}
-
 # A Quick Start Guide to PVFS2
 
 ## Contents
@@ -822,8 +817,6 @@ everything has terminated properly. Once the pvfs2-client has been
 killed, it is safe to remove the PVFS2 kernel module:
 
     gil:~# rmmod pvfs2
-
-\appendix
 
 ## Notes on running PVFS2 without root access
 

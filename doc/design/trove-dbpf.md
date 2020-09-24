@@ -1,5 +1,3 @@
-\maketitle
-
 # Trove Database + Files (DBPF) Implementation
 
 ## Introduction

@@ -1,5 +1,3 @@
-\maketitle
-
 # PVFS2 Distribution Design Notes
 
 ## Introduction

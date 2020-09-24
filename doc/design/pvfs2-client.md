@@ -1,5 +1,3 @@
-\maketitle
-
 # `pvfs2-client` Design Document (DRAFT)
 
 ## Introduction

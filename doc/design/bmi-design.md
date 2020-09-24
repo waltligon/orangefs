@@ -1,5 +1,3 @@
-\maketitle
-
 # BMI Document
 
 ## Contents

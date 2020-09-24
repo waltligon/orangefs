@@ -1,11 +1,3 @@
-\maketitle
-\newpage
-\setcounter{tocdepth}{2}
-\tableofcontents
-\setlength{\parindent}{0pt}
-\setlength{\parskip}{11pt}
-\newpage
-
 # Parallel Virtual File System, Version 2
 
 ## Contents
@@ -385,8 +377,6 @@ users to subscribe – it’s the best way to keep abreast of PVFS2
 developments. All code is being distributed under the LGPL license to
 facilitate use under arbitrarily licensed high-level libraries.
 
-\newpage
-
 ## The basics of PVFS2
 
 PVFS2 is a parallel file system. This means that it is designed for
@@ -613,8 +603,6 @@ objects are referenced by anyone else we can clean them up without
 concern for what other processes might be up to – they never made it
 into the directory hierarchy.
 
-\newpage
-
 ## PVFS2 terminology
 
 PVFS2 is based on a somewhat unconventional design in order to achieve
@@ -737,8 +725,6 @@ servers in order to produce more readable configuration files.
 
 File system IDs are also occasionally referred to as collection IDs.
 
-\newpage
-
 ## PVFS2 internal I/O API terminology
 
 PVFS2 contains several low level interfaces for performing various types
@@ -857,8 +843,6 @@ governs how long the API is allowed to sleep if it is idle when the test
 call is made. It is under no obligation to actually consume the full
 idle time. It is more like a hint to control whether the function is a
 busy poll, or if it should sleep when there is no work to do.
-
-\newpage
 
 ## PVFS2 User APIs and Semantics
 
@@ -999,8 +983,6 @@ The ROMIO implementation relies on the use of locking support from the
 file system to implement both of these families of functions, so these
 are not currently supported. We are researching alternative
 implementations.
-
-\newpage
 
 ## The code tree
 

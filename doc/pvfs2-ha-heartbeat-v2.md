@@ -1,7 +1,3 @@
-\maketitle
-\tableofcontents
-\newpage
-
 # PVFS High Availability Clustering Using Heartbeat 2.0
 
 ## Contents

@@ -1,7 +1,3 @@
-\maketitle
-\tableofcontents
-\thispagestyle{empty}
-
 # PVFS Tuning
 
 ## Contents

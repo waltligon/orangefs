@@ -1,5 +1,3 @@
-\maketitle
-
 # PVFS2 MPI Based Requests Design Notes
 
 ## PVFS Requests

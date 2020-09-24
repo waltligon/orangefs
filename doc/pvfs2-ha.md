@@ -1,5 +1,3 @@
-\maketitle
-
 # PVFS2 High-Availability Clustering
 
 ## Introduction

@@ -1,5 +1,3 @@
-\maketitle
-
 # Flow Design Document
 
 ## TODO

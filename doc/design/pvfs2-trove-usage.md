@@ -1,5 +1,3 @@
-\maketitle
-
 # Trove and PVFS2
 
 ## Motivation and Goals

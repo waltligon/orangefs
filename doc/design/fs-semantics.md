@@ -1,5 +1,3 @@
-\maketitle
-
 # PVFS2 File System Semantics Document
 
 ## Introduction
