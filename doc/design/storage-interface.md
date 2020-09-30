@@ -369,9 +369,10 @@ pwrite.
     the arguments are self explanatory. The flags are not yet defined,
     but may include such possibilities as specifying atomic operations.
     The vtag returned from this function applies to the region of the
-    byte stream defined by the requested offset and size. This allows
-    the underlying implementation to avoid the overhead of calculating
-    the value.
+    byte stream defined by the requested offset and size. <ins>A flag
+    can be passed in if the caller does not want a vtag returned.</ins>
+    This allows the underlying implementation to avoid the overhead of
+    calculating the value.
     
     *The size is \[in/out\] in code? Figure out semantics\!\!\!*
 
