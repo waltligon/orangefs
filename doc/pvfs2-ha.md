@@ -170,12 +170,13 @@ until we add XML config files at some point in the future.
 
 #### ACTIVE-PASSIVE (A-P)
 
-The two nodes are configured as in Figure [\[fig:nodes\]](#fig:nodes).
+The two nodes are configured as in Figure 1.
 They have a private internal network for heartbeat, and a public IP
 address so people can log into them and perform maintenance tasks.
 
-![Simplified wiring diagram of a PVFS2 HA
-cluster<span label="fig:nodes"></span>](pvfs2-failover.eps)
+![Figure 1: Simplified wiring diagram of a PVFS2 HA
+cluster](images/ha-cluster-active-passive.png)
+Figure 1 - Simplified wiring diagram of a PVFS2 HA cluster
 
 There is a shared "cluster" IP address which is assigned to whichever
 node is active.
