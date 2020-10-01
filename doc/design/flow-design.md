@@ -89,7 +89,7 @@ same expected functionality (which will be described later). Flow
 protocols take care of details such as buffering and flow control if
 necessary.
 
-<img src="images/basic-flow-architecture.png" alt="Figure 1: Basic flow architecture">
+<img src="images/basic-flow-architecture.png" alt="Figure 1: Basic flow architecture" width=800px>
 
 *Figure 1: Basic flow architecture*
 
