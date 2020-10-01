@@ -91,7 +91,7 @@ necessary.
 
 <img src="images/basic-flow-architecture.png" alt="Figure 1: Basic flow architecture">
 
-Figure 1: Basic flow architecture
+*Figure 1: Basic flow architecture*
 
 ### Describing flows
 

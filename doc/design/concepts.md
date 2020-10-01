@@ -72,7 +72,7 @@ idea of how the words above fit together.
 
 <img src="images/pvfs2-components.png" alt="Figure 1: PVFS2 Components" width=400px>
 
-Figure 1: PVFS2 Components
+*Figure 1: PVFS2 Components*
 
 All end-user access to PVFS will still be provided by one of several
 front ends (VFS kernel interface, ROMIO, libpvfs) ( *what’s the right
@@ -131,7 +131,7 @@ true? the server expects a request enough to post a receive )*
 
 <img src="images/pvfs2-setmeta-operation.png" alt="Figure 2: PVFS2 setmeta operation">
 
-Figure 2: PVFS2 setmeta operation
+*Figure 2: PVFS2 setmeta operation*
 
 Data operations are largely similar to metadata operations: the client
 posts jobs to send the request and receive the response, the server

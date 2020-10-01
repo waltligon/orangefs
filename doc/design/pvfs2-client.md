@@ -19,7 +19,7 @@ This document will focus specifically on the pvfs2-client application.
 
 <img src="images/pvfs2-architecture.png" alt="Figure 1: High-Level PVFS2 Architecture" width=400px>
 
-Figure 1: High Level PVFS2 Architecture
+*Figure 1: High Level PVFS2 Architecture*
 
 ## Motivation for the `pvfs2-client` Application
 
@@ -129,7 +129,7 @@ re-use, and design simplicity.
 
 <img src="images/state-machine.png" alt="Figure 2: Operation Servicing State Machine (w/ nested core state machine)" width=300px>
 
-Figure 2: Operation Servicing State Machine (w/ nested core state machine)
+*Figure 2: Operation Servicing State Machine (w/ nested core state machine)*
 
 We can think of all pvfs2-client operations as having a similar
 structure, as depicted in Figure 2. What we see here is a generic state

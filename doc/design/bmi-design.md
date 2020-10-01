@@ -164,7 +164,7 @@ for presenting the top level BMI interface to the application.
 
 <img src="images/bmi-architecture.png" alt="Figure 1: BMI Architecture" width=400px>
 
-Figure 1: BMI Architecture
+*Figure 1: BMI Architecture*
 
 #### Method control
 

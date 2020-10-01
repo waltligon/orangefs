@@ -176,7 +176,7 @@ address so people can log into them and perform maintenance tasks.
 
 <img src="images/ha-cluster-active-passive.png" alt="Figure 1: Simplified wiring diagram of a PVFS2 HA cluster" width=400px>
 
-Figure 1 - Simplified wiring diagram of a PVFS2 HA cluster
+*Figure 1 - Simplified wiring diagram of a PVFS2 HA cluster*
 
 There is a shared "cluster" IP address which is assigned to whichever
 node is active.
@@ -336,7 +336,7 @@ for a (hopefully rare) failure. Figure 6 depicts an Active-Active cluster.
 
 <img src="images/ha-cluster-active-active.png" alt="Figure 6: Simplified wiring diagram of a PVFS2 HA cluster, Active-Active configuration" width=400px>
 
-Figure 6: Simplified wiring diagram of a PVFS2 HA cluster, Active-Active configuration
+*Figure 6: Simplified wiring diagram of a PVFS2 HA cluster, Active-Active configuration*
 
 As mentioned above, you’ll need two partitions on the shared storage and
 two shared IP addresses. configure PVFS2 on the two servers as you
