@@ -206,7 +206,7 @@ possible values:
 
 ### Error values
 
-Table [\[table:storage\_errors\]](#table:storage_errors) shows values.
+Table 1 shows values.
 All values will be returned as integers in the native format (size and
 byte order).
 
@@ -229,10 +229,7 @@ was (and still is in some cases) a real problem for PVFS1.*
 | TROVE\_ENOMEM | unable to allocate memory for operation |
 | TROVE\_EINVAL | invalid input parameter                 |
 
-Error values for storage
-interface
-
-<span id="table:storage_errors" label="table:storage_errors">\[table:storage\_errors\]</span>
+*Table 1: Error values for storage interface*
 
 ### Flags related to vtags
 
