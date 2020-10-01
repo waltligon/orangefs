@@ -156,15 +156,15 @@ particular network device, but such details are not exposed to the user.
 
 ### Architecture
 
-The overall architecture of BMI is shown in Figure
-[\[fig:bmi-arch\]](#fig:bmi-arch). Support for individual network
+The overall architecture of BMI is shown in Figure 1. Support for individual network
 protocols is provided by BMI *methods*. There may be any number of
 methods active at a given time. This collection of methods is managed by
 the *method control layer*. The method control layer is also responsible
 for presenting the top level BMI interface to the application.
 
-![BMI Architecture
-<span id="fig:bmi-arch" label="fig:bmi-arch">\[fig:bmi-arch\]</span>](bmi-arch-color.eps)
+<img src="images/bmi-architecture.png" alt="Figure 1: BMI Architecture" width=400px>
+
+Figure 1: BMI Architecture
 
 #### Method control
 

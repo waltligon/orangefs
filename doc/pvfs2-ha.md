@@ -326,17 +326,17 @@ on node B will migrate back to node A (if you set `auto_failback` to
 
 #### Active-Active (A-A)
 
-![Simplified wiring diagram of a PVFS2 HA cluster, Active-Active
-configuration<span label="fig:nodes-aa"></span>](pvfs2-failover-AA.eps)
-
 If that wasn’t exciting enough, we can do active-active, too. It’s
 pretty much like active-passive, except both nodes are pvfs2 servers.
 Instead of sharing one cluster IP, there will be two – one for each
 server. Instead of sharing one file system, there will be two. If A
 dies, B will serve it’s data and A’s data, and vice versa. You get all
 the benefits of Active-Passive, but you don’t have a server waiting idly
-for a (hopefully rare) failure. Figure [\[fig:nodes-aa\]](#fig:nodes-aa)
-depicts an Active-Active cluster.
+for a (hopefully rare) failure. Figure 6 depicts an Active-Active cluster.
+
+<img src="images/ha-cluster-active-active.png" alt="Figure 6: Simplified wiring diagram of a PVFS2 HA cluster, Active-Active configuration" width=400px>
+
+Figure 6: Simplified wiring diagram of a PVFS2 HA cluster, Active-Active configuration
 
 As mentioned above, you’ll need two partitions on the shared storage and
 two shared IP addresses. configure PVFS2 on the two servers as you

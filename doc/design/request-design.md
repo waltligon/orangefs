@@ -90,7 +90,7 @@ generally utilize the sequence type chain.
 The following are a few examples of how request patterns would be
 represented using the PVFS\_Request structure.
 
-![image](figs_atoc.eps)
+<img src="images/example-requests-abc.png" alt="Figures A through C: Example Requests" width=400px>
 
 ### Single Contiguous Region Requests
 
@@ -174,7 +174,7 @@ STRIDE bytes would be as in figure C:
 
 Once again this assumes that ETYPE is a contiguous type.
 
-![image](figs_dtoe.eps)
+<img src="images/example-requests-de.png" alt="Figures D and E: Example Requests" width=400px>
 
 ### Sequential Requests
 

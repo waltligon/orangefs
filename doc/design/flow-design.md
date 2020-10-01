@@ -70,8 +70,7 @@ for handshaking before or after the flow as needed.
 
 ### Architecture
 
-There are two major parts of the flow architecture, as seen in figure
-[\[fig:flow-arch\]](#fig:flow-arch). The first is the *flow interface*.
+There are two major parts of the flow architecture, as seen in Figure 1. The first is the *flow interface*.
 Applications (ie PVFS components) interact with this interface. It
 provides a consistent API regardless of what protocols are in use, what
 scheduling is being performed, etc.
@@ -82,16 +81,17 @@ flow protocol implements communication between a different pair of data
 endpoint types. For example, one flow protocol may link TCP/IP to
 asynchronous unix I/O, while another may link VIA to memory regions. For
 two seperate hosts to communicate, they must share compatible flow
-protocols (as indicated by the dotted line at the bottom of figure
-[\[fig:flow-arch\]](#fig:flow-arch)).
+protocols (as indicated by the dotted line at the bottom of Figure
+1).
 
 Flow protocols all adhere to a strict interface and must provide the
 same expected functionality (which will be described later). Flow
 protocols take care of details such as buffering and flow control if
 necessary.
 
-![Basic flow architecture
-<span id="fig:flow-arch" label="fig:flow-arch">\[fig:flow-arch\]</span>](flow-arch.eps)
+<img src="images/basic-flow-architecture.png" alt="Figure 1: Basic flow architecture">
+
+Figure 1: Basic flow architecture
 
 ### Describing flows
 

@@ -14,10 +14,12 @@ between the VFS request and the pvfs2-client application is the
 requests from the /dev/pvfs2 device node is required, and using the
 existing BMI interface is preferred.
 
-![image](pvfs2-vfs.eps)
-
 Figure 1 illustrates the architecture of several components of PVFS2.
 This document will focus specifically on the pvfs2-client application.
+
+<img src="images/pvfs2-architecture.png" alt="Figure 1: High-Level PVFS2 Architecture" width=400px>
+
+Figure 1: High Level PVFS2 Architecture
 
 ## Motivation for the `pvfs2-client` Application
 
@@ -111,8 +113,6 @@ reusable state machines can solve these limitations, as discussed below.
 
 ## `pvfs2-client` Request Servicing
 
-![image](core-sm.eps)
-
 Operation request servicing in the pvfs2-client application will be
 implemented by state machines. That is, for each type of request that
 can be handed up from the PVFS2 kernel module, a matching state machine
@@ -126,6 +126,10 @@ state machine. Implementing the core functionality of the System
 Interface methods in terms of state machines allows an opportunity for
 blocking *and* non-blocking interface implementations, heavier code
 re-use, and design simplicity.
+
+<img src="images/state-machine.png" alt="Figure 2: Operation Servicing State Machine (w/ nested core state machine)" width=300px>
+
+Figure 2: Operation Servicing State Machine (w/ nested core state machine)
 
 We can think of all pvfs2-client operations as having a similar
 structure, as depicted in Figure 2. What we see here is a generic state

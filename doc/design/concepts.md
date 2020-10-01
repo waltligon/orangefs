@@ -67,8 +67,12 @@ the terminology and concepts used in the other pvfs2 documents.
 
 ## The view from 10,000 feet
 
-Refer to figure [\[fig:interface-model\]](#fig:interface-model) for an
+Refer to Figure 1 for an
 idea of how the words above fit together.
+
+<img src="images/pvfs2-components.png" alt="Figure 1: PVFS2 Components" width=400px>
+
+Figure 1: PVFS2 Components
 
 All end-user access to PVFS will still be provided by one of several
 front ends (VFS kernel interface, ROMIO, libpvfs) ( *what’s the right
@@ -110,12 +114,12 @@ client asks for something to happen and can test for completion of that
 job. PVFS2 servers can additionally receive “unexpected” jobs, generally
 (always?) when a client initiates a request from a server. (*where can i
 find more information about the “request handler” and the “op state
-machine” in figure [\[fig:interface-model\]](#fig:interface-model) ?* )
+machine” in Figure 1 ?* )
 
 The job manager works the same way for the server as it does for the
 client, keeping track of BMI, trove, and flow jobs.
 
-Figure [\[fig:setmeta-protocol\]](#fig:setmeta-protocol) shows a setmeta
+Figure 2 shows a setmeta
 operation. The client starts a BMI job to send a request to the meta
 server. The server then receives a job indicating that an unexpected BMI
 message has arrived. The server then issues a Trove job to store the
@@ -124,6 +128,10 @@ to receive the ack. A setmeta requires 2 jobs on the client side (send
 request, receive ack), and 3 jobs on the server side (receive request,
 do meta operation, send ack). *(hrm? so “unexpected” isn’t completely
 true? the server expects a request enough to post a receive )*
+
+<img src="images/pvfs2-setmeta-operation.png" alt="Figure 2: PVFS2 setmeta operation">
+
+Figure 2: PVFS2 setmeta operation
 
 Data operations are largely similar to metadata operations: the client
 posts jobs to send the request and receive the response, the server
@@ -139,13 +147,3 @@ move bytes.
 
 Similarly, jobs and flows use trove abstractions and let trove deal with
 the actual storage of bytestream and keyval objects
-
-\centering
-
-![PVFS2 components
-<span id="fig:interface-model" label="fig:interface-model">\[fig:interface-model\]</span>](interface-model.eps)
-
-\centering
-
-![PVFS2 setmeta operation
-<span id="fig:setmeta-protocol" label="fig:setmeta-protocol">\[fig:setmeta-protocol\]</span>](setmeta-protocol.eps)
