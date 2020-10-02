@@ -903,11 +903,11 @@ http://www.mcs.anl.gov/romio/pvfs2-patches.html.
 Unpack mpich2. Apply the ROMIO patch in the src/mpi/romio directory if
 one is needed.
 
-    prompt% tar xzf ~/src/mpich2-1.4.0p1.tar.gz    # unpack mpich2 source
-    prompt% cd mpich2-1.4.0p1/src/mpi/romio        # change to ROMIO dir
-    prompt% patch -p1 < ~/src/romio-<CORRECT_VERSION>.diff   #apply patch
-    prompt% cd ../../..                            # return to top of src
-    prompt% 
+    # tar xzf ~/src/mpich2-1.4.0p1.tar.gz    # unpack mpich2 source
+    # cd mpich2-1.4.0p1/src/mpi/romio        # change to ROMIO dir
+    # patch -p1 < ~/src/romio-<CORRECT_VERSION>.diff   #apply patch
+    # cd ../../..                            # return to top of src
+    #
 
 In order to build MPICH2 with a ROMIO that speaks PVFS2, pass the
 `–with-pvfs2=PVFS_PREFIX` option to configure. ‘PVFS2\_PREFIX’ is the
@@ -927,7 +927,7 @@ configure process. MPICH2-1.0.4p1 and older will need to know the path
 to the PVFS2 installation. Modify the CFLAGS, LDFLAGS and LIBS
 environment variables.
 
-    prompt% export CFLAGS="<other desired flags> -I/usr/local/pvfs2/include"
-    prompt% export LDFLAGS="-L/usr/local/pvfs2/lib"
-    prompt% export LIBS="-lpvfs2 -lpthread"
-    prompt% configure --with-file-system=ufs+nfs+testfs+pvfs2 [other flags]
+    # export CFLAGS="<other desired flags> -I/usr/local/pvfs2/include"
+    # export LDFLAGS="-L/usr/local/pvfs2/lib"
+    # export LIBS="-lpvfs2 -lpthread"
+    # configure --with-file-system=ufs+nfs+testfs+pvfs2 [other flags]

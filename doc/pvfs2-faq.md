@@ -513,12 +513,12 @@ discussed in the PVFS quickstart, different mount commands are needed
 for linux-2.4 and linux-2.6. A linux-2.6 mount command will look like
 this:
 
-    prompt# mount -t pvfs2 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2
+    # mount -t pvfs2 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2
 
 Under linux-2.4, the mount command looks slightly
     different:
 
-    prompt# mount -t pvfs2 pvfs2 /mnt/pvfs2 -o tcp://testhost:3334/pvfs2-fs
+    # mount -t pvfs2 pvfs2 /mnt/pvfs2 -o tcp://testhost:3334/pvfs2-fs
 
 This error could also mean a pvfs2-client process is not running, either
 because it was not started before the mount command, or was terminated
@@ -720,16 +720,16 @@ file-system objects through the VFS as well as through the system
 interface. Example usage scenarios are shown below, To set an extended
 attribute ("key1", "val1") on a PVFS file foo,
 
-    prompt# setfattr -n key1 -v val1 /path/to/mounted/pvfs2/foo
+    # setfattr -n key1 -v val1 /path/to/mounted/pvfs2/foo
 
 To retrieve an extended attribute for a given key ("key1") on a PVFS
 file foo,
 
-    prompt# getfattr -n key1 /path/to/mounted/pvfs2/foo
+    # getfattr -n key1 /path/to/mounted/pvfs2/foo
 
 To retrieve all attributes of a given PVFS file foo,
 
-    prompt# getfattr -m "" /path/to/mounted/pvfs2/foo
+    # getfattr -m "" /path/to/mounted/pvfs2/foo
 
 Note that PVFS uses a few standard names for its internal use that
 prohibit users from reusing the same names. A list of such keys are as
@@ -762,7 +762,7 @@ enforce access control lists on 2.6 kernels, one must mount the PVFS
 file system by specifying the "acl" option in the mount command line.
 For example,
 
-    prompt# mount -t pvfs2 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2 -o acl
+    # mount -t pvfs2 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2 -o acl
 
 Please refer to the man pages of "setfacl", "getfacl" or section 5 acl
 for detailed usage information.
@@ -972,7 +972,7 @@ subdirectories.
 
 The distribution can be set as follows:
 
-    prompt# setfattr -n "user.pvfs2.dist_name" -v "basic_dist" /mnt/pvfs2/directory
+    # setfattr -n "user.pvfs2.dist_name" -v "basic_dist" /mnt/pvfs2/directory
 
 Supported distribution names can be found by looking in the
 pvfs2-dist-\* header files.
@@ -982,7 +982,7 @@ pvfs2-dist-\* header files.
 Some distributions allow you to set parameters that impact how the
 distribution behaves. These parameters can be set as follows:
 
-    prompt# setfattr -n "user.pvfs2.dist_params" -v "strip_size:4096" /mnt/pvfs2/directory
+    # setfattr -n "user.pvfs2.dist_params" -v "strip_size:4096" /mnt/pvfs2/directory
 
 You can specify more than one "parameter:value" pair by seperating them
 with commas.
@@ -991,7 +991,7 @@ with commas.
 
 You can also specify the number of datafiles to stripe across:
 
-    prompt# setfattr -n "user.pvfs2.num_dfiles" -v "1" /mnt/pvfs2/directory
+    # setfattr -n "user.pvfs2.num_dfiles" -v "1" /mnt/pvfs2/directory
 
 PVFS defaults to striping files across each server in the file system.
 However, you may find that for small files it is advantages to limit
@@ -1184,7 +1184,7 @@ systems. This allows applications to be sent kill signals when a
 filesystem is unresponsive (due to network failures, etc.). The option
 can be specified at mount time:
 
-    mount -t pvfs2 -o intr tcp://hosta:3334/pvfs2-fs /pvfs-storage/
+    # mount -t pvfs2 -o intr tcp://hosta:3334/pvfs2-fs /pvfs-storage/
 
 ## Missing Features
 
