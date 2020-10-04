@@ -145,9 +145,8 @@ to latex. This can be extremely useful when trying to quickly read code.
 It is also helpful in catching a few minor coding errors. You can
 control these options for vi by way of a file in your home directory
 name “.vimrc”. This file can also be used to control other settings in
-vi, as an alternative to the environment variable used in section
-[\[sec:vi\_env\]](#sec:vi_env). The following is an example of some
-color settings for vi taken from a .vimrc file:
+vi. The following is an example of some color settings for vi taken from
+a .vimrc file:
 
     set background=dark
     if has("syntax")
@@ -190,7 +189,7 @@ of the basic capabilities that it provides:
 
   - allows you to work remotely
 
-You can find out more information about CVS at http://www.cvshome.org.
+You can find out more information about CVS at http://www.nongnu.org/cvs/.
 
 ### Overview
 
@@ -315,7 +314,7 @@ real project*
 There are many other CVS commands and features, but the ones listed
 above should be enough to get you started. You can find out more
 information in the CVS man pages or by reading documentation at
-http://www.cvshome.org.
+http://www.nongnu.org/cvs/.
 
 ### Starting a new project
 
@@ -1040,7 +1039,7 @@ Argonne National Lab, where several key PVFS developers are located).
 
 *Figure out what standard should be to match up with autodocument tools.
 This is on hold until we settle on such a tool, so use standard put
-forth in section [9.1.3](#sec:comments) for now.*
+forth in section [9.1.3](#commenting) for now.*
 
 ### Function naming
 

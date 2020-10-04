@@ -511,10 +511,11 @@ available in the ROMIO code.
 
 *Note: need to discuss completion queue, internal or external?*
 
-*Phil: See pvfs2-internal email
+<!-- TODO: does this still exist anywhere? -->
+<!-- *Phil: See pvfs2-internal email
 at  
 http://beowulf-underground.org/pipermail/pvfs2-internal/2001-October/000010.html
-for my thoughts on this topic.*
+for my thoughts on this topic.* -->
 
 #### Batch operations
 

@@ -13,7 +13,7 @@
     2. [Starting the server](#starting-the-server-single-host)
         1. [Automatic server startup and shutdown](#automatic-server-startup-and-shutdown)
     3. [Client configuration](#client-configuration-single-host)
-    4. [Testing your installation](#testing-your-installation)
+    4. [Testing your installation](#testing-your-installation-single-host)
 4. [Installing PVFS2 on a cluster](#installing-pvfs2-on-a-cluster)
     1. [Server configuration](#server-configuration-cluster)
     2. [Starting the servers](#starting-the-servers-cluster)
@@ -48,7 +48,7 @@ This document only applies to the most recent snapshot of PVFS2.
 
 ## Downloading and compiling PVFS2
 
-Follow the information at http://www.pvfs.org/pvfs2/download.html . Once
+Follow the information at http://www.orangefs.org/#downloadlinks-1-section. Once
 the source code is downloaded, compiling the PVFS2 source code is a
 matter of running ‘./configure’, followed by ‘make’ from the top level
 source directory. More detailed instruction for building and installing
@@ -438,7 +438,7 @@ install on every node, or else have provided the pvfs2 executables,
 headers, and libraries to each machine by some other means.
 
 Installing PVFS2 on a cluster is quite similar to installing it on a
-single machine, so familiarize yourself with Section [3](#sec:single).
+single machine, so familiarize yourself with Section [3](#configuring-pvfs2-for-a-single-host).
 We are going to generate one master config file and 8 smaller
 node-specific config files. Again, remember that it is critical to list
 correct hostnames for each machine, and to make sure that these
@@ -556,13 +556,13 @@ If you want to run the server in the foreground (e.g. for debugging),
 use the -d option.
 
 If you wish to automate server startup and shutdown with rc scripts,
-refer to the corresponding section [3.2.1](#sec:rc) from the single
-server example.
+refer to the corresponding section [3.2.1](#automatic-server-startup-and-shutdown)
+from the single server example.
 
 ### Client configuration (cluster)
 
 Setting up a client for multiple servers is the same as setting up a
-client for a single server. Refer to section [3.3](#subsec:client).
+client for a single server. Refer to section [3.3](#client-configuration-single-host).
 
 The `/etc/pvfs2tab` file (or an `/etc/fstab` entry) needs to exist on
 each client so that each client can find the file system. The server
@@ -575,7 +575,7 @@ of clients reading initial configuration information.
 
 Testing a multiple-server pvfs2 installation is the same as testing a
 single-server pvfs2 installation. Refer to section
-[3.4](#subsec:testing)
+[3.4](#testing-your-installation-single-host).
 
 ## The PVFS2 Linux Kernel Interface
 
@@ -846,11 +846,10 @@ installation and configuration process:
 
 ## Debugging your PVFS2 configuration
 
-Bug reports and questions should be directed to the PVFS2 users mailing
-list for best results (see the PVFS2 web site for details:
-http://www.pvfs.org/pvfs2/lists.html). It is helpful to include a
-description of your problem, the PVFS2 version number, and include
-relevant log information from /var/log/messages and
+Bug reports and questions should be directed to the
+[PVFS2 users mailing list](http://lists.orangefs.org/mailman/listinfo/users_lists.orangefs.org).
+It is helpful to include a description of your problem, the PVFS2 version
+number, and include relevant log information from /var/log/messages and
 /tmp/pvfs2-server.log.
 
 People who wish to find more verbose information about what the file
@@ -896,9 +895,11 @@ not well documented. Reports of the correct way to build for OpenMPI
 would be appreciated. This document will cover building for MPICH2.
 
 First, get the software. Download MPICH2 from
-http://www.mcs.anl.gov/mpi/mpich2/. We may have found bug fixes since
+http://www.mcs.anl.gov/mpi/mpich2/.
+<!--- TODO: is this information still out there? -->
+<!-- We may have found bug fixes since
 the last MPICH2 release. If there are bug fixes, they can be found at
-http://www.mcs.anl.gov/romio/pvfs2-patches.html.
+http://www.mcs.anl.gov/romio/pvfs2-patches.html. -->
 
 Unpack mpich2. Apply the ROMIO patch in the src/mpi/romio directory if
 one is needed.

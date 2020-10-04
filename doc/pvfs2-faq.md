@@ -215,9 +215,8 @@ allows access to the file system through it.
 
 ### What are the components of PVFS that I should know about?
 
-The PVFS Guide (<http://www.pvfs.org/pvfs2-guide.html>) has more
-information on all of these components, plus a discussion of the system
-as a whole, the code tree, and more.
+The [PVFS Guide](./pvfs2-guide) has more information on all of these
+components, plus a discussion of the system as a whole, the code tree, and more.
 
 ### What is the format of the PVFS version string?
 
@@ -234,9 +233,7 @@ PVFS2 1.x.x, to PVFS 2.x.x. Users familiar with ‘PVFS2’ and had been
 using PVFS2 1.5.1 will find the same software in PVFS version 2.6.0 or
 later (with updates and new features of course).
 
-Users of PVFS version 1 can still go to:
-<http://www.parl.clemson.edu/pvfs>, although we highly encourage you to
-upgrade to PVFS version 2, if you are still using version 1.
+Users of PVFS version 1 are highly encouraged to upgrade to PVFS version 2.
 
 ## Supported Architectures and Hardware
 
@@ -250,18 +247,19 @@ network infrastructure for communication and can currently operate over
 TCP, Myrinet, and InfiniBand. Disk local to servers is used for PVFS
 storage, so no storage area network (SAN) is required either (although
 it can be helpful when setting up fault tolerant solutions; see
-Section [7](#sec:fault-tolerance).
+Section [7](#fault-tolerance).
 
 ### What architectures does PVFS support?
 
 The majority of PVFS is POSIX-compliant C code that runs in user space.
 As such, much of PVFS can run on most available systems. See
-Question [2.5](#sec:supported-hw) for more information on particular
-hardware.
+Question [2.5](#what-specific-hardware-architectures-are-supported-by-the-pvfs-kernel-module)
+for more information on particular hardware.
 
 The (optional) part of PVFS that hooks to the operating system on
 clients must be written specifically for the particular operating
-system. Question [2.4](#sec:kernel-version) covers this issue.
+system. Question [2.4](#does-running-pvfs-require-a-particular-kernel-or-kernel-version)
+covers this issue.
 
 ### Does PVFS work across heterogeneous architectures?
 
@@ -312,8 +310,7 @@ This section covers issues related to installing and configuring PVFS.
 
 ### How do I install PVFS?
 
-The PVFS Quick Start Guide
-(<http://www.pvfs.org/pvfs2/pvfs2-quickstart.html>) provides an overview
+The [PVFS Quick Start Guide](./pvfs2-quickstart) provides an overview
 of both a simple, single-server installation, and a more complicated,
 multi-server configuration.
 
@@ -349,8 +346,7 @@ resource contention issues, so we suggest trying other options first.
 If you do decide to run more than one PVFS server on the same node,
 setting things up is as simple as setting up servers on different nodes.
 Each will need its own entry in the list of Aliases and its own
-server-specific configuration file, as described in the Quick Start
-(<http://www.pvfs.org/pvfs2/pvfs2-quickstart.html>).
+server-specific configuration file, as described in the [Quick Start](./pvfs2-quickstart).
 
 ### Can I use multiple metadata servers in PVFS?
 
@@ -363,7 +359,7 @@ like to store metadata; the clients will handle the rest.
 Unfortunately, no. While using multiple metadata servers distributes
 metadata, it does not replicate or store redundant information across
 these servers. For information on better handling failures, see
-Section [7](#sec:fault-tolerance).
+Section [7](#fault-tolerance).
 
 ### How many servers should I run?
 
@@ -442,8 +438,8 @@ out what has happened when you have a problem.
 
 ### Where can I find documentation?
 
-The best place to look for documentation on PVFS is the PVFS web site at
-<http://www.pvfs.org/>. Documentation (including this FAQ) is also
+The best place to look for documentation on PVFS is the OrangeFS web site at
+http://www.orangefs.org/. Documentation (including this FAQ) is also
 available in the `doc` subdirectory of the PVFS source distribution.
 Please reference `pvfs2-logging.txt` to understand more about PVFS’
 informational messages, where the logs exist, and how to turn logging on
@@ -456,22 +452,20 @@ if it addresses your problem. We are constantly updating documentation
 to clarify sections that users have found confusing and to add to this
 document answers to questions that we have seen.
 
-The next thing to do is to check out the PVFS mailing list archives at
-<http://www.pvfs.org/pvfs2/lists.html>. It is likely that you are not
+The next thing to do is to check out the [developer](http://lists.orangefs.org/pipermail/devel_lists.orangefs.org/)
+and [user](http://lists.orangefs.org/pipermail/users_lists.orangefs.org/)
+mailing list archives. It is likely that you are not
 the first person to see a particular problem, so searching this list
 will often result in an immediate answer.
 
 If you still haven’t found an answer, the next thing to do is to mail
 the mailing list and report your problem.
 
-If you enjoy using IRC, you can also join us on irc.freenode.net in the
-\#pvfs2 channel.
-
 ### How do I report a problem with PVFS?
 
 First you will need to join the PVFS2 Users Mailing list at
-<http://www.beowulf-underground.org/mailman/listinfo/pvfs2-users>. You
-must be a user to post to the list; this is necessary to keep down the
+http://lists.orangefs.org/mailman/listinfo/users_lists.orangefs.org.
+You must be a user to post to the list; this is necessary to keep down the
 amount of spam on the list.
 
 Next you should gather up some information regarding your system:
@@ -529,7 +523,7 @@ This error can also occur if you attempt to mount a second PVFS file
 system on a client, where the new file system has the same name or ID as
 one that is already mounted. If you are trying to mount more than one
 file system on the same client and have problems, please see question
-[3.9](#sec:multiple-mounts).
+[3.9](#can-i-mount-more-than-one-pvfs-file-system-on-the-same-client).
 
 Finally, be sure there are no typos in your command line, as this is
 commonly the case\!
@@ -565,9 +559,10 @@ able to deliver a few KB/s, and the CPU utilization will be close to
 (designed to reduce fragmentation). The solution is to either mount the
 filesystem with the ‘noreservation’ option, or upgrade your kernel.
 
-For more information, including URLs to several other reports of this
+<!-- TODO: is this still somewhere accessible? -->
+<!-- For more information, including URLs to several other reports of this
 issue, see Phil’s original post:
-<http://www.beowulf-underground.org/pipermail/pvfs2-developers/2006-March/001885.html>
+<http://www.beowulf-underground.org/pipermail/pvfs2-developers/2006-March/001885.html> -->
 
 ### I get “error while loading shared libraries” when starting PVFS programs
 
@@ -889,12 +884,13 @@ stress local file systems. They do not accurately reflect the types of
 workloads for which we designed PVFS. Furthermore, because of their
 serial nature, PVFS will be unable to deliver its full performance.
 Instead try running a parallel file system benchmark like IOR
-(<ftp://ftp.llnl.gov/pub/siop/ior/>).
+(https://github.com/hpc/ior).
 
 ### Why is program XXX so slow?
 
-See Question [6.2](#sec:badperf). If the program uses small block sizes
-to access a PVFS file, performance will suffer.
+See Question [6.2](#i-ran-bonnie-andor-iozone-and-the-performance-is-terrible-why-is-there-anything-i-can-do).
+If the program uses small block sizes to access a PVFS file, performance will
+suffer.
 
 Setting both (or either of) the `TroveSyncMeta` and `TroveSyncData`
 options to `no` in the config file can improve performance in some
@@ -948,7 +944,8 @@ their parameters.
 People have looked at sync performance for a variety of file systems.
 Some file systems will flush all dirty buffers when `fsync` is called.
 Other file systems will only flush dirty buffers belonging to the file.
-See the threads starting at <http://www.parl.clemson.edu/pipermail/pvfs2-developers/2004-July/000740.html> and at <http://www.parl.clemson.edu/pipermail/pvfs2-developers/2004-July/000741.html>.
+<!-- TODO: do these still exist somewhere? -->
+<!-- See the threads starting at <http://www.parl.clemson.edu/pipermail/pvfs2-developers/2004-July/000740.html> and at <http://www.parl.clemson.edu/pipermail/pvfs2-developers/2004-July/000741.html>. -->
 
 These tests demonstrate wide variance in file system behavior.
 Interested users are encouraged to experiment and discuss their findings
@@ -1005,7 +1002,7 @@ probably ask you one or more of the following questions:
   - Are you running servers and clients on the same nodes? We support
     this configuration – sometimes it is required given space or budget
     constraints. You will not, however, see the best performance out of
-    this configuration. See Section [3.6](#sec:howmany-servers).
+    this configuration. See Section [3.6](#how-many-servers-should-i-run).
 
   - Have you benchmarked your network? A tool like netpipe or ttcp can
     help diagnose point-to-point issues. PVFS will tax your bisection
@@ -1047,7 +1044,8 @@ client failure does not affect either the servers or other clients.
 Yes, if configured to do so. Multiple disks on each server may be used
 to form redundant storage for that server, allowing servers to continue
 operating in the event of a disk failure. See section
-[3.2](#sec:multiple-disks) for more information on this approach.
+[3.2](#how-can-i-store-pvfs-data-on-multiple-disks-on-a-single-node) for more
+information on this approach.
 
 ### Can PVFS tolerate network failures?
 
@@ -1075,9 +1073,8 @@ This section covers issues related to accessing PVFS file systems.
 ### How do I get MPI-IO for PVFS?
 
 The ROMIO MPI-IO implementation, as provided with MPICH2 and others,
-supports PVFS. You can find more information in the ROMIO section of the
-pvfs2-quickstart:
-<http://www.pvfs.org/pvfs2/pvfs2-quickstart.html#sec:romio>
+supports PVFS. You can find more information in the
+[ROMIO section](./pvfs2-quickstart#romio-support) of the pvfs2-quickstart.
 
 ### Can I directly manipulate PVFS files on the PVFS servers without going through some client interface?
 
@@ -1144,8 +1141,9 @@ relative order):
 Note that adding a new server will *not* cause existing datafiles to be
 placed on the new server, although new ones will be (by default).
 Migration tools are necessary to move existing datafiles (see
-Question [9.3](#sec:migration)) both in the case of a new server, or if
-you wanted to migrate data off a server before removing it.
+Question [9.3](#are-there-tools-for-migrating-data-between-servers)) both in
+the case of a new server, or if you wanted to migrate data off a server before
+removing it.
 
 ### Are there tools for migrating data between servers?
 
@@ -1208,8 +1206,8 @@ and it will remain so.
 
 No. Currently PVFS does not intelligently place new files based on free
 space. It’s a good idea, and possible, but we have not done this yet.
-See Section [11.1](#sec:contributing) for notes on how you could help
-get this feature in place.
+See Section [11.1](#how-can-i-contribute-to-the-pvfs-project) for notes on how
+you could help get this feature in place.
 
 ### Does PVFS have locks?
 
@@ -1240,8 +1238,8 @@ ideas on the mailing lists.
 
 If you’re interested in this type of exchange, we suggest joining the
 PVFS2 Developers List, grabbing the newest CVS version of the code, and
-seeing what is new in PVFS. See
-<http://www.pvfs.org/pvfs2/developers.html> for more details.
+seeing what is new in PVFS. See the [Developer Guidelines](.//coding/developer-guidelines)
+for more details.
 
 ## Implementation Details
 
