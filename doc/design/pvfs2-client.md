@@ -73,21 +73,21 @@ that implements the VFS operations.
 The pvfs2-client has a similar processing loop as the pvfs2-server:
 
 ``` 
-    while (pvfs2-client application is running)
-    {
-      ...
-      wait on pending jobs in progress and expected requests
-      ...
-      foreach job returned
-         if job is an unexpected request
+while (pvfs2-client application is running)
+{
+    ...
+    wait on pending jobs in progress and expected requests
+    ...
+    foreach job returned
+        if job is an unexpected request
             initialize appropriate operation state machine
-         end if
-         ...
-         while completions occur immediately
-             advance to next state in state machine
-         end while
-      end foreach
-    }
+        end if
+        ...
+        while completions occur immediately
+            advance to next state in state machine
+        end while
+    end foreach
+}
 ```
 
 ## Limitations of the Existing System Interface

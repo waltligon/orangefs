@@ -23,115 +23,117 @@ from a nested state machine, or to terminate the current state machine.
 The following is a synopsis of the state machine language, showing the
 various options by way of example:
 
-    /* beginning of .sm file */
-    
-    /* code at the top of the file is plain C code. */
-    /* state actions must be declared here before the state machine */
-    
-    static PINT_sm_action state_action_1 (
-        struct PINT_smcb *smcb, job_status_s *js_p);
-    static PINT_sm_action state_action_3 (
-        struct PINT_smcb *smcb, job_status_s *js_p);
-    static PINT_sm_action state_action_4 (
-        struct PINT_smcb *smcb, job_status_s *js_p);
-    
-    /* helper functions and other declarations go here too */
-    
-    #define RETVAL 1
-    
-    %%
-    
-    /* after the double percent goes the machine declaration */
-    
-    machine my_machine_sm (
-        state_1,
-         state_2,
-         state_3)
-    {
-        state state_1
-         {
-             run state_action_1;
-              success => state_2;  /* success is return value 0 */
-              default => state_4;
-         }
-    
-         state state_2
-         {
-             jump a_nested_state_machine_sm;
-              RETVAL => state_3;
-         }
-    
-         state state_3
-         {
-             pjmp state_action_3
-              {
-                  /* values here are set up in state_action_3 */
-                  4 => parallel_state_machine_1;
-                  3 => parallel_state_machine_2;
-                  RETVAL => parallel_state_machine_3;
-              }
-              default => state_4;
-         }
-    
-         state state_4
-         {
-             /* this state action cleans up after the pjmp */
-             run state_action_4;
-              default => terminate;
-         }
-    }
-    
-    %%
-    
-    /* after the second double percent all code is in plain C */
-    /* here we implement all of the state actions */
-    
-    static PINT_sm_action state_action_1 (
-        struct PINT_smcb *smcb, job_status_s *js_p)
-    {
-        PINT_server_op *sop = (PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-        retrn SM_ACTION_COMPLETE;
-    }
-    
-    static PINT_sm_action state_action_3 (
-        struct PINT_smcb *smcb, job_status_s *js_p)
-    {
-        PINT_server_op *sop = (PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-        /* This state action sets up a pjmp.  It needs to push one frame
-           onto the frame stack for each parallel task.  Each time is pushes a
-           frame it needs to specify a tag that matches one of the tags in the
-           state machine code above (4, 3, or RETVAL).
-         */
-        for (i = 0; i < sop->req.u.foo.num_servers; i++)
+```
+/* beginning of .sm file */
+
+/* code at the top of the file is plain C code. */
+/* state actions must be declared here before the state machine */
+
+static PINT_sm_action state_action_1 (
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action state_action_3 (
+    struct PINT_smcb *smcb, job_status_s *js_p);
+static PINT_sm_action state_action_4 (
+    struct PINT_smcb *smcb, job_status_s *js_p);
+
+/* helper functions and other declarations go here too */
+
+#define RETVAL 1
+
+%%
+
+/* after the double percent goes the machine declaration */
+
+machine my_machine_sm (
+    state_1,
+        state_2,
+        state_3)
+{
+    state state_1
         {
-            PINT_server_op *new = (PINT_server_op *)malloc(sizeof(PINT_server_op));
-            /* set up new for the new sm probably from the current frame */
-            new->req.u.foo.blah = sop->req.u.foo.blah;
-            /* determine which state machine to run */
-            if (i = 0)
-                tag = RETVAL; /* run parallel_state_machine_3 */
-            else
-                if (somevar > someval)
-                    tag = 4; /* run parallel_state_machine_1 */
-                else
-                    tag = 3; /* run parallel_state_machine_2 */
-            /* push frame */
-            PINT_push_frame(smcb,new,tag);
-        } 
-        return SM_ACTION_DEFERED;
-    }
-    
-    static PINT_sm_action state_action_4 (
-        struct PINT_smcb *smcb, job_status_s *js_p)
+            run state_action_1;
+            success => state_2;  /* success is return value 0 */
+            default => state_4;
+        }
+
+        state state_2
+        {
+            jump a_nested_state_machine_sm;
+            RETVAL => state_3;
+        }
+
+        state state_3
+        {
+            pjmp state_action_3
+            {
+                /* values here are set up in state_action_3 */
+                4 => parallel_state_machine_1;
+                3 => parallel_state_machine_2;
+                RETVAL => parallel_state_machine_3;
+            }
+            default => state_4;
+        }
+
+        state state_4
+        {
+            /* this state action cleans up after the pjmp */
+            run state_action_4;
+            default => terminate;
+        }
+}
+
+%%
+
+/* after the second double percent all code is in plain C */
+/* here we implement all of the state actions */
+
+static PINT_sm_action state_action_1 (
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PINT_server_op *sop = (PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    retrn SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action state_action_3 (
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PINT_server_op *sop = (PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    /* This state action sets up a pjmp.  It needs to push one frame
+        onto the frame stack for each parallel task.  Each time is pushes a
+        frame it needs to specify a tag that matches one of the tags in the
+        state machine code above (4, 3, or RETVAL).
+        */
+    for (i = 0; i < sop->req.u.foo.num_servers; i++)
     {
-        PINT_server_op *sop = (PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-        /* This state action cleans up after the parallel SMs have been run with
-           pjmp.  The frames pushed before the pjmp are still on the stack and must
-           be poped off.  Presumably there is return information in each one that
-           must be aggrigated.  In particular, error codes should be reviewed.
-         */
-        return SM_ACTION_COMPLETE;
-    }
+        PINT_server_op *new = (PINT_server_op *)malloc(sizeof(PINT_server_op));
+        /* set up new for the new sm probably from the current frame */
+        new->req.u.foo.blah = sop->req.u.foo.blah;
+        /* determine which state machine to run */
+        if (i = 0)
+            tag = RETVAL; /* run parallel_state_machine_3 */
+        else
+            if (somevar > someval)
+                tag = 4; /* run parallel_state_machine_1 */
+            else
+                tag = 3; /* run parallel_state_machine_2 */
+        /* push frame */
+        PINT_push_frame(smcb,new,tag);
+    } 
+    return SM_ACTION_DEFERED;
+}
+
+static PINT_sm_action state_action_4 (
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PINT_server_op *sop = (PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    /* This state action cleans up after the parallel SMs have been run with
+        pjmp.  The frames pushed before the pjmp are still on the stack and must
+        be poped off.  Presumably there is return information in each one that
+        must be aggrigated.  In particular, error codes should be reviewed.
+        */
+    return SM_ACTION_COMPLETE;
+}
+```
 
 # State Machine Stacks
 

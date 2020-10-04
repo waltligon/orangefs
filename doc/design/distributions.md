@@ -42,7 +42,7 @@ The external distribution API is exposed to users via the following data
 types and functions:
 
 ``` 
-  struct PVFS_sys_dist;
+struct PVFS_sys_dist;
 ```
 
 The system interface distribution structure. It contains the
@@ -51,12 +51,12 @@ the distribution parameters for this type distribution. In general, the
 user should not modify the data within this struct.
 
 ``` 
-  int PVFS_sys_create( char* entry_name,
-                       PVFS_object_ref ref,
-                       PVFS_sys_attr,
-                       PVFS_credentials credentials,
-                       PVFS_sys_dist* dist,
-                       PVFS_sysresp_create* resp );
+int PVFS_sys_create( char* entry_name,
+                      PVFS_object_ref ref,
+                      PVFS_sys_attr,
+                      PVFS_credentials credentials,
+                      PVFS_sys_dist* dist,
+                      PVFS_sysresp_create* resp );
 ```
 
 Creates a file using the specified distribution. If no distribution is
@@ -66,7 +66,7 @@ file and may not be changed later. Altering the distribution used to
 store the file contents could result in data corruption.
 
 ``` 
-  PVFS_sys_dist* PVFS_sys_dist_lookup( const char* name );
+PVFS_sys_dist* PVFS_sys_dist_lookup( const char* name );
 ```
 
 Allocates a new distribution instance by copying the internal
@@ -75,16 +75,16 @@ distribution has additional data not exposed thru the system interface,
 but that should be fully configurable thru the distribution parameters.
 
 ``` 
-  int PVFS_sys_dist_free( PVFS_sys_dist* dist );
+int PVFS_sys_dist_free( PVFS_sys_dist* dist );
 ```
 
 Deallocate all system interface resources allocated during distribution
 lookup.
 
 ``` 
-  int PVFS_sys_dist_setparam( PVFS_sys_dist* dist,
-                              const char* param,
-                              void* value );
+int PVFS_sys_dist_setparam( PVFS_sys_dist* dist,
+                            const char* param,
+                            void* value );
 ```
 
 Set the distribution parameter specified by the string *param* to
@@ -181,10 +181,10 @@ a default implementation is available that may be acceptable for most
 distributions.
 
 ``` 
-  PVFS_offset logical_to_physical_offset( void* params,
-                                          uint32_t dfile_nr, 
-                                          uint32_t dfile_ct,
-                                          PVFS_offset logical_offset );
+PVFS_offset logical_to_physical_offset( void* params,
+                                        uint32_t dfile_nr, 
+                                        uint32_t dfile_ct,
+                                        PVFS_offset logical_offset );
 ```
 
 Given a logical offset, return the physical offset that corresponds to
@@ -193,10 +193,10 @@ down to the largest physical offset held by the I/O server if the
 logical offset does not map to a physical offset on that server.
 
 ``` 
-  PVFS_offset physical_to_logical_offset( void* params,
-                                          uint32_t dfile_nr, 
-                                          uint32_t dfile_ct,    
-                                          PVFS_offset physical_offset)
+PVFS_offset physical_to_logical_offset( void* params,
+                                        uint32_t dfile_nr, 
+                                        uint32_t dfile_ct,    
+                                        PVFS_offset physical_offset)
 ```
 
 Given a physical offset, return the logical offset that corresponds to
@@ -204,10 +204,10 @@ that physical offset. Returns a logical offset. The input value is
 assumed to be on the current PVFS server.
 
 ``` 
-  PVFS_offset next_mapped_offset( void* params,
-                                  uint32_t dfile_nr, 
-                                  uint32_t dfile_ct, 
-                                  PVFS_offset logical_offset)
+PVFS_offset next_mapped_offset( void* params,
+                                uint32_t dfile_nr, 
+                                uint32_t dfile_ct, 
+                                PVFS_offset logical_offset)
 ```
 
 Given a logical offset, find the logical offset greater than or equal to
@@ -215,10 +215,10 @@ the logical offset that maps to a physical offset on the current PVFS
 server. Returns a logical offset.
 
 ``` 
-  PVFS_size contiguous_length( void* params,
-                               uint32_t dfile_nr, 
-                               uint32_t dfile_ct, 
-                               PVFS_offset physical_offset)
+PVFS_size contiguous_length( void* params,
+                              uint32_t dfile_nr, 
+                              uint32_t dfile_ct, 
+                              PVFS_offset physical_offset)
 ```
 
 Beginning in a given physical location, return the number of contiguous
@@ -227,9 +227,9 @@ to contiguous bytes in the logical byte sequence. Returns a length in
 bytes.
 
 ``` 
-  int get_num_dfiles( void* params,
-                      uint32_t num_servers_requested, 
-                      uint32_t num_dfiles_requested )
+int get_num_dfiles( void* params,
+                    uint32_t num_servers_requested, 
+                    uint32_t num_dfiles_requested )
 ```
 
 Returns the number of data file objects to use for the requested file.
@@ -240,8 +240,8 @@ that returns the number of servers requested (which is usually the
 number of data servers in the system).
 
 ``` 
-  int set_param( const char* dist_name, void* params
-                 const char* param_name, void* value )
+int set_param( const char* dist_name, void* params
+                const char* param_name, void* value )
 ```
 
 Set the distribution parameter described by *param\_name* to *value*. A
@@ -249,19 +249,19 @@ default implementation is provided in pint-dist-utils.h that can handle
 parameters that have been previously registered.
 
 ``` 
-  void encode_lebf( char** pptr, void* params )
+void encode_lebf( char** pptr, void* params )
 ```
 
 Write *params* into the data stream pptr in little endian byte format.
 
 ``` 
-  void decode_lebf( char** pptr, void* params )
+void decode_lebf( char** pptr, void* params )
 ```
 
 Read *params* from the data stream pptr in little endian byte format.
 
 ``` 
-  void registration_init( void* params )
+void registration_init( void* params )
 ```
 
 Called when the distribution is registered (i.e. once). Used to set

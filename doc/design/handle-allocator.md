@@ -17,10 +17,12 @@ explain it all.
 We have a large handle space we need to represent efficiently. This
 approach uses extents:
 
-    struct extent {
-        int64_t first;
-        int64_t last;
-    };
+```
+struct extent {
+    int64_t first;
+    int64_t last;
+};
+```
 
 #### Extent List
 
@@ -31,13 +33,15 @@ are added. The most important is the `timestamp` member, used to make
 sure no handle in its list gets reused before it should. `__size` is
 only used internally, keeping track of how big `extents` is.
 
-    struct extentlist {
-        int64_t __size;
-        int64_t num_extents;
-        int64_t num_handles;
-        struct timeval timestamp;
-        struct extent * extents;
-    };
+```
+struct extentlist {
+    int64_t __size;
+    int64_t num_extents;
+    int64_t num_handles;
+    struct timeval timestamp;
+    struct extent * extents;
+};
+```
 
 #### Handle Ledger
 
@@ -50,15 +54,17 @@ expire time to pass.
 We save our state by writing out and reading from the three
 `TROVE_handle` members, making use of the higher level trove interface.
 
-    struct handle_ledger {
-            struct extentlist free_list;
-        struct extentlist recently_freed_list;
-        struct extentlist overflow_list;
-        FILE *backing_store;
-        TROVE_handle free_list_handle;
-        TROVE_handle recently_freed_list_handle;
-        TROVE_handle overflow_list_handle;
-    }
+```
+struct handle_ledger {
+        struct extentlist free_list;
+    struct extentlist recently_freed_list;
+    struct extentlist overflow_list;
+    FILE *backing_store;
+    TROVE_handle free_list_handle;
+    TROVE_handle recently_freed_list_handle;
+    TROVE_handle overflow_list_handle;
+}
+```
 
 ## Algorithm
 

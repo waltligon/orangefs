@@ -254,12 +254,14 @@ values for output.
 
 *TODO: sync. with code on data\_sz element.*
 
-    struct TROVE_keyval {
-        void *  buffer;
-        int32_t buffer_sz;
-        int32_t data_sz;
-    };
-    typedef struct TROVE_keyval TROVE_keyval_s;
+```
+struct TROVE_keyval {
+    void *  buffer;
+    int32_t buffer_sz;
+    int32_t data_sz;
+};
+typedef struct TROVE_keyval TROVE_keyval_s;
+```
 
 Keys, values, and hints are all implemented with the same TROVE\_keyval
 structure (do we want a different name?), shown above. Keys and values

@@ -398,13 +398,13 @@ The Linux automounter needs some help dealing with PVFS’s resource
 strings. A typical mount command (on Linux 2.6) would look like this:
 
 ``` 
-    mount -t pvfs2 tcp://server0:3334/pvfs2-fs /mnt/pvfs2
+# mount -t pvfs2 tcp://server0:3334/pvfs2-fs /mnt/pvfs2
 ```
 
 The entry in the automount config file should look like this:
 
 ``` 
-    pvfs -fstype=pvfs2           tcp://server0\:3334/pvfs2-fs
+pvfs -fstype=pvfs2           tcp://server0\:3334/pvfs2-fs
 ```
 
 Note the backslash-escape of the colon before the port number. Without
@@ -507,12 +507,16 @@ discussed in the PVFS quickstart, different mount commands are needed
 for linux-2.4 and linux-2.6. A linux-2.6 mount command will look like
 this:
 
-    # mount -t pvfs2 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2
+```
+# mount -t pvfs2 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2
+```
 
 Under linux-2.4, the mount command looks slightly
     different:
 
-    # mount -t pvfs2 pvfs2 /mnt/pvfs2 -o tcp://testhost:3334/pvfs2-fs
+```
+# mount -t pvfs2 pvfs2 /mnt/pvfs2 -o tcp://testhost:3334/pvfs2-fs
+```
 
 This error could also mean a pvfs2-client process is not running, either
 because it was not started before the mount command, or was terminated
@@ -608,17 +612,19 @@ Be sure to do this on all machines in your cluster.
 On some Redhat and Redhat-derived distributions, “make kmod24” might
 fail with errors like this:
 
-    console]:make kmod24
-     CC [M]  /usr/src/pvfs2/src/kernel/linux-2.4/pvfs2-utils.o
-    pvfs2-utils.c: In function `mask_blocked_signals':
-    pvfs2-utils.c:1063: structure has no member named `sig'
-    pvfs2-utils.c:1070: structure has no member named `sigmask_lock'
-    pvfs2-utils.c:1073: too many arguments to function `recalc_sigpending'
-    pvfs2-utils.c: In function `unmask_blocked_signals':
-    pvfs2-utils.c:1082: structure has no member named `sigmask_lock'
-    pvfs2-utils.c:1084: too many arguments to function `recalc_sigpending'
-    make[1]: *** [pvfs2-utils.o] Error 1
-    make: *** [kmod24] Error 2
+```
+console]:make kmod24
+    CC [M]  /usr/src/pvfs2/src/kernel/linux-2.4/pvfs2-utils.o
+pvfs2-utils.c: In function `mask_blocked_signals':
+pvfs2-utils.c:1063: structure has no member named `sig'
+pvfs2-utils.c:1070: structure has no member named `sigmask_lock'
+pvfs2-utils.c:1073: too many arguments to function `recalc_sigpending'
+pvfs2-utils.c: In function `unmask_blocked_signals':
+pvfs2-utils.c:1082: structure has no member named `sigmask_lock'
+pvfs2-utils.c:1084: too many arguments to function `recalc_sigpending'
+make[1]: *** [pvfs2-utils.o] Error 1
+make: *** [kmod24] Error 2
+```
 
 Redhat, and derived distributions, have a linux-2.4 based kernel with
 many linux-2.6 features backported. These backported features change the
@@ -715,16 +721,22 @@ file-system objects through the VFS as well as through the system
 interface. Example usage scenarios are shown below, To set an extended
 attribute ("key1", "val1") on a PVFS file foo,
 
-    # setfattr -n key1 -v val1 /path/to/mounted/pvfs2/foo
+```
+# setfattr -n key1 -v val1 /path/to/mounted/pvfs2/foo
+```
 
 To retrieve an extended attribute for a given key ("key1") on a PVFS
 file foo,
 
-    # getfattr -n key1 /path/to/mounted/pvfs2/foo
+```
+# getfattr -n key1 /path/to/mounted/pvfs2/foo
+```
 
 To retrieve all attributes of a given PVFS file foo,
 
-    # getfattr -m "" /path/to/mounted/pvfs2/foo
+```
+# getfattr -m "" /path/to/mounted/pvfs2/foo
+```
 
 Note that PVFS uses a few standard names for its internal use that
 prohibit users from reusing the same names. A list of such keys are as
@@ -757,7 +769,9 @@ enforce access control lists on 2.6 kernels, one must mount the PVFS
 file system by specifying the "acl" option in the mount command line.
 For example,
 
-    # mount -t pvfs2 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2 -o acl
+```
+# mount -t pvfs2 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2 -o acl
+```
 
 Please refer to the man pages of "setfacl", "getfacl" or section 5 acl
 for detailed usage information.
@@ -781,8 +795,10 @@ required libraries when you link `libpvfs2` is to use the `pvfs2-config`
 utility. `pvfs2-config –libs` will give you the full set of linker flags
 needed. Here’s an example of how one might use this tool:
 
-    $ gcc -c $(pvfs2-config --cflags) example.c 
-    $ gcc example.o -o example $(pvfs2-config --libs) 
+```
+$ gcc -c $(pvfs2-config --cflags) example.c
+$ gcc example.o -o example $(pvfs2-config --libs)
+```
 
 ### Can we run the Apache webserver to serve files off a PVFS volume?
 
@@ -812,7 +828,9 @@ must be run (a one-time only procedure) to convert the file system from
 the old format to the new one. The migration tool can be used as
 follows:
 
-    $PVFS_INSTALL/bin/pvfs2-migrate-collection --all fs.conf server.conf-<hostname>
+```
+$PVFS_INSTALL/bin/pvfs2-migrate-collection --all fs.conf server.conf-<hostname>
+```
 
 This command finds all the pvfs2 storage collections specified in the
 configuration files and migrates them to the new format. Instead of
@@ -969,7 +987,9 @@ subdirectories.
 
 The distribution can be set as follows:
 
-    # setfattr -n "user.pvfs2.dist_name" -v "basic_dist" /mnt/pvfs2/directory
+```
+# setfattr -n "user.pvfs2.dist_name" -v "basic_dist" /mnt/pvfs2/directory
+```
 
 Supported distribution names can be found by looking in the
 pvfs2-dist-\* header files.
@@ -979,7 +999,9 @@ pvfs2-dist-\* header files.
 Some distributions allow you to set parameters that impact how the
 distribution behaves. These parameters can be set as follows:
 
-    # setfattr -n "user.pvfs2.dist_params" -v "strip_size:4096" /mnt/pvfs2/directory
+```
+# setfattr -n "user.pvfs2.dist_params" -v "strip_size:4096" /mnt/pvfs2/directory
+```
 
 You can specify more than one "parameter:value" pair by seperating them
 with commas.
@@ -988,7 +1010,9 @@ with commas.
 
 You can also specify the number of datafiles to stripe across:
 
-    # setfattr -n "user.pvfs2.num_dfiles" -v "1" /mnt/pvfs2/directory
+```
+# setfattr -n "user.pvfs2.num_dfiles" -v "1" /mnt/pvfs2/directory
+```
 
 PVFS defaults to striping files across each server in the file system.
 However, you may find that for small files it is advantages to limit
@@ -1024,8 +1048,7 @@ IO-intensive workloads.
 
 ## Fault Tolerance
 
-This section covers issues related to fault tolerance in the context of
-PVFS.
+This section covers issues related to fault tolerance in the context of PVFS.
 
 ### Does PVFS support some form of fault tolerance?
 
@@ -1099,8 +1122,7 @@ improvements present in the new system.
 ### Can I add, remove, or change the order of the PVFS servers on an existing PVFS file system?
 
 You can add and change the order of PVFS servers for an existing PVFS
-file system. At this time, you must stop all the servers in order to do
-so.
+file system. At this time, you must stop all the servers in order to do so.
 
 To add a new server:
 
@@ -1182,7 +1204,9 @@ systems. This allows applications to be sent kill signals when a
 filesystem is unresponsive (due to network failures, etc.). The option
 can be specified at mount time:
 
-    # mount -t pvfs2 -o intr tcp://hosta:3334/pvfs2-fs /pvfs-storage/
+```
+# mount -t pvfs2 -o intr tcp://hosta:3334/pvfs2-fs /pvfs-storage/
+```
 
 ## Missing Features
 

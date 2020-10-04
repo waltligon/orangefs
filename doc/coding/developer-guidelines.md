@@ -126,11 +126,13 @@ aliases the “vi” command to start whichever version is available. This
 example illustrates how to do this if you use the tcsh shell. Add the
 following lines to your ~/.cshrc file:
 
-    if ( -X vimx ) then
-       alias vi vimx
-    else if ( -X vim ) then
-       alias vi vim
-    endif
+```
+if ( -X vimx ) then
+    alias vi vimx
+else if ( -X vim ) then
+    alias vi vim
+endif
+```
 
 The next time you login to the system, it will alias the vi command to
 either vimx of vim if they are available. Otherwise the vi command will
@@ -148,24 +150,26 @@ name “.vimrc”. This file can also be used to control other settings in
 vi. The following is an example of some color settings for vi taken from
 a .vimrc file:
 
-    set background=dark
-    if has("syntax")
-       syntax on
-       hi! Comment ctermfg=darkgreen
-       hi Type NONE
-       hi Structure NONE
-       hi! Operator NONE
-       hi! Include ctermfg=darkblue
-       hi! PreCondit ctermfg=darkcyan
-       hi! cIncluded ctermfg=darkblue
-       hi! Statement ctermfg=brown
-       hi! Conditional ctermfg=brown
-       hi! Todo ctermfg=yellow
-       hi! Operator ctermfg=NONE
-       hi! Constant ctermfg=NONE
-       hi! cCppOut ctermfg=darkred
-       hi! cSpecial ctermfg=darkmagenta
-    endif
+```
+set background=dark
+if has("syntax")
+    syntax on
+    hi! Comment ctermfg=darkgreen
+    hi Type NONE
+    hi Structure NONE
+    hi! Operator NONE
+    hi! Include ctermfg=darkblue
+    hi! PreCondit ctermfg=darkcyan
+    hi! cIncluded ctermfg=darkblue
+    hi! Statement ctermfg=brown
+    hi! Conditional ctermfg=brown
+    hi! Todo ctermfg=yellow
+    hi! Operator ctermfg=NONE
+    hi! Constant ctermfg=NONE
+    hi! cCppOut ctermfg=darkred
+    hi! cSpecial ctermfg=darkmagenta
+endif
+```
 
 ### Emacs
 
@@ -177,11 +181,9 @@ CVS is a network aware version control system. Several of the larger
 projects in the PARL lab use CVS to manage source code. These are some
 of the basic capabilities that it provides:
 
-  - automatically tracks changes to code so that old versions are backed
-    up
+  - automatically tracks changes to code so that old versions are backed up
 
-  - allows you to document incremental changes and browse this
-    documentation
+  - allows you to document incremental changes and browse this documentation
 
   - multiple users can make changes simultaneously
 
@@ -215,11 +217,15 @@ Before using CVS, you must set an environment variable that tells it
 where to look for the CVS repositories. If you are using tcsh, you can
 do something like this (and add it to your .cshrc file):
 
-    setenv CVSROOT /projects/cvsroot
+```
+setenv CVSROOT /projects/cvsroot
+```
 
 and for bash:
 
-    set CVSROOT=/projects/cvsroot
+```
+set CVSROOT=/projects/cvsroot
+```
 
 *Hmm. Should we maybe have a sample project in cvs that anyone can check
 out? Might be nice to be able to play with this stuff without hurting a
@@ -231,7 +237,9 @@ real project*
     populates it with the source code. To export the most recent copy of
     a project:
     
-        cvs export -D today <projectname>
+    ```
+    cvs export -D today <projectname>
+    ```
     
     (where \<projectname\> is the name of the project). When you
     are done with the code you can simply delete the directory.
@@ -241,8 +249,10 @@ real project*
     changes and additions to the project. You must have appropriate
     permissions in order to perform this operation:
     
-        cvs co <projectname>
-    
+    ```
+    cvs co <projectname>
+    ```
+
     This will create a directory for the project that contains source
     code and CVS information. See the “commit” command for information
     on submitting modifications, and the “release” command to get rid of
@@ -261,7 +271,9 @@ real project*
     for long periods of time if you are going to be working on it
     regularly.
     
-        cvs release -d <projectname>
+    ```
+    cvs release -d <projectname>
+    ```
 
   - **commit:** Once you have made any changes to the project, you must
     perform a commit operation to record the changes in CVS and make
@@ -271,7 +283,9 @@ real project*
     with someone else’s work. This command should be carried out within
     the project directory:
     
-        cvs commit
+    ```
+    cvs commit
+    ```
     
     When you do this, CVS will open up a vi session that allows you to
     write a brief summary of the changes that you have made. Note that
@@ -283,7 +297,9 @@ real project*
     You must create the new file first. Then run the following command
     from within the project directory that contains the new file:
     
-        cvs add <newfilename>
+    ```
+    cvs add <newfilename>
+    ```
     
     You must follow this up with a “commit” in order for other users to
     see the new file. This command may also be used to add new
@@ -302,14 +318,18 @@ real project*
     determining if your copy is up to date or if it has been modified
     but not checked in:
     
-        cvs status
+    ```
+    cvs status
+    ```
     
     If you wish to filter the output from this command so that it only
     shows you files that are not up to date you may do the following
     (you can make this an alias or script if you wish to use this
     regularly):
     
-        cvs status |& grep Status: | grep -v Up-to-date 
+    ```
+    cvs status |& grep Status: | grep -v Up-to-date 
+    ```
 
 There are many other CVS commands and features, but the ones listed
 above should be enough to get you started. You can find out more
@@ -324,7 +344,9 @@ desired. To create a new CVS entry, go into the source directory and
 delete all of the binary or object files (assuming that you only wish to
 track the source code). Then run this command:
 
-    cvs import -m "Imported sources" <projectname> PARL start
+```
+cvs import -m "Imported sources" <projectname> PARL start
+```
 
 (for the sake of clarity, \<projectname\> should probably match
 the name of the directory that contains the source)
@@ -337,7 +359,9 @@ installed on your remote machine. It works exactly like using CVS
 locally. You can use the same commands listed above, except substitute
 the following for the the word “cvs” in the command lines:
 
-    cvs -d :ext:<userid>@cvs.parl.clemson.edu:/projects/cvsroot
+```
+cvs -d :ext:<userid>@cvs.parl.clemson.edu:/projects/cvsroot
+```
 
 (where userid is your lab user login id) You may wish to create an alias
 or script to do this for convenience. CVS will prompt you for a password
@@ -381,12 +405,16 @@ In order to use gdb, the code in question must have been compiled with
 the debugging option turned on. For the gcc compiler (see section
 [5](#compiler-flags)), this just means using the -g option:
 
-    gcc -g test.c -o test
+```
+gcc -g test.c -o test
+```
 
 In order to start debugging, just launch gdb with with the name of the
 program you wish to debug as the only argument:
 
-    gdb test
+```
+gdb test
+```
 
 If you start gdb by this mechanism, then gdb will present you with a
 prompt at which you can enter commands to gdb. At this point, the
@@ -397,10 +425,12 @@ Alternatively, you can attach to a process that is already running if
 you know it’s pid. In this case, the command line arguments to gdb are
 the program name followed by the pid of the running program.
 
-    > ./test &
-    > ps | grep test
-    23716 ttyp4    00:00:00 test
-    > gdb test 23716
+```
+> ./test &
+> ps | grep test
+23716 ttyp4    00:00:00 test
+> gdb test 23716
+```
 
 In this scenario, gdb will still present you with a prompt for entering
 gdb commands. However, the program that you are debugging will be in the
@@ -502,7 +532,9 @@ To use Electric Fence, you just need to link in the efence library
 during the last stage of linking (or compilation, if you do not have a
 separate link step):
 
-    gcc -g -Wall -Wstrict-prototypes -lefence test.c
+```
+gcc -g -Wall -Wstrict-prototypes -lefence test.c
+```
 
 When you run your program, it should print a message to the screen
 indicating that Electric Fence is in use. If your program segfaults, it
@@ -596,13 +628,14 @@ part of the c language specification.
 
 For single line comments (or brief comments trailing a line of code),
 just use the /\* and \*/ delimiters. If the comment is longer than one
-line, use this
-    format:
+line, use this format:
 
-    /* This code does lots of cool things.  It is also written perfectly and
-     * will never break.  It is fast, robust, extensible, and resistant to
-     * rust and corrosion.
-     */
+```
+/* This code does lots of cool things.  It is also written perfectly and
+  * will never break.  It is fast, robust, extensible, and resistant to
+  * rust and corrosion.
+  */
+```
 
 This makes it easy to tell where the comment begins and ends.
 
@@ -611,19 +644,21 @@ listed just above the function definition, not the prototype. The
 comment should give the function name, what it does, what any potential
 side effects are, and the range of return values. This is one example:
 
-    /* MC_finalize()
-     *
-     * This function shuts down the method control subsystem.  It is
-     * responsible for tearing down internal data structures, shutting down
-     * individual method devices, and gracefully removing any unfinished
-     * operations.
-     *
-     * returns 0 on success, -errno on failure
-     */
-    int MC_finalize(void)
-    {
-       ...
-    }
+```
+/* MC_finalize()
+  *
+  * This function shuts down the method control subsystem.  It is
+  * responsible for tearing down internal data structures, shutting down
+  * individual method devices, and gracefully removing any unfinished
+  * operations.
+  *
+  * returns 0 on success, -errno on failure
+  */
+int MC_finalize(void)
+{
+    ...
+}
+```
 
 If you are working on the PVFS project, then you should adhere to the
 function comments described in section [10.2](#function-commenting).
@@ -635,15 +670,19 @@ loops, conditional statements, or functions. For clarity, *any*
 statement executed within a conditional or loop should be enclosed in
 brackets, even if it is just one line. For example:
 
-    if(something true)
-    {
-       do something;
-    }
+```
+if(something true)
+{
+    do something;
+}
+```
 
 and *not*
 
-    if(something true) 
-       do something;
+```
+if(something true) 
+    do something;
+```
 
 Also note that each bracket gets it’s own line in the source code.
 
@@ -654,25 +693,27 @@ rule to remember is that any new set of brackets should add a level of
 indentation for the code contained within it. This holds for functions,
 loops, and conditionals. The following is an example:
 
-    int foofunction(int x)
+```
+int foofunction(int x)
+{
+
+    int y = 0;
+
+    if(x <= 0)
     {
-    
-       int y = 0;
-    
-       if(x <= 0)
-       {
-          do some stuff;
-       }
-       else
-       {
-          for(y=0; y<x; y++)
-          {
-             do lots of stuff;
-          }
-       }
-    
-       return(0);
+      do some stuff;
     }
+    else
+    {
+      for(y=0; y<x; y++)
+      {
+          do lots of stuff;
+      }
+    }
+
+    return(0);
+}
+```
 
 ### Hints for writing maintainable code
 
@@ -776,13 +817,15 @@ allocated. Any dynamically allocated structure or variable should at
 least be zeroed out before being used in the code. This can be done with
 the `memset()` function:
 
-    foopointer = (struct foostruct)malloc(sizeof(struct foostruct));
-    if(foopointer == NULL)
-    {
-       /* alloc failed */
-       return(some error value);
-    }
-    memset(foopointer, 0, sizeof(struct foostruct));
+```
+foopointer = (struct foostruct)malloc(sizeof(struct foostruct));
+if(foopointer == NULL)
+{
+    /* alloc failed */
+    return(some error value);
+}
+memset(foopointer, 0, sizeof(struct foostruct));
+```
 
 If there are sentinal values other than 0 for elements contained in your
 struct, they should be set as well.
@@ -797,13 +840,15 @@ structure. Encapsulating all of this memory management in a pair of
 functions aids in debugging and makes your code more readable overall. A
 good naming convention is:
 
-    /* returns a pointer to new structure on success, null on failure */
-    struct foo* alloc_foo(void);  
-    
-    and
-    
-    /* no return value */
-    void dealloc_foo(struct foo*);
+```
+/* returns a pointer to new structure on success, null on failure */
+struct foo* alloc_foo(void);  
+
+and
+
+/* no return value */
+void dealloc_foo(struct foo*);
+```
 
 #### Keeping up with work in progress
 
@@ -833,9 +878,11 @@ functions are related, or collectively form a common interface, the
 prepend an identifier to each function so that it is obvious that they
 belong together:
 
-    int test_control_open();
-    int test_control_close();
-    int test_control_read();
+```
+int test_control_open();
+int test_control_close();
+int test_control_read();
+```
 
 Function and variable nameing issues specific to PVFS can be found in
 section [10.3](#function-naming).
@@ -863,13 +910,15 @@ However, passing in a string in this manner allows the function to
 modify the argument, which may not be desirable. Using a const char\*
 argument can prevent this. Example:
 
-    int string_key(const char *key, const char *id_string)
-    {
-       /* within this function it is now impossible to accidentally modify 
-        * the character strings pointed to by key or id_string
-        */
-       return(0);
+```
+int string_key(const char *key, const char *id_string)
+{
+    /* within this function it is now impossible to accidentally modify 
+    * the character strings pointed to by key or id_string
+    */
+    return(0);
     }
+```
 
 #### Obscure coding practices
 
@@ -917,19 +966,19 @@ pages. One common example occurs when an integer value must be read out
 of a string. In this case, it is better to use sscanf than atoi:
 
 ``` 
-   char number_string[] = "300";
-   int my_number = -1;
-   ret = -1;
+char number_string[] = "300";
+int my_number = -1;
+ret = -1;
 
-   /* if you use sscanf, you can check the return value */
-   ret = sscanf(number_string, "%d", &my_number);
-   if(ret < 1)
-   {
-      return an error;
-   }
+/* if you use sscanf, you can check the return value */
+ret = sscanf(number_string, "%d", &my_number);
+if(ret < 1)
+{
+  return an error;
+}
 
-   /* as opposed to atoi, which will not tell you if it fails */
-   my_number = atoi(number_string);
+/* as opposed to atoi, which will not tell you if it fails */
+my_number = atoi(number_string);
 ```
 
 #### Abstraction
@@ -960,32 +1009,34 @@ you to pick which function will be used to perform a given task at run
 time rather than compile time. This is not really any harder than
 manipulating pointers to variables:
 
-    /* this is the first way to send a message */
-    int send_message_one(void* data, int size);
-    
-    /* this is the second way to send a message */
-    int send_message_two(void* data, int size);
-    
-    /* this is a pointer to the prefered method */
-    int (*send_message_generic)(void*, int) = NULL;
-    
-    ...
-    
-    if(something is true)
-    {
-       send_message_generic = send_message_one;
-    }
-    else
-    {
-       send_message_generic = send_message_two;
-    }
-    
-    ...
-    
-    /* We don't care which method the user chose.  We know that it can be
-     * accessed through this function pointer without us modifying our code.
-     */
-    send_message_generic(my_data, sizeof(my_data));
+```
+/* this is the first way to send a message */
+int send_message_one(void* data, int size);
+
+/* this is the second way to send a message */
+int send_message_two(void* data, int size);
+
+/* this is a pointer to the prefered method */
+int (*send_message_generic)(void*, int) = NULL;
+
+...
+
+if(something is true)
+{
+    send_message_generic = send_message_one;
+}
+else
+{
+    send_message_generic = send_message_two;
+}
+
+...
+
+/* We don't care which method the user chose.  We know that it can be
+  * accessed through this function pointer without us modifying our code.
+  */
+send_message_generic(my_data, sizeof(my_data));
+```
 
 #### Typedefs and opaque types
 
@@ -1003,7 +1054,7 @@ issues here:
     that have a known, fixed size:
     
     ``` 
-        typedef int32_t pvfs_flag_t;
+    typedef int32_t pvfs_flag_t;
     ```
     
     This guarantees that when a pvfs\_flag\_t variable is declared, it

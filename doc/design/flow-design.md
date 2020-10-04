@@ -372,27 +372,29 @@ would not otherwise be present. It may therefore be helpful to
 eventually introduce an optimization to avoid the use of flows for small
 read or write operations.
 
-    text of an email discussion on this topic (> part by Phil, non >
-    part by Rob):
-    
-    > Yeah, we need to get these ideas documented somewhere.  There may actually
-    > be a couple of eager modes.  By default, BMI only allows unexpected
-    > messages < 16K or so.  That places a cap on the eager write size,
-    > unless we had a second eager mode that consists of a) send write request
-    > b) send write data c) receive ack...
-    
-    Yes.  These two modes are usually differentiated by the terms "short" and
-    "eager", where the "short" one puts the data actually into the same
-    packet/message (depending on the network layer at which we are working).
-    
-    > Of course all of this would need to be tunable so that we can see what
-    > works well.  Maybe rules like:
-    > 
-    > contig writes < 15K : simple eager write
-    > 15K < contig writes < 64K : two part eager write
-    > writes > 64K && noncontig writes : flow
-    > 
-    > contig reads < 64K : eager read
-    > contig reads > 64K && noncontig reads : flow
-    
-    Yeah, something like that.
+```
+text of an email discussion on this topic (> part by Phil, non >
+part by Rob):
+
+> Yeah, we need to get these ideas documented somewhere.  There may actually
+> be a couple of eager modes.  By default, BMI only allows unexpected
+> messages < 16K or so.  That places a cap on the eager write size,
+> unless we had a second eager mode that consists of a) send write request
+> b) send write data c) receive ack...
+
+Yes.  These two modes are usually differentiated by the terms "short" and
+"eager", where the "short" one puts the data actually into the same
+packet/message (depending on the network layer at which we are working).
+
+> Of course all of this would need to be tunable so that we can see what
+> works well.  Maybe rules like:
+> 
+> contig writes < 15K : simple eager write
+> 15K < contig writes < 64K : two part eager write
+> writes > 64K && noncontig writes : flow
+> 
+> contig reads < 64K : eager read
+> contig reads > 64K && noncontig reads : flow
+
+Yeah, something like that.
+```
