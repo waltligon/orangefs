@@ -1,0 +1,56 @@
+#
+# After making changes to this or any other .gitignore file in this
+# project, please use the following command to make sure there aren't
+# any tracked files that will be ignored:
+#
+#    git ls-files -i --exclude-standard
+#
+# Files located/generated in a specific subdirectory are included in
+# the ".gitignore" file in that subdirectory.
+#
+
+#
+# Global rules
+#
+*.aux
+*.log
+*.ps
+*.toc
+*.out
+*.o
+*.po
+*kdev*
+module.mk
+cscope.*
+config.status
+
+#
+# Ignore generated dependency files...
+#
+*.d
+#
+# ... but don't ignore *.d directories
+#
+!*.d/
+
+#
+# Top-level files...
+#
+/build
+/aclocal.m4
+/configure
+/pvfs2-config.h.in
+/Makefile
+/pvfs2-config.h
+/config.save
+#
+# ... and directories
+#
+/autom4te.cache/
+/lib/
+
+#
+# Editor files
+#
+*~
+*.swp

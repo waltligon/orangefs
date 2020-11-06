@@ -94,12 +94,12 @@ static int parse_args(int argc, char **argv, options_t *opts)
                 }
                 else if (strcmp("data-space", cur_option) == 0)
                 {
-                    strncpy(opts->data_space, optarg, PATH_MAX);
+                    strncpy(opts->data_space, optarg, PATH_MAX - 1);
                     break;
                 }
                 else if (strcmp("meta-space", cur_option) == 0)
 		{
-                    strncpy(opts->meta_space, optarg, PATH_MAX);
+                    strncpy(opts->meta_space, optarg, PATH_MAX - 1);
                     break;
                 }
                 else if (strcmp("coll-id", cur_option) == 0)
@@ -145,7 +145,7 @@ static int parse_args(int argc, char **argv, options_t *opts)
 		break;
 	    case 'c':
           do_collection_name:
-		strncpy(opts->collection, optarg, PATH_MAX);
+		strncpy(opts->collection, optarg, PATH_MAX - 1);
 		break;
             case 'd':
           do_defaults:
@@ -175,11 +175,11 @@ static int parse_args(int argc, char **argv, options_t *opts)
 		break;
 	    case 'M':
           do_meta_handle_range:
-		strncpy(opts->meta_ranges, optarg, PATH_MAX);
+		strncpy(opts->meta_ranges, optarg, PATH_MAX - 1);
 		break;
 	    case 'N':
           do_data_handle_range:
-		strncpy(opts->data_ranges, optarg, PATH_MAX);
+		strncpy(opts->data_ranges, optarg, PATH_MAX - 1);
 		break;
 	    case 'v':
           do_verbose:

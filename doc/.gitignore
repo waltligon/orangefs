@@ -1,0 +1,9 @@
+*.pdf
+pvfs2-ha
+pvfs2-tuning
+pvfs2-quickstart
+pvfs2-guide
+pvfs2-status
+pvfs2-faq
+pvfs2-ha-heartbeat
+pvfs2-ha-heartbeat-v2

@@ -2709,9 +2709,8 @@ DOTCONF_CB(get_flow_buffers_per_flow)
 
 DOTCONF_CB(get_attr_cache_keywords_list)
 {
-    int i = 0, len = 0;
+    int i = 0;
     char buf[512] = {0};
-    char *ptr = buf;
     const char * rtok;
     struct filesystem_configuration_s *fs_conf = NULL;
 
@@ -2735,10 +2734,18 @@ DOTCONF_CB(get_attr_cache_keywords_list)
             rtok = replace_old_keystring(tokens[j]);
             if(!strstr(buf, rtok))
             {
-                len = strlen(rtok);
-                strncat(ptr, rtok, len);
-                strncat(ptr, ",", 1);
-                ptr += len + 1;
+                /* rtok is a pointer to an arbitrary length string that
+                 * we got from replace_old_keystring. We'll trust that it
+                 * is a valid (null terminated) string and just run
+                 * strlen on it.
+                 */
+                if (((strnlen(buf, sizeof(buf)) + strlen(rtok) + 2) >
+                      sizeof(buf)))
+                {
+                   return("1 Buffer too small for Attr Cache Keywords\n");
+                }
+                strcat(buf, rtok);
+                strcat(buf, ",");
             }
         }
        
@@ -2758,17 +2765,19 @@ DOTCONF_CB(get_attr_cache_keywords_list)
             rtok = replace_old_keystring(tokens[j]);
             if(!strstr(buf, rtok))
             {
-                len = strlen(rtok);
-                strncat(ptr, rtok, len);
-                strncat(ptr, ",", 1);
-                ptr += len + 1;
+                if (((strnlen(buf, sizeof(buf)) + strlen(rtok) + 2) >
+                      sizeof(buf)))
+                {
+                   return("2 Buffer too small for Attr Cache Keywords\n");
+                }
+                strcat(buf, rtok);
+                strcat(buf, ",");
             }
         }
 
         PINT_free_string_list(tokens, token_count);
     }
 
-    *ptr = '\0';
     fs_conf->attr_cache_keywords = strdup(buf);
     return NULL;
 }
@@ -5056,7 +5065,12 @@ static int cache_config_files(struct server_configuration_s *config_s,
 #ifdef WIN32
             _snprintf(buf, 512, "%s\\%s",working_dir, my_global_fn);
 #else
-            snprintf(buf, 512, "%s/%s",working_dir, my_global_fn);
+            if (snprintf(buf, sizeof(buf),
+                "%s/%s", working_dir, my_global_fn) == sizeof(buf))
+            {
+                gossip_err("%s: buf was overrun.\n", __func__);
+                goto error_exit;
+            }
 #endif
             my_global_fn = buf;
         }

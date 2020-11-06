@@ -122,7 +122,6 @@ typedef struct
 
 static options_t s_server_options = { 0, 0, 1, NULL, NULL};
 static char fs_conf[PATH_MAX];
-static char startup_cwd[PATH_MAX+1];
 
 /* each of the elements in this array consists of a string and its length.
  * we're able to use sizeof here because sizeof an inlined string ("") gives
@@ -2075,7 +2074,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 {
     int ret = 0, option_index = 0;
     int total_arguments = 0;
-    const char *cur_option = NULL, *tmp_path = NULL;
+    const char *cur_option = NULL;
     static struct option long_opts[] =
     {
         {"foreground",0,0,0},
@@ -2186,56 +2185,47 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         goto parse_cmd_line_args_failure;
     }
 
+    /* The location of the configuration file will be placed into
+     * the global fs_conf array. fs_conf is also referenced from 
+     * main and reload_config.
+     */
     if (argv[optind][0] != '/')
     {
-        if( (tmp_path = getcwd(startup_cwd, PATH_MAX)) == NULL )
+        if (getcwd(fs_conf, sizeof(fs_conf)) == NULL )
         {
             gossip_err("Failed to get current working directory to create "
                        "absolute path for configuration file: %s\n",
                        strerror(errno));
-        }
-
-        if( (strlen(argv[optind]) + strlen(startup_cwd) + 1) >= PATH_MAX )
-        {
-            gossip_err("Config file path greater than %d characters\n",
-                       PATH_MAX);
             goto parse_cmd_line_args_failure;
         }
 
-        if( strncat(startup_cwd, "/", PATH_MAX) == NULL )
+        /* need room for cwd + slash + relative part + null.
+         * null + slash is where the 2 comes from.
+         */
+        if (strnlen(fs_conf, sizeof(fs_conf)) +
+            strlen(argv[optind]) + 2 > sizeof(fs_conf))
         {
             gossip_err("Failure creating absolute path from relative "
                        "configuration file path\n");
             goto parse_cmd_line_args_failure;
         }
-
-        /* copy the relative path into the string for the user */
-        if( strncat(startup_cwd, argv[optind++], PATH_MAX) == NULL )
+        else
         {
-            gossip_err("Failure creating absolute path from relative "
-                       "configuration file path\n");
-            goto parse_cmd_line_args_failure;
-        }
-
-        if( strncpy(fs_conf, startup_cwd, PATH_MAX) == NULL )
-        {
-            gossip_err("Failure copying created full path into configuration "
-                       "file path\n");
-            goto parse_cmd_line_args_failure;
+            strcat(fs_conf, "/");
+            strcat(fs_conf, argv[optind++]);
         }
     }
     else
     {
-        if( strlen(argv[optind]) >= PATH_MAX )
+        if (strlen(argv[optind]) >= sizeof(fs_conf))
         {
             gossip_err("Config file path greater than %d characters\n",
                        PATH_MAX);
             goto parse_cmd_line_args_failure;
         }
-        if( strncpy( fs_conf, argv[optind++], PATH_MAX) == NULL )
+        else
         {
-            gossip_err("Failure copying configuration file path\n");
-            goto parse_cmd_line_args_failure;
+            strcpy(fs_conf, argv[optind++]);
         }
     }
 
