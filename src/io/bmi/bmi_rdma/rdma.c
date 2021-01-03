@@ -1291,6 +1291,10 @@ static void post_sr_rdmaw(struct rdma_work *sq,
         {
             sr.wr_id = int64_from_ptr(sq);     /* used to match in completion */
             sr.send_flags = IBV_SEND_SIGNALED; /* completion drives the unpin */
+
+            c->refcnt++;
+            debug(4, "%s: incremented refcnt to %d; id: %ld (%s)",
+                  __func__, c->refcnt, sr.wr_id, c->conn_info->peername);
         }
         else
         {
@@ -1298,9 +1302,6 @@ static void post_sr_rdmaw(struct rdma_work *sq,
             sr.send_flags = 0;
         }
 
-        c->refcnt++;
-        debug(4, "%s: incremented refcnt to %d; id: %ld (%s)",
-              __func__, c->refcnt, sr.wr_id, c->conn_info->peername);
         ret = ibv_post_send(rc->qp, &sr, &bad_wr);
         if (ret < 0)
         {
