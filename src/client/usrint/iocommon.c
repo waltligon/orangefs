@@ -1088,11 +1088,11 @@ pvfs_descriptor *iocommon_open(const char *path,
             char *tmp_path;
             int dlen = strlen(pdir->s->dpath);
             int plen = strlen(path);
-            int mlen = dlen + plen + 2;
-            tmp_path = (char *)malloc(mlen);
-            strncpy(tmp_path, pdir->s->dpath, dlen + 1);
-            strncat(tmp_path, "/", 1);
-            strncat(tmp_path, path, plen);
+            int mlen = dlen + plen + 1; /* 1 for / */
+            tmp_path = (char *)malloc(mlen + 1); /* 1 for for terminator */
+            strncpy(tmp_path, pdir->s->dpath, mlen);
+            strncat(tmp_path, "/", mlen - dlen);
+            strncat(tmp_path, path, (mlen - dlen) - 1);
             Ppath = PVFS_new_path(tmp_path);
 
             rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
@@ -1191,11 +1191,11 @@ pvfs_descriptor *iocommon_open(const char *path,
             char *tmp_path;
             int dlen = strlen(pdir->s->dpath);
             int plen = strlen(directory);
-            int mlen = dlen + plen + 2;
-            tmp_path = (char *)malloc(mlen);
-            strncpy(tmp_path, pdir->s->dpath, dlen + 1);
-            strncat(tmp_path, "/", 1);
-            strncat(tmp_path, directory, plen);
+            int mlen = dlen + plen + 1; /* 1 for / */
+            tmp_path = (char *)malloc(mlen + 1); /* 1 for terminator */
+            strncpy(tmp_path, pdir->s->dpath, dlen);
+            strncat(tmp_path, "/", mlen - dlen);
+            strncat(tmp_path, directory, (mlen - dlen) - 1);
             Ppath = PVFS_new_path(tmp_path);
 
             rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
@@ -1335,11 +1335,11 @@ finish:
             char *tpath;
             int dlen = strlen(pdir->s->dpath);
             int plen = strlen(path);
-            int mlen = dlen + plen + 2;
-            tpath = (char *)malloc(mlen);
-            strncpy(tpath, pdir->s->dpath, dlen + 1);
-            strncat(tpath, "/", 1);
-            strncat(tpath, path, plen);
+            int mlen = dlen + plen + 1; /* 1 for / */
+            tpath = (char *)malloc(mlen + 1); /* 1 for terminator */
+            strncpy(tpath, pdir->s->dpath, dlen);
+            strncat(tpath, "/", mlen - dlen);
+            strncat(tpath, path, (mlen - dlen) - 1);
             pd->s->dpath = pvfs_dpath_insert(tpath);
             free(tpath);
         }

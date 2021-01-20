@@ -27,6 +27,12 @@
 #define _IO_wide_NOT -1
 #endif
 
+/* Newer LibC has IO_FILE defs in bits/types/struct_FILE.h
+ * but not many important defines
+ * struct _IO_FILE is a struct equivalent to type FILE
+ */
+#include "old_libio.h"
+
 /* PITA LIBC IO stuff that is defined to be hard to override */
 #ifdef getc
 #undef getc
@@ -47,22 +53,22 @@
 #ifdef _IO_putc_unlocked
 #undef _IO_putc_unlocked
 #endif
-int _IO_putc_unlocked(int c, _IO_FILE *stream);
+int _IO_putc_unlocked(int c, struct _IO_FILE *stream);
 
 #ifdef _IO_getc_unlocked
 #undef _IO_getc_unlocked
 #endif
-int _IO_getc_unlocked(_IO_FILE *stream);
+int _IO_getc_unlocked(struct _IO_FILE *stream);
 
 #ifdef _IO_feof_unlocked
 #undef _IO_feof_unlocked
 #endif
-int _IO_feof_unlocked (_IO_FILE *stream);
+int _IO_feof_unlocked (struct _IO_FILE *stream);
 
 #ifdef _IO_ferror_unlocked
 #undef _IO_ferror_unlocked
 #endif
-int _IO_ferror_unlocked (_IO_FILE *stream);
+int _IO_ferror_unlocked (struct _IO_FILE *stream);
 
 /* fdopendir not present until glibc2.5 */
 #if __GLIBC_PREREQ (2,5)
@@ -1796,7 +1802,7 @@ int putc(int c, FILE *stream)
     return fputc(c, stream);
 }
 
-int _IO_putc(int c, _IO_FILE *stream)
+int _IO_putc(int c, struct _IO_FILE *stream)
 {
     return fputc(c, (FILE *)stream);
 }
@@ -1806,7 +1812,7 @@ int putc_unlocked(int c, FILE *stream)
     return fputc_unlocked(c, stream);
 }
 
-int _IO_putc_unlocked(int c, _IO_FILE *stream)
+int _IO_putc_unlocked(int c, struct _IO_FILE *stream)
 {
     return fputc_unlocked(c, (FILE *)stream);
 }
@@ -2058,7 +2064,7 @@ int getc(FILE *stream)
     return fgetc(stream);
 }
 
-int _IO_getc(_IO_FILE *stream)
+int _IO_getc(struct _IO_FILE *stream)
 {
     return fgetc((FILE *)stream);
 }
@@ -2068,7 +2074,7 @@ int getc_unlocked(FILE *stream)
     return fgetc_unlocked(stream);
 }
 
-int _IO_getc_unlocked(_IO_FILE *stream)
+int _IO_getc_unlocked(struct _IO_FILE *stream)
 {
     return fgetc_unlocked((FILE *)stream);
 }
@@ -2608,7 +2614,7 @@ int feof_unlocked (FILE *stream)
     return rc;
 }
 
-int _IO_feof_unlocked (_IO_FILE *stream)
+int _IO_feof_unlocked (struct _IO_FILE *stream)
 {
     return feof_unlocked((FILE *)stream);
 }
@@ -2677,7 +2683,7 @@ int ferror_unlocked (FILE *stream)
     return ISFLAGSET(stream, _IO_ERR_SEEN);
 }
 
-int _IO_ferror_unlocked (_IO_FILE *stream)
+int _IO_ferror_unlocked (struct _IO_FILE *stream)
 {
     return ferror_unlocked((FILE *)stream);
 }

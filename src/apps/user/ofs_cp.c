@@ -62,7 +62,7 @@ struct cp_options
     char **srcv;
 };
 
-static char dest_path_buffer[PATH_MAX];
+static char dest_path_buffer[PATH_MAX + 1]; /* for terminator, easier args */
 
 static PVFS_hint hints = NULL;
 
@@ -869,14 +869,15 @@ static int parse_args(int argc, char *argv[], struct cp_options *user_opts)
             int len;
             /* relative path */
             ret = getcwd(dest_path_buffer, PATH_MAX);
+            len = strnlen(dest_path_buffer, PATH_MAX);
             if (!ret)
             {
                 perror("getcwd");
                 goto exit_err;
             }
-            strncat(dest_path_buffer, "/", 1);
-            len = strnlen(argv[argc - 1], PATH_MAX);
-            strncat(dest_path_buffer, argv[argc - 1], len);
+            strncat(dest_path_buffer, "/", PATH_MAX - len);
+            len = strnlen(dest_path_buffer, PATH_MAX);
+            strncat(dest_path_buffer, argv[argc - 1], PATH_MAX - len);
             /* code in main ensures there is a trailing slash */
         }
         user_opts->destfile = dest_path_buffer;

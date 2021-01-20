@@ -12,6 +12,7 @@
 
 #define USRINT_SOURCE 1
 #include "usrint.h"
+#include "old_libio.h"
 #include "stdio-ops.h"
 #include "openfile-util.h"
 
