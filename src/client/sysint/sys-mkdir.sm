@@ -248,7 +248,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     PINT_init_sysint_credential(sm_p->cred_p, credential);
 
     sm_p->u.mkdir.object_name = object_name;
-    dir_attr = &sm_p->u.mkdir.obj_attr;
+    dir_attr = &sm_p->u.mkdir.dir_attr;
 
     /*
      * I really hate sys_attr's - I would really rather convert them to
@@ -274,7 +274,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     sm_p->parent_ref = parent_ref;
 
     /* We will start building attributes for the new directory object
-     * In this function we will add attributes to sm_p->u.mkdir.obj_attr
+     * In this function we will add attributes to sm_p->u.mkdir.dir_attr
      * first from the built-in defaults, second from config file defaults,
      * In the validate function - after we have read the parent attributes
      * we continue with third from the parent directory attributes and hints,
@@ -349,13 +349,6 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
 
     /* return checked out verion of config struct */
     PINT_put_server_config_struct(server_config);
-
-    /* These are convenience variables in the sm_p 
-     * In the case of a directory both should be the same
-     * since directories are metadata
-     */
-    sm_p->u.mkdir.metadata_sid_count = dir_attr->meta_sid_count;
-    sm_p->u.mkdir.dirdata_sid_count = dir_attr->meta_sid_count;
 
     /* does this apply to a dir?  if so, shouldn't we have attrs for it? */
     /* TODO: For now, just use round robin layout. */
@@ -561,17 +554,21 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     /*
      * The getattr leaves the attributes (obj) of the parent in sm_p->getattr.attr
      * Attributes (sys) for the mkdir request constructed in sm_p->u.mkdir.sys_attr
-     * Attributes (obj) in sm_p->u.mkdir.obj_attr will be passed to the server
+     * Attributes (obj) in sm_p->u.mkdir.dir_attr will be passed to the server
      * We need to complete the attributes using parent attributes and user
      * attributes including hints, and meta_sid_count
      */
 
     p_attr = &sm_p->getattr.attr;       /* parent attributes */
     assert(p_attr);
-    dir_attr = &sm_p->u.mkdir.obj_attr; /* new dir attributes */
+    dir_attr = &sm_p->u.mkdir.dir_attr; /* new dir attributes */
     assert(dir_attr);
     sys_attr = &sm_p->u.mkdir.sys_attr;   /* system attributes from user */
     assert(sys_attr);
+
+    distr_dir_servers_initial_requested = sys_attr->distr_dir_servers_initial;
+    distr_dir_servers_max_requested = sys_attr->distr_dir_servers_max;
+    distr_dir_split_size_requested = sys_attr->distr_dir_split_size;
 
     gossip_debug(GOSSIP_MKDIR_DEBUG,
         "parent owner: %d, group: %d, perms: %d, dirdata_count: %d\n",
@@ -608,14 +605,15 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     /* Priority for new directory object attributes such as:
      * number of data files / distributed directory parameters,
      * 1) values passed into sys_mkdir
-     * 2) directory hints / parent attributes
-     * 3) mount options (not yet implemented)  -- N/A
-     * 4) config file defaults                 -- DONE
-     * 4) system default (compiled in limits)  -- DONE
+     * 2) directory hints 
+     * 3) inherit parent attributes
+     * 4) mount options (not yet implemented)  -- N/A
+     * 5) config file defaults                 -- DONE
+     * 6) system default (compiled in limits)  -- DONE
      */
 
     /*******************************/
-    /* Parent defaults/hints */
+    /* Parent inherits/hints */
     /*******************************/
 #define SET_DIR_ATTR_FROM_PARENT(attr, mbit)                                    \
     if (((p_attr->attr) > 0) && PVFS2_attr_all(p_attr->mask, (mbit)))           \
@@ -732,104 +730,6 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     /* tree height, bitmap size and branch level are computed */
 #undef SET_DIR_ATTR_FROM_USER
 
-
-
-
-
-
-#if 0
-    /* Initial Requested */
-    if (sys_attr->distr_dir_servers_initial > 0)
-    {
-        distr_dir_servers_initial_requested =
-            sys_attr->distr_dir_servers_initial;
-    }
-    else
-    {
-        ; /* TODO ECQ - If we implement a directory hint or mount
-           * option check it here. */
-    }
-
-    /* Servers_MAX */
-    if (sys_attr->distr_dir_servers_max > 0)
-    {
-        distr_dir_servers_max_requested =
-            sys_attr->distr_dir_servers_max;
-    }
-    else
-    {
-        ; /* TODO ECQ - If we implement a directory hint or mount
-           * option check it here. */
-    }
-
-    /* Split_Size */
-    if (sys_attr->distr_dir_split_size > 0)
-    {
-        distr_dir_split_size_requested =
-            sys_attr->distr_dir_split_size;
-    }
-    else
-    {
-        ; /* TODO ECQ - If we implement a directory hint or mount
-           * option check it here. */
-    }
-
-/* not sure if it makes sense to do this or not - the idead would be
- * to carry all dist_dir fields in a sys-attr so when we wan to create things we
- * have enough data to fill the attr - also give programmers an
- * option to set some of these fields.
- */
-    /* Dirdata Count */
-    if (sys_attr->distr_dir_dirdata_count > 0)
-    {
-        distr_dir_dirdata_count_requested =
-            sys_attr->distr_dir_dirdata_count;
-    }
-    else
-    {
-        ; /* TODO ECQ - If we implement a directory hint or mount
-           * option check it here. */
-    }
-
-    /* Bitmap Size */
-    if (sys_attr->distr_dir_bitmap_size > 0)
-    {
-        distr_dir_bitmap_size_requested =
-            sys_attr->distr_dir_bitmap_size;
-    }
-    else
-    {
-        ; /* TODO ECQ - If we implement a directory hint or mount
-           * option check it here. */
-    }
-
-    /* Sid Count  - set to asystem preset */
-    if (sys_attr->distr_dir_sid_count > 0)
-    {
-        distr_dir_sid_count_requested =
-            sys_attr->distr_dir_sid_count;
-    }
-    else
-    {
-        ; /* TODO ECQ - If we implement a directory hint or mount
-           * option check it here. */
-    }
-#endif
-
-
-#if 0
-    /* Final determination based on config and number of meta
-     * servers present.
-     */
-    ret = PINT_cached_config_get_default_distr_dir_params(
-                             sm_p->parent_ref.fs_id,
-                             distr_dir_servers_initial_requested,
-                             &sys_attr->distr_dir_servers_initial,
-                             distr_dir_servers_max_requested,
-                             &sys_attr->distr_dir_servers_max,
-                             distr_dir_split_size_requested,
-                             &sys_attr->distr_dir_split_size);
-#endif
     if (ret < 0)
     {
         gossip_err("Error: failed to get distributed directory parameters\n");
@@ -840,17 +740,17 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_MKDIR_DEBUG,
                  "Setting distributed directory initial "
                  "servers to %d [requested %d]\n",
-                 sys_attr->distr_dir_servers_initial,
+                 dir_attr->u.dir.dist_dir_attr.dirdata_min,
                  distr_dir_servers_initial_requested);
     gossip_debug(GOSSIP_MKDIR_DEBUG,
                  "Setting distributed directory max "
                  "servers to %d [requested %d]\n",
-                 sys_attr->distr_dir_servers_max,
+                 dir_attr->u.dir.dist_dir_attr.dirdata_max,
                  distr_dir_servers_max_requested);
     gossip_debug(GOSSIP_MKDIR_DEBUG,
                  "Setting distributed directory split size "
                  "to %d [requested %d]\n",
-                 sys_attr->distr_dir_split_size,
+                 dir_attr->u.dir.dist_dir_attr.split_size,
                  distr_dir_split_size_requested);
 
 
@@ -874,7 +774,8 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_MKDIR_DEBUG," mkdir: posting mkdir req, "
-            "[distr_dir_servers_initial=%d]\n", sm_p->u.mkdir.sys_attr.distr_dir_servers_initial);
+                                    "[distr_dir_servers_initial=%d]\n", 
+                                    sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_min);
 
     /* Allocate OIDs and SIDs for a directory.
      * There is one OID for the metadata, and n OIDs for the dirdata
@@ -892,11 +793,11 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
      */
     ret = PVFS_OBJ_gen_dir(sm_p->parent_ref.fs_id,
                            &sm_p->u.mkdir.metadata_handle,
-                           sm_p->u.mkdir.metadata_sid_count, /* in */
+                           sm_p->u.mkdir.dir_attr.meta_sid_count, /* in */
                            &sm_p->u.mkdir.metadata_sid_array,
-                           sm_p->u.mkdir.sys_attr.distr_dir_servers_max,/* in */
+                           sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max, /* in */
                            &sm_p->u.mkdir.dirdata_handles,
-                           sm_p->u.mkdir.dirdata_sid_count, /* in */
+                           sm_p->u.mkdir.dir_attr.meta_sid_count, /* in */
                            &sm_p->u.mkdir.dirdata_sid_array);
     if(ret != 0)
     {
@@ -909,7 +810,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                      "mkdir selected meta server: %s,\ndirdata servers:\n",
                      PVFS_OID_str(sm_p->u.mkdir.metadata_handle));
 
-    for (i = 0; i < sm_p->u.mkdir.sys_attr.distr_dir_servers_max; i++)
+    for (i = 0; i < sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max; i++)
     {
         gossip_debug(GOSSIP_MKDIR_DEBUG, "\t%s\n",
                      PVFS_OID_str(&sm_p->u.mkdir.dirdata_handles[i]));
@@ -918,33 +819,28 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     /* object ref will now refer to newly created metadata object */
     sm_p->object_ref.handle    = *sm_p->u.mkdir.metadata_handle;
     sm_p->object_ref.fs_id     = sm_p->parent_ref.fs_id;
-    sm_p->object_ref.sid_count = sm_p->u.mkdir.metadata_sid_count;
+    sm_p->object_ref.sid_count = sm_p->u.mkdir.dir_attr.meta_sid_count;
     sm_p->object_ref.sid_array = sm_p->u.mkdir.metadata_sid_array;
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    /* we have built the object attrs directly, do no need to conver any more
-     * and sys_attr is only the atts passed by user, not final attrs
-     */
-    //PINT_CONVERT_ATTR(&sm_p->u.mkdir.obj_attr, &sm_p->u.mkdir.sys_attr, 0);
-
     PINT_SERVREQ_MKDIR_FILL(msg_p->req,
                             sm_p->getattr.attr.capability,
                             *sm_p->cred_p,
-                            sm_p->u.mkdir.obj_attr,
+                            sm_p->u.mkdir.dir_attr,
                             sm_p->parent_ref.fs_id,
                             *sm_p->u.mkdir.metadata_handle, /* object */
-                            sm_p->u.mkdir.metadata_sid_count,
+                            sm_p->u.mkdir.dir_attr.meta_sid_count,
                             sm_p->u.mkdir.metadata_sid_array,
                             &sm_p->parent_ref.handle, /* back ptr */
                             sm_p->parent_ref.sid_array,
-                            sm_p->u.mkdir.sys_attr.distr_dir_servers_max,
+                            sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max,
                             sm_p->u.mkdir.dirdata_handles,
-                            sm_p->u.mkdir.dirdata_sid_count,
+                            sm_p->u.mkdir.dir_attr.meta_sid_count, /* dirdata */
                             sm_p->u.mkdir.dirdata_sid_array,
-                            sm_p->u.mkdir.sys_attr.distr_dir_servers_initial,
-                            sm_p->u.mkdir.sys_attr.distr_dir_split_size,
+                            sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_min,
+                            sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.split_size,
                             sm_p->hints);
 
     msg_p->msgclass = PVFS_IO_METADATA;
@@ -952,7 +848,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = *sm_p->u.mkdir.metadata_handle;
     /* V3 this assumes fan out from client */
-    msg_p->sid_count = sm_p->u.mkdir.metadata_sid_count;
+    msg_p->sid_count = sm_p->u.mkdir.dir_attr.meta_sid_count;
     msg_p->sid_index = 0;
     msg_p->sid_array = sm_p->u.mkdir.metadata_sid_array;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
@@ -1007,29 +903,29 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
      * and used in the upcomming setattr call
      * Do we NEED to make this copy?   Is the src used anywhere after this?
      */
-    PINT_copy_object_attr(&dirdata_attr, &sm_p->u.mkdir.obj_attr);
+    PINT_copy_object_attr(&dirdata_attr, &sm_p->u.mkdir.dir_attr);
 
     /* we need the masks to reflect what is really in the attr */
 
     dirdata_attr.objtype = PVFS_TYPE_DIRDATA; /* this is a mkdir, so these are dirdata */
     ret = PINT_init_dist_dir_state(&dirdata_attr.u.dirdata.dist_dir_attr,
                                    &dirdata_attr.u.dirdata.dist_dir_bitmap,
-                                   sm_p->u.mkdir.sys_attr.distr_dir_servers_max,
-                                   sm_p->u.mkdir.dirdata_sid_count,
+                                   sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max,
+                                   sm_p->u.mkdir.dir_attr.meta_sid_count,
                                    0,  /* server_no - reset below */
-                                   sm_p->u.mkdir.sys_attr.distr_dir_servers_initial,
-                                   sm_p->u.mkdir.sys_attr.distr_dir_split_size);
+                                   sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_min,
+                                   sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_min);
 
     dirdata_attr.u.dirdata.dirdata_handles = sm_p->u.mkdir.dirdata_handles;
     dirdata_attr.u.dirdata.dirdata_sids = sm_p->u.mkdir.dirdata_sid_array;
     dirdata_attr.mask = PVFS_ATTR_DISTDIR_ATTR;
 
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op,
-                                 sm_p->u.mkdir.dirdata_sid_count);
+                                 sm_p->u.mkdir.dir_attr.meta_sid_count);
     if (ret != 0)
     {
         gossip_err("mkdir: setattr failed to initialize %d msgpairs\n",
-                   sm_p->u.mkdir.dirdata_sid_count);
+                   sm_p->u.mkdir.dir_attr.meta_sid_count);
         js_p->error_code = ret;
         return(SM_ACTION_COMPLETE);
     }
@@ -1047,9 +943,9 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
                                   *sm_p->cred_p,
                                   sm_p->parent_ref.fs_id,
                                   sm_p->u.mkdir.dirdata_handles[i],
-                                  sm_p->u.mkdir.dirdata_sid_count,
+                                  sm_p->u.mkdir.dir_attr.meta_sid_count,
                                   &sm_p->u.mkdir.dirdata_sid_array[i *
-                                              sm_p->u.mkdir.dirdata_sid_count],
+                                              sm_p->u.mkdir.dir_attr.meta_sid_count],
                                   PVFS_TYPE_DIRDATA, /* type of obj being set */
                                   dirdata_attr,      /* attrs COPIED by macro */
                                   0,                 /* extra_amask - remove this? */
@@ -1060,12 +956,13 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
         msg_p->msgdir = PVFS_IO_WRITE;
         msg_p->fs_id = sm_p->parent_ref.fs_id;
         msg_p->handle = sm_p->u.mkdir.dirdata_handles[i];
-        msg_p->sid_count = sm_p->u.mkdir.dirdata_sid_count;
+        msg_p->sid_count = sm_p->u.mkdir.dir_attr.meta_sid_count;
         msg_p->sid_index = 0;  /* I'm wondering if this should be i rather than 0? */
                                /* I think this is an index within the array of this
                                 * request (item below) not the whole array - verify
                                 */
-        msg_p->sid_array = &sm_p->u.mkdir.dirdata_sid_array[i * sm_p->u.mkdir.dirdata_sid_count];
+        msg_p->sid_array = &sm_p->u.mkdir.dirdata_sid_array[i * 
+                                          sm_p->u.mkdir.dir_attr.meta_sid_count];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = NULL;
 
@@ -1218,8 +1115,9 @@ static PINT_sm_action mkdir_crdirent_failure(struct PINT_smcb *smcb,
     {
         sm_p->u.mkdir.retry_count++;
 
-        gossip_debug(GOSSIP_MKDIR_DEBUG, "mkdir: received -PVFS_EAGAIN, will retry getattr and crdirent (attempt number %d).\n",
-                     sm_p->u.mkdir.retry_count);
+        gossip_debug(GOSSIP_MKDIR_DEBUG, "mkdir: received -PVFS_EAGAIN, "
+                                 "will retry getattr and crdirent (attempt number %d).\n",
+                                 sm_p->u.mkdir.retry_count);
 
         /* clear acache content */
         PINT_acache_invalidate(sm_p->object_ref);

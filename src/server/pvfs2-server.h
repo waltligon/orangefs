@@ -909,6 +909,12 @@ struct PINT_server_req_params
      */
     enum PINT_server_sched_policy sched_policy;
 
+    /* A callback implemented by the request to return the attribute
+     * struct imbedded in the server request structure for a given op.
+     */
+    int (*get_attr)(struct PVFS_server_req *req,
+                    PVFS_object_attr *attr);
+
     /* A callback implemented by the request to return the object reference
      * from the server request structure.
      */
@@ -939,6 +945,9 @@ struct PINT_server_req_entry
 extern struct PINT_server_req_entry PINT_server_req_table[];
 
 /* Exported Prototypes */
+
+int PINT_server_req_get_attr(struct PVFS_server_req *req,
+                             PVFS_object_attr *attr);
 
 int PINT_server_req_get_object_ref(struct PVFS_server_req *req,
                                    PVFS_fs_id *fs_id,

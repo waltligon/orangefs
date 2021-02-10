@@ -170,6 +170,10 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
         js_p->error_code = -PVFS_EINVAL;
     }
 
+    ret = PINT_server_req_get_attr(s_op->req,
+                                   &s_op->attr);
+    /* should we accept a NULL return for some OPs? */
+
     s_op->access_type = PINT_server_req_get_access_type(s_op->req);
     s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
 
@@ -178,12 +182,15 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
                  s_op->target_fs_id, PVFS_OID_str(&s_op->target_handle),
                  s_op->access_type, s_op->sched_policy);
 
-    /* add the user to the uid mgmt system */
+    /* FIXME!!add the user to the uid mgmt system */
     /* TODO: not currently supported w/new security system */
     /* Why not supported?  Is there nolonger uid in all requests
      * can we write logic for when there is or is not (like not if
      * using cert security)?  This is an important mgmt function, if 
      * it is possible to support.
+     */
+    /* I'm thinking this should be moved to unexpected, not everything
+     * calls prelude, and sometime other things call it more than once
      */
 #if 0
     ret = PINT_add_user_to_uid_mgmt(s_op->req->credentials.uid);

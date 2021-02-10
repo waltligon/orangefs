@@ -785,6 +785,14 @@ static PINT_sm_action cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 
 /***************** HELPER FUNCTIONS *****************/
 
+
+static int PINT_get_attr(struct PVFS_server_req *req,
+                         PVFS_object_attr *attr)
+{
+    *attr = req->u.create.attr;
+    return 0;
+};
+
 static int PINT_get_object_ref_create(struct PVFS_server_req *req,
                                       PVFS_fs_id *fs_id,
                                       PVFS_handle *handle)
@@ -821,6 +829,7 @@ static void create_get_ctrl(struct PVFS_server_req *req,
 struct PINT_server_req_params pvfs2_create_params =
 {
     .string_name = "create",
+    .get_attr = PINT_get_attr,
     .get_object_ref = PINT_get_object_ref_create,
     .get_credential = PINT_get_credential_create,
     .perm = perm_create,

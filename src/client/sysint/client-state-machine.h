@@ -232,8 +232,8 @@ struct PINT_client_mkdir_sm
 {
     char *object_name;              /* input parameter  */
     PVFS_sysresp_mkdir *mkdir_resp; /* in/out parameter */
-    PVFS_sys_attr sys_attr;         /* input: user passed attributes  */
-    PVFS_object_attr obj_attr;      /* attributes passed to server mkdir */
+    PVFS_sys_attr sys_attr;         /* input: user passed system attributes  */
+    PVFS_object_attr dir_attr;      /* attributes of new dir passed to server mkdir */
     PVFS_ds_keyval *key_array;
     PVFS_ds_keyval *val_array;
 
@@ -241,12 +241,10 @@ struct PINT_client_mkdir_sm
     int stored_error_code;
 
     PVFS_handle *metadata_handle;
-    int32_t metadata_sid_count;
     PVFS_SID *metadata_sid_array;
 
     int dirdata_count;
     PVFS_handle *dirdata_handles;
-    int32_t dirdata_sid_count;
     PVFS_SID *dirdata_sid_array;
 
     PVFS_capability capability;

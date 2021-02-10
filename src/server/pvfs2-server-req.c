@@ -128,6 +128,12 @@ struct PINT_server_req_entry PINT_server_req_table[] =
 #endif
 };
 
+/* These functions are used to retrieve data from a request that while common
+ * among requests, may not be at the same place in the union.  These are used
+ * by code that does not know aprior which request they are processing and wish
+ * to avoid long switch statements.  Examples include the prelude code.
+ */
+
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)
 
 enum PINT_server_req_access_type PINT_server_req_readonly(
@@ -168,6 +174,22 @@ PINT_server_req_get_sched_policy(struct PVFS_server_req *req)
     return PINT_server_req_table[req->op].params->sched_policy;
 }
 
+int PINT_server_req_get_attr(struct PVFS_server_req *req,
+                             PVFS_object_attr *attr)
+{
+    CHECK_OP(req->op);
+
+    if(!PINT_server_req_table[req->op].params->get_object_ref)
+    {
+        attr = NULL;
+        return 0;  /* is this an error, or a potential result? */
+    }
+    else
+    {
+        return PINT_server_req_table[req->op].params->get_attr(req, attr);
+    }
+}
+
 int PINT_server_req_get_object_ref(struct PVFS_server_req *req,
                                    PVFS_fs_id *fs_id,
                                    PVFS_handle *handle)
@@ -182,10 +204,9 @@ int PINT_server_req_get_object_ref(struct PVFS_server_req *req,
     }
     else
     {
-        return PINT_server_req_table[req->op].params->get_object_ref(
-                                                      req,
-                                                      fs_id,
-                                                      handle);
+        return PINT_server_req_table[req->op].params->get_object_ref(req,
+                                                                     fs_id,
+                                                                     handle);
     }
 }
 

@@ -178,7 +178,7 @@ machine pvfs2_mkdir_sm
 static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *a_p = NULL;
+    PVFS_object_attr *dir_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
     PVFS_uid uid;
     uint32_t num_groups;
@@ -191,38 +191,49 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
      * increment the counter for mkdir requests
      */
     PINT_perf_count(PINT_server_pc, PINT_PERF_MKDIR, 1, PINT_PERF_ADD);
-
-    /* The request provides a set of object attributes (s_op->req->u.mkdir.attr)
-     * The parent getattr provides another obj set (s_op->attr).  
-     * We need to create a set of ds attributes for writing to storage (s_op->ds_attr).A
-     * We will modify the req attr and convert them to ds_attrs at the end.
-     * There are shortcut pointers (a_p, ds_attr) to these structs.
-     * We must also consider hints from the parent directory
-     * (s_op->attr.u.dir.hint.xxx).
-     * We can fall back to defaults provided by the system.
-     */
-
-    s_op->attr.u.dir.dirdata_handles = NULL;
-    s_op->attr.u.dir.dist_dir_bitmap = NULL;
+    
+    /* set up key fields */
     s_op->key_a = NULL;
     s_op->val_a = NULL;
     s_op->error_a = NULL;
 
+    /*** SET UP ATTRIBUTES ***/
+    /* The request provides a set of object attributes (s_op->req->u.mkdir.attr).
+     * Prelude leaves "target" dir attrs in (s_op->attr) and (s_op->ds_attr).
+     *
+     * We need to create a set of ds attributes for writing to storage (s_op->ds_attr).
+     * We will modify the req obj attr and convert them to ds_attrs at the end.
+     * There are shortcut pointers (dir_attr, ds_attr) to these structs.
+     * 
+     * The request attrs have already had the compiled-in and config file defaults
+     * incorporated, as well as the parent attrs and hints by the client code.
+     *
+     * This code should verify the values make sense as a precaution.  Assumes
+     * we kinda trust client to ask for what it wants, but not with the details.
+     */
+
+    if (dir_attr->u.dir.dist_dir_attr.dirdata_count < 1)
+    {
+    /* !!!!!!!!! No Parent !!!!! */
+        s_op->attr.u.dir.dirdata_handles = NULL;
+        s_op->attr.u.dir.dist_dir_bitmap = NULL;
+    }
+
     s_op->u.mkdir.fs_id = s_op->req->u.mkdir.fs_id;
     s_op->u.mkdir.handle = s_op->req->u.mkdir.handle;
 
-    a_p = &(s_op->req->u.mkdir.attr);
+    dir_attr = &(s_op->req->u.mkdir.attr);
     ds_attr = (&s_op->ds_attr);
 
-    if (a_p->objtype != PVFS_TYPE_DIRECTORY)
+    if (dir_attr->objtype != PVFS_TYPE_DIRECTORY)
     {
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
     }
 
     /* map owner/group from credential */
-    if (a_p->mask & (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID) &&
-        (a_p->owner == PVFS_UID_MAX || a_p->group == PVFS_GID_MAX))
+    if (dir_attr->mask & (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID) &&
+        (dir_attr->owner == PVFS_UID_MAX || dir_attr->group == PVFS_GID_MAX))
     {
         ret  = PINT_map_credential(&s_op->req->u.mkdir.credential, 
                                    &uid, &num_groups, group_array);
@@ -232,41 +243,42 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
             return SM_ACTION_COMPLETE;
         }
 
-        if (a_p->mask & PVFS_ATTR_COMMON_UID &&
-            a_p->owner == PVFS_UID_MAX)
+        if (dir_attr->mask & PVFS_ATTR_COMMON_UID &&
+            dir_attr->owner == PVFS_UID_MAX)
         {
-            a_p->owner = uid;
+            dir_attr->owner = uid;
         }
 
-        if (a_p->mask & PVFS_ATTR_COMMON_GID &&
-            a_p->group == PVFS_GID_MAX)
+        if (dir_attr->mask & PVFS_ATTR_COMMON_GID &&
+            dir_attr->group == PVFS_GID_MAX)
         {
-            a_p->group = group_array[0];
+            dir_attr->group = group_array[0];
         }
     }
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " attrs to write: [owner = %d, "
-                 "group = %d, perms = %o]\n", a_p->owner, a_p->group,
-                 a_p->perms);
+                 "group = %d, perms = %o]\n", dir_attr->owner, dir_attr->group,
+                 dir_attr->perms);
 
     /* set up the dist-dir-state portion of the attributes
-     * pointed to by a_p attributes in the mkdir request
+     * pointed to by dir_attr attributes in the mkdir request
      * which are the directory attributes.
      */
-    ret = PINT_init_dist_dir_state(&a_p->u.dir.dist_dir_attr,
-                                   &a_p->u.dir.dist_dir_bitmap,
+    ret = PINT_init_dist_dir_state(&dir_attr->u.dir.dist_dir_attr,
+                                   &dir_attr->u.dir.dist_dir_bitmap,
                                    s_op->req->u.mkdir.dirdata_count,
                                    s_op->req->u.mkdir.dirdata_sid_count,
                                    -1, /* server_no -1 for meta objects */
                                    s_op->req->u.mkdir.dist_dir_servers_initial,
                                    s_op->req->u.mkdir.dist_dir_split_size);
 
-    if (a_p->u.dir.dist_dir_attr.dirdata_count < 1)
+/* !!!!!!!!! No Parent !!!!! */
+    if (dir_attr->u.dir.dist_dir_attr.dirdata_count < 1)
     {
         /* check for parent hint */
         if (s_op->attr.u.dir.hint.dir_dirdata_min > 0)
         {
-            a_p->u.dir.dist_dir_attr.dirdata_count = 
+            dir_attr->u.dir.dist_dir_attr.dirdata_count = 
                             s_op->attr.u.dir.hint.dir_dirdata_min;
         }
         else
@@ -275,14 +287,16 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
         }
     }
 
+/* !!!!!!!!! No Parent !!!!! */
+    if (dir_attr->u.dir.dist_dir_attr.dirdata_count < 1)
 /* this might be totally useless */
 #if 0
-    if (a_p->u.dir.dist_dir_attr.sid_count < 1)
+    if (dir_attr->u.dir.dist_dir_attr.sid_count < 1)
     {
         /* check for parent hint */
         if (s_op->attr.u.dir.hint.sid_count > 0)
         {
-            a_p->u.dir.dist_dir_attr.sid_count = s_op->attr.u.dir.hint.sid_count;
+            dir_attr->u.dir.dist_dir_attr.sid_count = s_op->attr.u.dir.hint.sid_count;
         }
         else
         {
@@ -297,46 +311,50 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
         return SM_ACTION_COMPLETE;
     }
 
+/* !!!!!!!!! No Parent !!!!! */
+    if (dir_attr->u.dir.dist_dir_attr.dirdata_count < 1)
     /* inherit hints from parent */
-    memcpy(&a_p->u.dir.hint, &s_op->attr.u.dir.hint, sizeof(PVFS_directory_hint));
+    memcpy(&dir_attr->u.dir.hint, &s_op->attr.u.dir.hint, sizeof(PVFS_directory_hint));
     /* copy distribution parameters string */
     if (s_op->attr.u.dir.hint.dist_params_len > 0 && s_op->attr.u.dir.hint.dist_params)
     {
-        a_p->u.dir.hint.dist_params = strdup(s_op->attr.u.dir.hint.dist_params);
+        dir_attr->u.dir.hint.dist_params = strdup(s_op->attr.u.dir.hint.dist_params);
     }
     else
     {
-        a_p->u.dir.hint.dist_params = NULL;
-        a_p->u.dir.hint.dist_params_len = 0;
+        dir_attr->u.dir.hint.dist_params = NULL;
+        dir_attr->u.dir.hint.dist_params_len = 0;
     }
     /* copy distribution name string */
     if (s_op->attr.u.dir.hint.dist_name_len > 0 && s_op->attr.u.dir.hint.dist_name)
     {
-        a_p->u.dir.hint.dist_name = strdup(s_op->attr.u.dir.hint.dist_name);
+        dir_attr->u.dir.hint.dist_name = strdup(s_op->attr.u.dir.hint.dist_name);
     }
     else
     {
         /* if name is missing, there is no dist so zero it all */
-        a_p->u.dir.hint.dist_name = NULL;
-        a_p->u.dir.hint.dist_name_len = 0;
-        free(a_p->u.dir.hint.dist_params);
-        a_p->u.dir.hint.dist_params = NULL;
-        a_p->u.dir.hint.dist_params_len = 0;
+        dir_attr->u.dir.hint.dist_name = NULL;
+        dir_attr->u.dir.hint.dist_name_len = 0;
+        free(dir_attr->u.dir.hint.dist_params);
+        dir_attr->u.dir.hint.dist_params = NULL;
+        dir_attr->u.dir.hint.dist_params_len = 0;
     }
 
     /* struct specific gossip macros defined in src/common/misc/dist-dir-utils.h */
-    PINT_debug_dist_dir_attr(GOSSIP_MKDIR_DEBUG, a_p->u.dir.dist_dir_attr);
-    PINT_debug_dist_dir_bitmap(GOSSIP_MKDIR_DEBUG, a_p->u.dir.dist_dir_attr,
-                               a_p->u.dir.dist_dir_bitmap);
+    PINT_debug_dist_dir_attr(GOSSIP_MKDIR_DEBUG, dir_attr->u.dir.dist_dir_attr);
+    PINT_debug_dist_dir_bitmap(GOSSIP_MKDIR_DEBUG, dir_attr->u.dir.dist_dir_attr,
+                               dir_attr->u.dir.dist_dir_bitmap);
 
     /* last couple of things to set up before we convert to ds_attr */
-    a_p->u.dir.dirdata_handles = s_op->req->u.mkdir.dirdata_handles;
-    a_p->u.dir.dirdata_sids = s_op->req->u.mkdir.dirdata_sid_array;
-    a_p->u.dir.dirent_count = 0; /* new dir so no entries */
-    a_p->meta_sid_count = s_op->attr.meta_sid_count; /* get from parent */
+    dir_attr->u.dir.dirdata_handles = s_op->req->u.mkdir.dirdata_handles;
+    dir_attr->u.dir.dirdata_sids = s_op->req->u.mkdir.dirdata_sid_array;
+    dir_attr->u.dir.dirent_count = 0; /* new dir so no entries */
+/* !!!!!!!!! No Parent !!!!! */
+    if (dir_attr->u.dir.dist_dir_attr.dirdata_count < 1)
+    dir_attr->meta_sid_count = s_op->attr.meta_sid_count; /* get from parent */
 
     /* translate attrs to storage attr format */
-    PVFS_ds_attr_from_object_attr(ds_attr, a_p);
+    PVFS_ds_attr_from_object_attr(ds_attr, dir_attr);
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
@@ -1175,7 +1193,14 @@ static inline int PINT_get_object_ref_mkdir(struct PVFS_server_req *req,
     return 0;
 }
 
-static int perm_mkdir(PINT_server_op *s_op)
+static int PINT_get_attr_mkdir(struct PVFS_server_req *req,
+                                PVFS_object_attr *attr)
+{
+    *attr = req->u.mkdir.attr;
+    return 0;
+}
+
+static int PINT_perm_mkdir(PINT_server_op *s_op)
 {
     int ret;
 
@@ -1196,8 +1221,9 @@ PINT_GET_CREDENTIAL_DEFINE(mkdir);
 struct PINT_server_req_params pvfs2_mkdir_params =
 {
     .string_name = "mkdir",
+    .get_attr = PINT_get_attr_mkdir,
     .get_object_ref = PINT_get_object_ref_mkdir,
-    .perm = perm_mkdir,
+    .perm = PINT_perm_mkdir,
     .access_type = PINT_server_req_modify,
     .get_credential = PINT_get_credential_mkdir,
     .state_machine = &pvfs2_mkdir_sm

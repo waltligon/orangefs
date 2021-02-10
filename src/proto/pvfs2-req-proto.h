@@ -1407,7 +1407,7 @@ struct PVFS_servreq_mkdir
     PVFS_handle handle;           /* object being created */
     int32_t sid_count;            /* for object being created */
     PVFS_SID *sid_array;          /* sids for object being created */
-    PVFS_handle *parent;          /* pointer to back pointer handle */
+    PVFS_handle *parent;          /* back pointer to handle parent*/
     PVFS_SID *parent_sid_array;   /* sids for back pointer */
     int32_t dirdata_count;        /* number of dirdata handles */
     PVFS_handle *dirdata_handles; /* array of dirdata handles */

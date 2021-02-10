@@ -1194,7 +1194,7 @@ static PINT_sm_action setattr_cleanup(struct PINT_smcb *smcb,
 #define PERM_TABLE_ATTR     0
 #define PERM_TABLE_PERM     1
 
-static int perm_setattr(PINT_server_op *s_op)
+static int PINT_perm_setattr(PINT_server_op *s_op)
 {
     /* permissions required for specified attributes
        if entries are added, update PERM_TABLE_COUNT above */
@@ -1313,7 +1313,7 @@ static int perm_setattr(PINT_server_op *s_op)
     return 0;
 }
 
-static void setattr_get_ctrl(struct PVFS_server_req *req,
+static void PINT_get_ctrl_setattr(struct PVFS_server_req *req,
                              struct PINT_server_req_ctrl *ctrl)
 {
     /* this sets up a standard replication */
@@ -1326,18 +1326,26 @@ static void setattr_get_ctrl(struct PVFS_server_req *req,
     ctrl->sid_count = req->u.setattr.sid_count;
 }
 
+static int PINT_get_attr_seattr(struct PVFS_server_req *req,
+                         PVFS_object_attr *attr)
+{
+    *attr = req->u.setattr.attr;
+    return 0;
+}
+
 PINT_GET_OBJECT_REF_DEFINE(setattr);
 PINT_GET_CREDENTIAL_DEFINE(setattr);
 
 struct PINT_server_req_params pvfs2_set_attr_params =
 {
     .string_name = "setattr",
-    .perm = perm_setattr,
+    .perm = PINT_perm_setattr,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_setattr,
+    .get_attr = PINT_get_attr_seattr,
     .get_credential = PINT_get_credential_setattr,
-    .get_ctrl = setattr_get_ctrl,
+    .get_ctrl = PINT_get_ctrl_setattr,
     .state_machine = &pvfs2_set_attr_sm
 };
 
