@@ -2928,7 +2928,7 @@ static int test_rq(struct rdma_work *rq,
     }
     else if (rq->state.recv == RQ_CANCELLED && complete)
     {
-        debug(2, "%s: rq %p canelled", __func__, rq);
+        debug(2, "%s: rq %p cancelled", __func__, rq);
         *err = -BMI_ETIMEDOUT;
 
         if (rq->mop)
