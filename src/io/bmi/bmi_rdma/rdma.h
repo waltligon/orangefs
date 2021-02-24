@@ -63,7 +63,10 @@ typedef struct
     int send_credit;    /* free slots on receiver */
     int return_credit;  /* receive buffers he filled but that we've emptied */
 
-    void *priv;     /* TODO: change from void to rdma_connection_priv? */
+    struct rdma_cm_id *id;          /* connection id */
+    struct ibv_qp *qp;              /* queue pair */
+    struct ibv_mr *eager_send_mr;   /* send memory region */
+    struct ibv_mr *eager_recv_mr;   /* recv memory region */
 
     BMI_addr_t bmi_addr;
 } rdma_connection_t;
@@ -403,7 +406,32 @@ typedef struct
     unsigned long eager_buf_size;
     bmi_size_t eager_buf_payload;
 
-    void *priv;
+    struct ibv_context *ctx;  /* device context */
+    struct ibv_cq *nic_cq;    /* single completion queue for all QPs */
+    struct ibv_pd *nic_pd;    /* single protection domain for all memory/QPs */
+    struct ibv_comp_channel *channel;   /* completion channel */
+
+    /* max values as reported by NIC */
+    int nic_max_sge;
+    int nic_max_wr;
+
+    /*
+     * Temp array for filling scatter/gather lists to pass to RDMA functions,
+     * allocated once at start to max size defined as reported by the QP.
+     */
+    struct ibv_sge *sg_tmp_array;
+    uint32_t sg_max_len;
+
+    /*
+     * We use unsignaled sends. They complete locally but we have no need to
+     * hear about it since the ack protocol with the peer handles freeing up
+     * buffers and whatever. However, the completion queue _will_ fill up
+     * even though poll returns no results. Hence you must post a signaled
+     * send every once in a while, per CQ, not per QP. This trackes when we
+     * need to do the next.
+     */
+    unsigned int num_unsignaled_sends;
+    unsigned int max_unsignaled_sends;
 } rdma_device_t;
 extern rdma_device_t *rdma_device;
 
