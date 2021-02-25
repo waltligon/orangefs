@@ -605,7 +605,6 @@ static int check_cq(void)
 
     if (!rdma_device->nic_cq)
     {
-        //gossip_err("%s: cq hasn't been created yet!\n", __func__);
         return 0;
     }
 
@@ -620,10 +619,8 @@ static int check_cq(void)
         vret = get_one_completion(&wc);
         if (vret == 0 || wc.id == 0)
         {
-            //gossip_err("%s: no completions\n", __func__);
             break;  /* empty */
         }
-        //gosip_err("%s: got a completion\n", __func__);
 
         debug(4, "%s: found something", __func__);
 
@@ -4796,7 +4793,6 @@ static int rdma_block_for_activity(int timeout_ms)
 
     if (!rdma_device->nic_cq)
     {
-        //gossip_err("%s: no cq yet, no need to poll\n", __func__);
         return 0;
     }
 
@@ -5025,7 +5021,8 @@ static int mem_register(memcache_entry_t *c)
 
     if (!rdma_device->nic_pd)
     {
-        gossip_err("%s: no Protection Domain yet; this entry will have to be pinned at the time of posting\n", __func__);
+        debug(4, "%s: no Protection Domain yet; this entry will have to be pinned at the time of posting\n",
+              __func__);
         return 0;
     }
 
@@ -5091,7 +5088,7 @@ static void mem_deregister(memcache_entry_t *c)
     }
     else
     {
-        gossip_err("%s: nothing to unpin?\n", __func__);
+        debug(4, "%s: nothing to unpin\n", __func__);
     }
 }
 
