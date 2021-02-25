@@ -5,10 +5,6 @@
  * Copyright (C) 2006 Kyle Schochenmaier <kschoche@scl.ameslab.gov>
  * Copyright (C) 2016 David Reynolds <david@omnibond.com>
  *
- * TODO: If we still need to support ibv_get_devices(), which was replaced
- *       by ibv_get_device_list(), then the #ifdef HAVE_IBV_GET_DEVICES
- *       statements and corresponding code need to be added back in.
- *
  * See COPYING in top-level directory.
  */
 
@@ -78,71 +74,6 @@ struct rdma_conn_info
     char *hostname;         /* peer's addr */
     char *peername;         /* combination of hostname and port number */
 };
-
-/* TODO: remove */
-#if 0
-/*
- * RDMA-private device-wide state.
- */
-struct rdma_device_priv
-{
-    struct ibv_context *ctx;   /* context used to reference everything */
-    struct ibv_cq *nic_cq;     /* single completion queue for all QPs */
-    struct ibv_pd *nic_pd;     /* single protection domain for all memory/QPs */
-    /* TODO: is the nic_lid field needed? */
-    //uint16_t nic_lid;          /* local id (nic) */
-    int nic_port;              /* port number */
-    struct ibv_comp_channel *channel;
-
-    /* max values as reported by NIC */
-    int nic_max_sge;
-    int nic_max_wr;
-
-    /* MTU values reported by NIC port */
-    //int max_mtu;
-    //int active_mtu;
-
-    /*
-     * Temp array for filling scatter/gather lists to pass to RDMA functions,
-     * allocated once at start to max size defined as reported by the qp.
-     */
-    struct ibv_sge *sg_tmp_array;
-    uint32_t sg_max_len;
-
-    /*
-     * We use unsignaled sends.  They complete locally but we have no need to
-     * hear about it since the ack protocol with the peer handles freeing up
-     * buffers and whatever.  However, the completion queue _will_ fill up
-     * even though poll returns no results.  Hence you must post a signaled
-     * send every once in a while, per CQ, not per QP.  This tracks when we
-     * need to do the next.
-     */
-    unsigned int num_unsignaled_sends;
-    unsigned int max_unsignaled_sends;
-};
-#endif
-
-/* TODO: remove */
-#if 0
-/*
- * Per-connection state.
- */
-struct rdma_connection_priv
-{
-    /* connection id */
-    struct rdma_cm_id *id;
-
-    /* ibv local params */
-    struct ibv_qp *qp;
-    struct ibv_mr *eager_send_mr;
-    struct ibv_mr *eager_recv_mr;
-
-    /* TODO: are these still needed? */
-    /* rdma remote params */
-    //uint16_t remote_lid;
-    //uint32_t remote_qp_num;
-};
-#endif
 
 /* function prototypes */
 static int BMI_rdma_initialize(struct bmi_method_addr *listen_addr,
@@ -369,12 +300,6 @@ static void build_qp_init_attr(int *num_wr,
 static int verify_qp_caps(struct ibv_qp_init_attr attr, int num_wr);
 
 static void build_conn_params(struct rdma_conn_param *params);
-
-//static void init_connection_modify_qp(struct ibv_qp *qp,
-//                                      uint32_t remote_qp_num,
-//                                      int remote_lid);
-
-//static void rdma_drain_qp(rdma_connect_t *c);
 
 static void rdma_close_connection(rdma_connection_t *c);
 
@@ -3925,27 +3850,6 @@ static void build_conn_params(struct rdma_conn_param *params)
 }
 
 /*
- * The queue pair is automatically transitioned through the required states
- * by rdma_create_qp(), so it is ready to post receives. All we need to do
- * here is modify attributes.
- *
- * TODO: is this needed anymore?
- */
-//static void init_connection_modify_qp()
-//{
-//}
-
-/*
- * Close the QP associated with this connection.
- *
- * TODO: does replacing this entire function with rdma_disconnect() achieve
- *       the desired result?
- */
-//static void rdma_drain_qp(rdma_connect_t *c)
-//{
-//{
-
-/*
  * rdma_close_connection()
  *
  * Description:
@@ -4671,8 +4575,6 @@ void *rdma_server_listener_thread(void *arg)
 
             debug(0, "%s: accepted new connection from %s at server",
                   __func__, c->conn_info->peername);
-
-            /* TODO: cleanup rc? */
         }
         else if (event_copy.event == RDMA_CM_EVENT_DISCONNECTED)
         {
@@ -5225,15 +5127,6 @@ static int BMI_rdma_initialize(struct bmi_method_addr *listen_addr,
         return bmi_errno_to_pvfs(-ENOMEM);
     }
 
-#if 0
-    ret = build_rdma_context();
-    if (ret)
-    {
-        gen_mutex_unlock(&interface_mutex);
-        return bmi_errno_to_pvfs(-BMI_ENODEV);
-    }
-#endif
-
     /* initialize memcache */
     rdma_device->memcache = memcache_init(mem_register,
                                           mem_deregister);
@@ -5289,8 +5182,6 @@ static int BMI_rdma_initialize(struct bmi_method_addr *listen_addr,
 static int build_rdma_context(struct ibv_context *dev_ctx)
 {
     int flags, ret = 0;
-    //struct ibv_device *nic_handle;
-    //struct ibv_context *ctx;
     int cqe_num;    /* local variables, mainly for debug */
     struct ibv_device_attr hca_cap;
 
@@ -5382,31 +5273,6 @@ static int build_rdma_context(struct ibv_context *dev_ctx)
 
     return 0;
 }
-
-/* TODO: not needed anymore */
-#if 0
-//static struct ibv_device *get_nic_handle(void)
-//{
-//    struct ibv_device *nic_handle;
-//    struct ibv_context **dev_list;
-//    int num_devs;
-//
-//    dev_list = rdma_get_devices(&num_devs);
-//    if (num_devs == 0)
-//    {
-//        return NULL;
-//    }
-//    if (num_devs > 1)
-//    {
-//        warning("%s: found %d HCAs, choosing the first", __func__, num_devs);
-//    }
-//
-//    nic_handle = dev_list[0]->device;
-//    rdma_free_devices(dev_list);
-//
-//    return nic_handle;
-//}
-#endif
 
 /* NOTE:  You have to be sure that ib_uverbs.ko is loaded, otherwise it
  * will segfault and/or not find the ib device.
