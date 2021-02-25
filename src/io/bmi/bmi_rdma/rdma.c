@@ -36,6 +36,12 @@
 
 #include "rdma.h"
 
+/* NOTE:  You have to be sure that ib_uverbs.ko is loaded, otherwise it
+ * will segfault and/or not find the ib device.
+ * TODO:  Find some way to check and see if ib_uverbs.ko is loaded (if
+ *        needed for RDMA/RoCE)
+ */
+
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 
 /*
@@ -5273,12 +5279,6 @@ static int build_rdma_context(struct ibv_context *dev_ctx)
 
     return 0;
 }
-
-/* NOTE:  You have to be sure that ib_uverbs.ko is loaded, otherwise it
- * will segfault and/or not find the ib device.
- * TODO:  Find some way to check and see if ib_uverbs.ko is loaded (if
- *        needed for RDMA/RoCE)
- */
 
 /*
  * BMI_rdma_finalize()
