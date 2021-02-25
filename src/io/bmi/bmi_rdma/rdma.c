@@ -408,8 +408,6 @@ static void mem_deregister(memcache_entry_t *c);
 
 static int build_rdma_context(struct ibv_context *dev_ctx);
 
-static int return_active_nic_handle(struct ibv_device_attr *hca_dev_attr);
-
 static void cleanup_rdma_context(void);
 
 
@@ -5301,17 +5299,6 @@ static int build_rdma_context(struct ibv_context *dev_ctx)
 
     rdma_device->ctx = dev_ctx;
 
-#if 0
-    ret = return_active_nic_handle(&hca_cap);
-    if (ret)
-    {
-        return -ENOSYS;
-    }
-
-    /* TODO: is the nic_lid field still needed? */
-    //rdma_device->nic_lid = hca_cap.lid;
-#endif
-
     /* Query the device for the max_ requests and such */
     ret = ibv_query_device(rdma_device->ctx, &hca_cap);
     if (ret)
@@ -5429,154 +5416,6 @@ static int build_rdma_context(struct ibv_context *dev_ctx)
  * TODO:  Find some way to check and see if ib_uverbs.ko is loaded (if
  *        needed for RDMA/RoCE)
  */
-
-#if 0
-/*
- * return_active_nic_handle()
- *
- * Description:
- *  This function returns the first active HCA device which returns a
- *  valid IBV_PORT_ACTIVE.
- *
- * Params:
- *  [out] rd - preallocated from build_rdma_context(); rd->ctx is allocated
- *             by rdma_get_devices() inside this function
- *  [out] hca_port - hcas port attributes
- *
- * Returns:
- *  0 on success, -errno on failure
- */
-static int return_active_nic_handle(struct ibv_device_attr *hca_dev_attr)
-{
-    int ret = 0, i = 0, j = 0;
-    struct ibv_device *nic_handle = NULL;
-    struct ibv_context **dev_list;
-    int num_devs = 0;
-    struct ibv_context *ctx;
-    int active_device = 0;
-    struct ibv_port_attr hca_port_attr;
-
-    /* make this configurable once we decide how
-     * adding more than one HCA REALLY complicates the configurable
-     * nature that we had discussed */
-    rd->nic_port = IBV_PORT;
-
-    dev_list = rdma_get_devices(&num_devs);
-    if (num_devs <= 0)
-    {
-        error("%s: NO RDMA DEVICES FOUND", __func__);
-        return -ENOSYS;
-    }
-    else
-    {
-        /* return a device which is active */
-        for (i = 0; i < num_devs; i++)
-        {
-            nic_handle = dev_list[i]->device;
-
-            /* test the device to see if active */
-            ctx = NULL;
-            ctx = dev_list[i];
-            rd->ctx = ctx;
-            if (!rd->ctx || ctx == NULL || !ctx)
-            {
-                error("%s: rdma_get_devices", __func__);
-                return -ENOSYS;
-            }
-
-            ret = ibv_query_device(ctx, hca_dev_attr);
-            if (ret)
-            {
-                error_xerrno(ret, "%s: ibv_query_device", __func__);
-                return -ENOSYS;
-            }
-
-            for (j = 1; j <= hca_dev_attr->phys_port_cnt; j++)
-            {
-                ret = ibv_query_port(ctx, j, &hca_port_attr);
-                if (ret)
-                {
-                    error_xerrno(ret, "ibv_query_port", __func__);
-                    return -ENOSYS;
-                }
-
-                if (hca_port_attr.state == IBV_PORT_ACTIVE)
-                {
-                    /* found an active port */
-                    active_device = 1;
-                    break;
-                }
-                else
-                {
-                    /* in this case, continue, delete old hca_port_attr info */
-                    memset(&hca_port_attr, 0, sizeof(hca_port_attr));
-                    warning("%s: found an inactive device/port", __func__);
-                }
-            }
-
-            if (active_device)
-            {
-                /* found one so we're done */
-                break;
-            }
-            else
-            {
-                /* if we get to num_devs, no valid devices found */
-                if (i == (num_devs - 1 ))
-                {
-                    /* FATAL */
-                    warning("%s: No Active IB ports/devices found", __func__);
-                    return -ENOSYS;
-                }
-
-                /* keep looking */
-                continue;
-            }
-
-#if 0
-            /* TODO: is ibv_query_port supported by RoCE/RDMA */
-            ret = ibv_query_port(ctx, rd->nic_port, hca_port);
-            if (ret)
-            {
-                error_xerrno(ret, "%s: ibv_query_port", __func__);
-                return -ENOSYS;
-            }
-
-            if (hca_port->state != IBV_PORT_ACTIVE)
-            {
-                /* in this case, continue, delete old hca_port info */
-                memset(hca_port, 0, sizeof(*hca_port));
-                warning("%s: found an inactive device/port", __func__);
-
-                /* if we get to num_devs, no valid devices found */
-                if (i == (num_devs - 1))
-                {
-                    /* FATAL */
-                    warning("%s: No Active IB ports/devices found", __func__);
-                    return -ENOSYS;
-                }
-
-                continue;
-            }
-            else
-            {
-                /* if we get here, we had a valid device found,
-                 * done searching */
-                rd->max_mtu = hca_port->max_mtu;
-                rd->active_mtu = hca_port->active_mtu;
-                break;
-            }
-#endif
-        }
-    }
-
-    VALGRIND_MAKE_MEM_DEFINED(ctx, sizeof(*ctx));
-
-    /* cleanup */
-    rdma_free_devices(dev_list);
-    return 0;
-}
-#endif
 
 /*
  * BMI_rdma_finalize()
