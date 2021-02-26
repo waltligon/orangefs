@@ -543,6 +543,8 @@ static int check_cq(void)
         struct bmi_rdma_wc wc;
         int vret;
 
+        memset(&wc, 0, sizeof(wc));
+
         bh = NULL;
         sq = NULL;
 
