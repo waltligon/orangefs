@@ -64,11 +64,8 @@ int listener_thread_shutdown = 0;
 gen_thread_t listener_thread_id;
 int listener_timeout_ms = 2000;   /* TODO: test this, may be too long */
 
-/* constants used to initialize infiniband device */
-static const int IBV_PORT = 1;  /* TODO: what if it isn't Port 1? */
+/* constants used to initialize RDMA device */
 static const unsigned int IBV_NUM_CQ_ENTRIES = 1024;
-/* TODO: can the MTU be bumped up? */
-static const int IBV_MTU = IBV_MTU_1024;  /* dmtu, 1k good for mellanox */
 
 /*
  * RDMA connection info passed to rdma_new_connection.
