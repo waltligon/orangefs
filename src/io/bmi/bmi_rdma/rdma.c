@@ -3221,7 +3221,14 @@ static int BMI_rdma_cancel(bmi_op_id_t id,
         struct qlist_head *l;
 
         c->cancelled = 1;
-        rdma_disconnect(c->id);
+        if (c->id)
+        {
+            rdma_disconnect(c->id);
+        }
+        else
+        {
+            debug(4, "%s: already disconnected", __func__);
+        }
         /*
          * TODO: does rdma_disconnect() accomplish everything that was
          * previously handled in rdma_drain_qp()?
@@ -3971,6 +3978,7 @@ static void rdma_close_connection(rdma_connection_t *c)
         {
             error_errno("%s: rdma_destroy_id failed", __func__);
         }
+        c->id = NULL;
 
         /* only destroy the event channel if we are a client */
         if (!is_server)
@@ -5353,6 +5361,7 @@ static int BMI_rdma_finalize(void)
               llu(int64_from_ptr(rdma_device->listen_id)),
               rdma_device->listen_id->channel->fd);
         rdma_destroy_id(rdma_device->listen_id);
+        rdma_device->listen_id = NULL;
         rdma_destroy_event_channel(channel);
         channel = NULL;
         /* TODO: make sure any QP that is associated with the listen ID is
