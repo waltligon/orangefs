@@ -5111,8 +5111,6 @@ static int BMI_rdma_initialize(struct bmi_method_addr *listen_addr,
                                int init_flags,
                                char *options)
 {
-    int ret;
-
     debug(0, "Initializing RDMA module");
 
     gen_mutex_lock(&interface_mutex);
@@ -5166,7 +5164,7 @@ static int BMI_rdma_initialize(struct bmi_method_addr *listen_addr,
     gen_mutex_unlock(&interface_mutex);
 
     debug(0, "rdma module successfully initialized");
-    return ret;
+    return 0;
 }
 
 /*
