@@ -81,7 +81,8 @@ struct rdma_conn_info
 /* function prototypes */
 static int BMI_rdma_initialize(struct bmi_method_addr *listen_addr,
                                int method_id,
-                               int init_flags);
+                               int init_flags,
+                               char *options);
 
 static int BMI_rdma_finalize(void);
 
@@ -5107,7 +5108,8 @@ static int BMI_rdma_set_info(int option,
  */
 static int BMI_rdma_initialize(struct bmi_method_addr *listen_addr,
                                int method_id,
-                               int init_flags)
+                               int init_flags,
+                               char *options)
 {
     int ret;
 
