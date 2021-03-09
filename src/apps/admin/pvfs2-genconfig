@@ -863,7 +863,7 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
      --mxboard     <NUM>               MX board to use (default is 0)
      --mxendpoint  <NUM>               MX endpoint to use (default is 3)
      --ibport      <NUM>               IB port to use (default is 3335)
-     --rdmaport    <NUM>               RDMA port to use (default is 1)
+     --rdmaport    <NUM>               RDMA port to use (default is 3335)
      --portal      <NUM>               Portals index for
                                        listening server (default is 5)
      --logging     <STRING>            debugging mask for log messages
@@ -1327,7 +1327,7 @@ sub ib_get_port
 
 sub rdma_get_port
 {
-    my $port = 1;
+    my $port = 3335;
     if ($opt_rdmaport) {
         $port = $opt_rdmaport;
     } elsif (!$opt_iospec) {
