@@ -3081,7 +3081,7 @@ restart:
             msg_header_eager_t mh_eager;
             char *ptr = rq->bh->buf;
             rdma_connection_t *c = rq->c;
-            
+
             /* TODO: is there a better way to do this? */
             /* don't try to process the recv until the server has all the
              * information it needs about the connection */
@@ -3967,7 +3967,7 @@ static void rdma_close_connection(rdma_connection_t *c)
     if (c->id)
     {
         channel = c->id->channel;
-        
+
         debug(0, "%s: destroying id=%llu, fd=%d\n",
               __func__,
               llu(int64_from_ptr(c->id)),
@@ -4180,7 +4180,8 @@ retry_connect:
             c = (rdma_connection_t *) event_copy.id->context;
             /* TODO: make sure c == rdma_map->c? */
 
-            debug(4, "%s: connected, peername=%s", __func__, c->conn_info->peername);
+            debug(4, "%s: connected, peername=%s",
+                  __func__, c->conn_info->peername);
             break;
         }
         else if (event_copy.event == RDMA_CM_EVENT_ADDR_ERROR)
