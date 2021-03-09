@@ -862,8 +862,8 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
      --gmport      <NUM>               GM port to use (default: 6)
      --mxboard     <NUM>               MX board to use (default is 0)
      --mxendpoint  <NUM>               MX endpoint to use (default is 3)
-     --ibport      <NUM>               IB port to use (default is 3335)
-     --rdmaport    <NUM>               RDMA port to use (default is 3335)
+     --ibport      <NUM>               TCP port to use for IB (default: 3335)
+     --rdmaport    <NUM>               TCP port to use for RDMA (default: 3335)
      --portal      <NUM>               Portals index for
                                        listening server (default is 5)
      --logging     <STRING>            debugging mask for log messages
