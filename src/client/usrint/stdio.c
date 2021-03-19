@@ -523,8 +523,11 @@ FILE *fopen64(const char *path, const char *modes)
  */
 static int init_stream (FILE *stream, int flags, int bufsize)
 {
+    void _IO_init(FILE *fp, int flags); /* from libioP.h in glibc */
     /* make sure stdio is initialized so we can insert on chain */
     PVFS_INIT(init_stdio);
+    /* call libio std initialization routine */
+    _IO_init(stream, flags);
     /* set up stream here */
     //if (flags)
     {
@@ -3353,6 +3356,10 @@ static void init_stdio_internal(void)
 {
     static int recurse_flag = 0;
     static gen_mutex_t initlock = GEN_RECURSIVE_MUTEX_INITIALIZER_NP;
+
+    //void IO_set_accept_foreign_vtables(void (*f)(void));
+    //void _IO_vtable_check(void);
+
     /* don't let more than one thread initialize */
     gen_mutex_lock(&initlock);
     if (init_flag || recurse_flag)
@@ -3362,6 +3369,9 @@ static void init_stdio_internal(void)
     }
     /* init stdio is running */
     recurse_flag = 1;
+
+    /* turn off glibc's security check for interposing vtables */
+    //IO_set_accept_foreign_vtables(&_IO_vtable_check);
 
     /* init open file chain - must do before setting up stdin etc */
     lock_init_stream(&open_files);
