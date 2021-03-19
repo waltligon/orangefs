@@ -25,6 +25,7 @@ my $opt_gmport = '';
 my $opt_mxboard = '';
 my $opt_mxendpoint = '';
 my $opt_ibport = '';
+my $opt_rdmaport = '';
 my $opt_portal = '';
 my $opt_ioservers = '';
 my $opt_metaservers = '';
@@ -841,7 +842,7 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
   and one of the two [] grouped options below:
 
      [
-       --protocol    <PROTO>[,<PROTO>..] protocol(s) to use (tcp,gm,mx,ib,portals)
+       --protocol    <PROTO>[,<PROTO>..] protocol(s) to use (tcp,gm,mx,ib,rdma,portals)
        --ioservers   <STRING>   hostnames of data servers.  Can be
                                 <prefix>{#-#,#,#-#,...}
        --metaservers <STRING>   hostnames of meta servers.
@@ -861,7 +862,8 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
      --gmport      <NUM>               GM port to use (default: 6)
      --mxboard     <NUM>               MX board to use (default is 0)
      --mxendpoint  <NUM>               MX endpoint to use (default is 3)
-     --ibport      <NUM>               IB port to use (default is 3335)
+     --ibport      <NUM>               TCP port to use for IB (default: 3335)
+     --rdmaport    <NUM>               TCP port to use for RDMA (default: 3335)
      --portal      <NUM>               Portals index for
                                        listening server (default is 5)
      --logging     <STRING>            debugging mask for log messages
@@ -994,7 +996,7 @@ sub get_protocol
             # get network type
             print $OUT <<"PROTOCOL"
 You must first select the network protocol that your file system will use.
-The currently supported options are \"tcp\", \"gm\", \"mx\", \"ib\", and \"portals\".
+The currently supported options are \"tcp\", \"gm\", \"mx\", \"ib\", \"rdma\", and \"portals\".
 (For multi-homed configurations, use e.g. \"ib,tcp\".)
 PROTOCOL
             ;;
@@ -1032,10 +1034,12 @@ PROTOCOL
             $port{'mx'} = mx_get_endpoint();
         } elsif ($_ eq "ib") {
             $port{'ib'} = ib_get_port();
+        } elsif ($_ eq "rdma") {
+            $port{'rdma'} = rdma_get_port();
         } elsif ($_ eq "portals") {
             $port{'portals'} = portals_get_portal();
         } else {
-            die "Sorry.  At this time, only the tcp, gm, mx, ib, and portals protocols are available\nfor use with this configuration utility.\n";
+            die "Sorry.  At this time, only the tcp, gm, mx, ib, rdma, and portals protocols are available\nfor use with this configuration utility.\n";
         }
     }
 
@@ -1321,6 +1325,21 @@ sub ib_get_port
     return  $port;
 }
 
+sub rdma_get_port
+{
+    my $port = 3335;
+    if ($opt_rdmaport) {
+        $port = $opt_rdmaport;
+    } elsif (!$opt_iospec) {
+        if (!$opt_quiet) {
+            print $OUT "Choose a TCP/IP port for the servers to listen on for RDMA communications.\n";
+            print $OUT "Note that this script assumes that all servers will use the same port number.\n";
+            $port = prompt_num("Enter port number [Default is 3335]: ","3335");
+        }
+    }
+    return $port;
+}
+
 sub portals_get_portal
 {
     my $port = 5;
@@ -1349,6 +1368,11 @@ sub get_ionames
         print $OUT "Next you must list the hostnames of " .
                    "the I/O servers.\nAcceptable syntax is " .
                    "\"node1, node2, ...\" or \"node{#-#,#,#}\".\n";
+        if ($bmi_module eq "bmi_rdma") {
+            print $OUT "NOTE: For RDMA, make sure you use the IB device " .
+                       "names if your servers have both ethernet and IB " .
+                       "interfaces.\n";
+        }
         $ioline = prompt_word(
             "Enter hostnames [Default is localhost]: ",
             "localhost");
@@ -1973,6 +1997,7 @@ GetOptions('protocol=s' => \$opt_protocol,
     'mxboard=i'     => \$opt_mxboard,
     'mxendpoint=i'  => \$opt_mxendpoint,
     'ibport=i'      => \$opt_ibport,
+    'rdmaport=i'    => \$opt_rdmaport,
     'portal=i'      => \$opt_portal,
     'ioservers=s'   => \$opt_ioservers,
     'metaservers=s' => \$opt_metaservers,

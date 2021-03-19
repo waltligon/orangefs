@@ -1572,6 +1572,11 @@ dnl
 AX_IB
 
 dnl
+dnl Configure bmi_rdma, if --with-rdma or a variant given.
+dnl
+AX_RDMA
+
+dnl
 dnl Configure bmi_portals, if --with-portals or a variant given.
 dnl
 AX_PORTALS
@@ -1923,6 +1928,7 @@ src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
 src/io/bmi/bmi_mx/module.mk
 src/io/bmi/bmi_ib/module.mk
+src/io/bmi/bmi_rdma/module.mk
 src/io/bmi/bmi_portals/module.mk
 src/io/bmi/bmi_zoid/module.mk
 src/io/description/module.mk
