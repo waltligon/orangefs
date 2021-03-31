@@ -6,7 +6,7 @@ AC_DEFUN([AX_RDMA],
     dnl    --with-rdma-libs=<dir>/lib (or lib64 if that exists)
     rdma_home=
 	AC_ARG_WITH(rdma,
-	[  --with-rdma=<dir>		Location of the RDMA installation (default no RDMA)],
+	[  --with-rdma=<dir>       Location of the RDMA installation (default no RDMA)],
 	if test -z "$withval" -o "$withval" = yes ; then
 		AC_MSG_ERROR([Option --with-rdma requires the path to your RDMA tree.])
 	elif test "$withval" != no ; then
@@ -14,7 +14,8 @@ AC_DEFUN([AX_RDMA],
 	fi
 	)
 	AC_ARG_WITH(rdma-includes,
-	[  --with-rdma-includes=<dir>		Location of the RDMA includes],
+	[  --with-rdma-includes=<dir>
+                          Location of the RDMA includes],
 	if test -z "$withval" -o "$withval" = yes ; then
 		AC_MSG_ERROR([Option --with-rdma-includes requires path to RDMA headers.])
 	elif test "$withval" != no ; then
@@ -22,7 +23,8 @@ AC_DEFUN([AX_RDMA],
 	fi
 	)
 	AC_ARG_WITH(rdma-libs,
-	[  --with-rdma-libs=<dir>		Location of the RDMA libraries],
+	[  --with-rdma-libs=<dir>
+                          Location of the RDMA libraries],
 	if test -z "$withval" -o "$withval" = yes ; then
 		AC_MSG_ERROR([Option --with-rdma-libs requires path to RDMA libraries.])
 	elif test "$withval" != no ; then
