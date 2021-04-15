@@ -66,7 +66,7 @@ AC_DEFUN([AX_RDMA],
 
 	save_ldflags="$LDFLAGS"
 	LDFLAGS="-L$RDMA_LIBDIR -libverbs"
-	save cppflags="$CPPFLAGS"
+	save_cppflags="$CPPFLAGS"
 	CPPFLAGS="$CPPFLAGS -I$RDMA_INCDIR"
 
 	dnl Check for existence of reregister event; it's somewhat new.
