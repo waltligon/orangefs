@@ -1,0 +1,48 @@
+#
+# Makefile stub for bmi_ib_exp.
+#
+# Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
+# Copyright (C) 2021 David Reynolds <david@omnibond.com>
+#
+# See COPYING in top-level directory.
+#
+
+# only do any of this if configure decided to use IB or OpenIB
+ifneq (,$(BUILD_IB)$(BUILD_OPENIB))
+
+#
+# Local definitions.
+#
+DIR := src/io/bmi/bmi_ib_exp
+cfiles := ib-exp.c util-exp.c mem-exp.c
+apis :=
+
+ifdef BUILD_IB
+    cfiles += vapi-exp.c
+    apis += -DVAPI
+endif
+ifdef BUILD_OPENIB
+    cfiles += openib-exp.c
+    apis += -DOPENIB
+endif
+
+#
+# Export these to the top Makefile to tell it what to build.
+#
+src := $(patsubst %,$(DIR)/%,$(cfiles))
+LIBSRC    += $(src)
+SERVERSRC += $(src)
+LIBBMISRC += $(src)
+
+#
+# Each particular IB API needs its headers.
+#
+MODCFLAGS_$(DIR)/vapi-exp.c := -I@IB_INCDIR@
+MODCFLAGS_$(DIR)/openib-exp.c := -I@OPENIB_INCDIR@
+
+#
+# Tell the main driver about the APIs that are available.
+#
+MODCFLAGS_$(DIR)/ib-exp.c := $(apis)
+
+endif  # BUILD_IB or BUILD_OPENIB

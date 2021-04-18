@@ -222,6 +222,24 @@ AC_DEFUN([AX_IB],
         LDFLAGS="$save_ldflags"
         CPPFLAGS="$save_cppflags"
     fi
+
+    AC_ARG_WITH(
+        experimental-ib,
+        AS_HELP_STRING([--with-experimental-ib],
+                       [Use experimental bmi_ib module (requires --with-ib, --with-openib, or variant).]),
+        [ if test -z "$withval" -o "$withval" = yes; then
+              if test -n "$BUILD_IB" -o -n "$BUILD_OPENIB"; then
+                  BUILD_IB_EXP=1
+              else
+                  AC_MSG_ERROR([Option --with-experimental-ib requires --with-ib, --with-openib, or variant.])
+              fi
+          elif test "$withval" = no; then
+              :
+          else
+              AC_MSG_ERROR([Option --with-experimental-ib requires yes/no argument.])
+          fi
+        ])
+	AC_SUBST(BUILD_IB_EXP)
 ])
 
 dnl vim: set ft=config :
