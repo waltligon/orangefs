@@ -272,7 +272,7 @@ int memcache_memfree(void *md,
 }
 
 /*
- * Interface for bmi_ib send and recv routines in ib.c.  Takes a buflist
+ * Interface for bmi_ib_exp send and recv routines in ib-exp.c.  Takes a buflist
  * and looks up each entry in the memcache, adding it if not yet pinned.
  */
 void memcache_register(void *md,

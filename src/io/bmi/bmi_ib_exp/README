@@ -12,8 +12,8 @@ InifiniBand programming interface
 The BMI IB implementation was developed for the API provided by Mellanox, a
 major manufacturer of IB silicon, called VAPI.  In 2006, this code was adapted
 to use the OpenIB (now OpenFabrics) API.  Both versions live in this
-directory, bmi_ib, with the VAPI functions in vapi.c and the OpenIB ones in
-openib.c.  Only the basic operations such as posting descriptors and checking
+directory, bmi_ib_exp, with the VAPI functions in vapi-exp.c and the OpenIB ones in
+openib-exp.c.  Only the basic operations such as posting descriptors and checking
 for completion are implemented separately for each.
 
 Pete Wyckoff wrote the original PVFS2 BMI support for IB on VAPI in 2003.

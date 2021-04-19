@@ -399,7 +399,7 @@ typedef struct {
 extern ib_device_t *ib_device;
 
 /*
- * Internal functions in util.c.
+ * Internal functions in util-exp.c.
  */
 void error(const char *fmt, ...);
 void error_errno(const char *fmt, ...);
@@ -421,7 +421,7 @@ int read_full(int fd, void *buf, size_t num);
 int write_full(int fd, const void *buf, size_t count);
 
 /*
- * Memory allocation and caching internal functions, in mem.c.
+ * Memory allocation and caching internal functions, in mem-exp.c.
  */
 void *memcache_memalloc(void *md, bmi_size_t len, int eager_limit);
 int memcache_memfree(void *md, void *buf, bmi_size_t len);
@@ -456,7 +456,7 @@ void memcache_cache_flush(void *md);
 #define bmi_ib_unlikely(x)     __builtin_expect(!!(x), 0)
 
 /*
- * Memory caching settings, needed both by ib.c and vapi.c or openib.c.
+ * Memory caching settings, needed both by ib-exp.c and vapi-exp.c or openib-exp.c.
  */
 #define MEMCACHE_BOUNCEBUF 0
 #define MEMCACHE_EARLY_REG 1

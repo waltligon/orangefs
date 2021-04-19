@@ -418,7 +418,7 @@ static void vapi_post_sr(const struct buf_head *bh, u_int32_t len)
     sr.opcode = VAPI_SEND;
     sr.id = int64_from_ptr(bh);
     sr.comp_type = VAPI_SIGNALED;
-/* no unsignaled anymore, see openib.c
+/* no unsignaled anymore, see openib-exp.c
     if (++vc->num_unsignaled_wr + 100 == vd->max_outstanding_wr) {
         vc->num_unsignaled_wr = 0;
     } else
