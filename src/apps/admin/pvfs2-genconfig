@@ -842,7 +842,8 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
   and one of the two [] grouped options below:
 
      [
-       --protocol    <PROTO>[,<PROTO>..] protocol(s) to use (tcp,gm,mx,ib,rdma,portals)
+       --protocol    <PROTO>[,<PROTO>..]  protocol(s) to use (tcp,gm,mx,ib,
+                                          ib_exp,rdma,portals)
        --ioservers   <STRING>   hostnames of data servers.  Can be
                                 <prefix>{#-#,#,#-#,...}
        --metaservers <STRING>   hostnames of meta servers.
@@ -996,7 +997,8 @@ sub get_protocol
             # get network type
             print $OUT <<"PROTOCOL"
 You must first select the network protocol that your file system will use.
-The currently supported options are \"tcp\", \"gm\", \"mx\", \"ib\", \"rdma\", and \"portals\".
+The currently supported options are \"tcp\", \"gm\", \"mx\", \"ib\", \"ib_exp\",
+\"rdma\", and \"portals\".
 (For multi-homed configurations, use e.g. \"ib,tcp\".)
 PROTOCOL
             ;;
@@ -1034,12 +1036,14 @@ PROTOCOL
             $port{'mx'} = mx_get_endpoint();
         } elsif ($_ eq "ib") {
             $port{'ib'} = ib_get_port();
+        } elsif ($_ eq "ib_exp") {
+            $port{'ib_exp'} = ib_get_port();
         } elsif ($_ eq "rdma") {
             $port{'rdma'} = rdma_get_port();
         } elsif ($_ eq "portals") {
             $port{'portals'} = portals_get_portal();
         } else {
-            die "Sorry.  At this time, only the tcp, gm, mx, ib, rdma, and portals protocols are available\nfor use with this configuration utility.\n";
+            die "Sorry.  At this time, only the tcp, gm, mx, ib, ib_exp, rdma, and portals\nprotocols are available for use with this configuration utility.\n";
         }
     }
 
