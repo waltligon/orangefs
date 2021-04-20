@@ -2158,7 +2158,7 @@ else
 {
     my $portmap = get_protocol();
     $bmi_module = join(',', map("bmi_" . $_, keys (%{$portmap})));
-    if ($bmi_module =~ ",")
+    if ($bmi_module =~ "," and $bmi_module =~ "bmi_tcp")
     {
 # Warn about potential slowness if using a "fast" network along with
 # TCP.  Polling with timeout in BMI is implemented by sequentially asking
@@ -2166,10 +2166,10 @@ else
 # delay in the TCP device before the IB device can be queried, for instance.
 # When traffic will only appear on one device, suggest that TCP be disabled.
 # But leave TCP as default on, certainly, as that is what most people want.
-        print "You have selected to use a fast network interface, but\n";
-        print "have not disabled TCP.  The way this is currently\n";
-        print "implemented will lead to rather slow response times on\n";
-        print "the fast interface.\n";
+        print "You have specified a fast network interface in addition to\n";
+        print "TCP. The way this is currently implemented will lead to\n";
+        print "rather slow response times on the fast interface. If traffic\n";
+        print "will only appear on one device, we recommend disabling TCP.\n";
         print "\n";
 
     }
