@@ -5406,22 +5406,28 @@ static void cleanup_rdma_context(void)
         free(rdma_device->sg_tmp_array);
     }
 
-    ret = ibv_destroy_cq(rdma_device->nic_cq);
-    if (ret)
-    {
-        error_xerrno(ret, "%s: ibv_destroy_cq", __func__);
+    if (rdma_device->nic_cq) {
+        ret = ibv_destroy_cq(rdma_device->nic_cq);
+        if (ret)
+        {
+            error_xerrno(ret, "%s: ibv_destroy_cq", __func__);
+        }
     }
 
-    ret = ibv_destroy_comp_channel(rdma_device->channel);
-    if (ret)
-    {
-        error_xerrno(ret, "%s: ibv_destroy_comp_channel", __func__);
+    if (rdma_device->channel) {
+        ret = ibv_destroy_comp_channel(rdma_device->channel);
+        if (ret)
+        {
+            error_xerrno(ret, "%s: ibv_destroy_comp_channel", __func__);
+        }
     }
 
-    ret = ibv_dealloc_pd(rdma_device->nic_pd);
-    if (ret)
-    {
-        error_xerrno(ret, "%s: ibv_dealloc_pd", __func__);
+    if (rdma_device->nic_pd) {
+        ret = ibv_dealloc_pd(rdma_device->nic_pd);
+        if (ret)
+        {
+            error_xerrno(ret, "%s: ibv_dealloc_pd", __func__);
+        }
     }
 
     /* TODO: How do I close the rdma_device/free rdma_device->ctx? Do I need to? */
