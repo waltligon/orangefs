@@ -32,23 +32,25 @@
 
 #define DEFAULT_ROOTDIR_META_SID_COUNT root_sid_count
 #define DEFAULT_ROOTDIR_TREE_HEIGHT    0
+#define DEFAULT_ROOTDIR_DIRDATA_MIN    1
+#define DEFAULT_ROOTDIR_DIRDATA_MAX    1
 #define DEFAULT_ROOTDIR_DIRDATA_COUNT  1
 #define DEFAULT_ROOTDIR_BITMAP_SIZE    1
 #define DEFAULT_ROOTDIR_SPLIT_SIZE  4096
 #define DEFAULT_ROOTDIR_BRANCH_LEVEL   1
 /* Note: server_no is set below where attribs are initialized */
 /* -1 indicates no hint present */
-#define DEFAULT_ROOTDIR_HINT_DIST_NAME_LEN -1
-#define DEFAULT_ROOTDIR_HINT_DIST_PARAMS_LEN -1
-#define DEFAULT_ROOTDIR_HINT_DFILE_COUNT -1
-#define DEFAULT_ROOTDIR_HINT_DFILE_SID_COUNT -1
+#define DEFAULT_ROOTDIR_HINT_DIST_NAME_LEN 0
+#define DEFAULT_ROOTDIR_HINT_DIST_PARAMS_LEN 0
+#define DEFAULT_ROOTDIR_HINT_DFILE_COUNT 0
+#define DEFAULT_ROOTDIR_HINT_DFILE_SID_COUNT 0
 #define DEFAULT_ROOTDIR_HINT_LAYOUT_ALGORITHM PVFS_SYS_LAYOUT_NULL
-#define DEFAULT_ROOTDIR_HINT_LAYOUT_LIST_CNT -1
-#define DEFAULT_ROOTDIR_HINT_DIRDATA_MIN -1
-#define DEFAULT_ROOTDIR_HINT_DIRDATA_MAX -1
-#define DEFAULT_ROOTDIR_HINT_SPLIT_SIZE -1
+#define DEFAULT_ROOTDIR_HINT_LAYOUT_LIST_CNT 0
+#define DEFAULT_ROOTDIR_HINT_DIRDATA_MIN 0
+#define DEFAULT_ROOTDIR_HINT_DIRDATA_MAX 0
+#define DEFAULT_ROOTDIR_HINT_SPLIT_SIZE 0
 #define DEFAULT_ROOTDIR_HINT_DIR_LAYOUT_ALGORITHM PVFS_SYS_LAYOUT_NULL
-#define DEFAULT_ROOTDIR_HINT_DIR_LAYOUT_LIST_CNT -1
+#define DEFAULT_ROOTDIR_HINT_DIR_LAYOUT_LIST_CNT 0
 
 
 /*
@@ -521,6 +523,8 @@ int pvfs2_mkspace(char *data_path,
         ds_attr.meta_sid_count =                    DEFAULT_ROOTDIR_META_SID_COUNT;
         ds_attr.u.directory.dirent_count =          0;
         ds_attr.u.directory.tree_height =           DEFAULT_ROOTDIR_TREE_HEIGHT;
+        ds_attr.u.directory.dirdata_min =           DEFAULT_ROOTDIR_DIRDATA_MIN;
+        ds_attr.u.directory.dirdata_max =           DEFAULT_ROOTDIR_DIRDATA_MAX;
         ds_attr.u.directory.dirdata_count =         DEFAULT_ROOTDIR_DIRDATA_COUNT;
         ds_attr.u.directory.bitmap_size =           DEFAULT_ROOTDIR_BITMAP_SIZE;
         ds_attr.u.directory.split_size =            DEFAULT_ROOTDIR_SPLIT_SIZE;

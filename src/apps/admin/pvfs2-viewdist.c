@@ -377,10 +377,10 @@ static int resolve_filename(file_object *obj, char *filename)
     if (ret < 0)
     {
 	obj->fs_type = UNIX_FILE;
-        strncpy(obj->u.ufs.path, filename, NAME_MAX);
+        strncpy(obj->u.ufs.path, filename, NAME_MAX - 1);
     } else {
 	obj->fs_type = PVFS2_FILE;
-	strncpy(obj->u.pvfs2.user_path, filename, PVFS_NAME_MAX);
+	strncpy(obj->u.pvfs2.user_path, filename, PVFS_NAME_MAX - 1);
     }
     return 0;
 }

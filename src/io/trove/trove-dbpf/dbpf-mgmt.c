@@ -1154,7 +1154,13 @@ int dbpf_collection_create(char *collname,
 
     for(i = 0; i < DBPF_BSTREAM_MAX_NUM_BUCKETS; i++)
     {
-        snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
+        ret = snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
+        if (ret < 0)
+        {
+           gossip_err("%s: snprintf output failure on dir, i:%d:\n",
+                      __func__, i);
+           return(ret);
+        }
         if ((mkdir(dir, 0755) == -1) && (errno != EEXIST))
         {
             gossip_err("mkdir failed on bstream bucket directory %s\n",
@@ -1276,7 +1282,13 @@ int dbpf_collection_remove(char *collname,
                              sto_p->data_path, db_data.coll_id);
     for(i = 0; i < DBPF_BSTREAM_MAX_NUM_BUCKETS; i++)
     {
-        snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
+        ret = snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
+        if (ret < 0)
+        {
+           gossip_err("%s: snprintf output failure on dir, i:%d:\n",
+                      __func__, i);
+           return(ret);
+        }
 
         /* remove all bstream files in this bucket directory */
         current_dir = opendir(dir);
@@ -1289,8 +1301,14 @@ int dbpf_collection_remove(char *collname,
                 {
                     continue;
                 }
-                snprintf(tmp_path, PATH_MAX, "%s/%s", dir,
-                         current_dirent->d_name);
+                ret = snprintf(tmp_path, PATH_MAX, "%s/%s", dir,
+                               current_dirent->d_name);
+                if (ret < 0)
+                {
+                   gossip_err("%s: snprintf output failure on dir, i:%d:\n",
+                              __func__, i);
+                   return(ret);
+                }
                 if (stat(tmp_path, &file_info) < 0)
                 {
                     gossip_err("error doing stat on bstream entry\n");
@@ -1332,8 +1350,14 @@ int dbpf_collection_remove(char *collname,
             {
                 continue;
             }
-            snprintf(tmp_path, PATH_MAX, "%s/%s", path_name,
-                     current_dirent->d_name);
+            ret = snprintf(tmp_path, PATH_MAX, "%s/%s", path_name,
+                           current_dirent->d_name);
+            if (ret < 0)
+            {
+               gossip_err("%s: snprintf output failure on dir, i:%d:\n",
+                          __func__, i);
+               return(ret);
+            }
             if(stat(tmp_path, &file_info) < 0)
             {
                 gossip_err("error doing stat on bstream entry\n");

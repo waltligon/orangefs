@@ -283,16 +283,14 @@ void print_dspace( struct dbpf_data key, struct dbpf_data val )
 
         case PVFS_TYPE_DIRECTORY:
             printf("(dirent_count: %llu)"
-                   "(tree_height: %d)(dirdata_count: %d)(sid_count: %d)"
-                   "(bitmap_size: %d)(split_size: %d)(server_no: %d)"
+                   "(tree_height: %d)(dirdata_count: %d)"
+                   "(bitmap_size: %d)(split_size: %d)"
                    "(branch_level: %d) (%zu)\n",
                     llu(v->u.directory.dirent_count),
                     v->u.directory.tree_height,
                     v->u.directory.dirdata_count,
-                    v->u.directory.sid_count,
                     v->u.directory.bitmap_size,
                     v->u.directory.split_size,
-                    v->u.directory.server_no,
                     v->u.directory.branch_level,
                     val.len);
             break;
@@ -303,13 +301,12 @@ void print_dspace( struct dbpf_data key, struct dbpf_data val )
 
         case PVFS_TYPE_DIRDATA:
             printf("(dirent_count: %llu)"
-                   "(tree_height: %d)(dirdata_count: %d)(sid_count: %d)"
+                   "(tree_height: %d)(dirdata_count: %d)"
                    "(bitmap_size: %d)(split_size: %d)(server_no: %d)"
                    "(branch_level: %d) (%zu)\n",
                     llu(v->u.dirdata.dirent_count),
                     v->u.dirdata.tree_height,
                     v->u.dirdata.dirdata_count,
-                    v->u.dirdata.sid_count,
                     v->u.dirdata.bitmap_size,
                     v->u.dirdata.split_size,
                     v->u.dirdata.server_no,

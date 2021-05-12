@@ -580,6 +580,10 @@ PVFS_error PVFS_isys_ref_lookup(PVFS_fs_id fs_id,
             strncpy(sm_p->u.lookup.lookup_resp->error_path,
                     relative_pathname,
                     sm_p->u.lookup.lookup_resp->error_path_size);
+            /* strncpy is f'ed up */
+            sm_p->u.lookup.lookup_resp->error_path[
+                    sm_p->u.lookup.lookup_resp->error_path_size - 1] = '\0';
+            /* already an error condition */
         }
         else
         {
@@ -1211,6 +1215,9 @@ static PINT_sm_action lookup_segment_handle_relative_link(
             strncpy(sm_p->u.lookup.lookup_resp->error_path,
                     relative_symlink_target,
                     sm_p->u.lookup.lookup_resp->error_path_size);
+            /* strncpy is f'd up */
+            sm_p->u.lookup.lookup_resp->error_path[
+                    sm_p->u.lookup.lookup_resp->error_path_size - 1] = '\0';
             ret = -PVFS_ENOTPVFS;
         }
         js_p->error_code = ret;
@@ -1262,6 +1269,9 @@ static PINT_sm_action lookup_segment_handle_absolute_link(
                 cur_seg->seg_attr.u.sym.target_path,
                 /*absolute_symlink_target,*/
                 sm_p->u.lookup.lookup_resp->error_path_size);
+        /* strncpy is f'd up */
+        sm_p->u.lookup.lookup_resp->error_path[
+                sm_p->u.lookup.lookup_resp->error_path_size - 1] = '\0';
         /* set special error code */
         ret = -PVFS_ENOTPVFS;
     }

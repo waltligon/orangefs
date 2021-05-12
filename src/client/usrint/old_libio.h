@@ -29,9 +29,6 @@
 #ifndef _IO_OLDIO_H
 #define _IO_OLDIO_H
 
-#if 0
-#endif
-
 #define _IOS_INPUT        1
 #define _IOS_OUTPUT       2
 #define _IOS_ATEND        4
@@ -100,9 +97,6 @@
 #define _IO_DONT_CLOSE 0100000
 #define _IO_BOOLALPHA 0200000
 
-#if 0
-#endif
-
 /* A streammarker remembers a position in a buffer. */
 
 struct _IO_marker {
@@ -113,9 +107,6 @@ struct _IO_marker {
   /* if _pos < 0, it points to _buf->eBptr()+_pos. FIXME comment */
   int _pos;
 };
-
-#if 0
-#endif /* OFS */
 
 #endif /* _IO_OLDIO_H */
 

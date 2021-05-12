@@ -28,8 +28,8 @@ void PINT_dist_finalize(void);
  * else returns the number of servers requested
  */
 int PINT_dist_default_get_num_dfiles(void *params,
-                                     uint32_t num_servers_requested,
-                                     uint32_t num_dfiles_requested);
+                                     int32_t num_servers_requested,
+                                     int32_t num_dfiles_requested);
 
 /**
  * Utility default implmentation for PINT_dist_methods set_param

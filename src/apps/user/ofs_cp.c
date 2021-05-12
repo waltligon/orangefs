@@ -62,7 +62,8 @@ struct cp_options
     char **srcv;
 };
 
-static char dest_path_buffer[PATH_MAX];
+static char dest_path_buffer[PATH_MAX] = {0};
+static int dest_path_size = 0;
 
 static PVFS_hint hints = NULL;
 
@@ -860,7 +861,7 @@ static int parse_args(int argc, char *argv[], struct cp_options *user_opts)
         if (argv[argc - 1][0] == '/')
         {
             /* absolute path */
-            strncpy(dest_path_buffer, argv[argc - 1], PATH_MAX);
+            strncpy(dest_path_buffer, argv[argc - 1], PATH_MAX - dest_path_size);
             /* code in main ensures there is a trailing slash */
         }
         else
@@ -869,14 +870,17 @@ static int parse_args(int argc, char *argv[], struct cp_options *user_opts)
             int len;
             /* relative path */
             ret = getcwd(dest_path_buffer, PATH_MAX);
+            dest_path_size = strnlen(dest_path_buffer, PATH_MAX);
             if (!ret)
             {
                 perror("getcwd");
                 goto exit_err;
             }
-            strncat(dest_path_buffer, "/", 1);
+            strncat(dest_path_buffer, "/", PATH_MAX - dest_path_size);
+            dest_path_size += 1;
             len = strnlen(argv[argc - 1], PATH_MAX);
-            strncat(dest_path_buffer, argv[argc - 1], len);
+            strncat(dest_path_buffer, argv[argc - 1], PATH_MAX - dest_path_size);
+            dest_path_size += len;
             /* code in main ensures there is a trailing slash */
         }
         user_opts->destfile = dest_path_buffer;

@@ -173,9 +173,9 @@ PVFS_error PVFS_isys_create(char *object_name,
     struct filesystem_configuration_s *fs_config = NULL;
 
 { fprintf(stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-  PVFS_debug_mask dm; int m1, m2, fl; 
-  gossip_get_debug_mask(&fl, &dm); m1 = dm.mask1; m2 = dm.mask2;
-  fprintf(stderr, "Mask: %x %x\n", m1, m2);
+  PVFS_debug_mask dm; int fl; 
+  gossip_get_debug_mask(&fl, &dm);
+  fprintf(stderr, "Mask: %lx %lx\n", dm.mask1, dm.mask2);
 }
 
     gossip_debug(GOSSIP_CREATE_DEBUG, "PVFS_isys_create entered\n");
@@ -268,9 +268,14 @@ PVFS_error PVFS_isys_create(char *object_name,
 
     sm_p->parent_ref = parent_ref;
 
-    if(attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
+    if((attr.mask & PVFS_ATTR_SYS_DFILE_COUNT) && (0 < attr.dfile_count))
     {
         sm_p->u.create.user_requested_num_data_files = attr.dfile_count;
+    }
+    else
+    {
+        /* don't assume field is clean */
+        sm_p->u.create.user_requested_num_data_files = 0;
     }
 
     gossip_debug(GOSSIP_CREATE_DEBUG, "Checking SID/UID counts\n");
@@ -586,11 +591,14 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
     int num_dfiles_requested = 0;
     int tmp_i;
 
+    /* dumps from debugging gossip */
+#if 0
     { fprintf(stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
       PVFS_debug_mask dm; int m1, m2, fl; 
       gossip_get_debug_mask(&fl, &dm); m1 = dm.mask1; m2 = dm.mask2;
       fprintf(stderr, "Mask: %x %x\n", m1, m2);
     }
+#endif
 
     gossip_debug(GOSSIP_CREATE_DEBUG,
                  "Create state: parent_getattr_inspect.\n");
@@ -830,13 +838,15 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
      * All of the above can be overridden by the distribution itself.
      */
 
-    if(sm_p->u.create.user_requested_num_data_files > 0)
+    /* num_dfiles_requested should be 0 at this point */
+    if(0 < sm_p->u.create.user_requested_num_data_files)
     {
         /* specified by sys_create caller */
         num_dfiles_requested = sm_p->u.create.user_requested_num_data_files;     
     }
-    else if(attr->u.dir.hint.dfile_count > 0)
+    else if(0 < attr->u.dir.hint.dfile_count)
     {
+        /* taken from parent directory hints */
         num_dfiles_requested = attr->u.dir.hint.dfile_count;
     }
     else
@@ -848,14 +858,17 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         rc = PVFS_util_get_mntent_copy(sm_p->parent_ref.fs_id, &mntent);
         if (0 == rc)
         {
-            num_dfiles_requested = mntent.default_num_dfiles;
-            PVFS_util_free_mntent(&mntent);
+            if (0 < mntent.default_num_dfiles)
+            {
+                num_dfiles_requested = mntent.default_num_dfiles;
+                PVFS_util_free_mntent(&mntent);
+            }
         }
     }
 
     /* Final determination based on config and distribution.
-     * Pass in the number requested by the client, but will 
-     * e overridden by default configuration and/or
+     * Pass in the number requested by the client, but can 
+     * be overridden by default configuration and/or
      * distribution if necessary.  Distribution determines
      * if there is a reasonable max or not.
      */

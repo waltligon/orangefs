@@ -304,6 +304,8 @@ static PINT_sm_action get_user_cert_encrypt_pwd_and_key(
     memset(pwddata, 0, PVFS_REQ_LIMIT_USERID_PWD);
     strncpy((char *) pwddata, sm_p->u.mgmt_get_user_cert.pwd, 
             PVFS_REQ_LIMIT_USERID_PWD);
+    /* strncpy is f'd up */
+    pwddata[PVFS_REQ_LIMIT_USERID_PWD - 1] = '\0';
 
     flen = RSA_size(rsa_pubkey) - 12;
     if (strlen((char *) pwddata)+1 > flen) {

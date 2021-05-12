@@ -393,6 +393,7 @@ int SID_cacheval_alloc(SID_cacheval_t **cacheval,
                        const BMI_addr sid_bmi,
                        const char *sid_url)
 {
+    int ulen = 0;
     if(!sid_url)
     {
         gossip_err("%s: url passed in is NULL\n", __func__);
@@ -400,9 +401,9 @@ int SID_cacheval_alloc(SID_cacheval_t **cacheval,
         return(-1);
     }
 
+    ulen = strlen(sid_url) + 1;
     /* Mallocing space for the SID_cacheval_t struct */
-    *cacheval = (SID_cacheval_t *)malloc(sizeof(SID_cacheval_t) +
-                                         (strlen(sid_url) + 1));
+    *cacheval = (SID_cacheval_t *)malloc(sizeof(SID_cacheval_t) + ulen);
     if (!*cacheval)
     {
         gossip_err("%s: failed to malloc cacheval\n", __func__);
@@ -417,7 +418,10 @@ int SID_cacheval_alloc(SID_cacheval_t **cacheval,
         memcpy((*cacheval)->attr, sid_attributes, (sizeof(int) * SID_NUM_ATTR));
     }
     memcpy(&((*cacheval)->bmi_addr), &sid_bmi, sizeof(BMI_addr));
-    strncpy((*cacheval)->url, sid_url, (strlen(sid_url) + 1));
+    /* we alreaddy know the size of the string and buffer so we do a memcpy
+     * and NOT a strcpy
+     */
+    memcpy((*cacheval)->url, sid_url, ulen);
 
     return(0);
 }
@@ -484,7 +488,7 @@ static int SID_cache_parse_header(FILE *inpfile,
 {
     int i = 0, j = 0;             /* Loop index variables */
     char **attrs_strings;         /* Strings of the attributes in the file */
-    char tmp_buff[TMP_BUFF_SIZE]; /* Temporary string buffer to read the
+    char tmp_buff[TMP_BUFF_SIZE] = {0}; /* Temporary string buffer to read the
                                      attribute strings from the input file */
 
     /* Checking to make sure the input file is open, the function
@@ -546,15 +550,19 @@ static int SID_cache_parse_header(FILE *inpfile,
     /* Getting the attribute strings from the input file */
     for(i = 0; i < *attrs_in_file; i++)
     {
+        int slen = 0;
+        slen = strlen(tmp_buff) + 1;
         fscanf(inpfile, "%s", tmp_buff);
-        attrs_strings[i] = (char *)malloc(sizeof(char) *
-                                          (strlen(tmp_buff) + 1));
+        attrs_strings[i] = (char *)malloc(sizeof(char) * slen);
         if (!attrs_strings[i])
         {
             gossip_err("%s: malloc attr strings %d failed\n", __func__, i);
             return -1;
         }
-        strncpy(attrs_strings[i], tmp_buff, (strlen(tmp_buff) + 1));
+        /* we already know the length of the string and buffer so
+         * do a memcpy, not a strcpy
+         */
+        memcpy(attrs_strings[i], tmp_buff, slen);
     }
 
     /* Getting the correct positions from the input file for the

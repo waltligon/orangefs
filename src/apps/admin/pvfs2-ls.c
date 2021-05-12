@@ -235,8 +235,14 @@ void print_entry_attr(
     time_t mtime, atime, ctime;
     struct tm *time;
     PVFS_size size = 0;
-    char scratch_owner[16] = {0}, scratch_group[16] = {0}, scratch_time[MAX_TIME_LENGTH] = {0}, scratch_big_time[MAX_TIME_LENGTH] = {0};
-    char scratch_size[16] = {0}, scratch_inode[21] = {0};
+
+    char scratch_owner[16] = {0}; 
+    char scratch_group[16] = {0};
+    char scratch_time[MAX_TIME_LENGTH] = {0};
+    char scratch_big_time[MAX_TIME_LENGTH] = {0};
+    char scratch_size[16] = {0};
+    char scratch_inode[64] = {0};
+
     char f_type = '-';
     char group_x_char = '-';
     int num_bytes = 0;
@@ -292,12 +298,12 @@ void print_entry_attr(
         format_size_string(scratch_time,16,&formatted_time,0,1);
     }
 
-    snprintf(scratch_owner,16,"%d",(int)attr->owner);
-    snprintf(scratch_group,16,"%d",(int)attr->group);
+    snprintf(scratch_owner, 16, "%d", (int)attr->owner);
+    snprintf(scratch_group, 16, "%d", (int)attr->group);
 
     if (opts->list_inode)
     {
-        snprintf(scratch_inode,21,"%s ",PVFS_OID_str(&handle));
+        snprintf(scratch_inode, 64, "%s ", PVFS_OID_str(&handle));
         inode = scratch_inode;
     }
 
@@ -325,7 +331,7 @@ void print_entry_attr(
     {
         snprintf(scratch_size,16, "%lld", lld(size));
     }
-    format_size_string(scratch_size,11,&formatted_size,1,1);
+    format_size_string(scratch_size, 11, &formatted_size, 1, 1);
 
     if (!opts->list_no_owner)
     {
@@ -364,8 +370,8 @@ void print_entry_attr(
      * necessary (set hard_limit to 0), but pad anything smaller to
      * take up 8 spaces.
      */
-    format_size_string(owner,8,&formatted_owner,0,0);
-    format_size_string(group,8,&formatted_group,0,0);
+    format_size_string(owner, 8, &formatted_owner, 0, 0);
+    format_size_string(group, 8, &formatted_group, 0, 0);
 
     if (attr->objtype == PVFS_TYPE_DIRECTORY)
     {

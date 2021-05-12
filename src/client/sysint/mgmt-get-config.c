@@ -121,12 +121,12 @@ int PVFS_mgmt_get_config(const PVFS_fs_id *fsid,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_get_config completed\n");
 
-    /* make sure strings will be null terminated after strncpy */
-    fs_buf[fs_buf_size-1] = '\0';
-
     /* The following copies the retrieved configuration buffers
        into the return buffers */
     strncpy(fs_buf, sm_p->u.get_config.fs_config_buf, (fs_buf_size - 1));
+
+    /* make sure strings will be null terminated after strncpy */
+    fs_buf[fs_buf_size - 1] = '\0';
 
   exit_path:
 

@@ -12,8 +12,11 @@
 
 #define USRINT_SOURCE 1
 #include "usrint.h"
+#include "old_libio.h"
 #include "stdio-ops.h"
 #include "openfile-util.h"
+
+int __underflow (FILE *stream);
 
 int __underflow (FILE *stream)
 {

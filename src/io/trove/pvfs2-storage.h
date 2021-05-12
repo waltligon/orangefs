@@ -51,44 +51,44 @@ struct PVFS_ds_directory_attr_s
 {
     uint64_t    dirent_count;  /* number of dirents in this dir - volatile */
     /* global info */
-    int32_t     tree_height;   /* ceil(log2(dirdata_count)) */
-    int32_t     dirdata_min;   /* min number of servers that are part of this dir */
-    int32_t     dirdata_max;   /* max of servers that are part of this dir */
-    int32_t     dirdata_count; /* current number of servers that are part of this dir */
-    int32_t     bitmap_size;   /* number of PVFS_dist_dir_bitmap_basetype */
+    uint32_t    tree_height;   /* ceil(log2(dirdata_count)) */
+    uint32_t    dirdata_min;   /* min number of servers that are part of this dir */
+    uint32_t    dirdata_max;   /* max of servers that are part of this dir */
+    uint32_t    dirdata_count; /* current number of servers that are part of this dir */
+    uint32_t    bitmap_size;   /* number of PVFS_dist_dir_bitmap_basetype */
                                /*     stored under the key DIST_DIR_BITMAP */
-    int32_t     split_size;    /* maximum number of entries before a split */
+    uint32_t    split_size;    /* maximum number of entries before a split */
     /* local info */
-    int32_t     branch_level;  /* level of branching on this server */
+    uint32_t    branch_level;  /* level of branching on this server */
     /* FILE HINTS */
-    int32_t     hint_dist_name_len;        /* size of dist name buffer */
-    int32_t     hint_dist_params_len;      /* size of dist params buffer */
-    int32_t     hint_dfile_count;          /* number of dfiles to be used */
-    int32_t     hint_dfile_sid_count;      /* number of dfile replicas */
-    int32_t     hint_layout_algorithm;     /* how servers are selected */
-    int32_t     hint_layout_list_cnt;      /* servers in list */
+    uint32_t    hint_dist_name_len;        /* size of dist name buffer */
+    uint32_t    hint_dist_params_len;      /* size of dist params buffer */
+    uint32_t    hint_dfile_count;          /* number of dfiles to be used */
+    uint32_t    hint_dfile_sid_count;      /* number of dfile replicas */
+    uint32_t    hint_layout_algorithm;     /* how servers are selected */
+    uint32_t    hint_layout_list_cnt;      /* servers in list */
     /* DIR HINTS */
-    int32_t     hint_dirdata_min;          /* number of dfiles to be used */
-    int32_t     hint_dirdata_max;          /* number of dfiles to be used */
-    int32_t     hint_split_size;           /* max number of entries before a split */
-    int32_t     hint_dir_layout_algorithm; /* how servers are selected */
-    int32_t     hint_dir_layout_list_cnt;  /* servers in list */
+    uint32_t    hint_dirdata_min;          /* number of dfiles to be used */
+    uint32_t    hint_dirdata_max;          /* number of dfiles to be used */
+    uint32_t    hint_split_size;           /* max number of entries before a split */
+    uint32_t    hint_dir_layout_algorithm; /* how servers are selected */
+    uint32_t    hint_dir_layout_list_cnt;  /* servers in list */
 };
 
 struct PVFS_ds_dirdata_attr_s
 {
-    uint64_t dirent_count; /* number of dirents in this dirdata */
+    uint64_t dirent_count;  /* number of dirents in this dirdata */
     /* global info */
-    int32_t tree_height;   /* ceil(log2(dirdata_count)) */
-    int32_t dirdata_count; /* total number of servers */
-    int32_t bitmap_size;   /* number of PVFS_dist_dir_bitmap_basetype */
-                           /* stored under the key DIST_DIR_BITMAP */
-    int32_t split_size;    /* maximum number of entries before a split */
+    uint32_t tree_height;   /* ceil(log2(dirdata_count)) */
+    uint32_t dirdata_count; /* total number of servers */
+    uint32_t bitmap_size;   /* number of PVFS_dist_dir_bitmap_basetype */
+                            /* stored under the key DIST_DIR_BITMAP */
+    uint32_t split_size;    /* maximum number of entries before a split */
     /* local info */
-    int32_t server_no;     /* 0 to dirdata_count-1, indicates */
-                           /* which server is running this code */
-    int32_t branch_level;  /* level of branching on this server */
-    int32_t __pad1;
+    uint32_t server_no;     /* 0 to dirdata_count-1, indicates */
+                            /* which server is running this code */
+    uint32_t branch_level;  /* level of branching on this server */
+    uint32_t __pad1;
 };
 
 /* dataspace attributes that are not explicitly stored within the

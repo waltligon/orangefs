@@ -230,14 +230,14 @@ static int parse_args(int argc, char **argv)
 	switch (c)
         {
 	    case 's':
-		strncpy(data_path, optarg, PATH_MAX);
+		strncpy(data_path, optarg, PATH_MAX - 1);
 		break;
             case 'm':
-		strncpy(meta_path, optarg, PATH_MAX);
+		strncpy(meta_path, optarg, PATH_MAX - 1);
                 break;
 	    case 'c': /* collection */
 		got_collection = 1;
-		strncpy(collection, optarg, PATH_MAX);
+		strncpy(collection, optarg, PATH_MAX - 1);
 		break;
 	    case 'k':
 		print_keyvals = 1;

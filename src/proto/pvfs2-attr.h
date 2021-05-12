@@ -592,8 +592,8 @@ endecode_fields_1(PVFS_datafile_attr, PVFS_size, size);
  */
 struct PVFS_dirhint_server_list_s
 {
-    int32_t count;
-    int32_t bufsize;
+    uint32_t count;
+    uint32_t bufsize;
     char *servers;
 };
 typedef struct PVFS_dirhint_server_list_s PVFS_dirhint_server_list;
@@ -627,7 +627,7 @@ struct PVFS_directory_hint_s
     uint32_t            dist_params_len;   /* size of dist params buffer */
     char               *dist_params;       /* distribution parameters? */
     uint32_t            dfile_count;       /* number of dfiles to be used */
-    int32_t             dfile_sid_count;   /* number of dfile replicas */
+    uint32_t            dfile_sid_count;   /* number of dfile replicas */
     PVFS_dirhint_layout layout;            /* how servers are selected */
     uint32_t            dir_dirdata_min;   /* min number of dirdata to be used */    
     uint32_t            dir_dirdata_max;   /* max number of dirdata to be used */    
@@ -647,7 +647,7 @@ endecode_fields_13(
         skip4,,
         string,   dist_params,
         uint32_t, dfile_count,
-        int32_t,  dfile_sid_count,
+        uint32_t,  dfile_sid_count,
         PVFS_dirhint_layout, layout,
         uint32_t, dir_dirdata_min,
         uint32_t, dir_dirdata_max,

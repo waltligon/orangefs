@@ -3008,9 +3008,6 @@ int pvfs_chdir(const char *path)
     }
     /* we will keep a copy and keep one in the environment */
     pvfs_put_cwd(newpath, PVFS_PATH_MAX);
-    /* strncpy(pvfs_cwd, newpath, PVFS_PATH_MAX);
-     * setenv("PWD", newpath, 1);
-     */
 
 errout:
     if (newpath != path)
@@ -3046,15 +3043,12 @@ int pvfs_fchdir(int fd)
     /* we will keep a copy and keep one in the environment */
     /* memset(pvfs_cwd, 0, sizeof(pvfs_cwd)); */
     pvfs_put_cwd(pd->s->dpath, plen + 1);
-    /* strncpy(pvfs_cwd, pd->s->dpath, plen + 1);
-     * setenv("PWD", pd->s->dpath, 1);
-     */
     return 0;
 }
 
 char *pvfs_getcwd(char *buf, size_t size)
 {
-    int plen;
+    int plen = 0;
     plen = pvfs_len_cwd();
     /* plen = strnlen(pvfs_cwd, PVFS_PATH_MAX);
      */
@@ -3091,8 +3085,6 @@ char *pvfs_getcwd(char *buf, size_t size)
         memset(buf, 0, size);
     }
     pvfs_get_cwd(buf, plen + 1);
-    /* strncpy(buf, pvfs_cwd, plen + 1);
-     */
     return buf;
 }
 
@@ -3127,8 +3119,6 @@ char *pvfs_getwd(char *buf)
         return NULL;
     }
     pvfs_get_cwd(buf, PVFS_PATH_MAX);
-    /* strncpy(buf, pvfs_cwd, PVFS_PATH_MAX);
-     */
     return buf;
 }
 

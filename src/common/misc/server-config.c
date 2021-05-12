@@ -3003,8 +3003,9 @@ DOTCONF_CB(get_flow_buffers_per_flow)
 
 DOTCONF_CB(get_attr_cache_keywords_list)
 {
-    int i = 0, len = 0;
+    int i = 0;
     char buf[512] = {0};
+    int len = 0; /* used space in buff */
     char *ptr = buf;
     const char * rtok;
     struct filesystem_configuration_s *fs_conf = NULL;
@@ -3029,10 +3030,12 @@ DOTCONF_CB(get_attr_cache_keywords_list)
             rtok = replace_old_keystring(tokens[j]);
             if(!strstr(buf, rtok))
             {
-                len = strlen(rtok);
-                strncat(ptr, rtok, len);
-                strncat(ptr, ",", 1);
-                ptr += len + 1;
+                int rtlen = strlen(rtok);
+                strncat(ptr, rtok, 512 - len);
+                len += rtlen;
+                strncat(ptr, ",", 512 - len);
+                len += 1;
+                ptr += rtlen + 1;
             }
         }
        
@@ -3052,17 +3055,23 @@ DOTCONF_CB(get_attr_cache_keywords_list)
             rtok = replace_old_keystring(tokens[j]);
             if(!strstr(buf, rtok))
             {
-                len = strlen(rtok);
-                strncat(ptr, rtok, len);
-                strncat(ptr, ",", 1);
-                ptr += len + 1;
+                int rtlen = strlen(rtok);
+                strncat(ptr, rtok, 512 - len);
+                len += rtlen;
+                strncat(ptr, ",", 512 - len);
+                len += 1;
+                ptr += rtlen + 1;
             }
         }
 
         PINT_free_string_list(tokens, token_count);
     }
 
-    *ptr = '\0';
+    *ptr = '\0'; /* strncat should have done this */
+    if (len > 512)
+    {
+        gossip_err("buffer overflow in server_config.c: get_attr_cache_keywords_list\n");
+    }
     fs_conf->attr_cache_keywords = strdup(buf);
     return NULL;
 }

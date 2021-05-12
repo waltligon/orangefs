@@ -91,19 +91,25 @@ void PINT_dist_finalize(void)
     PINT_dist_param_table_size = 0;
 }
 
-/*  PINT_dist_default_get_num_dfiles implementation */
+/*  PINT_dist_default_get_num_dfiles implementation
+ *  the default is to put a dfile on each server
+ */
 int PINT_dist_default_get_num_dfiles(void *params,
-                                     uint32_t num_servers_requested,
-                                     uint32_t num_dfiles_requested)
+                                     int32_t num_servers_available,
+                                     int32_t num_dfiles_requested)
 {
     int dfiles;
     if (0 < num_dfiles_requested)
     {
         dfiles = num_dfiles_requested;
     }
+    else if (0 < num_servers_available)
+    {
+        dfiles = num_servers_available;
+    }
     else
     {
-        dfiles = num_servers_requested;
+        dfiles = 1;
     }
     return dfiles;
 }

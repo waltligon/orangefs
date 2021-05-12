@@ -340,7 +340,9 @@ int iocommon_lookup_relative(const char *rel_path,
             }
         }
         memset(current_seg_path, 0, PVFS_NAME_MAX);
-        strncpy(current_seg_path, start, (cur - start) + 1);
+        /* strncpy(current_seg_path, start, (cur - start) + 1); WBL */
+        /* strncpy is f'd up - we checked string length above */
+        strcpy(current_seg_path, start);
         start = cur;
         last = cur;
 
@@ -1112,13 +1114,19 @@ pvfs_descriptor *iocommon_open(const char *path,
              * full expand that handles link and everything
              */
             char *tmp_path;
-            int dlen = strlen(pdir->s->dpath);
-            int plen = strlen(path);
-            int mlen = dlen + plen + 2;
-            tmp_path = (char *)malloc(mlen);
-            strncpy(tmp_path, pdir->s->dpath, dlen + 1);
-            strncat(tmp_path, "/", 1);
-            strncat(tmp_path, path, plen);
+            int dlen = strnlen(pdir->s->dpath, PVFS_PATH_MAX);
+            int plen = strnlen(path, PVFS_PATH_MAX);
+            int mlen = dlen + plen + 1; /* 1 for / */
+            if (mlen >= PVFS_PATH_MAX - 1)
+            {
+                gossip_err("PVFS_PATH_MAX exceeded in iocommon_open\n");
+                goto errorout;
+            }
+            tmp_path = (char *)malloc(mlen + 1); /* 1 for for terminator */
+            /* strncpy is f'ed up - we set buff len from src so "n" not needed */
+            strcpy(tmp_path, pdir->s->dpath);
+            strncat(tmp_path, "/", mlen - dlen);
+            strncat(tmp_path, path, (mlen - dlen) - 1);
             Ppath = PVFS_new_path(tmp_path);
 
             rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
@@ -1219,13 +1227,19 @@ pvfs_descriptor *iocommon_open(const char *path,
              * full expand that handles link and everything
              */
             char *tmp_path;
-            int dlen = strlen(pdir->s->dpath);
-            int plen = strlen(directory);
-            int mlen = dlen + plen + 2;
-            tmp_path = (char *)malloc(mlen);
-            strncpy(tmp_path, pdir->s->dpath, dlen + 1);
-            strncat(tmp_path, "/", 1);
-            strncat(tmp_path, directory, plen);
+            int dlen = strnlen(pdir->s->dpath, PVFS_PATH_MAX);
+            int plen = strnlen(directory, PVFS_PATH_MAX);
+            int mlen = dlen + plen + 1; /* 1 for / */
+            if (mlen >= PVFS_PATH_MAX - 1)
+            {
+                gossip_err("PVFS_PATH_MAX exceeded in iocommon_open\n");
+                goto errorout;
+            }
+            tmp_path = (char *)malloc(mlen + 1); /* 1 for terminator */
+            /* strncpy is f'ed up - we set buff len from src so "n" not needed */
+            strcpy(tmp_path, pdir->s->dpath);
+            strncat(tmp_path, "/", mlen - dlen);
+            strncat(tmp_path, directory, (mlen - dlen) - 1);
             Ppath = PVFS_new_path(tmp_path);
 
             rc = iocommon_expand_path(Ppath, follow_links, flags, mode, &pd);
@@ -1365,13 +1379,19 @@ finish:
         {
             /* we opened relative to pdir so need to cat the paths */
             char *tpath;
-            int dlen = strlen(pdir->s->dpath);
-            int plen = strlen(path);
-            int mlen = dlen + plen + 2;
-            tpath = (char *)malloc(mlen);
-            strncpy(tpath, pdir->s->dpath, dlen + 1);
-            strncat(tpath, "/", 1);
-            strncat(tpath, path, plen);
+            int dlen = strnlen(pdir->s->dpath, PVFS_PATH_MAX);
+            int plen = strnlen(path, PVFS_PATH_MAX);
+            int mlen = dlen + plen + 1; /* 1 for / */
+            if (mlen >= PVFS_PATH_MAX - 1)
+            {
+                gossip_err("PVFS_PATH_MAX exceeded in iocommon_open\n");
+                goto errorout;
+            }
+            tpath = (char *)malloc(mlen + 1); /* 1 for terminator */
+            /* strncpy is f'ed up - we set buff len from src so "n" not needed */
+            strcpy(tpath, pdir->s->dpath);
+            strncat(tpath, "/", mlen - dlen);
+            strncat(tpath, path, (mlen - dlen) - 1);
             pd->s->dpath = pvfs_dpath_insert(tpath);
             free(tpath);
         }
@@ -3040,6 +3060,7 @@ int iocommon_readlink(pvfs_descriptor *pd, char *buf, int size)
     if (attr.objtype == PVFS_TYPE_SYMLINK)
     {
         strncpy(buf, attr.link_target, size);
+        buf[size - 1] = '\0';  /* strncpy is f'ed up */
         rc = attr.size;
     }
     else
@@ -3114,7 +3135,7 @@ errorout:
     return(rc);
 }
 
-int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
+int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs file descriptor */
                       struct dirent *dirp, /**< pointer to buffer */
                       unsigned int size)   /**< number of bytes in buffer */
 {
@@ -3157,8 +3178,13 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
 
     /* clear the output buffer */
     memset(dirp, 0, size);
-    /* posix deals in bytes in buffer and bytes read */
-    /* PVFS deals in number of records to read or were read */
+    /* posix deals in bytes in buffer and bytes read.
+     * PVFS deals in number of records to read or were read.
+     * We pass count to the server to tell it how man dirents
+     * we can read. The server returns the actual number read
+     * in readdir_resp.pvfs_dirent_outcount which we trust is
+     * <= count and will fit in the buffer
+     */
     count = size / sizeof(struct dirent);
     if (count > PVFS_REQ_LIMIT_DIRENT_COUNT)
     {
@@ -3194,7 +3220,7 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
         dirp->d_type = DT_UNKNOWN;
 #endif
         strncpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
-        dirp->d_name[name_max] = 0;
+        dirp->d_name[name_max] = '\0'; /* strncpy is f'ed up */
         pd->s->file_pointer += sizeof(struct dirent);
         bytes += sizeof(struct dirent);
         dirp++;
@@ -3286,7 +3312,7 @@ int iocommon_getdents64(pvfs_descriptor *pd,
         dirp->d_type = DT_UNKNOWN;
 #endif
         strncpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
-        dirp->d_name[name_max] = 0;
+        dirp->d_name[name_max - 1] = '\0';
         pd->s->file_pointer += sizeof(struct dirent64);
         bytes += sizeof(struct dirent64);
         dirp++;
@@ -3958,6 +3984,8 @@ int iocommon_listeattr(pvfs_descriptor *pd,
         {
             if (size > 0)
             {
+                /* could check for null term strings and matching read_sz here
+                 * but probably not needed */
                 if (total_size + listeattr_resp.key_array[k].read_sz > size)
                 {
                     total_size = size;
@@ -3965,8 +3993,9 @@ int iocommon_listeattr(pvfs_descriptor *pd,
                     rc = -1;
                     break; /* ran out of buffer space */
                 }
-                strncpy(list, listeattr_resp.key_array[k].buffer,
-                        listeattr_resp.key_array[k].read_sz);
+                /* strncpy f'ed up - size has already been checked above */
+                /* we trust server to return null term strings */
+                strcpy(list, listeattr_resp.key_array[k].buffer);
                 list += listeattr_resp.key_array[k].read_sz;
             }
             total_size += listeattr_resp.key_array[k].read_sz;

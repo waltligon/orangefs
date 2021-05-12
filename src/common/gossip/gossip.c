@@ -36,7 +36,7 @@
 /* These gobal vars are used to control calls to gossip_debug()
  */
 
-/** controls whether debugging is on or off */
+/** controls whether PVFS debugging is on or off */
 int gossip_debug_on = 0;
 
 int gossip_facility;
@@ -64,14 +64,14 @@ int gossip_facility = GOSSIP_STDERR;
 /* Using gossip to debug gossip can be problematic so this is a simple
  * macro that can be set on or off to enable direct printing to stderr
  */
-#define GOSSIP_INTERNAL 1
-#ifndef GOSSIP_INTERNAL
-#define gossip_internal(format, f...) do {} while(0)
-#else
+#define GOSSIP_INTERNAL 0
+#if defined(GOSSIP_INTERNAL) && GOSSIP_INTERNAL
 #define gossip_internal(format, f...)                  \
 do {                                                   \
     fprintf(stderr, format, ##f);                      \
 } while(0)
+#else
+#define gossip_internal(format, f...) do {} while(0)
 #endif /* GOSSIP_INTERNAL */
 
 /* file handle used for file logging */
@@ -817,7 +817,7 @@ int gossip_pop_mask(int *debug_on,
 {
     gossip_mask_stack *new_stack;
     struct qlist_head *qh;
-#ifdef GOSSIP_INTERNAL
+#if defined(GOSSIP_INTERNAL) && GOSSIP_INTERNAL
     int pflag = -1;
     unsigned long pmask1 = -1, pmask2 = -1;
 

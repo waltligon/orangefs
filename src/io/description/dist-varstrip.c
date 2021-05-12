@@ -303,8 +303,8 @@ static PVFS_size logical_file_size(void* params,
 }
 
 static int get_num_dfiles(void* params,
-                          uint32_t num_servers_requested,
-                          uint32_t num_dfiles_requested)
+                          int32_t num_servers_requested,
+                          int32_t num_dfiles_requested)
 {
     PVFS_varstrip_params* varstrip_params = (PVFS_varstrip_params*)params;
     /* parse parameter */

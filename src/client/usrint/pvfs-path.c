@@ -228,6 +228,7 @@ char *PVFS_expand_path(const char *path, int skip_last_lookup)
                 {
                     /* get the link contents */
                     strncpy(link_path, attr.link_target, PVFS_PATH_MAX);
+                    link_path[PVFS_PATH_MAX - 1] = '\0'; /* strncpy is f'ed up */
                     n = strlen(link_path);
                     is_a_link = 1;
                     /* even though we were success looking this up
@@ -456,13 +457,14 @@ int is_pvfs_path(const char **path, int skip_last_lookup)
 #if PVFS_USRINT_KMOUNT
     memset(&sbuf, 0, sizeof(sbuf));
     memset(&fsbuf, 0, sizeof(fsbuf));
-    npsize = strnlen(path, PVFS_PATH_MAX) + 1;
-    newpath = (char *)malloc(npsize);
+    npsize = strnlen(path, PVFS_PATH_MAX);
+    newpath = (char *)malloc(npsize + 1);
     if (!newpath)
     {
         return 0; /* let glibc sort out the error */
     }
     strncpy(newpath, path, npsize);
+    newpath[npsize - 1] = '\0';
     
     /* first try to stat the path */
     /* this must call standard glibc stat */

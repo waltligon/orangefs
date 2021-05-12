@@ -179,9 +179,8 @@ int PINT_server_req_get_attr(struct PVFS_server_req *req,
 {
     CHECK_OP(req->op);
 
-    if(!PINT_server_req_table[req->op].params->get_object_ref)
+    if(!PINT_server_req_table[req->op].params->get_attr)
     {
-        attr = NULL;
         return 0;  /* is this an error, or a potential result? */
     }
     else

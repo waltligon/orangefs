@@ -21,7 +21,7 @@ int PVFS_sys_getparent(
 {
     int ret = -PVFS_EINVAL;
     char parent_buf[PVFS_NAME_MAX] = {0};
-    char file_buf[PVFS_SEGMENT_MAX] = {0};
+    char file_buf[PVFS_NAME_MAX] = {0};
     PVFS_sysresp_lookup resp_look;
 
     if ((entry_name == NULL) || (resp == NULL))
@@ -51,13 +51,14 @@ int PVFS_sys_getparent(
         return ret;
     }
 
-    if (PINT_remove_base_dir(entry_name,file_buf,PVFS_SEGMENT_MAX))
+    if (PINT_remove_base_dir(entry_name, file_buf, PVFS_NAME_MAX))
     {
 	gossip_err("invalid filename: %s\n", entry_name);
 	return ret;
     }
 
-    strncpy(resp->basename, file_buf, PVFS_SEGMENT_MAX);
+    strncpy(resp->basename, file_buf, PVFS_NAME_MAX);
+    resp->basename[PVFS_NAME_MAX - 1] = '\0';
     resp->parent_ref = resp_look.ref;
 
     return 0;

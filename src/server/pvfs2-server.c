@@ -123,8 +123,8 @@ typedef struct
 } options_t;
 
 static options_t s_server_options = { 0, 0, 1, NULL, NULL};
-static char fs_conf[PATH_MAX];
-static char startup_cwd[PATH_MAX+1];
+static char fs_conf[PATH_MAX] = {0};
+static char startup_cwd[PATH_MAX] = {0};
 
 /* each of the elements in this array consists of a string and its length.
  * we're able to use sizeof here because sizeof an inlined string ("") gives
@@ -2385,6 +2385,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
                        strerror(errno));
         }
 
+        /* checking path length here so don't need n verssions below */
         if( (strlen(argv[optind]) + strlen(startup_cwd) + 1) >= PATH_MAX )
         {
             gossip_err("Config file path greater than %d characters\n",
@@ -2392,7 +2393,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
             goto parse_cmd_line_args_failure;
         }
 
-        if( strncat(startup_cwd, "/", PATH_MAX) == NULL )
+        if( strcat(startup_cwd, "/") == NULL )
         {
             gossip_err("Failure creating absolute path from relative "
                        "configuration file path\n");
@@ -2400,14 +2401,14 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         }
 
         /* copy the relative path into the string for the user */
-        if( strncat(startup_cwd, argv[optind++], PATH_MAX) == NULL )
+        if( strcat(startup_cwd, argv[optind++]) == NULL )
         {
             gossip_err("Failure creating absolute path from relative "
                        "configuration file path\n");
             goto parse_cmd_line_args_failure;
         }
 
-        if( strncpy(fs_conf, startup_cwd, PATH_MAX) == NULL )
+        if( strcpy(fs_conf, startup_cwd) == NULL )
         {
             gossip_err("Failure copying created full path into configuration "
                        "file path\n");
@@ -2416,13 +2417,14 @@ static int server_parse_cmd_line_args(int argc, char **argv)
     }
     else
     {
-        if( strlen(argv[optind]) >= PATH_MAX )
+        /* checking path length here so don't need n version below */
+        if( strnlen(argv[optind], PATH_MAX) >= PATH_MAX )
         {
             gossip_err("Config file path greater than %d characters\n",
                        PATH_MAX);
             goto parse_cmd_line_args_failure;
         }
-        if( strncpy( fs_conf, argv[optind++], PATH_MAX) == NULL )
+        if( strcpy(fs_conf, argv[optind++]) == NULL)
         {
             gossip_err("Failure copying configuration file path\n");
             goto parse_cmd_line_args_failure;

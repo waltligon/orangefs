@@ -45,8 +45,8 @@ typedef struct PINT_dist_methods_s
 
     /* Returns the number of data file objects to use for a file */
     int (*get_num_dfiles)(void *params,
-                          uint32_t num_servers_available,
-                          uint32_t num_dfiles_requested);
+                          int32_t num_servers_available,
+                          int32_t num_dfiles_requested);
 
     /* Sets the parameter designated by name to the given value */
     int (*set_param)(const char *dist_name, void *params,

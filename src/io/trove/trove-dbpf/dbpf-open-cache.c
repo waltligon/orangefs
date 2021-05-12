@@ -774,6 +774,7 @@ void clear_stranded_bstreams(TROVE_coll_id coll_id)
     struct dirent *current_dirent = NULL;
     struct stat file_info;
     struct file_struct *tmp_item;
+    int sz = 0;
 
     DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name,
                                       PATH_MAX,
@@ -804,11 +805,18 @@ void clear_stranded_bstreams(TROVE_coll_id coll_id)
                 free(tmp_item);
                 return;
             }
-            snprintf(tmp_item->pathname,
-                     PATH_MAX,
-                     "%s/%s",
-                     path_name,
-                     current_dirent->d_name);
+            sz = snprintf(tmp_item->pathname,
+                          PATH_MAX,
+                          "%s/%s",
+                          path_name,
+                          current_dirent->d_name);
+            if (sz >= PATH_MAX)
+            {
+                /* truncation */
+                gossip_err("Pathname plus filename exceeds PATH_MAX[%d]\n", errno);
+                free(tmp_item);
+                return;
+            }
             if(stat(tmp_item->pathname, &file_info) < 0)
             {
                 gossip_err("error doing stat on bstream entry\n");
