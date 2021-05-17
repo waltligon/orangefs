@@ -27,6 +27,7 @@
 #define strcasecmp     stricmp
 #define strncasecmp    strnicmp
 #define strtoll(str, end, base)    _atoi64(str)
+#define strtok_r(str, delim, saveptr)    strtok_s(str, delim, saveptr)
 
 /*
  * gettimeofday
