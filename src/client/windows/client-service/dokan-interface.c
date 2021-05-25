@@ -46,6 +46,7 @@ struct context_entry
 {
     struct qhash_head hash_link;
     ULONG64 context;
+	DWORD flags;
     PVFS_credential credential;
 };
 
@@ -531,28 +532,52 @@ static int get_credential(PDOKAN_FILE_INFO file_info,
     return ret;
 }
 
-/* add credential to cache */
-static void add_credential(ULONG64 context, PVFS_credential *credential)
+/* add entry for file to the context cache */
+static void add_context(PDOKAN_FILE_INFO file_info, DWORD flags, PVFS_credential *credential)
 {
-    struct context_entry *entry;
+	struct context_entry *entry;
 
-    entry = (struct context_entry *) calloc(1, sizeof(struct context_entry));
+	if (file_info == NULL) {
+		DbgPrint("   add_context: NULL file_info\n");
+		return;
+	}
+
+	/* create new entry */
+	entry = (struct context_entry *) calloc(1, sizeof(struct context_entry));
     if (entry == NULL)
     {
-        DbgPrint("   add_credential: out of memory\n");
+        DbgPrint("   add_context: out of memory\n");
         return;
     }
-            
-    entry->context = context;
-    PINT_copy_credential(credential, &(entry->credential));
+
+	entry->context = file_info->Context;
+	entry->flags = flags;
+	PINT_copy_credential(credential, &(entry->credential));
 
     gen_mutex_lock(&context_cache_mutex);
     qhash_add(context_cache, &entry->context, &entry->hash_link);
     gen_mutex_unlock(&context_cache_mutex);
 }
 
+static struct context_entry *get_context_entry(ULONG64 context)
+{
+	struct qhash_head *item = NULL;
+	struct context_entry *entry = NULL;
+	
+	gen_mutex_lock(&context_cache_mutex);
+    item = qhash_search(context_cache, &context);
+    if (item != NULL)
+    {
+        /* get entry on cache hit */
+		entry = qhash_entry(item, struct context_entry, hash_link);		
+	}
+	gen_mutex_unlock(&context_cache_mutex);
+	
+	return entry;
+}
+
 /* remove credential from cache */
-static void remove_credential(ULONG64 context)
+static void remove_context(ULONG64 context)
 {
     struct qhash_head *link; 
     struct context_entry *entry;
@@ -966,7 +991,7 @@ PVFS_Dokan_create_file(
         DokanFileInfo->Context = gen_context();
 
         DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
-        add_credential(DokanFileInfo->Context, &credential);
+	    add_context(DokanFileInfo, FlagsAndAttributes, &credential);
 
         /* determine whether this is a directory */
         if (!attr_flag)
@@ -1024,7 +1049,7 @@ PVFS_Dokan_create_directory(
     {
         DokanFileInfo->IsDirectory = TRUE;
         DokanFileInfo->Context = gen_context();
-        add_credential(DokanFileInfo->Context, &credential);
+        add_context(DokanFileInfo, 0, &credential);
     }
 
     free(fs_path);
@@ -1075,7 +1100,7 @@ PVFS_Dokan_open_directory(
     {
         DokanFileInfo->IsDirectory = TRUE;
         DokanFileInfo->Context = gen_context();
-        add_credential(DokanFileInfo->Context, &credential);
+        add_context(DokanFileInfo, 0, &credential);
     }
 
     free(fs_path);
@@ -1095,14 +1120,27 @@ PVFS_Dokan_close_file(
     char *fs_path = NULL;
     int ret = 0, err;
     PVFS_credential credential;
+	int del_flag = 0;
+	struct context_entry *entry;
 
     DbgPrint("CloseFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
+	/* determine whether file should be deleted */
+	del_flag = DokanFileInfo->DeleteOnClose;
+	if (!del_flag)
+	{
+		/* get cached entry */
+		entry = get_context_entry(DokanFileInfo->Context);
+		del_flag = entry && entry->flags & FILE_FLAG_DELETE_ON_CLOSE;
+	}
+
     /* delete the file/dir if DeleteOnClose specified */
-    if (DokanFileInfo->DeleteOnClose)
+    if (del_flag)
     {
-        /* load credential */
+        DbgPrint("   Deleting file\n");
+		
+		/* load credential */
         err = get_credential(DokanFileInfo, &credential);
         CRED_CHECK("CloseFile", err);
 
@@ -1117,11 +1155,11 @@ PVFS_Dokan_close_file(
         PINT_cleanup_credential(&credential);
     }
 
-    /* PVFS doesn't have a close-file semantic */ 
+    /* No-op: PVFS doesn't have a close-file semantic */ 
 
     /* remove credential from table */
     if (DokanFileInfo->Context != 0)
-        remove_credential(DokanFileInfo->Context);
+        remove_context(DokanFileInfo->Context);
 
     if (fs_path != NULL)
         free(fs_path);    
@@ -2595,7 +2633,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
 
     } while (TRUE);
 
-    cleanup_string(dokanOptions->MountPoint);
+    cleanup_string((void *) dokanOptions->MountPoint);
 
     qhash_destroy_and_finalize(context_cache, struct context_entry, hash_link, free);
     gen_mutex_destroy(&context_cache_mutex);
