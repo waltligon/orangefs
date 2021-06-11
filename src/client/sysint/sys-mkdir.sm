@@ -221,8 +221,8 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
      */
     if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) != PVFS_ATTR_SYS_ALL_SETABLE)
     {
-        gossip_lerr("PVFS_isys_mkdir() failure: invalid attribute mask %d, "
-                    "expected SYS_ALL_SETABLE (%d)\n",
+        gossip_lerr("PVFS_isys_mkdir() failure: invalid attribute mask %ld, "
+                    "expected SYS_ALL_SETABLE (%ld)\n",
                     attr.mask, PVFS_ATTR_SYS_ALL_SETABLE);
         return ret;
     }
@@ -257,7 +257,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
      * possible - tricky because of return struct we use.
      */
     
-    /* COPY the user provided attributes into the sys_aattr sm block */
+    /* COPY the user provided attributes into the sys_attr sm block */
     PVFS_util_copy_sys_attr(&sm_p->u.mkdir.sys_attr, &attr);
 
     sm_p->u.mkdir.mkdir_resp = resp;
@@ -317,7 +317,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     dir_attr->u.dir.dist_dir_attr.bitmap_size = 1;
     dir_attr->u.dir.dist_dir_attr.split_size = 8192;
     dir_attr->u.dir.dist_dir_attr.server_no = -1;
-    dir_attr->u.dir.dist_dir_attr.branch_level = 0;
+    dir_attr->u.dir.dist_dir_attr.branch_level = -1;
 
     /* get config for this filesystem */
     server_config = PINT_get_server_config_struct(parent_ref.fs_id);
@@ -547,7 +547,8 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     int32_t distr_dir_servers_initial_requested = 0;
     int32_t distr_dir_servers_max_requested = 0;
     int32_t distr_dir_split_size_requested = 0;
-    int ret = 0;
+    /* remove this with lost error check below
+    int ret = 0; */
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, "mkdir state: parent_getattr_inspect\n");
 
@@ -565,6 +566,9 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     assert(dir_attr);
     sys_attr = &sm_p->u.mkdir.sys_attr;   /* system attributes from user */
     assert(sys_attr);
+
+    DEBUG_attr_mask(p_attr->mask);
+    DEBUG_attr_mask(dir_attr->mask);
 
     distr_dir_servers_initial_requested = sys_attr->distr_dir_servers_initial;
     distr_dir_servers_max_requested = sys_attr->distr_dir_servers_max;
@@ -620,16 +624,31 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     {                                                                           \
         dir_attr->attr = p_attr->attr;                                          \
         dir_attr->mask |= mbit;                                                 \
+        gossip_debug(GOSSIP_MKDIR_DEBUG, "Add attr %ld\n", mbit);               \
     }
 
     /* General attributes - inherit */
     SET_DIR_ATTR_FROM_PARENT(meta_sid_count, PVFS_ATTR_COMMON_SID_COUNT);
     /* Hints pertaining to files - inherit */
     SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dist_name_len, PVFS_ATTR_DIR_HINT_DIST_NAME_LEN);
-    dir_attr->u.dir.hint.dist_name = strdup(p_attr->u.dir.hint.dist_name);
+    if (0 < p_attr->u.dir.hint.dist_name_len)
+    {
+        dir_attr->u.dir.hint.dist_name = strdup(p_attr->u.dir.hint.dist_name);
+    }
+    else
+    {
+        dir_attr->u.dir.hint.dist_name = NULL;
+    }
     SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dist_params_len,
                              PVFS_ATTR_DIR_HINT_DIST_PARAMS_LEN);
-    dir_attr->u.dir.hint.dist_params = strdup(p_attr->u.dir.hint.dist_params);
+    if (0 < p_attr->u.dir.hint.dist_params_len)
+    {
+        dir_attr->u.dir.hint.dist_params = strdup(p_attr->u.dir.hint.dist_params);
+    }
+    else
+    {
+        dir_attr->u.dir.hint.dist_params = NULL;
+    }
     SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dfile_count, PVFS_ATTR_DIR_HINT_DFILE_COUNT);
     SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dfile_sid_count, PVFS_ATTR_DIR_HINT_SID_COUNT);
     SET_DIR_ATTR_FROM_PARENT(u.dir.hint.layout.algorithm, PVFS_ATTR_DIR_HINT_LAYOUT);
@@ -640,34 +659,41 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     SET_DIR_ATTR_FROM_PARENT(u.dir.hint.layout.server_list.servers,
                              PVFS_ATTR_DIR_HINT_LAYOUT);
     /* Hints pertaining to directories - inherit and apply */
-    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_dirdata_min, PVFS_ATTR_DIR_DIRDATA_COUNT);
-    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_dirdata_max, PVFS_ATTR_DIR_DIRDATA_COUNT);
-    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_split_size, PVFS_ATTR_DIR_SPLIT_SIZE);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_dirdata_min, PVFS_ATTR_DIR_HINT_DIRDATA_MIN);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_dirdata_max, PVFS_ATTR_DIR_HINT_DIRDATA_MAX);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_split_size, PVFS_ATTR_DIR_HINT_SPLIT_SIZE);
     //SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.algorithm = 0;
     //SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.server_list.count = 0;
     //SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.server_list.bufsize = 0;
     //SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.server_list.servers = NULL;
     /* Distributed Directory Attributes - inherit */
     SET_DIR_ATTR_FROM_PARENT(u.dir.dist_dir_attr.dirdata_min, 
-                             PVFS_ATTR_DIR_DIRDATA_COUNT);
+                             PVFS_ATTR_DIR_DIRDATA_MIN);
     SET_DIR_ATTR_FROM_PARENT(u.dir.dist_dir_attr.dirdata_max, 
-                             PVFS_ATTR_DIR_DIRDATA_COUNT);
+                             PVFS_ATTR_DIR_DIRDATA_MAX);
     SET_DIR_ATTR_FROM_PARENT(u.dir.dist_dir_attr.dirdata_count, 
                              PVFS_ATTR_DIR_DIRDATA_COUNT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.dist_dir_attr.sid_count, 
+                             PVFS_ATTR_DIR_SID_COUNT);
     SET_DIR_ATTR_FROM_PARENT(u.dir.dist_dir_attr.split_size, PVFS_ATTR_DIR_SPLIT_SIZE);
-    dir_attr->u.dir.dist_dir_attr.server_no = -1;
+    dir_attr->u.dir.dist_dir_attr.server_no = 0;
     /* tree height, bitmap size and branch level are computed so not shown here */
 
     /* Apply directory hints after inheriting attributes */
     if ((p_attr->u.dir.hint.dir_dirdata_min > 0) && 
-        PVFS2_attr_all(p_attr->mask, PVFS_ATTR_DIR_DIRDATA_COUNT))
+        (p_attr->u.dir.hint.dir_dirdata_max >= p_attr->u.dir.hint.dir_dirdata_min) && 
+        PVFS2_attr_all(p_attr->mask, PVFS_ATTR_DIR_HINT_DIRDATA_MIN) &&
+        PVFS2_attr_all(p_attr->mask, PVFS_ATTR_DIR_HINT_DIRDATA_MAX))
     {
         dir_attr->u.dir.dist_dir_attr.dirdata_min = p_attr->u.dir.hint.dir_dirdata_min;
         dir_attr->u.dir.dist_dir_attr.dirdata_count = p_attr->u.dir.hint.dir_dirdata_min;
+        dir_attr->u.dir.dist_dir_attr.dirdata_max = p_attr->u.dir.hint.dir_dirdata_max;
+        dir_attr->mask |= PVFS_ATTR_DIR_DIRDATA_MIN;
+        dir_attr->mask |= PVFS_ATTR_DIR_DIRDATA_MAX;
         dir_attr->mask |= PVFS_ATTR_DIR_DIRDATA_COUNT;
     }
     if ((p_attr->u.dir.hint.dir_split_size > 0) && 
-        PVFS2_attr_all(p_attr->mask, PVFS_ATTR_DIR_SPLIT_SIZE))
+        PVFS2_attr_all(p_attr->mask, PVFS_ATTR_DIR_HINT_SPLIT_SIZE))
     {
         dir_attr->u.dir.dist_dir_attr.split_size = p_attr->u.dir.hint.dir_split_size;
         dir_attr->mask |= PVFS_ATTR_DIR_SPLIT_SIZE;
@@ -677,11 +703,16 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     /***********************************/
     /* User provided attributes */
     /***********************************/
+
+    /* this process assumes that the masks for the sys_attr and the obj_attr are
+     * the same.  This was not true in pre-V3
+     */
 #define SET_DIR_ATTR_FROM_USER(dattr, mbit, sattr)                              \
     if ((sys_attr->sattr) > 0 && PVFS2_attr_all(sys_attr->mask, (mbit)))        \
     {                                                                           \
         dir_attr->dattr = sys_attr->sattr;                                      \
         dir_attr->mask |= mbit;                                                 \
+        gossip_debug(GOSSIP_MKDIR_DEBUG, "Add attr %ld\n", mbit);               \
     }
 
     /* General attributes */
@@ -690,12 +721,12 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
                            owner);
     SET_DIR_ATTR_FROM_USER(group,
                            PVFS_ATTR_COMMON_GID,
-                           dfile_count);
+                           group);
     SET_DIR_ATTR_FROM_USER(perms,
                            PVFS_ATTR_COMMON_PERM,
                            perms);
     /* Hints pertaining to files - inherit */
-    SET_DIR_ATTR_FROM_USER(u.dir.hint.dfile_sid_count, 
+    SET_DIR_ATTR_FROM_USER(u.dir.hint.dfile_sid_count, /*  ??????  */
                            PVFS_ATTR_DIR_HINT_SID_COUNT,
                            mirror_copies_count);
     if (sys_attr->dist_name && PVFS2_attr_all(sys_attr->mask,
@@ -716,26 +747,41 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     }
     /* Hints pertaining to directories */
     /* Distributed Directory Attributes  - set directly */
-    SET_DIR_ATTR_FROM_USER(u.dir.dist_dir_attr.dirdata_min, 
-                           PVFS_ATTR_DIR_DIRDATA_COUNT,
-                           distr_dir_servers_initial);
-    SET_DIR_ATTR_FROM_USER(u.dir.dist_dir_attr.dirdata_max, 
-                           PVFS_ATTR_DIR_DIRDATA_COUNT,
-                           distr_dir_servers_max);
-    SET_DIR_ATTR_FROM_USER(u.dir.dist_dir_attr.split_size,
-                           PVFS_ATTR_DIR_SPLIT_SIZE,
-                           distr_dir_split_size);
-    dir_attr->u.dir.dist_dir_attr.dirdata_count =
-                           dir_attr->u.dir.dist_dir_attr.dirdata_min;
-    /* tree height, bitmap size and branch level are computed */
+
+    /* should we check MIN, MAX, and SPLIT_SIZE, or allow override of individual
+     * parameters?  We could check for existing params - from parent - but that makes
+     * for complicated logic!
+     */
+    if ((0 < sys_attr->distr_dir_servers_initial) &&
+        (sys_attr->distr_dir_servers_max >= sys_attr->distr_dir_servers_initial) &&
+        PVFS2_attr_all(sys_attr->mask, (PVFS_ATTR_DIR_DIRDATA_MIN | 
+                                        PVFS_ATTR_DIR_DIRDATA_MAX)))
+    {
+        SET_DIR_ATTR_FROM_USER(u.dir.dist_dir_attr.dirdata_min, 
+                               PVFS_ATTR_DIR_DIRDATA_MIN,
+                               distr_dir_servers_initial);
+        SET_DIR_ATTR_FROM_USER(u.dir.dist_dir_attr.dirdata_max, 
+                               PVFS_ATTR_DIR_DIRDATA_MAX,
+                               distr_dir_servers_max);
+        SET_DIR_ATTR_FROM_USER(u.dir.dist_dir_attr.split_size,
+                               PVFS_ATTR_DIR_SPLIT_SIZE,
+                               distr_dir_split_size);
+        dir_attr->u.dir.dist_dir_attr.dirdata_count =
+                               dir_attr->u.dir.dist_dir_attr.dirdata_min;
+        dir_attr->mask |= PVFS_ATTR_DIR_DIRDATA_COUNT;
+    }
+    /* tree height, bitmap size and branch level are computed in next state */
 #undef SET_DIR_ATTR_FROM_USER
 
+#if 0
+    /* no idea what this was supposed to check - it seems list now, remove it */
     if (ret < 0)
     {
         gossip_err("Error: failed to get distributed directory parameters\n");
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
+#endif
 
     gossip_debug(GOSSIP_MKDIR_DEBUG,
                  "Setting distributed directory initial "
@@ -753,6 +799,7 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
                  dir_attr->u.dir.dist_dir_attr.split_size,
                  distr_dir_split_size_requested);
 
+    DEBUG_attr_mask(dir_attr->mask);
 
     return SM_ACTION_COMPLETE;
 }
@@ -797,7 +844,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                            &sm_p->u.mkdir.metadata_sid_array,
                            sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max, /* in */
                            &sm_p->u.mkdir.dirdata_handles,
-                           sm_p->u.mkdir.dir_attr.meta_sid_count, /* in */
+                           sm_p->u.mkdir.dir_attr.meta_sid_count, /* in */ /* DUP */
                            &sm_p->u.mkdir.dirdata_sid_array);
     if(ret != 0)
     {
@@ -843,6 +890,15 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                             sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.split_size,
                             sm_p->hints);
 
+    /* after setting up the request, zero out the handle and sid counts in the attr
+     * we don't send lists of oids and sids in the attr, but in the req.  On the
+     * other side we need to remember to put everything back
+     */
+    msg_p->req.u.mkdir.attr.u.dir.dirdata_handles = NULL;
+    msg_p->req.u.mkdir.attr.u.dir.dirdata_sids = NULL;
+    msg_p->req.u.mkdir.attr.u.dir.dist_dir_attr.dirdata_count = 0;
+    msg_p->req.u.mkdir.attr.u.dir.dist_dir_attr.sid_count = 0;
+    /* now fill in various msg_p fields */
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->parent_ref.fs_id;

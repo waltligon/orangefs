@@ -224,11 +224,11 @@ extern int iocommon_ireadorwrite_nocache(enum PVFS_io_type which,
 
 extern int iocommon_getattr(PVFS_object_ref obj,
                             PVFS_sys_attr *attr,
-                            uint32_t mask);
+                            uint64_t mask);
 
 extern int iocommon_setattr(PVFS_object_ref obj, PVFS_sys_attr *attr);
 
-extern int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask);
+extern int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint64_t mask);
 
 /*
  * The only difference here is that buf is stat64 which
@@ -236,7 +236,7 @@ extern int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask);
  */
 extern int iocommon_stat64(pvfs_descriptor *pd,
                            struct stat64 *buf,
-                           uint32_t mask);
+                           uint64_t mask);
 
 extern int iocommon_statfs(pvfs_descriptor *pd, struct statfs *buf);
 

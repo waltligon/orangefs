@@ -259,7 +259,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
     memset(respattr, 0, sizeof(PVFS_object_attr));
 
     /* We are using this routine (which normally would be hidden) because
-     * the attr we are copying from was just red from dspace and it has
+     * the attr we are copying from was just read from dspace and it has
      * none of its veriable length fields yet.  If we try  to copy the
      * var fields we will get a seg fault, so only copy the fixed size
      * fields.
@@ -506,13 +506,21 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
 #endif
             gossip_debug(
                 GOSSIP_GETATTR_DEBUG,
-                "\n\t\t[dirdata_count = %d, sid_count = %d,\n"
-                "\t\ttree_height = %d, bitmap_size = %d,\n"
-                "\t\tsplit_size = %d, server_no= %d,\n"
-                "\t\tbranch_level = %d, dirent_count= %d,]\n",
+                "\n\t\t[tree_height = %d\n"
+                "\t\tdirdata_min = %d\n"
+                "\t\tdirdata_max = %d\n"
+                "\t\tdirdata_count = %d\n"
+                "\t\tsid_count = %d\n"
+                "\t\tbitmap_size = %d\n"
+                "\t\tsplit_size = %d\n"
+                "\t\tserver_no= %d\n"
+                "\t\tbranch_level = %d\n"
+                "\t\tdirent_count= %d]\n",
+                (int)respattr->u.dir.dist_dir_attr.tree_height,
+                (int)respattr->u.dir.dist_dir_attr.dirdata_min,
+                (int)respattr->u.dir.dist_dir_attr.dirdata_max,
                 (int)respattr->u.dir.dist_dir_attr.dirdata_count,
                 (int)respattr->u.dir.dist_dir_attr.sid_count,
-                (int)respattr->u.dir.dist_dir_attr.tree_height,
                 (int)respattr->u.dir.dist_dir_attr.bitmap_size,
                 (int)respattr->u.dir.dist_dir_attr.split_size,
                 (int)respattr->u.dir.dist_dir_attr.server_no,
@@ -562,13 +570,21 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
 #endif
             gossip_debug(
                 GOSSIP_GETATTR_DEBUG,
-                "\n\t\t[dirdata_count = %d, sid_count = %d,\n"
-                "\t\ttree_height = %d, bitmap_size = %d,\n"
-                "\t\tsplit_size = %d, server_no= %d,\n"
-                "\t\tbranch_level = %d, dirent_count= %d,]\n",
+                "\t\ttree_height = %d\n"
+                "\t\tdirdata_min = %d\n"
+                "\t\tdirdata_max = %d\n"
+                "\t\tdirdata_count = %d\n"
+                "\t\tsid_count = %d\n"
+                "\t\tbitmap_size = %d\n"
+                "\t\tsplit_size = %d\n"
+                "\t\tserver_no= %d\n"
+                "\t\tbranch_level = %d\n"
+                "\t\tdirent_count= %d\n",
+                (int)respattr->u.dirdata.dist_dir_attr.tree_height,
+                (int)respattr->u.dirdata.dist_dir_attr.dirdata_min,
+                (int)respattr->u.dirdata.dist_dir_attr.dirdata_max,
                 (int)respattr->u.dirdata.dist_dir_attr.dirdata_count,
                 (int)respattr->u.dirdata.dist_dir_attr.sid_count,
-                (int)respattr->u.dirdata.dist_dir_attr.tree_height,
                 (int)respattr->u.dirdata.dist_dir_attr.bitmap_size,
                 (int)respattr->u.dirdata.dist_dir_attr.split_size,
                 (int)respattr->u.dirdata.dist_dir_attr.server_no,
@@ -1221,7 +1237,7 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
      * about here, the stuff above
      * other than error checking
      * should be removed I think
-     * error checking out to be in
+     * error checking ought to be in
      * the validate routine I think
      ******************************
      */
@@ -2076,22 +2092,26 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
         break;
     case PVFS_TYPE_DIRECTORY :
     {
-        uint32_t dirent_file_count_i;
+        uint32_t dd_count_i;
         int bcount;
         unsigned char *c;
 
         /* !!! may change later */
-        gossip_debug(GOSSIP_GETATTR_DEBUG, " SERVER RETURNING :\n"
+        gossip_debug(GOSSIP_GETATTR_DEBUG, " SERVER RETURNING DIR:\n"
                      "\t\tdirent_count           = %llu \n"
-                     "\t\tdirdata_oid_count      = %d \n"
-                     "\t\tdirdata_sid_count      = %d \n"
-                     "\t\tdirdata_tree_height    = %d \n"
-                     "\t\tdirdata_bitmap_size    = %d \n"
-                     "\t\tdirdata_split_size     = %d \n"
+                     "\t\tdirdata_max            = %d \n"
+                     "\t\tdirdata_min            = %d \n"
+                     "\t\tdirdata_count          = %d \n"
+                     "\t\tsid_count              = %d \n"
+                     "\t\ttree_height            = %d \n"
+                     "\t\tbitmap_size            = %d \n"
+                     "\t\tsplit_size             = %d \n"
                      "\t\tdfile_count(hint)      = %d \n"
                      "\t\tdist_name_len(hint)    = %d \n"
                      "\t\tdist_params_len(hint)  = %d \n",
                      llu(respattr->u.dir.dirent_count),
+                     respattr->u.dir.dist_dir_attr.dirdata_max,
+                     respattr->u.dir.dist_dir_attr.dirdata_min,
                      respattr->u.dir.dist_dir_attr.dirdata_count,
                      respattr->u.dir.dist_dir_attr.sid_count,
                      respattr->u.dir.dist_dir_attr.tree_height,
@@ -2117,15 +2137,13 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
 
         gossip_debug(GOSSIP_GETATTR_DEBUG, "\n");
 
-        for (dirent_file_count_i = 0;
-             dirent_file_count_i < respattr->u.dir.dist_dir_attr.dirdata_count;
-             dirent_file_count_i++)
+        for (dd_count_i = 0;
+             dd_count_i < respattr->u.dir.dist_dir_attr.dirdata_count;
+             dd_count_i++)
         {
             gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         "    dirdata_handle[%d] = %s\n",
-                         dirent_file_count_i,
-                         PVFS_OID_str(&respattr->u.dir.dirdata_handles[
-                                                 dirent_file_count_i]));
+                         "    dirdata_handle[%d] = %s\n", dd_count_i,
+                         PVFS_OID_str(&respattr->u.dir.dirdata_handles[dd_count_i]));
         }
     }
     break;

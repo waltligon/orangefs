@@ -278,8 +278,8 @@ enum PVFS_sys_layout_algorithm
 /* For list layout this is the largest string encoding */
 #define PVFS_SYS_LIMIT_LAYOUT 4096
 
-/* these are redefining function defs which crashes
- * horribly.  The defs for these funcs is in pint-util.c
+/* these are redefining function defs which crash horribly.  
+ * The defs for these funcs are in pint-util.c
  */
 #if 0
 #define encode_PVFS_sys_layout_algorithm encode_enum
@@ -505,61 +505,111 @@ typedef struct
     uint32_t count;
 } PVFS_ds_keyval_handle_info;
 
+/* Under V3 these mask flags are the same as those used in an obj_attr
+ * Thus, any change here or in src/proto/pvfs2-attr.h must be reflexted
+ * in the other.  We may try to make that semi-automatic eventually
+ */
+
 /* attribute masks used by system interface callers */
-#define PVFS_ATTR_SYS_SIZE                  (1 << 20)
-#define PVFS_ATTR_SYS_DISTDIR_ATTR          (1 << 21)
-#define PVFS_ATTR_SYS_LNK_TARGET            (1 << 24)
-#define PVFS_ATTR_SYS_DFILE_COUNT           (1 << 25)
-#define PVFS_ATTR_SYS_DIRENT_COUNT          (1 << 26)
-#define PVFS_ATTR_SYS_DIR_HINT              (1 << 27)
-#define PVFS_ATTR_SYS_BLKSIZE               (1 << 28)
-#define PVFS_ATTR_SYS_MIRROR_COPIES_COUNT   (1 << 29)
-#define PVFS_ATTR_SYS_CAPABILITY            (1 << 30)
-#define PVFS_ATTR_SYS_UID                   (1 << 0)
-#define PVFS_ATTR_SYS_GID                   (1 << 1)
-#define PVFS_ATTR_SYS_PERM                  (1 << 2)
-#define PVFS_ATTR_SYS_ATIME                 (1 << 3)
-#define PVFS_ATTR_SYS_CTIME                 (1 << 4)
-#define PVFS_ATTR_SYS_MTIME                 (1 << 5)
-#define PVFS_ATTR_SYS_NTIME                 (1 << 6)
-#define PVFS_ATTR_SYS_TYPE                  (1 << 7)
-#define PVFS_ATTR_SYS_ATIME_SET             (1 << 8)
-#define PVFS_ATTR_SYS_CTIME_SET             (1 << 9)
-#define PVFS_ATTR_SYS_MTIME_SET             (1 << 10)
-#define PVFS_ATTR_SYS_NTIME_SET             (1 << 11)
-#define PVFS_ATTR_SYS_FASTEST               (1 << 15)
-#define PVFS_ATTR_SYS_LATEST                (1 << 16)
+#define PVFS_ATTR_SYS_UID                   (1UL << 0)
+#define PVFS_ATTR_SYS_GID                   (1UL << 1)
+#define PVFS_ATTR_SYS_PERM                  (1UL << 2)
+#define PVFS_ATTR_SYS_ATIME                 (1UL << 3)
+#define PVFS_ATTR_SYS_CTIME                 (1UL << 4)
+#define PVFS_ATTR_SYS_MTIME                 (1UL << 5)
+#define PVFS_ATTR_SYS_NTIME                 (1UL << 6)
+#define PVFS_ATTR_SYS_TYPE                  (1UL << 7)
+#define PVFS_ATTR_SYS_ATIME_SET             (1UL << 8)
+#define PVFS_ATTR_SYS_CTIME_SET             (1UL << 9)
+#define PVFS_ATTR_SYS_MTIME_SET             (1UL << 10)
+#define PVFS_ATTR_SYS_NTIME_SET             (1UL << 11)
+
+#define PVFS_ATTR_SYS_DFILE_COUNT           (1UL << 17)
+#define PVFS_ATTR_SYS_MIRROR_COPIES_COUNT   (1UL << 18) /* dfile SID_COUNT */
+#define PVFS_ATTR_SYS_MIRROR_MODE           (1UL << 19)
+#define PVFS_ATTR_SYS_SIZE                  (1UL << 20) /* from meta - whole file */
+
+#define PVFS_ATTR_SYS_LNK_TARGET            (1UL << 23)
+#define PVFS_ATTR_SYS_DIRENT_COUNT          (1UL << 24)
+
+#define PVFS_ATTR_SYS_BLKSIZE               (1UL << 28)
+
+#define PVFS_ATTR_SYS_DIR_HINT_INIT         (1UL << 30)
+#define PVFS_ATTR_SYS_DIR_HINT_MAX          (1UL << 31)
+#define PVFS_ATTR_SYS_DIR_HINT_SPLIT_SIZE   (1UL << 32)
+#define PVFS_ATTR_SYS_DIR_INIT              (1UL << 35)
+#define PVFS_ATTR_SYS_DIR_MAX               (1UL << 36)
+#define PVFS_ATTR_SYS_DIR_SPLIT_SIZE        (1UL << 40)
+
+/* "extras" are items not in dspace but in keyval space - may be multiple items */
+#define PVFS_ATTR_SYS_DISTDIR_ATTR          (1UL << 43) /* get dirdata extras */
+#define PVFS_ATTR_SYS_DIR_HINT              (1UL << 44) /* get hint extras */
+
+#define PVFS_ATTR_SYS_CAPABILITY            (1UL << 55)
+
+#define PVFS_ATTR_SYS_FASTEST               (1UL << 62)
+#define PVFS_ATTR_SYS_LATEST                (1UL << 63)
 
 #define PVFS_ATTR_SYS_COMMON_ALL \
-(PVFS_ATTR_SYS_UID   | PVFS_ATTR_SYS_GID   | \
- PVFS_ATTR_SYS_PERM  | PVFS_ATTR_SYS_ATIME | \
- PVFS_ATTR_SYS_CTIME | PVFS_ATTR_SYS_MTIME | \
- PVFS_ATTR_SYS_NTIME | PVFS_ATTR_SYS_TYPE)
+                 (PVFS_ATTR_SYS_UID   | \
+                  PVFS_ATTR_SYS_GID   | \
+                  PVFS_ATTR_SYS_PERM  | \
+                  PVFS_ATTR_SYS_ATIME | \
+                  PVFS_ATTR_SYS_CTIME | \
+                  PVFS_ATTR_SYS_MTIME | \
+                  PVFS_ATTR_SYS_NTIME | \
+                  PVFS_ATTR_SYS_TYPE)
 
 #define PVFS_ATTR_SYS_ALL            \
-(PVFS_ATTR_SYS_COMMON_ALL |          \
- PVFS_ATTR_SYS_SIZE |                \
- PVFS_ATTR_SYS_LNK_TARGET |          \
- PVFS_ATTR_SYS_DFILE_COUNT |         \
- PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
- PVFS_ATTR_SYS_DISTDIR_ATTR |        \
- PVFS_ATTR_SYS_DIR_HINT |            \
- PVFS_ATTR_SYS_DIRENT_COUNT |        \
- PVFS_ATTR_SYS_BLKSIZE)
+                 (PVFS_ATTR_SYS_COMMON_ALL |          \
+                  PVFS_ATTR_SYS_DFILE_COUNT |         \
+                  PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
+                  PVFS_ATTR_SYS_MIRROR_MODE |         \
+                  PVFS_ATTR_SYS_SIZE |                \
+                  PVFS_ATTR_SYS_LNK_TARGET |          \
+                  PVFS_ATTR_SYS_DIRENT_COUNT |        \
+                  PVFS_ATTR_SYS_BLKSIZE |             \
+                  PVFS_ATTR_SYS_DIR_HINT_INIT |       \
+                  PVFS_ATTR_SYS_DIR_HINT_MAX |        \
+                  PVFS_ATTR_SYS_DIR_HINT_SPLIT_SIZE | \
+                  PVFS_ATTR_SYS_DIR_INIT |            \
+                  PVFS_ATTR_SYS_DIR_MAX |             \
+                  PVFS_ATTR_SYS_DIR_SPLIT_SIZE |      \
+                  PVFS_ATTR_SYS_DISTDIR_ATTR |        \
+                  PVFS_ATTR_SYS_DIR_HINT |            \
+                  PVFS_ATTR_SYS_CAPABILITY)
 
+/* DIR HINT refers to hints that are not stored in dspace and thus need
+ * an additional read on the server.  Other DIR_HINT attributes are in
+ * dspace and so come with every getattr.
+ */
 #define PVFS_ATTR_SYS_NOHINT ~(PVFS_ATTR_SYS_DIR_HINT)
 
+/* There are both a central size, and a distributed size on files.  The central
+ * may be out of date.  the distributed requiers sending requsts to all of the
+ * dfiles.  This is why we might want to ask for attributes with no size.  Central
+ * size always comes.
+ */
 #define PVFS_ATTR_SYS_NOSIZE ~(PVFS_ATTR_SYS_SIZE)
 
+/* DISTDIR_ATTR refers to attributes that are not in the dspace, particularly
+ * lists of handes for dfiles and dirdatas, sids, bitmaps, etc.  These
+ * require additional reads on server.
+ */
+#define PVFS_ATTR_SYS_NODISTDIR_ATTR ~(PVFS_ATTR_SYS_DISTDIR_ATTR)
+
 #define PVFS_ATTR_SYS_ALL_NOHINT \
-               (PVFS_ATTR_SYS_ALL & PVFS_ATTR_SYS_NOHINT)
+                 (PVFS_ATTR_SYS_ALL & PVFS_ATTR_SYS_NOHINT)
 
 #define PVFS_ATTR_SYS_ALL_NOSIZE \
-               (PVFS_ATTR_SYS_ALL & PVFS_ATTR_SYS_NOSIZE)
+                 (PVFS_ATTR_SYS_ALL & PVFS_ATTR_SYS_NOSIZE)
+
+#define PVFS_ATTR_SYS_ALL_NODISTDIR_ATTR \
+                 (PVFS_ATTR_SYS_ALL & PVFS_ATTR_SYS_DISTDIR_ATTR)
 
 #define PVFS_ATTR_SYS_ALL_NOHINTSIZE \
-               (PVFS_ATTR_SYS_ALL & PVFS_ATTR_SYS_NOSIZE & \
-                PVFS_ATTR_SYS_NOHINT)
+                 (PVFS_ATTR_SYS_ALL & PVFS_ATTR_SYS_NOSIZE & \
+                  PVFS_ATTR_SYS_NOHINT)
 
 #if 0
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
@@ -570,6 +620,8 @@ typedef struct
  PVFS_ATTR_SYS_DIRENT_COUNT | \
  PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
 #endif
+
+/* still not really clear on these three attribute groups */
 
 #define PVFS_ATTR_SYS_ALL_SETABLE \
                (PVFS_ATTR_SYS_COMMON_ALL - PVFS_ATTR_SYS_TYPE) 
@@ -781,29 +833,29 @@ endecode_fields_2(
 typedef struct PVFS_dist_dir_attr_s
 {
     /* global info */
-    int32_t tree_height;    /* ceil(log2(dirdata_count)) */
-    int32_t dirdata_min;    /* minimum and initial number if dirdata servers */
-    int32_t dirdata_max;    /* maximum number if dirdata servers */
-    int32_t dirdata_count;  /* current number of dirdata servers */
-    int32_t sid_count;      /* number of copies of each dirdata (bucket) */
-    int32_t bitmap_size;    /* number of PVFS_dist_dir_bitmap_basetype */
+    uint32_t tree_height;    /* ceil(log2(dirdata_count)) */
+    uint32_t dirdata_min;    /* minimum and initial number if dirdata servers */
+    uint32_t dirdata_max;    /* maximum number if dirdata servers */
+    uint32_t dirdata_count;  /* current number of dirdata servers */
+    uint32_t sid_count;      /* number of copies of each dirdata (bucket) */
+    uint32_t bitmap_size;    /* number of PVFS_dist_dir_bitmap_basetype */
                             /* stored under the key DIST_DIR_BITMAP */
-    int32_t split_size;     /* maximum number of entries before a split */
+    uint32_t split_size;     /* maximum number of entries before a split */
 
     /* local info */
     int32_t server_no;      /* 0 to dirdata_count-1, indicates */
-                                /* which server is running this code */
+                                /* which dirdata server is running this code */
     int32_t branch_level;   /* level of branching on this server */
 } PVFS_dist_dir_attr;
 endecode_fields_9(
     PVFS_dist_dir_attr,
-    int32_t, tree_height,
-    int32_t, dirdata_min,
-    int32_t, dirdata_max,
-    int32_t, dirdata_count,
-    int32_t, sid_count,
-    int32_t, bitmap_size,
-    int32_t, split_size,
+    uint32_t, tree_height,
+    uint32_t, dirdata_min,
+    uint32_t, dirdata_max,
+    uint32_t, dirdata_count,
+    uint32_t, sid_count,
+    uint32_t, bitmap_size,
+    uint32_t, split_size,
     int32_t, server_no,
     int32_t, branch_level);
 

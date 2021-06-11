@@ -1027,7 +1027,7 @@ int pvfs_stat(const char *path, struct stat *buf)
     return pvfs_stat_mask(path, buf, PVFS_ATTR_SYS_ALL);
 }
 
-int pvfs_stat_mask(const char *path, struct stat *buf, uint32_t mask)
+int pvfs_stat_mask(const char *path, struct stat *buf, uint64_t mask)
 {
     int rc;
     char *newpath;
@@ -1116,7 +1116,7 @@ int pvfs_fstat(int fd, struct stat *buf)
     return pvfs_fstat_mask(fd, buf, PVFS_ATTR_DEFAULT_MASK);
 }
 
-int pvfs_fstat_mask(int fd, struct stat *buf, uint32_t mask)
+int pvfs_fstat_mask(int fd, struct stat *buf, uint64_t mask)
 {
     gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_fstat_mask: called with %d\n", fd);
     pvfs_descriptor *pd;
@@ -1280,7 +1280,7 @@ int pvfs_lstat(const char *path, struct stat *buf)
     return pvfs_lstat_mask(path, buf, PVFS_ATTR_DEFAULT_MASK);
 }
 
-int pvfs_lstat_mask(const char *path, struct stat *buf, uint32_t mask)
+int pvfs_lstat_mask(const char *path, struct stat *buf, uint64_t mask)
 {
     int rc;
     char *newpath;

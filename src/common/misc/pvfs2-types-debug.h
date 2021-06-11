@@ -14,6 +14,7 @@
 
 #include "gossip.h"
 #include "pvfs2-types.h"
+#include "pvfs2-attr.h"
 
 static inline void PINT_attr_dump_object_type(PVFS_debug_mask gossip_mask,
                                               PVFS_object_attr *attr_p)
@@ -56,6 +57,9 @@ static inline void PINT_attrmask_print(PVFS_debug_mask debug,
  * of attributes and attribute mask for V3.  We probably want to
  * resurect this using some macros but for now just setting asside.
  */
+
+DEBUG_attr_mask(attrmask);
+
 #if 0
     gossip_debug(debug, "mask = 0x%x:\n", attrmask);
     if (attrmask & PVFS_ATTR_COMMON_UID) gossip_debug(debug, "\tPVFS_ATTR_COMMON_UID\n");

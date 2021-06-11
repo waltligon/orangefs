@@ -283,15 +283,44 @@ void print_dspace( struct dbpf_data key, struct dbpf_data val )
 
         case PVFS_TYPE_DIRECTORY:
             printf("(dirent_count: %llu)"
-                   "(tree_height: %d)(dirdata_count: %d)"
-                   "(bitmap_size: %d)(split_size: %d)"
-                   "(branch_level: %d) (%zu)\n",
+                   "(tree_height: %d)"
+                   "(dirdata_count: %d)"
+                   "(dirdata_min: %d)"
+                   "(dirdata_max: %d)"
+                   "(bitmap_size: %d)"
+                   "(split_size: %d)"
+                   "(branch_level: %d)"
+                   "(hint_dist_name_len: %d)"
+                   "(hint_dist_params_len: %d)"
+                   "(hint_dfile_count: %d)"
+                   "(hint_dfile_sid_count: %d)"
+                   "(hint_layout_algorithm: %d)"
+                   "(hint_layout_list_cnt: %d)"
+                   "(hint_dirdata_min: %d)"
+                   "(hint_dirdata_max: %d)"
+                   "(hint_split_size: %d)"
+                   "(hint_dir_layout_algorithm: %d)"
+                   "(hint_dir_layout_list_cnt: %d)"
+                   "(%zu)\n",
                     llu(v->u.directory.dirent_count),
                     v->u.directory.tree_height,
                     v->u.directory.dirdata_count,
+                    v->u.directory.dirdata_min,
+                    v->u.directory.dirdata_max,
                     v->u.directory.bitmap_size,
                     v->u.directory.split_size,
                     v->u.directory.branch_level,
+                    v->u.directory.hint_dist_name_len,
+                    v->u.directory.hint_dist_params_len,
+                    v->u.directory.hint_dfile_count,
+                    v->u.directory.hint_dfile_sid_count,
+                    v->u.directory.hint_layout_algorithm,
+                    v->u.directory.hint_layout_list_cnt,
+                    v->u.directory.hint_dirdata_min,
+                    v->u.directory.hint_dirdata_max,
+                    v->u.directory.hint_split_size,
+                    v->u.directory.hint_dir_layout_algorithm,
+                    v->u.directory.hint_dir_layout_list_cnt,
                     val.len);
             break;
 

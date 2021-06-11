@@ -13,6 +13,15 @@
 #ifndef PVFS_USRINT_H
 #define PVFS_USRINT_H 1
 
+/* define FD flags unique to PVFS here */
+#define PVFS_FD_NOCACHE 0x10000
+
+/* We don't don't want all of this when compiling the OFS USRINT source so we
+ * use this define to suppress it.
+ */
+
+#ifndef ORANGEFS_SOURCE
+
 /* This should turn on all but the FILE_OFFSET_BITS but we keep */
 /* the others as documentation of what is needed for usrint */
 #ifndef _GNU_SOURCE
@@ -63,30 +72,30 @@
 #define O_HINTS     02000000  /* PVFS hints are present */
 #define O_NOTPVFS   04000000  /* Open non-PVFS files if possible */
 
-/* define FD flags unique to PVFS here */
-#define PVFS_FD_NOCACHE 0x10000
-
 /* Define AT_FDCWD and related flags on older systems */
 #ifndef AT_FDCWD
 # define AT_FDCWD		-100	/* Special value used to indicate
 					   the *at functions should use the
 					   current working directory. */
 #endif
+
 #ifndef AT_SYMLINK_NOFOLLOW
 # define AT_SYMLINK_NOFOLLOW	0x100	/* Do not follow symbolic links.  */
 #endif
+
 #ifndef AT_REMOVDIR
 # define AT_REMOVEDIR		0x200	/* Remove directory instead of
 					   unlinking file.  */
 #endif
+
 #ifndef AT_SYMLINK_FOLLOW
 # define AT_SYMLINK_FOLLOW	0x400	/* Follow symbolic links.  */
 #endif
+
 #ifndef AT_EACCESS
 # define AT_EACCESS		0x200	/* Test access permitted for
 					   effective IDs, not real IDs.  */
 #endif
-
 
 /* Set of valid atomic operations to be performed by a call to atomic_eattr */
 enum
@@ -96,13 +105,16 @@ enum
     PVFS_FETCH_AND_ADD = 0xADD
 };
 
+#endif /* ORANGEFS_SOURCE */
+
+/*** helper functions - not part of POSIX ***/
 /* functions to check fd or path validity */
 extern int pvfs_valid_path(const char *path);
 
 extern int pvfs_valid_fd(int fd);
 
 /* functions to process server lists */
-extern PVFS_sys_layout *pvfs_layout(const char *path,char *serverlist);
+extern PVFS_sys_layout *pvfs_layout(const char *path, char *serverlist);
 
 extern PVFS_sys_layout *pvfs_layout_fd(int dfd, char *serverlist);
 
@@ -112,6 +124,7 @@ extern int pvfs_layout_string(PVFS_sys_layout *layout,
 
 extern void pvfs_release_layout(PVFS_sys_layout *layout);
 
+/*** POSIX based IO functions ***/
 /* pvfs_open */
 extern int pvfs_open(const char *path, int flags, ...);
 
@@ -124,9 +137,9 @@ extern int pvfs_openat(int dirfd, const char *path, int flags, ...);
 /* pvfs_openat64 */
 extern int pvfs_openat64(int dirfd, const char *path, int flags, ...);
 
-extern int pvfs_creat(const char *path, mode_t mode, ...);
+extern int pvfs_creat(const char *path, mode_t mode);
 
-extern int pvfs_creat64(const char *path, mode_t mode, ...);
+extern int pvfs_creat64(const char *path, mode_t mode);
 
 /* pvfs_unlink */
 extern int pvfs_unlink (const char *path);
@@ -135,8 +148,10 @@ extern int pvfs_unlinkat (int dirfd, const char *path, int flags);
 
 extern int pvfs_rename(const char *oldpath, const char *newpath);
 
-extern int pvfs_renameat(int olddirfd, const char *oldpath,
-                  int newdirfd, const char *newpath);
+extern int pvfs_renameat(int olddirfd, 
+                         const char *oldpath,
+                         int newdirfd, 
+                         const char *newpath);
 
 /* pvfs_read */
 extern ssize_t pvfs_read( int fd, void *buf, size_t count );
@@ -177,7 +192,7 @@ extern int pvfs_ftruncate (int fd, off_t length);
 extern int pvfs_ftruncate64 (int fd, off64_t length);
 
 /* pvfs_close */
-extern int pvfs_close( int fd );
+extern int pvfs_close(int fd);
 
 extern int pvfs_flush(int fd);
 
@@ -186,7 +201,7 @@ extern int pvfs_stat(const char *path, struct stat *buf);
 
 extern int pvfs_stat64(const char *path, struct stat64 *buf);
 
-extern int pvfs_stat_mask(const char *path, struct stat *buf, uint32_t mask);
+extern int pvfs_stat_mask(const char *path, struct stat *buf, uint64_t mask);
 
 extern int pvfs_fstat(int fd, struct stat *buf);
 
@@ -196,13 +211,22 @@ extern int pvfs_fstatat(int fd, const char *path, struct stat *buf, int flag);
 
 extern int pvfs_fstatat64(int fd, const char *path, struct stat64 *buf, int flag);
 
-extern int pvfs_fstat_mask(int fd, struct stat *buf, uint32_t mask);
+extern int pvfs_fstat_mask(int fd, struct stat *buf, uint64_t mask);
 
 extern int pvfs_lstat(const char *path, struct stat *buf);
 
 extern int pvfs_lstat64(const char *path, struct stat64 *buf);
 
-extern int pvfs_lstat_mask(const char *path, struct stat *buf, uint32_t mask);
+extern int pvfs_lstat_mask(const char *path, struct stat *buf, uint64_t mask);
+
+#ifdef __USE_GLIBC__
+extern int pvfs_utimensat(int dirfd,
+                          const char *path,
+                          const struct timespec times[2],
+                          int flags);
+
+extern int pvfs_futimens(int fd, const struct timespec times[2]);
+#endif
 
 extern int pvfs_futimesat(int dirfd, const char *path, const struct timeval times[2]);
 
@@ -215,6 +239,8 @@ extern int pvfs_futimes(int fd, const struct timeval times[2]);
 extern int pvfs_dup(int oldfd);
 
 extern int pvfs_dup2(int oldfd, int newfd);
+
+extern int pvfs_dup3(int oldfd, int newfd, int flags);
 
 extern int pvfs_chown (const char *path, uid_t owner, gid_t group);
 
@@ -248,8 +274,11 @@ extern int pvfs_symlinkat (const char *oldpath, int newdirfd, const char *newpat
 extern int pvfs_link (const char *oldpath, const char *newpath);
 
 /* PVFS does not have hard links */
-extern int pvfs_linkat (int olddirfd, const char *oldpath,
-                 int newdirfd, const char *newpath, int flags);
+extern int pvfs_linkat (int olddirfd, 
+                        const char *oldpath,
+                        int newdirfd, 
+                        const char *newpath, 
+                        int flags);
 
 /* this reads exactly one dirent, count is ignored */
 extern int pvfs_readdir(unsigned int fd, struct dirent *dirp, unsigned int count);
@@ -300,23 +329,38 @@ extern ssize_t pvfs_sendfile(int outfd, int infd, off_t *offset, size_t count);
 
 extern ssize_t pvfs_sendfile64(int outfd, int infd, off64_t *offset, size_t count);
 
-extern int pvfs_setxattr(const char *path, const char *name,
-                          const void *value, size_t size, int flags);
+extern int pvfs_setxattr(const char *path, 
+                         const char *name,
+                         const void *value, 
+                         size_t size, 
+                         int flags);
 
-extern int pvfs_lsetxattr(const char *path, const char *name,
-                          const void *value, size_t size, int flags);
+extern int pvfs_lsetxattr(const char *path, 
+                          const char *name,
+                          const void *value, 
+                          size_t size, 
+                          int flags);
 
-extern int pvfs_fsetxattr(int fd, const char *name,
-                          const void *value, size_t size, int flags);
+extern int pvfs_fsetxattr(int fd, 
+                          const char *name,
+                          const void *value, 
+                          size_t size, 
+                          int flags);
 
-extern ssize_t pvfs_getxattr(const char *path, const char *name,
-                             void *value, size_t size);
+extern ssize_t pvfs_getxattr(const char *path, 
+                             const char *name,
+                             void *value, 
+                             size_t size);
 
-extern ssize_t pvfs_lgetxattr(const char *path, const char *name,
-                              void *value, size_t size);
+extern ssize_t pvfs_lgetxattr(const char *path, 
+                              const char *name,
+                              void *value, 
+                              size_t size);
 
-extern ssize_t pvfs_fgetxattr(int fd, const char *name,
-                              void *value, size_t size);
+extern ssize_t pvfs_fgetxattr(int fd, 
+                              const char *name,
+                              void *value, 
+                              size_t size);
 
 extern ssize_t pvfs_atomicxattr(const char *path,
                                 int opcode,
@@ -367,7 +411,7 @@ extern int pvfs_chdir(const char *path);
 
 extern int pvfs_fchdir(int fd);
 
-extern int pvfs_cwd_init(const char *buf, size_t size);
+extern int pvfs_cwd_init(const char *buf, size_t size); /* pvfs_cwd_init(int expand); */
 
 extern char *pvfs_getcwd(char *buf, size_t size);
 
@@ -388,7 +432,28 @@ extern int pvfs_munmap(void *start, size_t length);
 
 extern int pvfs_msync(void *start, size_t length, int flags);
 
+/* find where this comes from and set up config and conditional compile */
+
+#ifdef ORANGEFS_SOURCE
+extern int pvfs_getfscreatecon(security_context_t *con);
+
+extern int pvfs_getfilecon(const char *path, security_context_t *con);
+
+extern int pvfs_lgetfilecon(const char *path, security_context_t *con);
+
+extern int pvfs_fgetfilecon(int fd, security_context_t *con);
+
+extern int pvfs_setfscreatecon(security_context_t con);
+
+extern int pvfs_setfilecon(const char *path, security_context_t con);
+
+extern int pvfs_lsetfilecon(const char *path, security_context_t con);
+
+extern int pvfs_fsetfilecon(int fd, security_context_t con);
 #endif
+
+
+#endif   /* PVFS_USRINT_H */
 
 /*
  * Local variables:

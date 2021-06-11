@@ -129,13 +129,14 @@ PVFS_msg_tag_t PINT_util_get_next_tag(void)
  * clumbsy and we now move around complete attributes - with the
  * following caveates:
  *
- * file size, dirent_count, and the 3 times are volatile
+ * file size, dirent_count, and the times are volatile
  *
  * These fields may or may not represent an accurate up-to-the-second
  * value, and in fact (in V3) getattr supports a flag to get the most
  * recent value, otherwise it represents the last known value.
  *
- * The commented out code is the old model.
+ * Attributes are tricky, they get partially set from lots of places so
+ * its a good idea not to wantonly zero (or NULL) out fields.
  */
 
 /* PINT_copy_object_attr_var
@@ -143,37 +144,53 @@ PVFS_msg_tag_t PINT_util_get_next_tag(void)
  * arrays, strings, etc.
  */
 
-#define CPYFIELD(x,s,f)                         \
-    do { if (((src->mask & (f)) == (f)) &&      \
-             ((s) > 0) && (src->u.x)) {         \
-        dest->u.x = malloc(s);                  \
-        memcpy(dest->u.x, src->u.x, s); }       \
+#define CPYFIELD(x,s,f)                            \
+    do {                                           \
+        if ((NULL != src->u.x)  &&                 \
+            ((src->mask & (f)) == (f)) &&          \
+            ((s) > 0))                             \
+        {                                          \
+            dest->u.x = malloc(s);                 \
+            memcpy(dest->u.x, src->u.x, (s));      \
+        }                                          \
+        else                                       \
+        {                                          \
+            /*dest->u.x = NULL;*/                      \
+        }                                          \
     } while (0)
 
 /* this macro is only for OID/SID arrays, we prefer these to be
  * allocated contiguouosly.  If the src has them packed, we simply copy
  * the src, otherwise we allocate space for both a copy in two chunks
  */
-#define PACKSID(o,s,oc,sc,f)                                               \
-    do {                                                                   \
-        if (((src->mask & f) == f)   &&                                    \
-            (src->u.s == (PVFS_SID *)(src->u.o + src->u.oc)))              \
-        {                                                                  \
-            /* OIDs and SIDs are packed */                                 \
-            CPYFIELD(o, OSASZ(dest->u.oc, dest->u.sc), f);                 \
-        }                                                                  \
-        else                                                               \
-        {                                                                  \
-            /* make packed from unpacked */                                \
-            dest->u.o = malloc(OSASZ(dest->u.oc, dest->u.sc));             \
-            memcpy(dest->u.o, src->u.o, OASZ(dest->u.oc));                 \
-            memcpy(dest->u.o + dest->u.oc, src->u.s, SASZ(dest->u.sc));    \
-        }                                                                  \
-        dest->u.s = (PVFS_SID *)(dest->u.o + dest->u.oc);                  \
+#define PACKSID(o,s,oc,sc,f)                                                   \
+    do {                                                                       \
+        if (NULL != src->u.o && NULL != src->u.s &&                            \
+            ((src->mask & (f)) == (f)))                                        \
+        {                                                                      \
+            if (src->u.s == (PVFS_SID *)(src->u.o + src->u.oc))                \
+            {                                                                  \
+                /* OIDs and SIDs are packed */                                 \
+                CPYFIELD(o, OSASZ(dest->u.oc, dest->u.sc), f);                 \
+            }                                                                  \
+            else                                                               \
+            {                                                                  \
+                /* make packed from unpacked */                                \
+                dest->u.o = malloc(OSASZ(dest->u.oc, dest->u.sc));             \
+                memcpy(dest->u.o, src->u.o, OASZ(dest->u.oc));                 \
+                memcpy(dest->u.o + dest->u.oc, src->u.s, SASZ(dest->u.sc));    \
+            }                                                                  \
+            dest->u.s = (PVFS_SID *)(dest->u.o + dest->u.oc);                  \
+        }                                                                      \
+        else                                                                   \
+        {                                                                      \
+            /*dest->u.o = dest->u.s = NULL;*/                                      \
+        }                                                                      \
     } while (0)
 
 int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
 {
+    /* should we copy the capability? */
     if (src->parent && (src->mask &  PVFS_ATTR_COMMON_PARENT))
     {
         dest->parent = malloc(OSASZ(1, src->meta_sid_count));
@@ -354,10 +371,12 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
     switch(dest->objtype)
     {
     case PVFS_TYPE_METAFILE :
+        /* these is a var field copied after the fixed fields */
         CLRFIELD(dest->u.meta.dist);
 
         copy_attr(u.meta.dist_size, PVFS_ATTR_META_DIST_SIZE);
 
+        /* these is a var field copied after the fixed fields */
         CLRPACK(meta.dfile_array, meta.sid_array, meta.dfile_count);
 
         copy_attr(u.meta.dfile_count, PVFS_ATTR_META_DFILE_COUNT);
@@ -386,9 +405,15 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         copy_attr(u.dir.hint.dfile_count, PVFS_ATTR_DIR_HINT_DFILE_COUNT);
         copy_attr(u.dir.hint.dfile_sid_count, PVFS_ATTR_DIR_HINT_SID_COUNT);
         copy_attr(u.dir.hint.layout, PVFS_ATTR_DIR_HINT_LAYOUT);
+        copy_attr(u.dir.hint.dir_dirdata_min, PVFS_ATTR_DIR_HINT_DIRDATA_MIN);
+        copy_attr(u.dir.hint.dir_dirdata_max, PVFS_ATTR_DIR_HINT_DIRDATA_MAX);
+        copy_attr(u.dir.hint.dir_split_size, PVFS_ATTR_DIR_HINT_SPLIT_SIZE);
+        copy_attr(u.dir.hint.dir_layout, PVFS_ATTR_DIR_HINT_DIR_LAYOUT);
         /* end hints */
         /* begin dirdata */
         copy_attr(u.dir.dist_dir_attr.tree_height, PVFS_ATTR_DIR_TREE_HEIGHT);
+        copy_attr(u.dir.dist_dir_attr.dirdata_min, PVFS_ATTR_DIR_DIRDATA_MIN);
+        copy_attr(u.dir.dist_dir_attr.dirdata_max, PVFS_ATTR_DIR_DIRDATA_MAX);
         copy_attr(u.dir.dist_dir_attr.dirdata_count, PVFS_ATTR_DIR_DIRDATA_COUNT);
         copy_attr(u.dir.dist_dir_attr.sid_count, PVFS_ATTR_DIR_SID_COUNT);
         copy_attr(u.dir.dist_dir_attr.bitmap_size, PVFS_ATTR_DIR_BITMAP_SIZE);
@@ -396,6 +421,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         copy_attr(u.dir.dist_dir_attr.server_no, PVFS_ATTR_DIR_SERVER_NO);
         copy_attr(u.dir.dist_dir_attr.branch_level, PVFS_ATTR_DIR_BRANCH_LEVEL);
         /* end dirdata */
+        /* these are var fields copied after the fixed fields */
         CLRFIELD(dest->u.dir.dist_dir_bitmap);
 
         CLRPACK(dir.dirdata_handles,
@@ -414,6 +440,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         copy_attr(u.dirdata.dist_dir_attr.server_no, PVFS_ATTR_DIRDATA_SERVER_NO);
         copy_attr(u.dirdata.dist_dir_attr.branch_level, PVFS_ATTR_DIRDATA_BRANCH_LEVEL);
         /* end dirdata */
+        /* these are var fields copied after the fixed fields */
         CLRFIELD(dest->u.dirdata.dist_dir_bitmap);
         CLRPACK(dirdata.dirdata_handles,
                 dirdata.dirdata_sids,
@@ -422,6 +449,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         break;
     case PVFS_TYPE_SYMLINK :
         copy_attr(u.sym.target_path_len, PVFS_ATTR_SYMLNK_TARGET);
+        /* these are var fields copied after the fixed fields */
         CLRFIELD(dest->u.sym.target_path);
         /**/
         break;

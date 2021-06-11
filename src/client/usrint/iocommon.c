@@ -2671,7 +2671,7 @@ errorout:
 /** Implelments an object attribute get or read
  *
  */
-int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr, uint32_t mask)
+int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr, uint64_t mask)
 {
     int rc = 0;
     int orig_errno = errno;
@@ -2747,7 +2747,7 @@ errorout:
     return rc;
 }
 
-int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
+int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint64_t mask)
 {
     int rc = 0;
     PVFS_sys_attr attr;
@@ -2830,7 +2830,7 @@ errorout:
  * The only difference here is that buf is stat64 which
  * means some of its fields are defined as different types
  */
-int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
+int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint64_t mask)
 {
     int rc = 0;
     PVFS_sys_attr attr;

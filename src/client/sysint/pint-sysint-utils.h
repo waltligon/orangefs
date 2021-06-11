@@ -20,7 +20,6 @@
 #include "pvfs2-sysint.h"
 #include "pint-cached-config.h"
 #include "pint-perf-counter.h"
-#include "pvfs2-sysint.h"
 #include "server-config.h"
 
 int PINT_server_get_config(struct server_configuration_s *config,

@@ -210,20 +210,41 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
      *
      * This code should verify the values make sense as a precaution.  Assumes
      * we kinda trust client to ask for what it wants, but not with the details.
+     *
+     * MKDIR does not do a prelude lookup - see the bottom of this file where a NULL
+     * handle is returned by the call back.  We also don't auto-create an object
+     * with prelude, so the attributes in s_op->attr should NEVER be real.  Thus the
+     * No Parent!!! comments, if they still exist are meaningless.  Instead we seem
+     * to be putting some attribute information into these slots as a placeholder???
      */
 
+    dir_attr = &(s_op->req->u.mkdir.attr);
+    ds_attr = (&s_op->ds_attr);
+
+#if 0
     if (dir_attr->u.dir.dist_dir_attr.dirdata_count < 1)
     {
     /* !!!!!!!!! No Parent !!!!! */
         s_op->attr.u.dir.dirdata_handles = NULL;
         s_op->attr.u.dir.dist_dir_bitmap = NULL;
+        s_op->attr.u.dir.dirdata_sids    = NULL;
     }
+    else
+    {
+        s_op->attr.u.dir.dist_dir_attr.dirdata_count = 
+                         s_op->req->u.mkdir.dirdata_count;
+        s_op->attr.u.dir.dist_dir_attr.sid_count =
+                         s_op->req->u.mkdir.dirdata_sid_count;
+
+        s_op->attr.u.dir.dirdata_handles = 
+                         s_op->req->u.mkdir.dirdata_handles;
+        s_op->attr.u.dir.dirdata_sids = 
+                         s_op->req->u.mkdir.dirdata_sid_array;
+    }
+#endif
 
     s_op->u.mkdir.fs_id = s_op->req->u.mkdir.fs_id;
     s_op->u.mkdir.handle = s_op->req->u.mkdir.handle;
-
-    dir_attr = &(s_op->req->u.mkdir.attr);
-    ds_attr = (&s_op->ds_attr);
 
     if (dir_attr->objtype != PVFS_TYPE_DIRECTORY)
     {
@@ -263,15 +284,21 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
     /* set up the dist-dir-state portion of the attributes
      * pointed to by dir_attr attributes in the mkdir request
      * which are the directory attributes.
+     *
+     * this does not affect dist_dir_attr fields dirdata_min, dirdata_max,
+     * dirdata_count.  server_no branch_level are the only signed fields and
+     * usually start as -1
      */
     ret = PINT_init_dist_dir_state(&dir_attr->u.dir.dist_dir_attr,
                                    &dir_attr->u.dir.dist_dir_bitmap,
                                    s_op->req->u.mkdir.dirdata_count,
                                    s_op->req->u.mkdir.dirdata_sid_count,
-                                   -1, /* server_no -1 for meta objects */
+                                   0, /* server_no -1 for meta objects */
                                    s_op->req->u.mkdir.dist_dir_servers_initial,
                                    s_op->req->u.mkdir.dist_dir_split_size);
 
+#if 0
+/* parent hints should have been consulted on client */
 /* !!!!!!!!! No Parent !!!!! */
     if (dir_attr->u.dir.dist_dir_attr.dirdata_count < 1)
     {
@@ -286,9 +313,12 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
             /* look up default */
         }
     }
+#endif
 
 /* !!!!!!!!! No Parent !!!!! */
     if (dir_attr->u.dir.dist_dir_attr.dirdata_count < 1)
+    {
+    }
 /* this might be totally useless */
 #if 0
     if (dir_attr->u.dir.dist_dir_attr.sid_count < 1)
@@ -311,10 +341,13 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
         return SM_ACTION_COMPLETE;
     }
 
+#if 0
 /* !!!!!!!!! No Parent !!!!! */
     if (dir_attr->u.dir.dist_dir_attr.dirdata_count < 1)
-    /* inherit hints from parent */
-    memcpy(&dir_attr->u.dir.hint, &s_op->attr.u.dir.hint, sizeof(PVFS_directory_hint));
+    {
+        /* inherit hints from parent */
+        memcpy(&dir_attr->u.dir.hint, &s_op->attr.u.dir.hint, sizeof(PVFS_directory_hint));
+    }
     /* copy distribution parameters string */
     if (s_op->attr.u.dir.hint.dist_params_len > 0 && s_op->attr.u.dir.hint.dist_params)
     {
@@ -339,6 +372,7 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
         dir_attr->u.dir.hint.dist_params = NULL;
         dir_attr->u.dir.hint.dist_params_len = 0;
     }
+#endif
 
     /* struct specific gossip macros defined in src/common/misc/dist-dir-utils.h */
     PINT_debug_dist_dir_attr(GOSSIP_MKDIR_DEBUG, dir_attr->u.dir.dist_dir_attr);
@@ -349,9 +383,13 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
     dir_attr->u.dir.dirdata_handles = s_op->req->u.mkdir.dirdata_handles;
     dir_attr->u.dir.dirdata_sids = s_op->req->u.mkdir.dirdata_sid_array;
     dir_attr->u.dir.dirent_count = 0; /* new dir so no entries */
+#if 0
 /* !!!!!!!!! No Parent !!!!! */
     if (dir_attr->u.dir.dist_dir_attr.dirdata_count < 1)
-    dir_attr->meta_sid_count = s_op->attr.meta_sid_count; /* get from parent */
+    {
+        dir_attr->meta_sid_count = s_op->attr.meta_sid_count; /* get from parent */
+    }
+#endif
 
     /* translate attrs to storage attr format */
     PVFS_ds_attr_from_object_attr(ds_attr, dir_attr);

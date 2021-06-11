@@ -451,7 +451,7 @@ void print_stats(const PVFS_object_ref *ref,
    fprintf(stdout, "  Relative Name : %s\n",  pszRelativeName);
    fprintf(stdout, "  fs ID         : %d\n",  ref->fs_id);
    fprintf(stdout, "  Handle        : %s\n",  PVFS_OID_str(&ref->handle));
-   fprintf(stdout, "  Mask          : %x\n",  attr->mask);
+   fprintf(stdout, "  Mask          : %lx\n",  attr->mask);
    if(attr->mask & PVFS_ATTR_SYS_PERM)
    {
       fprintf(stdout, "  Permissions   : %o\n",  attr->perms);

@@ -714,24 +714,30 @@ int PVFS_util_copy_sys_attr(PVFS_sys_attr *dest_attr,
 
     if (src_attr && dest_attr)
     {
+        dest_attr->objtype = src_attr->objtype;
+        dest_attr->mask = src_attr->mask;
+        dest_attr->flags = src_attr->flags;
         dest_attr->owner = src_attr->owner;
         dest_attr->group = src_attr->group;
         dest_attr->perms = src_attr->perms;
         dest_attr->atime = src_attr->atime;
         dest_attr->mtime = src_attr->mtime;
         dest_attr->ctime = src_attr->ctime;
+
         dest_attr->dfile_count = src_attr->dfile_count;
         dest_attr->distr_dir_servers_initial = src_attr->distr_dir_servers_initial;
         dest_attr->distr_dir_servers_max = src_attr->distr_dir_servers_max;
         dest_attr->distr_dir_split_size = src_attr->distr_dir_split_size;
-        dest_attr->objtype = src_attr->objtype;
-        dest_attr->mask = src_attr->mask;
-        dest_attr->flags = src_attr->flags;
+        dest_attr->hint_distr_dir_servers_initial =
+                                src_attr->hint_distr_dir_servers_initial;
+        dest_attr->hint_distr_dir_servers_max = src_attr->hint_distr_dir_servers_max;
+        dest_attr->hint_distr_dir_split_size = src_attr->hint_distr_dir_split_size;
 
-        if (src_attr->mask & PVFS_ATTR_SYS_SIZE)
-        {
-            dest_attr->size = src_attr->size;
-        }
+        dest_attr->mirror_copies_count = src_attr->mirror_copies_count;
+        dest_attr->dirent_count = src_attr->dirent_count;
+        dest_attr->stuffed = src_attr->stuffed; /* probably obsolete */
+        dest_attr->blksize = src_attr->blksize; /* probably obsolete */
+        dest_attr->size = src_attr->size;
 
         if((src_attr->mask & PVFS_ATTR_SYS_LNK_TARGET) &&
             src_attr->link_target)
@@ -2326,6 +2332,15 @@ void PINT_release_pvfstab(void)
     gen_mutex_unlock(&s_stat_tab_mutex);
 }
 
+#define CMASKSYS2OBJ(sflag,oflag) \
+    do { \
+        if (PVFS2_attr_all(sys_attrmask, sflag)) \
+        { \
+            attrmask |= oflag; \
+        } \
+    } while (0)
+
+
 uint32_t PVFS_util_sys_to_object_attr_mask(uint32_t sys_attrmask)
 {
     /*
@@ -2334,6 +2349,7 @@ uint32_t PVFS_util_sys_to_object_attr_mask(uint32_t sys_attrmask)
      * before passing the getattr request to the server.
      */
     uint32_t attrmask = 0;
+    #if 0
     if (sys_attrmask & PVFS_ATTR_SYS_SIZE)
     {
         /* need datafile handles and distribution in order to get 
@@ -2342,90 +2358,48 @@ uint32_t PVFS_util_sys_to_object_attr_mask(uint32_t sys_attrmask)
          */
         attrmask |= (PVFS_ATTR_META_ALL | PVFS_ATTR_DATA_SIZE);
     }
-    if(sys_attrmask & PVFS_ATTR_SYS_DFILE_COUNT)
-    {
-        attrmask |= (PVFS_ATTR_META_DFILES | PVFS_ATTR_META_MIRROR_MODE);
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_MIRROR_COPIES_COUNT)
-    {
-        attrmask |= PVFS_ATTR_META_MIRROR_MODE; /* FIX THIS !!! */
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_DIRENT_COUNT)
-    {
-        attrmask |= PVFS_ATTR_DIR_DIRENT_COUNT;
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_DIR_HINT)
-    {
-        attrmask |= PVFS_ATTR_DIR_HINT;
-    }
-    if (sys_attrmask & PVFS_ATTR_SYS_DISTDIR_ATTR)
-    {
-        attrmask |= PVFS_ATTR_DISTDIR_ATTR;
-    }
-    if (sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
-    {
-        attrmask |= PVFS_ATTR_SYMLNK_TARGET;
-    }
+    #endif
+    /* these two may specify reading from multiple servers */
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_SIZE,                PVFS_ATTR_META_SIZE);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_DIRENT_COUNT,        PVFS_ATTR_DIR_DIRENT_COUNT);
+
+    /* These two specify reading extra items not in the dspace */
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_DIR_HINT,            PVFS_ATTR_DIR_HINT);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_DISTDIR_ATTR,        PVFS_ATTR_DISTDIR_ATTR);
+
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_CAPABILITY,          PVFS_ATTR_CAPABILITY);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_LNK_TARGET,          PVFS_ATTR_SYMLNK_TARGET);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_DFILE_COUNT,         PVFS_ATTR_META_DFILE_COUNT);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_MIRROR_COPIES_COUNT, PVFS_ATTR_META_SID_COUNT);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_MIRROR_MODE,         PVFS_ATTR_META_MIRROR_MODE);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_DFILE_COUNT,         PVFS_ATTR_META_DFILE_COUNT);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_DIR_HINT_INIT,       PVFS_ATTR_DIR_HINT_DIRDATA_MIN);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_DIR_HINT_MAX,        PVFS_ATTR_DIR_HINT_DIRDATA_MAX);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_DIR_HINT_SPLIT_SIZE, PVFS_ATTR_DIR_HINT_SPLIT_SIZE);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_DIR_INIT,            PVFS_ATTR_DIR_DIRDATA_MIN);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_DIR_MAX,             PVFS_ATTR_DIR_DIRDATA_MAX);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_DIR_SPLIT_SIZE,      PVFS_ATTR_DIR_SPLIT_SIZE);
     /* we need the distribution in order to calculate block size */
-    if(sys_attrmask & PVFS_ATTR_SYS_BLKSIZE)
-    {
-        attrmask |= PVFS_ATTR_META_DIST;
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_CAPABILITY)
-    {
-        attrmask |= PVFS_ATTR_CAPABILITY;
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_FASTEST)
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_BLKSIZE,             PVFS_ATTR_META_DIST);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_UID,                 PVFS_ATTR_COMMON_UID);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_GID,                 PVFS_ATTR_COMMON_GID);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_PERM,                PVFS_ATTR_COMMON_PERM);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_ATIME,               PVFS_ATTR_COMMON_ATIME);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_CTIME,               PVFS_ATTR_COMMON_CTIME);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_MTIME,               PVFS_ATTR_COMMON_MTIME);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_NTIME,               PVFS_ATTR_COMMON_NTIME);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_TYPE,                PVFS_ATTR_COMMON_TYPE);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_ATIME_SET,           PVFS_ATTR_COMMON_ATIME_SET);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_CTIME_SET,           PVFS_ATTR_COMMON_CTIME_SET);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_MTIME_SET,           PVFS_ATTR_COMMON_MTIME_SET);
+    CMASKSYS2OBJ(PVFS_ATTR_SYS_NTIME_SET,           PVFS_ATTR_COMMON_NTIME_SET);
+    if (PVFS2_attr_all(sys_attrmask, PVFS_ATTR_FASTEST))
     {
         attrmask |= PVFS_ATTR_FASTEST;
     }
     else
     {
-        attrmask |= PVFS_ATTR_LATEST;  /* default */
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_UID)
-    {
-        attrmask |= PVFS_ATTR_COMMON_UID;
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_GID)
-    {
-        attrmask |= PVFS_ATTR_COMMON_GID;
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_PERM)
-    {
-        attrmask |= PVFS_ATTR_COMMON_PERM;
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_ATIME)
-    {
-        attrmask |= PVFS_ATTR_COMMON_ATIME;
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_CTIME)
-    {
-        attrmask |= PVFS_ATTR_COMMON_CTIME;
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_MTIME)
-    {
-        attrmask |= PVFS_ATTR_COMMON_MTIME;
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_NTIME)
-    {
-        attrmask |= PVFS_ATTR_COMMON_NTIME;
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_TYPE)
-    {
-        attrmask |= PVFS_ATTR_COMMON_TYPE;
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_ATIME_SET)
-    {
-        attrmask |= PVFS_ATTR_COMMON_ATIME_SET;
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_MTIME_SET)
-    {
-        attrmask |= PVFS_ATTR_COMMON_MTIME_SET;
-    }
-    if(sys_attrmask & PVFS_ATTR_SYS_CTIME_SET)
-    {
-        attrmask |= PVFS_ATTR_COMMON_CTIME_SET;
+        attrmask |= PVFS_ATTR_LATEST; /* default */
     }
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
@@ -2434,93 +2408,55 @@ uint32_t PVFS_util_sys_to_object_attr_mask(uint32_t sys_attrmask)
 
     return attrmask;
 }
+#undef CMASKSYS2OBJ
+
+#define CMASKOBJ2SYS(oflag, sflag) \
+    do { \
+        if (PVFS2_attr_all(obj_mask, oflag)) \
+        { \
+            sys_mask |= sflag; \
+        } \
+    } while (0)
 
 uint32_t PVFS_util_object_to_sys_attr_mask(uint32_t obj_mask)
 {
     int sys_mask = 0;
+    CMASKOBJ2SYS(PVFS_ATTR_DIR_HINT , PVFS_ATTR_SYS_DIR_HINT);
+    CMASKOBJ2SYS(PVFS_ATTR_DISTDIR_ATTR , PVFS_ATTR_SYS_DISTDIR_ATTR);
 
-    if (obj_mask & PVFS_ATTR_COMMON_UID)
-    {
-        sys_mask |= PVFS_ATTR_SYS_UID;
-    }
-    if (obj_mask & PVFS_ATTR_COMMON_GID)
-    {
-        sys_mask |= PVFS_ATTR_SYS_GID;
-    }
-    if (obj_mask & PVFS_ATTR_COMMON_PERM)
-    {
-        sys_mask |= PVFS_ATTR_SYS_PERM;
-    }
-    if (obj_mask & PVFS_ATTR_COMMON_ATIME)
-    {
-        sys_mask |= PVFS_ATTR_SYS_ATIME;
-    }
-    if (obj_mask & PVFS_ATTR_COMMON_CTIME)
-    {
-        sys_mask |= PVFS_ATTR_SYS_CTIME;
-    }
-    if (obj_mask & PVFS_ATTR_COMMON_MTIME)
-    {
-        sys_mask |= PVFS_ATTR_SYS_MTIME;
-    }
-    if (obj_mask & PVFS_ATTR_COMMON_NTIME)
-    {
-        sys_mask |= PVFS_ATTR_SYS_NTIME;
-    }
-    if (obj_mask & PVFS_ATTR_COMMON_TYPE)
-    {
-        sys_mask |= PVFS_ATTR_SYS_TYPE;
-    }
-    if (obj_mask & PVFS_ATTR_DATA_SIZE)
-    {
-        sys_mask |= PVFS_ATTR_SYS_SIZE;
-    }
-    if (obj_mask & PVFS_ATTR_SYMLNK_TARGET)
-    {
-        sys_mask |= PVFS_ATTR_SYS_LNK_TARGET;
-    }
-    if (obj_mask & PVFS_ATTR_DIR_DIRENT_COUNT)
-    {
-        sys_mask |= PVFS_ATTR_SYS_DIRENT_COUNT;
-    }
-    if (obj_mask & PVFS_ATTR_META_DFILES)
-    {
-        sys_mask |= PVFS_ATTR_SYS_DFILE_COUNT;
-    }
-    if (obj_mask & PVFS_ATTR_META_MIRROR_MODE) /* FIX THIS !!! */
-    {
-        sys_mask |= PVFS_ATTR_SYS_MIRROR_COPIES_COUNT;
-    }
-    if (obj_mask & PVFS_ATTR_META_DIST)
-    {
-        sys_mask |= PVFS_ATTR_SYS_BLKSIZE;
-    }
-    if (obj_mask & PVFS_ATTR_DIR_HINT)
-    {
-        sys_mask |= PVFS_ATTR_SYS_DIR_HINT;
-    }
-    if (obj_mask & PVFS_ATTR_CAPABILITY)
-    {
-        sys_mask |= PVFS_ATTR_SYS_CAPABILITY;
-    }
-    if (obj_mask & PVFS_ATTR_DISTDIR_ATTR)
-    {
-        sys_mask |= PVFS_ATTR_SYS_DISTDIR_ATTR;
-    }
-    if(obj_mask & PVFS_ATTR_COMMON_MTIME_SET)
-    {
-        sys_mask |= PVFS_ATTR_SYS_MTIME_SET;
-    }
-    if(obj_mask & PVFS_ATTR_COMMON_CTIME_SET)
-    {
-        sys_mask |= PVFS_ATTR_SYS_CTIME_SET;
-    }
+    CMASKOBJ2SYS(PVFS_ATTR_META_SIZE , PVFS_ATTR_SYS_SIZE);
+    CMASKOBJ2SYS(PVFS_ATTR_DIR_DIRENT_COUNT , PVFS_ATTR_SYS_DIRENT_COUNT);
+
+    CMASKOBJ2SYS(PVFS_ATTR_CAPABILITY , PVFS_ATTR_SYS_CAPABILITY);
+    CMASKOBJ2SYS(PVFS_ATTR_COMMON_UID , PVFS_ATTR_SYS_UID);
+    CMASKOBJ2SYS(PVFS_ATTR_COMMON_GID , PVFS_ATTR_SYS_GID);
+    CMASKOBJ2SYS(PVFS_ATTR_COMMON_PERM , PVFS_ATTR_SYS_PERM);
+    CMASKOBJ2SYS(PVFS_ATTR_COMMON_ATIME , PVFS_ATTR_SYS_ATIME);
+    CMASKOBJ2SYS(PVFS_ATTR_COMMON_CTIME , PVFS_ATTR_SYS_CTIME);
+    CMASKOBJ2SYS(PVFS_ATTR_COMMON_MTIME , PVFS_ATTR_SYS_MTIME);
+    CMASKOBJ2SYS(PVFS_ATTR_COMMON_NTIME , PVFS_ATTR_SYS_NTIME);
+    CMASKOBJ2SYS(PVFS_ATTR_COMMON_TYPE , PVFS_ATTR_SYS_TYPE);
+    CMASKOBJ2SYS(PVFS_ATTR_COMMON_MTIME_SET , PVFS_ATTR_SYS_MTIME_SET);
+    CMASKOBJ2SYS(PVFS_ATTR_COMMON_CTIME_SET , PVFS_ATTR_SYS_CTIME_SET);
+    CMASKOBJ2SYS(PVFS_ATTR_SYMLNK_TARGET , PVFS_ATTR_SYS_LNK_TARGET);
+    CMASKOBJ2SYS(PVFS_ATTR_META_DFILES , PVFS_ATTR_SYS_DFILE_COUNT);
+    CMASKOBJ2SYS(PVFS_ATTR_META_MIRROR_MODE , PVFS_ATTR_SYS_MIRROR_MODE);
+    CMASKOBJ2SYS(PVFS_ATTR_META_SID_COUNT , PVFS_ATTR_SYS_MIRROR_COPIES_COUNT);
+    CMASKOBJ2SYS(PVFS_ATTR_DIR_HINT_DIRDATA_MAX , PVFS_ATTR_SYS_DIR_HINT_MAX);
+    CMASKOBJ2SYS(PVFS_ATTR_DIR_HINT_DIRDATA_MIN , PVFS_ATTR_SYS_DIR_HINT_INIT);
+    CMASKOBJ2SYS(PVFS_ATTR_DIR_HINT_SPLIT_SIZE , PVFS_ATTR_SYS_DIR_HINT_SPLIT_SIZE);
+    CMASKOBJ2SYS(PVFS_ATTR_DIR_DIRDATA_MAX , PVFS_ATTR_SYS_DIR_MAX);
+    CMASKOBJ2SYS(PVFS_ATTR_DIR_DIRDATA_MIN , PVFS_ATTR_SYS_DIR_INIT);
+    CMASKOBJ2SYS(PVFS_ATTR_DIR_SPLIT_SIZE , PVFS_ATTR_SYS_DIR_SPLIT_SIZE);
+
+    CMASKOBJ2SYS(PVFS_ATTR_META_DIST , PVFS_ATTR_SYS_BLKSIZE);
 
     /* NOTE: the PVFS_ATTR_META_UNSTUFFED is intentionally not exposed
      * outside of the system interface
      */
     return sys_mask;
 }
+#undef CMASKOBJ2SYS
 
 /*
  * Pull out the wire encoding specified as a mount option in the tab

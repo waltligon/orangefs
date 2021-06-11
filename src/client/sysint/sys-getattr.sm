@@ -216,7 +216,7 @@ machine pvfs2_client_sysint_getattr_sm
 /** Initiate retrieval of object attributes.
  */
 PVFS_error PVFS_isys_getattr(PVFS_object_ref ref,
-                             uint32_t attrmask, 
+                             uint64_t attrmask, 
                              const PVFS_credential *credential,
                              PVFS_sysresp_getattr *resp_p,
                              PVFS_sys_op_id *op_id,
@@ -282,7 +282,7 @@ PVFS_error PVFS_isys_getattr(PVFS_object_ref ref,
 /** Retrieve object attributes.
  */
 PVFS_error PVFS_sys_getattr(PVFS_object_ref ref,
-                            uint32_t attrmask, 
+                            uint64_t attrmask, 
                             const PVFS_credential *credential,
                             PVFS_sysresp_getattr *resp_p,
                             PVFS_hint hints)
@@ -1188,7 +1188,8 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     msg_p->sid_count = object_ref.sid_count;
     msg_p->sid_index = 0;
     msg_p->sid_array = object_ref.sid_array;
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    /*msg_p->retry_flag = PVFS_MSGPAIR_RETRY;*/
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = getattr_object_getattr_comp_fn;
 
     gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: fs_id: %d\n",
@@ -1393,7 +1394,8 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     }
     else
     {
-        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+        /*msg_p->retry_flag = PVFS_MSGPAIR_RETRY;*/
     }
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
@@ -1841,7 +1843,8 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
         msg_p->sid_count = sm_p->getattr.object_ref.sid_count;
         msg_p->sid_index = 0;
         msg_p->sid_array = sm_p->getattr.object_ref.sid_array;
-        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        /*msg_p->retry_flag = PVFS_MSGPAIR_RETRY;*/
+        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = getattr_dirdata_getattr_comp_fn;
         
         /* V3 */

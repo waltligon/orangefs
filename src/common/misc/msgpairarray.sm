@@ -1335,7 +1335,7 @@ static inline int io_decode_message_recv(PINT_sm_msgpair_state *msg_p,
 {
     int ret = -PVFS_EINVAL;
 
-    gossip_debug(GOSSIP_IO_DEBUG, "- io_decode_message_reccv called\n");
+    gossip_debug(GOSSIP_IO_DEBUG, "- io_decode_message_recv called\n");
 
     assert(msg_p && decoded_msg && resp);
 

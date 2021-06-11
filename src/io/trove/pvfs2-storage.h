@@ -59,7 +59,7 @@ struct PVFS_ds_directory_attr_s
                                /*     stored under the key DIST_DIR_BITMAP */
     uint32_t    split_size;    /* maximum number of entries before a split */
     /* local info */
-    uint32_t    branch_level;  /* level of branching on this server */
+    int32_t     branch_level;  /* level of branching on this server */
     /* FILE HINTS */
     uint32_t    hint_dist_name_len;        /* size of dist name buffer */
     uint32_t    hint_dist_params_len;      /* size of dist params buffer */
@@ -85,9 +85,9 @@ struct PVFS_ds_dirdata_attr_s
                             /* stored under the key DIST_DIR_BITMAP */
     uint32_t split_size;    /* maximum number of entries before a split */
     /* local info */
-    uint32_t server_no;     /* 0 to dirdata_count-1, indicates */
+    int32_t server_no;      /* 0 to dirdata_count-1, indicates */
                             /* which server is running this code */
-    uint32_t branch_level;  /* level of branching on this server */
+    int32_t branch_level;   /* level of branching on this server */
     uint32_t __pad1;
 };
 
@@ -177,11 +177,11 @@ do {                                                                   \
         (__oa)->u.meta.size = (__dsa)->u.metafile.size;                \
         (__oa)->u.meta.mirror_mode = (__dsa)->u.metafile.mirror_mode;  \
         (__oa)->u.meta.flags = (__dsa)->u.metafile.flags;              \
-        (__oa)->mask |= PVFS_ATTR_META_ALL; /*includes COMMON_ALL */   \
+        (__oa)->mask |= PVFS_ATTR_META_ALL;                            \
         break;                                                         \
     case PVFS_TYPE_DATAFILE :                                          \
         (__oa)->u.data.size = (__dsa)->u.datafile.b_size;              \
-        (__oa)->mask |= PVFS_ATTR_DATA_ALL; /*includes COMMON_ALL */   \
+        (__oa)->mask |= PVFS_ATTR_DATA_ALL;                            \
         break;                                                         \
     case PVFS_TYPE_DIRECTORY :                                         \
         (__oa)->u.dir.dirent_count =                                   \
@@ -228,7 +228,7 @@ do {                                                                   \
                 (__dsa)->u.directory.hint_dir_layout_algorithm;        \
         (__oa)->u.dir.hint.dir_layout.server_list.count =              \
                 (__dsa)->u.directory.hint_dir_layout_list_cnt;         \
-        (__oa)->mask |= PVFS_ATTR_DIR_ALL; /*includes COMMON_ALL */    \
+        (__oa)->mask |= PVFS_ATTR_DIR_ALL;                             \
         break;                                                         \
     case PVFS_TYPE_DIRDATA :                                           \
         (__oa)->u.dirdata.dirent_count =                               \
@@ -247,7 +247,7 @@ do {                                                                   \
                 (__dsa)->u.dirdata.server_no;                          \
         (__oa)->u.dirdata.dist_dir_attr.branch_level =                 \
                 (__dsa)->u.dirdata.branch_level;                       \
-        (__oa)->mask |= PVFS_ATTR_DIRDATA_ALL; /*includes COMMON_ALL */\
+        (__oa)->mask |= PVFS_ATTR_DIRDATA_ALL;                         \
         break;                                                         \
     default :                                                          \
         break;                                                         \
@@ -319,7 +319,6 @@ do {                                                                   \
                 (__oa)->u.dir.hint.dir_layout.algorithm;               \
         (__dsa)->u.directory.hint_dir_layout_list_cnt =                \
                 (__oa)->u.dir.hint.dir_layout.server_list.count;       \
-        /*(__dsa)->mask |= PVFS_ATTR_DIR_ALL;*/ /*includes COMMON_ALL */    \
         break;                                                         \
     case PVFS_TYPE_DIRDATA :                                           \
         (__dsa)->u.dirdata.dirent_count =                              \

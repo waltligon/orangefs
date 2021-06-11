@@ -172,12 +172,6 @@ PVFS_error PVFS_isys_create(char *object_name,
     struct server_configuration_s *server_config = NULL;
     struct filesystem_configuration_s *fs_config = NULL;
 
-{ fprintf(stderr, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-  PVFS_debug_mask dm; int fl; 
-  gossip_get_debug_mask(&fl, &dm);
-  fprintf(stderr, "Mask: %lx %lx\n", dm.mask1, dm.mask2);
-}
-
     gossip_debug(GOSSIP_CREATE_DEBUG, "PVFS_isys_create entered\n");
 
     if (!PVFS_OID_cmp(&parent_ref.handle, &PVFS_HANDLE_NULL) ||
@@ -188,14 +182,16 @@ PVFS_error PVFS_isys_create(char *object_name,
         return ret;
     }
 
+    /* Why must this be? must be setting all setable attribs? */
     if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) != PVFS_ATTR_SYS_ALL_SETABLE)
     {
-        gossip_lerr("PVFS_isys_create() failure: invalid attribute mask: %d, "
-                    "expected SYS_ALL_SETABLE (%d)\n",
+        gossip_lerr("PVFS_isys_create() failure: invalid attribute mask: %lu, "
+                    "expected SYS_ALL_SETABLE (%lu)\n",
                     attr.mask, PVFS_ATTR_SYS_ALL_SETABLE);
         return ret;
     }
 
+    /* useless, if SYS_DFILE_COUNT is set previous test will error out */
     if ((attr.mask & PVFS_ATTR_SYS_DFILE_COUNT) &&
         ((attr.dfile_count < 1) ||
          (attr.dfile_count > PVFS_REQ_LIMIT_DFILE_COUNT)))
