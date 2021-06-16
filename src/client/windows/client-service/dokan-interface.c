@@ -57,6 +57,8 @@ extern PORANGEFS_OPTIONS goptions;
 
 #define DEBUG_FLAG(val, flag) if (val&flag) { DbgPrint("   "#flag"\n"); }
 
+#define DEBUG_FILE_INFO(p, i) DbgPrint("   "#i": %u\n", p->i)
+
 #define MALLOC_CHECK(ptr)   if (ptr == NULL) \
                                 return -ERROR_NOT_ENOUGH_MEMORY
 #define MALLOC_CHECK_N(ptr) if (ptr == NULL) \
@@ -877,6 +879,14 @@ PVFS_Dokan_create_file(
     DEBUG_FLAG(FlagsAndAttributes, SECURITY_EFFECTIVE_ONLY);
     DEBUG_FLAG(FlagsAndAttributes, SECURITY_SQOS_PRESENT);
 
+    DEBUG_FILE_INFO(DokanFileInfo, ProcessId);
+    DEBUG_FILE_INFO(DokanFileInfo, IsDirectory);
+    DEBUG_FILE_INFO(DokanFileInfo, DeleteOnClose);
+    DEBUG_FILE_INFO(DokanFileInfo, PagingIo);
+    DEBUG_FILE_INFO(DokanFileInfo, SynchronousIo);
+    DEBUG_FILE_INFO(DokanFileInfo, Nocache);
+    DEBUG_FILE_INFO(DokanFileInfo, WriteToEndOfFile);
+    
     DokanFileInfo->Context = 0;
 
     /* load credential (of requestor) */
@@ -1132,7 +1142,7 @@ PVFS_Dokan_close_file(
 	{
 		/* get cached entry */
 		entry = get_context_entry(DokanFileInfo->Context);
-		del_flag = entry && entry->flags & FILE_FLAG_DELETE_ON_CLOSE;
+		del_flag = entry && (entry->flags & FILE_FLAG_DELETE_ON_CLOSE);
 	}
 
     /* delete the file/dir if DeleteOnClose specified */
@@ -2013,10 +2023,19 @@ PVFS_Dokan_delete_directory(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     int err;
+    PVFS_credential credential;
 
     DbgPrint("DeleteDirectory: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
+    /* load credential (for add_context */
+    err = get_credential(DokanFileInfo, &credential);
+    CRED_CHECK("DeleteDirectory", err);
+
+    /* store context with DeleteOnClose flag */
+    add_context(DokanFileInfo, FILE_FLAG_DELETE_ON_CLOSE, &credential);
+
+    /* use same process as a file deletion) */
     err = PVFS_Dokan_delete_file(FileName, DokanFileInfo);
 
     DbgPrint("DeleteDirectory exit: %d\n", err);
