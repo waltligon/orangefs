@@ -60,50 +60,38 @@ void BMI_socket_collection_queue(socket_collection_p scp,
 do { \
     struct tcp_addr* tcp_data = (struct tcp_addr *) (m)->method_data; \
     if(tcp_data->socket > -1){ \
-        char c; \
-        DWORD count; \
-	gen_mutex_lock(&((s)->queue_mutex)); \
-	BMI_socket_collection_queue(s, m, &((s)->add_queue)); \
-	gen_mutex_unlock(&((s)->queue_mutex)); \
-        /*WriteFile(s->pipe_fd[1], &c, 1, &count, NULL);*/\
+	      gen_mutex_lock(&((s)->queue_mutex)); \
+   	    BMI_socket_collection_queue(s, m, &((s)->add_queue)); \
+	      gen_mutex_unlock(&((s)->queue_mutex)); \
     } \
 } while(0)
 
 #define BMI_socket_collection_remove(s, m) \
 do { \
-    char c; \
-    DWORD count; \
     gen_mutex_lock(&((s)->queue_mutex)); \
     BMI_socket_collection_queue(s, m, &((s)->remove_queue)); \
     gen_mutex_unlock(&((s)->queue_mutex)); \
-    /*WriteFile(s->pipe_fd[1], &c, 1, &count, NULL);*/\
 } while(0)
 
 /* we _must_ have a valid socket at this point if we want to write data */
 #define BMI_socket_collection_add_write_bit(s, m) \
 do { \
-    char c;\
-    DWORD count; \
     struct tcp_addr* tcp_data = (struct tcp_addr *) (m)->method_data; \
     assert(tcp_data->socket > -1); \
     gen_mutex_lock(&((s)->queue_mutex)); \
     tcp_data->write_ref_count++; \
     BMI_socket_collection_queue((s),(m), &((s)->add_queue)); \
     gen_mutex_unlock(&((s)->queue_mutex)); \
-    /*WriteFile(s->pipe_fd[1], &c, 1, &count, NULL);*/\
 } while(0)
 
 #define BMI_socket_collection_remove_write_bit(s, m) \
 do { \
-    char c;\
-    DWORD count; \
     struct tcp_addr* tcp_data = (struct tcp_addr *) (m)->method_data; \
     gen_mutex_lock(&((s)->queue_mutex)); \
     tcp_data->write_ref_count--; \
     assert(tcp_data->write_ref_count > -1); \
     BMI_socket_collection_queue((s),(m), &((s)->add_queue)); \
     gen_mutex_unlock(&((s)->queue_mutex)); \
-    /*WriteFile(s->pipe_fd[1], &c, 1, &count, NULL);*/\
 } while(0)
 
 void BMI_socket_collection_finalize(socket_collection_p scp);

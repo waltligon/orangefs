@@ -29,6 +29,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{B7F1BEBC-F833-448A-829A-3505019C8169}</ProjectGuid>
     <RootNamespace>bmi</RootNamespace>
+    <ProjectName>bmi</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -139,8 +140,8 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\gen-locks;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\windows</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;__STATIC_METHOD_BMI_TCP__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;__STATIC_METHOD_BMI_TCP__;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4018;4311</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -153,7 +154,7 @@
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\gen-locks;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\windows</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;__STATIC_METHOD_BMI_TCP__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
-      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4018;4311</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -182,8 +183,8 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\gen-locks;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\windows</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_MBCS;__STATIC_METHOD_BMI_TCP__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+      <PreprocessorDefinitions>WIN32;_MBCS;__STATIC_METHOD_BMI_TCP__;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4018;4311</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

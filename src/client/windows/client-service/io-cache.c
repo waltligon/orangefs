@@ -20,7 +20,7 @@ struct qhash_table *io_cache;
 
 gen_mutex_t io_cache_mutex;
 
-int io_cache_compare(void *key,
+int io_cache_compare(const void *key,
                      struct qhash_head *link)
 {
     struct io_cache_entry *entry = qhash_entry(link, 

@@ -29,6 +29,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{2F406AB6-D010-4196-A523-FAE6F2B1585F}</ProjectGuid>
     <RootNamespace>proto</RootNamespace>
+    <ProjectName>proto</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -134,7 +135,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\common\security;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..\;..\..\..\..\include</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4018;4311</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -147,7 +148,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\common\security;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..\;..\..\..\..\include</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
-      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4018;4311</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -177,7 +178,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\job;..\..\..\..\src\common\gossip;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\misc;..\..\..\..\src\common\security;..\..\..\..\src\io\trove;..\..\..\..\src\io\description;..\..\..\..\src\io\dev;..\..\..\..\src\common\windows;..\..\..\..\src\client\sysint;..\..\..\..\src\server;..\..\..\..\;..\..\..\..\include</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings>4018</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4018;4311</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

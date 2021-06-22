@@ -30,7 +30,7 @@
 
 #include "bmi-types.h"
 
-int BMI_sockio_new_sock(void);
+SOCKET BMI_sockio_new_sock(void);
 int BMI_sockio_bind_sock(int,
 			 int);
 int BMI_sockio_bind_sock_specific(int sockd,
