@@ -29,7 +29,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{A7C0F968-DACA-4BFE-B36F-46FDAEB8EF1D}</ProjectGuid>
     <RootNamespace>bmi_common</RootNamespace>
-    <ProjectName>bmi_misc-vs2012</ProjectName>
+    <ProjectName>bmi_misc-vs2019</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

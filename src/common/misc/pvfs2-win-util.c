@@ -125,7 +125,7 @@ static int parse_encoding_string(
 
 static int parse_num_dfiles_string(const char* cp, int* num_dfiles);
 
-static int PINT_util_resolve_absolute(
+static int PVFS_util_resolve_absolute(
     const char* local_path,
     PVFS_fs_id* out_fs_id,
     char* out_fs_path,
@@ -543,7 +543,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     const char *file_list[1] = { NULL };
     const char *targetfile = NULL;
     PINT_fstab_entry_t *tmp_ent;
-    int i, j;
+    int i;
     int ret = -1;
     int tmp_mntent_count = 0;
     PVFS_util_tab *current_tab = NULL;
@@ -2236,7 +2236,6 @@ static struct fstab *PINT_util_my_get_next_fsent(PINT_fstab_t *tab)
 {
     char linestr[500];
     int linelen = 0;
-    char *strtok_ctx;
     char *nexttok; 
     PINT_fstab_entry_t *fsentry;
     if (!fgets(linestr, 500, tab))

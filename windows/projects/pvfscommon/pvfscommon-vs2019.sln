@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31205.134
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "statecomp-vs2019", "statecomp\statecomp-vs2019.vcxproj", "{CDB2E5EB-EE62-4018-92AA-79CB47A2A8BD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CDB2E5EB-EE62-4018-92AA-79CB47A2A8BD}.Debug|x86.ActiveCfg = Debug|Win32
+		{CDB2E5EB-EE62-4018-92AA-79CB47A2A8BD}.Debug|x86.Build.0 = Debug|Win32
+		{CDB2E5EB-EE62-4018-92AA-79CB47A2A8BD}.Release|x86.ActiveCfg = Release|Win32
+		{CDB2E5EB-EE62-4018-92AA-79CB47A2A8BD}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F306477F-C683-414B-843A-1BD01CD51919}
+	EndGlobalSection
+EndGlobal
