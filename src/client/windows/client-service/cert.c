@@ -208,7 +208,7 @@ static unsigned long verify_cert(char *user_name,
                                  PVFS_credential *credential)
 {
     X509_STORE *trust_store;
-    X509_STORE_CTX *ctx;
+    X509_STORE_CTX *ctx = NULL;
     int ret, verify_flag = 0;
     int (*save_verify_cb)(int ok, X509_STORE_CTX *ctx);
     char error_msg[256];
@@ -626,7 +626,7 @@ int get_user_cert_credential(HANDLE huser,
     ret = init_credential(PVFS_UID_MAX, group_array, 1, key_file, cert, cred);
     if (ret != 0)
     {
-        _snprintf(errmsg, sizeof(errmsg), "User %s: credential error: ", ret);
+        _snprintf(errmsg, sizeof(errmsg), "User %s: credential error: %d", user_name, ret);
         report_error(errmsg, ret);
     }
 

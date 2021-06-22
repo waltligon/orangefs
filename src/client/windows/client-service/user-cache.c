@@ -35,7 +35,7 @@ struct qhash_table *user_cache;
 
 gen_mutex_t user_cache_mutex;
 
-int user_compare(void *key, 
+int user_compare(const void *key, 
                  struct qhash_head *link)
 {
     struct user_entry *entry = qhash_entry(link, struct user_entry, hash_link);

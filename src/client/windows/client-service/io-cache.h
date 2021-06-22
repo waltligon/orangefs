@@ -31,7 +31,7 @@ struct io_cache_entry
     int update_flag;
 };
 
-int io_cache_compare(void *key,
+int io_cache_compare(const void *key,
                      struct qhash_head *link);
 
 int io_cache_add(ULONG64 context, 

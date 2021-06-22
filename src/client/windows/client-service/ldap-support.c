@@ -235,7 +235,7 @@ int get_ldap_credential(char *user_name,
         if (ret != 0)
         {
             _snprintf(error_msg, sizeof(error_msg), "User %s: credential "
-                "error: ", ret);
+                "error: %d", user_name, ret);
         }
     }
     else if (ret == 0)
