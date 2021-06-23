@@ -101,7 +101,7 @@ typedef struct PINT_smcb
     int base_frame;   /* index of current base frame */
     int frame_count;  /* number of frames in list */
 
-    /* usage specific routinet to look up SM from OP */
+    /* usage specific routine to look up SM from OP */
     struct PINT_state_machine_s *(*op_get_state_machine)(int);
     /* state machine context and control variables */
     int op; /* this field externally indicates type of state machine */

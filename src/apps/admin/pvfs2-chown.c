@@ -99,7 +99,7 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile)
     PVFS_sysresp_getattr resp_getattr;
     PVFS_sys_attr old_attr;
     PVFS_sys_attr new_attr;
-    uint32_t attrmask;
+    PVFS_system_attrmask attrmask;
 
     /* translate local path into pvfs2 relative path */
     ret = PVFS_util_resolve(destfile, &cur_fs, pvfs_path, PVFS_NAME_MAX);

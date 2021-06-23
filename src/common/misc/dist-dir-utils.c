@@ -204,9 +204,12 @@ int PINT_find_dist_dir_bucket(
 		return -1;
 	}
 
-	for( node_val = hash & ((1l << level) - 1); /* use the rightmost 'tree_height' bits */
-		 (level >= 0) && !(TST_BIT(bitmap, node_val)); /* test if node_val bit is set */
-		 node_val &= ((1l << (--level)) - 1) ); /* if it's not, use less bits of the hash value */
+        /* use the rightmost 'tree_height' bits */
+	for(node_val = hash & ((1l << level) - 1);
+            /* test if node_val bit is set */
+            (level >= 0) && !(TST_BIT(bitmap, node_val));
+            /* if it's not, use less bits of the hash value */
+            node_val &= ((1l << (--level)) - 1) );
 
 	return (int)node_val; /* assume tree_height < 32 */
 }

@@ -2023,6 +2023,10 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_COMMON_ATIME_SET;
     if(sys_attrmask & PVFS_ATTR_SYS_MTIME_SET)
         attrmask |= PVFS_ATTR_COMMON_MTIME_SET;
+    if(sys_attrmask & PVFS_ATTR_SYS_CTIME_SET)
+        attrmask |= PVFS_ATTR_COMMON_CTIME_SET;
+    if(sys_attrmask & PVFS_ATTR_SYS_NTIME_SET)
+        attrmask |= PVFS_ATTR_COMMON_NTIME_SET;
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "attrmask being passed to server: ");
@@ -2059,6 +2063,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     if (obj_mask & PVFS_ATTR_COMMON_MTIME)
     {
         sys_mask |= PVFS_ATTR_SYS_MTIME;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_NTIME)
+    {
+        sys_mask |= PVFS_ATTR_SYS_NTIME;
     }
     if (obj_mask & PVFS_ATTR_COMMON_TYPE)
     {

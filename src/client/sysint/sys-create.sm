@@ -941,6 +941,11 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
 
     /* This is a file create - ignore any file times passed in
      * Set them all to now.
+     *
+     * This represents time set by client, at least for create.  Other situations
+     * time cannot be set by client because there isn't a field in req.  If we
+     * are doing set by client we need to fix that.  All times by serer is another
+     * option.
      */
 
     sm_p->u.create.attr.mask &= PVFS_ATTR_NOTIME_SET;

@@ -1190,7 +1190,7 @@ static PINT_sm_action setattr_cleanup(struct PINT_smcb *smcb,
 #define PERM_RWS     (PINT_CAP_READ|PINT_CAP_WRITE|PINT_CAP_SETATTR)
 #define PERM_WS      (PINT_CAP_WRITE|PINT_CAP_SETATTR)
 
-#define PERM_TABLE_COUNT   12
+#define PERM_TABLE_COUNT   15
 #define PERM_TABLE_ATTR     0
 #define PERM_TABLE_PERM     1
 
@@ -1209,7 +1209,10 @@ static int PINT_perm_setattr(PINT_server_op *s_op)
                                  {PVFS_ATTR_COMMON_ATIME_SET, PERM_SETATTR},
                                  {PVFS_ATTR_COMMON_MTIME, PERM_WS},
                                  {PVFS_ATTR_COMMON_MTIME_SET, PERM_WS},
-                                 {PVFS_ATTR_COMMON_CTIME, PERM_WS}
+                                 {PVFS_ATTR_COMMON_CTIME, PERM_WS},
+                                 {PVFS_ATTR_COMMON_CTIME_SET, PERM_WS},
+                                 {PVFS_ATTR_COMMON_NTIME, PERM_STATIC},
+                                 {PVFS_ATTR_COMMON_NTIME_SET, PERM_STATIC}
                                };
 
     PVFS_object_attr *attr = &s_op->attr;

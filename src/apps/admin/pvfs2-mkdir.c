@@ -245,10 +245,10 @@ static int make_directory(PVFS_credential      * credentials,
     }
     
     /* Set the attributes for the new directory */
+    attr.objtype = PVFS_TYPE_DIRECTORY;
     attr.owner = credentials->userid;
     attr.group = credentials->group_array[0];
     attr.perms = mode;
-    attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
     /* sys_attr.distr_dir_servers_max is meant to be the total number of dirdata handles.
      * introduced for pvfs2_fs_dump & pvfs2_fsck.
      * here it's used to pass the initial number of dirdata handles
@@ -256,6 +256,8 @@ static int make_directory(PVFS_credential      * credentials,
     attr.distr_dir_servers_initial = init_num_dirdata;
     attr.distr_dir_servers_max = max_num_dirdata;
     attr.distr_dir_split_size = split_size;
+
+    attr.mask = (PVFS_ATTR_SYS_MKDIR);
         
     /* Clear out any info from previous calls */
     memset(&resp_lookup,  0, sizeof(resp_lookup));

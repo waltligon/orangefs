@@ -213,17 +213,12 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
         return ret;
     }
 
-    /* This does not seem right - this says that the mask must contain
-     * all of the flags in ALL_SETABLE but could also contain others
-     * is that really what we want?
-     * Or do we want to say all of the bits in mask are also in
-     * ALL_SETABLE?  that would be ((mask & ~ALL_SETABLE) == 0)
-     */
-    if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) != PVFS_ATTR_SYS_ALL_SETABLE)
+    /* check to make sure all expected attributes are present */
+    if ((attr.mask & PVFS_ATTR_SYS_MKDIR_REQUIRED) != PVFS_ATTR_SYS_MKDIR_REQUIRED)
     {
         gossip_lerr("PVFS_isys_mkdir() failure: invalid attribute mask %ld, "
-                    "expected SYS_ALL_SETABLE (%ld)\n",
-                    attr.mask, PVFS_ATTR_SYS_ALL_SETABLE);
+                    "expected SYS_MKDIR_RREQUIRED (%ld)\n",
+                    attr.mask, PVFS_ATTR_SYS_MKDIR_REQUIRED);
         return ret;
     }
 
@@ -287,8 +282,11 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
 
     /* General attributes */
     dir_attr->objtype = PVFS_TYPE_DIRECTORY;
+    dir_attr->mask |= PVFS_ATTR_COMMON_TYPE;
     dir_attr->meta_sid_count = 1;
+    dir_attr->mask |= PVFS_ATTR_COMMON_SID_COUNT;
     dir_attr->u.dir.dirent_count = 0;
+    dir_attr->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
     /* Hints pertaining to files */
     dir_attr->u.dir.hint.dist_name_len = 0;
     dir_attr->u.dir.hint.dist_name = NULL;
@@ -300,6 +298,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     dir_attr->u.dir.hint.layout.server_list.count = 0;
     dir_attr->u.dir.hint.layout.server_list.bufsize = 0;
     dir_attr->u.dir.hint.layout.server_list.servers = NULL;
+    dir_attr->mask |= PVFS_ATTR_DIR_HINT_LAYOUT;
     /* Hints pertaining to directories */
     dir_attr->u.dir.hint.dir_dirdata_min = 0;
     dir_attr->u.dir.hint.dir_dirdata_max = 0;
@@ -308,16 +307,26 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     dir_attr->u.dir.hint.dir_layout.server_list.count = 0;
     dir_attr->u.dir.hint.dir_layout.server_list.bufsize = 0;
     dir_attr->u.dir.hint.dir_layout.server_list.servers = NULL;
+    dir_attr->mask |= PVFS_ATTR_DIR_HINT_DIR_LAYOUT;
     /* Distributed Directory Attributes */
     dir_attr->u.dir.dist_dir_attr.tree_height = 0;
+    dir_attr->mask |= PVFS_ATTR_DIR_TREE_HEIGHT;
     dir_attr->u.dir.dist_dir_attr.dirdata_min = 1;
+    dir_attr->mask |= PVFS_ATTR_DIR_DIRDATA_MIN;
     dir_attr->u.dir.dist_dir_attr.dirdata_max = 1;
-    dir_attr->u.dir.dist_dir_attr.dirdata_count = 1;
+    dir_attr->mask |= PVFS_ATTR_DIR_DIRDATA_MAX;
+    dir_attr->u.dir.dist_dir_attr.dirdata_count = 1;  /* this is really initial */
+    dir_attr->mask |= PVFS_ATTR_DIR_DIRDATA_COUNT;
     dir_attr->u.dir.dist_dir_attr.sid_count = 1;      /* I think this is obsolete */
-    dir_attr->u.dir.dist_dir_attr.bitmap_size = 1;
+    dir_attr->mask |= PVFS_ATTR_DIR_SID_COUNT;
+    dir_attr->u.dir.dist_dir_attr.bitmap_size = 0;    /* bitmap set up on server */
+    dir_attr->mask |= PVFS_ATTR_DIR_BITMAP_SIZE;
     dir_attr->u.dir.dist_dir_attr.split_size = 8192;
-    dir_attr->u.dir.dist_dir_attr.server_no = -1;
-    dir_attr->u.dir.dist_dir_attr.branch_level = -1;
+    dir_attr->mask |= PVFS_ATTR_DIR_SPLIT_SIZE;
+    dir_attr->u.dir.dist_dir_attr.server_no = -1;     /* overridden on server */
+    dir_attr->mask |= PVFS_ATTR_DIR_SERVER_NO;
+    dir_attr->u.dir.dist_dir_attr.branch_level = -1;  /* branch level set up on server */
+    dir_attr->mask |= PVFS_ATTR_DIR_BRANCH_LEVEL;
 
     /* get config for this filesystem */
     server_config = PINT_get_server_config_struct(parent_ref.fs_id);
@@ -332,19 +341,24 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
         dir_attr->u.dir.dist_dir_attr.dirdata_min = 
         dir_attr->u.dir.dist_dir_attr.dirdata_count = 
                          fs_config->default_distr_dir_servers_initial;
+        dir_attr->mask |= PVFS_ATTR_DIR_DIRDATA_MIN;
+        dir_attr->mask |= PVFS_ATTR_DIR_DIRDATA_COUNT;
     }
     if (fs_config->default_distr_dir_servers_max > 0)
     {
         dir_attr->u.dir.dist_dir_attr.dirdata_max = 
                          fs_config->default_distr_dir_servers_max;
+        dir_attr->mask |= PVFS_ATTR_DIR_DIRDATA_MAX;
     }
     if (fs_config->default_distr_dir_split_size > 100)
     {
         dir_attr->u.dir.dist_dir_attr.split_size = fs_config->default_distr_dir_split_size;
+        dir_attr->mask |= PVFS_ATTR_DIR_SPLIT_SIZE;
     }
     if (fs_config->metadata_replication_factor > 0)
     {
         dir_attr->meta_sid_count = fs_config->metadata_replication_factor;
+        dir_attr->mask |= PVFS_ATTR_COMMON_SID_COUNT;
     }
 
     /* return checked out verion of config struct */
@@ -568,6 +582,7 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     assert(sys_attr);
 
     DEBUG_attr_mask(p_attr->mask);
+    DEBUG_attr_mask(sys_attr->mask);
     DEBUG_attr_mask(dir_attr->mask);
 
     distr_dir_servers_initial_requested = sys_attr->distr_dir_servers_initial;
@@ -677,7 +692,7 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
                              PVFS_ATTR_DIR_SID_COUNT);
     SET_DIR_ATTR_FROM_PARENT(u.dir.dist_dir_attr.split_size, PVFS_ATTR_DIR_SPLIT_SIZE);
     dir_attr->u.dir.dist_dir_attr.server_no = 0;
-    /* tree height, bitmap size and branch level are computed so not shown here */
+    /* tree height, bitmap size and branch level are computed on server */
 
     /* Apply directory hints after inheriting attributes */
     if ((p_attr->u.dir.hint.dir_dirdata_min > 0) && 
@@ -872,6 +887,9 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
+    /* WHY?  Why do we copy all of this from the attr to the req, only to copy it
+     * back on the server?  Why not just move it all inthe attr?
+     */
     PINT_SERVREQ_MKDIR_FILL(msg_p->req,
                             sm_p->getattr.attr.capability,
                             *sm_p->cred_p,
@@ -894,10 +912,14 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
      * we don't send lists of oids and sids in the attr, but in the req.  On the
      * other side we need to remember to put everything back
      */
+    msg_p->req.u.mkdir.attr.parent = NULL;
+    msg_p->req.u.mkdir.attr.parent_sids = NULL;
+    msg_p->req.u.mkdir.attr.meta_sid_count = 0;
     msg_p->req.u.mkdir.attr.u.dir.dirdata_handles = NULL;
     msg_p->req.u.mkdir.attr.u.dir.dirdata_sids = NULL;
     msg_p->req.u.mkdir.attr.u.dir.dist_dir_attr.dirdata_count = 0;
     msg_p->req.u.mkdir.attr.u.dir.dist_dir_attr.sid_count = 0;
+    msg_p->req.u.mkdir.attr.u.dir.dist_dir_attr.bitmap_size = 0;
     /* now fill in various msg_p fields */
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;

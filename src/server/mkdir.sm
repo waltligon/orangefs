@@ -30,7 +30,7 @@ static int tree_setattr_comp_fn(
         int index);
 */
 
-#define STATE_DIRDATA_DONE 0
+#define STATE_DIRDATA_DONE 1
 
 %%
 
@@ -93,7 +93,8 @@ nested machine pvfs2_mkdir_work_sm
     {
         run setup_dirdata_create;
         STATE_DIRDATA_DONE => setup_getattr_request;
-        default => initiate_dirdata_create;
+        success => initiate_dirdata_create;
+        default => err_msg;
     }
 
     state initiate_dirdata_create
@@ -243,6 +244,18 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
     }
 #endif
 
+    /* Restore attribute pointers zero'd out in sys-mkdir.sm */
+    dir_attr->parent = s_op->req->u.mkdir.parent;
+    dir_attr->parent_sids = s_op->req->u.mkdir.parent_sid_array;
+    dir_attr->meta_sid_count = s_op->req->u.mkdir.sid_count;
+    dir_attr->u.dir.dirdata_handles = s_op->req->u.mkdir.dirdata_handles;
+    dir_attr->u.dir.dirdata_sids = s_op->req->u.mkdir.dirdata_sid_array;
+    dir_attr->u.dir.dist_dir_attr.dirdata_count = s_op->req->u.mkdir.dirdata_count;
+    dir_attr->u.dir.dist_dir_attr.sid_count = s_op->req->u.mkdir.dirdata_sid_count;
+    dir_attr->u.dir.dist_dir_attr.bitmap_size = 1;
+    dir_attr->u.dir.dirent_count = 0; /* new dir so no entries */
+    
+
     s_op->u.mkdir.fs_id = s_op->req->u.mkdir.fs_id;
     s_op->u.mkdir.handle = s_op->req->u.mkdir.handle;
 
@@ -298,6 +311,8 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
                                    s_op->req->u.mkdir.dist_dir_split_size);
 
 #if 0
+    /* most if not all of this should be set up on the client */
+
 /* parent hints should have been consulted on client */
 /* !!!!!!!!! No Parent !!!!! */
     if (dir_attr->u.dir.dist_dir_attr.dirdata_count < 1)
@@ -379,11 +394,13 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
     PINT_debug_dist_dir_bitmap(GOSSIP_MKDIR_DEBUG, dir_attr->u.dir.dist_dir_attr,
                                dir_attr->u.dir.dist_dir_bitmap);
 
+#if 0
+    /* moved earlier */
+
     /* last couple of things to set up before we convert to ds_attr */
     dir_attr->u.dir.dirdata_handles = s_op->req->u.mkdir.dirdata_handles;
     dir_attr->u.dir.dirdata_sids = s_op->req->u.mkdir.dirdata_sid_array;
     dir_attr->u.dir.dirent_count = 0; /* new dir so no entries */
-#if 0
 /* !!!!!!!!! No Parent !!!!! */
     if (dir_attr->u.dir.dist_dir_attr.dirdata_count < 1)
     {
@@ -774,12 +791,16 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
     if (!s_op->u.mkdir.dirdata_parent_buffer)
     {
         char *p;
+
         s_op->u.mkdir.dirdata_parent_buffer =
                 malloc(OSASZ(1, s_op->req->u.mkdir.sid_count));
+
         p = (char *)s_op->u.mkdir.dirdata_parent_buffer;
         ZEROMEM(p, OSASZ(1, s_op->req->u.mkdir.sid_count));
+
         memcpy((void *)p, (void *)&s_op->req->u.mkdir.handle, sizeof(PVFS_OID));
         p += sizeof(PVFS_OID);
+
         memcpy((void *)p,
                (void *)s_op->req->u.mkdir.sid_array, 
                sizeof(PVFS_SID) * s_op->req->u.mkdir.sid_count);
@@ -970,12 +991,20 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -1, h = 0;
+    int ret = 0, h = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_capability capability;
     PVFS_object_attr *pattr = NULL;;
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+
+    /* we are bypassing this stepfor now - might try to add it back using
+     * a PJMP to prevent delaying the end of the request but for now we
+     * assume remote dirdatas are created on demand at the server when a
+     * request accesses them.
+     */
+    js_p->error_code = STATE_DIRDATA_DONE;
+    return SM_ACTION_COMPLETE;
 
     /* set up for an array of requests */
     ret = PINT_msgpairarray_init(&s_op->msgarray_op, s_op->u.mkdir.rmt_dirdata_index);
@@ -1057,7 +1086,7 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
        return SM_ACTION_COMPLETE;
     }
 
-
+    js_p->error_code = ret;
     return SM_ACTION_COMPLETE;
 }
 
@@ -1075,7 +1104,7 @@ static PINT_sm_action mkdir_setup_getattr_request(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *getattr_op;
-    int ret;
+    int ret = 0;
     PVFS_capability capability;
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
@@ -1083,8 +1112,8 @@ static PINT_sm_action mkdir_setup_getattr_request(
     getattr_op = calloc(1, sizeof(*getattr_op));
     if ( !getattr_op )
     {
-       js_p->error_code = -PVFS_ENOMEM;
-       return SM_ACTION_COMPLETE;
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
     }
 
     PINT_null_capability(&capability);
@@ -1109,13 +1138,14 @@ static PINT_sm_action mkdir_setup_getattr_request(
     ret = PINT_sm_push_frame(smcb, 0, getattr_op);
     if ( ret < 0 )
     {
-       gossip_err("%s:Error pushing getattr frame onto mkdir stack:ret(%d)\n",
-                   __func__, ret);
-       free(getattr_op);
-       js_p->error_code = ret;
-       return SM_ACTION_COMPLETE;
+        gossip_err("%s:Error pushing getattr frame onto mkdir stack:ret(%d)\n",
+                    __func__, ret);
+        free(getattr_op);
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
     }
 
+    js_p->error_code = ret;
     return SM_ACTION_COMPLETE;
 }
 

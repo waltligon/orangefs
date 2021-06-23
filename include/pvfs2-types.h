@@ -305,7 +305,7 @@ endecode_fields_1a_struct(
     PVFS_BMI_addr_t, servers);
 #endif
 
-/* The server laout struct passed to PVFS_sys_create.  The algorithm
+/* The server layout struct passed to PVFS_sys_create.  The algorithm
  * specifies how the servers are chosen to layout the file.  If the
  * algorithm is set to PVFS_SYS_LAYOUT_LIST, the server_list parameter
  * is used to determine the layout.
@@ -621,10 +621,47 @@ typedef struct
  PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
 #endif
 
+/* these are read only except during a create */
+#define PVFS_ATTR_SYS_READ_ONLY \
+                  (PVFS_ATTR_SYS_TYPE           | \
+                   PVFS_ATTR_SYS_DFILE_COUNT    | \
+                   PVFS_ATTR_SYS_SIZE           | \
+                   PVFS_ATTR_SYS_LNK_TARGET     | \
+                   PVFS_ATTR_SYS_DIRENT_COUNT   | \
+                   PVFS_ATTR_SYS_DIR_INIT       | \
+                   PVFS_ATTR_SYS_DIR_MAX        | \
+                   PVFS_ATTR_SYS_DIR_SPLIT_SIZE | \
+                   PVFS_ATTR_SYS_CAPABILITY)
+
+#define PVFS_ATTR_SYS_CREATE_REQUIRED \
+                  (PVFS_ATTR_SYS_TYPE                | \
+                   PVFS_ATTR_SYS_UID                 | \
+                   PVFS_ATTR_SYS_GID                 | \
+                   PVFS_ATTR_SYS_PERM                | \
+                   PVFS_ATTR_SYS_DFILE_COUNT         | \
+                   PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
+                   PVFS_ATTR_SYS_MIRROR_MODE)
+
+#define PVFS_ATTR_SYS_MKDIR_REQUIRED \
+                  (PVFS_ATTR_SYS_TYPE           | \
+                   PVFS_ATTR_SYS_UID            | \
+                   PVFS_ATTR_SYS_GID            | \
+                   PVFS_ATTR_SYS_PERM           | \
+                   PVFS_ATTR_SYS_DIR_INIT       | \
+                   PVFS_ATTR_SYS_DIR_MAX        | \
+                   PVFS_ATTR_SYS_DIR_SPLIT_SIZE)
+
+#define PVFS_ATTR_SYS_SYMLINK_REQUIRED \
+                  (PVFS_ATTR_SYS_TYPE      | \
+                   PVFS_ATTR_SYS_UID       | \
+                   PVFS_ATTR_SYS_GID       | \
+                   PVFS_ATTR_SYS_PERM      | \
+                   PVFS_ATTR_SYS_LNK_TARGET)
+
 /* still not really clear on these three attribute groups */
 
 #define PVFS_ATTR_SYS_ALL_SETABLE \
-               (PVFS_ATTR_SYS_COMMON_ALL - PVFS_ATTR_SYS_TYPE) 
+               (PVFS_ATTR_SYS_ALL - PVFS_ATTR_SYS_READ_ONLY) 
 
 #define PVFS_ATTR_SYS_ALL_TIMES           \
           (PVFS_ATTR_SYS_ALL_SETABLE |    \
@@ -633,6 +670,16 @@ typedef struct
 #define PVFS_ATTR_SYS_ALL_VALID                         \
      (PVFS_ATTR_SYS_ALL | PVFS_ATTR_SYS_CAPABILITY |    \
       PVFS_ATTR_SYS_FASTEST | PVFS_ATTR_SYS_LATEST)     \
+
+/* typical attributes supplied to a PVFS_sys_mkdir */
+#define PVFS_ATTR_SYS_MKDIR                \
+                 (PVFS_ATTR_SYS_TYPE     | \
+                  PVFS_ATTR_SYS_UID      | \
+                  PVFS_ATTR_SYS_GID      | \
+                  PVFS_ATTR_SYS_PERM     | \
+                  PVFS_ATTR_SYS_DIR_INIT | \
+                  PVFS_ATTR_SYS_DIR_MAX  | \
+                  PVFS_ATTR_SYS_DIR_SPLIT_SIZE )
 
 /* Extended attribute flags */
 #define PVFS_XATTR_CREATE  0x1
