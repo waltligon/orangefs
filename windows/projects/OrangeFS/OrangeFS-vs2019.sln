@@ -3,38 +3,38 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.31205.134
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bmi_wintcp-vs2019", "bmi_wintcp\bmi_wintcp-vs2019.vcxproj", "{62A89A5C-1B78-40B7-BB6A-6E5A06DB06E1}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bmi_wintcp", "bmi_wintcp\bmi_wintcp-vs2019.vcxproj", "{62A89A5C-1B78-40B7-BB6A-6E5A06DB06E1}"
 	ProjectSection(ProjectDependencies) = postProject
 		{9C95DF0D-5B60-4E94-94ED-000861C651B4} = {9C95DF0D-5B60-4E94-94ED-000861C651B4}
 		{A7C0F968-DACA-4BFE-B36F-46FDAEB8EF1D} = {A7C0F968-DACA-4BFE-B36F-46FDAEB8EF1D}
 		{9138ABF9-041F-4A55-9E87-0F433719F4FC} = {9138ABF9-041F-4A55-9E87-0F433719F4FC}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gen-locks-vs2019", "gen-locks\gen-locks-vs2019.vcxproj", "{9138ABF9-041F-4A55-9E87-0F433719F4FC}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gen-locks", "gen-locks\gen-locks-vs2019.vcxproj", "{9138ABF9-041F-4A55-9E87-0F433719F4FC}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bmi_misc-vs2012", "bmi_misc\bmi_misc-vs2019.vcxproj", "{A7C0F968-DACA-4BFE-B36F-46FDAEB8EF1D}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gossip-vs2019", "gossip\gossip-vs2019.vcxproj", "{9C95DF0D-5B60-4E94-94ED-000861C651B4}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gossip", "gossip\gossip-vs2019.vcxproj", "{9C95DF0D-5B60-4E94-94ED-000861C651B4}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "id-generator-vs2019", "id-generator\id-generator-vs2019.vcxproj", "{0CBAD436-373C-4F35-A620-2D46C12D8FE0}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "id-generator", "id-generator\id-generator-vs2019.vcxproj", "{0CBAD436-373C-4F35-A620-2D46C12D8FE0}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bmi-vs2019", "bmi\bmi-vs2019.vcxproj", "{B7F1BEBC-F833-448A-829A-3505019C8169}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bmi", "bmi\bmi-vs2019.vcxproj", "{B7F1BEBC-F833-448A-829A-3505019C8169}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "job-vs2019", "job\job-vs2019.vcxproj", "{C0F175D2-0285-4C14-8362-98CEBF0C306F}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "job", "job\job-vs2019.vcxproj", "{C0F175D2-0285-4C14-8362-98CEBF0C306F}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "misc-vs2019", "misc\misc-vs2019.vcxproj", "{7506190B-64BE-4D64-95A4-4C22D48E0994}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "misc", "misc\misc-vs2019.vcxproj", "{7506190B-64BE-4D64-95A4-4C22D48E0994}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "flow-vs2019", "flow\flow-vs2019.vcxproj", "{9B1C78DC-D1F2-4857-85D0-A649D9515B40}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "flow", "flow\flow-vs2019.vcxproj", "{9B1C78DC-D1F2-4857-85D0-A649D9515B40}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dev-vs2019", "dev\dev-vs2019.vcxproj", "{BC214BA7-319E-47E3-8F00-E0355A7E1F51}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dev", "dev\dev-vs2019.vcxproj", "{BC214BA7-319E-47E3-8F00-E0355A7E1F51}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "request-scheduler-vs2019", "request-scheduler\request-scheduler-vs2019.vcxproj", "{AB729944-B3C0-44B4-8A63-ADB6C2CDA177}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "request-scheduler", "request-scheduler\request-scheduler-vs2019.vcxproj", "{AB729944-B3C0-44B4-8A63-ADB6C2CDA177}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "description-vs2019", "description\description-vs2019.vcxproj", "{36810FAE-CC16-4F63-90E4-8AEF095B58D8}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "description", "description\description-vs2019.vcxproj", "{36810FAE-CC16-4F63-90E4-8AEF095B58D8}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sysint-client-vs2019", "sysint-client\sysint-client-vs2019.vcxproj", "{CD20A8BE-CC52-465E-9F40-A97A3912ED14}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sysint-client", "sysint-client\sysint-client-vs2019.vcxproj", "{CD20A8BE-CC52-465E-9F40-A97A3912ED14}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "proto-vs2019", "proto\proto-vs2019.vcxproj", "{2F406AB6-D010-4196-A523-FAE6F2B1585F}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "proto", "proto\proto-vs2019.vcxproj", "{2F406AB6-D010-4196-A523-FAE6F2B1585F}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "client-service-vs2012", "client-service\client-service-vs2019.vcxproj", "{61019A9A-D6E0-4E04-B163-EADB88766C9E}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -55,7 +55,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "client-service-vs2012", "cl
 		{9138ABF9-041F-4A55-9E87-0F433719F4FC} = {9138ABF9-041F-4A55-9E87-0F433719F4FC}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "security-vs2019", "security\security-vs2019.vcxproj", "{D8085311-2E2E-466B-A743-B9DF093EEF4E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "security", "security\security-vs2019.vcxproj", "{D8085311-2E2E-466B-A743-B9DF093EEF4E}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "orangefs-get-user-cert", "orangefs-get-user-cert\orangefs-get-user-cert.vcxproj", "{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}"
 	ProjectSection(ProjectDependencies) = postProject

@@ -55,3 +55,5 @@ config.status
 #
 *~
 *.swp
+/windows/dokany/include
+*.bak
