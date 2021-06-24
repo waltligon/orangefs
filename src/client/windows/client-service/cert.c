@@ -310,11 +310,11 @@ int get_proxy_cert_credential(HANDLE huser,
     unsigned long err_flag = FALSE;
     char error_msg[1024];
 
-    DbgPrint("   get_proxy_cert_credential: enter\n");
+    client_debug("   get_proxy_cert_credential: enter\n");
     
     if (user_name == NULL || credential == NULL || expires == NULL)
     {
-        DbgPrint("   get_proxy_cert_credential: invalid parameter\n");
+        client_debug("   get_proxy_cert_credential: invalid parameter\n");
         return -1;
     }
 
@@ -462,7 +462,7 @@ get_proxy_cert_credential_exit:
     if (ca_cert != NULL)
         X509_free(ca_cert);
 
-    DbgPrint("   get_proxy_cert_credential: exit\n");
+    client_debug("   get_proxy_cert_credential: exit\n");
 
     return ret;
 }
@@ -502,7 +502,7 @@ int get_user_cert_credential(HANDLE huser,
        3. sign credential 
      */
     
-    DbgPrint("   get_user_cert_credential: enter\n");
+    client_debug("   get_user_cert_credential: enter\n");
 
     if (user_name == NULL || strlen(user_name) == 0 || cred == NULL ||
         expires == NULL)
@@ -619,7 +619,7 @@ int get_user_cert_credential(HANDLE huser,
     /* free X509 cert */
     X509_free(xcert);
 
-    DbgPrint("   get_user_cert_credential: user: %s\tkey_file: %s\tcert_file: %s\n",
+    client_debug("   get_user_cert_credential: user: %s\tkey_file: %s\tcert_file: %s\n",
         user_name, key_file, cert_file);
 
     /* initialize the credential */
@@ -632,7 +632,7 @@ int get_user_cert_credential(HANDLE huser,
 
     PINT_cleanup_cert(cert);
 
-    DbgPrint("   get_user_cert_credential: exit\n");
+    client_debug("   get_user_cert_credential: exit\n");
 
     return ret;
 }

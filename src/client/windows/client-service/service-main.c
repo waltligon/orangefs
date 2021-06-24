@@ -242,8 +242,8 @@ BOOL report_error_event(char *message, BOOL startup)
         }
     }
 
-    DbgPrint("Error reported:\n");
-    DbgPrint("%s\n", message);
+    client_debug("Error reported:\n");
+    client_debug("%s\n", message);
 
     if (hevent_log != NULL)
     {

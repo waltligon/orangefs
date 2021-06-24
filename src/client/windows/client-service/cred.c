@@ -44,7 +44,7 @@ int sign_credential(const char *key_file,
     EVP_MD_CTX mdctx;
     int ret = 0, err;
 
-    DbgPrint("    sign_credential: enter\n");
+    client_debug("    sign_credential: enter\n");
 
     if (key_file == NULL || cred == NULL)
     {
@@ -133,7 +133,7 @@ sign_credential_exit:
         EVP_PKEY_free(privkey);
     }
 
-    DbgPrint("    sign_credential: exit (%d)\n", ret);
+    client_debug("    sign_credential: exit (%d)\n", ret);
 
     return ret;
 }
@@ -148,7 +148,7 @@ int init_credential(PVFS_uid uid,
 {
     int ret = 0;
 
-    DbgPrint("    init_credential: enter\n");
+    client_debug("    init_credential: enter\n");
 
     if (group_array == NULL || cred == NULL || num_groups == 0)
     {
@@ -230,7 +230,7 @@ int init_credential(PVFS_uid uid,
         }
     }
 
-    DbgPrint("    init_credential: exit (%d)\n", ret);
+    client_debug("    init_credential: exit (%d)\n", ret);
 
     return ret;
 }
