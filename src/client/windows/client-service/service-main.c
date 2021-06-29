@@ -748,7 +748,12 @@ DWORD WINAPI main_loop(LPVOID poptions)
     /*** main loop - run dokan client ***/
     if (ret == 0)
     {
-        dokan_loop(options);
+        /* note: dokan_loop does not return normally */
+        ret = dokan_loop(options);
+        if (ret == -1) {
+          _snprintf(event_msg, sizeof(event_msg), "Fatal init error - no memory");
+          report_startup_error(event_msg, ret);
+        }
 
         /* close file systems */
         fs_finalize();
