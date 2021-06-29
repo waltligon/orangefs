@@ -197,6 +197,16 @@ static int ib_check_cq(void)
                             sq->state.send = SQ_ERROR;
                             sq->mop->error_code = wc.status;
                         }
+                        bh->c->refcnt--;
+                        debug(4, "%s: decremented refcnt to %d; id: %ld (%s)",
+                              __func__,
+                              bh->c->refcnt,
+                              wc.id,
+                              bh->c->peername);
+                        if (bh-c->closed || bh->c->cancelled)
+                        {
+                            ib_close_connection(bh->c);
+                        }
                         break;
                     }
                 }
@@ -209,6 +219,17 @@ static int ib_check_cq(void)
                         wc_opcode_string(wc.opcode),
                         wc_status_string(wc.status),
                         bh->c->peername);
+
+                bh->c->refcnt--;
+                debug(4, "%s: decremented refcnt to %d; id: %ld (%s)",
+                      __func__,
+                      bh->c->refcnt,
+                      wc.id,
+                      bh->c->peername);
+                if (bh->c->closed || bh->c->cancelled)
+                {
+                    ib_close_connection(bh->c);
+                }
             }
             continue;
         }
@@ -228,6 +249,14 @@ static int ib_check_cq(void)
                 continue;
             }
             ptr = bh->buf;
+
+            bh->c->refcnt--;
+            debug(4, "%s: decremented refcnt to %d; id: %ld (%s)",
+                  __func__, bh->c->refcnt, wc.id, bh->c->peername);
+            if (bh->c->closed || bh->c->cancelled)
+            {
+                ib_close_connection(bh->c);
+            }
 
             VALGRIND_MAKE_MEM_DEFINED(ptr, byte_len);
             decode_msg_header_common_t(&ptr, &mh_common);
@@ -257,6 +286,14 @@ static int ib_check_cq(void)
              * to signal memory unpin etc. */
             sq = ptr_from_int64(wc.id);
 
+            sq->c->refcnt--;
+            debug(4, "%s: decremented refcnt to %d; id: %ld (%s)",
+                  __func__, sq->c->refcnt, wc.id, sq->c->peername);
+            if (sq->c->closed || sq->c->cancelled)
+            {
+                ib_close_connection(sq->c);
+            }
+
             sq->state.send = SQ_WAITING_RTS_DONE_BUFFER;
 
 #if !MEMCACHE_BOUNCEBUF
@@ -273,6 +310,14 @@ static int ib_check_cq(void)
             if (!bh)
             {
                 continue;
+            }
+
+            bh->c->refcnt--;
+            debug(4, "%s: decremented refcnt to %d; id: %ld (%s)",
+                  __func__, bh->c->refcnt, wc.id, bh->c->peername);
+            if (bh->c->closed || bh->c->cancelled)
+            {
+                ib_close_connection(bh->c);
             }
 
             sq = bh->sq;
@@ -638,7 +683,6 @@ static struct ib_work *alloc_new_recv(ib_connection_t *c,
     struct ib_work *rq = bmi_ib_malloc(sizeof(*rq));
     rq->type = BMI_RECV;
     rq->c = c;
-    ++rq->c->refcnt;
     rq->bh = bh;
     rq->mop = 0;  /* until user posts for it */
     rq->rts_mop_id = 0;
@@ -1140,7 +1184,6 @@ static int post_send(bmi_op_id_t *id,
 
     sq->bmi_tag = tag;
     sq->c = ibmap->c;
-    ++sq->c->refcnt;
     sq->is_unexpected = is_unexpected;
     qlist_add_tail(&sq->list, &ib_device->sendq);
 
@@ -1484,7 +1527,6 @@ static int test_sq(struct ib_work *sq,
                    void **user_ptr,
                    int complete)
 {
-    ib_connection_t *c;
     int ret = 0;
 
     debug(7, "%s (in): sq %p complete %d",
@@ -1509,14 +1551,8 @@ static int test_sq(struct ib_work *sq,
             }
             qlist_del(&sq->list);
             id_gen_fast_unregister(sq->mop->op_id);
-            c = sq->c;
             free(sq->mop);
             free(sq);
-            --c->refcnt;
-            if (c->closed || c->cancelled)
-            {
-                ib_close_connection(c);
-            }
 
             ret = 1;
             goto out;
@@ -1553,15 +1589,8 @@ static int test_sq(struct ib_work *sq,
 
         qlist_del(&sq->list);
         id_gen_fast_unregister(sq->mop->op_id);
-        c = sq->c;
         free(sq->mop);
         free(sq);
-        --c->refcnt;
-
-        if (c->closed || c->cancelled)
-        {
-            ib_close_connection(c);
-        }
 
         ret = 1;
         goto out;
@@ -1583,10 +1612,8 @@ static int test_sq(struct ib_work *sq,
 
             qlist_del(&sq->list);
             id_gen_fast_unregister(sq->mop->op_id);
-            c = sq->c;
             free(sq->mop);
             free(sq);
-            --c->refcnt;
 
             ret = 1;
             goto out;
@@ -1627,7 +1654,6 @@ static int test_rq(struct ib_work *rq,
                    void **user_ptr,
                    int complete)
 {
-    ib_connection_t *c;
     int ret = 0;
 
     debug(7, "%s (in): rq %p complete %d", __func__, rq, complete);
@@ -1658,14 +1684,7 @@ static int test_rq(struct ib_work *rq,
             }
 
             qlist_del(&rq->list);
-            c = rq->c;
             free(rq);
-            --c->refcnt;
-
-            if (c->closed || c->cancelled)
-            {
-                ib_close_connection(c);
-            }
 
             ret = 1;
             goto out;
@@ -1710,14 +1729,7 @@ static int test_rq(struct ib_work *rq,
         }
 
         qlist_del(&rq->list);
-        c = rq->c;
         free(rq);
-        --c->refcnt;
-
-        if (c->closed || c->cancelled)
-        {
-            ib_close_connection(c);
-        }
 
         ret = 1;
         goto out;
@@ -1741,10 +1753,8 @@ static int test_rq(struct ib_work *rq,
 
                 qlist_del(&rq->list);
                 id_gen_fast_unregister(rq->mop->op_id);
-                c = rq->c;
                 free(rq->mop);
                 free(rq);
-                --c->refcnt;
 
                 ret = 1;
                 goto out;
@@ -2007,12 +2017,7 @@ restart:
             n = 1;
             qlist_del(&rq->list);
             free(rq);
-            --c->refcnt;
 
-            if (c->closed || c->cancelled)
-            {
-                ib_close_connection(c);
-            }
             goto out;
         }
     }
@@ -2331,6 +2336,9 @@ static ib_connection_t *ib_new_connection(int sock,
     {
         struct buf_head *ebs = &c->eager_send_buf_head_contig[i];
         struct buf_head *ebr = &c->eager_recv_buf_head_contig[i];
+        debug(4, "ebs %02d id %lu", i, (uint64_t) ebs);
+        debug(4, "ebr %02d id %lu", i, (uint64_t) ebr);
+
         INIT_QLIST_HEAD(&ebs->list);
         INIT_QLIST_HEAD(&ebr->list);
         ebs->c = c;
@@ -2961,6 +2969,8 @@ static int BMI_ib_initialize(struct bmi_method_addr *listen_addr,
  */
 static int BMI_ib_finalize(void)
 {
+    int i = 0;
+
     gen_mutex_lock(&interface_mutex);
 
     /* if client, send BYE to each connection and bring down the QP */
@@ -2978,6 +2988,16 @@ static int BMI_ib_finalize(void)
             /* Send BYE message to servers, transition QP to drain state */
             send_bye(c);
             drain_qp(c);
+
+            /* wait until all outstanding requests have been flushed */
+            while (c->refcnt != 0)
+            {
+                debug(4, "%s: refcnt for %s is %d",
+                      __func__, c->peername, c->refcnt);
+                debug(4, "%s: calling check_cq to reap FLUSH_ERRS [%d]",
+                      __func__, i++);
+                ib_check_cq();
+            }
         }
     }
 
@@ -3026,7 +3046,8 @@ static int BMI_ib_finalize(void)
     ib_device = NULL;
 
     gen_mutex_unlock(&interface_mutex);
-    debug(0, "BMI_ib_finalize: IB (experimental) module finalized.");
+
+    debug(0, "BMI_ib_finalize: IB (experimental) module finalized");
     return 0;
 }
 

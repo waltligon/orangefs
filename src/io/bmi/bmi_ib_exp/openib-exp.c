@@ -109,7 +109,7 @@ static int exchange_data(int sock,
 static void init_connection_modify_qp(struct ibv_qp *qp,
                                       uint32_t remote_qp_num,
                                       union nic_id remote_id);
-static void openib_post_rr(const ib_connection_t *c,
+static void openib_post_rr(ib_connection_t *c,
                            struct buf_head *bh);
 int parse_bmi_opts_get_ib_port(char *options);
 int openib_ib_initialize(char *options);
@@ -605,6 +605,9 @@ static void openib_post_sr(const struct buf_head *bh,
         ++od->num_unsignaled_sends;
     }
 
+    c->refcnt++;
+    debug(4, "%s: incremented refcnt to %d; id: %ld (%s)",
+          __func__, c->refcnt, sr.wr_id, c->peername);
     ret = ibv_post_send(oc->qp, &sr, &bad_wr);
     if (ret < 0)
     {
@@ -615,7 +618,7 @@ static void openib_post_sr(const struct buf_head *bh,
 /*
  * Post one of the eager recv bufs for this connection.
  */
-static void openib_post_rr(const ib_connection_t *c,
+static void openib_post_rr(ib_connection_t *c,
                            struct buf_head *bh)
 {
     struct openib_connection_priv *oc = c->priv;
@@ -634,6 +637,10 @@ static void openib_post_rr(const ib_connection_t *c,
     struct ibv_recv_wr *bad_wr;
 
     debug(4, "%s: %s bh %d", __func__, c->peername, bh->num);
+
+    c->refcnt++;
+    debug(4, "%s: incremented refcnt to %d; id: %ld (%s)",
+          __func__, c->refcnt, rr.wr_id, c->peername);
     ret = ibv_post_recv(oc->qp, &rr, &bad_wr);
     if (ret)
     {
@@ -794,6 +801,9 @@ static void openib_post_sr_rdmaw(struct ib_work *sq,
             sr.send_flags = 0;
         }
 
+        c->refcnt++;
+        debug(4, "%s: incremented refcnt to %d; id: %ld (%s)",
+              __func__, c->refcnt, sr.wr_id, c->peername);
         ret = ibv_post_send(oc->qp, &sr, &bad_wr);
         if (ret < 0)
         {

@@ -92,7 +92,7 @@ static int exchange_data(int sock, int is_server, void *xin, void *xout,
 static void verify_prop_caps(VAPI_qp_cap_t *cap);
 static void init_connection_modify_qp(VAPI_qp_hndl_t qp,
   VAPI_qp_num_t remote_qp_num, int remote_lid);
-static void vapi_post_rr(const ib_connection_t *c, struct buf_head *bh);
+static void vapi_post_rr(ib_connection_t *c, struct buf_head *bh);
 static void __attribute__((noreturn,format(printf,2,3)))
   error_verrno(int ecode, const char *fmt, ...);
 int vapi_ib_initialize(char *options);
@@ -434,7 +434,7 @@ static void vapi_post_sr(const struct buf_head *bh, u_int32_t len)
 /*
  * Post one of the eager recv bufs for this connection.
  */
-static void vapi_post_rr(const ib_connection_t *c, struct buf_head *bh)
+static void vapi_post_rr(ib_connection_t *c, struct buf_head *bh)
 {
     VAPI_sg_lst_entry_t sg;
     VAPI_rr_desc_t rr;
@@ -452,6 +452,9 @@ static void vapi_post_rr(const ib_connection_t *c, struct buf_head *bh)
     rr.id = int64_from_ptr(bh);
     rr.sg_lst_p = &sg;
     rr.sg_lst_len = 1;
+    c->refcnt++;
+    debug(4, "%s: incremented refcnt to %d; id: %ld (%s)",
+          __func__, c->refcnt, rr.id, c->peername);
     ret = VAPI_post_rr(vd->nic_handle, vc->qp, &rr);
     if (ret < 0)
         error_verrno(ret, "%s: VAPI_post_rr", __func__);

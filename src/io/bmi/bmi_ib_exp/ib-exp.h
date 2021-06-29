@@ -355,7 +355,7 @@ struct ib_device_func {
     int (*ib_initialize)(char *options);
     void (*ib_finalize)(void);
     void (*post_sr)(const struct buf_head *bh, u_int32_t len);
-    void (*post_rr)(const ib_connection_t *c, struct buf_head *bh);
+    void (*post_rr)(ib_connection_t *c, struct buf_head *bh);
     void (*post_sr_rdmaw)(struct ib_work *sq, msg_header_cts_t *mh_cts,
                           void *mh_cts_buf);
     void (*prepare_cq_block)(int *cq_fd, int *async_fd);
