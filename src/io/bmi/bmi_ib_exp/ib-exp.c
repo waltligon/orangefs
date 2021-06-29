@@ -2973,31 +2973,28 @@ static int BMI_ib_finalize(void)
 
     gen_mutex_lock(&interface_mutex);
 
-    /* if client, send BYE to each connection and bring down the QP */
-    if (ib_device->listen_sock < 0)
+    /* send BYE to each connection and bring down the QP */
+    struct qlist_head *l;
+    qlist_for_each(l, &ib_device->connection)
     {
-        struct qlist_head *l;
-        qlist_for_each(l, &ib_device->connection)
+        ib_connection_t *c = qlist_upcast(l);
+        if (c->cancelled)
         {
-            ib_connection_t *c = qlist_upcast(l);
-            if (c->cancelled)
-            {
-                continue;  /* already closed */
-            }
+            continue;  /* already closed */
+        }
 
-            /* Send BYE message to servers, transition QP to drain state */
-            send_bye(c);
-            drain_qp(c);
+        /* Send BYE message, then transition QP to drain state */
+        send_bye(c);
+        drain_qp(c);
 
-            /* wait until all outstanding requests have been flushed */
-            while (c->refcnt != 0)
-            {
-                debug(4, "%s: refcnt for %s is %d",
-                      __func__, c->peername, c->refcnt);
-                debug(4, "%s: calling check_cq to reap FLUSH_ERRS [%d]",
-                      __func__, i++);
-                ib_check_cq();
-            }
+        /* wait until all outstanding requests have been flushed */
+        while (c->refcnt != 0)
+        {
+            debug(4, "%s: refcnt for %s is %d",
+                    __func__, c->peername, c->refcnt);
+            debug(4, "%s: calling check_cq to reap FLUSH_ERRS [%d]",
+                    __func__, i++);
+            ib_check_cq();
         }
     }
 
