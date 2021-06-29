@@ -1003,7 +1003,7 @@ PVFS_Dokan_create_file(
         DokanFileInfo->Context = gen_context();
 
         client_debug("   Context: %llx\n", DokanFileInfo->Context);
-	    add_context(DokanFileInfo, FileAttributes, &credential);
+        add_context(DokanFileInfo, FileAttributes, &credential);
 
         /* determine whether this is a directory */
         if (!attr_flag)
@@ -1029,6 +1029,8 @@ PVFS_Dokan_create_file(
 }
 
 
+/* Not used for Dokany */
+#if 0
 static int __stdcall
 PVFS_Dokan_create_directory(
     LPCWSTR          FileName,
@@ -1122,6 +1124,7 @@ PVFS_Dokan_open_directory(
     
     return err;
 }
+#endif
 
 
 static int __stdcall
@@ -1130,7 +1133,7 @@ PVFS_Dokan_close_file(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     char *fs_path = NULL;
-    int ret = 0, err;
+    int ret = 0, err = 0;
     PVFS_credential credential;
 	int del_flag = 0;
 	struct context_entry *entry;
@@ -1138,45 +1141,13 @@ PVFS_Dokan_close_file(
     client_debug("CloseFile: %S\n", FileName);
     client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
-	/* determine whether file should be deleted */
-	del_flag = DokanFileInfo->DeleteOnClose;
-	if (!del_flag)
-	{
-		/* get cached entry */
-		entry = get_context_entry(DokanFileInfo->Context);
-		del_flag = entry && (entry->flags & FILE_FLAG_DELETE_ON_CLOSE);
-	}
+    /* No-op: PVFS doesn't have an open-file/close-file semantic */ 
 
-    /* delete the file/dir if DeleteOnClose specified */
-    if (del_flag)
-    {
-        client_debug("   Deleting file\n");
-		
-		/* load credential */
-        err = get_credential(DokanFileInfo, &credential);
-        CRED_CHECK("CloseFile", err);
-
-        /* get file system path */
-        fs_path = get_fs_path(FileName);
-        if (fs_path == NULL)
-            return -1;
-
-        /* remove the file/dir */
-        ret = fs_remove(fs_path, &credential);
-
-        PINT_cleanup_credential(&credential);
-    }
-
-    /* No-op: PVFS doesn't have a close-file semantic */ 
-
-    /* remove credential from table */
+    /* remove credential from cache */
     if (DokanFileInfo->Context != 0)
+    {
         remove_context(DokanFileInfo->Context);
-
-    if (fs_path != NULL)
-        free(fs_path);    
-
-    err = error_map(ret);
+    }
 
     client_debug("CloseFile exit: %d (%d)\n", err, ret);
 
@@ -1184,78 +1155,58 @@ PVFS_Dokan_close_file(
 }
 
 
-static int __stdcall
+static void __stdcall
 PVFS_Dokan_cleanup(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-/* TODO: delete */
-#if 0
-    PVFS_object_ref object_ref;
-    enum PVFS_io_type io_type;
-    int update_flag;
+    char* fs_path = NULL;
+    int ret = 0, err;
     PVFS_credential credential;
-    PVFS_sys_attr attr;
-    char *fs_path = NULL;
-    int cache_ret, ret, err;
-#endif
+    int del_flag = 0;
+    struct context_entry* entry;
 
     client_debug("Cleanup: %S\n", FileName);
     client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
-/* TODO: delete */
+    /* determine whether file should be deleted */
+    del_flag = DokanFileInfo->DeleteOnClose;
+    /* TODO: determine if DeleteOnClose is always set correctly--otherwise 
+       the following will be needed. */
 #if 0
-    cache_ret = io_cache_get(DokanFileInfo->Context, &object_ref,
-        &io_type, &update_flag);
-    if (cache_ret == IO_CACHE_HIT)
+    if (!del_flag)
     {
-        if (update_flag)
-        {
-            /* get credential */
-            err = get_credential(DokanFileInfo, &credential);
-            CRED_CHECK("Cleanup", err);
-
-            /* get file system path */
-            fs_path = get_fs_path(FileName);
-            if (fs_path == NULL)
-                return -1;
-
-            if (io_type == PVFS_IO_READ)
-            {
-                /* update access time */
-                attr.mask = PVFS_ATTR_SYS_ATIME|PVFS_ATTR_SYS_ATIME_SET;
-                attr.atime = time(NULL);
-            }
-            else /* PVFS_IO_WRITE */
-            {
-                attr.mask = PVFS_ATTR_SYS_ATIME|PVFS_ATTR_SYS_ATIME_SET |
-                            PVFS_ATTR_SYS_MTIME|PVFS_ATTR_SYS_MTIME_SET;
-                attr.atime = attr.mtime = time(NULL);
-            }
-
-            ret = fs_setattr(fs_path, &attr, &credential);
-            if (ret != 0)
-            {
-                client_debug("   time operation failed: %d\n", ret);
-            }        
-
-            free(fs_path);
-
-            PINT_cleanup_credential(&credential);
-        }
-        /* remove from cache */
-        io_cache_remove(DokanFileInfo->Context);
-    }
-    else if (cache_ret != IO_CACHE_MISS)
-    {
-        client_debug("   cache error: %d\n", cache_ret);
+        /* get cached entry */
+        entry = get_context_entry(DokanFileInfo->Context);
+        del_flag = entry && (entry->flags & FILE_FLAG_DELETE_ON_CLOSE);
     }
 #endif
 
+    /* delete the file/dir if DeleteOnClose specified */
+    if (del_flag)
+    {
+        client_debug("   Deleting file\n");
+
+        /* load credential */
+        err = get_credential(DokanFileInfo, &credential);
+        CRED_CHECK("CloseFile", err);
+
+        /* get file system path */
+        fs_path = get_fs_path(FileName);
+        if (fs_path == NULL)
+        {
+            return -1;
+        }
+
+        /* remove the file/dir */
+        ret = fs_remove(fs_path, &credential);
+
+        PINT_cleanup_credential(&credential);
+    }
+
     client_debug("Cleanup exit: %d\n", 0);
 
-    /* note result of time operation is not returned */
-    return 0;
+    return;
 }
 
 
@@ -1278,7 +1229,7 @@ PVFS_Dokan_read_file(
     PVFS_sys_attr attr;
 #endif
     PVFS_credential credential;
-    int ret, cache_ret, err;
+    int ret = -1, cache_ret, err;
     
     client_debug("ReadFile: %S\n", FileName);
     client_debug("   Context: %llx\n", DokanFileInfo->Context);
@@ -1286,9 +1237,11 @@ PVFS_Dokan_read_file(
     client_debug("   Offset: %llu\n", Offset);
 
     if (FileName == NULL || wcslen(FileName) == 0 ||
-        Buffer == NULL || BufferLength == 0 || 
+        Buffer == NULL || BufferLength == 0 ||
         ReadLength == 0)
+    {
         return -1;
+    }
 
     /* load credential */
     err = get_credential(DokanFileInfo, &credential);
@@ -1308,7 +1261,7 @@ PVFS_Dokan_read_file(
     else if (cache_ret != IO_CACHE_MISS)
     {
         /* error */
-        report_error("Write file: cache error: ", cache_ret);
+        report_error("Read file: cache error: ", cache_ret);
 
         goto read_file_exit;
     }
@@ -1403,7 +1356,7 @@ PVFS_Dokan_write_file(
     enum PVFS_io_type io_type;
     int update_flag;
 #endif    
-    int ret, ret2, cache_ret, err;
+    int ret = -1, ret2, cache_ret, err;
     PVFS_sys_attr attr = {0};
 
     client_debug("WriteFile: %S\n", FileName);
@@ -1541,7 +1494,9 @@ PVFS_Dokan_flush_file_buffers(
     /* get file system path */
     fs_path = get_fs_path(FileName);
     if (fs_path == NULL)
+    {
         return -1;
+    }
 
     /* flush the file */
     ret = fs_flush(fs_path, &credential);
@@ -1589,7 +1544,9 @@ PVFS_Dokan_get_file_information(
     /* get file system path */
     fs_path = get_fs_path(FileName);
     if (fs_path == NULL)
+    {
         return -1;
+    }
 
     /* get file attributes */
     ret = fs_getattr(fs_path, &credential, &attr);
@@ -1598,7 +1555,7 @@ PVFS_Dokan_get_file_information(
     {       
         filename = (char *) malloc(strlen(fs_path) + 1);
         MALLOC_CHECK(filename);
-        PINT_remove_base_dir(fs_path, filename, (int) strlen(fs_path) + 1);        
+        PINT_remove_base_dir(fs_path, filename, (int) strlen(fs_path) + 1);
         
         ret = PVFS_sys_attr_to_file_info(filename, &credential, &attr, 
             HandleFileInformation);
@@ -1675,7 +1632,9 @@ PVFS_Dokan_set_file_attributes(
     /* get file system path */
     fs_path = get_fs_path(FileName);
     if (fs_path == NULL)
+    {
         return -1;
+    }
 
     /* convert attributes to PVFS */
     ret = fs_getattr(fs_path, &credential, &attr);
@@ -1686,8 +1645,8 @@ PVFS_Dokan_set_file_attributes(
         /* write permission is on and request to make
            file readonly */
         if (((attr.perms & 0200) ||
-            (attr.perms & 0020) ||
-            (attr.perms & 0002)) &&
+             (attr.perms & 0020) ||
+             (attr.perms & 0002)) &&
             (FileAttributes & FILE_ATTRIBUTE_READONLY))
         {
             attr.perms &= ~0222;
@@ -1696,7 +1655,7 @@ PVFS_Dokan_set_file_attributes(
         else if ((!(attr.perms & 0200) ||
                   !(attr.perms & 0020) ||
                   !(attr.perms & 0002)) &&
-                  !(FileAttributes & FILE_ATTRIBUTE_READONLY))
+                 !(FileAttributes & FILE_ATTRIBUTE_READONLY))
         {
             /* write permission is off and request to make
                file writable */
@@ -1853,7 +1812,9 @@ PVFS_Dokan_find_files_with_pattern(
     /* get file system path */
     fs_path = get_fs_path(PathName);
     if (fs_path == NULL)
+    {
         return -1;
+    }
 
     /* max files per request */
     incount = PVFS2_FIND_FILES_MAX;
@@ -1907,6 +1868,10 @@ PVFS_Dokan_find_files_with_pattern(
             client_debug("   File found: %s\n", filename_array[i]);
 
             wfilename = convert_mbstring(filename_array[i]);
+            if (wfilename == NULL) {
+                ret = -1; /* TODO */
+                goto find_files_exit;
+            }
             
             /* match file against search pattern */
             if (match_flag)
@@ -2005,7 +1970,7 @@ PVFS_Dokan_delete_file(
 
     /* Do not actually remove the file here, just return
        success if file is found. 
-       The file/dir will be deleted in close_file(). */
+       The file/dir will be deleted in PVFS_Dokan_cleanup(). */
     ret = fs_lookup(fs_path, &credential, &handle);
 
     free(fs_path);
@@ -2553,11 +2518,17 @@ PVFS_Dokan_get_volume_information(
 int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
 {
 
-    int status;
-    PDOKAN_OPERATIONS dokanOperations =
-            (PDOKAN_OPERATIONS) malloc(sizeof(DOKAN_OPERATIONS));
-    PDOKAN_OPTIONS dokanOptions =
-            (PDOKAN_OPTIONS) malloc(sizeof(DOKAN_OPTIONS));
+    int status;    
+    PDOKAN_OPERATIONS dokanOperations = NULL;
+    PDOKAN_OPTIONS dokanOptions = NULL;
+
+    if ((dokanOperations = (PDOKAN_OPERATIONS)malloc(sizeof(DOKAN_OPERATIONS))) == NULL) {
+      return -1;
+    }
+
+    if ((dokanOptions = (PDOKAN_OPTIONS)malloc(sizeof(DOKAN_OPTIONS))) == NULL) {
+      return -1;
+    }
 
     /* init credential cache */
     context_cache = qhash_init(cred_compare, quickhash_64bit_hash, 257);
@@ -2585,8 +2556,6 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     /* assign file operations */
     ZeroMemory(dokanOperations, sizeof(DOKAN_OPERATIONS));
     dokanOperations->ZwCreateFile = PVFS_Dokan_create_file;
-    /*dokanOperations->OpenDirectory = PVFS_Dokan_open_directory; 
-    dokanOperations->CreateDirectory = PVFS_Dokan_create_directory; */
     dokanOperations->Cleanup = PVFS_Dokan_cleanup;
     dokanOperations->CloseFile = PVFS_Dokan_close_file;
     dokanOperations->ReadFile = PVFS_Dokan_read_file;
