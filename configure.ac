@@ -1928,6 +1928,7 @@ src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
 src/io/bmi/bmi_mx/module.mk
 src/io/bmi/bmi_ib/module.mk
+src/io/bmi/bmi_ib_exp/module.mk
 src/io/bmi/bmi_rdma/module.mk
 src/io/bmi/bmi_portals/module.mk
 src/io/bmi/bmi_zoid/module.mk

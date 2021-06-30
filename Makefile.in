@@ -84,6 +84,7 @@ BUILD_GM = @BUILD_GM@
 BUILD_MX = @BUILD_MX@
 BUILD_IB = @BUILD_IB@
 BUILD_OPENIB = @BUILD_OPENIB@
+BUILD_IB_EXP = @BUILD_IB_EXP@
 BUILD_RDMA = @BUILD_RDMA@
 BUILD_PORTALS = @BUILD_PORTALS@
 BUILD_ZOID = @BUILD_ZOID@
@@ -447,9 +448,15 @@ endif
 #####################################
 # enable IB if configure requested it
 
+ifdef BUILD_IB_EXP
+    CFLAGS += -D__STATIC_METHOD_BMI_IB_EXP__
+endif
+
 ifdef BUILD_IB
     # other settings in bmi_ib/module.mk.in
+ifndef BUILD_IB_EXP
     CFLAGS += -D__STATIC_METHOD_BMI_IB__
+endif
     IBLIBS := -L@IB_LIBDIR@ \
 	      -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl
     LIBS += $(IBLIBS)
@@ -459,7 +466,8 @@ ifdef BUILD_IB
 endif
 
 ifdef BUILD_OPENIB
-ifndef BUILD_IB
+ifeq (,$(or $(BUILD_IB),$(BUILD_IB_EXP)))
+    # only if neither BUILD_IB nor BUILD_IB_EXP is defined
     CFLAGS += -D__STATIC_METHOD_BMI_IB__
 endif
     OPENIBLIBS := -L@OPENIB_LIBDIR@ -libverbs
