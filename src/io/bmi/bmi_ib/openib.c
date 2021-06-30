@@ -1120,6 +1120,7 @@ static const char *async_event_type_string(enum ibv_event_type event_type)
         CASE(IBV_EVENT_QP_LAST_WQE_REACHED);
         CASE(IBV_EVENT_CLIENT_REREGISTER);
         CASE(IBV_EVENT_GID_CHANGE);
+        CASE(IBV_EVENT_WQ_FATAL);
 
         /* Experimental event types */
 #ifdef HAVE_IBV_EXP_EVENT_DCT_KEY_VIOLATION
