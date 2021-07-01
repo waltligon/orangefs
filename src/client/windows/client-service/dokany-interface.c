@@ -1,15 +1,16 @@
 /*
- * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
+ * Copyright (C) 2010-2021 Clemson University and Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
 
 /* 
- * Dokan is a user-mode file system API like FUSE: http://dokan-dev.net/en/.
- * Most of the following functions are callbacks. dokan_loop starts the
- * Dokan thread. Functions are called as needed by Dokan (responding to
- * file system requests). 
+ * Dokany is a user-mode file system API like FUSE: https://github.com/dokan-dev/dokany.
+ * Most of the following functions are callbacks. dokan_loop starts the Dokany thread. 
+ * Functions are called as needed by Dokan (responding to file system requests).
  */
+
+#include "dokan.h"
 
 #include <Windows.h>
 #include <AccCtrl.h>
@@ -17,8 +18,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-
-#include "dokan.h"
 
 #include "pvfs2.h"
 #include "gossip.h"
@@ -46,7 +45,7 @@ struct context_entry
 {
     struct qhash_head hash_link;
     ULONG64 context;
-	DWORD flags;
+    DWORD flags;
     PVFS_credential credential;
 };
 
@@ -537,24 +536,24 @@ static int get_credential(PDOKAN_FILE_INFO file_info,
 /* add entry for file to the context cache */
 static void add_context(PDOKAN_FILE_INFO file_info, DWORD flags, PVFS_credential *credential)
 {
-	struct context_entry *entry;
+    struct context_entry *entry;
 
-	if (file_info == NULL) {
-		client_debug("   add_context: NULL file_info\n");
-		return;
-	}
+    if (file_info == NULL) {
+        client_debug("   add_context: NULL file_info\n");
+        return;
+    }
 
-	/* create new entry */
-	entry = (struct context_entry *) calloc(1, sizeof(struct context_entry));
+    /* create new entry */
+    entry = (struct context_entry *) calloc(1, sizeof(struct context_entry));
     if (entry == NULL)
     {
         client_debug("   add_context: out of memory\n");
         return;
     }
 
-	entry->context = file_info->Context;
-	entry->flags = flags;
-	PINT_copy_credential(credential, &(entry->credential));
+    entry->context = file_info->Context;
+    entry->flags = flags;
+    PINT_copy_credential(credential, &(entry->credential));
 
     gen_mutex_lock(&context_cache_mutex);
     qhash_add(context_cache, &entry->context, &entry->hash_link);
@@ -563,19 +562,19 @@ static void add_context(PDOKAN_FILE_INFO file_info, DWORD flags, PVFS_credential
 
 static struct context_entry *get_context_entry(ULONG64 context)
 {
-	struct qhash_head *item = NULL;
-	struct context_entry *entry = NULL;
-	
-	gen_mutex_lock(&context_cache_mutex);
+    struct qhash_head *item = NULL;
+    struct context_entry *entry = NULL;
+    
+    gen_mutex_lock(&context_cache_mutex);
     item = qhash_search(context_cache, &context);
     if (item != NULL)
     {
         /* get entry on cache hit */
-		entry = qhash_entry(item, struct context_entry, hash_link);		
-	}
-	gen_mutex_unlock(&context_cache_mutex);
-	
-	return entry;
+        entry = qhash_entry(item, struct context_entry, hash_link);		
+    }
+    gen_mutex_unlock(&context_cache_mutex);
+    
+    return entry;
 }
 
 /* remove credential from cache */
@@ -1133,10 +1132,7 @@ PVFS_Dokan_close_file(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     char *fs_path = NULL;
-    int ret = 0, err = 0;
-    PVFS_credential credential;
-	int del_flag = 0;
-	struct context_entry *entry;
+    int ret = 0, err = 0;    
 
     client_debug("CloseFile: %S\n", FileName);
     client_debug("   Context: %llx\n", DokanFileInfo->Context);
@@ -1164,7 +1160,7 @@ PVFS_Dokan_cleanup(
     int ret = 0, err;
     PVFS_credential credential;
     int del_flag = 0;
-    struct context_entry* entry;
+    /* struct context_entry* entry; */
 
     client_debug("Cleanup: %S\n", FileName);
     client_debug("   Context: %llx\n", DokanFileInfo->Context);
