@@ -821,9 +821,11 @@ int main(int argc, char **argv, char **envp)
       {
           cmd_debug = TRUE;
       }
+      else {
+          fprintf(stderr, "Invalid argument %s - exiting\n", argv[i]);
+          return 1;
+      }
   }
-
-
 
   /* init event log */
   if ((err = init_event_log()) != 0)
