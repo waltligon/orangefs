@@ -77,7 +77,7 @@ void client_debug(char *format, ...)
 {
     if (g_DebugMode) 
     {
-        char buffer[DEBUG_BUF_SIZE];        
+        char buffer[DEBUG_BUF_SIZE];
         va_list argp;
 
         va_start(argp, format);
@@ -2545,7 +2545,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     dokanOptions->Options |= /* DOKAN_OPTION_KEEP_ALIVE | */
                              DOKAN_OPTION_REMOVABLE;
 
-    dokanOptions->Version = 600;
+    dokanOptions->Version = 150;
 
     dokanOptions->MountPoint = convert_mbstring(options->mount_point);
 
