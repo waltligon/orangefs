@@ -82,13 +82,20 @@ int PINT_unregister_distribution(char *dist_name)
  * This is similar to PVFS_Dist_copy, but it copies from the static table,
  * not from another contiguous region.
  */
+/*
+ * mallocing PINT_DIST_PACK_SIZE allocates enough memory for the PINT_dist
+ * struct and the name string and parameters specific to the distribution.
+ * sizes are rounded up by 8 to ensure each starts on an even 64-bit boundary.
+ */
 PINT_dist *PINT_dist_create(const char *name)
 {
     PINT_dist old_dist;
     PINT_dist *new_dist = 0;
 
     if (!name)
-    return 0;
+    {
+        return 0;
+    }
     old_dist.dist_name = (char*)name;
     old_dist.params = 0;
     old_dist.methods = 0;
@@ -98,7 +105,9 @@ PINT_dist *PINT_dist_create(const char *name)
         new_dist = malloc(PINT_DIST_PACK_SIZE(&old_dist));
         if (new_dist)
         {
+            /* copy all fields */
             *new_dist = old_dist;
+            /* find address for name and params */
             new_dist->dist_name
                     = (char *) new_dist + roundup8(sizeof(*new_dist));
             new_dist->params
@@ -107,6 +116,8 @@ PINT_dist *PINT_dist_create(const char *name)
             assert(old_dist.name_size >= (strlen(old_dist.dist_name) + 1));
             /* copy using length of string passed in by caller
              * rather than rounded up name_size used for distribution packing
+             * NOTE, I'm not sure why use this and not a strcpy, or a
+             * fixed size memcpy.  WBL
              */
             memcpy(new_dist->dist_name, old_dist.dist_name,
                                         (strlen(old_dist.dist_name) + 1));
@@ -128,6 +139,7 @@ int PINT_dist_free(PINT_dist *dist)
     return -1;
 }
 
+/* copies an entire dist in binary to a new contiguous block of memory */
 PINT_dist* PINT_dist_copy(const PINT_dist *dist)
 {
     int dist_size;
@@ -153,6 +165,7 @@ PINT_dist* PINT_dist_copy(const PINT_dist *dist)
     return (new_dist);
 }
 
+/* copies a binary block of parameters from a dist */
 int PINT_dist_getparams(void *buf, const PINT_dist *dist)
 {
     if (!dist || !buf)
@@ -163,6 +176,7 @@ int PINT_dist_getparams(void *buf, const PINT_dist *dist)
     return 0;
 }
 
+/* copies a binary block of parameters into a dist */
 int PINT_dist_setparams(PINT_dist *dist, const void *buf)
 {
     if (!dist || !buf)

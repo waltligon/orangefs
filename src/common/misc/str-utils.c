@@ -884,44 +884,44 @@ char *strstr(const char *haystack, const char *needle)
  * ab:23,bc:34 - returns nkey as 2, pkey <"ab", "bc">, pval<"23", "34">
  *
  */
-int PINT_split_keyvals(char *string, int *nkey, 
-        char ***pkey, char ***pval)
+int PINT_split_keyvals(char *string, int *nkey, char ***pkey, char ***pval)
 {
     char **key, **val, *ptr, *params;
     int nparams = 0, i;
 
-    if (string == NULL || nkey == NULL 
-            || pkey == NULL || pval == NULL)
+    if (string == NULL || nkey == NULL || pkey == NULL || pval == NULL)
     {
-      return -PVFS_EINVAL;
+        return -PVFS_EINVAL;
     }
     params = strdup(string);
     if (params == NULL)
     {
-      return -PVFS_ENOMEM;
+        return -PVFS_ENOMEM;
     }
     ptr = params;
     while (ptr)
     {
         if (*ptr != ',' || *ptr != '\0')
-                 nparams++;
+        {
+            nparams++;
+        }
         ptr++;
         ptr = strchr(ptr, ',');
     }
     if (nparams == 0)
     {
-      free(params);
-      return -PVFS_EINVAL;
+        free(params);
+        return -PVFS_EINVAL;
     }
     ptr = params;
     key = (char **) calloc(nparams, sizeof(char *));
     val = (char **) calloc(nparams, sizeof(char *));
     if (key == NULL || val ==  NULL)
     {
-      free(key);
-      free(val);
-      free(params);
-      return -PVFS_ENOMEM;
+        free(key);
+        free(val);
+        free(params);
+        return -PVFS_ENOMEM;
     }
     for (i = 0; i < nparams; i++)
     {
@@ -951,43 +951,44 @@ int PINT_split_keyvals(char *string, int *nkey,
     }
     if (i != nparams)
     {
-      free(key);
-      free(val);
-      free(params);
-      return -PVFS_EINVAL;
+        free(key);
+        free(val);
+        free(params);
+        return -PVFS_EINVAL;
     }
     else
     {
-      for (i = 0; i < nparams; i++)
-      {
-          char *ptr1, *ptr2;
-          ptr1 = strdup(key[i]);
-          ptr2 = strdup(val[i]);
-          if (ptr1 == NULL || ptr2 == NULL)
-              break;
-          if (strchr(ptr1, ':') || strchr(ptr2, ':'))
-              break;
-          key[i] = ptr1;
-          val[i] = ptr2;
-      }
-      if (i != nparams)
-      {
-          int j;
-          for (j = 0; j < i; j++)
-          {
-              if (key[j]) free(key[j]);
-              if (val[j]) free(val[j]);
-          }
-          free(key);
-          free(val);
-          free(params);
-          return -PVFS_EINVAL;
-      }
-      free(params);
-      *nkey = nparams;
-      *pkey = key;
-      *pval = val;
-      return 0;
+        for (i = 0; i < nparams; i++)
+        {
+            char *ptr1, *ptr2;
+            ptr1 = strdup(key[i]);
+            ptr2 = strdup(val[i]);
+            if (ptr1 == NULL || ptr2 == NULL)
+                break;
+            if (strchr(ptr1, ':') || strchr(ptr2, ':'))
+                break;
+            key[i] = ptr1;
+            val[i] = ptr2;
+        }
+        if (i != nparams)
+        {
+            int j;
+            for (j = 0; j < i; j++)
+            {
+                if (key[j]) free(key[j]);
+                if (val[j]) free(val[j]);
+            }
+            free(key);
+            free(val);
+            free(params);
+            return -PVFS_EINVAL;
+        }
+    }
+    free(params);
+    *nkey = nparams;
+    *pkey = key;
+    *pval = val;
+    return 0;
     }
 }
 

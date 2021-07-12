@@ -29,7 +29,7 @@ typedef struct PINT_dist_param_offset_s
 } PINT_dist_param_offset;
 
 /* Dist param table */
-static PINT_dist_param_offset* PINT_dist_param_table = 0;
+static PINT_dist_param_offset *PINT_dist_param_table = NULL;
 static size_t PINT_dist_param_table_entries = 0;
 static size_t PINT_dist_param_table_size = 0;
 static int PINT_dist_param_table_alloc_inc = 10;
@@ -37,11 +37,11 @@ static int PINT_dist_param_table_alloc_inc = 10;
 /* Return a pointer to the dist param offset for this parameter, or null
  *  if none exists
  */
-static PINT_dist_param_offset* PINT_get_param_offset(const char *dist_name,
+static PINT_dist_param_offset *PINT_get_param_offset(const char *dist_name,
                                                      const char *param_name)
 {
-    PINT_dist_param_offset *dpo = 0;
-    if (0 != PINT_dist_param_table)
+    PINT_dist_param_offset *dpo = NULL;
+    if (NULL != PINT_dist_param_table)
     {
         int i;
         for (i = 0; i < PINT_dist_param_table_entries; i++)
@@ -87,7 +87,7 @@ void PINT_dist_finalize(void)
     PINT_unregister_distribution(twod_stripe_dist.dist_name);
 
     free(PINT_dist_param_table);
-    PINT_dist_param_table = 0;
+    PINT_dist_param_table = NULL;
     PINT_dist_param_table_size = 0;
 }
 
@@ -121,7 +121,7 @@ int PINT_dist_default_set_param(const char *dist_name, void* params,
     int rc = 0;
     PINT_dist_param_offset *offset_data;
     offset_data = PINT_get_param_offset(dist_name, param_name);
-    if (0 != offset_data)
+    if (NULL != offset_data)
     {
         memcpy(((char *)params) + offset_data->offset, 
                value, offset_data->size);
@@ -139,28 +139,28 @@ int PINT_dist_register_param_offset(const char *dist_name,
                                     size_t field_size)
 {
     int dist_len, param_len;
+    PINT_dist_param_offset *buf;
+    int new_table_size = 0;
     
     /* Increase the size of the param table if its full */
     if (PINT_dist_param_table_entries >= PINT_dist_param_table_size)
     {
-        PINT_dist_param_offset *buf;
-        int new_table_size = PINT_dist_param_table_size +
-            PINT_dist_param_table_alloc_inc;
+        new_table_size = PINT_dist_param_table_size + PINT_dist_param_table_alloc_inc;
 
         buf = malloc(new_table_size * sizeof(PINT_dist_param_offset));
-        if (0 != buf)
+        if (NULL != buf)
         {
             if(PINT_dist_param_table_size)
             {
-                memcpy(buf, PINT_dist_param_table,
-                       PINT_dist_param_table_size * sizeof(PINT_dist_param_offset));
+                memcpy (buf, PINT_dist_param_table,
+                        PINT_dist_param_table_size * sizeof(PINT_dist_param_offset));
             }
-            memset(buf + PINT_dist_param_table_size, 0,
-                   PINT_dist_param_table_alloc_inc * sizeof(PINT_dist_param_offset));
+            memset (buf + PINT_dist_param_table_size, 0,
+                    PINT_dist_param_table_alloc_inc * sizeof(PINT_dist_param_offset));
 
-            if(PINT_dist_param_table_size)
+            if (PINT_dist_param_table_size)
             {
-                free(PINT_dist_param_table);
+                free (PINT_dist_param_table);
             }
             PINT_dist_param_table_size = new_table_size;
             PINT_dist_param_table = buf;
@@ -173,26 +173,24 @@ int PINT_dist_register_param_offset(const char *dist_name,
 
     /* Allocate memory for the dist and param name */
     dist_len = strlen(dist_name) + 1;
-    param_len = strlen(param_name) + 1;
-    PINT_dist_param_table[PINT_dist_param_table_entries].dist_name =
-        malloc(dist_len);
-    if (0 == PINT_dist_param_table[PINT_dist_param_table_entries].dist_name)
+    PINT_dist_param_table[PINT_dist_param_table_entries].dist_name = malloc(dist_len);
+    if (NULL == PINT_dist_param_table[PINT_dist_param_table_entries].dist_name)
     {
         return -1;
     }
     
-    PINT_dist_param_table[PINT_dist_param_table_entries].param_name =
-        malloc(param_len);
-    if (0 == PINT_dist_param_table[PINT_dist_param_table_entries].param_name)
+    param_len = strlen(param_name) + 1;
+    PINT_dist_param_table[PINT_dist_param_table_entries].param_name = malloc(param_len);
+    if (NULL == PINT_dist_param_table[PINT_dist_param_table_entries].param_name)
     {
         return -1;
     }    
     
     /* Register the parameter information for later lookup */
     strncpy(PINT_dist_param_table[PINT_dist_param_table_entries].dist_name,
-           dist_name, dist_len);
+            dist_name, dist_len);
     strncpy(PINT_dist_param_table[PINT_dist_param_table_entries].param_name,
-           param_name, param_len);
+            param_name, param_len);
     PINT_dist_param_table[PINT_dist_param_table_entries].offset = offset;
     PINT_dist_param_table[PINT_dist_param_table_entries].size = field_size;
     PINT_dist_param_table_entries += 1;
@@ -204,7 +202,7 @@ int PINT_dist_unregister_param_offset(const char *dist_name,
 {
     int i = 0, dlen, plen;
 
-    if( !dist_name || !param_name )
+    if (!dist_name || !param_name)
     {
         return -EINVAL;
     }
@@ -212,26 +210,26 @@ int PINT_dist_unregister_param_offset(const char *dist_name,
     dlen = strlen(dist_name) + 1;
     plen = strlen(param_name) + 1;
 
-    for( i = 0; i < PINT_dist_param_table_entries; i++ )
+    for ( i = 0; i < PINT_dist_param_table_entries; i++ )
     {
-        if((strncmp(PINT_dist_param_table[i].dist_name, dist_name, dlen)==0) && 
-           (strncmp(PINT_dist_param_table[i].param_name, param_name, plen)==0))
+        if ((strncmp(PINT_dist_param_table[i].dist_name, dist_name, dlen) == 0) && 
+            (strncmp(PINT_dist_param_table[i].param_name, param_name, plen) == 0))
         {
             /* found dist and param to unregister */
-            if( PINT_dist_param_table[i].dist_name )
+            if ( PINT_dist_param_table[i].dist_name )
             {
                 free(PINT_dist_param_table[i].dist_name);
             }
-            if( PINT_dist_param_table[i].param_name )
+            if ( PINT_dist_param_table[i].param_name )
             {
                 free(PINT_dist_param_table[i].param_name);
             }
             
             /* bubble up, not sure I like this but it is just an array */
             --PINT_dist_param_table_entries;
-            for( ; i < PINT_dist_param_table_entries; i++ )
+            for ( ; i < PINT_dist_param_table_entries; i++ )
             {
-                PINT_dist_param_table[i] = PINT_dist_param_table[i+1];
+                PINT_dist_param_table[i] = PINT_dist_param_table[i + 1];
             }
         }
     }

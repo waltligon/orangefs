@@ -197,6 +197,7 @@ struct PINT_client_create_sm
 {
     char *object_name;                /* input parameter */
     PVFS_object_attr attr;            /* input parameter */
+    PVFS_sys_attr sys_attr;
     PVFS_sysresp_create *create_resp; /* in/out parameter */
 
     int retry_count;
@@ -216,7 +217,7 @@ struct PINT_client_create_sm
     PVFS_SID *datafile_sid_array;
 
     int stuffed;
-    PVFS_object_attr store_attr;
+    PVFS_object_attr store_attr;      /* holds a copy of attr for retries */
 
     int dirent_file_count;
     PVFS_handle *dirent_handle;

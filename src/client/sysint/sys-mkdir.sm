@@ -198,12 +198,11 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     struct filesystem_configuration_s *fs_config = NULL;
     PVFS_object_attr *dir_attr = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_mkdir entered\n");
-
-    if(((uint64_t)gossip_debug_mask.mask1) & ((uint64_t)GOSSIP_MKDIR_DEBUG.mask1)){
-        gossip_err(" MKDIR flag is ON\n");}
-    else{
-        gossip_err(" MKDIR flag is OFF\n");}
+/*  gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_mkdir entered\n");
+ *      gossip_err(" MKDIR flag is ON\n");}
+ *  else{
+ *      gossip_err(" MKDIR flag is OFF\n");}
+ */
 
     if (!PVFS_OID_cmp(&parent_ref.handle, &PVFS_HANDLE_NULL) ||
         (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
@@ -227,6 +226,28 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
         return -PVFS_ENAMETOOLONG;
     }
 
+#ifndef ENABLE_SECURITY_CERT
+    /* if owner/group differ from credential values, and credential is
+       not for root, create with owner/group equal to credential values
+       (in cert. mode the credential fields aren't used) */
+    if (attr.owner != credential->userid &&
+        credential->userid != 0)
+    {
+        gossip_debug(GOSSIP_CREATE_DEBUG, "Replacing owner uid %d with %d "
+                     "on create\n", attr.owner, credential->userid);
+        attr.owner = credential->userid;
+    }
+
+    if (attr.group != credential->group_array[0] &&
+        credential->group_array[0] != 0)
+    {
+        gossip_debug(GOSSIP_CREATE_DEBUG, "Replacing group gid %d with %d "
+                     "on create\n", attr.group, credential->group_array[0]);
+        attr.group = credential->group_array[0];
+    }
+#endif
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "mkdir Allocating SMCB\n\n");
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_MKDIR,
                     sizeof(struct PINT_client_sm),
@@ -241,7 +262,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
     PINT_init_sysint_credential(sm_p->cred_p, credential);
-
+    sm_p->u.mkdir.mkdir_resp = resp;
     sm_p->u.mkdir.object_name = object_name;
     dir_attr = &sm_p->u.mkdir.dir_attr;
 
@@ -255,11 +276,10 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     /* COPY the user provided attributes into the sys_attr sm block */
     PVFS_util_copy_sys_attr(&sm_p->u.mkdir.sys_attr, &attr);
 
-    sm_p->u.mkdir.mkdir_resp = resp;
     sm_p->u.mkdir.stored_error_code = 0;
     sm_p->u.mkdir.retry_count = 0;
 
-
+    gossip_debug(GOSSIP_CREATE_DEBUG, "mkdir Adding hints\n\n");
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints,
                   PVFS_HINT_HANDLE_NAME,
@@ -273,7 +293,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
      * first from the built-in defaults, second from config file defaults,
      * In the validate function - after we have read the parent attributes
      * we continue with third from the parent directory attributes and hints,
-     * and finall from the sys_attrs passed in to the sys_mkdir call.
+     * and finally from the sys_attrs passed in to the sys_mkdir call.
      */
 
     /*********************/
@@ -328,13 +348,13 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     dir_attr->u.dir.dist_dir_attr.branch_level = -1;  /* branch level set up on server */
     dir_attr->mask |= PVFS_ATTR_DIR_BRANCH_LEVEL;
 
-    /* get config for this filesystem */
-    server_config = PINT_get_server_config_struct(parent_ref.fs_id);
-    fs_config = PINT_config_find_fs_id(server_config, parent_ref.fs_id);
-
     /*********************************/
     /* Defaults from the config file */
     /*********************************/
+
+    /* get config for this filesystem */
+    server_config = PINT_get_server_config_struct(parent_ref.fs_id);
+    fs_config = PINT_config_find_fs_id(server_config, parent_ref.fs_id);
 
     if (fs_config->default_distr_dir_servers_initial > 0)
     {
@@ -366,8 +386,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
 
     /* does this apply to a dir?  if so, shouldn't we have attrs for it? */
     /* TODO: For now, just use round robin layout. */
-    /* handled above */
-    //sm_p->u.mkdir.layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
+    sm_p->u.mkdir.layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Creating directory named %s "
                  "under parent handle %s on fs %d\n", object_name,
@@ -627,8 +646,8 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
      * 2) directory hints 
      * 3) inherit parent attributes
      * 4) mount options (not yet implemented)  -- N/A
-     * 5) config file defaults                 -- DONE
-     * 6) system default (compiled in limits)  -- DONE
+     * 5) config file defaults                 -- DONE in isys_mkdir
+     * 6) system default (compiled in limits)  -- DONE in isys_mkdir
      */
 
     /*******************************/
