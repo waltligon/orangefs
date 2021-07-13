@@ -124,7 +124,7 @@ static int error_map(int fs_err)
     case -PVFS_EBUSY:          /* Device or resource busy */
         return -ERROR_BUSY;              /* 170 */
     case -PVFS_EEXIST:         /* File exists */
-        return -ERROR_ALREADY_EXISTS;    /* 183 */
+        return -ERROR_FILE_EXISTS;    /* 80 */
     case -PVFS_ENODEV:         /* No such device */
         return -ERROR_DEV_NOT_EXIST;     /* 55 */
     case -PVFS_ENOTDIR:        /* Not a directory */
@@ -1022,9 +1022,10 @@ PVFS_Dokan_create_file(
     free(fs_path);
     PINT_cleanup_credential(&credential);
 
-    client_debug("CreateFile exit: %d (%d)\n", err, ret);
+    client_debug("CreateFile exit: %d (%d)\n", -err, ret);
         
-    return err;
+    /* TODO: have return values be positive */
+    return -err;
 }
 
 
@@ -2480,19 +2481,31 @@ PVFS_Dokan_get_volume_information(
 {
     char *vol_name;
     wchar_t *wvol_name;
+    size_t vol_len;
 
     client_debug("GetVolumeInformation\n");
     client_debug("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("   VolumeNameSize: %u\n", VolumeNameSize);
+    client_debug("   FileSystemNameSize: %u\n", FileSystemNameSize);
 
-    /* volume name */
+    /* get OrangeFS FS name and convert to Unicode for volume name */
     vol_name = fs_get_name(0);
+    client_debug("  FS name: %s\n", vol_name);
+
     wvol_name = convert_mbstring(vol_name);
-    /* bug in volume.c -- use length of wvol_name */
-    wcsncpy(VolumeNameBuffer, wvol_name, wcslen(wvol_name));
+    ZeroMemory(VolumeNameBuffer, VolumeNameSize * sizeof(wchar_t));
+    vol_len = wcslen(wvol_name);
+    if (vol_len > VolumeNameSize - 1)
+    {
+        vol_len = VolumeNameSize - 1;
+    }
+
+    wcsncpy(VolumeNameBuffer, wvol_name, vol_len);
     free(wvol_name);
 
     /* serial number, comp. length and flags */
     *VolumeSerialNumber = fs_get_id(0);
+    client_debug("  FS ID: %u\n", *VolumeSerialNumber);
     *MaximumComponentLength = PVFS_NAME_MAX;
     *FileSystemFlags = FILE_CASE_SENSITIVE_SEARCH | 
                        FILE_CASE_PRESERVED_NAMES;
@@ -2501,9 +2514,10 @@ PVFS_Dokan_get_volume_information(
                        FILE_PERSISTENT_ACLS;
                        */
 
-    /* File System Name */
-    /* bug in volume.c -- see above */
-    wcsncpy(FileSystemNameBuffer, L"OrangeFS", 8);
+    /* File System Name - report as NTFS for compatibility */
+    ZeroMemory(FileSystemNameBuffer, FileSystemNameSize * sizeof(wchar_t));
+    /* wcsncpy(FileSystemNameBuffer, L"OrangeFS", 8); */
+    wcsncpy(FileSystemNameBuffer, L"NTFS", 4);
 
     client_debug("GetVolumeInformation exit: 0\n");
 
