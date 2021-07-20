@@ -723,7 +723,7 @@ static int PVFS_sys_attr_to_file_info(char *filename,
         return -PVFS_EINVAL;
     }
 
-    phFileInfo->dwFileAttributes = 0;
+    ZeroMemory(phFileInfo, sizeof(BY_HANDLE_FILE_INFORMATION));
     
     if (attr->objtype & PVFS_TYPE_DIRECTORY) {
         phFileInfo->dwFileAttributes |= FILE_ATTRIBUTE_DIRECTORY;
@@ -1534,6 +1534,14 @@ PVFS_Dokan_get_file_information(
     client_debug("GetFileInfo: %S\n", FileName);
     client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
+    DEBUG_FILE_INFO(DokanFileInfo, ProcessId);
+    DEBUG_FILE_INFO(DokanFileInfo, IsDirectory);
+    DEBUG_FILE_INFO(DokanFileInfo, DeleteOnClose);
+    DEBUG_FILE_INFO(DokanFileInfo, PagingIo);
+    DEBUG_FILE_INFO(DokanFileInfo, SynchronousIo);
+    DEBUG_FILE_INFO(DokanFileInfo, Nocache);
+    DEBUG_FILE_INFO(DokanFileInfo, WriteToEndOfFile);
+
     /* load credential */
     err = get_credential(DokanFileInfo, &credential);
     CRED_CHECK("GetFileInfo", err);
@@ -1556,6 +1564,9 @@ PVFS_Dokan_get_file_information(
         
         ret = PVFS_sys_attr_to_file_info(filename, &credential, &attr, 
             HandleFileInformation);
+
+        /* set serial number */
+        HandleFileInformation->dwVolumeSerialNumber = fs_get_id(0);
         
         free(filename);
 
