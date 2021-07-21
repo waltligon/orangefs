@@ -51,6 +51,7 @@ static int create_delete_handles_comp_fn(void *v_p,
 
 /* misc helper functions */
 static PINT_dist* get_default_distribution(PVFS_fs_id fs_id);
+static int convert_dist (char *dist_name, char *dist_params, PVFS_dist **file_dist);
 
 %%
 
@@ -172,7 +173,7 @@ PVFS_error PVFS_isys_create(char *object_name,
     struct server_configuration_s *server_config = NULL;
     struct filesystem_configuration_s *fs_config = NULL;
     PVFS_object_attr *file_attr = NULL;
-    PVFS_size default_strip_size = 65536;
+    PVFS_size default_strip_size = PVFS_DIST_SIMPLE_STRIPE_DEFAULT_STRIP_SIZE;
 
     gossip_debug(GOSSIP_CREATE_DEBUG, "PVFS_isys_create entered\n");
 
@@ -250,7 +251,7 @@ PVFS_error PVFS_isys_create(char *object_name,
     file_attr = &sm_p->u.create.attr;
 
     /* Rather than convert and toss the sys_attrs, save them so we can apply them
-     * last in the validate function
+     * last in the parent_getattr_inspect function
      */
     //PINT_CONVERT_ATTR(&sm_p->u.create.attr, &attr, PVFS_ATTR_META_ALL);
     PVFS_util_copy_sys_attr(&sm_p->u.create.sys_attr, &attr);
@@ -297,15 +298,17 @@ PVFS_error PVFS_isys_create(char *object_name,
      * NEED to figure out distributions and parameters here
      * ALSO layout - do we need to have layout any more?
      */
+    /* if no other distribution is specified, we will use simple stripe */
     file_attr->u.meta.dist = PINT_dist_create(PVFS_DIST_SIMPLE_STRIPE_NAME);
     /* set strip_size paramater for simple_stripe */
     PINT_dist_setparams(file_attr->u.meta.dist, (void *)&default_strip_size);
     file_attr->mask |= PVFS_ATTR_META_DIST;
-    file_attr->u.meta.dist_size = 0; /* decode only */
-    file_attr->u.meta.dfile_count = 1;   /* zero out for transmit */
+    file_attr->u.meta.dist_size = 0;        /* decode only */
+    file_attr->mask &= ~PVFS_ATTR_META_DIST_SIZE;
+    file_attr->u.meta.dfile_count = 1;      /* zero out for transmit */
     file_attr->mask |= PVFS_ATTR_META_DFILE_COUNT;
     file_attr->u.meta.dfile_array = NULL;
-    file_attr->u.meta.sid_count = 1;   /* zero out for transmit */
+    file_attr->u.meta.sid_count = 1;        /* zero out for transmit */
     file_attr->mask |= PVFS_ATTR_META_SID_COUNT;
     file_attr->u.meta.sid_array = NULL;
     file_attr->u.meta.mirror_mode = 0;
@@ -323,17 +326,17 @@ PVFS_error PVFS_isys_create(char *object_name,
 
     if (fs_config->default_num_dfiles > 0)
     {
-        file_attr->u.meta.dfile_count =    /* zero out for transmit */
+        file_attr->u.meta.dfile_count =    /* will zero out for transmit */
                         fs_config->default_num_dfiles;
         file_attr->mask |= PVFS_ATTR_META_DFILE_COUNT;
     }
-    if (fs_config->default_dfile_replication_factor > 0)
+    if (fs_config->default_dfile_replication_factor > 0) /* dfile sids */
     {
-        file_attr->u.meta.sid_count =    /* zero out for transmit */
+        file_attr->u.meta.sid_count =    /* will zero out for transmit */
                         fs_config->default_dfile_replication_factor;
         file_attr->mask |= PVFS_ATTR_META_SID_COUNT;
     }
-    if (fs_config->metadata_replication_factor > 0)
+    if (fs_config->metadata_replication_factor > 0) /* meta sids */
     {
         file_attr->meta_sid_count =
                         fs_config->metadata_replication_factor;
@@ -341,6 +344,7 @@ PVFS_error PVFS_isys_create(char *object_name,
     }
 
     /* return checked out verion of config struct */
+    /* must free before call to get_default_distribution */
     PINT_put_server_config_struct(server_config);
 
     /* Distributions are a little more complicated */
@@ -348,7 +352,7 @@ PVFS_error PVFS_isys_create(char *object_name,
     {
         /* free the system default */
         PINT_dist_free(file_attr->u.meta.dist);
-        /* allocates packed dist */
+        /* allocates packed dist gets default parameter also */
         file_attr->u.meta.dist = get_default_distribution(sm_p->parent_ref.fs_id);
         file_attr->mask |= PVFS_ATTR_META_DIST;
         /* dist_size is only used by decode to report the size of the dist */
@@ -426,7 +430,16 @@ PVFS_error PVFS_isys_create(char *object_name,
          */
         sm_p->u.create.layout.algorithm = PVFS_SYS_LAYOUT_NULL;
     }
-
+/*
+ * We are nolonger going to pass a distribution is as a separate 
+ * argument to the sys_create call.  Instead we can pass it as
+ * part of sys_attr attributes, as is done in sys_mkdir where they
+ * are used as a hint. in the sys_attr there is only a string for
+ * the distribution name, and a string for the encoded parameters.
+ * These will be interpreted out of the user attr in the SM frame
+ * during the interpret phase.
+ */
+#if 0
     /* distribution must be passed with the req and stored as part of
      * the attributes, so we should handle like other attributes.
      */
@@ -470,9 +483,10 @@ PVFS_error PVFS_isys_create(char *object_name,
         }
 #endif
     }
+#endif
 
-    /* Save the original attribute passed in. since create does it's own
-     * retries we need the original attribute available on retries.
+    /* Save the attributes at this point. Since create does it's own
+     * retries we need to rebuild the attributes on each retry.
      */
     PINT_copy_object_attr(&(sm_p->u.create.store_attr),
                           &(sm_p->u.create.attr));
@@ -672,9 +686,9 @@ static PINT_sm_action create_init(struct PINT_smcb *smcb, job_status_s *js_p)
 
     if (js_p->error_code == CREATE_RETRY)
     {
-        /* reset the attributes to what got passed in to the sysint call and
-         * the config file defaults. the retry path comes through here so we'll
-         * want to reset it after each try. 
+        /* Reset the attributes to the state at the end of the isys_create call.
+         * The retry path comes through here so we'll want to reset it before each
+         * retry. 
          */
         if (sm_p->u.create.retry_count > 0)
         {
@@ -780,14 +794,6 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
                   &sm_p->u.create.attr.group);
 #endif
 
-#define SET_FILE_ATTR_FROM_PARENT(d_attr, mbit, p_attr)                \
-    if (((pattr->p_attr) > 0) && PVFS2_attr_all(pattr->mask, (mbit)))  \
-    {                                                                  \
-        dir_attr->d_attr = pattr->p_attr;                              \
-        dir_attr->mask |= mbit;                                        \
-        gossip_debug(GOSSIP_CREATE_DEBUG, "Add attr %ld\n", mbit);     \
-    }
-
     /* from parent */
     if (pattr->meta_sid_count > 0 && (pattr->mask & PVFS_ATTR_COMMON_SID_COUNT))
     {  
@@ -795,22 +801,51 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         file_attr->mask |= PVFS_ATTR_COMMON_SID_COUNT; 
         gossip_debug(GOSSIP_CREATE_DEBUG, "Add attr %ld\n", PVFS_ATTR_COMMON_SID_COUNT);  
     }
+
     file_attr->parent          /* set to parent OID */
     file_attr->parent_sids     /* set to parent SIDs */
 
-    /* set distribution from parent dir hints if present */
     /*
-    file_attr->u.meta.dist =
-    file_attr->u.meta.distsize =
+     * Both parent and user attr will specify a name and a parameter string.  No point
+     * in converting one pair just to delete it and covert the other.  We will check
+     * both here and convert the right one, and put a comment below in the user
+     * attr area.
+     */
+    if (sys_attr->dist_name && sys_attr->dist_params)
+    {
+        /* set distribution from user sys_attr */
+        ret = convert_dist(sys_attr->name,
+                           sys_attr->dist_params,
+                           &file_attr->u.meta.dist)
+    }
+    else
+    {
+        if (pattr->u.dir.hint.dist_name && pattr->u.dir.hint.dist_params)
+        {
+            /* set distribution from parent */
+            ret = convert_dist(pattr->u.dir.hint.dist_name,
+                               pattr->u.dir.hint.dist_params,
+                               &file_attr->u.meta.dist)
+        }
+        else
+        {
+            if(!file_attr->u.meta.dist)
+            {
+                /* error, no distribution!, code should guarantee a dist! */
+                gossip_err("In sys_create:getattr_inspect - no distribution!");
+                ret = -1;
+            }
+            /* else we use what is already there */
+            ret = 0;
+        }
+    }
+    if (ret)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
 
-    Do we call split_keyval crap?
-
-    pattr->u.dir.hint.dist_name_len
-    pattr->u.dir.hint.dist_name
-    pattr->u.dir.hint.dist_params_len
-    pattr->u.dir.hint.dist_params
-    */
-
+    /* parent defaults for dfile_count and dfile_si_count */
     if (pattr->u.dir.hint.dfile_count > 0 && 
         (pattr->mask & PVFS_ATTR_DIR_HINT_DFILE_COUNT))
     {  
@@ -826,7 +861,9 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_CREATE_DEBUG, "Add attr %ld\n", PVFS_ATTR_META_SID_COUNT);  
     }
 
-    /* !!! change more later */
+    /***LAYOUT***/
+
+    /* Some debugging output !!! change more later */
     if (gossip_debug_enabled(GOSSIP_CREATE_DEBUG))
     {
         gossip_debug(GOSSIP_CREATE_DEBUG, "create_parent_getattr: [%p]\n"
@@ -858,20 +895,8 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         }
     }
 
-    /* may just use sm_p->getattr.attr.u.dir...
-    sm_p->u.create.dirent_handle = malloc(
-            sizeof(*pattr->dirdata_handles) * pattr->dist_dir_attr.dirdata_count);
-    if (!sm_p->u.create.dirent_handle)
-    {
-        return -PVFS_ENOMEM;
-    }
-    memcpy(sm_p->u.create.dirent_handle,
-           pattr->dirdata_handles,
-           sizeof(*attr->dirdata_handles) * pattr->dist_dir_attr.dirdata_count);
-
-    sm_p->u.create.dirent_file_count = pattr->dist_dir_attr.dirdata_count;
-    */
-
+/* old code for converting distribution strings */
+#if 0
     current_dist = sm_p->u.create.dist;
     /* If we have an overriding distribution for this directory honor that */
 
@@ -897,6 +922,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         }
         set_new_dist = 1;
     }
+
 
     /* okay, we might need to override some dist params as well 
      * even if distribution is default parameters may be 
@@ -985,44 +1011,50 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
             free(val);
         }
     }
-
-
-    /* GET Default distribution here
-     * This code is from Trunk
-     * Default Dist is already accounted for in isys_create
-     */
-#if 0
-    if (!current_dist)
-    {
-        /* set to default distribution */
-        sm_p->u.create.dist = get_default_distribution(sm_p->parent_ref.fs_id);
-        if (!sm_p->u.create.dist)
-        {
-            PINT_smcb_free(smcb);
-            return -PVFS_ENOMEM;
-        }
-        current_dist = sm_p->u.create.dist;
-    }
 #endif
 
-    /* Replication for metadata is always set in the configuration for
-     * the file system as it is not user setable, so all we have to do is
-     * grab it, but we will check and make sure it is reasonable and
-     * default to 1 if not.
-     * TODO There should be a reasonable max also, not implemented yet.
+    /***************************************/
+    /* Defaults from the Parent Attributes */
+    /***************************************/
+
+    /* at this point user overrides include, (owner?), group, perms, dfile_count,
+     * distribution (already taken care of), replication.
      */
-    /*
-     * We did this in PVFS2_sys_create it is already in place
-     */
-#if 0
-    PINT_cached_config_get_metadata_sid_count(
-                                sm_p->parent_ref.fs_id, 
-                                &sm_p->u.create.metadata_sid_count);
-    if (sm_p->u.create.metadata_sid_count <= 0)
+
+    if (sys_attr->owner > 0 && 
+        (sys_attr->mask & PVFS_ATTR_SYS_UID))
     {
-        sm_p->u.create.metadata_sid_count = 1;
+        file_attr->owner = sys_attr->owner;
+        file_attr->mask |= PVFS_ATTR_COMMON_UID; 
     }
-#endif
+
+    if (sys_attr->group > 0 && 
+        (sys_attr->mask & PVFS_ATTR_SYS_GID))
+    {
+        file_attr->group = sys_attr->group;
+        file_attr->mask |= PVFS_ATTR_COMMON_GID; 
+    }
+
+    if (sys_attr->perms & PVFS_PERM_VALID > 0 && 
+        (sys_attr->mask & PVFS_ATTR_SYS_PERM))
+    {
+        file_attr->perms = sys_attr->perms & PVFS_PERM_VALID;
+        file_attr->mask |= PVFS_ATTR_COMMON_PERMS; 
+    }
+
+    if (sys_attr->dfile_count > 0 && 
+        (sys_attr->mask & PVFS_ATTR_SYS_DFILE_COUNT))
+    {
+        file_attr->meta.dfile_count = sys_attr->dfile_count;
+        file_attr->mask |= PVFS_ATTR_META_DFILE_COUNT; 
+    }
+
+    if (sys_attr->mirror_copies_count > 0 && 
+        (sys_attr->mask & PVFS_ATTR_SYS_MIRROR_COPIES_COUNT))
+    {
+        file_attr->meta.sid_count = sys_attr->mirror_copies_count;
+        file_attr->mask |= PVFS_ATTR_META_SID_COUNT; 
+    }
 
     /* Determining the number of dfiles.
      * priority for determining user's preference for number of data files:
@@ -1031,6 +1063,10 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
      * 3) mount options
      * 4) system default
      * All of the above can be overridden by the distribution itself.
+     */
+
+    /* at this point sm_p->u.create.user_requested_num_data_files is
+     * the value passed by user in sys_attr that was saved in isys_create
      */
 
     /* num_dfiles_requested should be 0 at this point */
@@ -1673,8 +1709,9 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 /** HELPER FUNCTION
  * Returns the default distribution, or NULL if the distribution could not
  * be created.  The default distribution is read from the server
- * configuration if possible.  If the server config does not specify a
- * default distribution, simple_stripe will be used.
+ * configuration if possible.  Parameters are stored in an internal linked
+ * list format.  If there is no default in the config file, this returns
+ * the hardcoded default - simple_strip 64K strip size.
  */
 static PINT_dist *get_default_distribution(PVFS_fs_id fs_id)
 {
@@ -1751,6 +1788,99 @@ getdist_exit:
     PINT_put_server_config_struct(server_config);
 
     return dist;
+}
+
+static int convert_dist (char *dist_name, char *dist_params, PVFS_dist **file_dist)
+{
+    PINIT_dist_free(*file_dist);
+    *file_dist = PINT_dist_create(dist_name);
+    if (!*file_dist)
+    {
+        gossip_debug(GOSSIP_CREATE_DEBUG,
+                     "ran out of memory creating distribution\n");
+        return -1;
+    }
+
+    if (strlen(dist_params) > 0)
+    {
+        /* We have a series of comma separated key:val strings */
+        char **key, **val;
+        int64_t tmp_val;
+        int nparams = 0;
+
+        if (strncmp((*file_dist)->dist_name, 
+                    PVFS_DIST_VARSTRIP_NAME, 
+                    PVFS_DIST_VARSTRIP_NAME_SIZE) == 0) 
+        {
+            /* varstrip parameters are a special case; we can't use the
+             * normal split_keyvals function because the : separater is also
+             * used within paramers that only varstrip can parse
+             */ 
+
+            /* look for a "strips:" prefix */
+            if(strstr(dist_params, "strips:") != dist_params)
+            {
+                gossip_err("Error: failed to parse directory "
+                           "hints for varstrip distribution.\n");
+                return -1;
+            }
+            if((*file_dist)->methods->set_param((*file_dist)->dist_name,
+                                                (*file_dist)->params,
+                                                "strips",
+                &dist_params[strlen("strips:")]))
+            {
+                gossip_err("Error: failed to set directory "
+                           "hints for varstrip distribution.\n");
+                return -1;
+            }
+        }
+        /* ignore parse errors! */
+        /* TODO: why should we ignore parsing errors? */
+        else if (PINT_split_keyvals(dist_params, &nparams, &key, &val) == 0)
+        {
+            int i;
+            for (i = 0; i < nparams; i++)
+            {
+                gossip_debug(GOSSIP_CREATE_DEBUG,
+                             "distribution parameter %s, value %s\n",
+                             key[i], val[i]);
+                /* NOTE: just as in server-config.c when parsing "Param" and
+                 * "Value" fields, we will assume that all values are 64 bit
+                 * integers.  The only difference here is that we scan
+                 * directly into a 64 bit integer, rather than converting
+                 * from the int format that dotconf supports.
+                 */
+                ret = sscanf(val[i], SCANF_lld, (SCANF_lld_type *)&tmp_val);
+                if(ret != 1)
+                {
+                    gossip_err(
+                        "Error: unsupported type for distribution parameter %s, "
+                        "value %s found in directory hints.\n", 
+                        key[i], val[i]);
+                    gossip_err("Error: continuing anyway.\n");
+                }
+                else
+                {
+                    if(current_dist->methods->set_param((*file_dist)->dist_name,
+                                                        (*file_dist)->params,
+                                                        key[i],
+                                                        &tmp_val))
+                    {
+
+                        gossip_err(
+                            "Error: could not override hinted distribution "
+                            "parameter %s, value %s found in directory hints\n",
+                            key[i], val[i]);
+                    }
+                 }
+                 free(key[i]);
+                 free(val[i]);
+            }
+            free(key);
+            free(val);
+        }
+    }
+    return 0;
 }
 
 /* delete the newly created meta and data handles */
