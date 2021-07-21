@@ -12,7 +12,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bmi_wintcp", "bmi_wintcp\bm
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gen-locks", "gen-locks\gen-locks-vs2019.vcxproj", "{9138ABF9-041F-4A55-9E87-0F433719F4FC}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bmi_misc-vs2012", "bmi_misc\bmi_misc-vs2019.vcxproj", "{A7C0F968-DACA-4BFE-B36F-46FDAEB8EF1D}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bmi_misc", "bmi_misc\bmi_misc-vs2019.vcxproj", "{A7C0F968-DACA-4BFE-B36F-46FDAEB8EF1D}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gossip", "gossip\gossip-vs2019.vcxproj", "{9C95DF0D-5B60-4E94-94ED-000861C651B4}"
 EndProject
@@ -36,7 +36,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sysint-client", "sysint-cli
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "proto", "proto\proto-vs2019.vcxproj", "{2F406AB6-D010-4196-A523-FAE6F2B1585F}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "client-service-vs2012", "client-service\client-service-vs2019.vcxproj", "{61019A9A-D6E0-4E04-B163-EADB88766C9E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "client-service", "client-service\client-service-vs2019.vcxproj", "{61019A9A-D6E0-4E04-B163-EADB88766C9E}"
 	ProjectSection(ProjectDependencies) = postProject
 		{7506190B-64BE-4D64-95A4-4C22D48E0994} = {7506190B-64BE-4D64-95A4-4C22D48E0994}
 		{9C95DF0D-5B60-4E94-94ED-000861C651B4} = {9C95DF0D-5B60-4E94-94ED-000861C651B4}
@@ -94,6 +94,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pvfs2-win-cp", "pvfs2-win-c
 		{9B1C78DC-D1F2-4857-85D0-A649D9515B40} = {9B1C78DC-D1F2-4857-85D0-A649D9515B40}
 		{9138ABF9-041F-4A55-9E87-0F433719F4FC} = {9138ABF9-041F-4A55-9E87-0F433719F4FC}
 	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "get-file-info", "get-file-info\get-file-info.vcxproj", "{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -432,6 +434,24 @@ Global
 		{61168039-2093-4F5A-9B62-12E478BAA1B8}.Release|Win32.Build.0 = Release|Win32
 		{61168039-2093-4F5A-9B62-12E478BAA1B8}.Release|x64.ActiveCfg = Release|x64
 		{61168039-2093-4F5A-9B62-12E478BAA1B8}.Release|x64.Build.0 = Release|x64
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.Debug|Mixed Platforms.Build.0 = Debug|Win32
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.Debug|Win32.ActiveCfg = Debug|Win32
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.Debug|Win32.Build.0 = Debug|Win32
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.Debug|x64.ActiveCfg = Debug|x64
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.Debug|x64.Build.0 = Debug|x64
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.MemLeaks|Mixed Platforms.ActiveCfg = Debug|Win32
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.MemLeaks|Mixed Platforms.Build.0 = Debug|Win32
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.MemLeaks|Win32.ActiveCfg = Debug|Win32
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.MemLeaks|Win32.Build.0 = Debug|Win32
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.MemLeaks|x64.ActiveCfg = Debug|x64
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.MemLeaks|x64.Build.0 = Debug|x64
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.Release|Mixed Platforms.ActiveCfg = Release|Win32
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.Release|Mixed Platforms.Build.0 = Release|Win32
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.Release|Win32.ActiveCfg = Release|Win32
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.Release|Win32.Build.0 = Release|Win32
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.Release|x64.ActiveCfg = Release|x64
+		{7E4D9523-BEB0-4E4A-A0B2-F211E139DEE8}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
