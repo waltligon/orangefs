@@ -101,6 +101,7 @@ static int error_map(int fs_err)
     switch (fs_err)
     {
     case 0:
+    case STATUS_OBJECT_NAME_COLLISION:
         return ERROR_SUCCESS;         /* 0 */
     case -PVFS_EPERM:          /* Operation not permitted */
     case -PVFS_EACCES:         /* Access not allowed */
@@ -803,7 +804,7 @@ PVFS_Dokan_create_file(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     char *fs_path;
-    int ret, found, err, attr_flag = 0,
+    int ret, found, err, collision = 0, attr_flag = 0,
         new_flag = 0;
     PVFS_handle handle;
     PVFS_sys_attr attr;
@@ -952,6 +953,10 @@ PVFS_Dokan_create_file(
         }
         ret = fs_create(fs_path, &credential, &handle, 
             goptions->new_file_perms);
+        if (found && ret == 0) {
+            collision = 1;
+            ret = STATUS_OBJECT_NAME_COLLISION;
+        }
         break;
     case CREATE_NEW:
         if (found) 
@@ -972,6 +977,10 @@ PVFS_Dokan_create_file(
             /* create file */
             ret = fs_create(fs_path, &credential, &handle,
                 goptions->new_file_perms);
+        }
+        else {
+            collision = 1;
+            ret = STATUS_OBJECT_NAME_COLLISION;
         }
         break;
     case OPEN_EXISTING:
@@ -1025,7 +1034,8 @@ PVFS_Dokan_create_file(
     client_debug("CreateFile exit: %d (%d)\n", -err, ret);
         
     /* TODO: have return values be positive */
-    return -err;
+    /* return name collision result if applicable */
+    return collision ? ret : -err;
 }
 
 
@@ -1529,6 +1539,7 @@ PVFS_Dokan_get_file_information(
     int ret, err;
     PVFS_sys_attr attr;
     PVFS_credential credential;
+    PVFS_handle handle;
     char info[32];
 
     client_debug("GetFileInfo: %S\n", FileName);
@@ -1553,61 +1564,70 @@ PVFS_Dokan_get_file_information(
         return -1;
     }
 
-    /* get file attributes */
-    ret = fs_getattr(fs_path, &credential, &attr);
+    /* lookup for handle */
+    ret = fs_lookup(fs_path, &credential, &handle);
+    if (ret == 0) {
 
-    if (ret == 0)
-    {       
-        filename = (char *) malloc(strlen(fs_path) + 1);
-        MALLOC_CHECK(filename);
-        PINT_remove_base_dir(fs_path, filename, (int) strlen(fs_path) + 1);
-        
-        ret = PVFS_sys_attr_to_file_info(filename, &credential, &attr, 
-            HandleFileInformation);
+        /* get file attributes */
+        ret = fs_getattr(fs_path, &credential, &attr);
 
-        /* set serial number */
-        HandleFileInformation->dwVolumeSerialNumber = fs_get_id(0);
-        
-        free(filename);
-
-        if (ret == 0) 
+        if (ret == 0)
         {
-            strcpy(info, "   ");
-            /* temporary file */
-            if (DokanFileInfo->DeleteOnClose)
+            filename = (char*)malloc(strlen(fs_path) + 1);
+            MALLOC_CHECK(filename);
+            PINT_remove_base_dir(fs_path, filename, (int)strlen(fs_path) + 1);
+
+            ret = PVFS_sys_attr_to_file_info(filename, &credential, &attr,
+                HandleFileInformation);
+
+            /* set serial number */
+            HandleFileInformation->dwVolumeSerialNumber = fs_get_id(0);
+
+            /* set index */
+            HandleFileInformation->nFileIndexHigh = (DWORD)(handle >> 32);
+            HandleFileInformation->nFileIndexLow = (DWORD)(handle & 0xFFFFFFFF);
+
+            free(filename);
+
+            if (ret == 0)
             {
-                HandleFileInformation->dwFileAttributes |= FILE_ATTRIBUTE_TEMPORARY;
-                strcat(info, "TEMP ");
+                strcpy(info, "   ");
+                /* temporary file */
+                if (DokanFileInfo->DeleteOnClose)
+                {
+                    HandleFileInformation->dwFileAttributes |= FILE_ATTRIBUTE_TEMPORARY;
+                    strcat(info, "TEMP ");
+                }
+
+                /* debugging */
+                if (HandleFileInformation->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                {
+                    strcat(info, "DIR ");
+                }
+
+                if (HandleFileInformation->dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)
+                {
+                    strcat(info, "HIDDEN ");
+                }
+
+                if (HandleFileInformation->dwFileAttributes & FILE_ATTRIBUTE_READONLY)
+                {
+                    strcat(info, "READONLY ");
+                }
+
+                /* normal file */
+                if (HandleFileInformation->dwFileAttributes & FILE_ATTRIBUTE_NORMAL)
+                {
+                    strcat(info, "NORMAL");
+                }
+
+                client_debug("%s\n", info);
             }
 
-            /* debugging */
-            if (HandleFileInformation->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-            {
-                strcat(info, "DIR ");
-            }
-        
-            if (HandleFileInformation->dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)
-            {
-                strcat(info, "HIDDEN ");
-            }
-            
-            if (HandleFileInformation->dwFileAttributes & FILE_ATTRIBUTE_READONLY)
-            {
-                strcat(info, "READONLY ");
-            }
-         
-            /* normal file */
-            if (HandleFileInformation->dwFileAttributes & FILE_ATTRIBUTE_NORMAL)
-            {            
-                strcat(info, "NORMAL");
-            }
-        
-            client_debug("%s\n", info);
+            FREE_ATTR_BUFS(attr);
         }
+    }
 
-        FREE_ATTR_BUFS(attr);
-    }    
-    
     err = error_map(ret);
 
     free(fs_path);
