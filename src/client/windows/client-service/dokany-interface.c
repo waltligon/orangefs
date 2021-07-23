@@ -1003,7 +1003,6 @@ PVFS_Dokan_create_file(
 
     client_debug("   fs_create/fs_truncate returns: %d\n", ret);
 
-    
     err = error_map(ret);
     if (err == ERROR_SUCCESS)
     {
@@ -1541,6 +1540,8 @@ PVFS_Dokan_get_file_information(
     PVFS_credential credential;
     PVFS_handle handle;
     char info[32];
+    ULONG64 index;
+    
 
     client_debug("GetFileInfo: %S\n", FileName);
     client_debug("   Context: %llx\n", DokanFileInfo->Context);
@@ -1622,6 +1623,13 @@ PVFS_Dokan_get_file_information(
                 }
 
                 client_debug("%s\n", info);
+
+                /* debug volume serial no. and index */
+                client_debug("Volume Serial Number: %x\n", HandleFileInformation->dwVolumeSerialNumber);
+                index = HandleFileInformation->nFileIndexHigh;
+                index <<= 32;
+                index |= HandleFileInformation->nFileIndexLow;
+                client_debug("File Index: %llx\n", index);
             }
 
             FREE_ATTR_BUFS(attr);
