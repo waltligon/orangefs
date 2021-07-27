@@ -319,6 +319,16 @@ static void convert_filetime(CONST LPFILETIME pft, PVFS_time *t)
     *t = ll / 10000000LL;
 }
 
+static DWORD get_volume_serial_num(PVFS_fs_id fs_id) {
+    DWORD serial_num = (DWORD) fs_id;
+
+    if (serial_num < 0x10000000) {
+        serial_num += 0x10000000;
+    }
+
+    return serial_num;
+}
+
 /* Return resolved file system path.
    Caller must free returned string. */
 static char *get_fs_path(const wchar_t *local_path)
@@ -1582,7 +1592,7 @@ PVFS_Dokan_get_file_information(
                 HandleFileInformation);
 
             /* set serial number */
-            HandleFileInformation->dwVolumeSerialNumber = fs_get_id(0);
+            HandleFileInformation->dwVolumeSerialNumber = get_volume_serial_num(fs_get_id(0));
 
             /* set index */
             HandleFileInformation->nFileIndexHigh = (DWORD)(handle >> 32);
@@ -2543,8 +2553,8 @@ PVFS_Dokan_get_volume_information(
     free(wvol_name);
 
     /* serial number, comp. length and flags */
-    *VolumeSerialNumber = fs_get_id(0);
-    client_debug("  FS ID: %u\n", *VolumeSerialNumber);
+    *VolumeSerialNumber = get_volume_serial_num(fs_get_id(0));
+    client_debug("  VolumeSerialNumber: %x\n", *VolumeSerialNumber);
     *MaximumComponentLength = PVFS_NAME_MAX;
     *FileSystemFlags = FILE_CASE_SENSITIVE_SEARCH | 
                        FILE_CASE_PRESERVED_NAMES;
