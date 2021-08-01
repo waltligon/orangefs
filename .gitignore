@@ -57,3 +57,5 @@ config.status
 *.swp
 /windows/dokany/include
 *.bak
+*.pl
+/windows/projects/OrangeFS/ops.txt
