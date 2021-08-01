@@ -971,8 +971,12 @@ PVFS_Dokan_create_file(
     case CREATE_NEW:
         if (found) 
         {
-            /* set error */
-            ret = -PVFS_EEXIST;
+            /* special case - Windows issues "CREATE_NEW" for root folder -
+               do not return an error in this case. */
+            if (strcmp(fs_path, "/")) {
+                /* set error */
+                ret = -PVFS_EEXIST;
+            }
         }
         else
         {
