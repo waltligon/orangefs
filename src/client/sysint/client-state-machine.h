@@ -196,18 +196,18 @@ struct PINT_client_remove_sm
 struct PINT_client_create_sm
 {
     char *object_name;                /* input parameter */
-    PVFS_object_attr attr;            /* input parameter */
-    PVFS_sys_attr sys_attr;
+    PVFS_sys_attr sys_attr;           /* input parameter */
+    PVFS_object_attr file_attr;       /* attributes sent with request */
     PVFS_sysresp_create *create_resp; /* in/out parameter */
 
     int retry_count;
-    int user_requested_num_data_files;
+    /* int user_requested_num_data_files; V3 removed */
     int stored_error_code;
 
-    PINT_dist *dist;
-    PVFS_sys_layout layout;
+    /* PINT_dist *dist; V3 removed */
+    PVFS_sys_layout layout;           /* struct includes algorithm and server lists */
 
-    PVFS_handle *metadata_handle;
+    PVFS_handle *metadata_handle;     /* these don't go into file_attr */
     int32_t metadata_sid_count;
     PVFS_SID *metadata_sid_array;
 
@@ -217,7 +217,7 @@ struct PINT_client_create_sm
     PVFS_SID *datafile_sid_array;
 
     int stuffed;
-    PVFS_object_attr store_attr;      /* holds a copy of attr for retries */
+    PVFS_object_attr store_attr;      /* holds a copy of file_attr for retries */
 
     int dirent_file_count;
     PVFS_handle *dirent_handle;

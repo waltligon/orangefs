@@ -1063,9 +1063,9 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             /* all of the OIDs and SIDs arrays are malloced with 1
              * call - sid_array points to the buffer
              */
-            if (req->u.create.sid_array)
+            if (req->u.create.attr.u.meta.sid_array)
             {
-                decode_free(req->u.create.sid_array);
+                decode_free(req->u.create.attr.u.meta.sid_array);
             }
             break;
 

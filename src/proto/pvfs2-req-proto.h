@@ -300,13 +300,24 @@ do { \
  * a datafile handle, and links the datafile handle to the metadata handle.
  * It also sets the attributes on the metadata. */
 
-/* V3 I don't think we will need either of these any more - WBL */
+struct PVFS_servreq_create
+{
+    PVFS_credential  credential;
+    PVFS_object_attr attr;
+    PVFS_object_ref  parent;
+    PVFS_object_ref  object;      /* the file being created */
+};
+
+/* redefine this macro */
+#define PVFS_debug_servreq_create(mask, req) \
+do { \
+    if (gossip_isset(gossip_debug_mask, (mask))) \
+    { \
+    } \
+} while (0)
+
+/* restructured */
 #if 0
-    int32_t num_dfiles_req;
-    /* NOTE: leave layout as final field so that we can deal with encoding
-     * errors */
-    PVFS_sys_layout layout;
-#endif
 struct PVFS_servreq_create
 {
     PVFS_fs_id fs_id;
@@ -339,6 +350,15 @@ do { \
         PVFS_debug_reqfield((mask), (req)->datafile_sid_array, PVFS_SID); \
     } \
 } while (0)
+#endif
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+endecode_fields_4_struct(
+    PVFS_servreq_create,
+    PVFS_credential, credential,
+    PVFS_object_attr, attr,
+    PVFS_object_ref, parent,
+    PVFS_object_ref, object);
 
 #if 0
 endecode_fields_7a1a_struct(
@@ -370,7 +390,7 @@ endecode_fields_7a1a_struct(
 
 #endif
 
-#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#if 0
 static inline void encode_PVFS_servreq_create(char **pptr,
                                               struct PVFS_servreq_create *x)
 {                            
@@ -463,12 +483,38 @@ static inline void defree_PVFS_servreq_create(struct PVFS_servreq_create *x)
 }
 #endif
 
+#endif
+
 #define extra_size_PVFS_servreq_create \
      (extra_size_PVFS_object_attr + \
       extra_size_PVFS_credential + \
       (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
       (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID))) 
 
+#define PINT_SERVREQ_CREATE_FILL(__req,                                    \
+                                 __cap,                                    \
+                                 __cred,                                   \
+                                 __attr,                                   \
+                                 __parent_ref,                             \
+                                 __metadata_ref,                           \
+                                 __hints)                                  \
+do {                                                                       \
+    memset(&(__req), 0, sizeof(__req));                                    \
+    (__req).op = PVFS_SERV_CREATE;                                         \
+    (__req).ctrl.mode = PVFS_REQ_REPLICATE;                                \
+    (__req).ctrl.type = PVFS_REQ_PRIMARY;                                  \
+    (__req).ctrl.sub  = PVFS_REQ_OTHER;                                    \
+    (__req).hints = (__hints);                                             \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                            \
+    (__req).u.create.credential = (__cred);                                \
+    PVFS_object_ref_copy(&(__req).u.create.parent, (__parent_ref));        \
+    PVFS_object_ref_copy(&(__req).u.create.object, (__metadata_ref));      \
+    PINT_copy_object_attr(&(__req).u.create.attr, (__attr));               \
+} while (0)
+
+
+/* old version to remove when new version verified */
+#if 0
 #define PINT_SERVREQ_CREATE_FILL(__req,                                    \
                                  __cap,                                    \
                                  __cred,                                   \
@@ -511,6 +557,7 @@ do {                                                                       \
     PINT_copy_object_attr(&(__req).u.create.attr, &(__attr));              \
     (__req).u.create.attr.mask |= mask;                                    \
 } while (0)
+#endif
 
 struct PVFS_servresp_create
 {

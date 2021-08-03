@@ -989,7 +989,6 @@ int PINT_split_keyvals(char *string, int *nkey, char ***pkey, char ***pval)
     *pkey = key;
     *pval = val;
     return 0;
-    }
 }
 
 

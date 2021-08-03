@@ -82,12 +82,3 @@ void decode_func_handle(char **pptr, void *x)
  *
  * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */
-/*
- * Local variables:
- *  mode: c
- *  c-indent-level: 4
- *  c-basic-offset: 4
- * End:
- *
- * vim: ft=c ts=8 sts=4 sw=4 expandtab
- */

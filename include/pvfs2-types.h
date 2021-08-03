@@ -365,9 +365,10 @@ void defree_PVFS_sys_layout(struct PVFS_sys_layout_s *x);
 
 /* valid permission mask */
 #define PVFS_PERM_VALID \
-(PVFS_O_EXECUTE | PVFS_O_WRITE | PVFS_O_READ | PVFS_G_EXECUTE | \
- PVFS_G_WRITE | PVFS_G_READ | PVFS_U_EXECUTE | PVFS_U_WRITE | \
- PVFS_U_READ | PVFS_G_SGID | PVFS_U_SUID)
+(PVFS_O_EXECUTE | PVFS_O_WRITE | PVFS_O_READ |  \
+ PVFS_G_EXECUTE | PVFS_G_WRITE | PVFS_G_READ | \
+ PVFS_U_EXECUTE | PVFS_U_WRITE | PVFS_U_READ | \
+ PVFS_G_SGID | PVFS_U_SUID)
 
 #define PVFS_USER_ALL  (PVFS_U_EXECUTE|PVFS_U_WRITE|PVFS_U_READ)
 #define PVFS_GROUP_ALL (PVFS_G_EXECUTE|PVFS_G_WRITE|PVFS_G_READ)
@@ -700,6 +701,7 @@ typedef struct PVFS_statfs_s
     uint64_t handles_available_count;
     uint64_t handles_total_count;
 } PVFS_statfs;
+
 endecode_fields_12(
     PVFS_statfs,
     skip4,,
@@ -726,6 +728,13 @@ typedef struct PVFS_object_ref_s
     int32_t     sid_count;
     PVFS_SID    *sid_array;
 } PVFS_object_ref;
+
+endecode_fields_2a(
+    PVFS_object_ref,
+    PVFS_handle, handle,
+    PVFS_fs_id,  fs_id,
+    int32_t,     sid_count,
+    PVFS_SID,    sid_array);
 
 /* a sid_count of -1 indicates the default which should be obtained
  * from the configuration - for the moment stuck at 3

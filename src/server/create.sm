@@ -138,8 +138,8 @@ static int create_metafile(struct PINT_smcb *smcb, job_status_s *js_p)
         return SM_ACTION_COMPLETE;
     }
 
-    ret = job_trove_dspace_create(s_op->req->u.create.fs_id,
-                                  s_op->req->u.create.handle,
+    ret = job_trove_dspace_create(s_op->req->u.create.object.fs_id,
+                                  s_op->req->u.create.object.handle,
                                   PVFS_TYPE_METAFILE,
                                   NULL, /* hint */
                                   0,    /* flags */
@@ -379,26 +379,26 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
 
     /* writing list of handles/sids for datafile handles and sids*/
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
-    s_op->key_a[0].buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
+    s_op->key_a[0].buffer =    Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
 
-    s_op->val_a[0].buffer_sz = OSASZ(s_op->req->u.create.datafile_count,
-                                     s_op->req->u.create.sid_count);
-    s_op->val_a[0].buffer = s_op->req->u.create.datafile_handles;
+    s_op->val_a[0].buffer_sz = OSASZ(s_op->req->u.create.attr.u.meta.dfile_count,
+                                     s_op->req->u.create.attr.u.meta.sid_count);
+    s_op->val_a[0].buffer =    s_op->req->u.create.attr.u.meta.dfile_array;
 
     /* writing distribution for the metafile */
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
-    s_op->key_a[1].buffer = Trove_Common_Keys[METAFILE_DIST_KEY].key;
+    s_op->key_a[1].buffer =    Trove_Common_Keys[METAFILE_DIST_KEY].key;
 
     s_op->val_a[1].buffer_sz = s_op->req->u.create.attr.u.meta.dist_size;
-    s_op->val_a[1].buffer = malloc(s_op->val_a[1].buffer_sz);
+    s_op->val_a[1].buffer =    malloc(s_op->val_a[1].buffer_sz);
 
     /* writing object parent handle and sids */
     s_op->key_a[2].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
-    s_op->key_a[2].buffer = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
+    s_op->key_a[2].buffer =    Trove_Common_Keys[OBJECT_PARENT_KEY].key;
 
     /* datafile handle and sids should be contiguous */
-    s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.create.sid_count);
-    s_op->val_a[2].buffer = s_op->req->u.create.parent;
+    s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.create.parent.sid_count);
+    s_op->val_a[2].buffer =    &s_op->req->u.create.parent.handle;
 
     if(!s_op->val_a[1].buffer)
     {
@@ -410,8 +410,8 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
     PINT_dist_encode(s_op->val_a[1].buffer,
                      s_op->req->u.create.attr.u.meta.dist);
 
-    ret = job_trove_keyval_write_list(s_op->req->u.create.fs_id,
-                                      s_op->req->u.create.handle, /*metafile*/
+    ret = job_trove_keyval_write_list(s_op->req->u.create.object.fs_id,
+                                      s_op->req->u.create.object.handle, /*metafile*/
                                       s_op->key_a,
                                       s_op->val_a,
                                       keyval_count,
@@ -462,12 +462,10 @@ static PINT_sm_action write_metafile_attribs(struct PINT_smcb *smcb,
      * for whatever reason we aren't getting the time passed from the
      * user (client) there is no reason we can't set it here.
      */
-    dspace_a_p->u.meta.dfile_count = s_op->req->u.create.datafile_count;
-    dspace_a_p->u.meta.sid_count = s_op->req->u.create.sid_count;
-    dspace_a_p->atime =
-            dspace_a_p->ctime =
+    dspace_a_p->u.meta.dfile_count = s_op->req->u.create.attr.u.meta.dfile_count;
+    dspace_a_p->u.meta.sid_count = s_op->req->u.create.attr.u.meta.sid_count;
+    dspace_a_p->atime = dspace_a_p->ctime = dspace_a_p->mtime = 
                       dspace_a_p->ntime = PINT_util_get_current_time();
-    dspace_a_p->mtime = dspace_a_p->ntime;
 
 #ifdef ENABLE_SECURITY_CERT
     /*                                                              
@@ -514,8 +512,8 @@ static PINT_sm_action write_metafile_attribs(struct PINT_smcb *smcb,
     ds_attr = &(s_op->ds_attr);
     PVFS_ds_attr_from_object_attr(ds_attr, dspace_a_p);
 
-    ret = job_trove_dspace_setattr(s_op->req->u.create.fs_id,
-                                   s_op->req->u.create.handle, /* metafile */
+    ret = job_trove_dspace_setattr(s_op->req->u.create.object.fs_id,
+                                   s_op->req->u.create.object.handle, /* metafile */
                                    ds_attr,
                                    TROVE_SYNC, /* flags */
                                    smcb,       /* user_ptr */
@@ -538,7 +536,7 @@ static PINT_sm_action setup_resp(struct PINT_smcb *smcb,
         PINT_ACCESS_DEBUG(s_op,
                           GOSSIP_ACCESS_DEBUG,
                           "create: new metadata handle: %s.\n",
-                          PVFS_OID_str(&s_op->req->u.create.handle));
+                          PVFS_OID_str(&s_op->req->u.create.object.handle));
     }
 
     /* Copy attributes from the s_op's attribes (the ones written to Trove)
@@ -646,8 +644,8 @@ static PINT_sm_action remove_metafile_object(struct PINT_smcb *smcb,
         s_op->u.create.saved_error_code = js_p->error_code;
     }
 
-    ret = job_trove_dspace_remove(s_op->req->u.create.fs_id,
-                                  s_op->req->u.create.handle, /* metafile */
+    ret = job_trove_dspace_remove(s_op->req->u.create.object.fs_id,
+                                  s_op->req->u.create.object.handle, /* metafile */
                                   0,
                                   smcb,
                                   0,
@@ -681,7 +679,7 @@ static PINT_sm_action remove_local_datafile_handles(struct PINT_smcb *smcb,
         return(SM_ACTION_COMPLETE);
     }
 
-    ret = job_trove_dspace_remove_list(s_op->req->u.create.fs_id,
+    ret = job_trove_dspace_remove_list(s_op->req->u.create.object.fs_id,
                                        s_op->u.create.handle_array_local,
                                        NULL,
                                        s_op->u.create.handle_array_local_count,
@@ -712,8 +710,8 @@ static PINT_sm_action remove_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
     }
 
     /* the keyval keys and vals should still be valid here */
-    ret = job_trove_keyval_remove_list(s_op->req->u.create.fs_id,
-                                       s_op->req->u.create.handle, /*metafile*/
+    ret = job_trove_keyval_remove_list(s_op->req->u.create.object.fs_id,
+                                       s_op->req->u.create.object.handle, /*metafile*/
                                        s_op->key_a,
                                        s_op->val_a,
                                        s_op->error_a,
@@ -797,7 +795,7 @@ static int PINT_get_object_ref_create(struct PVFS_server_req *req,
                                       PVFS_fs_id *fs_id,
                                       PVFS_handle *handle)
 {
-    *fs_id = req->u.create.fs_id;
+    *fs_id = req->u.create.object.fs_id;
     *handle = PVFS_HANDLE_NULL;
     return 0;
 };
@@ -819,11 +817,11 @@ static void create_get_ctrl(struct PVFS_server_req *req,
     /* this sets up a standard replication */
     /* generates a request to each of sid_count SIDs */
     /* all with the same UID */
-    ctrl->fs_id = req->u.create.fs_id;
-    ctrl->handles = &req->u.create.handle;
+    ctrl->fs_id = req->u.create.object.fs_id;
+    ctrl->handles = &req->u.create.object.handle;
     ctrl->count = 1;
-    ctrl->sids = req->u.create.sid_array;
-    ctrl->sid_count = req->u.create.sid_count;
+    ctrl->sids = req->u.create.object.sid_array;
+    ctrl->sid_count = req->u.create.object.sid_count;
 }
 
 struct PINT_server_req_params pvfs2_create_params =

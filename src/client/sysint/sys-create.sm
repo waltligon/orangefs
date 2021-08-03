@@ -51,7 +51,7 @@ static int create_delete_handles_comp_fn(void *v_p,
 
 /* misc helper functions */
 static PINT_dist* get_default_distribution(PVFS_fs_id fs_id);
-static int convert_dist (char *dist_name, char *dist_params, PVFS_dist **file_dist);
+static int convert_dist (char *dist_name, char *dist_params, PINT_dist **file_dist);
 
 %%
 
@@ -174,6 +174,7 @@ PVFS_error PVFS_isys_create(char *object_name,
     struct filesystem_configuration_s *fs_config = NULL;
     PVFS_object_attr *file_attr = NULL;
     PVFS_size default_strip_size = PVFS_DIST_SIMPLE_STRIPE_DEFAULT_STRIP_SIZE;
+    struct PVFS_sys_mntent mntent;
 
     gossip_debug(GOSSIP_CREATE_DEBUG, "PVFS_isys_create entered\n");
 
@@ -248,7 +249,7 @@ PVFS_error PVFS_isys_create(char *object_name,
     PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.create.create_resp = resp;
     sm_p->u.create.object_name = object_name;
-    file_attr = &sm_p->u.create.attr;
+    file_attr = &sm_p->u.create.file_attr;
 
     /* Rather than convert and toss the sys_attrs, save them so we can apply them
      * last in the parent_getattr_inspect function
@@ -269,11 +270,14 @@ PVFS_error PVFS_isys_create(char *object_name,
     sm_p->parent_ref = parent_ref;
 
     /* We will start building attributes for the new file object
-     * In this function we will add attributes to sm_p->u.create.attr
-     * first from the built-in defaults, second from config file defaults,
+     * In this function we will add attributes to sm_p->u.create.file_attr
+     * - first from the built-in defaults, 
+     * - second from config file defaults,
+     * - third from mount options,
      * In the validate function - after we have read the parent attributes
-     * we continue with third from the parent directory attributes and hints,
-     * and finally from the sys_attrs passed in to the sys_mkdir call.
+     * we continue with:
+     * - fourth from the parent directory attributes and hints, and finally 
+     * - fifth from the sys_attrs passed in to the sys_mkdir call.
      */
 
     /*********************/
@@ -295,10 +299,11 @@ PVFS_error PVFS_isys_create(char *object_name,
     file_attr->parent_sids = NULL;
     /* attributes pertaining to files */
     /* 
-     * NEED to figure out distributions and parameters here
-     * ALSO layout - do we need to have layout any more?
+     * layout is not an attribute, its is used in this SM to pick servers
+     * and is not saved to any attribute structures.
      */
-    /* if no other distribution is specified, we will use simple stripe */
+    /* Set default distribution and parameters here
+     * if no other distribution is specified, we will use simple stripe */
     file_attr->u.meta.dist = PINT_dist_create(PVFS_DIST_SIMPLE_STRIPE_NAME);
     /* set strip_size paramater for simple_stripe */
     PINT_dist_setparams(file_attr->u.meta.dist, (void *)&default_strip_size);
@@ -315,7 +320,7 @@ PVFS_error PVFS_isys_create(char *object_name,
     file_attr->mask |= PVFS_ATTR_META_MIRROR_MODE;
     file_attr->u.meta.size = 0;
     file_attr->u.meta.flags = 0;
-                                                                    
+
     /*********************************/
     /* Defaults from the config file */
     /*********************************/
@@ -358,6 +363,27 @@ PVFS_error PVFS_isys_create(char *object_name,
         /* dist_size is only used by decode to report the size of the dist */
     }
 
+    /***********************************/
+    /* Defaults from the mount options */
+    /***********************************/
+
+    /* Check the mount options */
+    ret = PVFS_util_get_mntent_copy(sm_p->parent_ref.fs_id, &mntent);
+    if (0 == ret)
+    {
+        if (0 < mntent.default_num_dfiles)
+        {
+            file_attr->u.meta.dfile_count =    /* will zero out for transmit */
+                            mntent.default_num_dfiles;
+            file_attr->mask |= PVFS_ATTR_META_DFILE_COUNT;
+
+            PVFS_util_free_mntent(&mntent);
+        }
+    }
+
+    /* all sys_attr saved in sm_p - so this not needed
+     */
+#if 0
     /********************************************/
     /* Defaults deferred to SM inspection state */
     /********************************************/
@@ -371,6 +397,7 @@ PVFS_error PVFS_isys_create(char *object_name,
         /* don't assume field is clean */
         sm_p->u.create.user_requested_num_data_files = 0;
     }
+#endif
 
 /******* OLD CODE HERE *******/
 #if 0
@@ -393,8 +420,9 @@ PVFS_error PVFS_isys_create(char *object_name,
     }
 #endif
 
-    /* if user supplies layout, copy layout to sm struct 
-     * layout will be used in SM
+    /*
+     * layout will be used in this SM later to pick
+     * servers. If user supplies layout, copy layout to sm struct 
      */
     if(layout)
     {
@@ -489,7 +517,7 @@ PVFS_error PVFS_isys_create(char *object_name,
      * retries we need to rebuild the attributes on each retry.
      */
     PINT_copy_object_attr(&(sm_p->u.create.store_attr),
-                          &(sm_p->u.create.attr));
+                          &(sm_p->u.create.file_attr));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "creating file %s under %s, %d\n",
                  object_name, PVFS_OID_str(&parent_ref.handle),
@@ -692,7 +720,7 @@ static PINT_sm_action create_init(struct PINT_smcb *smcb, job_status_s *js_p)
          */
         if (sm_p->u.create.retry_count > 0)
         {
-            PINT_copy_object_attr(&(sm_p->u.create.attr), 
+            PINT_copy_object_attr(&(sm_p->u.create.file_attr), 
                                   &(sm_p->u.create.store_attr));
         }
         js_p->error_code = 0;
@@ -723,11 +751,8 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
     PVFS_object_attr *pattr = NULL;
     PVFS_object_attr *file_attr = NULL;
     PVFS_sys_attr *sys_attr = NULL;
-    PINT_dist *current_dist; 
-    int set_new_dist = 0;
     int ret = 0;
-    int num_dfiles_requested = 0;
-    int tmp_i;
+    int tmp_i = 0;
 
     /* dumps from debugging gossip */
 #if 0
@@ -741,7 +766,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_CREATE_DEBUG, "Create state: parent_getattr_inspect.\n");
 
 
-    file_attr = &sm_p->u.create.attr; /* attributes of the new file sent with req */
+    file_attr = &sm_p->u.create.file_attr; /* attributes of the new file sent with req */
 
     pattr = &sm_p->getattr.attr;      /* attributes of parent directory from getattr */
     assert(pattr);  /* does this really detect an error? */
@@ -753,7 +778,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
                  "parent owner: %d, group: %d, perms: %d\n",
                  (int)pattr->owner, (int)pattr->group, (int)pattr->perms);
 
-    PINT_debug_capability(&pattr->>capability, "create_parent_getattr_inspect");
+    PINT_debug_capability(&pattr->capability, "create_parent_getattr_inspect");
 
     /*
      * We resume processing defaults and their impact on attributes and other
@@ -766,9 +791,10 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
      * 1) values passed into sys_mkdir
      * 2) directory hints
      * 3) inherit parent attributes
-     * 4) mount options (not yet implemented)  -- N/A
+     * 4) mount options (not yet implemented)  -- TBD in isys_create
      * 5) config file defaults                 -- DONE in isys_create
      * 6) system default (compiled in limits)  -- DONE in isys_create
+     */
 
     /***************************************/
     /* Defaults from the Parent Attributes */
@@ -780,18 +806,18 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_CREATE_DEBUG, "parent has setgid bit set.\n");
         gossip_debug(GOSSIP_CREATE_DEBUG, " - modifying requested attr "
                                           "for new file.\n");
-        sm_p->u.create.attr.group = pattr->group;
+        file_attr->group = pattr->group;
         /* note that permission checking is left to server even in this case */
     }
 
 #ifdef ENABLE_SECURITY_CERT
     /* we need to know the correct owner group in cert. mode */
     gossip_debug(GOSSIP_CLIENT_DEBUG, "adding gid hint: %d\n", 
-                             sm_p->u.create.attr.group);
+                             file_attr->group);
     PVFS_hint_add(&sm_p->hints, 
                   PVFS_HINT_OWNER_GID_NAME, 
                   sizeof(uint32_t),
-                  &sm_p->u.create.attr.group);
+                  &file_attr->group);
 #endif
 
     /* from parent */
@@ -802,8 +828,8 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_CREATE_DEBUG, "Add attr %ld\n", PVFS_ATTR_COMMON_SID_COUNT);  
     }
 
-    file_attr->parent          /* set to parent OID */
-    file_attr->parent_sids     /* set to parent SIDs */
+    file_attr->parent =      &sm_p->parent_ref.handle;
+    file_attr->parent_sids = sm_p->parent_ref.sid_array;
 
     /*
      * Both parent and user attr will specify a name and a parameter string.  No point
@@ -814,9 +840,9 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
     if (sys_attr->dist_name && sys_attr->dist_params)
     {
         /* set distribution from user sys_attr */
-        ret = convert_dist(sys_attr->name,
+        ret = convert_dist(sys_attr->dist_name,
                            sys_attr->dist_params,
-                           &file_attr->u.meta.dist)
+                           &file_attr->u.meta.dist);
     }
     else
     {
@@ -825,7 +851,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
             /* set distribution from parent */
             ret = convert_dist(pattr->u.dir.hint.dist_name,
                                pattr->u.dir.hint.dist_params,
-                               &file_attr->u.meta.dist)
+                               &file_attr->u.meta.dist);
         }
         else
         {
@@ -845,7 +871,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    /* parent defaults for dfile_count and dfile_si_count */
+    /* parent defaults for dfile_count and dfile_sid_count */
     if (pattr->u.dir.hint.dfile_count > 0 && 
         (pattr->mask & PVFS_ATTR_DIR_HINT_DFILE_COUNT))
     {  
@@ -854,7 +880,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_CREATE_DEBUG, "Add attr %ld\n", PVFS_ATTR_META_DFILE_COUNT);  
     }
     if (pattr->u.dir.hint.dfile_sid_count > 0 && 
-        (pattr->mask & PVFS_ATTR_DIR_HINT_DFILE_SID_COUNT))
+        (pattr->mask & PVFS_ATTR_DIR_HINT_SID_COUNT))
     {  
         file_attr->u.meta.sid_count = pattr->u.dir.hint.dfile_sid_count; 
         file_attr->mask |= PVFS_ATTR_META_DFILE_COUNT; 
@@ -895,7 +921,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         }
     }
 
-/* old code for converting distribution strings */
+/* old code for converting distribution strings - moved to a function */
 #if 0
     current_dist = sm_p->u.create.dist;
     /* If we have an overriding distribution for this directory honor that */
@@ -1013,9 +1039,9 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
     }
 #endif
 
-    /***************************************/
-    /* Defaults from the Parent Attributes */
-    /***************************************/
+    /********************************************/
+    /* Settings from the USER System Attributes */
+    /********************************************/
 
     /* at this point user overrides include, (owner?), group, perms, dfile_count,
      * distribution (already taken care of), replication.
@@ -1035,40 +1061,39 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         file_attr->mask |= PVFS_ATTR_COMMON_GID; 
     }
 
-    if (sys_attr->perms & PVFS_PERM_VALID > 0 && 
+    if ((sys_attr->perms & PVFS_PERM_VALID) > 0 && 
         (sys_attr->mask & PVFS_ATTR_SYS_PERM))
     {
         file_attr->perms = sys_attr->perms & PVFS_PERM_VALID;
-        file_attr->mask |= PVFS_ATTR_COMMON_PERMS; 
+        file_attr->mask |= PVFS_ATTR_COMMON_PERM; 
     }
 
     if (sys_attr->dfile_count > 0 && 
         (sys_attr->mask & PVFS_ATTR_SYS_DFILE_COUNT))
     {
-        file_attr->meta.dfile_count = sys_attr->dfile_count;
+        file_attr->u.meta.dfile_count = sys_attr->dfile_count;
         file_attr->mask |= PVFS_ATTR_META_DFILE_COUNT; 
     }
 
-    if (sys_attr->mirror_copies_count > 0 && 
+    if ((sys_attr->mirror_copies_count) > 0 && 
         (sys_attr->mask & PVFS_ATTR_SYS_MIRROR_COPIES_COUNT))
     {
-        file_attr->meta.sid_count = sys_attr->mirror_copies_count;
+        /* setting DFILE sids in the META attribute section 
+         * NOT the metadata sids in the common section
+         */
+        file_attr->u.meta.sid_count = sys_attr->mirror_copies_count;
         file_attr->mask |= PVFS_ATTR_META_SID_COUNT; 
     }
 
-    /* Determining the number of dfiles.
-     * priority for determining user's preference for number of data files:
-     * 1) count specified in attr's passed into sys_create
-     * 2) directory hints
-     * 3) mount options
-     * 4) system default
-     * All of the above can be overridden by the distribution itself.
+    /* In old code the requested number of dfiles at this point is in:
+     * sm_p->u.create.user_requested_num_data_file, but NOW this is
+     * simply in the attribute file_attr->meta.dfile_count and we have
+     * already dealt with all of the defaults, overrides, and settings.
+     * Now, we just need to let the distribution code verify the number
+     * is reasonable before we go on to set up the request.
      */
 
-    /* at this point sm_p->u.create.user_requested_num_data_files is
-     * the value passed by user in sys_attr that was saved in isys_create
-     */
-
+#if 0
     /* num_dfiles_requested should be 0 at this point */
     if(0 < sm_p->u.create.user_requested_num_data_files)
     {
@@ -1097,27 +1122,44 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         }
     }
 
-    /* Final determination based on config and distribution.
-     * Pass in the number requested by the client, but can 
-     * be overridden by default configuration and/or
-     * distribution if necessary.  Distribution determines
-     * if there is a reasonable max or not.
-     */
     ret = PINT_cached_config_get_num_dfiles(sm_p->parent_ref.fs_id,
                                             sm_p->u.create.dist,
                                             num_dfiles_requested,
                                             &sm_p->u.create.datafile_count);
+#endif
+    /* Final determination based on config and distribution.
+     * Pass in the number requested by the client, but can 
+     * be overridden by distribution if necessary.
+     * Distribution determines if there is a reasonable max or not.
+     * If no dfiles requested, tries to use configuration to set
+     * them but that should not happen here because if nothing
+     * else, the hard defaults above.
+     */
+    ret = PINT_cached_config_get_num_dfiles(sm_p->parent_ref.fs_id,
+                                            file_attr->u.meta.dist,
+                                            file_attr->u.meta.dfile_count,
+                                            &sm_p->u.create.datafile_count);
     if(ret < 0)
     {
-        gossip_err("Error: failed to get number of data servers\n");
+        gossip_err("Error: failed to get valid number of data servers\n");
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
 
     gossip_debug(GOSSIP_CREATE_DEBUG,
                  "Setting number of datafiles to %d [requested %d]\n", 
-                 sm_p->u.create.datafile_count, num_dfiles_requested);
+                 sm_p->u.create.datafile_count, file_attr->u.meta.dfile_count);
+    
+    /* copy result back to attributes */
+    file_attr->u.meta.dfile_count = sm_p->u.create.datafile_count;
 
+    /* There is no means for the distribution to check or adjust the 
+     * requested dfile sid count - there probably should be and really
+     * it should probably rolled into the same call as for number of
+     * dfiles.
+     */
+    
+#if 0
     /*
      * Set up default replication for dfiles. Again, can be set by
      * a directory hint, the configuration, or has a final default
@@ -1144,6 +1186,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
     {
          sm_p->u.create.datafile_sid_count = 1;
     }
+#endif
 
     return SM_ACTION_COMPLETE;
 }
@@ -1186,12 +1229,12 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
      * option.
      */
 
-    sm_p->u.create.attr.mask &= PVFS_ATTR_NOTIME_SET; /* clears TIME_SET bits */
-    sm_p->u.create.attr.mask |= PVFS_ATTR_TIME_ALL;
-    sm_p->u.create.attr.atime = sm_p->u.create.attr.ctime =
-                                sm_p->u.create.attr.mtime = 
-                                sm_p->u.create.attr.ntime = 
-                                PINT_util_get_current_time();
+    sm_p->u.create.file_attr.mask &= PVFS_ATTR_NOTIME_SET; /* clears TIME_SET bits */
+    sm_p->u.create.file_attr.mask |= PVFS_ATTR_TIME_ALL;
+    sm_p->u.create.file_attr.atime = sm_p->u.create.file_attr.ctime =
+                                     sm_p->u.create.file_attr.mtime = 
+                                     sm_p->u.create.file_attr.ntime = 
+                                     PINT_util_get_current_time();
 
 #if 0
     /* creating one metadata object OID and SIDs */
@@ -1200,20 +1243,24 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
 
     gossip_debug(GOSSIP_CREATE_DEBUG,"create: Calling gen file\n");
     /* Allocate OIDs and SIDs for a file.
-     * There is one OID for the metadata, and n OIDs for the data
-     * and each OID has multiple SIDs.
+     * There is one OID for the metadata. 
+     * There are n OIDs for the dfiles in meta.dfile_array.
+     * The metadata OID has meta_sid_count SIDs.
+     * Each dfile OID has meta.sid_count SIDs in meta.sid_array.
+     * Metadata created in sm_p struct and passed in req.
+     * Dfile handles created in file_attr which is in turn passed in req.
      * We send this request to one meta server, which in turn sends it
      * to the other meta servers.
      * Data objects are not created until used.
      */
     ret = PVFS_OBJ_gen_file(sm_p->parent_ref.fs_id,
                             &sm_p->u.create.metadata_handle,
-                            sm_p->u.create.metadata_sid_count, /* in */
+                            sm_p->u.create.file_attr.meta_sid_count,   /* in */
                             &sm_p->u.create.metadata_sid_array,
-                            sm_p->u.create.datafile_count,     /* in */
-                            &sm_p->u.create.datafile_handles,
-                            sm_p->u.create.datafile_sid_count, /* in */
-                            &sm_p->u.create.datafile_sid_array);
+                            sm_p->u.create.file_attr.u.meta.dfile_count, /* in */
+                            &sm_p->u.create.file_attr.u.meta.dfile_array,
+                            sm_p->u.create.file_attr.u.meta.sid_count,   /* in */
+                            &sm_p->u.create.file_attr.u.meta.sid_array);
     /* add gossip debug here to see the values created */
     if(ret != 0)
     {
@@ -1223,9 +1270,9 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     }
 
     /* object ref will now refer to newly created metadata object */
-    sm_p->object_ref.handle = *sm_p->u.create.metadata_handle;
-    sm_p->object_ref.fs_id = sm_p->parent_ref.fs_id;
-    sm_p->object_ref.sid_count = sm_p->u.create.metadata_sid_count;
+    sm_p->object_ref.handle =   *sm_p->u.create.metadata_handle;
+    sm_p->object_ref.fs_id =     sm_p->parent_ref.fs_id;
+    sm_p->object_ref.sid_count = sm_p->u.create.file_attr.meta_sid_count;
     sm_p->object_ref.sid_array = sm_p->u.create.metadata_sid_array;
 
     PINT_msgpair_init(&sm_p->msgarray_op);
@@ -1247,34 +1294,54 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     PINT_SERVREQ_CREATE_FILL(msg_p->req,
                              sm_p->getattr.attr.capability,
                              *sm_p->cred_p,
-                             sm_p->u.create.attr,
+                             &sm_p->u.create.file_attr,
+                             &sm_p->parent_ref, /* back reference */
+                             &sm_p->object_ref, /* metadata object */
+                             sm_p->hints);
+
+                             /* these are now in parent_ref or object_ref
                              sm_p->parent_ref.fs_id,
                              sm_p->u.create.metadata_handle, 
                              sm_p->u.create.metadata_sid_count,
                              sm_p->u.create.metadata_sid_array, 
-                             &sm_p->parent_ref.handle, /* back ptr */
+                             &sm_p->parent_ref.handle, 
                              sm_p->parent_ref.sid_array, 
+                             */
+                             /* these are now in file_attr 
                              sm_p->u.create.datafile_count,
                              sm_p->u.create.datafile_handles,
                              sm_p->u.create.datafile_sid_count,
                              sm_p->u.create.datafile_sid_array,
-                             sm_p->hints);
+                             */
 
     gossip_debug(GOSSIP_CREATE_DEBUG, "sys-create: Setting up message request\n");
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
-    msg_p->fs_id = sm_p->parent_ref.fs_id;
-    msg_p->handle = *sm_p->u.create.metadata_handle;
+
+    msg_p->handle =    sm_p->object_ref.handle;
+    msg_p->fs_id =     sm_p->object_ref.fs_id;
+    msg_p->sid_count = sm_p->object_ref.sid_count;
+    msg_p->sid_array = sm_p->object_ref.sid_array;
+
+    /* relating these items
+    msg_p->handle =   *sm_p->u.create.metadata_handle;
+    msg_p->fs_id =     sm_p->parent_ref.fs_id;
     msg_p->sid_count = sm_p->u.create.metadata_sid_count;
-    msg_p->sid_index = 0;
     msg_p->sid_array = sm_p->u.create.metadata_sid_array;
+    */
+
+    msg_p->sid_index = 0;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = create_comp_fn;
     /* we are creating so we need to send attr */
     /* server will fill in object specific fields */
+    /* already set
     msg_p->req.u.create.attr.u.meta.dist = sm_p->u.create.dist;
     msg_p->req.u.create.attr.u.meta.dist_size =
                                     PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
+    */
+    /* now sending dfiles in file_attr so no need to zero out */
+    #if 0
     /* prevent encoder from trying to encode fields passed elsewhere */
     msg_p->req.u.create.attr.u.meta.dfile_count  = 0;
                                     /* sm_p->u.create.datafile_count; */
@@ -1282,6 +1349,7 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
                                     /* sm_p->u.create.datafile_sid_count; */
     msg_p->req.u.create.attr.u.meta.size         = 0;
     msg_p->req.u.create.attr.u.meta.mirror_mode  = 0;
+    #endif
     /* removed during layout merge */
 #if 0
     msg_p->req.u.create.attr.u.meta.stuffed      = 0;
@@ -1389,7 +1457,12 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
 
     /* need gossip for parent dirdata oids and sids should come from
      * earlier getattr - other items come from create data gened in
-     * earlier state */
+     * earlier state
+     */
+    /* data to add to req: all of parent dirdata handles and sida,
+     * bitmap, tree_height, etc. stored on all dirdatas
+     * combine with existing data, parent attributes.
+     */
 
     PINT_SERVREQ_CRDIRENT_FILL(
               msg_p->req,
@@ -1586,13 +1659,13 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
                            (const PVFS_object_ref *) &(sm_p->object_ref), 
                            (const PVFS_object_ref *) &(sm_p->parent_ref));
 
-        sm_p->u.create.attr.mask |= PVFS_ATTR_META_DFILES;
-        sm_p->u.create.attr.u.meta.dfile_count = sm_p->u.create.datafile_count;
-        sm_p->u.create.attr.u.meta.dfile_array =
+        sm_p->u.create.file_attr.mask |= PVFS_ATTR_META_DFILES;
+        sm_p->u.create.file_attr.u.meta.dfile_count = sm_p->u.create.datafile_count;
+        sm_p->u.create.file_attr.u.meta.dfile_array =
                                          sm_p->u.create.datafile_handles;
-        sm_p->u.create.attr.u.meta.sid_count =
+        sm_p->u.create.file_attr.u.meta.sid_count =
                                        sm_p->u.create.metadata_sid_count;
-        sm_p->u.create.attr.u.meta.sid_array =
+        sm_p->u.create.file_attr.u.meta.sid_array =
                                        sm_p->u.create.metadata_sid_array;
 
 /* removed during layout merge */
@@ -1609,20 +1682,22 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
         }
 #endif
 
+        /* already set
         if(sm_p->u.create.dist)
         {
-            sm_p->u.create.attr.u.meta.dist = sm_p->u.create.dist;
-            sm_p->u.create.attr.u.meta.dist_size =
+            sm_p->u.create.file_attr.u.meta.dist = sm_p->u.create.dist;
+            sm_p->u.create.file_attr.u.meta.dist_size =
                             PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
-            sm_p->u.create.attr.mask |= PVFS_ATTR_META_DIST;
+            sm_p->u.create.file_attr.mask |= PVFS_ATTR_META_DIST;
         }
+        */
 
         /* we only insert a cache entry if the entire create succeeds,
          * set size to 0 
          * we know that the file size is zero, since we just created it. 
          */ 
         ret = PINT_acache_update(sm_p->object_ref,
-                                 &sm_p->u.create.attr,
+                                 &sm_p->u.create.file_attr,
                                  &data_size);
         if(ret < 0)
         {
@@ -1656,10 +1731,17 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
         sm_p->u.create.layout.server_list.servers = NULL;
     }
 
+    /* now passed in sys_attr, space allocated in file_attr
     if(sm_p->u.create.dist)
     {
         PINT_dist_free(sm_p->u.create.dist);
         sm_p->u.create.dist = NULL;
+    }
+    */
+    if(sm_p->u.create.file_attr.u.meta.dist)
+    {
+        PINT_dist_free(sm_p->u.create.file_attr.u.meta.dist);
+        sm_p->u.create.file_attr.u.meta.dist = NULL;
     }
 
     if(sm_p->u.create.metadata_handle)
@@ -1790,9 +1872,15 @@ getdist_exit:
     return dist;
 }
 
-static int convert_dist (char *dist_name, char *dist_params, PVFS_dist **file_dist)
+/*
+ * This converts a string description of a distribution and its parameters into
+ * the internal form used by client and server to manage flows.
+ */
+static int convert_dist (char *dist_name, char *dist_params, PINT_dist **file_dist)
 {
-    PINIT_dist_free(*file_dist);
+    int ret = -1;
+
+    PINT_dist_free(*file_dist);
     *file_dist = PINT_dist_create(dist_name);
     if (!*file_dist)
     {
@@ -1861,7 +1949,7 @@ static int convert_dist (char *dist_name, char *dist_params, PVFS_dist **file_di
                 }
                 else
                 {
-                    if(current_dist->methods->set_param((*file_dist)->dist_name,
+                    if((*file_dist)->methods->set_param((*file_dist)->dist_name,
                                                         (*file_dist)->params,
                                                         key[i],
                                                         &tmp_val))
