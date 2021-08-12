@@ -257,6 +257,9 @@ PVFS_error PVFS_isys_create(char *object_name,
     //PINT_CONVERT_ATTR(&sm_p->u.create.attr, &attr, PVFS_ATTR_META_ALL);
     PVFS_util_copy_sys_attr(&sm_p->u.create.sys_attr, &attr);
 
+    /* save parent reference for later in SM */
+    sm_p->parent_ref = parent_ref;
+
     sm_p->u.create.stored_error_code = 0;
     sm_p->u.create.retry_count = 0;
 
@@ -267,8 +270,6 @@ PVFS_error PVFS_isys_create(char *object_name,
                   sizeof(PVFS_handle),
                   &parent_ref.handle);
 
-    sm_p->parent_ref = parent_ref;
-
     /* We will start building attributes for the new file object
      * In this function we will add attributes to sm_p->u.create.file_attr
      * - first from the built-in defaults, 
@@ -277,7 +278,7 @@ PVFS_error PVFS_isys_create(char *object_name,
      * In the validate function - after we have read the parent attributes
      * we continue with:
      * - fourth from the parent directory attributes and hints, and finally 
-     * - fifth from the sys_attrs passed in to the sys_mkdir call.
+     * - fifth from the sys_attrs passed in to the sys_create call.
      */
 
     /*********************/
@@ -421,7 +422,7 @@ PVFS_error PVFS_isys_create(char *object_name,
 #endif
 
     /*
-     * layout will be used in this SM later to pick
+     * LAYOUT will be used in this SM later to pick
      * servers. If user supplies layout, copy layout to sm struct 
      */
     if(layout)
@@ -828,10 +829,8 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_CREATE_DEBUG, "Add attr %ld\n", PVFS_ATTR_COMMON_SID_COUNT);  
     }
 
-    file_attr->parent =      &sm_p->parent_ref.handle;
-    file_attr->parent_sids = sm_p->parent_ref.sid_array;
-
     /*
+     * DISTRIBUTION
      * Both parent and user attr will specify a name and a parameter string.  No point
      * in converting one pair just to delete it and covert the other.  We will check
      * both here and convert the right one, and put a comment below in the user
@@ -871,6 +870,18 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    /* LAYOUT
+     * like distribution this is easier to do all aat once.  We already
+     * have the user layout (if any) set in isys_create, and if not we
+     * set the parent supplied layout hint (if any).
+     */
+    if (NULL == sm_p->u.create.layout &&
+        pattr->u.dir.hint.layout > 0 && 
+        (pattr->mask & PVFS_ATTR_DIR_HINT_LAYOUT))
+    {  
+        sm_p->u.create.layout = pattr->u.dir.hint.layout; 
+    }
+
     /* parent defaults for dfile_count and dfile_sid_count */
     if (pattr->u.dir.hint.dfile_count > 0 && 
         (pattr->mask & PVFS_ATTR_DIR_HINT_DFILE_COUNT))
@@ -886,8 +897,6 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         file_attr->mask |= PVFS_ATTR_META_DFILE_COUNT; 
         gossip_debug(GOSSIP_CREATE_DEBUG, "Add attr %ld\n", PVFS_ATTR_META_SID_COUNT);  
     }
-
-    /***LAYOUT***/
 
     /* Some debugging output !!! change more later */
     if (gossip_debug_enabled(GOSSIP_CREATE_DEBUG))
@@ -1085,6 +1094,14 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         file_attr->mask |= PVFS_ATTR_META_SID_COUNT; 
     }
 
+    /* User supplied layout is set above */
+
+    /* parent is required argument of sys_create */
+    /* set here because user passes this in */
+    file_attr->parent =      &sm_p->parent_ref.handle;
+    file_attr->parent_sids =  sm_p->parent_ref.sid_array;
+    file_attr->mask |= PVFS_ATTR_COMMON_PARENT;
+
     /* In old code the requested number of dfiles at this point is in:
      * sm_p->u.create.user_requested_num_data_file, but NOW this is
      * simply in the attribute file_attr->meta.dfile_count and we have
@@ -1146,13 +1163,13 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    /* copy result back to attributes */
+    file_attr->u.meta.dfile_count = sm_p->u.create.datafile_count;
+
     gossip_debug(GOSSIP_CREATE_DEBUG,
                  "Setting number of datafiles to %d [requested %d]\n", 
                  sm_p->u.create.datafile_count, file_attr->u.meta.dfile_count);
     
-    /* copy result back to attributes */
-    file_attr->u.meta.dfile_count = sm_p->u.create.datafile_count;
-
     /* There is no means for the distribution to check or adjust the 
      * requested dfile sid count - there probably should be and really
      * it should probably rolled into the same call as for number of
@@ -1223,14 +1240,14 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     /* This is a file create - ignore any file times passed in
      * Set them all to now.
      *
-     * This represents time set by client, at least for create.  Other situations
+     * TIME_SET represents time set by client, at least for create.  Other situations
      * time cannot be set by client because there isn't a field in req.  If we
-     * are doing set by client we need to fix that.  All times by serer is another
-     * option.
+     * are doing set by client we need to fix that.  All times by server using the
+     * TIME flags is another option.
      */
 
-    sm_p->u.create.file_attr.mask &= PVFS_ATTR_NOTIME_SET; /* clears TIME_SET bits */
-    sm_p->u.create.file_attr.mask |= PVFS_ATTR_TIME_ALL;
+    sm_p->u.create.file_attr.mask &= PVFS_ATTR_NOTIME; /* clears TIME_SET bits */
+    sm_p->u.create.file_attr.mask |= PVFS_ATTR_TIME_SET;
     sm_p->u.create.file_attr.atime = sm_p->u.create.file_attr.ctime =
                                      sm_p->u.create.file_attr.mtime = 
                                      sm_p->u.create.file_attr.ntime = 
@@ -1240,6 +1257,15 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     /* creating one metadata object OID and SIDs */
     ret = PVFS_OBJ_gen_meta(&sm_p->object_ref, 1, sm_p->parent_ref.fs_id);
 #endif
+
+    /* This is where we would expect to employ layout - the moment when servers
+     * are picked for the new file.  At the moment this is all down in the
+     * sidcache (PVFS_OBJ_gen_file) and any such picking is being done without
+     * layout.  We will incorporate layout into the sidcache routines eventually.
+     * In any event the layout is stored in sm_p->u.create.layout.
+     */
+
+    /***LAYOUT***/
 
     gossip_debug(GOSSIP_CREATE_DEBUG,"create: Calling gen file\n");
     /* Allocate OIDs and SIDs for a file.
@@ -1406,8 +1432,9 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
 
     js_p->error_code = 0;
 
-    /* find the hash value and the dist dir bucket */
+    /* find the hash value and the dist dir bucket (server index) */
     dirdata_hash = PINT_encrypt_dirdata(sm_p->u.create.object_name);
+
     gossip_debug(GOSSIP_CREATE_DEBUG,
                  "create: encrypt dirent %s into hash value %llu.\n", 
                  sm_p->u.create.object_name,
@@ -1428,11 +1455,13 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_CREATE_DEBUG, "\n");
     }
 
+    /* get the server_index - which of the dirdatas will hold this entry */
     dirdata_server_index = 
             PINT_find_dist_dir_bucket(dirdata_hash,
                    &sm_p->getattr.attr.u.dir.dist_dir_attr,
                    sm_p->getattr.attr.u.dir.dist_dir_bitmap);
 
+    /* find sids of this dirdata server */
     dirdata_sid_index = dirdata_server_index *
                         sm_p->getattr.attr.u.dir.dist_dir_attr.sid_count;
 
@@ -1452,6 +1481,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                  sm_p->u.create.object_name,
                  PVFS_OID_str(sm_p->u.create.metadata_handle));
 
+    /* Set up a request message */
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
@@ -1459,11 +1489,25 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
      * earlier getattr - other items come from create data gened in
      * earlier state
      */
-    /* data to add to req: all of parent dirdata handles and sida,
+    /* data to add to req: all of parent dirdata handles and sids,
      * bitmap, tree_height, etc. stored on all dirdatas
      * combine with existing data, parent attributes.
      */
 
+    PINT_SERVREQ_CRDIRENT_FILL(
+              msg_p->req,
+              sm_p->getattr.attr.capability,
+              *sm_p->cred_p,
+              sm_p->u.create.object_name,                /* item inserted into dir */
+              sm_p->object_ref,                          /* inserted object */
+              sm_p->parent_ref,                          /* back reference */
+              sm_p->getattr.attr,                        /* parent to create dirdata */
+              dirdata_server_index,                      /* target */
+              dirdata_sid_index,                         /* target */
+              sm_p->hints);
+
+/* old pre V3 code */
+#if 0
     PINT_SERVREQ_CRDIRENT_FILL(
               msg_p->req,
               sm_p->getattr.attr.capability,
@@ -1479,6 +1523,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
               sm_p->parent_ref.handle,           /* back ptr to dir */
               sm_p->parent_ref.sid_array,        /* back ptr to dir */
               sm_p->hints);
+#endif
 
     if (gossip_debug_enabled(GOSSIP_CLIENT_DEBUG))
     {
@@ -1526,7 +1571,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle =
             sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
-    msg_p->sid_count = sm_p->parent_ref.sid_count;
+    msg_p->sid_count = sm_p->parent_ref.sid_count; /* meta_sid_count from attr? */
     msg_p->sid_index = 0;
     msg_p->sid_array = 
             &sm_p->getattr.attr.u.dir.dirdata_sids[dirdata_sid_index];

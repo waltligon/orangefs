@@ -742,6 +742,7 @@ typedef struct PINT_server_op
 
     PINT_sm_msgarray_op msgarray_op;
 
+    int32_t new_target_object;
     PVFS_handle target_handle;
     PVFS_fs_id target_fs_id;
     PVFS_object_attr *target_object_attr;

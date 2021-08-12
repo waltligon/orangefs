@@ -308,6 +308,14 @@ struct PVFS_servreq_create
     PVFS_object_ref  object;      /* the file being created */
 };
 
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+endecode_fields_4_struct(
+    PVFS_servreq_create,
+    PVFS_credential, credential,
+    PVFS_object_attr, attr,
+    PVFS_object_ref, parent,
+    PVFS_object_ref, object);
+
 /* redefine this macro */
 #define PVFS_debug_servreq_create(mask, req) \
 do { \
@@ -351,14 +359,6 @@ do { \
     } \
 } while (0)
 #endif
-
-#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
-endecode_fields_4_struct(
-    PVFS_servreq_create,
-    PVFS_credential, credential,
-    PVFS_object_attr, attr,
-    PVFS_object_ref, parent,
-    PVFS_object_ref, object);
 
 #if 0
 endecode_fields_7a1a_struct(
@@ -1657,6 +1657,29 @@ endecode_fields_1_struct(
 
 struct PVFS_servreq_crdirent
 {
+    PVFS_credential  credential;
+    char            *name;              /* stored with new entry */
+    PVFS_object_ref  new_ref;           /* stored with new entry */
+    PVFS_object_ref  parent_ref;        /* back ref and metadata for split */
+    PVFS_object_attr parent_attr;       /* for creating dirdata */
+    int32_t          dd_server_index;
+    int32_t          dd_sid_index;
+};
+
+endecode_fields_7_struct(
+    PVFS_servreq_crdirent,
+    PVFS_credential,  credential,
+    string,           name,
+    PVFS_object_ref,  new_ref,
+    PVFS_object_ref,  parent_ref,
+    PVFS_object_attr, parent_attr,
+    int32_t,          dd_server_index,
+    int32_t,          dd_sid_index);
+
+/* old pre-V3 structure */
+#if 0
+struct PVFS_servreq_crdirent
+{
     PVFS_credential credential;
     char *name;                  /* stored with new entry */
     PVFS_handle new_handle;      /* stored with new entry */
@@ -1682,10 +1705,13 @@ endecode_fields_6a2a_struct(
     PVFS_SID, new_sid_array,
     PVFS_SID, parent_sid_array,
     PVFS_SID, dirdata_sid_array);
+#endif
+
 #define extra_size_PVFS_servreq_crdirent \
                     (roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES + 1) + \
                      (PVFS_REQ_LIMIT_SIDS_COUNT * 3 * sizeof(PVFS_SID)))
 
+#if 0
 #define PVFS_debug_servreq_crdirent(mask, req) \
 do { \
     if (gossip_isset(gossip_debug_mask, (mask))) \
@@ -1701,20 +1727,17 @@ do { \
         PVFS_debug_reqfield((mask), (req)->dirdata_sid_array, PVFS_SID); \
     } \
 } while (0)
+#endif
 
 #define PINT_SERVREQ_CRDIRENT_FILL(__req,                         \
                                    __cap,                         \
                                    __cred,                        \
-                                   __fs_id,                       \
-                                   __dirdata_handle,              \
-                                   __sid_count,                   \
-                                   __dirdata_sid_array,           \
                                    __name,                        \
-                                   __new_handle,                  \
-                                   __new_sid_array,               \
-                                   __new_sid_count,               \
-                                   __parent_handle,               \
-                                   __parent_sid_array,            \
+                                   __new_ref,                     \
+                                   __parent_ref,                  \
+                                   __parent_attr,                 \
+                                   __dd_server_index,             \
+                                   __dd_sid_index,                \
                                    __hints)                       \
 do {                                                              \
     memset(&(__req), 0, sizeof(__req));                           \
@@ -1726,16 +1749,14 @@ do {                                                              \
     (__req).u.crdirent.credential = (__cred);                     \
     (__req).hints = (__hints);                                    \
     (__req).u.crdirent.name = (__name);                           \
-    (__req).u.crdirent.new_handle = (__new_handle);               \
-    (__req).u.crdirent.parent_handle = (__parent_handle);         \
-    (__req).u.crdirent.dirdata_handle = (__dirdata_handle);       \
-    (__req).u.crdirent.fs_id = (__fs_id);                         \
-    (__req).u.crdirent.sid_count = (__sid_count);                 \
-    (__req).u.crdirent.new_sid_array = (__new_sid_array);         \
-    (__req).u.crdirent.new_sid_count = (__new_sid_count);         \
-    (__req).u.crdirent.dirdata_sid_array = (__dirdata_sid_array); \
-    (__req).u.crdirent.parent_sid_array = (__parent_sid_array);   \
+    PVFS_object_ref_copy(&(__req).u.crdirent.new_ref, (__new_ref));            \
+    PVFS_object_ref_copy(&(__req).u.crdirent.parent_ref, (__parent_ref));      \
+    PINT_copy_object_attr(&(__req).u.crdirent.parent_attr, (__parent_attr));   \
+    (__req).u.crdirent.parent_attr.u.dir.dist_dir_attr.server_no = __dd_server_index; \
+    (__req).u.crdirent.dd_server_index = (__dd_server_index);                  \
+    (__req).u.crdirent.dd_sid_index = (__dd_sid_index);                        \
 } while (0)
+
 
 /* rmdirent ****************************************************/
 /* - removes an existing directory entry */

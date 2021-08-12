@@ -119,13 +119,30 @@ typedef uint64_t PVFS_object_attrmask;
          PVFS_ATTR_COMMON_PERM | PVFS_ATTR_COMMON_TYPE  | \
          PVFS_ATTR_COMMON_PARENT | PVFS_ATTR_COMMON_SID_COUNT)
 
+/* Time flags do not have a corresponding attribute
+ * Rather, they indicate the server should set the given
+ * time to the current time on the server.  The TIME_SET
+ * flags indicate there is a time in the corresponding attribute
+ * sent from the client and that should be used to set the
+ * attribute on the server.
+ */
+#define PVFS_ATTR_TIME_SET \
+        (PVFS_ATTR_COMMON_ATIME_SET | PVFS_ATTR_COMMON_NTIME_SET | \
+         PVFS_ATTR_COMMON_CTIME_SET | PVFS_ATTR_COMMON_MTIME_SET)
+
 #define PVFS_ATTR_NOTIME_SET \
         ~(PVFS_ATTR_COMMON_ATIME_SET | PVFS_ATTR_COMMON_NTIME_SET | \
           PVFS_ATTR_COMMON_CTIME_SET | PVFS_ATTR_COMMON_MTIME_SET)
 
-#define PVFS_ATTR_TIME_ALL \
+#define PVFS_ATTR_TIME \
         (PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_NTIME | \
          PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_MTIME)
+
+#define PVFS_ATTR_NOTIME \
+        ~(PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_NTIME | \
+          PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_MTIME)
+
+#define PVFS_ATTR_TIME_ALL       PVFS_ATTR_TIME
 
 #define PVFS_ATTR_COMMON_ALL                               \
         (PVFS_ATTR_COMMON_NOTIME | PVFS_ATTR_TIME_ALL)
@@ -652,7 +669,7 @@ struct PVFS_directory_hint_s
     char               *dist_params;       /* distribution parameters? */
     uint32_t            dfile_count;       /* number of dfiles to be used */
     uint32_t            dfile_sid_count;   /* number of dfile replicas */
-    PVFS_dirhint_layout layout;            /* how ddfile servers are selected */
+    PVFS_dirhint_layout layout;            /* how dfile servers are selected */
     uint32_t            dir_dirdata_min;   /* min number of dirdata to be used */    
     uint32_t            dir_dirdata_max;   /* max number of dirdata to be used */    
     uint32_t            dir_split_size;    /* max number of entries before a split */
@@ -785,10 +802,10 @@ struct PVFS_dirdata_attr_s
     int32_t dirent_count;
     void *__PAD;   /* to match directory structure */
 
-    PVFS_dist_dir_attr dist_dir_attr;
-    PVFS_dist_dir_bitmap dist_dir_bitmap;
-    PVFS_handle *dirdata_handles;  /* These are siblings for splitting */
-    PVFS_SID *dirdata_sids;
+    PVFS_dist_dir_attr    dist_dir_attr;
+    PVFS_dist_dir_bitmap  dist_dir_bitmap;
+    PVFS_handle          *dirdata_handles;  /* These are siblings for splitting */
+    PVFS_SID             *dirdata_sids;
 };
 typedef struct PVFS_dirdata_attr_s PVFS_dirdata_attr;
 
@@ -910,7 +927,7 @@ struct PVFS_object_attr
     uint32_t meta_sid_count;   /* number of metadata sids in this FS */
     PVFS_capability capability;
     PVFS_handle *parent;       /* handle for parent object */
-    PVFS_SID *parent_sids;
+    PVFS_SID *parent_sids;     /* num parent sids is meta_sid_count */
 
     union
     {

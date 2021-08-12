@@ -172,7 +172,7 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
 
     ret = PINT_server_req_get_attr(s_op->req,
                                    &s_op->attr);
-    /* should we accept a NULL return for some OPs? */
+    /* There is a valied NULL return for some OPs */
 
     s_op->access_type = PINT_server_req_get_access_type(s_op->req);
     s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
@@ -327,8 +327,12 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     INIT_PROFILER(profiler);
     START_PROFILER(profiler);
  
+    /* What happens if the object not found (below) should we wait
+     * to do this only if we actually read something?
+     */
     /* First translate the dspace attributes into object attributes */
     PVFS_ds_attr_to_object_attr(&s_op->ds_attr, &s_op->attr);
+
     /* s_op->attr.mask = PVFS_ATTR_COMMON_ALL; */
     s_op->target_object_attr = &s_op->attr;
 
@@ -343,14 +347,14 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
      * they are filled in.
      */
     if (error_code == ENOENT)
-    {
+    {   
         /* A new object, Try to decide what kind of object from the req op type.
          * We are building the object attr for the new object which we later 
          * convert to a ds_attr for writing to the database.
          * First copy in the attrs sent in by the original req as a starting point.
          */
         memcpy((void *)&s_op->attr,
-               (void *)&s_op->req->u.setattr.attr,
+               (void *)&s_op->req->u.setattr.attr, /* <<== BAD: THIS IS NOT ALWAYS THERE */
                sizeof(PVFS_object_attr));
 
         create_object = 1;    /* Assume creating unless proven otherwise */
@@ -455,7 +459,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             s_op->attr.u.dirdata.dist_dir_attr.server_no =
                             s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.server_no;
         }
-    } /* endif */
+    } /* endif object not found */
 
     /* Remaining logic deals with new or existing object. */
 
@@ -662,6 +666,7 @@ complete:
      */
     if (js_p->error_code == 0 && create_object == 1)
     {
+        s_op->new_target_object = 1; /* passing back to mainop SM's */
         js_p->error_code = CREATE_OBJECT;
 #if 0
         if (s_op->attr.objtype == PVFS_TYPE_DATAFILE)
@@ -678,7 +683,7 @@ complete:
 }
 
 /* if opcode is appropriate and we have a proper capability
- * then we create the object - a DATAFILE  or DIRFILE with the
+ * then we create the object - a DATAFILE or DIRDATA with the
  * approporiate attributes
  */
 static PINT_sm_action prelude_create_object_if_allowed(struct PINT_smcb *smcb,
@@ -812,7 +817,6 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (prelude sm) state: write_new_object_keyval\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op));
-    gossip_debug(GOSSIP_SERVER_DEBUG, "writing keyvals for new object\n");
 
     if (s_op->req->ctrl.sub == PVFS_REQ_DIRDATA)
     {
@@ -820,6 +824,8 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
          * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES, PARENT */
         keyval_count = 3;
     }
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "writing keyvals for new object\n");
 
     /* no attr in the db, so we are assuming the request attr has our data */
     pattr = &s_op->req->u.setattr.attr;

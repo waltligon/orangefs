@@ -307,7 +307,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     dir_attr->mask |= PVFS_ATTR_COMMON_SID_COUNT;
     dir_attr->u.dir.dirent_count = 0;
     dir_attr->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
-    /* Hints pertaining to files */
+    /* Hints pertaining to files - none are present by default */
     dir_attr->u.dir.hint.dist_name_len = 0;
     dir_attr->u.dir.hint.dist_name = NULL;
     dir_attr->u.dir.hint.dist_params_len = 0;
@@ -318,8 +318,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     dir_attr->u.dir.hint.layout.server_list.count = 0;
     dir_attr->u.dir.hint.layout.server_list.bufsize = 0;
     dir_attr->u.dir.hint.layout.server_list.servers = NULL;
-    dir_attr->mask |= PVFS_ATTR_DIR_HINT_LAYOUT;
-    /* Hints pertaining to directories */
+    /* Hints pertaining to directories - none are present by default */
     dir_attr->u.dir.hint.dir_dirdata_min = 0;
     dir_attr->u.dir.hint.dir_dirdata_max = 0;
     dir_attr->u.dir.hint.dir_split_size = 0;
@@ -327,7 +326,6 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     dir_attr->u.dir.hint.dir_layout.server_list.count = 0;
     dir_attr->u.dir.hint.dir_layout.server_list.bufsize = 0;
     dir_attr->u.dir.hint.dir_layout.server_list.servers = NULL;
-    dir_attr->mask |= PVFS_ATTR_DIR_HINT_DIR_LAYOUT;
     /* Distributed Directory Attributes */
     dir_attr->u.dir.dist_dir_attr.tree_height = 0;
     dir_attr->mask |= PVFS_ATTR_DIR_TREE_HEIGHT;

@@ -321,6 +321,16 @@ typedef struct PVFS_sys_layout_s
     struct PVFS_sys_server_list server_list;
 } PVFS_sys_layout;
 
+/* in V3 layout should never need to cross the wire to/from servers
+ * layout is processed on a client machine when it picks a set of SIDs
+ * for a set of OIDs.  OIDs are all selected in advance, even when the
+ * object is not actually created right away.  OIDs are sent to servers
+ * in order to create the objects, this is after the layout.  Thus,
+ * no further need to encode or decode a layout.  
+ * Layouts ARE stored on directories in hints, but at the moment this
+ * is a distinct data type PVFS_dirhint_layout_s 
+ * defined in proto/pvfs2-attr.c
+ */
 #if 0
 endecode_fields_2(
     PVFS_sys_layout,
@@ -903,6 +913,7 @@ typedef struct PVFS_dist_dir_attr_s
                                 /* which dirdata server is running this code */
     int32_t branch_level;   /* level of branching on this server */
 } PVFS_dist_dir_attr;
+
 endecode_fields_9(
     PVFS_dist_dir_attr,
     uint32_t, tree_height,

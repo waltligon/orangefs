@@ -181,7 +181,7 @@ int PINT_server_req_get_attr(struct PVFS_server_req *req,
 
     if(!PINT_server_req_table[req->op].params->get_attr)
     {
-        return 0;  /* is this an error, or a potential result? */
+        return 0;  /* This is a valid result for some OPs? */
     }
     else
     {
