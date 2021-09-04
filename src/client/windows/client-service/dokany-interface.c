@@ -70,6 +70,13 @@ extern PORANGEFS_OPTIONS goptions;
                                    } \
                                } while (0)
 
+#define CRED_CHECK_VOID(func, err)  do { \
+                                        if (err != 0) { \
+                                           client_debug("%s: bad credential (%d)\n", func, err); \
+                                           return; \
+                                        } \
+                                    } while (0)
+
 #define DEBUG_PATH(path)   client_debug("   resolved path: %s\n", path)
 
 #define DEBUG_BUF_SIZE    8192
@@ -814,8 +821,8 @@ PVFS_Dokan_create_file(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     char *fs_path;
-    int ret, found, err, collision = 0, attr_flag = 0,
-        new_flag = 0;
+    int ret = -1, ret_attr = -1, ret_perm = -1, err = -1;
+    int found = 0, attr_flag = 0, new_flag = 0;
     PVFS_handle handle;
     PVFS_sys_attr attr;
     PVFS_credential credential;
@@ -932,23 +939,23 @@ PVFS_Dokan_create_file(
     /* check permissions for existing file */
     if (found)
     {
-        ret = fs_getattr(fs_path, &credential, &attr);
-        if (ret == 0)
+        ret_attr = fs_getattr(fs_path, &credential, &attr);
+        if (ret_attr == 0)
         {
-            ret = check_create_perm(&attr, &credential, DesiredAccess);
-            if (!ret)
+            ret_perm = check_create_perm(&attr, &credential, DesiredAccess);
+            if (!ret_perm)
             {
                 client_debug("CreateFile exit: access denied\n");
                 free(fs_path);
-                return -ERROR_ACCESS_DENIED;
+                return ERROR_ACCESS_DENIED;
             }
             attr_flag = 1;
         }
         else
         {
-            client_debug("CreateFile exit: fs_getattr (1) failed with code: %d\n", ret);
+            client_debug("CreateFile exit: fs_getattr (1) failed with code: %d\n", ret_attr);
             free(fs_path);
-            return error_map(ret);
+            return -error_map(ret_attr);
         }
     }
 
@@ -961,40 +968,46 @@ PVFS_Dokan_create_file(
         {
             fs_remove(fs_path, &credential);
         }
-        ret = fs_create(fs_path, &credential, &handle, 
-            goptions->new_file_perms);
+        if (DokanFileInfo->IsDirectory)
+        {
+            ret = fs_mkdir(fs_path, &credential, &handle, goptions->new_dir_perms);
+        }
+        else {
+            ret = fs_create(fs_path, &credential, &handle, goptions->new_file_perms);
+        }
         if (found && ret == 0) {
-            collision = 1;
-            ret = STATUS_OBJECT_NAME_COLLISION;
+            err = STATUS_OBJECT_NAME_COLLISION;
         }
         break;
     case CREATE_NEW:
-        if (found) 
+        if (found)
         {
-            /* special case - Windows issues "CREATE_NEW" for root folder -
-               do not return an error in this case. */
+            /* return an error for CREATE_NEW for an existing file unless it's
+               the root folder */
             if (strcmp(fs_path, "/")) {
-                /* set error */
                 ret = -PVFS_EEXIST;
             }
         }
         else
         {
-            /* create file */
-            ret = fs_create(fs_path, &credential, &handle, 
-                goptions->new_file_perms);
+            /* create file or directory */
+            if (DokanFileInfo->IsDirectory)
+            {
+                ret = fs_mkdir(fs_path, &credential, &handle, goptions->new_dir_perms);
+            }
+            else {
+                ret = fs_create(fs_path, &credential, &handle, goptions->new_file_perms);
+            }
         }
         break;
     case OPEN_ALWAYS:
         if (!found)
         {    
             /* create file */
-            ret = fs_create(fs_path, &credential, &handle,
-                goptions->new_file_perms);
+            ret = fs_create(fs_path, &credential, &handle, goptions->new_file_perms);
         }
         else {
-            collision = 1;
-            ret = STATUS_OBJECT_NAME_COLLISION;
+            err = STATUS_OBJECT_NAME_COLLISION;
         }
         break;
     case OPEN_EXISTING:
@@ -1017,38 +1030,40 @@ PVFS_Dokan_create_file(
 
     client_debug("   fs_create/fs_truncate returns: %d\n", ret);
 
-    err = error_map(ret);
-    if (err == ERROR_SUCCESS)
+    if (err != STATUS_OBJECT_NAME_COLLISION) {
+        err = error_map(ret);
+    }
+    if (err == ERROR_SUCCESS || err == STATUS_OBJECT_NAME_COLLISION)
     {
         /* generate unique context */
         DokanFileInfo->Context = gen_context();
 
         client_debug("   Context: %llx\n", DokanFileInfo->Context);
         add_context(DokanFileInfo, FileAttributes, &credential);
-
         /* determine whether this is a directory */
         if (!attr_flag)
         {
-            ret = fs_getattr(fs_path, &credential, &attr);
+            ret_attr = fs_getattr(fs_path, &credential, &attr);
         }
-        if (ret == 0)
+        if (ret_attr == 0)
         {
             DokanFileInfo->IsDirectory = attr.objtype & PVFS_TYPE_DIRECTORY;
         }
         else
         {
-            client_debug("   fs_getattr (2) failed with code: %d\n", ret);
+            client_debug("   fs_getattr (2) failed with code: %d\n", ret_attr);
         }
     }
 
     free(fs_path);
     PINT_cleanup_credential(&credential);
 
-    client_debug("CreateFile exit: %d (%d)\n", -err, ret);
-        
-    /* TODO: have return values be positive */
-    /* return name collision result if applicable */
-    return collision ? ret : -err;
+    /* set negative error code to positive */
+    err = err >= 0 ? err : -err;
+
+    client_debug("CreateFile exit: %d (%d)\n", err, ret);
+
+    return err;
 }
 
 
@@ -1209,13 +1224,13 @@ PVFS_Dokan_cleanup(
 
         /* load credential */
         err = get_credential(DokanFileInfo, &credential);
-        CRED_CHECK("CloseFile", err);
+        CRED_CHECK_VOID("CloseFile", err);
 
         /* get file system path */
         fs_path = get_fs_path(FileName);
         if (fs_path == NULL)
         {
-            return -1;
+            return;
         }
 
         /* remove the file/dir */
@@ -1639,11 +1654,11 @@ PVFS_Dokan_get_file_information(
                 client_debug("%s\n", info);
 
                 /* debug volume serial no. and index */
-                client_debug("Volume Serial Number: %x\n", HandleFileInformation->dwVolumeSerialNumber);
+                client_debug("   Volume Serial Number: %x\n", HandleFileInformation->dwVolumeSerialNumber);
                 index = HandleFileInformation->nFileIndexHigh;
                 index <<= 32;
                 index |= HandleFileInformation->nFileIndexLow;
-                client_debug("File Index: %llx\n", index);
+                client_debug("   File Index: %llx\n", index);
             }
 
             FREE_ATTR_BUFS(attr);
@@ -2612,7 +2627,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     dokanOptions->Options |= /* DOKAN_OPTION_KEEP_ALIVE | */
                              DOKAN_OPTION_REMOVABLE;
 
-    dokanOptions->Version = 150;
+    dokanOptions->Version = DOKAN_VERSION;
 
     dokanOptions->MountPoint = convert_mbstring(options->mount_point);
 
