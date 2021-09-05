@@ -2584,8 +2584,8 @@ PVFS_Dokan_get_volume_information(
 
     /* File System Name - report as NTFS for compatibility */
     ZeroMemory(FileSystemNameBuffer, FileSystemNameSize * sizeof(wchar_t));
-    /* wcsncpy(FileSystemNameBuffer, L"OrangeFS", 8); */
-    wcsncpy(FileSystemNameBuffer, L"NTFS", 4);
+    wcsncpy(FileSystemNameBuffer, L"OrangeFS", 8);
+    /* wcsncpy(FileSystemNameBuffer, L"NTFS", 4) */
 
     client_debug("GetVolumeInformation exit: 0\n");
 
