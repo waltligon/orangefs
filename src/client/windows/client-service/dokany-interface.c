@@ -2576,16 +2576,14 @@ PVFS_Dokan_get_volume_information(
     client_debug("  VolumeSerialNumber: %x\n", *VolumeSerialNumber);
     *MaximumComponentLength = PVFS_NAME_MAX;
     *FileSystemFlags = FILE_CASE_SENSITIVE_SEARCH | 
-                       FILE_CASE_PRESERVED_NAMES;
-                       /*
-                       FILE_SUPPORTS_REMOTE_STORAGE |
+                       FILE_CASE_PRESERVED_NAMES |
+                       FILE_NAMED_STREAMS |
                        FILE_PERSISTENT_ACLS;
-                       */
 
     /* File System Name - report as NTFS for compatibility */
     ZeroMemory(FileSystemNameBuffer, FileSystemNameSize * sizeof(wchar_t));
-    wcsncpy(FileSystemNameBuffer, L"OrangeFS", 8);
-    /* wcsncpy(FileSystemNameBuffer, L"NTFS", 4) */
+    /* wcsncpy(FileSystemNameBuffer, L"OrangeFS", 8); */
+    wcsncpy(FileSystemNameBuffer, L"NTFS", 4);
 
     client_debug("GetVolumeInformation exit: 0\n");
 
