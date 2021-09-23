@@ -15,6 +15,7 @@
 #include <Windows.h>
 #include <AccCtrl.h>
 #include <AclAPI.h>
+#include <psapi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -303,6 +304,28 @@ wchar_t *convert_mbstring(const char *mbstr)
 }
 
 #define cleanup_string(str)    free(str)
+
+/* get process name with Process ID */
+DWORD get_process_name(DWORD dwProcessId, LPSTR lpProcessName, DWORD nSize)
+{
+    HANDLE hProcess;
+
+    hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, dwProcessId);
+    if (!hProcess)
+    {
+        return GetLastError();
+    }
+
+    if (!GetProcessImageFileName(hProcess, lpProcessName, nSize))
+    {
+        CloseHandle(hProcess);
+        return GetLastError();
+    }
+
+    CloseHandle(hProcess);
+
+    return STATUS_SUCCESS;
+}
 
 /* convert PVFS time to Windows FILETIME 
    (from MSDN Knowledgebase) */
@@ -820,6 +843,7 @@ PVFS_Dokan_create_file(
     ULONG CreateOptions,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
+    char process_name[PATH_MAX];
     char *fs_path;
     int ret = -1, ret_attr = -1, ret_perm = -1, err = -1;
     int found = 0, attr_flag = 0, new_flag = 0;
@@ -905,6 +929,10 @@ PVFS_Dokan_create_file(
     DEBUG_FILE_INFO(DokanFileInfo, SynchronousIo);
     DEBUG_FILE_INFO(DokanFileInfo, Nocache);
     DEBUG_FILE_INFO(DokanFileInfo, WriteToEndOfFile);
+
+    strcpy(process_name, "Unknown");
+    get_process_name(DokanFileInfo->ProcessId, process_name, PATH_MAX);
+    client_debug("   ProcessName: %s\n", process_name);
     
     DokanFileInfo->Context = 0;
 
@@ -918,7 +946,7 @@ PVFS_Dokan_create_file(
 
     /* look up the file */
     found = 0;
-    ret = fs_lookup(fs_path, &credential, &handle);    
+    ret = fs_lookup(fs_path, &credential, &handle);
 
     client_debug("   fs_lookup returns: %d\n", ret);
 
@@ -929,7 +957,7 @@ PVFS_Dokan_create_file(
     else if (ret != 0)
     {
         free(fs_path);
-        return error_map(ret);
+        return -error_map(ret);
     }
     else
     {
@@ -982,9 +1010,12 @@ PVFS_Dokan_create_file(
     case CREATE_NEW:
         if (found)
         {
-            /* return an error for CREATE_NEW for an existing file unless it's
-               the root folder */
-            if (strcmp(fs_path, "/")) {
+            if (strcmp(fs_path, "/") == 0) {
+                /* set directory flag on for the root directory */
+                DokanFileInfo->IsDirectory = 1;
+            }
+            else if (DesiredAccess & (FILE_WRITE_DATA|FILE_WRITE_ATTRIBUTES|FILE_APPEND_DATA)) {
+                /* return an error if Windows wants to write the file */
                 ret = -PVFS_EEXIST;
             }
         }
@@ -2254,6 +2285,7 @@ PVFS_Dokan_set_file_time(
 }
 
 /* TODO: Not currently in use. Causes Windows Explorer to crash. */
+#if 0
 static int __stdcall
 PVFS_Dokan_get_file_security(
     LPCWSTR               FileName,
@@ -2421,7 +2453,25 @@ get_file_security_exit:
 
     return err;
 }
+#endif 
 
+static int __stdcall
+PVFS_Dokan_get_file_security(
+    LPCWSTR               FileName,
+    PSECURITY_INFORMATION SecurityInformation,
+    PSECURITY_DESCRIPTOR  SecurityDescriptor,
+    ULONG                 BufferLength,
+    PULONG                LengthNeeded,
+    PDOKAN_FILE_INFO      DokanFileInfo)
+{
+    client_debug("GetFileSecurity: %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
+
+    client_debug("GetFileSecurity exit: %d\n", STATUS_NOT_IMPLEMENTED);
+
+    /* allow Dokan to build the Security Descriptor */
+    return STATUS_NOT_IMPLEMENTED;
+}
 
 static int __stdcall
 PVFS_Dokan_set_file_security(
@@ -2576,15 +2626,20 @@ PVFS_Dokan_get_volume_information(
     client_debug("  VolumeSerialNumber: %x\n", *VolumeSerialNumber);
     *MaximumComponentLength = PVFS_NAME_MAX;
     *FileSystemFlags = FILE_CASE_SENSITIVE_SEARCH | 
-                       FILE_CASE_PRESERVED_NAMES |
-                       FILE_NAMED_STREAMS |
-                       FILE_PERSISTENT_ACLS;
+                       FILE_CASE_PRESERVED_NAMES /* |
+                       FILE_NAMED_STREAMS  |
+                       FILE_PERSISTENT_ACLS*/ ;
 
     /* File System Name - report as NTFS for compatibility */
     ZeroMemory(FileSystemNameBuffer, FileSystemNameSize * sizeof(wchar_t));
     /* wcsncpy(FileSystemNameBuffer, L"OrangeFS", 8); */
     wcsncpy(FileSystemNameBuffer, L"NTFS", 4);
 
+    client_debug("   VolumeNameBuffer: %S\n", VolumeNameBuffer);
+    client_debug("   VolumeSerialNumber: %08X\n", *VolumeSerialNumber);
+    client_debug("   MaximumComponentLength: %u\n", *MaximumComponentLength);
+    client_debug("   FileSystemFlags: %08X\n", *FileSystemFlags);
+    client_debug("   FileSystemNameBuffer: %S\n", FileSystemNameBuffer);
     client_debug("GetVolumeInformation exit: 0\n");
 
     return 0;
@@ -2622,8 +2677,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     if (g_UseStdErr)
         dokanOptions->Options |= DOKAN_OPTION_STDERR;
     
-    dokanOptions->Options |= /* DOKAN_OPTION_KEEP_ALIVE | */
-                             DOKAN_OPTION_REMOVABLE;
+    dokanOptions->Options |= DOKAN_OPTION_REMOVABLE;
 
     dokanOptions->Version = DOKAN_VERSION;
 
@@ -2650,7 +2704,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     dokanOperations->UnlockFile = PVFS_Dokan_unlock_file;
     dokanOperations->GetDiskFreeSpace = PVFS_Dokan_get_disk_free_space;
     dokanOperations->GetVolumeInformation = PVFS_Dokan_get_volume_information;
-/*    dokanOperations->GetFileSecurityA = PVFS_Dokan_get_file_security; */
+    dokanOperations->GetFileSecurityA = PVFS_Dokan_get_file_security;
     dokanOperations->SetFileSecurityA = PVFS_Dokan_set_file_security;
     dokanOperations->Unmounted = PVFS_Dokan_unmount;
 
