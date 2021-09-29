@@ -309,19 +309,44 @@ wchar_t *convert_mbstring(const char *mbstr)
 DWORD get_process_name(DWORD dwProcessId, LPSTR lpProcessName, DWORD nSize)
 {
     HANDLE hProcess;
+    char* process_name, *base_name, *temp;
+
+    if (!(process_name = (char*)malloc(sizeof(char) * nSize)))
+    {
+        return ERROR_OUTOFMEMORY;
+    }
+
+    if (!(base_name = (char*)malloc(sizeof(char) * nSize)))
+    {
+        return ERROR_OUTOFMEMORY;
+    }
 
     hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, dwProcessId);
     if (!hProcess)
     {
+        free(base_name);
+        free(process_name);
         return GetLastError();
     }
 
-    if (!GetProcessImageFileName(hProcess, lpProcessName, nSize))
+    if (!GetProcessImageFileName(hProcess, process_name, nSize))
     {
+        free(base_name);
+        free(process_name);
         CloseHandle(hProcess);
         return GetLastError();
     }
 
+    strncpy(lpProcessName, process_name, strlen(process_name) + 1);
+    if ((temp = strrchr(process_name, '\\')))
+    {
+        strncpy(base_name, temp + 1, strlen(temp + 1) + 1);
+        if (strlen(base_name))
+            strncpy(lpProcessName, base_name, strlen(base_name) + 1);
+    }
+
+    free(base_name);
+    free(process_name);
     CloseHandle(hProcess);
 
     return STATUS_SUCCESS;
@@ -843,6 +868,9 @@ PVFS_Dokan_create_file(
     ULONG CreateOptions,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
+    ACCESS_MASK desired_access;
+    DWORD file_attrs_and_flags;
+    DWORD create_disposition;
     char process_name[PATH_MAX];
     char *fs_path;
     int ret = -1, ret_attr = -1, ret_perm = -1, err = -1;
@@ -852,87 +880,105 @@ PVFS_Dokan_create_file(
     PVFS_credential credential;
 
     client_debug("CreateFile: %S\n", FileName);
-    
-    if (CreateDisposition == CREATE_NEW)
-        client_debug("   CREATE_NEW\n");
-    if (CreateDisposition == OPEN_ALWAYS)
-        client_debug("   OPEN_ALWAYS\n");
-    if (CreateDisposition == CREATE_ALWAYS)
-        client_debug("   CREATE_ALWAYS\n");
-    if (CreateDisposition == OPEN_EXISTING)
-        client_debug("   OPEN_EXISTING\n");
-    if (CreateDisposition == TRUNCATE_EXISTING)
-        client_debug("   TRUNCATE_EXISTING\n");
 
-    client_debug("   ShareAccess = 0x%x\n", ShareAccess);
+    /* change kernel flags to usermode flags */
+    DokanMapKernelToUserCreateFileFlags(
+        DesiredAccess, FileAttributes, CreateOptions, CreateDisposition,
+        &desired_access, &file_attrs_and_flags, &create_disposition);
+
+    client_debug("  Create Disposition = 0x%x\n", create_disposition);
+    
+    if (create_disposition == CREATE_NEW)
+    {
+        client_debug("   CREATE_NEW\n");
+    }
+    else if (create_disposition == OPEN_ALWAYS)
+    {
+        client_debug("   OPEN_ALWAYS\n");
+    }
+    else if (create_disposition == CREATE_ALWAYS)
+    {
+        client_debug("   CREATE_ALWAYS\n");
+    }
+    if (create_disposition == OPEN_EXISTING)
+    {
+        client_debug("   OPEN_EXISTING\n");
+    }
+    if (create_disposition == TRUNCATE_EXISTING)
+    {
+        client_debug("   TRUNCATE_EXISTING\n");
+    }
+
+    client_debug("  ShareAccess = 0x%x\n", ShareAccess);
 
     DEBUG_FLAG(ShareAccess, FILE_SHARE_READ);
     DEBUG_FLAG(ShareAccess, FILE_SHARE_WRITE);
     DEBUG_FLAG(ShareAccess, FILE_SHARE_DELETE);
 
-    client_debug("   DesiredAccess = 0x%x\n", DesiredAccess);
+    client_debug("  Desired Access = 0x%x\n", desired_access);
 
-    DEBUG_FLAG(DesiredAccess, GENERIC_READ);
-    DEBUG_FLAG(DesiredAccess, GENERIC_WRITE);
-    DEBUG_FLAG(DesiredAccess, GENERIC_EXECUTE);
+    DEBUG_FLAG(desired_access, GENERIC_READ);
+    DEBUG_FLAG(desired_access, GENERIC_WRITE);
+    DEBUG_FLAG(desired_access, GENERIC_EXECUTE);
     
-    DEBUG_FLAG(DesiredAccess, DELETE);
-    DEBUG_FLAG(DesiredAccess, FILE_READ_DATA);
-    DEBUG_FLAG(DesiredAccess, FILE_READ_ATTRIBUTES);
-    DEBUG_FLAG(DesiredAccess, FILE_READ_EA);
-    DEBUG_FLAG(DesiredAccess, READ_CONTROL);
-    DEBUG_FLAG(DesiredAccess, FILE_WRITE_DATA);
-    DEBUG_FLAG(DesiredAccess, FILE_WRITE_ATTRIBUTES);
-    DEBUG_FLAG(DesiredAccess, FILE_WRITE_EA);
-    DEBUG_FLAG(DesiredAccess, FILE_APPEND_DATA);
-    DEBUG_FLAG(DesiredAccess, WRITE_DAC);
-    DEBUG_FLAG(DesiredAccess, WRITE_OWNER);
-    DEBUG_FLAG(DesiredAccess, SYNCHRONIZE);
-    DEBUG_FLAG(DesiredAccess, FILE_EXECUTE);
-    DEBUG_FLAG(DesiredAccess, STANDARD_RIGHTS_READ);
-    DEBUG_FLAG(DesiredAccess, STANDARD_RIGHTS_WRITE);
-    DEBUG_FLAG(DesiredAccess, STANDARD_RIGHTS_EXECUTE);
+    DEBUG_FLAG(desired_access, DELETE);
+    DEBUG_FLAG(desired_access, FILE_READ_DATA);
+    DEBUG_FLAG(desired_access, FILE_READ_ATTRIBUTES);
+    DEBUG_FLAG(desired_access, FILE_READ_EA);
+    DEBUG_FLAG(desired_access, READ_CONTROL);
+    DEBUG_FLAG(desired_access, FILE_WRITE_DATA);
+    DEBUG_FLAG(desired_access, FILE_WRITE_ATTRIBUTES);
+    DEBUG_FLAG(desired_access, FILE_WRITE_EA);
+    DEBUG_FLAG(desired_access, FILE_APPEND_DATA);
+    DEBUG_FLAG(desired_access, WRITE_DAC);
+    DEBUG_FLAG(desired_access, WRITE_OWNER);
+    DEBUG_FLAG(desired_access, SYNCHRONIZE);
+    DEBUG_FLAG(desired_access, FILE_EXECUTE);
+    DEBUG_FLAG(desired_access, STANDARD_RIGHTS_READ);
+    DEBUG_FLAG(desired_access, STANDARD_RIGHTS_WRITE);
+    DEBUG_FLAG(desired_access, STANDARD_RIGHTS_EXECUTE);
 
-    client_debug("   FileAttributes = 0x%x\n", FileAttributes);
+    client_debug("  File Attributes / Flags = 0x%x\n", file_attrs_and_flags);
 
-    DEBUG_FLAG(FileAttributes, FILE_ATTRIBUTE_ARCHIVE);
-    DEBUG_FLAG(FileAttributes, FILE_ATTRIBUTE_ENCRYPTED);
-    DEBUG_FLAG(FileAttributes, FILE_ATTRIBUTE_HIDDEN);
-    DEBUG_FLAG(FileAttributes, FILE_ATTRIBUTE_NORMAL);
-    DEBUG_FLAG(FileAttributes, FILE_ATTRIBUTE_NOT_CONTENT_INDEXED);
-    DEBUG_FLAG(FileAttributes, FILE_ATTRIBUTE_OFFLINE);
-    DEBUG_FLAG(FileAttributes, FILE_ATTRIBUTE_READONLY);
-    DEBUG_FLAG(FileAttributes, FILE_ATTRIBUTE_SYSTEM);
-    DEBUG_FLAG(FileAttributes, FILE_ATTRIBUTE_TEMPORARY);
-    DEBUG_FLAG(FileAttributes, FILE_FLAG_WRITE_THROUGH);
-    DEBUG_FLAG(FileAttributes, FILE_FLAG_OVERLAPPED);
-    DEBUG_FLAG(FileAttributes, FILE_FLAG_NO_BUFFERING);
-    DEBUG_FLAG(FileAttributes, FILE_FLAG_RANDOM_ACCESS);
-    DEBUG_FLAG(FileAttributes, FILE_FLAG_SEQUENTIAL_SCAN);
-    DEBUG_FLAG(FileAttributes, FILE_FLAG_DELETE_ON_CLOSE);
-    DEBUG_FLAG(FileAttributes, FILE_FLAG_BACKUP_SEMANTICS);
-    DEBUG_FLAG(FileAttributes, FILE_FLAG_POSIX_SEMANTICS);
-    DEBUG_FLAG(FileAttributes, FILE_FLAG_OPEN_REPARSE_POINT);
-    DEBUG_FLAG(FileAttributes, FILE_FLAG_OPEN_NO_RECALL);
-    DEBUG_FLAG(FileAttributes, SECURITY_ANONYMOUS);
-    DEBUG_FLAG(FileAttributes, SECURITY_IDENTIFICATION);
-    DEBUG_FLAG(FileAttributes, SECURITY_IMPERSONATION);
-    DEBUG_FLAG(FileAttributes, SECURITY_DELEGATION);
-    DEBUG_FLAG(FileAttributes, SECURITY_CONTEXT_TRACKING);
-    DEBUG_FLAG(FileAttributes, SECURITY_EFFECTIVE_ONLY);
-    DEBUG_FLAG(FileAttributes, SECURITY_SQOS_PRESENT);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_ATTRIBUTE_ARCHIVE);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_ATTRIBUTE_ENCRYPTED);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_ATTRIBUTE_HIDDEN);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_ATTRIBUTE_NORMAL);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_ATTRIBUTE_NOT_CONTENT_INDEXED);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_ATTRIBUTE_OFFLINE);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_ATTRIBUTE_READONLY);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_ATTRIBUTE_SYSTEM);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_ATTRIBUTE_TEMPORARY);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_FLAG_WRITE_THROUGH);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_FLAG_OVERLAPPED);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_FLAG_NO_BUFFERING);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_FLAG_RANDOM_ACCESS);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_FLAG_SEQUENTIAL_SCAN);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_FLAG_DELETE_ON_CLOSE);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_FLAG_BACKUP_SEMANTICS);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_FLAG_POSIX_SEMANTICS);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_FLAG_OPEN_REPARSE_POINT);
+    DEBUG_FLAG(file_attrs_and_flags, FILE_FLAG_OPEN_NO_RECALL);
+    DEBUG_FLAG(file_attrs_and_flags, SECURITY_ANONYMOUS);
+    DEBUG_FLAG(file_attrs_and_flags, SECURITY_IDENTIFICATION);
+    DEBUG_FLAG(file_attrs_and_flags, SECURITY_IMPERSONATION);
+    DEBUG_FLAG(file_attrs_and_flags, SECURITY_DELEGATION);
+    DEBUG_FLAG(file_attrs_and_flags, SECURITY_CONTEXT_TRACKING);
+    DEBUG_FLAG(file_attrs_and_flags, SECURITY_EFFECTIVE_ONLY);
+    DEBUG_FLAG(file_attrs_and_flags, SECURITY_SQOS_PRESENT);
 
+    client_debug("  DokanFileInfo:\n");
+
+    strcpy(process_name, "Unknown");
+    get_process_name(DokanFileInfo->ProcessId, process_name, PATH_MAX);    
     DEBUG_FILE_INFO(DokanFileInfo, ProcessId);
+    client_debug("   ProcessName: %s\n", process_name);
     DEBUG_FILE_INFO(DokanFileInfo, IsDirectory);
     DEBUG_FILE_INFO(DokanFileInfo, DeleteOnClose);
     DEBUG_FILE_INFO(DokanFileInfo, PagingIo);
     DEBUG_FILE_INFO(DokanFileInfo, SynchronousIo);
     DEBUG_FILE_INFO(DokanFileInfo, Nocache);
     DEBUG_FILE_INFO(DokanFileInfo, WriteToEndOfFile);
-
-    strcpy(process_name, "Unknown");
-    get_process_name(DokanFileInfo->ProcessId, process_name, PATH_MAX);
-    client_debug("   ProcessName: %s\n", process_name);
     
     DokanFileInfo->Context = 0;
 
@@ -970,7 +1016,7 @@ PVFS_Dokan_create_file(
         ret_attr = fs_getattr(fs_path, &credential, &attr);
         if (ret_attr == 0)
         {
-            ret_perm = check_create_perm(&attr, &credential, DesiredAccess);
+            ret_perm = check_create_perm(&attr, &credential, desired_access);
             if (!ret_perm)
             {
                 client_debug("CreateFile exit: access denied\n");
@@ -989,7 +1035,7 @@ PVFS_Dokan_create_file(
 
     ret = 0;
 
-    switch (CreateDisposition)
+    switch (create_disposition)
     {
     case CREATE_ALWAYS:
         if (found)
@@ -1014,8 +1060,7 @@ PVFS_Dokan_create_file(
                 /* set directory flag on for the root directory */
                 DokanFileInfo->IsDirectory = 1;
             }
-            else if (DesiredAccess & (FILE_WRITE_DATA|FILE_WRITE_ATTRIBUTES|FILE_APPEND_DATA)) {
-                /* return an error if Windows wants to write the file */
+            else {
                 ret = -PVFS_EEXIST;
             }
         }
@@ -1070,7 +1115,7 @@ PVFS_Dokan_create_file(
         DokanFileInfo->Context = gen_context();
 
         client_debug("   Context: %llx\n", DokanFileInfo->Context);
-        add_context(DokanFileInfo, FileAttributes, &credential);
+        add_context(DokanFileInfo, file_attrs_and_flags, &credential);
         /* determine whether this is a directory */
         if (!attr_flag)
         {
@@ -1089,7 +1134,7 @@ PVFS_Dokan_create_file(
     free(fs_path);
     PINT_cleanup_credential(&credential);
 
-    /* set negative error code to positive */
+    /* TODO: (temp) set negative error code to positive */
     err = err >= 0 ? err : -err;
 
     client_debug("CreateFile exit: %d (%d)\n", err, ret);
