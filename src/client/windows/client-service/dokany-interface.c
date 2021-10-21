@@ -796,21 +796,12 @@ static int PVFS_sys_attr_to_file_info(char *filename,
     }
 
     /* check for hidden file */
-    /*
-    filename = (char *) malloc(strlen(fs_path) + 1);
-    MALLOC_CHECK(filename);
-    ret = PINT_remove_base_dir(fs_path, filename, strlen(fs_path) + 1);
-    */
     if (strcmp(filename, ".") != 0 &&
         strcmp(filename, "..") != 0 &&
         filename[0] == '.')
     {
         phFileInfo->dwFileAttributes |= FILE_ATTRIBUTE_HIDDEN;
     }
-    /*
-    free(filename);
-    ret = 0;
-    */
         
     /* Check perms for READONLY */
     if (!check_perm(attr, credential, PERM_WRITE))
@@ -857,7 +848,7 @@ static ULONG64 gen_context()
     return (ULONG64) counter.QuadPart;
 }
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_create_file(
     LPCWSTR FileName,
     PDOKAN_IO_SECURITY_CONTEXT SecurityContext,
@@ -1123,7 +1114,8 @@ PVFS_Dokan_create_file(
         }
         if (ret_attr == 0)
         {
-            DokanFileInfo->IsDirectory = attr.objtype & PVFS_TYPE_DIRECTORY;
+            DokanFileInfo->IsDirectory = (attr.objtype & PVFS_TYPE_DIRECTORY) ? TRUE : FALSE;
+            client_debug("   Directory: %s\n", DokanFileInfo->IsDirectory ? "TRUE" : "FALSE");
         }
         else
         {
@@ -1145,7 +1137,7 @@ PVFS_Dokan_create_file(
 
 /* Not used for Dokany */
 #if 0
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_create_directory(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
@@ -1189,7 +1181,7 @@ PVFS_Dokan_create_directory(
 }
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_open_directory(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
@@ -1241,7 +1233,7 @@ PVFS_Dokan_open_directory(
 #endif
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_close_file(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
@@ -1321,7 +1313,7 @@ PVFS_Dokan_cleanup(
 }
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_read_file(
     LPCWSTR          FileName,
     LPVOID           Buffer,
@@ -1450,7 +1442,7 @@ read_file_exit:
 }
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_write_file(
     LPCWSTR          FileName,
     LPCVOID          Buffer,
@@ -1586,7 +1578,7 @@ write_file_exit:
 }
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_flush_file_buffers(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
@@ -1633,7 +1625,7 @@ PVFS_Dokan_flush_file_buffers(
                                 } while (0)
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_get_file_information(
     LPCWSTR                      FileName,
     LPBY_HANDLE_FILE_INFORMATION HandleFileInformation,
@@ -1752,7 +1744,7 @@ PVFS_Dokan_get_file_information(
 }
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_set_file_attributes(
     LPCWSTR          FileName,
     DWORD            FileAttributes,
@@ -1925,7 +1917,7 @@ static int add_dir_entries(
    pvfs2-req-proto.h */
 #define PVFS2_FIND_FILES_MAX    60
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_find_files_with_pattern(
     LPCWSTR          PathName,
     LPCWSTR          SearchPattern,
@@ -2039,6 +2031,7 @@ PVFS_Dokan_find_files_with_pattern(
             
 
             find_data.dwFileAttributes = hfile_info.dwFileAttributes;
+            client_debug("   Matching file attrs: %lx\n", find_data.dwFileAttributes);
             memcpy(&find_data.ftCreationTime, &hfile_info.ftCreationTime, 
                    sizeof(FILETIME));
             memcpy(&find_data.ftLastAccessTime, &hfile_info.ftLastAccessTime,
@@ -2087,7 +2080,7 @@ find_files_exit:
 }
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_delete_file(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
@@ -2125,7 +2118,7 @@ PVFS_Dokan_delete_file(
 }
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_delete_directory(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
@@ -2152,7 +2145,7 @@ PVFS_Dokan_delete_directory(
 }
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_move_file(
     LPCWSTR          FileName, // existing file name
     LPCWSTR          NewFileName,
@@ -2196,7 +2189,7 @@ PVFS_Dokan_move_file(
     return err;
 }
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_lock_file(
     LPCWSTR          FileName,
     LONGLONG         ByteOffset,
@@ -2214,7 +2207,7 @@ PVFS_Dokan_lock_file(
 }
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_set_end_of_file(
     LPCWSTR             FileName,
     LONGLONG            ByteOffset,
@@ -2231,7 +2224,7 @@ PVFS_Dokan_set_end_of_file(
 }
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_set_allocation_size(
     LPCWSTR          FileName,
     LONGLONG         AllocSize,
@@ -2267,7 +2260,7 @@ PVFS_Dokan_set_allocation_size(
 }
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_set_file_time(
     LPCWSTR          FileName,
     CONST FILETIME*  CreationTime,
@@ -2331,7 +2324,7 @@ PVFS_Dokan_set_file_time(
 
 /* TODO: Not currently in use. Causes Windows Explorer to crash. */
 #if 0
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_get_file_security(
     LPCWSTR               FileName,
     PSECURITY_INFORMATION SecurityInformation, 
@@ -2500,7 +2493,7 @@ get_file_security_exit:
 }
 #endif 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_get_file_security(
     LPCWSTR               FileName,
     PSECURITY_INFORMATION SecurityInformation,
@@ -2518,7 +2511,7 @@ PVFS_Dokan_get_file_security(
     return STATUS_NOT_IMPLEMENTED;
 }
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_set_file_security(
     LPCWSTR               FileName,
     PSECURITY_INFORMATION SecurityInformation,
@@ -2562,7 +2555,7 @@ PVFS_Dokan_set_file_security(
 }
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_unlock_file(
     LPCWSTR          FileName,
     LONGLONG         ByteOffset,
@@ -2580,7 +2573,7 @@ PVFS_Dokan_unlock_file(
 }
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_unmount(
     PDOKAN_FILE_INFO    DokanFileInfo)
 {
@@ -2593,7 +2586,7 @@ PVFS_Dokan_unmount(
 }
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_get_disk_free_space(
     PULONGLONG       FreeBytesAvailable,
     PULONGLONG       TotalNumberOfBytes,
@@ -2631,7 +2624,7 @@ PVFS_Dokan_get_disk_free_space(
 }
 
 
-static int __stdcall
+static NTSTATUS DOKAN_CALLBACK
 PVFS_Dokan_get_volume_information(
     LPWSTR           VolumeNameBuffer,
     DWORD            VolumeNameSize,
