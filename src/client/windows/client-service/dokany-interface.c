@@ -113,74 +113,74 @@ static int error_map(int fs_err)
         return ERROR_SUCCESS;         /* 0 */
     case -PVFS_EPERM:          /* Operation not permitted */
     case -PVFS_EACCES:         /* Access not allowed */
-        return -ERROR_ACCESS_DENIED;  /* 5 */
+        return ERROR_ACCESS_DENIED;  /* 5 */
     case -PVFS_ENOENT:         /* No such file or directory */
-        return -ERROR_FILE_NOT_FOUND;  /* 2 */
+        return ERROR_FILE_NOT_FOUND;  /* 2 */
     case -PVFS_EINTR:          /* Interrupted system call */
         return -1;
     case -PVFS_EIO:            /* I/O error */
         return -1;
     case -PVFS_ENXIO:          /* No such device or address */
-        return -ERROR_DEV_NOT_EXIST;  /* 110 */
+        return ERROR_DEV_NOT_EXIST;  /* 110 */
     case -PVFS_EBADF:          /* Bad file number */
-        return -ERROR_INVALID_HANDLE; /* 6 */
+        return ERROR_INVALID_HANDLE; /* 6 */
     case -PVFS_EAGAIN:         /* Try again */
         return -1;
     case -PVFS_ENOMEM:         /* Out of memory */
-        return -ERROR_NOT_ENOUGH_MEMORY;  /* 8 */
+        return ERROR_NOT_ENOUGH_MEMORY;  /* 8 */
     case -PVFS_EFAULT:         /* Bad address */
-        return -ERROR_INVALID_ADDRESS;  /* 487 */
+        return ERROR_INVALID_ADDRESS;  /* 487 */
     case -PVFS_EBUSY:          /* Device or resource busy */
-        return -ERROR_BUSY;              /* 170 */
+        return ERROR_BUSY;              /* 170 */
     case -PVFS_EEXIST:         /* File exists */
-        return -ERROR_FILE_EXISTS;    /* 80 */
+        return ERROR_FILE_EXISTS;    /* 80 */
     case -PVFS_ENODEV:         /* No such device */
-        return -ERROR_DEV_NOT_EXIST;     /* 55 */
+        return ERROR_DEV_NOT_EXIST;     /* 55 */
     case -PVFS_ENOTDIR:        /* Not a directory */
-        return -ERROR_DIRECTORY;         /* 267 */
+        return ERROR_DIRECTORY;         /* 267 */
     case -PVFS_EISDIR:         /* Is a directory */
-        return -ERROR_DIRECTORY;         /* 267 */
+        return ERROR_DIRECTORY;         /* 267 */
     case -PVFS_EINVAL:         /* Invalid argument */
-        return -ERROR_INVALID_PARAMETER; /* 87 */
+        return ERROR_INVALID_PARAMETER; /* 87 */
     case -PVFS_EMFILE:         /* Too many open files */
-        return -ERROR_TOO_MANY_OPEN_FILES;  /* 4 */
+        return ERROR_TOO_MANY_OPEN_FILES;  /* 4 */
     case -PVFS_EFBIG:          /* File too large */
-        return -ERROR_FILE_TOO_LARGE;       /* 223 */
+        return ERROR_FILE_TOO_LARGE;       /* 223 */
     case -PVFS_ENOSPC:         /* No space left on device */
-        return -ERROR_HANDLE_DISK_FULL;     /* 39 */
+        return ERROR_HANDLE_DISK_FULL;     /* 39 */
     case -PVFS_EROFS:          /* Read-only file system */
-        return -ERROR_NOT_SUPPORTED;        /* 50 */
+        return ERROR_NOT_SUPPORTED;        /* 50 */
     case -PVFS_EMLINK:         /* Too many links */
-        return -ERROR_TOO_MANY_LINKS;       /* 1142 */
+        return ERROR_TOO_MANY_LINKS;       /* 1142 */
     case -PVFS_EPIPE:          /* Broken pipe */
-        return -ERROR_BROKEN_PIPE;          /* 109 */
+        return ERROR_BROKEN_PIPE;          /* 109 */
     case -PVFS_EDEADLK:        /* Resource deadlock would occur */
-        return -ERROR_POSSIBLE_DEADLOCK;    /* 1131 */
+        return ERROR_POSSIBLE_DEADLOCK;    /* 1131 */
     case -PVFS_ENAMETOOLONG:   /* File name too long */
-        return -ERROR_BUFFER_OVERFLOW;      /* 111 */
+        return ERROR_BUFFER_OVERFLOW;      /* 111 */
     case -PVFS_ENOLCK:         /* No record locks available */
-        return -ERROR_LOCK_FAILED;          /* 167 */
+        return ERROR_LOCK_FAILED;          /* 167 */
     case -PVFS_ENOSYS:         /* Function not implemented */
-        return -ERROR_CALL_NOT_IMPLEMENTED; /* 120 */
+        return ERROR_CALL_NOT_IMPLEMENTED; /* 120 */
     case -PVFS_ENOTEMPTY:      /* Directory not empty */
-        return -ERROR_DIR_NOT_EMPTY;        /* 145 */
+        return ERROR_DIR_NOT_EMPTY;        /* 145 */
     case -PVFS_ELOOP:          /* Too many symbolic links encountered */
-        return -ERROR_TOO_MANY_LINKS;       /* 1142 */
+        return ERROR_TOO_MANY_LINKS;       /* 1142 */
     case -PVFS_EWOULDBLOCK:    /* Operation would block */
-        return -WSAEWOULDBLOCK;             /* 10035 */
+        return WSAEWOULDBLOCK;             /* 10035 */
     case -PVFS_ENOMSG:         /* No message of desired type */
-        return -ERROR_INVALID_MESSAGE;      /* 1002 */
+        return ERROR_INVALID_MESSAGE;      /* 1002 */
     case -PVFS_EUNATCH:        /* Protocol driver not attached */
-        return -ERROR_FS_DRIVER_REQUIRED;   /* 588 */
+        return ERROR_FS_DRIVER_REQUIRED;   /* 588 */
     case -PVFS_EBADR:          /* Invalid request descriptor */
     case -PVFS_EDEADLOCK:      /* Deadlock would result */
-        return -ERROR_POSSIBLE_DEADLOCK;    /* 1131 */
+        return ERROR_POSSIBLE_DEADLOCK;    /* 1131 */
     case -PVFS_ENODATA:        /* No data available */
-        return -ERROR_NO_DATA;              /* 232 */
+        return ERROR_NO_DATA;              /* 232 */
     case -PVFS_ETIME:          /* Timer expired */
-        return -ERROR_TIMEOUT;              /* 1460 */
+        return ERROR_TIMEOUT;              /* 1460 */
     case -PVFS_ENONET:         /* Machine is not on the network */
-        return -ERROR_NO_NETWORK;           /* 1222 */
+        return ERROR_NO_NETWORK;           /* 1222 */
     case -PVFS_EREMOTE:        /* Object is remote */
         return -1;          
     case -PVFS_ECOMM:          /* Communication error on send */
@@ -188,45 +188,45 @@ static int error_map(int fs_err)
     case -PVFS_EPROTO:         /* Protocol error */
         return -1;
     case -PVFS_EBADMSG:        /* Not a data message */
-        return -ERROR_INVALID_MESSAGE;      /* 1002 */      
+        return ERROR_INVALID_MESSAGE;      /* 1002 */      
     case -PVFS_EOVERFLOW:      /* Value too large for defined data type */
-        return -ERROR_BUFFER_OVERFLOW;      /* 111 */
+        return ERROR_BUFFER_OVERFLOW;      /* 111 */
     case -PVFS_ERESTART:       /* Interrupted system call should be restarted */
         return -1;
     case -PVFS_EMSGSIZE:       /* Message too long */
-        return -WSAEMSGSIZE;                /* 10040 */
+        return WSAEMSGSIZE;                /* 10040 */
     case -PVFS_EPROTOTYPE:     /* Protocol wrong type for socket */
-        return -WSAEPROTOTYPE;              /* 10041 */
+        return WSAEPROTOTYPE;              /* 10041 */
     case -PVFS_ENOPROTOOPT:    /* Protocol not available */
-        return -WSAENOPROTOOPT;             /* 10042 */
+        return WSAENOPROTOOPT;             /* 10042 */
     case -PVFS_EPROTONOSUPPORT:/* Protocol not supported */
-        return -WSAEPROTONOSUPPORT;         /* 10043 */
+        return WSAEPROTONOSUPPORT;         /* 10043 */
     case -PVFS_EOPNOTSUPP:     /* Operation not supported on transport endpoint */
-        return -WSAEOPNOTSUPP;              /* 10045 */
+        return WSAEOPNOTSUPP;              /* 10045 */
     case -PVFS_EADDRINUSE:     /* Address already in use */
-        return -WSAEADDRINUSE;              /* 10048 */
+        return WSAEADDRINUSE;              /* 10048 */
     case -PVFS_EADDRNOTAVAIL:  /* Cannot assign requested address */
-        return -WSAEADDRNOTAVAIL;           /* 10049 */
+        return WSAEADDRNOTAVAIL;           /* 10049 */
     case -PVFS_ENETDOWN:       /* Network is down */
-        return -WSAENETDOWN;                /* 10050 */
+        return WSAENETDOWN;                /* 10050 */
     case -PVFS_ENETUNREACH:    /* Network is unreachable */
-        return -WSAENETUNREACH;             /* 10051 */
+        return WSAENETUNREACH;             /* 10051 */
     case -PVFS_ENETRESET:      /* Network dropped connection because of reset */
-        return -WSAENETRESET;               /* 10052 */
+        return WSAENETRESET;               /* 10052 */
     case -PVFS_ENOBUFS:        /* No buffer space available */
-        return -WSAENOBUFS;                 /* 10055 */
+        return WSAENOBUFS;                 /* 10055 */
     case -PVFS_ETIMEDOUT:      /* Connection timed out */
-        return -WSAETIMEDOUT;               /* 10060 */
+        return WSAETIMEDOUT;               /* 10060 */
     case -PVFS_ECONNREFUSED:   /* Connection refused */
-        return -WSAECONNREFUSED;            /* 10061 */
+        return WSAECONNREFUSED;            /* 10061 */
     case -PVFS_EHOSTDOWN:      /* Host is down */
-        return -WSAEHOSTDOWN;               /* 10064 */
+        return WSAEHOSTDOWN;               /* 10064 */
     case -PVFS_EHOSTUNREACH:   /* No route to host */
-        return -WSAEHOSTUNREACH;            /* 10065 */
+        return WSAEHOSTUNREACH;            /* 10065 */
     case -PVFS_EALREADY:       /* Operation already in progress */
-        return -WSAEALREADY;                /* 10037 */
+        return WSAEALREADY;                /* 10037 */
     case -PVFS_ECONNRESET:    /* Connection reset by peer */
-        return -WSAECONNRESET;              /* 10054 */
+        return WSAECONNRESET;              /* 10054 */
     }
 
     return -1;
@@ -994,7 +994,7 @@ PVFS_Dokan_create_file(
     else if (ret != 0)
     {
         free(fs_path);
-        return -error_map(ret);
+        return error_map(ret);
     }
     else
     {
@@ -1020,7 +1020,7 @@ PVFS_Dokan_create_file(
         {
             client_debug("CreateFile exit: fs_getattr (1) failed with code: %d\n", ret_attr);
             free(fs_path);
-            return -error_map(ret_attr);
+            return error_map(ret_attr);
         }
     }
 
@@ -1083,6 +1083,11 @@ PVFS_Dokan_create_file(
             /* return error */;
             ret = -PVFS_ENOENT;
         }
+        else {
+            if (DokanFileInfo->IsDirectory && !(attr.objtype & PVFS_TYPE_DIRECTORY)) {
+                ret = -PVFS_ENOENT;
+            }
+        }
         break;
     case TRUNCATE_EXISTING:
         if (!found)
@@ -1125,9 +1130,6 @@ PVFS_Dokan_create_file(
 
     free(fs_path);
     PINT_cleanup_credential(&credential);
-
-    /* TODO: (temp) set negative error code to positive */
-    err = err >= 0 ? err : -err;
 
     client_debug("CreateFile exit: %d (%d)\n", err, ret);
 
@@ -1719,7 +1721,7 @@ PVFS_Dokan_get_file_information(
                     strcat(info, "NORMAL");
                 }
 
-                client_debug("%s\n", info);
+                client_debug("%s (%lx)\n", info, HandleFileInformation->dwFileAttributes);
 
                 /* debug volume serial no. and index */
                 client_debug("   Volume Serial Number: %x\n", HandleFileInformation->dwVolumeSerialNumber);
