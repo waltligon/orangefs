@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
+ * (C) 2010-2021 Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -167,6 +167,82 @@ static void close_config_file(FILE *f)
     fclose(f);
 }
 
+# define MAX_ARGS 16
+static char** get_args(char* args)
+{
+    int i = 0, alloc_flag = 0, c;
+    char quote_flag = 0;
+    char** out_args;
+    char* p, *cur_arg = NULL;
+
+    /* allocate max_args array + 1 for null ptr*/
+    out_args = (char**)malloc(sizeof(char*) * (MAX_ARGS + 1));
+    if (!out_args) {
+        return NULL;
+    }
+
+    ZeroMemory(out_args, sizeof(char*) * (MAX_ARGS + 1));
+
+    /* parse args, splitting on whitespace or quote marks */
+    p = args;
+    while (*p) {
+        EAT_WS(p);
+
+        if (!(*p)) {
+            break;
+        }
+
+        if (*p == '"' || *p == '\'') {
+            quote_flag = *p;
+            p++;
+        }
+
+        /* get current argument */
+        while (*p && ((quote_flag && *p != quote_flag) || (!quote_flag && (*p != ' ' && *p != '\t')))) {
+            if (!alloc_flag) {
+                out_args[i] = (char*)malloc(STR_BUF_LEN);
+                if (!out_args[i]) {
+                    return NULL;
+                }
+                ZeroMemory(out_args[i], STR_BUF_LEN);
+                cur_arg = out_args[i++];
+                c = 0;
+                alloc_flag = 1;
+            }
+            cur_arg[c++] = *p++;
+            if (c == STR_BUF_LEN-1) {
+                break;
+            }
+        }
+
+        /* move to next argument */
+        if (*p && *p == quote_flag) {
+            p++;
+        }
+        alloc_flag = quote_flag = 0;
+        if (i == MAX_ARGS) {
+            break;
+        }
+
+    }
+
+    return out_args;
+}
+
+static void free_args(char** args) {
+    char* cur_arg; 
+
+    if (!args) {
+        return;
+    }
+
+    while ((cur_arg = *args++)) {
+        free(cur_arg);
+    }
+
+    return;
+}
+
 static KEYWORD_CB(mount)
 {
     KEYWORD_ARGS_CHECK();
@@ -217,15 +293,13 @@ static KEYWORD_CB(user_mode)
 
 static KEYWORD_CB(user)
 {
-    char *token, *p;
-    char user_name[STR_BUF_LEN];
+    char** iargs, *user_name, *uid_gid, *p;
     char uidbuf[16], gidbuf[16];
     PVFS_uid uid;
     PVFS_gid gid;
-    int i, ret = 0;
+    int i, ret = 0, quote_flag = 0;
     PCONFIG_USER_ENTRY user_entry;
     
-
     if (options->user_mode != USER_MODE_LIST)
     {
         _snprintf(error_msg, ERROR_MSG_LEN, "%s option: must be in list mode", 
@@ -233,25 +307,50 @@ static KEYWORD_CB(user)
         return KEYWORD_ERR_UNEXPECTED;
     }
 
-    /* tokenize arguments */
-    token = strtok(args, " \t");
-
-    if (token)
+    iargs = get_args(args);
+    if (!iargs)
     {
-        /* copy user name */
-        strncpy(user_name, token, STR_BUF_LEN);
+        _snprintf(error_msg, ERROR_MSG_LEN, "%s option: format is '%s username uid:gid'",
+            keyword, keyword);
+        return KEYWORD_ERR_NO_ARGS;
+    }
+    if (!iargs[0] || !iargs[1]) {
+        _snprintf(error_msg, ERROR_MSG_LEN, "%s option: format is '%s username uid:gid'",
+            keyword, keyword);
+        return KEYWORD_ERR_INVALID_ARGS;
+    }
 
-        token = strtok(NULL, " \t");
-        if (token)
+    user_name = iargs[0];
+    uid_gid = iargs[1];
+    
+    if (uid_gid)
+    {
+        uidbuf[0] = gidbuf[0] = '\0';
+        i = 0;
+        p = uid_gid;
+        while (*p && *p != ':' && i < 15)
         {
-            uidbuf[0] = gidbuf[0] = '\0';
+            if (isdigit(*p))
+            {
+                uidbuf[i++] = *p++;
+            }
+            else 
+            {
+                ret = -1;
+                break;
+            }
+        }
+        uidbuf[i] = '\0';
+        if (ret == 0)
+        {
+            if (*p == ':')
+                p++;
             i = 0;
-            p = token;
-            while (*p && *p != ':' && i < 15)
+            while(*p && i < 15)
             {
                 if (isdigit(*p))
                 {
-                    uidbuf[i++] = *p++;
+                    gidbuf[i++] = *p++;
                 }
                 else 
                 {
@@ -259,37 +358,14 @@ static KEYWORD_CB(user)
                     break;
                 }
             }
-            uidbuf[i] = '\0';
-            if (ret == 0)
-            {
-                if (*p == ':')
-                    p++;
-                i = 0;
-                while(*p && i < 15)
-                {
-                    if (isdigit(*p))
-                    {
-                        gidbuf[i++] = *p++;
-                    }
-                    else 
-                    {
-                        ret = -1;
-                        break;
-                    }
-                }
-                gidbuf[i] = '\0';
-            }
-        }
-        else
-        {
-            ret = -1;
+            gidbuf[i] = '\0';
         }
     }
     else
     {
-        ret = -1;
+            ret = -1;
     }
-
+    
     if (ret == 0)
         ret = !(strlen(uidbuf) > 0 && strlen(gidbuf) > 0);
 
@@ -320,6 +396,10 @@ static KEYWORD_CB(user)
 
         /* insert entry */
         qlist_add_tail(&user_entry->link, &user_list);
+    }
+
+    if (iargs) {
+        free_args(iargs);
     }
 
     return ret;
@@ -497,12 +577,13 @@ static KEYWORD_CB(cert_security)
 static KEYWORD_CB(ldap)
 {
     char temp[STR_BUF_LEN], *token;
-    int ret;
+    int ret = -1;
 
     if (!stricmp(keyword, "ldap-host"))
     {
         /* parse string of form ldap[s]://host[:port] */      
         strncpy(temp, args, STR_BUF_LEN);
+        temp[STR_BUF_LEN - 1] = '\0';
         token = strtok(temp, ":/");
         if (token != NULL)
         {
@@ -543,7 +624,7 @@ static KEYWORD_CB(ldap)
     else if (!stricmp(keyword, "ldap-bind-dn"))
     {
         /* the dn of the user used to bind to the ldap host */
-        strncpy(options->ldap.bind_dn, args, STR_BUF_LEN);
+        strncpy(options->ldap.bind_dn, args, sizeof(options->ldap.bind_dn));
         options->ldap.bind_dn[255] = '\0';
 
         ret = strlen(args) > 0 ? 0 : -1;
@@ -560,7 +641,7 @@ static KEYWORD_CB(ldap)
     else if (!stricmp(keyword, "ldap-search-root"))
     {
         /* dn of the object from which to start the search */
-        strncpy(options->ldap.search_root, args, STR_BUF_LEN);
+        strncpy(options->ldap.search_root, args, sizeof(options->ldap.bind_dn));
         options->ldap.search_root[255] = '\0';
 
         ret = strlen(args) > 0 ? 0 : -1;

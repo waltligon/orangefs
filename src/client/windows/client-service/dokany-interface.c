@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2021 Clemson University and Omnibond Systems, LLC
+ * Copyright (C) 2010-2021 Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -104,132 +104,186 @@ void client_debug(char *format, ...)
 
 /* map a file system error code to a Dokan/Windows code 
    -1 is used as a default error */
-static int error_map(int fs_err)
+static NTSTATUS error_map(int fs_err)
 {
+    NTSTATUS ret = (NTSTATUS) fs_err;
+
     switch (fs_err)
     {
     case 0:
-    case STATUS_OBJECT_NAME_COLLISION:
-        return ERROR_SUCCESS;         /* 0 */
+    case STATUS_OBJECT_NAME_COLLISION: /* special case */
+        ret = STATUS_SUCCESS;         /* 0 */
+        break;
     case -PVFS_EPERM:          /* Operation not permitted */
     case -PVFS_EACCES:         /* Access not allowed */
-        return ERROR_ACCESS_DENIED;  /* 5 */
+        ret = ERROR_ACCESS_DENIED;  /* 5 */
+        break;
     case -PVFS_ENOENT:         /* No such file or directory */
-        return ERROR_FILE_NOT_FOUND;  /* 2 */
+        ret = ERROR_FILE_NOT_FOUND;  /* 2 */
+        break;
     case -PVFS_EINTR:          /* Interrupted system call */
-        return -1;
     case -PVFS_EIO:            /* I/O error */
-        return -1;
+        ret = -1;
+        break;
     case -PVFS_ENXIO:          /* No such device or address */
-        return ERROR_DEV_NOT_EXIST;  /* 110 */
+        ret = ERROR_DEV_NOT_EXIST;  /* 110 */
+        break;
     case -PVFS_EBADF:          /* Bad file number */
-        return ERROR_INVALID_HANDLE; /* 6 */
+        ret = ERROR_INVALID_HANDLE; /* 6 */
+        break;
     case -PVFS_EAGAIN:         /* Try again */
-        return -1;
+        ret = -1;
+        break;
     case -PVFS_ENOMEM:         /* Out of memory */
-        return ERROR_NOT_ENOUGH_MEMORY;  /* 8 */
+        ret = ERROR_NOT_ENOUGH_MEMORY;  /* 8 */
+        break;
     case -PVFS_EFAULT:         /* Bad address */
-        return ERROR_INVALID_ADDRESS;  /* 487 */
+        ret = ERROR_INVALID_ADDRESS;  /* 487 */
+        break;
     case -PVFS_EBUSY:          /* Device or resource busy */
-        return ERROR_BUSY;              /* 170 */
+        ret = ERROR_BUSY;              /* 170 */
+        break;
     case -PVFS_EEXIST:         /* File exists */
-        return ERROR_FILE_EXISTS;    /* 80 */
+        ret = ERROR_FILE_EXISTS;    /* 80 */
+        break;
     case -PVFS_ENODEV:         /* No such device */
-        return ERROR_DEV_NOT_EXIST;     /* 55 */
+        ret = ERROR_DEV_NOT_EXIST;     /* 55 */
+        break;
     case -PVFS_ENOTDIR:        /* Not a directory */
-        return ERROR_DIRECTORY;         /* 267 */
+        ret = ERROR_DIRECTORY;         /* 267 */
+        break;
     case -PVFS_EISDIR:         /* Is a directory */
-        return ERROR_DIRECTORY;         /* 267 */
+        ret = ERROR_DIRECTORY;         /* 267 */
+        break;
     case -PVFS_EINVAL:         /* Invalid argument */
-        return ERROR_INVALID_PARAMETER; /* 87 */
+        ret = ERROR_INVALID_PARAMETER; /* 87 */
+        break;
     case -PVFS_EMFILE:         /* Too many open files */
-        return ERROR_TOO_MANY_OPEN_FILES;  /* 4 */
+        ret = ERROR_TOO_MANY_OPEN_FILES;  /* 4 */
+        break;
     case -PVFS_EFBIG:          /* File too large */
-        return ERROR_FILE_TOO_LARGE;       /* 223 */
+        ret = ERROR_FILE_TOO_LARGE;       /* 223 */
+        break;
     case -PVFS_ENOSPC:         /* No space left on device */
-        return ERROR_HANDLE_DISK_FULL;     /* 39 */
+        ret = ERROR_HANDLE_DISK_FULL;     /* 39 */
+        break;
     case -PVFS_EROFS:          /* Read-only file system */
-        return ERROR_NOT_SUPPORTED;        /* 50 */
+        ret = ERROR_NOT_SUPPORTED;        /* 50 */
+        break;
     case -PVFS_EMLINK:         /* Too many links */
-        return ERROR_TOO_MANY_LINKS;       /* 1142 */
+        ret = ERROR_TOO_MANY_LINKS;       /* 1142 */
+        break;
     case -PVFS_EPIPE:          /* Broken pipe */
-        return ERROR_BROKEN_PIPE;          /* 109 */
+        ret = ERROR_BROKEN_PIPE;          /* 109 */
+        break;
     case -PVFS_EDEADLK:        /* Resource deadlock would occur */
-        return ERROR_POSSIBLE_DEADLOCK;    /* 1131 */
+        ret = ERROR_POSSIBLE_DEADLOCK;    /* 1131 */
+        break;
     case -PVFS_ENAMETOOLONG:   /* File name too long */
-        return ERROR_BUFFER_OVERFLOW;      /* 111 */
+        ret = ERROR_BUFFER_OVERFLOW;      /* 111 */
+        break;
     case -PVFS_ENOLCK:         /* No record locks available */
-        return ERROR_LOCK_FAILED;          /* 167 */
+        ret = ERROR_LOCK_FAILED;          /* 167 */
+        break;
     case -PVFS_ENOSYS:         /* Function not implemented */
-        return ERROR_CALL_NOT_IMPLEMENTED; /* 120 */
+        ret = ERROR_CALL_NOT_IMPLEMENTED; /* 120 */
+        break;
     case -PVFS_ENOTEMPTY:      /* Directory not empty */
-        return ERROR_DIR_NOT_EMPTY;        /* 145 */
+        ret = ERROR_DIR_NOT_EMPTY;        /* 145 */
+        break;
     case -PVFS_ELOOP:          /* Too many symbolic links encountered */
-        return ERROR_TOO_MANY_LINKS;       /* 1142 */
+        ret = ERROR_TOO_MANY_LINKS;       /* 1142 */
+        break;
     case -PVFS_EWOULDBLOCK:    /* Operation would block */
-        return WSAEWOULDBLOCK;             /* 10035 */
+        ret = WSAEWOULDBLOCK;             /* 10035 */
+        break;
     case -PVFS_ENOMSG:         /* No message of desired type */
-        return ERROR_INVALID_MESSAGE;      /* 1002 */
+        ret = ERROR_INVALID_MESSAGE;      /* 1002 */
+        break;
     case -PVFS_EUNATCH:        /* Protocol driver not attached */
-        return ERROR_FS_DRIVER_REQUIRED;   /* 588 */
+        ret = ERROR_FS_DRIVER_REQUIRED;   /* 588 */
+        break;
     case -PVFS_EBADR:          /* Invalid request descriptor */
     case -PVFS_EDEADLOCK:      /* Deadlock would result */
-        return ERROR_POSSIBLE_DEADLOCK;    /* 1131 */
+        ret = ERROR_POSSIBLE_DEADLOCK;    /* 1131 */
+        break;
     case -PVFS_ENODATA:        /* No data available */
-        return ERROR_NO_DATA;              /* 232 */
+        ret = ERROR_NO_DATA;              /* 232 */
+        break;
     case -PVFS_ETIME:          /* Timer expired */
-        return ERROR_TIMEOUT;              /* 1460 */
+        ret = ERROR_TIMEOUT;              /* 1460 */
+        break;
     case -PVFS_ENONET:         /* Machine is not on the network */
-        return ERROR_NO_NETWORK;           /* 1222 */
+        ret = ERROR_NO_NETWORK;           /* 1222 */
+        break;
     case -PVFS_EREMOTE:        /* Object is remote */
-        return -1;          
     case -PVFS_ECOMM:          /* Communication error on send */
-        return -1;
     case -PVFS_EPROTO:         /* Protocol error */
-        return -1;
+        ret = -1;
+        break;
     case -PVFS_EBADMSG:        /* Not a data message */
-        return ERROR_INVALID_MESSAGE;      /* 1002 */      
+        ret = ERROR_INVALID_MESSAGE;      /* 1002 */
+        break;
     case -PVFS_EOVERFLOW:      /* Value too large for defined data type */
-        return ERROR_BUFFER_OVERFLOW;      /* 111 */
+        ret = ERROR_BUFFER_OVERFLOW;      /* 111 */
+        break;
     case -PVFS_ERESTART:       /* Interrupted system call should be restarted */
-        return -1;
+        ret = -1;
+        break;
     case -PVFS_EMSGSIZE:       /* Message too long */
-        return WSAEMSGSIZE;                /* 10040 */
+        ret = WSAEMSGSIZE;                /* 10040 */
+        break;
     case -PVFS_EPROTOTYPE:     /* Protocol wrong type for socket */
-        return WSAEPROTOTYPE;              /* 10041 */
+        ret = WSAEPROTOTYPE;              /* 10041 */
+        break;
     case -PVFS_ENOPROTOOPT:    /* Protocol not available */
-        return WSAENOPROTOOPT;             /* 10042 */
+        ret = WSAENOPROTOOPT;             /* 10042 */
+        break;
     case -PVFS_EPROTONOSUPPORT:/* Protocol not supported */
-        return WSAEPROTONOSUPPORT;         /* 10043 */
+        ret = WSAEPROTONOSUPPORT;         /* 10043 */
+        break;
     case -PVFS_EOPNOTSUPP:     /* Operation not supported on transport endpoint */
-        return WSAEOPNOTSUPP;              /* 10045 */
+        ret = WSAEOPNOTSUPP;              /* 10045 */
+        break;
     case -PVFS_EADDRINUSE:     /* Address already in use */
-        return WSAEADDRINUSE;              /* 10048 */
+        ret = WSAEADDRINUSE;              /* 10048 */
+        break;
     case -PVFS_EADDRNOTAVAIL:  /* Cannot assign requested address */
-        return WSAEADDRNOTAVAIL;           /* 10049 */
+        ret = WSAEADDRNOTAVAIL;           /* 10049 */
+        break;
     case -PVFS_ENETDOWN:       /* Network is down */
-        return WSAENETDOWN;                /* 10050 */
+        ret = WSAENETDOWN;                /* 10050 */
+        break;
     case -PVFS_ENETUNREACH:    /* Network is unreachable */
-        return WSAENETUNREACH;             /* 10051 */
+        ret = WSAENETUNREACH;             /* 10051 */
+        break;
     case -PVFS_ENETRESET:      /* Network dropped connection because of reset */
-        return WSAENETRESET;               /* 10052 */
+        ret = WSAENETRESET;               /* 10052 */
+        break;
     case -PVFS_ENOBUFS:        /* No buffer space available */
-        return WSAENOBUFS;                 /* 10055 */
+        ret = WSAENOBUFS;                 /* 10055 */
+        break;
     case -PVFS_ETIMEDOUT:      /* Connection timed out */
-        return WSAETIMEDOUT;               /* 10060 */
+        ret = WSAETIMEDOUT;               /* 10060 */
+        break;
     case -PVFS_ECONNREFUSED:   /* Connection refused */
-        return WSAECONNREFUSED;            /* 10061 */
+        ret = WSAECONNREFUSED;            /* 10061 */
+        break;
     case -PVFS_EHOSTDOWN:      /* Host is down */
-        return WSAEHOSTDOWN;               /* 10064 */
+        ret = WSAEHOSTDOWN;               /* 10064 */
+        break;
     case -PVFS_EHOSTUNREACH:   /* No route to host */
-        return WSAEHOSTUNREACH;            /* 10065 */
+        ret = WSAEHOSTUNREACH;            /* 10065 */
+        break;
     case -PVFS_EALREADY:       /* Operation already in progress */
-        return WSAEALREADY;                /* 10037 */
+        ret = WSAEALREADY;                /* 10037 */
+        break;
     case -PVFS_ECONNRESET:    /* Connection reset by peer */
-        return WSAECONNRESET;              /* 10054 */
+        ret = WSAECONNRESET;              /* 10054 */
+        break;
     }
 
-    return -1;
+    return DokanNtStatusFromWin32(ret);
 }
 
 /* convert string from wide char (Unicode) to multi-byte string */
@@ -1085,7 +1139,7 @@ PVFS_Dokan_create_file(
         }
         else {
             if (DokanFileInfo->IsDirectory && !(attr.objtype & PVFS_TYPE_DIRECTORY)) {
-                ret = -PVFS_ENOENT;
+                ret = -PVFS_ENOTDIR;
             }
         }
         break;

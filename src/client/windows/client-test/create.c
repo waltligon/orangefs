@@ -301,17 +301,17 @@ int create_file_toolong(global_options *options, int fatal)
 {
     int code;
 
-    code = create_file_long_int(options, MAX_FILE_NAME+1);
+    code = create_file_long_int(options, MAX_FILE_NAME*2-1);
 
     report_result(options,
                   "create_file_toolong",
                   "main",
                   RESULT_FAILURE,
-                  22,
+                  2,
                   OPER_EQUAL,
                   code);
 
-    if (code != 22 && fatal)
+    if (code != 2 && fatal)
         return CODE_FATAL;
 
     return 0;
