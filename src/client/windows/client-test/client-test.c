@@ -150,9 +150,12 @@ int init(int argc, char **argv,
     attrs = GetFileAttributes(options->root_dir);
 
     /* root directory must be found */
-    if ((attrs == INVALID_FILE_ATTRIBUTES) || 
-        !(attrs & FILE_ATTRIBUTE_DIRECTORY))
+    if ((attrs == INVALID_FILE_ATTRIBUTES) ||
+        !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+        fprintf(stderr, "GetLastError: %d\n", GetLastError());
         return FALSE;
+    }
+
 #else
     ret = stat(options->root_dir, &buf);
     if (ret != 0 || !(S_ISDIR(buf.st_mode)))
@@ -321,10 +324,10 @@ int main(int argc, char **argv)
 
     free(options->root_dir);
 
-    {
+/* {
         char dummy[16];
-        gets(dummy);
+        fgets(dummy, 15, stdin);
     }
-
+*/
     return ret;
 }
