@@ -41,7 +41,7 @@ struct PINT_worker_external_s
     gen_mutex_t mutex;
 };
 
-struct PINT_worker_impl PINT_worker_external_impl;
+extern struct PINT_worker_impl PINT_worker_external_impl;
 
 #endif
 
