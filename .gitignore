@@ -23,6 +23,7 @@
 module.mk
 cscope.*
 config.status
+.DS_Store
 
 #
 # Ignore generated dependency files...
