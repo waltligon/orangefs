@@ -10,7 +10,7 @@ weight=220
 
 *Note*     Neither the default nor certificate-based modes of security
 require any additional setup on Server systems. For these modes, see the
-next topic, [Server Startup]({{<relref "Server-Startup.md">}})
+next topic, [Server Startup]({{<relref "Server-Startup">}})
 
 Procedure
 ---------
@@ -28,9 +28,8 @@ where...
 *hostname* = host name of the Server system
 
 **Note     **The above command line format assumes you generated your
-keys according to instructions in [Set Up
-Security](Setup_Security_(Build).htm) under the [Build and
-Configure](Build_and_Configure.htm) step.
+keys according to instructions in [Advanced Security Build]({{<relref "Setup_Security_(Build)#key-based-mode">}}) under the "Build and
+Configure" step.
 
 ### Copying Keys to Many Systems
 
@@ -43,11 +42,10 @@ true**:
     you plan to use an OrangeFS client interface.
 
 2.  You generated your security keys during the [Build and
-    Configure](Build_and_Configure.htm) step, using the script provided
+    Configure]({{<relref "Setup_Security_(Build)#key-based-mode">}}) step, using the script provided
     with OrangeFS (pvfs2-gen-keys.sh).
 
-**Note     **For more information about client interfaces, see [Add
-Clients](Installing_Other_Clients.htm).
+**Note     **For more information about client interfaces, see [OrangeFS Clients]({{<relref "nix-clients">}}).
 
  
 

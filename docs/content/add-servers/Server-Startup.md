@@ -49,7 +49,7 @@ once. \
 the \<ServerOptions\> section in OrangeFS configuration file. With this
 method, you can specify unique directory locations for each server. For
 detailed information on all options in the OrangeFS configuration file,
-see the [Administration Guide](Administration_Guide.htm).
+see the [Administration Guide]({{<relref "configuration/admin_ofs_configuration_file">}}).
 
 ### Start the Server Process
 
@@ -64,8 +64,7 @@ To start the server process, enter the following command:
 
 To avoid repeating this command each time you reboot an OrangeFS server,
 you can place the statement in the appropriate system file(s) for
-automatic execution. For more information, see [Automating System
-Startup](Automating_System_Startup_.htm).
+automatic execution. <!-- TODO: add this page? -> For more information, see [Automating System Startup](Automating_System_Startup_.htm). -->
 
  
 

@@ -5,14 +5,14 @@ weight=470
 
 Information in this topic includes:
 
--   [Configuration](#Configuration)
+-   [Configuration]({{<relref "#configuration">}})
 -   [Configuring the Client Security
-    Mode](WinClient_Admin.htm#Configuring_the_Client_Security_Mode)
--   [User Mapping](#User_Mapping)
+    Mode]({{<relref "#configuring-the-client-security-mode">}})
+-   [User Mapping]({{<relref "#user-mapping">}})
 -   [Installing and Using Globus
-    Toolkit](#Notes_on_Installing_Globus_Toolkit) (certificates only)
--   [Troubleshooting](#Troubleshooting)
--   [Source Code](#Source_Code)
+    Toolkit]({{<relref "#notes-on-installing-globus-toolkit">}}) (certificates only)
+-   [Troubleshooting]({{<relref "#troubleshooting">}})
+-   [Source Code]({{<relref "#source-code">}})
 
 Configuration
 -------------
@@ -218,8 +218,7 @@ Configuring the Client Security Mode
 ------------------------------------
 
 **A**n OrangeFS installation operates in one of three security modes:
-default, key- and certificate-based (see [Preview
-Security](Preview_Security.htm)). You must configure the Client’s
+default, key- and certificate-based (see [Advanced Security Build]({{<relref "build-configure/Setup_Security_(Build)">}})). You must configure the Client’s
 security mode to match that of the servers or it cannot access the file
 system.
 
@@ -242,8 +241,7 @@ mode, which requires no further configuration.
 In this mode, each client and server has a key pair consisting of a
 public key and a private key. Public keys are stored in a server-side
 file known as the keystore, while each client or server stores its
-private key in a protected file. See [Set Up
-Security](Setup_Security_(Build).htm) for instructions for generating
+private key in a protected file. See [Advanced Security Build]({{<relref "build-configure/Setup_Security_(Build)">}}) for instructions for generating
 key pairs. The generated private key for the client should be
 transferred to the client’s local file system.
 
@@ -280,9 +278,9 @@ key-file C:\\Users\\%USERNAME%\\orangefs-cert-key.pem\
 Additionally, a certificate and private key must be obtained for the
 SYSTEM user which performs basic OrangeFS operations such as retrieving
 the disk space. You must place these files in the same directory as
-orangefs-client.exe, C:\\OrangeFS\\Client by default. (See[Using the
+orangefs-client.exe, C:\\OrangeFS\\Client by default. (See [Using the
 orangefs-get-user-cert
-App](WinClient_Admin.htm#Using_the_orangefs-get-user-cert_App) below.)
+App]({{<relref "#using-the-orangefs-get-user-cert-app">}}) below.)
 
 Users can generate their own certificates and private keys using the
 orangefs-get-user-cert app.
@@ -373,7 +371,7 @@ This section includes:
 **Important  **This topic *does not* discuss how to create certificates.
 For details on the mechanics of generating certificates, see [Notes on
 Installing and Using Globus
-Toolkit](#Notes_on_Installing_Globus_Toolkit) later in this topic.
+Toolkit]({{<relref "#notes-on-installing-globus-toolkit">}}) later in this topic.
 
 #### Certificates for Grid-Computing
 
@@ -390,7 +388,7 @@ If you select the certificate mode for user mapping, the certificates
 must already have been generated and placed in their appropriate
 locations. For more information on meeting these certificate
 requirements for Windows Client, see [Notes on Installing and Using
-Globus Toolkit](#Notes_on_Installing_Globus_Toolkit) below.
+Globus Toolkit]({{<relref "#notes-on-installing-globus-toolkit">}}) below.
 
 Future releases of the Windows Client will address alternatives to
 Globus Toolkit. Until then, if you wish to implement a certificate
@@ -499,7 +497,7 @@ ldap-bind-dn cn=orangefs-user,ou=special,o=acme\
 
 Because the password is stored in plain text in the configuration file,
 give the binding user minimal rights to the directory. For more
-information, see [LDAP Security](#LDAP_Security) below.
+information, see [LDAP Security]({{<relref "#ldap-security">}}) below.
 
 #### Search Options
 
@@ -591,8 +589,8 @@ implementation of the Windows Client.
 
 **Note     **Future releases will accommodate alternatives to the Globus
 Toolkit approach. Until then, if you wish to implement a certificate
-solution other than the one described here, please contact [Technical
-Support](Technical_Support.htm).  
+solution other than the one described here, please contact Technical
+Support (see [http://www.orangefs.org](http://www.orangefs.org)).  
 
 Whether you are new to Globus Toolkit or you have already installed it
 for certificate generation, the guidelines and suggestions in this
@@ -659,7 +657,7 @@ grid should be able to locate the file.
 
 The CA certificate must be copied to the Windows Client system after the
 Client is installed. For the file location, see [Client Certificate
-Locations](#Client_Certificate_Locations) below.
+Locations]({{<relref "#client-certificate-locations">}}) below.
 
 ### Using Grid-Based Certification
 
@@ -695,7 +693,7 @@ The resulting proxy certificate is stored by default at
 
 Transfer this certificate to the Windows Client system, along with the
 user certificate. For the file location, see [Client Certificate
-Locations](#Client_Certificate_Locations) below. The proxy certificate
+Locations]({{<relref "#client-certificate-locations">}}) below. The proxy certificate
 must be renamed cert.0, and the user certificate cert.1.
 
 ### Delegating Identities for Clusters
@@ -772,7 +770,7 @@ Troubleshooting
 
 To troubleshoot problems, check the Application Event Log in the Event
 Viewer utility. You can also turn on detailed debugging (see
-[Working\_With\_The\_orangefs.cfg\_File](#Working_With_the_orangefs.cfg_File)).
+[Working with the orangefs.cfg File]({{<relref "#working-with-the-orangefscfg-file">}})).
 
 Startup errors are logged to the Windows Event Log.
 
@@ -787,7 +785,7 @@ the server(s) hosting OrangeFS. Check firewall settings and network
 access lists.
 
 For information about the debug and related keywords, see
-[Configuration](#Configuration). You can use the generated file
+[Configuration]({{<relref "#configuration">}}). You can use the generated file
 orangefs.log to diagnose problems. A file named service.log is also
 created in the installation directory when debugging is enabled and can
 provide more detail on startup errors.

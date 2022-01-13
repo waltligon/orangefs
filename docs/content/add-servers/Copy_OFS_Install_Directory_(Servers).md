@@ -13,8 +13,7 @@ System Requirements
 Any system that functions as an OrangeFS server requires a supported
 distribution of Linux.
 
-**Note     **For more information on supported distributions, see
-[Preview System Requirements](Preview_System_Requirements.htm).
+**Note     **For more information on supported distributions, see the available [packages]({{<relref "quickstart/quickstart-package#install-the-packages">}}) or the source build [prerequisites]({{<relref "quickstart/quickstart-build#build-prerequisites">}}).
 
 Procedure
 ---------
