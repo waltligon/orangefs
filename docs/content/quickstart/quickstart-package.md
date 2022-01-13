@@ -94,36 +94,55 @@ To add clients, complete the following steps:
     pvfs2-ping -m /orangef  
 
 6.  If everything is working correctly, the pvfs2-ping utility will
-    output similar to the following.  
-​{{% panel %}}
-(1) Parsing tab file...  
-(2) Initializing system interface...  
-(3) Initializing each file system found in tab file: /etc/pvfs2tab...  
-    PVFS2 servers: tcp://localhost:3334   
-    Storage name: orangefs 
-    Local mount point: /orangefs  
-/orangefs: Ok  
-(4) Searching for /orangefs in pvfstab...  
-PVFS2 servers: tcp://localhost:3334  
-Storage name: orangefs  
-Local mount point: /pvfsmnt  
-meta servers:  
-tcp://localhost:3334  
-data servers:  
-tcp://localhost:3334  
-(5) Verifying that all servers are responding...  
-meta servers:  
-tcp://localhost:3334 Ok  
-data servers:  
-tcp://localhost:3334 Ok  
-(6) Verifying that fsid 1 is acceptable to all servers...  
-Ok; all servers understand fs_id 1  
-(7) Verifying that root handle is owned by one server...  
-Root handle: 1048576  
-Ok; root handle is owned by exactly one server.  
- =============================================================  
+    output similar to the following:
+{{<code>}}
+$ pvfs2-ping -m /orangefs
+
+(1) Parsing tab file...
+
+(2) Initializing system interface...
+
+(3) Initializing each file system found in tab file: /etc/pvfs2tab...
+
+   PVFS2 servers: tcp://localhost:3334
+   Storage name: orangefs
+   Local mount point: /orangefs
+   /orangefs: Ok
+
+(4) Searching for /orangefs in pvfstab...
+
+   PVFS2 servers: tcp://localhost:3334
+   Storage name: orangefs
+   Local mount point: /pvfsmnt
+
+   meta servers:
+   tcp://localhost:3334
+
+   data servers:
+   tcp://localhost:3334
+
+(5) Verifying that all servers are responding...
+
+   meta servers:
+   tcp://localhost:3334 Ok
+
+   data servers:
+   tcp://localhost:3334 Ok
+
+(6) Verifying that fsid 1 is acceptable to all servers...
+
+   Ok; all servers understand fs_id 1
+
+(7) Verifying that root handle is owned by one server...
+
+   Root handle: 1048576
+     Ok; root handle is owned by exactly one server.
+
+=============================================================
+
 The PVFS2 filesystem at /pvfsmnt appears to be correctly configured.
-{{% /panel %}} 
+
+{{</code>}}
 
 7.   If the kernel module will not be used, OrangeFS is now installed;
     otherwise, the kernel module will be used. To load the kernel
