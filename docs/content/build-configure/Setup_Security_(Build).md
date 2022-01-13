@@ -11,9 +11,9 @@ In the [Procedure]({{<relref "Build_OrangeFS#procedure">}}) section of the previ
 
 Depending on the mode you chose (default, key-based or certificate-based), refer to the appropriate sections in this topic for additional security setup for the Build system:  
 
--   Default_Mode
--   Key-Based_Mode
--   Certificate-Based_Mode
+-   [Default Mode]({{<relref "#default-mode">}})
+-   [Key-Based Mode]({{<relref "#key-based-mode">}})
+-   [Certificate-Based Mode]({{<relref "#certificate-based-mode">}})
 
 ### Default Mode
 
