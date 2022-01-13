@@ -133,8 +133,7 @@ Here is an example \<Security\> context for certificate-based security:
 The \<Security\> context can also be specified in a \<ServerOptions\>
 context for different settings on each server.
 
-For more information, see [OrangeFS Configuration
-File]({{<relref "configuration/admin_ofs_configuration_file">}}).
+For more information, see [Advanced Configuration > OrangeFS Configuration File]({{<relref "configuration/admin_ofs_configuration_file">}}).
 
  
 

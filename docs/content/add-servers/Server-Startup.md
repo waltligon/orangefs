@@ -49,7 +49,7 @@ once. \
 the \<ServerOptions\> section in OrangeFS configuration file. With this
 method, you can specify unique directory locations for each server. For
 detailed information on all options in the OrangeFS configuration file,
-see the [Administration Guide]({{<relref "configuration/admin_ofs_configuration_file">}}).
+see [Advanced Configuration > OrangeFS Configuration File]({{<relref "configuration/admin_ofs_configuration_file">}}).
 
 ### Start the Server Process
 

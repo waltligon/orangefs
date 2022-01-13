@@ -1,5 +1,5 @@
 +++
-title= "OrangeFS Configuration"
+title= "Advanced Configuration"
 weight=500
 +++
 
