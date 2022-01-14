@@ -33,24 +33,23 @@ Install the Packages
 ### Install on Fedora
 
 To install on Fedora, issue the following command:  
-dnf -y install orangefs orangefs-server
+{{<code>}}dnf -y install orangefs orangefs-server{{</code>}}
 
 ### Install on CentOS
 
 To install on CentOS, issue the following commands:
 
-yum -y install epel-release  
-yum -y install orangefs orangefs-server
+{{<code>}}yum -y install epel-release
+yum -y install orangefs orangefs-server{{</code>}}
 
 #### Install the ELRepo Kernel
 
 If the kernel module will be used on CentOS, the ELRepo kernel must be
 installed. To install the ELRepo kernel, issue the following commands:
 
-rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org  
-rpm -Uvh
- http://www.elrepo.org/elrepo-release-7.0-3.el7.elrepo.noarch.rpm  
-yum -y --enablerepo=elrepo-kernel install kernel-ml
+{{<code>}}rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+rpm -Uvh http://www.elrepo.org/elrepo-release-7.0-3.el7.elrepo.noarch.rpm
+yum -y --enablerepo=elrepo-kernel install kernel-ml{{</code>}}
 
 ### Add Servers
 
@@ -58,45 +57,47 @@ To add servers, complete the following steps:
 
 1.  Install the necessary packages on each machine as described above.
     An example server configuration is provided in
-    /etc/orangefs/orangefs.conf.  It will suffice for a single-server
-    installation.  If necessary, the default hostname localhost should
+    `/etc/orangefs/orangefs.conf`.  It will suffice for a single-server
+    installation.  If necessary, the default hostname `localhost` should
     be changed. Otherwise, if multiple servers will be used, generate a
-    configuration using:  
-    pvfs2-genconfig
+    configuration using:
+{{<code>}}pvfs2-genconfig{{</code>}}
 
-2.  Copy the configuration to each server machine.  
-    scp -pr hostname:/etc/orangefs/orangefs.conf /etc/orangefs/orangefs.conf
+2.  Copy the configuration to each server machine.
+{{<code>}}scp -pr HOSTNAME:/etc/orangefs/orangefs.conf /etc/orangefs/orangefs.conf{{</code>}}
 
-3.  Initialize the filesystem and start on each machine.  
-    pvfs2-server -f /etc/orangefs/orangefs.conf  
-    systemctl start orangefs-server  
-    **Note** The filesystem should only be initialized once.    
+3.  Initialize the filesystem and start on each machine.
+{{<code>}}pvfs2-server -f /etc/orangefs/orangefs.conf
+systemctl start orangefs-server{{</code>}}
+    **Note** The filesystem should only be initialized once.
 
-4.  In the future each server can be started manually.  
-    systemctl start orangefs-server  
+4.  In the future each server can be started manually.
+{{<code>}}systemctl start orangefs-server{{</code>}}
 
-5.  Start the server at boot.  
-    systemctl enable orangefs-server  
+5.  Start the server at boot.
+{{<code>}}systemctl enable orangefs-server{{</code>}}
 
 ### Add Clients
 
 To add clients, complete the following steps:
 
 1.  Install the necessary packages on each machine as described above.
-2.  An example client configuration is provided in /etc/pvfs2tab.  It is
+
+2.  An example client configuration is provided in `/etc/pvfs2tab`.  It is
     commented by default.  Uncomment it by removing the leading '\#',
-    then change the hostname if necessary.  
-3.  Change the default mount point, /orangefs, if necessary.
-4.  Copy the client configuration to each client machine.  
-    scp -pr hostname:/etc/pvfs2tab /etc/pvfs2tab
+    then change the hostname if necessary.
 
-5.  Test connectivity to the server  
-    pvfs2-ping -m /orangef  
+3.  Change the default mount point, `/orangefs`, if necessary.
 
-6.  If everything is working correctly, the pvfs2-ping utility will
+4.  Copy the client configuration to each client machine.
+{{<code>}}scp -pr HOSTNAME:/etc/pvfs2tab /etc/pvfs2tab{{</code>}}
+
+5.  Test connectivity to the server
+{{<code>}}pvfs2-ping -m /orangefs{{</code>}}
+
+6.  If everything is working correctly, the `pvfs2-ping` utility will
     output similar to the following:
-{{<code>}}
-$ pvfs2-ping -m /orangefs
+{{<code>}}$ pvfs2-ping -m /orangefs
 
 (1) Parsing tab file...
 
@@ -144,17 +145,17 @@ The PVFS2 filesystem at /pvfsmnt appears to be correctly configured.
 
 {{</code>}}
 
-7.   If the kernel module will not be used, OrangeFS is now installed;
+7.  If the kernel module will not be used, OrangeFS is now installed;
     otherwise, the kernel module will be used. To load the kernel
-    module, issue the following command:  
-    modprobe orangefs  
+    module, issue the following command:
+{{<code>}}modprobe orangefs{{</code>}}
 
-8.  Start the client with the following command:  
-    systemctl start orangefs-client  
+8.  Start the client with the following command:
+{{<code>}}systemctl start orangefs-client{{</code>}}
 
 9.  Next, mount the filesystem.  Change the hostname and mountpoint if
-    necessary.  
-    mount -t pvfs2 tcp://localhost:3334/orangefs /pvfsmnt  
+    necessary.
+{{<code>}}mount -t pvfs2 tcp://localhost:3334/orangefs /pvfsmnt{{</code>}}
 
 The filesystem is now mounted.
 
