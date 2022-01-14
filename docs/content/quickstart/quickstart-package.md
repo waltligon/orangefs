@@ -69,7 +69,7 @@ To add servers, complete the following steps:
 3.  Initialize the filesystem and start on each machine.
 {{<code>}}pvfs2-server -f /etc/orangefs/orangefs.conf
 systemctl start orangefs-server{{</code>}}
-    **Note** The filesystem should only be initialized once.
+{{<alert theme="warning">}}The filesystem should only be initialized once.{{</alert>}}
 
 4.  In the future each server can be started manually.
 {{<code>}}systemctl start orangefs-server{{</code>}}
