@@ -87,17 +87,19 @@ To add clients, complete the following steps:
     commented by default.  Uncomment it by removing the leading '\#',
     then change the hostname if necessary.
 
-3.  Change the default mount point, `/orangefs`, if necessary.
+<!-- TODO: verify /orangefs is the default mount point -->
+3.  Change the default mount point, `/orangefs`, if necessary. This example
+    uses `/ofsmnt`.
 
 4.  Copy the client configuration to each client machine.
 {{<code>}}scp -pr HOSTNAME:/etc/pvfs2tab /etc/pvfs2tab{{</code>}}
 
 5.  Test connectivity to the server
-{{<code>}}pvfs2-ping -m /orangefs{{</code>}}
+{{<code>}}pvfs2-ping -m /ofsmnt{{</code>}}
 
 6.  If everything is working correctly, the `pvfs2-ping` utility will
     output similar to the following:
-{{<code>}}$ pvfs2-ping -m /orangefs
+{{<code>}}$ pvfs2-ping -m /ofsmnt
 
 (1) Parsing tab file...
 
@@ -107,14 +109,14 @@ To add clients, complete the following steps:
 
    PVFS2 servers: tcp://localhost:3334
    Storage name: orangefs
-   Local mount point: /orangefs
+   Local mount point: /ofsmnt
    /orangefs: Ok
 
-(4) Searching for /orangefs in pvfstab...
+(4) Searching for /ofsmnt in pvfstab...
 
    PVFS2 servers: tcp://localhost:3334
    Storage name: orangefs
-   Local mount point: /pvfsmnt
+   Local mount point: /ofsmnt
 
    meta servers:
    tcp://localhost:3334
@@ -141,7 +143,7 @@ To add clients, complete the following steps:
 
 =============================================================
 
-The PVFS2 filesystem at /pvfsmnt appears to be correctly configured.
+The PVFS2 filesystem at /ofsmnt appears to be correctly configured.
 
 {{</code>}}
 
@@ -155,7 +157,7 @@ The PVFS2 filesystem at /pvfsmnt appears to be correctly configured.
 
 9.  Next, mount the filesystem.  Change the hostname and mountpoint if
     necessary.
-{{<code>}}mount -t pvfs2 tcp://localhost:3334/orangefs /pvfsmnt{{</code>}}
+{{<code>}}mount -t pvfs2 tcp://localhost:3334/orangefs /ofsmnt{{</code>}}
 
 The filesystem is now mounted.
 
