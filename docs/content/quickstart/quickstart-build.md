@@ -145,7 +145,7 @@ kernel module, omit `--with-kernel=KERNEL_PATH`{{%/notice%}}
     SUSE:  /lib/modules/\`uname -r\`/source  
     Ubuntu 16.04 (or earlier):  /lib/modules/\`uname -r\`/build  
 
-    {{<notice note>}}Every update will require rebuilding if the distro does not include the OrangeFS kernel module.{{</notice>}}
+    {{<notice note>}}If not using the upstream kernel module, you will need to rebuild OrangeFS anytime you update the kernel.{{</notice>}}
 
 ##### 2. Build and install the software:
 
