@@ -14,16 +14,6 @@
 		    <input data-search-input id="search-by" type="text" placeholder="{{T "Search-placeholder"}}">
 		    <span data-search-clear=""><i class="fa fa-close"></i></span>
 		</div>
-		<script type="text/javascript" src="{{"js/lunr.min.js" | relURL}}"></script>
-		<script type="text/javascript" src="{{"js/auto-complete.js" | relURL}}"></script>
-		<script type="text/javascript">
-        {{ if .Site.IsMultiLingual }}
-            var baseurl = "{{.Site.BaseURL}}{{.Site.LanguagePrefix}}";
-        {{ else }}
-            var baseurl = "{{.Site.BaseURL}}";
-        {{ end }}
-		</script>
-		<script type="text/javascript" src="{{"js/search.js" | relURL}}"></script>
     {{- end}}
   </div>
 
@@ -34,14 +24,14 @@
             </li>
         {{- end}}
 		
-		{{- partial "menu.html" . }}
+		{{- partialCached "menu.html" . }}
 		
 		{{- with .Site.Menus.shortcuts}}
         <section id="shortcuts">
             {{- range sort . "Weight"}}
                 <li class="" role="">
                     {{- .Pre -}}
-                    <a href="{{.URL}}" target="_blank" rel="noopener">{{safeHTML .Name}}</a>
+                    <a href="{{.URL}}" {{if eq $.Site.Params.menushortcutsnewtab true}}target="_blank" {{end}}rel="noopener">{{safeHTML .Name}}</a>
                     {{- .Post -}}
                 </li>
             {{- end}}
@@ -120,7 +110,7 @@
 
 {{define "breadcrumb"}}
 {{ if .page.Parent}}
-{{$value := (printf "<a href='%s'>%s</a> > %s" .page.Parent.URL .page.Parent.Title .value)}}
+{{$value := (printf "<a href='%s'>%s</a> > %s" .page.Parent.Permalink .page.Parent.Title .value)}}
 {{ template "breadcrumb" dict "page" .page.Parent "value" $value }} 
 {{else}}
  {{.value|safeHTML}}
