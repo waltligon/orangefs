@@ -198,7 +198,7 @@ long path, include this find statement:   
 
 ##### 3.  Start the client process on each Client system:
 
-{{<code>}}/opt/orangefs/sbin/pvfs2-client{{</code>}}
+{{<code>}}/opt/orangefs/sbin/pvfs2-client -p /opt/orangefs/sbin/pvfs2-client-core{{</code>}}
 
 ##### 4.  Create a directory in the Client system's /mnt directory
 
