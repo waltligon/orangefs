@@ -38,33 +38,58 @@ The following illustration shows the three interface levels.
 ![](ofs_usrint_parts.png)
 -->
 
-Descriptions of the three levels:
+- [Level 1: System Call Library]({{<relref "#level-1-system-call-library">}})
+- [Level 2: POSIX Library]({{<relref "#level-2-posix-library">}})
+- [Level 3: C Library]({{<relref "#level-3-c-library">}})
 
-  ------- --------------------- ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  Level   Library               Description
+#### Level 1: System Call Library
 
-  1       System Call Library   The first and lowest level is an API with OrangeFS-specific functions that can be substituted for each of the basic POSIX defined I/O related system calls. Essentially, each POSIX system call is replicated in the API. What makes this API different is that each function ONLY works with files in the OrangeFS file systems.
+The first and lowest level is an API with OrangeFS-specific functions that can
+be substituted for each of the basic POSIX defined I/O related system calls.
+Essentially, each POSIX system call is replicated in the API. What makes this
+API different is that each function ONLY works with files in the OrangeFS file
+systems.
 
-  2       POSIX Library         The next layer is a POSIX system call interposition library. Each of the same POSIX system calls represented in the lower layer are provided in this API, this time with the same interface syntax as Linux POSIX. Rather than calling the Linux kernel directly, each call is checked to see if it refers to an OrangeFS file, and if so the call is made to the corresponding function in the lower level API. Thus a call to open() will call pvfs\_open() if the path refers to an OrangeFS file; otherwise it will call the Linux open system call. This API is more convenient, though slightly less efficient, than the lower level one.
+#### Level 2: POSIX Library
 
-  3       C Library             Finally, many programmers prefer to use the C library interface rather than the system call interface to file I/O, in part because it provides I/O buffering and a richer set of interface options. Any C calls are implemented using the POSIX calls, and so their implementation can, in theory, be linked from the C library, and use the OrangeFS POSIX interposition API.
-                                
-                                Virtually all modern Linux systems use shared libraries for the C library. Shared libraries tend to link all of the various functions at various levels into a single shared object that is loaded dynamically. Thus, if you call fopen() using the standard shared C library, there is no means to get that function to call the OrangeFS pvfs\_open() function. For this reason, OrangeFS provides its own implementation of these functions in an OrangeFS C Library interposition API. These functions are identical to those in the standard C library implementation, except that they call the OrangeFS functions, and, in some cases, can be optimized for specific OrangeFS features.
-  ------- --------------------- ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+The next layer is a POSIX system call interposition library. Each of the same
+POSIX system calls represented in the lower layer are provided in this API,
+this time with the same interface syntax as Linux POSIX. Rather than calling
+the Linux kernel directly, each call is checked to see if it refers to an
+OrangeFS file, and if so the call is made to the corresponding function in the
+lower level API. Thus a call to open() will call pvfs\_open() if the path
+refers to an OrangeFS file; otherwise it will call the Linux open system call.
+This API is more convenient, though slightly less efficient, than the lower level one.
 
- 
+#### Level 3: C Library
+
+Finally, many programmers prefer to use the C library interface rather than the
+system call interface to file I/O, in part because it provides I/O buffering
+and a richer set of interface options. Any C calls are implemented using the
+POSIX calls, and so their implementation can, in theory, be linked from the C
+library, and use the OrangeFS POSIX interposition API.
+
+Virtually all modern Linux systems use shared libraries for the C library.
+Shared libraries tend to link all of the various functions at various levels
+into a single shared object that is loaded dynamically. Thus, if you call
+fopen() using the standard shared C library, there is no means to get that
+function to call the OrangeFS pvfs\_open() function. For this reason, OrangeFS
+provides its own implementation of these functions in an OrangeFS C Library
+interposition API. These functions are identical to those in the standard C
+library implementation, except that they call the OrangeFS functions, and, in
+some cases, can be optimized for specific OrangeFS features.
 
 Configuring the Direct Interface
 --------------------------------
 
 This section explains two methods for configuring the Direct Interface.
 
-  -------------------------------------------------- ------------------------------------------------------------------------------------------------
-  [Program Configuration]({{<relref "#program-configuration">}})   Use this method to specify an individual program to run through the OrangeFS Direct Interface.
-  [Global Configuration]({{<relref "#global-configuration">}})     Use this method to specify that all programs will run through the OrangeFS Direct Interface.
-  -------------------------------------------------- ------------------------------------------------------------------------------------------------
+[Program Configuration]({{<relref "#program-configuration">}}):  Use this
+method to specify an individual program to run through the OrangeFS Direct
+Interface.  
+[Global Configuration]({{<relref "#global-configuration">}}):  Use this method
+to specify that all programs will run through the OrangeFS Direct Interface.
 
- 
 
 ### Program Configuration
 
@@ -92,11 +117,10 @@ installation directory
 
 *rep\_lib* = one of the following options:
 
-  -------------------------------- -------------------- ----------------------------------
-  If your program is written to:   Enter this option:   To use this replacement library:
-  C Library or POSIX Library       -lorangefsposix      liborangefsposix
-  OrangeFS System Call Library     -lorangefs           liborangefs
-  -------------------------------- -------------------- ----------------------------------
+| If your program is written to: | Enter this option: | To use this replacement library: |
+| --- | --- | --- |
+| C Library or POSIX Library | -lorangefsposix | liborangefsposix |
+| OrangeFS System Call Library | -lorangefs | liborangefs |
 
 Example command line:
 
@@ -128,11 +152,10 @@ Example: /opt/orangefs/lib
 
 *rep\_shared\_lib* = one of the following replacement library files:
 
-  ---------------------------------- --------------------------------------
-  To redirect programs written to:   Use these replacement library files:
-  C Library or POSIX Library         libofs.so and libpvfs2.so
-  OrangeFS System Call Library       libpvfs2.so
-  ---------------------------------- --------------------------------------
+| To redirect programs written to: | Use these replacement library files: |
+| --- | --- |
+| C Library or POSIX Library | libofs.so and libpvfs2.so |
+| OrangeFS System Call Library | libpvfs2.so |
 
 Example: LD\_PRELOAD=\$OFS\_LIB\_PATH/libpvfs2.so
 
