@@ -103,7 +103,11 @@ version of the library.
 To link a program with the replacement library, include the following
 command when compiling the program:
 
-gcc -o *program* *program\_source* -L*orangefs\_lib\_path* -*rep\_lib*
+<!-- backticks instead of "code" shortcode in order to use <> without having
+to use html entities -->
+```
+gcc -o <program> <program_source> -L<orangefs_lib_path> <rep_lib>
+```
 
 where...
 
@@ -124,8 +128,9 @@ installation directory
 
 Example command line:
 
+```
 gcc -o /programs/foo /programs/foo.c -L/opt/orangefs/lib -lorangefsposix
-
+```
  
 
 ### Global Configuration
@@ -139,9 +144,11 @@ OrangeFS.
 Assuming the shared libraries are installed, set the following
 environment variables:
 
-export OFS\_LIB\_PATH=*orangefs\_lib\_path*\
- export LD\_LIBRARY\_PATH=\$OFS\_LIB\_PATH:\$LD\_LIBRARY\_PATH\
- export LD\_PRELOAD=\$OFS\_LIB\_PATH/*rep\_shared\_library*
+```
+export OFS_LIB_PATH=<orangefs_lib_path>
+export LD_LIBRARY_PATH=$OFS_LIB_PATH:$LD_LIBRARY_PATH
+export LD_PRELOAD=$OFS_LIB_PATH/<rep_shared_library>
+```
 
 where...
 
