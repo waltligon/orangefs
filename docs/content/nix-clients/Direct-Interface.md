@@ -10,8 +10,8 @@ Kernel for a more direct and better performing path to OrangeFS. It
 provides high performance access for programs that are not written for
 MPI.
 
-**Important  **The OrangeFS Direct Interface using Global Configuration
-will work only on systems configured with shared C libraries.
+{{<notice info>}}The OrangeFS Direct Interface using Global Configuration
+will work only on systems configured with shared C libraries.{{</notice>}}
 
 The Direct Interface is included with the OrangeFS standard
 installation, accessed  by copying appropriate files to a client
@@ -159,11 +159,9 @@ Example: /opt/orangefs/lib
 
 Example: LD\_PRELOAD=\$OFS\_LIB\_PATH/libpvfs2.so
 
- 
+{{<notice info>}}The global configuration method does not work if you use the
+static version of libc.{{</notice>}}
 
-**Notes   **The global configuration method does not work if you use the
-static version of libc.\
- \
  Ensure that your system's /etc/ld.so.preload includes libdl, libssl,
 libcrypto and libpthreads preloaded through /etc/ld.so.preload. Most
 Linux systems will already include this.\
