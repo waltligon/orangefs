@@ -56,7 +56,7 @@ extern "C" {
 /** @{ */
 
 /** The current Dokan version (140 means ver 1.4.0). \ref DOKAN_OPTIONS.Version */
-#define DOKAN_VERSION 150
+#define DOKAN_VERSION 151
 /** Minimum Dokan version (ver 1.1.0) accepted. */
 #define DOKAN_MINIMUM_COMPATIBLE_VERSION 110
 /** Driver file name including the DOKAN_MAJOR_API_VERSION */
@@ -395,6 +395,9 @@ typedef struct _DOKAN_OPERATIONS {
   * Same as \ref DOKAN_OPERATIONS.FindFiles but with a search pattern.\n
   * The search pattern is a Windows MS-DOS-style expression.
   * It can contain wild cards and extended characters or none of them. See \ref DokanIsNameInExpression.
+  *
+  * If the function is not implemented, \ref DOKAN_OPERATIONS.FindFiles
+  * will be called instead and the result will be filtered internally by the library.
   *
   * \param PathName Path requested by the Kernel on the FileSystem.
   * \param SearchPattern Search pattern.
