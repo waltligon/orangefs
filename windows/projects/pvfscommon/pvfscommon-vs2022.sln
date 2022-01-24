@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.32112.339
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "statecomp-vs2022", "statecomp\statecomp-vs2022.vcxproj", "{87AEF0E6-05F3-45E3-97F5-07042B339397}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{87AEF0E6-05F3-45E3-97F5-07042B339397}.Debug|x86.ActiveCfg = Debug|Win32
+		{87AEF0E6-05F3-45E3-97F5-07042B339397}.Debug|x86.Build.0 = Debug|Win32
+		{87AEF0E6-05F3-45E3-97F5-07042B339397}.Release|x86.ActiveCfg = Release|Win32
+		{87AEF0E6-05F3-45E3-97F5-07042B339397}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F306477F-C683-414B-843A-1BD01CD51919}
+	EndGlobalSection
+EndGlobal
