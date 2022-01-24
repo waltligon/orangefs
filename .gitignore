@@ -54,7 +54,14 @@ config.status
 #
 *~
 *.swp
-/windows/dokany/include
 *.bak
 *.pl
 /windows/projects/OrangeFS/ops.txt
+
+#
+# Third-Party Windows Libraries
+#
+/windows/dokan/
+/windows/dokany/
+/windows/ldap/
+/windows/openssl/
