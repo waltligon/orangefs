@@ -11,10 +11,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{CDB2E5EB-EE62-4018-92AA-79CB47A2A8BD}</ProjectGuid>
+    <ProjectGuid>{87AEF0E6-05F3-45E3-97F5-07042B339397}</ProjectGuid>
     <RootNamespace>statecomp</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>statecomp-vs2019</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
