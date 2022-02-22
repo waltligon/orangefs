@@ -16,6 +16,7 @@
 #include <Userenv.h>
 #include <stdio.h>
 
+#include <crypto/x509.h>
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
 #include <openssl/pem.h>
@@ -34,6 +35,9 @@
 
 extern PORANGEFS_OPTIONS goptions;
 
+static CRYPTO_ONCE once = CRYPTO_ONCE_STATIC_INIT;
+static CRYPTO_RWLOCK* rwlock = NULL;
+
 /* initialize OpenSSL */
 void openssl_init()
 {
@@ -46,23 +50,46 @@ void openssl_init()
 /* cleanup OpenSSL */
 void openssl_cleanup()
 {
+    if (rwlock) {
+        CRYPTO_THREAD_lock_free(rwlock);
+    }
     CRYPTO_cleanup_all_ex_data();
     ERR_free_strings();
     ERR_remove_state(0);
 }
 
+static void lock_init(void)
+{
+    rwlock = CRYPTO_THREAD_lock_new();
+}
+
 static int get_proxy_auth_ex_data_cred()
 {
     static volatile int idx = -1;
+
     if (idx < 0)
     {
-        CRYPTO_w_lock(CRYPTO_LOCK_X509_STORE);
-        if (idx < 0)
+        /* set up lock if necessary */
+        if (!rwlock)
         {
-            idx = X509_STORE_CTX_get_ex_new_index(0, "credential", NULL, NULL,
-                NULL);
+            if (!CRYPTO_THREAD_run_once(&once, lock_init) || rwlock == NULL) {
+                return -1;
+            }
         }
-        CRYPTO_w_unlock(CRYPTO_LOCK_X509_STORE);
+        
+        if (CRYPTO_THREAD_write_lock(rwlock))
+        {
+            if (idx < 0)
+            {
+                idx = X509_STORE_CTX_get_ex_new_index(0, "credential", NULL, NULL,
+                    NULL);
+            }
+            CRYPTO_THREAD_unlock(rwlock);
+        }
+        else
+        {
+            report_error("Failed to lock thread in get_proxy_auth_ex_data_cred()", -PVFS_ESECURITY);
+        }
     }
 
     return idx;
@@ -73,13 +100,27 @@ static int get_proxy_auth_ex_data_user_name()
     static volatile int idx = -1;
     if (idx < 0)
     {
-        CRYPTO_w_lock(CRYPTO_LOCK_X509_STORE);
-        if (idx < 0)
+        /* set up lock if necessary */
+        if (!rwlock)
         {
-            idx = X509_STORE_CTX_get_ex_new_index(0, "user_name",
-                NULL, NULL, NULL);
+            if (!CRYPTO_THREAD_run_once(&once, lock_init) || rwlock == NULL) {
+                return -1;
+            }
         }
-        CRYPTO_w_unlock(CRYPTO_LOCK_X509_STORE);
+
+        if (CRYPTO_THREAD_write_lock(rwlock))
+        {
+            if (idx < 0)
+            {
+                idx = X509_STORE_CTX_get_ex_new_index(0, "user_name",
+                    NULL, NULL, NULL);
+            }
+            CRYPTO_THREAD_unlock(rwlock);
+        }
+        else
+        {
+            report_error("Failed to lock thread in get_proxy_auth_ex_data_user_name()", -PVFS_ESECURITY);
+        }
     }
 
     return idx;
