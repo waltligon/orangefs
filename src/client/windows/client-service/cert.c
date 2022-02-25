@@ -437,7 +437,7 @@ int get_proxy_cert_credential(HANDLE huser,
 
     if (ret == 0)
     {        
-        *expires = M_ASN1_UTCTIME_dup(X509_get_notAfter(cert));
+        *expires = ASN1_STRING_dup(X509_get_notAfter(cert));
         /* TODO: cache revision */
         credential->timeout = time(NULL) + PVFS2_SECURITY_TIMEOUT_MAX;
     }
@@ -614,7 +614,7 @@ int get_user_cert_credential(HANDLE huser,
     }
 
     /* get the expiration time for caching */
-    *expires = M_ASN1_UTCTIME_dup(X509_get_notAfter(xcert));
+    *expires = ASN1_STRING_dup(X509_get_notAfter(xcert));
 
     /* free X509 cert */
     X509_free(xcert);

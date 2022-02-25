@@ -11,7 +11,9 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include <crypto/evp.h>
 #include <openssl/err.h>
+#include <openssl/evp.h>
 #include <openssl/pem.h>
 
 #include "pint-util.h"
