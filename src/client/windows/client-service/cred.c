@@ -41,7 +41,7 @@ int sign_credential(const char *key_file,
     EVP_PKEY *privkey;
     BOOL key_flag = FALSE;
     const EVP_MD *md;
-    EVP_MD_CTX mdctx;
+    EVP_MD_CTX *mdctx;
     int ret = 0, err;
 
     client_debug("    sign_credential: enter\n");
@@ -94,22 +94,22 @@ int sign_credential(const char *key_file,
     }
 
     md = EVP_sha1();
-    EVP_MD_CTX_init(&mdctx);
+    mdctx = EVP_MD_CTX_new();
 
-    ret = EVP_SignInit_ex(&mdctx, md, NULL);
-    ret &= EVP_SignUpdate(&mdctx, &cred->userid, sizeof(PVFS_uid));
-    ret &= EVP_SignUpdate(&mdctx, &cred->num_groups, sizeof(uint32_t));
-    ret &= EVP_SignUpdate(&mdctx, cred->group_array, 
+    ret = EVP_SignInit_ex(mdctx, md, NULL);
+    ret &= EVP_SignUpdate(mdctx, &cred->userid, sizeof(PVFS_uid));
+    ret &= EVP_SignUpdate(mdctx, &cred->num_groups, sizeof(uint32_t));
+    ret &= EVP_SignUpdate(mdctx, cred->group_array, 
                           cred->num_groups * sizeof(PVFS_gid));
-    ret &= EVP_SignUpdate(&mdctx, cred->issuer, 
+    ret &= EVP_SignUpdate(mdctx, cred->issuer, 
                           strlen(cred->issuer) * sizeof(char));
-    ret &= EVP_SignUpdate(&mdctx, &cred->timeout, sizeof(PVFS_time));
+    ret &= EVP_SignUpdate(mdctx, &cred->timeout, sizeof(PVFS_time));
     if (!ret)
     {
         ret = -PVFS_ESECURITY;
         goto sign_credential_error;
     }
-    ret = EVP_SignFinal(&mdctx, cred->signature, &cred->sig_size, privkey);
+    ret = EVP_SignFinal(mdctx, cred->signature, &cred->sig_size, privkey);
     if (!ret)
     {
         ret = -PVFS_ESECURITY;
@@ -127,7 +127,7 @@ sign_credential_error:
 
 sign_credential_exit:
 
-    EVP_MD_CTX_cleanup(&mdctx);
+    EVP_MD_CTX_free(mdctx);
     if (key_flag)
     {
         EVP_PKEY_free(privkey);
