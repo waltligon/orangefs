@@ -17,10 +17,10 @@ method, so you are limited only by system resources.  
 This topic is organized into the following two sections:
 
 -   [Multiple Server Processes, Multiple File
-    Systems](OrangeFS_Advanced_Configuration.htm#Multiple_Server_Processes__Multiple_File_Systems)
+    Systems]({{<relref "#multiple-server-processes-multiple-file-systems">}})
 
 -   [Single Server Process, Multiple File
-    Systems](OrangeFS_Advanced_Configuration.htm#Single_Server_Process__Multiple_File_Systems)
+    Systems]({{<relref "#single-server-process-multiple-file-systems">}})
 
 Multiple Server Processes, Multiple File Systems
 ------------------------------------------------

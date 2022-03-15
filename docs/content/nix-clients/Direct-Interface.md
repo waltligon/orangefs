@@ -19,20 +19,24 @@ location and activating it with configuration statements.
 
 This topic is organized into two sections:
 
--   [Understanding\_the\_Interface\_Levels](#Understanding_The_Interface_Levels)
--   [Configuring\_the\_Direct\_Interface](#Configuring_The_Direct_Interface)
+-   [Understanding the Interface Levels]({{<relref "#understanding-the-interface-levels">}})
+-   [Configuring the Direct Interface]({{<relref "#configuring-the-direct-interface">}})
 
+<!-- TODO: add System Calls page?
 **Note     **To learn about System Calls for the Direct Interface, see
 [System Calls](System_Calls.htm) in the Administration Guide.
+-->
 
 Understanding the Interface Levels
 ----------------------------------
 
 The Direct Interface offers three levels of access, so you must
 configure your access based on the level that works best for your needs.
+<!-- TODO: find and add this image
 The following illustration shows the three interface levels.
 
 ![](ofs_usrint_parts.png)
+-->
 
 Descriptions of the three levels:
 
@@ -56,8 +60,8 @@ Configuring the Direct Interface
 This section explains two methods for configuring the Direct Interface.
 
   -------------------------------------------------- ------------------------------------------------------------------------------------------------
-  [Program\_Configuration](#Program_Configuration)   Use this method to specify an individual program to run through the OrangeFS Direct Interface.
-  [Global\_Configuration](#Global_Configuration)     Use this method to specify that all programs will run through the OrangeFS Direct Interface.
+  [Program Configuration]({{<relref "#program-configuration">}})   Use this method to specify an individual program to run through the OrangeFS Direct Interface.
+  [Global Configuration]({{<relref "#global-configuration">}})     Use this method to specify that all programs will run through the OrangeFS Direct Interface.
   -------------------------------------------------- ------------------------------------------------------------------------------------------------
 
  

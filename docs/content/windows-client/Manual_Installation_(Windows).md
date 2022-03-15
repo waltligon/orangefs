@@ -5,7 +5,7 @@ weight=440
 
 **Important**  The Client connects to a running OrangeFS server. If you
 have not yet installed the OrangeFS server components, consult the
-documentation and [install the server](Add_Server(s).htm) before
+documentation and [install the server]({{<relref "add-servers">}}) before
 installing the Windows Client.
 
 Follow the instructions below to install the OrangeFS Windows Client:
@@ -47,7 +47,7 @@ Open a Command Prompt from **Start** | **All Programs** |
 1.  Change directory (cd) to the OrangeFS\\Client directory.
 2.  Install the service using orangefs-client.exe: <br> orangefs-client -installService
 
-3.  Configure the OrangeFS Client by creating the orangefstab and orangefs.cfg files in OrangeFS\\Client, following the instructions in the [Configuration]({{<relref "WinClient_Admin.md">}}) section of the Windows Client documentation.
+3.  Configure the OrangeFS Client by creating the orangefstab and orangefs.cfg files in OrangeFS\\Client, following the instructions in the [Client Administration > Configuration]({{<relref "WinClient_Admin#configuration">}}) section of the Windows Client documentation.
 4.  Start the Dokan Mounter and OrangeFS Client services using the Services Administrative Tool (**Start** | **Control Panel** **Administrative Tools** | **Services**).
 
 Your OrangeFS file system should appear as a Removable Drive.

@@ -3,9 +3,8 @@ title= "Quickstart Guides"
 weight=10
 +++
 
-Quickstart Guides
-
- 
+- [Package Installation Guide]({{<relref "quickstart-package">}})
+- [Source Build Guide]({{<relref "quickstart-build">}})
 
  
 

@@ -1,4 +1,5 @@
-
++++
++++
 
 <div id="image-table">
     <table>

@@ -23,13 +23,13 @@ OrangeFS.
 Setting up a ROMIO client involves one step, with options for
 configuring Open MPI or MPICH:
 
--   [Configuring for Linux](ROMIO_Interface.htm#Configuring_for_Linux)
+-   [Configuring for Linux]({{<relref "#configuring-for-linux">}})
 
 -   [Install OrangeFS 2.9 with MPICH
-    3.0.4](ROMIO_Interface.htm#Install_OrangeFS_2.9_with_MPICH_3.0.4)
+    3.0.4]({{<relref "#install-orangefs-29-with-mpich-304">}})
 
 -   [Install OrangeFS 2.9 with Open MPI
-    1.6.5](ROMIO_Interface.htm#Install_OrangeFS_2.9_with_Open_MPI_1.6.5)
+    1.6.5]({{<relref "#install-orangefs-29-with-open-mpi-165">}})
 
 Configuring for Linux
 ---------------------
@@ -82,18 +82,17 @@ users seek in OrangeFS, so the above instructions focus on Linux client
 implementations only.
 
 -   To connect to OrangeFS from a Windows environment, consider using
-    the [Windows Client](WinClient_Intro.htm) developed specifically for
+    the [Windows Client]({{<relref "windows-client">}}) developed specifically for
     OrangeFS.
 -   To connect to OrangeFS from a Mac environment, consider using
-    [FUSE](FUSE_Client.htm).
+    [FUSE]({{<relref "FUSE-Client">}}).
 
 Install OrangeFS 2.9 with MPICH 3.0.4
 -------------------------------------
 
 **Notes   **You must install OrangeFS on your storage nodes and the
 OrangeFS system must be online prior to performing these steps. If you
-have not completed this step, see the [Installation
-Guide](Installation_Guide.htm) for instructions to complete this step
+have not completed this step, see [Add Server(s)]({{<relref "add-servers">}}) for instructions to complete this step
 before proceeding.\
  \
  For instructions on how to use MPICH, see *[MPICH User's
@@ -102,10 +101,13 @@ Guide](http://www.mpich.org/static/downloads/3.0.4/mpich-3.0.4-userguide.pdf).*
 ### Secure Shell (SSH)—without Passphrase
 
 You must configure all clients to support secure shell connections via
-SSH without passing a passphrase. For more information, see [Generating
+SSH without passing a passphrase.
+<!-- TODO: Page is no longer there
+For more information, see [Generating
 SSH Keys for Passwordless
 Login](http://hortonworks.com/kb/generating-ssh-keys-for-passwordless-login/),
 an article from the Hortonworks Knowledgebase.
+-->
 
 Prior to configuring MPICH, ensure that you have built shared libraries
 for OrangeFS:
@@ -160,8 +162,7 @@ Install OrangeFS 2.9 with Open MPI 1.6.5
 
 **Notes   **You must install OrangeFS on your storage nodes and the
 OrangeFS system must be online prior to performing these steps. If you
-have not completed this step, see the [Installation
-Guide](Installation_Guide.htm) for instructions to complete this step
+have not completed this step, see [Add Server(s)]({{<relref "add-servers">}}) for instructions to complete this step
 before proceeding.\
  \
  OrangeFS 2.9.0 has been successfully tested with OpenMPI 1.8.3 on
@@ -175,10 +176,13 @@ High Performance Computing](http://www.open-mpi.org/).*
 ### Secure Shell (SSH)—without Passphrase
 
 You must configure all clients to support secure shell connections via
-SSH without passing a passphrase. For more information, see [Generating
+SSH without passing a passphrase.
+<!-- TODO: Page is no longer there
+For more information, see [Generating
 SSH Keys for Passwordless
 Login](http://hortonworks.com/kb/generating-ssh-keys-for-passwordless-login/),
 an article from the Hortonworks Knowledgebase.
+-->
 
 Prior to configuring MPICH, ensure that you have built shared libraries
 for OrangeFS:

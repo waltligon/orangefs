@@ -7,13 +7,13 @@ weight=130
 |---|---|
 | {{<figure src="../images/icon_security.png" alt="Security Icon" width="50">}} | After you build the OrangeFS installation directory, you must continue setup and configuration if you select either the key-based or certificate-based mode of security. Much of this work can be done once on the build system, then copied to your servers and clients. In future versions of OrangeFS, security will be simplified. |
 
-In the [Procedure](Build_OrangeFS.md) section of the previous topic, you specified a security mode when running ./configure (see step 3 in Build OrangeFS).
+In the [Procedure]({{<relref "Build_OrangeFS#procedure">}}) section of the previous topic, you specified a security mode when running ./configure (see step 3 in Build OrangeFS).
 
 Depending on the mode you chose (default, key-based or certificate-based), refer to the appropriate sections in this topic for additional security setup for the Build system:  
 
--   Default_Mode
--   Key-Based_Mode
--   Certificate-Based_Mode
+-   [Default Mode]({{<relref "#default-mode">}})
+-   [Key-Based Mode]({{<relref "#key-based-mode">}})
+-   [Certificate-Based Mode]({{<relref "#certificate-based-mode">}})
 
 ### Default Mode
 

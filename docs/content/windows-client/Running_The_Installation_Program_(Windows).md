@@ -42,7 +42,7 @@ Click Next to continue.
 | List Map Add User | If you selected list mode, enter one Windows user ID and the OrangeFS (Linux/UNIX-based) UID and primary GID for mapping. You will manually add additional users to the configuration file after the installation. |
 | Certificate User Mapping | If you selected certificate mode, enter the Windows prefix directory of your user and proxy certificates. The default is the user profile directory (C:\\Users). You can also enter another location, for the prefix directory. |
 | Setup Type | If you selected ldap mode, a dialog provides three choices for your LDAP implementation (**Microsoft Active Directory**, **Novell eDirectory** or **Custom**). Select one and click **Next**. <br> <br> In the next dialog, enter the LDAP values required by OrangeFS. <br> <br>  **Note**     Depending on your LDAP selection, some of the text fields that display in the dialog might already have entries. |
-For complete details on user mapping see [ClientAdministration](({{<relref "WinClient_Admin.md">}})).
+For complete details on user mapping see [Client Administration]({{<relref "WinClient_Admin">}}).
 
 - Click Next to continue.
 

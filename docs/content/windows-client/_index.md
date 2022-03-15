@@ -14,13 +14,13 @@ This Client enables you to view files though Windows Explorer and the Command Pr
 
 The following topics guide you through the installation, operation and configuration of the Windows Client:
 
--   [Preparing for Installation](({{<relref "Preparing_for_Installation_(Windows).md">}})
--   [What to Expect](({{<relref "What_to_Expect_(Windows).md">}})
--   [Running the Installer](({{<relref "Running_The_Installation_Program_(Windows).md">}})
--   [Manual Installation](({{<relref "Manual_Installation_(Windows).md">}})
--   [Uninstalling the Windows Client](({{<relref "Uninstalling_the_Client_(Windows).md">}})
--   [Using the Client](({{<relref "WinClient_Use.md">}})
--   [Client Administration](({{<relref "WinClient_Admin.md">}})
+-   [Preparing for Windows Installation]({{<relref "Preparing_for_Installation_(Windows)">}})
+-   [What to Expect]({{<relref "What_to_Expect_(Windows)">}})
+-   [Installing the Software]({{<relref "Running_The_Installation_Program_(Windows)">}})
+-   [Manual Installation]({{<relref "Manual_Installation_(Windows)">}})
+-   [Uninstalling the Windows Client]({{<relref "Uninstalling_the_Client_(Windows)">}})
+-   [Using the Client]({{<relref "WinClient_Use">}})
+-   [Client Administration]({{<relref "WinClient_Admin">}})
 
  
 

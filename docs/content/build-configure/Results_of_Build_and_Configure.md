@@ -30,8 +30,10 @@ Following is a top-level list of the orangefs installation directory:
 /opt/orangefs \$ ls\
  bin   include   lib   sbin   share   etc   log
 
+<!-- TODO: add this page?
 For file listings of all directories and subdirectories, see
 [Directory/File Listing](Installed_File_Listing.htm).
+-->
 
 Configuration File
 ------------------
@@ -131,8 +133,7 @@ Here is an example \<Security\> context for certificate-based security:
 The \<Security\> context can also be specified in a \<ServerOptions\>
 context for different settings on each server.
 
-For more information, see [OrangeFS Configuration
-File](admin_ofs_configuration_file.htm) in the *Administration Guide*.
+For more information, see [Advanced Configuration > OrangeFS Configuration File]({{<relref "configuration/admin_ofs_configuration_file">}}).
 
  
 

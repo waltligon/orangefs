@@ -5,7 +5,7 @@ weight=120
 
 The OrangeFS installation directory on the Build system will need an OrangeFS configuration file. You will enter basic information for this file in a program called pvfs2-genconfig. Once the configuration file has been created, you might need to make additional modifications (regarding security, for example) for the initial deployment.
                          
-**Note** After standard installation, consult the [Administration Guide](Administration_Guide.md) for details on the options and values available for fine tuning the configuration file.
+**Note** After standard installation, consult [Advanced Configuration > OrangeFS Configuration File]({{<relref "configuration/admin_ofs_configuration_file">}}) for details on the options and values available for fine tuning the configuration file.
 
 
 ##### To create the OrangeFS configuration file, follow these steps:
@@ -142,8 +142,8 @@ password.
 system storage directories inside the OrangeFS installation directory
 under opt for portability. These directories can be located elsewhere
 for system optimization and larger space allocations. For detailed
-information on all options in the OrangeFS configuration file, see the
-[Administration Guide](Administration_Guide.md).
+information on all options in the OrangeFS configuration file, see
+[Advanced Configuration > OrangeFS Configuration File]({{<relref "configuration/admin_ofs_configuration_file">}}).
 
 When you are finished running pvfs2-genconfig, the OrangeFS
 configuration file is added to /opt/orangefs/etc.
@@ -152,8 +152,8 @@ The configuration file is a simple text file that can be opened and
 modified manually. While pvfs2-genconfig will query you about the most
 important options, default values are assigned to many additional
 options. You can consider changes for most of these defaults later after
-installation, when you can reference the [Administration
-Guide](Administration_Guide.htm) for performance-tuning and
+installation, when you can reference
+[Advanced Configuration > OrangeFS Configuration File]({{<relref "configuration/admin_ofs_configuration_file">}}) for performance-tuning and
 optimization.
 
  
