@@ -252,9 +252,7 @@ static PINT_sm_action setattr_msg_setup_msgpair(struct PINT_smcb *smcb,
                               sm_p->object_ref.handle,
                               sm_p->object_ref.sid_count,
                               sm_p->object_ref.sid_array,
-                              objtype,
                               sm_p->u.setattr.obj_attr,
-                              0,
                               sm_p->hints);
 
     msg_p->msgclass = PVFS_IO_METADATA;

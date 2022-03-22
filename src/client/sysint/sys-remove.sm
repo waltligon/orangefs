@@ -531,16 +531,12 @@ static PINT_sm_action remove_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                           msg_p->req,
                           sm_p->parent_capability,
                           *sm_p->cred_p,
-                          sm_p->parent_ref.fs_id,
-                          attr->u.dir.dirdata_handles[dirdata_server_index],
-                          sm_p->parent_ref.sid_count,
-                          &attr->u.dir.dirdata_sids[dirdata_sid_index],
                           sm_p->u.remove.object_name,
-                          sm_p->object_ref.handle,
-                          sm_p->object_ref.sid_array,
-                          sm_p->object_ref.sid_count,
-                          sm_p->parent_ref.handle,
-                          sm_p->parent_ref.sid_array,
+                          sm_p->object_ref,
+                          sm_p->parent_ref,
+                          sm_p->getattr.attr, /* parent object attrs read initially */
+                          dirdata_server_index,
+                          dirdata_sid_index,
                           sm_p->hints);
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing CRDIRENT of %s (%s,%d) "

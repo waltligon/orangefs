@@ -270,21 +270,20 @@ static PINT_sm_action mgmt_create_dirent_setup_msgpair(struct PINT_smcb *smcb,
                  PVFS_OID_str(&sm_p->parent_ref.handle),
                  sm_p->parent_ref.fs_id);
 
+    sm_p->object_ref.fs_id = sm_p->parent_ref.fs_id;
+    sm_p->object_ref.handle = sm_p->u.mgmt_create_dirent.entry_handle;
+    sm_p->object_ref.sid_count = sm_p->u.mgmt_create_dirent.sid_count;
+    sm_p->object_ref.sid_array = sm_p->u.mgmt_create_dirent.sid_array;
+
     PINT_SERVREQ_CRDIRENT_FILL(msg_p->req,
                                sm_p->getattr.attr.capability,
                                *sm_p->cred_p,
-                               sm_p->parent_ref.fs_id,
-                               sm_p->getattr.attr.u.dir.dirdata_handles[
-                                                        dirdata_server_index],
-                               sm_p->parent_ref.sid_count,
-                               &sm_p->getattr.attr.u.dir.dirdata_sids[
-                                                        dirdata_sid_index],
                                sm_p->u.mgmt_create_dirent.entry,
-                               sm_p->u.mgmt_create_dirent.entry_handle,
-                               sm_p->u.mgmt_create_dirent.sid_array,
-                               sm_p->u.mgmt_create_dirent.sid_count,
-                               sm_p->parent_ref.handle,
-                               sm_p->parent_ref.sid_array,
+                               sm_p->object_ref,
+                               sm_p->parent_ref,
+                               sm_p->getattr.attr, /* parent attrs read initially */
+                               dirdata_server_index,
+                               dirdata_sid_index,
                                sm_p->hints);
 
     msg_p->msgclass = PVFS_IO_METADATA;

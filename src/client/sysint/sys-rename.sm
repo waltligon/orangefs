@@ -965,16 +965,12 @@ static PINT_sm_action rename_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     PINT_SERVREQ_CRDIRENT_FILL(msg_p->req,
                                sm_p->u.rename.parent_attr[1].capability,
                                *sm_p->cred_p,
-                               sm_p->u.rename.parent_refns[1].fs_id,
-                               sm_p->u.rename.dirdata_handle[1],
-                               sm_p->u.rename.parent_refns[1].sid_count,
-                               sm_p->u.rename.dirdata_sids[1],
                                sm_p->u.rename.entries[1], /* name */
-                               sm_p->u.rename.refns[0].handle,
-                               sm_p->u.rename.refns[0].sid_array,
-                               sm_p->u.rename.refns[0].sid_count,
-                               sm_p->u.rename.parent_refns[1].handle,
-                               sm_p->u.rename.parent_refns[1].sid_array,
+                               sm_p->u.rename.refns[0],
+                               sm_p->u.rename.parent_refns[1],
+                               sm_p->u.rename.parent_attr[1],
+                               dirdata_index,
+                               0, /* SID index ??? */
                                sm_p->hints);
 
     msg_p->msgclass = PVFS_IO_METADATA;

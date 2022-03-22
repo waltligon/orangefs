@@ -1242,7 +1242,7 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
      ******************************
      */
 
-    /* allocate space for bitmap, dirdata handles, and dirdata sids */
+    /* allocate space for bitmap, dirdata OIDS and OIDS, parent OID and SIDS */
     attr->u.dir.dist_dir_bitmap =
                 malloc(attr->u.dir.dist_dir_attr.bitmap_size *
                              sizeof(PVFS_dist_dir_bitmap_basetype));
@@ -2048,6 +2048,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                      respattr->u.meta.dist_size);
         break;
     case PVFS_TYPE_DIRDATA :
+        /* why do we zero these fields? */
         respattr->u.dirdata.dist_dir_attr.bitmap_size = 0;
         respattr->u.dirdata.dist_dir_attr.dirdata_count = 0;
         respattr->u.dirdata.dist_dir_attr.sid_count = 0;

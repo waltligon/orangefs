@@ -102,6 +102,7 @@ nested machine pvfs2_crdirent_work_sm
         default => check_for_split;
     }
 
+    /* setattr */
     state update_metahandle_timestamp_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
@@ -302,9 +303,10 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
      * all of the dirdata are created (not sure how) so for now I'm
      * leaving this here.
      */
-    if(s_op->u.crdirent.new_target_object) /* set in prelude */
+    /* if(s_op->u.crdirent.new_target_object) */
+    if(s_op->new_target_object) /* set in prelude */
     {
-        js_p=>error_code = 0;
+        js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
 
@@ -319,7 +321,7 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
             "crdirent: get dist-dir-attr for dirdata handle %s "
             "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
-            PVFS_OID_str(&s_op->req->u.crdirent.dd_server_handles[
+            PVFS_OID_str(&s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles[
                           s_op->req->u.crdirent.dd_server_index]),
             attr_p->u.dirdata.dist_dir_attr.tree_height,
             attr_p->u.dirdata.dist_dir_attr.dirdata_count,
@@ -420,7 +422,7 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
 
     js_p->error_code = 0;
     ret = job_trove_keyval_read_list(s_op->req->u.crdirent.parent_ref.fs_id,
-                                     s_op->req->u.crdirent.dd_server_handles[
+                                     s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles[
                                              s_op->req->u.crdirent.dd_server_index],
                                      s_op->key_a,
                                      s_op->val_a,
@@ -598,8 +600,11 @@ static PINT_sm_action crdirent_write_dirent(struct PINT_smcb *smcb,
     job_id_t j_id;
     TROVE_ds_flags keyval_flags;
 
+    /* DUMB ASSERT */
+    /*
     assert(PVFS_OID_cmp(&s_op->req->u.crdirent.dirdata_handle,
                         &PVFS_HANDLE_NULL));
+     */
 
     js_p->error_code = 0;
 
@@ -638,7 +643,7 @@ static PINT_sm_action crdirent_write_dirent(struct PINT_smcb *smcb,
 
     gossip_debug(GOSSIP_SERVER_DEBUG," to dirdata dspace %s\n",
                  PVFS_OID_str(&s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles[
-                               s_OP->req->u.crdirent.dd_server_index]));
+                               s_op->req->u.crdirent.dd_server_index]));
 
     keyval_flags = TROVE_SYNC;
         
@@ -661,7 +666,7 @@ static PINT_sm_action crdirent_write_dirent(struct PINT_smcb *smcb,
      * case a write, but also various flavors of delete) determins that a
      * call to dbpf_keyval_info_op() is warranted, Then that consults these
      * flags to see if TROVE_KEYVAL_HANDLE_COUNT was requested, and if so,
-     * reads the counter, modifies it, and writes it.  The rove operation
+     * reads the counter, modifies it, and writes it.  The trove operation
      * also decides if it is an increment or decrement.  As of V3 (maybe
      * earlier) we have wanted to move this into the dspace record so it is
      * read and written as one - the dspace is read regardless, and usually
@@ -673,8 +678,8 @@ static PINT_sm_action crdirent_write_dirent(struct PINT_smcb *smcb,
      */
     keyval_flags |= TROVE_KEYVAL_HANDLE_COUNT | TROVE_KEYVAL_DIRECTORY_ENTRY;
 
-    ret = job_trove_keyval_write(s_op->req->u.crdirent.parent_ref.s_id,
-                                 s_op->req->u.crdirent.dd_server_handles[
+    ret = job_trove_keyval_write(s_op->req->u.crdirent.parent_ref.fs_id,
+                                 s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles[
                                          s_op->req->u.crdirent.dd_server_index],
                                  &s_op->key,
                                  &s_op->val,
@@ -696,7 +701,7 @@ static PINT_sm_action crdirent_write_dirent(struct PINT_smcb *smcb,
 
 /* What in the world is this?  The name says it is updating a "directory" attr
  * but we don't have a directory attribute here, only a dirdata.  We will need
- * to update the dirdata, butnot isn't a good time since we don't know if we
+ * to update the dirdata, but it isn't a good time since we don't know if we
  * must split or now, nor have we even incremented the dirent count and I
  * really don''t know what this UID/GID stuff is about!  This was already 
  * modified too update the dirdata attr, but I'm thinking we lose it
@@ -778,14 +783,23 @@ static PINT_sm_action crdirent_update_directory_attr(struct PINT_smcb *smcb,
 #endif
 
 /*
- * This state assumes we need to update the CTIME of the object who's dirent we just
- * wrote.  In the case of sys_create the time is already set and isn't needed.  What
- * about other sys calls that call crdirent?  Do they need to update CTIME (or other times)
- * must it be done automatically? in this state machine?  Need to clarity this.
+ * This state assumes we need to update the CTIME of the DIR who's dirent we just
+ * wrote.  In V3 we have a choice, we can update the DIR, which may be local or
+ * remote, or we can update DIRDATA which is always local.  This requires a read
+ * of all DIRDATAs to get an correct value.  This is slow when reading the CTIME
+ * but faster at create time.  For the moment we we update the DIR.
+ *
+ * CRDIRENT creates a directory entry, which is contained by a DIRDATA, which is a
+ * sub object to a DIR.  By creating a directory entry this directory (DIR) has been
+ * changed and thus its CTIME must be updated.  The reference to DIR is passed to the
+ * CRDIRENT as the parent_ref.
  *
  * This function checks to see if the metaobject for the new dirent is local, and if
  * so initiates an update (by reading) otherwise, reads remotely.  Later state
  * writes back the update.
+ * 
+ * Is this already done by client?  Yes, but we have removed that.
+ * Seems more efficient here.
  */
 static PINT_sm_action crdirent_update_metahandle_timestamp(struct PINT_smcb *smcb,
                                                            job_status_s *js_p)
@@ -794,7 +808,7 @@ static PINT_sm_action crdirent_update_metahandle_timestamp(struct PINT_smcb *smc
     int ret = -1;
 
     /* check the result of dirent write to keyval */
-    if (js_p.error_code != 0)
+    if (js_p->error_code != 0)
     {
         /* write failed so don't increment dirent_count */
         s_op->attr.u.dirdata.dirent_count -= 1;
@@ -802,24 +816,23 @@ static PINT_sm_action crdirent_update_metahandle_timestamp(struct PINT_smcb *smc
     }
 
     /* Determine whether the metadata handle is on the local server. */
-    /*if (PINT_cached_config_server_local(&s_op->req->u.crdirent.new_ref.sid_array[0]))*/
-    if (PINT_cached_config_server_local(&s_op->req->u.crdirent.new_ref.handle))
+    if (PINT_cached_config_server_local(&s_op->req->u.crdirent.parent_ref.sid_array[0]))
     {
         /* local */
         job_id_t tmp_id;
 
-        /* Need to retrieve dspace for the new object's metahandle.
+        /* Need to retrieve dspace for the directory object's metahandle.
          * We will then update the timestamp info. */
         gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
-                     "for metadata handle %s\n",
-                     PVFS_OID_str(&s_op->req->u.crdirent.new_ref.handle));
+                     "for direcotry metadata handle %s\n",
+                     PVFS_OID_str(&s_op->req->u.crdirent.parent_ref.handle));
 
         memset(&(s_op->u.crdirent.metahandle_ds_attr),
                0,
                sizeof(PVFS_ds_attributes));
 
-        ret = job_trove_dspace_getattr(s_op->req->u.crdirent.fs_id,
-                                       s_op->req->u.crdirent.new_ref.handle,
+        ret = job_trove_dspace_getattr(s_op->req->u.crdirent.parent_ref.fs_id,
+                                       s_op->req->u.crdirent.parent_ref.handle,
                                        smcb,
                                        &(s_op->u.crdirent.metahandle_ds_attr),
                                        0,
@@ -834,8 +847,8 @@ static PINT_sm_action crdirent_update_metahandle_timestamp(struct PINT_smcb *smc
     {
         /* remote */
         gossip_debug(GOSSIP_SERVER_DEBUG, "About to send setattr "
-                     "request for metadata handle %s\n",
-                     PVFS_OID_str(&s_op->req->u.crdirent.new_ref.handle));
+                     "request for directory metadata handle %s\n",
+                     PVFS_OID_str(&s_op->req->u.crdirent.parent_ref.handle));
         /* if we get an error somewhere we will not take this jump */
         js_p->error_code = REMOTE_METAHANDLE;
 
@@ -861,9 +874,9 @@ static PINT_sm_action crdirent_update_metahandle_timestamp(struct PINT_smcb *smc
             return SM_ACTION_COMPLETE;
         }
 
-        capability_handles[0] = s_op->req->u.crdirent.new_handle;
+        capability_handles[0] = s_op->req->u.crdirent.parent_ref.handle;
         ret = PINT_server_to_server_capability(&s_op->u.crdirent.capability,
-                                               s_op->req->u.crdirent.fs_id,
+                                               s_op->req->u.crdirent.parent_ref.fs_id,
                                                1,
                                                capability_handles);
         if (ret != 0)
@@ -883,33 +896,31 @@ static PINT_sm_action crdirent_update_metahandle_timestamp(struct PINT_smcb *smc
                                   s_op->u.crdirent.capability,
                                   s_op->req->u.crdirent.credential,
                                   s_op->req->u.crdirent.parent_ref.fs_id,
-                                  s_op->req->u.crdirent.new_ref.handle,
-                                  s_op->req->u.crdirent.new_ref.sid_count,
-                                   s_op->req->u.crdirent.new_ref.sid_array,
-                                  PVFS_TYPE_NONE,
+                                  s_op->req->u.crdirent.parent_ref.handle,
+                                  s_op->req->u.crdirent.parent_ref.sid_count,
+                                  s_op->req->u.crdirent.parent_ref.sid_array,
                                   tmp_attr,
-                                  PVFS_ATTR_COMMON_CTIME, /* nolonger used - remove */
                                   s_op->req->hints);
 
         msg_p->msgclass = PVFS_IO_METADATA;
         msg_p->msgdir = PVFS_IO_WRITE;
         msg_p->fs_id = s_op->req->u.crdirent.parent_ref.fs_id;
-        msg_p->handle = s_op->req->u.crdirent.new_ref.handle;
-        msg_p->sid_count = s_op->req->u.crdirent.new_ref.sid_count;
+        msg_p->handle = s_op->req->u.crdirent.parent_ref.handle;
+        msg_p->sid_count = s_op->req->u.crdirent.parent_ref.sid_count;
         msg_p->sid_index = 0;
-        msg_p->sid_array = s_op->req->u.crdirent.new_ref.sid_array;
+        msg_p->sid_array = s_op->req->u.crdirent.parent_ref.sid_array;
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = NULL;
 
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "setting timestamps for handle %s\n"
+                     "setting timestamps for directory handle %s\n"
                      "               SID %s\n",
                      PVFS_OID_str(&msg_p->handle),
-                     PVFS_SID_str(&s_op->req->u.crdirent.new_ref.sid_array[0])
+                     PVFS_SID_str(&s_op->req->u.crdirent.parent_ref.sid_array[0])
                      );
 
         ret = PVFS_SID_get_addr(&msg_p->svr_addr,
-                                &s_op->req->u.crdirent.new_ref.sid_array[0]);
+                                &s_op->req->u.crdirent.parent_ref.sid_array[0]);
         if (ret)
         {
             gossip_err("Failed to map dirdata server address\n");
@@ -925,7 +936,10 @@ static PINT_sm_action crdirent_update_metahandle_timestamp(struct PINT_smcb *smc
    return ret;
 }
 
-/*
+/* Like the last function, this function is part of the system for
+ * updating the metadata (DIR) timestamp because we are adding a dirent
+ * to it - which is a "change" CTIME.  I think the handle used may be
+ * wrong, in any event I'm not clear on it.  WBL`
  * THis function writes back the new_ref's dspace if it is local to this node.
  */
 static PINT_sm_action crdirent_update_local_metahandle_timestamp(
@@ -935,35 +949,42 @@ static PINT_sm_action crdirent_update_local_metahandle_timestamp(
     job_id_t j_id;
     int ret = -1;
 
-    PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
+    /* PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
+     */
     PVFS_ds_attributes *ds_attr = NULL;
 
     PVFS_ds_attr_to_object_attr(&s_op->u.crdirent.metahandle_ds_attr,
                                 &s_op->u.crdirent.metahandle_attr);
 
     /* WHAT????? What the hell is going on here???? 
-     * Why are we re-writing an objects attribute mask?*/
-    s_op->u.crdirent.metahandle_attr.mask = PVFS_ATTR_COMMON_ALL |
+     * Why are we re-writing an objects attribute mask?
+     */
+    /* s_op->u.crdirent.metahandle_attr.mask = PVFS_ATTR_COMMON_ALL |
                                             PVFS_ATTR_META_ALL;
+     */
 
     /* The only thing we need to change is CTIME, so all we have to
      * do is set that flag in the representation of the attributes
      * we want to change. */
-    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
+    /* memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
     tmp_attr.mask = PVFS_ATTR_COMMON_CTIME;
+     */
 
-    /* This is a crappy way to do this - Much metter to have a function
+    /* This is a crappy way to do this - Much better to have a function
      * that simply processes the time attributes and doesn.t mess with owner,
      * group, etc.  This old function should go!!!
      */
-    PVFS_object_attr_overwrite_setable(&s_op->u.crdirent.metahandle_attr,
+    /* PVFS_object_attr_overwrite_setable(&s_op->u.crdirent.metahandle_attr,
                                        tmp_attr_ptr);
-    
+     */
+
+    s_op->u.crdirent.metahandle_attr.ctime = PINT_util_get_current_time();
+    s_op->u.crdirent.metahandle_attr.mask |= PVFS_ATTR_COMMON_CTIME;
     ds_attr = &(s_op->u.crdirent.metahandle_ds_attr);
     PVFS_object_attr_to_ds_attr(&s_op->u.crdirent.metahandle_attr, ds_attr);
 
     ret = job_trove_dspace_setattr(s_op->req->u.crdirent.parent_ref.fs_id,
-                                   s_op->req->u.crdirent.new_ref.handle,
+                                   s_op->req->u.crdirent.parent_ref.handle,
                                    ds_attr,
                                    TROVE_SYNC,
                                    smcb,
@@ -1124,7 +1145,7 @@ static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
      */
     /* update timestamps for the dirdata handle. */
     ret = job_trove_dspace_setattr(s_op->req->u.crdirent.parent_ref.fs_id,
-                                   s_op->req->u.crdirent.dd_server__handle[
+                                   s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles[
                                            s_op->req->u.crdirent.dd_server_index],
                                    ds_attr,
                                    TROVE_SYNC,
@@ -1253,7 +1274,7 @@ static int PINT_get_object_ref_crdirent(struct PVFS_server_req *req,
                                         PVFS_fs_id *fs_id,
                                         PVFS_handle *handle) 
 {                                    
-    *fs_id = req->u.crdirent.parent_fs_id; 
+    *fs_id = req->u.crdirent.parent_ref.fs_id; 
     *handle = req->u.crdirent.parent_attr.u.dir.dirdata_handles[
                       req->u.crdirent.dd_server_index];
     return 0;                       
@@ -1274,7 +1295,7 @@ static void crdirent_get_ctrl(struct PVFS_server_req *req,
    ctrl->handles   = &req->u.crdirent.parent_attr.u.dir.dirdata_handles[
                               req->u.crdirent.dd_server_index];
    ctrl->count     = 1; /* is this right? need to understand better */
-   ctrl->sids      = req->u.crdirent.parent_attr.u.dir.dirdata_sids[
+   ctrl->sids      = &req->u.crdirent.parent_attr.u.dir.dirdata_sids[
                               req->u.crdirent.dd_sid_index];
    ctrl->sid_count = req->u.crdirent.parent_attr.meta_sid_count;
 }

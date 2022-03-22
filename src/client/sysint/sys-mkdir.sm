@@ -96,6 +96,9 @@ machine pvfs2_client_mkdir_sm
         default => cleanup;
     }
 
+/* This sends setattrs to all remote dirdatas
+ * I don't think we want to do this any more.
+ */
 /* change the setattr timestamp - why is this not
  * handled during the servers mkdir.sm?  This can
  * create dirdatas on servers other than the one above
@@ -121,8 +124,7 @@ machine pvfs2_client_mkdir_sm
         default => delete_handle_setup_msgpair;
     }
 
-/* last step create the dirent - again not sure
- * why we can't do this from server's mkdir.sm
+/* last step create the dirent 
  */
 
     state mkdir_crdirent_setup_msgpair
@@ -198,12 +200,8 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     struct filesystem_configuration_s *fs_config = NULL;
     PVFS_object_attr *dir_attr = NULL;
 
-/*  gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_mkdir entered\n");
- *      gossip_err(" MKDIR flag is ON\n");}
- *  else{
- *      gossip_err(" MKDIR flag is OFF\n");}
- */
-
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_mkdir entered\n");
+   
     if (!PVFS_OID_cmp(&parent_ref.handle, &PVFS_HANDLE_NULL) ||
         (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
         (object_name == NULL) || (resp == NULL))
@@ -681,8 +679,10 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     {
         dir_attr->u.dir.hint.dist_params = NULL;
     }
-    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dfile_count, PVFS_ATTR_DIR_HINT_DFILE_COUNT);
-    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dfile_sid_count, PVFS_ATTR_DIR_HINT_SID_COUNT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dfile_count,
+                             PVFS_ATTR_DIR_HINT_DFILE_COUNT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dfile_sid_count,
+                             PVFS_ATTR_DIR_HINT_SID_COUNT);
     SET_DIR_ATTR_FROM_PARENT(u.dir.hint.layout.algorithm, PVFS_ATTR_DIR_HINT_LAYOUT);
     SET_DIR_ATTR_FROM_PARENT(u.dir.hint.layout.server_list.count,
                              PVFS_ATTR_DIR_HINT_LAYOUT);
@@ -691,13 +691,20 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     SET_DIR_ATTR_FROM_PARENT(u.dir.hint.layout.server_list.servers,
                              PVFS_ATTR_DIR_HINT_LAYOUT);
     /* Hints pertaining to directories - inherit and apply */
-    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_dirdata_min, PVFS_ATTR_DIR_HINT_DIRDATA_MIN);
-    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_dirdata_max, PVFS_ATTR_DIR_HINT_DIRDATA_MAX);
-    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_split_size, PVFS_ATTR_DIR_HINT_SPLIT_SIZE);
-    //SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.algorithm = 0;
-    //SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.server_list.count = 0;
-    //SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.server_list.bufsize = 0;
-    //SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.server_list.servers = NULL;
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_dirdata_min,
+                             PVFS_ATTR_DIR_HINT_DIRDATA_MIN);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_dirdata_max,
+                             PVFS_ATTR_DIR_HINT_DIRDATA_MAX);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_split_size,
+                             PVFS_ATTR_DIR_HINT_SPLIT_SIZE);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.algorithm,
+                             PVFS_ATTR_DIR_HINT_LAYOUT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.server_list.count,
+                             PVFS_ATTR_DIR_HINT_LAYOUT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.server_list.bufsize,
+                             PVFS_ATTR_DIR_HINT_LAYOUT);
+    SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dir_layout.server_list.servers,
+                             PVFS_ATTR_DIR_HINT_LAYOUT);
     /* Distributed Directory Attributes - inherit */
     SET_DIR_ATTR_FROM_PARENT(u.dir.dist_dir_attr.dirdata_min, 
                              PVFS_ATTR_DIR_DIRDATA_MIN);
@@ -980,6 +987,9 @@ static PINT_sm_action mkdir_msg_failure(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+/* This sends setattrs to all of the new remote dirdata, which
+ * will create them and update their metadata
+ */
 /* send a setattr to each new dirdata to set up data */
 static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
                                                   job_status_s *js_p)
@@ -1004,18 +1014,33 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
 
     /* we need the masks to reflect what is really in the attr */
 
-    dirdata_attr.objtype = PVFS_TYPE_DIRDATA; /* this is a mkdir, so these are dirdata */
+    dirdata_attr.objtype = PVFS_TYPE_DIRDATA; /* this is mkdir,targets are dirdata */
+
+    /* this works for letting prelude create the object, but setattr won't like it */
+    dirdata_attr.mask = PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIRDATA_ALL;
+
     ret = PINT_init_dist_dir_state(&dirdata_attr.u.dirdata.dist_dir_attr,
                                    &dirdata_attr.u.dirdata.dist_dir_bitmap,
                                    sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max,
                                    sm_p->u.mkdir.dir_attr.meta_sid_count,
                                    0,  /* server_no - reset below */
                                    sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_min,
-                                   sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_min);
+                                   sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.split_size);
 
+    /* since we are doing mkdir, and these are remote dirdatas, we know
+     * the objects don't exist yet, so we aren't really doing setattrs, we're
+     * doing create dirdata objects.  prelude will create the objects before the
+     * setattr but then there really isnt anything for the setattr code to do.
+     */
+    /* we just copied the attr in s_op, which included copying these two arrays
+     * if they exist (should exist) and now copying another pointer on top?
+     * maybe these pointers are null in the attr
+     */
     dirdata_attr.u.dirdata.dirdata_handles = sm_p->u.mkdir.dirdata_handles;
     dirdata_attr.u.dirdata.dirdata_sids = sm_p->u.mkdir.dirdata_sid_array;
-    dirdata_attr.mask = PVFS_ATTR_DISTDIR_ATTR;
+
+    dirdata_attr.parent = sm_p->u.mkdir.metadata_handle;
+    dirdata_attr.parent_sids = sm_p->u.mkdir.metadata_sid_array;
 
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op,
                                  sm_p->u.mkdir.dir_attr.meta_sid_count);
@@ -1034,6 +1059,15 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
         /* need to set dirdata_attr->u.dir.dist_dir_attr.server_no to i 
          * this is ok because this FILL macro copies the attributes
          */
+        dirdata_attr.u.dir.dist_dir_attr.server_no = i;
+        /* we need a second attr for the parent, in case the target doesn't
+         * exist yet.  Problem is I'm not sure where that comes from each time
+         * during a create or mkdir it should be fine because we just created
+         * parent and so we have this info at hand.  Normally, I'm not sure.
+         * Really we should be able to get it, because we just read a dir's
+         * attr to get info on the target, but I'm not sure how to make that all
+         * fit together.
+         */
         PINT_SERVREQ_SETATTR_FILL(msg_p->req,
                                   PVFS_REQ_DIRDATA,  /* sub ctrl */
                                   sm_p->u.mkdir.capability,
@@ -1043,9 +1077,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
                                   sm_p->u.mkdir.dir_attr.meta_sid_count,
                                   &sm_p->u.mkdir.dirdata_sid_array[i *
                                               sm_p->u.mkdir.dir_attr.meta_sid_count],
-                                  PVFS_TYPE_DIRDATA, /* type of obj being set */
                                   dirdata_attr,      /* attrs COPIED by macro */
-                                  0,                 /* extra_amask - remove this? */
                                   NULL);
         /* this is done in the FILL macro */
         /* PINT_copy_object_attr(&msg_p->req.u.setattr.attr, &dirdata_attr); */
@@ -1161,6 +1193,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     /* updating the parent - pass in object name, OID, SIDs, and 
      * parent's OID and SIDs - use one count and fs_id
      */
+    #if 0
     PINT_SERVREQ_CRDIRENT_FILL(
                msg_p->req,
                sm_p->getattr.attr.capability,
@@ -1176,12 +1209,26 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                sm_p->parent_ref.handle,
                sm_p->parent_ref.sid_array,
                sm_p->hints);
+    #endif
+    PINT_SERVREQ_CRDIRENT_FILL(
+               msg_p->req,
+               sm_p->getattr.attr.capability,
+               *sm_p->cred_p,
+               sm_p->u.mkdir.object_name,
+               sm_p->object_ref,
+               sm_p->parent_ref,
+               sm_p->getattr.attr, /* parent attr from first state */
+               dirdata_server_index,
+               dirdata_sid_index,
+               sm_p->hints);
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->parent_ref.fs_id;
+    /* this is the actual target - the DD not the DIR */
     msg_p->handle = sm_p->getattr.attr.u.dir.dirdata_handles[
                                                      dirdata_server_index];
+    /* dir objects are all metadata so sid counts are the same */
     msg_p->sid_count = sm_p->parent_ref.sid_count;
     msg_p->sid_index = 0;
     msg_p->sid_array = &sm_p->getattr.attr.u.dir.dirdata_sids[

@@ -875,11 +875,13 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
      * have the user layout (if any) set in isys_create, and if not we
      * set the parent supplied layout hint (if any).
      */
-    if (NULL == sm_p->u.create.layout &&
-        pattr->u.dir.hint.layout > 0 && 
+    if (sm_p->u.create.layout.algorithm == PVFS_SYS_LAYOUT_NULL &&
+        pattr->u.dir.hint.dir_layout.algorithm > PVFS_SYS_LAYOUT_NULL && 
         (pattr->mask & PVFS_ATTR_DIR_HINT_LAYOUT))
     {  
-        sm_p->u.create.layout = pattr->u.dir.hint.layout; 
+        /* we need to copy an attr layout to a sys layout - need a func? */
+        sm_p->u.create.layout.algorithm = pattr->u.dir.hint.dir_layout.algorithm; 
+        /* we need to copy the layout server list */
     }
 
     /* parent defaults for dfile_count and dfile_sid_count */

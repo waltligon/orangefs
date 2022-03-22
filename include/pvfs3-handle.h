@@ -47,6 +47,10 @@ typedef struct {uuid_t u;} PVFS_SID __attribute__ ((__aligned__ (8)));
 /** Unique identifier for an object on a PVFS3 file system  128-bit */
 typedef struct {uuid_t u;} PVFS_OID __attribute__ ((__aligned__ (8)));
 
+/* encode_PVFS_handle and decode_PVFS_handle are defined in include/pvfs2-types.h and
+ * are defined as encode_PVFS_OID and decode_PVFS_OID
+ */
+
 #define encode_PVFS_OID(pptr,pbuf) do { \
     memcpy(*(pptr), (pbuf), OID_SZ); \
     *(pptr) += OID_SZ; \

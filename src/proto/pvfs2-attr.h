@@ -98,6 +98,8 @@ typedef uint64_t PVFS_object_attrmask;
  * -------------------------
  */
 
+#define PVFS_ATTR_NULL               (0)
+
 /* internal attribute masks, common to all obj types */
 #define PVFS_ATTR_COMMON_UID         (1UL << 0)
 #define PVFS_ATTR_COMMON_GID         (1UL << 1)
@@ -225,7 +227,7 @@ typedef uint64_t PVFS_object_attrmask;
     PVFS_ATTR_DIR_HINT_LAYOUT)
 
 /* These are the dist_dir_attr struct which now are in the 
- * the dspace so we are getting away from refering to them as such
+ * dspace so we are getting away from refering to them as such
  */
 #define PVFS_ATTR_DIR_TREE_HEIGHT          (1UL << 34)
 #define PVFS_ATTR_DIR_DIRDATA_MIN          (1UL << 35)   /* buff */
@@ -355,7 +357,6 @@ static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask,
             __DEBUG_ATTR_MASK(m, __FILE__, __LINE__);  \
         } while (0)
 
-#if 1
 #define DATTRPRINT(fmt) printf(fmt);
 
 #define MASKDEBUG(field,fmt) \
@@ -365,7 +366,10 @@ static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask,
                                      char *filename,
                                      int lineno)
 {
-    DATTRPRINT("DEBUG_attr_mask (src/proto/pvfs2-attr.c) ");
+    /* for now we manually turn this on and off - should add a gossip flag */
+    #if 0
+
+    DATTRPRINT("DEBUG_attr_mask (src/proto/pvfs2-attr.h) ");
     printf("Called from file %s line %d\n", filename, lineno);
 
     MASKDEBUG(PVFS_ATTR_COMMON_UID,               "COMMON_UID\n");
@@ -425,11 +429,12 @@ static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask,
 /**/MASKDEBUG(PVFS_ATTR_CAPABILITY,               "CAPABILITY\n");
     MASKDEBUG(PVFS_ATTR_FASTEST,                  "FASTEST\n");
     MASKDEBUG(PVFS_ATTR_LATEST,                   "LATEST\n");
+    #endif
 }
 
 #undef MASKDEBUG
 #undef DATTRPRINT
-#endif
+/* end of DEBUG_attr_mask stuff */
 
 /* extended hint attributes for a metafile object  V3 */
 #if 0
@@ -926,8 +931,8 @@ struct PVFS_object_attr
     PVFS_time ntime;           /* new (create) time */
     uint32_t meta_sid_count;   /* number of metadata sids in this FS */
     PVFS_capability capability;
-    PVFS_handle *parent;       /* handle for parent object */
-    PVFS_SID *parent_sids;     /* num parent sids is meta_sid_count */
+    PVFS_handle *parent;       /* handle for parent object - load from keyval */
+    PVFS_SID *parent_sids;     /* num parent sids is meta_sid_count - from keyval */
 
     union
     {
@@ -960,12 +965,24 @@ static inline void encode_PVFS_object_attr(char **pptr,
     encode_uint32_t(pptr, &(x)->meta_sid_count); 
     encode_skip4(pptr,);
     encode_PVFS_capability(pptr, &(x)->capability); 
-    encode_PVFS_handle(pptr, &(x)->parent);             
-    align8(pptr);                                                             
-    for (index_i = 0; index_i < (x)->meta_sid_count; index_i++)      
-    {                                                                         
-        encode_PVFS_SID(pptr, &(x)->parent_sids[index_i]);                   
-    }                                                                         
+
+    /* must deal with NULL handle and SIDs */
+    if ((x)->parent == NULL)
+    {
+        uint64_t Z = 0;
+        encode_uint64_t(pptr, &Z);
+    }
+    else
+    {
+        encode_PVFS_handle(pptr, &(x)->parent);             
+        align8(pptr);                                                             
+
+        for (index_i = 0; index_i < (x)->meta_sid_count; index_i++)      
+        {                                                                         
+            encode_PVFS_SID(pptr, &(x)->parent_sids[index_i]);                   
+        }                                                                         
+    }
+
     switch ((x)->objtype) 
     { 
     case PVFS_TYPE_METAFILE : 
@@ -1007,14 +1024,26 @@ static inline void decode_PVFS_object_attr(char **pptr, PVFS_object_attr *x)
     decode_PVFS_capability(pptr, &(x)->capability); 
     align8(pptr);                                                             
 
-    (x)->parent = decode_malloc(OSASZ(1, (x)->meta_sid_count));       
-    (x)->parent_sids = (PVFS_SID *)&(x)->parent[1]; 
+    /* must deal with NULL handle and SIDs */
+    /* This will not deal with a root dir's non-parent */
+    if (*((uint64_t *)(*pptr)) == 0)
+    {
+        *pptr += sizeof(uint64_t);
+        (x)->parent = NULL;
+        (x)->parent_sids = NULL;
+        (x)->meta_sid_count = 0;
+    }
+    else
+    {
+        (x)->parent = decode_malloc(OSASZ(1, (x)->meta_sid_count));       
+        (x)->parent_sids = (PVFS_SID *)&(x)->parent[1]; 
 
-    decode_PVFS_handle(pptr, (x)->parent);             
-    for (index_i = 0; index_i < (x)->meta_sid_count; index_i++)      
-    {                                                                         
-        decode_PVFS_SID(pptr, (x)->parent_sids + index_i);                   
-    }                                                                         
+        decode_PVFS_handle(pptr, (x)->parent);             
+        for (index_i = 0; index_i < (x)->meta_sid_count; index_i++)      
+        {                                                                         
+            decode_PVFS_SID(pptr, &(x)->parent_sids[index_i]);                   
+        }                                                                         
+    }
 
     switch ((x)->objtype) 
     { 

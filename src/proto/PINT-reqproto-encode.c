@@ -176,7 +176,11 @@ int PINT_decode(void *input_buffer,
 	    lld(size));
 	return(-PVFS_EPROTO);
     }
-    
+ 
+    /* why is this all crammed up inthe message like this?  Easier
+     * to set and read putting it in a struct, also less likely to
+     * have errors due to later modifications
+     */
     /* pull the encoding type and protocol version out */
     proto_ver_recved = (int)bmitoh32(*((int32_t *)input_buffer));
     enc_type_recved = bmitoh32(*((int32_t *)enc_type_ptr));
@@ -239,6 +243,7 @@ int PINT_decode(void *input_buffer,
 	    struct PVFS_server_req *tmp_req GCC_UNUSED;
 	    struct PVFS_server_req *tmp_resp GCC_UNUSED;
 	    target_msg->enc_type = enc_type_recved;
+            /* GDB reporting wrong input_type, but right behavior ??? */
 	    if(input_type == PINT_DECODE_REQ)
 	    {
 		ret = PINT_encoding_table[i]->op->decode_req(buffer_index,

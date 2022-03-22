@@ -157,6 +157,10 @@ typedef uint8_t  u_int8_t;
  * Strings. Decoding just points into existing character data.  This handles
  * NULL strings too, just encoding the length and four zero bytes.  The
  * valgrind version zeroes out any padding.
+ *
+ * In these macros "pbuf" has taken the place of "x" in the other encoding macros.
+ * pbus, like pptr is often a pointer to a pointer, but in some cases in a
+ * simple pointer (see the "here" macros just a bit below this).
  */
 #ifdef HAVE_VALGRIND_H
 #define encode_string(pptr,pbuf) do { \
@@ -201,6 +205,7 @@ typedef uint8_t  u_int8_t;
 #define defree_string(pbuf) do { \
 } while (0)
 
+/* In these "pbuf" is a simple macro to the space the string is in user's space */
 /* odd variation, space exists in some structure, must copy-in string */
 #define encode_here_string(pptr,pbuf) encode_string(pptr,pbuf)
 #define decode_here_string(pptr,pbuf) do { \

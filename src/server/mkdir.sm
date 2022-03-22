@@ -558,11 +558,21 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
         {
             keyval_count++;
         }
-        if (pattr->u.dir.hint.layout.algorithm > 0)
+        if (pattr->u.dir.hint.layout.algorithm > PVFS_SYS_LAYOUT_NONE &&
+            pattr->u.dir.hint.layout.algorithm <= PVFS_SYS_LAYOUT_MAX)
         {
             keyval_count++;
         }
         if (pattr->u.dir.hint.layout.server_list.count > 0)
+        {
+            keyval_count++;
+        }
+        if (pattr->u.dir.hint.dir_layout.algorithm > PVFS_SYS_LAYOUT_NONE &&
+            pattr->u.dir.hint.dir_layout.algorithm <= PVFS_SYS_LAYOUT_MAX)
+        {
+            keyval_count++;
+        }
+        if (pattr->u.dir.hint.dir_layout.server_list.count > 0)
         {
             keyval_count++;
         }
@@ -652,12 +662,12 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
             keep_keyval_buffers(s_op, k);
             k++;
         }
-        if (pattr->u.dir.hint.layout.algorithm > 0)
+        if (pattr->u.dir.hint.layout.algorithm > PVFS_SYS_LAYOUT_NONE &&
+            pattr->u.dir.hint.layout.algorithm <= PVFS_SYS_LAYOUT_MAX)
         {
             /* convert to string */
             s_op->key_a[k].buffer = Trove_Special_Keys[LAYOUT_KEY].key;
             s_op->key_a[k].buffer_sz = Trove_Special_Keys[LAYOUT_KEY].size;
-
             s_op->val_a[k].buffer = (void *)malloc(10);
             if (!s_op->val_a[k].buffer)
             {
@@ -675,12 +685,42 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
         {
             s_op->key_a[k].buffer = Trove_Special_Keys[SERVER_LIST_KEY].key;
             s_op->key_a[k].buffer_sz = Trove_Special_Keys[SERVER_LIST_KEY].size;
-
             s_op->val_a[k].buffer = pattr->u.dir.hint.layout.server_list.servers;
             s_op->val_a[k].buffer_sz = pattr->u.dir.hint.layout.server_list.bufsize;
             keep_keyval_buffers(s_op, k);
             k++;
         }
+    /* not sure we have KEYs and such set up for this */
+    #if 0
+        if (pattr->u.dir.hint.dir_layout.algorithm > PVFS_SYS_LAYOUT_NONE &&
+            pattr->u.dir.hint.dir_layout.algorithm <= PVFS_SYS_LAYOUT_MAX)
+        {
+            /* convert to string */
+            s_op->key_a[k].buffer = Trove_Special_Keys[LAYOUT_KEY].key;
+            s_op->key_a[k].buffer_sz = Trove_Special_Keys[LAYOUT_KEY].size;
+            s_op->val_a[k].buffer = (void *)malloc(10);
+            if (!s_op->val_a[k].buffer)
+            {
+                js_p->error_code = -PVFS_ENOMEM;
+                return SM_ACTION_COMPLETE;
+            }
+            slen = snprintf(s_op->val_a[k].buffer,
+                            10,
+                            "%05d",
+                            pattr->u.dir.hint.dir_layout.algorithm);
+            s_op->val_a[k].buffer_sz = slen + 1;
+            k++;
+        }
+        if (pattr->u.dir.hint.dir_layout.server_list.count > 0)
+        {
+            s_op->key_a[k].buffer = Trove_Special_Keys[SERVER_LIST_KEY].key;
+            s_op->key_a[k].buffer_sz = Trove_Special_Keys[SERVER_LIST_KEY].size;
+            s_op->val_a[k].buffer = pattr->u.dir.hint.dir_layout.server_list.servers;
+            s_op->val_a[k].buffer_sz = pattr->u.dir.hint.dir_layout.server_list.bufsize;
+            keep_keyval_buffers(s_op, k);
+            k++;
+        }
+#endif
     }
     if (k != keyval_count)
     {
@@ -777,6 +817,7 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
     /* if i is zero there are no more dirdata to test/create */
     if (i < 0)
     {
+        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "error code: 1 is SM branch control\n");
         js_p->error_code = STATE_DIRDATA_DONE;
         return SM_ACTION_COMPLETE;
     }
@@ -1003,6 +1044,7 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
      * assume remote dirdatas are created on demand at the server when a
      * request accesses them.
      */
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "error code: 1 is SM branch control\n");
     js_p->error_code = STATE_DIRDATA_DONE;
     return SM_ACTION_COMPLETE;
 
@@ -1050,9 +1092,7 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
                                   msg_p->handle,
                                   msg_p->sid_count,
                                   msg_p->sid_array,
-                                  objtype,
                                   s_op->req->u.mkdir.attr, 
-                                  0,     /* extra_amask */
                                   NULL);
 
         msg_p->msgclass = PVFS_IO_METADATA;
@@ -1241,8 +1281,9 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     s_op->u.mkdir.rmt_dirdata_array = NULL;
     free(s_op->u.mkdir.dirdata_parent_buffer);
     s_op->u.mkdir.dirdata_parent_buffer = NULL;
-    free(s_op->req->u.mkdir.attr.u.dir.hint.dist_name);
-    free(s_op->req->u.mkdir.attr.u.dir.hint.dist_params);
+    /* old code I think - if things are working OK remove */
+    /*free(s_op->req->u.mkdir.attr.u.dir.hint.dist_name);*/
+    /*free(s_op->req->u.mkdir.attr.u.dir.hint.dist_params);*/
 #if 0
     if (s_op->msgarray_op.count > 0)
     {
@@ -1257,7 +1298,8 @@ static inline int PINT_get_object_ref_mkdir(struct PVFS_server_req *req,
                                             PVFS_handle *handle)
 {
     *fs_id = req->u.mkdir.fs_id;
-    *handle = PVFS_HANDLE_NULL;
+    *handle = PVFS_HANDLE_NULL; /* This was V2 had to pick OID in this routine */
+    /* *handle = req->u.mkdir.handle; */
     return 0;
 }
 

@@ -315,6 +315,7 @@ endecode_fields_4_struct(
     PVFS_object_attr, attr,
     PVFS_object_ref, parent,
     PVFS_object_ref, object);
+#endif
 
 /* redefine this macro */
 #define PVFS_debug_servreq_create(mask, req) \
@@ -324,7 +325,7 @@ do { \
     } \
 } while (0)
 
-/* restructured */
+/* restructured - this is old code */
 #if 0
 struct PVFS_servreq_create
 {
@@ -483,7 +484,7 @@ static inline void defree_PVFS_servreq_create(struct PVFS_servreq_create *x)
 }
 #endif
 
-#endif
+/*  #endif  */
 
 #define extra_size_PVFS_servreq_create \
      (extra_size_PVFS_object_attr + \
@@ -1294,7 +1295,7 @@ endecode_fields_1_struct(
 struct PVFS_servreq_setattr
 {
     PVFS_handle handle;        /* handle of target object */
-    PVFS_object_attr attr;     /* new attributes */
+    PVFS_object_attr attr;     /* new attributes including OID/SID lists*/
     PVFS_credential credential;
     PVFS_fs_id fs_id;          /* file system */
     int32_t sid_count;         /* reflexive */
@@ -1324,6 +1325,7 @@ do { \
     } \
 } while (0)
 
+/* V3 structure */
 #define PINT_SERVREQ_SETATTR_FILL(__req,         \
                                   __sub,         \
                                   __cap,         \
@@ -1332,9 +1334,7 @@ do { \
                                   __handle,      \
                                   __sid_count,   \
                                   __sid_array,   \
-                                  __objtype,     \
                                   __attr,        \
-                                  __extra_amask, \
                                   __hints)       \
 do {                                             \
     memset(&(__req), 0, sizeof(__req));          \
@@ -1654,6 +1654,9 @@ endecode_fields_1_struct(
 
 /* create dirent ***********************************************/
 /* - creates a new entry within an existing directory */
+/* Is this sent to a DIRDATA.  The OID in
+ * parent_attr.u.dir.dirdata_handles[dd_server_index] 
+ * Unsure what is in parent_ref - maybe a copy */
 
 struct PVFS_servreq_crdirent
 {
@@ -1711,6 +1714,11 @@ endecode_fields_6a2a_struct(
                     (roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES + 1) + \
                      (PVFS_REQ_LIMIT_SIDS_COUNT * 3 * sizeof(PVFS_SID)))
 
+/* fill this in later */
+#define PVFS_debug_servreq_crdirent(mask, req) \
+do { \
+} while (0)
+
 #if 0
 #define PVFS_debug_servreq_crdirent(mask, req) \
 do { \
@@ -1729,6 +1737,7 @@ do { \
 } while (0)
 #endif
 
+/* V3 structure */
 #define PINT_SERVREQ_CRDIRENT_FILL(__req,                         \
                                    __cap,                         \
                                    __cred,                        \
@@ -1749,9 +1758,9 @@ do {                                                              \
     (__req).u.crdirent.credential = (__cred);                     \
     (__req).hints = (__hints);                                    \
     (__req).u.crdirent.name = (__name);                           \
-    PVFS_object_ref_copy(&(__req).u.crdirent.new_ref, (__new_ref));            \
-    PVFS_object_ref_copy(&(__req).u.crdirent.parent_ref, (__parent_ref));      \
-    PINT_copy_object_attr(&(__req).u.crdirent.parent_attr, (__parent_attr));   \
+    PVFS_object_ref_copy(&(__req).u.crdirent.new_ref, &(__new_ref));            \
+    PVFS_object_ref_copy(&(__req).u.crdirent.parent_ref, &(__parent_ref));      \
+    PINT_copy_object_attr(&(__req).u.crdirent.parent_attr, &(__parent_attr));   \
     (__req).u.crdirent.parent_attr.u.dir.dist_dir_attr.server_no = __dd_server_index; \
     (__req).u.crdirent.dd_server_index = (__dd_server_index);                  \
     (__req).u.crdirent.dd_sid_index = (__dd_sid_index);                        \

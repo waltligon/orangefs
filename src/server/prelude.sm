@@ -170,8 +170,9 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
         js_p->error_code = -PVFS_EINVAL;
     }
 
-    ret = PINT_server_req_get_attr(s_op->req,
-                                   &s_op->attr);
+    /** gets the target's attrs from the request and copies into the s_op **/
+    /* ret = PINT_server_req_get_attr(s_op->req, &s_op->attr); */
+
     /* There is a valied NULL return for some OPs */
 
     s_op->access_type = PINT_server_req_get_access_type(s_op->req);
@@ -286,6 +287,15 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    /* When creating an object it has no attrs in the DB so skip getattr */
+    if (s_op->req->op == PVFS_SERV_MKDIR || s_op->req->op == PVFS_SERV_CREATE)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "Creating new object - prelude bypass getattr\n");
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+
     /* all other operations fall to this point and read basic
      * attribute information
      */
@@ -319,24 +329,17 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     DECLARE_PROFILER(profiler);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "(%p) %s (prelude sm) state: req_sched\n", s_op,
+                 "(%p) %s (prelude sm) state: prelude_validate\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
-    gossip_debug(GOSSIP_SERVER_DEBUG, "validating getattr\n");
 
     /* Profile validate operation */
     INIT_PROFILER(profiler);
     START_PROFILER(profiler);
  
-    /* What happens if the object not found (below) should we wait
-     * to do this only if we actually read something?
-     */
-    /* First translate the dspace attributes into object attributes */
-    PVFS_ds_attr_to_object_attr(&s_op->ds_attr, &s_op->attr);
 
     /* s_op->attr.mask = PVFS_ATTR_COMMON_ALL; */
-    s_op->target_object_attr = &s_op->attr;
 
-    /* Get the errno value to use for comparison */
+    /* Get the errno value from the getattr to use for comparison */
     error_code = PVFS_get_errno_mapping(js_p->error_code);
 
     /* Reworked logic.  Next we see if we need to create a new object.
@@ -353,11 +356,11 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
          * convert to a ds_attr for writing to the database.
          * First copy in the attrs sent in by the original req as a starting point.
          */
-        memcpy((void *)&s_op->attr,
-               (void *)&s_op->req->u.setattr.attr, /* <<== BAD: THIS IS NOT ALWAYS THERE */
-               sizeof(PVFS_object_attr));
+        /** gets the target's attrs from the request and copies into the s_op **/
+        ret = PINT_server_req_get_attr(s_op->req, &s_op->attr);
+        s_op->target_object_attr = &s_op->attr; /* is this used? */
 
-        create_object = 1;    /* Assume creating unless proven otherwise */
+        create_object = 1;    /* default to create unless zereo'd below */
         js_p->error_code = 0; /* Clear ENOENT */
         switch (s_op->req->op)
         {
@@ -390,11 +393,15 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             {
                 s_op->attr.objtype = PVFS_TYPE_DATAFILE;
                 s_op->attr.u.data.size = 0;
+                s_op->orig_mask = s_op->attr.mask;
+                s_op->attr.mask = PVFS_ATTR_DATA_ALL | PVFS_ATTR_COMMON_ALL;
             }
             else if (s_op->req->ctrl.sub == PVFS_REQ_DIRDATA)
             {
                 s_op->attr.objtype = PVFS_TYPE_DIRDATA;
                 s_op->attr.u.dirdata.dirent_count = 0;
+                s_op->orig_mask = s_op->attr.mask;
+                s_op->attr.mask = PVFS_ATTR_DIRDATA_ALL | PVFS_ATTR_COMMON_ALL;
             }
             else
             {
@@ -419,7 +426,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         }
 
         /* initialize the time members */
-        /* these are used for fine-grain time values */
+        /* these are used for whole second time values in file timestamps */
             current_time = time(NULL);
         s_op->attr.atime = current_time;
         s_op->attr.mtime = current_time;
@@ -441,6 +448,11 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         {
             s_op->attr.u.dirdata.dirent_count = 0; /* new object no items */
 
+            /* we copied from the req attr to the s_op attr so all of this should be
+             * there, no need to copy it all again
+             */
+#if 0            
+            /* We don't know this is a setattr request - have to fix this! */
             s_op->attr.u.dirdata.dist_dir_attr.tree_height =
                             s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.tree_height;
         
@@ -458,8 +470,17 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 
             s_op->attr.u.dirdata.dist_dir_attr.server_no =
                             s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.server_no;
+#endif
         }
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "prelude: validate: create_object is %d\n", create_object);
     } /* endif object not found */
+    else
+    {
+        /* Translate the dspace attributes read from db into object attributes */
+        PVFS_ds_attr_to_object_attr(&s_op->ds_attr, &s_op->attr);
+        s_op->target_object_attr = &s_op->attr;
+    }
 
     /* Remaining logic deals with new or existing object. */
 
@@ -615,10 +636,18 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     /* check operation permissions */
     if (ret)
     {
-        ret = PINT_perm_check(s_op);
-        gossip_debug(GOSSIP_SERVER_DEBUG,"%s:return from PINT_perm_check=%d\n"
-                                        ,__func__
-                                        ,ret);
+        ret = 0; /* clear from revious ops */
+        if (!create_object) /* if create_object allow all attrs to be set */
+        {
+            ret = PINT_perm_check(s_op);
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "%s:return from PINT_perm_check = %d\n" ,__func__ ,ret);
+        }
+        else
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "%s:skipping PINT_perm_check\n" ,__func__);
+        }
     }
     else
     {
@@ -653,9 +682,9 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     js_p->error_code = ret;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "(%p) %s (req=%d) (prelude sm) state: perm_check (status = %d)\n",
+                 "(%p) %s (req=%d) (prelude sm) state: %s (status = %d)\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op),s_op->req->op,
-                 js_p->error_code);
+                 __func__, js_p->error_code);
 
 complete:
 
@@ -666,18 +695,9 @@ complete:
      */
     if (js_p->error_code == 0 && create_object == 1)
     {
+        s_op->attr.mask = s_op->orig_mask; /* clean up just in case */
         s_op->new_target_object = 1; /* passing back to mainop SM's */
         js_p->error_code = CREATE_OBJECT;
-#if 0
-        if (s_op->attr.objtype == PVFS_TYPE_DATAFILE)
-        {
-            js_p->error_code = CREATE_DATA_OBJECT;
-        }
-        else if (s_op->attr.objtype == PVFS_TYPE_DIRDATA)
-        {
-            js_p->error_code = CREATE_DIRDATA_OBJECT;
-        }
-#endif
     }
     return SM_ACTION_COMPLETE;
 }
@@ -692,7 +712,8 @@ static PINT_sm_action prelude_create_object_if_allowed(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
-
+ 
+    js_p->error_code = 0;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (prelude sm) state: create_object\n", s_op,
@@ -774,9 +795,9 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
     int ret;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "(%p) %s (prelude sm) state: req_sched\n", s_op,
+                 "(%p) %s (prelude sm) state: write_new_object_attr\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
-    gossip_debug(GOSSIP_SERVER_DEBUG, "writing attributes for new object\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "prelude: writing attributes for new object\n");
 
     js_p->error_code = 0;
 
@@ -797,10 +818,26 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
                                    &tmp_id,
                                    server_job_context,
                                    s_op->req->hints);
+
+    /* if this is a setattr, tell setattr SM nothing left to do */
+    if (s_op->req->op == PVFS_SERV_SETATTR)
+    {
+        struct PINT_server_op *ps_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+        if (ps_op)
+        {
+            ps_op->attr.mask = PVFS_ATTR_NULL; 
+            
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "prelude: marking all attributes written mask: %ld\n",
+                         ps_op->attr.mask);
+        }
+    }
     return ret;
 }
 
 /*
+ * Contrary to the prev messge, this shuold run on a crdirent, which is
+ * called during a mkdir.  The dirdata needs creating at this site.
  * This runs on a mkdir when the dirdata object has not been created
  * yet.
  */
@@ -809,7 +846,6 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     //int i = 0;
-    PVFS_object_attr *pattr;
     int ret = -1;
     job_id_t j_id;
     int keyval_count = 1; /* for a DATAFILE - PARENT key */
@@ -826,9 +862,6 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "writing keyvals for new object\n");
-
-    /* no attr in the db, so we are assuming the request attr has our data */
-    pattr = &s_op->req->u.setattr.attr;
 
     /* allocate key and val arrays */
 
@@ -860,8 +893,10 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
     s_op->key_a[0].buffer = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
 
-    s_op->val_a[0].buffer_sz = OSASZ(1, s_op->req->u.setattr.sid_count);
-    s_op->val_a[0].buffer = (void *)&s_op->req->u.setattr.attr.parent;
+/* where does data come from?  depends on underlying call?
+ */
+    s_op->val_a[0].buffer_sz = OSASZ(1, s_op->attr.meta_sid_count);
+    s_op->val_a[0].buffer = (void *)s_op->attr.parent;
     gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals2 %p sz %d\n",
                                       (void *)s_op->val_a[0].buffer,
                                       s_op->val_a[0].buffer_sz);
@@ -873,14 +908,16 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
 
     if (keyval_count == 3)  
     {
-        /* write dirdata handles for DIRDATA */
+        /* ONLY write dirdata handles for DIRDATA */
 
         s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
         s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
 
-        s_op->val_a[1].buffer_sz = OSASZ(pattr->u.dir.dist_dir_attr.dirdata_count,
-                                        pattr->u.dir.dist_dir_attr.sid_count);
-        s_op->val_a[1].buffer = (void *)&pattr->u.dir.dirdata_handles;
+        s_op->val_a[1].buffer_sz = OSASZ(s_op->attr.u.dirdata.dist_dir_attr.dirdata_count,
+                                        s_op->attr.u.dirdata.dist_dir_attr.sid_count);
+/* aren't getting the right data here 
+ */
+        s_op->val_a[1].buffer = (void *)&s_op->attr.u.dirdata.dirdata_handles;
         gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals1 %p sz %d\n",
                                         (void *)s_op->val_a[1].buffer,
                                         s_op->val_a[1].buffer_sz);
@@ -889,14 +926,16 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
 
 /*---------------------------------------------------------------------------*/
 
-        /* write bitmap data for DIRDATA */
+        /* ONLY write bitmap data for DIRDATA */
 
         s_op->key_a[2].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
         s_op->key_a[2].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
 
-        s_op->val_a[2].buffer_sz = pattr->u.dir.dist_dir_attr.bitmap_size *
+        s_op->val_a[2].buffer_sz = s_op->attr.u.dirdata.dist_dir_attr.bitmap_size *
                                 sizeof(PVFS_dist_dir_bitmap_basetype);
-        s_op->val_a[2].buffer = (void *)&pattr->u.dir.dist_dir_bitmap;
+/* aren't getting the right data here 
+ */
+        s_op->val_a[2].buffer = (void *)&s_op->attr.u.dirdata.dist_dir_bitmap;
         gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals0 %p sz %d\n",
                                         (void *)s_op->val_a[2].buffer,
                                         s_op->val_a[2].buffer_sz);

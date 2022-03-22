@@ -416,32 +416,32 @@ struct PINT_server_crdirent_op
     PVFS_size   sid_count;      /* All should be the metadata const */
 #endif
     PVFS_ds_keyval_handle_info keyval_handle_info;
-    PVFS_object_attr dirdata_attr;
-    PVFS_object_attr metahandle_attr;
-    PVFS_ds_attributes dirdata_ds_attr;
-    PVFS_ID *keyval_temp_store;
-    PVFS_ds_attributes metahandle_ds_attr;
+    PVFS_object_attr     dirdata_attr;
+    PVFS_object_attr     metahandle_attr;
+    PVFS_ds_attributes   dirdata_ds_attr;
+    PVFS_ID             *keyval_temp_store;
+    PVFS_ds_attributes   metahandle_ds_attr;
 
     /* index of node to receive directory entries when a split is necessary. */
-    int split_node;
+    int                  split_node;
 
     /* Save old directory attrs in case we have to back out due to an error. */
-    PVFS_object_attr saved_attr;
+    PVFS_object_attr     saved_attr;
 
     /* variables used for sending mgmt_split_dirent request */
-    PVFS_BMI_addr_t svr_addr; /* destination server address */
-    PVFS_error *split_status; /* status from PVFS_SERV_MGMT_SPLIT_DIRENT */
-    PINT_dist  *dist;         /* distribution structure for basic_dist */
-    int read_all_directory_entries;
-    int nentries;
-    PVFS_handle *entry_handles;
-    PVFS_SID    *entry_sid;
-    char       **entry_names;
-    int num_msgs_required;
+    PVFS_BMI_addr_t      svr_addr;     /* destination server address */
+    PVFS_error          *split_status; /* status from PVFS_SERV_MGMT_SPLIT_DIRENT */
+    PINT_dist           *dist;         /* distribution structure for basic_dist */
+    int                 read_all_directory_entries;
+    int                 nentries;
+    PVFS_handle        *entry_handles;
+    PVFS_SID           *entry_sid;
+    char              **entry_names;
+    int                 num_msgs_required;
     split_msg_boundary *msg_boundaries;
-    PVFS_ds_keyval *entries_key_a;
-    PVFS_ds_keyval *entries_val_a;
-    PVFS_handle *remote_dirdata_handles;
+    PVFS_ds_keyval     *entries_key_a;
+    PVFS_ds_keyval     *entries_val_a;
+    PVFS_handle        *remote_dirdata_handles;
 };
 
 struct PINT_server_setattr_op
@@ -724,30 +724,32 @@ typedef struct PINT_server_op
      * size out in the get-attr server sm); don't use it otherwise --
      * the object_attr is prepared for other sm's, so use it instead.
      */
-    PVFS_ds_attributes ds_attr;
-    PVFS_object_attr attr;
+    PVFS_ds_attributes         ds_attr;
+    PVFS_object_attr           attr;
+    PVFS_object_attrmask       orig_mask; /* temp mask holder */
 
-    PVFS_BMI_addr_t addr;   /* address of client that contacted us */
-    bmi_msg_tag_t tag;      /* operation tag */
+    PVFS_BMI_addr_t            addr;   /* address of client that contacted us */
+    bmi_msg_tag_t              tag;      /* operation tag */
     /* information about unexpected message that initiated this operation */
     struct BMI_unexpected_info unexp_bmi_buff;
 
     /* decoded request and response structures */
-    struct PVFS_server_req *req; 
-    struct PVFS_server_resp resp; 
+    struct PVFS_server_req    *req; 
+    struct PVFS_server_resp    resp; 
 
     /* encoded request and response structures */
-    struct PINT_encoded_msg encoded;
-    struct PINT_decoded_msg decoded;
+    struct PINT_encoded_msg    encoded;
+    struct PINT_decoded_msg    decoded;
 
-    PINT_sm_msgarray_op msgarray_op;
+    PINT_sm_msgarray_op        msgarray_op;
 
-    int32_t new_target_object;
-    PVFS_handle target_handle;
-    PVFS_fs_id target_fs_id;
-    PVFS_object_attr *target_object_attr;
+    /* used by prelude when creating a "missing" DIRDATA or DATA object */
+    int32_t                    new_target_object;  /* flag for host stsate machine */
+    PVFS_handle                target_handle;
+    PVFS_fs_id                 target_fs_id;
+    PVFS_object_attr          *target_object_attr;
 
-    PINT_prelude_flag prelude_mask;
+    PINT_prelude_flag          prelude_mask;
 
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
@@ -755,11 +757,11 @@ typedef struct PINT_server_op
     /* used in a pjmp to remember how many frames we pushed but be
      * careful about nesting
      */
-    int num_pjmp_frames;
-    struct PINT_mpa_join *join;
+    int                        num_pjmp_frames;
+    struct PINT_mpa_join      *join;
 
     /* Used just about everywhere so this is a std place to keep it */
-    int32_t metasidcnt; /* number of sids per handle for metadata */
+    int32_t                    metasidcnt; /* number of sids per handle for metadata */
 
     union
     {

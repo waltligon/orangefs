@@ -191,11 +191,17 @@ int pvfs2_mkspace(char *data_path,
     TROVE_handle new_root_dirdata_handle = root_dirdata_handle;
     PVFS_dist_dir_bitmap_basetype bitmap[1];
     PVFS_ID *dirdata_handles = NULL;
+    PVFS_ID *dirdata_parent_handles = NULL;
     struct stat root_stat;
     struct stat meta_stat;
     struct stat data_stat;
 
     struct server_configuration_s *config = PINT_server_config_mgr_get_config();
+
+    static PVFS_OID ROOT_DIR_PARENT_AND_SID[2] = {{{0,0,0,0,0,0,0,0, /* NULL OID, SID */
+                                                    0,0,0,0,0,0,0,0}},
+                                                  {{0,0,0,0,0,0,0,0,
+                                                    0,0,0,0,0,0,0,0}}};
 
     mkspace_print(verbose, "Data storage space     : %s\n", data_path);
     mkspace_print(verbose, "Metadata storage space : %s\n", meta_path);
@@ -368,9 +374,9 @@ int pvfs2_mkspace(char *data_path,
     }
 
     /*
-     * if a root_handle is specified, 1) create a dataspace to hold the
-     * root directory 2) create the dspace for dir entries, 3) set
-     * attributes on the dspace
+     * if a root_handle is specified, 1) create a dir dspace to hold the
+     * root directory 2) create the dirdata dspace for dir entries, 3) set
+     * attributes on both dspaces
      */
     if (PVFS_OID_NE(&new_root_handle, &TROVE_HANDLE_NULL))
     {
@@ -500,7 +506,7 @@ int pvfs2_mkspace(char *data_path,
             return -1;
         }
 
-        /* if new_root_handle is not eq to root_handle we have a problem
+        /* if new_root_dirdata_handle is not eq to root_dirdata_handle we have a problem
          */
         if(PVFS_OID_NE(&root_dirdata_handle, &new_root_dirdata_handle))
         {
@@ -623,11 +629,13 @@ int pvfs2_mkspace(char *data_path,
         /************************************/
         /* write Root Dir keyval attributes */
 
-        /* total 2 keyvals,
-         * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES
+        /* total 3 keyvals,
+         * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES, OBJECT_PARENT
          */
-        rec_count = 2;
+        rec_count = 3;
 
+        /* malloc arrays and buffers - will be freed at the end */
+        /* key_a */
         key_a = malloc(sizeof(PVFS_ds_keyval) * rec_count);
         if(!key_a)
         {
@@ -635,6 +643,7 @@ int pvfs2_mkspace(char *data_path,
         }
         ZEROMEM(key_a, sizeof(PVFS_ds_keyval) * rec_count);
 
+        /* val_a */
         val_a = malloc(sizeof(PVFS_ds_keyval) * rec_count);
         if(!val_a)
         {
@@ -643,6 +652,7 @@ int pvfs2_mkspace(char *data_path,
         }
         ZEROMEM(val_a, sizeof(PVFS_ds_keyval) * rec_count);
 
+        /* dirdata_handles */
         dirdata_handles = (PVFS_ID *)malloc((root_sid_count + 1) *
                                             sizeof(PVFS_ID));
         if(!dirdata_handles)
@@ -653,6 +663,18 @@ int pvfs2_mkspace(char *data_path,
         }
         ZEROMEM(dirdata_handles, ((root_sid_count + 1) * sizeof(PVFS_ID)));
 
+        /* parent_handles */
+        dirdata_parent_handles = (PVFS_ID *)malloc((root_sid_count + 1) *
+                                            sizeof(PVFS_ID));
+        if(!dirdata_parent_handles)
+        {
+            free(key_a);
+            free(val_a);
+            return -1;
+        }
+        ZEROMEM(dirdata_parent_handles, ((root_sid_count + 1) * sizeof(PVFS_ID)));
+
+        /* set up query keys */
         key_a[0].buffer = DIST_DIRDATA_BITMAP_KEYSTR;
         key_a[0].buffer_sz = DIST_DIRDATA_BITMAP_KEYLEN;
 
@@ -674,6 +696,14 @@ int pvfs2_mkspace(char *data_path,
         val_a[1].buffer_sz = sizeof(PVFS_OID) +
                              ((root_sid_count) * sizeof(PVFS_SID));
 
+        /* parent of root directory is NULL */
+        key_a[2].buffer_sz = OBJECT_PARENT_KEYLEN;
+        key_a[2].buffer = OBJECT_PARENT_KEYSTR;
+
+        val_a[2].buffer_sz = OSASZ(1, 1);
+        val_a[2].buffer = &ROOT_DIR_PARENT_AND_SID;
+
+        /* write data to keyval database */
         ret = trove_keyval_write_list(coll_id,
                                       root_handle,
                                       key_a,
@@ -713,6 +743,17 @@ int pvfs2_mkspace(char *data_path,
          * collecitve extensible hashing with other dirdata records
          */
 
+        /* only change query key 2 */
+        dirdata_parent_handles[0].oid = root_handle;
+        for (i = 0; i < root_sid_count; i++)
+        {
+            dirdata_parent_handles[i + 1].sid = root_sid_array[i];
+        }
+        val_a[2].buffer = dirdata_parent_handles;
+        val_a[2].buffer_sz = sizeof(PVFS_OID) +
+                             ((root_sid_count) * sizeof(PVFS_SID));
+
+        /* write data to keyval database */
         ret = trove_keyval_write_list(coll_id,
                                       root_dirdata_handle,
                                       key_a,
@@ -778,6 +819,7 @@ int pvfs2_mkspace(char *data_path,
     
         /*********************/
         /* create lost+found */
+        /* NOT DONE YET */
 
     }
     
@@ -812,6 +854,10 @@ int pvfs2_mkspace(char *data_path,
     if (dirdata_handles)
     {
         free(dirdata_handles);
+    }
+    if (dirdata_parent_handles)
+    {
+        free(dirdata_parent_handles);
     }
 
     return 0;

@@ -845,9 +845,7 @@ static PINT_sm_action io_inspect_attr(struct PINT_smcb *smcb,
                                   sm_p->object_ref.handle,
                                   sm_p->object_ref.sid_count,
                                   sm_p->object_ref.sid_array,
-                                  PVFS_TYPE_METAFILE,
                                   atime_update_attr,
-                                  0,
                                   sm_p->hints);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,

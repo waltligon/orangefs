@@ -1523,6 +1523,7 @@ struct PVFS_capability
     uint32_t num_handles;      /* number of elements in the handle array */
     PVFS_handle *handle_array; /* handles in this capability */
 };
+/* should not need the skip4 - really only 2a2a */
 endecode_fields_3a2a_struct (
     PVFS_capability,
     string, issuer,

@@ -123,6 +123,8 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     PINT_event_type event_type;
     PINT_event_id event_id = 0;
 
+    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_create handle: %s\n",
+                 PVFS_OID_str(&handle));
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -255,6 +257,8 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_create_list\n");
 
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
@@ -396,6 +400,8 @@ static int dbpf_dspace_remove_list(TROVE_coll_id coll_id,
         return -TROVE_ENOMEM;
     }
 
+    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_remove_list\n");
+
     dbpf_queued_op_init(q_op_p,
                         DSPACE_REMOVE_LIST,
                         TROVE_HANDLE_NULL,
@@ -428,6 +434,9 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
     int ret;
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_remove handle: %s\n",
+                 PVFS_OID_str(&handle));
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -924,6 +933,9 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     PINT_event_id event_id = 0;
     PINT_event_type event_type;
 
+    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_getattr handle: %s\n",
+                 PVFS_OID_str(&handle));
+
     /* fast path cache hit; skips queueing */
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     if (dbpf_attr_cache_ds_attr_fetch_cached_data(ref, ds_attr_p) == 0)
@@ -1105,6 +1117,8 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
         return -TROVE_ENOMEM;
     }
 
+    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_getattr_list\n");
+
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
                         DSPACE_GETATTR_LIST,
@@ -1143,6 +1157,9 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     int ret;
     PINT_event_id event_id = 0;
     PINT_event_type event_type;
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_setattr handle: %s\n",
+                 PVFS_OID_str(&handle));
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)

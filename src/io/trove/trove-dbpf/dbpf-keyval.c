@@ -155,6 +155,9 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
+    gossip_debug(GOSSIP_TROVE_DEBUG,"trove: dbpf_keyval_read handle: %s\n)",
+                 PVFS_OID_str(&op_p->handle));
+                         
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
                                            KEYVAL_READ,
@@ -304,6 +307,12 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
+
+    gossip_debug(GOSSIP_TROVE_DEBUG,"trove: dbpf_keyval_write handle: %s\n)",
+                 PVFS_OID_str(&op_p->handle));
+                         
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove Keyval Write "
+                 "of %s\n", (char *)key_p->buffer);
 
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
@@ -536,6 +545,9 @@ static int dbpf_keyval_remove(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
+    gossip_debug(GOSSIP_TROVE_DEBUG,"trove: dbpf_keyval_remove handle: %s\n)",
+                 PVFS_OID_str(&op_p->handle));
+                         
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
                                            KEYVAL_REMOVE_KEY,
@@ -635,6 +647,9 @@ static int dbpf_keyval_remove_list(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
+
+    gossip_debug(GOSSIP_TROVE_DEBUG,"trove: dbpf_keyval_remove_list\n)");
+                         
 
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
@@ -1113,6 +1128,8 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
+    gossip_debug(GOSSIP_TROVE_DEBUG,"trove: dbpf_keyval_read_list\n)");
+                         
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
                                            KEYVAL_READ_LIST,
@@ -1240,6 +1257,8 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
+    gossip_debug(GOSSIP_TROVE_DEBUG,"trove: dbpf_keyval_read_list\n)");
+                         
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
                                            KEYVAL_WRITE_LIST,

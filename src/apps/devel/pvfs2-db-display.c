@@ -81,6 +81,17 @@ int main( int argc, char **argv )
         iterate_database(db_p, &print_collection );
         dbpf_db_close(db_p);
     }
+
+    /* collection attribute database */
+    memset(path, path_len, sizeof(char));
+    sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, COLLECTION_ATTR_FILE );
+    ret = dbpf_db_open(path, 0, &db_p, 0, NULL);
+    if (ret == 0) 
+    {
+        printf("Collection Attributes Database\n");
+        iterate_database(db_p, &print_collection_attr );
+        dbpf_db_close(db_p);
+    }
     
     /* storage database */
     memset(path, path_len, sizeof(char));
@@ -112,17 +123,6 @@ int main( int argc, char **argv )
     {
         printf("Keyval Database\n");
         iterate_database(db_p, &print_keyval );
-        dbpf_db_close(db_p);
-    }
-
-    /* collection attribute database */
-    memset(path, path_len, sizeof(char));
-    sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, COLLECTION_ATTR_FILE );
-    ret = dbpf_db_open(path, 0, &db_p, 0, NULL);
-    if (ret == 0) 
-    {
-        printf("Collection Attributes Database\n");
-        iterate_database(db_p, &print_collection_attr );
         dbpf_db_close(db_p);
     }
 

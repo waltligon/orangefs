@@ -156,7 +156,7 @@ int gossip_debug_fp(FILE *fp,
                   (gossip_debug_on && gossip_isset(gossip_debug_mask, __m))
 
 #if 0
-/* Gossip Debug Mask inline funccombine multiple mask values into one
+/* Gossip Debug Mask inline func combines multiple mask values into one
  * This is done at runtime so it is best avoided where possible but it
  * can be very convenient in some places
  */

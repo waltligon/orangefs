@@ -241,6 +241,7 @@ struct PINT_client_mkdir_sm
     int retry_count;
     int stored_error_code;
 
+    /* shouldn't all of this be in the dir_attr? */
     PVFS_handle *metadata_handle;
     PVFS_SID *metadata_sid_array;
 
@@ -249,6 +250,7 @@ struct PINT_client_mkdir_sm
     PVFS_SID *dirdata_sid_array;
 
     PVFS_capability capability;
+    /* even this */
 
     PINT_sm_getattr_state metadata_getattr;
 

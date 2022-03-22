@@ -61,7 +61,8 @@ enum
  */
 int gossip_facility = GOSSIP_STDERR;
 
-/* Using gossip to debug gossip can be problematic so this is a simple
+/* THIS IS FOR DEBUGGING GOSSIP - NOT NORMALLY TURNED ON
+ * Using gossip to debug gossip can be problematic so this is a simple
  * macro that can be set on or off to enable direct printing to stderr
  */
 #define GOSSIP_INTERNAL 0
@@ -125,11 +126,10 @@ int gossip_enable_syslog(int priority)
 #else
 int gossip_enable_syslog(int priority)
 {
-    /* Debug setting/clearing debug_mask */
+    /* DEBUGGING GOSSIP - Debug setting/clearing debug_mask */
     gossip_internal( "Gossip_enable_syslog\n");
-    gossip_internal( "gdm = %d, (%lx , %lx)\n", 
-                    gossip_debug_on, gossip_debug_mask.mask1, 
-                                     gossip_debug_mask.mask2);
+    gossip_internal( "gdm = %d, (%lx , %lx)\n", gossip_debug_on, 
+                     gossip_debug_mask.mask1, gossip_debug_mask.mask2);
 
     /* turn off any running facility */
     gossip_disable(); /* includes  a push */
@@ -142,6 +142,7 @@ int gossip_enable_syslog(int priority)
     /* restore the logging settings */
     gossip_pop_mask(NULL, NULL);
 
+    /* DEBUGGING GOSSIP */
     gossip_internal( "final enable syslog gdm = %d, (%lx , %lx)\n\n", 
                     gossip_debug_on, gossip_debug_mask.mask1, 
                                      gossip_debug_mask.mask2);
@@ -155,7 +156,7 @@ int gossip_enable_syslog(int priority)
  */
 int gossip_enable_stderr(void)
 {
-    /* Debug setting/clearing debug_mask */
+    /* DEBUGGING GOSSIP - Debug setting/clearing debug_mask */
     gossip_internal( "Gossip_enable_stderr\n");
     gossip_internal( "gdm = %d, (%lx , %lx)\n", 
                     gossip_debug_on, gossip_debug_mask.mask1, 
@@ -169,6 +170,7 @@ int gossip_enable_stderr(void)
     /* restore the logging settings */
     gossip_pop_mask(NULL, NULL);
 
+    /* DEBUGGING GOSSIP */
     gossip_internal( "final enable stderr gdm = %d, (%lx , %lx)\n\n", 
                     gossip_debug_on, gossip_debug_mask.mask1, 
                                      gossip_debug_mask.mask2);
@@ -199,7 +201,7 @@ int gossip_enable_file(const char *filename, const char *mode)
     /* restore the logging settings */
     gossip_pop_mask(NULL, NULL);
 
-    /* Debug setting/clearing debug_mask */
+    /* CREATE LOG MESSAGE - Debug setting/clearing debug_mask */
     gossip_debug(GOSSIP_GOSSIP_DEBUG,
                  "final enable file  gdm = %d, (%lx , %lx)\n\n", 
                  gossip_debug_on, gossip_debug_mask.mask1, 

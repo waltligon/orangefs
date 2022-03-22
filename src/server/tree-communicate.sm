@@ -366,9 +366,7 @@ static PINT_sm_action tree_communicate_partition_handles(
                                    s_op->u.tree_communicate.handle_array_local[0],
                                    0,    /* V3 sid count */
                                    NULL, /* V3 sid array */
-                                   this_req->u.tree_setattr.objtype,
                                    dummy_obj_attr,
-                                   0,
                                    s_op->req->hints);
 
                     /* copy to req->u.setattr.attr because of calling
