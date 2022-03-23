@@ -1348,7 +1348,7 @@ PVFS_Dokan_cleanup(
 
         /* load credential */
         err = get_credential(DokanFileInfo, &credential);
-        CRED_CHECK_VOID("CloseFile", err);
+        CRED_CHECK_VOID("CleanupFile", err);
 
         /* get file system path */
         fs_path = get_fs_path(FileName);
