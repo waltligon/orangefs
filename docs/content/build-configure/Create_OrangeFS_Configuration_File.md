@@ -78,7 +78,7 @@ options are described below.
   Default: 5
 
 {{%notice note%}}
-The pvfs2-genconfig script asumes that all servers will use the same port
+The pvfs2-genconfig script assumes that all servers will use the same port
 number, board number, or portal index.
 {{%/notice%}}
 
