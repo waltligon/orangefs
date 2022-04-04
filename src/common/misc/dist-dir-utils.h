@@ -86,6 +86,9 @@ int PINT_init_dist_dir_state(
 		const int server_no, 
 		int pre_dsg_num_server,
                 const int split_size);
+int PINT_copy_dist_dir_attr(
+                PVFS_dist_dir_attr *src,
+                PVFS_dist_dir_attr *dst);
 int PINT_is_dist_dir_bucket_active(
 		const PVFS_dist_dir_attr *dist_dir_attr_p, 
 		const PVFS_dist_dir_bitmap bitmap,

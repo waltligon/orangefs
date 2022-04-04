@@ -912,8 +912,10 @@ int SID_cache_put(DB *dbp,
     gossip_debug(GOSSIP_SIDCACHE_DEBUG, "sidcache adds record for SID %s\n",
                  PVFS_SID_str(sid_server));
     */
+#if 0
     fprintf(stderr, "sidcache adds record for SID %s\n",
                  PVFS_SID_str(sid_server));
+#endif
 
     return(ret);
 }

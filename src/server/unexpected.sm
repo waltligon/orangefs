@@ -260,6 +260,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
         return SM_ACTION_TERMINATE;
     }
 
+    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "unexpected_pjmp_setup: decoding request\n");
     /* Decode request */
     ret = PINT_decode(s_op->unexp_bmi_buff.buffer,
                       PINT_DECODE_REQ,
@@ -286,13 +287,16 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
-                 
+     
+
+    gossip_debug(GOSSIP_UNEXP_DEBUG, "unexpected_pjmp_setup: Set up req and op\n");
     s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
     smcb->op = s_op->req->op;
     s_op->op = s_op->req->op;
 
-    gossip_debug(GOSSIP_UNEXP_DEBUG, "Received a request with op=%d\n",
-                                     s_op->op);
+    gossip_debug(GOSSIP_UNEXP_DEBUG,
+                 "unexpected_pjmp_setup: Received a request with op=%d\n",
+                 s_op->op);
 
     if (s_op->op < 2 || s_op->op > PVFS_SERV_NUM_OPS)
     {
@@ -323,12 +327,13 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
      * original and push it onto the framestack
      */
     memcpy(local_op_frame, s_op, sizeof(struct PINT_server_op));
-    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "Pushing local op frame\n");
+    gossip_ldebug(GOSSIP_UNEXP_DEBUG,
+                  "unexpected_pjmp_setup: Pushing local op frame\n");
     s_op->num_pjmp_frames = 1;
     ret = PINT_sm_push_frame(smcb, LOCAL_OPERATION, local_op_frame);
     if(ret < 0)
     {
-        gossip_lerr("unexpected_pjmp_setup failed to push frame for "
+        gossip_lerr("unexpected_pjmp_setup: failed to push frame for "
                     "local_op!\n");
     }
 
@@ -369,7 +374,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
         }
 
         /* This must be inside the "if" to work right otherwise we think
-         * we need remote ops be really don't
+         * we need remote ops we really don't
          */
         if (remote_op_cnt <= 0)
         {
@@ -471,6 +476,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
 noremote:
     /* Do nothing but just run the request as normal */
 
+    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "unexpected_pjmp_setup: ready for pjmp\n");
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -486,8 +492,7 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
     int remaining = 0;
     PFI();
 
-    gossip_ldebug(GOSSIP_UNEXP_DEBUG,
-                  "s_op->num_pjmp_frames = %d\n",
+    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "s_op->num_pjmp_frames = %d\n",
                   s_op->num_pjmp_frames);
 
     assert(s_op->num_pjmp_frames > 0);
@@ -495,6 +500,7 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
     for (; s_op->num_pjmp_frames > 1; s_op->num_pjmp_frames--)
     {
         gossip_ldebug(GOSSIP_UNEXP_DEBUG, "Poping a remote frame\n");
+
         remote_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, &remaining);
         if (!remote_op)
         {

@@ -1676,14 +1676,12 @@ int PVFS_util_resolve(const char* local_path,
     PVFS_path_t *Ppath;
     int ppath_local = 0;
 
-fprintf(stderr, "Starting PVFS_util_resolve\n");
     if(strlen(local_path) > (PVFS_PATH_MAX-1))
     {
         gossip_err("Error: PVFS_util_resolve() input path too long.\n");
         return(-PVFS_ENAMETOOLONG);
     }
 
-fprintf(stderr, "Expanding path\n");
     Ppath = PVFS_path_from_expanded((char *)local_path);
     if (!VALID_PATH_MAGIC(Ppath))
     {
@@ -1704,7 +1702,6 @@ fprintf(stderr, "Expanding path\n");
     /* the most common case first; just try to resolve the path that we
      * were given
      */
-fprintf(stderr, "Calling PVFS_util_resolve_absolute\n");
     ret = PVFS_util_resolve_absolute(local_path);
     if(ret == 0)
     {
@@ -1718,7 +1715,6 @@ fprintf(stderr, "Calling PVFS_util_resolve_absolute\n");
         }
         return(0);
     }
-fprintf(stderr, "Not found, attempting canonicalization\n");
     if(ret == -PVFS_ENOENT)
     {
         /* if the path wasn't found, try canonicalizing the path in case it
@@ -1770,7 +1766,6 @@ fprintf(stderr, "Not found, attempting canonicalization\n");
             return(-PVFS_ENOENT);
         }
 
-fprintf(stderr, "Running absolute again\n");
         ret = PVFS_util_resolve_absolute(tmp_path);
         if (!ret)
         {
@@ -1788,7 +1783,6 @@ fprintf(stderr, "Running absolute again\n");
         /* fall through and preserve "ret" to be returned */
     }
 
-fprintf(stderr, "Returning, for better or worse\n");
     if (ppath_local)
     {
        free(Ppath);

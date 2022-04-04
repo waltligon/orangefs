@@ -149,6 +149,10 @@ PVFS_error PVFS_isys_setattr(PVFS_object_ref ref,
         return ret;
     }
 
+    /* we jump locally to the getattr SM which will check for cached attributes
+     * and capabilities, barring that will initiate a remote getattr for the
+     * capability needed to do the setattr
+     */
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->object_ref,
                                PVFS_ATTR_CAPABILITY,
@@ -248,7 +252,7 @@ static PINT_sm_action setattr_msg_setup_msgpair(struct PINT_smcb *smcb,
                               PVFS_REQ_DATAFILE,
                               sm_p->getattr.attr.capability,
                               *sm_p->cred_p,
-                              sm_p->object_ref.fs_id,
+                              sm_p->object_ref.fs_id,  /* collapse into object_ref */
                               sm_p->object_ref.handle,
                               sm_p->object_ref.sid_count,
                               sm_p->object_ref.sid_array,
@@ -297,6 +301,7 @@ static PINT_sm_action setattr_cleanup(struct PINT_smcb *smcb,
     /* Since we just updated attributes (most of the time we are updating timestamps) 
      * for this object, we must invalidate it's acache entry.  We do not do partial 
      * updates anymore.
+     * Can we not update the whole attr rec?
      */
     if(sm_p->error_code == 0)
     {

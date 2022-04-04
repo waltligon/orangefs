@@ -360,7 +360,8 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
      */
     if (msg_p->encoded_resp_p == NULL)
     {
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "msg_p->encoded_resp_p != NULL");
+        /* message used to say "resp_p != NULL", above if says otherwise */
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "msg_p->encoded_resp_p == NULL\n");
         if (msg_p->fs_id != PVFS_FS_ID_NULL)
         {
             server_config = PINT_server_config_mgr_get_config(msg_p->fs_id);
@@ -999,7 +1000,9 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
 
     assert(msg_p);
 
-    /* op_status error indicating a network issue; set by send/recv.  Go straight to retry */
+    /* op_status error indicating a network issue; set by send/recv.
+     * Go straight to retry 
+     */
     if (msg_p->op_status != 0)
     {
         char s[1024];
@@ -1010,8 +1013,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
         {
             server_string = "[UNKNOWN]";
         }
-
-        gossip_err("Warning: msgpair failed to %s, will retry: %s\n",
+        gossip_err("\tWarning: msgpair failed to %s, will retry: %s\n",
                    server_string, s);
 
         /* this identifies we might need a retry but does not check
@@ -1026,19 +1028,25 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
     /* this decodes what should be a successful response */
     /* this could either be the recv ack or the write ack */
     /* this is an IO read, do we do this here? was it not done before? */
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG,"\tDecoding message\n");
     ret = PINT_serv_decode_resp(msg_p->fs_id,
                                 msg_p->encoded_resp_p,
                                 &decoded_msg,
                                 &msg_p->svr_addr,
                                 msg_p->recv_status.actual_size,
                                 &resp_p);
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                 "\tPINT_serv_decode_resp: return code: (%d)\n", ret);
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                 "\tPINT_serv_decode_resp: msg_p op_status: (%d)\n", msg_p->op_status);
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                 "\tPINT_serv_decode_resp: resp_p->status: (%d)\n", resp_p->status);
     if (ret != 0)
     {
         /* Didn't decode right, keep decode error */
-        PVFS_perror_gossip("msgpairarray decode error", ret);
         msg_p->op_status = js_p->error_code = ret;
         gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                     "%s:error code %d from PINT_serv_decode_resp, "
+                     "\t%s:error code %d from PINT_serv_decode_resp, "
                                           "from msgpair %d\n"
                                          ,__func__
                                          ,msg_p->op_status
@@ -1047,6 +1055,8 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
     }
     else
     {
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                     "\tmsgpairarray decode complete (%d)\n", ret);
         /* if we've made it this far, the server response status is
          * meaningful, so we save it.  This should be a valid response
          * so we should not overwrite any error codes here.
@@ -1073,7 +1083,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
             }
             else
             {
-                gossip_err("IO neither read nor write");
+                gossip_err("\tIO neither read nor write");
             }
             break;
         case PVFS_IO_SMALL_IO :
@@ -1098,12 +1108,16 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
          * or some other status meaningful to the request.
          */
         js_p->error_code = msg_p->op_status = msg_p->comp_fn(smcb, resp_p, mop->index);
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "\tCompletion function returns %d\n",
+                     js_p->error_code);
     }
    
     msg_p->op_action = PVFS_MPA_OK;
 
 
 cleanup:
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                 "\tFreeing capability and msgpair resources\n");
     /* cleanup capability */
     PINT_cleanup_capability(&msg_p->req.capability);
 
@@ -1117,10 +1131,11 @@ cleanup:
 
     if (ret)
     {
-        PVFS_perror_gossip("Failed to free msgpair resources", ret);
+        PVFS_perror_gossip("Failed to free msgpair resources (%d)", ret);
         js_p->error_code = ret;
     }
 
+    /* wipe out actual response, keep decoded response */
     memset(&msg_p->encoded_req, 0, sizeof(msg_p->encoded_req));
     msg_p->encoded_resp_p = NULL;
     msg_p->max_resp_sz = 0;
@@ -1129,8 +1144,10 @@ cleanup:
     msg_p->complete = 1;
 
 retry_message:
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "\tEntering retry processing\n");
     if (msg_p->op_action == PVFS_MPA_RETRY)
     {
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "\tMessage requests PVFS_MPA_RETRY\n");
         /* free up and zero out msg fields; if we retry we will reallocate */
         memset(&msg_p->encoded_req, 0, sizeof(msg_p->encoded_req));
         msg_p->encoded_resp_p = NULL;
@@ -1168,16 +1185,17 @@ retry_message:
         else
         {
             /* Not going to retry so log it */
-            char s[1024];
+            char errmsg[1024];
             server_string = BMI_addr_rev_lookup(msg_p->svr_addr);
             if(!server_string)
             {
                 server_string = "[UNKNOWN]";
             }
-            PVFS_strerror_r(msg_p->op_status, s, sizeof(s));
+            PVFS_strerror_r(msg_p->op_status, errmsg, sizeof(errmsg));
             gossip_err_unless_quiet(
                     "*** %s: msgpair to server %s failed: %s\n",
-                    __func__, server_string, s);
+                    __func__, server_string, errmsg);
+
             if(msg_p->retry_flag != PVFS_MSGPAIR_RETRY)
             {
                 gossip_err_unless_quiet("*** No retries requested.\n");
@@ -1190,6 +1208,7 @@ retry_message:
             {
                 gossip_err_unless_quiet("*** Out of retries.\n");
             }
+
             if (js_p->error_code == 0)
             {
                 js_p->error_code = msg_p->op_status;
@@ -1213,8 +1232,11 @@ retry_message:
         gen_mutex_unlock(mop->join.mutex);
 #endif
     }
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                 "\tFinished complete_message error_code: %d\n", js_p->error_code);
+
     return SM_ACTION_TERMINATE; /* Done with this message / child SM */
-}
+} /* end of msgpairarray_complete_msg */
 
 /*  This message failed in a bad way we could not retry or otherwise
  *  recover from
@@ -1553,197 +1575,6 @@ static inline int io_post_flow(PINT_smcb *smcb, PINT_sm_msgpair_state *msg_p)
     return 0;
 }
 
-#if 0
-/*
-  returns 0 on send completion; IO_RECV_COMPLETED on recv completion,
-  and -PVFS_error on failure
-*/
-static inline int io_complete_context_send_or_recv(PINT_smcb *smcb,
-                                                   job_status_s *js_p)
-{
-    int ret = -PVFS_EINVAL, index = 0;
-    unsigned long status_user_tag = 0;
-    /* GET RID OF CONTEXTS */
-    PINT_client_io_ctx *cur_ctx = NULL;
-    PINT_sm_msgpair_state *msg = NULL;
-    /* BROKEN - frame is a mop */
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    gossip_debug(GOSSIP_IO_DEBUG,
-                 "- complete_context_send_or_recv called\n");
-
-    assert(smcb && js_p);
-    assert(smcb->op == PVFS_SYS_IO);
-
-    status_user_tag = (unsigned long)js_p->status_user_tag;
-
-    if (STATUS_USER_TAG_TYPE(status_user_tag, IO_SM_PHASE_REQ_MSGPAIR_RECV))
-    {
-        index = STATUS_USER_TAG_GET_INDEX(status_user_tag,
-                                          IO_SM_PHASE_REQ_MSGPAIR_RECV);
-
-        gossip_debug(GOSSIP_IO_DEBUG, "got a recv completion with "
-                     "context index %d\n", index);
-
-        cur_ctx = &sm_p->u.io.contexts[index];
-        assert(cur_ctx);
-
-        msg = &cur_ctx->msg;
-
-        msg->recv_id = 0;
-        msg->recv_status = *js_p;
-
-        assert(msg->recv_status.error_code <= 0);
-        assert(msg->recv_status.actual_size <= msg->max_resp_sz);
-
-        cur_ctx->msg_recv_in_progress = 0;
-        sm_p->u.io.msgpair_completion_count--;
-
-        ret = IO_RECV_COMPLETED;
-    }
-    else if (STATUS_USER_TAG_TYPE(status_user_tag,
-                                  IO_SM_PHASE_REQ_MSGPAIR_SEND))
-    {
-        index = STATUS_USER_TAG_GET_INDEX(status_user_tag,
-                                          IO_SM_PHASE_REQ_MSGPAIR_RECV);
-
-        gossip_debug(GOSSIP_IO_DEBUG, "got a send completion with "
-                     "context index %d\n", index);
-
-        cur_ctx = &sm_p->u.io.contexts[index];
-        assert(cur_ctx);
-
-        msg = &cur_ctx->msg;
-
-        msg->send_id = 0;
-        msg->send_status = *js_p;
-
-        assert(msg->send_status.error_code <= 0);
-
-        cur_ctx->msg_send_in_progress = 0;
-        sm_p->u.io.msgpair_completion_count--;
-
-        ret = 0;
-    }
-    return ret;
-}
-
-static inline int io_check_context_status(PINT_client_io_ctx *cur_ctx,
-                                          int io_type,
-                                          PVFS_size *total_size)
-{
-    int ret = 0;
-
-    gossip_debug(GOSSIP_IO_DEBUG, "- io_check_context_status called\n");
-
-    assert(cur_ctx && total_size);
-
-    if (cur_ctx->msg.send_status.error_code)
-    {
-        gossip_debug(GOSSIP_IO_DEBUG,
-                     "  error (%d) in msgpair send for context %p\n",
-                     cur_ctx->msg.send_status.error_code, cur_ctx);
-        ret = cur_ctx->msg.send_status.error_code;
-    }
-    else if (cur_ctx->msg.recv_status.error_code)
-    {
-        gossip_debug(GOSSIP_IO_DEBUG,
-                     "  error (%d) in msgpair recv for context %p\n",
-                     cur_ctx->msg.recv_status.error_code, cur_ctx);
-        ret = cur_ctx->msg.recv_status.error_code;
-    }
-    else if (io_type == PVFS_IO_WRITE)
-    {
-        /* we check the write ack status before the flow status so that the
-         * error code that the server reported in the ack takes precedence
-         */
-        if (cur_ctx->write_ack.recv_status.error_code)
-        {
-            gossip_debug(
-                GOSSIP_IO_DEBUG,
-                "  error (%d) in final ack for context %p\n",
-                cur_ctx->write_ack.recv_status.error_code, cur_ctx);
-
-            assert(cur_ctx->write_ack_has_been_posted);
-            ret = cur_ctx->write_ack.recv_status.error_code;
-        }
-        else if (cur_ctx->write_ack_has_been_posted)
-        {
-            struct PINT_decoded_msg decoded_msg;
-            struct PVFS_server_resp *resp = NULL;
-            /*
-              size for writes are reported in the final ack, but we
-              have to decode it first
-            */
-            ret = PINT_serv_decode_resp(
-                                     cur_ctx->msg.fs_id,
-                                     cur_ctx->write_ack.encoded_resp_p,
-                                     &decoded_msg,
-                                     &cur_ctx->msg.svr_addr,
-                                     cur_ctx->write_ack.recv_status.actual_size,
-                                     &resp);
-            if (ret == 0)
-            {
-                gossip_debug(
-                    GOSSIP_IO_DEBUG,
-                    "  %lld bytes written to context %p\n",
-                    lld(resp->u.write_completion.total_completed),
-                    cur_ctx);
-
-                *total_size += resp->u.write_completion.total_completed;
-                
-                /* pass along the error code from the server as well */
-                ret = resp->status;
-
-                PINT_decode_release(&decoded_msg, PINT_DECODE_RESP);
-            }
-            else
-            {
-                PVFS_perror_gossip("PINT_serv_decode_resp failed", ret);
-            }
-
-            PINT_flow_reset(&cur_ctx->flow_desc);
-            BMI_memfree(cur_ctx->msg.svr_addr,
-                        cur_ctx->write_ack.encoded_resp_p,
-                        cur_ctx->write_ack.max_resp_sz,
-                        BMI_RECV);
-        }
-        else if (cur_ctx->flow_status.error_code)
-        {
-            gossip_debug(GOSSIP_IO_DEBUG,
-                         "  error (%d) in flow for context %p\n",
-                         cur_ctx->flow_status.error_code, cur_ctx);
-            PINT_flow_reset(&cur_ctx->flow_desc);
-            ret = cur_ctx->flow_status.error_code;
-        }
-    }
-    else if (cur_ctx->flow_status.error_code)
-    {
-        gossip_debug(GOSSIP_IO_DEBUG,
-                     "  error (%d) in flow for context %p\n",
-                     cur_ctx->flow_status.error_code, cur_ctx);
-        PINT_flow_reset(&cur_ctx->flow_desc);
-        ret = cur_ctx->flow_status.error_code;
-    }
-    else if (io_type == PVFS_IO_READ)
-    {
-        gossip_debug(
-            GOSSIP_IO_DEBUG, "  %lld bytes read from context %p\n",
-            lld(cur_ctx->flow_desc.total_transferred), cur_ctx);
-
-        /* size for reads are reported in the flow */
-        *total_size += cur_ctx->flow_desc.total_transferred;
-
-        /*
-          we can't reset the flow here in case we have to do a zero
-          fill adjustment that we haven't detected yet
-        */
-    }
-
-    return ret;
-}
-#endif
-
 /*********************************************************************
  * externally callable helper functions used in conjunction with 
  * the msgpairarray state machine defined above
@@ -1802,6 +1633,7 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
     int ret = -1;
     const char *server_string;
 
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: calling PINT_decode\n",__func__);
 
     ret = PINT_decode(encoded_resp_p,
                       PINT_DECODE_RESP,
@@ -1810,7 +1642,13 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
                       actual_resp_sz);
     if (ret > -1)
     {
+        PVFS_perror_gossip("\tPINT_decode returns an error", ret);            
+
         *resp_out_pp = (struct PVFS_server_resp *)decoded_msg_p->buffer;
+
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                     "\tresp->op is %d\n", (*resp_out_pp)->op);
+
         if ((*resp_out_pp)->op == PVFS_SERV_PROTO_ERROR)
         {
 
@@ -1837,6 +1675,8 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
             return(-EPROTONOSUPPORT);
         }
     }
+gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+             "%s: returning %d\n",__func__,ret);
     return ret;
 }
 

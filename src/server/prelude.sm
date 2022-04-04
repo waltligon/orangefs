@@ -360,6 +360,14 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         ret = PINT_server_req_get_attr(s_op->req, &s_op->attr);
         s_op->target_object_attr = &s_op->attr; /* is this used? */
 
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+                     "prelude: handle: %s \n\t\tparent: %s bitmap: \n\t\t%d dirdata: %s\n",
+                     PVFS_OID_str(&s_op->target_handle),
+                     PVFS_OID_str(s_op->attr.parent),
+                     *s_op->attr.u.dirdata.dist_dir_bitmap,
+                     PVFS_OID_str(s_op->attr.u.dirdata.dirdata_handles)
+                     );
+
         create_object = 1;    /* default to create unless zereo'd below */
         js_p->error_code = 0; /* Clear ENOENT */
         switch (s_op->req->op)
@@ -718,7 +726,8 @@ static PINT_sm_action prelude_create_object_if_allowed(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (prelude sm) state: create_object\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
-    gossip_debug(GOSSIP_SERVER_DEBUG, "creating missing object\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "prelude: creating missing object: %s\n",
+                 PVFS_OID_str(&s_op->target_handle));
 
     /* setup and post dspace create job */
     ret = job_trove_dspace_create(s_op->target_fs_id,
@@ -822,21 +831,17 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
     /* if this is a setattr, tell setattr SM nothing left to do */
     if (s_op->req->op == PVFS_SERV_SETATTR)
     {
-        struct PINT_server_op *ps_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-        if (ps_op)
-        {
-            ps_op->attr.mask = PVFS_ATTR_NULL; 
+        s_op->attr.mask = PVFS_ATTR_NULL; 
             
-            gossip_debug(GOSSIP_SERVER_DEBUG,
-                         "prelude: marking all attributes written mask: %ld\n",
-                         ps_op->attr.mask);
-        }
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "prelude: marking all attributes written mask: %ld\n",
+                     s_op->attr.mask);
     }
     return ret;
 }
 
 /*
- * Contrary to the prev messge, this shuold run on a crdirent, which is
+ * Contrary to the prev messge, this should run on a crdirent, which is
  * called during a mkdir.  The dirdata needs creating at this site.
  * This runs on a mkdir when the dirdata object has not been created
  * yet.
@@ -917,7 +922,10 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
                                         s_op->attr.u.dirdata.dist_dir_attr.sid_count);
 /* aren't getting the right data here 
  */
-        s_op->val_a[1].buffer = (void *)&s_op->attr.u.dirdata.dirdata_handles;
+        gossip_debug(GOSSIP_SERVER_DEBUG, "prelude: dirdata_handles: %s\n",
+                     PVFS_OID_str(s_op->attr.u.dirdata.dirdata_handles));
+
+        s_op->val_a[1].buffer = (void *)s_op->attr.u.dirdata.dirdata_handles;
         gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals1 %p sz %d\n",
                                         (void *)s_op->val_a[1].buffer,
                                         s_op->val_a[1].buffer_sz);
@@ -935,7 +943,10 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
                                 sizeof(PVFS_dist_dir_bitmap_basetype);
 /* aren't getting the right data here 
  */
-        s_op->val_a[2].buffer = (void *)&s_op->attr.u.dirdata.dist_dir_bitmap;
+        gossip_debug(GOSSIP_SERVER_DEBUG, "prelude: bitmap: %d\n",
+                     *s_op->attr.u.dirdata.dist_dir_bitmap);
+
+        s_op->val_a[2].buffer = (void *)s_op->attr.u.dirdata.dist_dir_bitmap;
         gossip_debug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals0 %p sz %d\n",
                                         (void *)s_op->val_a[2].buffer,
                                         s_op->val_a[2].buffer_sz);

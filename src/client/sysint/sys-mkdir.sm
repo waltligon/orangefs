@@ -814,16 +814,6 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     /* tree height, bitmap size and branch level are computed in next state */
 #undef SET_DIR_ATTR_FROM_USER
 
-#if 0
-    /* no idea what this was supposed to check - it seems list now, remove it */
-    if (ret < 0)
-    {
-        gossip_err("Error: failed to get distributed directory parameters\n");
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
-#endif
-
     gossip_debug(GOSSIP_MKDIR_DEBUG,
                  "Setting distributed directory initial "
                  "servers to %d [requested %d]\n",
@@ -914,7 +904,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     msg_p = &sm_p->msgarray_op.msgpair;
 
     /* WHY?  Why do we copy all of this from the attr to the req, only to copy it
-     * back on the server?  Why not just move it all inthe attr?
+     * back on the server?  Why not just move it all in the attr?
      */
     PINT_SERVREQ_MKDIR_FILL(msg_p->req,
                             sm_p->getattr.attr.capability,
@@ -922,16 +912,16 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                             sm_p->u.mkdir.dir_attr,
                             sm_p->parent_ref.fs_id,
                             *sm_p->u.mkdir.metadata_handle, /* object */
-                            sm_p->u.mkdir.dir_attr.meta_sid_count,
+                            sm_p->u.mkdir.dir_attr.meta_sid_count, /* redundant */
                             sm_p->u.mkdir.metadata_sid_array,
                             &sm_p->parent_ref.handle, /* back ptr */
                             sm_p->parent_ref.sid_array,
-                            sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max,
+                            sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max, /* redundant */
                             sm_p->u.mkdir.dirdata_handles,
-                            sm_p->u.mkdir.dir_attr.meta_sid_count, /* dirdata */
+                            sm_p->u.mkdir.dir_attr.meta_sid_count, /* dirdata */ /* redundant */
                             sm_p->u.mkdir.dirdata_sid_array,
-                            sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_min,
-                            sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.split_size,
+                            sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_min, /* redundant */
+                            sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.split_size, /* redundant */
                             sm_p->hints);
 
     /* after setting up the request, zero out the handle and sid counts in the attr
@@ -949,8 +939,9 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     /* now fill in various msg_p fields */
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
+    //dirdata_attr.u.dirdata.dist_dir_attr.dirdata_count = sm_p->u.mkdir.dirdata_count;
     msg_p->fs_id = sm_p->parent_ref.fs_id;
-    msg_p->handle = *sm_p->u.mkdir.metadata_handle;
+    msg_p->handle = *sm_p->u.mkdir.metadata_handle; /* collapse into object_ref */
     /* V3 this assumes fan out from client */
     msg_p->sid_count = sm_p->u.mkdir.dir_attr.meta_sid_count;
     msg_p->sid_index = 0;
@@ -987,8 +978,8 @@ static PINT_sm_action mkdir_msg_failure(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
-/* This sends setattrs to all of the new remote dirdata, which
- * will create them and update their metadata
+/* This sends setattrs to all of the new remote dirdata,
+ * which will create them and update their metadata
  */
 /* send a setattr to each new dirdata to set up data */
 static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
@@ -1012,27 +1003,36 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
      */
     PINT_copy_object_attr(&dirdata_attr, &sm_p->u.mkdir.dir_attr);
 
-    /* we need the masks to reflect what is really in the attr */
-
     dirdata_attr.objtype = PVFS_TYPE_DIRDATA; /* this is mkdir,targets are dirdata */
 
-    /* this works for letting prelude create the object, but setattr won't like it */
-    dirdata_attr.mask = PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIRDATA_ALL;
+    /* assume all valid dirdata attrs since we are creating a dirdata */
+    dirdata_attr.mask = PVFS_ATTR_DIRDATA_ALL | PVFS_ATTR_COMMON_ALL;
 
-    ret = PINT_init_dist_dir_state(&dirdata_attr.u.dirdata.dist_dir_attr,
-                                   &dirdata_attr.u.dirdata.dist_dir_bitmap,
-                                   sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max,
-                                   sm_p->u.mkdir.dir_attr.meta_sid_count,
-                                   0,  /* server_no - reset below */
-                                   sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_min,
-                                   sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.split_size);
+//    ret = PINT_copy_dist_dir_attr(&dirdata_attr.u.dirdata.dist_dir_attr,
+//                                  &sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr);
+
+    PINT_init_dist_dir_state(&dirdata_attr.u.dirdata.dist_dir_attr,
+                             &dirdata_attr.u.dirdata.dist_dir_bitmap, /* malloc'd */
+                             sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_count,
+                             sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.sid_count,
+                             0,
+                             sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max,
+                             sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.split_size
+                            );
+
+    /* these are not handled in above func */
+    dirdata_attr.u.dirdata.dist_dir_attr.dirdata_max =
+              sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max;
+    dirdata_attr.u.dirdata.dist_dir_attr.dirdata_min =
+              sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_min;
+
+    //PINT_dist_dir_set_serverno(0, &dirdata_attr.u.dirdata.dist_dir_attr,
+    ///                             dirdata_attr.u.dirdata.dist_dir_bitmap);
 
     /* since we are doing mkdir, and these are remote dirdatas, we know
      * the objects don't exist yet, so we aren't really doing setattrs, we're
      * doing create dirdata objects.  prelude will create the objects before the
-     * setattr but then there really isnt anything for the setattr code to do.
-     */
-    /* we just copied the attr in s_op, which included copying these two arrays
+     * setattr but then there really isnt anything for the setattr code to do.  */ /* we just copied the attr in s_op, which included copying these two arrays
      * if they exist (should exist) and now copying another pointer on top?
      * maybe these pointers are null in the attr
      */
@@ -1081,6 +1081,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
                                   NULL);
         /* this is done in the FILL macro */
         /* PINT_copy_object_attr(&msg_p->req.u.setattr.attr, &dirdata_attr); */
+
         msg_p->msgclass = PVFS_IO_METADATA;
         msg_p->msgdir = PVFS_IO_WRITE;
         msg_p->fs_id = sm_p->parent_ref.fs_id;
@@ -1193,23 +1194,6 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     /* updating the parent - pass in object name, OID, SIDs, and 
      * parent's OID and SIDs - use one count and fs_id
      */
-    #if 0
-    PINT_SERVREQ_CRDIRENT_FILL(
-               msg_p->req,
-               sm_p->getattr.attr.capability,
-               *sm_p->cred_p,
-               sm_p->parent_ref.fs_id,
-               sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
-               sm_p->parent_ref.sid_count,
-               &sm_p->getattr.attr.u.dir.dirdata_sids[dirdata_sid_index],
-               sm_p->u.mkdir.object_name,
-               sm_p->object_ref.handle,
-               sm_p->object_ref.sid_array,
-               sm_p->object_ref.sid_count,
-               sm_p->parent_ref.handle,
-               sm_p->parent_ref.sid_array,
-               sm_p->hints);
-    #endif
     PINT_SERVREQ_CRDIRENT_FILL(
                msg_p->req,
                sm_p->getattr.attr.capability,

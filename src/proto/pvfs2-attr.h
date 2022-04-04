@@ -827,7 +827,7 @@ static inline void encode_PVFS_dirdata_attr(char **pptr,
     encode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);                     
 
 
-    for (index_i = 0; index_i<(x)->dist_dir_attr.bitmap_size; index_i++)      
+    for (index_i = 0; index_i < (x)->dist_dir_attr.bitmap_size; index_i++)      
     {                                                                         
         encode_PVFS_dist_dir_bitmap_basetype(pptr,                            
                                              &(x)->dist_dir_bitmap[index_i]); 
@@ -952,29 +952,37 @@ static inline void encode_PVFS_object_attr(char **pptr,
                                            const PVFS_object_attr *x) 
 { 
     int index_i = 0;
-    encode_PVFS_ds_type(pptr, &(x)->objtype); 
+    encode_PVFS_ds_type(pptr,         &(x)->objtype); 
     encode_PVFS_object_attrmask(pptr, &(x)->mask); 
-    encode_PVFS_uid(pptr, &(x)->owner); 
-    encode_PVFS_gid(pptr, &(x)->group); 
-    encode_PVFS_permissions(pptr, &(x)->perms); 
+    encode_PVFS_uid(pptr,             &(x)->owner); 
+    encode_PVFS_gid(pptr,             &(x)->group); 
+    encode_PVFS_permissions(pptr,     &(x)->perms); 
     encode_skip4(pptr,); 
-    encode_PVFS_time(pptr, &(x)->atime); 
-    encode_PVFS_time(pptr, &(x)->mtime); 
-    encode_PVFS_time(pptr, &(x)->ctime); 
-    encode_PVFS_time(pptr, &(x)->ntime); 
-    encode_uint32_t(pptr, &(x)->meta_sid_count); 
+    encode_PVFS_time(pptr,            &(x)->atime); 
+    encode_PVFS_time(pptr,            &(x)->mtime); 
+    encode_PVFS_time(pptr,            &(x)->ctime); 
+    encode_PVFS_time(pptr,            &(x)->ntime); 
+    encode_uint32_t(pptr,             &(x)->meta_sid_count); 
     encode_skip4(pptr,);
-    encode_PVFS_capability(pptr, &(x)->capability); 
+    encode_PVFS_capability(pptr,      &(x)->capability); 
 
-    /* must deal with NULL handle and SIDs */
     if ((x)->parent == NULL)
     {
-        uint64_t Z = 0;
-        encode_uint64_t(pptr, &Z);
+        /* must deal with NULL handle and SIDs 
+         * EVERY object must have a parent, except the root dir
+         * we have a choice here of either stopping the encode with an
+         * error, or encode a null handle for the parent.  There are
+         * times (setattr) when we may not want to fetch the parent and
+         * encode it so we might decide the latter is better.  This must
+         * be revisited.  Another option might PVFS_HANDLE_HIGH which would
+         * differentiate the root dir's NULL parent from one that is missing.
+         */
+        PVFS_OID nulloid = PVFS_HANDLE_NULL;
+        encode_PVFS_handle(pptr, &nulloid); 
     }
     else
     {
-        encode_PVFS_handle(pptr, &(x)->parent);             
+        encode_PVFS_handle(pptr, (x)->parent); /* no & on parent */
         align8(pptr);                                                             
 
         for (index_i = 0; index_i < (x)->meta_sid_count; index_i++)      
@@ -1024,26 +1032,15 @@ static inline void decode_PVFS_object_attr(char **pptr, PVFS_object_attr *x)
     decode_PVFS_capability(pptr, &(x)->capability); 
     align8(pptr);                                                             
 
-    /* must deal with NULL handle and SIDs */
-    /* This will not deal with a root dir's non-parent */
-    if (*((uint64_t *)(*pptr)) == 0)
-    {
-        *pptr += sizeof(uint64_t);
-        (x)->parent = NULL;
-        (x)->parent_sids = NULL;
-        (x)->meta_sid_count = 0;
-    }
-    else
-    {
-        (x)->parent = decode_malloc(OSASZ(1, (x)->meta_sid_count));       
-        (x)->parent_sids = (PVFS_SID *)&(x)->parent[1]; 
+    (x)->parent = decode_malloc(OSASZ(1, (x)->meta_sid_count));       
+    (x)->parent_sids = (PVFS_SID *)&(x)->parent[1]; 
 
-        decode_PVFS_handle(pptr, (x)->parent);             
-        for (index_i = 0; index_i < (x)->meta_sid_count; index_i++)      
-        {                                                                         
-            decode_PVFS_SID(pptr, &(x)->parent_sids[index_i]);                   
-        }                                                                         
-    }
+    /* there should always be an encoded parent, even if it is NULL */
+    decode_PVFS_handle(pptr, (x)->parent);             
+    for (index_i = 0; index_i < (x)->meta_sid_count; index_i++)      
+    {                                                                         
+        decode_PVFS_SID(pptr, &(x)->parent_sids[index_i]);                   
+    }                                                                         
 
     switch ((x)->objtype) 
     { 

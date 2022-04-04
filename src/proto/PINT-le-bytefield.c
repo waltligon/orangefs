@@ -898,11 +898,11 @@ static int lebf_decode_resp(void *input_buffer, /* decoding from this buff */
     char **p = &ptr;
     struct PVFS_server_resp *resp = &target_msg->stub_dec.resp;
 
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_resp\n");
     target_msg->buffer = resp;
 
     /* decode generic part of response (including op number) */
     decode_PVFS_server_resp(p, resp);
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_resp\n");
 
     if (resp->status != 0) 
     {
@@ -993,7 +993,6 @@ static int lebf_decode_resp(void *input_buffer, /* decoding from this buff */
     }
 
 out:
-
     return(ret);
 }
 

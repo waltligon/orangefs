@@ -80,7 +80,17 @@ static PINT_sm_action final_response_release(struct PINT_smcb *smcb,
     /* NOTE: we filter out any subsystem mask and make sure that this
      * shows up as a generic pvfs error on the client side
      */
-    s_op->resp.status = -PVFS_ERROR_CODE(-js_p->error_code);
+    /* positive error codes are not errors, they are flags for the state machine
+     * they should be cleaned up already, but check for them
+     */
+    if (js_p->error_code < 0)
+    {
+        s_op->resp.status = -PVFS_ERROR_CODE(-js_p->error_code);
+    }
+    else
+    {
+        s_op->resp.status = 0;
+    }
 
     /* catch cases in which the operation has not been scheduled */
     if (!s_op->scheduled_id)

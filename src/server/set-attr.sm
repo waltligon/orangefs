@@ -21,6 +21,8 @@
 #include "dist-dir-utils.h"
 #include "sid.h"
 
+/* these are SM flags they must be positive */
+/* as to not conflict with error_codes */
 enum
 {
     STATE_FINISHED = 6,
@@ -555,7 +557,11 @@ static PINT_sm_action setattr_write_metafile_datafile_handles_if_required(
     job_id_t j_id;
 
     /* reset from jump to here with STATE_METAFILE */
-    js_p->error_code = 0;
+    /* clear SM flags */
+    if (js_p->error_code > 0)
+    {
+        js_p->error_code = 0;
+    }
 
     gossip_debug(GOSSIP_SETATTR_DEBUG,
                  " request has dfile_count of %d | dspace has %d\n",
@@ -621,12 +627,17 @@ static PINT_sm_action setattr_write_metafile_distribution_if_required(
     int ret = 0;
     job_id_t j_id;
 
+    /* clear SM flags */
+    if (js_p->error_code > 0)
+    {
+        js_p->error_code = 0;
+    }
+
     /* if we don't need to fill in the distribution, skip it */
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DIST))
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "skipping distribution write\n");
-        js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
 
@@ -681,12 +692,17 @@ static PINT_sm_action setattr_write_symlink_target_if_required(
     int ret = 0;
     job_id_t j_id;
 
+    /* clear SM flags */
+    if (js_p->error_code > 0)
+    {
+        js_p->error_code = 0;
+    }
+
     /* if we don't need to fill in the symlink target, skip it */
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_SYMLNK_TARGET))
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "skipping symlink target write\n");
-        js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
 
@@ -739,7 +755,11 @@ static PINT_sm_action setattr_directory_write_distr_dir_data_if_required(
     int i;
 
     /* reset from jump to here with STATE_DIRDATA or STATE_DIRECTORY */
-    js_p->error_code = 0;
+    /* clear SM flags */
+    if (js_p->error_code > 0)
+    {
+        js_p->error_code = 0;
+    }
 
     /* if we don't need to write the distr_dir struct, skip it */
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_DISTDIR_ATTR))
@@ -869,7 +889,11 @@ static PINT_sm_action setattr_dirdata_write_distr_dir_data_if_required(
     int i;
 
     /* reset from jump to here with STATE_DIRDATA or STATE_DIRECTORY */
-    js_p->error_code = 0;
+    /* clear SM flags */
+    if (js_p->error_code > 0)
+    {
+        js_p->error_code = 0;
+    }
 
     /* if we don't need to write the distr_dir struct, skip it */
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_DISTDIR_ATTR))
@@ -1156,6 +1180,12 @@ static PINT_sm_action setattr_work_cleanup(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    /* clear SM flags */
+    if (js_p->error_code > 0)
+    {
+        js_p->error_code = 0;
+    }
+
 /* ECQ - fix this!
     PINT_free_object_attr(&s_op->attr);
 */
@@ -1174,6 +1204,7 @@ static PINT_sm_action setattr_work_cleanup(struct PINT_smcb *smcb,
     {
         free(s_op->val_a);
     }
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -1343,10 +1374,10 @@ static void PINT_get_ctrl_setattr(struct PVFS_server_req *req,
 }
 
 static int PINT_get_attr_setattr(struct PVFS_server_req *req,
-                         PVFS_object_attr *attr)
+                                 PVFS_object_attr *attr)
 {
     PINT_copy_object_attr(attr, &req->u.setattr.attr);
-    *attr = req->u.setattr.attr;
+    /* *attr = req->u.setattr.attr; WTF is this? */
     return 0;
 }
 

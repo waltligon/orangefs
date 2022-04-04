@@ -156,6 +156,16 @@ int PINT_init_dist_dir_state(
 	return 0;
 }
 
+/* this function copies a dist_dir_attr, mostly for creating dirdatas from
+ * dir, which should have the same info (other than server_no)
+ */
+int PINT_copy_dist_dir_attr(PVFS_dist_dir_attr *src, 
+                            PVFS_dist_dir_attr *dst)
+{
+    memcpy((void *)dst, (void *)src, sizeof(PVFS_dist_dir_attr));
+    return 0;
+}
+ 
 /* functions to test whether a dirdata server is active or not. 
  * will return 0 if server_no is out of bound or server is inactive.
  */

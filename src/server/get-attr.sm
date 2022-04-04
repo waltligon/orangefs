@@ -1200,14 +1200,6 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    /* these correct values are in the database, but not in the
-     * buffer after we read and convert the attributes.  Fix it!!!
-     */
-    /* this code is just for early V3 work, it should be removed */
-    //attr->u.dir.dist_dir_attr.dirdata_count = 1;
-    //attr->u.dir.dist_dir_attr.bitmap_size   = 1;
-    //attr->meta_sid_count = 1;
-
     /* this should not assert, but error and drop the request
      * so the server doesn't die.  We should be building with NDEBUG
      * for real installations.  Probably just good error messages
@@ -1216,21 +1208,6 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
     assert(attr->u.dir.dist_dir_attr.dirdata_count > 0);
     assert(attr->u.dir.dist_dir_attr.bitmap_size > 0);
     assert(attr->meta_sid_count > 0);
-
-    /* just printed all the following in getattr_validate */
-#if 0
-    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "getattr: get dist-dir-attr for dir meta handle %s "
-                 "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
-                 "split_size=%d, server_no=%d and branch_level=%d\n",
-                 PVFS_OID_str(&s_op->u.getattr.handle),
-                 attr->u.dir.dist_dir_attr.tree_height,
-                 attr->u.dir.dist_dir_attr.dirdata_count,
-                 attr->u.dir.dist_dir_attr.bitmap_size,
-                 attr->u.dir.dist_dir_attr.split_size,
-                 attr->u.dir.dist_dir_attr.server_no,
-                 attr->u.dir.dist_dir_attr.branch_level);
-#endif
 
     /******************************
      * This starts to make sense
@@ -1383,34 +1360,45 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
 
     attr_p = &s_op->resp.u.getattr.attr;
 
-    /* gossip bitmap */
+    /* gossip parent */
     gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "getattr: dist_dir_bitmap as:\n");
+                 " getattr: kvals of directory %s\n",
+                 PVFS_OID_str(&s_op->u.getattr.handle));
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     "\t\t parent: %s\n",
+                     PVFS_OID_str(attr_p->parent));
+
+    /* gossip dir bitmap */
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                 "\t\t dist_dir_bitmap:\n");
 
     for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
     {
         c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
         gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     " i=%d : %02x %02x %02x %02x\n",
+                     "\t\t i=%d : %02x %02x %02x %02x\n",
                      i, c[3], c[2], c[1], c[0]);
     }
 
-    /* gossip handles */
+    /* gossip dirdata handles */
     gossip_debug(GOSSIP_GETATTR_DEBUG, "\n");
-
-    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "\t getattr: dirdata handles array of directory %s.\n",
-                 PVFS_OID_str(&s_op->u.getattr.handle));
 
     for(i = 0; i < attr_p->u.dir.dist_dir_attr.dirdata_count; i++)
     {
         gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     "\t\tdirdata server %d: %s.\n",
+                     "\t\t dirdata server %d: %s\n",
                      i, PVFS_OID_str(&attr_p->u.dir.dirdata_handles[i]));
     }
 
     /*
      * Start to get DIR HINTS
+     */
+
+    /*
+     * I think the rest of this function is obsolete due to storing the hints in
+     * the main attr struct in V3.  This isn't hurting anything other than being
+     * wasted time/performance.  It should be removed.
      */
 
     /* NOTE: memory allocations are released in the getattr_cleanup()
@@ -1568,6 +1556,12 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
 
     return ret;
 }
+
+/* 
+ * I think some of this function is absolete due to storing hints in the main attr
+ * struct - dists and layouts may still need handling so it all needs to be
+ * investigated.
+ */
 
 static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
                                                  job_status_s *js_p)
@@ -2031,6 +2025,13 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                  llu(respattr->ctime), llu(respattr->ntime),
                  (int)respattr->u.meta.dist_size,
                  (int)respattr->u.dir.dirent_count);
+
+    if (respattr->parent)
+    {
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                 "\t\t[parent: %s]\n",
+                 PVFS_OID_str(respattr->parent));
+    }
 
     switch (respattr->objtype)
     {

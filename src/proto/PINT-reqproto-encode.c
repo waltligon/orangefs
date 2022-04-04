@@ -234,7 +234,6 @@ int PINT_decode(void *input_buffer,
         gossip_err("   and make sure that the version is consistent.\n");
         return(-PVFS_EPROTONOSUPPORT);
     }
-
     for(i = 0; i < ENCODING_TABLE_SIZE; i++)
     {
 	if(PINT_encoding_table[i] && 
@@ -259,6 +258,7 @@ int PINT_decode(void *input_buffer,
 		                                              size_index,
 		                                              target_msg,
 		                                              target_addr);
+
 		tmp_resp = target_msg->buffer;
 		return(ret);
 	    }

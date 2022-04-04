@@ -601,14 +601,6 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
 
     gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", sm_p, __func__);
 
-/* V3 this functionality moved to MPA */
-#if 0
-    PINT_sm_msgpair_state *msg = &(sm_p->msgarray_op.msgarray[index]);
-    struct PVFS_servreq_tree_get_file_size *tree = 
-                                              &(msg->req.u.tree_get_file_size);
-    PINT_client_getattr_mirror_ctx *ctx = NULL;
-    uint32_t server_nr = 0;
-#endif
     int i = 0;
 
     if (resp_p->status)
@@ -1174,7 +1166,7 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
                               PVFS_REQ_OTHER,
                               capability,
                               *sm_p->cred_p,
-                              object_ref.fs_id,
+                              object_ref.fs_id,    /* collapse into object_ref ? */
                               object_ref.handle,
                               sm_p->getattr.req_attrmask,
                               sm_p->hints);
@@ -1847,12 +1839,6 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
         msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = getattr_dirdata_getattr_comp_fn;
         
-        /* V3 */
-#if 0
-        ret = PINT_cached_config_map_to_server(
-            &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-#endif
-
         ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
         if (ret)
         {   
