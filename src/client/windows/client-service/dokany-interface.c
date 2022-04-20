@@ -2179,8 +2179,12 @@ PVFS_Dokan_delete_directory(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    int err;
+    int ret, err;
     PVFS_credential credential;
+    char *fs_path, **filename_array;
+    int incount, outcount;
+    PVFS_ds_position token;
+    PVFS_sys_attr *attr_array;
 
     client_debug("DeleteDirectory: %S\n", FileName);
     client_debug("   Context: %llx\n", DokanFileInfo->Context);
@@ -2189,13 +2193,69 @@ PVFS_Dokan_delete_directory(
     err = get_credential(DokanFileInfo, &credential);
     CRED_CHECK("DeleteDirectory", err);
 
-    /* store context with DeleteOnClose flag */
-    add_context(DokanFileInfo, FILE_FLAG_DELETE_ON_CLOSE, &credential);
+    /* get file system path */
+    fs_path = get_fs_path(FileName);
+    if (fs_path == NULL)
+    {
+        return -1;
+    }
 
-    /* use same process as a file deletion) */
+    /* just look for 1 file/directory */
+    incount = 1;
+
+    /* allocate filename buffer */
+    filename_array = (char**)malloc(sizeof(char*));
+    MALLOC_CHECK(filename_array);
+    filename_array[0] = (char*)malloc(PVFS_NAME_MAX + 8);
+    MALLOC_CHECK(filename_array[0]);
+
+    /* allocate attr buffer */
+    attr_array = (PVFS_sys_attr*)malloc(sizeof(PVFS_sys_attr));
+    MALLOC_CHECK(attr_array);
+
+    token = PVFS_READDIR_START;
+
+    /* check whether directory is empty */
+    ret = fs_find_files(fs_path, &credential, &token, incount, &outcount,
+        filename_array, attr_array);
+
+    if (ret != 0)
+    {
+        client_debug("   fs_find_files returned %d\n", ret);
+        goto delete_directory_exit;
+    }
+
+    /* do not delete non-empty directories - return error */
+    if (outcount) {
+        client_debug("   nonempty directory\n");
+        ret = -PVFS_ENOTEMPTY;
+        goto delete_directory_exit;
+    }
+
+    /* store context with DeleteOnClose flag */
+    /* TODO: not needed? */
+#if 0
+    add_context(DokanFileInfo, FILE_FLAG_DELETE_ON_CLOSE, &credential);
+#endif
+
+    /* use same process as a file deletion */
     err = PVFS_Dokan_delete_file(FileName, DokanFileInfo);
 
-    client_debug("DeleteDirectory exit: %d\n", err);
+delete_directory_exit:
+
+    /* free filename array */
+    free(filename_array[0]);
+    free(filename_array);
+
+    free(attr_array);
+
+    free(fs_path);
+
+    PINT_cleanup_credential(&credential);
+
+    err = error_map(ret);
+
+    client_debug("DeleteDirectory exit: %d (%d)\n", err, ret);
 
     return err;
 }

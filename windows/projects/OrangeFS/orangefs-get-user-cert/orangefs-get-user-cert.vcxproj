@@ -111,7 +111,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;security.lib;libeay32.lib;ssleay32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;security.lib;libcrypto_static.lib;libssl_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)$(Platform)\$(Configuration);..\..\..\openssl\lib64\debug</AdditionalLibraryDirectories>
       <AllowIsolation>false</AllowIsolation>
     </Link>
@@ -152,7 +152,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;security.lib;libeay32.lib;ssleay32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;security.lib;libcrypto_static.lib;libssl_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)$(Platform)\$(Configuration);..\..\..\openssl\lib64\release</AdditionalLibraryDirectories>
       <AllowIsolation>false</AllowIsolation>
     </Link>
