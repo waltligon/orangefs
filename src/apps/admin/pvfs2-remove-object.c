@@ -194,7 +194,11 @@ int main(int argc, char **argv)
             return ret;
         }
 
-        if (!user_opts->dirent_name)
+        /*
+         * Space for struct user_opts points to was malloced and memset to
+         * zero in parse_args.
+         */
+        if (strlen(user_opts->dirent_name) == 0)
         {
             fprintf(stderr, "No dirent name specified under parent "
                     "%llu,%d\n", llu(ref.handle), ref.fs_id);
