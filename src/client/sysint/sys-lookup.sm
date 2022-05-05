@@ -596,7 +596,7 @@ PVFS_error PVFS_isys_ref_lookup(PVFS_fs_id fs_id,
     }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "lookup got: %s (parent %s)\n",
+                 "initializer_ context got: %s (parent %s)\n",
                  relative_pathname,
                  PVFS_OID_str(&parent.handle));
 
@@ -887,8 +887,8 @@ static int lookup_segment_query_ncache(struct PINT_smcb *smcb,
     int ret;
     
     cur_seg = GET_CURRENT_SEGMENT(sm_p);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: segment [%s]\n", __func__,
-                 cur_seg->seg_name);
+    gossip_debug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
+                 "%s: segment [%s]\n", __func__, cur_seg->seg_name);
 
     memset(&parent_ref, 0, sizeof(parent_ref));
     memset(&object_ref, 0, sizeof(object_ref));
@@ -900,7 +900,7 @@ static int lookup_segment_query_ncache(struct PINT_smcb *smcb,
                                        &parent_ref);
     if (ret == 0)
     {
-        gossip_debug(GOSSIP_NCACHE_DEBUG,
+        gossip_debug(DBG_OR(2,GOSSIP_NCACHE_DEBUG,GOSSIP_LOOKUP_DEBUG),
                      "*** ncache hit on first segment of %s (%s|%d)\n",
                      cur_seg->seg_name,
                      PVFS_OID_str(&object_ref.handle),
@@ -911,7 +911,7 @@ static int lookup_segment_query_ncache(struct PINT_smcb *smcb,
     } 
     else
     {
-        gossip_debug(GOSSIP_NCACHE_DEBUG,
+        gossip_debug(DBG_OR(2,GOSSIP_NCACHE_DEBUG,GOSSIP_LOOKUP_DEBUG),
                      "*** ncache clean miss on first segment of %s\n",
                      cur_seg->seg_name);
 
@@ -996,9 +996,8 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
                                   PVFS_ATTR_COMMON_ALL,
                                   sm_p->hints);
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "Looking up segment %s under handle "
-                 "%s\n", seg_to_lookup, 
-                 PVFS_OID_str(&cur_seg->seg_starting_refn.handle));
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "Looking up segment %s under handle %s\n",
+                 seg_to_lookup, PVFS_OID_str(&cur_seg->seg_starting_refn.handle));
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_READ;
@@ -1025,7 +1024,7 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
 static PINT_sm_action lookup_segment_lookup_failure(struct PINT_smcb *smcb,
                                                     job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
                  "lookup state: lookup_segment_lookup_failure\n");
     return SM_ACTION_COMPLETE;
 }
@@ -1042,7 +1041,7 @@ static PINT_sm_action lookup_segment_verify_attr_present(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
                  "lookup state: lookup_segment_verify_attr_present\n");
 
     cur_seg = GET_CURRENT_SEGMENT(sm_p);
@@ -1097,7 +1096,7 @@ static PINT_sm_action lookup_segment_check_attr_type(struct PINT_smcb *smcb,
     PINT_client_lookup_sm_ctx *cur_ctx = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
                  "lookup state: lookup_segment_check_attr_type\n");
 
     cur_seg = GET_CURRENT_SEGMENT(sm_p);
@@ -1136,8 +1135,8 @@ static PINT_sm_action lookup_segment_check_attr_type(struct PINT_smcb *smcb,
                 (sm_p->u.lookup.current_context == 0) &&
                 (sm_p->u.lookup.follow_link == PVFS2_LOOKUP_LINK_NO_FOLLOW))
             {
-                gossip_debug(GOSSIP_LOOKUP_DEBUG, "** skipping final "
-                             "symlink resolution due to user request\n");
+                gossip_debug(GOSSIP_LOOKUP_DEBUG,
+                             "** skipping final symlink resolution due to user request\n");
 
                 sm_p->u.lookup.skipped_final_resolution = 1;
                 js_p->error_code = LOOKUP_TYPE_LN_NO_FOLLOW;
@@ -1157,8 +1156,8 @@ static PINT_sm_action lookup_segment_check_attr_type(struct PINT_smcb *smcb,
             }
             break;
         default:
-            gossip_debug(GOSSIP_CLIENT_DEBUG, "cannot resolve object of "
-                         "type %d\n", cur_seg->seg_attr.objtype);
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, "cannot resolve object of type %d\n",
+                         cur_seg->seg_attr.objtype);
             js_p->error_code = -PVFS_EINVAL;
     }
     return SM_ACTION_COMPLETE;
@@ -1181,7 +1180,7 @@ static PINT_sm_action lookup_segment_handle_relative_link(
       case.  the reason this is tricker is because the relative link
       may contain '.' and '..' characters (i.e. foo -> ../oldfoo)
     */
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
                  "lookup state: lookup_segment_handle_relative_link\n");
 
     js_p->error_code = 0;
@@ -1243,7 +1242,7 @@ static PINT_sm_action lookup_segment_handle_absolute_link(
       new context and continuing along our completely linear state
       machine.
     */
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
                  "lookup state: lookup_segment_handle_absolute_link\n");
 
 #if 0
@@ -1259,7 +1258,7 @@ static PINT_sm_action lookup_segment_handle_absolute_link(
     /* if we have an absolute link just bail out and expand the path */
     /* from outside of the SM then rerun the SM if it is still PVFS */
     ret = -PVFS_ENOENT; /* this forces the if */
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
                  "PVFS_util_resolve returned %d on %s\n",
                  ret, cur_seg->seg_attr.u.sym.target_path);
     if (ret == -PVFS_ENOENT && sm_p->u.lookup.lookup_resp->error_path)
@@ -1322,7 +1321,7 @@ static PINT_sm_action lookup_context_check_completion(struct PINT_smcb *smcb,
     PINT_client_lookup_sm_ctx *cur_ctx = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
                  "lookup state: lookup_context_check_completion\n");
 
     cur_ctx = GET_CURRENT_CONTEXT(sm_p);
@@ -1413,7 +1412,8 @@ static PINT_sm_action lookup_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: lookup_cleanup\n");
+    gossip_debug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
+                 "lookup state: lookup_cleanup\n");
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
@@ -1435,13 +1435,13 @@ static PINT_sm_action lookup_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     {
         char buf[64] = {0};
         PVFS_strerror_r(sm_p->error_code, buf, 64);
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup failed to "
-                     "resolve %s: %s\n", sm_p->u.lookup.orig_pathname, buf);
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup failed to resolve %s: %s\n",
+                     sm_p->u.lookup.orig_pathname, buf);
     }
     else
     {
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup resolved segment %s "
-                     "to %s\n", sm_p->u.lookup.orig_pathname,
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup resolved segment %s to %s\n",
+                     sm_p->u.lookup.orig_pathname,
                      PVFS_OID_str(&sm_p->u.lookup.lookup_resp->ref.handle));
     }
 

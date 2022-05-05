@@ -119,8 +119,8 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     PINT_event_id event_id = 0;
     PINT_event_type event_type;
 
-    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Read "
-                 "of %s\n", (char *)key_p->buffer);
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Read of %s\n",
+                 (char *)key_p->buffer);
 
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     cache_elem = dbpf_attr_cache_elem_lookup(ref);
@@ -155,8 +155,8 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG,"trove: dbpf_keyval_read handle: %s\n)",
-                 PVFS_OID_str(&op_p->handle));
+    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_keyval_read handle: %s\n)",
+                 PVFS_OID_str(&handle));
                          
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
@@ -227,11 +227,9 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     if (ret != 0)
     {
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                     "warning: keyval read error on handle %s and "
-                     "key=%*s (%s)\n", PVFS_OID_str(&op_p->handle),
-                     op_p->u.k_read.key->buffer_sz,
-                     (char *)op_p->u.k_read.key->buffer, 
-                     strerror(ret));
+                     "warning: keyval read error on handle %s and key=%*s (%s)\n",
+                     PVFS_OID_str(&op_p->handle), op_p->u.k_read.key->buffer_sz,
+                     (char *)op_p->u.k_read.key->buffer, strerror(ret));
 
         /* if data buffer is too small returns ERANGE error */
         if (data.len > op_p->u.k_read.val->buffer_sz)
@@ -264,15 +262,14 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
              * there is no associated cache_elem for this key
              */
             gossip_debug(
-                GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data retrieved "
-                "(key is %s)\n", (char *)key_entry.key);
+                GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                "** CANNOT cache data retrieved (key is %s)\n", (char *)key_entry.key);
         }
         else
         {
             gossip_debug(
-                GOSSIP_DBPF_ATTRCACHE_DEBUG,"*** cached keyval data "
-                "retrieved (key is %s)\n",
-                (char *)key_entry.key);
+                GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                "*** cached keyval data retrieved (key is %s)\n", (char *)key_entry.key);
         }
         gen_mutex_unlock(&dbpf_attr_cache_mutex);
     }
@@ -308,11 +305,11 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG,"trove: dbpf_keyval_write handle: %s\n)",
-                 PVFS_OID_str(&op_p->handle));
+    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_keyval_write handle: %s\n)",
+                 PVFS_OID_str(&handle));
                          
-    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove Keyval Write "
-                 "of %s\n", (char *)key_p->buffer);
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove Keyval Write of %s\n",
+                 (char *)key_p->buffer);
 
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
@@ -464,8 +461,8 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 
     if(!(op_p->flags & TROVE_BINARY_KEY))
     {
-        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Write "
-                     "of %s\n", (char *)key_entry.key);
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Write of %s\n",
+                     (char *)key_entry.key);
     }
 
     if(op_p->flags & TROVE_NOOVERWRITE)
@@ -497,16 +494,15 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
                  * NOTE: this can happen if the keyword isn't registered,
                  * or if there is no associated cache_elem for this key
                  */
-                gossip_debug(
-                    GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data written "
-                    "(key is %s)\n", (char *)key_entry.key);
+                gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                             "** CANNOT cache data written (key is %s)\n",
+                             (char *)key_entry.key);
             }
             else
             {
-                gossip_debug(
-                    GOSSIP_DBPF_ATTRCACHE_DEBUG,"*** cached keyval data "
-                    "written (key is %s)\n",
-                    (char *)key_entry.key);
+                gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                             "*** cached keyval data written (key is %s)\n",
+                             (char *)key_entry.key);
             }
         }
         gen_mutex_unlock(&dbpf_attr_cache_mutex);
@@ -545,8 +541,8 @@ static int dbpf_keyval_remove(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG,"trove: dbpf_keyval_remove handle: %s\n)",
-                 PVFS_OID_str(&op_p->handle));
+    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_keyval_remove handle: %s\n)",
+                 PVFS_OID_str(&handle));
                          
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
@@ -648,7 +644,7 @@ static int dbpf_keyval_remove_list(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG,"trove: dbpf_keyval_remove_list\n)");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_keyval_remove_list\n)");
                          
 
     ret = dbpf_op_init_queued_or_immediate(&op,
@@ -1128,7 +1124,7 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG,"trove: dbpf_keyval_read_list\n)");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_keyval_read_list\n)");
                          
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
@@ -1257,7 +1253,7 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG,"trove: dbpf_keyval_write_list\n)");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_keyval_write_list\n)");
                          
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,

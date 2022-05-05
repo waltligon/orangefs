@@ -486,6 +486,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
     {
         PINT_cleanup_capability(&dest->capability);
         PINT_copy_capability(&src->capability, &dest->capability);
+        dest->mask |= PVFS_ATTR_CAPABILITY;
     }
     return ret;
 }

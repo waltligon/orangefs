@@ -47,9 +47,9 @@
 enum
 {
     GETATTR_CACHE_MISS = 1,
-    GETATTR_NEED_DATAFILE_ATTRS = 2,
+    GETATTR_NEED_DATAFILE_ATTRS = 2, /* get detail file size from dfiles */
     GETATTR_IO_RETRY = 3,
-    GETATTR_NEED_DIRDATA_ATTRS = 4
+    GETATTR_NEED_DIRDATA_ATTRS = 4 /* get detail dirent count from dirdatas */
 };
 
 /* completion function prototypes */
@@ -146,6 +146,7 @@ nested machine pvfs2_client_getattr_sm
     {
         jump pvfs2_msgpairarray_sm;
         success => acache_insert;
+        /* these request detail size and count numbers */
         GETATTR_NEED_DATAFILE_ATTRS => datafile_get_attrs;
         GETATTR_NEED_DIRDATA_ATTRS => dirdata_get_attrs;
         default => object_getattr_failure;
@@ -1147,6 +1148,11 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
      * target is needed, the calling client should put this attribute in its
      * request mask.  
      */
+    /* Shold we be putting all of this stuff into thee req mask?  Maybe this
+     * is just for devel - we cannot actually get all of it since its comes
+     * in a union.  The caller sshould be setting this up I think.  The
+     * server should only return what is in the actual attrs.
+     */
     /* Why are we using GOSSIP_ACACHE_DEBUG here?  This would imply
      * this debugging is only of interest when debugging the acache, and
      * not the getattr call which should use GOSSIP_GETATTR_DEBUG, or
@@ -1731,8 +1737,8 @@ static PINT_sm_action getattr_datafile_getattr_cleanup(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
-/* We run this state if we are doing getattr on a direcotry AND we need
- * the up-to-date timestamps and total dirdate count.  Unlink the
+/* We run this state if we are doing getattr on a directory AND we need
+ * the up-to-date timestamps and total dirdate count.  Unlike the
  * earlier request this sends multiple getattr requests to the dirdate
  * objects (not the directory object) and only asks for the partial data
  * which will be combined afterwards.

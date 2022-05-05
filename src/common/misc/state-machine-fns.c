@@ -1005,7 +1005,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
         new_sm->current_state = PINT_sm_task_map(smcb, f->task_id);
 
         gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                     "START CHILD FRAMES: new_sm->current_state is %s\n:"
+                     "START CHILD FRAMES: new_sm->current_state is %s\n"
                     ,(new_sm->current_state) ? "VALID" : "INVALID");
 
         if (new_sm->current_state)

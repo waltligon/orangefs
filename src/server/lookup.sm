@@ -230,9 +230,9 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
      * by the config file.
      * NOTE:  sid_count should ALWAYS be 1 or more.
      * 1 indicates no replication.
-     * More than * one indicates (sid_count - 1) number of replicas.
+     * More than one indicates (sid_count - 1) number of replicas.
      * NOTE:  it is possible that the root has X # of replicas while
-     * the system default * has Y # of replicas.
+     * the system default has Y # of replicas.
      * So, if the s_op->target_handle is root, use the
      * system default metasidcount and NOT the root's sid count.  
      */
@@ -268,8 +268,10 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
        }
     }
 
-    s_op->metasidcnt = s_op->attr.u.dir.dist_dir_attr.sid_count;
+    /* s_op->metasidcnt = s_op->attr.u.dir.dist_dir_attr.sid_count; */
+    s_op->metasidcnt = s_op->attr.meta_sid_count;
 
+    /* is this relevant any more?  Do we put proper MSC in root attr? */
     if ( !(PVFS_OID_cmp(&s_op->target_handle,&fs_root.handle)) )
     {
        /* get the filesystem value representing the
@@ -280,7 +282,7 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
                                                        &(s_op->metasidcnt));
        if (ret)
        {
-          gossip_err("%s:Error retrieving the metadata sid count from the config file.\n",__func__);
+          gossip_err("%s:Error retrieving metadata sid count from config file.\n",__func__);
           js_p->error_code = ret;
           return SM_ACTION_COMPLETE;
        }
@@ -290,8 +292,7 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
     s_op->u.lookup.segp = NULL;
     s_op->u.lookup.seg_nr = 0;
     s_op->u.lookup.array_index = 0;
-    s_op->u.lookup.seg_ct = PINT_string_count_segments(
-                                        s_op->req->u.lookup_path.path);
+    s_op->u.lookup.seg_ct = PINT_string_count_segments(s_op->req->u.lookup_path.path);
     s_op->u.lookup.handle_ct = 0;
     s_op->u.lookup.attr_ct = 0;
 
@@ -1170,7 +1171,8 @@ static PINT_sm_action lookup_compute_directory_entry_location(
                                     &s_op->u.lookup.attr.u.dir.dist_dir_attr,
                                     s_op->u.lookup.attr.u.dir.dist_dir_bitmap);
 
-    /* thus, the dirdata handle is s_op->u.lookup.attr.u.dir.dirdata_handles[dirdata_server_index]
+    /* thus, the dirdata handle is 
+     * s_op->u.lookup.attr.u.dir.dirdata_handles[dirdata_server_index]
      * and the sids associated with that dirdata handle are
      * s_op->u.lookup.attr.u.dir.dirdata_sids[dirdata_server_index * metasidcnt]...
      *                                       [(dirdata_server_index * metasidcnt) +
@@ -1192,7 +1194,7 @@ static PINT_sm_action lookup_compute_directory_entry_location(
      * the other sids, if the first one fails.
      */
     last_dirdata_sid_index = s_op->u.lookup.dirdata_sid_index + s_op->metasidcnt;
-    for (i=s_op->u.lookup.dirdata_sid_index; i<last_dirdata_sid_index; i++)
+    for (i = s_op->u.lookup.dirdata_sid_index; i < last_dirdata_sid_index; i++)
     {
         if (PINT_cached_config_server_local(&s_op->u.lookup.attr.u.dir.dirdata_sids[i]))
         {
@@ -1230,34 +1232,37 @@ static PINT_sm_action lookup_read_directory_entry_local(
 
     /* TJS: Read in SID information to temporary location.  Copy back into
      * response array in next state */
-    s_op->u.lookup.keyval_temp_store = (PVFS_ID *)malloc(
-                                                sizeof(PVFS_handle) +
-                                                (sizeof(PVFS_SID) * 
-                                                 s_op->metasidcnt));
+    s_op->u.lookup.keyval_temp_store = (PVFS_ID *)malloc(sizeof(PVFS_handle) +
+                                                         (sizeof(PVFS_SID) * 
+                                                          s_op->metasidcnt));
 
 
     
     s_op->val.buffer = s_op->u.lookup.keyval_temp_store;
 
-    s_op->val.buffer_sz = sizeof(PVFS_handle) + 
-                          (s_op->metasidcnt * sizeof(PVFS_SID));
+    /* s_op->val.buffer_sz = sizeof(PVFS_handle) + 
+                          (s_op->metasidcnt * sizeof(PVFS_SID)); */
+    s_op->val.buffer_sz = OSASZ(1, s_op->metasidcnt);
 
-    ret = job_trove_keyval_read(
-        s_op->req->u.lookup_path.fs_id,
-        s_op->u.lookup.attr.u.dir.dirdata_handles[
+    ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id,
+                                s_op->u.lookup.attr.u.dir.dirdata_handles[
                                           s_op->u.lookup.dirdata_server_index],
-        &s_op->key, 
-        &s_op->val,
-        TROVE_KEYVAL_DIRECTORY_ENTRY,
-        NULL, smcb, 0, js_p, &j_id,
-        server_job_context, s_op->req->hints);
+                                &s_op->key, 
+                                &s_op->val,
+                                TROVE_KEYVAL_DIRECTORY_ENTRY,
+                                NULL, 
+                                smcb, 
+                                0, 
+                                js_p, 
+                                &j_id,
+                                server_job_context, 
+                                s_op->req->hints);
 
     return ret;
 }
 
-static PINT_sm_action lookup_read_directory_entry_remote(
-        struct PINT_smcb *smcb,
-        job_status_s *js_p)
+static PINT_sm_action lookup_read_directory_entry_remote(struct PINT_smcb *smcb,
+                                                         job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
@@ -1273,21 +1278,27 @@ static PINT_sm_action lookup_read_directory_entry_remote(
 
     PINT_null_capability(&capability);
 
-    PINT_SERVREQ_MGMT_GET_DIRENT_FILL(
-            msg_p->req,
-            capability,
-            s_op->req->u.lookup_path.fs_id,
-            s_op->u.lookup.attr.u.dir.dirdata_handles[
-                                          s_op->u.lookup.dirdata_server_index],
-            s_op->u.lookup.segp,
-            NULL);
+    PINT_SERVREQ_MGMT_GET_DIRENT_FILL(msg_p->req,
+                                      capability,
+                                      s_op->req->u.lookup_path.fs_id,
+                                      s_op->u.lookup.attr.u.dir.dirdata_handles[
+                                                   s_op->u.lookup.dirdata_server_index],
+                                      s_op->u.lookup.segp,
+                                      NULL);
 
     PINT_cleanup_capability(&capability);
 
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_READ;
     msg_p->fs_id = s_op->req->u.lookup_path.fs_id;
     msg_p->handle =
         s_op->u.lookup.attr.u.dir.dirdata_handles[
                                           s_op->u.lookup.dirdata_server_index];
+        /* dir objects are all metadata so sid counts are the same */
+    msg_p->sid_count = s_op->u.lookup.attr.meta_sid_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = &s_op->u.lookup.attr.u.dir.dirdata_sids[
+                                                     s_op->u.lookup.dirdata_sid_index];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = lookup_get_dirent_comp_fn;
 
@@ -1342,11 +1353,11 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /*
-      NOTE: we may have handle_count N and sid_count N*metasidcnt
-      with attr_count N-1 in the case that another meta-server needs to 
-      continue with the path (attr) lookup.  otherwise, we're returning 
-      N handles, N*metasidcnt, and  N attrs.
-    */
+     * NOTE: we may have handle_count N and sid_count N*metasidcnt
+     * with attr_count N-1 in the case that another meta-server needs to 
+     * continue with the path (attr) lookup.  otherwise, we're returning 
+     * N handles, N*metasidcnt, and  N attrs.
+     */
     s_op->resp.u.lookup_path.handle_count = s_op->u.lookup.handle_ct;
     s_op->resp.u.lookup_path.attr_count   = s_op->u.lookup.attr_ct;
 
@@ -1382,7 +1393,7 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
                           s_op->req->u.lookup_path.path, 
                           PVFS_OID_str(&s_op->resp.u.lookup_path.handle_array[
                                    s_op->resp.u.lookup_path.handle_count]));
-    }
+    }                               /* handle_count -1 or 0 */
     else
     {
         PINT_ACCESS_DEBUG(
@@ -1407,7 +1418,7 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
    int i;
    for (i = 0; i < s_op->resp.u.lookup_path.sid_count; i++)
    {
-      gossip_debug(GOSSIP_LOOKUP_DEBUG
+       gossip_debug(GOSSIP_LOOKUP_DEBUG
                    ,"%s:sid[%d]=(%s)\n"
                    ,__func__
                    ,i

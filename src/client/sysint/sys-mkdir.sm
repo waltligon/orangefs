@@ -1199,9 +1199,9 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                sm_p->getattr.attr.capability,
                *sm_p->cred_p,
                sm_p->u.mkdir.object_name,
-               sm_p->object_ref,
-               sm_p->parent_ref,
-               sm_p->getattr.attr, /* parent attr from first state */
+               sm_p->object_ref,   /* this is dirent being created */
+               sm_p->parent_ref,   /* this is a dirdata, may or may not exist */
+               sm_p->getattr.attr, /* attrs from dir to build dirdata */
                dirdata_server_index,
                dirdata_sid_index,
                sm_p->hints);
@@ -1220,7 +1220,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mkdir_crdirent_comp_fn;
 
-    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &sm_p->parent_ref.sid_array[0]);
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[msg_p->sid_index]);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");

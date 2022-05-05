@@ -314,6 +314,7 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
                                    server_job_context,
                                    s_op->req->hints);
 
+    /* this getattr will not include parent, dirdata/dfile handles, or bitmaps */
     return ret;
 }
 
@@ -335,14 +336,13 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     /* Profile validate operation */
     INIT_PROFILER(profiler);
     START_PROFILER(profiler);
- 
 
     /* s_op->attr.mask = PVFS_ATTR_COMMON_ALL; */
 
     /* Get the errno value from the getattr to use for comparison */
     error_code = PVFS_get_errno_mapping(js_p->error_code);
 
-    /* Reworked logic.  Next we see if we need to create a new object.
+    /* Next we see if we need to create a new object.
      * The only objects created by prelude are DATAFILE and DIRDATA objects
      * that were not created during the original CREATE or MKDIR operations.
      * When we create these objects the implication is that the getattr from 
@@ -356,17 +356,34 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
          * convert to a ds_attr for writing to the database.
          * First copy in the attrs sent in by the original req as a starting point.
          */
-        /** gets the target's attrs from the request and copies into the s_op **/
+        /** gets the target's attrs from the request using the get_attr method
+         * defined in the .sm file and copy it to the s_op scratch space for the attr
+         */
         ret = PINT_server_req_get_attr(s_op->req, &s_op->attr);
         s_op->target_object_attr = &s_op->attr; /* is this used? */
 
-        gossip_debug(GOSSIP_SERVER_DEBUG, 
-                     "prelude: handle: %s \n\t\tparent: %s bitmap: \n\t\t%d dirdata: %s\n",
-                     PVFS_OID_str(&s_op->target_handle),
-                     PVFS_OID_str(s_op->attr.parent),
-                     *s_op->attr.u.dirdata.dist_dir_bitmap,
-                     PVFS_OID_str(s_op->attr.u.dirdata.dirdata_handles)
-                     );
+        gossip_debug(GOSSIP_SERVER_DEBUG, "\ttarget_handle: %s\n",
+                     PVFS_OID_str(&s_op->target_handle));
+        /* Everything has a parent, but it may not have come with the request.
+         * It should have.  Don't crash if its not there, but maybe log an error!
+         */
+        if (s_op->attr.parent)
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG, "\tparent: %s\n",
+                         PVFS_OID_str(s_op->attr.parent));
+        }
+        /* these need to be farther down once we know what kind of obj it is */
+        if (s_op->attr.u.dirdata.dirdata_handles) 
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG, "\tdirdata_handle: %s\n",
+                         PVFS_OID_str(s_op->attr.u.dirdata.dirdata_handles));
+        }
+        if (s_op->attr.u.dirdata.dist_dir_bitmap)
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG, "\tbitmap: %d\n",
+                         *s_op->attr.u.dirdata.dist_dir_bitmap);
+        }
+        /* */
 
         create_object = 1;    /* default to create unless zereo'd below */
         js_p->error_code = 0; /* Clear ENOENT */
