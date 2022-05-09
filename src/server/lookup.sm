@@ -1302,6 +1302,10 @@ static PINT_sm_action lookup_read_directory_entry_remote(struct PINT_smcb *smcb,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = lookup_get_dirent_comp_fn;
 
+    gossip_debug(GOSSIP_LOOKUP_DEBUG,
+                 "reading remote dirent %s from dirdata handle %s sid %s\n",
+                 s_op->u.lookup.segp, PVFS_OID_str(&msg_p->handle),
+                 PVFS_SID_str(&msg_p->sid_array[0]));
 #if 0
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
@@ -1314,10 +1318,6 @@ static PINT_sm_action lookup_read_directory_entry_remote(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                 "reading remote directory entry from handle %s\n",
-                 PVFS_OID_str(&msg_p->handle));
-
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
@@ -1328,8 +1328,8 @@ static int lookup_get_dirent_comp_fn(void *v_p,
                                      int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_server_op *s_op = PINT_sm_frame(smcb, (PINT_MSGPAIR_PARENT_SM));
-
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_server_op *s_op = PINT_sm_frame(parent_smcb, (PINT_MSGPAIR_PARENT_SM));
 
     assert(resp_p->op == PVFS_SERV_MGMT_GET_DIRENT);
 
