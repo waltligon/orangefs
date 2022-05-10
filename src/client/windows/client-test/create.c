@@ -79,8 +79,9 @@ int create_subdir_int(global_options *options, int fatal, int max_size)
     int i, dir_count, code = 0;
     char path[MAX_SIZE*2], dir[9];
 
-    /* number of dirs that will fit, accounting for size of root_dir */
-    dir_count = (max_size - (int) strlen(options->root_dir)) / DIR_LEN;
+    /* number of dirs that will fit, accounting for size of root_dir 
+       (deduct 1 size from max_size for the terminating null) */
+    dir_count = ((max_size - 1) - (int) strlen(options->root_dir)) / DIR_LEN;
 
     /* copy root into path */
     strcpy(path, options->root_dir);

@@ -161,8 +161,8 @@ int delete_dir_notempty(global_options *options, int fatal)
     report_result(options,
                   "delete-dir-notempty",
                   "main",
-                  RESULT_SUCCESS,
-                  0,
+                  RESULT_FAILURE,
+                  ENOTEMPTY,
                   OPER_EQUAL,
                   code);
 
