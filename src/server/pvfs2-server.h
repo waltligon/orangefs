@@ -373,7 +373,8 @@ struct PINT_server_lookup_op
     PVFS_ds_attributes *ds_attr_array;
     PVFS_object_attr attr;
 
-    PVFS_ID *keyval_temp_store;
+    PVFS_ID *temp_dirent_store;
+    int temp_dirent_sid_count;
 
     int dirdata_server_index;
     int dirdata_sid_index;

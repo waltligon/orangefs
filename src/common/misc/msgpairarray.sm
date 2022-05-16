@@ -1100,7 +1100,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
 
     if (msg_p->comp_fn != NULL && resp_p != NULL)
     {
-        gossip_debug(GOSSIP_MIRROR_DEBUG,"\texecuting msg_p->comp_fn..\n");
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG,"\texecuting msg_p->comp_fn..\n");
 
         /* even though error_code and op_status were already set to resp_p->status,
          * override their values with the result of the completion function.

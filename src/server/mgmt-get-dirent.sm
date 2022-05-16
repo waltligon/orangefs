@@ -247,6 +247,11 @@ static int mgmt_get_dirent(struct PINT_smcb *smcb, job_status_s *js_p)
         return -1;
     }
 
+    /* This value gets cached for convenience.  It doesn't change */
+    ret = PINT_cached_config_get_metadata_sid_count(
+                                         s_op->req->u.mgmt_get_dirent.fs_id,
+                                         &(s_op->metasidcnt));
+
     /* gossip bitmap, since jump from get_bitmap */
     /* right now we don't have the bitmap, and it doesn't seem
      * worth the trouble of reading it.  Maybe we need to add error
@@ -355,8 +360,19 @@ static PINT_sm_action mgmt_get_dirent_setup_resp(struct PINT_smcb *smcb,
         s_op->resp.u.mgmt_get_dirent.sid_array = 
                 (PVFS_SID *) &(s_op->u.mgmt_get_dirent.keyval_temp_store[1]);
         s_op->resp.u.mgmt_get_dirent.sid_count = s_op->metasidcnt;
+
         gossip_debug(GOSSIP_SERVER_DEBUG, "  Found dirent handle %s\n",
-                     PVFS_OID_str(&s_op->u.mgmt_get_dirent.handle));
+                     PVFS_OID_str(&s_op->resp.u.mgmt_get_dirent.handle));
+        if (s_op->resp.u.mgmt_get_dirent.sid_array)
+        {
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, "  Found %d SIDs [0] = %s\n",
+                         s_op->resp.u.mgmt_get_dirent.sid_count,
+                         PVFS_SID_str(&s_op->resp.u.mgmt_get_dirent.sid_array[0]));
+        }
+        else
+        {
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, "  Found NO SIDs\n");
+        }
     }
     else
     {
