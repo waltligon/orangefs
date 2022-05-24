@@ -715,12 +715,10 @@ static int acache_hash_key(const void* key, int table_size)
 static int acache_free_payload(void* payload)
 {
     struct acache_payload * payload_p = payload;
+
     if(payload_p)
     {
-        if(&payload_p->attr)
-        {
-            PINT_free_object_attr(&payload_p->attr);
-        }
+        PINT_free_object_attr(&payload_p->attr);
         free(payload_p);
     }
     return(0);
