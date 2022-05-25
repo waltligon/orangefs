@@ -80,10 +80,7 @@ AC_DEFUN([AX_PORTALS],
 
 	AC_MSG_CHECKING([for portals3.h header])
 	ok=no
-	AC_TRY_COMPILE(
-	    [#include <portals/portals3.h>],
-	    [int m, n; m = PtlInit(&n);],
-	    [ok=yes])
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <portals/portals3.h>]], [[int m, n; m = PtlInit(&n);]])],[ok=yes],[])
 
 	if test "$ok" = yes ; then
 	    AC_MSG_RESULT([yes])
@@ -97,27 +94,18 @@ AC_DEFUN([AX_PORTALS],
 	dnl a box that does not have the hardware.
 	AC_MSG_CHECKING([for portals libraries])
 	ok=no
-	AC_TRY_LINK(
-	    [#include <portals/portals3.h>],
-	    [int m, n; m = PtlInit(&n);],
-	    [ok=yes])
+	AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <portals/portals3.h>]], [[int m, n; m = PtlInit(&n);]])],[ok=yes],[])
 
 	if test "$ok" = no ; then
 	    PORTALS_LIBS="$libs -lportals"
 	    LIBS="$save_libs $PORTALS_LIBS"
-	    AC_TRY_LINK(
-		[#include <portals/portals3.h>],
-		[int m, n; m = PtlInit(&n);],
-		[ok=yes])
+	    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <portals/portals3.h>]], [[int m, n; m = PtlInit(&n);]])],[ok=yes],[])
 	fi
 
 	if test "$ok" = no ; then
 	    PORTALS_LIBS="$libs -lp3api -lp3lib -lp3utcp -lp3rt -lpthread"
 	    LIBS="$save_libs $PORTALS_LIBS"
-	    AC_TRY_LINK(
-		[#include <portals/portals3.h>],
-		[int m, n; m = PtlInit(&n);],
-		[ok=yes])
+	    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <portals/portals3.h>]], [[int m, n; m = PtlInit(&n);]])],[ok=yes],[])
 	fi
 
 	if test "$ok" = yes ; then
@@ -134,12 +122,9 @@ AC_DEFUN([AX_PORTALS],
 	AC_CHECK_FUNCS(PtlErrorStr)
 	AC_CHECK_FUNCS(PtlEventKindStr)
 
-	AC_TRY_COMPILE(
-	    [#include <portals/portals3.h>],
-	    [int m; ptl_process_id_t any_pid;
-	     m = PtlACEntry(0, 0, any_pid, (ptl_uid_t) -1, (ptl_jid_t) -1, 0);],
-	    AC_DEFINE(HAVE_PTLACENTRY_JID, 1,
-		      [Define if have PtlACEntry with jid argument.]))
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <portals/portals3.h>]], [[int m; ptl_process_id_t any_pid;
+	     m = PtlACEntry(0, 0, any_pid, (ptl_uid_t) -1, (ptl_jid_t) -1, 0);]])],[AC_DEFINE(HAVE_PTLACENTRY_JID, 1,
+		      Define if have PtlACEntry with jid argument.)],[])
 
 	# Reset
 	CPPFLAGS="$save_cppflags"
