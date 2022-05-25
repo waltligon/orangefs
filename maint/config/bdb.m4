@@ -35,10 +35,7 @@ AC_DEFUN([AX_BERKELEY_DB],
 	LIBS="${oldlibs} -ldb -lpthread"
 	DB_LIB="-ldb"
 	CFLAGS="$DB_CFLAGS $oldcflags"
-	AC_TRY_LINK(
-		[#include <db.h>],
-		[DB *dbp; db_create(&dbp, NULL, 0);],
-		lib=db)
+	AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <db.h>]], [[DB *dbp; db_create(&dbp, NULL, 0);]])],[lib=db],[])
 	CFLAGS=$oldcflags
 	
     else
@@ -113,10 +110,7 @@ AC_DEFUN([AX_BERKELEY_DB],
         for lib in db4  db3  db  notfound; do
            LIBS="${oldlibs} -l$lib -lpthread"
            DB_LIB="-l$lib"
-           AC_TRY_LINK(
-                  [#include <db.h>],
-                  [DB *dbp; db_create(&dbp, NULL, 0);],
-                  [break])
+           AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <db.h>]], [[DB *dbp; db_create(&dbp, NULL, 0);]])],[break],[])
         done
     fi
 
@@ -133,18 +127,17 @@ AC_DEFUN([AX_BERKELEY_DB],
     dnl See if we have a new enough version of Berkeley DB; needed for
     dnl    compilation of trove-dbpf component
     dnl AC_MSG_CHECKING(whether version of Berkeley DB is new enough)
-    dnl       AC_TRY_COMPILE([
+    dnl       AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
     dnl       #include <db.h>
-    dnl       ], [
+    dnl       ]], [[
     dnl       #if DB_VERSION_MAJOR < 4
     dnl              #error "DB_VERSION_MAJOR < 4; need newer Berkeley DB implementation"
     dnl       #endif
-    dnl       ], AC_MSG_RESULT(yes),
-    dnl       AC_MSG_RESULT(no)
+    dnl       ]])],[AC_MSG_RESULT(yes)],[dnl       AC_MSG_RESULT(no)
     dnl              AC_MSG_ERROR(Need newer (4.x.x or later) version of Berkeley DB.
     dnl try: http://www.sleepycat.com/download/index.shtml
     dnl or: /parl/pcarns/rpms/db4-4.0.14-1mdk.src.rpm (to build rpm))
-    dnl       )
+    dnl       ])
 
     oldcflags=$CFLAGS
     CFLAGS="$USR_CFLAGS $DB_CFLAGS -Werror"    
@@ -155,62 +148,55 @@ AC_DEFUN([AX_BERKELEY_DB],
     dnl while the txnid parameter is new.  So we don't test for the old
     dnl unknown parameter if we found the new one.
     AC_MSG_CHECKING(for DB stat with malloc function ptr)
-    AC_TRY_COMPILE([
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
       #include <db.h>
       #include <stdlib.h>
-      ], [
+      ]], [[
       int ret = 0;
       DB *db = db;
       int dummy = 0;
       u_int32_t flags = 0;
         
       ret = db->stat(db, &dummy, malloc, flags);
-      ], AC_MSG_RESULT(yes)
+      ]])],[AC_MSG_RESULT(yes)
     AC_DEFINE(HAVE_UNKNOWN_PARAMETER_TO_DB_STAT, 1,
     Define if DB stat function takes malloc function ptr)
-    have_db_stat_malloc=yes,
-    AC_MSG_RESULT(no)
-    have_db_stat_malloc=no)
+    have_db_stat_malloc=yes],[AC_MSG_RESULT(no)
+    have_db_stat_malloc=no])
 
     dnl check for DB_DIRTY_READ (it is not in db-3.2.9, for example)
     AC_MSG_CHECKING(for DB_DIRTY_READ flag)
-    AC_TRY_COMPILE([
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
     #include <db.h>
-    ], [
+    ]], [[
     u_int32_t flags = DB_DIRTY_READ;
-    ], AC_MSG_RESULT(yes)
-    AC_DEFINE(HAVE_DB_DIRTY_READ, 1, [Define if db library has DB_DIRTY_READ flag]),
-    AC_MSG_RESULT(no))
+    ]])],[AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_DB_DIRTY_READ, 1, Define if db library has DB_DIRTY_READ flag)],[AC_MSG_RESULT(no)])
 
     dnl check for DB_BUFFER_SMALL (it is returned by dbp->get in db-4.4 and up)
     AC_MSG_CHECKING(for DB_BUFFER_SMALL error)
-    AC_TRY_COMPILE([
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
     #include <db.h>
-    ], [
+    ]], [[
     int res = DB_BUFFER_SMALL;
     res++;
-    ], AC_MSG_RESULT(yes)
-    AC_DEFINE(HAVE_DB_BUFFER_SMALL, 1, [Define if db library has DB_BUFFER_SMALL error]),
-    AC_MSG_RESULT(no))
+    ]])],[AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_DB_BUFFER_SMALL, 1, Define if db library has DB_BUFFER_SMALL error)],[AC_MSG_RESULT(no)])
 
     dnl Check BDB version here since it's just a warning
     AC_MSG_CHECKING([Berkeley DB version])
-    AC_TRY_COMPILE(
-        [
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
             #include <db.h>
-        ], 
-        [
+        ]], [[
              #if DB_VERSION_MAJOR < 4 || \
                 (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR < 8) || \
                 (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR == 8 && \
                  DB_VERSION_PATCH < 30)
                  #error "Recommend version of Berkeley DB at least 4.8.30"
              #endif
-        ], 
-        AC_MSG_RESULT(yes)
-        HAVE_DB_OLD=0,
-        AC_MSG_RESULT(no)
+        ]])],[AC_MSG_RESULT(yes)
+        HAVE_DB_OLD=0],[AC_MSG_RESULT(no)
         HAVE_DB_OLD=1
-    )
+    ])
     CFLAGS="$oldcflags"    
 ])
