@@ -342,6 +342,7 @@ static void lebf_initialize(void)
             case PVFS_SERV_MGMT_GET_DIRENT:
                 req.u.mgmt_get_dirent.entry = tmp_name;
                 reqsize = extra_size_PVFS_servreq_mgmt_get_dirent;
+                respsize = extra_size_PVFS_servresp_mgmt_get_dirent;
                 break;
 /* V3 - no longer needed */
 #if 0
