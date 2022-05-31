@@ -27,8 +27,9 @@ typedef struct {
 /* callback definition for keyword processing */
 typedef struct {
     const char *keyword;
+    int min_args, max_args;
     int (*keyword_cb)(PORANGEFS_OPTIONS options, const char *keyword, 
-                      char *args, char *error_msg);
+                      char **args, char *error_msg);
 } CONFIG_KEYWORD_DEF, *PCONFIG_KEYWORD_DEF;
 
 int get_config(PORANGEFS_OPTIONS options,

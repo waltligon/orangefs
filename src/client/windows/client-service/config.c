@@ -36,47 +36,17 @@ QLIST_HEAD(user_list);
                               *str == '\t')) \
                            str++
 
+#define MAX_ARGS    8
+
 #define KEYWORD_ERR_UNEXPECTED    -1
-#define KEYWORD_ERR_NO_ARGS       -2
-#define KEYWORD_ERR_INVALID_ARGS  -3
+#define KEYWORD_ERR_INVALID_ARGS  -2
 
 #define ERROR_MSG_LEN            255
-
-/* #define KEYWORD_ARGS_CHECK()        do { \
-                                        if (strlen(args) == 0) { \
-                                            _snprintf(error_msg, ERROR_MSG_LEN, \
-                                              "%s option: missing option arguments", \
-                                              keyword); \
-                                            return KEYWORD_ERR_NO_ARGS; \
-                                        } \
-                                    } while (0)
-*/
-
-#define KEYWORD_ARGS_CHECK(pargs, min, max)    do { \
-                                                   int args_count = 0; \
-                                                   char** cargs; \
-                                                   if (pargs == NULL) \
-                                                   { \
-                                                       return KEYWORD_ERR_NO_ARGS; \
-                                                   } \
-                                                   cargs = pargs; \
-                                                   while (*cargs++) \
-                                                   { \
-                                                       args_count++; \
-                                                   } \
-                                                   if (args_count < min || args_count > max) \
-                                                   { \
-                                                      _snprintf(error_msg, ERROR_MSG_LEN, \
-                                                        "%s option: invalid number of arguments", \
-                                                        keyword); \
-                                                      return KEYWORD_ERR_INVALID_ARGS; \
-                                                   } \
-                                               } while (0)
 
 /* keyword callbacks */
 #define KEYWORD_CB(__name)    int keyword_cb_##__name(PORANGEFS_OPTIONS options, \
                                                       const char *keyword, \
-                                                      char *args, \
+                                                      char **args, \
                                                       char *error_msg)
 
 static KEYWORD_CB(mount);
@@ -95,34 +65,34 @@ static KEYWORD_CB(ldap);
 /* keyword processing callback definitions */
 CONFIG_KEYWORD_DEF config_keyword_defs[] = 
 {
-    { "mount", keyword_cb_mount },
-    { "threads", keyword_cb_threads },
-    { "user-mode", keyword_cb_user_mode },
-    { "user", keyword_cb_user },
-    { "new-file-perms", keyword_cb_perms },
-    { "new-dir-perms", keyword_cb_perms },
-    { "disable-update-write-time", keyword_cb_write_time },
-    { "debug", keyword_cb_debug },
-    { "debug-stderr", keyword_cb_debug },
-    { "debug-file", keyword_cb_debug },
-    { "security-mode", keyword_cb_security_mode },
-    { "key-file", keyword_cb_key_file },
-    { "security-timeout", keyword_cb_security_timeout },
-    { "cert-mode", keyword_cb_cert_security },
-    { "ca-file", keyword_cb_cert_security },
-    { "ca-path", keyword_cb_cert_security },
-    { "cert-dir-prefix", keyword_cb_cert_security },
-    { "cert-file", keyword_cb_cert_security },
-    { "ldap-host", keyword_cb_ldap },
-    { "ldap-bind-dn", keyword_cb_ldap },
-    { "ldap-bind-password", keyword_cb_ldap },
-    { "ldap-search-root", keyword_cb_ldap },
-    { "ldap-search-scope", keyword_cb_ldap },
-    { "ldap-search-class", keyword_cb_ldap },
-    { "ldap-naming-attr", keyword_cb_ldap },
-    { "ldap-uid-attr", keyword_cb_ldap },
-    { "ldap-gid-attr", keyword_cb_ldap },
-    { NULL, NULL }
+    { "mount", 1, 1, keyword_cb_mount },
+    { "threads", 1, 1, keyword_cb_threads },
+    { "user-mode", 1, 1, keyword_cb_user_mode },
+    { "user", 2, 2, keyword_cb_user },
+    { "new-file-perms", 1, 1, keyword_cb_perms },
+    { "new-dir-perms", 1, 1, keyword_cb_perms },
+    { "disable-update-write-time", 0, 0, keyword_cb_write_time },
+    { "debug", 0, 1, keyword_cb_debug },
+    { "debug-stderr", 0, 0, keyword_cb_debug },
+    { "debug-file", 1, 1, keyword_cb_debug },
+    { "security-mode", 1, 1, keyword_cb_security_mode },
+    { "key-file", 1, 1, keyword_cb_key_file },
+    { "security-timeout", 1, 1, keyword_cb_security_timeout },
+    { "cert-mode", 1, 1, keyword_cb_cert_security },
+    { "ca-file", 1, 1, keyword_cb_cert_security },
+    { "ca-path", 1, 1, keyword_cb_cert_security },
+    { "cert-dir-prefix", 1, 1, keyword_cb_cert_security },
+    { "cert-file", 1, 1, keyword_cb_cert_security },
+    { "ldap-host", 1, 1, keyword_cb_ldap },
+    { "ldap-bind-dn", 1, 1, keyword_cb_ldap },
+    { "ldap-bind-password", 1, 1, keyword_cb_ldap },
+    { "ldap-search-root", 1, 1, keyword_cb_ldap },
+    { "ldap-search-scope", 1, 1, keyword_cb_ldap },
+    { "ldap-search-class", 1, 1, keyword_cb_ldap },
+    { "ldap-naming-attr", 1, 1, keyword_cb_ldap },
+    { "ldap-uid-attr", 1, 1, keyword_cb_ldap },
+    { "ldap-gid-attr", 1, 1, keyword_cb_ldap },
+    { NULL, 0, 0, NULL }
 };
 
 /* get the directory where exe resides
@@ -168,12 +138,19 @@ static FILE *open_config_file(char *error_msg,
             malloc_flag = TRUE;
 
             ZeroMemory(file_name, MAX_PATH);
-            strncpy(file_name, module_dir, MAX_PATH-14);
-            strcat(file_name, "\\orangefs.cfg");            
+            _snprintf(file_name, MAX_PATH-14, "%s", module_dir);
+            file_name[strlen(module_dir)] = '\0';
+            if (!strcmp(file_name, module_dir))
+            {
+                _snprintf(error_msg, error_msg_len, "Fatal: OrangeFS dir path too long\n");
+                free(file_name);
+                return NULL;
+            }
+            strcat(file_name, "\\orangefs.cfg");
         }
         else
         {
-            _snprintf(error_msg, error_msg_len, "GetModuleFileName failed: %u\n", ret);
+            _snprintf(error_msg, error_msg_len, "Fatal: GetModuleFileName failed: %u\n", ret);
             return NULL;
         }
     }
@@ -195,25 +172,26 @@ static void close_config_file(FILE *f)
     fclose(f);
 }
 
-static char** get_args(char* args, int max_args)
+/* Return null-terminated array of keyword arguments.
+   Note: strings aren't freed on error as the program will exit. */
+static char** get_args(char* args, char *keyword, int min_args, int max_args, char* error_msg)
 {
-    int i = 0, alloc_flag = 0, c;
+    int i = 0, alloc_flag = 0, c = 0, count = 0,
+        truncated = 0;
     char quote_flag = 0;
     char** out_args;
     char* p, *cur_arg = NULL;
 
-    if (max_args <= 0)
-    {
-        return NULL;
-    }
+    /* NOTE: up to MAX_ARGS args are read to detect config file errors */
 
-    /* allocate max_args array + 1 for null ptr */
-    out_args = (char**)malloc(sizeof(char*) * (max_args + 1));
+    /* allocate MAX_ARGS array + 1 for null ptr */
+    out_args = (char**)malloc(sizeof(char*) * (MAX_ARGS + 1));
     if (!out_args) {
+        _snprintf(error_msg, ERROR_MSG_LEN, "out of memory");
         return NULL;
     }
 
-    ZeroMemory(out_args, sizeof(char*) * (max_args + 1));
+    ZeroMemory(out_args, sizeof(char*) * (MAX_ARGS + 1));
 
     /* parse args, splitting on whitespace or quote marks */
     p = args;
@@ -243,9 +221,15 @@ static char** get_args(char* args, int max_args)
             }
             cur_arg[c++] = *p++;
             if (c == STR_BUF_LEN-1) {
-                /* TODO: error re: truncated arg */ 
+                truncated = 1;
                 break;
             }
+        }
+
+        if (truncated) {
+            _snprintf(error_msg, ERROR_MSG_LEN, "Fatal: configuration file - option '%s' "
+                "value is too long", keyword);
+            return NULL;
         }
 
         /* move to next argument */
@@ -253,10 +237,20 @@ static char** get_args(char* args, int max_args)
             p++;
         }
         alloc_flag = quote_flag = 0;
-        if (i == max_args) {
+        if (++count == MAX_ARGS) {
             break;
         }
+    }
 
+    if (count < min_args) {
+        _snprintf(error_msg, ERROR_MSG_LEN, "Fatal: configuration file - option '%s' "
+            " is missing argument(s)", keyword);
+        return NULL;
+    }
+    else if (count > max_args) {
+        _snprintf(error_msg, ERROR_MSG_LEN, "Fatal: configuration file - option '%s' "
+            " has too many arguments", keyword);
+        return NULL;
     }
 
     return out_args;
@@ -280,65 +274,49 @@ static void free_args(char** args) {
    An error is returned if there is an invalid number of arguments. */
 static KEYWORD_CB(mount)
 {
-    char** iargs = get_args(args, 1);
-    KEYWORD_ARGS_CHECK(iargs, 1, 1);
-
-    strncpy(options->mount_point, iargs[0], MAX_PATH);
-
-    free_args(iargs);
+    strncpy(options->mount_point, args[0], MAX_PATH);
 
     return 0;
 }
 
 static KEYWORD_CB(threads)
 {
-    char** iargs = get_args(args, 1);
-    KEYWORD_ARGS_CHECK(iargs, 1, 1);
-
-    options->threads = atoi(iargs[0]);
-
-    free_args(iargs);
-    
+    options->threads = atoi(args[0]);
+   
     return 0;
 }
 
 static KEYWORD_CB(user_mode)
 {
-    char** iargs = get_args(args, 1);
-    KEYWORD_ARGS_CHECK(iargs, 1, 1);
-
-    if (!stricmp(iargs[0], "list"))
+    if (!stricmp(args[0], "list"))
     {
         options->user_mode = USER_MODE_LIST;
     }
-    else if (!stricmp(iargs[0], "certificate"))
+    else if (!stricmp(args[0], "certificate"))
     {
         options->user_mode = USER_MODE_CERT;
     }
-    else if (!stricmp(iargs[0], "ldap"))
+    else if (!stricmp(args[0], "ldap"))
     {
         options->user_mode = USER_MODE_LDAP;
     }
-    else if (!stricmp(iargs[0], "server"))
+    else if (!stricmp(args[0], "server"))
     {
         options->user_mode = USER_MODE_SERVER;
     }
     else
     {
-        _snprintf(error_msg, ERROR_MSG_LEN, "%s option: must be \"list\" "
-            "\"certificate\", \"ldap\" or \"server\"", keyword);
-        free_args(iargs);
+        _snprintf(error_msg, ERROR_MSG_LEN, "Fatal: configuration file - '%s' option"
+            " must be \"list\", \"certificate\", \"ldap\" or \"server\"", keyword);
         return KEYWORD_ERR_INVALID_ARGS;
     }
-
-    free_args(iargs);
 
     return 0;
 }
 
 static KEYWORD_CB(user)
 {
-    char** iargs = NULL, *user_name, *uid_gid, *p;
+    char *user_name, *uid_gid, *p;
     char uidbuf[16], gidbuf[16];
     PVFS_uid uid;
     PVFS_gid gid;
@@ -352,11 +330,8 @@ static KEYWORD_CB(user)
         return KEYWORD_ERR_UNEXPECTED;
     }
 
-    iargs = get_args(args, 2);
-    KEYWORD_ARGS_CHECK(iargs, 2, 2);
-
-    user_name = iargs[0];
-    uid_gid = iargs[1];
+    user_name = args[0];
+    uid_gid = args[1];
     
     if (uid_gid)
     {
@@ -398,7 +373,7 @@ static KEYWORD_CB(user)
     }
     else
     {
-            ret = -1;
+        ret = -1;
     }
     
     if (ret == 0)
@@ -436,8 +411,6 @@ static KEYWORD_CB(user)
         }
     }
 
-    free_args(iargs);
-
     return ret;
 }
 
@@ -446,16 +419,12 @@ static KEYWORD_CB(perms)
     char *endptr = NULL;
     long mask;
 
-    char** iargs = get_args(args, 1);
-    KEYWORD_ARGS_CHECK(iargs, 1, 1);
-
-    mask = strtol(iargs[0], &endptr, 8);
+    mask = strtol(args[0], &endptr, 8);
     if (!mask)
     {
         _snprintf(error_msg, ERROR_MSG_LEN,
-                  "Configuration file (fatal): %s option: parse error - value "
+                  "Fatal: configuration file - '%s' option: parse error - value "
                   "must be nonzero octal integer\n", keyword);
-        free_args(iargs);
         return KEYWORD_ERR_INVALID_ARGS;
     }
 
@@ -467,8 +436,6 @@ static KEYWORD_CB(perms)
     {
         options->new_dir_perms = (unsigned int) mask;
     }
-
-    free_args(iargs);
 
     return 0;
 }
@@ -482,16 +449,13 @@ static KEYWORD_CB(write_time)
 
 static KEYWORD_CB(debug)
 {
-    char** iargs = get_args(args, 1);
-    KEYWORD_ARGS_CHECK(iargs, 0, 1);
-
     if (!stricmp(keyword, "debug"))
     {
         options->debug = TRUE;
         /* optional debug mask */
-        if (iargs[0])
+        if (args[0])
         {
-            strncpy(options->debug_mask, iargs[0], STR_BUF_LEN);
+            strncpy(options->debug_mask, args[0], STR_BUF_LEN);
             options->debug_mask[STR_BUF_LEN-1] = '\0';
         }
         else
@@ -507,47 +471,39 @@ static KEYWORD_CB(debug)
     else if (!stricmp(keyword, "debug-file"))
     {
         /* copy in file path (else use default) */
-        if (iargs[0])
+        if (args[0])
         {
-            strncpy(options->debug_file, iargs[0], MAX_PATH - 2);
+            strncpy(options->debug_file, args[0], MAX_PATH - 2);
             options->debug_file[MAX_PATH-2] = '\0';
 
             options->debug_file_flag = TRUE;
         }
     }
 
-    free_args(iargs);
-
     return 0;
 }
 
 static KEYWORD_CB(security_mode)
 {
-    char** iargs = get_args(args, 1);
-    KEYWORD_ARGS_CHECK(iargs, 1, 1);
-
-    if (!stricmp(iargs[0], "default"))
+    if (!stricmp(args[0], "default"))
     {
         options->security_mode = SECURITY_MODE_DEFAULT;
     }
-    else if (!stricmp(iargs[0], "key"))
+    else if (!stricmp(args[0], "key"))
     {
         options->security_mode = SECURITY_MODE_KEY;
     }
-    else if (!stricmp(iargs[0], "certificate"))
+    else if (!stricmp(args[0], "certificate"))
     {
         options->security_mode = SECURITY_MODE_CERT;
     }
     else
     {
-        _snprintf(error_msg, ERROR_MSG_LEN, "%s option: must be \"default\","
-            "\"key\" or \"certificate\"", keyword);
+        _snprintf(error_msg, ERROR_MSG_LEN, "Fatal: configuration file - '%s' option"
+            " must be \"default\", \"key\" or \"certificate\"", keyword);
 
-        free_args(iargs);
         return KEYWORD_ERR_INVALID_ARGS;
     }
-
-    free_args(iargs);
 
     return 0;
 }
@@ -557,10 +513,7 @@ static KEYWORD_CB(key_file)
     FILE *f;
     char errbuf[256];
 
-    char** iargs = get_args(args, 1);
-    KEYWORD_ARGS_CHECK(iargs, 1, 1);
-
-    strncpy(options->key_file, iargs[0], MAX_PATH - 2);
+    strncpy(options->key_file, args[0], MAX_PATH - 2);
     options->key_file[MAX_PATH-2] = '\0';
 
     /* cache private key in key mode */
@@ -570,10 +523,9 @@ static KEYWORD_CB(key_file)
         if (f == NULL)
         {
             strerror_s(errbuf, sizeof(errbuf), errno);
-            _snprintf(error_msg, ERROR_MSG_LEN, "%s option: could not open file "
-                "%s: %s (%d)", keyword, options->key_file, errbuf, errno);
+            _snprintf(error_msg, ERROR_MSG_LEN, "Fatal: configuration file - '%s' option:"
+                " could not open file %s: %s (%d)", keyword, options->key_file, errbuf, errno);
 
-            free_args(iargs);
             return KEYWORD_ERR_INVALID_ARGS;
         }
     
@@ -585,8 +537,6 @@ static KEYWORD_CB(key_file)
         fclose(f);
     }
 
-    free_args(iargs);
-
     return 0;
 }
 
@@ -594,45 +544,34 @@ static KEYWORD_CB(security_timeout)
 {
     int timeout; 
 
-    char** iargs = get_args(args, 1);
-    KEYWORD_ARGS_CHECK(iargs, 1, 1);
-
-    timeout = atoi(iargs[0]);
+    timeout = atoi(args[0]);
     if (timeout > 0)
     {
         options->security_timeout = timeout;
     }
     else
     {
-        _snprintf(error_msg, ERROR_MSG_LEN, "%s option: must be a positive"
-            "integer", keyword);
+        _snprintf(error_msg, ERROR_MSG_LEN, "Fatal: configuration file - '%s' option "
+            " must be a positive integer", keyword);
 
-        free_args(iargs);
         return KEYWORD_ERR_INVALID_ARGS;
     }
-
-    free_args(iargs);
 
     return 0;
 }
 
 static KEYWORD_CB(cert_security)
 {
-    char** iargs = get_args(args, 1);
-    KEYWORD_ARGS_CHECK(iargs, 1, 1);
-
     if (!stricmp(keyword, "ca-file") || !stricmp(keyword, "ca-path"))
     {
-        strncpy(options->ca_file, iargs[0], MAX_PATH - 2);
+        strncpy(options->ca_file, args[0], MAX_PATH - 2);
         options->ca_file[MAX_PATH-2] = '\0';
     }
     else if (!stricmp(keyword, "cert-dir-prefix") || !stricmp(keyword, "cert-file"))
     {
-        strncpy(options->cert_dir_prefix, iargs[0], MAX_PATH - 2);
+        strncpy(options->cert_dir_prefix, args[0], MAX_PATH - 2);
         options->cert_dir_prefix[MAX_PATH-2] = '\0';
     }
-
-    free_args(iargs);
 
     return 0;
 }
@@ -642,13 +581,10 @@ static KEYWORD_CB(ldap)
     char temp[STR_BUF_LEN], *token;
     int ret = -1;
 
-    char** iargs = get_args(args, 1);
-    KEYWORD_ARGS_CHECK(iargs, 1, 1);
-
     if (!stricmp(keyword, "ldap-host"))
     {
         /* parse string of form ldap[s]://host[:port] */      
-        strncpy(temp, iargs[0], STR_BUF_LEN);
+        strncpy(temp, args[0], STR_BUF_LEN);
         temp[STR_BUF_LEN - 1] = '\0';
         token = strtok(temp, ":/");
         if (token != NULL)
@@ -690,7 +626,7 @@ static KEYWORD_CB(ldap)
     else if (!stricmp(keyword, "ldap-bind-dn"))
     {
         /* the dn of the user used to bind to the ldap host */
-        strncpy(options->ldap.bind_dn, iargs[0], sizeof(options->ldap.bind_dn));
+        strncpy(options->ldap.bind_dn, args[0], sizeof(options->ldap.bind_dn));
         options->ldap.bind_dn[sizeof(options->ldap.bind_dn)-1] = '\0';
 
         ret = 0;
@@ -699,7 +635,7 @@ static KEYWORD_CB(ldap)
     {
         /* TODO: file option */
         /* the password of the binding user */        
-        strncpy(options->ldap.bind_password, iargs[0], 32);
+        strncpy(options->ldap.bind_password, args[0], 32);
         options->ldap.bind_password[31] = '\0';
 
         ret = 0;
@@ -707,7 +643,7 @@ static KEYWORD_CB(ldap)
     else if (!stricmp(keyword, "ldap-search-root"))
     {
         /* dn of the object from which to start the search */
-        strncpy(options->ldap.search_root, iargs[0], sizeof(options->ldap.search_root));
+        strncpy(options->ldap.search_root, args[0], sizeof(options->ldap.search_root));
         options->ldap.search_root[sizeof(options->ldap.search_root)-1] = '\0';
 
         ret = 0;
@@ -715,7 +651,7 @@ static KEYWORD_CB(ldap)
     else if (!stricmp(keyword, "ldap-search-scope"))
     {
         /* scope of search: onelevel or subtree */
-        strncpy(temp, iargs[0], 32);
+        strncpy(temp, args[0], 32);
         temp[31] = '\0';
 
         if (!stricmp(temp, "onelevel"))
@@ -728,8 +664,8 @@ static KEYWORD_CB(ldap)
         }
         else
         {
-            _snprintf(error_msg, ERROR_MSG_LEN, "%s option: must be \"onelevel\""
-                " or \"subtree\"", keyword);
+            _snprintf(error_msg, ERROR_MSG_LEN, "Fatal: configuration file - '%s' option"
+                " must be \"onelevel\" or \"subtree\"", keyword);
             ret = KEYWORD_ERR_INVALID_ARGS;
             goto keyword_ldap_cb_exit;
         }
@@ -738,36 +674,34 @@ static KEYWORD_CB(ldap)
     }
     else if (!stricmp(keyword, "ldap-search-class"))
     {
-        strncpy(options->ldap.search_class, iargs[0], 32);
+        strncpy(options->ldap.search_class, args[0], 32);
         options->ldap.search_class[31] = '\0';
 
         ret = 0;
     }
     else if (!stricmp(keyword, "ldap-naming-attr"))
     {
-        strncpy(options->ldap.naming_attr, iargs[0], 32);
+        strncpy(options->ldap.naming_attr, args[0], 32);
         options->ldap.naming_attr[31] = '\0';
 
         ret = 0;
     }
     else if (!stricmp(keyword, "ldap-uid-attr"))
     {
-        strncpy(options->ldap.uid_attr, iargs[0], 32);
+        strncpy(options->ldap.uid_attr, args[0], 32);
         options->ldap.uid_attr[31] = '\0';
 
         ret = 0;
     }
     else if (!stricmp(keyword, "ldap-gid-attr"))
     {
-        strncpy(options->ldap.gid_attr, args, 32);
+        strncpy(options->ldap.gid_attr, args[0], 32);
         options->ldap.gid_attr[31] = '\0';
 
         ret = 0;
     }
 
 keyword_ldap_cb_exit:
-
-    free_args(iargs);
 
     return ret;
 }
@@ -845,8 +779,8 @@ int get_config(PORANGEFS_OPTIONS options,
 {
     FILE *config_file;
     PCONFIG_KEYWORD_DEF keyword_def;
-    char line[STR_BUF_LEN], *pline, keyword[STR_BUF_LEN], args[STR_BUF_LEN];
-    int ret = 0, i, debug_file_flag = FALSE;
+    char line[STR_BUF_LEN+8], *pline, keyword[STR_BUF_LEN], args[STR_BUF_LEN];
+    int line_num, ret = 0, i, debug_file_flag = FALSE;
 
     config_file = open_config_file(error_msg, error_msg_len);
     if (config_file == NULL)
@@ -859,11 +793,18 @@ int get_config(PORANGEFS_OPTIONS options,
     /*INIT_QLIST_HEAD(&user_list);*/
 
     /* parse options from the file */
+    line_num = 1;
     while (!feof(config_file))
     {
-        line[0] = '\0';
+        ZeroMemory(line, sizeof(line));
         fgets(line, sizeof(line), config_file);
         line[sizeof(line)-1] = '\0';
+        /* check for line that exceeds maximum length */
+        if (strlen(line) > STR_BUF_LEN) {
+            _snprintf(error_msg, ERROR_MSG_LEN, "Fatal: configuration file - line %d is too long",
+                line_num);
+            return -1;
+        }
 
         /* remove \n */        
         if (strlen(line) > 0 && line[strlen(line)-1] == '\n')
@@ -905,8 +846,16 @@ int get_config(PORANGEFS_OPTIONS options,
             while (keyword_def->keyword != NULL)
             {
                 if (!stricmp(keyword_def->keyword, keyword)) {
+                    /* parse argments into array */
+                    char** arglist = get_args(args, keyword, keyword_def->min_args, 
+                        keyword_def->max_args, error_msg);
+                    if (arglist == NULL) {
+                        /* exit - error msg already set */
+                        ret = -1;
+                        goto get_config_exit;
+                    }
                     /* call callback */
-                    ret = keyword_def->keyword_cb(options, keyword, args, error_msg);
+                    ret = keyword_def->keyword_cb(options, keyword, arglist, error_msg);
                     break;
                 }
                 keyword_def = &config_keyword_defs[++i];
@@ -916,14 +865,14 @@ int get_config(PORANGEFS_OPTIONS options,
             {
                 if (ret == KEYWORD_ERR_UNEXPECTED)
                 {
-                    _snprintf(error_msg, error_msg_len, "Configuration file "
-                        "(fatal): could not process line %s", line);
+                    _snprintf(error_msg, error_msg_len, "Fatal: configuration file - "
+                        "could not process line %s", line);
                 }
                 close_config_file(config_file);
                 return ret;
-            }
+            }            
         }
-
+        line_num++;
     } /* feof */
 
     if (options->user_mode == USER_MODE_NONE && 
@@ -935,8 +884,8 @@ int get_config(PORANGEFS_OPTIONS options,
     if (options->user_mode == USER_MODE_NONE)
     {
         _snprintf(error_msg, error_msg_len, 
-            "Configuration file (fatal): "
-            "Must specify user-mode (list, certificate, ldap or server)");
+            "Fatal: configuration file - "
+            "must specify user-mode (list, certificate, ldap or server)");
         ret = -1;
         goto get_config_exit;
     }
@@ -945,8 +894,8 @@ int get_config(PORANGEFS_OPTIONS options,
         options->user_mode != USER_MODE_SERVER)
     {
         _snprintf(error_msg, error_msg_len,
-            "Configuration file (fatal): "
-            "User-mode must be server if security-mode is certificate");
+            "Fatal: configuration file - "
+            "user-mode must be server if security-mode is certificate");
         ret = -1;
         goto get_config_exit;
     }
@@ -956,8 +905,8 @@ int get_config(PORANGEFS_OPTIONS options,
          strlen(options->ldap.search_root) == 0))
     {        
         _snprintf(error_msg, error_msg_len, 
-            "Configuration file (fatal): "
-            "Missing ldap option: ldap-host, or ldap-search-root");
+            "Fatal: configuration file - "
+            "missing ldap option: ldap-host, or ldap-search-root");
         ret = -1;
     }
 
@@ -965,8 +914,8 @@ int get_config(PORANGEFS_OPTIONS options,
     if (options->debug_stderr && options->debug_file_flag)
     {
         _snprintf(error_msg, error_msg_len, 
-            "Configuration file (fatal): "
-            "Cannot specify both debug-stderr and debug-file");
+            "Fatal: configuration file - "
+            "cannot specify both debug-stderr and debug-file");
         ret = -1;
     }
 
@@ -1001,7 +950,7 @@ int add_users(PORANGEFS_OPTIONS options,
             user_entry = qlist_entry(iterator, CONFIG_USER_ENTRY, link);
             if (user_entry == NULL)
             {
-                _snprintf(error_msg, error_msg_len, "Initialization (fatal): "
+                _snprintf(error_msg, error_msg_len, "Fatal: initialization - "
                     "internal error");
                 ret = -1;
                 break;
@@ -1011,7 +960,7 @@ int add_users(PORANGEFS_OPTIONS options,
             ret = init_credential(user_entry->uid, &user_entry->gid, 1, NULL, NULL, &cred);
             if (ret != 0)
             {
-                _snprintf(error_msg, error_msg_len, "Initialization (fatal): "
+                _snprintf(error_msg, error_msg_len, "Fatal: initialization - "
                     "could not init credential for %s", user_entry->user_name);
                 break;
             }
@@ -1020,7 +969,7 @@ int add_users(PORANGEFS_OPTIONS options,
             ret = add_cache_user(user_entry->user_name, &cred, NULL);
             if (ret != 0)
             {
-                _snprintf(error_msg, error_msg_len, "Initialization (fatal): "
+                _snprintf(error_msg, error_msg_len, "Fatal: initialization - "
                     "could not add %s to cache", user_entry->user_name);
                 break;
             }
@@ -1036,7 +985,7 @@ int add_users(PORANGEFS_OPTIONS options,
 
     if (options->user_mode == USER_MODE_LIST && ret == 0 && add_flag == 0)
     {
-        _snprintf(error_msg, error_msg_len, "Initialization (fatal): no users");
+        _snprintf(error_msg, error_msg_len, "Fatal: initialization - no users");
         ret = -1;
     }
 
