@@ -19,11 +19,7 @@ AC_DEFUN([AX_AIO],
     	    [],
     	    [AC_MSG_ERROR(Invalid libaio path specified.  No libaio.h found.)])
     
-        AC_TRY_LINK(
-    	    [#include "libaio.h"],
-    	    [io_context_t * b;],
-    	    [AC_MSG_RESULT(yes)],
-    	    [AC_MSG_ERROR(could not find libaio libs)])
+        AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include "libaio.h"]], [[io_context_t * b;]])],[AC_MSG_RESULT(yes)],[AC_MSG_ERROR(could not find libaio libs)])
     
         AC_DEFINE(WITH_AIO, 1, [Define if libaio exists])
         
@@ -42,13 +38,9 @@ AC_DEFUN([AX_AIO_OPTIONAL],
       [],
       [AC_MSG_WARN(No libaio headers found.)])
 
-    AC_TRY_LINK(
-      [#include "libaio.h"],
-      [io_context_t * b;],
-      [AC_MSG_RESULT(yes)
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include "libaio.h"]], [[io_context_t * b;]])],[AC_MSG_RESULT(yes)
        AC_DEFINE(WITH_AIO, 1, [Define if libaio exists])
-      ],
-      [
+      ],[
       	AC_MSG_WARN(No libaio headers found.)
 	LIBS=${TMPLIBS}
       ])
