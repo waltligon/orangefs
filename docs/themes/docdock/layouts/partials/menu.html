@@ -14,14 +14,11 @@
 <!-- templates -->
 {{- define "section-tree-nav" }}
 {{- $showvisitedlinks := .showvisitedlinks }}
-{{- $currentNode := .currentnode }}
  {{- with .sect}}
   {{- if and .IsSection (or (not .Params.hidden) $.showhidden)}}
     {{- $numberOfPages := (add (len .Pages) (len .Sections)) }}
     {{- safeHTML .Params.head}}
-    <li data-nav-id="{{.URL}}" class="dd-item
-        {{- if .IsAncestor $currentNode}} parent{{end}}
-        {{- if eq .URL $currentNode.URL}} active{{end}}
+    <li data-nav-id="{{.Permalink}}" class="dd-item
         {{- if .Params.alwaysopen}} alwaysopen{{end -}}
         {{- if ne $numberOfPages 0 }} haschildren{{end}}
         ">
@@ -29,7 +26,7 @@
       <a href="{{ .RelPermalink}}">{{safeHTML .Params.Pre}}{{.Title}}{{safeHTML .Params.Post}}</a>
         
         {{- if ne $numberOfPages 0 }}
-          {{- if or (.IsAncestor $currentNode) (.Params.alwaysopen) }}
+          {{- if .Params.alwaysopen }}
             <i class="fa fa-angle-down fa-lg category-icon"></i>
           {{- else -}}
             <i class="fa fa-angle-right fa-lg category-icon"></i>
@@ -40,24 +37,23 @@
       </div>
       {{- if ne $numberOfPages 0 }}
         <ul>
-          {{- .Scratch.Set "pages" .Pages }}
-          {{- if .Sections}}
-          {{- .Scratch.Set "pages" (.Pages | union .Sections) }}
-          {{- end}}
-          {{- $pages := (.Scratch.Get "pages") }}
+        {{- $pages := .Pages }}
+        {{- if .Sections}}
+        {{- $pages = (.Pages | union .Sections) }}
+        {{- end}}
 
         {{- if eq .Site.Params.ordersectionsby "title"}}
           {{- range $pages.ByTitle }}
             {{- if and .Params.hidden (not $.showhidden) }}
             {{- else}}
-            {{- template "section-tree-nav" dict "sect" . "currentnode" $currentNode "showvisitedlinks" $showvisitedlinks }}
+            {{- template "section-tree-nav" dict "sect" . "showvisitedlinks" $showvisitedlinks }}
             {{- end}}
           {{- end}}
         {{- else}}
           {{- range $pages.ByWeight }}
             {{- if and .Params.hidden (not $.showhidden) }}
             {{- else}}
-            {{- template "section-tree-nav" dict "sect" . "currentnode" $currentNode "showvisitedlinks" $showvisitedlinks }}
+            {{- template "section-tree-nav" dict "sect" . "showvisitedlinks" $showvisitedlinks }}
             {{- end}}
           {{- end}}
         {{- end}}
@@ -66,9 +62,7 @@
     </li>
   {{- else}}
     {{- if not .Params.Hidden }}
-      <li data-nav-id="{{.URL}}" class="dd-item
-     {{- if eq .URL $currentNode.URL}} active{{end -}}
-      ">
+      <li data-nav-id="{{.Permalink}}" class="dd-item">
         <div>
           <a href="{{ .RelPermalink}}">
             {{safeHTML .Params.Pre}}{{.LinkTitle}}{{safeHTML .Params.Post}}
