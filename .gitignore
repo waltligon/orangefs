@@ -66,3 +66,5 @@ config.status
 /windows/dokany/
 /windows/ldap/
 /windows/openssl/
+/src/client/windows/client-service/messagesTEMP.BIN
+/src/client/windows/client-service/messages.aps

@@ -138,15 +138,8 @@ static FILE *open_config_file(char *error_msg,
             malloc_flag = TRUE;
 
             ZeroMemory(file_name, MAX_PATH);
-            _snprintf(file_name, MAX_PATH-14, "%s", module_dir);
-            file_name[strlen(module_dir)] = '\0';
-            if (!strcmp(file_name, module_dir))
-            {
-                _snprintf(error_msg, error_msg_len, "Fatal: OrangeFS dir path too long\n");
-                free(file_name);
-                return NULL;
-            }
-            strcat(file_name, "\\orangefs.cfg");
+            _snprintf(file_name, MAX_PATH, "%s\\orangefs.cfg", module_dir);
+            file_name[MAX_PATH-1] = '\0';
         }
         else
         {
