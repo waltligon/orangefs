@@ -119,18 +119,18 @@ void close_service_log()
     }
 }
 
-/* Open our Event Log entry (from registry) */
+/* Open our Event Log Provider */
 DWORD init_event_log()
 {
-    hevent_log = RegisterEventSource(NULL, "OrangeFS Client");
+    /* hevent_log = RegisterEventSource(NULL, "OrangeFS Client"); */
+    EventRegisterOrangeFS_Client_Provider();
     return GetLastError();
 }
 
-/* Close our Event Log source */
+/* Close our Event Log Provider */
 void close_event_log()
 {
-    if (hevent_log != NULL)
-        DeregisterEventSource(hevent_log);
+    EventUnregisterOrangeFS_Client_Provider();
 }
 
 /* get OpenSSL error message */
@@ -227,7 +227,7 @@ void get_windows_error(const char *msg,
    log. The entire text of the message is displayed without modification. */
 BOOL report_error_event(char *message, BOOL startup)
 {
-    char *strings[1];
+    // char *strings[1];
 
     /* startup errors also go to service log or stderr */
     if (startup)
@@ -247,10 +247,9 @@ BOOL report_error_event(char *message, BOOL startup)
 
     if (hevent_log != NULL)
     {
-        strings[0] = message;
+        // strings[0] = message;
 
-        return ReportEvent(hevent_log, EVENTLOG_ERROR_TYPE, 0, 
-            MSG_GENERIC_ERROR, NULL, 1, 0, strings, NULL);
+        EventWriteERROR_EVENT(message);
     }
 
     return FALSE;
@@ -840,8 +839,8 @@ int main(int argc, char **argv, char **envp)
   err = WSAStartup(version, &wsaData);
   if (err != 0)
   {
-	  report_startup_error("WSAStartup (Windows Sockets) error:", err);
-	  return 1;
+      report_startup_error("WSAStartup (Windows Sockets) error:", err);
+      return 1;
   }
 
   /* initialize OpenSSL */

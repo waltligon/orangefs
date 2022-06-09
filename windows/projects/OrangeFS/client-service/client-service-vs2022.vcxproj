@@ -57,6 +57,29 @@
   <ItemGroup>
     <ResourceCompile Include="..\..\..\..\src\client\windows\client-service\messages.rc" />
   </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\..\src\client\windows\client-service\messages.man">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">mc.exe -um -h %(RelativeDir) -r %(RelativeDir) %(FullPath)</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)messages.h;%(RelativeDir)messages.rc</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">mc.exe -um -h %(RelativeDir) -r %(RelativeDir) %(FullPath)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'">mc.exe -um -h %(RelativeDir) -r %(RelativeDir) %(FullPath)</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Running message compiler...</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Running message compiler...</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'">Running message compiler...</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)messages.h;%(RelativeDir)messages.rc</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'">%(RelativeDir)messages.h;%(RelativeDir)messages.rc</Outputs>
+      <OutputItemType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </OutputItemType>
+      <OutputItemType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </OutputItemType>
+      <OutputItemType Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'">
+      </OutputItemType>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'">true</DeploymentContent>
+    </CustomBuild>
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{61019A9A-D6E0-4E04-B163-EADB88766C9E}</ProjectGuid>
     <RootNamespace>dokanservice</RootNamespace>
