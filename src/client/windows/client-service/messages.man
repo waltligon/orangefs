@@ -48,7 +48,7 @@
 	<localization>
 		<resources culture="en-US">
 			<stringTable>
-				<string id="Provider.Name" value="OrangeFS-Client-Provider"/>
+				<string id="Provider.Name" value="OrangeFS Client"/>
 				<string id="Event.Info" value="%1."/>
 				<string id="Event.Error" value="%1."/>
 			</stringTable>

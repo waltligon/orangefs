@@ -44,7 +44,7 @@ int is_running = 0;
 int run_service = 0;  
 
 HANDLE hthread, hcache_thread;
-HANDLE hevent_log = NULL;
+// HANDLE hevent_log = NULL;
 
 DWORD thread_start(PORANGEFS_OPTIONS options);
 DWORD thread_stop();
@@ -120,11 +120,10 @@ void close_service_log()
 }
 
 /* Open our Event Log Provider */
-DWORD init_event_log()
+ULONG init_event_log()
 {
     /* hevent_log = RegisterEventSource(NULL, "OrangeFS Client"); */
-    EventRegisterOrangeFS_Client_Provider();
-    return GetLastError();
+    return EventRegisterOrangeFS_Client_Provider();
 }
 
 /* Close our Event Log Provider */
@@ -191,7 +190,7 @@ void get_windows_error(const char *msg,
                        char *errstr,
                        size_t errlen)
 {
-    LPVOID msg_buf;
+    LPVOID msg_buf = NULL;
     LPTSTR win_msg;
 
     errstr[0] = '\0';
@@ -244,13 +243,9 @@ BOOL report_error_event(char *message, BOOL startup)
 
     client_debug("Error reported:\n");
     client_debug("%s\n", message);
-
-    if (hevent_log != NULL)
-    {
-        // strings[0] = message;
-
-        EventWriteERROR_EVENT(message);
-    }
+    
+    /* write to the Windows Application Event Log, viewable in Event Viewer */
+    EventWriteERROR_EVENT(message);
 
     return FALSE;
 }
@@ -500,7 +495,7 @@ void WINAPI service_main(DWORD argc, char *argv[])
     ret = get_config(options, error_msg, 512);
 
     /* point global options */
-    goptions = options;    
+    goptions = options;
 
     if (ret == 0)
     {
@@ -776,6 +771,7 @@ int main(int argc, char **argv, char **envp)
   int i = 0;
   PORANGEFS_OPTIONS options;
   DWORD err = 0, cmd_debug = FALSE;
+  ULONG evterr = 0;
   WORD version;
   WSADATA wsaData;
   char mount_point[256];
@@ -827,10 +823,10 @@ int main(int argc, char **argv, char **envp)
   }
 
   /* init event log */
-  if ((err = init_event_log()) != 0)
+  if ((evterr = init_event_log()) != ERROR_SUCCESS)
   {
       /* since we can't log to event log, log to stderr */
-      fprintf(stderr, "Could not open event log: %u\n", err);
+      fprintf(stderr, "Could not register event log: %lu\n", evterr);
   }
 
   /* init Windows Sockets -- this needs to be done in order
