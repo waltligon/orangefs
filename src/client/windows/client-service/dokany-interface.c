@@ -2869,7 +2869,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     do {
         client_debug("Entering DokanMain\n");
 
-        /* dokan loops until termination */
+        /* blocks until unmounted */
         status = DokanMain(dokanOptions, dokanOperations);
 
         client_debug("Exited DokanMain\n");
@@ -2901,11 +2901,11 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
                 break;
         }
 
-        client_debug("Retrying in 30 seconds...\n");
-        
-        Sleep(30000);
-
-    } while (TRUE);
+        if (status != DOKAN_SUCCESS) {
+            client_debug("Retrying in 30 seconds...\n");
+            Sleep(30000);
+        }
+    } while (status != DOKAN_SUCCESS);
 
     cleanup_string((void *) dokanOptions->MountPoint);
 
@@ -2915,6 +2915,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     free(dokanOptions);
     free(dokanOperations);
 
-    return status;
+    ExitThread((DWORD)status);
 
+    return status;
 }

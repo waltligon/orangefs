@@ -10,6 +10,8 @@
  * -- Run client as a service or console app
  */
 
+#include "dokan.h"
+
 #include <Windows.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -46,6 +48,8 @@ int run_service = 0;
 HANDLE hthread, hcache_thread;
 // HANDLE hevent_log = NULL;
 
+int main_init();
+
 DWORD thread_start(PORANGEFS_OPTIONS options);
 DWORD thread_stop();
 
@@ -65,6 +69,7 @@ extern gen_mutex_t io_cache_mutex;
 PORANGEFS_OPTIONS goptions;
 
 /* externs */
+extern wchar_t* convert_mbstring(const char* mbstr);
 extern int __cdecl dokan_loop(PORANGEFS_OPTIONS options);
 
 void init_service_log()
@@ -72,7 +77,7 @@ void init_service_log()
     char exe_path[MAX_PATH], *p;
     int ret;
 
-    if (!debug || !run_service)
+    if (!run_service)
         return;
 
     /* create log file in exe directory */
@@ -92,24 +97,35 @@ void init_service_log()
 
 void service_debug(char *format, ...)
 {
-    char buffer[512];
+    char buffer[512], prefix[128], *pp;
+    struct timeval tv;
+    time_t tp;
     va_list argp;
 
-    if (!debug || !run_service)
+    if (!run_service)
         return;
 
     va_start(argp, format);
     vsprintf_s(buffer, sizeof(buffer), format, argp);
     va_end(argp);
 
-    fprintf(debug_log, buffer);
+    strcpy(prefix, "[S ");
+    pp = prefix + strlen(prefix);
+    gettimeofday(&tv, NULL);
+    tp = tv.tv_sec;
+    strftime(pp, sizeof(prefix) - strlen(prefix), "%H:%M:%S", localtime(&tp));
+    pp = prefix + strlen(prefix);
+    sprintf(pp, ".%03ld (%4ld)] ", (long)tv.tv_usec / 1000,
+        GetThreadId(GetCurrentThread()));
+    
+    fprintf(debug_log, "%s%s", prefix, buffer);
     fflush(debug_log);
 
 }
 
 void close_service_log()
 {
-    if (!debug || !run_service)
+    if (!run_service)
         return;
 
     if (debug_log)
@@ -474,9 +490,15 @@ void WINAPI service_ctrl(DWORD ctrl_code)
 void WINAPI service_main(DWORD argc, char *argv[])
 {
     PORANGEFS_OPTIONS options;
-    int ret, ret2;
-    char error_msg[512];    
+    int err = 0;
+    char error_msg[512];
     char env_debug_file[MAX_PATH+16], env_debug_mask[256+16];
+
+    init_service_log();
+
+    if ((err = main_init()) != 0) {
+        goto service_main_exit;
+    }
 
     /* allocate options */
     options = (PORANGEFS_OPTIONS) calloc(1, sizeof(ORANGEFS_OPTIONS));
@@ -492,32 +514,34 @@ void WINAPI service_main(DWORD argc, char *argv[])
     gen_mutex_init(&io_cache_mutex);
 
     /* read from config file */
-    ret = get_config(options, error_msg, 512);
+    if ((err = get_config(options, error_msg, 512)) != 0) {
+        goto service_main_exit;
+    }
 
     /* point global options */
     goptions = options;
 
-    if (ret == 0)
-    {
-        /* add users (in list mode) */
-        ret2 = add_users(options, error_msg, 512);
+    /* add users (in list mode) */
+    if ((err = add_users(options, error_msg, 512)) != 0) {
+        goto service_main_exit;
     }
    
     debug = options->debug;
 
-    init_service_log();
-
+    /* now under service_main_exit label 
     if (ret != 0 || ret2 != 0)
     {
         report_startup_error(error_msg, (ret != 0) ? ret : ret2);
         close_service_log();
         close_event_log();
         return;
+    } */
+
+    /* see if mount point is already in use */
+    if (!check_mount_point(options->mount_point)) {
+        err = 1;
+        goto service_main_exit;
     }
-
-
-    if (!check_mount_point(options->mount_point))
-        return;
 
     /* turn on gossip debugging */
     if (debug)
@@ -544,17 +568,11 @@ void WINAPI service_main(DWORD argc, char *argv[])
         service_debug("Service registered\n");
 
         /* run the user cache thread */
-        ret = cache_thread_start();
-        if (ret != 0)
+        if ((err = cache_thread_start()) != 0)
         {
             _snprintf(error_msg, sizeof(error_msg), "Fatal init error: could "
-                "not start cache thread: %u", ret);
-            report_startup_error(error_msg, ret);
-            close_service_log();
-            close_event_log();
-            free(options);
-            
-            return;
+                "not start cache thread: %u", err);
+            goto service_main_exit;
         }
 
         /* run the service */
@@ -564,7 +582,8 @@ void WINAPI service_main(DWORD argc, char *argv[])
         service_status.dwWin32ExitCode = NO_ERROR;
         service_status.dwServiceSpecificExitCode = 0;
 
-        /* execute service main loop */
+        /*** execute service main loop ***/
+        /*** (not expected to return ***/
         if (SetServiceStatus(hstatus, &service_status))
         {
             is_running = 1;
@@ -573,30 +592,46 @@ void WINAPI service_main(DWORD argc, char *argv[])
         }
 
         /* stop cache thread */
-        cache_thread_stop();
+        //cache_thread_stop();
 
         /* LDAP cleanup */
-        PVFS_ldap_cleanup();
+        //PVFS_ldap_cleanup();
 
         /* cleanup OpenSSL */
-        openssl_cleanup();
+        //openssl_cleanup();
         
         /* shut down service */        
-        service_status.dwCurrentState = SERVICE_STOPPED;
-        SetServiceStatus(hstatus, &service_status);        
+        //service_status.dwCurrentState = SERVICE_STOPPED;
+        //SetServiceStatus(hstatus, &service_status);        
     }
     else
     {
         report_error("RegisterServiceCtrlHandler failed: ", GetLastError());
     }
 
+service_main_exit:
+
+    if (err)
+    {
+        report_startup_error(error_msg, GetLastError());
+    }
+
     qhash_destroy_and_finalize(user_cache, struct user_entry, hash_link, free);
+
+    qhash_destroy_and_finalize(io_cache, struct io_cache_entry, hash_link, free);
+
+    cache_thread_stop();
+
+    PVFS_ldap_cleanup();
+
+    openssl_cleanup();
     
     close_service_log();
 
     close_event_log();
 
     free(options);
+
 }
 
 DWORD thread_start(PORANGEFS_OPTIONS options)
@@ -614,6 +649,7 @@ DWORD thread_start(PORANGEFS_OPTIONS options)
                            NULL);
     if (hthread)
     {  
+        service_debug("thread_start: created thread %ld\n", GetThreadId(hthread));
         WaitForSingleObject(hthread, INFINITE);
     }
     else
@@ -630,14 +666,30 @@ DWORD thread_start(PORANGEFS_OPTIONS options)
 DWORD thread_stop()
 {
     DWORD err = 0;
+    LPCWSTR w_mount_point;
+    BOOL unmounted = FALSE;
 
     service_debug("thread_stop enter\n");
+    /*service_debug("thread_stop: stopping thread %ld\n", GetThreadId(hthread));*/
     
     /* stop the thread */
-    if (!TerminateThread(hthread, 0))
+    /*if (!TerminateThread(hthread, 0))
     {
         err = GetLastError();
         report_error("TerminateThread (main) failed: ", err);
+    }*/
+
+    /* Unmount drive */
+    if ((w_mount_point = convert_mbstring(goptions->mount_point)) != NULL) {
+        unmounted = DokanRemoveMountPoint(w_mount_point);
+    }
+
+    if (unmounted) {
+        service_debug("thread_stop: umount OK\n");
+    }
+    else {
+        /* TODO: more info? */
+        service_debug("thread_stop: unmount failed\n");
     }
 
     service_debug("thread_stop exit\n");
@@ -766,14 +818,48 @@ DWORD WINAPI main_loop(LPVOID poptions)
     return (DWORD) ret;
 }
 
+int main_init()
+{
+    DWORD err = 0;
+    ULONG evterr = 0;
+    WORD version;
+    WSADATA wsaData;
+
+    /* init event log */
+    if ((evterr = init_event_log()) != ERROR_SUCCESS)
+    {
+        /* since we can't log to event log, log to stderr */
+        fprintf(stderr, "Could not register event log: %lu\n", evterr);
+    }
+
+    /* init Windows Sockets -- this needs to be done in order
+       to use gethostname() if loading credentials in advance. */
+    version = MAKEWORD(2, 2);
+    err = WSAStartup(version, &wsaData);
+    if (err != 0)
+    {
+        report_startup_error("WSAStartup (Windows Sockets) error:", err);
+        return 1;
+    }
+
+    /* initialize OpenSSL */
+    openssl_init();
+
+    /* initialize LDAP */
+    if (PVFS_ldap_init() != 0)
+    {
+        report_startup_error("Fatal error: LDAP could not be initialized", 0);
+        return 1;
+    }
+
+    return 0;
+}
+
 int main(int argc, char **argv, char **envp)
 {
-  int i = 0;
+  int i = 0, err = 0;
   PORANGEFS_OPTIONS options;
-  DWORD err = 0, cmd_debug = FALSE;
-  ULONG evterr = 0;
-  WORD version;
-  WSADATA wsaData;
+  BOOL cmd_debug = FALSE;
   char mount_point[256];
   char error_msg[512];
   char env_debug_file[MAX_PATH+16], env_debug_mask[256+16];
@@ -822,33 +908,6 @@ int main(int argc, char **argv, char **envp)
       }
   }
 
-  /* init event log */
-  if ((evterr = init_event_log()) != ERROR_SUCCESS)
-  {
-      /* since we can't log to event log, log to stderr */
-      fprintf(stderr, "Could not register event log: %lu\n", evterr);
-  }
-
-  /* init Windows Sockets -- this needs to be done in order
-     to use gethostname() if loading credentials in advance. */
-  version = MAKEWORD(2, 2);
-  err = WSAStartup(version, &wsaData);
-  if (err != 0)
-  {
-      report_startup_error("WSAStartup (Windows Sockets) error:", err);
-      return 1;
-  }
-
-  /* initialize OpenSSL */
-  openssl_init();
-
-  /* initialize LDAP */
-  if (PVFS_ldap_init() != 0)
-  {
-      report_startup_error("Fatal error: LDAP could not be initialized", 0);
-      return 1;
-  }
-
   if (run_service) 
   {
       /* dispatch the main service thread */
@@ -870,7 +929,11 @@ int main(int argc, char **argv, char **envp)
               _CrtSetReportFile(_CRT_WARN, hfile);
       } 
 #endif
-      
+      /* call initialization function */
+      if ((err = main_init()) != 0) {
+          goto main_exit;
+      }
+
       options = (PORANGEFS_OPTIONS) calloc(1, sizeof(ORANGEFS_OPTIONS));
 
       /* init user list */
