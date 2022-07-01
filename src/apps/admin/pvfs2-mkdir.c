@@ -179,7 +179,7 @@ int main(int argc, char **argv)
     
     if(pvfs_path != NULL)
     {
-        for(i=0;i<user_opts.numdirs;i++)
+        for(i = 0; i < user_opts.numdirs; i++)
         {
             if(pvfs_path[i] != NULL)
             {
@@ -268,24 +268,20 @@ static int make_directory(PVFS_credential      * credentials,
                           &resp_lookup, 
                           PVFS2_LOOKUP_LINK_FOLLOW, NULL);
 
-    if( ret < 0 &&
-        !make_parent_dirs)
+    if( ret < 0 && !make_parent_dirs)
     {
         PVFS_perror("PVFS_sys_lookup", ret);
         return(ret);
     }
 
-    if( ret < 0         && 
-        make_parent_dirs && 
-        ret != -PVFS_ENOENT)
+    if( ret < 0 && make_parent_dirs && ret != -PVFS_ENOENT)
     {
         PVFS_perror("PVFS_sys_lookup", ret);
         return(ret);
     }
     
     /* The parent directory did not exist. Let's create the parent directory */
-    if(ret == -PVFS_ENOENT &&
-       make_parent_dirs)
+    if(ret == -PVFS_ENOENT && make_parent_dirs)
     {
         strcpy(parent_dir, pvfs_path);
         strcpy(realpath,  dir);

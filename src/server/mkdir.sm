@@ -526,7 +526,6 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
     int ret = -1;
     job_id_t j_id;
     int k = 0;
-    int slen; /* length of conversion strings */
 
     /* total 3 static keyvals every dir has:
      * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES, PARENT */
@@ -546,10 +545,12 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
      */
     if (pattr->mask & PVFS_ATTR_DIR_HINT)
     {
+        /*
         if (pattr->u.dir.hint.dfile_count > 0)
         {
             keyval_count++;
         }
+        */
         if (pattr->u.dir.hint.dist_name_len > 0)
         {
             keyval_count++;
@@ -558,20 +559,24 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
         {
             keyval_count++;
         }
+        /*
         if (pattr->u.dir.hint.layout.algorithm > PVFS_SYS_LAYOUT_NONE &&
             pattr->u.dir.hint.layout.algorithm <= PVFS_SYS_LAYOUT_MAX)
         {
             keyval_count++;
         }
+        */
         if (pattr->u.dir.hint.layout.server_list.count > 0)
         {
             keyval_count++;
         }
+        /*
         if (pattr->u.dir.hint.dir_layout.algorithm > PVFS_SYS_LAYOUT_NONE &&
             pattr->u.dir.hint.dir_layout.algorithm <= PVFS_SYS_LAYOUT_MAX)
         {
             keyval_count++;
         }
+        */
         if (pattr->u.dir.hint.dir_layout.server_list.count > 0)
         {
             keyval_count++;
@@ -623,8 +628,10 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
     k = 3;
     if (pattr->mask & PVFS_ATTR_DIR_HINT)
     {
+#if 0
         if (pattr->u.dir.hint.dfile_count > 0)
         {
+    int slen; /* length of conversion strings */
             /* convert to string */
             s_op->key_a[k].buffer = Trove_Special_Keys[NUM_DFILES_KEY].key;
             s_op->key_a[k].buffer_sz = Trove_Special_Keys[NUM_DFILES_KEY].size;
@@ -642,6 +649,7 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
             s_op->val_a[k].buffer_sz = slen + 1;
             k++;
         }
+#endif
         if (pattr->u.dir.hint.dist_name_len > 0)
         {
             s_op->key_a[k].buffer = Trove_Special_Keys[DIST_NAME_KEY].key;
@@ -662,6 +670,7 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
             keep_keyval_buffers(s_op, k);
             k++;
         }
+#if 0
         if (pattr->u.dir.hint.layout.algorithm > PVFS_SYS_LAYOUT_NONE &&
             pattr->u.dir.hint.layout.algorithm <= PVFS_SYS_LAYOUT_MAX)
         {
@@ -681,12 +690,22 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
             s_op->val_a[k].buffer_sz = slen + 1;
             k++;
         }
+#endif
         if (pattr->u.dir.hint.layout.server_list.count > 0)
         {
             s_op->key_a[k].buffer = Trove_Special_Keys[SERVER_LIST_KEY].key;
             s_op->key_a[k].buffer_sz = Trove_Special_Keys[SERVER_LIST_KEY].size;
             s_op->val_a[k].buffer = pattr->u.dir.hint.layout.server_list.servers;
             s_op->val_a[k].buffer_sz = pattr->u.dir.hint.layout.server_list.bufsize;
+            keep_keyval_buffers(s_op, k);
+            k++;
+        }
+        if (pattr->u.dir.hint.dir_layout.server_list.count > 0)
+        {
+            s_op->key_a[k].buffer = Trove_Special_Keys[DIR_SERVER_LIST_KEY].key;
+            s_op->key_a[k].buffer_sz = Trove_Special_Keys[DIR_SERVER_LIST_KEY].size;
+            s_op->val_a[k].buffer = pattr->u.dir.hint.dir_layout.server_list.servers;
+            s_op->val_a[k].buffer_sz = pattr->u.dir.hint.dir_layout.server_list.bufsize;
             keep_keyval_buffers(s_op, k);
             k++;
         }

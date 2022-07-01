@@ -127,7 +127,7 @@
 
 /* Optional xattrs have "user.pvfs2." as a prefix 
  * These are used to define the table Trove_Special_keys in
- * the file src/server/get-attr.sm
+ * the file src/server/pvfs2-server.c
  */
 /* new keys for distributed directory, '/' makes sure no conflict with dirent names */
 #define DIST_DIR_ATTR_KEYSTR          "/dda\0"   /* obsolete */
@@ -150,17 +150,13 @@
 #define SPECIAL_DIST_PARAMS_STRING     SPECIAL_PREFIX SPECIAL_DIST_PARAMS_KEYSTR
 #define SPECIAL_DIST_PARAMS_KEYLEN     23
 
-#define SPECIAL_NUM_DFILES_KEYSTR      "num_dfiles\0"
-#define SPECIAL_NUM_DFILES_STRING      SPECIAL_PREFIX SPECIAL_NUM_DFILES_KEYSTR
-#define SPECIAL_NUM_DFILES_KEYLEN      22
-
-#define SPECIAL_LAYOUT_KEYSTR          "layout\0"
-#define SPECIAL_LAYOUT_STRING          SPECIAL_PREFIX SPECIAL_LAYOUT_KEYSTR
-#define SPECIAL_LAYOUT_KEYLEN          18
-
 #define SPECIAL_SERVER_LIST_KEYSTR     "server_list\0"
 #define SPECIAL_SERVER_LIST_STRING     SPECIAL_PREFIX SPECIAL_SERVER_LIST_KEYSTR
 #define SPECIAL_SERVER_LIST_KEYLEN     23
+
+#define SPECIAL_DIR_SERVER_LIST_KEYSTR  "dir_server_list\0"
+#define SPECIAL_DIR_SERVER_LIST_STRING  SPECIAL_PREFIX SPECIAL_DIR_SERVER_LIST_KEYSTR
+#define SPECIAL_DIR_SERVER_LIST_KEYLEN  27
 
 #define SPECIAL_METAFILE_HINT_KEYSTR   "meta_hint\0"
 #define SPECIAL_METAFILE_HINT_STRING   SPECIAL_PREFIX SPECIAL_METAFILE_HINT_KEYSTR

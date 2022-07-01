@@ -112,7 +112,7 @@ enum
     POSIX_ACL_KEY            = 11
 };
 
-/* This is defined in src/server/get-attr.sm
+/* This is defined in src/common/misc/pvfs2-internal.h
  * These values index this table
  * The first NUM_SPECIAL_KEYS of these are automatically
  * Read when getting metadata
@@ -123,18 +123,24 @@ extern PINT_server_trove_keys_s Trove_Special_Keys[];
 /* optional; user-settable keys */
 enum 
 {
-    DIST_NAME_KEY          = 0,
-    DIST_PARAMS_KEY        = 1,
+    DIST_NAME_KEY          = 0, /* string, name of a distribution */
+    DIST_PARAMS_KEY        = 1, /* struct, parameters to a distribution */
+    SERVER_LIST_KEY        = 2, /* string, list of servers part of distribution */
+    DIR_SERVER_LIST_KEY    = 3, /* string, list of servers part of distribution */
+    NUM_SPECIAL_KEYS       = 4, /* not an index */
+    METAFILE_HINT_KEY      = 4,
+    MIRROR_COPIES_KEY      = 5,
+    MIRROR_HANDLES_KEY     = 6,
+    MIRROR_STATUS_KEY      = 7,
+};
+
+/* These keys went away in V3 */
+#if 0
     NUM_DFILES_KEY         = 2, /* these in get-attr and mkdir */
     DEFAULT_NUM_DFILES_KEY = 2, /* alias ? This is supposed to be in config */
     LAYOUT_KEY             = 3,
-    SERVER_LIST_KEY        = 4,
-    NUM_SPECIAL_KEYS       = 5, /* not an index */
-    METAFILE_HINT_KEY      = 5,
-    MIRROR_COPIES_KEY      = 6,
-    MIRROR_HANDLES_KEY     = 7,
-    MIRROR_STATUS_KEY      = 8,
 };
+#endif
 
 typedef enum
 {

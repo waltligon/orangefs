@@ -899,10 +899,11 @@ static int lebf_decode_resp(void *input_buffer, /* decoding from this buff */
     char **p = &ptr;
     struct PVFS_server_resp *resp = &target_msg->stub_dec.resp;
 
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_resp\n");
+    gossip_debug(GOSSIP_ENDECODE_DEBUG, "lebf_decode_resp\n");
     target_msg->buffer = resp;
 
     /* decode generic part of response (including op number) */
+    gossip_debug(GOSSIP_ENDECODE_DEBUG, "decoding generic part of resp\n");
     decode_PVFS_server_resp(p, resp);
 
     if (resp->status != 0) 
@@ -913,6 +914,8 @@ static int lebf_decode_resp(void *input_buffer, /* decoding from this buff */
 #define CASE(tag,var) \
     case tag: decode_PVFS_servresp_##var(p,&resp->u.var); break
 
+    gossip_debug(GOSSIP_ENDECODE_DEBUG, "decoding op (%d) specific part of resp\n",
+                 resp->op);
     switch (resp->op)
     {
 

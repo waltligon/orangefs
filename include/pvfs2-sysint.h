@@ -323,7 +323,7 @@ PVFS_error PVFS_isys_ref_lookup(
     char *relative_pathname,
     PVFS_object_ref parent_ref,
     const PVFS_credential *credential,
-    PVFS_sysresp_lookup * resp,
+    PVFS_sysresp_lookup *resp,
     int32_t follow_link,
     PVFS_sys_op_id *op_id,
     PVFS_hint hints,
@@ -334,7 +334,7 @@ PVFS_error PVFS_sys_ref_lookup(
     char *relative_pathname,
     PVFS_object_ref parent_ref,
     const PVFS_credential *credential,
-    PVFS_sysresp_lookup * resp,
+    PVFS_sysresp_lookup *resp,
     int32_t follow_link,
     PVFS_hint hints);
 

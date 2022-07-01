@@ -380,6 +380,11 @@ void *PINT_malloc (size_t size __PMDBG)
     size_t sizeplus;
     extra_t *extra;
 
+    if (size == 0)
+    {
+        return NULL;
+    }
+
     sizeplus = size + EXTRA_SIZE;
 
     mem = my_glibc_malloc(sizeplus);
@@ -424,6 +429,12 @@ int PINT_posix_memalign (void **mem, size_t alignment, size_t size __PMDBG)
     extra_t *extra;
     void *mem_orig;
     void *aligned;
+
+    if (size == 0)
+    {
+        *mem = NULL;
+        return EINVAL;
+    }
 
     /* make sure alignment is nonzero and a power of two */
     if (alignment == 0 || !((alignment & (~alignment + 1)) == alignment))

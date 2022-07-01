@@ -1058,35 +1058,61 @@ static inline void defree_##name(struct name *x) { \
 /* one field, and array, another field, another array - a special case */
 #define endecode_fields_1a1a1a_struct(name, t1, x1, tn1, n1, ta1, a1, t2, x2, tn2, n2, ta2, a2, t3, x3, tn3, n3, ta3, a3) \
 static inline void encode_##name(char **pptr, const struct name *x) { int i; \
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"%s\n", __func__); \
+    \
     encode_##t1(pptr, &x->x1); \
     encode_##tn1(pptr, &x->n1); \
     for (i=0; i<x->n1; i++) { int n; n = i; \
 	    encode_##ta1(pptr, &(x)->a1[n]); } \
+        \
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"%s:n1 %d\n", __func__, x->n1); \
+                 \
     encode_##t2(pptr, &x->x2); \
     encode_##tn2(pptr, &x->n2); \
     for (i=0; i<x->n2; i++) { int n; n = i; \
 	    encode_##ta2(pptr, &(x)->a2[n]); } \
+    \
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"%s:n2 %d\n", __func__, x->n2); \
+\
     encode_##t3(pptr, &x->x3); \
     encode_##tn3(pptr, &x->n3); \
     for (i=0; i<x->n3; i++) { int n; n = i; \
 	    encode_##ta3(pptr, &(x)->a3[n]); } \
+    \
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"%s:n3 %d\n", __func__, x->n3); \
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"%s:n1 %d: n2 %d: n3 %d\n", \
+                 __func__, x->n1, x->n2, x->n3); \
 } \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"%s\n", __func__); \
     decode_##t1(pptr, &x->x1); \
     decode_##tn1(pptr, &x->n1); \
     x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
     for (i=0; i<x->n1; i++) \
 	    decode_##ta1(pptr, &(x)->a1[i]); \
+        \
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"%s:n1 %d\n", __func__, x->n1); \
+                 \
     decode_##t2(pptr, &x->x2); \
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"%s:x2\n", __func__); \
     decode_##tn2(pptr, &x->n2); \
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"%s:n2 %d\n", __func__, x->n2); \
     x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"%s:a2 %p\n", __func__, x->a2); \
     for (i=0; i<x->n2; i++) \
 	    decode_##ta2(pptr, &(x)->a2[i]); \
+    \
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"%s:a2 coomplete\n", __func__); \
+\
     decode_##t3(pptr, &x->x3); \
     decode_##tn3(pptr, &x->n3); \
     x->a3 = decode_malloc(x->n3 * sizeof(*x->a3)); \
     for (i=0; i<x->n3; i++) \
 	    decode_##ta3(pptr, &(x)->a3[i]); \
+    \
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"%s:n3 %d\n", __func__, x->n3); \
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"%s:n1 %d: n2 %d: n3 %d\n", \
+                 __func__, x->n1, x->n2, x->n3); \
 } \
 static inline void defree_##name(struct name *x) { \
     defree_##t1(&x->x1); \

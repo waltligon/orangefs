@@ -666,6 +666,10 @@ endecode_fields_2(PVFS_dirhint_layout,
 
 /* extended hint attributes for a directory object */
 /* these are local defaults that control creates */
+
+/* dist_name, dist_params, and part of layout are
+ * stored in keyval and must be access and linked here
+ */
 struct PVFS_directory_hint_s
 {
     uint32_t            dist_name_len;     /* size of dist name buffer */

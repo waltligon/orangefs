@@ -1329,7 +1329,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret, i;
+    int ret, i, j;
     job_id_t tmp_id;
     PVFS_object_attr *attr_p;
     unsigned char *c;
@@ -1396,60 +1396,67 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
      */
 
     /*
-     * I think the rest of this function is obsolete due to storing the hints in
-     * the main attr struct in V3.  This isn't hurting anything other than being
-     * wasted time/performance.  It should be removed.
+     * This function is reading the dir hints - most of the hints were read
+     * with the dspace attributes of the dir, but variable length stuff like
+     * layout server list, dist_name, and dist_params are in keyval.
      */
 
     /* NOTE: memory allocations are released in the getattr_cleanup()
      * function 
      */
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "  trying to getxattr of %s,%s,%s "
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  trying to getxattr of %s,%s,%s,%s "
                  "of dir handle (coll_id = %d, handle = %s\n",
                  Trove_Special_Keys[DIST_NAME_KEY].key,
                  Trove_Special_Keys[DIST_PARAMS_KEY].key, 
-                 Trove_Special_Keys[DEFAULT_NUM_DFILES_KEY].key,
+                 Trove_Special_Keys[SERVER_LIST_KEY].key,
+                 Trove_Special_Keys[DIR_SERVER_LIST_KEY].key,
                  s_op->u.getattr.fs_id,
                  PVFS_OID_str(&s_op->u.getattr.handle));
 
     /* malloc space for distribution parameters */
     s_op->resp.u.getattr.attr.u.dir.hint.dist_params = 
-                    (char *) calloc(1, PVFS_REQ_LIMIT_DIST_BYTES);
+            (char *)malloc(s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len);
 
-    if (!s_op->resp.u.getattr.attr.u.dir.hint.dist_params)
+    if (s_op->resp.u.getattr.attr.u.dir.hint.dist_params == NULL &&
+        s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len > 0)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-
-    s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len = 
-                    PVFS_REQ_LIMIT_DIST_BYTES;
 
     /* malloc space for distribution name */
     s_op->resp.u.getattr.attr.u.dir.hint.dist_name = 
-            (char *) calloc(1, PVFS_REQ_LIMIT_DIST_NAME);
+            (char *)malloc(s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len);
 
-    if (!s_op->resp.u.getattr.attr.u.dir.hint.dist_name)
+    if (s_op->resp.u.getattr.attr.u.dir.hint.dist_name == NULL &&
+        s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len > 0)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
-    s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len = 
-                    PVFS_REQ_LIMIT_DIST_NAME;
-
-    /* malloc space for layout and server list */
+    /* malloc space for layout server list */
     s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers =
-            (char *) calloc(1, PVFS_REQ_LIMIT_LAYOUT);
-    if (!s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers)
+        (char *)malloc(s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize);
+
+    if (s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers == NULL &&
+        s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize > 0)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize =
-            PVFS_REQ_LIMIT_LAYOUT;
-    s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count = 0;
+
+    /* malloc space for dir layout server list */
+    s_op->resp.u.getattr.attr.u.dir.hint.dir_layout.server_list.servers =
+        (char *)malloc(s_op->resp.u.getattr.attr.u.dir.hint.dir_layout.server_list.bufsize);
+
+    if (s_op->resp.u.getattr.attr.u.dir.hint.dir_layout.server_list.servers == NULL &&
+        s_op->resp.u.getattr.attr.u.dir.hint.dir_layout.server_list.bufsize > 0)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
 
     free_keyval_buffers(s_op);
 
@@ -1482,59 +1489,84 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
     }
 
     /* set up key and val buffers */
+    /* don't know what this is for - not used */
     s_op->keyval_count = NUM_SPECIAL_KEYS;
 
-    for (i = 0; i < NUM_SPECIAL_KEYS; i++)
+    /* Set up the queries for the keyval read - one for each item in the
+     * Trove special keys.
+     * i counts through the various keys, j indexes the buffers for the
+     * keys we actually use.
+     */
+    for (i = 0, j = 0; i < NUM_SPECIAL_KEYS; i++)
     {
-        s_op->key_a[i].buffer = Trove_Special_Keys[i].key;
-        s_op->key_a[i].buffer_sz = Trove_Special_Keys[i].size;
+        /* set up the key strings from the preconfigured table */
+        s_op->key_a[j].buffer = Trove_Special_Keys[i].key;
+        s_op->key_a[j].buffer_sz = Trove_Special_Keys[i].size;
 
-        if (i == DEFAULT_NUM_DFILES_KEY)
+        /* for each possible key, set up the keys we actually have 
+         * if the corresponding length field is zero, skip that key 
+         */
+        if (i == DIST_PARAMS_KEY)
         {
-            s_op->val_a[i].buffer = (char *) calloc(1, 16);
-            if (s_op->val_a[i].buffer == NULL)
+            if (s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len == 0)
             {
-                js_p->error_code = -PVFS_ENOMEM;
-                return SM_ACTION_COMPLETE;
+                break;
             }
-            s_op->val_a[i].buffer_sz = 16;
-        }
-        else if (i == DIST_PARAMS_KEY)
-        {
-            s_op->val_a[i].buffer =
+            s_op->val_a[j].buffer =
                         s_op->resp.u.getattr.attr.u.dir.hint.dist_params;
-            s_op->val_a[i].buffer_sz =
+            s_op->val_a[j].buffer_sz =
                         s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len;
-            KEEP_BUFFER(DIST_PARAMS_KEY);
-            KEEP_BUFFER(DIST_PARAMS_KEY);
+            KEEP_BUFFER(j);
+            j++;
         }
         else if (i == DIST_NAME_KEY)
         {
-            s_op->val_a[i].buffer =
-                        s_op->resp.u.getattr.attr.u.dir.hint.dist_name;
-            s_op->val_a[i].buffer_sz =
-                        s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len;
-            KEEP_BUFFER(DIST_NAME_KEY);
-            KEEP_BUFFER(DIST_NAME_KEY);
-        }
-        else if (i == LAYOUT_KEY)
-        {
-            s_op->val_a[i].buffer = (char *) calloc(1, 16);
-            if (s_op->val_a[i].buffer == NULL)
+            if (s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len == 0)
             {
-                js_p->error_code = -PVFS_ENOMEM;
-                return SM_ACTION_COMPLETE;
+                break;
             }
-            s_op->val_a[i].buffer_sz = 16;
+            s_op->val_a[j].buffer =
+                        s_op->resp.u.getattr.attr.u.dir.hint.dist_name;
+            s_op->val_a[j].buffer_sz =
+                        s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len;
+            KEEP_BUFFER(j);
+            j++;
         }
         else if (i == SERVER_LIST_KEY)
         {
-            s_op->val_a[i].buffer =
+            if (s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize == 0)
+            {
+                break;
+            }
+            s_op->val_a[j].buffer =
                 s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers;
-            s_op->val_a[i].buffer_sz =
+            s_op->val_a[j].buffer_sz =
                 s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize;
-            KEEP_BUFFER(SERVER_LIST_KEY);
+            KEEP_BUFFER(j);
+            j++;
         }
+        else if (i == DIR_SERVER_LIST_KEY)
+        {
+            if (s_op->resp.u.getattr.attr.u.dir.hint.dir_layout.server_list.bufsize == 0)
+            {
+                break;
+            }
+            s_op->val_a[j].buffer =
+                s_op->resp.u.getattr.attr.u.dir.hint.dir_layout.server_list.servers;
+            s_op->val_a[j].buffer_sz =
+                s_op->resp.u.getattr.attr.u.dir.hint.dir_layout.server_list.bufsize;
+            KEEP_BUFFER(j);
+            j++;
+        }
+    }
+
+    if (j == 0)
+    {
+        /* a dir object does not have to have these hints 
+         * if not, skip the keyval read and go on to the next state 
+         */
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
     }
 
     /* read key val pairs */
@@ -1544,7 +1576,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
                                      s_op->key_a,
                                      s_op->val_a,
                                      s_op->error_a,
-                                     NUM_SPECIAL_KEYS,
+                                     j,              /* number of actual keys */
                                      0,
                                      NULL,
                                      smcb,
@@ -1558,7 +1590,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
 }
 
 /* 
- * I think some of this function is absolete due to storing hints in the main attr
+ * I think some of this function is obsolete due to storing hints in the main attr
  * struct - dists and layouts may still need handling so it all needs to be
  * investigated.
  */
@@ -1583,6 +1615,13 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
         "getattr: job status code = %d (may be ENOENT - OK)\n", js_p->error_code);
+
+    /* First, this needs to be rewritten not assuming we read all of the keyvals
+     * Second, most of this seems to based on the idea that we didn't know the sizes
+     * of things, but all of this data was written into the database at the same time
+     * soo we know the size of things, and kept those sizes in the dspace, so we
+     * should not redo the sizes.  This will ultimagely eliminte most of this code.
+     */
 
     if (s_op->val_a && s_op->key_a)
     {
@@ -1619,6 +1658,7 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
             s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len = 0;
         }
 
+#if 0
         if (s_op->error_a[DEFAULT_NUM_DFILES_KEY] == 0)
         {
             long int dfile_count = 0;
@@ -1638,6 +1678,7 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
             }
             s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = dfile_count;
         }
+#endif
 /* commented out in trunk, not sure why WBL */
 #if 0
         if(s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer)
@@ -1646,7 +1687,6 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
             s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer = NULL;
             s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer_sz = 0;
         }
-#endif
         if (s_op->error_a[LAYOUT_KEY] == 0)
         {
             long int layout;
@@ -1669,6 +1709,7 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
             s_op->resp.u.getattr.attr.u.dir.hint.layout.algorithm =
                     PVFS_SYS_LAYOUT_NULL;
         }
+#endif
 
         if ((s_op->error_a[SERVER_LIST_KEY] == 0) &&
             (s_op->val_a[SERVER_LIST_KEY].read_sz >= 6))
@@ -1693,6 +1734,31 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
         {
             s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.count = 0;
             s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.bufsize = 0;
+        }            
+
+        if ((s_op->error_a[DIR_SERVER_LIST_KEY] == 0) &&
+            (s_op->val_a[DIR_SERVER_LIST_KEY].read_sz >= 6))
+        {
+            /* no error, so set the count from the list */
+            /* list should be in the buffer of the k/v read */
+            s_op->resp.u.getattr.attr.u.dir.hint.dir_layout.server_list.count = 
+                    strtol(s_op->val_a[DIR_SERVER_LIST_KEY].buffer,
+                    NULL,
+                    10);
+            /* WBL
+             * should this be s_op->val_a[SERVER_LIST_KEY].read_sz ? 
+             * instead of strlen(buffer) and if not, should it be
+             * strlen + 1 ? */
+            s_op->resp.u.getattr.attr.u.dir.hint.dir_layout.server_list.bufsize = 
+                    strlen(s_op->val_a[DIR_SERVER_LIST_KEY].buffer) + 1;
+            /* force the dfile_count */
+            s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = 
+                  s_op->resp.u.getattr.attr.u.dir.hint.dir_layout.server_list.count;
+        }
+        else
+        {
+            s_op->resp.u.getattr.attr.u.dir.hint.dir_layout.server_list.count = 0;
+            s_op->resp.u.getattr.attr.u.dir.hint.dir_layout.server_list.bufsize = 0;
         }            
 
         /* s_op->free_val = 1; free everything that is not KEEP_BUF */

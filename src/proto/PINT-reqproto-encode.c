@@ -172,28 +172,22 @@ int PINT_decode(void *input_buffer,
     if(size < PINT_ENC_GENERIC_HEADER_SIZE)
     {
         gossip_err("Error: poorly formatted protocol message received.\n");
-	gossip_err("   Too small: message only %lld bytes.\n",
-	    lld(size));
+	gossip_err("   Too small: message only %lld bytes.\n", lld(size));
 	return(-PVFS_EPROTO);
     }
  
-    /* why is this all crammed up inthe message like this?  Easier
-     * to set and read putting it in a struct, also less likely to
-     * have errors due to later modifications
-     */
     /* pull the encoding type and protocol version out */
     proto_ver_recved = (int)bmitoh32(*((int32_t *)input_buffer));
     enc_type_recved = bmitoh32(*((int32_t *)enc_type_ptr));
     proto_major_recved = proto_ver_recved / 1000;
-    proto_minor_recved = proto_ver_recved - (proto_major_recved*1000);
+    proto_minor_recved = proto_ver_recved - (proto_major_recved * 1000);
 
     /* check encoding type */
     if(enc_type_recved != ENCODING_LE_BFIELD)
     {
         gossip_err("Error: poorly formatted protocol message received.\n");
 	gossip_err("   Encoding type mismatch: received type %d when "
-	    "expecting %d.\n", (int)enc_type_recved, 
-	    ENCODING_LE_BFIELD);
+	    "expecting %d.\n", (int)enc_type_recved, ENCODING_LE_BFIELD);
         return(-PVFS_EPROTONOSUPPORT);
     }
 
@@ -214,8 +208,7 @@ int PINT_decode(void *input_buffer,
     {
         gossip_err("Error: poorly formatted protocol message received.\n");
 	gossip_err("   Protocol version mismatch: request has minor version %d when "
-	    "expecting %d or lower.\n", (int)proto_minor_recved,
-	    PVFS2_PROTO_MINOR);
+	    "expecting %d or lower.\n", (int)proto_minor_recved, PVFS2_PROTO_MINOR);
         gossip_err("   Client is too new for server.\n");
 	gossip_err("   Please verify your OrangeFS installation\n");
         gossip_err("   and make sure that the version is consistent.\n");
@@ -227,8 +220,7 @@ int PINT_decode(void *input_buffer,
     {
         gossip_err("Error: poorly formatted protocol message received.\n");
 	gossip_err("   Protocol version mismatch: request has minor version %d when "
-	    "expecting %d or higher.\n", (int)proto_minor_recved,
-	    PVFS2_PROTO_MINOR);
+	    "expecting %d or higher.\n", (int)proto_minor_recved, PVFS2_PROTO_MINOR);
         gossip_err("   Server is too old for client.\n");
 	gossip_err("   Please verify your OrangeFS installation\n");
         gossip_err("   and make sure that the version is consistent.\n");
@@ -245,6 +237,7 @@ int PINT_decode(void *input_buffer,
             /* GDB reporting wrong input_type, but right behavior ??? */
 	    if(input_type == PINT_DECODE_REQ)
 	    {
+                gossip_debug(GOSSIP_ENDECODE_DEBUG, "calling decode req method\n");
 		ret = PINT_encoding_table[i]->op->decode_req(buffer_index,
 		                                             size_index,
 		                                             target_msg,
@@ -254,6 +247,7 @@ int PINT_decode(void *input_buffer,
 	    }
 	    else if(input_type == PINT_DECODE_RESP)
 	    {
+                gossip_debug(GOSSIP_ENDECODE_DEBUG, "calling decode resp method\n");
 		ret = PINT_encoding_table[i]->op->decode_resp(buffer_index,
 		                                              size_index,
 		                                              target_msg,

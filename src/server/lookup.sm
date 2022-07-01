@@ -39,8 +39,8 @@ static int lookup_get_dirent_comp_fn(
 enum 
 {
     LOOKUP_LOCAL_METAFILE_KEYVALS = 21,
-    STATE_ENOTDIR                 = 22,
-    STATE_NOMORESEGS              = 23,
+    STATE_ENOTDIR                 = 22,  /* used in init, not used in verify_obj_meta */
+    STATE_NOMORESEGS              = 23,  /* not used */
     LOOKUP_CHECK_DIR_ACLS         = 24,
     LOOKUP_CHECK_PERMS            = 25,
     LOCAL_DIRENT                  = 26,
@@ -399,6 +399,17 @@ static PINT_sm_action lookup_get_dirdata_from_keyval(struct PINT_smcb *smcb,
         /* We have looped for another segment
          * Attributes of the new segment are in s_op->resp attr_array
          */
+        /* WTF??? They are already in resp - then why copy to the frame?
+         */
+    /* THis is some confusng shit.  here we set a pointer in the s_op u.lookup.attr
+     * to another pointer in the s_op being resp.u.lookup_path.attr_array[...] which
+     * creates an interesting aliasing situation.  We also set the local ptr attr to
+     * point to this for convenience, but it goes away and the end of the function.
+     * In the next function, after reading from the db there is data copied between
+     * these addresses, in such a way it is very difficult to understand.
+     * PLUS we never copy attrs this way, we have a specific copy routine !!!
+     */
+     
         s_op->u.lookup.attr =
              s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.array_index];
     }
@@ -422,11 +433,15 @@ static PINT_sm_action lookup_get_dirdata_from_keyval(struct PINT_smcb *smcb,
 
     gossip_debug(GOSSIP_LOOKUP_DEBUG,
             "lookup: get dist-dir-attr for dir meta handle %s "
-            "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
+            "with tree_height=%d, dirdata_min=%d, dirdata_max=%d, dirdata_count=%d, "
+            "sid_count=%d, bitmap_size=%d, "
             "split_size=%d, server_no=%d and branch_level=%d\n",
             PVFS_OID_str(&handle),
             attr->u.dir.dist_dir_attr.tree_height,
+            attr->u.dir.dist_dir_attr.dirdata_min,
+            attr->u.dir.dist_dir_attr.dirdata_max,
             attr->u.dir.dist_dir_attr.dirdata_count,
+            attr->u.dir.dist_dir_attr.sid_count,
             attr->u.dir.dist_dir_attr.bitmap_size,
             attr->u.dir.dist_dir_attr.split_size,
             attr->u.dir.dist_dir_attr.server_no,
@@ -555,6 +570,10 @@ error_out:
  *
  * Synopsis: Given a handle for a dspace holding directory entries,
  * look up the current segment and obtain its handle.
+ *
+ * Clean up the previous read of kv attrs, copoy complete attrs into resp
+ * struct.  Compute the handle of the dirdata to search for the segment name
+ * in.
  */
 static PINT_sm_action lookup_compute_directory_entry_location(
         struct PINT_smcb *smcb,
@@ -566,7 +585,9 @@ static PINT_sm_action lookup_compute_directory_entry_location(
     int last_dirdata_sid_index=0;
     int i;
 
-    /* Record the distributed directory bitmap and handles for the response. */
+    /* Copy attrs including bitmap and handles from frame into the response. 
+     * The rest of this func does not reference the resp copy, only the frame copy
+     * but it doesn't update the attributes, so that's ok.*/
     ret = PINT_copy_object_attr(
                 &s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.array_index],
                 &s_op->u.lookup.attr);
@@ -613,9 +634,11 @@ static PINT_sm_action lookup_compute_directory_entry_location(
                  "lookup: selecting bucket No.%d from dist_dir_bitmap.\n",
                  s_op->u.lookup.dirdata_server_index);
     gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                 "  need to read from dirent handle=%s, segment=%s (len=%d)\n",
+                 "  need to read from dirent handle=%s, sid=%s, segment=%s (len=%d)\n",
                  PVFS_OID_str(&s_op->u.lookup.attr.u.dir.dirdata_handles[
                                        s_op->u.lookup.dirdata_server_index]),
+                 PVFS_SID_str(&s_op->u.lookup.attr.u.dir.dirdata_sids[
+                                       s_op->u.lookup.dirdata_sid_index]),
                  s_op->u.lookup.segp, (int) strlen(s_op->u.lookup.segp));
 
     /* For that dirdata handle, do any of its sids identify the local machine? 
@@ -809,6 +832,8 @@ static PINT_sm_action lookup_read_object_metadata(
 
     /* A dirent object was found in the keyval db 
      * OR we read a dirent from the keyval of another server
+     * Effectively increment lookup.array_index - on a dir we loop back
+     * and use the next spot in the resp arrays.  A file is the end anyway.
      */
     s_op->u.lookup.seg_nr++;
     s_op->u.lookup.array_index = s_op->u.lookup.seg_nr - 1;
@@ -840,6 +865,11 @@ static PINT_sm_action lookup_read_object_metadata(
     gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: sid[0] = %s\n", __func__, 
                  PVFS_SID_str(&s_op->u.lookup.temp_dirent_store[1].sid));
 
+    /* I think these are the sids for handles that represent the segment in the
+     * response.  They wouldn't be anywhere else - the sid lists in the attr are
+     * for parents and dirdata and datafiles and such.  Not sure if they are set up
+     * to be stored with the handles, we might not know how many there are.
+     */
     for (i = start_index, j = 1; i < end_index; i++, j++)
     {
         s_op->resp.u.lookup_path.sid_array[i] =
@@ -855,20 +885,26 @@ static PINT_sm_action lookup_read_object_metadata(
         if (PINT_cached_config_server_local(
                                 &(s_op->u.lookup.temp_dirent_store[j].sid)))
         {
-           break;
+            /* this object is n this server */
+            break;
         }
     }
     if (i == end_index)
     {
-       /* None of the sids identifies the local server */
-       js_p->error_code = REMOTE_SEGMENT;
+        /* None of the sids identifies the local server */
 
-       /* But, the handle is valid; it just lives on another server */
-       s_op->u.lookup.handle_ct++;
+        /* But, the handle is valid; it just lives on another server */
+        s_op->u.lookup.handle_ct++;
 
-       gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: Remote Segment\n", __func__);
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: Remote Segment\n", __func__);
 
-       return SM_ACTION_COMPLETE;
+        /* the SM does not look for this, we will go to
+         * lookup_verify_metadata_object() in either case.
+         * That func doesn't look for it either, so this seems to be
+         * rather useless.
+         */
+        js_p->error_code = REMOTE_SEGMENT;
+        return SM_ACTION_COMPLETE;
     }
 
     /* Copy the fsid and handle to the s_op structure for the acl check */
@@ -967,6 +1003,10 @@ static PINT_sm_action lookup_verify_object_metadata(
         gossip_debug(GOSSIP_LOOKUP_DEBUG, "  object is a symlink; "
                      "halting lookup and sending response\n");
 
+        /* This is not recognized by the state machine.  This would look back
+         * to the top the same as other dirs but without checking perms.  Not sure if
+         * that's right for a symlink.
+         */
         js_p->error_code = STATE_ENOTDIR;
         return SM_ACTION_COMPLETE;
     }
@@ -977,6 +1017,9 @@ static PINT_sm_action lookup_verify_object_metadata(
         gossip_debug(GOSSIP_LOOKUP_DEBUG, "  no more segments in path; "
                      "sending response\n");
 
+        /* This is not recognized by the state machine.  This would look back
+         * to the top the same as other dirs but without checking perms.
+         */
         js_p->error_code = STATE_NOMORESEGS;
         return SM_ACTION_COMPLETE;
     }
@@ -992,6 +1035,7 @@ static PINT_sm_action lookup_verify_object_metadata(
         return SM_ACTION_COMPLETE;
     }
 
+    /* only the first die should look bacck here */
     return SM_ACTION_COMPLETE;
 }
 
@@ -1078,6 +1122,17 @@ static PINT_sm_action lookup_verify_getattr_results(struct PINT_smcb *smcb,
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     resp_attr = &(getattr_op->resp.u.getattr.attr);
+
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: attr: %p\n", __func__,
+                                      resp_attr);
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: objtype: %d\n", __func__,
+                                      resp_attr->objtype);
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: dcount: %d\n", __func__,
+                                      resp_attr->u.dir.dist_dir_attr.dirdata_count);
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: scount: %d\n", __func__,
+                                      resp_attr->u.dir.dist_dir_attr.sid_count);
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: serno: %d\n", __func__,
+                                      resp_attr->u.dir.dist_dir_attr.server_no);
 
     ret = PINT_copy_object_attr(&s_op->resp.u.lookup_path.attr_array[
                                               s_op->u.lookup.array_index],
@@ -1381,6 +1436,7 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
                   "\t\thandle_count (%d)\n"
                   "\t\thandle (%s)\n"
                   "\t\tattr_count (%d)\n"
+                  "\t\tattr_array (%p)\n"
                   "\t\tsid_count (%d)\n"
                  ,__func__
                  ,s_op->resp.u.lookup_path.handle_count
@@ -1388,6 +1444,7 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
                       PVFS_OID_str(&s_op->resp.u.lookup_path.handle_array[0]) :
                       "none"
                  ,s_op->resp.u.lookup_path.attr_count
+                 ,s_op->resp.u.lookup_path.attr_array
                  ,s_op->resp.u.lookup_path.sid_count);
 
    int i;
