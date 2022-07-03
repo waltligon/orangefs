@@ -46,12 +46,11 @@ int is_running = 0;
 int run_service = 0;  
 
 HANDLE hthread, hcache_thread;
-// HANDLE hevent_log = NULL;
 
 int main_init();
 
-DWORD thread_start(PORANGEFS_OPTIONS options);
-DWORD thread_stop();
+DWORD main_thread_start(PORANGEFS_OPTIONS options);
+DWORD main_thread_stop();
 
 DWORD cache_thread_start();
 DWORD cache_thread_stop();
@@ -483,7 +482,7 @@ void WINAPI service_ctrl(DWORD ctrl_code)
         SetServiceStatus(hstatus, &service_status);
         
         is_running = 0;
-        thread_stop();
+        main_thread_stop();
     }
 }
 
@@ -582,27 +581,17 @@ void WINAPI service_main(DWORD argc, char *argv[])
         service_status.dwWin32ExitCode = NO_ERROR;
         service_status.dwServiceSpecificExitCode = 0;
 
-        /*** execute service main loop ***/
-        /*** (not expected to return ***/
+        /*** execute service main thread ***/
         if (SetServiceStatus(hstatus, &service_status))
         {
             is_running = 1;
             service_debug("Starting thread\n");
-            thread_start(options);
+            main_thread_start(options);
         }
-
-        /* stop cache thread */
-        //cache_thread_stop();
-
-        /* LDAP cleanup */
-        //PVFS_ldap_cleanup();
-
-        /* cleanup OpenSSL */
-        //openssl_cleanup();
-        
-        /* shut down service */        
-        //service_status.dwCurrentState = SERVICE_STOPPED;
-        //SetServiceStatus(hstatus, &service_status);        
+        else
+        {
+            report_error("SetServiceStatus to SERVICE_RUNNING failed: ", GetLastError());
+        }
     }
     else
     {
@@ -631,14 +620,19 @@ service_main_exit:
     close_event_log();
 
     free(options);
-
+    
+    if (hstatus != NULL) {
+        service_status.dwCurrentState = SERVICE_STOPPED;
+        SetServiceStatus(hstatus, &service_status);
+    }
 }
 
-DWORD thread_start(PORANGEFS_OPTIONS options)
+DWORD main_thread_start(PORANGEFS_OPTIONS options)
 {
     DWORD err = 0;
+    int rc = 0;
 
-    service_debug("thread_start enter\n");
+    service_debug("main_thread_start enter\n");
 
     /* create and run the new thread */
     hthread = CreateThread(NULL, 
@@ -649,7 +643,9 @@ DWORD thread_start(PORANGEFS_OPTIONS options)
                            NULL);
     if (hthread)
     {  
-        service_debug("thread_start: created thread %ld\n", GetThreadId(hthread));
+        service_debug("main_thread_start: created thread %ld\n", GetThreadId(hthread));
+        
+        /* wait until main_loop() is exited */
         WaitForSingleObject(hthread, INFINITE);
     }
     else
@@ -658,41 +654,34 @@ DWORD thread_start(PORANGEFS_OPTIONS options)
         report_error("CreateThread (main) failed: ", err);
     }
 
-    service_debug("thread_start exit\n");
+    service_debug("main_thread_start exit\n");
 
     return err;                           
 }
 
-DWORD thread_stop()
+DWORD main_thread_stop()
 {
     DWORD err = 0;
-    LPCWSTR w_mount_point;
+    LPWSTR w_mount_point;
     BOOL unmounted = FALSE;
 
-    service_debug("thread_stop enter\n");
-    /*service_debug("thread_stop: stopping thread %ld\n", GetThreadId(hthread));*/
-    
-    /* stop the thread */
-    /*if (!TerminateThread(hthread, 0))
-    {
-        err = GetLastError();
-        report_error("TerminateThread (main) failed: ", err);
-    }*/
+    service_debug("main_thread_stop enter\n");
 
     /* Unmount drive */
+    service_debug("main_thread_stop: unmounting %s...\n", goptions->mount_point);
     if ((w_mount_point = convert_mbstring(goptions->mount_point)) != NULL) {
         unmounted = DokanRemoveMountPoint(w_mount_point);
+        free(w_mount_point);
     }
 
     if (unmounted) {
-        service_debug("thread_stop: umount OK\n");
+        service_debug("main_thread_stop: unmount OK\n");
     }
     else {
-        /* TODO: more info? */
-        service_debug("thread_stop: unmount failed\n");
+        service_debug("main_thread_stop: unmount failed\n");
     }
 
-    service_debug("thread_stop exit\n");
+    service_debug("main_thread_stop exit\n");
 
     return err;
 }
@@ -732,6 +721,7 @@ DWORD cache_thread_stop()
     return err;
 }
 
+#define RETRY_TIMEOUT    15000
 DWORD WINAPI main_loop(LPVOID poptions)
 {
     PORANGEFS_OPTIONS options = (PORANGEFS_OPTIONS) poptions;
@@ -739,6 +729,7 @@ DWORD WINAPI main_loop(LPVOID poptions)
          event_msg[512];
     FILE *f;
     int ret, malloc_flag = 0;
+    DWORD err = 0;
 
     /* locate tabfile -- env. variable overrides */
     if (!(tabfile = getenv("PVFS2TAB_FILE")))
@@ -751,21 +742,26 @@ DWORD WINAPI main_loop(LPVOID poptions)
             if (p)
                 *p = '\0';
 
-            tabfile = (char *) malloc(MAX_PATH);
-            malloc_flag = TRUE;
+            tabfile = (char*)malloc(MAX_PATH);
+            if (tabfile != NULL) {
+                malloc_flag = TRUE;
 
-            strcpy(tabfile, exe_path);
-            strcat(tabfile, "\\orangefstab");
-
-            /* attempt to open file */
-            f = fopen(tabfile, "r");
-            if (f)
-                fclose(f);
-            else 
-            {
-                /* switch to pvfs2tab -- fs_initialize will fail if not valid */
                 strcpy(tabfile, exe_path);
-                strcat(tabfile, "\\pvfs2tab");
+                strcat(tabfile, "\\orangefstab");
+
+                /* attempt to open file */
+                f = fopen(tabfile, "r");
+                if (f)
+                    fclose(f);
+                else
+                {
+                    /* switch to pvfs2tab -- fs_initialize will fail if not valid */
+                    strcpy(tabfile, exe_path);
+                    strcat(tabfile, "\\pvfs2tab");
+                }
+            }
+            else {
+                return 1;
             }
         }
     }
@@ -779,12 +775,12 @@ DWORD WINAPI main_loop(LPVOID poptions)
 
             if (ret != 0)
             {
+                /* delay until retrying connecting to the filesystem */
                 service_debug("Retrying fs initialization...\n");
                 report_startup_error(error_msg, 0);
-                Sleep(30000);
+                Sleep(RETRY_TIMEOUT);
             }
-
-        } while (ret != 0);
+        } while (is_running && ret != 0);
     }
     else
     {
@@ -792,7 +788,7 @@ DWORD WINAPI main_loop(LPVOID poptions)
     }
 
     /*** main loop - run dokan client ***/
-    if (ret == 0)
+    if (is_running && ret == 0)
     {
         /* note: dokan_loop does not return normally */
         ret = dokan_loop(options);
@@ -803,13 +799,6 @@ DWORD WINAPI main_loop(LPVOID poptions)
 
         /* close file systems */
         fs_finalize();
-    }
-    else 
-    {
-        /* note: this will no longer occur */
-        _snprintf(event_msg, sizeof(event_msg), "Fatal init error: %s",
-            error_msg);        
-        report_startup_error(event_msg, ret);
     }
 
     if (malloc_flag)
