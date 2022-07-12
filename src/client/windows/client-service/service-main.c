@@ -33,6 +33,7 @@
 
 #define WIN32ServiceName           "orangefs-client"
 #define WIN32ServiceDisplayName    "OrangeFS Client"
+#define WIN32ServiceDescription    "Mounts an OrangeFS file system as a removable drive."
 
 #define report_startup_error(msg, err)    _report_error(msg, err, TRUE)
 
@@ -325,6 +326,7 @@ DWORD service_install()
 {
     SC_HANDLE sch_service;
     SC_HANDLE sch_manager;
+    SERVICE_DESCRIPTION service_desc;
     char *exe_path, *command;
     DWORD size;
     int err;
@@ -389,6 +391,13 @@ DWORD service_install()
         if (sch_service != NULL)
         {
             printf("%s installed\n", WIN32ServiceDisplayName);
+            /* Set service description */
+            service_desc.lpDescription = (LPSTR)WIN32ServiceDescription;
+            if (!ChangeServiceConfig2(sch_service, SERVICE_CONFIG_DESCRIPTION, &service_desc))
+            {
+                printf("Warning: could not set service description\n");
+            }
+
             CloseServiceHandle(sch_service);
         }
         else
