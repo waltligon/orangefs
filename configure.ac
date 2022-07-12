@@ -8,7 +8,18 @@ dnl You may need to use autoheader as well if changing any DEFINEs
 dnl sanity checks, output header, location of scripts used here
 AC_INIT
 AC_CONFIG_SRCDIR([include/pvfs2-types.h])
-AC_PREREQ([2.71])
+
+dnl As time progresses our old autotools files and m4 macros
+dnl get out-of-date. Autotools responds with pages of warnings
+dnl about obsolete macros. I ran autoupdate on our configure.ac
+dnl and the m4 files in maint/config, plus a little hand editing
+dnl where required. I was afraid that my updates
+dnl might introduce warnings or failures on older machines, so I
+dnl tested across a range of autotools generations on  2.6.32-754.el6
+dnl and 5.17.11-300.fc36.
+dnl 2.6.32-754.el6 has autoconf-2.63 which came out in 2008.
+dnl 5.17.11-300.fc36 has autoconf-2.71.
+AC_PREREQ([2.63])
 AC_CONFIG_AUX_DIR(maint/config)
 
 dnl
