@@ -50,12 +50,9 @@
     <ClInclude Include="..\..\..\..\src\client\windows\client-service\fs.h" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="..\..\..\..\src\client\windows\client-service\messages.rc" />
-  </ItemGroup>
-  <ItemGroup>
     <CustomBuild Include="..\..\..\..\src\client\windows\client-service\messages.man">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">mc.exe -v -um -h %(RelativeDir) -r %(RelativeDir) %(FullPath)</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">mc.exe -um -h %(RelativeDir) -r %(RelativeDir) %(FullPath)</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)messages.h;%(RelativeDir)messages.rc</Outputs>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">mc.exe -um -h %(RelativeDir) -r %(RelativeDir) %(FullPath)</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'">mc.exe -um -h %(RelativeDir) -r %(RelativeDir) %(FullPath)</Command>
@@ -74,6 +71,9 @@
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'">true</DeploymentContent>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\..\..\..\src\client\windows\client-service\messages.rc" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{61019A9A-D6E0-4E04-B163-EADB88766C9E}</ProjectGuid>
