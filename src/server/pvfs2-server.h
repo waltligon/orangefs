@@ -368,10 +368,10 @@ struct PINT_server_lookup_op
     int seg_ct, seg_nr; 
 
     /* number of attrs read succesfully */
-    int attr_ct;
+    uint32_t attr_ct;
 
     /* number of handles read successfully */
-    int handle_ct;
+    uint32_t handle_ct;
 
     char *segp;
     void *segstate;
@@ -380,7 +380,7 @@ struct PINT_server_lookup_op
     PVFS_object_attr attr;
 
     PVFS_ID *temp_dirent_store;
-    int temp_dirent_sid_count;
+    int32_t temp_dirent_sid_count;
 
     int dirdata_server_index;
     int dirdata_sid_index;

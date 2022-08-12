@@ -213,6 +213,7 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
  * Synopsis: Runs the state action pointed to by the
  *           current state, then continues to run the SM
  *           as long as return code is SM_ACTION_COMPLETE.
+ *           Asssumes smcb created with smcb_alloc and set to initial condition.
  */
 
 PINT_sm_action PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
@@ -224,6 +225,11 @@ PINT_sm_action PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
      */
     smcb->immediate = 1;
 
+    /* under what conditions do we call SM start?  I wojuld assume
+     * alwaus after smcb_alloc, which sets the base_frame to 0 since
+     * there is only one frame - making this redundant - unless there
+     * are undocumented use cases.
+     */
     /* set the base frame to be the current TOS, which should be 0 */
     smcb->base_frame = smcb->frame_count - 1;
 
@@ -729,8 +735,8 @@ static struct PINT_state_s *PINT_pop_state(struct PINT_smcb *smcb)
     }
 
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                 "[SM pop_state]: (%p) op-id: %d stk-ptr: %d base-frm: %d\n",
-                 smcb, smcb->op, smcb->stackptr, smcb->base_frame);
+                 "[SM pop_state]: (%p) op-id: %d stk-ptr: %d base-frm: %d frm-cnt: %d\n",
+                 smcb, smcb->op, smcb->stackptr, smcb->base_frame, smcb->frame_count);
     
     if(smcb->stackptr == 0)
     {
@@ -760,8 +766,8 @@ static void PINT_push_state(struct PINT_smcb *smcb,
     }
 
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                 "[SM push_state]: (%p) op-id: %d stk-ptr: %d base-frm: %d\n",
-                 smcb, smcb->op, smcb->stackptr, smcb->base_frame);
+                 "[SM push_state]: (%p) op-id: %d stk-ptr: %d base-frm: %d frm-cnt: %d\n",
+                 smcb, smcb->op, smcb->stackptr, smcb->base_frame, smcb->frame_count);
 
     assert(smcb->stackptr < PINT_STATE_STACK_SIZE);
 

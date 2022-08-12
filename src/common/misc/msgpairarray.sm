@@ -1633,15 +1633,19 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
     int ret = -1;
     const char *server_string;
 
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: calling PINT_decode\n",__func__);
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: calling PINT_decode\n", __func__);
 
     ret = PINT_decode(encoded_resp_p,
                       PINT_DECODE_RESP,
                       decoded_msg_p, /* holds data on decoded msg */
                       *svr_addr_p,
                       actual_resp_sz);
+
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: PINT_decode return %d\n", __func__, ret);
+    
     if (ret > -1)
     {
+        /* correct return, so why this message? */
         PVFS_perror_gossip("\tPINT_decode returns an error", ret);            
 
         *resp_out_pp = (struct PVFS_server_resp *)decoded_msg_p->buffer;

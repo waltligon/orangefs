@@ -151,6 +151,9 @@ int PINT_encode(void* input_buffer,
  *
  * returns 0 on success, -PVFS_error on failure
  */
+
+char *gpptr; /* global buffer pointer, for quick and dirty debugging */
+
 int PINT_decode(void *input_buffer,
 		enum PINT_encode_msg_type input_type,
 		struct PINT_decoded_msg *target_msg,

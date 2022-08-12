@@ -673,6 +673,7 @@ static int lebf_encode_resp(struct PVFS_server_resp *resp,
 #define CASE(tag,var) \
     case tag: encode_PVFS_servresp_##var(p,&resp->u.var); break
 
+    gpptr = *p;  /* q&d debugging */
 
     /* we stand a good chance of segfaulting if we try to encode the response
      * after something bad happened reading data from disk. */
@@ -914,6 +915,7 @@ static int lebf_decode_resp(void *input_buffer, /* decoding from this buff */
 #define CASE(tag,var) \
     case tag: decode_PVFS_servresp_##var(p,&resp->u.var); break
 
+    gpptr = *p; /* q&d debugging skipping header decoding */
     gossip_debug(GOSSIP_ENDECODE_DEBUG, "decoding op (%d) specific part of resp\n",
                  resp->op);
     switch (resp->op)

@@ -268,6 +268,8 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
                       s_op->unexp_bmi_buff.addr,
                       s_op->unexp_bmi_buff.size);
 
+    gossip_log("%s: after req decode enc_type is %d\n", __func__, s_op->decoded.enc_type);
+
     if (ret == -PVFS_EPROTONOSUPPORT)
     {
         /* we have a protocol mismatch of some sort; try to trigger a

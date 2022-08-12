@@ -263,6 +263,10 @@ void PINT_server_req_get_ctrl(struct PVFS_server_req *req,
 const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 {
     CHECK_OP(op);
+
+    gossip_log("%s: map server with op %d and params %p\n", __func__,
+               op, PINT_server_req_table[op].params);
+
     return PINT_server_req_table[op].params->string_name;
 }
 

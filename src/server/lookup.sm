@@ -102,11 +102,19 @@ machine pvfs2_lookup_sm
         default => setup_resp;
     }
 
+    /* read an object attr for the current segment */
+
     state read_object_metadata
     {
         run lookup_read_object_metadata;
-        success => verify_object_metadata;
+        success => initiate_read_object_metadata;
         default => setup_resp;
+    }
+
+    state initiate_read_object_metadata
+    {
+        jump pvfs2_get_attr_work_sm;
+        default => verify_object_metadata;
     }
 
     state verify_object_metadata
@@ -117,6 +125,8 @@ machine pvfs2_lookup_sm
         success => get_dirdata_from_keyval; /* Looping back from here */
         default => setup_resp;
     }
+
+    /* processing file (metafile object) at the end of the path */
 
     state setup_getattr_request
     {
@@ -136,6 +146,8 @@ machine pvfs2_lookup_sm
         run lookup_verify_getattr_results;
         default => setup_resp;
     }
+
+    /* processing dir (directory object) permissions */
 
     state check_perms
     {
@@ -157,6 +169,8 @@ machine pvfs2_lookup_sm
         success => get_dirdata_from_keyval; /* Looping back from here */
         default => setup_resp;
     }
+
+    /* request finished set up and send response */
 
     state setup_resp
     {
@@ -290,6 +304,8 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
     s_op->u.lookup.seg_ct = PINT_string_count_segments(s_op->req->u.lookup_path.path);
     s_op->u.lookup.handle_ct = 0;
     s_op->u.lookup.attr_ct = 0;
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: s_op lookup handle ct = %u\n",
+                 __func__, s_op->u.lookup.handle_ct);
 
     /* temp memory block for moving around dirents */
     s_op->u.lookup.temp_dirent_store = (PVFS_ID *)malloc(OSASZ(1, s_op->metasidcnt));
@@ -400,6 +416,8 @@ static PINT_sm_action lookup_get_dirdata_from_keyval(struct PINT_smcb *smcb,
          * Attributes of the new segment are in s_op->resp attr_array
          */
         /* WTF??? They are already in resp - then why copy to the frame?
+         * at this point getting rid of the frame copy is too much work,
+         * but we need to make sure the copy already in resp is not used.
          */
     /* THis is some confusng shit.  here we set a pointer in the s_op u.lookup.attr
      * to another pointer in the s_op being resp.u.lookup_path.attr_array[...] which
@@ -407,11 +425,15 @@ static PINT_sm_action lookup_get_dirdata_from_keyval(struct PINT_smcb *smcb,
      * point to this for convenience, but it goes away and the end of the function.
      * In the next function, after reading from the db there is data copied between
      * these addresses, in such a way it is very difficult to understand.
-     * PLUS we never copy attrs this way, we have a specific copy routine !!!
      */
-     
-        s_op->u.lookup.attr =
-             s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.array_index];
+     /* PLUS we never copy attrs this way, we have a specific copy routine !!!
+     */
+
+        ret = PINT_copy_object_attr(&s_op->u.lookup.attr,
+                     &s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.array_index]);
+
+        /*s_op->u.lookup.attr =
+             s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.array_index];*/
     }
     attr = &s_op->u.lookup.attr;
 
@@ -447,6 +469,11 @@ static PINT_sm_action lookup_get_dirdata_from_keyval(struct PINT_smcb *smcb,
             attr->u.dir.dist_dir_attr.server_no,
             attr->u.dir.dist_dir_attr.branch_level);
 
+    /* I don't think any of this is needed - except maybe on the first handle
+     * The code below calls getattr to get the attributes, and it gets the
+     * kval attribute automatically (or it should).  I can leave this and see
+     * if it causes an error, but it is inefficient at best.
+     */
     /* allocate space for bitmap and dirdata handles */
     attr->u.dir.dist_dir_bitmap =
             malloc(attr->u.dir.dist_dir_attr.bitmap_size *
@@ -765,6 +792,8 @@ static PINT_sm_action lookup_read_directory_entry_remote(struct PINT_smcb *smcb,
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
+
+    /* calls MPA to run get get_dirent on remote node */
 }
 
 /* Completion Function: lookup_get_dirent_comp_fn
@@ -822,10 +851,11 @@ static PINT_sm_action lookup_read_object_metadata(
         job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *getattr_op;
     int ret = -PVFS_EINVAL;
-    job_id_t j_id;
+    /* job_id_t j_id; */
     PVFS_handle handle = PVFS_HANDLE_NULL;
-    PVFS_ds_attributes *ds_attr = NULL;
+    /* PVFS_ds_attributes *ds_attr = NULL; */
     int i,j,start_index,end_index;
 
     assert(s_op->u.lookup.seg_nr <= s_op->u.lookup.seg_ct);
@@ -843,7 +873,7 @@ static PINT_sm_action lookup_read_object_metadata(
      * another directory until we retrieve it.  
      */ 
     handle  = (PVFS_handle)s_op->u.lookup.temp_dirent_store[0].oid;
-    ds_attr = &(s_op->u.lookup.ds_attr_array[s_op->u.lookup.array_index]);
+    /* ds_attr = &(s_op->u.lookup.ds_attr_array[s_op->u.lookup.array_index]); */
 
     gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: handle = %s\n", __func__, 
                  PVFS_OID_str(&handle));
@@ -885,7 +915,7 @@ static PINT_sm_action lookup_read_object_metadata(
         if (PINT_cached_config_server_local(
                                 &(s_op->u.lookup.temp_dirent_store[j].sid)))
         {
-            /* this object is n this server */
+            /* this object is on this server */
             break;
         }
     }
@@ -895,6 +925,8 @@ static PINT_sm_action lookup_read_object_metadata(
 
         /* But, the handle is valid; it just lives on another server */
         s_op->u.lookup.handle_ct++;
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: s_op lookup handle ct = %u\n",
+                     __func__, s_op->u.lookup.handle_ct);
 
         gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: Remote Segment\n", __func__);
 
@@ -911,8 +943,11 @@ static PINT_sm_action lookup_read_object_metadata(
     s_op->target_handle = handle;
     s_op->target_fs_id = s_op->req->u.lookup_path.fs_id;
 
+    /* local handle dspace */
+
     /* get the dspace attributes for this object
-     * (could be a directory or a metafile) */
+     * (could be a directory or a metafile) should we cal SM? */
+#if 0
     ret = job_trove_dspace_getattr(s_op->req->u.lookup_path.fs_id,
                                    handle,
                                    smcb,
@@ -922,8 +957,53 @@ static PINT_sm_action lookup_read_object_metadata(
                                    &j_id,
                                    server_job_context,
                                    s_op->req->hints);
+#endif
+/*********** BEGIN New code ************/
+    js_p->error_code = 0;
 
-    return ret;
+    getattr_op = calloc(1,sizeof(*getattr_op));
+    if ( !getattr_op )
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /*This seems to copy the attr on front of array to the getattr
+     * Why?  As far as I know getattr doesn't use this and will only
+     * overwrite it.  We will let getattr place results in the standard place
+     * and then move them to the correct space.
+     * Is there a way to redirect getattr to put the result where we want?
+     */
+    getattr_op->attr = s_op->resp.u.lookup_path.attr_array[
+                                               s_op->u.lookup.array_index];
+
+    getattr_op->req = s_op->req;
+
+    getattr_op->u.getattr.fs_id      = s_op->req->u.lookup_path.fs_id;
+    getattr_op->u.getattr.handle     = s_op->resp.u.lookup_path.handle_array[
+                                                    s_op->u.lookup.array_index ];
+    getattr_op->u.getattr.attrmask   = PVFS_ATTR_META_DIST          |
+                                       PVFS_ATTR_META_DFILES        |
+                                       PVFS_ATTR_META_MIRROR_MODE   |
+                                       PVFS_ATTR_CAPABILITY;
+
+    getattr_op->u.getattr.credential = s_op->req->u.lookup_path.credential;
+
+    ret = PINT_sm_push_frame(smcb, 0, getattr_op);
+    js_p->error_code = ret;
+
+    if ( ret < 0 )
+    {
+        gossip_err("%s:Error pushing getattr frame onto lookup stack:ret(%d)\n",
+                   __func__,ret);
+        free(getattr_op);
+        return SM_ACTION_COMPLETE;
+    }
+
+    return SM_ACTION_COMPLETE;
+/************** END of new code ***************/
+
+/*    return ret; */
 }
 
 /*
@@ -941,45 +1021,74 @@ static PINT_sm_action lookup_read_object_metadata(
  * This function does not post an operation, but rather returns 1
  * immediately.
  */
-static PINT_sm_action lookup_verify_object_metadata(
-        struct PINT_smcb *smcb,
-        job_status_s *js_p)
+static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
+                                                    job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *a_p = NULL;
-    PVFS_ds_attributes *ds_attr = NULL;
+    struct PINT_server_op *getattr_op;
+    struct PINT_server_op *s_op;
+    int task_id;
+    int remaining;
 
-    /* dspace read may have failed!!!! What if object on another
-     * server?  or just not there? Nothing seems to be checking for that
-     */
+    /* struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT); */
+
+    PVFS_object_attr *a_p = NULL;
+
+    /* remove getattr frame */
+    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
+
+    if ( js_p->error_code )
+    {
+        goto errorout;
+    }
+
+    /* get current fram for this SM */
+    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* update our successful handle read count */
     s_op->u.lookup.handle_ct++;
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: s_op lookup handle ct = %u\n",
+                 __func__, s_op->u.lookup.handle_ct);
 
-    /* setup local variables. convert dspace attrs into sysint attrs.*/
-    a_p     = &s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.array_index];
-    ds_attr = &(s_op->u.lookup.ds_attr_array[s_op->u.lookup.array_index]);
+    /* setup local variables. 
+     * convert dspace attrs into sysint attrs.
+     * This copy is supposed to set up get_dirdata_from_kv
+     */
 
-    PVFS_object_attr_from_ds_attr(a_p, ds_attr);
-    /* a_p->mask = PVFS_ATTR_COMMON_ALL; */ /* Why overwrite mask? */
+/************/
+/* Both forms of attr are in s_op now using SM getattr.
+ * We can copy the ds_attr into this array if its needed
+ * The attr needs similar treatment we should also do that here
+ *     (see stmt above and below)
+ *  s_op->attr and s_op->ds_attr should have each type.  attr 
+ *  sshould be copied to the lookup resp array, ds_attr to
+ *  lookup storage array shown below.
+ */
+/************/
 
-    /* update our successful attr read count */
-    s_op->u.lookup.attr_ct++;
+    /* copy return from attr into resp attr array */
+    s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.array_index] = getattr_op->attr;
+    /* a_p now points to this copy */
+    a_p = &(s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.array_index]); 
 
+    s_op->u.lookup.ds_attr_array[s_op->u.lookup.array_index] = getattr_op->ds_attr; 
+
+    /* this frees the getattr s_op, invcluding the attr and ds_attr, which we have
+     * already copied the things pointed to by the objattr are still live.
+     */
+    free(getattr_op);
+     
     /* set target_object_attr for processing in permissions checks, if 
      * this check is needed.
      */
     s_op->target_object_attr = a_p;
 
-
     assert(((a_p->objtype == PVFS_TYPE_DIRECTORY) ||
             (a_p->objtype == PVFS_TYPE_METAFILE)  ||
             (a_p->objtype == PVFS_TYPE_SYMLINK)));
 
-    gossip_debug(
-        GOSSIP_LOOKUP_DEBUG, "  attrs = (owner = %d, group = %d, "
-        "perms = %o, type = %d)\n", a_p->owner, a_p->group,
-        a_p->perms, a_p->objtype);
+    gossip_debug( GOSSIP_LOOKUP_DEBUG, "  attrs = (owner = %d, group = %d, "
+                  "perms = %o, type = %d)\n", a_p->owner, a_p->group,
+                  a_p->perms, a_p->objtype);
 
     /* if we hit a metafile in local dspace db,
      * then we know additional attributes are in the
@@ -991,7 +1100,9 @@ static PINT_sm_action lookup_verify_object_metadata(
                      "gathering keyval attributes from local server.....\n");
 
         js_p->error_code = LOOKUP_LOCAL_METAFILE_KEYVALS;
-        return SM_ACTION_COMPLETE;
+        goto errorout;
+
+        /* sends SM to get attr for the file and end */
     }
 
     /*
@@ -1008,8 +1119,28 @@ static PINT_sm_action lookup_verify_object_metadata(
          * that's right for a symlink.
          */
         js_p->error_code = STATE_ENOTDIR;
-        return SM_ACTION_COMPLETE;
+        goto errorout;
     }
+
+    /* DIRECTORY by default at this point */
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "  object is a directory; "
+                 "dir_dir_attrs: tree ht:%u, dd min:%u, ddmax:%u, dd_cnt:%u, sid_cnt:%u, bit_sz:%d\n",
+                 a_p->u.dir.dist_dir_attr.tree_height,
+                 a_p->u.dir.dist_dir_attr.dirdata_min,
+                 a_p->u.dir.dist_dir_attr.dirdata_max,
+                 a_p->u.dir.dist_dir_attr.dirdata_count,
+                 a_p->u.dir.dist_dir_attr.sid_count,
+                 a_p->u.dir.dist_dir_attr.bitmap_size);
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "  directory lists; "
+                 "handles = %p, sids = %p, bitmap = %p\n",
+                 a_p->u.dir.dirdata_handles,
+                 a_p->u.dir.dirdata_sids,
+                 a_p->u.dir.dist_dir_bitmap);
+
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: s_op lookup handle ct = %u\n",
+                 __func__, s_op->u.lookup.handle_ct);
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: s_op lookup attr ct = %u\n",
+                 __func__, s_op->u.lookup.attr_ct);
 
     /* if we looked up all the segments, we are done */
     if (s_op->u.lookup.seg_nr == s_op->u.lookup.seg_ct)
@@ -1017,11 +1148,11 @@ static PINT_sm_action lookup_verify_object_metadata(
         gossip_debug(GOSSIP_LOOKUP_DEBUG, "  no more segments in path; "
                      "sending response\n");
 
-        /* This is not recognized by the state machine.  This would look back
-         * to the top the same as other dirs but without checking perms.
+        /* This is not recognized by the state machine.  This would loop back
+         * to get_dirdata_from_kv the same as other dirs but without checking perms.
          */
         js_p->error_code = STATE_NOMORESEGS;
-        return SM_ACTION_COMPLETE;
+        goto errorout;
     }
 
     /* if we reach this point, the object is a directory. If this is not 
@@ -1032,10 +1163,12 @@ static PINT_sm_action lookup_verify_object_metadata(
     if (s_op->u.lookup.seg_nr > 0)
     {
         js_p->error_code = LOOKUP_CHECK_PERMS;
-        return SM_ACTION_COMPLETE;
+        goto errorout;
     }
 
-    /* only the first die should look bacck here */
+errorout:
+
+    /* only the first dir should loop back here */
     return SM_ACTION_COMPLETE;
 }
 
@@ -1091,9 +1224,10 @@ static PINT_sm_action lookup_setup_getattr_request(
     }
 
     return SM_ACTION_COMPLETE;
+
+    /* jumps to a getattr */
+
 }/*end lookup_setup_getattr_request*/
-
-
 
 /*
  * Function: lookup_verify_getattr_results
@@ -1376,6 +1510,8 @@ cleanup:
 
 /* Function: lookup_setup_resp
  * Setup the response for the lookup_path to be returned to the client
+ * This funnc primatily sets  up the counts for handles, sids, and attrs
+ * The arrays are set up in the resp during the processing of the request.
  */
 static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
                                         job_status_s *js_p)
@@ -1388,6 +1524,10 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
      * continue with the path (attr) lookup.  otherwise, we're returning 
      * N handles, N*metasidcnt, and  N attrs.
      */
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: Begin: s_op=%p s_op->decoded.enc_type=%d\n",
+                 __func__, s_op, s_op->decoded.enc_type);
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: s_op->lookup.handle_ct=%u\n",
+                 __func__, s_op->u.lookup.handle_ct);
     s_op->resp.u.lookup_path.handle_count = s_op->u.lookup.handle_ct;
     s_op->resp.u.lookup_path.attr_count   = s_op->u.lookup.attr_ct;
 
@@ -1406,8 +1546,8 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_ENOENT;
     }
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "  sending '%s' response with %d "
-                 "handle(s) and %d attr(s)\n",
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "  sending '%s' response with %u "
+                 "handle(s) and %u attr(s)\n",
                  (js_p->error_code ? "error" : "success"),
                  s_op->resp.u.lookup_path.handle_count,
                  s_op->resp.u.lookup_path.attr_count);
@@ -1417,6 +1557,11 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
 
     if (js_p->error_code == 0)
     {
+        /* is this debug assuming handle count is > 0 - not assured - the comment
+         * isn't clear whether they assume handle_count can be -1 - it can't because
+         * it is unsigned - or if the result of the index calculation can be.
+         * This PINT_ACCESS_DEBUG calls PINT_map_server_op_to_string(op).
+         */
         PINT_ACCESS_DEBUG(s_op,
                           GOSSIP_ACCESS_DEBUG,
                           "path: %s, handle: %s\n", 
@@ -1432,12 +1577,12 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
     }
 
     gossip_debug(GOSSIP_LOOKUP_DEBUG
-                 ,"%s: PVFS_servresp_lookup_path\n"
-                  "\t\thandle_count (%d)\n"
-                  "\t\thandle (%s)\n"
-                  "\t\tattr_count (%d)\n"
-                  "\t\tattr_array (%p)\n"
-                  "\t\tsid_count (%d)\n"
+                 ,"%s:\n\t\tPVFS_servresp_lookup_path (all in s_op->resp.u.lookup_path)\n"
+                  "\t\thandle_count=%u\n"
+                  "\t\thandle=%s\n"
+                  "\t\tattr_count=%u\n"
+                  "\t\tattr_array=%p\n"
+                  "\t\tsid_count=%d\n"
                  ,__func__
                  ,s_op->resp.u.lookup_path.handle_count
                  ,s_op->resp.u.lookup_path.handle_count > 0 ?
@@ -1447,15 +1592,17 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
                  ,s_op->resp.u.lookup_path.attr_array
                  ,s_op->resp.u.lookup_path.sid_count);
 
-   int i;
-   for (i = 0; i < s_op->resp.u.lookup_path.sid_count; i++)
-   {
-       gossip_debug(GOSSIP_LOOKUP_DEBUG
-                   ,"%s: sid[%d] = (%s)\n"
-                   ,__func__
-                   ,i
-                   ,PVFS_SID_str(&s_op->resp.u.lookup_path.sid_array[i]));
-   }
+    int i;
+    for (i = 0; i < s_op->resp.u.lookup_path.sid_count; i++)
+    {
+        gossip_debug(GOSSIP_LOOKUP_DEBUG
+                    ,"%s: sid[%d] = (%s)\n"
+                    ,__func__
+                    ,i
+                    ,PVFS_SID_str(&s_op->resp.u.lookup_path.sid_array[i]));
+    }
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: End: s_op=%p s_op->decoded.enc_type=%d\n",
+                 __func__, s_op, s_op->decoded.enc_type);
 
     return SM_ACTION_COMPLETE;
 }

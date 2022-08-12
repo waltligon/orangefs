@@ -67,6 +67,8 @@ static PINT_sm_action final_response_release(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t tmp_id;
+    gossip_log("%s: s_op=%p s_op->decoded.enc_type=%d\n", __func__,
+               s_op, s_op->decoded.enc_type);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
                  "(s_op %p) %s (FR sm) state: release: (error_code = %d)\n",
@@ -122,6 +124,7 @@ static PINT_sm_action final_response_send_resp(struct PINT_smcb *smcb,
     int ret = -1;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = PINT_server_config_mgr_get_config();
+    gossip_log("%s: s_op->decoded.enc_type is %d\n", __func__, s_op->decoded.enc_type);
     
     gossip_debug(GOSSIP_SERVER_DEBUG, 
 	         "(s_op %p) %s (FR sm) state: send_resp (status = %d)\n",
@@ -132,6 +135,9 @@ static PINT_sm_action final_response_send_resp(struct PINT_smcb *smcb,
     {
         gossip_lerr("Error: req_sched_release() failure; continuing...\n");
     }
+
+    gossip_log("%s: calling PINT_encode, s_op->decoded.enc_type is %d\n", __func__,
+               s_op->decoded.enc_type);
 
     ret = PINT_encode(&s_op->resp,
                       PINT_ENCODE_RESP,

@@ -78,6 +78,8 @@
 #include "pvfs2-encode-stubs.h"
 #include "pvfs2-hint.h"
 
+extern char *gpptr; /* q&d debug */
+
 /* Basic types used throughout the code. */
 typedef uint8_t PVFS_boolean;
 typedef int32_t PVFS_error;

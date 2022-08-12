@@ -1206,6 +1206,9 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                dirdata_sid_index,
                sm_p->hints);
 
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"%s: attr sid_count: %d\n", __func__,
+                 sm_p->getattr.attr.u.dir.dist_dir_attr.sid_count);
+
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
     msg_p->fs_id = sm_p->parent_ref.fs_id;
