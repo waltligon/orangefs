@@ -27,7 +27,7 @@
 /* export prototype MyFunction(HWND); */
 
 prototype InstallServices(); 
-prototype InstallDriver(); 
+// prototype InstallDriver(); 
 prototype WriteOrangeFSTab(STRING);
 prototype InitConfigFile(BYREF NUMBER, STRING);
 prototype WriteListMapConfig(NUMBER, STRING, STRING, STRING);
@@ -96,7 +96,9 @@ begin
 		abort;
     endif;
     
-	nSetupType = TYPICAL;	
+	nSetupType = TYPICAL;
+	
+	
 
 Dlg_SdWelcome:
     szTitle = "";
@@ -107,6 +109,7 @@ Dlg_SdWelcome:
 	szTitle   = "";
 	svName    = "";
     svCompany = "";
+    
 /*
 Dlg_SdRegisterUser:
     szMsg = "";
@@ -272,19 +275,21 @@ begin
     CloseFile(nFileHandle);
 end;
 
-
+/***
 function InstallDriver()
     STRING svExePath;
 begin                                                 
     svExePath = szProgramFilesDir ^ "\\Dokan\\DokanLibrary\\dokanctl.exe";
     
     LaunchAppAndWait(svExePath, "/i d", LAAW_OPTION_WAIT);
-end;    
+end;
+***/    
 
 function InstallServices()
     NUMBER rc, line, error;
     STRING file, errText;
 begin
+    /*
     if (!ServiceExistsService("DokanMounter")) then
         rc = ServiceAddService("DokanMounter",
                                "DokanMounter",
@@ -300,10 +305,11 @@ begin
                         szProgramFilesDir + "\\Dokan\\DokanLibrary\\mounter.exe", SEVERE);
         endif;
     endif;
+    */
     if (!ServiceExistsService("orangefs-client")) then
         rc = ServiceAddService("orangefs-client",
                                "OrangeFS Client",
-                               "Allows transparent access to Orange file systems.",
+                               "Mounts an OrangeFS file system as a removable drive.",
                                INSTALLDIR ^ "\\orangefs-client -service",
                                FALSE,
                                "");
@@ -401,7 +407,7 @@ Label_DlgSkip:
         
     InstallServices();
     
-    InstallDriver();    
+    // InstallDriver();    
 
     if ( BATCH_INSTALL ) then
     	SdFinishReboot ( szTitle , szMsg1 , SYS_BOOTMACHINE , szMsg2 , 0 );
@@ -411,7 +417,7 @@ Label_DlgSkip:
 	    SdFinish ( szTitle , szMsg1 , szMsg2 , szOpt1 , szOpt2 , bOpt1 , bOpt2 );
 	    
         if (bOpt1) then
-            ServiceStartService("DokanMounter", "");
+            // ServiceStartService("DokanMounter", "");
             ServiceStartService("orangefs-client", "");
         endif;
 	endif;
