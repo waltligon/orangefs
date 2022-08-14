@@ -278,6 +278,7 @@ __pycache__/
 
 # OrangeFS Third-Party Libraries
 dokan
+dokany
 ldap
 openssl
 
@@ -292,6 +293,8 @@ Setup.dbg
 Setup.inx
 Setup.map
 *.ism.[0-9][0-9][0-9]
+install/installer-copy.ps1
+install/OrangeFS-Client-IS2022/X64\ Configuration/
 
 # apple files
 .DS_Store
