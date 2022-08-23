@@ -26,8 +26,8 @@
     
 /* export prototype MyFunction(HWND); */
 
-prototype InstallServices(); 
-// prototype InstallDriver(); 
+prototype InstallEventLogManifest();
+prototype InstallService();
 prototype WriteOrangeFSTab(STRING);
 prototype InitConfigFile(BYREF NUMBER, STRING);
 prototype WriteListMapConfig(NUMBER, STRING, STRING, STRING);
@@ -178,7 +178,7 @@ begin
         MessageBox("File " + INSTALLDIR + "\\orangefstab could not be created. " +
                    "You must add this file manually (see documentation).", SEVERE);
     else
-        WriteLine(nFileHandle, szFSURI + " /mnt/pvfs2 pvfs2 defaults,noauto 0 0"); 
+        WriteLine(nFileHandle, szFSURI + " /mnt/orangefs pvfs2 defaults,noauto 0 0"); 
         
         CloseFile(nFileHandle);
     endif;
@@ -209,7 +209,7 @@ begin
     WriteLine(nFileHandle, "user-mode list");
     
     if (szUserID != "" && szUID != "" && szGID != "") then
-        WriteLine(nFileHandle, "user " + szUserID + " " + szUID + ":" + szGID);
+        WriteLine(nFileHandle, "user \"" + szUserID + "\" " + szUID + ":" + szGID);
     endif;
     
 end;
@@ -275,37 +275,10 @@ begin
     CloseFile(nFileHandle);
 end;
 
-/***
-function InstallDriver()
-    STRING svExePath;
-begin                                                 
-    svExePath = szProgramFilesDir ^ "\\Dokan\\DokanLibrary\\dokanctl.exe";
-    
-    LaunchAppAndWait(svExePath, "/i d", LAAW_OPTION_WAIT);
-end;
-***/    
-
-function InstallServices()
+function InstallService()
     NUMBER rc, line, error;
     STRING file, errText;
 begin
-    /*
-    if (!ServiceExistsService("DokanMounter")) then
-        rc = ServiceAddService("DokanMounter",
-                               "DokanMounter",
-                               "OrangeFS/Dokan driver interface service",
-                               szProgramFilesDir ^ "\\Dokan\\DokanLibrary\\mounter.exe",
-                               TRUE,
-                               "");
-        if (rc < ISERR_SUCCESS) then
-            GetExtendedErrInfo(file, line, error);
-            Sprintf(errText, " (%d)", error);
-            MessageBox("DokanMounter service installation failed:\n" +
-                        FormatMessage(error) + errText + " " +
-                        szProgramFilesDir + "\\Dokan\\DokanLibrary\\mounter.exe", SEVERE);
-        endif;
-    endif;
-    */
     if (!ServiceExistsService("orangefs-client")) then
         rc = ServiceAddService("orangefs-client",
                                "OrangeFS Client",
@@ -320,6 +293,25 @@ begin
                         FormatMessage(error) + errText + " " +
                         INSTALLDIR + "\\orangefs-client -service", SEVERE);
         endif;
+    endif;
+end;
+
+function InstallEventLogManifest()
+    STRING szEXEPath, szCmdLine, file, errText;
+    NUMBER rc, line, error;
+begin
+    // Run wevtutil.exe to install the Event Log manifest file so that messages
+    // are displayed correctly in Event Log.
+    
+    szEXEPath = INSTALLDIR ^ "\\orangefs.exe";
+    szCmdLine = "im \"/mf:szEXEPath\" \"/rf:szEXEPath\"";
+    
+    rc = LaunchApplication(WINSYSDIR64 ^ "\\wevtutil.exe", szCmdLine, "", SW_NORMAL, 60000, LAAW_OPTION_WAIT);
+    if (rc < ISERR_SUCCESS) then
+        GetExtendedErrInfo(file, line, error);
+        Sprintf(errText, " (%d)", error);
+        MessageBox("Installation of the Event Log manifest failed:\n" +
+                   FormatMessage(error) + errText, WARNING);
     endif;
 end;
                         
@@ -405,10 +397,10 @@ Dlg_UserMap:
 
 Label_DlgSkip:
         
-    InstallServices();
+    InstallService();
     
-    // InstallDriver();    
-
+    InstallEventLogManifest();
+    
     if ( BATCH_INSTALL ) then
     	SdFinishReboot ( szTitle , szMsg1 , SYS_BOOTMACHINE , szMsg2 , 0 );
     else
@@ -417,7 +409,6 @@ Label_DlgSkip:
 	    SdFinish ( szTitle , szMsg1 , szMsg2 , szOpt1 , szOpt2 , bOpt1 , bOpt2 );
 	    
         if (bOpt1) then
-            // ServiceStartService("DokanMounter", "");
             ServiceStartService("orangefs-client", "");
         endif;
 	endif;
@@ -449,14 +440,7 @@ begin
 	    // Stop and remove the services
 	    ServiceStopService("orangefs-client");
 	    ServiceRemoveService("orangefs-client");
-	    ServiceStopService("DokanMounter");
-	    ServiceRemoveService("DokanMounter");
-	    
-	    // uninstall driver
-        szExePath = szProgramFilesDir ^ "\\Dokan\\DokanLibrary\\dokanctl.exe";
-    
-        LaunchAppAndWait(szExePath, "/r d", LAAW_OPTION_WAIT);
-                                       
+	                                          
         // remove files etc.
         FeatureRemoveAll();
         
@@ -466,7 +450,7 @@ begin
         StatusUpdate(ON, 100);
     endif;                                       
 	
-/*	
+/*	Unused skeleton code
 Dlg_Start:
 
     // Added in Version 9.5 - Support for REMOVEONLY option.
