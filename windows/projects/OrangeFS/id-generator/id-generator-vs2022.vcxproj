@@ -137,6 +137,7 @@
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\gen-locks;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4018;4311</DisableSpecificWarnings>
+      <AssemblerOutput>All</AssemblerOutput>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -180,6 +181,7 @@
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\gen-locks;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4018;4311</DisableSpecificWarnings>
+      <AssemblerOutput>All</AssemblerOutput>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

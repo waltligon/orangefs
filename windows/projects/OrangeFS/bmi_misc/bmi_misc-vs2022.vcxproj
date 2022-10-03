@@ -137,6 +137,7 @@
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\client\usrint</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4018;4311</DisableSpecificWarnings>
+      <AssemblerOutput>All</AssemblerOutput>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -180,6 +181,7 @@
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\client\usrint</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4018;4311</DisableSpecificWarnings>
+      <AssemblerOutput>All</AssemblerOutput>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

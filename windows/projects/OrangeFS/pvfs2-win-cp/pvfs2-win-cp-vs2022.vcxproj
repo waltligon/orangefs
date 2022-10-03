@@ -108,6 +108,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\src\common\security;..\..\..\..\src\client\sysint;..\..\..\..\include;..\..\..\..\;..\..\..\openssl\include</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4018;4311</DisableSpecificWarnings>
+      <AssemblerOutput>All</AssemblerOutput>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -147,6 +148,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\src\common\security;..\..\..\..\src\client\sysint;..\..\..\..\include;..\..\..\..\;..\..\..\openssl\include</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4018;4311</DisableSpecificWarnings>
+      <AssemblerOutput>All</AssemblerOutput>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
