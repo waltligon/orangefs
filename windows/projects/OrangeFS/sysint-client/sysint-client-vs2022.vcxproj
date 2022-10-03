@@ -147,6 +147,7 @@
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\client\usrint;..\..\..\..\src\common\misc;..\..\..\..\src\common\token-utils;..\..\..\..\src\common\security;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\openssl\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4047;4133;4018</DisableSpecificWarnings>
+      <AssemblerOutput>All</AssemblerOutput>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -205,6 +206,7 @@
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\client\usrint;..\..\..\..\src\common\misc;..\..\..\..\src\common\token-utils;..\..\..\..\src\common\security;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..;..\..\..\openssl\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4047;4133;4018</DisableSpecificWarnings>
+      <AssemblerOutput>All</AssemblerOutput>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

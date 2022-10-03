@@ -137,6 +137,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4018;4311</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc</AdditionalIncludeDirectories>
+      <AssemblerOutput>All</AssemblerOutput>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -180,6 +181,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4018;4311</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc</AdditionalIncludeDirectories>
+      <AssemblerOutput>All</AssemblerOutput>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

@@ -137,6 +137,7 @@
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\io\bmi;..\..\..\..\src\common\misc;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\gen-locks;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\windows</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4018;4311;26451</DisableSpecificWarnings>
+      <AssemblerOutput>All</AssemblerOutput>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -180,6 +181,7 @@
       <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\io\bmi;..\..\..\..\src\common\misc;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\gen-locks;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\windows</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_MBCS_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4018;4311;26451</DisableSpecificWarnings>
+      <AssemblerOutput>All</AssemblerOutput>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
