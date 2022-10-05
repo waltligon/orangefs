@@ -7,7 +7,7 @@
 /* 
  * Dokany is a user-mode file system API like FUSE: https://github.com/dokan-dev/dokany.
  * Most of the following functions are callbacks. dokan_loop starts the Dokany thread. 
- * Functions are called as needed by Dokan (responding to file system requests).
+ * Functions are called as needed by Dokany (responding to file system requests).
  */
 
 #include "dokan.h"

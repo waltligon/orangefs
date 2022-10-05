@@ -48,6 +48,7 @@
     <ClInclude Include="..\..\..\..\src\client\windows\client-service\messages.h" />
     <ClInclude Include="..\..\..\..\src\client\windows\client-service\user-cache.h" />
     <ClInclude Include="..\..\..\..\src\client\windows\client-service\fs.h" />
+    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\..\..\src\client\windows\client-service\messages.man">
@@ -74,6 +75,7 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\..\..\src\client\windows\client-service\messages.rc" />
+    <ResourceCompile Include="version.rc" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{61019A9A-D6E0-4E04-B163-EADB88766C9E}</ProjectGuid>
