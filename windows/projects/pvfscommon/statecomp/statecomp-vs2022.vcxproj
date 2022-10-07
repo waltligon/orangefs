@@ -95,7 +95,7 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(FileName).c</Outputs>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">bison -d %(FullPath) -o %(RootDir)%(Directory)%(Filename).c</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">bison -d %(FullPath) -o %(RootDir)%(Directory)%(Filename).c</Message>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(FileName).c</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RootDir)%(Directory)%(FileName).c</Outputs>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
@@ -106,7 +106,7 @@
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">flex -o%(RootDir)%(Directory)%(Filename).c %(FullPath)</Message>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">flex -o%(RootDir)%(Directory)%(Filename).c %(FullPath)</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">flex -o%(RootDir)%(Directory)%(Filename).c %(FullPath)</Message>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(FileName).c</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RootDir)%(Directory)%(FileName).c</Outputs>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
