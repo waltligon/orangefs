@@ -284,7 +284,7 @@ static int enqueue_operation(op_list_p target_list,
                              bmi_size_t actual_size,
                              bmi_size_t expected_size,
                              bmi_context_id context_id,
-                             int32_t event_id);
+                             PINT_event_id event_id);
 static int tcp_cleanse_addr(bmi_method_addr_p map, int error_code);
 static int tcp_shutdown_addr(bmi_method_addr_p map);
 static int tcp_do_work(int max_idle_time);
@@ -295,7 +295,7 @@ static int work_on_recv_op(method_op_p my_method_op,
                            int *stall_flag);
 static int work_on_send_op(method_op_p my_method_op,
                            int *blocked_flag, int* stall_flag);
-static int tcp_accept_init(int *socket, char** peer);
+static int tcp_accept_init(SOCKET *socket, char** peer);
 static method_op_p alloc_tcp_method_op(void);
 static void dealloc_tcp_method_op(method_op_p old_op);
 static int handle_new_connection(bmi_method_addr_p map);
@@ -817,7 +817,7 @@ dealloc_trusted_connection_info(void* ptcp_allowed_connection_info)
 static void convert_mask(int mask_bits, struct in_addr *mask)
 {
    uint32_t addr = -1;
-   addr = addr & ~~(-1 << (mask_bits ? (32 - mask_bits) : 32));
+   addr = addr & ~~(0xffffffff << (mask_bits ? (32 - mask_bits) : 32));
    mask->s_addr = htonl(addr);
    return;
 }
@@ -2340,7 +2340,7 @@ static int enqueue_operation(op_list_p target_list,
                              bmi_size_t actual_size,
                              bmi_size_t expected_size,
                              bmi_context_id context_id,
-                             int32_t eid)
+                             PINT_event_id eid)
 {
     method_op_p new_method_op = NULL;
     struct tcp_op *tcp_op_data = NULL;
@@ -2825,7 +2825,6 @@ static int tcp_do_work(int max_idle_time)
     int i = 0;
     int stall_flag = 0;
     int busy_flag = 1;
-    struct timespec req;
     struct tcp_addr* tcp_addr_data = NULL;
     struct timespec wait_time;
     struct timeval start;
@@ -2939,10 +2938,7 @@ static int tcp_do_work(int max_idle_time)
      */
     if(busy_flag)
     {
-        /* req.tv_sec = 0;
-        req.tv_nsec = 1000; */
         gen_mutex_unlock(&interface_mutex);
-        /* nanosleep(&req, NULL); */
         Sleep(1);
         gen_mutex_lock(&interface_mutex);
     }
@@ -3007,7 +3003,7 @@ static int tcp_do_work_send(bmi_method_addr_p map, int* stall_flag)
 static int handle_new_connection(bmi_method_addr_p map)
 {
     struct tcp_addr *tcp_addr_data = NULL;
-    int accepted_socket = -1;
+    SOCKET accepted_socket = -1;
     bmi_method_addr_p new_addr = NULL;
     int ret = -1;
     char* tmp_peer = NULL;
@@ -3178,7 +3174,7 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
         current_time = time(NULL);
         if(!tcp_addr_data->short_header_timer)
         {
-            tcp_addr_data->short_header_timer = current_time;
+            tcp_addr_data->short_header_timer = (int) current_time;
         }
         else if((current_time - tcp_addr_data->short_header_timer) > 
             BMI_TCP_HEADER_WAIT_SECONDS)
@@ -3539,7 +3535,7 @@ static int tcp_do_work_error(bmi_method_addr_p map)
     tcp_addr_data = (struct tcp_addr *) map->method_data;
 
     /* perform a read on the socket so that we can get a real errno */
-    ret = recv(tcp_addr_data->socket, &buf, sizeof(int), 0);
+    ret = recv(tcp_addr_data->socket, (char*) &buf, sizeof(int), 0);
     if (ret == 0)
         tmp_errno = EPIPE;  /* report other side closed socket with this */
     else
@@ -3701,7 +3697,7 @@ port_check:
  *
  * returns 0 on success, -errno on failure.
  */
-static int tcp_accept_init(int *socket, char** peer)
+static int tcp_accept_init(SOCKET *socket, char** peer)
 {
 
     int ret = -1;

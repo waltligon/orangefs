@@ -1,5 +1,5 @@
 /* 
- * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
+ * (C) 2010-2022 Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -75,7 +75,7 @@ int get_ldap_credential(char *user_name,
     LDAPMessage *results, *entry;
     BerElement *ptr;
 
-    DbgPrint("   get_ldap_credential: enter\n");
+    client_debug("   get_ldap_credential: enter\n");
 
     if (user_name == NULL || strlen(user_name) == 0 || 
         credential == NULL)
@@ -141,12 +141,12 @@ int get_ldap_credential(char *user_name,
     strncpy(attrs[1], goptions->ldap.gid_attr, 32);
     attrs[2] = NULL;
 
-    DbgPrint("   get_ldap_credential: search root: %s\n",
+    client_debug("   get_ldap_credential: search root: %s\n",
         goptions->ldap.search_root);
-    DbgPrint("   get_ldap_credential: search scope: %d\n", 
+    client_debug("   get_ldap_credential: search scope: %d\n", 
         goptions->ldap.search_scope);
-    DbgPrint("   get_ldap_credential: filter: %s\n", filter);
-    DbgPrint("   get_ldap_credential: attrs: %s/%s\n", 
+    client_debug("   get_ldap_credential: filter: %s\n", filter);
+    client_debug("   get_ldap_credential: attrs: %s/%s\n", 
         goptions->ldap.uid_attr, goptions->ldap.gid_attr);
     ret = ldap_search_st(ld, goptions->ldap.search_root, goptions->ldap.search_scope,
               filter, (char **) attrs, 0, &timeout, &results);
@@ -235,7 +235,7 @@ int get_ldap_credential(char *user_name,
         if (ret != 0)
         {
             _snprintf(error_msg, sizeof(error_msg), "User %s: credential "
-                "error: ", ret);
+                "error: %d", user_name, ret);
         }
     }
     else if (ret == 0)
@@ -254,7 +254,7 @@ get_ldap_credential_exit:
     if (ld != NULL)
         ldap_unbind_s(ld);
 
-    DbgPrint("   get_ldap_credential: exit\n");
+    client_debug("   get_ldap_credential: exit\n");
 
     return ret;
 }

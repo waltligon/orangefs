@@ -80,17 +80,15 @@ AC_DEFUN([AX_MX],
         CPPFLAGS="$CPPFLAGS -I$MX_INCDIR"
 
         AC_MSG_CHECKING(for mx_decompose_endpoint_addr2)
-        AC_TRY_LINK([
+        AC_LINK_IFELSE([AC_LANG_PROGRAM([[
             #include "mx_extensions.h"
             #include <stdlib.h>
-        ], [ 
+        ]], [[ 
             mx_endpoint_addr_t epa;
             mx_decompose_endpoint_addr2(epa, NULL, NULL, NULL);
-        ],
-            AC_MSG_RESULT(yes),
-            AC_MSG_RESULT(no)
-	    AC_MSG_ERROR([Function mx_decompose_endpoint_addr2() not found.])
-        )
+        ]])],[AC_MSG_RESULT(yes)],[AC_MSG_RESULT(no)
+	    AC_MSG_ERROR(Function mx_decompose_endpoint_addr2() not found.)
+        ])
 
         LDFLAGS="$save_ldflags"
         CPPFLAGS="$save_cppflags"

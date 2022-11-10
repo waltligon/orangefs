@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
+ * (C) 2010-2022 Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -20,7 +20,7 @@ struct qhash_table *io_cache;
 
 gen_mutex_t io_cache_mutex;
 
-int io_cache_compare(void *key,
+int io_cache_compare(const void *key,
                      struct qhash_head *link)
 {
     struct io_cache_entry *entry = qhash_entry(link, 

@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
+ * (C) 2010-2022 Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -9,6 +9,8 @@
  * -- Install or remove OrangeFS Client service
  * -- Run client as a service or console app
  */
+
+#include "dokan.h"
 
 #include <Windows.h>
 #include <stdlib.h>
@@ -31,6 +33,7 @@
 
 #define WIN32ServiceName           "orangefs-client"
 #define WIN32ServiceDisplayName    "OrangeFS Client"
+#define WIN32ServiceDescription    "Mounts an OrangeFS file system as a removable drive."
 
 #define report_startup_error(msg, err)    _report_error(msg, err, TRUE)
 
@@ -44,10 +47,11 @@ int is_running = 0;
 int run_service = 0;  
 
 HANDLE hthread, hcache_thread;
-HANDLE hevent_log = NULL;
 
-DWORD thread_start(PORANGEFS_OPTIONS options);
-DWORD thread_stop();
+int main_init();
+
+DWORD main_thread_start(PORANGEFS_OPTIONS options);
+DWORD main_thread_stop();
 
 DWORD cache_thread_start();
 DWORD cache_thread_stop();
@@ -65,6 +69,7 @@ extern gen_mutex_t io_cache_mutex;
 PORANGEFS_OPTIONS goptions;
 
 /* externs */
+extern wchar_t* convert_mbstring(const char* mbstr);
 extern int __cdecl dokan_loop(PORANGEFS_OPTIONS options);
 
 void init_service_log()
@@ -72,7 +77,7 @@ void init_service_log()
     char exe_path[MAX_PATH], *p;
     int ret;
 
-    if (!debug || !run_service)
+    if (!run_service)
         return;
 
     /* create log file in exe directory */
@@ -92,24 +97,35 @@ void init_service_log()
 
 void service_debug(char *format, ...)
 {
-    char buffer[512];
+    char buffer[512], prefix[128], *pp;
+    struct timeval tv;
+    time_t tp;
     va_list argp;
 
-    if (!debug || !run_service)
+    if (!run_service)
         return;
 
     va_start(argp, format);
     vsprintf_s(buffer, sizeof(buffer), format, argp);
     va_end(argp);
 
-    fprintf(debug_log, buffer);
+    strcpy(prefix, "[S ");
+    pp = prefix + strlen(prefix);
+    gettimeofday(&tv, NULL);
+    tp = tv.tv_sec;
+    strftime(pp, sizeof(prefix) - strlen(prefix), "%H:%M:%S", localtime(&tp));
+    pp = prefix + strlen(prefix);
+    sprintf(pp, ".%03ld (%4ld)] ", (long)tv.tv_usec / 1000,
+        GetThreadId(GetCurrentThread()));
+    
+    fprintf(debug_log, "%s%s", prefix, buffer);
     fflush(debug_log);
 
 }
 
 void close_service_log()
 {
-    if (!debug || !run_service)
+    if (!run_service)
         return;
 
     if (debug_log)
@@ -119,18 +135,17 @@ void close_service_log()
     }
 }
 
-/* Open our Event Log entry (from registry) */
-DWORD init_event_log()
+/* Open our Event Log Provider */
+ULONG init_event_log()
 {
-    hevent_log = RegisterEventSource(NULL, "OrangeFS Client");
-    return GetLastError();
+    /* hevent_log = RegisterEventSource(NULL, "OrangeFS Client"); */
+    return EventRegisterOrangeFS_Client_Provider();
 }
 
-/* Close our Event Log source */
+/* Close our Event Log Provider */
 void close_event_log()
 {
-    if (hevent_log != NULL)
-        DeregisterEventSource(hevent_log);
+    EventUnregisterOrangeFS_Client_Provider();
 }
 
 /* get OpenSSL error message */
@@ -191,7 +206,7 @@ void get_windows_error(const char *msg,
                        char *errstr,
                        size_t errlen)
 {
-    LPVOID msg_buf;
+    LPVOID msg_buf = NULL;
     LPTSTR win_msg;
 
     errstr[0] = '\0';
@@ -227,7 +242,7 @@ void get_windows_error(const char *msg,
    log. The entire text of the message is displayed without modification. */
 BOOL report_error_event(char *message, BOOL startup)
 {
-    char *strings[1];
+    // char *strings[1];
 
     /* startup errors also go to service log or stderr */
     if (startup)
@@ -242,16 +257,11 @@ BOOL report_error_event(char *message, BOOL startup)
         }
     }
 
-    DbgPrint("Error reported:\n");
-    DbgPrint("%s\n", message);
-
-    if (hevent_log != NULL)
-    {
-        strings[0] = message;
-
-        return ReportEvent(hevent_log, EVENTLOG_ERROR_TYPE, 0, 
-            MSG_GENERIC_ERROR, NULL, 1, 0, strings, NULL);
-    }
+    client_debug("Error reported:\n");
+    client_debug("%s\n", message);
+    
+    /* write to the Windows Application Event Log, viewable in Event Viewer */
+    EventWriteERROR_EVENT(message);
 
     return FALSE;
 }
@@ -316,6 +326,7 @@ DWORD service_install()
 {
     SC_HANDLE sch_service;
     SC_HANDLE sch_manager;
+    SERVICE_DESCRIPTION service_desc;
     char *exe_path, *command;
     DWORD size;
     int err;
@@ -380,6 +391,13 @@ DWORD service_install()
         if (sch_service != NULL)
         {
             printf("%s installed\n", WIN32ServiceDisplayName);
+            /* Set service description */
+            service_desc.lpDescription = (LPSTR)WIN32ServiceDescription;
+            if (!ChangeServiceConfig2(sch_service, SERVICE_CONFIG_DESCRIPTION, &service_desc))
+            {
+                printf("Warning: could not set service description\n");
+            }
+
             CloseServiceHandle(sch_service);
         }
         else
@@ -473,16 +491,22 @@ void WINAPI service_ctrl(DWORD ctrl_code)
         SetServiceStatus(hstatus, &service_status);
         
         is_running = 0;
-        thread_stop();
+        main_thread_stop();
     }
 }
 
 void WINAPI service_main(DWORD argc, char *argv[])
 {
     PORANGEFS_OPTIONS options;
-    int ret, ret2;
-    char error_msg[512];    
+    int err = 0;
+    char error_msg[512];
     char env_debug_file[MAX_PATH+16], env_debug_mask[256+16];
+
+    init_service_log();
+
+    if ((err = main_init()) != 0) {
+        goto service_main_exit;
+    }
 
     /* allocate options */
     options = (PORANGEFS_OPTIONS) calloc(1, sizeof(ORANGEFS_OPTIONS));
@@ -498,32 +522,34 @@ void WINAPI service_main(DWORD argc, char *argv[])
     gen_mutex_init(&io_cache_mutex);
 
     /* read from config file */
-    ret = get_config(options, error_msg, 512);
+    if ((err = get_config(options, error_msg, 512)) != 0) {
+        goto service_main_exit;
+    }
 
     /* point global options */
-    goptions = options;    
+    goptions = options;
 
-    if (ret == 0)
-    {
-        /* add users (in list mode) */
-        ret2 = add_users(options, error_msg, 512);
+    /* add users (in list mode) */
+    if ((err = add_users(options, error_msg, 512)) != 0) {
+        goto service_main_exit;
     }
    
     debug = options->debug;
 
-    init_service_log();
-
+    /* now under service_main_exit label 
     if (ret != 0 || ret2 != 0)
     {
         report_startup_error(error_msg, (ret != 0) ? ret : ret2);
         close_service_log();
         close_event_log();
         return;
+    } */
+
+    /* see if mount point is already in use */
+    if (!check_mount_point(options->mount_point)) {
+        err = 1;
+        goto service_main_exit;
     }
-
-
-    if (!check_mount_point(options->mount_point))
-        return;
 
     /* turn on gossip debugging */
     if (debug)
@@ -550,17 +576,11 @@ void WINAPI service_main(DWORD argc, char *argv[])
         service_debug("Service registered\n");
 
         /* run the user cache thread */
-        ret = cache_thread_start();
-        if (ret != 0)
+        if ((err = cache_thread_start()) != 0)
         {
             _snprintf(error_msg, sizeof(error_msg), "Fatal init error: could "
-                "not start cache thread: %u", ret);
-            report_startup_error(error_msg, ret);
-            close_service_log();
-            close_event_log();
-            free(options);
-            
-            return;
+                "not start cache thread: %u", err);
+            goto service_main_exit;
         }
 
         /* run the service */
@@ -570,46 +590,58 @@ void WINAPI service_main(DWORD argc, char *argv[])
         service_status.dwWin32ExitCode = NO_ERROR;
         service_status.dwServiceSpecificExitCode = 0;
 
-        /* execute service main loop */
+        /*** execute service main thread ***/
         if (SetServiceStatus(hstatus, &service_status))
         {
             is_running = 1;
             service_debug("Starting thread\n");
-            thread_start(options);
+            main_thread_start(options);
         }
-
-        /* stop cache thread */
-        cache_thread_stop();
-
-        /* LDAP cleanup */
-        PVFS_ldap_cleanup();
-
-        /* cleanup OpenSSL */
-        openssl_cleanup();
-        
-        /* shut down service */        
-        service_status.dwCurrentState = SERVICE_STOPPED;
-        SetServiceStatus(hstatus, &service_status);        
+        else
+        {
+            report_error("SetServiceStatus to SERVICE_RUNNING failed: ", GetLastError());
+        }
     }
     else
     {
         report_error("RegisterServiceCtrlHandler failed: ", GetLastError());
     }
 
+service_main_exit:
+
+    if (err)
+    {
+        report_startup_error(error_msg, GetLastError());
+    }
+
     qhash_destroy_and_finalize(user_cache, struct user_entry, hash_link, free);
+
+    qhash_destroy_and_finalize(io_cache, struct io_cache_entry, hash_link, free);
+
+    cache_thread_stop();
+
+    PVFS_ldap_cleanup();
+
+    openssl_cleanup();
     
     close_service_log();
 
     close_event_log();
 
     free(options);
+    
+    if (hstatus != NULL) {
+        service_status.dwCurrentState = SERVICE_STOPPED;
+        SetServiceStatus(hstatus, &service_status);
+    }
 }
 
-DWORD thread_start(PORANGEFS_OPTIONS options)
+DWORD main_thread_start(PORANGEFS_OPTIONS options)
 {
     DWORD err = 0;
+    int rc = 0;
 
-    service_debug("thread_start enter\n");
+    service_debug("main_thread_start enter\n");
 
     /* create and run the new thread */
     hthread = CreateThread(NULL, 
@@ -620,6 +652,9 @@ DWORD thread_start(PORANGEFS_OPTIONS options)
                            NULL);
     if (hthread)
     {  
+        service_debug("main_thread_start: created thread %ld\n", GetThreadId(hthread));
+        
+        /* wait until main_loop() is exited */
         WaitForSingleObject(hthread, INFINITE);
     }
     else
@@ -628,25 +663,34 @@ DWORD thread_start(PORANGEFS_OPTIONS options)
         report_error("CreateThread (main) failed: ", err);
     }
 
-    service_debug("thread_start exit\n");
+    service_debug("main_thread_start exit\n");
 
     return err;                           
 }
 
-DWORD thread_stop()
+DWORD main_thread_stop()
 {
     DWORD err = 0;
+    LPWSTR w_mount_point;
+    BOOL unmounted = FALSE;
 
-    service_debug("thread_stop enter\n");
-    
-    /* stop the thread */
-    if (!TerminateThread(hthread, 0))
-    {
-        err = GetLastError();
-        report_error("TerminateThread (main) failed: ", err);
+    service_debug("main_thread_stop enter\n");
+
+    /* Unmount drive */
+    service_debug("main_thread_stop: unmounting %s...\n", goptions->mount_point);
+    if ((w_mount_point = convert_mbstring(goptions->mount_point)) != NULL) {
+        unmounted = DokanRemoveMountPoint(w_mount_point);
+        free(w_mount_point);
     }
 
-    service_debug("thread_stop exit\n");
+    if (unmounted) {
+        service_debug("main_thread_stop: unmount OK\n");
+    }
+    else {
+        service_debug("main_thread_stop: unmount failed\n");
+    }
+
+    service_debug("main_thread_stop exit\n");
 
     return err;
 }
@@ -686,6 +730,7 @@ DWORD cache_thread_stop()
     return err;
 }
 
+#define RETRY_TIMEOUT    15000
 DWORD WINAPI main_loop(LPVOID poptions)
 {
     PORANGEFS_OPTIONS options = (PORANGEFS_OPTIONS) poptions;
@@ -693,6 +738,7 @@ DWORD WINAPI main_loop(LPVOID poptions)
          event_msg[512];
     FILE *f;
     int ret, malloc_flag = 0;
+    DWORD err = 0;
 
     /* locate tabfile -- env. variable overrides */
     if (!(tabfile = getenv("PVFS2TAB_FILE")))
@@ -705,21 +751,26 @@ DWORD WINAPI main_loop(LPVOID poptions)
             if (p)
                 *p = '\0';
 
-            tabfile = (char *) malloc(MAX_PATH);
-            malloc_flag = TRUE;
+            tabfile = (char*)malloc(MAX_PATH);
+            if (tabfile != NULL) {
+                malloc_flag = TRUE;
 
-            strcpy(tabfile, exe_path);
-            strcat(tabfile, "\\orangefstab");
-
-            /* attempt to open file */
-            f = fopen(tabfile, "r");
-            if (f)
-                fclose(f);
-            else 
-            {
-                /* switch to pvfs2tab -- fs_initialize will fail if not valid */
                 strcpy(tabfile, exe_path);
-                strcat(tabfile, "\\pvfs2tab");
+                strcat(tabfile, "\\orangefstab");
+
+                /* attempt to open file */
+                f = fopen(tabfile, "r");
+                if (f)
+                    fclose(f);
+                else
+                {
+                    /* switch to pvfs2tab -- fs_initialize will fail if not valid */
+                    strcpy(tabfile, exe_path);
+                    strcat(tabfile, "\\pvfs2tab");
+                }
+            }
+            else {
+                return 1;
             }
         }
     }
@@ -733,12 +784,12 @@ DWORD WINAPI main_loop(LPVOID poptions)
 
             if (ret != 0)
             {
+                /* delay until retrying connecting to the filesystem */
                 service_debug("Retrying fs initialization...\n");
                 report_startup_error(error_msg, 0);
-                Sleep(30000);
+                Sleep(RETRY_TIMEOUT);
             }
-
-        } while (ret != 0);
+        } while (is_running && ret != 0);
     }
     else
     {
@@ -746,19 +797,17 @@ DWORD WINAPI main_loop(LPVOID poptions)
     }
 
     /*** main loop - run dokan client ***/
-    if (ret == 0)
+    if (is_running && ret == 0)
     {
-        dokan_loop(options);
+        /* note: dokan_loop does not return normally */
+        ret = dokan_loop(options);
+        if (ret == -1) {
+          _snprintf(event_msg, sizeof(event_msg), "Fatal init error - no memory");
+          report_startup_error(event_msg, ret);
+        }
 
         /* close file systems */
         fs_finalize();
-    }
-    else 
-    {
-        /* note: this will no longer occur */
-        _snprintf(event_msg, sizeof(event_msg), "Fatal init error: %s",
-            error_msg);        
-        report_startup_error(event_msg, ret);
     }
 
     if (malloc_flag)
@@ -767,13 +816,48 @@ DWORD WINAPI main_loop(LPVOID poptions)
     return (DWORD) ret;
 }
 
+int main_init()
+{
+    DWORD err = 0;
+    ULONG evterr = 0;
+    WORD version;
+    WSADATA wsaData;
+
+    /* init event log */
+    if ((evterr = init_event_log()) != ERROR_SUCCESS)
+    {
+        /* since we can't log to event log, log to stderr */
+        fprintf(stderr, "Could not register event log: %lu\n", evterr);
+    }
+
+    /* init Windows Sockets -- this needs to be done in order
+       to use gethostname() if loading credentials in advance. */
+    version = MAKEWORD(2, 2);
+    err = WSAStartup(version, &wsaData);
+    if (err != 0)
+    {
+        report_startup_error("WSAStartup (Windows Sockets) error:", err);
+        return 1;
+    }
+
+    /* initialize OpenSSL */
+    openssl_init();
+
+    /* initialize LDAP */
+    if (PVFS_ldap_init() != 0)
+    {
+        report_startup_error("Fatal error: LDAP could not be initialized", 0);
+        return 1;
+    }
+
+    return 0;
+}
+
 int main(int argc, char **argv, char **envp)
 {
-  int i = 0;
+  int i = 0, err = 0;
   PORANGEFS_OPTIONS options;
-  DWORD err = 0, cmd_debug = FALSE;
-  WORD version;
-  WSADATA wsaData;
+  BOOL cmd_debug = FALSE;
   char mount_point[256];
   char error_msg[512];
   char env_debug_file[MAX_PATH+16], env_debug_mask[256+16];
@@ -816,35 +900,10 @@ int main(int argc, char **argv, char **envp)
       {
           cmd_debug = TRUE;
       }
-  }
-
-
-
-  /* init event log */
-  if ((err = init_event_log()) != 0)
-  {
-      /* since we can't log to event log, log to stderr */
-      fprintf(stderr, "Could not open event log: %u\n", err);
-  }
-
-  /* init Windows Sockets -- this needs to be done in order
-     to use gethostname() if loading credentials in advance. */
-  version = MAKEWORD(2, 2);
-  err = WSAStartup(version, &wsaData);
-  if (err != 0)
-  {
-	  report_startup_error("WSAStartup (Windows Sockets) error:", err);
-	  return 1;
-  }
-
-  /* initialize OpenSSL */
-  openssl_init();
-
-  /* initialize LDAP */
-  if (PVFS_ldap_init() != 0)
-  {
-      report_startup_error("Fatal error: LDAP could not be initialized", 0);
-      return 1;
+      else {
+          fprintf(stderr, "Invalid argument %s - exiting\n", argv[i]);
+          return 1;
+      }
   }
 
   if (run_service) 
@@ -868,7 +927,11 @@ int main(int argc, char **argv, char **envp)
               _CrtSetReportFile(_CRT_WARN, hfile);
       } 
 #endif
-      
+      /* call initialization function */
+      if ((err = main_init()) != 0) {
+          goto main_exit;
+      }
+
       options = (PORANGEFS_OPTIONS) calloc(1, sizeof(ORANGEFS_OPTIONS));
 
       /* init user list */

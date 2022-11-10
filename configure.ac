@@ -6,8 +6,20 @@ dnl Process this file with autoconf to produce a configure script.
 dnl You may need to use autoheader as well if changing any DEFINEs
 
 dnl sanity checks, output header, location of scripts used here
-AC_INIT(include/pvfs2-types.h)
-AC_PREREQ(2.57)
+AC_INIT
+AC_CONFIG_SRCDIR([include/pvfs2-types.h])
+
+dnl As time progresses our old autotools files and m4 macros
+dnl get out-of-date. Autotools responds with pages of warnings
+dnl about obsolete macros. I ran autoupdate on our configure.ac
+dnl and the m4 files in maint/config, plus a little hand editing
+dnl where required. I was afraid that my updates
+dnl might introduce warnings or failures on older machines, so I
+dnl tested across a range of autotools generations on  2.6.32-754.el6
+dnl and 5.17.11-300.fc36.
+dnl 2.6.32-754.el6 has autoconf-2.63 which came out in 2008.
+dnl 5.17.11-300.fc36 has autoconf-2.71.
+AC_PREREQ([2.63])
 AC_CONFIG_AUX_DIR(maint/config)
 
 dnl
@@ -47,7 +59,7 @@ if test "x$USR_CFLAGS" = "x"; then
 fi
 
 dnl if we use headers that might not be on every platform, add them here
-AC_CONFIG_HEADER(pvfs2-config.h)
+AC_CONFIG_HEADERS([pvfs2-config.h])
 
 AC_CHECK_HEADER([pwd.h],
         [AC_DEFINE(HAVE_PWD_H, 1, Define if pwd.h exists)])
@@ -663,59 +675,47 @@ AC_SUBST(MISC_TROVE_FLAGS)
 
 dnl Check for AIO's aiocb->__error_code field (linux has it, OS X doesn't)
 AC_MSG_CHECKING([for __error_code field in aiocb struct])
-AC_TRY_COMPILE(
-    [
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
      	#include <aio.h>
-    ], 
-    [
+    ]], [[
     	struct aiocb aiocb;
 	aiocb.__error_code = 0;
-    ],
-    AC_MSG_RESULT(yes)
+    ]])],[AC_MSG_RESULT(yes)
     AC_DEFINE(HAVE_AIOCB_ERROR_CODE, 1, Define if aiocb->__error_code exists)
-    ,
-    AC_MSG_RESULT(no)
-)
+    ],[AC_MSG_RESULT(no)
+])
 
 dnl Check for AIO's aiocb->__return_value field (linux has it, OS X doesn't)
 AC_MSG_CHECKING([for __return_value field in aiocb struct])
-AC_TRY_COMPILE(
-    [
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
         #include <aio.h>
-    ],
-    [
+    ]], [[
         struct aiocb aiocb;
 	aiocb.__return_value = 0;
-    ],
-    AC_MSG_RESULT(yes)
+    ]])],[AC_MSG_RESULT(yes)
     AC_DEFINE(HAVE_AIOCB_RETURN_VALUE, 1, Define if aiocb->__return_value exists)
-    ,
-    AC_MSG_RESULT(no)
-)
+    ],[AC_MSG_RESULT(no)
+])
 
 dnl Check for updated selinux so it won't break usrint
 AC_MSG_CHECKING([for const security_context_t in setfilecon])
 old_cflags="$CFLAGS"
 CFLAGS="$CFLAGS -Werror"
-AC_TRY_COMPILE(
-    [
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
         #include <stdio.h>
         #include <selinux/selinux.h>
         int setfilecon(const char *path, const char *con)
         {
             return 0;
         }
-    ],
-    [
+    ]], [[
         const char *sc_t = NULL;
         setfilecon("somepath", sc_t);
-    ],
-    [
+    ]])],[
        AC_MSG_RESULT(yes)
        AC_DEFINE(HAVE_CONST_SECURITY_CONTEXT, 1, Define if setfilecon uses a const security_context_t)
-    ],
-    AC_MSG_RESULT(no)
-)
+    ],[AC_MSG_RESULT(no)
+])
 CFLAGS="$old_cflags"
 
 dnl Check byte ordering
@@ -996,16 +996,14 @@ test_for_epoll()
 {
   AC_CHECK_HEADERS(sys/epoll.h)
   AC_MSG_CHECKING(for epoll functions)
-  AC_TRY_LINK([#include <sys/epoll.h>], [
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <sys/epoll.h>]], [[
 	int fd;
 	fd = epoll_create(1);
 	close(fd);
-  ],
-     AC_MSG_RESULT(yes)
+  ]])],[AC_MSG_RESULT(yes)
      BUILD_EPOLL=1
-     AC_SUBST(BUILD_EPOLL),
-     AC_MSG_RESULT(no)
-  )
+     AC_SUBST(BUILD_EPOLL)],[AC_MSG_RESULT(no)
+  ])
 }
 
 dnl optionally enable use of epoll() on Linux instead of poll()
@@ -1030,18 +1028,16 @@ AC_ARG_ENABLE(segv-backtrace,
 [  --disable-segv-backtrace
                           Disables back traces in segfault signal handler],,
     AC_MSG_CHECKING(if segv backtrace capable)
-    AC_TRY_COMPILE([
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <execinfo.h>
 #define __USE_GNU
 #include <ucontext.h>
 #if !defined(REG_EIP) && !defined(REG_RIP)
 		   choke me
 #endif
-		   ], [],
-		   AC_MSG_RESULT(yes)
-    		   PVFS2_SEGV_BACKTRACE=1,
-		   AC_MSG_RESULT(no)
-    )
+		   ]], [[]])],[AC_MSG_RESULT(yes)
+    		   PVFS2_SEGV_BACKTRACE=1],[AC_MSG_RESULT(no)
+    ])
 )
 AC_SUBST(PVFS2_SEGV_BACKTRACE)
 
@@ -1251,19 +1247,15 @@ fi],
 
 dnl Check for O_CLOEXEC flag in open()
 AC_MSG_CHECKING([for O_CLOEXEC flag in open()])
-AC_TRY_COMPILE(
-    [
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
      	#include <fcntl.h>
-    ], 
-    [
+    ]], [[
     	int flags;
         flags = O_CLOEXEC;
-    ],
-    AC_MSG_RESULT(yes)
+    ]])],[AC_MSG_RESULT(yes)
     AC_DEFINE(HAVE_O_CLOEXEC, 1, Define if open() has O_CLOEXEC flag)
-    ,
-    AC_MSG_RESULT(no)
-)
+    ],[AC_MSG_RESULT(no)
+])
 
 dnl Method to check if dl calls need an explicit link flag
 AC_MSG_CHECKING(if dlfns needs explicit library request)
@@ -1365,23 +1357,21 @@ AC_SUBST(BUILD_JNI)
 dnl See if we have includes needed for acls
 BUILD_ACL_INTERFACE=
 AC_MSG_CHECKING(for user acl includes sys/acl.h acl/libacl.h)
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <sys/acl.h>
 #include <acl/libacl.h>
-], [],
-    AC_MSG_RESULT(yes)
+]], [[]])],[AC_MSG_RESULT(yes)
     BUILD_ACL_INTERFACE=1
     AC_DEFINE(PVFS_HAVE_ACL_INCLUDES, 1,
-            [Should we build user interface acl routines.])
-,
-    AC_MSG_RESULT(no)
+            Should we build user interface acl routines.)
+],[AC_MSG_RESULT(no)
     BUILD_ACL_INTERFACE=0
-)
+])
 AC_SUBST(BUILD_ACL_INTERFACE)
 
 dnl See if scandir compare arg takes void pointers
 AC_MSG_CHECKING(for scandir compare arg using void pointers)
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #define _LARGEFILE64_SOURCE 1
 #define _GNU_SOURCE 1
 #include <dirent.h>
@@ -1393,13 +1383,11 @@ int scandir64 (const char *dir, struct dirent64 ***list,
                int (*sel)(const struct dirent64 *),
                int (*cmp)(const void *, const void *))
 { return 0; }
-], [],
-    AC_MSG_RESULT(yes)
+]], [[]])],[AC_MSG_RESULT(yes)
     AC_DEFINE(PVFS_SCANDIR_VOID, 1,
-            [scandir compare arg takes void pointers.])
-,
-    AC_MSG_RESULT(no)
-)
+            scandir compare arg takes void pointers.)
+],[AC_MSG_RESULT(no)
+])
     
 
 dnl See if CC is a GNU compiler.  This may require a real test in future
@@ -1409,16 +1397,14 @@ dnl not argument compatible
 INTELC=
 GNUC=
 AC_MSG_CHECKING(whether cc is an Intel compiler)
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #ifndef __ICC
        choke me
 #endif
-], [],
-    AC_MSG_RESULT(yes)
+]], [[]])],[AC_MSG_RESULT(yes)
     INTELC=1
-    ,
-    AC_MSG_RESULT(no)
-)
+    ],[AC_MSG_RESULT(no)
+])
 if test "x$INTELC" = "x" ; then
     if test "x$GCC" = "xyes" ; then
        GNUC=1
@@ -1519,26 +1505,22 @@ dnl check for gethostbyname function
 AC_MSG_CHECKING(for gethostbyname)
 oldcflags="$CFLAGS"
 CFLAGS="$USR_CFLAGS"
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <netdb.h>
-], [
+]], [[
 gethostbyname("localhost");
-],
-AC_MSG_RESULT(yes)
-AC_DEFINE(HAVE_GETHOSTBYNAME, 1, Define if gethostbyname function exists),
-AC_MSG_RESULT(no)
-WARN_ABOUT_HOSTNAMES="yes")
+]])],[AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_GETHOSTBYNAME, 1, Define if gethostbyname function exists)],[AC_MSG_RESULT(no)
+WARN_ABOUT_HOSTNAMES="yes"])
 
 AC_MSG_CHECKING(for gethostbyaddr)
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #include <netdb.h>
-], [
+]], [[
 struct sockaddr_in peer;
 gethostbyaddr((void *)&peer.sin_addr.s_addr, sizeof(struct in_addr), AF_INET);
-],
-AC_MSG_RESULT(yes)
-AC_DEFINE(HAVE_GETHOSTBYADDR, 1, Define if gethostbyaddr function exists),
-AC_MSG_RESULT(no)  )
+]])],[AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_GETHOSTBYADDR, 1, Define if gethostbyaddr function exists)],[AC_MSG_RESULT(no)  ])
 
 CFLAGS="$oldcflags"
 
@@ -1589,36 +1571,30 @@ AX_ZOID
 dnl
 dnl check for F_NOCACHE (MACOSX)
 AC_MSG_CHECKING([for F_NOCACHE])
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
     #include <sys/fcntl.h>
     int fd;
     fcntl(fd, F_NOCACHE, 1);
-    ], [],
-    AC_MSG_RESULT(no),
-    AC_MSG_RESULT(yes),
-    AC_DEFINE(HAVE_FCNTL_F_NOCACHE, 1, Define if system defines F_NOCACHE fcntl)
-)
+    ]], [[]])],[AC_MSG_RESULT(no)],[AC_MSG_RESULT(yes)])
 
 dnl
 dnl check for open O_DIRECT
 AC_MSG_CHECKING([for open O_DIRECT])
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
     #define _GNU_SOURCE
     #include <fcntl.h>
     #include <sys/types.h>
     #include <sys/stat.h>
-    ], [
+    ]], [[
     open("somefile", O_RDONLY | O_DIRECT);
-    ],
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(HAVE_OPEN_O_DIRECT, 1, Define if system defines O_DIRECT fcntl),
-    AC_MSG_RESULT(no)
-)
+    ]])],[AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_OPEN_O_DIRECT, 1, Define if system defines O_DIRECT fcntl)],[AC_MSG_RESULT(no)
+])
 
 dnl
 dnl check if fgetxattr takes extra arguments
 AC_MSG_CHECKING([for fgetxattr extra arguments])
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 	#include <sys/types.h>
 	#ifdef HAVE_ATTR_XATTR_H
 	#include <attr/xattr.h>
@@ -1626,19 +1602,16 @@ AC_TRY_COMPILE([
 	#ifdef HAVE_SYS_XATTR_H
 	#include <sys/xattr.h>
 	#endif
-	],
-	[
+	]], [[
 	fgetxattr(0, 0, 0, 0, 0, 0);
-	],
-	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_FGETXATTR_EXTRA_ARGS, 1, Define if fgetxattr takes position and option arguments),
-	AC_MSG_RESULT(no)
-)
+	]])],[AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_FGETXATTR_EXTRA_ARGS, 1, Define if fgetxattr takes position and option arguments)],[AC_MSG_RESULT(no)
+])
 
 dnl
 dnl check if setxattr takes extra arguments
 AC_MSG_CHECKING([for setxattr extra arguments])
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 	#include <sys/types.h>
 	#ifdef HAVE_ATTR_XATTR_H
 	#include <attr/xattr.h>
@@ -1646,19 +1619,16 @@ AC_TRY_COMPILE([
 	#ifdef HAVE_SYS_XATTR_H
 	#include <sys/xattr.h>
 	#endif
-	],
-	[
+	]], [[
 	setxattr(0, 0, 0, 0, 0, 0);
-	],
-	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_SETXATTR_EXTRA_ARGS, 1, Define if setxattr takes position and option arguments),
-	AC_MSG_RESULT(no)
-)
+	]])],[AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SETXATTR_EXTRA_ARGS, 1, Define if setxattr takes position and option arguments)],[AC_MSG_RESULT(no)
+])
 
 dnl
 dnl check if getxattr takes extra arguments
 AC_MSG_CHECKING([for getxattr extra arguments])
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 	#include <sys/types.h>
 	#ifdef HAVE_ATTR_XATTR_H
 	#include <attr/xattr.h>
@@ -1666,14 +1636,11 @@ AC_TRY_COMPILE([
 	#ifdef HAVE_SYS_XATTR_H
 	#include <sys/xattr.h>
 	#endif
-	],
-	[
+	]], [[
 	getxattr(0, 0, 0, 0, 0, 0);
-	],
-	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_GETXATTR_EXTRA_ARGS, 1, Define if getxattr takes position and option arguments),
-	AC_MSG_RESULT(no)
-)
+	]])],[AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_GETXATTR_EXTRA_ARGS, 1, Define if getxattr takes position and option arguments)],[AC_MSG_RESULT(no)
+])
 
 dnl
 dnl look for sysinfo header
@@ -1690,7 +1657,7 @@ AC_CHECK_FUNCS(fsetxattr)
 
 dnl fgetxattr doesn't have a prototype on some systems
 AC_MSG_CHECKING([for fgetxattr prototype])
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 	#include <sys/types.h>
 	#ifdef HAVE_ATTR_XATTR_H
 	#include <attr/xattr.h>
@@ -1699,18 +1666,16 @@ AC_TRY_COMPILE([
 	#include <sys/xattr.h>
 	#endif
 	char * fgetxattr(char *foo);
-	], [], 
-	AC_MSG_RESULT(no),
-	AC_MSG_RESULT(yes)
+	]], [[]])],[AC_MSG_RESULT(no)],[AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_FGETXATTR_PROTOTYPE, 1, Define if system provides fgtxattr prototype)
-)
+])
 
 dnl
 dnl check if fgetxattr takes extra arguments:  old systems that do not have any
 dnl sort of fgetxattr should fall back to our faked version.
 
 AC_MSG_CHECKING([for fgetxattr extra arguments])
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 	#include <sys/types.h>
 	#ifdef HAVE_ATTR_XATTR_H
 	#include <attr/xattr.h>
@@ -1718,21 +1683,18 @@ AC_TRY_COMPILE([
 	#ifdef HAVE_SYS_XATTR_H
 	#include <sys/xattr.h>
 	#endif
-	],
-	[
+	]], [[
 	#ifdef HAVE_FGETXATTR_PROTOTYPE
 	fgetxattr(0, 0, 0, 0, 0, 0);
 	#else
 	#  error
 	#endif
-	],
-	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_FGETXATTR_EXTRA_ARGS, 1, Define if fgetxattr takes position and option arguments),
-	AC_MSG_RESULT(no)
-)
+	]])],[AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_FGETXATTR_EXTRA_ARGS, 1, Define if fgetxattr takes position and option arguments)],[AC_MSG_RESULT(no)
+])
 
 AC_MSG_CHECKING([for fsetxattr extra arguments])
-AC_TRY_COMPILE([
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 	#include <sys/types.h>
 	#ifdef HAVE_ATTR_XATTR_H
 	#include <attr/xattr.h>
@@ -1740,14 +1702,11 @@ AC_TRY_COMPILE([
 	#ifdef HAVE_SYS_XATTR_H
 	#include <sys/xattr.h>
 	#endif
-	],
-	[
+	]], [[
 	fsetxattr(0, 0, 0, 0, 0, 0);
-	],
-	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_FSETXATTR_EXTRA_ARGS, 1, Define if fsetxattr takes position and option arguments),
-	AC_MSG_RESULT(no)
-)
+	]])],[AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_FSETXATTR_EXTRA_ARGS, 1, Define if fsetxattr takes position and option arguments)],[AC_MSG_RESULT(no)
+])
 
 
 dnl check for getmntent(), special test
@@ -1835,26 +1794,22 @@ dnl if it is an inline function. This way, we can leave the test in
 dnl src/io/bmi/bmi-byteswap.h in case there's anyone out there who
 dnl still needs it.
 AC_MSG_CHECKING([for __bswap_64 is a function])
-AC_TRY_COMPILE(
-    [
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
       #include <byteswap.h>
       #include <bits/types.h>
-    ],
-    [
+    ]], [[
       __uint64_t x;
       #ifndef  __bswap_64
         __bswap_64(x);
       #else
          __bswap_64_is_not_a_function(not a function);
       #endif
-    ],
-    [
+    ]])],[
       AC_MSG_RESULT(yes)
       AC_DEFINE(BSWAP_64_IS_A_FUNC, 1, Define if __bswap_64 is a function)
-    ]
-    ,
-    AC_MSG_RESULT(no)
-)
+    
+    ],[AC_MSG_RESULT(no)
+])
 
 dnl gets has been officially removed in ISO C11
 dnl     - /usr/include/stdio.h
@@ -1866,22 +1821,18 @@ dnl     - http://gcc.gnu.org/bugzilla/show_bug.cgi?id=51785
 AC_MSG_CHECKING([for gets in stdio.h])
 oldcflags="$CFLAGS"
 CFLAGS="$CFLAGS -Werror"
-AC_TRY_COMPILE(
-    [
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
        #include <stdio.h>
-    ],
-    [
+    ]], [[
        char *s;
        gets(s);
-    ],
-    [
+    ]])],[
        AC_MSG_RESULT(yes)
        AC_DEFINE(HAVE_STDIO_GETS, 1, Define if gets supported in stdio.h)
-    ],
-    [
+    ],[
        AC_MSG_RESULT(no)
-    ]
-)
+    
+])
 CFLAGS="$oldcflags"
 
 dnl create any missing subdirectories that wouldn't be created
@@ -1893,7 +1844,7 @@ done
 
 dnl output final version of top level makefile and subdirectory
 dnl    makefile includes
-AC_OUTPUT(include/pvfs2.h
+AC_CONFIG_FILES([include/pvfs2.h
 Makefile
 src/apps/admin/module.mk
 src/apps/admin/pvfs2-config
@@ -1961,7 +1912,8 @@ src/client/hadoop/orangefs-hadoop1/pom.xml
 src/client/hadoop/orangefs-hadoop1/src/main/resources/conf/hadoop-env.sh
 src/client/hadoop/orangefs-hadoop2/pom.xml
 src/client/hadoop/orangefs-hadoop2/src/main/resources/conf/hadoop-env.sh
-)
+])
+AC_OUTPUT
 
 chmod +x $BUILD_ABSOLUTE_TOP/src/apps/admin/pvfs2-config
 

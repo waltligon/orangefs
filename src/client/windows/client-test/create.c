@@ -79,8 +79,9 @@ int create_subdir_int(global_options *options, int fatal, int max_size)
     int i, dir_count, code = 0;
     char path[MAX_SIZE*2], dir[9];
 
-    /* number of dirs that will fit, accounting for size of root_dir */
-    dir_count = (max_size - (int) strlen(options->root_dir)) / DIR_LEN;
+    /* number of dirs that will fit, accounting for size of root_dir 
+       (deduct 1 size from max_size for the terminating null) */
+    dir_count = ((max_size - 1) - (int) strlen(options->root_dir)) / DIR_LEN;
 
     /* copy root into path */
     strcpy(path, options->root_dir);
@@ -301,17 +302,17 @@ int create_file_toolong(global_options *options, int fatal)
 {
     int code;
 
-    code = create_file_long_int(options, MAX_FILE_NAME+1);
+    code = create_file_long_int(options, MAX_FILE_NAME*2-1);
 
     report_result(options,
                   "create_file_toolong",
                   "main",
                   RESULT_FAILURE,
-                  22,
+                  2,
                   OPER_EQUAL,
                   code);
 
-    if (code != 22 && fatal)
+    if (code != 2 && fatal)
         return CODE_FATAL;
 
     return 0;

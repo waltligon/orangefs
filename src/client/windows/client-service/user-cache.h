@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
+ * (C) 2010-2022 Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -27,7 +27,7 @@ struct user_entry
     ASN1_UTCTIME *expires;    
 };
 
-int user_compare(void *key, 
+int user_compare(const void *key, 
                  struct qhash_head *link);
 
 int add_cache_user(char *user_name, 
@@ -36,8 +36,8 @@ int add_cache_user(char *user_name,
 
 int get_cache_user(char *user_name, 
                    PVFS_credential *credential);
-
-int remove_user(char *user_name);
+/* not needed
+int remove_user(char *user_name); */
 
 unsigned int user_cache_thread(void *options);
 

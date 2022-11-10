@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
+ * (C) 2010-2022 Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -16,6 +16,7 @@
 #include <Userenv.h>
 #include <stdio.h>
 
+#include <crypto/x509.h>
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
 #include <openssl/pem.h>
@@ -34,6 +35,9 @@
 
 extern PORANGEFS_OPTIONS goptions;
 
+static CRYPTO_ONCE once = CRYPTO_ONCE_STATIC_INIT;
+static CRYPTO_RWLOCK* rwlock = NULL;
+
 /* initialize OpenSSL */
 void openssl_init()
 {
@@ -46,23 +50,46 @@ void openssl_init()
 /* cleanup OpenSSL */
 void openssl_cleanup()
 {
+    if (rwlock) {
+        CRYPTO_THREAD_lock_free(rwlock);
+    }
     CRYPTO_cleanup_all_ex_data();
     ERR_free_strings();
     ERR_remove_state(0);
 }
 
+static void lock_init(void)
+{
+    rwlock = CRYPTO_THREAD_lock_new();
+}
+
 static int get_proxy_auth_ex_data_cred()
 {
     static volatile int idx = -1;
+
     if (idx < 0)
     {
-        CRYPTO_w_lock(CRYPTO_LOCK_X509_STORE);
-        if (idx < 0)
+        /* set up lock if necessary */
+        if (!rwlock)
         {
-            idx = X509_STORE_CTX_get_ex_new_index(0, "credential", NULL, NULL,
-                NULL);
+            if (!CRYPTO_THREAD_run_once(&once, lock_init) || rwlock == NULL) {
+                return -1;
+            }
         }
-        CRYPTO_w_unlock(CRYPTO_LOCK_X509_STORE);
+        
+        if (CRYPTO_THREAD_write_lock(rwlock))
+        {
+            if (idx < 0)
+            {
+                idx = X509_STORE_CTX_get_ex_new_index(0, "credential", NULL, NULL,
+                    NULL);
+            }
+            CRYPTO_THREAD_unlock(rwlock);
+        }
+        else
+        {
+            report_error("Failed to lock thread in get_proxy_auth_ex_data_cred()", -PVFS_ESECURITY);
+        }
     }
 
     return idx;
@@ -73,13 +100,27 @@ static int get_proxy_auth_ex_data_user_name()
     static volatile int idx = -1;
     if (idx < 0)
     {
-        CRYPTO_w_lock(CRYPTO_LOCK_X509_STORE);
-        if (idx < 0)
+        /* set up lock if necessary */
+        if (!rwlock)
         {
-            idx = X509_STORE_CTX_get_ex_new_index(0, "user_name",
-                NULL, NULL, NULL);
+            if (!CRYPTO_THREAD_run_once(&once, lock_init) || rwlock == NULL) {
+                return -1;
+            }
         }
-        CRYPTO_w_unlock(CRYPTO_LOCK_X509_STORE);
+
+        if (CRYPTO_THREAD_write_lock(rwlock))
+        {
+            if (idx < 0)
+            {
+                idx = X509_STORE_CTX_get_ex_new_index(0, "user_name",
+                    NULL, NULL, NULL);
+            }
+            CRYPTO_THREAD_unlock(rwlock);
+        }
+        else
+        {
+            report_error("Failed to lock thread in get_proxy_auth_ex_data_user_name()", -PVFS_ESECURITY);
+        }
     }
 
     return idx;
@@ -208,7 +249,7 @@ static unsigned long verify_cert(char *user_name,
                                  PVFS_credential *credential)
 {
     X509_STORE *trust_store;
-    X509_STORE_CTX *ctx;
+    X509_STORE_CTX *ctx = NULL;
     int ret, verify_flag = 0;
     int (*save_verify_cb)(int ok, X509_STORE_CTX *ctx);
     char error_msg[256];
@@ -310,11 +351,11 @@ int get_proxy_cert_credential(HANDLE huser,
     unsigned long err_flag = FALSE;
     char error_msg[1024];
 
-    DbgPrint("   get_proxy_cert_credential: enter\n");
+    client_debug("   get_proxy_cert_credential: enter\n");
     
     if (user_name == NULL || credential == NULL || expires == NULL)
     {
-        DbgPrint("   get_proxy_cert_credential: invalid parameter\n");
+        client_debug("   get_proxy_cert_credential: invalid parameter\n");
         return -1;
     }
 
@@ -437,7 +478,7 @@ int get_proxy_cert_credential(HANDLE huser,
 
     if (ret == 0)
     {        
-        *expires = M_ASN1_UTCTIME_dup(X509_get_notAfter(cert));
+        *expires = ASN1_STRING_dup(X509_get_notAfter(cert));
         /* TODO: cache revision */
         credential->timeout = time(NULL) + PVFS2_SECURITY_TIMEOUT_MAX;
     }
@@ -462,7 +503,7 @@ get_proxy_cert_credential_exit:
     if (ca_cert != NULL)
         X509_free(ca_cert);
 
-    DbgPrint("   get_proxy_cert_credential: exit\n");
+    client_debug("   get_proxy_cert_credential: exit\n");
 
     return ret;
 }
@@ -502,7 +543,7 @@ int get_user_cert_credential(HANDLE huser,
        3. sign credential 
      */
     
-    DbgPrint("   get_user_cert_credential: enter\n");
+    client_debug("   get_user_cert_credential: enter\n");
 
     if (user_name == NULL || strlen(user_name) == 0 || cred == NULL ||
         expires == NULL)
@@ -614,25 +655,25 @@ int get_user_cert_credential(HANDLE huser,
     }
 
     /* get the expiration time for caching */
-    *expires = M_ASN1_UTCTIME_dup(X509_get_notAfter(xcert));
+    *expires = ASN1_STRING_dup(X509_get_notAfter(xcert));
 
     /* free X509 cert */
     X509_free(xcert);
 
-    DbgPrint("   get_user_cert_credential: user: %s\tkey_file: %s\tcert_file: %s\n",
+    client_debug("   get_user_cert_credential: user: %s\tkey_file: %s\tcert_file: %s\n",
         user_name, key_file, cert_file);
 
     /* initialize the credential */
     ret = init_credential(PVFS_UID_MAX, group_array, 1, key_file, cert, cred);
     if (ret != 0)
     {
-        _snprintf(errmsg, sizeof(errmsg), "User %s: credential error: ", ret);
+        _snprintf(errmsg, sizeof(errmsg), "User %s: credential error: %d", user_name, ret);
         report_error(errmsg, ret);
     }
 
     PINT_cleanup_cert(cert);
 
-    DbgPrint("   get_user_cert_credential: exit\n");
+    client_debug("   get_user_cert_credential: exit\n");
 
     return ret;
 }
