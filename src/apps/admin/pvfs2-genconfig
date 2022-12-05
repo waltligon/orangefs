@@ -561,16 +561,13 @@ sub emit_filesystem
     my $meta_count = scalar(get_aliases($META_ENDPOINT));
     if ($opt_distrdir_servers_initial)
     {
-        print "1\n";
         die "\n*** error: distrdir-servers-initial must be between 1 and the number of metadata servers"
             if ($opt_distrdir_servers_initial lt 1 || $opt_distrdir_servers_initial gt $meta_count);
 
-        print "2\n";
         print $target "\tDistrDirServersInitial $opt_distrdir_servers_initial\n";
     }
     else
     {
-        print "3\n";
         print $target "\tDistrDirServersInitial 1\n";
     }
 #    print $target "\tDistrDirServersMax $meta_count\n";
