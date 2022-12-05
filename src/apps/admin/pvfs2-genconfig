@@ -2156,7 +2156,9 @@ if($opt_metaspec)
     get_specs($META_ENDPOINT, $opt_metaspec);
 
     $bmi_module = join(',', (map { "bmi_" . $_ } get_all_protocols()));
-    print "\tBMIModules $bmi_module\n";
+    if (!$opt_quiet) {
+        print $OUT "\tBMIModules $bmi_module\n";
+    }
 }
 else
 {
