@@ -75,7 +75,7 @@ static void aio_progress_notification(union sigval sig)
     struct dbpf_op *op_p = NULL;
     int ret, i, aiocb_inuse_count, state = 0;
     struct aiocb *aiocb_p = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = {0};
-    PVFS_size eor = -1;
+    TROVE_size eor = -1;
     int j;
     TROVE_ds_attributes attr;
     TROVE_object_ref ref;
@@ -730,7 +730,7 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     enum dbpf_op_type tmp_type;
     PINT_event_type event_type;
     int i;
-    PVFS_size count_mem;
+    TROVE_size count_mem;
 #ifdef __PVFS2_TROVE_AIO_THREADED__
     struct dbpf_op *op_p = NULL;
     int aiocb_inuse_count = 0;
@@ -795,7 +795,7 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 
     if(gossip_debug_enabled(GOSSIP_TROVE_DEBUG))
     {
-        PVFS_size count_stream = 0;
+        TROVE_size count_stream = 0;
         count_mem = 0;
         gossip_debug(GOSSIP_TROVE_DEBUG, 
                      "dbpf_bstream_rw_list: mem_count: %d, stream_count: %d\n",
@@ -1354,7 +1354,7 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
     TROVE_object_ref ref;
     dbpf_queued_op_t *q_op_p;
     struct open_cache_ref open_ref;
-    PVFS_size tmpsize;
+    TROVE_size tmpsize = 0;
 
     q_op_p = (dbpf_queued_op_t *)op_p->u.b_resize.queued_op_ptr;
 
@@ -1371,6 +1371,8 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
 
     tmpsize = op_p->u.b_resize.size;
     attr.u.datafile.b_size = tmpsize;
+    /* ensure attr mask bit is on? */
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: size = %ld\n", __func__, tmpsize);
 
     ret = dbpf_dspace_attr_set(op_p->coll_p, ref, &attr);
     if(ret < 0)
@@ -1389,21 +1391,28 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
                         q_op_p->op.user_ptr,
                         TROVE_SYNC,
                         q_op_p->op.context_id);
+
     q_op_p->op.state = OP_IN_SERVICE;
 
     /* truncate file after attributes are set */
-    ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle,
-        DBPF_FD_BUFFERED_WRITE,
-        &open_ref);
+    ret = dbpf_open_cache_get(op_p->coll_p->coll_id,
+                              op_p->handle,
+                              DBPF_FD_BUFFERED_WRITE,
+                              &open_ref);
     if(ret < 0)
     {
+        gossip_err("%s: failed to dbpf_open_cache_get errno %d\n",
+                   __func__, ret);
         return ret;
     }
 
+
+    /* resize bytestream file usng local FS */
     ret = ftruncate(open_ref.fd, tmpsize);
     if(ret < 0)
     {
+        gossip_err("%s: failed to resize using local FS errno %d\n",
+                   __func__, ret);
         return(ret);
     }
 
@@ -1446,6 +1455,9 @@ int dbpf_bstream_resize(TROVE_coll_id coll_id,
                         user_ptr,
                         flags,
                         context_id);
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: size = %ld\n",
+                 __func__, *inout_size_p);
 
     /* initialize the op-specific members */
     q_op_p->op.u.b_resize.size = *inout_size_p;

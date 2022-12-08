@@ -61,8 +61,13 @@ struct file_struct
     char *pathname;
 };
 
-static struct unlink_context dbpf_unlink_context;
+/* unlink_bstream is a thread that loops waiting for work
+ * in the global_list defined below. unlink_bstream is an
+ * infinite loop that does not halt unless forced to.
+ */
 static void* unlink_bstream(void *context);
+
+static struct unlink_context dbpf_unlink_context;
 static int fast_unlink(
     const char *pathname, 
     TROVE_coll_id coll_id, 
@@ -121,7 +126,11 @@ void dbpf_open_cache_initialize(void)
     INIT_QLIST_HEAD(&dbpf_unlink_context.global_list);
     pthread_mutex_init(&dbpf_unlink_context.mutex, NULL);
     pthread_cond_init(&dbpf_unlink_context.data_available, NULL);
-    ret = pthread_create(&dbpf_unlink_context.thread_id, NULL, unlink_bstream, (void*)&dbpf_unlink_context);
+
+    ret = pthread_create(&dbpf_unlink_context.thread_id,
+                         NULL,
+                         unlink_bstream,
+                         (void*)&dbpf_unlink_context);
     if(ret)
     {
         gossip_err("dbpf_open_cache_initialize: failed [%d]\n", ret);
@@ -387,17 +396,15 @@ void dbpf_open_cache_put(
     return;
 }
 
-int dbpf_open_cache_remove(
-    TROVE_coll_id coll_id,
-    TROVE_handle handle)
+int dbpf_open_cache_remove(TROVE_coll_id coll_id, TROVE_handle handle)
 {
-    struct qlist_head* tmp_link;
-    struct open_cache_entry* tmp_entry = NULL;
+    struct qlist_head *tmp_link;
+    struct open_cache_entry *tmp_entry = NULL;
     int found = 0;
     char filename[PATH_MAX];
     int ret = -1;
     int tmp_error = 0;
-    struct qlist_head* scratch;
+    struct qlist_head *scratch;
     char open_type[32] = {0};
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
@@ -413,8 +420,10 @@ int dbpf_open_cache_remove(
     /* TODO: remove this search later when we have more confidence */
     qlist_for_each(tmp_link, &used_list)
     {
-	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
-	    queue_link);
+	tmp_entry = qlist_entry(tmp_link,
+                                struct open_cache_entry,
+                                queue_link);
+
 	if ((tmp_entry->handle == handle) &&
             (tmp_entry->coll_id == coll_id))
 	{
@@ -464,8 +473,10 @@ int dbpf_open_cache_remove(
     /* see if the item is in the unused list (ref_ct == 0) */    
     qlist_for_each_safe(tmp_link, scratch, &unused_list)
     {
-	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
-	    queue_link);
+	tmp_entry = qlist_entry(tmp_link,
+                                struct open_cache_entry,
+	                        queue_link);
+
 	if ((tmp_entry->handle == handle) &&
              (tmp_entry->coll_id == coll_id))
         {
@@ -481,8 +492,9 @@ int dbpf_open_cache_remove(
 	    "dbpf_open_cache_remove: unused entry.\n");
         if (tmp_entry->remove_flag)
         {
-           gossip_err("DBPF_OPEN_CACHE_REMOVE: handle:%llu found in the UNused list with"
-                      " remove-flag turned on\n",llu(tmp_entry->handle));
+           gossip_err("DBPF_OPEN_CACHE_REMOVE: "
+                      "handle:%llu found in the UNused list with "
+                      "remove-flag turned on\n",llu(tmp_entry->handle));
         }
         tmp_entry->remove_flag = 0;
 	if (tmp_entry->fd > -1)
@@ -500,8 +512,11 @@ int dbpf_open_cache_remove(
 
     tmp_error = 0;
 
-    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
-                              my_storage_p->data_path, coll_id, llu(handle));
+    DBPF_GET_BSTREAM_FILENAME(filename,
+                              PATH_MAX,
+                              my_storage_p->data_path,
+                              coll_id,
+                              llu(handle));
 
     ret = fast_unlink(filename, coll_id, handle);
 
@@ -612,7 +627,9 @@ inline static struct open_cache_entry * dbpf_open_cache_find_entry(
     return NULL;
 }
 
-int fast_unlink(const char *pathname, TROVE_coll_id coll_id, TROVE_handle handle)
+int fast_unlink(const char *pathname,
+                TROVE_coll_id coll_id,
+                TROVE_handle handle)
 {
     int ret;
     struct file_struct *tmp_item;
@@ -630,19 +647,22 @@ int fast_unlink(const char *pathname, TROVE_coll_id coll_id, TROVE_handle handle
         free(tmp_item);
         return -TROVE_ENOMEM;
     }
-    DBPF_GET_STRANDED_BSTREAM_FILENAME(tmp_item->pathname, PATH_MAX,
+    DBPF_GET_STRANDED_BSTREAM_FILENAME(tmp_item->pathname,
+                                       PATH_MAX,
                                        my_storage_p->data_path, 
                                        coll_id,
                                        llu(handle));
     
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, 
-                 "Renaming [%s] to [%s] for threaded delete.\n", pathname, tmp_item->pathname);
+                 "Renaming [%s] to [%s] for threaded delete.\n",
+                 pathname, tmp_item->pathname);
 
     ret = rename(pathname, tmp_item->pathname);
     if(ret != 0)
     {
         gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, 
-            "Warning: During unlink, the rename failed on file [%s] with errno [%d] strerr [%s].\n", 
+            "Warning: During unlink, the rename failed on file [%s] "
+            "with errno [%d] strerr [%s].\n", 
             pathname, errno, strerror(errno));
         free(tmp_item->pathname);
         free(tmp_item);
@@ -652,9 +672,10 @@ int fast_unlink(const char *pathname, TROVE_coll_id coll_id, TROVE_handle handle
     /* Add to the queue */
     pthread_mutex_lock(&dbpf_unlink_context.mutex); 
     qlist_add_tail(&tmp_item->list_link, &dbpf_unlink_context.global_list);
-    /* Moved gossip_debug BEFORE pthread_cond_signal; otherwise, tmp_item->pathname caused a seg fault 
+    /* Moved gossip_debug BEFORE pthread_cond_signal; otherwise,
+     * tmp_item->pathname caused a seg fault 
      * if the unlink signal processed BEFORE the debug statement.
-    */
+     */
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, 
         "Added [%s] to the queue.\n", tmp_item->pathname);
     pthread_cond_signal(&dbpf_unlink_context.data_available);
@@ -663,7 +684,11 @@ int fast_unlink(const char *pathname, TROVE_coll_id coll_id, TROVE_handle handle
     return(0);
 }
 
-static void* unlink_bstream(void *context)
+/* unlink_bstream is a thread that loops waiting for work
+ * in the global_list defined below. unlink_bstream is an
+ * infinite loop that does not halt unless forced to.
+ */
+static void *unlink_bstream(void *context)
 {
     struct unlink_context *loc_context = (struct unlink_context *) context;
     int ret;
@@ -677,7 +702,8 @@ static void* unlink_bstream(void *context)
         /* If there is no work to do, go into a condition wait */
         if(qlist_empty(&loc_context->global_list))
         {
-            pthread_cond_wait(&loc_context->data_available, &loc_context->mutex);
+            pthread_cond_wait(&loc_context->data_available,
+                              &loc_context->mutex);
         }
         
         if(!qlist_empty(&loc_context->global_list))

@@ -54,18 +54,27 @@ machine pvfs2_truncate_sm
 
 %%
 
-static PINT_sm_action truncate_resize(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action truncate_resize(struct PINT_smcb *smcb,
+                                      job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
-    ret = job_trove_bstream_resize(
-        s_op->req->u.truncate.fs_id, s_op->req->u.truncate.handle,
-        s_op->req->u.truncate.size, s_op->req->u.truncate.flags,
-        NULL, smcb, 0, js_p, &i, server_job_context,
-        s_op->req->hints);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: resize bstream to %ld\n",
+                 __func__, s_op->req->u.truncate.size);
+
+    ret = job_trove_bstream_resize(s_op->req->u.truncate.fs_id,
+                                   s_op->req->u.truncate.handle,
+                                   s_op->req->u.truncate.size,
+                                   s_op->req->u.truncate.flags,
+                                   NULL,
+                                   smcb,
+                                   0,
+                                   js_p,
+                                   &i,
+                                   server_job_context,
+                                   s_op->req->hints);
 
     return ret;
 }
@@ -73,6 +82,10 @@ static PINT_sm_action truncate_resize(
 static PINT_sm_action truncate_check_error(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    if (js_p->error_code != 0)
+    {
+        gossip_err("Error resizing bytestream: %d\n", js_p->error_code);
+    }
     return SM_ACTION_COMPLETE;
 }
 
