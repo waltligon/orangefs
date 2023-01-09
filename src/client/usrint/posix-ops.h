@@ -165,14 +165,14 @@ typedef struct posix_ops_s
     int (*pipe)(int filedes[2]);
 
     /* selinux operations */
-    int (*getfscreatecon)(security_context_t *con);
-    int (*getfilecon)(const char *path, security_context_t *con);
-    int (*lgetfilecon)(const char *path, security_context_t *con);
-    int (*fgetfilecon)(int fd, security_context_t *con);
-    int (*setfscreatecon)(security_context_t con);
-    int (*setfilecon)(const char *path, security_context_t con);
-    int (*lsetfilecon)(const char *path, security_context_t con);
-    int (*fsetfilecon)(int fd, security_context_t con);
+    int (*getfscreatecon)(char *con);
+    int (*getfilecon)(const char *path, char *con);
+    int (*lgetfilecon)(const char *path, char *con);
+    int (*fgetfilecon)(int fd, char *con);
+    int (*setfscreatecon)(char con);
+    int (*setfilecon)(const char *path, char con);
+    int (*lsetfilecon)(const char *path, char con);
+    int (*fsetfilecon)(int fd, char con);
 } posix_ops;
 
 #ifdef BITDEFS

@@ -134,6 +134,7 @@ build_shared = @build_shared@
 build_static = @build_static@
 build_threaded = @build_threaded@
 build_usrint = @build_usrint@
+build_olib = @build_olib@
 build_symbolic = @build_symbolic@
 
 # Eliminate all default suffixes.  We want explicit control.
@@ -660,6 +661,11 @@ LIBRARIES_STATIC += lib/liborangefs.a
 LIBRARIES_SHARED += lib/liborangefs.so
 LIBRARIES_STATIC += lib/libofs.a lib/liborangefsposix.a
 LIBRARIES_SHARED += lib/libofs.so lib/liborangefsposix.so
+endif
+
+ifeq ($(build_olib),yes)
+LIBRARIES_STATIC += lib/liborangefs.a
+LIBRARIES_SHARED += lib/liborangefs.so
 endif
 
 ifneq ($(build_static),yes)

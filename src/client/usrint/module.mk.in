@@ -1,5 +1,21 @@
 DIR := src/client/usrint
 
+ifeq ($(build_olib),yes)
+
+OSRC := \
+       $(DIR)/pvfs-path.c \
+       $(DIR)/mmap.c \
+       $(DIR)/openfile-util.c \
+       $(DIR)/iocommon.c \
+       $(DIR)/request.c \
+       $(DIR)/ucache.c \
+       $(DIR)/posix-pvfs.c  \
+       $(DIR)/env-vars.c
+
+OLIBSRC += $(OSRC)
+
+endif # build_olib
+
 ifeq ($(build_usrint),yes)
 
 OSRC := \

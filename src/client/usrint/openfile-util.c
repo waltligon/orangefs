@@ -76,20 +76,6 @@
 # define init_debug2(f,v1,v2)
 #endif
 
-static struct glibc_redirect_s
-{
-    int (*stat)(int ver, const char *path, struct stat *buf);
-    int (*stat64)(int ver, const char *path, struct stat64 *buf);
-    int (*fstat)(int ver, int fd, struct stat *buf);
-    int (*fstat64)(int ver, int fd, struct stat64 *buf);
-    int (*fstatat)(int ver, int fd, const char *path, struct stat *buf, int flag);
-    int (*fstatat64)(int ver, int fd, const char *path, struct stat64 *buf, int flag);
-    int (*lstat)(int ver, const char *path, struct stat *buf);
-    int (*lstat64)(int ver, const char *path, struct stat64 *buf);
-    int (*mknod)(int ver, const char *path, mode_t mode, dev_t dev);
-    int (*mknodat)(int ver, int dirfd, const char *path, mode_t mode, dev_t dev);
-} glibc_redirect;
-
 /* this is for managing space in the shared memory area - first pass we
  * allocated enough of everything we can use a trivial algorithm but we
  * may choose to go to a more sophisticated version later
@@ -219,64 +205,6 @@ static int my_glibc_getcwd(char *buf, unsigned long size)
  * here
  */
 
-static int my_glibc_stat(const char *path, struct stat *buf)
-{
-    int rc = glibc_redirect.stat(_STAT_VER, path, buf);
-    return rc;
-}
-
-static int my_glibc_stat64(const char *path, struct stat64 *buf)
-{
-    int rc = glibc_redirect.stat64(_STAT_VER, path, buf);
-    return rc;
-}
-
-static int my_glibc_fstat(int fd, struct stat *buf)
-{
-    return glibc_redirect.fstat(_STAT_VER, fd, buf);
-}
-
-static int my_glibc_fstat64(int fd, struct stat64 *buf)
-{
-    return glibc_redirect.fstat64(_STAT_VER, fd, buf);
-}
-
-static int my_glibc_fstatat(int fd,
-                            const char *path,
-                            struct stat *buf,
-                            int flag)
-{
-    return glibc_redirect.fstatat(_STAT_VER, fd, path, buf, flag);
-}
-
-static int my_glibc_fstatat64(int fd,
-                              const char *path,
-                              struct stat64 *buf,
-                              int flag)
-{
-    return glibc_redirect.fstatat64(_STAT_VER, fd, path, buf, flag);
-}
-
-static int my_glibc_lstat(const char *path, struct stat *buf)
-{
-    return glibc_redirect.lstat(_STAT_VER, path, buf);
-}
-
-static int my_glibc_lstat64(const char *path, struct stat64 *buf)
-{
-    return glibc_redirect.lstat64(_STAT_VER, path, buf);
-}
-
-static int my_glibc_mknod(const char *path, mode_t mode, dev_t dev)
-{
-    return glibc_redirect.mknod(_MKNOD_VER, path, mode, dev);
-}
-
-static int my_glibc_mknodat(int dirfd, const char *path, mode_t mode, dev_t dev)
-{
-    return glibc_redirect.mknodat(_MKNOD_VER, dirfd, path, mode, dev);
-}
-
 static int my_glibc_getdents(u_int fd, struct dirent *dirp, u_int count)
 {
     return syscall(SYS_getdents, fd, dirp, count);
@@ -349,23 +277,6 @@ void load_glibc(void)
     glibc_ops.ftruncate64 = dlsym(libc_handle, "ftruncate64");
     glibc_ops.fallocate = dlsym(libc_handle, "posix_fallocate");
     glibc_ops.close = dlsym(libc_handle, "close");
-    /* stats */
-    glibc_ops.stat = my_glibc_stat;
-    glibc_redirect.stat = dlsym(libc_handle, "__xstat");
-    glibc_ops.stat64 = my_glibc_stat64;
-    glibc_redirect.stat64 = dlsym(libc_handle, "__xstat64");
-    glibc_ops.fstat = my_glibc_fstat;
-    glibc_redirect.fstat = dlsym(libc_handle, "__fxstat");
-    glibc_ops.fstat64 = my_glibc_fstat64;
-    glibc_redirect.fstat64 = dlsym(libc_handle, "__fxstat64");
-    glibc_ops.fstatat = my_glibc_fstatat;
-    glibc_redirect.fstatat = dlsym(libc_handle, "__fxstatat");
-    glibc_ops.fstatat64 = my_glibc_fstatat64;
-    glibc_redirect.fstatat64 = dlsym(libc_handle, "__fxstatat64");
-    glibc_ops.lstat = my_glibc_lstat;
-    glibc_redirect.lstat = dlsym(libc_handle, "__lxstat");
-    glibc_ops.lstat64 = my_glibc_lstat64;
-    glibc_redirect.lstat64 = dlsym(libc_handle, "__lxstat64");
     /* times dups chowns mks */
     glibc_ops.futimesat = dlsym(libc_handle, "futimesat");
     glibc_ops.utimes = dlsym(libc_handle, "utimes");
@@ -409,10 +320,6 @@ void load_glibc(void)
     glibc_ops.fstatfs64 = dlsym(libc_handle, "fstatfs64");
     glibc_ops.statvfs = dlsym(libc_handle, "statvfs");
     glibc_ops.fstatvfs = dlsym(libc_handle, "fstatvfs");
-    glibc_ops.mknod = my_glibc_mknod;
-    glibc_redirect.mknod = dlsym(libc_handle, "__xmknod");
-    glibc_ops.mknodat = my_glibc_mknodat;
-    glibc_redirect.mknodat = dlsym(libc_handle, "__xmknodat");
     glibc_ops.sendfile = dlsym(libc_handle, "sendfile");
     glibc_ops.sendfile64 = dlsym(libc_handle, "sendfile64");
 #ifdef HAVE_ATTR_XATTR_H

@@ -1067,6 +1067,32 @@ AC_ARG_ENABLE(threaded,
     [build_threaded=yes])
 AC_SUBST(build_threaded)
 
+dnl Method to disable build of liborangefs
+BUILD_OLIB=
+AC_ARG_ENABLE(olib,
+   [  --disable-olib          Do not build liborangefs],
+   [if test "x$enableval" = "xyes" ; then
+       AC_DEFINE(PVFS_OLIB_BUILD, 1,
+                 [Should we build liborangefs.])
+       BUILD_OLIB=1
+    else
+       AC_DEFINE(PVFS_OLIB_BUILD, 0,
+                 [Should we build liborangefs.])
+    fi
+    build_olib=$enableval
+   ],
+   [AC_DEFINE(PVFS_OLIB_BUILD, 1,
+              [Should we build liborangefs.])
+   build_olib=yes
+   BUILD_OLIB=1
+   ])
+AC_SUBST(build_olib)
+
+if test "x$build_olib" = "xyes"; then
+       dnl check if -lrt is required by olib
+       AX_CHECK_NEEDS_LIBRT
+fi
+
 dnl Method to disable build of user interface libraries
 BUILD_USRINT=
 AC_ARG_ENABLE(usrint,
@@ -1093,7 +1119,7 @@ AC_SUBST(build_usrint)
 
 if test "x$build_usrint" = "xyes"; then
 	dnl check if -lrt is required by usrint
-	AX_CHECK_LIB_NEEDS_LIBRT
+	AX_CHECK_NEEDS_LIBRT
 fi
  
 dnl libofs is ALWAYS symbolic, others should never be
@@ -2045,6 +2071,12 @@ if test "x$BUILD_USRINT" = "x1" ; then
    AC_MSG_RESULT([PVFS2 user interface libraries will be built      : yes])
 else
    AC_MSG_RESULT([PVFS2 user interface libraries will be built      :  no])
+fi
+
+if test "x$BUILD_OLIB" = "x1" ; then
+   AC_MSG_RESULT([liborangefs will be built                         : yes])
+else
+   AC_MSG_RESULT([liborangefs will be built                         :  no])
 fi
 
 if test "x$BUILD_SYMBOLIC" = "x1" ; then

@@ -318,21 +318,21 @@ extern int pvfs_acl_set_fd(int fd, acl_t acl);
 extern int pvfs_acl_set_file(const char *path_p, acl_type_t type, acl_t acl);
 #endif
 
-int pvfs_getfscreatecon(security_context_t *con);
+int pvfs_getfscreatecon(char *con);
 
-int pvfs_getfilecon(const char *path, security_context_t *con);
+int pvfs_getfilecon(const char *path, char *con);
 
-int pvfs_lgetfilecon(const char *path, security_context_t *con);
+int pvfs_lgetfilecon(const char *path, char *con);
 
-int pvfs_fgetfilecon(int fd, security_context_t *con);
+int pvfs_fgetfilecon(int fd, char *con);
 
-int pvfs_setfscreatecon(security_context_t con);
+int pvfs_setfscreatecon(char con);
 
-int pvfs_setfilecon(const char *path, security_context_t con);
+int pvfs_setfilecon(const char *path, char con);
 
-int pvfs_lsetfilecon(const char *path, security_context_t con);
+int pvfs_lsetfilecon(const char *path, char con);
 
-int pvfs_fsetfilecon(int fd, security_context_t con);
+int pvfs_fsetfilecon(int fd, char con);
 
 
 #endif
