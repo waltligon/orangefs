@@ -651,9 +651,7 @@ typedef struct
                    PVFS_ATTR_SYS_UID                 | \
                    PVFS_ATTR_SYS_GID                 | \
                    PVFS_ATTR_SYS_PERM                | \
-                   PVFS_ATTR_SYS_DFILE_COUNT         | \
-                   PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
-                   PVFS_ATTR_SYS_MIRROR_MODE)
+                   PVFS_ATTR_SYS_DFILE_COUNT)    
 
 #define PVFS_ATTR_SYS_MKDIR_REQUIRED \
                   (PVFS_ATTR_SYS_TYPE           | \

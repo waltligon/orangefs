@@ -212,8 +212,6 @@ int main(int argc, char **argv)
     mtrace();
 #endif
 
-    fprintf(stderr, "Entering main ...\n");
-
     /* Passed to server shutdown function */
     server_status_flag = SERVER_DEFAULT_INIT;
 
@@ -261,7 +259,6 @@ int main(int argc, char **argv)
     }
     server_status_flag |= SERVER_SID_INIT;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "PINT_parse_config called from main\n");
     /* read the local config file first to get initial settings */
     /* code to handle older two config file format */
     ret = PINT_parse_config(&server_config,
@@ -275,7 +272,6 @@ int main(int argc, char **argv)
         ret = -PVFS_EINVAL;
         goto server_shutdown;
     }
-    gossip_debug(GOSSIP_SERVER_DEBUG, "PINT_parse_config complete\n");
 
     /* V3 retrieve aux and remote config files as needed 
      * not active just yet
@@ -2186,7 +2182,7 @@ static int server_shutdown(PINT_server_status_flag status,
     if (status & SERVER_GOSSIP_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "[*] halting logging interface\n");
+                     "[*] halting logging interface\n\n\n");
         gossip_disable();
     }
 

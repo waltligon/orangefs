@@ -725,18 +725,18 @@ static inline void encode_PVFS_directory_attr(char **pptr,
                                               const PVFS_directory_attr *x)
 {
     int index_i;                                                              
-    char *dp;
+    /*char *dp;*/
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG, 
                  "%s: begin dir attr, (offset %ld)\n", __func__, *pptr-gpptr);
 
     encode_PVFS_size(pptr, &(x)->dirent_count);                               
-    gossip_log("%s: encode dirent_count, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: encode dirent_count, offset: %ld\n", __func__, *pptr-gpptr);*/
     encode_PVFS_directory_hint(pptr, &(x)->hint);                             
-    dp = *pptr;
-    gossip_log("%s: encode hints, offset: %ld\n", __func__, *pptr-gpptr);
+    /*dp = *pptr;*/
+    /*gossip_log("%s: encode hints, offset: %ld\n", __func__, *pptr-gpptr);*/
     encode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);                     
-    gossip_log("%s: encode dist dir attr, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: encode dist dir attr, offset: %ld\n", __func__, *pptr-gpptr);*/
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG,
                  "%s: tree_ht: %u,"
@@ -761,10 +761,10 @@ static inline void encode_PVFS_directory_attr(char **pptr,
                  );
 
     /* try to dump the binary buffer */
-    {int i; 
+    /*{int i; 
      gossip_log("encode:\n");
      for (i = 0; i < (*pptr - dp); i++)
-        gossip_log("%04u\n", dp[i]);}
+        gossip_log("%04u\n", dp[i]);}*/
 
     for (index_i = 0; index_i < (x)->dist_dir_attr.bitmap_size; index_i++)    
     {                                                                         
@@ -772,15 +772,15 @@ static inline void encode_PVFS_directory_attr(char **pptr,
                                              &(x)->dist_dir_bitmap[index_i]); 
     }                                                                         
 
-    gossip_log("%s: encode bitmap, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: encode bitmap, offset: %ld\n", __func__, *pptr-gpptr);*/
     align8(pptr);                                                             
-    gossip_log("%s: align 8, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: align 8, offset: %ld\n", __func__, *pptr-gpptr);*/
 
     for (index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count; index_i++)  
     {                                                                         
         encode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);             
     }                                                                         
-    gossip_log("%s: encode dirdata handles, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: encode dirdata handles, offset: %ld\n", __func__, *pptr-gpptr);*/
 
     for (index_i = 0;                                                         
          index_i < (x)->dist_dir_attr.dirdata_count *                         
@@ -790,7 +790,7 @@ static inline void encode_PVFS_directory_attr(char **pptr,
         encode_PVFS_SID(pptr, &(x)->dirdata_sids[index_i]);                   
     }                                                                        
 
-    gossip_log("%s: encode dirdata sids, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: encode dirdata sids, offset: %ld\n", __func__, *pptr-gpptr);*/
     gossip_debug(GOSSIP_ENDECODE_DEBUG, "%s: end dir attr\n", __func__ );
 }
 /* This decodes OIDs and SIDs into a contiguous array to make it easier
@@ -801,17 +801,17 @@ static inline void decode_PVFS_directory_attr(char **pptr,
                                               PVFS_directory_attr *x)
 {
     int index_i;                                                              
-    char *dp;
+    /*char *dp;*/
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG, "%s: begin dir attrs(offset: %ld)\n", __func__, *pptr-gpptr);
 
     decode_PVFS_size(pptr, &(x)->dirent_count);                               
-    gossip_log("%s: decode dirent_count, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: decode dirent_count, offset: %ld\n", __func__, *pptr-gpptr);*/
     decode_PVFS_directory_hint(pptr, &(x)->hint);                             
-    dp = *pptr;
-    gossip_log("%s: decode hints, offset: %ld\n", __func__, *pptr-gpptr);
+    /*dp = *pptr;*/
+    /*gossip_log("%s: decode hints, offset: %ld\n", __func__, *pptr-gpptr);*/
     decode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);                     
-    gossip_log("%s: decode dist dir attr, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: decode dist dir attr, offset: %ld\n", __func__, *pptr-gpptr);*/
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG,
                  "%s: tree_ht: %u,"
@@ -836,10 +836,10 @@ static inline void decode_PVFS_directory_attr(char **pptr,
                  );
 
     /* try to dump the binary buffer */
-    {int i; 
+    /*{int i; 
      gossip_log("decode:\n");
      for (i = 0; i < (*pptr - dp); i++)
-        gossip_log("%04u\n", dp[i]);}
+        gossip_log("%04u\n", dp[i]);}*/
 
     (x)->dist_dir_bitmap = decode_malloc((x)->dist_dir_attr.bitmap_size *     
                                       sizeof(PVFS_dist_dir_bitmap_basetype)); 
@@ -849,7 +849,7 @@ static inline void decode_PVFS_directory_attr(char **pptr,
         decode_PVFS_dist_dir_bitmap_basetype(pptr,                            
                                              &(x)->dist_dir_bitmap[index_i]); 
     }                                                                         
-    gossip_log("%s: decode bitmap, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: decode bitmap, offset: %ld\n", __func__, *pptr-gpptr);*/
     align8(pptr);                                                             
 
     (x)->dirdata_handles = decode_malloc(OSASZ(                               
@@ -863,14 +863,14 @@ static inline void decode_PVFS_directory_attr(char **pptr,
     {                                                                         
         decode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);             
     }                                                                         
-    gossip_log("%s: decode dirdata handles, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: decode dirdata handles, offset: %ld\n", __func__, *pptr-gpptr);*/
 
     for(index_i = 0; index_i < (x)->dist_dir_attr.dirdata_count *             
                                (x)->dist_dir_attr.sid_count; index_i++)       
     {                                                                         
         decode_PVFS_SID(pptr, &(x)->dirdata_sids[index_i]);                   
     }                                                                         
-    gossip_log("%s: decode dirdata sids, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: decode dirdata sids, offset: %ld\n", __func__, *pptr-gpptr);*/
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG, "%s: end dir attrs\n", __func__ );
 }
@@ -1051,11 +1051,11 @@ static inline void encode_PVFS_object_attr(char **pptr,
     encode_PVFS_time(pptr,            &(x)->ntime); 
     encode_uint32_t(pptr,             &(x)->meta_sid_count); 
     encode_skip4(pptr,);
-    gossip_log("%s: encode obj scalars, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: encode obj scalars, offset: %ld\n", __func__, *pptr-gpptr);*/
     encode_PVFS_capability(pptr,      &(x)->capability); 
-    gossip_log("%s: encode capability, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: encode capability, offset: %ld\n", __func__, *pptr-gpptr);*/
     align8(pptr);                                                             
-    gossip_log("%s: Align 8 offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: Align 8 offset: %ld\n", __func__, *pptr-gpptr);*/
 
     if (((x)->parent == NULL) || PVFS_OID_EQ((x)->parent, &PVFS_HANDLE_NULL))
     {
@@ -1070,18 +1070,18 @@ static inline void encode_PVFS_object_attr(char **pptr,
          */
         PVFS_OID nulloid = PVFS_HANDLE_NULL;
         encode_PVFS_handle(pptr, &nulloid); 
-        gossip_log("%s: encode NULL parent, offset: %ld\n", __func__, *pptr-gpptr);
+        /*gossip_log("%s: encode NULL parent, offset: %ld\n", __func__, *pptr-gpptr);*/
     }
     else
     {
         encode_PVFS_handle(pptr, (x)->parent); /* no & on parent */
-        gossip_log("%s: encode parent OID, offset: %ld\n", __func__, *pptr-gpptr);
+        /*gossip_log("%s: encode parent OID, offset: %ld\n", __func__, *pptr-gpptr);*/
 
         for (index_i = 0; index_i < (x)->meta_sid_count; index_i++)      
         {                                                                         
             encode_PVFS_SID(pptr, &(x)->parent_sids[index_i]);                   
         }                                                                         
-        gossip_log("%s: encode parent SIDs, offset: %ld\n", __func__, *pptr-gpptr);
+        /*gossip_log("%s: encode parent SIDs, offset: %ld\n", __func__, *pptr-gpptr);*/
     }
 
     switch ((x)->objtype) 
@@ -1123,18 +1123,18 @@ static inline void decode_PVFS_object_attr(char **pptr, PVFS_object_attr *x)
     decode_PVFS_time(pptr, &(x)->ntime); 
     decode_uint32_t(pptr, &(x)->meta_sid_count); 
     decode_skip4(pptr,); 
-    gossip_log("%s: decode obj scalars, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: decode obj scalars, offset: %ld\n", __func__, *pptr-gpptr);*/
     decode_PVFS_capability(pptr, &(x)->capability); 
-    gossip_log("%s: decode capability, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: decode capability, offset: %ld\n", __func__, *pptr-gpptr);*/
     align8(pptr);                                                             
-    gossip_log("%s: Align 8 offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: Align 8 offset: %ld\n", __func__, *pptr-gpptr);*/
 
     (x)->parent = decode_malloc(OSASZ(1, (x)->meta_sid_count));       
     (x)->parent_sids = (PVFS_SID *)&(x)->parent[1]; 
 
     /* there should always be an encoded parent, even if it is NULL */
     decode_PVFS_handle(pptr, (x)->parent);             
-    gossip_log("%s: decode parent OID, offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: decode parent OID, offset: %ld\n", __func__, *pptr-gpptr);*/
 
     if (PVFS_OID_NE((x)->parent, &PVFS_HANDLE_NULL))
     {
@@ -1142,7 +1142,7 @@ static inline void decode_PVFS_object_attr(char **pptr, PVFS_object_attr *x)
         {                                                                         
             decode_PVFS_SID(pptr, &(x)->parent_sids[index_i]);                   
         }                                                                         
-        gossip_log("%s: decode parent SIDs, offset: %ld\n", __func__, *pptr-gpptr);
+        /*gossip_log("%s: decode parent SIDs, offset: %ld\n", __func__, *pptr-gpptr);*/
     }
 
     switch ((x)->objtype) 
@@ -1166,7 +1166,7 @@ static inline void decode_PVFS_object_attr(char **pptr, PVFS_object_attr *x)
         break; 
     } 
     align8(pptr); 
-    gossip_log("%s: Align 8 offset: %ld\n", __func__, *pptr-gpptr);
+    /*gossip_log("%s: Align 8 offset: %ld\n", __func__, *pptr-gpptr);*/
 }
 
 static inline void defree_PVFS_object_attr(PVFS_object_attr *x) 

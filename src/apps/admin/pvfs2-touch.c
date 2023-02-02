@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    /* Remove each specified file */
+    /* Create each specified file */
     for (i = 0; i < user_opts->num_files; ++i)
     {
         int rc;
@@ -134,15 +134,18 @@ int main(int argc, char **argv)
 
         /* Set attributes */
         memset(&attr, 0, sizeof(PVFS_sys_attr));
+        attr.objtype = PVFS_TYPE_METAFILE;
         attr.owner = credentials.userid;
         attr.group = credentials.group_array[0];
         attr.perms = PVFS_util_translate_mode(
                        (S_IROTH|S_IWOTH|S_IRGRP|S_IWGRP|S_IRUSR|S_IWUSR)
                        & ~PVFS_util_get_umask(), 0);
-        attr.atime = time(NULL);
+        attr.atime = time(NULL); /* should we do this, or let server set the times? */
         attr.mtime = attr.atime;
-        attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-        attr.dfile_count = 0;
+        attr.ctime = attr.atime;
+        attr.ntime = attr.atime;
+        attr.mask = PVFS_ATTR_SYS_CREATE_REQUIRED;
+        attr.dfile_count = 1;
 
         parent_ref = resp_lookup.ref;
 
@@ -214,9 +217,9 @@ int main(int argc, char **argv)
                              NULL);
         if (rc)
         {
-            fprintf(stderr, "Error: An error occurred while creating %s\n",
-                    working_file);
-            PVFS_perror("PVFS_sys_create", rc);
+            /* fprintf(stderr, "Error: An error occurred while creating %s\n",
+                    working_file); */
+            PVFS_perror("pvfs2-touch: PVFS_sys_create", rc);
             ret = -1;
             break;
         }

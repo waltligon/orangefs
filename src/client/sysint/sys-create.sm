@@ -190,7 +190,7 @@ PVFS_error PVFS_isys_create(char *object_name,
     if ((attr.mask & PVFS_ATTR_SYS_CREATE_REQUIRED) != PVFS_ATTR_SYS_CREATE_REQUIRED)
     {
         gossip_lerr("PVFS_isys_create() failure: invalid attribute mask: %lu, "
-                    "expected SYS_ALL_SETABLE (%lu)\n",
+                    "expected PVFS_ATTR_SYS_CREATE_REQUIRED (%lu)\n",
                     attr.mask, PVFS_ATTR_SYS_CREATE_REQUIRED);
         return ret;
     }
@@ -545,7 +545,7 @@ PVFS_error PVFS_sys_create(
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
-{ fprintf(stderr, "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&\n"); }
+/* { fprintf(stderr, "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&\n"); } */
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "pvfs_sys_create entered\n");
 

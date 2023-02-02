@@ -37,7 +37,7 @@ static PVFS_debug_mask debug_to_mask(const __keyword_mask_t *mask_map,
 
         while(t)
         {
-            gossip_debug(GOSSIP_SERVER_DEBUG, "dbg2mask: %lx %lx\n",
+            gossip_debug(GOSSIP_GOSSIP_DEBUG, "dbg2mask: %lx %lx\n",
                          mask.mask1, mask.mask2);
             if (*t == '-')
             {
@@ -63,7 +63,7 @@ static PVFS_debug_mask debug_to_mask(const __keyword_mask_t *mask_map,
             t = strtok(NULL, toks);
         }
         free(s);
-        gossip_debug(GOSSIP_SERVER_DEBUG, "dbg2mask: %lx %lx\n",
+        gossip_debug(GOSSIP_GOSSIP_DEBUG, "dbg2mask: %lx %lx\n",
                     mask.mask1, mask.mask2);
     }
     return mask;

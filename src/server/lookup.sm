@@ -113,7 +113,8 @@ machine pvfs2_lookup_sm
 
     state initiate_read_object_metadata
     {
-        jump pvfs2_get_attr_work_sm;
+        /* jump pvfs2_get_attr_work_sm; */
+        jump pvfs2_get_attr_with_prelude_sm;
         default => verify_object_metadata;
     }
 
@@ -997,9 +998,11 @@ static PINT_sm_action lookup_read_object_metadata(
         gossip_err("%s:Error pushing getattr frame onto lookup stack:ret(%d)\n",
                    __func__,ret);
         free(getattr_op);
+        js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
 
+    js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 /************** END of new code ***************/
 
@@ -1059,9 +1062,9 @@ static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
  * We can copy the ds_attr into this array if its needed
  * The attr needs similar treatment we should also do that here
  *     (see stmt above and below)
- *  s_op->attr and s_op->ds_attr should have each type.  attr 
- *  sshould be copied to the lookup resp array, ds_attr to
- *  lookup storage array shown below.
+ *  s_op->attr and s_op->ds_attr should have each type.
+ *  attr should be copied to the lookup resp attr array,
+ *  ds_attr to lookup storage array s_op as shown below.
  */
 /************/
 
@@ -1073,7 +1076,7 @@ static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
     s_op->u.lookup.ds_attr_array[s_op->u.lookup.array_index] = getattr_op->ds_attr; 
 
     /* this frees the getattr s_op, invcluding the attr and ds_attr, which we have
-     * already copied the things pointed to by the objattr are still live.
+     * already copied. the things pointed to by the objattr are still live.
      */
     free(getattr_op);
      

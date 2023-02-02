@@ -2060,7 +2060,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *respattr = &(s_op->resp.u.getattr.attr);
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "frame: %p %s\n", s_op, __func__);
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "  getattr_setup_resp: error_code = %d\n",
