@@ -77,7 +77,10 @@ int dbpf_thread_finalize(void)
     return ret;
 }
 
-int synccount = 0;
+/* not used - only counted number of times we had a keyval op
+ * was printing negatives which look like errors - so I took it out
+ */
+/* int synccount = 0; */
 
 void *dbpf_thread_function(void *ptr)
 {
@@ -182,10 +185,15 @@ int dbpf_do_one_work_cycle(int *out_count)
             }
 
             dbpf_queued_op_dequeue_nolock(cur_op);
+            /* This print had negative numbers, which imply and error
+             * but there is no error - so I took it out
+             */
             if(DBPF_OP_IS_KEYVAL(cur_op->op.type)) 
             {
-                --synccount;
-                gossip_debug(GOSSIP_TROVE_DEBUG, "[DBPF THREAD]: [KEYVAL -1]: %d\n", synccount);
+                /* --synccount; */
+                gossip_debug(GOSSIP_TROVE_DEBUG,
+                             "[DBPF THREAD]: [KEYVAL]\n");
+                /*           "[DBPF THREAD]: [KEYVAL -1]: %d\n", synccount); */
             }
 
             cur_op->op.state = OP_IN_SERVICE;
@@ -200,14 +208,14 @@ int dbpf_do_one_work_cycle(int *out_count)
         }
 
         /* otherwise, service the current operation now */
-        gossip_debug(GOSSIP_TROVE_OP_DEBUG,"[DBPF THREAD]: STARTING TROVE "
-                     "SERVICE ROUTINE (%s)\n",
+        gossip_debug(GOSSIP_TROVE_OP_DEBUG,
+                     "[DBPF THREAD]: STARTING TROVE SERVICE ROUTINE (%s)\n",
                      dbpf_op_type_to_str(cur_op->op.type));
 
         ret = cur_op->op.svc_fn(&(cur_op->op));
 
-        gossip_debug(GOSSIP_TROVE_OP_DEBUG,"[DBPF THREAD]: FINISHED TROVE "
-                     "SERVICE ROUTINE (%s) (ret: %d)\n",
+        gossip_debug(GOSSIP_TROVE_OP_DEBUG,
+                     "[DBPF THREAD]: FINISHED TROVE SERVICE ROUTINE (%s) (ret: %d)\n",
                      dbpf_op_type_to_str(cur_op->op.type),
                      ret);
         if (ret == DBPF_OP_COMPLETE || ret < 0)

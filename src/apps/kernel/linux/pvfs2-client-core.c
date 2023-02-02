@@ -903,10 +903,9 @@ static PVFS_error post_remove_request(vfs_request_t *vfs_request)
     PVFS_object_ref refn;
     
     s = calloc(1, HANDLESTRINGSIZE);
-    gossip_debug(
-        GOSSIP_CLIENTCORE_DEBUG,
-        "Got a remove request for %s under fsid %d and "
-        "handle %s\n", vfs_request->in_upcall.req.remove.d_name,
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+        "Got a remove request for %s under fsid %d and handle %s\n",
+        vfs_request->in_upcall.req.remove.d_name,
         vfs_request->in_upcall.req.remove.parent_refn.fs_id,
         k2s(&(vfs_request->in_upcall.req.remove.parent_refn.khandle),s));
     free(s);
@@ -920,15 +919,15 @@ static PVFS_error post_remove_request(vfs_request_t *vfs_request)
     /* compat */
     refn.handle = pvfs2_khandle_to_ino(
         &(vfs_request->in_upcall.req.remove.parent_refn.khandle));
+
     refn.fs_id = vfs_request->in_upcall.req.remove.parent_refn.fs_id;
 
-    ret = PVFS_isys_remove(
-            vfs_request->in_upcall.req.remove.d_name,
-            refn,
-            credential,
-            &vfs_request->op_id,
-            vfs_request->hints,
-            (void *)vfs_request);
+    ret = PVFS_isys_remove(vfs_request->in_upcall.req.remove.d_name,
+                           refn,
+                           credential,
+                           &vfs_request->op_id,
+                           vfs_request->hints,
+                           (void *)vfs_request);
 
     if (credential)
     {
@@ -1162,12 +1161,11 @@ static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
     PVFS_object_ref refn;
     
     s = calloc(1, HANDLESTRINGSIZE);
-    gossip_debug(
-        GOSSIP_CLIENTCORE_DEBUG, "Got a truncate request for %s under "
-        "fsid %d to be size %lld\n",
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+        "Got a truncate request for %s under fsid %d to be size %lld\n",
         k2s(&(vfs_request->in_upcall.req.truncate.refn.khandle),s),
-        vfs_request->in_upcall.req.truncate.refn.fs_id,
-        lld(vfs_request->in_upcall.req.truncate.size));
+            vfs_request->in_upcall.req.truncate.refn.fs_id,
+            lld(vfs_request->in_upcall.req.truncate.size));
     free(s);
 
     fill_hints(vfs_request);
@@ -1179,15 +1177,15 @@ static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
     /* compat */
     refn.handle = pvfs2_khandle_to_ino(
             &(vfs_request->in_upcall.req.truncate.refn.khandle));
+
     refn.fs_id = vfs_request->in_upcall.req.truncate.refn.fs_id;
 
-    ret = PVFS_isys_truncate(
-        refn,
-        vfs_request->in_upcall.req.truncate.size,
-        credential,
-        &vfs_request->op_id,
-        vfs_request->hints,
-        (void *)vfs_request);
+    ret = PVFS_isys_truncate(refn,
+                             vfs_request->in_upcall.req.truncate.size,
+                             credential,
+                             &vfs_request->op_id,
+                             vfs_request->hints,
+                             (void *)vfs_request);
 
     if (credential)
     {

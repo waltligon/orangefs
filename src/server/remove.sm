@@ -306,6 +306,7 @@ static PINT_sm_action remove_check_object_type(
 	/* it must be a datafile, transition to try reading datafile 
 	 * attribs with dspace_getattr()
 	 */
+        gossip_debug(GOSSIP_SERVER_DEBUG, "  type is datafile;\n");
 	js_p->error_code = STATE_TYPE_DATAFILE;
 	return SM_ACTION_COMPLETE;
     }
@@ -320,6 +321,7 @@ static PINT_sm_action remove_check_object_type(
         return SM_ACTION_COMPLETE;
     }
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  type is not dirdata or datafile;\n");
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }

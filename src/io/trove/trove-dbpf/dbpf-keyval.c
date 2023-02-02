@@ -42,7 +42,11 @@
  */
 static uint16_t readdir_session = 0;
 
-extern int synccount;
+/* This is unused.  Not sure what it was intended use was.
+ * Maybe to count the number of times we did a sync in dbpf-thread.c
+ * where it is defined.  But then, why is in referenced here?
+ */
+/* extern int synccount; */
 
 extern gen_mutex_t dbpf_attr_cache_mutex;
 

@@ -133,18 +133,18 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    ret = dbpf_op_init_queued_or_immediate(
-        &op,
-        &q_op_p,
-        DSPACE_CREATE,
-        coll_p,
-        (handle_p ? *handle_p : TROVE_HANDLE_NULL),
-        dbpf_dspace_create_op_svc,
-        flags,
-        NULL,
-        user_ptr,
-        context_id,
-        &op_p);
+    ret = dbpf_op_init_queued_or_immediate(&op,
+                                           &q_op_p,
+                                           DSPACE_CREATE,
+                                           coll_p,
+                                           (handle_p ? 
+                                                *handle_p : TROVE_HANDLE_NULL),
+                                           dbpf_dspace_create_op_svc,
+                                           flags,
+                                           NULL,
+                                           user_ptr,
+                                           context_id,
+                                           &op_p);
     if(ret < 0)
     {
         return ret;
@@ -300,18 +300,17 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
         return(-TROVE_EINVAL);
     }
 
-    ret = dbpf_op_init_queued_or_immediate(
-        &op,
-        &q_op_p,
-        DSPACE_CREATE,
-        coll_p,
-        TROVE_HANDLE_NULL,
-        dbpf_dspace_create_list_op_svc,
-        flags,
-        NULL,
-        user_ptr,
-        context_id,
-        &op_p);
+    ret = dbpf_op_init_queued_or_immediate(&op,
+                                           &q_op_p,
+                                           DSPACE_CREATE,
+                                           coll_p,
+                                           TROVE_HANDLE_NULL,
+                                           dbpf_dspace_create_list_op_svc,
+                                           flags,
+                                           NULL,
+                                           user_ptr,
+                                           context_id,
+                                           &op_p);
     if(ret < 0)
     {
         return ret;
@@ -509,6 +508,8 @@ static int remove_one_handle(TROVE_object_ref ref,
     int ret = -TROVE_EINVAL;
     struct dbpf_data key;
 
+    gossip_debug(GOSSIP_TROVE_DEBUG, "remove_one_handle: called\n");
+
     key.data = &ref.handle;
     key.len = sizeof(TROVE_handle);
 
@@ -526,7 +527,7 @@ static int remove_one_handle(TROVE_object_ref ref,
     else
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "removed dataspace with handle %llu\n",
-            llu(ref.handle));
+                     llu(ref.handle));
     }
 
     /* if this attr is in the dbpf attr cache, remove it */
@@ -574,7 +575,7 @@ static int dbpf_dspace_remove_list_op_svc(struct dbpf_op *op_p)
     int ret = -TROVE_EINVAL;
     int i;
 
-    for(i=0; i<op_p->u.d_remove_list.count; i++)
+    for(i = 0; i < op_p->u.d_remove_list.count; i++)
     {
         ref.handle = op_p->u.d_remove_list.handle_array[i];
         ref.fs_id = op_p->coll_p->coll_id;
@@ -1177,17 +1178,17 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    ret = dbpf_op_init_queued_or_immediate(
-        &op, &q_op_p,
-        DSPACE_SETATTR,
-        coll_p,
-        handle,
-        dbpf_dspace_setattr_op_svc,
-        flags,
-        NULL,
-        user_ptr,
-        context_id,
-        &op_p);
+    ret = dbpf_op_init_queued_or_immediate(&op,
+                                           &q_op_p,
+                                           DSPACE_SETATTR,
+                                           coll_p,
+                                           handle,
+                                           dbpf_dspace_setattr_op_svc,
+                                           flags,
+                                           NULL,
+                                           user_ptr,
+                                           context_id,
+                                           &op_p);
     if(ret < 0)
     {
         return ret;

@@ -380,7 +380,7 @@ static void start_delayed_ops_if_any(int dec_first)
             gossip_debug(GOSSIP_TROVE_DEBUG,
                          "lio_listio called with %d following aiocbs:\n", 
                          aiocb_inuse_count);
-            for(i=0; i<aiocb_inuse_count; i++)
+            for(i = 0; i < aiocb_inuse_count; i++)
             {
                 gossip_debug(
                     GOSSIP_TROVE_DEBUG,
@@ -592,9 +592,10 @@ static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
     int ret = -TROVE_EINVAL, got_fd = 0;
     struct open_cache_ref tmp_ref;
 
-    ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle,
-        DBPF_FD_BUFFERED_WRITE, &tmp_ref);
+    ret = dbpf_open_cache_get(op_p->coll_p->coll_id,
+                              op_p->handle,
+                              DBPF_FD_BUFFERED_WRITE,
+                              &tmp_ref);
     if (ret < 0)
     {
         goto return_error;
@@ -921,18 +922,18 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 
     /* convert listio arguments into aiocb structures */
     aiocb_inuse_count = op_p->u.b_rw_list.aiocb_array_count;
-    ret = dbpf_bstream_listio_convert(
-        op_p->u.b_rw_list.fd,
-        op_p->u.b_rw_list.opcode,
-        op_p->u.b_rw_list.mem_offset_array,
-        op_p->u.b_rw_list.mem_size_array,
-        op_p->u.b_rw_list.mem_array_count,
-        op_p->u.b_rw_list.stream_offset_array,
-        op_p->u.b_rw_list.stream_size_array,
-        op_p->u.b_rw_list.stream_array_count,
-        aiocb_p,
-        &aiocb_inuse_count,
-        &op_p->u.b_rw_list.lio_state);
+
+    ret = dbpf_bstream_listio_convert(op_p->u.b_rw_list.fd,
+                                      op_p->u.b_rw_list.opcode,
+                                      op_p->u.b_rw_list.mem_offset_array,
+                                      op_p->u.b_rw_list.mem_size_array,
+                                      op_p->u.b_rw_list.mem_array_count,
+                                      op_p->u.b_rw_list.stream_offset_array,
+                                      op_p->u.b_rw_list.stream_size_array,
+                                      op_p->u.b_rw_list.stream_array_count,
+                                      aiocb_p,
+                                      &aiocb_inuse_count,
+                                      &op_p->u.b_rw_list.lio_state);
 
     if (ret == 1)
     {
@@ -942,7 +943,7 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     op_p->u.b_rw_list.sigev.sigev_notify = SIGEV_THREAD;
     op_p->u.b_rw_list.sigev.sigev_notify_attributes = NULL;
     op_p->u.b_rw_list.sigev.sigev_notify_function =
-        aio_progress_notification;
+                                        aio_progress_notification;
     op_p->u.b_rw_list.sigev.sigev_value.sival_ptr = (void *)q_op_p;
 
     /* mark unused with LIO_NOPs */
@@ -971,9 +972,11 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     id_gen_fast_register(&q_op_p->op.id, q_op_p);
     *out_op_id_p = q_op_p->op.id;
 
-    ret = issue_or_delay_io_operation(
-        q_op_p, aiocb_ptr_array, aiocb_inuse_count,
-        &op_p->u.b_rw_list.sigev, 0);
+    ret = issue_or_delay_io_operation(q_op_p,
+                                      aiocb_ptr_array,
+                                      aiocb_inuse_count,
+                                      &op_p->u.b_rw_list.sigev,
+                                      0);
 
     if (ret)
     {
@@ -1363,6 +1366,7 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
 
     gen_mutex_lock(&dbpf_update_size_lock);
     ret = dbpf_dspace_attr_get(op_p->coll_p, ref, &attr);
+
     if(ret != 0)
     {
         gen_mutex_unlock(&dbpf_update_size_lock);
