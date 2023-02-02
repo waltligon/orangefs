@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
+ * (C) 2010-2022 Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -35,7 +35,7 @@ struct qhash_table *user_cache;
 
 gen_mutex_t user_cache_mutex;
 
-int user_compare(void *key, 
+int user_compare(const void *key, 
                  struct qhash_head *link)
 {
     struct user_entry *entry = qhash_entry(link, struct user_entry, hash_link);
@@ -55,7 +55,7 @@ int add_cache_user(char *user_name,
     link = qhash_search(user_cache, user_name);
     if (link != NULL)
     {        
-        DbgPrint("   add_cache_user: deleting user %s\n", user_name);
+        client_debug("   add_cache_user: deleting user %s\n", user_name);
         qhash_del(link);
         free(qhash_entry(link, struct user_entry, hash_link));
     }
@@ -65,7 +65,7 @@ int add_cache_user(char *user_name,
     entry = (struct user_entry *) calloc(1, sizeof(struct user_entry));
     if (entry == NULL)
     {
-        DbgPrint("   add_cache_user: out of memory\n");
+        client_debug("   add_cache_user: out of memory\n");
         return -1;
     }
             
@@ -82,10 +82,10 @@ int add_cache_user(char *user_name,
         entry->expires = ASN1_UTCTIME_new();
         if (entry->expires == NULL)
         {
-            DbgPrint("   add_cache_user: out of memory\n");
+            client_debug("   add_cache_user: out of memory\n");
             return -1;
         }
-        DbgPrint("   add_cache_user: setting timeout to %u\n", credential->timeout);
+        client_debug("   add_cache_user: setting timeout to %u\n", credential->timeout);
         ASN1_UTCTIME_set(entry->expires, credential->timeout);
     }
     
@@ -93,13 +93,13 @@ int add_cache_user(char *user_name,
     qhash_add(user_cache, &entry->user_name, &entry->hash_link);
     if (goptions->user_mode != USER_MODE_SERVER)
     {
-        DbgPrint("   add_cache_user: adding user %s (%u:%u) (expires %s)\n", 
+        client_debug("   add_cache_user: adding user %s (%u:%u) (expires %s)\n", 
         user_name, credential->userid, credential->group_array[0], 
         entry->expires != NULL ? entry->expires->data : "never");
     }
     else
     {
-        DbgPrint("   add_cache_user: adding user %s (expires %s)\n", 
+        client_debug("   add_cache_user: adding user %s (expires %s)\n", 
         user_name, entry->expires != NULL ? entry->expires->data : "never");
     }
     gen_mutex_unlock(&user_cache_mutex);
@@ -123,12 +123,12 @@ int get_cache_user(char *user_name,
         PINT_copy_credential(&(entry->credential), credential);
         if (goptions->user_mode != USER_MODE_SERVER)
         {
-            DbgPrint("   get_cache_user: hit for %s (%u:%u)\n", user_name,
+            client_debug("   get_cache_user: hit for %s (%u:%u)\n", user_name,
                 credential->userid, credential->group_array[0]);
         }
         else
         {
-            DbgPrint("   get_cache_user: hit for %s\n", user_name);
+            client_debug("   get_cache_user: hit for %s\n", user_name);
         }
 
         gen_mutex_unlock(&user_cache_mutex);
@@ -171,7 +171,7 @@ unsigned int user_cache_thread(void *options)
     {        
         Sleep(USER_THREAD_SLEEP_TIME);
 
-        DbgPrint("user_cache_thread: checking\n");
+        client_debug("user_cache_thread: checking\n");
 
         now = time(NULL);
 
@@ -185,7 +185,7 @@ unsigned int user_cache_thread(void *options)
                 if (entry->expires != NULL && 
                     ASN1_UTCTIME_cmp_time_t(entry->expires, now) == -1)
                 {   
-                    DbgPrint("user_cache_thread: removing %s\n", entry->user_name);
+                    client_debug("user_cache_thread: removing %s\n", entry->user_name);
                     qhash_del(head);
                     PINT_cleanup_credential(&(entry->credential));
                     ASN1_UTCTIME_free(entry->expires);
@@ -195,7 +195,7 @@ unsigned int user_cache_thread(void *options)
         }
         gen_mutex_unlock(&user_cache_mutex);
 
-        DbgPrint("user_cache_thread: check complete\n");
+        client_debug("user_cache_thread: check complete\n");
 
     } while (1);
 

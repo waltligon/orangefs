@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
+ * (C) 2010-2022 Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -62,7 +62,7 @@ typedef struct
     LDAP_OPTIONS ldap;
 } ORANGEFS_OPTIONS, *PORANGEFS_OPTIONS;
 
-void DbgPrint(char *format, ...);
+void client_debug(char *format, ...);
 
 #define report_error(msg, err)            _report_error(msg, err, FALSE)
 

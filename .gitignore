@@ -55,3 +55,16 @@ config.status
 #
 *~
 *.swp
+*.bak
+*.pl
+/windows/projects/OrangeFS/ops.txt
+
+#
+# Third-Party Windows Libraries
+#
+/windows/dokan/
+/windows/dokany/
+/windows/ldap/
+/windows/openssl/
+/src/client/windows/client-service/messagesTEMP.BIN
+/src/client/windows/client-service/messages.aps

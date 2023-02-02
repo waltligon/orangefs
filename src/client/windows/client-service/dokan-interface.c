@@ -46,6 +46,7 @@ struct context_entry
 {
     struct qhash_head hash_link;
     ULONG64 context;
+	DWORD flags;
     PVFS_credential credential;
 };
 
@@ -54,7 +55,9 @@ gen_mutex_t context_cache_mutex;
 extern struct qhash_table *user_cache;
 extern PORANGEFS_OPTIONS goptions;
 
-#define DEBUG_FLAG(val, flag) if (val&flag) { DbgPrint("   "#flag"\n"); }
+#define DEBUG_FLAG(val, flag) if (val&flag) { client_debug("   "#flag"\n"); }
+
+#define DEBUG_FILE_INFO(p, i) client_debug("   "#i": %u\n", p->i)
 
 #define MALLOC_CHECK(ptr)   if (ptr == NULL) \
                                 return -ERROR_NOT_ENOUGH_MEMORY
@@ -63,15 +66,15 @@ extern PORANGEFS_OPTIONS goptions;
 
 #define CRED_CHECK(func, err)  do { \
                                    if (err != 0) { \
-                                       DbgPrint("%s: bad credential (%d)\n", func, err); \
+                                       client_debug("%s: bad credential (%d)\n", func, err); \
                                        return err; \
                                    } \
                                } while (0)
 
-#define DEBUG_PATH(path)   DbgPrint("   resolved path: %s\n", path)
+#define DEBUG_PATH(path)   client_debug("   resolved path: %s\n", path)
 
 #define DEBUG_BUF_SIZE    8192
-void DbgPrint(char *format, ...)
+void client_debug(char *format, ...)
 {
     if (g_DebugMode) 
     {
@@ -233,7 +236,7 @@ char *convert_wstring(const wchar_t *wcstr)
 
     if (err != 0)
     {
-        DbgPrint("convert_wstring: %d\n", err);
+        client_debug("convert_wstring: %d\n", err);
         return NULL;
     }
 
@@ -248,7 +251,7 @@ char *convert_wstring(const wchar_t *wcstr)
 
     if (err != 0)
     {
-        DbgPrint("convert_wstring 2: %d\n", err);
+        client_debug("convert_wstring 2: %d\n", err);
         free(mbstr);
 
         return NULL;
@@ -269,7 +272,7 @@ wchar_t *convert_mbstring(const char *mbstr)
 
     if (err != 0)
     {
-        DbgPrint("convert_mbstring: %d\n", err);
+        client_debug("convert_mbstring: %d\n", err);
         return NULL;
     }
 
@@ -283,7 +286,7 @@ wchar_t *convert_mbstring(const char *mbstr)
 
     if (err != 0)
     {
-        DbgPrint("convert_mbstring 2: %d\n", err);
+        client_debug("convert_mbstring 2: %d\n", err);
         free(wstr);
 
         return NULL;
@@ -336,7 +339,7 @@ static char *get_fs_path(const wchar_t *local_path)
     ret = fs_resolve_path(mb_path, fs_path, PVFS_PATH_MAX);
     if (ret != 0)
     {
-        DbgPrint("   fs_resolve_path returned %d\n", ret);
+        client_debug("   fs_resolve_path returned %d\n", ret);
         cleanup_string(mb_path);
         free(fs_path);
         return NULL;
@@ -370,7 +373,7 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
     ASN1_UTCTIME *expires = NULL;
     int cache_hit, ret = 0;
 
-    DbgPrint("   get_requestor_credential: enter\n");
+    client_debug("   get_requestor_credential: enter\n");
 
     /* get requesting user information */
     htoken = DokanOpenRequestorToken(file_info);
@@ -379,7 +382,7 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
         if (!GetTokenInformation(htoken, TokenUser, buffer, sizeof(buffer), &return_len))
         {
             err = GetLastError();
-            DbgPrint("   get_requestor_credential: GetTokenInformation failed: %d\n", err);
+            client_debug("   get_requestor_credential: GetTokenInformation failed: %d\n", err);
             CloseHandle(htoken);
             return err * -1;
         }   
@@ -390,7 +393,7 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
                               domain_name, &domain_len, &snu))
         {
             err = GetLastError();
-            DbgPrint("   get_requestor_credential: LookupAccountSid failed: %u\n", err);
+            client_debug("   get_requestor_credential: LookupAccountSid failed: %u\n", err);
             CloseHandle(htoken);
             return err * -1;
         }        
@@ -398,7 +401,7 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
     else
     {
         /* not all operations have a requestor */
-        DbgPrint("   get_requestor_credential: no requestor\n");
+        client_debug("   get_requestor_credential: no requestor\n");
 
         if (goptions->user_mode == USER_MODE_SERVER)
         {
@@ -417,7 +420,7 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
         }
     }
 
-    DbgPrint("   get_requestor_credential: requestor: %s\n", user_name);
+    client_debug("   get_requestor_credential: requestor: %s\n", user_name);
     
     /* search user list for credential */
     cache_hit = get_cache_user(user_name, credential);
@@ -433,7 +436,7 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
             }
             else
             {
-                DbgPrint("   get_requestor_credential:  user %s not found\n", user_name);
+                client_debug("   get_requestor_credential:  user %s not found\n", user_name);
                 ret = -ERROR_USER_PROFILE_LOAD;
             }
         }
@@ -461,7 +464,7 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
 
     CloseHandle(htoken);
 
-    DbgPrint("   get_requestor_credential: exit\n");
+    client_debug("   get_requestor_credential: exit\n");
 
     /* if credential can't be created return access denied */
     return (ret == 0) ? 0 : -ERROR_ACCESS_DENIED;
@@ -478,7 +481,7 @@ static int get_credential(PDOKAN_FILE_INFO file_info,
     if (file_info == NULL || credential == NULL)
         return -ERROR_INVALID_PARAMETER;
 
-    DbgPrint("   get_credential:  context: %llx\n", file_info->Context);
+    client_debug("   get_credential:  context: %llx\n", file_info->Context);
 
     if (file_info->Context != 0)
     {
@@ -493,17 +496,17 @@ static int get_credential(PDOKAN_FILE_INFO file_info,
             PINT_copy_credential(&(entry->credential), credential);
             if (goptions->user_mode != USER_MODE_SERVER)
             {
-                DbgPrint("   get_credential:  found (%d:%d)\n", 
+                client_debug("   get_credential:  found (%d:%d)\n", 
                     credential->userid, credential->group_array[0]);
             }
             else
             {
-                DbgPrint("   get_credential:  found\n");
+                client_debug("   get_credential:  found\n");
             }
         }
         else
         {
-            DbgPrint("   get_credential:  not found\n");
+            client_debug("   get_credential:  not found\n");
             ret = -1;
         }
         gen_mutex_unlock(&context_cache_mutex);
@@ -516,43 +519,67 @@ static int get_credential(PDOKAN_FILE_INFO file_info,
         {
             if (goptions->user_mode != USER_MODE_SERVER)
             {
-                DbgPrint("   get_credential:  requestor credential (%d:%d)\n", 
+                client_debug("   get_credential:  requestor credential (%d:%d)\n", 
                     credential->userid, credential->group_array[0]);
             }
             else
             {
-                DbgPrint("   get_credential:  requestor credential OK\n");
+                client_debug("   get_credential:  requestor credential OK\n");
             }
         }
     }
 
-    DbgPrint("   get_credential:  exit\n");
+    client_debug("   get_credential:  exit\n");
 
     return ret;
 }
 
-/* add credential to cache */
-static void add_credential(ULONG64 context, PVFS_credential *credential)
+/* add entry for file to the context cache */
+static void add_context(PDOKAN_FILE_INFO file_info, DWORD flags, PVFS_credential *credential)
 {
-    struct context_entry *entry;
+	struct context_entry *entry;
 
-    entry = (struct context_entry *) calloc(1, sizeof(struct context_entry));
+	if (file_info == NULL) {
+		client_debug("   add_context: NULL file_info\n");
+		return;
+	}
+
+	/* create new entry */
+	entry = (struct context_entry *) calloc(1, sizeof(struct context_entry));
     if (entry == NULL)
     {
-        DbgPrint("   add_credential: out of memory\n");
+        client_debug("   add_context: out of memory\n");
         return;
     }
-            
-    entry->context = context;
-    PINT_copy_credential(credential, &(entry->credential));
+
+	entry->context = file_info->Context;
+	entry->flags = flags;
+	PINT_copy_credential(credential, &(entry->credential));
 
     gen_mutex_lock(&context_cache_mutex);
     qhash_add(context_cache, &entry->context, &entry->hash_link);
     gen_mutex_unlock(&context_cache_mutex);
 }
 
+static struct context_entry *get_context_entry(ULONG64 context)
+{
+	struct qhash_head *item = NULL;
+	struct context_entry *entry = NULL;
+	
+	gen_mutex_lock(&context_cache_mutex);
+    item = qhash_search(context_cache, &context);
+    if (item != NULL)
+    {
+        /* get entry on cache hit */
+		entry = qhash_entry(item, struct context_entry, hash_link);		
+	}
+	gen_mutex_unlock(&context_cache_mutex);
+	
+	return entry;
+}
+
 /* remove credential from cache */
-static void remove_credential(ULONG64 context)
+static void remove_context(ULONG64 context)
 {
     struct qhash_head *link; 
     struct context_entry *entry;
@@ -781,26 +808,26 @@ PVFS_Dokan_create_file(
     PVFS_sys_attr attr;
     PVFS_credential credential;
 
-    DbgPrint("CreateFile: %S\n", FileName);
+    client_debug("CreateFile: %S\n", FileName);
     
     if (CreationDisposition == CREATE_NEW)
-        DbgPrint("   CREATE_NEW\n");
+        client_debug("   CREATE_NEW\n");
     if (CreationDisposition == OPEN_ALWAYS)
-        DbgPrint("   OPEN_ALWAYS\n");
+        client_debug("   OPEN_ALWAYS\n");
     if (CreationDisposition == CREATE_ALWAYS)
-        DbgPrint("   CREATE_ALWAYS\n");
+        client_debug("   CREATE_ALWAYS\n");
     if (CreationDisposition == OPEN_EXISTING)
-        DbgPrint("   OPEN_EXISTING\n");
+        client_debug("   OPEN_EXISTING\n");
     if (CreationDisposition == TRUNCATE_EXISTING)
-        DbgPrint("   TRUNCATE_EXISTING\n");
+        client_debug("   TRUNCATE_EXISTING\n");
 
-    DbgPrint("   ShareMode = 0x%x\n", ShareMode);
+    client_debug("   ShareMode = 0x%x\n", ShareMode);
 
     DEBUG_FLAG(ShareMode, FILE_SHARE_READ);
     DEBUG_FLAG(ShareMode, FILE_SHARE_WRITE);
     DEBUG_FLAG(ShareMode, FILE_SHARE_DELETE);
 
-    DbgPrint("   AccessMode = 0x%x\n", AccessMode);
+    client_debug("   AccessMode = 0x%x\n", AccessMode);
 
     DEBUG_FLAG(AccessMode, GENERIC_READ);
     DEBUG_FLAG(AccessMode, GENERIC_WRITE);
@@ -823,7 +850,7 @@ PVFS_Dokan_create_file(
     DEBUG_FLAG(AccessMode, STANDARD_RIGHTS_WRITE);
     DEBUG_FLAG(AccessMode, STANDARD_RIGHTS_EXECUTE);
 
-    DbgPrint("   FlagsAndAttributes = 0x%x\n", FlagsAndAttributes);
+    client_debug("   FlagsAndAttributes = 0x%x\n", FlagsAndAttributes);
 
     DEBUG_FLAG(FlagsAndAttributes, FILE_ATTRIBUTE_ARCHIVE);
     DEBUG_FLAG(FlagsAndAttributes, FILE_ATTRIBUTE_ENCRYPTED);
@@ -852,6 +879,14 @@ PVFS_Dokan_create_file(
     DEBUG_FLAG(FlagsAndAttributes, SECURITY_EFFECTIVE_ONLY);
     DEBUG_FLAG(FlagsAndAttributes, SECURITY_SQOS_PRESENT);
 
+    DEBUG_FILE_INFO(DokanFileInfo, ProcessId);
+    DEBUG_FILE_INFO(DokanFileInfo, IsDirectory);
+    DEBUG_FILE_INFO(DokanFileInfo, DeleteOnClose);
+    DEBUG_FILE_INFO(DokanFileInfo, PagingIo);
+    DEBUG_FILE_INFO(DokanFileInfo, SynchronousIo);
+    DEBUG_FILE_INFO(DokanFileInfo, Nocache);
+    DEBUG_FILE_INFO(DokanFileInfo, WriteToEndOfFile);
+    
     DokanFileInfo->Context = 0;
 
     /* load credential (of requestor) */
@@ -866,7 +901,7 @@ PVFS_Dokan_create_file(
     found = 0;
     ret = fs_lookup(fs_path, &credential, &handle);    
 
-    DbgPrint("   fs_lookup returns: %d\n", ret);
+    client_debug("   fs_lookup returns: %d\n", ret);
 
     if (ret == -PVFS_ENOENT)
     {
@@ -891,7 +926,7 @@ PVFS_Dokan_create_file(
             ret = check_create_perm(&attr, &credential, AccessMode);
             if (!ret)
             {
-                DbgPrint("CreateFile exit: access denied\n");
+                client_debug("CreateFile exit: access denied\n");
                 free(fs_path);
                 return -ERROR_ACCESS_DENIED;
             }
@@ -899,7 +934,7 @@ PVFS_Dokan_create_file(
         }
         else
         {
-            DbgPrint("CreateFile exit: fs_getattr (1) failed with code: %d\n", ret);
+            client_debug("CreateFile exit: fs_getattr (1) failed with code: %d\n", ret);
             free(fs_path);
             return error_map(ret);
         }
@@ -956,7 +991,7 @@ PVFS_Dokan_create_file(
         }
     }
 
-    DbgPrint("   fs_create/fs_truncate returns: %d\n", ret);
+    client_debug("   fs_create/fs_truncate returns: %d\n", ret);
 
     
     err = error_map(ret);
@@ -965,8 +1000,8 @@ PVFS_Dokan_create_file(
         /* generate unique context */
         DokanFileInfo->Context = gen_context();
 
-        DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
-        add_credential(DokanFileInfo->Context, &credential);
+        client_debug("   Context: %llx\n", DokanFileInfo->Context);
+	    add_context(DokanFileInfo, FlagsAndAttributes, &credential);
 
         /* determine whether this is a directory */
         if (!attr_flag)
@@ -979,14 +1014,14 @@ PVFS_Dokan_create_file(
         }
         else
         {
-            DbgPrint("   fs_getattr (2) failed with code: %d\n", ret);
+            client_debug("   fs_getattr (2) failed with code: %d\n", ret);
         }
     }
 
     free(fs_path);
     PINT_cleanup_credential(&credential);
 
-    DbgPrint("CreateFile exit: %d (%d)\n", err, ret);
+    client_debug("CreateFile exit: %d (%d)\n", err, ret);
         
     return err;
 }
@@ -1002,7 +1037,7 @@ PVFS_Dokan_create_directory(
     PVFS_handle handle;
     PVFS_credential credential;
 
-    DbgPrint("CreateDirectory: %S\n", FileName);
+    client_debug("CreateDirectory: %S\n", FileName);
 
     DokanFileInfo->Context = 0;
 
@@ -1017,20 +1052,20 @@ PVFS_Dokan_create_directory(
 
     ret = fs_mkdir(fs_path, &credential, &handle, goptions->new_dir_perms);
 
-    DbgPrint("   fs_mkdir returns: %d\n", ret);
+    client_debug("   fs_mkdir returns: %d\n", ret);
 
     err = error_map(ret);
     if (err == ERROR_SUCCESS)
     {
         DokanFileInfo->IsDirectory = TRUE;
         DokanFileInfo->Context = gen_context();
-        add_credential(DokanFileInfo->Context, &credential);
+        add_context(DokanFileInfo, 0, &credential);
     }
 
     free(fs_path);
     PINT_cleanup_credential(&credential);
 
-    DbgPrint("CreateDirectory exit: %d (%d)\n", err, ret);
+    client_debug("CreateDirectory exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -1046,7 +1081,7 @@ PVFS_Dokan_open_directory(
     PVFS_sys_attr attr;
     PVFS_credential credential;
 
-    DbgPrint("OpenDirectory: %S\n", FileName);
+    client_debug("OpenDirectory: %S\n", FileName);
 
     DokanFileInfo->Context = 0;
 
@@ -1061,7 +1096,7 @@ PVFS_Dokan_open_directory(
 
     /* verify file is a directory */
     ret = fs_getattr(fs_path, &credential, &attr);
-    DbgPrint("   fs_getattr returns: %d\n", ret);
+    client_debug("   fs_getattr returns: %d\n", ret);
     if (ret == 0)
     {
         if (!(attr.objtype & PVFS_TYPE_DIRECTORY))
@@ -1075,13 +1110,13 @@ PVFS_Dokan_open_directory(
     {
         DokanFileInfo->IsDirectory = TRUE;
         DokanFileInfo->Context = gen_context();
-        add_credential(DokanFileInfo->Context, &credential);
+        add_context(DokanFileInfo, 0, &credential);
     }
 
     free(fs_path);
     PINT_cleanup_credential(&credential);
 
-    DbgPrint("OpenDirectory exit: %d (%d)\n", err, ret);
+    client_debug("OpenDirectory exit: %d (%d)\n", err, ret);
     
     return err;
 }
@@ -1095,14 +1130,27 @@ PVFS_Dokan_close_file(
     char *fs_path = NULL;
     int ret = 0, err;
     PVFS_credential credential;
+	int del_flag = 0;
+	struct context_entry *entry;
 
-    DbgPrint("CloseFile: %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("CloseFile: %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
+
+	/* determine whether file should be deleted */
+	del_flag = DokanFileInfo->DeleteOnClose;
+	if (!del_flag)
+	{
+		/* get cached entry */
+		entry = get_context_entry(DokanFileInfo->Context);
+		del_flag = entry && (entry->flags & FILE_FLAG_DELETE_ON_CLOSE);
+	}
 
     /* delete the file/dir if DeleteOnClose specified */
-    if (DokanFileInfo->DeleteOnClose)
+    if (del_flag)
     {
-        /* load credential */
+        client_debug("   Deleting file\n");
+		
+		/* load credential */
         err = get_credential(DokanFileInfo, &credential);
         CRED_CHECK("CloseFile", err);
 
@@ -1117,18 +1165,18 @@ PVFS_Dokan_close_file(
         PINT_cleanup_credential(&credential);
     }
 
-    /* PVFS doesn't have a close-file semantic */ 
+    /* No-op: PVFS doesn't have a close-file semantic */ 
 
     /* remove credential from table */
     if (DokanFileInfo->Context != 0)
-        remove_credential(DokanFileInfo->Context);
+        remove_context(DokanFileInfo->Context);
 
     if (fs_path != NULL)
         free(fs_path);    
 
     err = error_map(ret);
 
-    DbgPrint("CloseFile exit: %d (%d)\n", err, ret);
+    client_debug("CloseFile exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -1150,8 +1198,8 @@ PVFS_Dokan_cleanup(
     int cache_ret, ret, err;
 #endif
 
-    DbgPrint("Cleanup: %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("Cleanup: %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
 /* TODO: delete */
 #if 0
@@ -1202,7 +1250,7 @@ PVFS_Dokan_cleanup(
     }
 #endif
 
-    DbgPrint("Cleanup exit: %d\n", 0);
+    client_debug("Cleanup exit: %d\n", 0);
 
     /* note result of time operation is not returned */
     return 0;
@@ -1230,10 +1278,10 @@ PVFS_Dokan_read_file(
     PVFS_credential credential;
     int ret, cache_ret, err;
     
-    DbgPrint("ReadFile: %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
-    DbgPrint("   BufferLength: %lu\n", BufferLength);
-    DbgPrint("   Offset: %llu\n", Offset);
+    client_debug("ReadFile: %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("   BufferLength: %lu\n", BufferLength);
+    client_debug("   Offset: %llu\n", Offset);
 
     if (FileName == NULL || wcslen(FileName) == 0 ||
         Buffer == NULL || BufferLength == 0 || 
@@ -1317,7 +1365,7 @@ PVFS_Dokan_read_file(
 
     *ReadLength = (DWORD) len64;
 
-    DbgPrint("   ReadLength: %u\n", *ReadLength);
+    client_debug("   ReadLength: %u\n", *ReadLength);
 
 read_file_exit:
 
@@ -1330,7 +1378,7 @@ read_file_exit:
 
     err = error_map(ret);
     
-    DbgPrint("ReadFile exit: %d (%d)\n", err, ret);
+    client_debug("ReadFile exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -1356,10 +1404,10 @@ PVFS_Dokan_write_file(
     int ret, ret2, cache_ret, err;
     PVFS_sys_attr attr = {0};
 
-    DbgPrint("WriteFile: %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
-    DbgPrint("   NumberOfBytesToWrite: %u\n", NumberOfBytesToWrite);
-    DbgPrint("   Offset: %llu\n", Offset);
+    client_debug("WriteFile: %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("   NumberOfBytesToWrite: %u\n", NumberOfBytesToWrite);
+    client_debug("   Offset: %llu\n", Offset);
 
     /* load credential */
     err = get_credential(DokanFileInfo, &credential);
@@ -1436,7 +1484,7 @@ PVFS_Dokan_write_file(
 
     *NumberOfBytesWritten = (DWORD) len64;
 
-    DbgPrint("   NumberOfBytesWritten: %u\n", *NumberOfBytesWritten);
+    client_debug("   NumberOfBytesWritten: %u\n", *NumberOfBytesWritten);
 
 write_file_exit:
     /* set the modify and access times */
@@ -1453,7 +1501,7 @@ write_file_exit:
             attr.atime = attr.mtime = time(NULL);
             if((ret2 = fs_setattr(fs_path, &attr, &credential)) != 0)
             {
-                DbgPrint("   fs_setattr (atime/mtime) returned %d\n", ret2);
+                client_debug("   fs_setattr (atime/mtime) returned %d\n", ret2);
             }
         }
     }
@@ -1466,7 +1514,7 @@ write_file_exit:
 
     err = error_map(ret);
 
-    DbgPrint("WriteFile exit: %d (%d)\n", err, ret);
+    client_debug("WriteFile exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -1481,8 +1529,8 @@ PVFS_Dokan_flush_file_buffers(
     int ret, err;
     PVFS_credential credential;
 
-    DbgPrint("FlushFileBuffers: %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("FlushFileBuffers: %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
     /* load credential */
     err = get_credential(DokanFileInfo, &credential);
@@ -1501,7 +1549,7 @@ PVFS_Dokan_flush_file_buffers(
     free(fs_path);
     PINT_cleanup_credential(&credential);
 
-    DbgPrint("FlushFileBuffers exit: %d (%d)\n", err, ret);
+    client_debug("FlushFileBuffers exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -1529,8 +1577,8 @@ PVFS_Dokan_get_file_information(
     PVFS_credential credential;
     char info[32];
 
-    DbgPrint("GetFileInfo: %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("GetFileInfo: %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
     /* load credential */
     err = get_credential(DokanFileInfo, &credential);
@@ -1587,7 +1635,7 @@ PVFS_Dokan_get_file_information(
                 strcat(info, "NORMAL");
             }
         
-            DbgPrint("%s\n", info);
+            client_debug("%s\n", info);
         }
 
         FREE_ATTR_BUFS(attr);
@@ -1598,7 +1646,7 @@ PVFS_Dokan_get_file_information(
     free(fs_path);
     PINT_cleanup_credential(&credential);
 
-    DbgPrint("GetFileInfo exit: %d (%d)\n", err, ret);
+    client_debug("GetFileInfo exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -1615,8 +1663,8 @@ PVFS_Dokan_set_file_attributes(
     PVFS_sys_attr attr;
     PVFS_credential credential;
 
-    DbgPrint("SetFileAttributes: %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("SetFileAttributes: %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
     /* load credential */
     err = get_credential(DokanFileInfo, &credential);
@@ -1665,7 +1713,7 @@ PVFS_Dokan_set_file_attributes(
 
     err = error_map(ret);
 
-    DbgPrint("SetFileAttributes exit: %d (%d)\n", err, ret);
+    client_debug("SetFileAttributes exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -1688,7 +1736,7 @@ static int add_dir_entries(
     ret = fs_getattr(fs_path, credential, &attr1);
     if (ret != 0)
     {
-        DbgPrint("   add_dir_entries: fs_getattr (1) returned %d\n", ret);
+        client_debug("   add_dir_entries: fs_getattr (1) returned %d\n", ret);
         return ret;
     }
 
@@ -1711,7 +1759,7 @@ static int add_dir_entries(
         ret = fs_getattr(parent_path, credential, &attr2);
         if (ret != 0)
         {
-            DbgPrint("   add_dir_entries: fs_getattr (2) returned %d\n", ret);
+            client_debug("   add_dir_entries: fs_getattr (2) returned %d\n", ret);
             return ret;
         }
     }
@@ -1721,7 +1769,7 @@ static int add_dir_entries(
     ret = PVFS_sys_attr_to_file_info(".", credential, &attr1, &hfile_info);
     if (ret != 0)
     {
-        DbgPrint("   add_dir_entries: PVFS_sys_attr_to_file_info returned %d\n", ret);        
+        client_debug("   add_dir_entries: PVFS_sys_attr_to_file_info returned %d\n", ret);        
         return -PVFS_EINVAL;
     }
         
@@ -1747,7 +1795,7 @@ static int add_dir_entries(
     ret = PVFS_sys_attr_to_file_info("..", credential, &attr2, &hfile_info);
     if (ret != 0)
     {
-        DbgPrint("   add_dir_entries: PVFS_sys_attr_to_file_info returned %d\n", ret);        
+        client_debug("   add_dir_entries: PVFS_sys_attr_to_file_info returned %d\n", ret);        
         return -PVFS_EINVAL;
     }
         
@@ -1792,9 +1840,9 @@ PVFS_Dokan_find_files_with_pattern(
     BY_HANDLE_FILE_INFORMATION hfile_info;
     int match_flag;
     
-    DbgPrint("FindFilesWithPattern: %S\n", PathName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
-    DbgPrint("   Pattern: %S\n", SearchPattern);
+    client_debug("FindFilesWithPattern: %S\n", PathName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("   Pattern: %S\n", SearchPattern);
 
     /* load credential */
     err = get_credential(DokanFileInfo, &credential);
@@ -1847,14 +1895,14 @@ PVFS_Dokan_find_files_with_pattern(
                             filename_array, attr_array);
         if (ret != 0)
         {
-            DbgPrint("   fs_find_files returned %d\n", ret);
+            client_debug("   fs_find_files returned %d\n", ret);
             goto find_files_exit;
         }
 
         /* loop through files */
         for (i = 0; i < outcount; i++)
         {
-            DbgPrint("   File found: %s\n", filename_array[i]);
+            client_debug("   File found: %s\n", filename_array[i]);
 
             wfilename = convert_mbstring(filename_array[i]);
             
@@ -1863,7 +1911,7 @@ PVFS_Dokan_find_files_with_pattern(
             {                
                 if (!DokanIsNameInExpression(SearchPattern, wfilename, FALSE))
                 {
-                    DbgPrint("   File doesn't match\n");
+                    client_debug("   File doesn't match\n");
                     goto find_files_no_match;
                 }
             }
@@ -1876,7 +1924,7 @@ PVFS_Dokan_find_files_with_pattern(
                 &attr_array[i], &hfile_info);
             if (ret != 0)
             {
-                DbgPrint("   PVFS_sys_attr_to_file_info returned %d\n", ret);
+                client_debug("   PVFS_sys_attr_to_file_info returned %d\n", ret);
                 cleanup_string(wfilename);
                 goto find_files_exit;
             }
@@ -1925,7 +1973,7 @@ find_files_exit:
 
     err = error_map(ret);
 
-    DbgPrint("FindFiles exit: %d (%d) (%d files)\n", err, ret, count);
+    client_debug("FindFiles exit: %d (%d) (%d files)\n", err, ret, count);
 
     return err;
 }
@@ -1941,8 +1989,8 @@ PVFS_Dokan_delete_file(
     PVFS_credential credential;
     int ret, err;
 
-    DbgPrint("DeleteFile: %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("DeleteFile: %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
     /* load credential */
     err = get_credential(DokanFileInfo, &credential);
@@ -1963,7 +2011,7 @@ PVFS_Dokan_delete_file(
 
     err = error_map(ret);
 
-    DbgPrint("DeleteFile exit: %d (%d)\n", err, ret);
+    client_debug("DeleteFile exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -1975,13 +2023,22 @@ PVFS_Dokan_delete_directory(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     int err;
+    PVFS_credential credential;
 
-    DbgPrint("DeleteDirectory: %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("DeleteDirectory: %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
+    /* load credential (for add_context */
+    err = get_credential(DokanFileInfo, &credential);
+    CRED_CHECK("DeleteDirectory", err);
+
+    /* store context with DeleteOnClose flag */
+    add_context(DokanFileInfo, FILE_FLAG_DELETE_ON_CLOSE, &credential);
+
+    /* use same process as a file deletion) */
     err = PVFS_Dokan_delete_file(FileName, DokanFileInfo);
 
-    DbgPrint("DeleteDirectory exit: %d\n", err);
+    client_debug("DeleteDirectory exit: %d\n", err);
 
     return err;
 }
@@ -1998,8 +2055,8 @@ PVFS_Dokan_move_file(
     int ret, err;
     PVFS_credential credential;
 
-    DbgPrint("MoveFile: %S -> %S\n", FileName, NewFileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("MoveFile: %S -> %S\n", FileName, NewFileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
     /* load credential */
     err = get_credential(DokanFileInfo, &credential);
@@ -2026,7 +2083,7 @@ PVFS_Dokan_move_file(
 
     err = error_map(ret);
 
-    DbgPrint("MoveFile exit: %d (%d)\n", err, ret);
+    client_debug("MoveFile exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -2038,12 +2095,12 @@ PVFS_Dokan_lock_file(
     LONGLONG         Length,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    DbgPrint("LockFile: %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("LockFile: %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
     /* PVFS does not currently have a locking mechanism */
 
-    DbgPrint("LockFile exit: %d\n", 0);
+    client_debug("LockFile exit: %d\n", 0);
 
     return 0;
 }
@@ -2055,12 +2112,12 @@ PVFS_Dokan_set_end_of_file(
     LONGLONG            ByteOffset,
     PDOKAN_FILE_INFO    DokanFileInfo)
 {
-    DbgPrint("SetEndOfFile %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("SetEndOfFile %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
     /* PVFS doesn't open file handles, so this function is not needed (?) */
 
-    DbgPrint("SetEndOfFile exit: %d\n", 0);
+    client_debug("SetEndOfFile exit: %d\n", 0);
 
     return 0;
 }
@@ -2076,8 +2133,8 @@ PVFS_Dokan_set_allocation_size(
     PVFS_credential credential;
     char *fs_path;
 
-    DbgPrint("SetAllocationSize %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("SetAllocationSize %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
     /* load credential */
     err = get_credential(DokanFileInfo, &credential);
@@ -2096,7 +2153,7 @@ PVFS_Dokan_set_allocation_size(
 
     err = error_map(ret);
 
-    DbgPrint("SetAllocationSize exit: %d (%d)\n", err, ret);
+    client_debug("SetAllocationSize exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -2115,8 +2172,8 @@ PVFS_Dokan_set_file_time(
     PVFS_credential credential;
     PVFS_sys_attr attr;
 
-    DbgPrint("SetFileTime: %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("SetFileTime: %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
     /* load credential */
     err = get_credential(DokanFileInfo, &credential);
@@ -2133,21 +2190,21 @@ PVFS_Dokan_set_file_time(
         CreationTime->dwHighDateTime == 0))
     {
         convert_filetime((LPFILETIME) CreationTime, &attr.ctime);
-        DbgPrint("   Setting CreationTime to %llu\n", attr.ctime);
+        client_debug("   Setting CreationTime to %llu\n", attr.ctime);
         attr.mask |= PVFS_ATTR_SYS_CTIME;
     }
     if (LastAccessTime != NULL && !(LastAccessTime->dwLowDateTime == 0 &&
         LastAccessTime->dwHighDateTime == 0))
     {
         convert_filetime((LPFILETIME) LastAccessTime, &attr.atime);
-        DbgPrint("   Setting LastAccessTime to %llu\n", attr.atime);
+        client_debug("   Setting LastAccessTime to %llu\n", attr.atime);
         attr.mask |= PVFS_ATTR_SYS_ATIME|PVFS_ATTR_SYS_ATIME_SET;
     }
     if (LastWriteTime != NULL && !(LastWriteTime->dwLowDateTime == 0 &&
         LastWriteTime->dwHighDateTime == 0))
     {
         convert_filetime((LPFILETIME) LastWriteTime, &attr.mtime);
-        DbgPrint("   Setting LastWriteTime to %llu\n", attr.mtime);
+        client_debug("   Setting LastWriteTime to %llu\n", attr.mtime);
         attr.mask |= PVFS_ATTR_SYS_MTIME|PVFS_ATTR_SYS_MTIME_SET;
     }
     
@@ -2159,7 +2216,7 @@ PVFS_Dokan_set_file_time(
 
     err = error_map(ret);
 
-    DbgPrint("SetFileTime exit: %d (%d)\n", err, ret);
+    client_debug("SetFileTime exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -2182,30 +2239,30 @@ PVFS_Dokan_get_file_security(
     PSECURITY_DESCRIPTOR desc = NULL;
     int err = 1;
 
-    DbgPrint("GetFileSecurity: %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
-    DbgPrint("   BufferLength: %u\n", BufferLength);
+    client_debug("GetFileSecurity: %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("   BufferLength: %u\n", BufferLength);
 
     /* debug flags */
-    DbgPrint("   Flags:\n");
+    client_debug("   Flags:\n");
     if (*SecurityInformation & DACL_SECURITY_INFORMATION)
-        DbgPrint("      DACL_SECURITY_INFORMATION\n");
+        client_debug("      DACL_SECURITY_INFORMATION\n");
     if (*SecurityInformation & GROUP_SECURITY_INFORMATION)
-        DbgPrint("      GROUP_SECURITY_INFORMATION\n");
+        client_debug("      GROUP_SECURITY_INFORMATION\n");
     if (*SecurityInformation & LABEL_SECURITY_INFORMATION)
-        DbgPrint("      LABEL_SECURITY_INFORMATION\n");
+        client_debug("      LABEL_SECURITY_INFORMATION\n");
     if (*SecurityInformation & OWNER_SECURITY_INFORMATION)
-        DbgPrint("      OWNER_SECURITY_INFORMATION\n");
+        client_debug("      OWNER_SECURITY_INFORMATION\n");
     if (*SecurityInformation & PROTECTED_DACL_SECURITY_INFORMATION)
-        DbgPrint("      PROTECTED_DACL_SECURITY_INFORMATION\n");
+        client_debug("      PROTECTED_DACL_SECURITY_INFORMATION\n");
     if (*SecurityInformation & PROTECTED_SACL_SECURITY_INFORMATION)
-        DbgPrint("      PROTECTED_SACL_SECURITY_INFORMATION\n");
+        client_debug("      PROTECTED_SACL_SECURITY_INFORMATION\n");
     if (*SecurityInformation & SACL_SECURITY_INFORMATION)
-        DbgPrint("      SACL_SECURITY_INFORMATION\n");
+        client_debug("      SACL_SECURITY_INFORMATION\n");
     if (*SecurityInformation & UNPROTECTED_DACL_SECURITY_INFORMATION)
-        DbgPrint("      UNPROTECTED_DACL_SECURITY_INFORMATION\n");
+        client_debug("      UNPROTECTED_DACL_SECURITY_INFORMATION\n");
     if (*SecurityInformation & UNPROTECTED_SACL_SECURITY_INFORMATION)
-        DbgPrint("      UNPROTECTED_SACL_SECURITY_INFORMATION\n");
+        client_debug("      UNPROTECTED_SACL_SECURITY_INFORMATION\n");
     
     /* TODO: return all access rights for everyone for now */
     
@@ -2213,7 +2270,7 @@ PVFS_Dokan_get_file_security(
     if (!AllocateAndInitializeSid(&sid_auth_world, 1, SECURITY_WORLD_RID,
                0, 0, 0, 0, 0, 0, 0, &everyone_sid))
     {   
-        DbgPrint("   Could not allocate SID for Everyone\n");
+        client_debug("   Could not allocate SID for Everyone\n");
         goto get_file_security_exit;
     }
 
@@ -2230,14 +2287,14 @@ PVFS_Dokan_get_file_security(
     self_sid = LocalAlloc(LMEM_FIXED, self_sid_size);
     if (self_sid == NULL)
     {
-        DbgPrint("   Could not allocate SID for self\n");
+        client_debug("   Could not allocate SID for self\n");
         goto get_file_security_exit;
     }
 
     /* get SID for current account */
     if (!CreateWellKnownSid(WinSelfSid, NULL, self_sid, &self_sid_size))
     {
-        DbgPrint("   Could not create SID for self\n");
+        client_debug("   Could not create SID for self\n");
         goto get_file_security_exit;
     }
 
@@ -2253,7 +2310,7 @@ PVFS_Dokan_get_file_security(
     /* add entry to the ACL */
     if (SetEntriesInAcl(1, &ea, NULL, &acl) != ERROR_SUCCESS)
     {
-        DbgPrint("   Could not add ACE to ACL\n");
+        client_debug("   Could not add ACE to ACL\n");
         goto get_file_security_exit;
     }
 
@@ -2263,7 +2320,7 @@ PVFS_Dokan_get_file_security(
     if (!InitializeSecurityDescriptor(desc, 
                 SECURITY_DESCRIPTOR_REVISION))
     {
-        DbgPrint("   Could not initialize descriptor\n");
+        client_debug("   Could not initialize descriptor\n");
         goto get_file_security_exit;
     }
 
@@ -2272,7 +2329,7 @@ PVFS_Dokan_get_file_security(
     {
         if (!SetSecurityDescriptorOwner(desc, self_sid, FALSE))
         {
-            DbgPrint("   Could not set descriptor owner\n");
+            client_debug("   Could not set descriptor owner\n");
             goto get_file_security_exit;
         }
     }
@@ -2282,7 +2339,7 @@ PVFS_Dokan_get_file_security(
     {
         if (!SetSecurityDescriptorGroup(desc, everyone_sid, FALSE))
         {
-            DbgPrint("   Could not set descriptor group\n");
+            client_debug("   Could not set descriptor group\n");
             goto get_file_security_exit;
         }
     }
@@ -2292,7 +2349,7 @@ PVFS_Dokan_get_file_security(
     {
        if (!SetSecurityDescriptorDacl(desc, TRUE, acl, FALSE))
        {
-           DbgPrint("   Could not set descriptor DACL\n");
+           client_debug("   Could not set descriptor DACL\n");
            goto get_file_security_exit;
        }
     }
@@ -2306,7 +2363,7 @@ PVFS_Dokan_get_file_security(
     }
     else
     {
-        DbgPrint("   Length Needed: %u\n", *LengthNeeded);
+        client_debug("   Length Needed: %u\n", *LengthNeeded);
         err = -ERROR_INSUFFICIENT_BUFFER;        
     }
 
@@ -2328,7 +2385,7 @@ get_file_security_exit:
     if (err == 1)
         err = GetLastError() * -1;
 
-    DbgPrint("GetFileSecurity exit: %d\n", err);
+    client_debug("GetFileSecurity exit: %d\n", err);
 
     return err;
 }
@@ -2344,35 +2401,35 @@ PVFS_Dokan_set_file_security(
 {
     int err;
 
-    DbgPrint("SetFileSecurity: %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("SetFileSecurity: %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
     /* debug flags */
-    DbgPrint("   Flags:\n");
+    client_debug("   Flags:\n");
     if (*SecurityInformation & DACL_SECURITY_INFORMATION)
-        DbgPrint("      DACL_SECURITY_INFORMATION\n");
+        client_debug("      DACL_SECURITY_INFORMATION\n");
     if (*SecurityInformation & GROUP_SECURITY_INFORMATION)
-        DbgPrint("      GROUP_SECURITY_INFORMATION\n");
+        client_debug("      GROUP_SECURITY_INFORMATION\n");
     if (*SecurityInformation & LABEL_SECURITY_INFORMATION)
-        DbgPrint("      LABEL_SECURITY_INFORMATION\n");
+        client_debug("      LABEL_SECURITY_INFORMATION\n");
     if (*SecurityInformation & OWNER_SECURITY_INFORMATION)
-        DbgPrint("      OWNER_SECURITY_INFORMATION\n");
+        client_debug("      OWNER_SECURITY_INFORMATION\n");
     if (*SecurityInformation & PROTECTED_DACL_SECURITY_INFORMATION)
-        DbgPrint("      PROTECTED_DACL_SECURITY_INFORMATION\n");
+        client_debug("      PROTECTED_DACL_SECURITY_INFORMATION\n");
     if (*SecurityInformation & PROTECTED_SACL_SECURITY_INFORMATION)
-        DbgPrint("      PROTECTED_SACL_SECURITY_INFORMATION\n");
+        client_debug("      PROTECTED_SACL_SECURITY_INFORMATION\n");
     if (*SecurityInformation & SACL_SECURITY_INFORMATION)
-        DbgPrint("      SACL_SECURITY_INFORMATION\n");
+        client_debug("      SACL_SECURITY_INFORMATION\n");
     if (*SecurityInformation & UNPROTECTED_DACL_SECURITY_INFORMATION)
-        DbgPrint("      UNPROTECTED_DACL_SECURITY_INFORMATION\n");
+        client_debug("      UNPROTECTED_DACL_SECURITY_INFORMATION\n");
     if (*SecurityInformation & UNPROTECTED_SACL_SECURITY_INFORMATION)
-        DbgPrint("      UNPROTECTED_SACL_SECURITY_INFORMATION\n");
+        client_debug("      UNPROTECTED_SACL_SECURITY_INFORMATION\n");
 
     /* TODO: no effect for now */
 
     err = 0;
 
-    DbgPrint("SetFileSecurity exit: %d\n", err);
+    client_debug("SetFileSecurity exit: %d\n", err);
 
     return err;
 }
@@ -2385,12 +2442,12 @@ PVFS_Dokan_unlock_file(
     LONGLONG         Length,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    DbgPrint("UnLockFile: %S\n", FileName);
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("UnLockFile: %S\n", FileName);
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
     /* PVFS does not currently have a locking mechanism */
 
-    DbgPrint("UnLockFile exit: %d\n", 0);
+    client_debug("UnLockFile exit: %d\n", 0);
 
     return 0;
 }
@@ -2400,10 +2457,10 @@ static int __stdcall
 PVFS_Dokan_unmount(
     PDOKAN_FILE_INFO    DokanFileInfo)
 {
-    DbgPrint("Unmount\n");
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("Unmount\n");
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
-    DbgPrint("Unmount exit: %d\n", 0);
+    client_debug("Unmount exit: %d\n", 0);
 
     return 0;
 }
@@ -2420,8 +2477,8 @@ PVFS_Dokan_get_disk_free_space(
     PVFS_gid gid = 0;
     PVFS_credential credential;
 
-    DbgPrint("GetDiskFreeSpace\n");
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("GetDiskFreeSpace\n");
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
     /* use root credential for this function */
     err = get_credential(DokanFileInfo, &credential);
@@ -2435,13 +2492,13 @@ PVFS_Dokan_get_disk_free_space(
     if (err == ERROR_SUCCESS)
     {
         *TotalNumberOfFreeBytes = *FreeBytesAvailable;
-        DbgPrint("   FreeBytesAvailable: %llu\n", *FreeBytesAvailable);
-        DbgPrint("   TotalNumberofBytes: %llu\n", *TotalNumberOfBytes);
+        client_debug("   FreeBytesAvailable: %llu\n", *FreeBytesAvailable);
+        client_debug("   TotalNumberofBytes: %llu\n", *TotalNumberOfBytes);
     }
 
     PINT_cleanup_credential(&credential);
 
-    DbgPrint("GetDiskFreeSpace exit: %d (%d)\n", err, ret);
+    client_debug("GetDiskFreeSpace exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -2461,8 +2518,8 @@ PVFS_Dokan_get_volume_information(
     char *vol_name;
     wchar_t *wvol_name;
 
-    DbgPrint("GetVolumeInformation\n");
-    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    client_debug("GetVolumeInformation\n");
+    client_debug("   Context: %llx\n", DokanFileInfo->Context);
 
     /* volume name */
     vol_name = fs_get_name(0);
@@ -2485,7 +2542,7 @@ PVFS_Dokan_get_volume_information(
     /* bug in volume.c -- see above */
     wcsncpy(FileSystemNameBuffer, L"OrangeFS", 8);
 
-    DbgPrint("GetVolumeInformation exit: 0\n");
+    client_debug("GetVolumeInformation exit: 0\n");
 
     return 0;
 }
@@ -2555,47 +2612,47 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
        Retry is primarily for waiting for services to be available on system 
        startup. */
     do {
-        DbgPrint("Entering DokanMain\n");
+        client_debug("Entering DokanMain\n");
 
         /* dokan loops until termination */
         status = DokanMain(dokanOptions, dokanOperations);
 
-        DbgPrint("Exited DokanMain\n");
+        client_debug("Exited DokanMain\n");
 
         switch (status) {
             case DOKAN_SUCCESS:
-                DbgPrint("Success\n");
+                client_debug("Success\n");
                 break;
             case DOKAN_ERROR:
-                DbgPrint("Error\n");
+                client_debug("Error\n");
                 break;
             case DOKAN_DRIVE_LETTER_ERROR:
-                DbgPrint("Bad Drive letter\n");
+                client_debug("Bad Drive letter\n");
                 break;
             case DOKAN_DRIVER_INSTALL_ERROR:
-                DbgPrint("Can't install driver\n");
+                client_debug("Can't install driver\n");
                 break;
             case DOKAN_START_ERROR:
-                DbgPrint("Driver something wrong\n");
+                client_debug("Driver something wrong\n");
                 break;
             case DOKAN_MOUNT_ERROR:
-                DbgPrint("Can't assign a drive letter\n");
+                client_debug("Can't assign a drive letter\n");
                 break;
             case DOKAN_MOUNT_POINT_ERROR:
-                DbgPrint("Can't assign mount point\n");
+                client_debug("Can't assign mount point\n");
                 break;
             default:
-                DbgPrint("Unknown error: %d\n", status);
+                client_debug("Unknown error: %d\n", status);
                 break;
         }
 
-        DbgPrint("Retrying in 30 seconds...\n");
+        client_debug("Retrying in 30 seconds...\n");
         
         Sleep(30000);
 
     } while (TRUE);
 
-    cleanup_string(dokanOptions->MountPoint);
+    cleanup_string((void *) dokanOptions->MountPoint);
 
     qhash_destroy_and_finalize(context_cache, struct context_entry, hash_link, free);
     gen_mutex_destroy(&context_cache_mutex);

@@ -245,7 +245,6 @@
     <ClCompile Include="..\..\..\..\src\client\sysint\perf-count-timer.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\pint-sysdev-unexp.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\pint-sysint-utils.c" />
-    <ClCompile Include="..\..\..\..\src\client\sysint\rcache.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\remove.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\server-get-config.c" />
     <ClCompile Include="..\..\..\..\src\client\sysint\sys-atomic-eattr.c" />
@@ -277,7 +276,6 @@
     <ClInclude Include="..\..\..\..\src\client\sysint\init-vars.h" />
     <ClInclude Include="..\..\..\..\src\client\sysint\ncache.h" />
     <ClInclude Include="..\..\..\..\src\client\sysint\pint-sysint-utils.h" />
-    <ClInclude Include="..\..\..\..\src\client\sysint\rcache.h" />
     <ClInclude Include="..\..\..\..\src\common\token-utils\token-utils.h" />
   </ItemGroup>
   <ItemGroup>
