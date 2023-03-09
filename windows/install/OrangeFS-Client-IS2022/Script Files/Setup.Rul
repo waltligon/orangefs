@@ -12,10 +12,12 @@
 
 // Included header files ----------------------------------------------------
 #include "ifx.h" 
-#include "MountPointUserModeDialog.Rul" 
+#include "MountPointDialog.Rul" 
 #include "ListMapDialog.Rul" 
+/*
 #include "CertMapDialog.Rul"
 #include "LDAPMapDialog.Rul"
+*/
 
 // Note: In order to have your InstallScript function executed as a custom
 // action by the Windows Installer, it must be prototyped as an 
@@ -31,17 +33,14 @@ prototype InstallService();
 prototype WriteOrangeFSTab(STRING);
 prototype InitConfigFile(BYREF NUMBER, STRING);
 prototype WriteListMapConfig(NUMBER, STRING, STRING, STRING);
+/*
 prototype WriteCertMapConfig(NUMBER, STRING);
 prototype WriteLDAPMapConfig(NUMBER, STRING, STRING, STRING, STRING,
                              NUMBER, STRING, STRING, STRING, STRING);
+*/                             
 prototype CloseConfigFile(NUMBER);
 
-// global variables
-/*
-#define USERMAP_LIST     1
-#define USERMAP_CERT     2
-#define USERMAP_LDAP     3
-*/
+// *** global variables ***
 
 // 64-bit flag
 BOOL bIs64Bit;
@@ -179,7 +178,6 @@ begin
                    "You must add this file manually (see documentation).", SEVERE);
     else
         WriteLine(nFileHandle, szFSURI + " /mnt/orangefs pvfs2 defaults,noauto 0 0"); 
-        
         CloseFile(nFileHandle);
     endif;
 end;
@@ -206,14 +204,15 @@ end;
 function WriteListMapConfig(nFileHandle, szUserID, szUID, szGID)
 begin
     // write list map mode setting and one user
-    WriteLine(nFileHandle, "user-mode list");
+    // WriteLine(nFileHandle, "user-mode list");
     
-    if (szUserID != "" && szUID != "" && szGID != "") then
+    if (szUserID != "" && szUID != "" && szGID != "") then        
         WriteLine(nFileHandle, "user \"" + szUserID + "\" " + szUID + ":" + szGID);
     endif;
     
 end;
 
+/*** Cert / LDAP mapping no longer used
 function WriteCertMapConfig(nFileHandle, szCertDirPrefix)
 begin          
     // write cert map mode settings
@@ -269,6 +268,7 @@ begin
     endif;
         
 end;
+*/
 
 function CloseConfigFile(nFileHandle)
 begin
@@ -297,20 +297,28 @@ begin
 end;
 
 function InstallEventLogManifest()
-    STRING szEXEPath, szCmdLine, file, errText;
+    STRING szManPath, szEXEPath, szCmdLine, file, errText;
     NUMBER rc, line, error;
 begin
     // Run wevtutil.exe to install the Event Log manifest file so that messages
     // are displayed correctly in Event Log.
     
-    szEXEPath = INSTALLDIR ^ "\\orangefs.exe";
-    szCmdLine = "im \"/mf:szEXEPath\" \"/rf:szEXEPath\"";
+    szManPath = INSTALLDIR ^ "\\messages.man";
+    szEXEPath = INSTALLDIR ^ "\\orangefs-client.exe";
+    szCmdLine = "im \"" + szManPath + "\" \"/mf:" + szEXEPath + "\" \"/rf:" + szEXEPath + "\"";
     
     rc = LaunchApplication(WINSYSDIR64 ^ "\\wevtutil.exe", szCmdLine, "", SW_NORMAL, 60000, LAAW_OPTION_WAIT);
     if (rc < ISERR_SUCCESS) then
         GetExtendedErrInfo(file, line, error);
         Sprintf(errText, " (%d)", error);
-        MessageBox("Installation of the Event Log manifest failed:\n" +
+        MessageBox("Execution of wevtutil.exe failed:\n" +
+                   FormatMessage(error) + errText, WARNING);
+    endif;
+    rc = LAAW_PARAMETERS.nLaunchResult;
+    if (rc != 0) then
+        GetExtendedErrInfo(file, line, error);
+        Sprintf(errText, " (%d)", error);
+        MessageBox("wevtutil.exe failed:\n" +
                    FormatMessage(error) + errText, WARNING);
     endif;
 end;
@@ -325,16 +333,16 @@ end;
 //---------------------------------------------------------------------------
 function OnFirstUIAfter()
     STRING szTitle, szMsg1, szMsg2, szOpt1, szOpt2, szTemp;
-    STRING szFSURI, szMountPoint, szUserMapMode;
+    STRING szFSURI, szMountPoint;
     STRING szUserID, szUID, szGID;
-    STRING szCertPrefixDir;
-    NUMBER bOpt1, bOpt2, nUserMapMode, nRC;    
-    NUMBER nCertMapMode;
-    BOOL bLDAP_AD, bLDAP_eDir, bLDAP_Custom;
-    NUMBER nLDAPMapDefault;
-    STRING szHost, szUserDN, szPassword, szRoot, szClass, 
-           szNamingAttr, szUIDAttr, szGIDAttr;
-    NUMBER nScope;
+    //STRING szCertPrefixDir;
+    NUMBER bOpt1, bOpt2, nRC;    
+    //NUMBER nCertMapMode;
+    //BOOL bLDAP_AD, bLDAP_eDir, bLDAP_Custom;
+    //NUMBER nLDAPMapDefault;
+    //STRING szHost, szUserDN, szPassword, szRoot, szClass, 
+    //       szNamingAttr, szUIDAttr, szGIDAttr;
+    //NUMBER nScope;
     NUMBER nFileHandle;
 begin
 	Disable(STATUSEX);
@@ -346,18 +354,20 @@ begin
     // are installed
     if (MODE = SILENTMODE) goto Label_DlgSkip;
     
-Dlg_MountPointUserMap:
+Dlg_MountPoint:
     // prompt for file system location, mount point and user mapping mode
     Disable(BACKBUTTON);
-    nUserMapMode = 0;
-    nRC = MountPointUserModeDialog(szFSURI, szMountPoint, nUserMapMode);
+    // nUserMapMode = 0;
+    nRC = MountPointDialog(szFSURI, szMountPoint);
     
 Dlg_UserMap:
-    // prompt for user mapping settings
+    // prompt for a user mapping
     Enable(BACKBUTTON);
+    nRC = ListMapDialog(szUserID, szUID, szGID);
+    /*     
     switch(nUserMapMode)
         case USERMAP_LIST:
-            nRC = ListMapDialog(szUserID, szUID, szGID); 
+            ListMapDialog(szUserID, szUID, szGID);
         case USERMAP_CERT:
             nRC = CertMapDialog(nUserMapMode, szCertPrefixDir);
         case USERMAP_LDAP:
@@ -376,15 +386,17 @@ Dlg_UserMap:
             nRC = LDAPMapDialog(nLDAPMapDefault, szHost, szUserDN, szPassword, szRoot, nScope,
                                 szClass, szNamingAttr, szUIDAttr, szGIDAttr);
     endswitch;
+    */
     
     if (nRC = BUTTON_BACK) then
-        goto Dlg_MountPointUserMap;
+        goto Dlg_MountPoint;
     endif;
         
     WriteOrangeFSTab(szFSURI);
     
     InitConfigFile(nFileHandle, szMountPoint);
-    switch (nUserMapMode)
+    WriteListMapConfig(nFileHandle, szUserID, szUID, szGID);
+    /* switch (nUserMapMode)
        case USERMAP_LIST:
            WriteListMapConfig(nFileHandle, szUserID, szUID, szGID);
        case USERMAP_CERT:
@@ -393,6 +405,7 @@ Dlg_UserMap:
            WriteLDAPMapConfig(nFileHandle, szHost, szUserDN, szPassword, szRoot, nScope,
                               szClass, szNamingAttr, szUIDAttr, szGIDAttr);
     endswitch;
+    */
     CloseConfigFile(nFileHandle);
 
 Label_DlgSkip:

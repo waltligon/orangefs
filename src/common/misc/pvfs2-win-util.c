@@ -88,7 +88,7 @@ struct fstab {
 #define PINT_fstab_close(_tab) fclose(_tab)
 #define PINT_fstab_next_entry(_tab) PINT_util_my_get_next_fsent(_tab)
 #define PINT_fstab_entry_destroy(_entry) PINT_util_fsent_destroy(_entry)
-#define PINT_fstab_entry_hasopt(_entry, _opt) strstr((_entry)->fs_mntops, _opt)
+#define PINT_fstab_entry_hasopt(_entry, _opt) PINT_util_fsent_hasopt(_entry, _opt)
 
 #define PINT_FSTAB_NAME(_entry) (_entry)->fs_spec
 #define PINT_FSTAB_PATH(_entry) (_entry)->fs_file
@@ -98,6 +98,7 @@ struct fstab {
 #define DEFINE_MY_GET_NEXT_FSENT
 static struct fstab * PINT_util_my_get_next_fsent(PINT_fstab_t * tab);
 static void PINT_util_fsent_destroy(PINT_fstab_entry_t * entry);
+static char * PINT_util_fsent_hasopt(PINT_fstab_entry_t* entry, char* opt);
 
 #else
 
@@ -803,8 +804,10 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             /* mnt_dir and mnt_opts are verbatim copies */
             strcpy(current_tab->mntent_array[i].mnt_dir,
                    PINT_FSTAB_PATH(tmp_ent));
-            strcpy(current_tab->mntent_array[i].mnt_opts,
-                   PINT_FSTAB_OPTS(tmp_ent));
+            if (PINT_FSTAB_OPTS(tmp_ent)) {
+                strcpy(current_tab->mntent_array[i].mnt_opts,
+                    PINT_FSTAB_OPTS(tmp_ent));
+            }
 
             /* find out if a particular flow protocol was specified */
             if ((PINT_fstab_entry_hasopt(tmp_ent, "flowproto")))
@@ -2294,6 +2297,15 @@ static struct fstab *PINT_util_my_get_next_fsent(PINT_fstab_t *tab)
 
  exit:
     return fsentry;
+}
+
+static char* PINT_util_fsent_hasopt(PINT_fstab_entry_t* entry, char* opt)
+{
+    if (entry && entry->fs_mntops) {
+        return strstr(entry->fs_mntops, opt);
+    }
+
+    return NULL;
 }
 
 static void PINT_util_fsent_destroy(PINT_fstab_entry_t * entry)

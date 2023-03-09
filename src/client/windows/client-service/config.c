@@ -29,8 +29,10 @@ extern struct qhash_table user_cache;
 
 QLIST_HEAD(user_list);
 
+/*
 #define LDAP_SCOPE_ONELEVEL    0x01
 #define LDAP_SCOPE_SUBTREE     0x02
+*/
 
 #define EAT_WS(str)    while (*str && (*str == ' ' || \
                               *str == '\t')) \
@@ -56,11 +58,12 @@ static KEYWORD_CB(user);
 static KEYWORD_CB(perms);
 static KEYWORD_CB(write_time);
 static KEYWORD_CB(debug);
+/*
 static KEYWORD_CB(security_mode);
 static KEYWORD_CB(key_file);
 static KEYWORD_CB(security_timeout);
 static KEYWORD_CB(cert_security);
-static KEYWORD_CB(ldap);
+ static KEYWORD_CB(ldap); */
 
 /* keyword processing callback definitions */
 CONFIG_KEYWORD_DEF config_keyword_defs[] = 
@@ -75,6 +78,7 @@ CONFIG_KEYWORD_DEF config_keyword_defs[] =
     { "debug", 0, 1, keyword_cb_debug },
     { "debug-stderr", 0, 0, keyword_cb_debug },
     { "debug-file", 1, 1, keyword_cb_debug },
+/*
     { "security-mode", 1, 1, keyword_cb_security_mode },
     { "key-file", 1, 1, keyword_cb_key_file },
     { "security-timeout", 1, 1, keyword_cb_security_timeout },
@@ -83,7 +87,7 @@ CONFIG_KEYWORD_DEF config_keyword_defs[] =
     { "ca-path", 1, 1, keyword_cb_cert_security },
     { "cert-dir-prefix", 1, 1, keyword_cb_cert_security },
     { "cert-file", 1, 1, keyword_cb_cert_security },
-    { "ldap-host", 1, 1, keyword_cb_ldap },
+    { "ldap-host", 1, 1, keyword_cb_ldap},
     { "ldap-bind-dn", 1, 1, keyword_cb_ldap },
     { "ldap-bind-password", 1, 1, keyword_cb_ldap },
     { "ldap-search-root", 1, 1, keyword_cb_ldap },
@@ -91,7 +95,7 @@ CONFIG_KEYWORD_DEF config_keyword_defs[] =
     { "ldap-search-class", 1, 1, keyword_cb_ldap },
     { "ldap-naming-attr", 1, 1, keyword_cb_ldap },
     { "ldap-uid-attr", 1, 1, keyword_cb_ldap },
-    { "ldap-gid-attr", 1, 1, keyword_cb_ldap },
+    { "ldap-gid-attr", 1, 1, keyword_cb_ldap }, */
     { NULL, 0, 0, NULL }
 };
 
@@ -285,22 +289,27 @@ static KEYWORD_CB(user_mode)
     {
         options->user_mode = USER_MODE_LIST;
     }
-    else if (!stricmp(args[0], "certificate"))
+    /* else if (!stricmp(args[0], "certificate"))
     {
         options->user_mode = USER_MODE_CERT;
     }
     else if (!stricmp(args[0], "ldap"))
     {
         options->user_mode = USER_MODE_LDAP;
+        _snprintf(error_msg, ERROR_MSG_LEN, "Fatal: configuration file - 'ldap'"
+            " user mode is not implemented in this version");
+        return KEYWORD_ERR_INVALID_ARGS;
     }
     else if (!stricmp(args[0], "server"))
     {
         options->user_mode = USER_MODE_SERVER;
-    }
+    } */
     else
     {
-        _snprintf(error_msg, ERROR_MSG_LEN, "Fatal: configuration file - '%s' option"
-            " must be \"list\", \"certificate\", \"ldap\" or \"server\"", keyword);
+        /* _snprintf(error_msg, ERROR_MSG_LEN, "Fatal: configuration file - '%s' option"
+            " must be \"list\", \"certificate\", \"ldap\" or \"server\"", keyword); */
+        _snprintf(error_msg, ERROR_MSG_LEN, "Fatal: configuration file - only 'list'"
+            " user mode is supported in this version");
         return KEYWORD_ERR_INVALID_ARGS;
     }
 
@@ -476,6 +485,8 @@ static KEYWORD_CB(debug)
     return 0;
 }
 
+/* security modes not supported this version */
+#if 0
 static KEYWORD_CB(security_mode)
 {
     if (!stricmp(args[0], "default"))
@@ -698,6 +709,7 @@ keyword_ldap_cb_exit:
 
     return ret;
 }
+#endif
 
 /* pick the first available drive, starting with E: 
    drive must be able to store two chars (e.g. "F:") */
@@ -742,8 +754,10 @@ void set_defaults(PORANGEFS_OPTIONS options)
     /* default CA and debug file paths */
     if (get_module_dir(module_dir) == 0)
     {
+        /* no longer used 
         strcpy(options->ca_file, module_dir);
         strcat(options->ca_file, "\\CA\\cacert.pem");
+        */
 
         strcpy(options->debug_file, module_dir);
         strcat(options->debug_file, "\\orangefs.log");
@@ -755,15 +769,19 @@ void set_defaults(PORANGEFS_OPTIONS options)
     options->new_file_perms = options->new_dir_perms = 0755; 
 
     /* default LDAP options */
+    /*
     options->ldap.search_scope = LDAP_SCOPE_ONELEVEL;
     strcpy(options->ldap.search_class, "user");
     strcpy(options->ldap.naming_attr, "sAMAccountName");
     strcpy(options->ldap.uid_attr, "uidNumber");
     strcpy(options->ldap.gid_attr, "gidNumber");
+    */
 
     /* default mount point */
     strcpy(options->mount_point, get_default_mount_point(mount_point));
 
+    /* only user mode is list */
+    options->user_mode = USER_MODE_LIST;
 }
 
 int get_config(PORANGEFS_OPTIONS options,
@@ -868,21 +886,27 @@ int get_config(PORANGEFS_OPTIONS options,
         line_num++;
     } /* feof */
 
+    /* Not needed
     if (options->user_mode == USER_MODE_NONE && 
         options->security_mode == SECURITY_MODE_CERT)
     {
         options->user_mode = USER_MODE_SERVER;
     }
+    */
 
     if (options->user_mode == USER_MODE_NONE)
     {
-        _snprintf(error_msg, error_msg_len, 
+        /* _snprintf(error_msg, error_msg_len,
             "Fatal: configuration file - "
-            "must specify user-mode (list, certificate, ldap or server)");
+            "must specify user-mode (list, certificate, ldap or server)"); */
+        _snprintf(error_msg, error_msg_len,
+            "Fatal: configuration file - "
+            "must specify user-mode (list)");
         ret = -1;
         goto get_config_exit;
     }
 
+    /* Not needed
     if (options->security_mode == SECURITY_MODE_CERT &&
         options->user_mode != USER_MODE_SERVER)
     {
@@ -892,7 +916,9 @@ int get_config(PORANGEFS_OPTIONS options,
         ret = -1;
         goto get_config_exit;
     }
+    */
 
+    /* 
     if (options->user_mode == USER_MODE_LDAP &&
         (strlen(options->ldap.host) == 0 ||
          strlen(options->ldap.search_root) == 0))
@@ -902,6 +928,7 @@ int get_config(PORANGEFS_OPTIONS options,
             "missing ldap option: ldap-host, or ldap-search-root");
         ret = -1;
     }
+    */
 
     /* gossip can only print to either a file or stderr */
     if (options->debug_stderr && options->debug_file_flag)
@@ -912,9 +939,11 @@ int get_config(PORANGEFS_OPTIONS options,
         ret = -1;
     }
 
+    /* 
     if (options->user_mode == USER_MODE_LDAP &&
         options->ldap.port == 0)
         options->ldap.port = options->ldap.secure ? 636 : 389;
+    */
 
 get_config_exit:
 
