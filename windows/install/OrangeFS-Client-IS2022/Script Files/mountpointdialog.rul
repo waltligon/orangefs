@@ -5,16 +5,9 @@
 #define BUTTON_BACK     12
 #define BUTTON_CANCEL2   9
 #define COMBO_MOUNT   1304
-#define RB_LIST       1327
-#define RB_CERT       1328
-#define RB_LDAP       1329
 #define EDIT_FS       1331
 
-#define USERMAP_LIST     1
-#define USERMAP_CERT     2
-#define USERMAP_LDAP     3
-
-prototype NUMBER MountPointUserModeDialog(BYREF STRING, BYREF STRING, BYREF NUMBER); 
+prototype NUMBER MountPointDialog(BYREF STRING, BYREF STRING); 
 prototype LIST CreateMountList();
 
 function LIST CreateMountList()
@@ -51,40 +44,32 @@ begin
 end;
 
 // handler for the MountPointUserModeDialog
-function NUMBER MountPointUserModeDialog(svFSURI, svMountPoint, nvUserMapMode)
+function NUMBER MountPointDialog(svFSURI, svMountPoint)
     BOOL bDone;
     NUMBER nResult, nControl;
     LIST listMount;
 begin
-    EzDefineDialog("MountPointUserModeDialog",
+    EzDefineDialog("MountPointDialog",
                    ISUSER,
-                   "MountPointUserModeDialog",
+                   "MountPointDialog",
                    0);
     
     bDone = FALSE;
     while (!bDone)
-        nControl = WaitOnDialog("MountPointUserModeDialog");
+        nControl = WaitOnDialog("MountPointDialog");
         switch (nControl)
             case DLG_INIT:       
                 // Init combo
                 listMount = CreateMountList();
-                CtrlSetList("MountPointUserModeDialog", COMBO_MOUNT, listMount);
+                CtrlSetList("MountPointDialog", COMBO_MOUNT, listMount);
                 ListDestroy(listMount);
                 // Default values
-                CtrlSetCurSel("MountPointUserModeDialog", COMBO_MOUNT, "Auto");
-                CtrlSetState("MountPointUserModeDialog", RB_LIST, BUTTON_CHECKED);                    
+                CtrlSetCurSel("MountPointDialog", COMBO_MOUNT, "Auto");
             case BUTTON_NEXT:
                 // Return specified values       
-                CtrlGetText("MountPointUserModeDialog", EDIT_FS, svFSURI);         
-                CtrlGetCurSel("MountPointUserModeDialog", COMBO_MOUNT, svMountPoint);
-                if (CtrlGetState("MountPointUserModeDialog", RB_LIST) = BUTTON_CHECKED) then
-                    nvUserMapMode = USERMAP_LIST;
-                elseif (CtrlGetState("MountPointUserModeDialog", RB_CERT) = BUTTON_CHECKED) then
-                    nvUserMapMode = USERMAP_CERT;
-                else
-                    nvUserMapMode = USERMAP_LDAP;
-                endif;  
-                nResult = BUTTON_NEXT;                
+                CtrlGetText("MountPointDialog", EDIT_FS, svFSURI);         
+                CtrlGetCurSel("MountPointDialog", COMBO_MOUNT, svMountPoint);
+                nResult = BUTTON_NEXT;
                 bDone = TRUE;                
             case BUTTON_CANCEL2:
                 // Cancel requested
@@ -96,9 +81,9 @@ begin
         endswitch;
     endwhile;  
     
-    EndDialog("MountPointUserModeDialog");
+    EndDialog("MountPointDialog");
     
-    ReleaseDialog("MountPointUserModeDialog");
+    ReleaseDialog("MountPointDialog");
     
     return nResult;        
 end;

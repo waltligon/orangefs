@@ -51,8 +51,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,9,9,0
- PRODUCTVERSION 2,9,9,0
+ FILEVERSION 2,10,0,0
+ PRODUCTVERSION 2,10,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -69,12 +69,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Omnibond, LLC"
             VALUE "FileDescription", "OrangeFS Windows Client Service"
-            VALUE "FileVersion", "2.9.9.0"
+            VALUE "FileVersion", "2.10.0.0"
             VALUE "InternalName", "orangefs-client.exe"
-            VALUE "LegalCopyright", "Copyright (C) 2022 Omnibond, LLC"
+            VALUE "LegalCopyright", "Copyright © 2023 Omnibond, LLC"
             VALUE "OriginalFilename", "orangefs-client.exe"
             VALUE "ProductName", "OrangeFS"
-            VALUE "ProductVersion", "2.9.9.0"
+            VALUE "ProductVersion", "2.10.0.0"
         END
     END
     BLOCK "VarFileInfo"

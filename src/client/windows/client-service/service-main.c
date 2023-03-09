@@ -28,7 +28,7 @@
 #include "cert.h"
 #include "io-cache.h"
 #include "user-cache.h"
-#include "ldap-support.h"
+/* #include "ldap-support.h" */
 #include "messages.h"
 
 #define WIN32ServiceName           "orangefs-client"
@@ -242,8 +242,6 @@ void get_windows_error(const char *msg,
    log. The entire text of the message is displayed without modification. */
 BOOL report_error_event(char *message, BOOL startup)
 {
-    // char *strings[1];
-
     /* startup errors also go to service log or stderr */
     if (startup)
     {
@@ -620,7 +618,7 @@ service_main_exit:
 
     cache_thread_stop();
 
-    PVFS_ldap_cleanup();
+    /* PVFS_ldap_cleanup(); */
 
     openssl_cleanup();
     
@@ -844,11 +842,11 @@ int main_init()
     openssl_init();
 
     /* initialize LDAP */
-    if (PVFS_ldap_init() != 0)
+    /* if (PVFS_ldap_init() != 0)
     {
         report_startup_error("Fatal error: LDAP could not be initialized", 0);
         return 1;
-    }
+    } */
 
     return 0;
 }
@@ -1036,7 +1034,7 @@ main_exit:
 
       qhash_destroy_and_finalize(io_cache, struct io_cache_entry, hash_link, free);
 
-      PVFS_ldap_cleanup();
+      /* PVFS_ldap_cleanup(); */
 
       openssl_cleanup();
 

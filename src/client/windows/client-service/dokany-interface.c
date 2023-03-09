@@ -30,7 +30,7 @@
 #include "fs.h"
 #include "cert.h"
 #include "user-cache.h"
-#include "ldap-support.h"
+/* #include "ldap-support.h" */
 #include "cred.h"
 #include "io-cache.h"
 
@@ -564,10 +564,10 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
             /* load credential from certificate */
             ret = get_proxy_cert_credential(htoken, user_name, credential, &expires);
         }
-        else if (goptions->user_mode == USER_MODE_LDAP) 
+        /* else if (goptions->user_mode == USER_MODE_LDAP)
         {
             ret = get_ldap_credential(user_name, credential);
-        }
+        } */
         else if (goptions->user_mode == USER_MODE_SERVER)
         {            
             /* TODO - key mode */

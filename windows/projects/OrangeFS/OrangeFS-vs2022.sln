@@ -73,7 +73,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "security", "security\securi
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sysint-client", "sysint-client\sysint-client-vs2022.vcxproj", "{CD20A8BE-CC52-465E-9F40-A97A3912ED14}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pvfs2-win-cp-vs2022", "pvfs2-win-cp\pvfs2-win-cp-vs2022.vcxproj", "{C4AFBB75-1F50-4312-B6BD-E565A4B382C5}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pvfs2-win-cp", "pvfs2-win-cp\pvfs2-win-cp-vs2022.vcxproj", "{C4AFBB75-1F50-4312-B6BD-E565A4B382C5}"
 	ProjectSection(ProjectDependencies) = postProject
 		{7506190B-64BE-4D64-95A4-4C22D48E0994} = {7506190B-64BE-4D64-95A4-4C22D48E0994}
 		{9C95DF0D-5B60-4E94-94ED-000861C651B4} = {9C95DF0D-5B60-4E94-94ED-000861C651B4}
@@ -344,7 +344,6 @@ Global
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Debug|Win32.ActiveCfg = Debug|Win32
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Debug|Win32.Build.0 = Debug|Win32
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Debug|x64.ActiveCfg = Debug|x64
-		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Debug|x64.Build.0 = Debug|x64
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.MemLeaks|Mixed Platforms.ActiveCfg = Debug|x64
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.MemLeaks|Mixed Platforms.Build.0 = Debug|x64
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.MemLeaks|Win32.ActiveCfg = Debug|Win32
@@ -356,7 +355,6 @@ Global
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Release|Win32.ActiveCfg = Release|Win32
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Release|Win32.Build.0 = Release|Win32
 		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Release|x64.ActiveCfg = Release|x64
-		{0FAB90E7-C31A-43AD-BA4F-F13959C406EB}.Release|x64.Build.0 = Release|x64
 		{2F406AB6-D010-4196-A523-FAE6F2B1585F}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
 		{2F406AB6-D010-4196-A523-FAE6F2B1585F}.Debug|Mixed Platforms.Build.0 = Debug|x64
 		{2F406AB6-D010-4196-A523-FAE6F2B1585F}.Debug|Win32.ActiveCfg = Debug|Win32
