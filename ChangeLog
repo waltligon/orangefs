@@ -2,6 +2,82 @@
 
 OrangeFS Release ChangeLog
 -----------------------
+
+orangefs-2.10.0 (Git Branch v.2.10.0)
+https://github.com/waltligon/orangefs.git
+up to commit-id 7c28362b
+
+New functionality:
+
+* - general updates
+	1. numerous autotools related m4 files are updated.
+	2. code refactored in numerous places to eliminate
+	   compiler warnings from new versions of gcc.
+	3. documentation updates.
+
+* - Server
+	1. updated formatting to conform to standard in simple-stripe code.
+
+* - Clients
+	1. build liborangefs by default. liborangefs provides an orangefs
+	   version of posix system calls.
+
+        2. Windows Client:
+		removed security modes
+	        added version resource to exe.
+	        updated compiler options to output assembler listing.
+	        updated installer
+	        updated Event Log message files
+	        add a service description when installing service.
+	        changes to service startup and shutdown
+	        switched messages to manifest file
+	        improved config file processing.
+	        retargeted test projects to Visual Studio 2022.
+	        updated pvfs2-win-cp for Visual Studio 2022.
+	        updated OpenSSL
+		minor changes to GetVolumeInformation.
+		updated GetFileInfo and CreateFile
+		Improvements to error codes
+		added get-file-info utility
+
+* - bmi
+	Handle IBV_EVENT_WQ_FATAL
+	Handle IBV_EVENT_WQ_FATAL
+	Add reference counting changes from bmi_rdma
+	Build bmi_ib OR bmi_ib_exp, not both
+	Add experimental BMI InfiniBand module
+	Remove return_active_nic_handle()
+	Refactor RDMA data structures and some functionality
+	
+
+
+
+* - general fixes
+	Fix hostname message for RDMA protocol in pvfs2-genconfig
+	Fix warning about using fast networks and TCP in pvfs2-genconfig
+	Fix default RDMA port in pvfs2-genconfig usage message
+	Add "ib_exp" protocol to pvfs2-genconfig options
+	
+
+* - Client fixes
+        1. Windows Client:
+		Fixed the failure to delete files in some cases.
+	        fixed CreateFile by converting kernel values to usermode.
+	        error code and directory-handling fixes.
+	        fixed warnings in statecomp project.
+		
+
+* - bmi fixes
+	Add server shutdown fix from bmi_rdma
+	Add RDMA write refcnt fix from bmi_rdma
+	Fix segfault issues:
+             - when shutting down restarted servers
+	     - Check if already disconnected in BMI_rdma_cancel()
+	Add "options" parameter to BMI_rdma_initialize()
+	Fix issue causing servers to hang on shutdown
+	Only increment refcnt when an RDMA write is completely done
+
+-----------------------
 Development 2.9.9
 orangefs-2.9.8 (Git Branch v.2.9.x)
 https://github.com/waltligon/orangefs.git
