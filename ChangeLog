@@ -2,6 +2,65 @@
 
 OrangeFS Release ChangeLog
 -----------------------
+
+orangefs-2.10.0 (Git Branch v.2.10.0)
+https://github.com/waltligon/orangefs.git
+up to commit-id 7c28362b
+
+New functionality:
+
+* - general updates
+	1. numerous autotools related m4 files are updated.
+	2. code refactored in numerous places to eliminate
+	   compiler warnings from new versions of gcc.
+	3. documentation updates.
+
+* - Server
+	1. updated formatting to conform to standard in simple-stripe code.
+
+* - Clients
+	1. build liborangefs by default. liborangefs provides an orangefs
+	   version of posix system calls.
+
+      2. Windows Client
+         * Retargeted Client to the user mode file system library "dokany"
+           v1.5.1.1000. (See https://github.com/dokan-dev/dokany)
+         * Retargeted build to Visual Studio 2022.
+         * Updated Event Logging for modern versions of Windows.
+         * Removed obsolete security modes.
+         * Updated the executable installer to install dokany and necessary
+           Visual C++ runtime libraries.
+         * Updated OpenSSL.
+         * Made several quality-of-life improvements.
+
+* - bmi
+	1. Eliminated IBV_EVENT_WQ_FATAL warnings
+	2. Added a new RDMA module:
+		* Utilizes the RDMA Communication Manager library (librdmacm),
+		  abstracting transport-specific details out of connection management
+		* Adds RoCE v2 support to BMI
+	3. Added a new experimental InfiniBand module for future development:
+		* Still a work in progress and minimally tested
+		* Current experimental changes include:
+			- Improved connection-based reference counting
+
+
+
+
+* - general fixes
+	1. Fixed warning about using fast networks and TCP in pvfs2-genconfig
+	
+
+* - Client fixes
+        1. Windows Client:
+	     * Fixed a failure to delete files in some cases.
+	     * Fixed compatibility issues between dokany 1.5.1 and the prior version.
+	     * Fixed issues with error codes and directory-handling.
+
+
+
+
+-----------------------
 Development 2.9.9
 orangefs-2.9.8 (Git Branch v.2.9.x)
 https://github.com/waltligon/orangefs.git
