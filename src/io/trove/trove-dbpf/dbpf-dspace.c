@@ -472,11 +472,17 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p = NULL;
     int ret;
 
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+		 "%s: calling find_registered\n", __func__);
+
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
         return -TROVE_EINVAL;
     }
+
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+		 "%s: calling queued_or_immidiate\n", __func__);
 
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
@@ -491,6 +497,8 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
                                            &op_p);
     if(ret < 0)
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+        	     "%s: returning %d\n", __func__, ret);
         return ret;
     }
     op_p->hints = hints;
@@ -498,6 +506,8 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);
 
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+        	 "%s: calling queue_or_service\n", __func__);
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
@@ -516,7 +526,7 @@ static int remove_one_handle(TROVE_object_ref ref,
     ret = dbpf_db_del(coll_p->ds_db, &key);
     if (ret == TROVE_ENOENT)
     {
-        gossip_err("tried to remove non-existant dataspace\n");
+        gossip_err("%s: tried to remove non-existant dataspace\n", __func__);
     }
     else if (ret != 0)
     {
@@ -526,18 +536,23 @@ static int remove_one_handle(TROVE_object_ref ref,
     }
     else
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG, "removed dataspace with handle %llu\n",
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+	             "%s: removed dataspace with handle %llu\n", __func__,
                      llu(ref.handle));
     }
 
     /* if this attr is in the dbpf attr cache, remove it */
     gen_mutex_lock(&dbpf_attr_cache_mutex);
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+		 "%s: removing attr from cache\n", __func__);
     dbpf_attr_cache_remove(ref);
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     /* remove bstream if it exists.  Not a fatal
      * error if this fails (may not have ever been created)
      */
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+		 "%s: removing bstream from cache\n", __func__);
     ret = dbpf_open_cache_remove(coll_p->coll_id, ref.handle);
 
     /* remove the keyval entries for this handle if any exist.
@@ -546,6 +561,7 @@ static int remove_one_handle(TROVE_object_ref ref,
      * the trove keyval interfaces.  It does allow us to perform the cleanup
      * of a handle without having to post more operations though.
      */
+    gossip_debug(GOSSIP_TROVE_DEBUG,"%s: removing keyval records\n", __func__);
     ret = PINT_dbpf_keyval_iterate(coll_p->keyval_db,
                                    ref.handle,
                                    DBPF_ATTRIBUTE_TYPE,
@@ -562,9 +578,11 @@ static int remove_one_handle(TROVE_object_ref ref,
 
     /* return handle to free list */
     trove_handle_free(coll_p->coll_id, ref.handle);
+    gossip_debug(GOSSIP_TROVE_DEBUG,"%s: returning success\n", __func__);
     return 0;
 
 return_error:
+    gossip_debug(GOSSIP_TROVE_DEBUG,"%s: returning error %d\n", __func__, ret);
     return ret;
 }
 
@@ -613,24 +631,35 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
     int ret = -TROVE_EINVAL;
 
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+		 "%s: calling remove_one_handle\n", __func__);
+
     ret = remove_one_handle(ref, op_p->coll_p);
     if(ret < 0)
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+	             "%s: returning %d\n", __func__, ret);
         return(ret);
     }
 
     /* we still do a non-coalesced sync of the keyval db here
      * because we're in a dspace operation
      */
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+		 "%s: calling SYNC_IF_NECESSARY\n", __func__);
     DBPF_DB_SYNC_IF_NECESSARY(op_p, op_p->coll_p->keyval_db, ret);
     if(ret < 0)
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+	             "%s: returning %d\n", __func__, ret);
         return(ret);
     }
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_SUB);
 
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "%s: done returning %d\n", __func__, DBPF_OP_COMPLETE);
     return DBPF_OP_COMPLETE;
 }
 

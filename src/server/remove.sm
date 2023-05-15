@@ -301,27 +301,39 @@ static PINT_sm_action remove_check_object_type(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    if(s_op->attr.objtype == PVFS_TYPE_DATAFILE)
+    switch(s_op->attr.objtype)
     {
-	/* it must be a datafile, transition to try reading datafile 
-	 * attribs with dspace_getattr()
-	 */
+    case PVFS_TYPE_DATAFILE :
+        /* it must be a datafile, transition to try reading datafile 
+         * attribs with dspace_getattr()
+         */
+        js_p->error_code = STATE_TYPE_DATAFILE;
         gossip_debug(GOSSIP_SERVER_DEBUG, "  type is datafile;\n");
-	js_p->error_code = STATE_TYPE_DATAFILE;
-	return SM_ACTION_COMPLETE;
-    }
-
-    if (s_op->attr.objtype == PVFS_TYPE_DIRDATA)
-    {
-        js_p->error_code = STATE_TYPE_DIRDATA;
-
-        gossip_debug(
-            GOSSIP_SERVER_DEBUG, "  type is dirdata; checking "
-            "dirent_count before removing dirdata itself.\n");
         return SM_ACTION_COMPLETE;
+
+    case PVFS_TYPE_DIRDATA :
+        js_p->error_code = STATE_TYPE_DIRDATA;
+        gossip_debug( GOSSIP_SERVER_DEBUG, "  type is dirdata; "
+            "checking dirent_count before removing dirdata itself.\n");
+        return SM_ACTION_COMPLETE;
+
+    case PVFS_TYPE_DIRECTORY :
+        gossip_debug(GOSSIP_SERVER_DEBUG, "  type is directory;\n");
+        break;
+
+    case PVFS_TYPE_METAFILE :
+        gossip_debug(GOSSIP_SERVER_DEBUG, "  type is metadata;\n");
+        break;
+
+    case PVFS_TYPE_SYMLINK :
+        gossip_debug(GOSSIP_SERVER_DEBUG, "  type is symbolic;\n");
+        break;
+
+    default :
+        gossip_debug(GOSSIP_SERVER_DEBUG, "  type is unknown;\n");
+        break;
     }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "  type is not dirdata or datafile;\n");
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -349,7 +361,7 @@ static PINT_sm_action remove_verify_object_metadata(
     js_p->error_code = 0;
     
     gossip_debug(GOSSIP_SERVER_DEBUG,
-		 "  attrs read from keyval = (owner = %d, "
+		 "  attrs read from dspace = (owner = %d, "
                  "group = %d, perms = %o, type = %d)\n",
 		 a_p->owner,
 		 a_p->group,

@@ -195,8 +195,8 @@ int dbpf_open_cache_get(TROVE_coll_id coll_id,
 
     if (tmp_entry && tmp_entry->remove_flag)
     {
-       gossip_err("DBPF_OPEN_CACHE_GET:  pulled EXISTING entry from the used-list with the "
-                  "remove flag set.\n");
+       gossip_err("%s: pulled EXISTING entry from the used-list with the "
+                  "remove flag set.\n", __func__);
        gossip_err("\t\thandle:%llu\n",llu(tmp_entry->handle));
        gossip_err("\t\tref-ct:%d \tfd:%d\n",tmp_entry->ref_ct,tmp_entry->fd);
     }
@@ -210,8 +210,8 @@ int dbpf_open_cache_get(TROVE_coll_id coll_id,
 
         if (tmp_entry && tmp_entry->remove_flag)
         {
-           gossip_err("DBPF_OPEN_CACHE_GET:  pulled EXISTING entry from the UNused-list with the "
-                      "remove flag set.\n");
+           gossip_err("%s: pulled EXISTING entry from the UNused-list with the "
+                      "remove flag set.\n", __func__);
            gossip_err("\t\thandle:%llu\n",llu(tmp_entry->handle));
            gossip_err("\t\tref-ct:%d \tfd:%d\n",tmp_entry->ref_ct,tmp_entry->fd);
         }
@@ -452,6 +452,8 @@ int dbpf_open_cache_remove(TROVE_coll_id coll_id, TROVE_handle handle)
      */
 
     /* TODO: remove this search later when we have more confidence */
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                 "%s: Checking Used list\n", __func__);
     qlist_for_each(tmp_link, &used_list)
     {
 	tmp_entry = qlist_entry(tmp_link,
@@ -461,8 +463,8 @@ int dbpf_open_cache_remove(TROVE_coll_id coll_id, TROVE_handle handle)
 	if ((tmp_entry->handle == handle) &&
             (tmp_entry->coll_id == coll_id))
 	{
-            gossip_err("DBPF_OPEN_CACHE_REMOVE:  BINGO! Entry found in the USED_list when trying to "
-                        "remove from the UNused_list.\n");
+            gossip_err("%s: BINGO! Entry found in the USED_list when trying to "
+                        "remove from the UNused_list.\n", __func__);
             gossip_err("\t\tused_list entry:\n");
             gossip_err("\t\t\t     handle:%llu\n",llu(tmp_entry->handle));
             gossip_err("\t\t\t     ref-ct:%d\n", tmp_entry->ref_ct);
@@ -500,11 +502,17 @@ int dbpf_open_cache_remove(TROVE_coll_id coll_id, TROVE_handle handle)
 
             tmp_entry->remove_flag=1;
 
-            return (0);
+            gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                         "%s: returning -1n", __func__);
+
+            gen_mutex_unlock(&cache_mutex);
+            return (-1);
 	    //assert(0);
 	}
     }
 
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                 "%s: Checking Unused list\n", __func__);
     /* see if the item is in the unused list (ref_ct == 0) */    
     qlist_for_each_safe(tmp_link, scratch, &unused_list)
     {
@@ -549,6 +557,8 @@ int dbpf_open_cache_remove(TROVE_coll_id coll_id, TROVE_handle handle)
 
     tmp_error = 0;
 
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                 "%s: find bstram filename.\n", __func__);
     DBPF_GET_BSTREAM_FILENAME(filename,
                               PATH_MAX,
                               my_storage_p->data_path,
