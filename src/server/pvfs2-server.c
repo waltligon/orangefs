@@ -2847,8 +2847,21 @@ int server_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *js_p)
  */
 struct PINT_state_machine_s *server_op_state_get_machine(int op)
 {
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-            "server_op_state_get_machine %d\n",op);
+    if (op == 999)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                "server_op_state_get_machine "
+                "%d\n", op);
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                "===================== New Request ================\n"
+                "                        "
+                "server_op_state_get_machine "
+                "%d(%s)\n", op,
+                PINT_map_server_op_to_string(op));
+    }
 
     switch (op)
     {
