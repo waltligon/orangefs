@@ -24,7 +24,7 @@ struct PINT_worker_per_op_s
     int service_count;
 };
 
-struct PINT_worker_impl PINT_worker_per_op_impl;
+extern struct PINT_worker_impl PINT_worker_per_op_impl;
 
 #endif
 
