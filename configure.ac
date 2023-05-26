@@ -1078,10 +1078,9 @@ AC_ARG_ENABLE(threaded,
     [build_threaded=yes])
 AC_SUBST(build_threaded)
 
-dnl Method to disable build of user interface libraries
-BUILD_USRINT=
+dnl Method to enable build of user interface libraries
 AC_ARG_ENABLE(usrint,
-   [  --disable-usrint        Do not build posix and stdio user libraries],
+   [  --enable-usrint        Build posix and stdio user libraries],
    [if test "x$enableval" = "xyes" ; then
        AC_DEFINE(PVFS_USRINT_BUILD, 1,
                  [Should we build user interface libraries.])
@@ -1089,13 +1088,14 @@ AC_ARG_ENABLE(usrint,
     else
        AC_DEFINE(PVFS_USRINT_BUILD, 0,
                  [Should we build user interface libraries.])
+       BUILD_USRINT=0
     fi
     build_usrint=$enableval
    ],
-   [AC_DEFINE(PVFS_USRINT_BUILD, 1,
+   [AC_DEFINE(PVFS_USRINT_BUILD, 0,
               [Should we build user interface libraries.])
-    build_usrint=yes
-    BUILD_USRINT=1
+    build_usrint=no
+    BUILD_USRINT=0
    ])
 AC_SUBST(build_usrint)
 
@@ -1131,7 +1131,7 @@ dnl    ])
 dnl AC_SUBST(build_symbolic)
  
 dnl Method to enable user interface kmod support
-USRINT_KMOUNT=
+dnl USRINT_KMOUNT=
 AC_ARG_ENABLE(usrint-kmount,
 [  --enable-usrint-kmount  Assume FS is mounted via kernel],
 [if test "x$enableval" = "xyes" ; then
@@ -1150,23 +1150,17 @@ fi],
    [Should user interface assume FS is mounted.])
 ])
 
-dnl Method to disable user interface CWD support
+dnl Method to enable user interface CWD support
 AC_ARG_ENABLE(usrint-cwd,
-[  --disable-usrint-cwd    Do not enable user interface CWD support],
+[  --enable-usrint-cwd    Enable user interface CWD support],
 [if test "x$enableval" = "xyes" ; then
    AC_DEFINE(PVFS_USRINT_CWD, 1,
       [Should we enable user interface CWD support.])
 else
    AC_DEFINE(PVFS_USRINT_CWD, 0,
       [Should we enable user interface CWD support.])
-fi],
-[if test "x$USRINT_KMOUNT" = "x1" ; then
-   AC_DEFINE(PVFS_USRINT_CWD, 0,
-      [Should we enable user interface CWD support.])
-else
-   AC_DEFINE(PVFS_USRINT_CWD, 1,
-      [Should we enable user interface CWD support.])
 fi])
+
 
 dnl Method to disable usrint redefining stdin stdout stderr as PVFS streams
 AC_ARG_ENABLE(stdio-redefstream,
