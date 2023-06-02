@@ -378,8 +378,7 @@ void dbpf_open_cache_put(struct open_cache_ref *in_ref)
 {
     struct open_cache_entry *tmp_entry = NULL;
 
-    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-                 "dbpf_open_cache_put: called\n");
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, "%s: called\n", __func__);
 
 
     gen_mutex_lock(&cache_mutex);
@@ -427,6 +426,8 @@ void dbpf_open_cache_put(struct open_cache_ref *in_ref)
 	}
     }
     gen_mutex_unlock(&cache_mutex);
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+	         "%s: open_cache_put complete.\n", __func__);
     return;
 }
 
@@ -503,7 +504,7 @@ int dbpf_open_cache_remove(TROVE_coll_id coll_id, TROVE_handle handle)
             tmp_entry->remove_flag=1;
 
             gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-                         "%s: returning -1n", __func__);
+                         "%s: returning -1\n", __func__);
 
             gen_mutex_unlock(&cache_mutex);
             return (-1);

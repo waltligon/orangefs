@@ -2181,7 +2181,7 @@ static PINT_sm_action getattr_get_dir_hint(
                  Trove_Special_Keys[NUM_DFILES_KEY].key,
                  s_op->u.getattr.fs_id, llu(s_op->u.getattr.handle));
 
-    /* distribution parameters */
+    /* dir hint: distribution parameters */
     s_op->resp.u.getattr.attr.u.dir.hint.dist_params = 
             (char *) calloc(1, PVFS_REQ_LIMIT_DIST_BYTES);
     if (!s_op->resp.u.getattr.attr.u.dir.hint.dist_params)
@@ -2192,7 +2192,7 @@ static PINT_sm_action getattr_get_dir_hint(
     s_op->resp.u.getattr.attr.u.dir.hint.dist_params_len = 
             PVFS_REQ_LIMIT_DIST_BYTES;
 
-    /* distribution name */
+    /* dir hint: distribution name */
     s_op->resp.u.getattr.attr.u.dir.hint.dist_name = 
             (char *) calloc(1, PVFS_REQ_LIMIT_DIST_NAME);
     if (!s_op->resp.u.getattr.attr.u.dir.hint.dist_name)
@@ -2203,7 +2203,7 @@ static PINT_sm_action getattr_get_dir_hint(
     s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len = 
             PVFS_REQ_LIMIT_DIST_NAME;
 
-    /* layout and server list */
+    /* dir hint: layout and server list */
     s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers =
             (char *) calloc(1, PVFS_REQ_LIMIT_LAYOUT);
     if (!s_op->resp.u.getattr.attr.u.dir.hint.layout.server_list.servers)

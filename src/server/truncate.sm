@@ -76,6 +76,8 @@ static PINT_sm_action truncate_resize(struct PINT_smcb *smcb,
                                    server_job_context,
                                    s_op->req->hints);
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: resize complete\n", __func__);
+
     return ret;
 }
 

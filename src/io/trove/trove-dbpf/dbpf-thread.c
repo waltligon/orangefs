@@ -215,9 +215,8 @@ int dbpf_do_one_work_cycle(int *out_count)
         ret = cur_op->op.svc_fn(&(cur_op->op));
 
         gossip_debug(GOSSIP_TROVE_OP_DEBUG,
-                     "[DBPF THREAD]: FINISHED TROVE SERVICE ROUTINE (%s) (ret: %d)\n",
-                     dbpf_op_type_to_str(cur_op->op.type),
-                     ret);
+               "[DBPF THREAD]: FINISHED TROVE SERVICE ROUTINE (%s) (ret: %d)\n",
+               dbpf_op_type_to_str(cur_op->op.type), ret);
         if (ret == DBPF_OP_COMPLETE || ret < 0)
         {
             /* Some dbpf calls may return non-fatal errors

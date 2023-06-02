@@ -127,7 +127,7 @@ int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
     r = (*db)->db->set_flags((*db)->db, 0);
     if (r)
     {
-        gossip_err("TROVE:DBPF:Berkeley DB %s failed to set_flags", name);
+        gossip_err("TROVE:DBPF:Berkeley DB %s failed to set_flags\n", name);
         (*db)->db->close((*db)->db, 0);
         free(*db);
         return db_error(r);
@@ -158,7 +158,7 @@ int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
     }
     if (r)
     {
-        gossip_err("TROVE:DBPF:Berkeley DB %s failed to open", name);
+        gossip_err("TROVE:DBPF:Berkeley DB %s failed to open\n", name);
         (*db)->db->close((*db)->db, 0);
         free(*db);
         return db_error(r);
@@ -217,8 +217,9 @@ int dbpf_db_get(struct dbpf_db *db, struct dbpf_data *key,
     return 0;
 }
 
-int dbpf_db_put(struct dbpf_db *db, struct dbpf_data *key,
-    struct dbpf_data *val)
+int dbpf_db_put(struct dbpf_db *db,
+	       	struct dbpf_data *key,
+                struct dbpf_data *val)
 {
     DBT db_key, db_data;
     db_key.data = key->data;

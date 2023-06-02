@@ -56,8 +56,8 @@ int64_t s_dbpf_metadata_writes = 0, s_dbpf_metadata_reads = 0;
 extern TROVE_method_callback global_trove_method_callback;
 extern struct TROVE_bstream_ops *bstream_method_table[];
 
-static inline void organize_post_op_statistics(
-    enum dbpf_op_type op_type, TROVE_op_id op_id)
+static inline void organize_post_op_statistics(enum dbpf_op_type op_type,
+                                               TROVE_op_id op_id)
 {
     switch(op_type)
     {
@@ -94,10 +94,9 @@ static inline void organize_post_op_statistics(
     }
 }
 
-static int dbpf_dspace_create_store_handle(
-    struct dbpf_collection* coll_p,
-    TROVE_ds_type type,
-    TROVE_handle new_handle);
+static int dbpf_dspace_create_store_handle(struct dbpf_collection* coll_p,
+                                           TROVE_ds_type type,
+                                           TROVE_handle new_handle);
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p);
@@ -268,16 +267,16 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 }
 
 static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
-                              TROVE_handle_extent_array *extent_array,
-                              TROVE_handle *handle_array_p,
-                              int count,
-                              TROVE_ds_type type,
-                              TROVE_keyval_s *hint,
-                              TROVE_ds_flags flags,
-                              void *user_ptr,
-                              TROVE_context_id context_id,
-                              TROVE_op_id *out_op_id_p,
-                              PVFS_hint hints)
+                                   TROVE_handle_extent_array *extent_array,
+                                   TROVE_handle *handle_array_p,
+                                   int count,
+                                   TROVE_ds_type type,
+                                   TROVE_keyval_s *hint,
+                                   TROVE_ds_flags flags,
+                                   void *user_ptr,
+                                   TROVE_context_id context_id,
+                                   TROVE_op_id *out_op_id_p,
+                                   PVFS_hint hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -366,7 +365,7 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
     int i;
     int j;
 
-    for(i=0; i<op_p->u.d_create_list.count; i++)
+    for(i = 0; i < op_p->u.d_create_list.count; i++)
     {
 
         /*
@@ -386,12 +385,12 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
         }
 
         ret = dbpf_dspace_create_store_handle(op_p->coll_p, 
-            op_p->u.d_create.type,
-            new_handle);
+                                              op_p->u.d_create.type,
+                                              new_handle);
         if(ret < 0)
         {
             /* release any handles we grabbed so far */
-            for(j=0; j<=i; j++)
+            for(j = 0; j <= i; j++)
             {
                 if(op_p->u.d_create_list.out_handle_array_p[j] 
                     != TROVE_HANDLE_NULL)
@@ -1650,14 +1649,13 @@ static int dbpf_dspace_test(
 #endif
 }
 
-static int dbpf_dspace_testcontext(
-    TROVE_coll_id coll_id,
-    TROVE_op_id *ds_id_array,
-    int *inout_count_p,
-    TROVE_ds_state *state_array,
-    void** user_ptr_array,
-    int max_idle_time_ms,
-    TROVE_context_id context_id)
+static int dbpf_dspace_testcontext(TROVE_coll_id coll_id,
+                                   TROVE_op_id *ds_id_array,
+                                   int *inout_count_p,
+                                   TROVE_ds_state *state_array,
+                                   void** user_ptr_array,
+                                   int max_idle_time_ms,
+                                   TROVE_context_id context_id)
 {
     int ret = 0;
     dbpf_queued_op_t *cur_op = NULL;
@@ -1790,16 +1788,15 @@ static int dbpf_dspace_testcontext(
  * The error state of the completed operation is returned via the
  * state_p.
  */
-static int dbpf_dspace_testsome(
-    TROVE_coll_id coll_id,
-    TROVE_context_id context_id,
-    TROVE_op_id *ds_id_array,
-    int *inout_count_p,
-    int *out_index_array,
-    TROVE_vtag_s *vtag_array,
-    void **returned_user_ptr_array,
-    TROVE_ds_state *state_array,
-    int max_idle_time_ms)
+static int dbpf_dspace_testsome(TROVE_coll_id coll_id,
+                                TROVE_context_id context_id,
+                                TROVE_op_id *ds_id_array,
+                                int *inout_count_p,
+                                int *out_index_array,
+                                TROVE_vtag_s *vtag_array,
+                                void **returned_user_ptr_array,
+                                TROVE_ds_state *state_array,
+                                int max_idle_time_ms)
 {
     int i = 0, out_count = 0, ret = 0;
 #ifdef __PVFS2_TROVE_THREADED__
@@ -1856,16 +1853,15 @@ static int dbpf_dspace_testsome(
 #else
         int tmp_count = 0;
 
-        ret = dbpf_dspace_test(
-            coll_id,
-            ds_id_array[i],
-            context_id,
-            &tmp_count,
-            &vtag_array[i],
-            ((returned_user_ptr_array != NULL) ?
-             &returned_user_ptr_array[out_count] : NULL),
-            &state_array[out_count],
-            max_idle_time_ms);
+        ret = dbpf_dspace_test(coll_id,
+                               ds_id_array[i],
+                               context_id,
+                               &tmp_count,
+                               &vtag_array[i],
+                               ((returned_user_ptr_array != NULL) ?
+                                    &returned_user_ptr_array[out_count] : NULL),
+                               &state_array[out_count],
+                               max_idle_time_ms);
 #endif
         if (ret != 0)
         {
@@ -1926,10 +1922,9 @@ static int dbpf_dspace_testsome(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-static int dbpf_dspace_create_store_handle(
-    struct dbpf_collection* coll_p,
-    TROVE_ds_type type,
-    TROVE_handle new_handle)
+static int dbpf_dspace_create_store_handle(struct dbpf_collection* coll_p,
+                                           TROVE_ds_type type,
+                                           TROVE_handle new_handle)
 {
     int ret = -TROVE_EINVAL;
     TROVE_ds_attributes attr;

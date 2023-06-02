@@ -110,10 +110,10 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
 
     int ret = 0;
     dbpf_db * dbp = NULL;
-    dbpf_sync_context_t * sync_context;
+    dbpf_sync_context_t *sync_context;
     dbpf_queued_op_t *ready_op;
     int sync_context_type;
-    struct dbpf_collection* coll = qop_p->op.coll_p;
+    struct dbpf_collection *coll = qop_p->op.coll_p;
     int cid = qop_p->op.context_id;
 
     /* We want to set the state in all cases
@@ -124,13 +124,14 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
     {
         dbpf_queued_op_complete(qop_p, OP_COMPLETED);
         (*outcount)++;
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]: %s called, returning non-sync op\n", __func__);
         return 0;
     }
 
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                 "[SYNC_COALESCE]: sync_coalesce called, "
-                 "handle: %llu, cid: %d\n",
-                 llu(qop_p->op.handle), cid);
+                 "[SYNC_COALESCE]: %s called, handle: %llu, cid: %d\n",
+                 __func__, llu(qop_p->op.handle), cid);
 
     sync_context_type = dbpf_sync_get_object_sync_context(qop_p->op.type);
 
@@ -215,6 +216,8 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
           sync_context->coalesce_counter >= coll->c_high_watermark ) )
     {
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]: meta sync enabled\n");
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                      "[SYNC_COALESCE]:\thigh or low watermark reached:\n"
                      "\t\tcoalesced: %d\n\t\tqueued: %d\n",
                      sync_context->coalesce_counter,
@@ -248,6 +251,8 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
          */
         while(!dbpf_op_queue_empty(sync_context->sync_queue))
         {
+            gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                         "[SYNC_COALESCE]: moving remaining ops\n");
             ready_op = dbpf_op_queue_shownext(sync_context->sync_queue);
 
             if(ready_op->event_type == trove_dbpf_dspace_create_event_id)
@@ -284,8 +289,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
                      sync_context->sync_counter,
                      llu(qop_p->op.handle));
 
-        dbpf_op_queue_add(
-            sync_context->sync_queue, qop_p);
+        dbpf_op_queue_add(sync_context->sync_queue, qop_p);
         sync_context->coalesce_counter++;
         ret = 0;
     }

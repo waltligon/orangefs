@@ -1094,9 +1094,9 @@ if test "x$build_olib" = "xyes"; then
 fi
 
 dnl Method to disable build of user interface libraries
-BUILD_USRINT=
+dnl BUILD_USRINT=
 AC_ARG_ENABLE(usrint,
-   [  --disable-usrint        Do not build posix and stdio user libraries],
+   [  --enable-usrint        Build posix and stdio user libraries],
    [if test "x$enableval" = "xyes" ; then
        AC_DEFINE(PVFS_USRINT_BUILD, 1,
                  [Should we build user interface libraries.])
@@ -1104,16 +1104,17 @@ AC_ARG_ENABLE(usrint,
     else
        AC_DEFINE(PVFS_USRINT_BUILD, 0,
                  [Should we build user interface libraries.])
+       BUILD_USRINT=0
     fi
     build_usrint=$enableval
    ],
-   [AC_DEFINE(PVFS_USRINT_BUILD, 1,
+   [AC_DEFINE(PVFS_USRINT_BUILD, 0,
               [Should we build user interface libraries.])
 dnl hubcap changed default to no for now.
 dnl    build_usrint=yes
 dnl    BUILD_USRINT=1
-   build_usrint=no
-   BUILD_USRINT=0
+    build_usrint=no
+    BUILD_USRINT=0
    ])
 AC_SUBST(build_usrint)
 
