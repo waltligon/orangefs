@@ -211,6 +211,7 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
      * coalesce. 
      */
     gen_mutex_lock(&sync_context->mutex);
+
     if( (sync_context->sync_counter < coll->c_low_watermark) ||
         ( coll->c_high_watermark > 0 && 
           sync_context->coalesce_counter >= coll->c_high_watermark ) )

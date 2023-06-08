@@ -1362,14 +1362,55 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
     dbpf_queued_op_t *q_op_p;
     struct open_cache_ref open_ref;
     TROVE_size tmpsize = 0;
-    int outcount;
+    TROVE_size savesize = 0;
 
     q_op_p = (dbpf_queued_op_t *)op_p->u.b_resize.queued_op_ptr;
 
     ref.fs_id = op_p->coll_p->coll_id;
     ref.handle = op_p->handle;
+    tmpsize = op_p->u.b_resize.size;
 
+    /* prevent simultaneous update of file size */
     gen_mutex_lock(&dbpf_update_size_lock);
+
+    /* truncate bstream file before attributes are set */
+    /* should we use the update size lock to protect the ftruncate? */
+    /* this gets a bstream file */
+    ret = dbpf_open_cache_get(op_p->coll_p->coll_id,
+                              op_p->handle,
+                              DBPF_FD_BUFFERED_WRITE,
+                              &open_ref);
+    if(ret < 0)
+    {
+        gossip_err("%s: failed to dbpf_open_cache_get error code %d\n",
+                   __func__, ret);
+        /* should already be PVFS_error */
+        gen_mutex_unlock(&dbpf_update_size_lock);
+        return ret;
+    }
+
+    /* resize bytestream file using local FS */
+    ret = ftruncate(open_ref.fd, tmpsize);
+
+    if(ret < 0)
+    {
+        PVFS_error pvfs_err;
+        gossip_err("%s: failed to resize using local FS errno %d\n",
+                   __func__, errno);
+        /* convert errno to PVFS_error */
+        pvfs_err = -PVFS_errno_to_error(errno);
+        /* remove from active list */
+        dbpf_open_cache_put(&open_ref);
+        /* return error */
+        gossip_err("%s: returning PVFS error %d\n", __func__, pvfs_err);
+        gen_mutex_unlock(&dbpf_update_size_lock);
+        return(pvfs_err);
+    }
+
+    /* this returns the bstream file on success */
+    dbpf_open_cache_put(&open_ref);
+
+    /* Now update file size attribute */
     /* read attributes for update */
     ret = dbpf_dspace_attr_get(op_p->coll_p, ref, &attr);
 
@@ -1379,13 +1420,16 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
         return ret;
     }
 
-    tmpsize = op_p->u.b_resize.size;
+    savesize = attr.u.datafile.b_size;
     attr.u.datafile.b_size = tmpsize;
     /* ensure attr mask bit is on? */
-    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: size = %ld\n", __func__, tmpsize);
+    gossip_debug(GOSSIP_TROVE_DEBUG, 
+                 "%s: old size = %ld, new size = %ld\n", __func__,
+                 savesize, tmpsize);
 
     /* write attributes back with new size */
     ret = dbpf_dspace_attr_set(op_p->coll_p, ref, &attr);
+
     if(ret < 0)
     {
         gen_mutex_unlock(&dbpf_update_size_lock);
@@ -1404,42 +1448,11 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
                         TROVE_SYNC,
                         q_op_p->op.context_id);
 
-    q_op_p->op.u.d_setattr.attr_p = &attr; /* ? */
+    q_op_p->op.u.d_setattr.attr_p = &attr;
     q_op_p->op.state = OP_IN_SERVICE;
-    /* dbpf_sync_coalesce(q_op_p, 0, &outcount); ? */
+    /* coalescing is calling outside of this func */
 
-    /* truncate bstream file after attributes are set */
-    /* this gets a bstream file */
-    ret = dbpf_open_cache_get(op_p->coll_p->coll_id,
-                              op_p->handle,
-                              DBPF_FD_BUFFERED_WRITE,
-                              &open_ref);
-    if(ret < 0)
-    {
-        gossip_err("%s: failed to dbpf_open_cache_get error code %d\n",
-                   __func__, ret);
-        /* should already be PVFS_error */
-        return ret;
-    }
-
-    /* resize bytestream file usng local FS */
-    ret = ftruncate(open_ref.fd, tmpsize);
-    if(ret < 0)
-    {
-        PVFS_error pvfs_err;
-        gossip_err("%s: failed to resize using local FS errno %d\n",
-                   __func__, errno);
-        /* remove from active list */
-        dbpf_open_cache_put(&open_ref);
-        /* convert errno to PVFS_error */
-        pvfs_err = -PVFS_errno_to_error(errno);
-        gossip_err("%s: returning PVFS error %d\n", __func__, pvfs_err);
-        return(pvfs_err);
-    }
-
-    /* this returns the bstream file */
-    dbpf_open_cache_put(&open_ref);
-    gossip_err("%s: complete.\n", __func__);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: complete.\n", __func__);
 
     return DBPF_OP_COMPLETE;
 }
