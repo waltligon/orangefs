@@ -877,20 +877,21 @@ static PINT_sm_action getattr_read_metafile_keyvals(struct PINT_smcb *smcb,
                  " response has dfile_count %d sid_count %d\n",
                  dfile_count, sid_count);
 
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+        "+ attrs read from dspace: (owner = %d, group = %d, "
+        "perms = %o, type = %d\n   atime = %lld, mtime = %lld, "
+        "ctime = %lld |\n   dfile_count = %d | dist_size = %d)\n",
+        respattr->owner, respattr->group, respattr->perms,
+        respattr->objtype, 
+        lld(respattr->atime), lld(respattr->mtime), lld(respattr->ctime),
+        (int)respattr->u.meta.dfile_count,
+        (int)respattr->u.meta.dist_size);
+
     /* verify that the retrieved dfile count is sane */
     if (!PVFS_REQ_LIMIT_DFILE_COUNT_IS_VALID(dfile_count))
     {
         gossip_err("The requested dfile count of %d is invalid; "
                    "aborting operation.\n", dfile_count);
-        gossip_err(
-            "+ attrs read from dspace: (owner = %d, group = %d, "
-            "perms = %o, type = %d\n   atime = %lld, mtime = %lld, "
-            "ctime = %lld |\n   dfile_count = %d | dist_size = %d)\n",
-            respattr->owner, respattr->group, respattr->perms,
-            respattr->objtype, 
-            lld(respattr->atime), lld(respattr->mtime), lld(respattr->ctime),
-            (int)respattr->u.meta.dfile_count,
-            (int)respattr->u.meta.dist_size);
 
         gossip_err("handle: %s, fsid: %d.\n",
             PVFS_OID_str(&s_op->u.getattr.handle),
@@ -967,8 +968,8 @@ static PINT_sm_action getattr_read_metafile_keyvals(struct PINT_smcb *smcb,
              (PVFS_SID *)&respattr->u.meta.dfile_array[dfile_count];
 
     /* this will get cleaned up with attr structure */
-    respattr->u.meta.dist = malloc(s_op->val_a[1].buffer_sz);
-    if (respattr->u.meta.dist)
+    respattr->u.meta.dist = malloc(respattr->u.meta.dist_size);
+    if (!respattr->u.meta.dist)
     {
         gossip_err("Cannot allocate dist of size %d\n",
                    s_op->val_a[1].buffer_sz);
@@ -978,13 +979,17 @@ static PINT_sm_action getattr_read_metafile_keyvals(struct PINT_smcb *smcb,
 
     /* this will get cleaned up with attr structure */
     respattr->parent = malloc(OSASZ(1, respattr->meta_sid_count));
-    if (respattr->u.meta.dist)
+    if (!respattr->parent)
     {
         gossip_err("Cannot allocate parent buffer of size %d\n",
                    s_op->val_a[1].buffer_sz);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+
+    /* We set the parent_sids to the appropriate place after the parent */
+    respattr->parent_sids = 
+             (PVFS_SID *)&respattr->parent[1];
 
 /*---------------------------------------------------------------------------*/
 
@@ -1001,7 +1006,7 @@ static PINT_sm_action getattr_read_metafile_keyvals(struct PINT_smcb *smcb,
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
     s_op->key_a[1].buffer    = Trove_Common_Keys[METAFILE_DIST_KEY].key;
 
-    s_op->val_a[1].buffer_sz = s_op->resp.u.getattr.attr.u.meta.dist_size; 
+    s_op->val_a[1].buffer_sz = respattr->u.meta.dist_size; 
     s_op->val_a[1].buffer    = respattr->u.meta.dist;
 
     keep_keyval_buffers(s_op, 1);

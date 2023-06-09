@@ -171,10 +171,9 @@ int main(int argc, char **argv)
                  * state machine.  This program should only have to send in
                  * a list of server aliases from the config file.
                  */
-                rc = BMI_addr_lookup(
-                        &layout.server_list.servers[tmp_server_index],
-                        tmp_server,
-                        NULL);
+                rc = BMI_addr_lookup(&layout.server_list.servers[tmp_server_index],
+                                     tmp_server,
+                                     NULL);
                 if(rc < 0)
                 {
                     PVFS_perror("BMI_addr_lookup", rc);
@@ -196,8 +195,6 @@ int main(int argc, char **argv)
                              NULL);
         if (rc)
         {
-            /* fprintf(stderr, "Error: An error occurred while creating %s\n",
-                    working_file); */
             PVFS_perror("pvfs2-touch: PVFS_sys_remove", rc);
             ret = -1;
             break;

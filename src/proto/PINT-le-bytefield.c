@@ -1055,22 +1055,12 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             {
                 decode_free(req->u.create.attr.u.meta.dist);
             }
-            /* V3 remove this:
-            if (req->u.create.layout.server_list.servers)
-            {
-                decode_free(req->u.create.layout.server_list.servers); 
-            }
-            if (req->u.create.datafile_handles)
-            {
-                decode_free(req->u.create.datafile_handles);
-            }
-            */
             /* all of the OIDs and SIDs arrays are malloced with 1
-             * call - sid_array points to the buffer
+             * call - dfile_array points to the buffer
              */
-            if (req->u.create.attr.u.meta.sid_array)
+            if (req->u.create.attr.u.meta.dfile_array)
             {
-                decode_free(req->u.create.attr.u.meta.sid_array);
+                decode_free(req->u.create.attr.u.meta.dfile_array);
             }
             break;
 
@@ -1101,18 +1091,34 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 #ifdef ENABLE_SECURITY_CERT
             decode_free(req->u.mkdir.credential.certificate.buf);
 #endif
-            if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DIST)
-            {
-                decode_free(req->u.mkdir.attr.u.meta.dist);
-            }
-            if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DFILES)
-            {
-                decode_free(req->u.mkdir.attr.u.meta.dfile_array);
-            }
             if (req->u.mkdir.attr.mask & PVFS_ATTR_CAPABILITY)
             {
                 decode_free(req->u.mkdir.attr.capability.handle_array);
                 decode_free(req->u.mkdir.attr.capability.signature);
+            }
+            if (req->u.mkdir.attr.u.dir.dirdata_handles)
+            {
+                decode_free(req->u.mkdir.attr.u.dir.dirdata_handles);
+            }
+            if (req->u.mkdir.attr.u.dir.dist_dir_bitmap)
+            {
+                decode_free(req->u.mkdir.attr.u.dir.dist_dir_bitmap);
+            }
+            if (req->u.mkdir.attr.u.dir.hint.dist_name)
+            {
+                decode_free(req->u.mkdir.attr.u.dir.hint.dist_name);
+            }
+            if (req->u.mkdir.attr.u.dir.hint.dist_params)
+            {
+                decode_free(req->u.mkdir.attr.u.dir.hint.dist_params);
+            }
+            if (req->u.mkdir.attr.u.dir.hint.layout.server_list.servers)
+            {
+                decode_free(req->u.mkdir.attr.u.dir.hint.layout.server_list.servers);
+            }
+            if (req->u.mkdir.attr.u.dir.hint.dir_layout.server_list.servers)
+            {
+                decode_free(req->u.mkdir.attr.u.dir.hint.dir_layout.server_list.servers);
             }
             break;
 

@@ -264,8 +264,9 @@ const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 {
     CHECK_OP(op);
 
-    gossip_log("%s: map server with op %d and params %p\n", __func__,
+    /* gossip_log("%s: map server with op %d and params %p\n", __func__,
                op, PINT_server_req_table[op].params);
+    */
 
     return PINT_server_req_table[op].params->string_name;
 }
