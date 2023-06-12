@@ -1035,10 +1035,12 @@ static void lebf_encode_rel(struct PINT_encoded_msg *msg,
 static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                             enum PINT_encode_msg_type input_type)
 {
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_rel\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,"called.\n");
     if (input_type == PINT_DECODE_REQ)
     {
         struct PVFS_server_req *req = &msg->stub_dec.req;
+
+        gossip_ldebug(GOSSIP_ENDECODE_DEBUG,"releasing from request decode.\n");
 
         decode_free(req->capability.handle_array);
         decode_free(req->capability.signature);
@@ -1096,29 +1098,23 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.mkdir.attr.capability.handle_array);
                 decode_free(req->u.mkdir.attr.capability.signature);
             }
-            if (req->u.mkdir.attr.u.dir.dirdata_handles)
+            /* points to all malloc'd space in mkdir req */
+            gossip_debug(GOSSIP_MKDIR_DEBUG, "%s: mkdir req pointers:\n"
+                    "\t\tsid array        (%p)\n"
+                    "\t\tparent           (%p)\n"
+                    "\t\tparent_sid_array (%p)\n"
+                    "\t\tdirdata_handles  (%p)\n"
+                    "\t\tdirdata_sid_array(%p)\n",
+                    __func__,
+                    req->u.mkdir.sid_array,
+                    req->u.mkdir.parent,
+                    req->u.mkdir.parent_sid_array,
+                    req->u.mkdir.dirdata_handles,
+                    req->u.mkdir.dirdata_sid_array);
+
+            if (req->u.mkdir.sid_array)
             {
-                decode_free(req->u.mkdir.attr.u.dir.dirdata_handles);
-            }
-            if (req->u.mkdir.attr.u.dir.dist_dir_bitmap)
-            {
-                decode_free(req->u.mkdir.attr.u.dir.dist_dir_bitmap);
-            }
-            if (req->u.mkdir.attr.u.dir.hint.dist_name)
-            {
-                decode_free(req->u.mkdir.attr.u.dir.hint.dist_name);
-            }
-            if (req->u.mkdir.attr.u.dir.hint.dist_params)
-            {
-                decode_free(req->u.mkdir.attr.u.dir.hint.dist_params);
-            }
-            if (req->u.mkdir.attr.u.dir.hint.layout.server_list.servers)
-            {
-                decode_free(req->u.mkdir.attr.u.dir.hint.layout.server_list.servers);
-            }
-            if (req->u.mkdir.attr.u.dir.hint.dir_layout.server_list.servers)
-            {
-                decode_free(req->u.mkdir.attr.u.dir.hint.dir_layout.server_list.servers);
+                decode_free(req->u.mkdir.sid_array);
             }
             break;
 
@@ -1305,6 +1301,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
     else if (input_type == PINT_DECODE_RESP)
     {
         struct PVFS_server_resp *resp = &msg->stub_dec.resp;
+
+        gossip_ldebug(GOSSIP_ENDECODE_DEBUG,"releasing from response decode.\n");
 
         if(resp->status == 0)
         {

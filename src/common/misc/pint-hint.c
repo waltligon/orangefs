@@ -521,7 +521,10 @@ void PVFS_hint_free(PVFS_hint *hint)
         free(old);
     }
     /* set the original hint list pointer to null */
-    *hint = NULL;
+    if (hint)
+    {
+        *hint = NULL;
+    }
 }
 
 /*

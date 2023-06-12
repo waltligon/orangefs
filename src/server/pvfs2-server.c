@@ -2779,14 +2779,14 @@ int server_state_machine_complete(PINT_smcb *smcb)
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_id_gen_t tmp_id;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-            "server_state_machine_complete %p\n",smcb);
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "(%p)\n", smcb);
 
     /* set a timestamp on the completion of the state machine */
     id_gen_fast_register(&tmp_id, s_op);
 
     if(s_op->req)
     {
+        gossip_ldebug(GOSSIP_SERVER_DEBUG, "calling PINT_EVENT_END (%p)\n", smcb);
         PINT_EVENT_END(PINT_sm_event_id,
                        server_controlling_pid,
                        NULL,
@@ -2797,19 +2797,20 @@ int server_state_machine_complete(PINT_smcb *smcb)
     /* release the decoding of the unexpected request */
     if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
+        gossip_ldebug(GOSSIP_SERVER_DEBUG, "calling PVFS_hint_free\n");
         PVFS_hint_free(&s_op->decoded.stub_dec.req.hints);
 
-        PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
+        gossip_ldebug(GOSSIP_SERVER_DEBUG, "calling PINT_decode_release\n");
+        PINT_decode_release(&(s_op->decoded), PINT_DECODE_REQ);
     }
 
-    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,"server_state_machine_complete: "
-                                       "smcb op code (%d).\n"
-                                      ,s_op->op);
-    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,"server_state_machine_complete: "
-                                       "s_op->unexp_bmi_buff.buffer (%p) "
-                                       "\tNULL(%s).\n"
-                                      ,s_op->unexp_bmi_buff.buffer
-                                      ,s_op->unexp_bmi_buff.buffer ? "NO" : "YES");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "smcb op code (%d).\n", s_op->op);
+
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "s_op->unexp_bmi_buff.buffer (%p) "
+                                       "\tNULL(%s).\n", 
+                                       s_op->unexp_bmi_buff.buffer,
+                                       s_op->unexp_bmi_buff.buffer ?
+                                               "NO" : "YES");
 
     /* BMI_unexpected_free MUST execute BEFORE BMI_set_info,
      * because BMI_set_info will remove the addr info from the
@@ -2817,11 +2818,13 @@ int server_state_machine_complete(PINT_smcb *smcb)
      * become zero.  The addr info holds the "unexpected-free"
      * function pointer.
      */
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "calling BMI_unexpected_free\n");
     BMI_unexpected_free(s_op->unexp_bmi_buff.addr, 
                         s_op->unexp_bmi_buff.buffer);
-    BMI_set_info(s_op->unexp_bmi_buff.addr, BMI_DEC_ADDR_REF, NULL);
-    s_op->unexp_bmi_buff.buffer = NULL;
 
+    BMI_set_info(s_op->unexp_bmi_buff.addr, BMI_DEC_ADDR_REF, NULL);
+
+    s_op->unexp_bmi_buff.buffer = NULL;
 
     /* Remove s_op from the inprogress_sop_list */
     qlist_del(&s_op->next);
@@ -2832,8 +2835,8 @@ int server_state_machine_complete(PINT_smcb *smcb)
 int server_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     /* free the operation structure itself */
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-            "server_state_machine_terminate %p\n",smcb);
+    gossip_ldebug(GOSSIP_SERVER_DEBUG,
+            "server_state_machine_terminate (%p)\n",smcb);
     PINT_smcb_free(smcb);
     return SM_ACTION_TERMINATE;
 }

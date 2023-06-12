@@ -304,21 +304,24 @@ void PINT_encode_release(struct PINT_encoded_msg* input_buffer,
 void PINT_decode_release(struct PINT_decoded_msg* input_buffer,
 			 enum PINT_encode_msg_type input_type)
 {
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_decode_release\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,"called.\n");
     if (ENCODING_IS_SUPPORTED(input_buffer->enc_type))
     {
+        gossip_ldebug(GOSSIP_ENDECODE_DEBUG,
+                      "calling encoding specific decode_release.\n");
         PINT_encoding_table[input_buffer->enc_type]->op->decode_release(
                             input_buffer, input_type);
     }
     else if (input_buffer->enc_type == -1)
     {
         /* invalid return from PINT_decode, quietly return */
+        gossip_lerr("Encoder returns -1\n");
         ;
     }
     else
     {
-        gossip_err("PINT_decode_release: Encoder type %d is not "
-                   "supported.\n", input_buffer->enc_type);
+        gossip_lerr("Encoder type %d is not supported.\n",
+                    input_buffer->enc_type);
     }
 }
 
