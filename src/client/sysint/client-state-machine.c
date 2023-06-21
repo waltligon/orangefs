@@ -406,7 +406,7 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
  * between largest sys op and lowest mgmt op - need to check on this
  * WBL
  */
-struct PINT_state_machine_s *client_op_state_get_machine(int op)
+struct PINT_state_machine_s *client_op_state_get_machine(int op, int dflag)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "client_op_state_get_machine %d\n",op);

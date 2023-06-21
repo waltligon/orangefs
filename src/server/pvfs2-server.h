@@ -626,6 +626,8 @@ struct PINT_server_getattr_op
     int num_dfiles_req;
     PVFS_handle *mirror_dfile_status_array;
     PVFS_credential credential;
+    int *size_array;
+    int size;
 };
 
 struct PINT_server_listattr_op
@@ -1101,7 +1103,7 @@ int server_state_machine_complete_noreq(PINT_smcb *smcb);
 
 #include "pvfs2-internal.h"
 
-struct PINT_state_machine_s *server_op_state_get_machine(int);
+struct PINT_state_machine_s *server_op_state_get_machine(int, int);
 
 #endif /* __PVFS_SERVER_H */
 

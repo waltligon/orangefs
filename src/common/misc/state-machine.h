@@ -102,7 +102,7 @@ typedef struct PINT_smcb
     int frame_count;  /* number of frames in list */
 
     /* usage specific routine to look up SM from OP */
-    struct PINT_state_machine_s *(*op_get_state_machine)(int);
+    struct PINT_state_machine_s *(*op_get_state_machine)(int, int);
     /* state machine context and control variables */
     int op; /* this field externally indicates type of state machine */
     PVFS_id_gen_t op_id; /* unique ID for this operation */
@@ -209,7 +209,7 @@ PINT_sm_action PINT_state_machine_continue(struct PINT_smcb *smcb,
 #ifdef WIN32
 int PINT_state_machine_locate(struct PINT_smcb *);
 #else
-int PINT_state_machine_locate(struct PINT_smcb *) __attribute__((used));
+int PINT_state_machine_locate(struct PINT_smcb *, int) __attribute__((used));
 #endif
 int PINT_smcb_set_op(struct PINT_smcb *smcb, int op);
 int PINT_smcb_op(struct PINT_smcb *smcb);
@@ -222,7 +222,7 @@ int PINT_smcb_cancelled(struct PINT_smcb *smcb);
 int PINT_smcb_alloc(struct PINT_smcb **,
                     int,
                     int,
-                    struct PINT_state_machine_s *(*getmach)(int),
+                    struct PINT_state_machine_s *(*getmach)(int, int),
                     int (*term_fn)(struct PINT_smcb *,
                     job_status_s *),
                     job_context_id context_id);

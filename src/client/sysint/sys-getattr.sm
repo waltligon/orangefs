@@ -559,8 +559,6 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                 /* need to gather dirdata attr */
                 if (sm_p->getattr.req_attrmask & PVFS_ATTR_LATEST)
                 {
-                    assert(attr->mask & PVFS_ATTR_DISTDIR_ATTR);
-
                     gossip_debug(GOSSIP_GETATTR_DEBUG,
                             "  !!! need to contact dirdata to gather "
                             "dirent_count and timestamps!\n");

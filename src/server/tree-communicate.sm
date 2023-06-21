@@ -1346,7 +1346,7 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
     struct PVFS_servresp_tree_get_file_size *s_tree =
                                   &(s_op->resp.u.tree_get_file_size);
     int i, j, k, task_id, error_code;
-    uint32_t size_array_index=0, error_array_index=0;
+    uint32_t size_array_index = 0, error_array_index = 0;
     PINT_server_op *old_frame;
     struct PVFS_servreq_tree_get_file_size *tree_req = NULL;
     PINT_sm_msgpair_state *tree_msgarray = NULL;
@@ -1396,11 +1396,12 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
                             ,"%s: REMOTE OPERATION encountered error:%d\n"
                             ,__func__
                             ,error_code);
+
                 for (j = 0; j < tree_msgop->count; j++)
                 {
                     tree_req = &(tree_msgarray[j].req.u.tree_get_file_size);
                     uint32_t index = 0;
-                    for (k=0; k < tree_req->num_data_files; k++)
+                    for (k = 0; k < tree_req->num_data_files; k++)
                     {
                         index = tree_req->caller_handle_index 
                             + k
@@ -1408,6 +1409,7 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
                         s_op->resp.u.tree_get_file_size.size[index]  = 0;
                         s_op->resp.u.tree_get_file_size.error[index] =
                             error_code;
+
                         gossip_err("%s:index:%d \terror[%d]:%d\n"
                                   ,__func__
                                   ,index
