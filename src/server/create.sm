@@ -385,20 +385,14 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
                                      s_op->req->u.create.attr.u.meta.sid_count);
     s_op->val_a[0].buffer =    s_op->req->u.create.attr.u.meta.dfile_array;
 
+    keep_keyval_buffers(s_op, 0);
+
     /* writing distribution for the metafile */
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
     s_op->key_a[1].buffer =    Trove_Common_Keys[METAFILE_DIST_KEY].key;
 
     s_op->val_a[1].buffer_sz = s_op->req->u.create.attr.u.meta.dist_size;
     s_op->val_a[1].buffer =    malloc(s_op->val_a[1].buffer_sz);
-
-    /* writing object parent handle and sids */
-    s_op->key_a[2].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
-    s_op->key_a[2].buffer =    Trove_Common_Keys[OBJECT_PARENT_KEY].key;
-
-    /* datafile handle and sids should be contiguous */
-    s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.create.parent.sid_count);
-    s_op->val_a[2].buffer =    &s_op->req->u.create.parent.handle;
 
     if(!s_op->val_a[1].buffer)
     {
@@ -409,6 +403,33 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
 
     PINT_dist_encode(s_op->val_a[1].buffer,
                      s_op->req->u.create.attr.u.meta.dist);
+
+    /* writing object parent handle and sids */
+    s_op->key_a[2].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
+    s_op->key_a[2].buffer =    Trove_Common_Keys[OBJECT_PARENT_KEY].key;
+
+    /* datafile handle and sids should be contiguous */
+    s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.create.parent.sid_count);
+    /* s_op->val_a[2].buffer =    &s_op->req->u.create.parent.handle; */
+
+    /* modification because object_ref does not store OID and SIDs together */
+    s_op->val_a[2].buffer =    malloc(s_op->val_a[2].buffer_sz);
+
+    if(!s_op->val_a[2].buffer)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    ZEROMEM(s_op->val_a[2].buffer, s_op->val_a[2].buffer_sz);
+
+    memcpy(s_op->val_a[2].buffer,
+          &s_op->req->u.create.parent.handle,
+          sizeof(PVFS_OID));
+
+    memcpy(((char*)s_op->val_a[2].buffer) + sizeof(PVFS_OID),
+           s_op->req->u.create.parent.sid_array,
+           s_op->req->u.create.parent.sid_count * sizeof(PVFS_OID));
+    /* modification because object_ref does not store OID and SIDs together */
 
     ret = job_trove_keyval_write_list(s_op->req->u.create.object.fs_id,
                                       s_op->req->u.create.object.handle, /*metafile*/
