@@ -119,7 +119,7 @@ int main(int argc, char **argv)
             ret = -1;
             break;
         }
-
+        fprintf(stderr, "Testing before lookup\n");
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
         rc = PVFS_sys_lookup(cur_fs, directory, &credentials,
                              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
