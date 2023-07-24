@@ -356,14 +356,16 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
          * convert to a ds_attr for writing to the database.
          * First copy in the attrs sent in by the original req as a starting point.
          */
+        gossip_debug(GOSSIP_SERVER_DEBUG, "\ttarget_handle: %s NOT FOUND!\n",
+                     PVFS_OID_str(&s_op->target_handle));
         /** gets the target's attrs from the request using the get_attr method
          * defined in the .sm file and copy it to the s_op scratch space for the attr
          */
         ret = PINT_server_req_get_attr(s_op->req, &s_op->attr);
         s_op->target_object_attr = &s_op->attr; /* is this used? */
 
-        gossip_debug(GOSSIP_SERVER_DEBUG, "\ttarget_handle: %s\n",
-                     PVFS_OID_str(&s_op->target_handle));
+        gossip_debug(GOSSIP_SERVER_DEBUG, "\trequest attributes accessed\n");
+
         /* Everything has a parent, but it may not have come with the request.
          * It should have.  Don't crash if its not there, but maybe log an error!
          */
@@ -393,13 +395,20 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         case PVFS_SERV_IO :
         case PVFS_SERV_SMALL_IO :
         case PVFS_SERV_TRUNCATE :
+            gossip_debug(GOSSIP_SERVER_DEBUG, "create DATAFILE\n");
             s_op->attr.objtype = PVFS_TYPE_DATAFILE;
             s_op->attr.u.data.size = 0;
             break;
         /* dirdata object specific */
         case PVFS_SERV_RMDIRENT : /* assumes existing dirdata */
+            gossip_debug(GOSSIP_SERVER_DEBUG, "removing dirent from non-existent dirdata - skip\n");
+            create_object = 0;
+            js_p->error_code = ENOENT;
+            goto complete;
+            break;
         case PVFS_SERV_CHDIRENT : /* assumes existing dirdata */
         case PVFS_SERV_CRDIRENT : /* assumes existing dirdata */
+            gossip_debug(GOSSIP_SERVER_DEBUG, "create DIRDATA\n");
             s_op->attr.objtype = PVFS_TYPE_DIRDATA;
             s_op->attr.u.dirdata.dirent_count = 0;
             break;
@@ -440,11 +449,27 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
          */
         case PVFS_SERV_CREATE :
         case PVFS_SERV_MKDIR :
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "%s: create or mkdir of object\n", __func__);
             create_object = 0;
             js_p->error_code = 0;
             break;
+        /* We are removing a DATAFILE or DIRDATA that does not exist yet.
+         * Do not need to create a cap, or translate ids.
+         */
+        case PVFS_SERV_REMOVE :
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "%s: remove or rmdir of non-existing object\n", __func__);
+            create_object = 0;
+            js_p->error_code = ENOENT;
+            goto complete;
+            break;
         default:
-            gossip_err("Prelude has request of unknown op %d\n", s_op->req->op);
+            if (s_op->req->op < 0 || s_op->req->op > PVFS_SERV_NUM_OPS)
+            {
+                gossip_err("Prelude has request of unknown op %d\n", s_op->req->op);
+            }
+            /* else don't create an object */
             create_object = 0;
             js_p->error_code = ENOENT;
             break;
