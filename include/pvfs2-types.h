@@ -1084,6 +1084,11 @@ PVFS_error PVFS_errno_to_error(int err);
 /* a shorthand to make the error code definitions more readable */
 #define E(num) (num|PVFS_ERROR_BIT)
 
+/* This is not an errno, it is a non-error code.  Do not put bits
+ * in it.
+ */
+#define PVFS_SUCCESS            0  /* successful completion */
+
 /* PVFS2 error codes, compliments of asm/errno.h */
 #define PVFS_EPERM            E(1) /* Operation not permitted */
 #define PVFS_ENOENT           E(2) /* No such file or directory */

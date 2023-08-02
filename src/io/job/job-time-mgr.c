@@ -127,8 +127,7 @@ static int __job_time_mgr_add(struct job_desc* jd, int timeout_sec)
     if(!tmp_bucket || tmp_bucket->expire_time_sec != expire_time_sec)
     {
 	/* make a new bucket, we didn't find an exact match */
-	new_bucket = (struct time_bucket*)
-            malloc(sizeof(struct time_bucket));
+	new_bucket = (struct time_bucket*)malloc(sizeof(struct time_bucket));
 	assert(new_bucket);
 
 	new_bucket->expire_time_sec = expire_time_sec;
@@ -173,6 +172,9 @@ int job_time_mgr_add(struct job_desc* jd, int timeout_sec)
     gen_mutex_lock(&bucket_mutex);
 
     ret = __job_time_mgr_add(jd, timeout_sec);
+
+    gossip_debug(GOSSIP_JOB_DEBUG, "(%p) %s: Adding job timeout %d sec id %llu\n",
+                 jd->job_user_ptr, __func__, timeout_sec, llu(jd->job_id));
 
     gen_mutex_unlock(&bucket_mutex);
 
@@ -257,7 +259,9 @@ int job_time_mgr_expire(void)
 	    switch(jd->type)
 	    {
 	    case JOB_BMI:
-		gossip_err("%s: job time out: cancelling bmi operation, job_id: %llu.\n", __func__, llu(jd->job_id));
+		gossip_err("(%p) %s: job time out: cancelling bmi operation, "
+                           "job_id: %llu.\n", jd->job_user_ptr, __func__,
+                           llu(jd->job_id));
 		ret = job_bmi_cancel(jd->job_id, jd->context_id);
 	        jd->time_bucket = NULL;
 		break;
@@ -275,15 +279,20 @@ int job_time_mgr_expire(void)
 		else
 		{
 		    /* otherwise kill the flow */
-		    gossip_err("%s: job time out: cancelling flow operation, job_id: %llu.\n", __func__, llu(jd->job_id));
+		    gossip_err("(%p) %s: job time out: cancelling flow operation, "
+                               "job_id: %llu.\n", jd->job_user_ptr, __func__,
+                               llu(jd->job_id));
 		    ret = job_flow_cancel(jd->job_id, jd->context_id);
 	            jd->time_bucket = NULL;
 		}
 		break;
 	    case JOB_TROVE:
-		gossip_err("%s: job time out: cancelling trove operation, job_id: %llu.\n", __func__, llu(jd->job_id));
-		ret = job_trove_dspace_cancel(
-                    jd->u.trove.fsid, jd->job_id, jd->context_id);
+		gossip_err("(%p) %s: job time out: cancelling trove operation, "
+                           "job_id: %llu.\n", jd->job_user_ptr, __func__,
+                           llu(jd->job_id));
+		ret = job_trove_dspace_cancel(jd->u.trove.fsid,
+                                              jd->job_id,
+                                              jd->context_id);
 	        jd->time_bucket = NULL;
                 break;
 	    default:
@@ -291,6 +300,9 @@ int job_time_mgr_expire(void)
 	        jd->time_bucket = NULL;
 		break;
 	    }
+
+            gossip_debug(GOSSIP_JOB_DEBUG, "(%p) %s: Expired a job id %llu\n",
+                         jd->job_user_ptr, __func__, llu(jd->job_id));
 
 	    /* FIXME: error handling */
 	    assert(ret == 0);

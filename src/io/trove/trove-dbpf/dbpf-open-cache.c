@@ -131,8 +131,12 @@ void dbpf_open_cache_initialize(void)
                          (void*)&dbpf_unlink_context);
     if(ret)
     {
-        gossip_err("dbpf_open_cache_initialize: failed [%d]\n", ret);
+        gossip_err("%s: failed [%d]\n", __func__, ret);
         return;
+    }
+    else
+    {
+        gossip_err("%s: initialized [%d]\n", __func__, ret);
     }
 }
 

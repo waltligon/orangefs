@@ -261,39 +261,47 @@ int trove_bstream_flush(
 
 /** Initiate read of a single keyword/value pair.
  */
-int trove_keyval_read(
-    TROVE_coll_id coll_id,
-    TROVE_handle handle,
-    TROVE_keyval_s* key_p,
-    TROVE_keyval_s* val_p,
-    TROVE_ds_flags flags,
-    TROVE_vtag_s* vtag,
-    void* user_ptr,
-    TROVE_context_id context_id,
-    TROVE_op_id* out_op_id_p,
-    PVFS_hint  hints)
+int trove_keyval_read(TROVE_coll_id coll_id,
+                      TROVE_handle handle,
+                      TROVE_keyval_s* key_p,
+                      TROVE_keyval_s* val_p,
+                      TROVE_ds_flags flags,
+                      TROVE_vtag_s* vtag,
+                      void* user_ptr,
+                      TROVE_context_id context_id,
+                      TROVE_op_id* out_op_id_p,
+                      PVFS_hint  hints)
 {
     TROVE_method_id method_id;
+
+    //gossip_debug(GOSSIP_TROVE_DEBUG, "%s: coll_id %d\n", __func__, coll_id);
+
     method_id = global_trove_method_callback(coll_id);
+
     /* Check arguments */
     if (key_p->buffer_sz < 2)
+    {
         return -TROVE_EINVAL;
+    }
+
     if(!(flags & TROVE_BINARY_KEY))
     {
         if (((char *)key_p->buffer)[key_p->buffer_sz-1] != 0)
+        {
             return -TROVE_EINVAL;
+        }
     }
-    return keyval_method_table[method_id]->keyval_read(
-           coll_id,
-           handle,
-           key_p,
-           val_p,
-           flags,
-           vtag,
-           user_ptr,
-           context_id,
-           out_op_id_p,
-           hints);
+
+    return keyval_method_table[method_id]->keyval_read(coll_id,
+                                                       handle,
+                                                       key_p,
+                                                       val_p,
+                                                       flags,
+                                                       vtag,
+                                                       user_ptr,
+                                                       context_id,
+                                                       out_op_id_p,
+                                                       hints);
 }
 
 /** Initiate write of a single keyword/value pair.

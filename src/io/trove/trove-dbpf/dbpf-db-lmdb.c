@@ -44,12 +44,12 @@ static int db_error(int e)
     switch (e)
     {
     case MDB_NOTFOUND:
-        return TROVE_ENOENT;
+        return -TROVE_ENOENT;
     case MDB_MAP_FULL:
         gossip_err("XXX lmdb map full\n");
-        return TROVE_ENOMEM;
+        return -TROVE_ENOMEM;
     case MDB_KEYEXIST:
-        return TROVE_EEXIST;
+        return -TROVE_EEXIST;
     }
     /* XXX: This is a dirty hack. */
     return DBPF_ERROR_UNKNOWN;

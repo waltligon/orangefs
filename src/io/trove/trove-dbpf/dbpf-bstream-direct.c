@@ -55,41 +55,36 @@ struct grow_bstream_handle
     int refcount;
 };
 
-static int dbpf_bstream_get_extents(
-    char **mem_offset_array,
-    TROVE_size *mem_size_array,
-    int mem_count,
-    TROVE_offset *stream_offset_array,
-    TROVE_size *stream_size_array,
-    int stream_count,
-    int *ext_count,
-    dbpf_stream_extents_t *extents);
+static int dbpf_bstream_get_extents(char **mem_offset_array,
+                                    TROVE_size *mem_size_array,
+                                    int mem_count,
+                                    TROVE_offset *stream_offset_array,
+                                    TROVE_size *stream_size_array,
+                                    int stream_count,
+                                    int *ext_count,
+                                    dbpf_stream_extents_t *extents);
 
-static int hash_handle_compare(
-    const void *key,
-    struct qlist_head *link);
+static int hash_handle_compare(const void *key, struct qlist_head *link);
 
-static int hash_handle(
-    const void *handle,
-    int table_size);
+static int hash_handle(const void *handle, int table_size);
 
 static int grow_bstream_handle_table_init( int size );
 static int grow_bstream_handle_acquire_lock( TROVE_object_ref ref );
 static int grow_bstream_handle_release_lock( TROVE_object_ref ref );
 
 static size_t direct_aligned_write(int fd, 
-                                    void *buf,
-                                    off_t buf_offset,
-                                    size_t size,
-                                    off_t write_offset,
-                                    off_t stream_size);
+                                   void *buf,
+                                   off_t buf_offset,
+                                   size_t size,
+                                   off_t write_offset,
+                                   off_t stream_size);
 
 static size_t direct_locked_write(int fd,
-                            void * buf,
-                            off_t buf_offset,
-                            size_t size,
-                            off_t write_offset,
-                            off_t stream_size);
+                                  void * buf,
+                                  off_t buf_offset,
+                                  size_t size,
+                                  off_t write_offset,
+                                  off_t stream_size);
 
 #if 0
 static size_t new_direct_write(int fd,
@@ -115,11 +110,11 @@ static size_t direct_aligned_read(int fd,
                                   off_t stream_size);
 
 static size_t direct_locked_read(int fd,
-                            void * buf,
-                            off_t buf_offset,
-                            size_t size,
-                            off_t file_offset,
-                            off_t stream_size);
+                                 void * buf,
+                                 off_t buf_offset,
+                                 size_t size,
+                                 off_t file_offset,
+                                 off_t stream_size);
 
 static size_t direct_read(int fd, 
                           void * buf, 
@@ -197,11 +192,11 @@ int dbpf_aligned_blocks_finalize(void);
  * @returns bytes written, otherwise a negative errno error code
  */
 static size_t direct_aligned_write(int fd, 
-                                    void *buf, 
-                                    off_t buf_offset,
-                                    size_t size, 
-                                    off_t write_offset,
-                                    off_t stream_size)
+                                   void *buf, 
+                                   off_t buf_offset,
+                                   size_t size, 
+                                   off_t write_offset,
+                                   off_t stream_size)
 {
     int ret;
 
@@ -249,11 +244,11 @@ static size_t direct_aligned_write(int fd,
 gen_mutex_t writes_lock = GEN_MUTEX_INITIALIZER; */
 
 static size_t direct_locked_write(int fd,
-                            void * buf,
-                            off_t buf_offset,
-                            size_t size,
-                            off_t write_offset,
-                            off_t stream_size)
+                                  void * buf,
+                                  off_t buf_offset,
+                                  size_t size,
+                                  off_t write_offset,
+                                  off_t stream_size)
 {
     struct flock writelock;
     int ret, write_ret;
@@ -271,8 +266,12 @@ static size_t direct_locked_write(int fd,
     }
     writelock.l_type = F_UNLCK;
 
-    write_ret = direct_write(
-        fd, buf, buf_offset, size, write_offset, stream_size);
+    write_ret = direct_write(fd,
+                             buf,
+                             buf_offset,
+                             size,
+                             write_offset,
+                             stream_size);
 
     ret = fcntl(fd, F_SETLK, &writelock);
     if (ret < 0)
@@ -505,11 +504,13 @@ static size_t direct_write(int fd,
         if(ALIGNED_SIZE(0, stream_size) >= aligned_end_offset)
         {
             gossip_debug(GOSSIP_DIRECTIO_DEBUG, "Doing RMW at end\n");
+
             ret = dbpf_pread(
                 fd,
                 ((char *)aligned_buf) + aligned_size - BLOCK_SIZE,
                 BLOCK_SIZE,
                 aligned_end_offset - BLOCK_SIZE);
+
             if(ret < 0)
             {
                 int pread_errno = errno;
@@ -524,7 +525,8 @@ static size_t direct_write(int fd,
         else
         {
             memset(((char *)aligned_buf) + aligned_size - BLOCK_SIZE, 
-                   0, BLOCK_SIZE);
+                   0,
+                   BLOCK_SIZE);
         }
     }
 
@@ -532,10 +534,15 @@ static size_t direct_write(int fd,
      * aligned buffer
      */
     memcpy(((char *)aligned_buf) + (write_offset - aligned_offset),
-           ((char *)buf) + buf_offset, size);
+           ((char *)buf) + buf_offset,
+           size);
 
-    ret = direct_aligned_write(fd, aligned_buf, 0,
-                                aligned_size, aligned_offset, stream_size);
+    ret = direct_aligned_write(fd,
+                               aligned_buf,
+                               0,
+                               aligned_size,
+                               aligned_offset,
+                               stream_size);
 
     /* PINT_mem_aligned_free(aligned_buf); */
     free(aligned_buf);
@@ -568,11 +575,11 @@ static size_t direct_write(int fd,
  * @return number of bytes read
  */
 static size_t direct_aligned_read(int fd,
-                                   void * buf,
-                                   off_t buf_offset,
-                                   size_t size,
-                                   off_t file_offset,
-                                   off_t stream_size)
+                                  void * buf,
+                                  off_t buf_offset,
+                                  size_t size,
+                                  off_t file_offset,
+                                  off_t stream_size)
 {
     int ret;
 
@@ -615,11 +622,11 @@ static size_t direct_aligned_read(int fd,
 }
 
 static size_t direct_locked_read(int fd,
-                           void * buf,
-                           off_t buf_offset,
-                           size_t size,
-                           off_t file_offset,
-                           off_t stream_size)
+                                 void * buf,
+                                 off_t buf_offset,
+                                 size_t size,
+                                 off_t file_offset,
+                                 off_t stream_size)
 {
     int ret, read_ret;
     struct flock readlock;
@@ -628,11 +635,13 @@ static size_t direct_locked_read(int fd,
     readlock.l_whence = SEEK_SET;
     readlock.l_start = (off_t)ALIGNED_OFFSET(file_offset);
     readlock.l_len = (off_t)ALIGNED_SIZE(file_offset, size);
+
     ret = fcntl(fd, F_SETLKW, &readlock);
     if(ret < 0 && errno == EINTR)
     {
         return -trove_errno_to_trove_error(errno);
     }
+
     readlock.l_type = F_UNLCK;
 
     read_ret = direct_read(fd, buf, buf_offset, size, file_offset, stream_size);
@@ -647,11 +656,11 @@ static size_t direct_locked_read(int fd,
 }
 
 static size_t direct_read(int fd,
-                           void * buf,
-                           off_t buf_offset,
-                           size_t size,
-                           off_t file_offset,
-                           off_t stream_size)
+                          void * buf,
+                          off_t buf_offset,
+                          size_t size,
+                          off_t file_offset,
+                          off_t stream_size)
 {
     void * aligned_buf;
     off_t aligned_offset;
@@ -676,8 +685,12 @@ static size_t direct_read(int fd,
        ALIGNED_OFFSET(buf_offset) == buf_offset &&
        aligned_size == read_size)
     {
-        return direct_aligned_read(fd, buf, buf_offset, read_size, 
-                                   file_offset, stream_size);
+        return direct_aligned_read(fd,
+                                   buf,
+                                   buf_offset,
+                                   read_size,
+                                   file_offset,
+                                   stream_size);
     }
 
     /* aligned_buf = PINT_mem_aligned_alloc(aligned_size, BLOCK_SIZE); */
@@ -687,8 +700,12 @@ static size_t direct_read(int fd,
         return -ENOMEM;
     }
 
-    ret = direct_aligned_read(fd, aligned_buf, 0, aligned_size, 
-                               aligned_offset, stream_size);
+    ret = direct_aligned_read(fd,
+                              aligned_buf,
+                              0,
+                              aligned_size,
+                              aligned_offset,
+                              stream_size);
     if(ret < 0)
     {
         /* PINT_mem_aligned_free(aligned_buf); */
@@ -732,15 +749,14 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
         goto done;
     }
 
-    ret = dbpf_bstream_get_extents(
-        rw_op->mem_offset_array,
-        rw_op->mem_size_array,
-        rw_op->mem_array_count,
-        rw_op->stream_offset_array,
-        rw_op->stream_size_array,
-        rw_op->stream_array_count,
-        &extent_count,
-        NULL);
+    ret = dbpf_bstream_get_extents(rw_op->mem_offset_array,
+                                   rw_op->mem_size_array,
+                                   rw_op->mem_array_count,
+                                   rw_op->stream_offset_array,
+                                   rw_op->stream_size_array,
+                                   rw_op->stream_array_count,
+                                   &extent_count,
+                                   NULL);
     if(ret != 0)
     {
         gossip_err("%s: failed to get bstream extents from offset/sizes: "
@@ -754,6 +770,16 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
         return -TROVE_ENOMEM;
     }
 
+    ret = dbpf_bstream_get_extents(rw_op->mem_offset_array,
+                                   rw_op->mem_size_array,
+                                   rw_op->mem_array_count,
+                                   rw_op->stream_offset_array,
+                                   rw_op->stream_size_array,
+                                   rw_op->stream_array_count,
+                                   &extent_count,
+                                   stream_extents);
+
+#if 0
     ret = dbpf_bstream_get_extents(
         rw_op->mem_offset_array,
         rw_op->mem_size_array,
@@ -763,6 +789,8 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
         rw_op->stream_array_count,
         &extent_count,
         stream_extents);
+#endif
+
     if(ret != 0)
     {
         gossip_err("%s: failed to get bstream extents from offset/sizes: "
@@ -773,11 +801,11 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
     for(i = 0; i < extent_count; ++ i)
     {
         ret = direct_locked_read(rw_op->open_ref.fd,
-                          stream_extents[i].buffer,
-                          0,
-                          stream_extents[i].size,
-                          stream_extents[i].offset,
-                          attr.u.datafile.b_size);
+                                 stream_extents[i].buffer,
+                                 0,
+                                 stream_extents[i].size,
+                                 stream_extents[i].offset,
+                                 attr.u.datafile.b_size);
         if(ret < 0)
         {
             ret = -trove_errno_to_trove_error(-ret);
@@ -816,15 +844,14 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
     ref.fs_id = qop_p->op.coll_p->coll_id;
     ref.handle = qop_p->op.handle;
 
-    ret = dbpf_bstream_get_extents(
-        rw_op->mem_offset_array,
-        rw_op->mem_size_array,
-        rw_op->mem_array_count,
-        rw_op->stream_offset_array,
-        rw_op->stream_size_array,
-        rw_op->stream_array_count,
-        &extent_count,
-        NULL);
+    ret = dbpf_bstream_get_extents(rw_op->mem_offset_array,
+                                   rw_op->mem_size_array,
+                                   rw_op->mem_array_count,
+                                   rw_op->stream_offset_array,
+                                   rw_op->stream_size_array,
+                                   rw_op->stream_array_count,
+                                   &extent_count,
+                                   NULL);
     if(ret != 0)
     {
         gossip_err("%s: failed to count extents from stream offset/sizes: "
@@ -839,15 +866,14 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
         goto cache_put;
     }
 
-    ret = dbpf_bstream_get_extents(
-        rw_op->mem_offset_array,
-        rw_op->mem_size_array,
-        rw_op->mem_array_count,
-        rw_op->stream_offset_array,
-        rw_op->stream_size_array,
-        rw_op->stream_array_count,
-        &extent_count,
-        stream_extents);
+    ret = dbpf_bstream_get_extents(rw_op->mem_offset_array,
+                                   rw_op->mem_size_array,
+                                   rw_op->mem_array_count,
+                                   rw_op->stream_offset_array,
+                                   rw_op->stream_size_array,
+                                   rw_op->stream_array_count,
+                                   &extent_count,
+                                   stream_extents);
     if(ret != 0)
     {
         gossip_err("%s: failed to get stream extents from stream offset/sizes: "
@@ -978,6 +1004,7 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
                                 qop_p->op.user_ptr,
                                 TROVE_SYNC,
                                 qop_p->op.context_id);
+
             qop_p->op.state = OP_IN_SERVICE;
             ret = dbpf_sync_coalesce(qop_p, 0, &outcount);
             if(ret < 0)
@@ -1014,7 +1041,8 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
         }
     }
     /* if we don't try to update the size then we already released the 
-     * handle grow lock above */
+     * handle grow lock above
+     */
 
    ret = PINT_MGMT_OP_COMPLETED;
 
@@ -1103,6 +1131,7 @@ static int dbpf_bstream_direct_read_list(TROVE_coll_id coll_id,
                         user_ptr,
                         flags,
                         context_id);
+
     op = (struct dbpf_bstream_rw_list_op *)&q_op_p->op.u.b_rw_list;
 
     /* initialize the op-specific members */
@@ -1116,10 +1145,10 @@ static int dbpf_bstream_direct_read_list(TROVE_coll_id coll_id,
     op->mem_size_array = mem_size_array;
     op->queued_op_ptr = q_op_p;
 
-    ret = dbpf_open_cache_get(
-        coll_id, handle,
-        DBPF_FD_DIRECT_READ,
-        &op->open_ref);
+    ret = dbpf_open_cache_get(coll_id,
+                              handle,
+                              DBPF_FD_DIRECT_READ,
+                              &op->open_ref);
     if(ret < 0)
     {
         if(ret == -TROVE_ENOENT)
@@ -1136,9 +1165,13 @@ static int dbpf_bstream_direct_read_list(TROVE_coll_id coll_id,
     }
 
     *out_op_id_p = q_op_p->op.id;
-    ret = PINT_manager_id_post(
-        io_thread_mgr, q_op_p, &q_op_p->mgr_op_id,
-        dbpf_bstream_direct_read_op_svc, op, NULL, io_queue_id);
+    ret = PINT_manager_id_post(io_thread_mgr,
+                               q_op_p,
+                               &q_op_p->mgr_op_id,
+                               dbpf_bstream_direct_read_op_svc,
+                               op,
+                               NULL,
+                               io_queue_id);
     if(ret < 0)
     {
         gossip_err("%s: failed to post direct read op: (error=%d)\n", 
@@ -1146,7 +1179,7 @@ static int dbpf_bstream_direct_read_list(TROVE_coll_id coll_id,
         return ret;
     }
 
-    return DBPF_OP_CONTINUE;
+    return DBPF_OP_COMPLETE;
 }
 
 static int dbpf_bstream_direct_write_list(TROVE_coll_id coll_id,
@@ -1204,10 +1237,10 @@ static int dbpf_bstream_direct_write_list(TROVE_coll_id coll_id,
     op->mem_size_array = mem_size_array;
     op->queued_op_ptr = q_op_p;
 
-    ret = dbpf_open_cache_get(
-        coll_id, handle,
-        DBPF_FD_DIRECT_WRITE,
-        &op->open_ref);
+    ret = dbpf_open_cache_get(coll_id,
+                              handle,
+                              DBPF_FD_DIRECT_WRITE,
+                              &op->open_ref);
     if(ret < 0)
     {
         dbpf_queued_op_free(q_op_p);
@@ -1218,11 +1251,15 @@ static int dbpf_bstream_direct_write_list(TROVE_coll_id coll_id,
 
     gossip_debug(GOSSIP_DIRECTIO_DEBUG, "%s: queuing direct write operation\n",
                   __func__);
-    PINT_manager_id_post(
-        io_thread_mgr, q_op_p, &q_op_p->mgr_op_id,
-        dbpf_bstream_direct_write_op_svc, op, NULL, io_queue_id);
+    PINT_manager_id_post(io_thread_mgr,
+                         q_op_p,
+                         &q_op_p->mgr_op_id,
+                         dbpf_bstream_direct_write_op_svc,
+                         op,
+                         NULL,
+                         io_queue_id);
 
-    return DBPF_OP_CONTINUE;
+    return DBPF_OP_COMPLETE;
 }
 
 static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
@@ -1266,13 +1303,14 @@ static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
                         q_op_p->op.user_ptr,
                         TROVE_SYNC,
                         q_op_p->op.context_id);
+
     q_op_p->op.state = OP_IN_SERVICE;
 
     /* truncate file after attributes are set */
-    ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle,
-        DBPF_FD_DIRECT_WRITE,
-        &open_ref);
+    ret = dbpf_open_cache_get(op_p->coll_p->coll_id,
+                              op_p->handle,
+                              DBPF_FD_DIRECT_WRITE,
+                              &open_ref);
     if(ret < 0)
     {
         return ret;
@@ -1352,13 +1390,13 @@ static int dbpf_bstream_direct_flush(TROVE_coll_id coll_id,
                                      TROVE_op_id *out_op_id_p,
                                      PVFS_hint hints)
 {
-    return DBPF_OP_COMPLETE;
+    return 1; //????
+    //return DBPF_OP_COMPLETE;
 }
 
-static int dbpf_bstream_direct_cancel(
-    TROVE_coll_id coll_id,
-    TROVE_op_id cancel_id,
-    TROVE_context_id context_id)
+static int dbpf_bstream_direct_cancel(TROVE_coll_id coll_id,
+                                      TROVE_op_id cancel_id,
+                                      TROVE_context_id context_id)
 {
     dbpf_queued_op_t *op;
     int ret;
@@ -1391,15 +1429,14 @@ struct TROVE_bstream_ops dbpf_bstream_direct_ops =
     dbpf_bstream_direct_cancel
 };
 
-static int dbpf_bstream_get_extents(
-    char **mem_offset_array,
-    TROVE_size *mem_size_array,
-    int mem_count,
-    TROVE_offset *stream_offset_array,
-    TROVE_size *stream_size_array,
-    int stream_count,
-    int *ext_count,
-    dbpf_stream_extents_t *extents)
+static int dbpf_bstream_get_extents(char **mem_offset_array,
+                                    TROVE_size *mem_size_array,
+                                    int mem_count,
+                                    TROVE_offset *stream_offset_array,
+                                    TROVE_size *stream_size_array,
+                                    int stream_count,
+                                    int *ext_count,
+                                    dbpf_stream_extents_t *extents)
 {
     int mct = 0, sct = 0, act = 0;
     int oom = 0, oos = 0;

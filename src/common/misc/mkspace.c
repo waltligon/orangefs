@@ -195,6 +195,7 @@ int pvfs2_mkspace(char *data_path,
     struct stat root_stat;
     struct stat meta_stat;
     struct stat data_stat;
+    struct stat config_stat;
 
     struct server_configuration_s *config = PINT_server_config_mgr_get_config();
 
@@ -203,23 +204,30 @@ int pvfs2_mkspace(char *data_path,
                                                   {{0,0,0,0,0,0,0,0,
                                                     0,0,0,0,0,0,0,0}}};
 
+    mkspace_print(verbose, "%s:\n", __func__);
     mkspace_print(verbose, "Data storage space     : %s\n", data_path);
     mkspace_print(verbose, "Metadata storage space : %s\n", meta_path);
+    mkspace_print(verbose, "Config storage space   : %s\n", config_path);
     mkspace_print(verbose, "Collection             : %s\n", collection);
-    mkspace_print(verbose, "ID                     : %d\n", coll_id);
+    mkspace_print(verbose, "Collection ID          : %d\n", coll_id);
     mkspace_print(verbose, "Root Handle            : %s\n",
                   PVFS_OID_str(&root_handle));
     mkspace_print(verbose, "Root Dirdata Handle    : %s\n",
                   PVFS_OID_str(&root_dirdata_handle));
+    mkspace_print(verbose, "Root SID Count         : %d\n", root_sid_count);
 
 
     /* init stat buffers */
     memset(&root_stat, 0, sizeof(root_stat));
     memset(&meta_stat, 0, sizeof(meta_stat));
+    memset(&data_stat, 0, sizeof(meta_stat));
+    memset(&config_stat, 0, sizeof(config_stat));
 
     /* call stat on root, meta, and data paths */
     stat("/", &root_stat);
+    stat(data_path, &data_stat);
     stat(meta_path, &meta_stat);
+    stat(config_path, &config_stat);
 
     /* see if the metadata path is located on the root device */
     if (meta_stat.st_dev == root_stat.st_dev)
@@ -239,8 +247,6 @@ int pvfs2_mkspace(char *data_path,
 
     if (!create_collection_only)
     {
-        memset(&data_stat, 0, sizeof(data_stat));
-        stat(data_path, &data_stat);
         /* see if the data path is located on the root device */
         if (data_stat.st_dev == root_stat.st_dev)
         {
@@ -268,6 +274,8 @@ int pvfs2_mkspace(char *data_path,
          * try to initialize; fails if storage space isn't there, which
          * is exactly what we're expecting in this case.
          */
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: calling trove_initialize. Paths NOT expected\n", __func__);
         ret = trove_initialize(TROVE_METHOD_DBPF, 
 			       NULL, 
 			       data_path,
@@ -276,28 +284,41 @@ int pvfs2_mkspace(char *data_path,
 			       0);
         if (ret > -1)
         {
-            gossip_err("error: storage space %s or %s already "
-                       "exists; aborting!\n", data_path, meta_path);
+            gossip_err("%s: error: storage space %s or %s or %s already exists; "
+                       "aborting!\n", __func__, data_path, meta_path, config_path);
             return -1;
         }
 
         /* set the config pointer and filesystem pointer inside of trove */
         ret = trove_collection_set_fs_config(coll_id, config);
+        if (ret < 0)
+        {
+            char emsg[256];
+            PVFS_strerror_r(ret, emsg, 256);
+            gossip_err("%s: trove_collection_set_fs_config(1) failed: %d(%s)\n",
+                       __func__, ret, emsg);
+        }
 
+        gossip_debug(GOSSIP_TROVE_DEBUG,"%s: calling trove_storage_create\n", __func__);
         ret = trove_storage_create(TROVE_METHOD_DBPF,
                                    data_path,
                                    meta_path,
                                    config_path,
                                    NULL,
                                    &op_id);
-        if (ret != 1)
+        //if (ret != 1)
+        if (ret != 0)
         {
-            gossip_err("error: storage create failed; aborting!\n");
+            char emsg[256];
+            PVFS_strerror_r(ret, emsg, 256);
+            gossip_err("%s: trove_storage_create failed: %d(%s)\n", __func__, ret, emsg);
             return -1;
         }
     }
 
     /* now that the storage space exists, initialize trove properly */
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "%s: calling trove_initialize. Paths expected.\n", __func__);
     ret = trove_initialize(TROVE_METHOD_DBPF,
                            NULL, 
 	                   data_path,
@@ -306,70 +327,94 @@ int pvfs2_mkspace(char *data_path,
                            0);
     if (ret < 0)
     {
-	gossip_err("error: trove initialize failed; aborting!\n");
+        char emsg[256];
+        strerror_r(ret, emsg, 256);
+	gossip_err("%s: trove_initialize failed: %d(%s)\n", __func__, ret, emsg);
 	return -1;
     }
 
     mkspace_print(verbose,
-                  "info: created data storage space '%s'.\n",
+                  "%s: created data storage space '%s'.\n", __func__,
                   data_path);
     mkspace_print(verbose,
-                  "info: created metadata storage space '%s'.\n",
+                  "%s: created metadata storage space '%s'.\n", __func__,
                   meta_path);
     mkspace_print(verbose,
-                  "info: created config storage space '%s'.\n",
+                  "%s: created config storage space '%s'.\n", __func__,
                   config_path);
 
     /* set the config pointer and filesystem pointer inside of trove */
     ret = trove_collection_set_fs_config(coll_id, config);
+    if (ret < 0)
+    {
+        char emsg[256];
+        strerror_r(ret, emsg, 256);
+	gossip_err("%s: trove_collection_set_fs_config(2) failed: %d(%s)\n",
+                   __func__, ret, emsg);
+	return -1;
+    }
 
-    /* try to look up collection used to store file system */
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "%s: trove_collection_lookup should fail with ENOENT\n",
+                 __func__);
+    /* try to look up collection used to store file system - should fail */
     ret = trove_collection_lookup(TROVE_METHOD_DBPF,
                                   collection,
                                   &coll_id,
                                   NULL,
                                   &op_id);
-    if (ret == 1)
+    //if (ret == 1)
+    if (ret == 0)
     {
+        char emsg[256];
+        PVFS_strerror_r(ret, emsg, 256);
 	mkspace_print(verbose,
-                      "warning: collection lookup succeeded "
-                      "before it should; aborting!\n");
+                      "%s: warning: trove_collection_lookup succeeded "
+                      "before it should; %d(%s) aborting!\n", __func__, ret, emsg);
 	trove_finalize(TROVE_METHOD_DBPF);
 	return -1;
     }
 
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "%s: trove_collection_create to set up collection\n",
+                 __func__);
     /* create the collection for the fs */
     ret = trove_collection_create(collection, coll_id, NULL, &op_id);
-    if (ret != 1)
+    //if (ret != 1)
+    if (ret != 0)
     {
+        char emsg[256];
+        PVFS_strerror_r(ret, emsg, 256);
 	mkspace_print(verbose,
-                      "error: collection create failed for "
-                      "collection '%s'.\n",
-                      collection);
+                      "%s: error: trove_collection_create failed for collection"
+                      " '%s' %d(%s).\n", __func__, collection, ret, emsg);
 	return -1;
     }
 
-    /* make sure a collection lookup succeeds */
+    /* try to look up collection used to store file system - should succeed */
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "%s: trove_collection_lookup should succeed\n", __func__);
     ret = trove_collection_lookup(TROVE_METHOD_DBPF,
                                   collection,
                                   &coll_id,
                                   NULL,
                                   &op_id);
-    if (ret != 1)
+    if (ret != 0)
     {
 	mkspace_print(verbose,
-                      "error: collection lookup failed for "
-                      "collection '%s' after create.\n",
+                      "%s: error: trove_collection_lookup failed for "
+                      "collection '%s' after create.\n", __func__,
                       collection);
 	return -1;
     }
 
-    mkspace_print(verbose, "info: created collection '%s'.\n",collection);
+    mkspace_print(verbose, "%s: info: created collection '%s'.\n",
+                  __func__, collection);
 
     ret = trove_open_context(coll_id, &trove_context);
     if (ret < 0)
     {
-        mkspace_print(verbose,"trove_open_context() failure.\n");
+        mkspace_print(verbose,"%s: trove_open_context() failure.\n", __func__);
         return -1;
     }
 
@@ -393,6 +438,10 @@ int pvfs2_mkspace(char *data_path,
         key.buffer_sz = ROOT_HANDLE_KEYLEN;
         val.buffer = &new_root_handle;
         val.buffer_sz = sizeof(new_root_handle);
+
+        /* for these operations the following nonstandard return codes
+         * are ret == 1 is successful, 0 is not complete, <0 error 
+         */
         ret = trove_collection_seteattr(coll_id,
                                         &key,
                                         &val,
@@ -400,10 +449,18 @@ int pvfs2_mkspace(char *data_path,
                                         NULL,
                                         trove_context,
                                         &op_id);
+        if (ret < 0)
+        {
+            gossip_err("%s: error: collection_seteattr (root handle) failed; "
+                       "aborting!\n", __func__);
+            return -1;
+        }
 
         while (ret == 0)
         {
             count = 0;
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "%s: calling dspace_test op_id=%ld\n", __func__, op_id);
             ret = trove_dspace_test(coll_id,
                                     op_id,
                                     trove_context,
@@ -413,11 +470,13 @@ int pvfs2_mkspace(char *data_path,
                                     &state,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
+        /* ret == 1 is successful, 0 is not complete, <0 error */
 
-        if (ret < 0)
+        if (ret <= TROVE_OP_ERROR)
+        //if (ret < 0)
         {
-            gossip_err("error: collection seteattr (for root handle) "
-                       "failed; aborting!\n");
+            gossip_err("%s: error: dspace_test failed; aborting!\n",
+                       __func__);
             return -1;
         }
 
@@ -437,7 +496,7 @@ int pvfs2_mkspace(char *data_path,
                                   &op_id,
                                   NULL);
 
-        while (ret == 0)
+        while (ret == TROVE_OP_BUSY)
         {
             count = 0;
             ret = trove_dspace_test(coll_id,
@@ -450,10 +509,12 @@ int pvfs2_mkspace(char *data_path,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
-        if ((ret != 1) && (state != 0))
+        if (ret <= TROVE_OP_ERROR && state != TROVE_OP_UNINITIALIZED)
+        //if ((ret != 1) && (state != 0))
         {
             mkspace_print(verbose,
-                          "dspace create (for root dir) failed.\n");
+                          "%s: dspace create (for root dir) failed.\n",
+                          __func__);
             return -1;
         }
 
@@ -461,13 +522,14 @@ int pvfs2_mkspace(char *data_path,
          */
         if(PVFS_OID_NE(&root_handle, &new_root_handle))
         {
-            gossip_err("Trove did not use handle passed in for root\n");
+            gossip_err("%s: Trove did not use handle passed in for root\n",
+                       __func__);
             return -1;
         }
 
         mkspace_print(verbose,
-                      "info: created root directory "
-                      "with handle %s.\n",
+                      "%s: info: created root directory "
+                      "with handle %s.\n", __func__,
                       PVFS_OID_str(&new_root_handle));
 
         /********************************/
@@ -486,7 +548,7 @@ int pvfs2_mkspace(char *data_path,
                                   &op_id,
                                   NULL);
 
-        while (ret == 0)
+        while (ret == TROVE_OP_BUSY)
         {
             count = 0;
             ret = trove_dspace_test(coll_id,
@@ -499,10 +561,11 @@ int pvfs2_mkspace(char *data_path,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
-        if ((ret != 1) && (state != 0))
+        if (ret <= TROVE_OP_ERROR && state != TROVE_OP_UNINITIALIZED)
         {
             mkspace_print(verbose,
-                          "dspace create (for root dirdata) failed.\n");
+                          "%s: dspace create (for root dirdata) failed.\n",
+                          __func__);
             return -1;
         }
 
@@ -510,7 +573,8 @@ int pvfs2_mkspace(char *data_path,
          */
         if(PVFS_OID_NE(&root_dirdata_handle, &new_root_dirdata_handle))
         {
-            gossip_err("Trove did not use handle passed in for root dirdata\n");
+            gossip_err("%s: Trove did not use handle passed for root dirdata\n",
+                       __func__);
             return -1;
         }
 
@@ -559,7 +623,7 @@ int pvfs2_mkspace(char *data_path,
                                    &op_id,
                                    NULL);
 
-        while (ret == 0)
+        while (ret == TROVE_OP_BUSY)
         {
             count = 0;
             ret = trove_dspace_test(coll_id,
@@ -572,10 +636,10 @@ int pvfs2_mkspace(char *data_path,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
-        if (ret < 0)
+        if (ret <= TROVE_OP_ERROR)
         {
-            gossip_err("error: dspace setattr for root handle "
-                       "attributes failed; aborting!\n");
+            gossip_err("%s: error: dspace setattr for root handle "
+                       "attributes failed; aborting!\n", __func__);
             return -1;
         }
 
@@ -606,7 +670,7 @@ int pvfs2_mkspace(char *data_path,
                                    &op_id,
                                    NULL);
 
-        while (ret == 0)
+        while (ret == TROVE_OP_BUSY)
         {
             count = 0;
             ret = trove_dspace_test(coll_id,
@@ -619,10 +683,10 @@ int pvfs2_mkspace(char *data_path,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
-        if (ret < 0)
+        if (ret <= TROVE_OP_ERROR)
         {
-            gossip_err("error: dspace setattr for root handle "
-                       "attributes failed; aborting!\n");
+            gossip_err("%s: error: dspace setattr for root handle "
+                       "attributes failed; aborting!\n", __func__);
             return -1;
         }
 
@@ -716,7 +780,7 @@ int pvfs2_mkspace(char *data_path,
                                       &op_id,
                                       NULL);
 
-        while (ret == 0)
+        while (ret == TROVE_OP_BUSY)
         {
             count = 0;
             ret = trove_dspace_test(coll_id,
@@ -729,10 +793,11 @@ int pvfs2_mkspace(char *data_path,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
-        if ((ret != 1) && (state != 0))
+        if ((ret <= TROVE_OP_ERROR) && (state != TROVE_OP_UNINITIALIZED))
         {
             mkspace_print(verbose,
-                          "keyval write_list (for root dirdata) failed.\n");
+                          "%s: keyval write_list (for root dirdata) failed.\n",
+                          __func__);
             return -1;
         }
 
@@ -766,7 +831,7 @@ int pvfs2_mkspace(char *data_path,
                                       &op_id,
                                       NULL);
 
-        while (ret == 0)
+        while (ret == TROVE_OP_BUSY)
         {
             count = 0;
             ret = trove_dspace_test(coll_id,
@@ -779,7 +844,7 @@ int pvfs2_mkspace(char *data_path,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
-        if ((ret != 1) && (state != 0))
+        if ((ret <= TROVE_OP_ERROR) && (state != TROVE_OP_UNINITIALIZED))
         {
             mkspace_print(verbose,
                           "keyval write_list (for root dirdata) failed.\n");
@@ -797,7 +862,7 @@ int pvfs2_mkspace(char *data_path,
                                  trove_context,
                                  &op_id,
                                  NULL);
-        while (ret == 0)
+        while (ret == TROVE_OP_BUSY)
         {
             count = 0;
             ret = trove_dspace_test(coll_id,
@@ -810,7 +875,7 @@ int pvfs2_mkspace(char *data_path,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
-        if ((ret != 1) && (state != 0))
+        if ((ret <= TROVE_OP_ERROR) && (state != TROVE_OP_UNINITIALIZED))
         {
             mkspace_print(verbose,
                           "keyval flush (for root dirdata) failed.\n");

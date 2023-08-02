@@ -315,6 +315,17 @@ static void lebf_initialize(void)
                 reqsize = extra_size_PVFS_servreq_tree_get_file_size;
                 respsize = extra_size_PVFS_servresp_tree_get_file_size;
                 break;
+            case PVFS_SERV_TREE_GET_DIRENT_COUNT:
+                req.u.tree_get_dirent_count.handle_array = NULL;
+                req.u.tree_get_dirent_count.num_dirdata = 0;
+                zero_credential(&req.u.tree_get_dirent_count.credential);
+                resp.u.tree_get_dirent_count.dentcnt = NULL;
+                resp.u.tree_get_dirent_count.error = NULL;
+                resp.u.tree_get_dirent_count.handle_count = 0;
+                resp.u.tree_get_dirent_count.caller_handle_index = 0;
+                reqsize = extra_size_PVFS_servreq_tree_get_dirent_count;
+                respsize = extra_size_PVFS_servresp_tree_get_dirent_count;
+                break;
             case PVFS_SERV_TREE_GETATTR:
                 req.u.tree_getattr.handle_array = NULL;
                 req.u.tree_getattr.handle_count = 0;
@@ -573,6 +584,7 @@ static int lebf_encode_req(struct PVFS_server_req *req,
         CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
         CASE(PVFS_SERV_TREE_REMOVE, tree_remove);
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
+        CASE(PVFS_SERV_TREE_GET_DIRENT_COUNT, tree_get_dirent_count);
         CASE(PVFS_SERV_TREE_GETATTR, tree_getattr);
         CASE(PVFS_SERV_TREE_SETATTR, tree_setattr);
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
@@ -710,6 +722,7 @@ static int lebf_encode_resp(struct PVFS_server_resp *resp,
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
+        CASE(PVFS_SERV_TREE_GET_DIRENT_COUNT, tree_get_dirent_count);
         CASE(PVFS_SERV_TREE_REMOVE, tree_remove);
         CASE(PVFS_SERV_TREE_GETATTR, tree_getattr);
         CASE(PVFS_SERV_TREE_SETATTR, tree_setattr);
@@ -814,6 +827,7 @@ static int lebf_decode_req(void *input_buffer, /* decoding from this buff */
         CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
         CASE(PVFS_SERV_TREE_REMOVE, tree_remove);
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
+        CASE(PVFS_SERV_TREE_GET_DIRENT_COUNT, tree_get_dirent_count);
         CASE(PVFS_SERV_TREE_GETATTR, tree_getattr);
         CASE(PVFS_SERV_TREE_SETATTR, tree_setattr);
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
@@ -947,6 +961,7 @@ static int lebf_decode_resp(void *input_buffer, /* decoding from this buff */
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
+        CASE(PVFS_SERV_TREE_GET_DIRENT_COUNT, tree_get_dirent_count);
         CASE(PVFS_SERV_TREE_REMOVE, tree_remove);
         CASE(PVFS_SERV_TREE_GETATTR, tree_getattr);
         CASE(PVFS_SERV_TREE_SETATTR, tree_setattr);
@@ -1166,6 +1181,15 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             decode_free(req->u.tree_get_file_size.credential.signature);
 #ifdef ENABLE_SECURITY_CERT
             decode_free(req->u.tree_get_file_size.credential.certificate.buf);
+#endif
+            break;
+
+        case PVFS_SERV_TREE_GET_DIRENT_COUNT:
+            decode_free(req->u.tree_get_dirent_count.handle_array);
+            decode_free(req->u.tree_get_dirent_count.credential.group_array);
+            decode_free(req->u.tree_get_dirent_count.credential.signature);
+#ifdef ENABLE_SECURITY_CERT
+            decode_free(req->u.tree_get_dirent_count.credential.certificate.buf);
 #endif
             break;
 
@@ -1535,6 +1559,11 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_TREE_GET_FILE_SIZE:
                 decode_free(resp->u.tree_get_file_size.size);
                 decode_free(resp->u.tree_get_file_size.error);
+                break;
+
+            case PVFS_SERV_TREE_GET_DIRENT_COUNT:
+                decode_free(resp->u.tree_get_dirent_count.dentcnt);
+                decode_free(resp->u.tree_get_dirent_count.error);
                 break;
 
             case PVFS_SERV_TREE_GETATTR:

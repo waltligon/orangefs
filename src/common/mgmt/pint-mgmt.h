@@ -41,6 +41,16 @@
  *
  */
 
+/* This enum is an problem waiting to happen.  There are several sets
+ * of similar constants: TROVE_OP_..., DBPF_OP_..., OP_..., and these.
+ * Some of them have been unified (TROVE and DBPF).  The problem is
+ * these are all integer return codes for functions, but the same
+ * numerical values have different meanings.  These should either be
+ * unified with the others, or assigned numerical values that are
+ * distinct.  Of course if code is referencing them by number, that
+ * screws the whole thing up - which is why I haven't fixed this yet.
+ */
+
 enum
 {
     /**

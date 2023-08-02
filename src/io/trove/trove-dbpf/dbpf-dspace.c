@@ -677,14 +677,15 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     {
         /* already hit end of keyval space; return 1 */
         *op_p->u.d_iterate_handles.count_p = 0;
-        return 1;
+        return DBPF_OP_COMPLETE;
+        //return 1;
     }
 
     /* get a cursor */
     ret = dbpf_db_cursor(op_p->coll_p->ds_db, &dbc, 1);
     if (ret != 0)
     {
-        ret = -ret;
+        //ret = -ret;
         gossip_err("failed to get a cursor\n");
         goto return_error;
     }
@@ -727,7 +728,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         }
         else if (ret != 0)
         {
-            ret = -ret;
+            //ret = -ret;
             gossip_err("failed to set cursor position: %llu\n",
                        llu(*op_p->u.d_iterate_handles.position_p));
             goto return_error;
@@ -748,13 +749,13 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
                                  &data,
                                  DBPF_DB_CURSOR_FIRST,
                                  sizeof(TROVE_handle));
-        if (ret == TROVE_ENOENT)
+        if (ret == -TROVE_ENOENT)
         {
             goto return_ok;
         }
         else if (ret != 0)
         {
-            ret = -ret;
+            //ret = -ret;
             gossip_err("failed to set cursor position at handle: %s\n",
                    PVFS_OID_str((TROVE_handle *)op_p->u.d_iterate_handles.position_p));
             goto return_error;
@@ -776,13 +777,13 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
                                  &data,
                                  DBPF_DB_CURSOR_NEXT,
                                  sizeof dummy_handle);
-        if(ret == TROVE_ENOENT)
+        if(ret == -TROVE_ENOENT)
         {
             goto return_ok;
         }
         else if(ret < 0)
         {
-            ret = -ret;
+            //ret = -ret;
             gossip_err("c_get failed on iteration %d\n", i);
             goto return_error;
         }
@@ -804,7 +805,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
                              &data,
                              DBPF_DB_CURSOR_NEXT,
                              sizeof dummy_handle);
-    if (ret == TROVE_ENOENT)
+    if (ret == -TROVE_ENOENT)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- notfound\n");
         goto return_ok;
@@ -813,12 +814,12 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG,
                      "iterate -- some other failure @ recno\n");
-        ret = -ret;
+        //ret = -ret;
         goto return_error;
     }
 
 return_ok:
-    if (ret == TROVE_ENOENT)
+    if (ret == -TROVE_ENOENT)
     {
         /* if off the end of the database, return TROVE_ITERATE_END */
         *op_p->u.d_iterate_handles.position_p = TROVE_ITERATE_END;
@@ -829,7 +830,8 @@ return_ok:
 
     dbpf_db_cursor_close(dbc);
 
-    return 1;
+    return DBPF_OP_COMPLETE;
+    //return 1;
 
 return_error:
     *op_p->u.d_iterate_handles.count_p = i;
@@ -902,14 +904,14 @@ static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
     if (ret)
     {
         /* error in accessing database */
-        ret = -ret;
+        //ret = -ret;
         goto return_error;
     }
 
     /* copy type value back into user's memory */
     *op_p->u.d_verify.type_p = attr.type;
 
-    return 1;
+    return DBPF_OP_COMPLETE;
 
 return_error:
     return ret;
@@ -949,8 +951,9 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
             (int)ds_attr_p->type, (int)ds_attr_p->dfile_count,
             (int)ds_attr_p->dist_size);
 #endif
-        gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "dspace_getattr fast "
-                     "path attr cache hit on %s\n", PVFS_OID_str(&handle));
+        gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                     "dspace_getattr fast path attr cache hit on %s\n",
+                     PVFS_OID_str(&handle));
         if(ds_attr_p->type == PVFS_TYPE_METAFILE)
         {
             gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
@@ -973,7 +976,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
 
         UPDATE_PERF_METADATA_READ();
         gen_mutex_unlock(&dbpf_attr_cache_mutex);
-        return 1;
+        return DBPF_OP_COMPLETE;
     }
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
@@ -1329,7 +1332,8 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         return(ret);
     }
 
-    return 1;
+    return DBPF_OP_COMPLETE;
+    //return 1;
 }
 
 static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
@@ -1359,7 +1363,8 @@ static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
                                             &op_p->u.d_getattr_list.attr_p[i]);
     }
 
-    return 1;
+    return DBPF_OP_COMPLETE;
+    //return 1;
 }
 
 /*
@@ -1501,7 +1506,7 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
     cur_op = id_gen_fast_lookup(id);
     if (cur_op == NULL)
     {
-        gossip_err("Invalid operation to test against\n");
+        gossip_err("%s: Invalid operation %ld to test against\n", __func__, id);
         return ret;
     }
 
@@ -1594,7 +1599,7 @@ op_not_completed:
     
     ret = cur_op->op.svc_fn(&(cur_op->op));
 
-    if (ret != 0)
+    if (ret != DBPF_OP_BUSY)
     {
         /* operation is done and we are telling the caller;
          * ok to pull off queue now.
@@ -1614,14 +1619,16 @@ op_not_completed:
         organize_post_op_statistics(cur_op->op.type, cur_op->op.id);
         dbpf_queued_op_put_and_dequeue(cur_op);
         dbpf_queued_op_free(cur_op);
-        return 1;
+        return DBPF_OP_COMPLETE;
+        //return 1;
     }
 
     dbpf_queued_op_put(cur_op, 0);
     gossip_debug(GOSSIP_TROVE_DEBUG,
                  "dbpf_dspace_test returning no progress.\n");
     usleep((max_idle_time_ms * 1000));
-    return 0;
+    return DBPF_OP_BUSY;
+    //return 0;
 #endif
 }
 

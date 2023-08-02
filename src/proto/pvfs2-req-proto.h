@@ -34,7 +34,7 @@
  * NOTE: Incrementing this will make clients unable to talk to older servers.
  * Do not change until we have a new version policy.
  */
-#define PVFS2_PROTO_MINOR 0
+#define PVFS2_PROTO_MINOR 1
 
 #define PVFS2_PROTO_VERSION ((PVFS2_PROTO_MAJOR*1000)+(PVFS2_PROTO_MINOR))
 
@@ -101,6 +101,7 @@ enum PVFS_server_op
     PVFS_SERV_TREE_GETATTR = 49,
     PVFS_SERV_MGMT_GET_USER_CERT = 50,
     PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ = 51,
+    PVFS_SERV_TREE_GET_DIRENT_COUNT = 52,
 
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
@@ -1012,6 +1013,82 @@ endecode_fields_1aa_struct(
 #define extra_size_PVFS_servresp_tree_get_file_size       \
             ( (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_error)) + \
               (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_size)) )
+
+/* tree get dirent count request *******************************************/
+
+struct PVFS_servreq_tree_get_dirent_count
+{
+    PVFS_fs_id  fs_id;
+    uint32_t caller_handle_index;
+    uint32_t retry_msgpair_at_leaf;
+    PVFS_credential credential;
+    uint32_t num_dirdata;
+    PVFS_handle *handle_array;
+    int32_t sid_count;
+    PVFS_SID *sid_array;
+};
+endecode_fields_3a1a_struct(
+    PVFS_servreq_tree_get_dirent_count,
+    uint32_t, caller_handle_index,
+    uint32_t, retry_msgpair_at_leaf,
+    PVFS_credential, credential,
+    uint32_t, num_dirdata,
+    PVFS_handle, handle_array,
+    PVFS_fs_id, fs_id,
+    int32_t, sid_count,
+    PVFS_SID, sid_array);
+#define extra_size_PVFS_servreq_tree_get_dirent_count \
+    ((PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
+     (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID)) + \
+     extra_size_PVFS_credential)
+
+#define PINT_SERVREQ_TREE_GET_DIRENT_COUNT_FILL(__req,                       \
+                                                __cap,                       \
+                                                __cred,                      \
+                                                __fsid,                      \
+                                                __caller_handle_index,       \
+                                                __num_dirdata,               \
+                                                __handle_array,              \
+                                                __sid_count,                 \
+                                                __sid_array,                 \
+                                                __retry_msgpair_at_leaf,     \
+                                                __hints)                     \
+do {                                                                         \
+    memset(&(__req), 0, sizeof(__req));                                      \
+    (__req).op = PVFS_SERV_TREE_GET_DIRENT_COUNT;                            \
+    (__req).ctrl.mode = PVFS_REQ_TREE;                                       \
+    (__req).ctrl.type = PVFS_REQ_PRIMARY;                                    \
+    (__req).ctrl.sub  = PVFS_REQ_DATAFILE;                                   \
+    (__req).hints = (__hints);                                               \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                              \
+    (__req).u.tree_get_dirent_count.credential = (__cred);                   \
+    (__req).u.tree_get_dirent_count.fs_id = (__fsid);                        \
+    (__req).u.tree_get_dirent_count.caller_handle_index = (__caller_handle_index);\
+    (__req).u.tree_get_dirent_count.num_dirdata = (__num_dirdata);           \
+    (__req).u.tree_get_dirent_count.handle_array = (__handle_array);         \
+    (__req).u.tree_get_dirent_count.sid_count = (__sid_count);               \
+    (__req).u.tree_get_dirent_count.sid_array = (__sid_array);               \
+    (__req).u.tree_get_dirent_count.retry_msgpair_at_leaf = (__retry_msgpair_at_leaf);\
+} while (0)
+
+struct PVFS_servresp_tree_get_dirent_count
+{
+    uint32_t caller_handle_index;
+    uint32_t handle_count;
+    PVFS_size  *dentcnt;
+    PVFS_error *error;
+};
+endecode_fields_1aa_struct(
+    PVFS_servresp_tree_get_dirent_count,
+    uint32_t, caller_handle_index,
+    uint32_t, handle_count, /* actually number of sizes and errors returned */
+    PVFS_size, dentcnt,
+    PVFS_error, error);
+#define extra_size_PVFS_servresp_tree_get_dirent_count       \
+            ( (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_error)) + \
+              (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_size)) )
+
+/* tree getattr request *******************************************/
 
 struct PVFS_servreq_tree_getattr
 {
@@ -3516,6 +3593,7 @@ struct PVFS_server_req
         struct PVFS_servreq_listattr listattr;
         struct PVFS_servreq_tree_remove tree_remove;
         struct PVFS_servreq_tree_get_file_size tree_get_file_size;
+        struct PVFS_servreq_tree_get_dirent_count tree_get_dirent_count;
         struct PVFS_servreq_tree_getattr tree_getattr;
         struct PVFS_servreq_mgmt_get_uid mgmt_get_uid;
         struct PVFS_servreq_tree_setattr tree_setattr;
@@ -3593,6 +3671,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_listattr listattr;
         struct PVFS_servresp_tree_remove tree_remove;
         struct PVFS_servresp_tree_get_file_size tree_get_file_size;
+        struct PVFS_servresp_tree_get_dirent_count tree_get_dirent_count;
         struct PVFS_servresp_tree_getattr tree_getattr;
         struct PVFS_servresp_mgmt_get_uid mgmt_get_uid;
         struct PVFS_servresp_tree_setattr tree_setattr; 

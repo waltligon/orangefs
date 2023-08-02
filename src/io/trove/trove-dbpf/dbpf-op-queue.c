@@ -132,9 +132,8 @@ dbpf_queued_op_t *dbpf_op_queue_shownext(dbpf_op_queue_p op_queue)
  * Returns one of DBPF_QUEUED_OP_INVALID, DBPF_QUEUED_OP_BUSY, or
  * DBPF_QUEUED_OP_SUCCESS.
  */
-int dbpf_queued_op_try_get(
-    TROVE_op_id id,
-    dbpf_queued_op_t **q_op_pp)
+int dbpf_queued_op_try_get(TROVE_op_id id,
+                           dbpf_queued_op_t **q_op_pp)
 {
     int state = 0;
     dbpf_queued_op_t *q_op_p = NULL;
@@ -263,18 +262,17 @@ void dbpf_queued_op_dequeue_nolock(dbpf_queued_op_t *q_op_p)
     dbpf_sync_coalesce_dequeue(q_op_p);
 }
 
-int dbpf_op_init_queued_or_immediate(
-    struct dbpf_op * op_p,
-    dbpf_queued_op_t ** q_op_pp,
-    enum dbpf_op_type op_type,
-    struct dbpf_collection *coll_p,
-    TROVE_handle handle,
-    int (* dbpf_op_svc_fn) (struct dbpf_op *),
-    TROVE_ds_flags flags,
-    TROVE_vtag_s *vtag,
-    void *user_ptr,
-    TROVE_context_id context_id,
-    struct dbpf_op **op_pp)
+int dbpf_op_init_queued_or_immediate(struct dbpf_op * op_p,
+                                     dbpf_queued_op_t ** q_op_pp,
+                                     enum dbpf_op_type op_type,
+                                     struct dbpf_collection *coll_p,
+                                     TROVE_handle handle,
+                                     int (* dbpf_op_svc_fn) (struct dbpf_op *),
+                                     TROVE_ds_flags flags,
+                                     TROVE_vtag_s *vtag,
+                                     void *user_ptr,
+                                     TROVE_context_id context_id,
+                                     struct dbpf_op **op_pp)
 {
     if(coll_p->immediate_completion)
     {

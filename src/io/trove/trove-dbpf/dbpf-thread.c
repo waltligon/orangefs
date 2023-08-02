@@ -75,7 +75,6 @@ int dbpf_thread_finalize(void)
     return ret;
 }
 
-int synccount = 0;
 
 void *dbpf_thread_function(void *ptr)
 {
@@ -84,7 +83,7 @@ void *dbpf_thread_function(void *ptr)
     struct timeval base;
     struct timespec wait_time;
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_function started\n");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: started\n", __func__);
 
     PINT_event_thread_start("TROVE-DBPF");
     while(dbpf_thread_running)
@@ -146,7 +145,7 @@ void *dbpf_thread_function(void *ptr)
         }
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_function ending\n");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: ending\n", __func__);
     PINT_event_thread_stop();
 #endif
     return ptr;
@@ -159,13 +158,16 @@ int dbpf_do_one_work_cycle(int *out_count)
     int max_num_ops_to_service = DBPF_OPS_PER_WORK_CYCLE;
     dbpf_queued_op_t *cur_op = NULL;
 #endif
+    static int synccount = 0;
 
     assert(out_count);
     *out_count = 0;
 
 #ifdef __PVFS2_TROVE_THREADED__
+    gossip_debug(GOSSIP_TROVE_DEBUG, "[DBPF THREAD]: Start one_work_cycle\n");
     do
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "[DBPF THREAD]: Start op\n");
         /* grab next op from queue and mark it as in service */
         gen_mutex_lock(&dbpf_op_queue_mutex);
         cur_op = dbpf_op_queue_shownext(&dbpf_op_queue);
@@ -183,7 +185,8 @@ int dbpf_do_one_work_cycle(int *out_count)
             if(DBPF_OP_IS_KEYVAL(cur_op->op.type)) 
             {
                 --synccount;
-                gossip_debug(GOSSIP_TROVE_DEBUG, "[DBPF THREAD]: [KEYVAL -1]: %d\n", synccount);
+                gossip_debug(GOSSIP_TROVE_DEBUG,
+                             "[DBPF THREAD]: [KEYVAL -1]: %d\n", synccount);
             }
 
             cur_op->op.state = OP_IN_SERVICE;
@@ -194,6 +197,8 @@ int dbpf_do_one_work_cycle(int *out_count)
         /* if there's no work to be done, return immediately */
         if (cur_op == NULL)
         {
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "[DBPF THREAD]: Null cur_op, returning\n");
             return ret;
         }
 
@@ -217,9 +222,13 @@ int dbpf_do_one_work_cycle(int *out_count)
              * and move _all_ the ready-to-be-synced operations to the
              * completion queue.
              */
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "[DBPF THREAD]: Sync_coalesce\n");
             ret = dbpf_sync_coalesce(cur_op, (ret == 1 ? 0 : ret), out_count);
             if(ret < 0)
             {
+                gossip_debug(GOSSIP_TROVE_DEBUG,
+                             "[DBPF THREAD]: Sync_coalesce error, return\n");
                 return ret; /* not sure how to recover from failure here */
             }
         }
@@ -229,29 +238,36 @@ int dbpf_do_one_work_cycle(int *out_count)
              * and just return.  Make sure the return code is negative
              * here though.
              */
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "[DBPF THREAD]: Unknown DB error, return\n");
             return (ret < 0) ? ret : -ret;
         }
         else
         {
 #ifndef __PVFS2_TROVE_AIO_THREADED__
             /*
-              check if trove is telling us to NOT mark this as
-              completed, and also to NOT re-add it to the service
-              queue.  this can happen if trove is throttling I/O
-              internally and will handle re-starting the operation
-              without our help.
-            */
+             * check if trove is telling us to NOT mark this as
+             * completed, and also to NOT re-add it to the service
+             * queue.  this can happen if trove is throttling I/O
+             * internally and will handle re-starting the operation
+             * without our help.
+             */
             if (cur_op->op.state == OP_INTERNALLY_DELAYED)
             {
                 continue;
             }
 #endif
             assert(cur_op->op.state != OP_COMPLETED);
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "[DBPF THREAD]: Re-queue cur_op\n");
             dbpf_queued_op_queue(cur_op);
         }
 
     } while(--max_num_ops_to_service);
 #endif
+
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "[DBPF THREAD]: Done with opts_to_service\n");
 
     return 0;
 }

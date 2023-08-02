@@ -195,7 +195,7 @@ int main(int argc, char **argv)
                              NULL);
         if (rc)
         {
-            PVFS_perror("pvfs2-touch: PVFS_sys_remove", rc);
+            PVFS_perror("pvfs2-rmit: PVFS_sys_remove", rc);
             ret = -1;
             break;
         }

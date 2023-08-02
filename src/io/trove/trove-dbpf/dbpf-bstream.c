@@ -593,9 +593,10 @@ static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
     int ret = -TROVE_EINVAL, got_fd = 0;
     struct open_cache_ref tmp_ref;
 
-    ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle,
-        DBPF_FD_BUFFERED_WRITE, &tmp_ref);
+    ret = dbpf_open_cache_get(op_p->coll_p->coll_id,
+                              op_p->handle,
+                              DBPF_FD_BUFFERED_WRITE,
+                              &tmp_ref);
     if (ret < 0)
     {
         goto return_error;
@@ -1211,14 +1212,15 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
     /* if we're not done with the last set of operations, break out */
     if (op_in_progress_count > 0)
     {
-        return 0;
+        return DBPF_OP_BUSY;
+        //return 0;
     }
     else if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLPOSTED)
     {
         /* we've posted everything, and it all completed */
         ret = 1;
 
-      final_aio_cleanup:
+    final_aio_cleanup: /* WTF is THIS??? */
         if ((op_p->type == BSTREAM_WRITE_AT) ||
             (op_p->type == BSTREAM_WRITE_LIST))
         {
@@ -1236,17 +1238,17 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
         /* no operations in progress; convert and post some more */
         aiocb_inuse_count = op_p->u.b_rw_list.aiocb_array_count;
         ret = dbpf_bstream_listio_convert(
-            op_p->u.b_rw_list.fd,
-            op_p->u.b_rw_list.opcode,
-            op_p->u.b_rw_list.mem_offset_array,
-            op_p->u.b_rw_list.mem_size_array,
-            op_p->u.b_rw_list.mem_array_count,
-            op_p->u.b_rw_list.stream_offset_array,
-            op_p->u.b_rw_list.stream_size_array,
-            op_p->u.b_rw_list.stream_array_count,
-            aiocb_p,
-            &aiocb_inuse_count,
-            &op_p->u.b_rw_list.lio_state);
+                op_p->u.b_rw_list.fd,
+                op_p->u.b_rw_list.opcode,
+                op_p->u.b_rw_list.mem_offset_array,
+                op_p->u.b_rw_list.mem_size_array,
+                op_p->u.b_rw_list.mem_array_count,
+                op_p->u.b_rw_list.stream_offset_array,
+                op_p->u.b_rw_list.stream_size_array,
+                op_p->u.b_rw_list.stream_array_count,
+                aiocb_p,
+                &aiocb_inuse_count,
+                &op_p->u.b_rw_list.lio_state);
 
         if (ret == 1)
         {
@@ -1255,7 +1257,8 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
         
         /* mark unused with LIO_NOPs */
         for(i = aiocb_inuse_count;
-            i < op_p->u.b_rw_list.aiocb_array_count; i++)
+            i < op_p->u.b_rw_list.aiocb_array_count;
+            i++)
         {
             aiocb_p[i].aio_lio_opcode = LIO_NOP;
         }
@@ -1279,15 +1282,18 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
         assert(op_p->u.b_rw_list.queued_op_ptr);
 
         ret = issue_or_delay_io_operation(
-            (dbpf_queued_op_t *)op_p->u.b_rw_list.queued_op_ptr,
-            aiocb_ptr_array, aiocb_inuse_count,
-            &op_p->u.b_rw_list.sigev, 1);
+                (dbpf_queued_op_t *)op_p->u.b_rw_list.queued_op_ptr,
+                aiocb_ptr_array,
+                aiocb_inuse_count,
+                &op_p->u.b_rw_list.sigev,
+                1);
 
         if (ret)
         {
             return ret;
         }
-        return 0;
+        return DBPF_OP_BUSY;
+        //return 0;
     }
 }
 
@@ -1390,13 +1396,14 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
                         q_op_p->op.user_ptr,
                         TROVE_SYNC,
                         q_op_p->op.context_id);
+
     q_op_p->op.state = OP_IN_SERVICE;
 
     /* truncate file after attributes are set */
-    ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle,
-        DBPF_FD_BUFFERED_WRITE,
-        &open_ref);
+    ret = dbpf_open_cache_get(op_p->coll_p->coll_id,
+                              op_p->handle,
+                              DBPF_FD_BUFFERED_WRITE,
+                              &open_ref);
     if(ret < 0)
     {
         return ret;

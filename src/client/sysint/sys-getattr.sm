@@ -1146,9 +1146,9 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
      * target is needed, the calling client should put this attribute in its
      * request mask.  
      */
-    /* Shold we be putting all of this stuff into thee req mask?  Maybe this
+    /* Should we be putting all of this stuff into the req mask?  Maybe this
      * is just for devel - we cannot actually get all of it since its comes
-     * in a union.  The caller sshould be setting this up I think.  The
+     * in a union.  The caller should be setting this up I think.  The
      * server should only return what is in the actual attrs.
      */
     /* Why are we using GOSSIP_ACACHE_DEBUG here?  This would imply
@@ -1170,7 +1170,7 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
                               PVFS_REQ_OTHER,
                               capability,
                               *sm_p->cred_p,
-                              object_ref.fs_id,    /* collapse into object_ref ? */
+                              object_ref.fs_id,/* collapse into object_ref? */
                               object_ref.handle,
                               sm_p->getattr.req_attrmask,
                               sm_p->hints);

@@ -232,12 +232,13 @@ static PINT_sm_action prelude_req_sched(struct PINT_smcb *smcb,
     PINT_perf_count(PINT_server_pc, PINT_PERF_REQUESTS, 1, PINT_PERF_ADD);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "posting schedule for op type %d, "
-                 "fs_id is %d handle is %s\n", s_op->op, s_op->target_fs_id,
-                 PVFS_OID_str(&s_op->target_handle));
+                 "fs_id is %d handle is %s\n", s_op->req->op,
+                 s_op->target_fs_id, PVFS_OID_str(&s_op->target_handle));
 
-    if (s_op->prelude_mask & PRELUDE_NO_SCHEDULE)
+    /* we schedule when mask has no schedule bit set ??? */
+    if (!(s_op->prelude_mask & PRELUDE_NO_SCHEDULE))
     {
-        ret = job_req_sched_post(s_op->op,
+        ret = job_req_sched_post(s_op->req->op,
                                  s_op->target_fs_id,
                                  s_op->target_handle,
                                  s_op->access_type,
@@ -248,10 +249,15 @@ static PINT_sm_action prelude_req_sched(struct PINT_smcb *smcb,
                                  &(s_op->scheduled_id),
                                  server_job_context);
 
+        gossip_debug(GOSSIP_SERVER_DEBUG, "%s: posted to scheduler id: %ld\n",
+                     __func__, s_op->scheduled_id);
+
         PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_ADD);
     }
     else
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+                     "%s: no job posted to scheduler\n", __func__);
         return SM_ACTION_COMPLETE;;
     }
     return ret;

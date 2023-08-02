@@ -37,21 +37,25 @@ static PVFS_error db_error(int db_error_value)
         case 0:
             return 0;
         case DB_NOTFOUND:
+            return -TROVE_ENOENT;
         case DB_KEYEMPTY:
-            return TROVE_ENOENT;
+            return -TROVE_EINVAL;
         case DB_KEYEXIST:
-            return TROVE_EEXIST;
+            return -TROVE_EEXIST;
         case DB_LOCK_DEADLOCK:
-            return TROVE_EDEADLK;
+            return -TROVE_EDEADLK;
         case DB_LOCK_NOTGRANTED:
-            return TROVE_ENOLCK;
+            return -TROVE_ENOLCK;
         case DB_RUNRECOVERY:
             gossip_err("Error: DB_RUNRECOVERY encountered.\n");
-            return TROVE_EIO;
+            return -TROVE_EIO;
     }
     return DBPF_ERROR_UNKNOWN; /* return some identifiable value */
 }
 
+/* WARNING: his function does NOT compare two ds_attr as the name suggests
+ * it appears to compare two handles in DBT structures.
+ */
 static int ds_attr_compare(DB *dbp, const DBT *a, const DBT *b)
 {
     int cmpval;
@@ -69,13 +73,13 @@ static int ds_attr_compare(DB *dbp, const DBT *a, const DBT *b)
         return 0;
     }
 
-    return (cmpval > 0) ? -1 : 1;
+    return (cmpval > 0) ? -1 : 0;
+    //return (cmpval > 0) ? -1 : 1;
 }
 
 static int keyval_compare(DB *dbp, const DBT *a, const DBT *b)
 {
     int cmpval;
-
     struct dbpf_keyval_db_entry *db_entry_a;
     struct dbpf_keyval_db_entry *db_entry_b;
 
@@ -95,83 +99,114 @@ static int keyval_compare(DB *dbp, const DBT *a, const DBT *b)
 
     if ((cmpval = PVFS_OID_cmp(&db_entry_a->handle, &db_entry_b->handle)))
     {
-        return (cmpval < 0) ? -1 : 1;
+        return (cmpval < 0) ? -1 : 0;
+        //return (cmpval < 0) ? -1 : 1;
     }
 
     if (db_entry_a->type != db_entry_b->type)
     {
-        return (db_entry_a->type < db_entry_b->type) ? -1 : 1;
+        return (db_entry_a->type < db_entry_b->type) ? -1 : 0;
+        //return (db_entry_a->type < db_entry_b->type) ? -1 : 1;
     }
 
     if (a->size > b->size)
     {
-        return 1;
+        return 0;
+        //return 1;
     }
     else if (a->size < b->size)
     {
         return -1;
     }
 
-    return memcmp(db_entry_a->key, db_entry_b->key,
-            DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->size));
+    return memcmp(db_entry_a->key,
+                  db_entry_b->key,
+                  DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->size));
 }
 
-int dbpf_db_open(char *name, int compare, struct dbpf_db **db,
-    int create, struct server_configuration_s *cfg)
+int dbpf_db_open(char *name,
+                 int compare,
+                 struct dbpf_db **db,
+                 int create,
+                 struct server_configuration_s *cfg)
 {
     int r;
+
     *db = malloc(sizeof **db);
     if (!*db)
     {
-        return errno;
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: malloc failed\n", __func__);
+        return -TROVE_ENOMEM;
+        //return errno;
     }
+
     r = db_create(&(*db)->db, NULL, 0);
+
     if (r)
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: db_create failed\n", __func__);
         free(*db);
         return db_error(r);
     }
  
     r = (*db)->db->set_flags((*db)->db, 0);
+
     if (r)
     {
-        gossip_err("TROVE:DBPF:Berkeley DB %s failed to set_flags\n", name);
+        gossip_err("%s: Berkeley DB %s failed to set_flags\n", __func__, name);
         (*db)->db->close((*db)->db, 0);
         free(*db);
         return db_error(r);
     }
     if (compare == DBPF_DB_COMPARE_DS_ATTR)
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: compare ds_attr\n", __func__);
         (*db)->db->set_bt_compare((*db)->db, ds_attr_compare);
     }
     else if (compare == DBPF_DB_COMPARE_KEYVAL)
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: compare keyval\n", __func__);
         (*db)->db->set_bt_compare((*db)->db, keyval_compare);
     }
 
     if (cfg)
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: set cache size\n", __func__);
         (*db)->db->set_cachesize((*db)->db, 0, cfg->db_cache_size_bytes, 1);
     }
 
     if (cfg && strcmp(cfg->db_cache_type, "mmap") == 0)
     {
-        r = (*db)->db->open((*db)->db, NULL, name, NULL, DB_BTREE,
-            (create ? DB_CREATE : 0)|DB_DIRTY_READ|DB_THREAD, 0600);
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: open mmap\n", __func__);
+        r = (*db)->db->open((*db)->db,
+                            NULL,
+                            name,
+                            NULL,
+                            DB_BTREE,
+                            (create ? DB_CREATE : 0) |
+                                    DB_DIRTY_READ | DB_THREAD,
+                            0600);
     }
     else
     {
-        r = (*db)->db->open((*db)->db, NULL, name, NULL, DB_BTREE,
-            (create ? DB_CREATE : 0)|DB_DIRTY_READ|DB_THREAD|DB_NOMMAP, 0600);
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: open nommap\n", __func__);
+        r = (*db)->db->open((*db)->db,
+                            NULL,
+                            name,
+                            NULL,
+                            DB_BTREE,
+                            (create ? DB_CREATE : 0) | DB_DIRTY_READ |
+                                    DB_THREAD | DB_NOMMAP,
+                            0600);
     }
     if (r)
     {
-        gossip_err("TROVE:DBPF:Berkeley DB %s failed to open\n", name);
+        gossip_err("%s: Berkeley DB %s failed to open\n", __func__, name);
         (*db)->db->close((*db)->db, 0);
         free(*db);
         return db_error(r);
     }
-    return 0;
+    return db_error(r);
 }
 
 int dbpf_db_close(struct dbpf_db *db)
@@ -187,20 +222,30 @@ int dbpf_db_sync(struct dbpf_db *db)
     return db_error(db->db->sync(db->db, 0));
 }
 
-int dbpf_db_get(struct dbpf_db *db, struct dbpf_data *key,
-    struct dbpf_data *val)
+int dbpf_db_get(struct dbpf_db *db,
+                struct dbpf_data *key,
+                struct dbpf_data *val)
 {
     DBT db_key, db_data;
-    int r;
+    int r, ret;
+
     db_key.data = key->data;
     db_key.ulen = db_key.size = key->len;
     db_key.flags = DB_DBT_USERMEM;
     db_data.data = val->data;
     db_data.ulen = val->len;
     db_data.flags = DB_DBT_USERMEM;
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling db->db->get\n", __func__);
     r = db->db->get(db->db, NULL, &db_key, &db_data, 0);
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "%s: return from db->db->get r = %d\n", __func__, r);
+
     if (r == DB_BUFFER_SMALL)
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: db->db->get returns DB_BUFFER_SMALL\n", __func__);
+
         db_data.data = malloc(db_data.size);
         if (! db_data.data)
         {
@@ -209,55 +254,83 @@ int dbpf_db_get(struct dbpf_db *db, struct dbpf_data *key,
 
         db_data.ulen = db_data.size;
 
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: retrying db->db->get\n", __func__);
         r = db->db->get(db->db, NULL, &db_key, &db_data, 0);
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: retry return from db->db->get r = %d\n", __func__, r);
 
         if (r == 0 && val)
         {
             memcpy(val->data, db_data.data, val->len);
+            ret = 0;
         }
         free(db_data.data);
+        db_data.data = NULL;
+        goto returning;
     }
     else if (r)
     {
-        return db_error(r);
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: db->db->get returns other error\n", __func__);
     }
+
+returning:
     val->len = db_data.size;
-    return 0;
+    ret = db_error(r);
+    {
+        char emsg[256];
+        PVFS_strerror_r(ret, emsg, 256);
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: returning %d(%s)\n", __func__, ret, emsg);
+    }
+    //return 0;
+    return ret;
 }
 
-int dbpf_db_put(struct dbpf_db *db, struct dbpf_data *key,
-    struct dbpf_data *val)
+int dbpf_db_put(struct dbpf_db *db,
+                struct dbpf_data *key,
+                struct dbpf_data *val)
 {
     DBT db_key, db_data;
+
     db_key.data = key->data;
     db_key.ulen = db_key.size = key->len;
     db_key.flags = DB_DBT_USERMEM;
     db_data.data = val->data;
     db_data.ulen = db_data.size = val->len;
     db_data.flags = DB_DBT_USERMEM;
+
     return db_error(db->db->put(db->db, NULL, &db_key, &db_data, 0));
 }
 
-int dbpf_db_putonce(struct dbpf_db *db, struct dbpf_data *key,
-    struct dbpf_data *val)
+int dbpf_db_putonce(struct dbpf_db *db,
+                    struct dbpf_data *key,
+                    struct dbpf_data *val)
 {
     DBT db_key, db_data;
+
     db_key.data = key->data;
     db_key.ulen = db_key.size = key->len;
     db_key.flags = DB_DBT_USERMEM;
     db_data.data = val->data;
     db_data.ulen = db_data.size = val->len;
     db_data.flags = DB_DBT_USERMEM;
-    return db_error(db->db->put(db->db, NULL, &db_key, &db_data,
-        DB_NOOVERWRITE));
+
+    return db_error(db->db->put(db->db,
+                                NULL,
+                                &db_key,
+                                &db_data,
+                                DB_NOOVERWRITE));
 }
 
 int dbpf_db_del(struct dbpf_db *db, struct dbpf_data *key)
 {
     DBT db_key;
+
     db_key.data = key->data;
     db_key.ulen = db_key.size = key->len;
     db_key.flags = DB_DBT_USERMEM;
+
     return db_error(db->db->del(db->db, NULL, &db_key, 0));
 }
 
@@ -286,11 +359,15 @@ int dbpf_db_cursor_close(struct dbpf_cursor *dbc)
     return db_error(r);
 }
 
-int dbpf_db_cursor_get(struct dbpf_cursor *dbc, struct dbpf_data *key,
-    struct dbpf_data *val, int op, size_t maxkeylen)
+int dbpf_db_cursor_get(struct dbpf_cursor *dbc,
+                       struct dbpf_data *key,
+                       struct dbpf_data *val,
+                       int op,
+                       size_t maxkeylen)
 {
     DBT db_key, db_data;
-    int r, flags=0;
+    int r, flags = 0;
+
     db_key.data = key->data;
     db_key.size = key->len;
     db_key.ulen = maxkeylen;
@@ -298,6 +375,7 @@ int dbpf_db_cursor_get(struct dbpf_cursor *dbc, struct dbpf_data *key,
     db_data.data = val->data;
     db_data.ulen = val->len;
     db_data.flags = DB_DBT_USERMEM;
+
     if (op == DBPF_DB_CURSOR_NEXT)
     {
         flags = DB_NEXT;
@@ -318,7 +396,9 @@ int dbpf_db_cursor_get(struct dbpf_cursor *dbc, struct dbpf_data *key,
     {
         flags = DB_FIRST;
     }
+
     r = dbc->dbc->c_get(dbc->dbc, &db_key, &db_data, flags);
+
     if (r == DB_BUFFER_SMALL)
     {
         db_data.data = malloc(db_data.size);

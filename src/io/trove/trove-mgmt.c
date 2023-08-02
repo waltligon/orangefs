@@ -145,7 +145,7 @@ int trove_finalize(TROVE_method_id method_id)
 
     gen_mutex_unlock(&trove_init_mutex);
 
-    return ((ret < 0) ? ret : 1);
+    return ret;
 }
 
 int trove_storage_create(TROVE_method_id method_id,
@@ -161,7 +161,7 @@ int trove_storage_create(TROVE_method_id method_id,
                                                            user_ptr,
                                                            out_op_id_p);
 
-    return ((ret < 0) ? ret : 1);
+    return ret;
 }
 
 
@@ -178,7 +178,7 @@ int trove_storage_remove(TROVE_method_id method_id,
                                                            user_ptr,
                                                            out_op_id_p);
 
-    return ((ret < 0) ? ret : 1);
+    return ret;
 }
 
 int trove_collection_create(char *collname,
@@ -201,7 +201,7 @@ int trove_collection_create(char *collname,
                                                           user_ptr,
                                                           out_op_id_p);
 
-    return ((ret < 0) ? ret : 1);
+    return ret;
 }
 
 int trove_collection_remove(TROVE_method_id method_id,
@@ -213,7 +213,7 @@ int trove_collection_remove(TROVE_method_id method_id,
                                                               user_ptr,
                                                               out_op_id_p);
 
-    return ((ret < 0) ? ret : 1);
+    return ret;
 }
 
 int trove_collection_lookup(TROVE_method_id method_id,
@@ -227,7 +227,7 @@ int trove_collection_lookup(TROVE_method_id method_id,
                                                               user_ptr,
                                                               out_op_id_p);
 
-    return (ret < 0) ? ret : 1;
+    return ret;
 }
 
 int trove_collection_iterate(TROVE_method_id method_id,
@@ -247,7 +247,7 @@ int trove_collection_iterate(TROVE_method_id method_id,
                                                                user_ptr,
                                                                out_op_id_p);
 
-    return ((ret < 0) ? ret : 1);
+    return ret;
 }
 
 int trove_open_context(TROVE_coll_id coll_id,

@@ -595,9 +595,11 @@ enum dbpf_op_type
 */
 char *dbpf_op_type_to_str(enum dbpf_op_type op_type);
 
+/* This is a mirror of TROVE_ds_state in trove.h
+ */
 enum dbpf_op_state
 {
-    OP_UNITIALIZED = 0,
+    OP_UNINITIALIZED = TROVE_OP_UNINITIALIZED,
     OP_NOT_QUEUED,
     OP_QUEUED,
     OP_IN_SERVICE,
@@ -607,8 +609,15 @@ enum dbpf_op_state
     OP_INTERNALLY_DELAYED
 };
 
-#define DBPF_OP_CONTINUE 0
-#define DBPF_OP_COMPLETE 1
+/* These return codes should be used for functions that are dealing
+ * with async operations - that might not be finished yet.  Always
+ * use these defines in those functions and those that call them.
+ * In case of an error return the error code if there is one or
+ * DBPF_OP_ERROR for a general error.
+ */
+#define DBPF_OP_BUSY         TROVE_OP_BUSY
+#define DBPF_OP_COMPLETE     TROVE_OP_COMPLETE
+#define DBPF_OP_ERROR        TROVE_OP_ERROR
 
 /* Used to store parameters for queued operations */
 struct dbpf_op

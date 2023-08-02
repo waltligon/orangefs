@@ -91,6 +91,18 @@ enum
     TROVE_DIRECTIO_TIMEOUT
 };
 
+/* these are function return codes for functions that deal with async ops
+ */
+#define TROVE_OP_BUSY 0
+#define TROVE_OP_COMPLETE 1
+#define TROVE_OP_ERROR -1
+
+/* This is one value for TROVE_ds_state
+ * The rest are int dbpf.h
+ */
+#define TROVE_OP_UNINITIALIZED 0
+
+
 /** Initializes the Trove layer.  Must be called before any other Trove
  *  functions.
  */

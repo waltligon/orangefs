@@ -1067,6 +1067,9 @@ int job_req_sched_post(enum PVFS_server_op op,
         jd = NULL;
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+                     "%s: failed to post on scheduler id: %ld\n",
+                     __func__, jd->job_id);
         return (1);
     }
 
@@ -1077,12 +1080,18 @@ int job_req_sched_post(enum PVFS_server_op op,
         out_status_p->status_user_tag = status_user_tag;
         *id = jd->job_id;
         /* don't delete the job desc until a matching release comes through */
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+                     "%s: immediate completion on scheduler id: %ld\n",
+                     __func__, jd->job_id);
         return (1);
     }
 
     /* if we hit this point, job did not immediately complete-
      * queue to test later
      */
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+                 "%s: deferred completion on scheduler id: %ld\n",
+                 __func__, jd->job_id);
     *id = jd->job_id;
 
     return (0);
@@ -1237,7 +1246,8 @@ int job_req_sched_release(job_id_t in_completed_id,
     if (!match_jd)
     {
         /* id has been released or was not registered */
-        gossip_err("Error: job_req_sched_release() failed to locate descriptor.\n");
+        gossip_err("Error: %s: failed to locate descriptor: %ld\n",
+                   __func__, in_completed_id);
         out_status_p->error_code = -PVFS_EINVAL;
         out_status_p->status_user_tag = status_user_tag;
         dealloc_job_desc(jd);
@@ -1259,6 +1269,8 @@ int job_req_sched_release(job_id_t in_completed_id,
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = -PVFS_ENOMEM;
+        gossip_err("Error: %s: failed to post id: %ld\n",
+                   __func__, in_completed_id);
         return 1;
     }
 
@@ -1269,12 +1281,18 @@ int job_req_sched_release(job_id_t in_completed_id,
         out_status_p->status_user_tag = status_user_tag;
         dealloc_job_desc(jd);
         jd = NULL;
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "%s: immediate completion on scheduler id: %ld\n",
+                     __func__, in_completed_id);
         return (1);
     }
 
     /* if we hit this point, job did not immediately complete-
      * queue to test later
      */
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "%s: deferred completion on scheduler id: %ld\n",
+                 __func__, in_completed_id);
     *out_id = jd->job_id;
 
     return (0);
@@ -1676,6 +1694,8 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
                           job_context_id context_id,
                           PVFS_hint hints)
 {
+    //gossip_debug(GOSSIP_TROVE_DEBUG, "%s: coll_id %d\n", __func__, coll_id);
+
     /* post a trove keyval read.  If it completes (or fails)
      * immediately, then return and fill in the status structure.
      * If it needs to be tested for completion later, then queue
