@@ -949,18 +949,18 @@ int dbpf_collection_create(char *collname,
 
     /* ensure that the collection record isn't already there */
     /* ===>we did this already in dbpf_collection_lookup<=== */
-    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling dbpf_db_get to ensure "
-                 "collection does not exist\n", __func__);
-    ret = dbpf_db_get(sto_p->coll_db, &key, &data);
+    //gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling dbpf_db_get to ensure "
+    //             "collection does not exist\n", __func__);
+    //ret = dbpf_db_get(sto_p->coll_db, &key, &data);
     //if (ret != TROVE_ENOENT)
-    if (ret != -TROVE_ENOENT)
-    {
-        gossip_debug(GOSSIP_TROVE_DEBUG,
-              "%s: collection %s already exists with coll_id %d, len = %zu.\n",
-              __func__, collname, db_data.coll_id, data.len);
-        //return -ret;
-        return ret;
-    }
+    //if (ret != -TROVE_ENOENT)
+    //{
+    //    gossip_debug(GOSSIP_TROVE_DEBUG,
+    //          "%s: collection %s already exists with coll_id %d, len = %zu.\n",
+    //          __func__, collname, db_data.coll_id, data.len);
+    //    //return -ret;
+    //    return ret;
+    //}
 
     memset(&db_data, 0, sizeof(db_data));
     db_data.coll_id = new_coll_id;
@@ -973,7 +973,7 @@ int dbpf_collection_create(char *collname,
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling dbpf_db_put collection\n",
                  __func__);
     ret = dbpf_db_put(sto_p->coll_db, &key, &data);
-    if (ret)
+    if (ret != DBPF_SUCCESS)
     {
         gossip_err("%s: dbpf_db_put failed:%s\n", __func__, strerror(ret));
         //return -ret;
@@ -983,7 +983,7 @@ int dbpf_collection_create(char *collname,
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling dbpf_db_sync collection\n",
                  __func__);
     ret = dbpf_db_sync(sto_p->coll_db);
-    if (ret)
+    if (ret != DBPF_SUCCESS)
     {
         gossip_err("%s: db_db_sync failed:%s\n", __func__, strerror(ret));
         //return -ret;
@@ -992,18 +992,19 @@ int dbpf_collection_create(char *collname,
 
     DBPF_GET_DATA_DIRNAME(path_name, PATH_MAX, sto_p->data_path);
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: stat data_path\n", __func__);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: stat data_path(%s)\n", __func__, path_name);
     ret = stat(path_name, &dirstat);
-    if (ret < 0 && errno != ENOENT)
+    if (ret < DBPF_SUCCESS && errno != ENOENT)
     {
         gossip_err("%s: stat failed on data directory %s\n",
                    __func__, path_name);
         return -trove_errno_to_trove_error(errno);
     }
-    else if (ret < 0)
+    else if (ret < DBPF_SUCCESS)
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: mkdir data_path (%s)\n", __func__, path_name);
         ret = mkdir(path_name, 0755);
-        if (ret != 0)
+        if (ret != DBPF_SUCCESS)
         {
             gossip_err("%s: mkdir failed on data directory %s\n",
                        __func__, path_name);
@@ -1013,18 +1014,19 @@ int dbpf_collection_create(char *collname,
 
     DBPF_GET_META_DIRNAME(path_name, PATH_MAX, sto_p->meta_path);
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: stat meta_path\n", __func__);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: stat meta_path (%s)\n", __func__, path_name);
     ret = stat(path_name, &dirstat);
-    if (ret < 0 && errno != ENOENT)
+    if (ret < DBPF_SUCCESS && errno != ENOENT)
     {
         gossip_err("%s: stat failed on metadata directory %s\n",
                    __func__, path_name);
         return -trove_errno_to_trove_error(errno);
     }
-    else if (ret < 0)
+    else if (ret < DBPF_SUCCESS)
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: mkdir meta_path (%s)\n", __func__, path_name);
         ret = mkdir(path_name, 0755);
-        if (ret != 0)
+        if (ret != DBPF_SUCCESS)
         {
             gossip_err("%s: mkdir failed on metadata directory %s\n",
                        __func__, path_name);
@@ -1034,18 +1036,19 @@ int dbpf_collection_create(char *collname,
 
     DBPF_GET_CONFIG_DIRNAME(path_name, PATH_MAX, sto_p->config_path);
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: stat config_path\n", __func__);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: stat config_path (%s)\n", __func__, path_name);
     ret = stat(path_name, &dirstat);
-    if (ret < 0 && errno != ENOENT)
+    if (ret < DBPF_SUCCESS && errno != ENOENT)
     {
         gossip_err("%s: stat failed on config directory %s\n",
                    __func__, path_name);
         return -trove_errno_to_trove_error(errno);
     }
-    else if (ret < 0)
+    else if (ret < DBPF_SUCCESS)
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: mkdir config_path (%s)\n", __func__, path_name);
         ret = mkdir(path_name, 0755);
-        if (ret != 0)
+        if (ret != DBPF_SUCCESS)
         {
             gossip_err("%s: mkdir failed on config directory %s\n",
                        __func__, path_name);
@@ -1053,13 +1056,13 @@ int dbpf_collection_create(char *collname,
         }
     }
 
-
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX, sto_p->data_path, new_coll_id);
 
-    gossip_err("%s: mkdir on config directory %s\n", __func__, path_name);
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "%s: mkdir on data directory %s\n", __func__, path_name);
     ret = mkdir(path_name, 0755);
     /* does strcmp make sense here? */
-    if (ret != 0 && strcmp(sto_p->data_path, sto_p->meta_path))
+    if (ret != DBPF_SUCCESS /*&& strcmp(sto_p->data_path, sto_p->meta_path)*/)
     {
         gossip_err("%s: mkdir failed on data collection directory %s\n", 
                    __func__, path_name);
@@ -1068,8 +1071,10 @@ int dbpf_collection_create(char *collname,
 
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX, sto_p->meta_path, new_coll_id);
 
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "%s: mkdir on meta directory %s\n", __func__, path_name);
     ret = mkdir(path_name, 0755);
-    if (ret != 0 && strcmp(sto_p->meta_path, sto_p->data_path))
+    if (ret != DBPF_SUCCESS /*&& strcmp(sto_p->meta_path, sto_p->data_path)*/)
     {
 	gossip_err("%s: mkdir failed on metadata collection directory %s\n",
                    __func__, path_name);
@@ -1078,10 +1083,12 @@ int dbpf_collection_create(char *collname,
 
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX, sto_p->config_path, new_coll_id);
 
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "%s: mkdir on config directory %s\n", __func__, path_name);
     ret = mkdir(path_name, 0755);
-    if (ret != 0 && strcmp(sto_p->config_path, sto_p->meta_path))
+    if (ret != DBPF_SUCCESS /*&& strcmp(sto_p->config_path, sto_p->meta_path)*/)
     {
-	gossip_err("%s: mkdir failed on configuration collection directory %s\n",
+	gossip_err("%s: mkdir failed on config collection directory %s\n",
                    __func__, path_name);
 	return -trove_errno_to_trove_error(errno);
     }
@@ -1092,12 +1099,12 @@ int dbpf_collection_create(char *collname,
                                 new_coll_id);
 
     ret = stat(path_name, &dbstat);
-    if(ret < 0 && errno != ENOENT)
+    if(ret < DBPF_SUCCESS && errno != ENOENT)
     {
         gossip_err("%s: failed to stat db file: %s\n", __func__, path_name);
         return -trove_errno_to_trove_error(errno);
     }
-    if(ret < 0)
+    if(ret < DBPF_SUCCESS)
     {
         /* errno should equal ENOENT */
 	ret = dbpf_db_create(path_name);
@@ -1116,9 +1123,9 @@ int dbpf_collection_create(char *collname,
     }
 
     /*
-       store trove-dbpf version string in the collection.  this is used
-       to know what format the metadata is stored in on disk.
-       */
+     * store trove-dbpf version string in the collection.  this is used
+     * to know what format the metadata is stored in on disk.
+     */
     key.data = TROVE_DBPF_VERSION_KEY;
     key.len = strlen(TROVE_DBPF_VERSION_KEY);
     data.data = TROVE_DBPF_VERSION_VALUE;
@@ -1127,8 +1134,10 @@ int dbpf_collection_create(char *collname,
     ret = dbpf_db_put(db_p, &key, &data);
     if (ret != 0)
     {
-        gossip_err("%s: db_p->put failed writing trove-dbpf version "
-                   "string: %s\n", __func__, strerror(ret));
+        char emsg[256];
+        PVFS_strerror_r(ret, emsg, 256);
+        gossip_err("%s: dbpf_db_put failed writing trove-dbpf version string "
+                   "ret = %d(%s)\n", __func__, ret, emsg);
         //return -ret;
         return ret;
     }
@@ -1168,7 +1177,7 @@ int dbpf_collection_create(char *collname,
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling stat meta_path 1\n", __func__);
     ret = stat(path_name, &dbstat);
-    if(ret < 0 && errno != ENOENT)
+    if(ret < DBPF_SUCCESS && errno != ENOENT)
     {
         gossip_err("%s: failed to stat ds attrib db: %s\n", __func__, path_name);
         return -trove_errno_to_trove_error(errno);
@@ -1177,7 +1186,7 @@ int dbpf_collection_create(char *collname,
     {
         /* errno should equal ENOENT */
         ret = dbpf_db_create(path_name);
-        if (ret != 0)
+        if (ret != DBPF_SUCCESS)
         {
             gossip_err("%s: dbpf_db_create failed on %s\n", __func__, path_name);
             return ret;
@@ -1189,15 +1198,15 @@ int dbpf_collection_create(char *collname,
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling stat meta_path 2\n", __func__);
     ret = stat(path_name, &dbstat);
-    if(ret < 0 && errno != ENOENT)
+    if(ret < DBPF_SUCCESS && errno != ENOENT)
     {
         gossip_err("%s: failed to stat keyval db: %s\n", __func__, path_name);
         return -trove_errno_to_trove_error(errno);
     }
-    if(ret < 0)
+    if(ret < DBPF_SUCCESS)
     {
         ret = dbpf_db_create(path_name);
-        if (ret != 0)
+        if (ret != DBPF_SUCCESS)
         {
             gossip_err("%s: dbpf_db_create failed on %s\n", __func__, path_name);
             return ret;
@@ -1212,7 +1221,7 @@ int dbpf_collection_create(char *collname,
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling mkdir data_path 1\n", __func__);
     ret = mkdir(path_name, 0755);
-    if(ret != 0)
+    if(ret != DBPF_SUCCESS)
     {
         gossip_err("%s: mkdir failed on bstream directory %s\n", __func__, path_name);
         return -trove_errno_to_trove_error(errno);
@@ -1221,7 +1230,7 @@ int dbpf_collection_create(char *collname,
     for(i = 0; i < DBPF_BSTREAM_MAX_NUM_BUCKETS; i++)
     {
         ret = snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
-        if (ret < 0)
+        if (ret < DBPF_SUCCESS)
         {
            gossip_err("%s: snprintf output failure on dir, i:%d:\n",
                       __func__, i);
@@ -1252,7 +1261,7 @@ int dbpf_collection_create(char *collname,
     /* return success */
     gossip_debug(GOSSIP_TROVE_DEBUG,"%s: exiting with error status 0\n", __func__);
     //return 1;
-    return 0;
+    return DBPF_SUCCESS;
 }
 
 int dbpf_collection_remove(char *collname,
@@ -1290,27 +1299,28 @@ int dbpf_collection_remove(char *collname,
     data.len = sizeof(db_data);
 
     ret = dbpf_db_get(sto_p->coll_db, &key, &data);
-    if (ret != 0)
+    if (ret != DBPF_SUCCESS)
     {
         gossip_err("TROVE:DBPF: dbpf_db_get collection\n");
         return -ret;
     }
 
     ret = dbpf_db_del(sto_p->coll_db, &key);
-    if (ret != 0)
+    if (ret != DBPF_SUCCESS)
     {
         gossip_err("TROVE:DBPF: dbpf_db_del");
         return -ret;
     }
 
     ret = dbpf_db_sync(sto_p->coll_db);
-    if (ret != 0)
+    if (ret != DBPF_SUCCESS)
     {
         gossip_err("TROVE:DBPF: dbpf_db_sync");
         return -ret;
     }
 
-    if ((db_collection = dbpf_collection_find_registered(db_data.coll_id)) == NULL) {
+    if ((db_collection = dbpf_collection_find_registered(db_data.coll_id)) == NULL) 
+    {
         ret = -TROVE_ENOENT;
     }
     else {
@@ -1328,7 +1338,7 @@ int dbpf_collection_remove(char *collname,
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
                               sto_p->meta_path, db_data.coll_id);
-    if (unlink(path_name) != 0)
+    if (unlink(path_name) != DBPF_SUCCESS)
     {
         gossip_err("failure removing dataspace attrib db\n");
         ret = -trove_errno_to_trove_error(errno);
@@ -1336,7 +1346,7 @@ int dbpf_collection_remove(char *collname,
 
     DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
                            sto_p->meta_path, db_data.coll_id);
-    if(unlink(path_name) != 0)
+    if(unlink(path_name) != DBPF_SUCCESS)
     {
         gossip_err("failure removing keyval db\n");
         ret = -trove_errno_to_trove_error(errno);
@@ -1344,7 +1354,7 @@ int dbpf_collection_remove(char *collname,
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 sto_p->meta_path, db_data.coll_id);
-    if (unlink(path_name) != 0)
+    if (unlink(path_name) != DBPF_SUCCESS)
     {
         gossip_err("failure removing collection attrib db\n");
         ret = -trove_errno_to_trove_error(errno);
@@ -1424,13 +1434,13 @@ int dbpf_collection_remove(char *collname,
             }
             ret = snprintf(tmp_path, PATH_MAX, "%s/%s", path_name,
                            current_dirent->d_name);
-            if (ret < 0)
+            if (ret == DBPF_SUCCESS)
             {
                gossip_err("%s: snprintf output failure on dir, i:%d:\n",
                           __func__, i);
                return(ret);
             }
-            if(stat(tmp_path, &file_info) < 0)
+            if(stat(tmp_path, &file_info) < DBPF_SUCCESS)
             {
                 gossip_err("error doing stat on bstream entry\n");
                 ret = -trove_errno_to_trove_error(errno);
@@ -1438,7 +1448,7 @@ int dbpf_collection_remove(char *collname,
                 goto collection_remove_failure;
             }
             assert(S_ISREG(file_info.st_mode));
-            if(unlink(tmp_path) != 0)
+            if(unlink(tmp_path) != DBPF_SUCCESS)
             {
                 gossip_err("failure removing bstream entry\n");
                 ret = -trove_errno_to_trove_error(errno);
@@ -1449,7 +1459,7 @@ int dbpf_collection_remove(char *collname,
         closedir(current_dir);
     }
 
-    if(rmdir(path_name) != 0)
+    if(rmdir(path_name) != DBPF_SUCCESS)
     {
         gossip_err("failure removing bstream directory %s\n", 
                    path_name);
@@ -1459,7 +1469,7 @@ int dbpf_collection_remove(char *collname,
 
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,
 			  sto_p->meta_path, db_data.coll_id);
-    if (rmdir(path_name) != 0)
+    if (rmdir(path_name) != DBPF_SUCCESS)
     {
 	gossip_err("failure removing metadata collection directory\n");
 	ret = -trove_errno_to_trove_error(errno);
@@ -1468,7 +1478,7 @@ int dbpf_collection_remove(char *collname,
 
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,
 			  sto_p->config_path, db_data.coll_id);
-    if (rmdir(path_name) != 0)
+    if (rmdir(path_name) != DBPF_SUCCESS)
     {
 	gossip_err("failure removing configuration collection directory\n");
 	ret = -trove_errno_to_trove_error(errno);
@@ -1477,7 +1487,7 @@ int dbpf_collection_remove(char *collname,
 
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,
                           sto_p->data_path, db_data.coll_id);
-    if (rmdir(path_name) != 0)
+    if (rmdir(path_name) != DBPF_SUCCESS)
     {
         gossip_err("failure removing data collection directory\n");
         ret = -trove_errno_to_trove_error(errno);
@@ -1501,7 +1511,7 @@ int dbpf_collection_iterate(TROVE_keyval_s *name_array,
 
     /* get a cursor */
     ret = dbpf_db_cursor(my_storage_p->coll_db, &dbc, 1);
-    if (ret != 0)
+    if (ret != DBPF_SUCCESS)
     {
         //ret = -ret;
         goto return_error;
@@ -1524,7 +1534,7 @@ int dbpf_collection_iterate(TROVE_keyval_s *name_array,
         {
             goto return_ok;
         }
-        else if (ret != 0)
+        else if (ret != DBPF_SUCCESS)
         {
             //ret = -ret;
             goto return_error;
@@ -1536,7 +1546,7 @@ return_ok:
     *inout_count_p = i;
 
     ret = dbpf_db_cursor_close(dbc);
-    if (ret != 0)
+    if (ret != DBPF_SUCCESS)
     {
         //ret = -ret;
         goto return_error;
@@ -1567,47 +1577,58 @@ int dbpf_collection_clear(TROVE_coll_id coll_id)
 
     dbpf_collection_deregister(coll_p);
 
-    if( coll_p == NULL )
+    if (coll_p == NULL)
     {
        gossip_err("%s: Trove collection not defined.\n", __func__);
-       return 0;
+       return DBPF_SUCCESS;
     }
 
-    if ( (coll_p->coll_attr_db != NULL ) &&
-         (ret = dbpf_db_sync(coll_p->coll_attr_db))
-        != 0)
+    if ((coll_p->coll_attr_db != NULL ) &&
+        ((ret = dbpf_db_sync(coll_p->coll_attr_db)) != DBPF_SUCCESS))
     {
-        gossip_err("%s: db_sync(coll_attr_db): %s\n", strerror(ret), __func__);
+        char emsg[256];
+        PVFS_strerror_r(ret, emsg, 256);
+        gossip_err("%s: db_sync(coll_attr_db): %d(%s)\n", __func__, ret, emsg);
     }
 
-    if ( (coll_p->coll_attr_db != NULL ) &&
-         (ret = dbpf_db_close(coll_p->coll_attr_db)) != 0) 
+    if ((coll_p->coll_attr_db != NULL ) &&
+        ((ret = dbpf_db_close(coll_p->coll_attr_db)) != DBPF_SUCCESS))
     {
-        gossip_lerr("%s: db_close(coll_attr_db): %s\n", strerror(ret), __func__);
+        char emsg[256];
+        PVFS_strerror_r(ret, emsg, 256);
+        gossip_err("%s: db_close(coll_attr_db): %d(%s)\n", __func__, ret, emsg);
     }
 
-    if ( (coll_p->ds_db != NULL ) &&
-         (ret = dbpf_db_sync(coll_p->ds_db)) != 0)
+    if ((coll_p->ds_db != NULL ) &&
+        ((ret = dbpf_db_sync(coll_p->ds_db)) != DBPF_SUCCESS))
     {
-        gossip_err("%s: db_sync(coll_ds_db): %s\n", strerror(ret), __func__);
+        char emsg[256];
+        PVFS_strerror_r(ret, emsg, 256);
+        gossip_err("%s: db_sync(coll_ds_db): %d(%s)\n", __func__, ret, emsg);
     }
 
-    if ( (coll_p->ds_db != NULL ) &&
-         (ret = dbpf_db_close(coll_p->ds_db)) != 0) 
+    if ((coll_p->ds_db != NULL ) &&
+        ((ret = dbpf_db_close(coll_p->ds_db)) != DBPF_SUCCESS))
     {
-        gossip_lerr("%s: db_close(coll_ds_db): %s\n", strerror(ret), __func__);
+        char emsg[256];
+        PVFS_strerror_r(ret, emsg, 256);
+        gossip_err("%s: db_close(coll_ds_db): %d(%s)\n", __func__, ret, emsg);
     }
 
-    if ( (coll_p->keyval_db != NULL ) &&
-         (ret = dbpf_db_sync(coll_p->keyval_db)) != 0)
+    if ((coll_p->keyval_db != NULL ) &&
+        ((ret = dbpf_db_sync(coll_p->keyval_db)) != DBPF_SUCCESS))
     {
-        gossip_err("%s: db_sync(coll_keyval_db): %s\n", strerror(ret), __func__);
+        char emsg[256];
+        PVFS_strerror_r(ret, emsg, 256);
+        gossip_err("%s: db_sync(coll_keyval_db): %d(%s)\n", __func__, ret, emsg);
     }
 
-    if ( (coll_p->keyval_db != NULL ) &&
-         (ret = dbpf_db_close(coll_p->keyval_db)) != 0) 
+    if ((coll_p->keyval_db != NULL ) &&
+        ((ret = dbpf_db_close(coll_p->keyval_db)) != DBPF_SUCCESS))
     {
-        gossip_lerr("%s: db_close(coll_keyval_db): %s\n", strerror(ret), __func__);
+        char emsg[256];
+        PVFS_strerror_r(ret, emsg, 256);
+        gossip_err("%s: db_close(coll_keyval_db): %d(%s)\n", __func__, ret, emsg);
     }
 
     free(coll_p->name);
@@ -1616,7 +1637,7 @@ int dbpf_collection_clear(TROVE_coll_id coll_id)
     PINT_dbpf_keyval_pcache_finalize(coll_p->pcache);
 
     free(coll_p);
-    return 0;
+    return DBPF_SUCCESS;
 }
 
 static int dbpf_direct_collection_lookup(char *collname,
@@ -1674,7 +1695,7 @@ int dbpf_collection_lookup(char *collname,
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling dbpf_db_get\n", __func__);
 
     ret = dbpf_db_get(my_storage_p->coll_db, &key, &data);
-    if (ret != 0)
+    if (ret != DBPF_SUCCESS)
     {
         if (ret != TROVE_ENOENT)
         {
@@ -1703,7 +1724,7 @@ int dbpf_collection_lookup(char *collname,
                      __func__);
         *out_coll_id_p = coll_p->coll_id;
         //return 1;
-        return -1;
+        return DBPF_OP_ERROR;
     }
 
     /*
@@ -1937,7 +1958,7 @@ int dbpf_collection_lookup(char *collname,
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: returning success\n", __func__);
     //return 1;
-    return 0;
+    return DBPF_SUCCESS;
 }
 
 /* dbpf_storage_lookup()
