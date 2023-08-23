@@ -28,9 +28,7 @@
 
 #include "client-service.h"
 #include "fs.h"
-#include "cert.h"
 #include "user-cache.h"
-/* #include "ldap-support.h" */
 #include "cred.h"
 #include "io-cache.h"
 
@@ -521,7 +519,7 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
     {
         /* not all operations have a requestor */
         client_debug("   get_requestor_credential: no requestor\n");
-
+#if 0
         if (goptions->user_mode == USER_MODE_SERVER)
         {
             /* this will cause the code below to use the certificate for the
@@ -530,13 +528,17 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
         }
         else
         {
+#endif
+
             ret = get_system_credential(credential);
             if (ret != 0)
             {
                 report_error("Error: no system credential", ret);
             }
             return (ret == 0) ? 0 : -ERROR_ACCESS_DENIED;
+#if 0
         }
+#endif
     }
 
     client_debug("   get_requestor_credential: requestor: %s\n", user_name);
@@ -559,6 +561,8 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
                 ret = -ERROR_USER_PROFILE_LOAD;
             }
         }
+/* TODO: remove completely */
+#if 0
         else if (goptions->user_mode == USER_MODE_CERT)
         {
             /* load credential from certificate */
@@ -573,7 +577,7 @@ static int get_requestor_credential(PDOKAN_FILE_INFO file_info,
             /* TODO - key mode */
             ret = get_user_cert_credential(htoken, user_name, credential, &expires);
         }
-
+#endif
         /* cache user if credential created */
         if (ret == 0)
         {
@@ -613,15 +617,8 @@ static int get_credential(PDOKAN_FILE_INFO file_info,
             /* if cache hit -- return credential */
             entry = qhash_entry(item, struct context_entry, hash_link);
             PINT_copy_credential(&(entry->credential), credential);
-            if (goptions->user_mode != USER_MODE_SERVER)
-            {
-                client_debug("   get_credential:  found (%d:%d)\n", 
-                    credential->userid, credential->group_array[0]);
-            }
-            else
-            {
-                client_debug("   get_credential:  found\n");
-            }
+            client_debug("   get_credential:  found (%d:%d)\n", 
+                credential->userid, credential->group_array[0]);
         }
         else
         {
@@ -636,15 +633,8 @@ static int get_credential(PDOKAN_FILE_INFO file_info,
         ret = get_requestor_credential(file_info, credential);
         if (ret == 0)
         {
-            if (goptions->user_mode != USER_MODE_SERVER)
-            {
-                client_debug("   get_credential:  requestor credential (%d:%d)\n", 
-                    credential->userid, credential->group_array[0]);
-            }
-            else
-            {
-                client_debug("   get_credential:  requestor credential OK\n");
-            }
+            client_debug("   get_credential:  requestor credential (%d:%d)\n", 
+                credential->userid, credential->group_array[0]);
         }
     }
 
@@ -724,38 +714,23 @@ static int check_perm(PVFS_sys_attr *attr, PVFS_credential *credential, int perm
 {
     int mask;
 
-    if (goptions->user_mode != USER_MODE_SERVER)
-    {
-        /* root user (uid 0 or gid 0) always has rights */
-        if (credential->userid == 0 || credential_in_group(credential, 0))
-            return 1;
+    /* root user (uid 0 or gid 0) always has rights */
+    if (credential->userid == 0 || credential_in_group(credential, 0))
+        return 1;
     
-        if (attr->owner == credential->userid)
-            /* use owner mask */
-            mask = (attr->perms >> 6) & 7;
-        else if (credential_in_group(credential, attr->group))
-            /* use group mask */
-            mask = (attr->perms >> 3) & 7;
-        else
-            /* use other mask */
-            mask = attr->perms & 7;
-
-        if (mask & perm)
-        {
-            return 1;
-        }
-    }
+    if (attr->owner == credential->userid)
+        /* use owner mask */
+        mask = (attr->perms >> 6) & 7;
+    else if (credential_in_group(credential, attr->group))
+        /* use group mask */
+        mask = (attr->perms >> 3) & 7;
     else
+        /* use other mask */
+        mask = attr->perms & 7;
+
+    if (mask & perm)
     {
-        /* in server-side user mode, user is listed as having permission if 
-           any users have permission; server will handle insufficent perms. 
-           FUTURE: request rights mask from server (need new server request)
-         */        
-        if (((attr->perms & 7) & perm) || (((attr->perms >> 3) & 7) & perm) ||
-            (((attr->perms >> 6) & 7) & perm))
-        {
-            return 1;
-        }    
+        return 1;
     }
 
     return 0;
@@ -1189,104 +1164,6 @@ PVFS_Dokan_create_file(
 
     return err;
 }
-
-
-/* Not used for Dokany */
-#if 0
-static NTSTATUS DOKAN_CALLBACK
-PVFS_Dokan_create_directory(
-    LPCWSTR          FileName,
-    PDOKAN_FILE_INFO DokanFileInfo)
-{
-    char *fs_path;
-    int ret, err;
-    PVFS_handle handle;
-    PVFS_credential credential;
-
-    client_debug("CreateDirectory: %S\n", FileName);
-
-    DokanFileInfo->Context = 0;
-
-    /* load credential (of requestor) */
-    err = get_credential(DokanFileInfo, &credential);
-    CRED_CHECK("CreateDirectory", err);
-
-    /* get file system path */
-    fs_path = get_fs_path(FileName);
-    if (fs_path == NULL)
-        return -1;
-
-    ret = fs_mkdir(fs_path, &credential, &handle, goptions->new_dir_perms);
-
-    client_debug("   fs_mkdir returns: %d\n", ret);
-
-    err = error_map(ret);
-    if (err == ERROR_SUCCESS)
-    {
-        DokanFileInfo->IsDirectory = TRUE;
-        DokanFileInfo->Context = gen_context();
-        add_context(DokanFileInfo, 0, &credential);
-    }
-
-    free(fs_path);
-    PINT_cleanup_credential(&credential);
-
-    client_debug("CreateDirectory exit: %d (%d)\n", err, ret);
-
-    return err;
-}
-
-
-static NTSTATUS DOKAN_CALLBACK
-PVFS_Dokan_open_directory(
-    LPCWSTR          FileName,
-    PDOKAN_FILE_INFO DokanFileInfo)
-{
-    char *fs_path;
-    int ret, err;
-    PVFS_sys_attr attr;
-    PVFS_credential credential;
-
-    client_debug("OpenDirectory: %S\n", FileName);
-
-    DokanFileInfo->Context = 0;
-
-    /* load credential (of requestor) */
-    err = get_credential(DokanFileInfo, &credential);
-    CRED_CHECK("OpenDirectory", err);
-
-    /* get file system path */
-    fs_path = get_fs_path(FileName);
-    if (fs_path == NULL)
-        return -1;
-
-    /* verify file is a directory */
-    ret = fs_getattr(fs_path, &credential, &attr);
-    client_debug("   fs_getattr returns: %d\n", ret);
-    if (ret == 0)
-    {
-        if (!(attr.objtype & PVFS_TYPE_DIRECTORY))
-        {
-            ret = -PVFS_ENOTDIR;
-        }
-    }
-
-    err = error_map(ret);
-    if (err == ERROR_SUCCESS)
-    {
-        DokanFileInfo->IsDirectory = TRUE;
-        DokanFileInfo->Context = gen_context();
-        add_context(DokanFileInfo, 0, &credential);
-    }
-
-    free(fs_path);
-    PINT_cleanup_credential(&credential);
-
-    client_debug("OpenDirectory exit: %d (%d)\n", err, ret);
-    
-    return err;
-}
-#endif
 
 
 static NTSTATUS DOKAN_CALLBACK
