@@ -103,7 +103,9 @@ int dbpf_collection_getinfo(TROVE_coll_id coll_id,
     {
         return ret;
     }
+
     coll_p = dbpf_collection_find_registered(coll_id);
+
     if (coll_p == NULL)
     {
         return ret;
@@ -159,7 +161,6 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
     int ret = -TROVE_EINVAL;
     struct dbpf_collection* coll;
     coll = dbpf_collection_find_registered(coll_id);
-
 
     switch(option)
     {
@@ -316,6 +317,7 @@ int dbpf_collection_seteattr(TROVE_coll_id coll_id,
         gossip_debug(GOSSIP_TROVE_DEBUG, "%s: my_storage_p is NULL\n", __func__);
         return ret;
     }
+
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
@@ -365,6 +367,7 @@ int dbpf_collection_geteattr(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
+
     coll_p = dbpf_collection_find_registered(coll_id);
     if (!coll_p)
     {
@@ -407,6 +410,7 @@ int dbpf_collection_deleattr(TROVE_coll_id coll_id,
     {
         return ret;
     }
+
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
@@ -560,10 +564,12 @@ static int dbpf_initialize(char *data_path,
     }
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling dbpf_storage_lookup\n", __func__);
+
     sto_p = dbpf_storage_lookup(data_path, meta_path, config_path, &ret, flags);
     if (sto_p == NULL)
     {
         char emsg[256];
+
         PVFS_strerror_r(ret, emsg, 256);
         gossip_debug(GOSSIP_TROVE_DEBUG, "%s: dbpf_storage_lookup error ret:%d(%s)\n",
                      __func__, ret, emsg);
@@ -895,7 +901,7 @@ int dbpf_storage_remove(char *data_path,
 #endif
     }
 
-    if (ret < 0)
+    if (ret < DBPF_SUCCESS)
     {
         return ret;
     }
@@ -904,7 +910,7 @@ int dbpf_storage_remove(char *data_path,
                  "All databases for storage space removed.\n");
 
     //return 1;
-    return 0;
+    return DBPF_SUCCESS;
 
 storage_remove_failure:
     return ret;
@@ -1336,32 +1342,44 @@ int dbpf_collection_remove(char *collname,
         free(db_collection);
     }
 
-    DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
-                              sto_p->meta_path, db_data.coll_id);
+    DBPF_GET_DS_ATTRIB_DBNAME(path_name,
+                              PATH_MAX,
+                              sto_p->meta_path,
+                              db_data.coll_id);
+
     if (unlink(path_name) != DBPF_SUCCESS)
     {
         gossip_err("failure removing dataspace attrib db\n");
         ret = -trove_errno_to_trove_error(errno);
     }
 
-    DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
-                           sto_p->meta_path, db_data.coll_id);
+    DBPF_GET_KEYVAL_DBNAME(path_name,
+                           PATH_MAX,
+                           sto_p->meta_path,
+                           db_data.coll_id);
+
     if(unlink(path_name) != DBPF_SUCCESS)
     {
         gossip_err("failure removing keyval db\n");
         ret = -trove_errno_to_trove_error(errno);
     }
 
-    DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
-                                sto_p->meta_path, db_data.coll_id);
+    DBPF_GET_COLL_ATTRIB_DBNAME(path_name,
+                                PATH_MAX,
+                                sto_p->meta_path,
+                                db_data.coll_id);
+
     if (unlink(path_name) != DBPF_SUCCESS)
     {
         gossip_err("failure removing collection attrib db\n");
         ret = -trove_errno_to_trove_error(errno);
     }
 
-    DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX,
-                             sto_p->data_path, db_data.coll_id);
+    DBPF_GET_BSTREAM_DIRNAME(path_name,
+                             PATH_MAX,
+                             sto_p->data_path,
+                             db_data.coll_id);
+
     for(i = 0; i < DBPF_BSTREAM_MAX_NUM_BUCKETS; i++)
     {
         ret = snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
@@ -1418,8 +1436,10 @@ int dbpf_collection_remove(char *collname,
         ret = -trove_errno_to_trove_error(errno);
     }
 
-    DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name, PATH_MAX,
-                                      sto_p->data_path, db_data.coll_id);
+    DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name,
+                                      PATH_MAX,
+                                      sto_p->data_path,
+                                      db_data.coll_id);
 
     /* remove stranded bstreams directory */
     current_dir = opendir(path_name);
@@ -1432,14 +1452,20 @@ int dbpf_collection_remove(char *collname,
             {
                 continue;
             }
-            ret = snprintf(tmp_path, PATH_MAX, "%s/%s", path_name,
+
+            ret = snprintf(tmp_path,
+                           PATH_MAX,
+                           "%s/%s",
+                           path_name,
                            current_dirent->d_name);
+
             if (ret == DBPF_SUCCESS)
             {
                gossip_err("%s: snprintf output failure on dir, i:%d:\n",
                           __func__, i);
                return(ret);
             }
+
             if(stat(tmp_path, &file_info) < DBPF_SUCCESS)
             {
                 gossip_err("error doing stat on bstream entry\n");
@@ -1447,6 +1473,7 @@ int dbpf_collection_remove(char *collname,
                 closedir(current_dir);
                 goto collection_remove_failure;
             }
+
             assert(S_ISREG(file_info.st_mode));
             if(unlink(tmp_path) != DBPF_SUCCESS)
             {
@@ -1463,33 +1490,46 @@ int dbpf_collection_remove(char *collname,
     {
         gossip_err("failure removing bstream directory %s\n", 
                    path_name);
+
         ret = -trove_errno_to_trove_error(errno);
         goto collection_remove_failure;
     }
 
-    DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,
-			  sto_p->meta_path, db_data.coll_id);
+    DBPF_GET_COLL_DIRNAME(path_name,
+                          PATH_MAX,
+			  sto_p->meta_path,
+                          db_data.coll_id);
+
     if (rmdir(path_name) != DBPF_SUCCESS)
     {
 	gossip_err("failure removing metadata collection directory\n");
+
 	ret = -trove_errno_to_trove_error(errno);
 	goto collection_remove_failure;
     }
 
-    DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,
-			  sto_p->config_path, db_data.coll_id);
+    DBPF_GET_COLL_DIRNAME(path_name,
+                          PATH_MAX,
+			  sto_p->config_path,
+                          db_data.coll_id);
+
     if (rmdir(path_name) != DBPF_SUCCESS)
     {
 	gossip_err("failure removing configuration collection directory\n");
+
 	ret = -trove_errno_to_trove_error(errno);
 	goto collection_remove_failure;
     }
 
-    DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,
-                          sto_p->data_path, db_data.coll_id);
+    DBPF_GET_COLL_DIRNAME(path_name,
+                          PATH_MAX,
+                          sto_p->data_path,
+                          db_data.coll_id);
+
     if (rmdir(path_name) != DBPF_SUCCESS)
     {
         gossip_err("failure removing data collection directory\n");
+
         ret = -trove_errno_to_trove_error(errno);
     }
 collection_remove_failure:
@@ -1543,9 +1583,10 @@ int dbpf_collection_iterate(TROVE_keyval_s *name_array,
     }
 
 return_ok:
-    *inout_count_p = i;
 
+    *inout_count_p = i;
     ret = dbpf_db_cursor_close(dbc);
+
     if (ret != DBPF_SUCCESS)
     {
         //ret = -ret;
@@ -1556,11 +1597,11 @@ return_ok:
 
 return_error:
 
+    *inout_count_p = i;
     dbpf_db_cursor_close(dbc);
 
     gossip_lerr("dbpf_collection_iterate_op_svc: %s\n", strerror(ret));
 
-    *inout_count_p = i;
     return ret;
 }
 
@@ -1695,6 +1736,7 @@ int dbpf_collection_lookup(char *collname,
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling dbpf_db_get\n", __func__);
 
     ret = dbpf_db_get(my_storage_p->coll_db, &key, &data);
+
     if (ret != DBPF_SUCCESS)
     {
         if (ret != TROVE_ENOENT)
@@ -1713,10 +1755,12 @@ int dbpf_collection_lookup(char *collname,
     }
 
     /*
-       look to see if we have already registered this collection; if
-       so, return
-       */
+     * Look to see if we have already registered this collection; if so, return
+     */
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "%s: dbpf_collection_find_registered\n", __func__);
     coll_p = dbpf_collection_find_registered(db_data.coll_id);
+
     if (coll_p != NULL)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG,
@@ -1728,12 +1772,13 @@ int dbpf_collection_lookup(char *collname,
     }
 
     /*
-       this collection hasn't been registered already (ie. looked up
-       before)
-       */
+     * This collection hasn't been registered already (ie. looked up before)
+     */
     coll_p = (struct dbpf_collection *)malloc(sizeof(struct dbpf_collection));
     if (coll_p == NULL)
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: Out of memory error 1\n",
+                     __func__);
         return -TROVE_ENOMEM;
     }
     memset(coll_p, 0, sizeof(struct dbpf_collection));
@@ -1746,8 +1791,11 @@ int dbpf_collection_lookup(char *collname,
     if (!coll_p->name)
     {
         free(coll_p);
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: Out of memory error 2\n",
+                     __func__);
         return -TROVE_ENOMEM;
     }
+
     /* Path to data collection dir */
     snprintf(path_name, PATH_MAX, "/%s/%08x/", my_storage_p->data_path, coll_p->coll_id);
     coll_p->data_path = strdup(path_name);
@@ -1755,6 +1803,8 @@ int dbpf_collection_lookup(char *collname,
     {
         free(coll_p->name);
         free(coll_p);
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: Out of memory error 3\n",
+                     __func__);
         return -TROVE_ENOMEM;
     }
 
@@ -1765,6 +1815,8 @@ int dbpf_collection_lookup(char *collname,
 	free(coll_p->data_path);
 	free(coll_p->name);
 	free(coll_p);
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: Out of memory error 4\n",
+                     __func__);
 	return -TROVE_ENOMEM;
     }
 
@@ -1776,6 +1828,8 @@ int dbpf_collection_lookup(char *collname,
 	free(coll_p->meta_path);
 	free(coll_p->name);
 	free(coll_p);
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: Out of memory error 5\n",
+                     __func__);
 	return -TROVE_ENOMEM;
     }
 
@@ -1788,7 +1842,8 @@ int dbpf_collection_lookup(char *collname,
                  "%s: calling dbpf_db_open on %s\n", __func__, path_name);
 
     ret = dbpf_db_open(path_name, 0, &coll_p->coll_attr_db, 0, server_cfg);
-    if (ret)
+
+    if (ret != DBPF_SUCCESS)
     {
         gossip_err("%s: error from dbpf_db_open\n", __func__);
         free(coll_p->meta_path);
@@ -1807,8 +1862,10 @@ int dbpf_collection_lookup(char *collname,
 
     gossip_debug(GOSSIP_TROVE_DEBUG,
                  "%s: calling dbpf_db_get of dbpf version\n", __func__);
+
     ret = dbpf_db_get(coll_p->coll_attr_db, &key, &data);
-    if (ret)
+
+    if (ret != DBPF_SUCCESS)
     {
         gossip_err("%s: Failed to retrieve collection version: %s\n",
                    __func__, strerror(ret));
@@ -1890,7 +1947,8 @@ int dbpf_collection_lookup(char *collname,
                        &coll_p->ds_db,
                        0,
                        server_cfg);
-    if (ret)
+
+    if (ret != DBPF_SUCCESS)
     {
         gossip_err("%s: error from dbpf_db_open\n", __func__);
         dbpf_db_close(coll_p->coll_attr_db);
@@ -1909,12 +1967,14 @@ int dbpf_collection_lookup(char *collname,
 
     gossip_debug(GOSSIP_TROVE_DEBUG,
                  "%s: calling dbpf_db_open on %s\n", __func__, path_name);
+
     ret = dbpf_db_open(path_name,
                        DBPF_DB_COMPARE_KEYVAL,
                        &coll_p->keyval_db,
                        0,
                        server_cfg);
-    if (ret)
+
+    if (ret != DBPF_SUCCESS)
     {
         gossip_err("%s: error from dbpf_db_open\n", __func__);
         dbpf_db_close(coll_p->coll_attr_db);
@@ -1928,6 +1988,7 @@ int dbpf_collection_lookup(char *collname,
     }
 
     coll_p->pcache = PINT_dbpf_keyval_pcache_initialize();
+
     if(!coll_p->pcache)
     {
         gossip_err("%s: error from dbpf_keyvak_pcache_init\n", __func__);
@@ -1951,9 +2012,13 @@ int dbpf_collection_lookup(char *collname,
     coll_p->c_low_watermark = 1;
     coll_p->meta_sync_enabled = 1; /* MUST be 1 !*/
 
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: dbpf_collection_register\n",
+                 __func__);
     dbpf_collection_register(coll_p);
     *out_coll_id_p = coll_p->coll_id;
 
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: clear_stranded_bstreams\n",
+                 __func__);
     clear_stranded_bstreams(coll_p->coll_id);
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: returning success\n", __func__);

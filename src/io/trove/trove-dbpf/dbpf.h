@@ -609,6 +609,18 @@ enum dbpf_op_state
     OP_INTERNALLY_DELAYED
 };
 
+/* These return codes are for normal function that return SUCCESS or
+ * a PVFS_error
+ */
+#define DBPF_SUCCESS         TROVE_SUCCESS
+#define DBPF_ERROR           TROVE_ERROR  
+
+/* These return codes are for comparison functions
+ */
+#define DBPF_EQ              TROVE_EQ
+#define DBPF_LT              TROVE_LT
+#define DBPF_GT              TROVE_GT
+
 /* These return codes should be used for functions that are dealing
  * with async operations - that might not be finished yet.  Always
  * use these defines in those functions and those that call them.

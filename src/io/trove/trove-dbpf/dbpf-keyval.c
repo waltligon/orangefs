@@ -1272,7 +1272,8 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_keyval_write_list\n)");
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "%s: Writing data to keyval DB\n", __func__);
                          
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
@@ -1305,6 +1306,18 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
     return ret;
 }
 
+/*****************************************************
+ * dbpf_data
+ * key
+ * .data
+ * |
+ * v
+ * dbpf_keyval_db_entry
+ * key_entry
+ * .handle (copied from op_p)   .type   .key
+ * 
+ */
+
 static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL;
@@ -1314,21 +1327,38 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
     /* used only in adding to dbpr attr cache */
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
     int k;
-    char tmpdata[PVFS_NAME_MAX];
+    char tmpdata[PVFS_NAME_MAX]; /* WHY PVFS_NAME_MAX ??? */
 
-    key_entry.handle = op_p->handle;
-    if (op_p->flags & TROVE_KEYVAL_DIRECTORY_ENTRY)
-    {
-        key_entry.type = DBPF_DIRECTORY_ENTRY_TYPE;
-    }
-    else
-    {
-        key_entry.type = DBPF_ATTRIBUTE_TYPE;
-    }
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: writing list to handle %s\n",
+                 __func__, PVFS_OID_str(&op_p->handle));
 
     /* read each key to see if it is present */
     for (k = 0; k < op_p->u.k_write_list.count; k++)
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: check key %d\n", __func__, k);
+
+    /* >>>> */
+    memset(&key_entry, 0, sizeof(key_entry));
+    memset(&tmpdata, 0, sizeof(tmpdata));
+
+    key_entry.handle = op_p->handle; /* copies the actual handle */
+    if (op_p->flags & TROVE_KEYVAL_DIRECTORY_ENTRY)
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: setting key_entry.type to dirent\n", __func__);
+        key_entry.type = DBPF_DIRECTORY_ENTRY_TYPE;
+    }
+    else
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: setting key_entry.type to attribute\n", __func__);
+        key_entry.type = DBPF_ATTRIBUTE_TYPE;
+    }
+    /* >>>> */
+
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: copying key_entry.key of %d chars\n", __func__,
+                     op_p->u.k_write_list.key_array[k].buffer_sz);
         memcpy(key_entry.key,
                op_p->u.k_write_list.key_array[k].buffer,
                op_p->u.k_write_list.key_array[k].buffer_sz);
@@ -1337,36 +1367,79 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         memset(&data, 0, sizeof(data));
         key.data = &key_entry;
         key.len = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
-            op_p->u.k_write_list.key_array[k].buffer_sz);
+                  op_p->u.k_write_list.key_array[k].buffer_sz);
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: setting key.len to %lu chars\n", __func__, key.len);
 
         data.data = tmpdata;
         data.len = PVFS_NAME_MAX;
 
-        ret = dbpf_db_get(op_p->coll_p->keyval_db, &key, &data);
+        if(!(op_p->flags & TROVE_BINARY_KEY))
+        {
+            struct dbpf_keyval_db_entry *tmp_entry = key.data;
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "%s: keyval_db->get(handle= %s, key= %s (%d)) "
+                         "size= %zu\n", __func__,
+                         PVFS_OID_str(&tmp_entry->handle), 
+                         tmp_entry->key,
+                         op_p->u.k_write_list.key_array[k].buffer_sz,
+                         key.len);
+#if 0
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "%s: keyval_db->get(handle= %s, key= %*s (%d)) "
+                         "size=%zu\n", __func__,
+                         PVFS_OID_str(&key_entry.handle), 
+                         op_p->u.k_write_list.key_array[k].buffer_sz,
+                         key_entry.key,
+                         op_p->u.k_write_list.key_array[k].buffer_sz,
+                         key.len);
+#endif
+        }
 
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: Reading key to check for pre-existing - "
+                     "should fail\n", __func__);
+        ret = dbpf_db_get(op_p->coll_p->keyval_db, &key, &data);
+        {
+            struct dbpf_keyval_db_entry *tmp_entry = key.data;
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "%s: keyval_db->get(handle= %s, key= %s (%d)) "
+                         "size= %zu\n", __func__,
+                         PVFS_OID_str(&tmp_entry->handle), 
+                         tmp_entry->key,
+                         op_p->u.k_write_list.key_array[k].buffer_sz,
+                         key.len);
+        }
         /* Do not worry about the case where the key is there but the data
          * is simply too big for the temporary data buffer used
          */
-        if (ret != 0)
+        if (ret != TROVE_SUCCESS)
         {
-            if(ret == TROVE_ENOENT && ((op_p->flags & TROVE_NOOVERWRITE) ||
+            if(ret == -TROVE_ENOENT && ((op_p->flags & TROVE_NOOVERWRITE) ||
                                       (!(op_p->flags & TROVE_ONLYOVERWRITE))))
             {
                 /* this means key is not in DB, which is what we
                  * want for the no-overwrite case - so go to the next key
                  */
+                gossip_debug(GOSSIP_TROVE_DEBUG,
+                             "%s: dbpf_db_get did not find key\n", __func__);
                 continue;
             }
 
-            gossip_err("%s: keyval dbpf_db_get\n", __func__);
+            gossip_err("%s: ERROR: keyval dbpf_db_get\n", __func__);
             //ret = -ret;
             goto return_error;
         }
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: dbpf_db_get found key pre-existing\n", __func__);
     }
 
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "%s: Writing records\n", __func__);
     /* write reccords */
     for (k = 0; k < op_p->u.k_write_list.count; k++)
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: write key %d\n", __func__, k);
         memcpy(key_entry.key,
                op_p->u.k_write_list.key_array[k].buffer,
                op_p->u.k_write_list.key_array[k].buffer_sz);
@@ -1398,10 +1471,13 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
                          key.len);
         }
 
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: Writing key/data\n", __func__);
         ret = dbpf_db_put(op_p->coll_p->keyval_db, &key, &data);
-        if (ret != 0)
+        if (ret != TROVE_SUCCESS)
         {
-            gossip_err("TROVE:DBPF: dbpf_db_put keyval write list (ret %d)\n", ret);
+            gossip_err("%s:ERROR: dbpf_db_put returns error (ret %d)\n",
+                       __func__, ret);
             //ret = -ret;
             goto return_error;
         }
@@ -1409,7 +1485,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         if(!(op_p->flags & TROVE_BINARY_KEY))
         {
             gossip_debug(GOSSIP_TROVE_DEBUG,
-                         "*** Trove KeyVal Write of %s\n",
+                         "%s: *** Trove KeyVal Write of %s\n", __func__,
                          (char *)op_p->u.k_write_list.key_array[k].buffer);
         }
 
@@ -1424,6 +1500,8 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
             }
         }
 
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: Updating key/data cache\n", __func__);
         /*
          * now that the data is written to disk, update the cache if it's
          * an attr keyval we manage.
@@ -1465,6 +1543,8 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
                     PINT_PERF_SUB);
 
 return_error:
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "%s: returning %d\n", __func__, ret);
     return ret;
 }
 

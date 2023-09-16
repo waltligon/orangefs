@@ -69,10 +69,17 @@ typedef TROVE_method_id (*TROVE_method_callback)(TROVE_coll_id);
 #define trove_ds_attr_to_stored PVFS_ds_attr_to_stored
 #define trove_ds_stored_to_attr PVFS_ds_stored_to_attr
 
-/* This is not an error code, it is a non-error code,
+/* These are not error codes, they are  non-error codes,
  * add no bits
  */
 #define TROVE_SUCCESS         PVFS_SUCCESS
+#define TROVE_ERROR           PVFS_ERROR
+
+/* These return codes are for comparison functions
+ */
+#define TROVE_EQ              0
+#define TROVE_LT              -1
+#define TROVE_GT              1
 
 /* mappings from PVFS errors to TROVE errors */
 #define TROVE_EPERM           (PVFS_EPERM | PVFS_ERROR_TROVE)

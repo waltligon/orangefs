@@ -200,24 +200,28 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
         PVFS_OID_gen(&new_handle);
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "new_handle is %s\n ",
-                 PVFS_OID_str(&new_handle));
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: new_handle is %s\n",
+                 __func__, PVFS_OID_str(&new_handle));
     /*
-      if we got a zero handle, we're either completely out of handles
-      -- or else something terrible has happened
-    */
+     * if we got a zero handle, we're either completely out of handles
+     * -- or else something terrible has happened
+     */
     if (!PVFS_OID_cmp(&new_handle, &TROVE_HANDLE_NULL))
     {
-        gossip_err("Error: handle allocator returned a zero handle.\n");
+        gossip_err("%s: Error: handle allocator returned a zero handle.\n",
+                   __func__);
         return(-TROVE_ENOSPC);
     }
 
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: creating dspace\n", __func__);
     ret = dbpf_dspace_create_store_handle(op_p->coll_p,
                                           op_p->u.d_create.type,
                                           new_handle);
     if(ret < 0)
     {
         PVFS_OID_init(&new_handle); /* clear out the variable */
+        gossip_err("%s: Error: create_store returned error %d. \n",
+                    __func__, ret);
         return(ret);
     }
 
@@ -258,7 +262,7 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_create_list\n");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: \n", __func__);
 
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
@@ -487,7 +491,7 @@ static int remove_one_handle(TROVE_object_ref ref,
     else if (ret != 0)
     {
         gossip_err("TROVE:DBPF: dbpf_dspace_remove");
-        ret = -ret;
+        //ret = -ret;
         goto return_error;
     }
     else
@@ -1061,8 +1065,9 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
                 (int)ds_attr_p->dist_size);
 #endif
             gossip_debug(GOSSIP_TROVE_DEBUG,
-                         "dspace_getattr_list fast path attr cache hit on %s, "
+                         "%s: fast path attr cache hit on %s, "
                          "uid=%d, mode=%d, type=%d\n",
+                         __func__,
                          PVFS_OID_str(&handle_array[i]),
                          (int)ds_attr_p[i].uid,
                          (int)ds_attr_p[i].mode,
@@ -1105,7 +1110,8 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
     /* All handles hit in the cache, return */
     if (cache_hits == nhandles) 
     {
-        gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "dspace_getattr_list serviced entirely from attr cache.\n");
+        gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                     "%s: serviced entirely from attr cache.\n", __func__);
         return 1;
     }
 
@@ -1233,7 +1239,8 @@ int dbpf_dspace_attr_set(struct dbpf_collection *coll_p,
     if (ret != 0)
     {
         gossip_err("TROVE:DBPF: dspace dbpf_db_put setattr");
-        return -ret;
+        return ret;
+        //return -ret;
     }
 
     /* now that the disk is updated, update the cache if necessary */
@@ -1283,7 +1290,8 @@ int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
         {
             gossip_err("TROVE:DBPF: dspace dbpf_db_get");
         }
-        return -ret;
+        return ret;
+        //return -ret;
     }
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved attributes "
@@ -1575,12 +1583,13 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 
         organize_post_op_statistics(cur_op->op.type, cur_op->op.id);
         dbpf_queued_op_free(cur_op);
-        return 1;
+        return TROVE_OP_COMPLETE;
     }
 
 op_not_completed:
     gen_mutex_unlock(context_mutex);
-    return 0;
+    return TROVE_OP_COMPLETE;
+    //return 0;
 
 #else
 
@@ -1592,7 +1601,8 @@ op_not_completed:
             return -TROVE_EINVAL;
         case DBPF_QUEUED_OP_BUSY:
             *out_count_p = 0;
-            return 0;
+            return TROVE_OP_BUSY;
+            //return 0;
         case DBPF_QUEUED_OP_SUCCESS:
             break;
     }
@@ -1851,7 +1861,7 @@ static int dbpf_dspace_testsome(TROVE_coll_id coll_id,
                                &state_array[out_count],
                                max_idle_time_ms);
 #endif
-        if (ret != 0)
+        if (ret != TROVE_OP_BUSY)
         {
             /* operation is done and we are telling the caller;
              * ok to pull off queue now.
@@ -1901,7 +1911,7 @@ static int dbpf_dspace_testsome(TROVE_coll_id coll_id,
 #endif
 
     *inout_count_p = out_count;
-    return ((out_count > 0) ? 1 : 0);
+    return ((out_count > 0) ? 1 : 0); // WTF!!!
 }
 
 /* dbpf_dspace_create_store_handle()
@@ -1920,6 +1930,9 @@ static int dbpf_dspace_create_store_handle(struct dbpf_collection* coll_p,
     TROVE_object_ref ref = {TROVE_HANDLE_NULL, coll_p->coll_id};
     char filename[PATH_MAX + 1] = {0};
 
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: create dspace record.\n",
+                 __func__);
+
     memset(&attr, 0, sizeof(attr));
     attr.type = type;
 
@@ -1930,19 +1943,25 @@ static int dbpf_dspace_create_store_handle(struct dbpf_collection* coll_p,
     data.len = sizeof(attr);
 
     /* check to see if handle is already used */
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: check for existing record.\n",
+                 __func__);
     ret = dbpf_db_get(coll_p->ds_db, &key, &data);
-    if (ret == 0)
+    //if (ret == 0)
+    if (ret == TROVE_SUCCESS)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG, "handle (%s) already exists.\n",
-                     PVFS_OID_str(&new_handle));
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: handle (%s) already exists.\n",
+                     __func__, PVFS_OID_str(&new_handle));
         return(-TROVE_EEXIST);
     }
-    else if ((ret != TROVE_ENOENT))
+    else if ((ret != -TROVE_ENOENT))
     {
-        gossip_err("error in dspace create (db_p->get failed).\n");
-        ret = -ret;
+        gossip_err("%s: error in dspace create (db_p->get failed).\n",
+                   __func__);
+        //ret = -ret;
         return(ret);
     }
+    gossip_debug(GOSSIP_TROVE_DEBUG,"%s: no existing record found\n",
+                 __func__);
     
     /* check for old bstream files (these should not exist, but it is
      * possible if the db gets out of sync with the rest of the collection
@@ -1953,15 +1972,16 @@ static int dbpf_dspace_create_store_handle(struct dbpf_collection* coll_p,
                               my_storage_p->data_path,
                               coll_p->coll_id,
                               new_handle);
+
     ret = access(filename, F_OK);
-    if(ret == 0)
+    if(ret == TROVE_SUCCESS)
     {
         char new_filename[PATH_MAX+1];
         memset(new_filename, 0, PATH_MAX+1);
 
-        gossip_err("Warning: found old bstream file %s; "
+        gossip_err("%s: Warning: found old bstream file %s; "
                    "moving to stranded-bstreams.\n", 
-                   filename);
+                   __func__, filename);
         
         DBPF_GET_STRANDED_BSTREAM_FILENAME(new_filename,
                                            PATH_MAX,
@@ -1970,11 +1990,11 @@ static int dbpf_dspace_create_store_handle(struct dbpf_collection* coll_p,
                                            new_handle);
         /* an old file exists.  Move it to the stranded subdirectory */
         ret = rename(filename, new_filename);
-        if(ret != 0)
+        if(ret != TROVE_SUCCESS)
         {
             ret = -trove_errno_to_trove_error(errno);
-            gossip_err("Error: trove failed to rename stranded bstream: %s\n",
-                       filename);
+            gossip_err("%s: Error: trove failed to rename stranded bstream:"
+                       " %s\n", __func__, filename);
             return(ret);
         }
     }
@@ -1983,11 +2003,13 @@ static int dbpf_dspace_create_store_handle(struct dbpf_collection* coll_p,
     data.len = sizeof(attr);
     
     /* create new dataspace entry */
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: creating record.\n", __func__);
     ret = dbpf_db_put(coll_p->ds_db, &key, &data);
     if (ret != 0)
     {
-        gossip_err("error in dspace create (db_p->put failed).\n");
-        ret = -ret;
+        gossip_err("%s: error in dspace create (db_p->put failed).\n",
+                   __func__);
+        //ret = -ret;
         return(ret);
     }
 
@@ -1997,7 +2019,8 @@ static int dbpf_dspace_create_store_handle(struct dbpf_collection* coll_p,
     dbpf_attr_cache_insert(ref, &attr);
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
-    return(0);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: Success!\n", __func__);
+    return(TROVE_SUCCESS);
 }
 
 struct TROVE_dspace_ops dbpf_dspace_ops =

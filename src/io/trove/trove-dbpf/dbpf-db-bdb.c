@@ -73,7 +73,7 @@ static int ds_attr_compare(DB *dbp, const DBT *a, const DBT *b)
         return 0;
     }
 
-    return (cmpval > 0) ? -1 : 0;
+    return (cmpval > 0) ? DBPF_LT : 0;
     //return (cmpval > 0) ? -1 : 1;
 }
 
@@ -99,24 +99,25 @@ static int keyval_compare(DB *dbp, const DBT *a, const DBT *b)
 
     if ((cmpval = PVFS_OID_cmp(&db_entry_a->handle, &db_entry_b->handle)))
     {
-        return (cmpval < 0) ? -1 : 0;
+        return (cmpval < 0) ? DBPF_ERROR : 0;
         //return (cmpval < 0) ? -1 : 1;
     }
 
     if (db_entry_a->type != db_entry_b->type)
     {
-        return (db_entry_a->type < db_entry_b->type) ? -1 : 0;
+        return (db_entry_a->type < db_entry_b->type) ? DBPF_LT : DBPF_EQ;
         //return (db_entry_a->type < db_entry_b->type) ? -1 : 1;
     }
 
     if (a->size > b->size)
     {
-        return 0;
+        return DBPF_GT;
         //return 1;
     }
     else if (a->size < b->size)
     {
-        return -1;
+        return DBPF_LT;
+        //return -1;
     }
 
     return memcmp(db_entry_a->key,
@@ -232,14 +233,25 @@ int dbpf_db_get(struct dbpf_db *db,
     db_key.data = key->data;
     db_key.ulen = db_key.size = key->len;
     db_key.flags = DB_DBT_USERMEM;
+
     db_data.data = val->data;
     db_data.ulen = val->len;
     db_data.flags = DB_DBT_USERMEM;
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling db->db->get\n", __func__);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling db->db->get on "
+                 "%s\n", __func__,
+                 PVFS_OID_str((PVFS_OID *)&(((struct dbpf_keyval_db_entry *)db_key.data)->handle)));
+
     r = db->db->get(db->db, NULL, &db_key, &db_data, 0);
+
     gossip_debug(GOSSIP_TROVE_DEBUG,
                  "%s: return from db->db->get r = %d\n", __func__, r);
+
+    ret = db_error(r);
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: db->db->get return key "
+                 "%s\n", __func__,
+                 PVFS_OID_str((PVFS_OID *)&(((struct dbpf_keyval_db_entry *)db_key.data)->handle)));
 
     if (r == DB_BUFFER_SMALL)
     {
@@ -268,6 +280,11 @@ int dbpf_db_get(struct dbpf_db *db,
         db_data.data = NULL;
         goto returning;
     }
+    else if (ret == -TROVE_ENOENT)
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: db->db->get returns ENOENT\n", __func__);
+    }
     else if (r)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG,
@@ -276,7 +293,6 @@ int dbpf_db_get(struct dbpf_db *db,
 
 returning:
     val->len = db_data.size;
-    ret = db_error(r);
     {
         char emsg[256];
         PVFS_strerror_r(ret, emsg, 256);
