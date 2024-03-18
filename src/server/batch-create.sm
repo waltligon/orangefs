@@ -61,7 +61,7 @@ machine pvfs2_batch_create_sm
  *
  * Synopsis: Create a dataspace.
  */
-static int batch_create_create(
+static PINT_sm_action batch_create_create(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -119,7 +119,7 @@ static int batch_create_create(
  * Synopsis: free memory and return
  *           
  */
-static int batch_create_cleanup(
+static PINT_sm_action batch_create_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -143,7 +143,7 @@ static int batch_create_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
-static int perm_batch_create(PINT_server_op *s_op)
+static PINT_sm_action perm_batch_create(PINT_server_op *s_op)
 {
     int ret;
 

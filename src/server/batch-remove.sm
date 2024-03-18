@@ -200,13 +200,13 @@ static PINT_sm_action remove_next(
 }
 
 
-static int cleanup(
+static PINT_sm_action cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     return(server_state_machine_complete(smcb));
 }
 
-static int perm_batch_remove(PINT_server_op *s_op)
+static PINT_sm_action perm_batch_remove(PINT_server_op *s_op)
 {
     int ret;
 

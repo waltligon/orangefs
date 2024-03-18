@@ -158,7 +158,7 @@ PVFS_error PVFS_sys_flush(
     return error;
 }
 
-static int flush_datafile_setup_msgpairarray(
+static PINT_sm_action flush_datafile_setup_msgpairarray(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -247,7 +247,7 @@ static int flush_datafile_setup_msgpairarray(
     return SM_ACTION_COMPLETE;
 }
 
-static int flush_datafile_flush_failure(
+static PINT_sm_action flush_datafile_flush_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -257,7 +257,7 @@ static int flush_datafile_flush_failure(
     return SM_ACTION_COMPLETE;
 }
 
-static int flush_cleanup(
+static PINT_sm_action flush_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);

@@ -728,7 +728,7 @@ static PINT_sm_action lookup_segment_start(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
-static int lookup_segment_query_ncache(struct PINT_smcb *smcb,
+static PINT_sm_action lookup_segment_query_ncache(struct PINT_smcb *smcb,
                                        job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);

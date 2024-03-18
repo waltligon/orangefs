@@ -181,7 +181,7 @@ PVFS_error PVFS_mgmt_setparam_list(PVFS_fs_id fs_id,
     return error;
 }
 
-static int mgmt_setparam_list_init(struct PINT_smcb *smcb,
+static PINT_sm_action mgmt_setparam_list_init(struct PINT_smcb *smcb,
                                    job_status_s *js_p)
 {    
     struct PINT_client_sm *sm_p;
