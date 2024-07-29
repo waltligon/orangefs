@@ -33,6 +33,19 @@ pthread_cond_t dbpf_op_completed_cond = PTHREAD_COND_INITIALIZER;
 
 extern int TROVE_max_concurrent_io;
 
+/* This starts the dbpf thread.  Iit should return one of 3 things:
+ * BUSY - the thread / op is running
+ * COMPLETED - the thread / has finished already
+ * ERROR - the usual meaning
+ *
+ * Consider though, this system runs multiple ops using a queue system
+ * Ops are added to a queue, the thread removes them from the queue,
+ * runs them, and adds them to a completion queue.  So really, we
+ * want this interface relative to ops, not the thread.  For now we
+ * leave it as it is, though I'm concerned that the return codes be
+ * consistent.  WBL
+ */
+
 int dbpf_thread_initialize(void)
 {
     int ret = 0;
@@ -120,6 +133,7 @@ void *dbpf_thread_function(void *ptr)
         }
         else
         {
+            /* use a function */
             /* compute how long to wait */
             gettimeofday(&base, NULL);
             wait_time.tv_sec = base.tv_sec +
@@ -190,6 +204,8 @@ int dbpf_do_one_work_cycle(int *out_count)
             }
 
             cur_op->op.state = OP_IN_SERVICE;
+            gossip_debug(GOSSIP_TROVE_DEBUG, "%s: op %ld state set to OP_IN_SERVICE\n",
+                         __func__, cur_op->op.id);
             gen_mutex_unlock(&cur_op->mutex);
         }
         gen_mutex_unlock(&dbpf_op_queue_mutex);
@@ -203,14 +219,14 @@ int dbpf_do_one_work_cycle(int *out_count)
         }
 
         /* otherwise, service the current operation now */
-        gossip_debug(GOSSIP_TROVE_OP_DEBUG,"[DBPF THREAD]: STARTING TROVE "
-                     "SERVICE ROUTINE (%s)\n",
+        gossip_debug(GOSSIP_TROVE_OP_DEBUG,
+            "[DBPF THREAD]: STARTING TROVE SERVICE ROUTINE (%s)\n",
                      dbpf_op_type_to_str(cur_op->op.type));
 
         ret = cur_op->op.svc_fn(&(cur_op->op));
 
-        gossip_debug(GOSSIP_TROVE_OP_DEBUG,"[DBPF THREAD]: FINISHED TROVE "
-                     "SERVICE ROUTINE (%s) (ret: %d)\n",
+        gossip_debug(GOSSIP_TROVE_OP_DEBUG,
+            "[DBPF THREAD]: FINISHED TROVE SERVICE ROUTINE (%s) (ret: %d)\n",
                      dbpf_op_type_to_str(cur_op->op.type),
                      ret);
         if (ret == DBPF_OP_COMPLETE || ret < 0)

@@ -1480,8 +1480,8 @@ static int dbpf_dspace_cancel(TROVE_coll_id coll_id,
 
 /* dbpf_dspace_test()
  *
- * Returns 0 if not completed, 1 if completed (successfully or with
- * error).
+ * Returns TROVE_OP_BUSY(0) if not completed, or TROVE_OP_COMPLETE(1)
+ * if completed (successfully or with error).
  *
  * The error state of the completed operation is returned via the
  * state_p, more to follow on this...
@@ -1521,16 +1521,21 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
     gen_mutex_lock(context_mutex);
 
     /* check the state of the current op to see if it's completed */
+    /* where is state changed? */
     gen_mutex_lock(&cur_op->mutex);
     state = cur_op->op.state;
     gen_mutex_unlock(&cur_op->mutex);
 
+    /* this appears to ignore errors the comments say should be treated
+     * as complete, unless we expect the op to do that translation
+     */
     /* if the op is not completed, wait for up to max_idle_time_ms */
     if ((state != OP_COMPLETED) && (state != OP_CANCELED))
     {
         struct timeval base;
         struct timespec wait_time;
 
+        /* replace with func call */
         /* compute how long to wait */
         gettimeofday(&base, NULL);
         wait_time.tv_sec = base.tv_sec + (max_idle_time_ms / 1000);
@@ -1575,6 +1580,8 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 
         *out_count_p = 1;
         *state_p = cur_op->state;
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: op %ld state set to %s\n",
+                         __func__, cur_op->op.id, dbpf_op_type_to_str(cur_op->state));
 
         if (returned_user_ptr_p != NULL)
         {
@@ -1588,7 +1595,7 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 
 op_not_completed:
     gen_mutex_unlock(context_mutex);
-    return TROVE_OP_COMPLETE;
+    return TROVE_OP_BUSY;
     //return 0;
 
 #else
@@ -1937,14 +1944,14 @@ static int dbpf_dspace_create_store_handle(struct dbpf_collection* coll_p,
     attr.type = type;
 
     key.data = &new_handle;
-    key.len = sizeof(new_handle);
+    key.len = sizeof(TROVE_handle);
 
     data.data = &attr;
     data.len = sizeof(attr);
 
     /* check to see if handle is already used */
-    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: check for existing record.\n",
-                 __func__);
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "%s: check for existing record - should fail.\n", __func__);
     ret = dbpf_db_get(coll_p->ds_db, &key, &data);
     //if (ret == 0)
     if (ret == TROVE_SUCCESS)
@@ -1960,8 +1967,8 @@ static int dbpf_dspace_create_store_handle(struct dbpf_collection* coll_p,
         //ret = -ret;
         return(ret);
     }
-    gossip_debug(GOSSIP_TROVE_DEBUG,"%s: no existing record found\n",
-                 __func__);
+    gossip_debug(GOSSIP_TROVE_DEBUG,"%s: no existing record (%s) found\n",
+                 __func__, PVFS_OID_str(&new_handle));
     
     /* check for old bstream files (these should not exist, but it is
      * possible if the db gets out of sync with the rest of the collection

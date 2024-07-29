@@ -542,6 +542,10 @@ struct dbpf_keyval_get_handle_info_op
 #define DSPACE_OP_TYPE  (2<<6)
 #define OP_TYPE_MASK    (3<<6)
 
+/* Why is this so complicated - and what are the 6 bits for?
+ * WBLH
+ */
+
 #define DBPF_OP_IS_BSTREAM(t) (((t) & OP_TYPE_MASK) == BSTREAM_OP_TYPE)
 #define DBPF_OP_IS_KEYVAL(t)  (((t) & OP_TYPE_MASK) == KEYVAL_OP_TYPE)
 #define DBPF_OP_IS_DSPACE(t)  (((t) & OP_TYPE_MASK) == DSPACE_OP_TYPE)
@@ -580,6 +584,7 @@ enum dbpf_op_type
      */
 };
 
+/* THese are the operations that do a sync */
 #define DBPF_OP_DOES_SYNC(__op)    \
     (__op == KEYVAL_WRITE       || \
      __op == KEYVAL_REMOVE_KEY  || \
@@ -590,12 +595,17 @@ enum dbpf_op_type
      __op == DSPACE_SETATTR)
 
 /*
-  a function useful for debugging that returns a human readable
-  op_type name given an op_type; returns NULL if no match is found
-*/
+ * a function useful for debugging that returns a human readable
+ * op_type name given an op_type; returns NULL if no match is found
+ */
 char *dbpf_op_type_to_str(enum dbpf_op_type op_type);
 
 /* This is a mirror of TROVE_ds_state in trove.h
+ * These are the states of a dbpf op and are kept in
+ * a "state" variable of type dbpf_op_state in a function
+ * or struct (See the sruct dbpf_op below);
+ * These are NOT return codes
+ * WBLH
  */
 enum dbpf_op_state
 {
@@ -626,6 +636,11 @@ enum dbpf_op_state
  * use these defines in those functions and those that call them.
  * In case of an error return the error code if there is one or
  * DBPF_OP_ERROR for a general error.
+ *
+ * I think these are for functions that start an async op which
+ * may be finished (COMPLETE) when the function returns, or may
+ * leave the op running asynchonously (BUSY) and of course there
+ * is ERROR.  Actual function return codes.
  */
 #define DBPF_OP_BUSY         TROVE_OP_BUSY
 #define DBPF_OP_COMPLETE     TROVE_OP_COMPLETE
@@ -646,6 +661,7 @@ struct dbpf_op
     PVFS_hint  hints;
     union
     {
+        /* d's: DSPACE b's: BSTREAM and k's: KEYVALS */
         /* all the op types go in here; structs are all
          * defined just below the prototypes for the functions.
          */
@@ -679,6 +695,10 @@ void dbpf_collection_deregister(struct dbpf_collection *entry);
 
 /* function for mapping db errors to trove errors */
 PVFS_error dbpf_db_error_to_trove_error(int db_error_value);
+
+/* Do these really make sense as macros?  Would they be better as
+ * inline or normal functions?  WBLH
+ */
 
 #define DBPF_AIO_SYNC_IF_NECESSARY(dbpf_op_ptr, fd, ret)  \
 do {                                                      \
@@ -737,6 +757,11 @@ do {                                                          \
     }                                                         \
 } while(0)
 
+/* Wouldn't this make more sense with the other EVENT
+ * functions/macros?  dbpf can have its own version too
+ * but I think the logic should be kept together WBLH
+ */
+
 #define DBPF_EVENT_START(__coll_p,               \
                          __q_op_p,               \
                          __event_type,           \
@@ -766,6 +791,9 @@ do {                                                          \
 
 extern struct dbpf_storage *my_storage_p;
 
+/* kinda defeats the built in facility to count and
+ * so on.  Why?  Need to look at this WBLH
+ */
 extern int64_t s_dbpf_metadata_writes, s_dbpf_metadata_reads;
 #define UPDATE_PERF_METADATA_READ()            \
 do {                                           \

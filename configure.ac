@@ -264,7 +264,7 @@ fi],
 AC_SUBST(BUILD_SERVER)
 
 AC_ARG_WITH(db-backend,
-[  --with-db-backend        Use specified database (bdb or lmdb).],
+[  --with-db-backend=DBPACK Use specified database (bdb or lmdb).],
 if test "${withval}" = "bdb"
 then
     DATABASE_BACKEND=bdb

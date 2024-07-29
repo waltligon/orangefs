@@ -229,56 +229,153 @@ int dbpf_db_get(struct dbpf_db *db,
 {
     DBT db_key, db_data;
     int r, ret;
+    char pstr[1024];
 
-    db_key.data = key->data;
-    db_key.ulen = db_key.size = key->len;
+    /* debug prints key and val info */
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: key->data(%p) (%d) : val->data(%p) (%d)\n", 
+                 __func__, key->data, (int)key->len, val->data, (int)val->len);
+    if (key->len == sizeof(struct dbpf_keyval_db_entry))
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: key handle %s\n", __func__,
+                     PVFS_OID_str((PVFS_OID *)&(((struct dbpf_keyval_db_entry *)key->data)->handle)));
+    }
+    else if (key->len == sizeof(PVFS_OID))
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: key handle (maybe) %s\n", __func__,
+                     PVFS_OID_str((PVFS_OID *)&(((struct dbpf_keyval_db_entry *)key->data)->handle)));
+    }
+    else
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: key buffer %s\n", __func__,
+                     (char *)&(((struct dbpf_keyval_db_entry *)key->data)->handle));
+    }
+
+    /* clear out DBT structures */
+    memset(&db_key, 0, sizeof(DBT));
+    memset(&db_data, 0, sizeof(DBT));
+
+    /* allocate and set DBT structures */
+    db_key.ulen = key->len;
+    db_key.data = (void *)malloc(db_key.ulen);
+    //gossip_debug(GOSSIP_TROVE_DEBUG, "%s: db_key %p db_key.data %p\n", __func__, &db_key, db_key.data);
+    if (!db_key.data)
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s:malloc failed for db_key.data\n", __func__);
+        ret = -TROVE_ENOMEM;
+        goto errorout;
+    }
+    db_key.size = db_key.ulen;
     db_key.flags = DB_DBT_USERMEM;
+    memset(db_key.data, 0, key->len);
+    memcpy(db_key.data, key->data, key->len);
 
-    db_data.data = val->data;
     db_data.ulen = val->len;
+    db_data.data = (void *)malloc(db_data.ulen);
+    if (!db_data.data)
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s:malloc failed for db_data.data\n", __func__);
+        ret = -TROVE_ENOMEM;
+        goto errorout;
+    }
+    db_data.size = 0; /* no user data in here yet */
     db_data.flags = DB_DBT_USERMEM;
+    memset(db_data.data, 0, db_data.ulen);
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling db->db->get on "
-                 "%s\n", __func__,
-                 PVFS_OID_str((PVFS_OID *)&(((struct dbpf_keyval_db_entry *)db_key.data)->handle)));
+    /* debug prints db_key and db_data info */
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: db_key.data(%p) (%d) : db_data.data(%p) (%d)\n", 
+                 __func__, db_key.data, (int)db_key.ulen, db_data.data, (int)db_data.ulen);
+    if (db_key.ulen == sizeof(struct dbpf_keyval_db_entry))
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: db_key handle %s\n", __func__,
+                     PVFS_OID_str((PVFS_OID *)&(((struct dbpf_keyval_db_entry *)db_key.data)->handle)));
+    }
+    else if (db_key.ulen == sizeof(PVFS_OID))
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: db_key handle (maybe) %s\n", __func__,
+                     PVFS_OID_str((PVFS_OID *)&(((struct dbpf_keyval_db_entry *)db_key.data)->handle)));
+    }
+    else
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: db_key buffer %s\n", __func__,
+                     (char *)&(((struct dbpf_keyval_db_entry *)db_key.data)->handle));
+    }
+    /* done with print */
 
     r = db->db->get(db->db, NULL, &db_key, &db_data, 0);
-
     gossip_debug(GOSSIP_TROVE_DEBUG,
                  "%s: return from db->db->get r = %d\n", __func__, r);
-
     ret = db_error(r);
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: db->db->get return key "
-                 "%s\n", __func__,
-                 PVFS_OID_str((PVFS_OID *)&(((struct dbpf_keyval_db_entry *)db_key.data)->handle)));
+    /* debug prints db_key and db_data info */
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: db_key.data(%p) (%d) : db_data.data(%p) (%d)\n", 
+                 __func__, db_key.data, (int)db_key.ulen, db_data.data, (int)db_data.ulen);
+    if (db_key.ulen == sizeof(struct dbpf_keyval_db_entry))
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: db_key handle %s\n", __func__,
+                     PVFS_OID_str((PVFS_OID *)&(((struct dbpf_keyval_db_entry *)db_key.data)->handle)));
+    }
+    else if (db_key.ulen == sizeof(PVFS_OID))
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: db_key handle (maybe) %s\n", __func__,
+                     PVFS_OID_str((PVFS_OID *)&(((struct dbpf_keyval_db_entry *)db_key.data)->handle)));
+    }
+    else
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: db_key buffer %s\n", __func__,
+                     (char *)&(((struct dbpf_keyval_db_entry *)db_key.data)->handle));
+    }
+    /* done with print */
 
     if (r == DB_BUFFER_SMALL)
     {
+        void *tmp;
         gossip_debug(GOSSIP_TROVE_DEBUG,
                      "%s: db->db->get returns DB_BUFFER_SMALL\n", __func__);
 
-        db_data.data = malloc(db_data.size);
+        free(db_data.data);  /* we allocated this above */
+        db_data.ulen = db_data.size;
+        db_data.data = malloc(db_data.ulen);
         if (! db_data.data)
         {
-            return -TROVE_ENOMEM;
+            ret = -TROVE_ENOMEM;
+            goto errorout;
         }
 
-        db_data.ulen = db_data.size;
+// Don't think we need to do this
+//        tmp = db_key.data;
+//        db_key.data = malloc(db_key.size);
+//        if (! db_key.data)
+//        {
+//            ret = -TROVE_ENOMEM;
+//            goto errorout;
+//        }
+//        memcpy(db_key.data, tmp, db_key.size);
+//        free(tmp);  /* we allocated this above */
 
-        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: retrying db->db->get\n", __func__);
-        r = db->db->get(db->db, NULL, &db_key, &db_data, 0);
+        db_key.ulen = db_key.size;
+
         gossip_debug(GOSSIP_TROVE_DEBUG,
-                     "%s: retry return from db->db->get r = %d\n", __func__, r);
+                     "%s: RETRY db->db->get ksize=%d, kulen=%d, dsize=%d, dulen=%d\n",
+                     __func__, db_key.size, db_key.ulen, db_data.size, db_data.ulen);
+
+        r = db->db->get(db->db, NULL, &db_key, &db_data, 0);
+        ret = db_error(r);
+
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: RETRY return from db->db->get r = %d\n", __func__, r);
 
         if (r == 0 && val)
         {
-            memcpy(val->data, db_data.data, val->len);
+            if (val->len < db_data.size)
+            {
+                gossip_err("%s: returned data too small for buffer passed in\n",
+                             __func__);
+                goto errorout;
+            }
+            memcpy(val->data, db_data.data, db_data.size);
             ret = 0;
         }
-        free(db_data.data);
-        db_data.data = NULL;
-        goto returning;
+        goto returning; /* this is an error condition?  should it go to returning? */
     }
     else if (ret == -TROVE_ENOENT)
     {
@@ -292,6 +389,7 @@ int dbpf_db_get(struct dbpf_db *db,
     }
 
 returning:
+    memcpy(val->data, db_data.data, db_data.size);
     val->len = db_data.size;
     {
         char emsg[256];
@@ -299,6 +397,11 @@ returning:
         gossip_debug(GOSSIP_TROVE_DEBUG,
                      "%s: returning %d(%s)\n", __func__, ret, emsg);
     }
+errorout:
+    free(db_data.data);
+    db_data.data = NULL;
+    free(db_key.data);
+    db_key.data = NULL;
     //return 0;
     return ret;
 }
@@ -307,6 +410,7 @@ int dbpf_db_put(struct dbpf_db *db,
                 struct dbpf_data *key,
                 struct dbpf_data *val)
 {
+    int ret;
     DBT db_key, db_data;
 
     db_key.data = key->data;
@@ -316,7 +420,17 @@ int dbpf_db_put(struct dbpf_db *db,
     db_data.ulen = db_data.size = val->len;
     db_data.flags = DB_DBT_USERMEM;
 
-    return db_error(db->db->put(db->db, NULL, &db_key, &db_data, 0));
+    ret = db->db->put(db->db, NULL, &db_key, &db_data, 0);
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: db->db->put return key (%p) %s (%d, %d)\n", 
+                 __func__, 
+                 (void *)&(((struct dbpf_keyval_db_entry *)db_key.data)->handle),
+                 db_key.size == sizeof(struct dbpf_keyval_db_entry) ?
+                     PVFS_OID_str((PVFS_OID *)&(((struct dbpf_keyval_db_entry *)db_key.data)->handle)) :
+                     (char *)&(((struct dbpf_keyval_db_entry *)db_key.data)->handle),
+                 db_key.size, db_data.size);
+
+    return db_error(ret);
 }
 
 int dbpf_db_putonce(struct dbpf_db *db,

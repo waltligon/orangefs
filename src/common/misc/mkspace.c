@@ -717,6 +717,7 @@ int pvfs2_mkspace(char *data_path,
         gossip_debug(GOSSIP_TROVE_DEBUG, "%s: setting root dir kvals\n",
                      __func__);
 
+//>>>>>
         /* total 3 keyvals,
          * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES, OBJECT_PARENT
          */
@@ -795,6 +796,7 @@ int pvfs2_mkspace(char *data_path,
 
         val_a[2].buffer_sz = OSASZ(1, 1);
         val_a[2].buffer = &ROOT_DIR_PARENT_AND_SID;
+//>>>>>
 
         gossip_debug(GOSSIP_TROVE_DEBUG, "%s: writing root dir kvals to %s\n",
                      __func__, PVFS_OID_str(&root_handle));
@@ -812,10 +814,14 @@ int pvfs2_mkspace(char *data_path,
                                       &op_id,
                                       NULL);
 
-        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: waiting for kvals to write\n", __func__);
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: returning from trove_keyval_write_list\n",
+                     __func__);
 
         while (ret == TROVE_OP_BUSY)
         {
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "%s: waiting for kvals to write\n", __func__);
             count = 0;
             ret = trove_dspace_test(coll_id,
                                     op_id,
@@ -840,13 +846,107 @@ int pvfs2_mkspace(char *data_path,
         gossip_debug(GOSSIP_TROVE_DEBUG, "%s: setting root dirdata kvals\n",
                      __func__);
 
+        /* I think this is wrong - causing a memory error
+         * key_a is an array of structs with pointer to a buffer, and its size.
+         * in this case the keys are all short strings statically defined for
+         * each of the various attributes.  We should never free key_a.buffer
+         * because it was not malloced.  The array itself was malloced but we
+         * need to be careful how this is used after this point.  key_a and
+         * val_a were passed into trove_keyval_write_list() which is serviced by
+         * another thread and uses the array to locate the buffer thus potentially
+         * accessing a freed data block.
+         * Although, the trove_dspace_test() above should indicate the op is
+         * complete and the thread is nolonger using the pointer.
+         */
+        free(key_a);
+        free(val_a);
+        free(dirdata_handles);
+        free(dirdata_parent_handles);
+
+//>>>>>
+        /* total 3 keyvals,
+         * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES, OBJECT_PARENT
+         */
+        rec_count = 3;
+
+        /* malloc arrays and buffers - will be freed at the end */
+        /* key_a */
+        key_a = malloc(sizeof(PVFS_ds_keyval) * rec_count);
+        if(!key_a)
+        {
+            return -1;
+        }
+        ZEROMEM(key_a, sizeof(PVFS_ds_keyval) * rec_count);
+
+        /* val_a */
+        val_a = malloc(sizeof(PVFS_ds_keyval) * rec_count);
+        if(!val_a)
+        {
+            free(key_a);
+            return -1;
+        }
+        ZEROMEM(val_a, sizeof(PVFS_ds_keyval) * rec_count);
+
+        /* dirdata_handles */
+        dirdata_handles = (PVFS_ID *)malloc((root_sid_count + 1) *
+                                            sizeof(PVFS_ID));
+        if(!dirdata_handles)
+        {
+            free(key_a);
+            free(val_a);
+            return -1;
+        }
+        ZEROMEM(dirdata_handles, ((root_sid_count + 1) * sizeof(PVFS_ID)));
+
+        /* I guesss this is actually dirdata parent OID and N SIDs */
+        /* parent_handles */
+        dirdata_parent_handles = (PVFS_ID *)malloc((root_sid_count + 1) *
+                                            sizeof(PVFS_ID));
+        if(!dirdata_parent_handles)
+        {
+            free(key_a);
+            free(val_a);
+            return -1;
+        }
+        ZEROMEM(dirdata_parent_handles, ((root_sid_count + 1) * sizeof(PVFS_ID)));
+
+        /* set up query keys */
+        /* bitmap */
+        key_a[0].buffer = DIST_DIRDATA_BITMAP_KEYSTR;
+        key_a[0].buffer_sz = DIST_DIRDATA_BITMAP_KEYLEN;
+
+        bitmap[0] = 1;
+        val_a[0].buffer = bitmap;
+        val_a[0].buffer_sz = 1 * sizeof(PVFS_dist_dir_bitmap_basetype);
+
+        /* dirdata handles */
+        key_a[1].buffer = DIST_DIRDATA_HANDLES_KEYSTR;
+        key_a[1].buffer_sz = DIST_DIRDATA_HANDLES_KEYLEN;
+
+        /* We use the root_sid_array for the dirdata sids because we assume
+         * each copy of the root dir also has a copy of the root dirdata
+         */
+        dirdata_handles[0].oid = root_dirdata_handle;
+        for (i = 0; i < root_sid_count; i++)
+        {
+            dirdata_handles[i + 1].sid = root_sid_array[i];
+        }
+        val_a[1].buffer = dirdata_handles;
+        val_a[1].buffer_sz = OSASZ(1, root_sid_count);
+
+//>>>>>
+
         /* Dirdata has the same attributes as it needs to perform
          * collecitve extensible hashing with other dirdata records
          */
 
         /* BUT, reusing buffers is dangerous!  Asking for errors! */
 
+//=====
         /* only change query key 2 */
+        key_a[2].buffer_sz = OBJECT_PARENT_KEYLEN;
+        key_a[2].buffer = OBJECT_PARENT_KEYSTR;
+        
         dirdata_parent_handles[0].oid = root_handle;
         for (i = 0; i < root_sid_count; i++)
         {
@@ -874,10 +974,14 @@ int pvfs2_mkspace(char *data_path,
                                       &op_id,
                                       NULL);
 
-        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: waiting for kvals to write\n", __func__);
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "%s: returning from trove_keyval_write_list\n",
+                     __func__);
 
         while (ret == TROVE_OP_BUSY)
         {
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "%s: waiting for kvals to write\n", __func__);
             count = 0;
             ret = trove_dspace_test(coll_id,
                                     op_id,
@@ -888,6 +992,8 @@ int pvfs2_mkspace(char *data_path,
                                     &state,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
+
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: finished kval wait for write loop\n", __func__);
 
         if ((ret <= TROVE_OP_ERROR) && (state != TROVE_OP_UNINITIALIZED))
         {
@@ -907,6 +1013,7 @@ int pvfs2_mkspace(char *data_path,
                                  trove_context,
                                  &op_id,
                                  NULL);
+
         while (ret == TROVE_OP_BUSY)
         {
             count = 0;

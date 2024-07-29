@@ -948,10 +948,14 @@ int dbpf_collection_create(char *collname,
     }
     sto_p = my_storage_p;
 
+    memset(&key, 0, sizeof(struct dbpf_data));
+    memset(&data, 0, sizeof(struct dbpf_data));
+    memset(&db_data, 0, sizeof(struct dbpf_collection_db_entry));
+
     key.data = collname;
     key.len = strlen(collname)+1;
     data.data = &db_data;
-    data.len = sizeof(db_data);
+    data.len = sizeof(struct dbpf_collection_db_entry);
 
     /* ensure that the collection record isn't already there */
     /* ===>we did this already in dbpf_collection_lookup<=== */
@@ -968,17 +972,22 @@ int dbpf_collection_create(char *collname,
     //    return ret;
     //}
 
-    memset(&db_data, 0, sizeof(db_data));
+    memset(&key, 0, sizeof(struct dbpf_data));
+    memset(&data, 0, sizeof(struct dbpf_data));
+    memset(&db_data, 0, sizeof(struct dbpf_collection_db_entry));
+
     db_data.coll_id = new_coll_id;
 
     key.data = collname;
     key.len = strlen(collname)+1;
     data.data = &db_data;
-    data.len = sizeof(db_data);
+    data.len = sizeof(struct dbpf_collection_db_entry);
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling dbpf_db_put collection\n",
-                 __func__);
+                __func__);
+
     ret = dbpf_db_put(sto_p->coll_db, &key, &data);
+
     if (ret != DBPF_SUCCESS)
     {
         gossip_err("%s: dbpf_db_put failed:%s\n", __func__, strerror(ret));
@@ -1133,9 +1142,9 @@ int dbpf_collection_create(char *collname,
      * to know what format the metadata is stored in on disk.
      */
     key.data = TROVE_DBPF_VERSION_KEY;
-    key.len = strlen(TROVE_DBPF_VERSION_KEY);
+    key.len = strlen(TROVE_DBPF_VERSION_KEY) +1;
     data.data = TROVE_DBPF_VERSION_VALUE;
-    data.len = strlen(TROVE_DBPF_VERSION_VALUE);
+    data.len = strlen(TROVE_DBPF_VERSION_VALUE) +1;
 
     ret = dbpf_db_put(db_p, &key, &data);
     if (ret != 0)
@@ -1716,7 +1725,7 @@ int dbpf_collection_lookup(char *collname,
     int ret = -TROVE_EINVAL;
     struct dbpf_collection *coll_p = NULL;
     struct dbpf_collection_db_entry db_data;
-    struct dbpf_data key, data;
+    struct dbpf_data dbpf_key, dbpf_data;
     char path_name[PATH_MAX];
     char trove_dbpf_version[32] = {0};
     int sto_major, sto_minor, sto_inc, major, minor, inc;
@@ -1728,14 +1737,14 @@ int dbpf_collection_lookup(char *collname,
         return -TROVE_EINVAL;
     }
 
-    key.data = collname;
-    key.len = strlen(collname)+1;
-    data.data = &db_data;
-    data.len = sizeof(db_data);
+    dbpf_key.data = collname;
+    dbpf_key.len = strlen(collname)+1;
+    dbpf_data.data = &db_data;
+    dbpf_data.len = sizeof(db_data);
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling dbpf_db_get\n", __func__);
 
-    ret = dbpf_db_get(my_storage_p->coll_db, &key, &data);
+    ret = dbpf_db_get(my_storage_p->coll_db, &dbpf_key, &dbpf_data);
 
     if (ret != DBPF_SUCCESS)
     {
@@ -1855,15 +1864,15 @@ int dbpf_collection_lookup(char *collname,
     }
 
     /* make sure the version matches the version we understand */
-    key.data = TROVE_DBPF_VERSION_KEY;
-    key.len = strlen(TROVE_DBPF_VERSION_KEY);
-    data.data = &trove_dbpf_version;
-    data.len = 32;
+    dbpf_key.data = TROVE_DBPF_VERSION_KEY;
+    dbpf_key.len = strlen(TROVE_DBPF_VERSION_KEY) + 1;
+    dbpf_data.data = &trove_dbpf_version;
+    dbpf_data.len = 32; /* what is this? why a const not used WBLH */
 
     gossip_debug(GOSSIP_TROVE_DEBUG,
                  "%s: calling dbpf_db_get of dbpf version\n", __func__);
 
-    ret = dbpf_db_get(coll_p->coll_attr_db, &key, &data);
+    ret = dbpf_db_get(coll_p->coll_attr_db, &dbpf_key, &dbpf_data);
 
     if (ret != DBPF_SUCCESS)
     {
