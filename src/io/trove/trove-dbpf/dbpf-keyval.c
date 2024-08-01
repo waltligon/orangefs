@@ -1392,7 +1392,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         {
             struct dbpf_keyval_db_entry *tmp_entry = key.data;
             gossip_debug(GOSSIP_TROVE_DEBUG,
-                         "%s: keyval_db->get(handle= %s, key= %s (%d)) "
+                         "%s: BEFORE keyval_db->get(handle= %s, key= %s (%d)) "
                          "size= %zu\n", __func__,
                          PVFS_OID_str(&tmp_entry->handle), 
                          tmp_entry->key,
@@ -1403,11 +1403,14 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         gossip_debug(GOSSIP_TROVE_DEBUG,
                      "%s: Reading key to check for pre-existing - "
                      "should fail\n", __func__);
+#if 0
         ret = dbpf_db_get(op_p->coll_p->keyval_db, &key, &data);
+#endif
+ret = -TROVE_ENOENT;
         {   /* This is all a gossip debug */
             struct dbpf_keyval_db_entry *tmp_entry = key.data;
             gossip_debug(GOSSIP_TROVE_DEBUG,
-                         "%s: keyval_db->get(handle= %s, key= %s (%d)) "
+                         "%s: AFTER keyval_db->get(handle= %s, key= %s (%d)) "
                          "size= %zu\n", __func__,
                          PVFS_OID_str(&tmp_entry->handle), 
                          tmp_entry->key,
