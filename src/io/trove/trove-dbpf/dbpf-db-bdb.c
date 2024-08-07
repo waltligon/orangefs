@@ -362,14 +362,15 @@ int dbpf_db_get(struct dbpf_db *db,
         {
             if (val->len < db_val.size)
             {
-                gossip_err("%s: returned data too small for buffer passed in\n",
+                gossip_err("%s: returned data too big for buffer passed in\n",
                              __func__);
                 goto errorout;
             }
-            memcpy(val->data, db_val.data, db_val.size);
+            // done below
+            //memcpy(val->data, db_val.data, db_val.size);
             ret = 0;
         }
-        goto returning; /* this is an error condition?  should it go to returning? */
+        goto returning;
     }
     else if (ret == -TROVE_ENOENT)
     {
@@ -383,6 +384,7 @@ int dbpf_db_get(struct dbpf_db *db,
     }
 
 returning:
+    assert(db_val.size <= val->len);
     memcpy(val->data, db_val.data, db_val.size);
     val->len = db_val.size;
     {

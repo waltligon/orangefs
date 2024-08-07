@@ -462,7 +462,7 @@ int pvfs2_mkspace(char *data_path,
         {
             gossip_err("%s: error: collection_seteattr (root handle) failed; "
                        "aborting!\n", __func__);
-            return -1;
+            return TROVE_OP_ERROR;
         }
 
         //while (ret == 0)
@@ -537,7 +537,7 @@ int pvfs2_mkspace(char *data_path,
         {
             gossip_err("%s: Trove did not use handle passed in for root\n",
                        __func__);
-            return -1;
+            return TROVE_OP_ERROR;
         }
 
         mkspace_print(verbose,
@@ -659,7 +659,7 @@ int pvfs2_mkspace(char *data_path,
             gossip_err("%s: error: dspace setattr for root dir "
                        "attributes failed; aborting!\n", __func__);
             return TROVE_OP_ERROR;
-            return -1;
+            //return -1;
         }
 
         /***********************************/
@@ -728,7 +728,7 @@ int pvfs2_mkspace(char *data_path,
         key_a = malloc(sizeof(PVFS_ds_keyval) * rec_count);
         if(!key_a)
         {
-            return -1;
+            return TROVE_OP_ERROR;
         }
         ZEROMEM(key_a, sizeof(PVFS_ds_keyval) * rec_count);
 
@@ -737,7 +737,7 @@ int pvfs2_mkspace(char *data_path,
         if(!val_a)
         {
             free(key_a);
-            return -1;
+            return TROVE_OP_ERROR;
         }
         ZEROMEM(val_a, sizeof(PVFS_ds_keyval) * rec_count);
 
@@ -748,7 +748,7 @@ int pvfs2_mkspace(char *data_path,
         {
             free(key_a);
             free(val_a);
-            return -1;
+            return TROVE_OP_ERROR;
         }
         ZEROMEM(dirdata_handles, ((root_sid_count + 1) * sizeof(PVFS_ID)));
 
@@ -760,7 +760,7 @@ int pvfs2_mkspace(char *data_path,
         {
             free(key_a);
             free(val_a);
-            return -1;
+            return TROVE_OP_ERROR;
         }
         ZEROMEM(dirdata_parent_handles, ((root_sid_count + 1) * sizeof(PVFS_ID)));
 
@@ -791,11 +791,11 @@ int pvfs2_mkspace(char *data_path,
         //                     ((root_sid_count) * sizeof(PVFS_SID));
 
         /* parent of root directory is NULL */
-        key_a[2].buffer_sz = OBJECT_PARENT_KEYLEN;
         key_a[2].buffer = OBJECT_PARENT_KEYSTR;
+        key_a[2].buffer_sz = OBJECT_PARENT_KEYLEN;
 
-        val_a[2].buffer_sz = OSASZ(1, 1);
         val_a[2].buffer = &ROOT_DIR_PARENT_AND_SID;
+        val_a[2].buffer_sz = OSASZ(1, 1);
 //>>>>>
 
         gossip_debug(GOSSIP_TROVE_DEBUG, "%s: writing root dir kvals to %s\n",
@@ -846,6 +846,11 @@ int pvfs2_mkspace(char *data_path,
         gossip_debug(GOSSIP_TROVE_DEBUG, "%s: setting root dirdata kvals\n",
                      __func__);
 
+        /* I THINK MY COMMENT HERE IS WRONG
+         * Having revied the code in more detail, I think what is here as of
+         * this writing is fine.  I will remove this whole thing after the next
+         * commit
+         */
         /* I think this is wrong - causing a memory error
          * key_a is an array of structs with pointer to a buffer, and its size.
          * in this case the keys are all short strings statically defined for
@@ -874,7 +879,7 @@ int pvfs2_mkspace(char *data_path,
         key_a = malloc(sizeof(PVFS_ds_keyval) * rec_count);
         if(!key_a)
         {
-            return -1;
+            return TROVE_OP_ERROR;
         }
         ZEROMEM(key_a, sizeof(PVFS_ds_keyval) * rec_count);
 
@@ -883,7 +888,7 @@ int pvfs2_mkspace(char *data_path,
         if(!val_a)
         {
             free(key_a);
-            return -1;
+            return TROVE_OP_ERROR;
         }
         ZEROMEM(val_a, sizeof(PVFS_ds_keyval) * rec_count);
 
@@ -894,7 +899,7 @@ int pvfs2_mkspace(char *data_path,
         {
             free(key_a);
             free(val_a);
-            return -1;
+            return TROVE_OP_ERROR;
         }
         ZEROMEM(dirdata_handles, ((root_sid_count + 1) * sizeof(PVFS_ID)));
 
@@ -906,7 +911,7 @@ int pvfs2_mkspace(char *data_path,
         {
             free(key_a);
             free(val_a);
-            return -1;
+            return TROVE_OP_ERROR;
         }
         ZEROMEM(dirdata_parent_handles, ((root_sid_count + 1) * sizeof(PVFS_ID)));
 
@@ -937,7 +942,7 @@ int pvfs2_mkspace(char *data_path,
 //>>>>>
 
         /* Dirdata has the same attributes as it needs to perform
-         * collecitve extensible hashing with other dirdata records
+         * collective extensible hashing with other dirdata records
          */
 
         /* BUT, reusing buffers is dangerous!  Asking for errors! */
@@ -997,7 +1002,7 @@ int pvfs2_mkspace(char *data_path,
 
         if ((ret <= TROVE_OP_ERROR) && (state != TROVE_OP_UNINITIALIZED))
         {
-            gossip_err("keyval write_list (for root dirdata) failed.\n");
+            gossip_err("%s: keyval write_list (for root dirdata) failed.\n", __func__);
             return TROVE_OP_ERROR;
         }
 
@@ -1006,6 +1011,7 @@ int pvfs2_mkspace(char *data_path,
         /* we will flush again when we clear the collection */
         gossip_debug(GOSSIP_TROVE_DEBUG, "%s: Flushing DB\n", __func__);
 
+        op_id = PVFS_OP_NULL;
         ret = trove_keyval_flush(coll_id,
                                  TROVE_HANDLE_NULL,
                                  0,    /* flags */

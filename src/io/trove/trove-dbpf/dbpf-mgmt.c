@@ -309,7 +309,7 @@ int dbpf_collection_seteattr(TROVE_coll_id coll_id,
     int ret = -TROVE_EINVAL;
     struct dbpf_storage *sto_p = NULL;
     struct dbpf_collection *coll_p = NULL;
-    struct dbpf_data key, data;
+    struct dbpf_data key, val;
 
     sto_p = my_storage_p;
     if (sto_p == NULL)
@@ -328,10 +328,10 @@ int dbpf_collection_seteattr(TROVE_coll_id coll_id,
 
     key.data = key_p->buffer;
     key.len = key_p->buffer_sz;
-    data.data = val_p->buffer;
-    data.len = val_p->buffer_sz;
+    val.data = val_p->buffer;
+    val.len = val_p->buffer_sz;
 
-    ret = dbpf_db_put(coll_p->coll_attr_db, &key, &data);
+    ret = dbpf_db_put(coll_p->coll_attr_db, &key, &val);
     if (ret != 0)
     {
         gossip_err("%s: db_put fail: %s\n", __func__, strerror(ret));
@@ -1506,7 +1506,7 @@ int dbpf_collection_remove(char *collname,
 
     DBPF_GET_COLL_DIRNAME(path_name,
                           PATH_MAX,
-			  sto_p->meta_path,
+                          sto_p->meta_path,
                           db_data.coll_id);
 
     if (rmdir(path_name) != DBPF_SUCCESS)
@@ -1519,7 +1519,7 @@ int dbpf_collection_remove(char *collname,
 
     DBPF_GET_COLL_DIRNAME(path_name,
                           PATH_MAX,
-			  sto_p->config_path,
+                          sto_p->config_path,
                           db_data.coll_id);
 
     if (rmdir(path_name) != DBPF_SUCCESS)
@@ -1725,7 +1725,7 @@ int dbpf_collection_lookup(char *collname,
     int ret = -TROVE_EINVAL;
     struct dbpf_collection *coll_p = NULL;
     struct dbpf_collection_db_entry db_data;
-    struct dbpf_data dbpf_key, dbpf_data;
+    struct dbpf_data dbpf_key, dbpf_val;
     char path_name[PATH_MAX];
     char trove_dbpf_version[32] = {0};
     int sto_major, sto_minor, sto_inc, major, minor, inc;
@@ -1739,12 +1739,12 @@ int dbpf_collection_lookup(char *collname,
 
     dbpf_key.data = collname;
     dbpf_key.len = strlen(collname)+1;
-    dbpf_data.data = &db_data;
-    dbpf_data.len = sizeof(db_data);
+    dbpf_val.data = &db_data;
+    dbpf_val.len = sizeof(db_data);
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: calling dbpf_db_get\n", __func__);
 
-    ret = dbpf_db_get(my_storage_p->coll_db, &dbpf_key, &dbpf_data);
+    ret = dbpf_db_get(my_storage_p->coll_db, &dbpf_key, &dbpf_val);
 
     if (ret != DBPF_SUCCESS)
     {
@@ -1866,13 +1866,13 @@ int dbpf_collection_lookup(char *collname,
     /* make sure the version matches the version we understand */
     dbpf_key.data = TROVE_DBPF_VERSION_KEY;
     dbpf_key.len = strlen(TROVE_DBPF_VERSION_KEY) + 1;
-    dbpf_data.data = &trove_dbpf_version;
-    dbpf_data.len = 32; /* what is this? why a const not used WBLH */
+    dbpf_val.data = &trove_dbpf_version;
+    dbpf_val.len = 32; /* what is this? why a const not used WBLH */
 
     gossip_debug(GOSSIP_TROVE_DEBUG,
                  "%s: calling dbpf_db_get of dbpf version\n", __func__);
 
-    ret = dbpf_db_get(coll_p->coll_attr_db, &dbpf_key, &dbpf_data);
+    ret = dbpf_db_get(coll_p->coll_attr_db, &dbpf_key, &dbpf_val);
 
     if (ret != DBPF_SUCCESS)
     {

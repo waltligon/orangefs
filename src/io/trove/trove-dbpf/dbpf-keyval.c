@@ -1326,16 +1326,8 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
     /* used only in adding to dbpr attr cache */
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
     int k;
-    //char tmpdata[PVFS_NAME_MAX]; /* WHY PVFS_NAME_MAX ??? */
-    char *tmpdata;
+    char tmpdata[PVFS_NAME_MAX]; /* WHY PVFS_NAME_MAX ??? */
 
-        tmpdata = (char *)malloc(PVFS_NAME_MAX);
-        if (!tmpdata)
-        {
-            ret = -TROVE_ENOMEM;
-            goto return_error;
-        }
-        memset((void *)tmpdata, 0, PVFS_NAME_MAX);
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: writing list to handle %s\n",
                  __func__, PVFS_OID_str(&op_p->handle));
@@ -1349,6 +1341,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         gossip_debug(GOSSIP_TROVE_DEBUG, "%s: check key %d\n", __func__, k);
 
     /* >>>> */
+        memset((void *)tmpdata, 0, PVFS_NAME_MAX);
         memset((void *)&key_entry, 0, sizeof(key_entry));
 
         key_entry.handle = op_p->handle; /* copies the actual handle */
@@ -1385,7 +1378,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
                      __func__, PVFS_OID_str(&key_entry.handle), key_entry.type, key_entry.key);
 
 
-        data.data = tmpdata;
+        data.data = &tmpdata;
         data.len = PVFS_NAME_MAX;
 
         if(!(op_p->flags & TROVE_BINARY_KEY))
