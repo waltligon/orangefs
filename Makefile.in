@@ -1355,6 +1355,7 @@ cleaner: clean
 	rm -rf autom4te*.cache
 	rm -f pvfs2-config.h.in~
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
+	if [ -e config.status ]; then cp -p config.status config.save; fi
 	rm -f config.log config.status config.cache
 	rm -f pvfs-@PVFS2_VERSION@.tar.gz
 
