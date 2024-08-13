@@ -163,7 +163,8 @@ void iterate_database(dbpf_db *db_p, void (*print)(struct dbpf_data key,
         val.len = 1024; 
     }
 
-    if( ret != TROVE_ENOENT )
+    /* making this neg seems right but ... */
+    if( ret != -TROVE_ENOENT )
     {
         printf("**** an error occurred (%s) ****\n", strerror(ret));
     }
@@ -630,15 +631,15 @@ int process_args(int argc, char ** argv)
             case 0: /* help */ 
                 print_help(argv[0]); 
                 exit(0);
-                                                                                            case 1: /* verbose */
+            case 1: /* verbose */
                 opts.verbose = 1; 
                 break;
 
             case 2: /*dbpath */ 
-                strncpy(opts.dbpath, optarg, PATH_MAX);
+                strncpy(opts.dbpath, optarg, PATH_MAX-1);
                 break;
             case 3: /* hexdir */
-                strncpy(opts.hexdir, optarg, PATH_MAX);
+                strncpy(opts.hexdir, optarg, PATH_MAX-1);
                 break;
             case 4: /* hexhandles */
                 hex = 1;

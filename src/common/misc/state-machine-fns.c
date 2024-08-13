@@ -351,7 +351,7 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
             }
             else /* state flag == SM_SWITCH */
             {
-                if (!PINT_state_machine_locate(smcb))
+                if (!PINT_state_machine_locate(smcb, 0))
                 {
                     return SM_ACTION_TERMINATE;
                 }
@@ -388,14 +388,15 @@ PINT_sm_action PINT_state_machine_continue(struct PINT_smcb *smcb,
     return ret;
 }
 
-/* Function: PINT_state_machine_locate(void)
+/* Function: PINT_state_machine_locate(**smcb, dflag)
  * Params:   smcb pointer with op correctly set
+ *           dflag controls gossip_debug output
  * Returns:  1 on successful locate, 0 on locate failure, <0 on error
  * Synopsis: This function locates the state associated with the op
  *           specified in smcb->op in order to start a state machine's
  *           execution.
  */
-int PINT_state_machine_locate(struct PINT_smcb *smcb)
+int PINT_state_machine_locate(struct PINT_smcb *smcb, int dflag)
 {
     struct PINT_state_s *current_tmp;
     struct PINT_state_machine_s *op_sm;
@@ -413,7 +414,7 @@ int PINT_state_machine_locate(struct PINT_smcb *smcb)
             "[SM Locating]: (%p) op-id: %d\n", smcb, (smcb)->op);
 #endif
     /* this is a the usage dependant routine to look up the SM */
-    op_sm = (*smcb->op_get_state_machine)(smcb->op);
+    op_sm = (*smcb->op_get_state_machine)(smcb->op, dflag);
     if (op_sm != NULL)
     {
 	current_tmp = op_sm->first_state;
@@ -452,7 +453,7 @@ int PINT_smcb_set_op(struct PINT_smcb *smcb, int op)
     if (smcb)
     {
         smcb->op = op;
-        return PINT_state_machine_locate(smcb);
+        return PINT_state_machine_locate(smcb, 0);
     }
     else
     {
@@ -624,7 +625,7 @@ int PINT_smcb_cancelled(struct PINT_smcb *smcb)
 int PINT_smcb_alloc(struct PINT_smcb **smcb,
                     int op,
                     int frame_size,
-                    struct PINT_state_machine_s *(*getmach)(int),
+                    struct PINT_state_machine_s *(*getmach)(int, int),
                     int (*term_fn)(struct PINT_smcb *, job_status_s *),
                     job_context_id context_id)
 {
@@ -662,7 +663,7 @@ int PINT_smcb_alloc(struct PINT_smcb **smcb,
     /* if a getmach given, lookup state machine */
     if (getmach)
     {
-        return PINT_state_machine_locate(*smcb);
+        return PINT_state_machine_locate(*smcb, 1);
     }
     return 0; /* success */
 }

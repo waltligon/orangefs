@@ -626,6 +626,9 @@ struct PINT_server_getattr_op
     int num_dfiles_req;
     PVFS_handle *mirror_dfile_status_array;
     PVFS_credential credential;
+    int *size_array;
+    int *dirent_array;
+    int size;
 };
 
 struct PINT_server_listattr_op
@@ -751,7 +754,7 @@ typedef struct PINT_server_op
     PINT_sm_msgarray_op        msgarray_op;
 
     /* used by prelude when creating a "missing" DIRDATA or DATA object */
-    int32_t                    new_target_object;  /* flag for host stsate machine */
+    int32_t                    new_target_object;  /* flag for state machine */
     PVFS_handle                target_handle;
     PVFS_fs_id                 target_fs_id;
     PVFS_object_attr          *target_object_attr;
@@ -810,7 +813,10 @@ typedef struct PINT_server_op
 
 } PINT_server_op;
 
-/* V3 call to server_local needs a propoer argument */
+/* This creates  new frame in __s_op and pushes it for a subsequent PJMP
+ *
+ * V3 call to server_local needs a propoer argument
+ */
 #define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb,                                \
                                              __s_op,                                \
                                              __sid,                                 \
@@ -848,10 +854,10 @@ do {                                                                            
       }                                                                             \
 } while (0)
 
-#define PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(__s_op) \
-    do { \
+#define PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(__s_op)      \
+    do {                                                   \
         PINT_cleanup_capability(&__s_op->req->capability); \
-        free(__s_op); \
+        free(__s_op);                                      \
     } while (0)
 
 /* state machine permission function */
@@ -870,7 +876,7 @@ static inline int PINT_get_object_ref_##req_name(                        \
 static inline int PINT_get_credential_##req_name(        \
     struct PVFS_server_req *req, PVFS_credential **cred) \
 {                                                        \
-    *cred = &req->u.req_name.credential;                  \
+    *cred = &req->u.req_name.credential;                 \
     return 0;                                            \
 }
 
@@ -1050,6 +1056,7 @@ extern struct PINT_state_machine_s pvfs2_create_immutable_copies_sm;
 extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
+extern struct PINT_state_machine_s pvfs2_tree_get_dirent_count_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_getattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
@@ -1101,7 +1108,7 @@ int server_state_machine_complete_noreq(PINT_smcb *smcb);
 
 #include "pvfs2-internal.h"
 
-struct PINT_state_machine_s *server_op_state_get_machine(int);
+struct PINT_state_machine_s *server_op_state_get_machine(int, int);
 
 #endif /* __PVFS_SERVER_H */
 
