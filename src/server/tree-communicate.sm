@@ -359,9 +359,9 @@ static PINT_sm_action tree_communicate_partition_handles(
              * so all sids must represent remote servers.
              * Add the datafile to the remote list.
              */
-            gossip_debug(GOSSIP_SERVER_DEBUG,
-                         "remote handle = %s\n"
-                         ,PVFS_OID_str(&handle_array[i]));
+            gossip_debug(GOSSIP_SERVER_DEBUG, 
+                         "%s: remote handle = %s\n", __func__,
+                         PVFS_OID_str(&handle_array[i]));
 
             s_op->u.tree_communicate.handle_array_remote[
                       s_op->u.tree_communicate.handle_array_remote_count] = 
@@ -559,6 +559,8 @@ static PINT_sm_action tree_communicate_partition_handles(
 
     if (s_op->u.tree_communicate.handle_array_remote_count > 0)
     {
+        int location = 0; /* return val from setting up frame - should be remote */
+
         gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Remote target\n", __func__);
         /* Decide how to divide the remote handles.
          * If there are only a few (fewer than tree_threshhold
@@ -586,13 +588,11 @@ static PINT_sm_action tree_communicate_partition_handles(
         }
 
         gossip_debug(GOSSIP_SERVER_DEBUG,
-            "tree_communicate_partition_handles: num_data_files = %d,"
-            " num_remote_handles = %d, "
-            "num_partitions = %d, num_files_per_server = %d\n",
-            num_data_files,
-            s_op->u.tree_communicate.handle_array_remote_count,
-            num_partitions,
-            num_files_per_server);
+                     "%s: num_data_files = %d, num_remote_handles = %d, "
+                     "num_partitions = %d, num_files_per_server = %d\n",
+                     __func__, num_data_files,
+                     s_op->u.tree_communicate.handle_array_remote_count,
+                     num_partitions, num_files_per_server);
 
         /* We need to send tree-based messages to other servers */
         js_p->error_code = REMOTE_OPERATION;
@@ -605,9 +605,9 @@ static PINT_sm_action tree_communicate_partition_handles(
                 PVFS_SID_NULL,  /* bc this is a remote operation, we don't 
                                    need a real sid, just a place holder */
                 fs_id,
-                js_p->error_code,
+                location, /* out: location */
                 req,
-                REMOTE_OPERATION);
+                0); /* task_id */
 
         /* store the number of partitions */
         s_op->u.tree_communicate.num_partitions = num_partitions;
@@ -844,8 +844,13 @@ static PINT_sm_action tree_communicate_partition_handles(
             msg_p->fs_id = fs_id;
             msg_p->handle = s_op->u.tree_communicate.handle_array_remote[
                                                    i * num_files_per_server];
+            msg_p->sid_array = &sid_array[i * num_sids];
 
             /* V3 need to adjust sid array index */
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "%s: msg_p->svr_addr (%p) msg_p->sid_array[0] (%p)\n",
+                         __func__, &msg_p->svr_addr, &msg_p->sid_array[0]);
+
             ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
             if (ret)
             {

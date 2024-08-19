@@ -899,6 +899,10 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
  *           code to decide which SM a new child should run.  Called
  *           by the start_child_frames function
  */
+/* Why do we have a loop without a well defined end?  Bad form!!!
+ * I realize we'll have to have some way to pass the side of the
+ * pjmptbl.  WBLH
+ */
 static struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb,
                                              int task_id)
 {
@@ -906,11 +910,20 @@ static struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb,
     int i;
 
     pjmptbl = smcb->current_state->pjtbl;
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+                 "%s: pjmptbl = (%p)\n", __func__,
+                 pjmptbl);
     for (i = 0; ; i++)
     {
+        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+                     "%s: &pjmptbl[%d] = (%p)\n", __func__,
+                     i, &pjmptbl[i]);
         if (pjmptbl[i].return_value == task_id ||
             pjmptbl[i].return_value == -1)
         {
+            gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+                         "%s: pjmptbl[%d].state_machine = (%p)\n",
+                         __func__, i, pjmptbl[i].state_machine);
             return pjmptbl[i].state_machine->first_state;
         }
     }

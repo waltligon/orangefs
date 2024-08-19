@@ -836,22 +836,23 @@ do {                                                                            
       memset(__s_op, 0, sizeof(struct PINT_server_op));                             \
       __s_op->req = &__s_op->decoded.stub_dec.req;                                  \
       PINT_sm_push_frame(__smcb, __task_id, __s_op);                                \
-      if (__location != REMOTE_OPERATION &&                                         \
-           (__location == LOCAL_OPERATION ||                                        \
+      if ((__location != REMOTE_OPERATION) &&                                       \
+           ((__location == LOCAL_OPERATION) ||                                      \
              (!PVFS_SID_is_null(&(__sid)) &&                                        \
-              !PVFS_SID_cmp(&(__sid),&(__config->host_sid))                         \
+              !PVFS_SID_cmp(&(__sid), &(__config->host_sid))                        \
              )                                                                      \
            )                                                                        \
          )                                                                          \
       {                                                                             \
           __location = LOCAL_OPERATION;                                             \
-          __req = __s_op->req;                                                      \
       }                                                                             \
       else                                                                          \
       {                                                                             \
-        memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op));               \
-        PINT_serv_init_msgarray_params(__s_op, __fs_id);                            \
+          __location = REMOTE_OPERATION;                                            \
+          memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op));             \
+          PINT_serv_init_msgarray_params(__s_op, __fs_id);                          \
       }                                                                             \
+      __req = __s_op->req;                                                          \
 } while (0)
 
 #define PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(__s_op)      \
