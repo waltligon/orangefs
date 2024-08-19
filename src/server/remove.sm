@@ -611,16 +611,34 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
     struct PVFS_server_req *req = NULL;
     PVFS_object_attr *attr_p = NULL;
     PVFS_capability capability;
-    int location = 0;
+   /* int location = 0;
 
     attr_p = &s_op->attr;
     PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb
                                         ,getattr_op
-                                        ,attr_p->u.dir.dirdata_sids[0]/*FIXME*/
+                                        ,attr_p->u.dir.dirdata_sids[0]FIXME
                                         ,s_op->req->u.remove.fs_id
                                         ,location
                                         ,req
                                         ,LOCAL_OPERATION);
+*/
+
+    int location = LOCAL_OPERATION;
+
+    attr_p = &s_op->attr;
+    PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb,
+                                         getattr_op,
+                                         attr_p->u.dir.dirdata_sids[0], /*FIXME*/
+                                         s_op->req->u.remove.fs_id,
+                                         location,
+                                         req,
+                                         0);  /* for now */
+    if (req == NULL)
+   {
+      gossip_err("tried to set up a local sysint call but its not LOCAL\n");
+      js_p->error_code = -PVFS_EINVAL;
+      return SM_ACTION_COMPLETE;
+   }
 
     PINT_null_capability(&capability);
 
