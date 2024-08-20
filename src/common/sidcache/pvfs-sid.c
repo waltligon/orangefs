@@ -158,6 +158,7 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
         {
             return ret;
         }
+        /* wrte back the bmi_addr we just looked up to sidcache */
         /* NULL enables overwrite of the record just looked up */
         ret = SID_cache_put(SID_db, sid, temp_cacheval, NULL);
         if (ret != 0)

@@ -2848,21 +2848,19 @@ int server_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *js_p)
  * pointer to this function set in the control block of server state
  * machines.
  */
-struct PINT_state_machine_s *server_op_state_get_machine(int op)
+struct PINT_state_machine_s *server_op_state_get_machine(int op, int dflag)
 {
     if (op == 999)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                "server_op_state_get_machine "
-                "%d\n", op);
+                "%s: %d\n", __func__, op);
     }
-    else
+    else if (dflag)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
                 "===================== New Request ================\n"
                 "                        "
-                "server_op_state_get_machine "
-                "%d(%s)\n", op,
+                "%s: %d(%s)\n", __func__, op,
                 PINT_map_server_op_to_string(op));
     }
 

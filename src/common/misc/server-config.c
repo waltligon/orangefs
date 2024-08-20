@@ -5637,7 +5637,7 @@ int PINT_config_pvfs2_mkspace(struct server_configuration_s *config)
             gossip_debug(
                 GOSSIP_SERVER_DEBUG,"\n*****************************\n");
             gossip_debug(
-                GOSSIP_SERVER_DEBUG, "Creating new PVFS2 %s\n",
+                GOSSIP_SERVER_DEBUG, "%s: Creating new PVFS2 %s\n", __func__,
                 (create_collection_only ? "collection" :
                  "storage space"));
 

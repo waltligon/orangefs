@@ -54,6 +54,7 @@ extern struct PINT_server_req_params pvfs2_mirror_params;
 extern struct PINT_server_req_params pvfs2_create_immutable_copies_params;
 extern struct PINT_server_req_params pvfs2_tree_remove_params;
 extern struct PINT_server_req_params pvfs2_tree_get_file_size_params;
+extern struct PINT_server_req_params pvfs2_tree_get_dirent_count_params;
 extern struct PINT_server_req_params pvfs2_uid_mgmt_params;
 extern struct PINT_server_req_params pvfs2_tree_setattr_params;
 extern struct PINT_server_req_params pvfs2_mgmt_get_dirent_params;
@@ -121,11 +122,12 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 49 */ {PVFS_SERV_TREE_GETATTR, &pvfs2_tree_getattr_params},
 #ifdef ENABLE_SECURITY_CERT
     /* 50 */ {PVFS_SERV_MGMT_GET_USER_CERT, &pvfs2_get_user_cert_params},
-    /* 51 */ {PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, &pvfs2_get_user_cert_keyreq_params}
+    /* 51 */ {PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, &pvfs2_get_user_cert_keyreq_params},
 #else
     /* 50 */ {PVFS_SERV_MGMT_GET_USER_CERT, NULL},
-    /* 51 */ {PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, NULL}
+    /* 51 */ {PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, NULL},
 #endif
+    /* 52 */ {PVFS_SERV_TREE_GET_DIRENT_COUNT, &pvfs2_tree_get_dirent_count_params}
 };
 
 /* These functions are used to retrieve data from a request that while common

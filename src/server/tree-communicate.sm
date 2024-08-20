@@ -44,6 +44,9 @@ enum
 static int tree_get_file_size_comp_fn(void *v_p,
                                       struct PVFS_server_resp *resp_p,
                                       int index);
+static int tree_get_dirent_count_comp_fn(void *v_p,
+                                         struct PVFS_server_resp *resp_p,
+                                         int index);
 static int tree_remove_comp_fn(void *v_p,
                                struct PVFS_server_resp *resp_p,
                                int index);
@@ -176,6 +179,46 @@ nested machine pvfs2_tree_get_file_size_work_sm
     }
 }
 
+machine pvfs2_tree_get_dirent_count_sm
+{
+    state tree_get_dirent_count_do_work
+    {
+        jump pvfs2_tree_get_dirent_count_work_sm;
+        default => tree_get_dirent_count_final_response;
+    }
+
+    state tree_get_dirent_count_final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => tree_get_dirent_count_cleanup;
+    }
+
+    state tree_get_dirent_count_cleanup
+    {
+        run tree_get_dirent_count_cleanup;
+        default => terminate;
+    }
+}
+
+nested machine pvfs2_tree_get_dirent_count_work_sm
+{
+    state tree_get_dirent_count_work_do_work
+    {
+        pjmp tree_get_dirent_count_setup
+        {
+            REMOTE_OPERATION => pvfs2_pjmp_call_msgpairarray_sm;
+            LOCAL_OPERATION => pvfs2_pjmp_get_attr_work_sm;
+        }
+        default => tree_get_dirent_count_work_cleanup;
+    }
+
+    state tree_get_dirent_count_work_cleanup
+    {
+        run tree_get_dirent_count_work_cleanup;
+        default => return;
+    }
+}
+
 machine pvfs2_tree_getattr_sm
 {       
     state tree_getattr_do_work
@@ -234,7 +277,7 @@ static PINT_sm_action tree_communicate_partition_handles(
     struct PINT_server_op *tree_communicate_s_op =
                         PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PVFS_server_req *this_req = s_op->req;
-    int num_partitions, num_files_per_server;
+    int num_partitions = 0, num_files_per_server = 0;
     int i,j;
     struct server_configuration_s *config = PINT_server_config_mgr_get_config();
     int ret = -PVFS_EINVAL;
@@ -259,6 +302,11 @@ static PINT_sm_action tree_communicate_partition_handles(
         !s_op->u.tree_communicate.local_join_size     ||
         !s_op->u.tree_communicate.remote_join_size)
     {
+        /* in case any of the mallocs succeeded */
+        free(s_op->u.tree_communicate.handle_array_local); 
+        free(s_op->u.tree_communicate.handle_array_remote);
+        free(s_op->u.tree_communicate.local_join_size);
+        free(s_op->u.tree_communicate.remote_join_size);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -266,12 +314,14 @@ static PINT_sm_action tree_communicate_partition_handles(
     /* Separate the handles into local and remote. */
     for (i = 0; i < num_data_files; i++)
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "%s: New target\n", __func__);
         /* Since a datafile will exist on multiple sids, check each sid to
          * see if one matches the local sid.  If so, use the local sid to
          * calculate/retrieve the size of the datafile.
          */
         for (j = 0; j < num_sids; j++)
         {
+            gossip_debug(GOSSIP_SERVER_DEBUG, "%s: New SID\n", __func__);
             /* j is looping through the number of sids per object,
              * a datafile object in this case, 
              * and i is ordinal number for this datafile within the group of
@@ -282,37 +332,36 @@ static PINT_sm_action tree_communicate_partition_handles(
              */
             if (PINT_cached_config_server_local( &sid_array[(i * num_sids) + j] ))
             {
-               /* we found a local sid, so put handle on the local list */
-               gossip_debug(GOSSIP_SERVER_DEBUG,
-                            "tree_communicate_partition_handles: "
-                            "local handle = %s\n"
-                            ,PVFS_OID_str(&handle_array[i]));
+                /* we found a local sid, so put handle on the local list */
+                gossip_debug(GOSSIP_SERVER_DEBUG,
+                             "%s: local handle = %s\n", __func__,
+                             PVFS_OID_str(&handle_array[i]));
 
-               s_op->u.tree_communicate.handle_array_local[
-                         s_op->u.tree_communicate.handle_array_local_count] =
-                                  handle_array[i];
+                s_op->u.tree_communicate.handle_array_local[
+                          s_op->u.tree_communicate.handle_array_local_count] =
+                                   handle_array[i];
 
 
-               //What is this used for?
-               s_op->u.tree_communicate.local_join_size[
-                         s_op->u.tree_communicate.handle_array_local_count] =
-                                  i;
+                //What is this used for?
+                s_op->u.tree_communicate.local_join_size[
+                          s_op->u.tree_communicate.handle_array_local_count] =
+                                   i;
 
-               s_op->u.tree_communicate.handle_array_local_count++;
-               break;
+                /* we assume only one SID for any OID can be local */
+                s_op->u.tree_communicate.handle_array_local_count++;
+                break;
             }            
         }/*end for each sid*/
 
         if ( j == num_sids )
         {
-           /* we did NOT find a local sid within the sid group,
-            * so all sids must represent remote servers.
-            * Add the datafile to the remote list.
-            */
-            gossip_debug(GOSSIP_SERVER_DEBUG,
-                         "tree_communicate_partition_handles: "
-                         "remote handle = %s\n"
-                         ,PVFS_OID_str(&handle_array[i]));
+            /* we did NOT find a local sid within the sid group,
+             * so all sids must represent remote servers.
+             * Add the datafile to the remote list.
+             */
+            gossip_debug(GOSSIP_SERVER_DEBUG, 
+                         "%s: remote handle = %s\n", __func__,
+                         PVFS_OID_str(&handle_array[i]));
 
             s_op->u.tree_communicate.handle_array_remote[
                       s_op->u.tree_communicate.handle_array_remote_count] = 
@@ -334,12 +383,15 @@ static PINT_sm_action tree_communicate_partition_handles(
      */
     if (s_op->u.tree_communicate.handle_array_local_count > 0)
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Local target\n", __func__);
         for (i = 0; i < s_op->u.tree_communicate.handle_array_local_count; i++)
         {
+            gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Next Local\n", __func__);
             /* Create a stack frame for the local operation. */
             s_op->u.tree_communicate.num_pjmp_frames++;
             js_p->error_code = LOCAL_OPERATION;
 
+            /* this creates a new frame and pushes it for a subsequent PJMP */
             PINT_CREATE_SUBORDINATE_SERVER_FRAME(
                                smcb,
                                tree_communicate_s_op, /* new frame */
@@ -352,45 +404,48 @@ static PINT_sm_action tree_communicate_partition_handles(
             switch (operation)
             {
             case PVFS_SERV_TREE_SETATTR:
-                {
-                    PVFS_object_attr dummy_obj_attr;
+            {
+                PVFS_object_attr dummy_obj_attr;
+                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: SETATTR\n", __func__);
                  
-                    memset(&dummy_obj_attr, 0, sizeof(PVFS_object_attr));
-                
-                    PINT_SERVREQ_SETATTR_FILL(
-                                   *req,
-                                   s_op->req->ctrl.sub,
-                                   s_op->req->capability,
-                                   s_op->req->u.tree_setattr.credential,
-                                   fs_id,
-                                   s_op->u.tree_communicate.handle_array_local[0],
-                                   0,    /* V3 sid count */
-                                   NULL, /* V3 sid array */
-                                   dummy_obj_attr,
-                                   s_op->req->hints);
+                memset(&dummy_obj_attr, 0, sizeof(PVFS_object_attr));
+            
+                PINT_SERVREQ_SETATTR_FILL(
+                               *req,
+                               s_op->req->ctrl.sub,
+                               s_op->req->capability,
+                               s_op->req->u.tree_setattr.credential,
+                               fs_id,
+                               s_op->u.tree_communicate.handle_array_local[0],
+                               0,    /* V3 sid count */
+                               NULL, /* V3 sid array */
+                               dummy_obj_attr,
+                               s_op->req->hints);
 
-                    /* copy to req->u.setattr.attr because of calling
-                    * pvfs2_set_attr_work_sm next
-                    */
-                    /* 
-                     * I'm pretty sure if we put this_req->u.tree_setattr.attr
-                     * in the macro above it will have the same effect
-                     * now that we have sys_attrs out of the way
-                     */
-                    PINT_copy_object_attr(&req->u.setattr.attr,
-                                          &this_req->u.tree_setattr.attr);
-                    /*
-                     * These two should go before the macro call ??
-                     */
-                    req->u.setattr.attr.objtype = 
-                                          this_req->u.tree_setattr.objtype;
-                    req->u.setattr.attr.mask |= PVFS_ATTR_COMMON_TYPE;
-                }
+                /* copy to req->u.setattr.attr because of calling
+                * pvfs2_set_attr_work_sm next
+                */
+                /* 
+                 * I'm pretty sure if we put this_req->u.tree_setattr.attr
+                 * in the macro above it will have the same effect
+                 * now that we have sys_attrs out of the way
+                 */
+                PINT_copy_object_attr(&req->u.setattr.attr,
+                                      &this_req->u.tree_setattr.attr);
+                /*
+                 * These two should go before the macro call ??
+                 */
+                req->u.setattr.attr.objtype = 
+                                      this_req->u.tree_setattr.objtype;
+                req->u.setattr.attr.mask |= PVFS_ATTR_COMMON_TYPE;
                 tree_communicate_s_op->local_index = i;
  
                 break;
+            }
             
             case PVFS_SERV_TREE_REMOVE:
+            {
+                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: REMOVE\n", __func__);
                 PINT_SERVREQ_REMOVE_FILL(
                         *req,
                         s_op->req->capability,
@@ -410,8 +465,11 @@ static PINT_sm_action tree_communicate_partition_handles(
                 tree_communicate_s_op->local_index = i;
 
                 break;
+            }
 
             case PVFS_SERV_TREE_GET_FILE_SIZE:
+            {
+                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: FILE_SIZE\n", __func__);
                 PINT_SERVREQ_GETATTR_FILL(
                          *req,
                          PVFS_REQ_DATAFILE,
@@ -430,9 +488,45 @@ static PINT_sm_action tree_communicate_partition_handles(
                 tree_communicate_s_op->local_index = i;
 
                 break;
+            }
+            case PVFS_SERV_TREE_GET_DIRENT_COUNT:
+            {
+                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: DIRENT_CNT\n", __func__);
+/* I don't really remember why this was changed WBL */
+#if 1
+                PINT_SERVREQ_GETATTR_FILL(
+                         *req,
+                         PVFS_REQ_DIRDATA,
+                         s_op->req->capability,
+                         this_req->u.tree_get_dirent_count.credential,
+                         fs_id,
+                         s_op->u.tree_communicate.handle_array_local[i],
+                         PVFS_ATTR_DIRDATA_ALL,
+                         s_op->req->hints);
+#else
+                PINT_SERVREQ_TREE_GET_DIRENT_COUNT_FILL(
+                       msg_p->req,
+                       capability,
+                       this_req->u.tree_get_file_size.credential,
+                       fs_id,
+                       (i * num_files_per_server),
+                       num_data_files_for_this_server,
+                       &s_op->u.tree_communicate.handle_array_remote[
+                                     i * num_files_per_server],
+                       s_op->u.tree_communicate.sid_count, /* FIXME */
+                       s_op->u.tree_communicate.sid_array, /* FIXME */
+                       this_req->u.tree_get_dirent_count.retry_msgpair_at_leaf,
+                              s_op->req->hints);
+#endif
+
+                tree_communicate_s_op->local_index = i;
+ 
+                break;
+            }
 
             case PVFS_SERV_TREE_GETATTR:
             {
+                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: GETATTR\n", __func__);
                 PINT_SERVREQ_GETATTR_FILL(
                     *req,
                     s_op->req->ctrl.sub,
@@ -456,12 +550,18 @@ static PINT_sm_action tree_communicate_partition_handles(
 
             default:
                 break;
-            } /* end switch on operation */
+            } /* end local switch */
         } /* end for each local handle */
     } /* end if local */
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Done with local\n", __func__);
+
+    /* END OF LOCAL FILES - NOW REMOTE FILES */
 
     if (s_op->u.tree_communicate.handle_array_remote_count > 0)
     {
+        int location = 0; /* return val from setting up frame - should be remote */
+
+        gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Remote target\n", __func__);
         /* Decide how to divide the remote handles.
          * If there are only a few (fewer than tree_threshhold
          * from the config file) then go ahead and
@@ -488,13 +588,11 @@ static PINT_sm_action tree_communicate_partition_handles(
         }
 
         gossip_debug(GOSSIP_SERVER_DEBUG,
-            "tree_communicate_partition_handles: num_data_files = %d,"
-            " num_remote_handles = %d, "
-            "num_partitions = %d, num_files_per_server = %d\n",
-            num_data_files,
-            s_op->u.tree_communicate.handle_array_remote_count,
-            num_partitions,
-            num_files_per_server);
+                     "%s: num_data_files = %d, num_remote_handles = %d, "
+                     "num_partitions = %d, num_files_per_server = %d\n",
+                     __func__, num_data_files,
+                     s_op->u.tree_communicate.handle_array_remote_count,
+                     num_partitions, num_files_per_server);
 
         /* We need to send tree-based messages to other servers */
         js_p->error_code = REMOTE_OPERATION;
@@ -507,9 +605,9 @@ static PINT_sm_action tree_communicate_partition_handles(
                 PVFS_SID_NULL,  /* bc this is a remote operation, we don't 
                                    need a real sid, just a place holder */
                 fs_id,
-                js_p->error_code,
+                location, /* out: location */
                 req,
-                REMOTE_OPERATION);
+                0); /* task_id */
 
         /* store the number of partitions */
         s_op->u.tree_communicate.num_partitions = num_partitions;
@@ -528,6 +626,7 @@ static PINT_sm_action tree_communicate_partition_handles(
 
         /* Use a null capability with tree_get_file_size and tree_getattr op */
         if (operation == PVFS_SERV_TREE_GET_FILE_SIZE ||
+            operation == PVFS_SERV_TREE_GET_DIRENT_COUNT ||
             operation == PVFS_SERV_TREE_GETATTR)
         {
             PINT_null_capability(&capability);
@@ -556,6 +655,7 @@ static PINT_sm_action tree_communicate_partition_handles(
             switch (operation)
             {
             case PVFS_SERV_TREE_SETATTR:
+            {
                 PINT_SERVREQ_TREE_SETATTR_FILL(
                                 msg_p->req,
                                 s_op->req->ctrl.sub,
@@ -574,9 +674,12 @@ static PINT_sm_action tree_communicate_partition_handles(
 
                 msg_p->comp_fn = tree_setattr_comp_fn;
                 msg_p->retry_flag = PVFS_MSGPAIR_RETRY; 
-                break;
+            }
+            break;
 
             case PVFS_SERV_TREE_REMOVE:
+            {
+                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: REMOVE\n", __func__);
                 PINT_SERVREQ_TREE_REMOVE_FILL(
                         msg_p->req,
                         s_op->req->capability,
@@ -592,10 +695,12 @@ static PINT_sm_action tree_communicate_partition_handles(
 
                 msg_p->comp_fn = tree_remove_comp_fn;
                 msg_p->retry_flag = PVFS_MSGPAIR_RETRY; 
-                break;
+            }
+            break;
     
             case PVFS_SERV_TREE_GET_FILE_SIZE:
-
+            {
+                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: FILE_SIZE\n", __func__);
                 PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(
                         msg_p->req,
                         capability,
@@ -635,10 +740,58 @@ static PINT_sm_action tree_communicate_partition_handles(
                                   ,__func__);
                     msg_p->retry_flag = PVFS_MSGPAIR_RETRY; 
                 }
-                break;
+            }
+            break;
+
+            case PVFS_SERV_TREE_GET_DIRENT_COUNT:
+            {
+                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: DIRENT_CNT\n", __func__);
+                PINT_SERVREQ_TREE_GET_DIRENT_COUNT_FILL(
+                        msg_p->req,
+                        capability,
+                        this_req->u.tree_get_dirent_count.credential,
+                        fs_id,
+                        (i * num_files_per_server),
+                        num_data_files_for_this_server,
+                        &s_op->u.tree_communicate.handle_array_remote[
+                                      i * num_files_per_server],
+                        s_op->u.tree_communicate.sid_count, /* FIXME */
+                        s_op->u.tree_communicate.sid_array, /* FIXME */
+                        this_req->u.tree_get_dirent_count.retry_msgpair_at_leaf,
+                        s_op->req->hints);
+
+                msg_p->comp_fn = tree_get_dirent_count_comp_fn;
+                msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+
+                /* if the logical file is mirrored, then we
+                 * want the mirroring logic
+                 * to handle retries, when we are processing
+                 * the leaf of the tree,
+                 * i.e., this tree request contains msgpairs
+                 * having only one handle
+                 * each. Otherwise, we let msgpairarray handle retries.
+                 */
+                if ((this_req->u.tree_get_dirent_count.retry_msgpair_at_leaf)&&
+                     (num_files_per_server == 1))
+                {
+                    gossip_debug(GOSSIP_SERVER_DEBUG,"%s:retry_flag:"
+                                 "PVFS_MSGPAIR_NO_RETRY\n"
+                                 ,__func__);
+                    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+                }
+                else
+                {
+                    gossip_debug(GOSSIP_SERVER_DEBUG,"%s:retry_flag:"
+                                 "PVFS_MSGPAIR_RETRY\n"
+                                  ,__func__);
+                    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+                }
+            }
+            break;
 
             case PVFS_SERV_TREE_GETATTR:
-
+            {
+                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: GETATTR\n", __func__);
                 PINT_SERVREQ_TREE_GETATTR_FILL(
                         msg_p->req,
                         s_op->req->ctrl.sub,
@@ -682,35 +835,45 @@ static PINT_sm_action tree_communicate_partition_handles(
                                                     ,__func__);
                     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
                 }
-                break;
+            }
+            break;
 
             default:
                 break;
-            }
+            } /* end of remote switch */
             msg_p->fs_id = fs_id;
             msg_p->handle = s_op->u.tree_communicate.handle_array_remote[
                                                    i * num_files_per_server];
+            msg_p->sid_array = &sid_array[i * num_sids];
 
             /* V3 need to adjust sid array index */
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "%s: msg_p->svr_addr (%p) msg_p->sid_array[0] (%p)\n",
+                         __func__, &msg_p->svr_addr, &msg_p->sid_array[0]);
+
             ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
             if (ret)
             {
                 gossip_err("Failed to map server address\n");
             }
-        } /* end for */
+        } /* end for partitions */
 
+        /* Use a null capability with tree_get_file_size and tree_getattr op */
         if (operation == PVFS_SERV_TREE_GET_FILE_SIZE ||
+            operation == PVFS_SERV_TREE_GET_DIRENT_COUNT ||
             operation == PVFS_SERV_TREE_GETATTR)
         {
-            PINT_cleanup_capability(&capability);
+            PINT_null_capability(&capability);
         }
-
+        gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Done with remote\n", __func__);
     }/* end if remote */
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Done.\n", __func__);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
 
+/*--------------------------------------------------------------------------*/
 static PINT_sm_action tree_setattr_setup(struct PINT_smcb *smcb,
                                          job_status_s *js_p)
 {
@@ -795,7 +958,8 @@ static int tree_setattr_comp_fn(void *v_p,
         gossip_debug(GOSSIP_SERVER_DEBUG,"%s: caller_handle_index:%u "
                                          "\tarray_local_count:%d\n"
                                         ,__func__
-                                        ,m_tree->caller_handle_index                                        ,s_tree_comm->handle_array_local_count);
+                                        ,m_tree->caller_handle_index
+                                        ,s_tree_comm->handle_array_local_count);
         gossip_debug(GOSSIP_SERVER_DEBUG,"%s: status for file %d is %d\n"
                                         ,__func__
                                         ,i
@@ -965,6 +1129,7 @@ static int tree_setattr_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     return(server_state_machine_complete(smcb));
 }
 
+/*--------------------------------------------------------------------------*/
 static PINT_sm_action tree_remove_setup(struct PINT_smcb *smcb,
                                         job_status_s *js_p)
 {
@@ -1217,60 +1382,64 @@ static int tree_remove_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
-
-
- 
+/*--------------------------------------------------------------------------*/
 static PINT_sm_action tree_get_file_size_setup(struct PINT_smcb *smcb,
                                                job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PVFS_server_req *req = s_op->req;
+    struct PVFS_server_resp *resp = &s_op->resp;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
-    assert(s_op->req->op == PVFS_SERV_TREE_GET_FILE_SIZE);
+    /* the request was built in msg_p->req */
+    msg_p = &s_op->msgarray_op.msgpair;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s:req->retry_msgpair_at_leaf:%s\n"
-                ,__func__
-                ,(req->u.tree_get_file_size.retry_msgpair_at_leaf ? "YES" : "NO"));
+    assert(msg_p->req.op == PVFS_SERV_TREE_GET_FILE_SIZE);
 
-    s_op->resp.u.tree_get_file_size.caller_handle_index =
-            s_op->req->u.tree_get_file_size.caller_handle_index;
-    s_op->resp.u.tree_get_file_size.handle_count =
-            s_op->req->u.tree_get_file_size.num_data_files;
+    gossip_debug(GOSSIP_SERVER_DEBUG,"%s:req->retry_msgpair_at_leaf:%s\n",
+           __func__,
+           (req->u.tree_get_file_size.retry_msgpair_at_leaf ? "YES" : "NO"));
 
+    resp->u.tree_get_file_size.caller_handle_index =
+            req->u.tree_get_file_size.caller_handle_index;
+    resp->u.tree_get_file_size.handle_count =
+            req->u.tree_get_file_size.num_data_files;
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "%s: frame:%p \ttree.caller_handle_index:%u\n"
-                 "\t\ttree.handle_count:%d \ttree.op:%d\n"
-                 ,__func__
-                 ,s_op
-                 ,s_op->resp.u.tree_get_file_size.caller_handle_index
-                 ,s_op->resp.u.tree_get_file_size.handle_count
-                 ,s_op->resp.op);
+                 "\t\ttree.handle_count:%d \ttree.op:%d\n", __func__,
+                 s_op, resp->u.tree_get_file_size.caller_handle_index,
+                 resp->u.tree_get_file_size.handle_count, resp->op);
 
     /* allocate response arrays */
-    s_op->resp.u.tree_get_file_size.error = (PVFS_error *)
-            calloc(s_op->req->u.tree_get_file_size.num_data_files,
+    resp->u.tree_get_file_size.error = (PVFS_error *)
+            calloc(req->u.tree_get_file_size.num_data_files,    
                    sizeof(PVFS_error));
-    s_op->resp.u.tree_get_file_size.size = (PVFS_size *)
-            calloc(s_op->req->u.tree_get_file_size.num_data_files,
+    resp->u.tree_get_file_size.size = (PVFS_size *)
+            calloc(req->u.tree_get_file_size.num_data_files,
                    sizeof(PVFS_size));
-    if (! s_op->resp.u.tree_get_file_size.error ||
-        ! s_op->resp.u.tree_get_file_size.size)
+    if (! resp->u.tree_get_file_size.error ||
+        ! resp->u.tree_get_file_size.size)
     {
         gossip_err("tree_get_file_size: failed to allocate arrays\n");
+        free(resp->u.tree_get_file_size.error);
+        free(resp->u.tree_get_file_size.size);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: calling partition_handles\n",
+                 __func__);
+
     return (tree_communicate_partition_handles(
                              smcb,
                              js_p,
-                             s_op->req->u.tree_get_file_size.num_data_files,
-                             s_op->req->u.tree_get_file_size.sid_count,
-                             s_op->req->u.tree_get_file_size.fs_id,
+                             req->u.tree_get_file_size.num_data_files,
+                             req->u.tree_get_file_size.sid_count,
+                             req->u.tree_get_file_size.fs_id,
                              PVFS_SERV_TREE_GET_FILE_SIZE,
-                             s_op->req->u.tree_get_file_size.handle_array,
-                             s_op->req->u.tree_get_file_size.sid_array));
-}
+                             req->u.tree_get_file_size.handle_array,
+                             req->u.tree_get_file_size.sid_array));
+} /* tree_get_file_size_setup */
 
 static int tree_get_file_size_comp_fn(void *v_p,
                                       struct PVFS_server_resp *resp_p,
@@ -1338,6 +1507,69 @@ static int tree_get_file_size_comp_fn(void *v_p,
     return 0;
 }
 
+static int tree_get_dirent_count_comp_fn(void *v_p,
+                                         struct PVFS_server_resp *resp_p,
+                                         int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_server_op *s_op = PINT_sm_frame(smcb, (PINT_MSGPAIR_PARENT_SM));
+    struct PVFS_server_resp *op_resp = &(s_op->resp); /*op resp structure*/
+    struct PVFS_server_resp *m_resp = resp_p;         /*msgpair resp structure*/
+    struct PVFS_servresp_tree_get_dirent_count *op_tree =
+                                      &(op_resp->u.tree_get_dirent_count);
+    struct PVFS_servresp_tree_get_dirent_count *m_tree  =
+                                      &(m_resp->u.tree_get_dirent_count);
+    struct PINT_server_tree_communicate_op *s_tree_comm =
+                                      &(s_op->u.tree_communicate);
+    int i;
+    uint32_t dentcnt_array_index=0,
+             error_array_index=0;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "tree_get_dirent_count_comp_fn[%d], "
+                 "caller_handle_index = %u\n", index,
+                 resp_p->u.tree_get_dirent_count.caller_handle_index);
+
+    assert(m_resp->op == PVFS_SERV_TREE_GET_FILE_SIZE);
+
+    if (m_resp->status != 0)
+    {
+        PVFS_perror_gossip("get_dirent_count failure", m_resp->status);
+        return resp_p->status;
+    }
+
+    /* stash the sizes and error codes for each file handle */
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "%s: m_resp->u.tree_get_dirent_count.handle_count"
+                 " is %d\n", __func__,
+                 m_resp->u.tree_get_dirent_count.handle_count);
+
+    for (i = 0; i < m_tree->handle_count; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,"%s: size of datafile[%d] is %lld\n",
+                     __func__, i, lld(m_tree->dentcnt[i]));
+
+        gossip_debug(GOSSIP_SERVER_DEBUG,"%s: caller_handle_index:%u "
+                     "\tarray_local_count:%d\n",
+                     __func__, m_tree->caller_handle_index,
+                     s_tree_comm->handle_array_local_count);
+
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "%s: error code for datafile %d is %d\n",
+                     __func__, i, m_tree->error[i]);
+
+        dentcnt_array_index = s_op->u.tree_communicate.remote_join_size[ i +
+                          resp_p->u.tree_get_dirent_count.caller_handle_index];
+        error_array_index = dentcnt_array_index;
+
+        op_tree->dentcnt[dentcnt_array_index]   = m_tree->dentcnt[i];
+
+        op_tree->error[error_array_index] = m_tree->error[i];
+    }
+
+    return 0;
+} /* tree_get_file_size_completion_function */
+
 static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
@@ -1346,7 +1578,7 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
     struct PVFS_servresp_tree_get_file_size *s_tree =
                                   &(s_op->resp.u.tree_get_file_size);
     int i, j, k, task_id, error_code;
-    uint32_t size_array_index=0, error_array_index=0;
+    uint32_t size_array_index = 0, error_array_index = 0;
     PINT_server_op *old_frame;
     struct PVFS_servreq_tree_get_file_size *tree_req = NULL;
     PINT_sm_msgpair_state *tree_msgarray = NULL;
@@ -1511,6 +1743,106 @@ static int tree_get_file_size_cleanup(struct PINT_smcb *smcb,
     
    return(server_state_machine_complete(smcb));
 }
+
+/*--------------------------------------------------------------------------*/
+static int tree_get_dirent_count_setup(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PVFS_server_req *req = &s_op->msgarray_op.msgpair.req;
+    struct PVFS_server_resp *resp = &s_op->resp;
+    /* PINT_sm_msgpair_state *msg_p = &s_op->msgarray_op.msgpair; */
+
+    /* assert(s_op->req->op == PVFS_SERV_TREE_GET_DIRENT_COUNT); */
+    assert(req->op == PVFS_SERV_TREE_GET_DIRENT_COUNT);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s:req->retry_msgpair_at_leaf:%s\n",
+          __func__,
+          (req->u.tree_get_dirent_count.retry_msgpair_at_leaf ? "YES" : "NO"));
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: dirent_count request:\n"
+                 "\t\t caller_handle_index: %u\n"
+                 "\t\t dirdata_count: %d\n"
+                 "\t\t sid_count: %d\n",
+                 __func__,
+                 req->u.tree_get_dirent_count.caller_handle_index,
+                 req->u.tree_get_dirent_count.num_dirdata,
+                 req->u.tree_get_dirent_count.sid_count);
+
+    resp->u.tree_get_dirent_count.caller_handle_index =
+            req->u.tree_get_dirent_count.caller_handle_index;
+    resp->u.tree_get_dirent_count.handle_count =
+            req->u.tree_get_dirent_count.num_dirdata;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "%s: Response frame:(%p)\n"
+                 "\t\t tree.caller_handle_index:%u\n"
+                 "\t\t tree.handle_count:%d\n"
+                 "\t\t tree.op:%d\n",
+                 __func__,
+                 s_op,
+                 resp->u.tree_get_dirent_count.caller_handle_index,
+                 resp->u.tree_get_dirent_count.handle_count,
+                 resp->op);
+
+    /* allocate response arrays */
+    resp->u.tree_get_dirent_count.error = (PVFS_error *)
+            calloc(req->u.tree_get_dirent_count.num_dirdata,
+                   sizeof(PVFS_error));
+    resp->u.tree_get_dirent_count.dentcnt = (PVFS_size *)
+            calloc(req->u.tree_get_dirent_count.num_dirdata,
+                   sizeof(PVFS_size));
+    if (! resp->u.tree_get_dirent_count.error ||
+        ! resp->u.tree_get_dirent_count.dentcnt)
+    {
+        gossip_err("%s: failed to allocate arrays\n", __func__);
+        free(resp->u.tree_get_dirent_count.error);
+        free(resp->u.tree_get_dirent_count.dentcnt);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: calling partition_handles\n",
+                 __func__);
+
+    return (tree_communicate_partition_handles(
+                             smcb,
+                             js_p,
+                             req->u.tree_get_dirent_count.num_dirdata,
+                             req->u.tree_get_dirent_count.sid_count,
+                             req->u.tree_get_dirent_count.fs_id,
+                             PVFS_SERV_TREE_GET_DIRENT_COUNT,
+                             req->u.tree_get_dirent_count.handle_array,
+                             req->u.tree_get_dirent_count.sid_array));
+} /* tree_get_dirent_count_setup */
+
+static int tree_get_dirent_count_cleanup(struct PINT_smcb *smcb,
+                                         job_status_s *js_p)
+{
+   PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   struct PVFS_servresp_tree_get_dirent_count *s_tree =
+                         &(s_op->resp.u.tree_get_dirent_count);
+
+   /*cleanup response structure*/
+   if (s_tree->dentcnt)
+   {
+       free(s_tree->dentcnt);
+   }
+   if (s_tree->error)
+   {
+       free(s_tree->error);
+   }
+
+   return(server_state_machine_complete(smcb));
+}
+
+static int tree_get_dirent_count_work_cleanup(struct PINT_smcb *smcb,
+                                               job_status_s *js_p)
+{
+    return SM_ACTION_COMPLETE;
+}
+
+/*--------------------------------------------------------------------------*/
 
 static PINT_sm_action tree_getattr_setup(struct PINT_smcb *smcb,
                                          job_status_s *js_p)
@@ -1789,6 +2121,7 @@ static int tree_getattr_cleanup(struct PINT_smcb *smcb,
    return(server_state_machine_complete(smcb));
 }
 
+/*--------------------------------------------------------------------------*/
 static inline int PINT_get_object_ref_tree_setattr(struct PVFS_server_req *req,
                                                    PVFS_fs_id *fs_id,
                                                    PVFS_handle *handle)
@@ -1858,6 +2191,7 @@ struct PINT_server_req_params pvfs2_tree_remove_params =
     .state_machine = &pvfs2_tree_remove_sm
 };
 
+/*--------------------------------------------------------------------------*/
 static inline int PINT_get_object_ref_tree_get_file_size(
                                              struct PVFS_server_req *req,
                                              PVFS_fs_id *fs_id,
@@ -1887,6 +2221,37 @@ struct PINT_server_req_params pvfs2_tree_get_file_size_params =
     .state_machine = &pvfs2_tree_get_file_size_sm
 };
 
+/*--------------------------------------------------------------------------*/
+static inline int PINT_get_object_ref_tree_get_dirent_count(
+                                             struct PVFS_server_req *req,
+                                             PVFS_fs_id *fs_id,
+                                             PVFS_handle *handle)
+{
+    *fs_id = req->u.tree_get_dirent_count.fs_id;
+    *handle = PVFS_HANDLE_NULL;
+    return 0;
+}
+
+static int perm_tree_get_dirent_count(PINT_server_op *s_op)
+{
+    int ret;
+
+    /* permission not required */
+    ret = 0;
+
+    return ret;
+}
+
+struct PINT_server_req_params pvfs2_tree_get_dirent_count_params =
+{
+    .string_name = "tree_get_dirent_count",
+    .get_object_ref = PINT_get_object_ref_tree_get_dirent_count,
+    .perm = perm_tree_get_dirent_count,
+    .access_type = PINT_server_req_readonly,
+    .state_machine = &pvfs2_tree_get_dirent_count_sm
+};
+
+/*--------------------------------------------------------------------------*/
 static inline int PINT_get_object_ref_tree_getattr(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
 {

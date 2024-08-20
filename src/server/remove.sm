@@ -611,8 +611,10 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
     struct PVFS_server_req *req = NULL;
     PVFS_object_attr *attr_p = NULL;
     PVFS_capability capability;
-    int location = 0;
+    int location = REMOTE_OPERATION;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Starting State Action s_op = (%p) attr_p = (%p)\n",
+                 __func__, s_op, &s_op->attr);
     attr_p = &s_op->attr;
     PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb
                                         ,getattr_op
@@ -620,10 +622,12 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
                                         ,s_op->req->u.remove.fs_id
                                         ,location
                                         ,req
-                                        ,LOCAL_OPERATION);
+                                        ,0);
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Setting NULL capability\n", __func__);
     PINT_null_capability(&capability);
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Filling getattr req (%p)\n", __func__, req);
     PINT_SERVREQ_TREE_GETATTR_FILL(
                         *req,
                         PVFS_REQ_DIRDATA,
@@ -640,8 +644,10 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
                         0,
                         s_op->req->hints);
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Cleanup capability\n", __func__);
     PINT_cleanup_capability(&capability);
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: State Action Complete\n", __func__);
     return SM_ACTION_COMPLETE;
 }
 
@@ -725,7 +731,9 @@ static PINT_sm_action remove_dirdata_handles_setup_tree_remove(
                                          attr_p->u.dir.dirdata_sids[0], /* FIXME? */
                                          //attr_p->u.dir.dirdata_handles[0],
                                          s_op->req->u.remove.fs_id,
-                                         location, req, LOCAL_OPERATION);
+                                         location,
+                                         req,
+                                         LOCAL_OPERATION);
 
     PINT_SERVREQ_TREE_REMOVE_FILL(*req,
                                   s_op->req->capability,
