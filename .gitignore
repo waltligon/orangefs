@@ -1,0 +1,16 @@
+*.d
+*.o
+*.po
+*.conf
+Makefile
+module.mk
+aclocal.m4
+autom4te.cache/
+config.log
+config.status
+configure
+lib/
+examples/
+docs/
+pvfs2-config.h
+
