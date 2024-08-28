@@ -1264,7 +1264,7 @@ static PINT_sm_action io_datafile_post_msgpairs(struct PINT_smcb *smcb,
  * some more msgpairs.  If mirroring, then we have more setup before a
  * retry can happen.  Also, the retry-count is calculated differently.
  */
-static int io_datafile_post_msgpairs_retry (struct PINT_smcb *smcb
+static PINT_sm_action io_datafile_post_msgpairs_retry (struct PINT_smcb *smcb
                                           ,job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -1287,7 +1287,7 @@ static int io_datafile_post_msgpairs_retry (struct PINT_smcb *smcb
 }
 
 
-static int io_datafile_mirror_retry(struct PINT_smcb *smcb
+static PINT_sm_action io_datafile_mirror_retry(struct PINT_smcb *smcb
                                    ,job_status_s *js_p )
 {
     struct PINT_client_sm *sm_p;
@@ -1454,7 +1454,7 @@ static int io_datafile_mirror_retry(struct PINT_smcb *smcb
 
 }/*end io_datafile_mirror_retry*/
 
-static int io_datafile_no_mirror_retry(struct PINT_smcb *smcb
+static PINT_sm_action io_datafile_no_mirror_retry(struct PINT_smcb *smcb
                                       ,job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);

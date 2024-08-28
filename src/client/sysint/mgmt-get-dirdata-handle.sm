@@ -34,7 +34,7 @@
 extern job_context_id pint_client_sm_context;
 #endif
 
-static int mgmt_get_dirdata_handle_comp_fn(
+static PINT_sm_action mgmt_get_dirdata_handle_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
 %%
@@ -154,14 +154,14 @@ PVFS_error PVFS_mgmt_get_dirdata_handle(
     return error;
 }
 
-static int mgmt_get_dirdata_handle_init(
+static  PINT_sm_action mgmt_get_dirdata_handle_init(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     assert(js_p->error_code == 0);
     return SM_ACTION_COMPLETE;
 }
 
-static int mgmt_get_dirdata_handle_setup_msgpair(
+static PINT_sm_action mgmt_get_dirdata_handle_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -207,7 +207,7 @@ static int mgmt_get_dirdata_handle_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
-static int mgmt_get_dirdata_handle_comp_fn(
+static PINT_sm_action mgmt_get_dirdata_handle_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index)
 {
     PINT_smcb *smcb = v_p;

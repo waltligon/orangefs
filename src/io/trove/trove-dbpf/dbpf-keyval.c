@@ -393,7 +393,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
             {
                 if(ret != TROVE_ENOENT)
                 {
-                    gossip_err("TROVE:DBPF: keyval dbpf_db_get");
+                    gossip_err("TROVE:DBPF: keyval dbpf_db_get 1:\n");
                 }
                 ret = -ret;
             }
@@ -689,7 +689,7 @@ static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
         }
         else if(ret != 0)
         {
-            gossip_err("TROVE:DBPF: keyval dbpf_db_get");
+            gossip_err("TROVE:DBPF: keyval dbpf_db_get 2:\n");
             return -ret;
         }
 
@@ -1303,7 +1303,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
                 continue;
             }
 
-            gossip_err("TROVE:DBPF: keyval dbpf_db_get");
+            gossip_err("TROVE:DBPF: keyval dbpf_db_get ret:%d:\n", ret);
             ret = -ret;
             goto return_error;
         }
@@ -1969,7 +1969,7 @@ static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op * op_p)
     {
         if(ret != TROVE_ENOENT)
         {
-            gossip_err("TROVE:DBPF: keyval dbpf_db_get (handle info)");
+            gossip_err("TROVE:DBPF: keyval dbpf_db_get (handle info)\n");
         }
 
         return -ret;
@@ -2013,7 +2013,7 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
         }
         else if(ret != 0)
         {
-            gossip_err("TROVE:DBPF: keyval dbpf_db_get");
+            gossip_err("TROVE:DBPF: keyval dbpf_db_get 4:\n");
             return -ret;
         }
        

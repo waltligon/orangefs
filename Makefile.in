@@ -697,6 +697,7 @@ all::
 
 # this is how we pull build information from all of the project
 #    subdirectories, make sure to catch top level module.mk as well
+include module.mk
 include $(patsubst %, %/module.mk, $(MODULES))
 
 ################################################################
@@ -1354,8 +1355,8 @@ cleaner: clean
 	rm -rf autom4te*.cache
 	rm -f pvfs2-config.h.in~
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
-	cp -p config.status config.save
-	rm -f config.log config.status config.cache 
+	if [ -e config.status ]; then cp -p config.status config.save; fi
+	rm -f config.log config.status config.cache
 	rm -f pvfs-@PVFS2_VERSION@.tar.gz
 
 # _really_ clean the tree; should go back to pristine state

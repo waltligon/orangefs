@@ -899,7 +899,7 @@ static PINT_sm_action mkdir_dirdata_keyval_setattr(
     return ret;
 }
 
-static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     s_op->resp.u.mkdir.handle = 0;
@@ -1059,7 +1059,7 @@ static inline int PINT_get_object_ref_mkdir(
     return 0;
 }
 
-static int perm_mkdir(PINT_server_op *s_op)
+static PINT_sm_action perm_mkdir(PINT_server_op *s_op)
 {
     int ret;
 

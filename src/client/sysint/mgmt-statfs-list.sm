@@ -312,7 +312,7 @@ static int statfs_list_comp_fn(void *v_p,
     return 0;
 }
 
-static int mgmt_statfs_list_parent_cleanup(
+static PINT_sm_action mgmt_statfs_list_parent_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);

@@ -73,10 +73,10 @@ Below is the first sample configuration file.
        DistrDirServersMax 1\
        DistrDirSplitSize 100\
        \<MetaHandleRanges\>\
-             Range ol7dot3 3-4611686018427387904\
+             Range ofs001 3-4611686018427387904\
        \</MetaHandleRanges\>\
        \<DataHandleRanges\>\
-             Range ol7dot3 4611686018427387905-9223372036854775806\
+             Range ofs001 4611686018427387905-9223372036854775806\
        \</DataHandleRanges\>\
        \<StorageHints\>\
              TroveSyncMeta yes\
@@ -130,10 +130,10 @@ Below is the second sample configuration file.
        DistrDirServersMax 1\
        DistrDirSplitSize 100\
        \<MetaHandleRanges\>\
-             Range ol7dot3 3-4611686018427387904\
+             Range ofs001 3-4611686018427387904\
        \</MetaHandleRanges\>\
        \<DataHandleRanges\>\
-             Range ol7dot3 4611686018427387905-9223372036854775806\
+             Range ofs001 4611686018427387905-9223372036854775806\
        \</DataHandleRanges\>\
        \<StorageHints\>\
              TroveSyncMeta yes\
@@ -189,10 +189,10 @@ file systems is shared.
        DistrDirServersMax 1\
        DistrDirSplitSize 100\
        \<MetaHandleRanges\>\
-             Range ol7dot3 3-4611686018427387904\
+             Range ofs001 3-4611686018427387904\
        \</MetaHandleRanges\>\
        \<DataHandleRanges\>\
-             Range ol7dot3 4611686018427387905-9223372036854775806\
+             Range ofs001 4611686018427387905-9223372036854775806\
        \</DataHandleRanges\>\
        \<StorageHints\>\
              TroveSyncMeta yes\
@@ -209,10 +209,10 @@ file systems is shared.
        DistrDirServersMax 1\
        DistrDirSplitSize 100\
        \<MetaHandleRanges\>\
-             Range ol7dot3 3-4611686018427387904\
+             Range ofs001 3-4611686018427387904\
        \</MetaHandleRanges\>\
        \<DataHandleRanges\>\
-             Range ol7dot3 4611686018427387905-9223372036854775806\
+             Range ofs001 4611686018427387905-9223372036854775806\
        \</DataHandleRanges\>\
        \<StorageHints\>\
              TroveSyncMeta yes\
